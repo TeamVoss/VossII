@@ -1,43 +1,75 @@
-# VossII
+Voss II
+=======
 
-## Requirements
-# On a stock Ubuntu installation you could do:
+Voss II is a software suite for describing and reasoning about circuits.
+Circuits, and properties about them, are described in a functional language
+called *fl*.
 
-`sudo apt install libz-dev libx11-dev libreadline-dev flex bison gawk graphviz doxygen clang`
+Fl is a statically typed language with call-by-need semantics (also known as
+*lazy evaluation*) and binary decision diagrams built right into the language
+itself.
 
-## Build
+Voss II has been tested and found to work on Debian, Ubuntu, Fedora, Red Hat
+and OpenSUSE. If you're using it on another distribution, we'd love to hear
+from you!
 
+
+Installation
+------------
+
+Download our
+[pre-built binaries](https://github.com/TeamVoss/VossII/releases/latest)
+and unpack them to your directory of choice, then execute the fl interpreter
+`bin/fl` to get started.
+
+Voss II depends on Tk for its graphical bits. If the fl interpreter dies with
+an angry message about not being able to find `wish`, you need to install it:
+
+* **On Ubuntu/other Debian-based**
+  ```shell
+  sudo apt install tk
+  ```
+* **On Fedora/Red Hat**
+  ```shell
+  sudo yum install tk
+  ```
+* **On SUSE**
+  ```shell
+  sudo zypper install tk
+  ```
+
+Building (on Ubuntu/Debian)
+---------------------------
+
+If you want to build your own libraries you will first need to install some
+build dependencies:
+
+```shell
+sudo apt-get install gcc g++ doxygen flex bison gawk \
+                     libz-dev tcl-dev tk-dev libc6-dev \
+                     clang libreadline-dev python3
 ```
-cd $(VOSSII_DIR)/src
-make install
+
+Then, from the root of the VossII repository (assuming you've already
+cloned it), run:
+
+
+This will build Voss II and install it _into the repository root directory_.
+If you want to build a distributable binary package, you should install run:
+
+```shell
+make -C src clean_package
 ```
 
+This will create a file `voss.tar.bz2` in the repository root directory.
 
-Finally, add $(VOSSII_DIR)/bin to your search path
+Finally, if you just want to build a Voss II package in a pristine environment,
+without having to sully your system with a bunch of dependencies, you can use
+Docker to build `voss.tar.bz2` instead:
 
-Now typing fl should start fl (yeah!).
-
-
-will install all the files needed by VossII in `bin/` (relative to where you
-cloned VossII).
-
-
-### Building a relocatable, statically linked binary distribution
-
-Quick and dirty:
-
-```
-cd $(VOSSII_DIR)/src
-make package
+```shell
+make -C src docker_package
 ```
 
-Suitable for release:
-
-```
-cd $(VOSSII_DIR)/src
-make clean_package
-```
-
-The `clean_package` target uses Docker to set up a somewhat reproducible
-build environment without cluttering up your system,
-which means you may need to run it as root.
+If you're not a member of the `docker` group on your system, you will need to
+run the above command as root.
