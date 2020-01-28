@@ -1,0 +1,29 @@
+\unitlength=0.5mm
+\begin{picture}(75,50)(0,0)
+% Draw the box
+\put(20,5){\line(1,0){40}}
+\put(60,5){\line(0,1){40}}
+\put(20,5){\line(0,1){40}}
+\put(20,45){\line(1,0){40}}
+% Put in label
+\put(40,1){\makebox(0,0){CSA}}
+% Put in B
+\put(5,25){\line(1,0){15}}
+\put(12,28){\makebox(0,0){B}}
+% Put in C
+\put(5,15){\line(1,0){15}}
+\put(12,18 ){\makebox(0,0){C}}
+% Put in A
+\put(5,35){\line(1,0){15}}
+\put(12,38 ){\makebox(0,0){A}}
+% Put in E
+\put(60,17){\line(1,0){15}}
+\put(67,20){\makebox(0,0){E}}
+% Put in D
+\put(60,33){\line(1,0){15}}
+\put(67,36){\makebox(0,0){D}}
+\end{picture}
+
+
+
+

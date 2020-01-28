@@ -1,0 +1,41 @@
+load "ste.fl";
+
+TYPE "nibble" 4;
+
+STRUCT "foo" [
+            ("valid", "bit"),
+            ("dirty", "bit"),
+	    ("data", "nibble")];
+
+let tst =
+    bit_input       clk.
+    foo_input	    ed.
+    nibble_output   res tst.
+    CELL "tst" [
+	tst <- ed-->data,
+        re_ff clk (ed-->data) res
+];
+
+let p = tst 'clk 'ed 'res 'tst;
+
+//let fp = fopen "/home/cseger/ZAQ" "w";
+//Ppexlif fp p;
+//fclose fp;
+
+//end_abstype p;
+
+time (p fseq 1);
+
+update_vossrc "VERBOSE-FSM-PRINT" "YES";
+let ckt = pexlif2fsm p;
+time ckt;
+
+let ant = "ed[5:0]" isv "e[5:0]" from 0 to 2;
+
+let s = STE "" ckt [] ant [] (map (\n. n,0,3) (nodes ckt));
+s;
+
+get_trace s "tst[3]";
+get_trace s "tst[2]";
+get_trace s "tst[1]";
+get_trace s "tst[0]";

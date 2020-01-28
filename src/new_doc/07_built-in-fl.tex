@@ -1,0 +1,78 @@
+\section{Summary of Predefined Functions}
+
+The following list contains all predefined functions in FL.
+The vast majority of these functions can be re-defined.
+In the list is also indicated whether the function is infix, whether it
+associates to the left or right and the precedence of the operator.
+
+\begin{tabbing}
+quant\_thereis \=infixr 3     \=basdb \kill
+{\bf String manipulations}\\
+chr         \>\>Convert an integer to the ASCII character corresponding to it.\\
+ord         \>\>Given a string returns the ASCII code for it.\\
+explode     \>\>Convert string to list of single character strings.\\
+implode     \>\>Takes a list of single character strings and catenates them together.\\
+bool2str    \>\>Convert a Boolean to a string.\\
+int2str     \>\>Convert integer to string for printing purposes.\\
+\\
+{\bf General functions} \\
+catch \>infix 2  \>Evaluate lhs, if it fails return e2 otherwise return result of lhs.\\
+error       \>\>Fail and print out message.\\
+empty       \>\>Applied to a list returns true if list is empty, false otherwise.\\
+load        \>\>Re-direct standard input to this file;\\
+print       \>\>Given a string, prints it out on stdout. Watch out for laziness!\\
+time        \>\>\parbox[t]{4.5in}{Given an expression forces it to be completely evaluated and returns a pair of result, time pair.}\\
+seq \>infix 1 \>Evaluate lhs first, throw away result and then evaluate rhs.\\
+\\
+{\bf Boolean}\\
+$<$       \>infix 3 \>Less than.\\
+$<=$      \>infix 3 \>Less than or equal.\\
+==      \>infix 3 \>Identical.\\
+!=      \>infix 3 \>Not equal.\\
+$>$       \>infix 3 \>Greater than.\\
+$>=$      \>infix 3 \>Greater than or equal to.\\
+variable     \> \>Given a string returns the Boolean variable with this name.\\
+AND     \>infix 4 \>Boolean conjunction.\\
+OR      \>infix 3 \>Boolean disjunction\\
+XOR     \>infix 3 \>Boolean exclusive or\\
+NOT       \>    \>Boolean negation.\\
+!v.e       \>   \>compute for all x in {0,1}  e\\
+?v.e        \>  \>compute there is x in {0,1}  e\\
+bdd\_size     \> \>\parbox[t]{4.5in}{Given a list of Boolean functions, returns the total size in number of BDD nodes}\\
+depends   \>    \>\parbox[t]{4.5in}{Given a list of Boolean functions, returns a list of the Boolean variables the function depends on.}\\
+quant\_forall\>  \>\parbox[t]{4.5in}{Universally quantify away all Boolean variables in the first argument from the expression in the second argument.}\\
+quant\_thereis\> \>\parbox[t]{4.5in}{Existentially quantify away all Boolean variables in the first argument from the expression in the second argument.}\\
+substitute   \> \>Applies a substitution to a Boolean expression.\\
+\\
+{\bf Finite State Machine Manipulation}\\
+load\_exe        \>\>Read in exe file and return the fsm.\\
+make\_fsm        \>\>Converts FL description of system into fsm.\\
+nodes           \>\>\parbox[t]{4.5in}{Given fsm returns a list of node lists. Each node list consists of all aliases for the node.}\\
+fanin           \>\>\parbox[t]{4.5in}{Given fsm model and node name returns a list of node names the next state function of the node depends on.}\\
+fanout           \>\>\parbox[t]{4.5in}{Given fsm model and node name returns a list of node names the nodes that depend on the value of this node.}\\
+get\_node\_val           \>\>\parbox[t]{4.5in}{Given fsm model and node name returns the encoded version of the current value on the node.}\\
+is\_stable           \>\>\parbox[t]{4.5in}{Given fsm model returns true (T) if the model is currently stable. Returns false (F) otherwise.}\\
+print\_fsm       \>\>Print out an internal representation of STE. Pretty obscure.\\
+STE             \>\>Basic trajectory evaluation function.\\
+\\
+\\
+{\bf Dealing with Cartesian Products}\\
+e1 , e2 \>\>Returns the tuple (e1, e2)\\
+fst     \>\>Returns the first element in tuple.\\
+snd       \>\>Returns the second component of tuple.\\
+\\
+{\bf Dealing with Lists}\\
+hd        \>\>Returns the first element in a list.\\
+tl            \>\>Returns the tail of a list. Note that tl [] = [].\\
+: \>infixr 2  \>Corresponds to the CONS operator in LISP.\\
+\\
+\\
+\\
+{\bf Arithmetic Functions}\\
+%       \>infix 4 \>Mod function.\\
+*       \>infix 4 \>Multiplication.\\
+/       \>infix 4 \>Integer division.\\
++       \>infix 3 \>Integer addition.\\
+-       \>infix 3 \>Integer subtraction.\\
+\verb!^!       \>infix 3 \>String catenation.
+\end{tabbing}

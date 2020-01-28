@@ -1,0 +1,18 @@
+let a = variable "a";
+let b = variable "b";
+let c = variable "c";
+
+let f5 = a OR b OR c;
+
+f5;
+
+substitute [ ("a", T), ("b", F), ("c", T) ] f5;
+
+
+let sub = map (\x. (x,rvariable x)) ["a","b","c"];
+
+substitute sub f5;
+sub;
+
+substitute sub f5;
+

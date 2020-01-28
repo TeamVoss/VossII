@@ -1,0 +1,62 @@
+
+
+let Pleaftype (INT i) = sprintf "%d" i
+ /\ Pleaftype (STRING s) = s
+ /\ Pleaftype (BOOL b) = sprintf "%B" b
+ /\ Pleaftype (BEXPR be) = bexpr2str 10 be
+ /\ Pleaftype (PRIM_FN i) = sprintf "PF_%d" i
+;
+
+let Pterm t =
+    let is_infix (APPLY (APPLY (VAR fn) a1) a2) =
+	str_is_prefix "infix" (get_fixity fn)
+     /\ is_infix _ = F
+    in
+    letrec pr prec e assuming (is_infix e) =
+	val (APPLY (APPLY (VAR fn) a1) a2) = e in
+	let fixity = sscanf "%d" (el 2 (str_split (get_fixity fn) " ")) in
+	(prec >= fixity => (fprintf stdout "(") | ()) fseq
+	(pr fixity a1) fseq
+	(fprintf stdout "%s" fn) fseq
+	(pr fixity a2) fseq
+	(prec >= fixity => (fprintf stdout ")") | ())
+     /\    pr prec (APPLY t1 t2) =
+	    (prec > 9 => (fprintf stdout "(") | ()) fseq
+	    (pr 9 t1) fseq
+	    (fprintf stdout " ") fseq
+	    (pr 9 t2) fseq
+	    (prec > 9 => (fprintf stdout ")") | ())
+     /\	   pr prec (LAMBDA s t) =
+	    (prec > 4 => (fprintf stdout "(") | ()) fseq
+	    (fprintf stdout "\\%s." s) fseq
+	    (pr 4 t) fseq
+	    (prec > 4 => (fprintf stdout ")") | ())
+     /\    pr prec (CONS t1 t2) =
+	    (prec > 3 => (fprintf stdout "(") | ()) fseq
+	    (pr 3 t1) fseq
+	    (fprintf stdout ":") fseq
+	    (pr 3 t2) fseq
+	    (prec > 3 => (fprintf stdout ")") | ())
+     /\	   pr prec (VAR s) =
+	    fprintf stdout "%s" s
+     /\	   pr prec (NIL) =
+	    fprintf stdout "NIL" 
+     /\	   pr prec (LEAF lt) =
+	    fprintf stdout "%s" (Pleaftype lt)
+    in
+    (pr 0 t) fseq (fprintf stdout "\n") fseq ""
+;
+
+install_print_function Pterm;
+    
+
+letrec fac n = n=0 => 1 | n*fac (n-1);
+
+fst ``let n = 12 in let k = 5 in fac n /(fac (n-k) * fac k)'';
+
+
+rvariable "a";
+
+lettype tr = BR tr tr | LF;
+
+let f (BR (BR LF qq) LF) = 12;

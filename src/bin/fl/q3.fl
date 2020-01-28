@@ -1,0 +1,1105 @@
+begin_abstype;
+load "EXE.fl";
+
+
+// Behavorial Description for Entity amd
+
+
+let VSSP = "vssp";
+let VDDP = "vddp";
+let VSS = "vss";
+let VDD = "vdd";
+let Y_0_ = "y[0]";
+let Y_1_ = "y[1]";
+let Y_2_ = "y[2]";
+let Y_3_ = "y[3]";
+let COUT = "cout";
+let CIN = "cin";
+let NG = "ng";
+let NP = "np";
+let SIGNE = "signe";
+let ZERO = "zero";
+let OVR = "ovr";
+let Q3 = "q3";
+let Q0 = "q0";
+let R3 = "r3";
+let R0 = "r0";
+let NOE = "noe";
+let D_0_ = "d[0]";
+let D_1_ = "d[1]";
+let D_2_ = "d[2]";
+let D_3_ = "d[3]";
+let B_0_ = "b[0]";
+let B_1_ = "b[1]";
+let B_2_ = "b[2]";
+let B_3_ = "b[3]";
+let A_0_ = "a[0]";
+let A_1_ = "a[1]";
+let A_2_ = "a[2]";
+let A_3_ = "a[3]";
+let I_0_ = "i[0]";
+let I_1_ = "i[1]";
+let I_2_ = "i[2]";
+let I_3_ = "i[3]";
+let I_4_ = "i[4]";
+let I_5_ = "i[5]";
+let I_6_ = "i[6]";
+let I_7_ = "i[7]";
+let I_8_ = "i[8]";
+let SCOUT = "scout";
+let SCIN = "scin";
+let TEST = "test";
+let FONC = "fonc";
+let CK = "ck";
+let RB_0_ = "rb[0]";
+let RB_1_ = "rb[1]";
+let RB_2_ = "rb[2]";
+let RB_3_ = "rb[3]";
+let RA_0_ = "ra[0]";
+let RA_1_ = "ra[1]";
+let RA_2_ = "ra[2]";
+let RA_3_ = "ra[3]";
+let ACCU_IN_0_ = "accu_in[0]";
+let ACCU_IN_1_ = "accu_in[1]";
+let ACCU_IN_2_ = "accu_in[2]";
+let ACCU_IN_3_ = "accu_in[3]";
+let WCKACCU = "wckaccu";
+let WCK15 = "wck15";
+let WCK14 = "wck14";
+let WCK13 = "wck13";
+let WCK12 = "wck12";
+let WCK11 = "wck11";
+let WCK10 = "wck10";
+let WCK9 = "wck9";
+let WCK8 = "wck8";
+let WCK7 = "wck7";
+let WCK6 = "wck6";
+let WCK5 = "wck5";
+let WCK4 = "wck4";
+let WCK3 = "wck3";
+let WCK2 = "wck2";
+let WCK1 = "wck1";
+let WCK0 = "wck0";
+let WRAM = "wram";
+let SH_RAM_0_ = "sh_ram[0]";
+let SH_RAM_1_ = "sh_ram[1]";
+let SH_RAM_2_ = "sh_ram[2]";
+let SH_RAM_3_ = "sh_ram[3]";
+let SH_ACC_0_ = "sh_acc[0]";
+let SH_ACC_1_ = "sh_acc[1]";
+let SH_ACC_2_ = "sh_acc[2]";
+let SH_ACC_3_ = "sh_acc[3]";
+let SHIFT_R = "shift_r";
+let SHIFT_L = "shift_l";
+let SHIFT_N = "shift_n";
+let TEST_MODE = "test_mode";
+let FONC_MODE = "fonc_mode";
+let WACCU = "waccu";
+let C_DIFSR_0_ = "c_difsr[0]";
+let C_DIFSR_1_ = "c_difsr[1]";
+let C_DIFSR_2_ = "c_difsr[2]";
+let C_DIFSR_3_ = "c_difsr[3]";
+let C_DIFRS_0_ = "c_difrs[0]";
+let C_DIFRS_1_ = "c_difrs[1]";
+let C_DIFRS_2_ = "c_difrs[2]";
+let C_DIFRS_3_ = "c_difrs[3]";
+let C_SUMRS_0_ = "c_sumrs[0]";
+let C_SUMRS_1_ = "c_sumrs[1]";
+let C_SUMRS_2_ = "c_sumrs[2]";
+let C_SUMRS_3_ = "c_sumrs[3]";
+let DIFSR_0_ = "difsr[0]";
+let DIFSR_1_ = "difsr[1]";
+let DIFSR_2_ = "difsr[2]";
+let DIFSR_3_ = "difsr[3]";
+let DIFRS_0_ = "difrs[0]";
+let DIFRS_1_ = "difrs[1]";
+let DIFRS_2_ = "difrs[2]";
+let DIFRS_3_ = "difrs[3]";
+let SUMRS_0_ = "sumrs[0]";
+let SUMRS_1_ = "sumrs[1]";
+let SUMRS_2_ = "sumrs[2]";
+let SUMRS_3_ = "sumrs[3]";
+let ALU_OUT_0_ = "alu_out[0]";
+let ALU_OUT_1_ = "alu_out[1]";
+let ALU_OUT_2_ = "alu_out[2]";
+let ALU_OUT_3_ = "alu_out[3]";
+let S_0_ = "s[0]";
+let S_1_ = "s[1]";
+let S_2_ = "s[2]";
+let S_3_ = "s[3]";
+let R_0_ = "r[0]";
+let R_1_ = "r[1]";
+let R_2_ = "r[2]";
+let R_3_ = "r[3]";
+let RAM15_0_ = "ram15[0]";
+let RAM15_1_ = "ram15[1]";
+let RAM15_2_ = "ram15[2]";
+let RAM15_3_ = "ram15[3]";
+let RAM14_0_ = "ram14[0]";
+let RAM14_1_ = "ram14[1]";
+let RAM14_2_ = "ram14[2]";
+let RAM14_3_ = "ram14[3]";
+let RAM13_0_ = "ram13[0]";
+let RAM13_1_ = "ram13[1]";
+let RAM13_2_ = "ram13[2]";
+let RAM13_3_ = "ram13[3]";
+let RAM12_0_ = "ram12[0]";
+let RAM12_1_ = "ram12[1]";
+let RAM12_2_ = "ram12[2]";
+let RAM12_3_ = "ram12[3]";
+let RAM11_0_ = "ram11[0]";
+let RAM11_1_ = "ram11[1]";
+let RAM11_2_ = "ram11[2]";
+let RAM11_3_ = "ram11[3]";
+let RAM10_0_ = "ram10[0]";
+let RAM10_1_ = "ram10[1]";
+let RAM10_2_ = "ram10[2]";
+let RAM10_3_ = "ram10[3]";
+let RAM9_0_ = "ram9[0]";
+let RAM9_1_ = "ram9[1]";
+let RAM9_2_ = "ram9[2]";
+let RAM9_3_ = "ram9[3]";
+let RAM8_0_ = "ram8[0]";
+let RAM8_1_ = "ram8[1]";
+let RAM8_2_ = "ram8[2]";
+let RAM8_3_ = "ram8[3]";
+let RAM7_0_ = "ram7[0]";
+let RAM7_1_ = "ram7[1]";
+let RAM7_2_ = "ram7[2]";
+let RAM7_3_ = "ram7[3]";
+let RAM6_0_ = "ram6[0]";
+let RAM6_1_ = "ram6[1]";
+let RAM6_2_ = "ram6[2]";
+let RAM6_3_ = "ram6[3]";
+let RAM5_0_ = "ram5[0]";
+let RAM5_1_ = "ram5[1]";
+let RAM5_2_ = "ram5[2]";
+let RAM5_3_ = "ram5[3]";
+let RAM4_0_ = "ram4[0]";
+let RAM4_1_ = "ram4[1]";
+let RAM4_2_ = "ram4[2]";
+let RAM4_3_ = "ram4[3]";
+let RAM3_0_ = "ram3[0]";
+let RAM3_1_ = "ram3[1]";
+let RAM3_2_ = "ram3[2]";
+let RAM3_3_ = "ram3[3]";
+let RAM2_0_ = "ram2[0]";
+let RAM2_1_ = "ram2[1]";
+let RAM2_2_ = "ram2[2]";
+let RAM2_3_ = "ram2[3]";
+let RAM1_0_ = "ram1[0]";
+let RAM1_1_ = "ram1[1]";
+let RAM1_2_ = "ram1[2]";
+let RAM1_3_ = "ram1[3]";
+let RAM0_0_ = "ram0[0]";
+let RAM0_1_ = "ram0[1]";
+let RAM0_2_ = "ram0[2]";
+let RAM0_3_ = "ram0[3]";
+let ACCU_0_ = "accu[0]";
+let ACCU_1_ = "accu[1]";
+let ACCU_2_ = "accu[2]";
+let ACCU_3_ = "accu[3]";
+{Set} let AMDs =
+	(Output (COUT,
+	(((Val C_SUMRS_3_) And (Not (Val I_3_) And Not (Val I_4_)
+	 And Not (Val I_5_))) Or (((Val C_DIFSR_3_) And ((Val I_3_)
+	 And Not (Val I_4_) And Not (Val I_5_))) Or ((Val C_DIFRS_3_)
+	 And (Not (Val I_3_) And (Val I_4_) And Not (Val I_5_)
+	))))))|_|
+	(Output (NG,
+	((Not (((((Val R_3_) And (Val S_3_)) Or (((Val R_3_)
+	 Or (Val S_3_)) And ((Val R_2_) And (Val S_2_)))) Or 
+	((((Val R_3_) Or (Val S_3_)) And ((Val R_2_) Or (Val S_2_)
+	)) And ((Val R_1_) And (Val S_1_)))) Or (((((Val R_3_)
+	 Or (Val S_3_)) And ((Val R_2_) Or (Val S_2_))) And 
+	((Val R_1_) Or (Val S_1_))) And ((Val R_0_) And (Val S_0_)
+	))) And (Not (Val I_3_) And Not (Val I_4_) And Not (Val I_5_)
+	)) Or (((Not ((((Not (Val R_3_) And (Val S_3_)) Or ((Not 
+	(Val R_3_) Or (Val S_3_)) And (Not (Val R_2_) And (Val S_2_)
+	))) Or (((Not (Val R_3_) Or (Val S_3_)) And (Not (Val R_2_)
+	 Or (Val S_2_))) And (Not (Val R_1_) And (Val S_1_))
+	)) Or ((((Not (Val R_3_) Or (Val S_3_)) And (Not (Val R_2_)
+	 Or (Val S_2_))) And (Not (Val R_1_) Or (Val S_1_)))
+	 And (Not (Val R_0_) And (Val S_0_)))) And ((Val I_3_)
+	 And Not (Val I_4_) And Not (Val I_5_))) Or (Not (((((Val R_3_)
+	 And Not (Val S_3_)) Or (((Val R_3_) Or Not (Val S_3_)
+	) And ((Val R_2_) And Not (Val S_2_)))) Or ((((Val R_3_)
+	 Or Not (Val S_3_)) And ((Val R_2_) Or Not (Val S_2_)
+	)) And ((Val R_1_) And Not (Val S_1_)))) Or (((((Val R_3_)
+	 Or Not (Val S_3_)) And ((Val R_2_) Or Not (Val S_2_)
+	)) And ((Val R_1_) Or Not (Val S_1_))) And ((Val R_0_)
+	 And Not (Val S_0_)))) And (Not (Val I_3_) And (Val I_4_)
+	 And Not (Val I_5_)))) Or (((Val I_3_) And (Val I_4_)
+	) Or (Val I_5_))))))|_|
+	(Output (NP,
+	((Not (((((Val R_3_) Or (Val S_3_)) And ((Val R_2_) Or 
+	(Val S_2_))) And ((Val R_1_) Or (Val S_1_))) And ((Val R_0_)
+	 Or (Val S_0_))) And (Not (Val I_3_) And Not (Val I_4_)
+	 And Not (Val I_5_))) Or (((Not ((((Not (Val R_3_) Or 
+	(Val S_3_)) And (Not (Val R_2_) Or (Val S_2_))) And 
+	(Not (Val R_1_) Or (Val S_1_))) And (Not (Val R_0_) Or 
+	(Val S_0_))) And ((Val I_3_) And Not (Val I_4_) And 
+	Not (Val I_5_))) Or (Not (((((Val R_3_) Or Not (Val S_3_)
+	) And ((Val R_2_) Or Not (Val S_2_))) And ((Val R_1_)
+	 Or Not (Val S_1_))) And ((Val R_0_) Or Not (Val S_0_)
+	)) And (Not (Val I_3_) And (Val I_4_) And Not (Val I_5_)
+	))) Or (((Val I_3_) And (Val I_4_)) Or (Val I_5_))))
+	))|_|
+	(Output (SIGNE,
+	(Val ALU_OUT_3_)))|_|
+	(Output (ZERO,
+	Not ((((Val ALU_OUT_3_) Or (Val ALU_OUT_2_)) Or (Val ALU_OUT_1_)
+	) Or (Val ALU_OUT_0_))))|_|
+	(Output (OVR,
+	((((Val C_SUMRS_3_) Xor (Val C_SUMRS_2_)) And (Not (Val I_3_)
+	 And Not (Val I_4_) And Not (Val I_5_))) Or ((((Val C_DIFSR_3_)
+	 Xor (Val C_DIFSR_2_)) And ((Val I_3_) And Not (Val I_4_)
+	 And Not (Val I_5_))) Or (((Val C_DIFRS_3_) Xor (Val C_DIFRS_2_)
+	) And (Not (Val I_3_) And (Val I_4_) And Not (Val I_5_)
+	))))))|_|
+	(Output (SCOUT,
+	(Not (Val ACCU_3_) And (Val TEST_MODE))))|_|
+	(BusDrv(Y_0_, [(
+	Not (Val NOE), 
+	(((Val RA_0_) And (Not (Val I_6_) And (Val I_7_) And 
+	Not (Val I_8_))) Or ((((((((Val ALU_OUT_0_) And (Not (Val I_6_)
+	 And Not (Val I_7_) And Not (Val I_8_))) Or ((Val ALU_OUT_0_)
+	 And ((Val I_6_) And Not (Val I_7_) And Not (Val I_8_)
+	))) Or ((Val ALU_OUT_0_) And ((Val I_6_) And (Val I_7_)
+	 And Not (Val I_8_)))) Or ((Val ALU_OUT_0_) And (Not (Val I_6_)
+	 And Not (Val I_7_) And (Val I_8_)))) Or ((Val ALU_OUT_0_)
+	 And ((Val I_6_) And Not (Val I_7_) And (Val I_8_)))
+	) Or ((Val ALU_OUT_0_) And (Not (Val I_6_) And (Val I_7_)
+	 And (Val I_8_)))) Or ((Val ALU_OUT_0_) And ((Val I_6_)
+	 And (Val I_7_) And (Val I_8_))))))]))|_|
+	(BusDrv(Y_1_, [(
+	Not (Val NOE), 
+	(((Val RA_1_) And (Not (Val I_6_) And (Val I_7_) And 
+	Not (Val I_8_))) Or ((((((((Val ALU_OUT_1_) And (Not (Val I_6_)
+	 And Not (Val I_7_) And Not (Val I_8_))) Or ((Val ALU_OUT_1_)
+	 And ((Val I_6_) And Not (Val I_7_) And Not (Val I_8_)
+	))) Or ((Val ALU_OUT_1_) And ((Val I_6_) And (Val I_7_)
+	 And Not (Val I_8_)))) Or ((Val ALU_OUT_1_) And (Not (Val I_6_)
+	 And Not (Val I_7_) And (Val I_8_)))) Or ((Val ALU_OUT_1_)
+	 And ((Val I_6_) And Not (Val I_7_) And (Val I_8_)))
+	) Or ((Val ALU_OUT_1_) And (Not (Val I_6_) And (Val I_7_)
+	 And (Val I_8_)))) Or ((Val ALU_OUT_1_) And ((Val I_6_)
+	 And (Val I_7_) And (Val I_8_))))))]))|_|
+	(BusDrv(Y_2_, [(
+	Not (Val NOE), 
+	(((Val RA_2_) And (Not (Val I_6_) And (Val I_7_) And 
+	Not (Val I_8_))) Or ((((((((Val ALU_OUT_2_) And (Not (Val I_6_)
+	 And Not (Val I_7_) And Not (Val I_8_))) Or ((Val ALU_OUT_2_)
+	 And ((Val I_6_) And Not (Val I_7_) And Not (Val I_8_)
+	))) Or ((Val ALU_OUT_2_) And ((Val I_6_) And (Val I_7_)
+	 And Not (Val I_8_)))) Or ((Val ALU_OUT_2_) And (Not (Val I_6_)
+	 And Not (Val I_7_) And (Val I_8_)))) Or ((Val ALU_OUT_2_)
+	 And ((Val I_6_) And Not (Val I_7_) And (Val I_8_)))
+	) Or ((Val ALU_OUT_2_) And (Not (Val I_6_) And (Val I_7_)
+	 And (Val I_8_)))) Or ((Val ALU_OUT_2_) And ((Val I_6_)
+	 And (Val I_7_) And (Val I_8_))))))]))|_|
+	(BusDrv(Y_3_, [(
+	Not (Val NOE), 
+	(((Val RA_3_) And (Not (Val I_6_) And (Val I_7_) And 
+	Not (Val I_8_))) Or ((((((((Val ALU_OUT_3_) And (Not (Val I_6_)
+	 And Not (Val I_7_) And Not (Val I_8_))) Or ((Val ALU_OUT_3_)
+	 And ((Val I_6_) And Not (Val I_7_) And Not (Val I_8_)
+	))) Or ((Val ALU_OUT_3_) And ((Val I_6_) And (Val I_7_)
+	 And Not (Val I_8_)))) Or ((Val ALU_OUT_3_) And (Not (Val I_6_)
+	 And Not (Val I_7_) And (Val I_8_)))) Or ((Val ALU_OUT_3_)
+	 And ((Val I_6_) And Not (Val I_7_) And (Val I_8_)))
+	) Or ((Val ALU_OUT_3_) And (Not (Val I_6_) And (Val I_7_)
+	 And (Val I_8_)))) Or ((Val ALU_OUT_3_) And ((Val I_6_)
+	 And (Val I_7_) And (Val I_8_))))))]))|_|
+	(BusDrv(Q3, [(
+	(Not (((Val I_6_) Or Not (Val I_7_)) Or Not (Val I_8_)
+	) Or ((Val I_6_) And (Val I_7_) And (Val I_8_))), 
+	Not (Val ACCU_3_))]))|_|
+	(BusDrv(Q0, [(
+	(Not (((Val I_6_) Or (Val I_7_)) Or Not (Val I_8_)) Or 
+	Not ((Not (Val I_6_) Or (Val I_7_)) Or Not (Val I_8_)
+	)), 
+	Not (Val ACCU_0_))]))|_|
+	(BusDrv(R3, [(
+	(Val SHIFT_L), 
+	(Val ALU_OUT_3_))]))|_|
+	(BusDrv(R0, [(
+	(Val SHIFT_R), 
+	(Val ALU_OUT_0_))]))|_|
+	(Output (RB_0_,
+	((Not (Val RAM0_0_) And (Not (Val B_0_) And Not (Val B_1_)
+	 And Not (Val B_2_) And Not (Val B_3_))) Or ((((((((((
+	(((((Not (Val RAM1_0_) And ((Val B_0_) And Not (Val B_1_)
+	 And Not (Val B_2_) And Not (Val B_3_))) Or (Not (Val RAM2_0_)
+	 And (Not (Val B_0_) And (Val B_1_) And Not (Val B_2_)
+	 And Not (Val B_3_)))) Or (Not (Val RAM3_0_) And ((Val B_0_)
+	 And (Val B_1_) And Not (Val B_2_) And Not (Val B_3_)
+	))) Or (Not (Val RAM4_0_) And (Not (Val B_0_) And Not 
+	(Val B_1_) And (Val B_2_) And Not (Val B_3_)))) Or (
+	Not (Val RAM5_0_) And ((Val B_0_) And Not (Val B_1_)
+	 And (Val B_2_) And Not (Val B_3_)))) Or (Not (Val RAM6_0_)
+	 And (Not (Val B_0_) And (Val B_1_) And (Val B_2_) And 
+	Not (Val B_3_)))) Or (Not (Val RAM7_0_) And ((Val B_0_)
+	 And (Val B_1_) And (Val B_2_) And Not (Val B_3_))))
+	 Or (Not (Val RAM8_0_) And (Not (Val B_0_) And Not (Val B_1_)
+	 And Not (Val B_2_) And (Val B_3_)))) Or (Not (Val RAM9_0_)
+	 And ((Val B_0_) And Not (Val B_1_) And Not (Val B_2_)
+	 And (Val B_3_)))) Or (Not (Val RAM10_0_) And (Not (Val B_0_)
+	 And (Val B_1_) And Not (Val B_2_) And (Val B_3_))))
+	 Or (Not (Val RAM11_0_) And ((Val B_0_) And (Val B_1_)
+	 And Not (Val B_2_) And (Val B_3_)))) Or (Not (Val RAM12_0_)
+	 And (Not (Val B_0_) And Not (Val B_1_) And (Val B_2_)
+	 And (Val B_3_)))) Or (Not (Val RAM13_0_) And ((Val B_0_)
+	 And Not (Val B_1_) And (Val B_2_) And (Val B_3_))))
+	 Or (Not (Val RAM14_0_) And (Not (Val B_0_) And (Val B_1_)
+	 And (Val B_2_) And (Val B_3_)))) Or (Not (Val RAM15_0_)
+	 And ((Val B_0_) And (Val B_1_) And (Val B_2_) And (Val B_3_)
+	))))))|_|
+	(Output (RB_1_,
+	((Not (Val RAM0_1_) And (Not (Val B_0_) And Not (Val B_1_)
+	 And Not (Val B_2_) And Not (Val B_3_))) Or ((((((((((
+	(((((Not (Val RAM1_1_) And ((Val B_0_) And Not (Val B_1_)
+	 And Not (Val B_2_) And Not (Val B_3_))) Or (Not (Val RAM2_1_)
+	 And (Not (Val B_0_) And (Val B_1_) And Not (Val B_2_)
+	 And Not (Val B_3_)))) Or (Not (Val RAM3_1_) And ((Val B_0_)
+	 And (Val B_1_) And Not (Val B_2_) And Not (Val B_3_)
+	))) Or (Not (Val RAM4_1_) And (Not (Val B_0_) And Not 
+	(Val B_1_) And (Val B_2_) And Not (Val B_3_)))) Or (
+	Not (Val RAM5_1_) And ((Val B_0_) And Not (Val B_1_)
+	 And (Val B_2_) And Not (Val B_3_)))) Or (Not (Val RAM6_1_)
+	 And (Not (Val B_0_) And (Val B_1_) And (Val B_2_) And 
+	Not (Val B_3_)))) Or (Not (Val RAM7_1_) And ((Val B_0_)
+	 And (Val B_1_) And (Val B_2_) And Not (Val B_3_))))
+	 Or (Not (Val RAM8_1_) And (Not (Val B_0_) And Not (Val B_1_)
+	 And Not (Val B_2_) And (Val B_3_)))) Or (Not (Val RAM9_1_)
+	 And ((Val B_0_) And Not (Val B_1_) And Not (Val B_2_)
+	 And (Val B_3_)))) Or (Not (Val RAM10_1_) And (Not (Val B_0_)
+	 And (Val B_1_) And Not (Val B_2_) And (Val B_3_))))
+	 Or (Not (Val RAM11_1_) And ((Val B_0_) And (Val B_1_)
+	 And Not (Val B_2_) And (Val B_3_)))) Or (Not (Val RAM12_1_)
+	 And (Not (Val B_0_) And Not (Val B_1_) And (Val B_2_)
+	 And (Val B_3_)))) Or (Not (Val RAM13_1_) And ((Val B_0_)
+	 And Not (Val B_1_) And (Val B_2_) And (Val B_3_))))
+	 Or (Not (Val RAM14_1_) And (Not (Val B_0_) And (Val B_1_)
+	 And (Val B_2_) And (Val B_3_)))) Or (Not (Val RAM15_1_)
+	 And ((Val B_0_) And (Val B_1_) And (Val B_2_) And (Val B_3_)
+	))))))|_|
+	(Output (RB_2_,
+	((Not (Val RAM0_2_) And (Not (Val B_0_) And Not (Val B_1_)
+	 And Not (Val B_2_) And Not (Val B_3_))) Or ((((((((((
+	(((((Not (Val RAM1_2_) And ((Val B_0_) And Not (Val B_1_)
+	 And Not (Val B_2_) And Not (Val B_3_))) Or (Not (Val RAM2_2_)
+	 And (Not (Val B_0_) And (Val B_1_) And Not (Val B_2_)
+	 And Not (Val B_3_)))) Or (Not (Val RAM3_2_) And ((Val B_0_)
+	 And (Val B_1_) And Not (Val B_2_) And Not (Val B_3_)
+	))) Or (Not (Val RAM4_2_) And (Not (Val B_0_) And Not 
+	(Val B_1_) And (Val B_2_) And Not (Val B_3_)))) Or (
+	Not (Val RAM5_2_) And ((Val B_0_) And Not (Val B_1_)
+	 And (Val B_2_) And Not (Val B_3_)))) Or (Not (Val RAM6_2_)
+	 And (Not (Val B_0_) And (Val B_1_) And (Val B_2_) And 
+	Not (Val B_3_)))) Or (Not (Val RAM7_2_) And ((Val B_0_)
+	 And (Val B_1_) And (Val B_2_) And Not (Val B_3_))))
+	 Or (Not (Val RAM8_2_) And (Not (Val B_0_) And Not (Val B_1_)
+	 And Not (Val B_2_) And (Val B_3_)))) Or (Not (Val RAM9_2_)
+	 And ((Val B_0_) And Not (Val B_1_) And Not (Val B_2_)
+	 And (Val B_3_)))) Or (Not (Val RAM10_2_) And (Not (Val B_0_)
+	 And (Val B_1_) And Not (Val B_2_) And (Val B_3_))))
+	 Or (Not (Val RAM11_2_) And ((Val B_0_) And (Val B_1_)
+	 And Not (Val B_2_) And (Val B_3_)))) Or (Not (Val RAM12_2_)
+	 And (Not (Val B_0_) And Not (Val B_1_) And (Val B_2_)
+	 And (Val B_3_)))) Or (Not (Val RAM13_2_) And ((Val B_0_)
+	 And Not (Val B_1_) And (Val B_2_) And (Val B_3_))))
+	 Or (Not (Val RAM14_2_) And (Not (Val B_0_) And (Val B_1_)
+	 And (Val B_2_) And (Val B_3_)))) Or (Not (Val RAM15_2_)
+	 And ((Val B_0_) And (Val B_1_) And (Val B_2_) And (Val B_3_)
+	))))))|_|
+	(Output (RB_3_,
+	((Not (Val RAM0_3_) And (Not (Val B_0_) And Not (Val B_1_)
+	 And Not (Val B_2_) And Not (Val B_3_))) Or ((((((((((
+	(((((Not (Val RAM1_3_) And ((Val B_0_) And Not (Val B_1_)
+	 And Not (Val B_2_) And Not (Val B_3_))) Or (Not (Val RAM2_3_)
+	 And (Not (Val B_0_) And (Val B_1_) And Not (Val B_2_)
+	 And Not (Val B_3_)))) Or (Not (Val RAM3_3_) And ((Val B_0_)
+	 And (Val B_1_) And Not (Val B_2_) And Not (Val B_3_)
+	))) Or (Not (Val RAM4_3_) And (Not (Val B_0_) And Not 
+	(Val B_1_) And (Val B_2_) And Not (Val B_3_)))) Or (
+	Not (Val RAM5_3_) And ((Val B_0_) And Not (Val B_1_)
+	 And (Val B_2_) And Not (Val B_3_)))) Or (Not (Val RAM6_3_)
+	 And (Not (Val B_0_) And (Val B_1_) And (Val B_2_) And 
+	Not (Val B_3_)))) Or (Not (Val RAM7_3_) And ((Val B_0_)
+	 And (Val B_1_) And (Val B_2_) And Not (Val B_3_))))
+	 Or (Not (Val RAM8_3_) And (Not (Val B_0_) And Not (Val B_1_)
+	 And Not (Val B_2_) And (Val B_3_)))) Or (Not (Val RAM9_3_)
+	 And ((Val B_0_) And Not (Val B_1_) And Not (Val B_2_)
+	 And (Val B_3_)))) Or (Not (Val RAM10_3_) And (Not (Val B_0_)
+	 And (Val B_1_) And Not (Val B_2_) And (Val B_3_))))
+	 Or (Not (Val RAM11_3_) And ((Val B_0_) And (Val B_1_)
+	 And Not (Val B_2_) And (Val B_3_)))) Or (Not (Val RAM12_3_)
+	 And (Not (Val B_0_) And Not (Val B_1_) And (Val B_2_)
+	 And (Val B_3_)))) Or (Not (Val RAM13_3_) And ((Val B_0_)
+	 And Not (Val B_1_) And (Val B_2_) And (Val B_3_))))
+	 Or (Not (Val RAM14_3_) And (Not (Val B_0_) And (Val B_1_)
+	 And (Val B_2_) And (Val B_3_)))) Or (Not (Val RAM15_3_)
+	 And ((Val B_0_) And (Val B_1_) And (Val B_2_) And (Val B_3_)
+	))))))|_|
+	(Output (RA_0_,
+	((Not (Val RAM0_0_) And (Not (Val A_0_) And Not (Val A_1_)
+	 And Not (Val A_2_) And Not (Val A_3_))) Or ((((((((((
+	(((((Not (Val RAM1_0_) And ((Val A_0_) And Not (Val A_1_)
+	 And Not (Val A_2_) And Not (Val A_3_))) Or (Not (Val RAM2_0_)
+	 And (Not (Val A_0_) And (Val A_1_) And Not (Val A_2_)
+	 And Not (Val A_3_)))) Or (Not (Val RAM3_0_) And ((Val A_0_)
+	 And (Val A_1_) And Not (Val A_2_) And Not (Val A_3_)
+	))) Or (Not (Val RAM4_0_) And (Not (Val A_0_) And Not 
+	(Val A_1_) And (Val A_2_) And Not (Val A_3_)))) Or (
+	Not (Val RAM5_0_) And ((Val A_0_) And Not (Val A_1_)
+	 And (Val A_2_) And Not (Val A_3_)))) Or (Not (Val RAM6_0_)
+	 And (Not (Val A_0_) And (Val A_1_) And (Val A_2_) And 
+	Not (Val A_3_)))) Or (Not (Val RAM7_0_) And ((Val A_0_)
+	 And (Val A_1_) And (Val A_2_) And Not (Val A_3_))))
+	 Or (Not (Val RAM8_0_) And (Not (Val A_0_) And Not (Val A_1_)
+	 And Not (Val A_2_) And (Val A_3_)))) Or (Not (Val RAM9_0_)
+	 And ((Val A_0_) And Not (Val A_1_) And Not (Val A_2_)
+	 And (Val A_3_)))) Or (Not (Val RAM10_0_) And (Not (Val A_0_)
+	 And (Val A_1_) And Not (Val A_2_) And (Val A_3_))))
+	 Or (Not (Val RAM11_0_) And ((Val A_0_) And (Val A_1_)
+	 And Not (Val A_2_) And (Val A_3_)))) Or (Not (Val RAM12_0_)
+	 And (Not (Val A_0_) And Not (Val A_1_) And (Val A_2_)
+	 And (Val A_3_)))) Or (Not (Val RAM13_0_) And ((Val A_0_)
+	 And Not (Val A_1_) And (Val A_2_) And (Val A_3_))))
+	 Or (Not (Val RAM14_0_) And (Not (Val A_0_) And (Val A_1_)
+	 And (Val A_2_) And (Val A_3_)))) Or (Not (Val RAM15_0_)
+	 And ((Val A_0_) And (Val A_1_) And (Val A_2_) And (Val A_3_)
+	))))))|_|
+	(Output (RA_1_,
+	((Not (Val RAM0_1_) And (Not (Val A_0_) And Not (Val A_1_)
+	 And Not (Val A_2_) And Not (Val A_3_))) Or ((((((((((
+	(((((Not (Val RAM1_1_) And ((Val A_0_) And Not (Val A_1_)
+	 And Not (Val A_2_) And Not (Val A_3_))) Or (Not (Val RAM2_1_)
+	 And (Not (Val A_0_) And (Val A_1_) And Not (Val A_2_)
+	 And Not (Val A_3_)))) Or (Not (Val RAM3_1_) And ((Val A_0_)
+	 And (Val A_1_) And Not (Val A_2_) And Not (Val A_3_)
+	))) Or (Not (Val RAM4_1_) And (Not (Val A_0_) And Not 
+	(Val A_1_) And (Val A_2_) And Not (Val A_3_)))) Or (
+	Not (Val RAM5_1_) And ((Val A_0_) And Not (Val A_1_)
+	 And (Val A_2_) And Not (Val A_3_)))) Or (Not (Val RAM6_1_)
+	 And (Not (Val A_0_) And (Val A_1_) And (Val A_2_) And 
+	Not (Val A_3_)))) Or (Not (Val RAM7_1_) And ((Val A_0_)
+	 And (Val A_1_) And (Val A_2_) And Not (Val A_3_))))
+	 Or (Not (Val RAM8_1_) And (Not (Val A_0_) And Not (Val A_1_)
+	 And Not (Val A_2_) And (Val A_3_)))) Or (Not (Val RAM9_1_)
+	 And ((Val A_0_) And Not (Val A_1_) And Not (Val A_2_)
+	 And (Val A_3_)))) Or (Not (Val RAM10_1_) And (Not (Val A_0_)
+	 And (Val A_1_) And Not (Val A_2_) And (Val A_3_))))
+	 Or (Not (Val RAM11_1_) And ((Val A_0_) And (Val A_1_)
+	 And Not (Val A_2_) And (Val A_3_)))) Or (Not (Val RAM12_1_)
+	 And (Not (Val A_0_) And Not (Val A_1_) And (Val A_2_)
+	 And (Val A_3_)))) Or (Not (Val RAM13_1_) And ((Val A_0_)
+	 And Not (Val A_1_) And (Val A_2_) And (Val A_3_))))
+	 Or (Not (Val RAM14_1_) And (Not (Val A_0_) And (Val A_1_)
+	 And (Val A_2_) And (Val A_3_)))) Or (Not (Val RAM15_1_)
+	 And ((Val A_0_) And (Val A_1_) And (Val A_2_) And (Val A_3_)
+	))))))|_|
+	(Output (RA_2_,
+	((Not (Val RAM0_2_) And (Not (Val A_0_) And Not (Val A_1_)
+	 And Not (Val A_2_) And Not (Val A_3_))) Or ((((((((((
+	(((((Not (Val RAM1_2_) And ((Val A_0_) And Not (Val A_1_)
+	 And Not (Val A_2_) And Not (Val A_3_))) Or (Not (Val RAM2_2_)
+	 And (Not (Val A_0_) And (Val A_1_) And Not (Val A_2_)
+	 And Not (Val A_3_)))) Or (Not (Val RAM3_2_) And ((Val A_0_)
+	 And (Val A_1_) And Not (Val A_2_) And Not (Val A_3_)
+	))) Or (Not (Val RAM4_2_) And (Not (Val A_0_) And Not 
+	(Val A_1_) And (Val A_2_) And Not (Val A_3_)))) Or (
+	Not (Val RAM5_2_) And ((Val A_0_) And Not (Val A_1_)
+	 And (Val A_2_) And Not (Val A_3_)))) Or (Not (Val RAM6_2_)
+	 And (Not (Val A_0_) And (Val A_1_) And (Val A_2_) And 
+	Not (Val A_3_)))) Or (Not (Val RAM7_2_) And ((Val A_0_)
+	 And (Val A_1_) And (Val A_2_) And Not (Val A_3_))))
+	 Or (Not (Val RAM8_2_) And (Not (Val A_0_) And Not (Val A_1_)
+	 And Not (Val A_2_) And (Val A_3_)))) Or (Not (Val RAM9_2_)
+	 And ((Val A_0_) And Not (Val A_1_) And Not (Val A_2_)
+	 And (Val A_3_)))) Or (Not (Val RAM10_2_) And (Not (Val A_0_)
+	 And (Val A_1_) And Not (Val A_2_) And (Val A_3_))))
+	 Or (Not (Val RAM11_2_) And ((Val A_0_) And (Val A_1_)
+	 And Not (Val A_2_) And (Val A_3_)))) Or (Not (Val RAM12_2_)
+	 And (Not (Val A_0_) And Not (Val A_1_) And (Val A_2_)
+	 And (Val A_3_)))) Or (Not (Val RAM13_2_) And ((Val A_0_)
+	 And Not (Val A_1_) And (Val A_2_) And (Val A_3_))))
+	 Or (Not (Val RAM14_2_) And (Not (Val A_0_) And (Val A_1_)
+	 And (Val A_2_) And (Val A_3_)))) Or (Not (Val RAM15_2_)
+	 And ((Val A_0_) And (Val A_1_) And (Val A_2_) And (Val A_3_)
+	))))))|_|
+	(Output (RA_3_,
+	((Not (Val RAM0_3_) And (Not (Val A_0_) And Not (Val A_1_)
+	 And Not (Val A_2_) And Not (Val A_3_))) Or ((((((((((
+	(((((Not (Val RAM1_3_) And ((Val A_0_) And Not (Val A_1_)
+	 And Not (Val A_2_) And Not (Val A_3_))) Or (Not (Val RAM2_3_)
+	 And (Not (Val A_0_) And (Val A_1_) And Not (Val A_2_)
+	 And Not (Val A_3_)))) Or (Not (Val RAM3_3_) And ((Val A_0_)
+	 And (Val A_1_) And Not (Val A_2_) And Not (Val A_3_)
+	))) Or (Not (Val RAM4_3_) And (Not (Val A_0_) And Not 
+	(Val A_1_) And (Val A_2_) And Not (Val A_3_)))) Or (
+	Not (Val RAM5_3_) And ((Val A_0_) And Not (Val A_1_)
+	 And (Val A_2_) And Not (Val A_3_)))) Or (Not (Val RAM6_3_)
+	 And (Not (Val A_0_) And (Val A_1_) And (Val A_2_) And 
+	Not (Val A_3_)))) Or (Not (Val RAM7_3_) And ((Val A_0_)
+	 And (Val A_1_) And (Val A_2_) And Not (Val A_3_))))
+	 Or (Not (Val RAM8_3_) And (Not (Val A_0_) And Not (Val A_1_)
+	 And Not (Val A_2_) And (Val A_3_)))) Or (Not (Val RAM9_3_)
+	 And ((Val A_0_) And Not (Val A_1_) And Not (Val A_2_)
+	 And (Val A_3_)))) Or (Not (Val RAM10_3_) And (Not (Val A_0_)
+	 And (Val A_1_) And Not (Val A_2_) And (Val A_3_))))
+	 Or (Not (Val RAM11_3_) And ((Val A_0_) And (Val A_1_)
+	 And Not (Val A_2_) And (Val A_3_)))) Or (Not (Val RAM12_3_)
+	 And (Not (Val A_0_) And Not (Val A_1_) And (Val A_2_)
+	 And (Val A_3_)))) Or (Not (Val RAM13_3_) And ((Val A_0_)
+	 And Not (Val A_1_) And (Val A_2_) And (Val A_3_))))
+	 Or (Not (Val RAM14_3_) And (Not (Val A_0_) And (Val A_1_)
+	 And (Val A_2_) And (Val A_3_)))) Or (Not (Val RAM15_3_)
+	 And ((Val A_0_) And (Val A_1_) And (Val A_2_) And (Val A_3_)
+	))))))|_|
+	(Output (ACCU_IN_0_,
+	(((Val SH_ACC_0_) And Not (Val TEST_MODE)) Or ((Val SCIN)
+	 And (Val TEST_MODE)))))|_|
+	(Output (ACCU_IN_1_,
+	(((Val SH_ACC_1_) And Not (Val TEST_MODE)) Or (Not (Val ACCU_0_)
+	 And (Val TEST_MODE)))))|_|
+	(Output (ACCU_IN_2_,
+	(((Val SH_ACC_2_) And Not (Val TEST_MODE)) Or (Not (Val ACCU_1_)
+	 And (Val TEST_MODE)))))|_|
+	(Output (ACCU_IN_3_,
+	(((Val SH_ACC_3_) And Not (Val TEST_MODE)) Or (Not (Val ACCU_2_)
+	 And (Val TEST_MODE)))))|_|
+	(Output (WCKACCU,
+	((Val CK) And ((Val TEST_MODE) Or ((Val WACCU) And (Val FONC_MODE)
+	)))))|_|
+	(Output (WCK15,
+	((((((Val CK) And (Val WRAM)) And (Val B_3_)) And (Val B_2_)
+	) And (Val B_1_)) And (Val B_0_))))|_|
+	(Output (WCK14,
+	((((((Val CK) And (Val WRAM)) And (Val B_3_)) And (Val B_2_)
+	) And (Val B_1_)) And Not (Val B_0_))))|_|
+	(Output (WCK13,
+	((((((Val CK) And (Val WRAM)) And (Val B_3_)) And (Val B_2_)
+	) And Not (Val B_1_)) And (Val B_0_))))|_|
+	(Output (WCK12,
+	((((((Val CK) And (Val WRAM)) And (Val B_3_)) And (Val B_2_)
+	) And Not (Val B_1_)) And Not (Val B_0_))))|_|
+	(Output (WCK11,
+	((((((Val CK) And (Val WRAM)) And (Val B_3_)) And Not 
+	(Val B_2_)) And (Val B_1_)) And (Val B_0_))))|_|
+	(Output (WCK10,
+	((((((Val CK) And (Val WRAM)) And (Val B_3_)) And Not 
+	(Val B_2_)) And (Val B_1_)) And Not (Val B_0_))))|_|
+	(Output (WCK9,
+	((((((Val CK) And (Val WRAM)) And (Val B_3_)) And Not 
+	(Val B_2_)) And Not (Val B_1_)) And (Val B_0_))))|_|
+	(Output (WCK8,
+	((((((Val CK) And (Val WRAM)) And (Val B_3_)) And Not 
+	(Val B_2_)) And Not (Val B_1_)) And Not (Val B_0_))))|_|
+	(Output (WCK7,
+	((((((Val CK) And (Val WRAM)) And Not (Val B_3_)) And 
+	(Val B_2_)) And (Val B_1_)) And (Val B_0_))))|_|
+	(Output (WCK6,
+	((((((Val CK) And (Val WRAM)) And Not (Val B_3_)) And 
+	(Val B_2_)) And (Val B_1_)) And Not (Val B_0_))))|_|
+	(Output (WCK5,
+	((((((Val CK) And (Val WRAM)) And Not (Val B_3_)) And 
+	(Val B_2_)) And Not (Val B_1_)) And (Val B_0_))))|_|
+	(Output (WCK4,
+	((((((Val CK) And (Val WRAM)) And Not (Val B_3_)) And 
+	(Val B_2_)) And Not (Val B_1_)) And Not (Val B_0_))))|_|
+	(Output (WCK3,
+	((((((Val CK) And (Val WRAM)) And Not (Val B_3_)) And 
+	Not (Val B_2_)) And (Val B_1_)) And (Val B_0_))))|_|
+	(Output (WCK2,
+	((((((Val CK) And (Val WRAM)) And Not (Val B_3_)) And 
+	Not (Val B_2_)) And (Val B_1_)) And Not (Val B_0_))))|_|
+	(Output (WCK1,
+	((((((Val CK) And (Val WRAM)) And Not (Val B_3_)) And 
+	Not (Val B_2_)) And Not (Val B_1_)) And (Val B_0_))))|_|
+	(Output (WCK0,
+	((((((Val CK) And (Val WRAM)) And Not (Val B_3_)) And 
+	Not (Val B_2_)) And Not (Val B_1_)) And Not (Val B_0_)
+	)))|_|
+	(Output (WRAM,
+	(((Val I_8_) Or (Val I_7_)) And (Val FONC_MODE))))|_|
+	(Output (SH_RAM_0_,
+	(((Val ALU_OUT_0_) And (Not (Val SHIFT_R) And Not (Val SHIFT_L)
+	 And (Val SHIFT_N))) Or (((Val R0) And (Not (Val SHIFT_R)
+	 And (Val SHIFT_L) And Not (Val SHIFT_N))) Or ((Val ALU_OUT_1_)
+	 And ((Val SHIFT_R) And Not (Val SHIFT_L) And Not (Val SHIFT_N)
+	))))))|_|
+	(Output (SH_RAM_1_,
+	(((Val ALU_OUT_1_) And (Not (Val SHIFT_R) And Not (Val SHIFT_L)
+	 And (Val SHIFT_N))) Or (((Val ALU_OUT_0_) And (Not (Val SHIFT_R)
+	 And (Val SHIFT_L) And Not (Val SHIFT_N))) Or ((Val ALU_OUT_2_)
+	 And ((Val SHIFT_R) And Not (Val SHIFT_L) And Not (Val SHIFT_N)
+	))))))|_|
+	(Output (SH_RAM_2_,
+	(((Val ALU_OUT_2_) And (Not (Val SHIFT_R) And Not (Val SHIFT_L)
+	 And (Val SHIFT_N))) Or (((Val ALU_OUT_1_) And (Not (Val SHIFT_R)
+	 And (Val SHIFT_L) And Not (Val SHIFT_N))) Or ((Val ALU_OUT_3_)
+	 And ((Val SHIFT_R) And Not (Val SHIFT_L) And Not (Val SHIFT_N)
+	))))))|_|
+	(Output (SH_RAM_3_,
+	(((Val ALU_OUT_3_) And (Not (Val SHIFT_R) And Not (Val SHIFT_L)
+	 And (Val SHIFT_N))) Or (((Val ALU_OUT_2_) And (Not (Val SHIFT_R)
+	 And (Val SHIFT_L) And Not (Val SHIFT_N))) Or ((Val R3)
+	 And ((Val SHIFT_R) And Not (Val SHIFT_L) And Not (Val SHIFT_N)
+	))))))|_|
+	(Output (SH_ACC_0_,
+	(((Val ALU_OUT_0_) And (Not (Val I_6_) And Not (Val I_7_)
+	 And Not (Val I_8_))) Or (((((Val Q0) And (Not (Val I_6_)
+	 And (Val I_7_) And (Val I_8_))) Or ((Val Q0) And ((Val I_6_)
+	 And (Val I_7_) And (Val I_8_)))) Or (Not (Val ACCU_1_)
+	 And (Not (Val I_6_) And Not (Val I_7_) And (Val I_8_)
+	))) Or (Not (Val ACCU_1_) And ((Val I_6_) And Not (Val I_7_)
+	 And (Val I_8_)))))))|_|
+	(Output (SH_ACC_1_,
+	(((Val ALU_OUT_1_) And (Not (Val I_6_) And Not (Val I_7_)
+	 And Not (Val I_8_))) Or ((((Not (Val ACCU_0_) And (Not 
+	(Val I_6_) And (Val I_7_) And (Val I_8_))) Or (Not (Val ACCU_0_)
+	 And ((Val I_6_) And (Val I_7_) And (Val I_8_)))) Or 
+	(Not (Val ACCU_2_) And (Not (Val I_6_) And Not (Val I_7_)
+	 And (Val I_8_)))) Or (Not (Val ACCU_2_) And ((Val I_6_)
+	 And Not (Val I_7_) And (Val I_8_)))))))|_|
+	(Output (SH_ACC_2_,
+	(((Val ALU_OUT_2_) And (Not (Val I_6_) And Not (Val I_7_)
+	 And Not (Val I_8_))) Or ((((Not (Val ACCU_1_) And (Not 
+	(Val I_6_) And (Val I_7_) And (Val I_8_))) Or (Not (Val ACCU_1_)
+	 And ((Val I_6_) And (Val I_7_) And (Val I_8_)))) Or 
+	(Not (Val ACCU_3_) And (Not (Val I_6_) And Not (Val I_7_)
+	 And (Val I_8_)))) Or (Not (Val ACCU_3_) And ((Val I_6_)
+	 And Not (Val I_7_) And (Val I_8_)))))))|_|
+	(Output (SH_ACC_3_,
+	(((Val ALU_OUT_3_) And (Not (Val I_6_) And Not (Val I_7_)
+	 And Not (Val I_8_))) Or ((((Not (Val ACCU_2_) And (Not 
+	(Val I_6_) And (Val I_7_) And (Val I_8_))) Or (Not (Val ACCU_2_)
+	 And ((Val I_6_) And (Val I_7_) And (Val I_8_)))) Or 
+	((Val Q3) And (Not (Val I_6_) And Not (Val I_7_) And 
+	(Val I_8_)))) Or ((Val Q3) And ((Val I_6_) And Not (Val I_7_)
+	 And (Val I_8_)))))))|_|
+	(Output (SHIFT_R,
+	((Val I_8_) And Not (Val I_7_))))|_|
+	(Output (SHIFT_L,
+	((Val I_8_) And (Val I_7_))))|_|
+	(Output (SHIFT_N,
+	Not (Val I_8_)))|_|
+	(Output (TEST_MODE,
+	((Val TEST) And Not (Val FONC))))|_|
+	(Output (FONC_MODE,
+	((Val FONC) And Not (Val TEST))))|_|
+	(Output (WACCU,
+	(Not (Val I_6_) And (Not (Val I_7_) Or (Val I_8_)))))|_|
+	(Output (C_DIFSR_0_,
+	(((Not (Val R_0_) And (Val S_0_)) Or (Not (Val R_0_)
+	 And (Val CIN))) Or ((Val S_0_) And (Val CIN)))))|_|
+	(Output (C_DIFSR_1_,
+	(((Not (Val R_1_) And (Val S_1_)) Or (Not (Val R_1_)
+	 And (Val C_DIFSR_0_))) Or ((Val S_1_) And (Val C_DIFSR_0_)
+	))))|_|
+	(Output (C_DIFSR_2_,
+	(((Not (Val R_2_) And (Val S_2_)) Or (Not (Val R_2_)
+	 And (Val C_DIFSR_1_))) Or ((Val S_2_) And (Val C_DIFSR_1_)
+	))))|_|
+	(Output (C_DIFSR_3_,
+	(((Not (Val R_3_) And (Val S_3_)) Or (Not (Val R_3_)
+	 And (Val C_DIFSR_2_))) Or ((Val S_3_) And (Val C_DIFSR_2_)
+	))))|_|
+	(Output (C_DIFRS_0_,
+	((((Val R_0_) And Not (Val S_0_)) Or ((Val R_0_) And 
+	(Val CIN))) Or (Not (Val S_0_) And (Val CIN)))))|_|
+	(Output (C_DIFRS_1_,
+	((((Val R_1_) And Not (Val S_1_)) Or ((Val R_1_) And 
+	(Val C_DIFRS_0_))) Or (Not (Val S_1_) And (Val C_DIFRS_0_)
+	))))|_|
+	(Output (C_DIFRS_2_,
+	((((Val R_2_) And Not (Val S_2_)) Or ((Val R_2_) And 
+	(Val C_DIFRS_1_))) Or (Not (Val S_2_) And (Val C_DIFRS_1_)
+	))))|_|
+	(Output (C_DIFRS_3_,
+	((((Val R_3_) And Not (Val S_3_)) Or ((Val R_3_) And 
+	(Val C_DIFRS_2_))) Or (Not (Val S_3_) And (Val C_DIFRS_2_)
+	))))|_|
+	(Output (C_SUMRS_0_,
+	((((Val R_0_) And (Val S_0_)) Or ((Val R_0_) And (Val CIN)
+	)) Or ((Val S_0_) And (Val CIN)))))|_|
+	(Output (C_SUMRS_1_,
+	((((Val R_1_) And (Val S_1_)) Or ((Val R_1_) And (Val C_SUMRS_0_)
+	)) Or ((Val S_1_) And (Val C_SUMRS_0_)))))|_|
+	(Output (C_SUMRS_2_,
+	((((Val R_2_) And (Val S_2_)) Or ((Val R_2_) And (Val C_SUMRS_1_)
+	)) Or ((Val S_2_) And (Val C_SUMRS_1_)))))|_|
+	(Output (C_SUMRS_3_,
+	((((Val R_3_) And (Val S_3_)) Or ((Val R_3_) And (Val C_SUMRS_2_)
+	)) Or ((Val S_3_) And (Val C_SUMRS_2_)))))|_|
+	(Output (DIFSR_0_,
+	((Not (Val R_0_) Xor (Val S_0_)) Xor (Val CIN))))|_|
+	(Output (DIFSR_1_,
+	((Not (Val R_1_) Xor (Val S_1_)) Xor (Val C_DIFSR_0_)
+	)))|_|
+	(Output (DIFSR_2_,
+	((Not (Val R_2_) Xor (Val S_2_)) Xor (Val C_DIFSR_1_)
+	)))|_|
+	(Output (DIFSR_3_,
+	((Not (Val R_3_) Xor (Val S_3_)) Xor (Val C_DIFSR_2_)
+	)))|_|
+	(Output (DIFRS_0_,
+	(((Val R_0_) Xor Not (Val S_0_)) Xor (Val CIN))))|_|
+	(Output (DIFRS_1_,
+	(((Val R_1_) Xor Not (Val S_1_)) Xor (Val C_DIFRS_0_)
+	)))|_|
+	(Output (DIFRS_2_,
+	(((Val R_2_) Xor Not (Val S_2_)) Xor (Val C_DIFRS_1_)
+	)))|_|
+	(Output (DIFRS_3_,
+	(((Val R_3_) Xor Not (Val S_3_)) Xor (Val C_DIFRS_2_)
+	)))|_|
+	(Output (SUMRS_0_,
+	(((Val R_0_) Xor (Val S_0_)) Xor (Val CIN))))|_|
+	(Output (SUMRS_1_,
+	(((Val R_1_) Xor (Val S_1_)) Xor (Val C_SUMRS_0_))))|_|
+	(Output (SUMRS_2_,
+	(((Val R_2_) Xor (Val S_2_)) Xor (Val C_SUMRS_1_))))|_|
+	(Output (SUMRS_3_,
+	(((Val R_3_) Xor (Val S_3_)) Xor (Val C_SUMRS_2_))))|_|
+	(Output (ALU_OUT_0_,
+	(((Val SUMRS_0_) And (Not (Val I_3_) And Not (Val I_4_)
+	 And Not (Val I_5_))) Or ((((((((Val DIFSR_0_) And ((Val I_3_)
+	 And Not (Val I_4_) And Not (Val I_5_))) Or ((Val DIFRS_0_)
+	 And (Not (Val I_3_) And (Val I_4_) And Not (Val I_5_)
+	))) Or (((Val R_0_) Or (Val S_0_)) And ((Val I_3_) And 
+	(Val I_4_) And Not (Val I_5_)))) Or (((Val R_0_) And 
+	(Val S_0_)) And (Not (Val I_3_) And Not (Val I_4_) And 
+	(Val I_5_)))) Or ((Not (Val R_0_) And (Val S_0_)) And 
+	((Val I_3_) And Not (Val I_4_) And (Val I_5_)))) Or 
+	(((Val R_0_) Xor (Val S_0_)) And (Not (Val I_3_) And 
+	(Val I_4_) And (Val I_5_)))) Or (Not ((Val R_0_) Xor 
+	(Val S_0_)) And ((Val I_3_) And (Val I_4_) And (Val I_5_)
+	))))))|_|
+	(Output (ALU_OUT_1_,
+	(((Val SUMRS_1_) And (Not (Val I_3_) And Not (Val I_4_)
+	 And Not (Val I_5_))) Or ((((((((Val DIFSR_1_) And ((Val I_3_)
+	 And Not (Val I_4_) And Not (Val I_5_))) Or ((Val DIFRS_1_)
+	 And (Not (Val I_3_) And (Val I_4_) And Not (Val I_5_)
+	))) Or (((Val R_1_) Or (Val S_1_)) And ((Val I_3_) And 
+	(Val I_4_) And Not (Val I_5_)))) Or (((Val R_1_) And 
+	(Val S_1_)) And (Not (Val I_3_) And Not (Val I_4_) And 
+	(Val I_5_)))) Or ((Not (Val R_1_) And (Val S_1_)) And 
+	((Val I_3_) And Not (Val I_4_) And (Val I_5_)))) Or 
+	(((Val R_1_) Xor (Val S_1_)) And (Not (Val I_3_) And 
+	(Val I_4_) And (Val I_5_)))) Or (Not ((Val R_1_) Xor 
+	(Val S_1_)) And ((Val I_3_) And (Val I_4_) And (Val I_5_)
+	))))))|_|
+	(Output (ALU_OUT_2_,
+	(((Val SUMRS_2_) And (Not (Val I_3_) And Not (Val I_4_)
+	 And Not (Val I_5_))) Or ((((((((Val DIFSR_2_) And ((Val I_3_)
+	 And Not (Val I_4_) And Not (Val I_5_))) Or ((Val DIFRS_2_)
+	 And (Not (Val I_3_) And (Val I_4_) And Not (Val I_5_)
+	))) Or (((Val R_2_) Or (Val S_2_)) And ((Val I_3_) And 
+	(Val I_4_) And Not (Val I_5_)))) Or (((Val R_2_) And 
+	(Val S_2_)) And (Not (Val I_3_) And Not (Val I_4_) And 
+	(Val I_5_)))) Or ((Not (Val R_2_) And (Val S_2_)) And 
+	((Val I_3_) And Not (Val I_4_) And (Val I_5_)))) Or 
+	(((Val R_2_) Xor (Val S_2_)) And (Not (Val I_3_) And 
+	(Val I_4_) And (Val I_5_)))) Or (Not ((Val R_2_) Xor 
+	(Val S_2_)) And ((Val I_3_) And (Val I_4_) And (Val I_5_)
+	))))))|_|
+	(Output (ALU_OUT_3_,
+	(((Val SUMRS_3_) And (Not (Val I_3_) And Not (Val I_4_)
+	 And Not (Val I_5_))) Or ((((((((Val DIFSR_3_) And ((Val I_3_)
+	 And Not (Val I_4_) And Not (Val I_5_))) Or ((Val DIFRS_3_)
+	 And (Not (Val I_3_) And (Val I_4_) And Not (Val I_5_)
+	))) Or (((Val R_3_) Or (Val S_3_)) And ((Val I_3_) And 
+	(Val I_4_) And Not (Val I_5_)))) Or (((Val R_3_) And 
+	(Val S_3_)) And (Not (Val I_3_) And Not (Val I_4_) And 
+	(Val I_5_)))) Or ((Not (Val R_3_) And (Val S_3_)) And 
+	((Val I_3_) And Not (Val I_4_) And (Val I_5_)))) Or 
+	(((Val R_3_) Xor (Val S_3_)) And (Not (Val I_3_) And 
+	(Val I_4_) And (Val I_5_)))) Or (Not ((Val R_3_) Xor 
+	(Val S_3_)) And ((Val I_3_) And (Val I_4_) And (Val I_5_)
+	))))))|_|
+	(Output (S_0_,
+	(((Val RA_0_) And (Not (Val I_0_) And Not (Val I_1_)
+	 And (Val I_2_))) Or (((((((Val RA_0_) And ((Val I_0_)
+	 And Not (Val I_1_) And (Val I_2_))) Or ((Val RB_0_)
+	 And ((Val I_0_) And Not (Val I_1_) And Not (Val I_2_)
+	))) Or ((Val RB_0_) And ((Val I_0_) And (Val I_1_) And 
+	Not (Val I_2_)))) Or (Not (Val ACCU_0_) And (Not (Val I_0_)
+	 And Not (Val I_1_) And Not (Val I_2_)))) Or (Not (Val ACCU_0_)
+	 And (Not (Val I_0_) And (Val I_1_) And Not (Val I_2_)
+	))) Or (Not (Val ACCU_0_) And (Not (Val I_0_) And (Val I_1_)
+	 And (Val I_2_)))))))|_|
+	(Output (S_1_,
+	(((Val RA_1_) And (Not (Val I_0_) And Not (Val I_1_)
+	 And (Val I_2_))) Or (((((((Val RA_1_) And ((Val I_0_)
+	 And Not (Val I_1_) And (Val I_2_))) Or ((Val RB_1_)
+	 And ((Val I_0_) And Not (Val I_1_) And Not (Val I_2_)
+	))) Or ((Val RB_1_) And ((Val I_0_) And (Val I_1_) And 
+	Not (Val I_2_)))) Or (Not (Val ACCU_1_) And (Not (Val I_0_)
+	 And Not (Val I_1_) And Not (Val I_2_)))) Or (Not (Val ACCU_1_)
+	 And (Not (Val I_0_) And (Val I_1_) And Not (Val I_2_)
+	))) Or (Not (Val ACCU_1_) And (Not (Val I_0_) And (Val I_1_)
+	 And (Val I_2_)))))))|_|
+	(Output (S_2_,
+	(((Val RA_2_) And (Not (Val I_0_) And Not (Val I_1_)
+	 And (Val I_2_))) Or (((((((Val RA_2_) And ((Val I_0_)
+	 And Not (Val I_1_) And (Val I_2_))) Or ((Val RB_2_)
+	 And ((Val I_0_) And Not (Val I_1_) And Not (Val I_2_)
+	))) Or ((Val RB_2_) And ((Val I_0_) And (Val I_1_) And 
+	Not (Val I_2_)))) Or (Not (Val ACCU_2_) And (Not (Val I_0_)
+	 And Not (Val I_1_) And Not (Val I_2_)))) Or (Not (Val ACCU_2_)
+	 And (Not (Val I_0_) And (Val I_1_) And Not (Val I_2_)
+	))) Or (Not (Val ACCU_2_) And (Not (Val I_0_) And (Val I_1_)
+	 And (Val I_2_)))))))|_|
+	(Output (S_3_,
+	(((Val RA_3_) And (Not (Val I_0_) And Not (Val I_1_)
+	 And (Val I_2_))) Or (((((((Val RA_3_) And ((Val I_0_)
+	 And Not (Val I_1_) And (Val I_2_))) Or ((Val RB_3_)
+	 And ((Val I_0_) And Not (Val I_1_) And Not (Val I_2_)
+	))) Or ((Val RB_3_) And ((Val I_0_) And (Val I_1_) And 
+	Not (Val I_2_)))) Or (Not (Val ACCU_3_) And (Not (Val I_0_)
+	 And Not (Val I_1_) And Not (Val I_2_)))) Or (Not (Val ACCU_3_)
+	 And (Not (Val I_0_) And (Val I_1_) And Not (Val I_2_)
+	))) Or (Not (Val ACCU_3_) And (Not (Val I_0_) And (Val I_1_)
+	 And (Val I_2_)))))))|_|
+	(Output (R_0_,
+	(((Val RA_0_) And (Not (Val I_0_) And Not (Val I_1_)
+	 And Not (Val I_2_))) Or (((((Val RA_0_) And ((Val I_0_)
+	 And Not (Val I_1_) And Not (Val I_2_))) Or ((Val D_0_)
+	 And ((Val I_0_) And Not (Val I_1_) And (Val I_2_)))
+	) Or ((Val D_0_) And (Not (Val I_0_) And (Val I_1_) And 
+	(Val I_2_)))) Or ((Val D_0_) And ((Val I_0_) And (Val I_1_)
+	 And (Val I_2_)))))))|_|
+	(Output (R_1_,
+	(((Val RA_1_) And (Not (Val I_0_) And Not (Val I_1_)
+	 And Not (Val I_2_))) Or (((((Val RA_1_) And ((Val I_0_)
+	 And Not (Val I_1_) And Not (Val I_2_))) Or ((Val D_1_)
+	 And ((Val I_0_) And Not (Val I_1_) And (Val I_2_)))
+	) Or ((Val D_1_) And (Not (Val I_0_) And (Val I_1_) And 
+	(Val I_2_)))) Or ((Val D_1_) And ((Val I_0_) And (Val I_1_)
+	 And (Val I_2_)))))))|_|
+	(Output (R_2_,
+	(((Val RA_2_) And (Not (Val I_0_) And Not (Val I_1_)
+	 And Not (Val I_2_))) Or (((((Val RA_2_) And ((Val I_0_)
+	 And Not (Val I_1_) And Not (Val I_2_))) Or ((Val D_2_)
+	 And ((Val I_0_) And Not (Val I_1_) And (Val I_2_)))
+	) Or ((Val D_2_) And (Not (Val I_0_) And (Val I_1_) And 
+	(Val I_2_)))) Or ((Val D_2_) And ((Val I_0_) And (Val I_1_)
+	 And (Val I_2_)))))))|_|
+	(Output (R_3_,
+	(((Val RA_3_) And (Not (Val I_0_) And Not (Val I_1_)
+	 And Not (Val I_2_))) Or (((((Val RA_3_) And ((Val I_0_)
+	 And Not (Val I_1_) And Not (Val I_2_))) Or ((Val D_3_)
+	 And ((Val I_0_) And Not (Val I_1_) And (Val I_2_)))
+	) Or ((Val D_3_) And (Not (Val I_0_) And (Val I_1_) And 
+	(Val I_2_)))) Or ((Val D_3_) And ((Val I_0_) And (Val I_1_)
+	 And (Val I_2_)))))))|_|
+	(RegDrv(RAM15_0_, [(
+	(Not (Val WCK15) And Not (Stable WCK15)), 
+	Not (Val SH_RAM_0_))]))|_|
+	(RegDrv(RAM15_1_, [(
+	(Not (Val WCK15) And Not (Stable WCK15)), 
+	Not (Val SH_RAM_1_))]))|_|
+	(RegDrv(RAM15_2_, [(
+	(Not (Val WCK15) And Not (Stable WCK15)), 
+	Not (Val SH_RAM_2_))]))|_|
+	(RegDrv(RAM15_3_, [(
+	(Not (Val WCK15) And Not (Stable WCK15)), 
+	Not (Val SH_RAM_3_))]))|_|
+	(RegDrv(RAM14_0_, [(
+	(Not (Val WCK14) And Not (Stable WCK14)), 
+	Not (Val SH_RAM_0_))]))|_|
+	(RegDrv(RAM14_1_, [(
+	(Not (Val WCK14) And Not (Stable WCK14)), 
+	Not (Val SH_RAM_1_))]))|_|
+	(RegDrv(RAM14_2_, [(
+	(Not (Val WCK14) And Not (Stable WCK14)), 
+	Not (Val SH_RAM_2_))]))|_|
+	(RegDrv(RAM14_3_, [(
+	(Not (Val WCK14) And Not (Stable WCK14)), 
+	Not (Val SH_RAM_3_))]))|_|
+	(RegDrv(RAM13_0_, [(
+	(Not (Val WCK13) And Not (Stable WCK13)), 
+	Not (Val SH_RAM_0_))]))|_|
+	(RegDrv(RAM13_1_, [(
+	(Not (Val WCK13) And Not (Stable WCK13)), 
+	Not (Val SH_RAM_1_))]))|_|
+	(RegDrv(RAM13_2_, [(
+	(Not (Val WCK13) And Not (Stable WCK13)), 
+	Not (Val SH_RAM_2_))]))|_|
+	(RegDrv(RAM13_3_, [(
+	(Not (Val WCK13) And Not (Stable WCK13)), 
+	Not (Val SH_RAM_3_))]))|_|
+	(RegDrv(RAM12_0_, [(
+	(Not (Val WCK12) And Not (Stable WCK12)), 
+	Not (Val SH_RAM_0_))]))|_|
+	(RegDrv(RAM12_1_, [(
+	(Not (Val WCK12) And Not (Stable WCK12)), 
+	Not (Val SH_RAM_1_))]))|_|
+	(RegDrv(RAM12_2_, [(
+	(Not (Val WCK12) And Not (Stable WCK12)), 
+	Not (Val SH_RAM_2_))]))|_|
+	(RegDrv(RAM12_3_, [(
+	(Not (Val WCK12) And Not (Stable WCK12)), 
+	Not (Val SH_RAM_3_))]))|_|
+	(RegDrv(RAM11_0_, [(
+	(Not (Val WCK11) And Not (Stable WCK11)), 
+	Not (Val SH_RAM_0_))]))|_|
+	(RegDrv(RAM11_1_, [(
+	(Not (Val WCK11) And Not (Stable WCK11)), 
+	Not (Val SH_RAM_1_))]))|_|
+	(RegDrv(RAM11_2_, [(
+	(Not (Val WCK11) And Not (Stable WCK11)), 
+	Not (Val SH_RAM_2_))]))|_|
+	(RegDrv(RAM11_3_, [(
+	(Not (Val WCK11) And Not (Stable WCK11)), 
+	Not (Val SH_RAM_3_))]))|_|
+	(RegDrv(RAM10_0_, [(
+	(Not (Val WCK10) And Not (Stable WCK10)), 
+	Not (Val SH_RAM_0_))]))|_|
+	(RegDrv(RAM10_1_, [(
+	(Not (Val WCK10) And Not (Stable WCK10)), 
+	Not (Val SH_RAM_1_))]))|_|
+	(RegDrv(RAM10_2_, [(
+	(Not (Val WCK10) And Not (Stable WCK10)), 
+	Not (Val SH_RAM_2_))]))|_|
+	(RegDrv(RAM10_3_, [(
+	(Not (Val WCK10) And Not (Stable WCK10)), 
+	Not (Val SH_RAM_3_))]))|_|
+	(RegDrv(RAM9_0_, [(
+	(Not (Val WCK9) And Not (Stable WCK9)), 
+	Not (Val SH_RAM_0_))]))|_|
+	(RegDrv(RAM9_1_, [(
+	(Not (Val WCK9) And Not (Stable WCK9)), 
+	Not (Val SH_RAM_1_))]))|_|
+	(RegDrv(RAM9_2_, [(
+	(Not (Val WCK9) And Not (Stable WCK9)), 
+	Not (Val SH_RAM_2_))]))|_|
+	(RegDrv(RAM9_3_, [(
+	(Not (Val WCK9) And Not (Stable WCK9)), 
+	Not (Val SH_RAM_3_))]))|_|
+	(RegDrv(RAM8_0_, [(
+	(Not (Val WCK8) And Not (Stable WCK8)), 
+	Not (Val SH_RAM_0_))]))|_|
+	(RegDrv(RAM8_1_, [(
+	(Not (Val WCK8) And Not (Stable WCK8)), 
+	Not (Val SH_RAM_1_))]))|_|
+	(RegDrv(RAM8_2_, [(
+	(Not (Val WCK8) And Not (Stable WCK8)), 
+	Not (Val SH_RAM_2_))]))|_|
+	(RegDrv(RAM8_3_, [(
+	(Not (Val WCK8) And Not (Stable WCK8)), 
+	Not (Val SH_RAM_3_))]))|_|
+	(RegDrv(RAM7_0_, [(
+	(Not (Val WCK7) And Not (Stable WCK7)), 
+	Not (Val SH_RAM_0_))]))|_|
+	(RegDrv(RAM7_1_, [(
+	(Not (Val WCK7) And Not (Stable WCK7)), 
+	Not (Val SH_RAM_1_))]))|_|
+	(RegDrv(RAM7_2_, [(
+	(Not (Val WCK7) And Not (Stable WCK7)), 
+	Not (Val SH_RAM_2_))]))|_|
+	(RegDrv(RAM7_3_, [(
+	(Not (Val WCK7) And Not (Stable WCK7)), 
+	Not (Val SH_RAM_3_))]))|_|
+	(RegDrv(RAM6_0_, [(
+	(Not (Val WCK6) And Not (Stable WCK6)), 
+	Not (Val SH_RAM_0_))]))|_|
+	(RegDrv(RAM6_1_, [(
+	(Not (Val WCK6) And Not (Stable WCK6)), 
+	Not (Val SH_RAM_1_))]))|_|
+	(RegDrv(RAM6_2_, [(
+	(Not (Val WCK6) And Not (Stable WCK6)), 
+	Not (Val SH_RAM_2_))]))|_|
+	(RegDrv(RAM6_3_, [(
+	(Not (Val WCK6) And Not (Stable WCK6)), 
+	Not (Val SH_RAM_3_))]))|_|
+	(RegDrv(RAM5_0_, [(
+	(Not (Val WCK5) And Not (Stable WCK5)), 
+	Not (Val SH_RAM_0_))]))|_|
+	(RegDrv(RAM5_1_, [(
+	(Not (Val WCK5) And Not (Stable WCK5)), 
+	Not (Val SH_RAM_1_))]))|_|
+	(RegDrv(RAM5_2_, [(
+	(Not (Val WCK5) And Not (Stable WCK5)), 
+	Not (Val SH_RAM_2_))]))|_|
+	(RegDrv(RAM5_3_, [(
+	(Not (Val WCK5) And Not (Stable WCK5)), 
+	Not (Val SH_RAM_3_))]))|_|
+	(RegDrv(RAM4_0_, [(
+	(Not (Val WCK4) And Not (Stable WCK4)), 
+	Not (Val SH_RAM_0_))]))|_|
+	(RegDrv(RAM4_1_, [(
+	(Not (Val WCK4) And Not (Stable WCK4)), 
+	Not (Val SH_RAM_1_))]))|_|
+	(RegDrv(RAM4_2_, [(
+	(Not (Val WCK4) And Not (Stable WCK4)), 
+	Not (Val SH_RAM_2_))]))|_|
+	(RegDrv(RAM4_3_, [(
+	(Not (Val WCK4) And Not (Stable WCK4)), 
+	Not (Val SH_RAM_3_))]))|_|
+	(RegDrv(RAM3_0_, [(
+	(Not (Val WCK3) And Not (Stable WCK3)), 
+	Not (Val SH_RAM_0_))]))|_|
+	(RegDrv(RAM3_1_, [(
+	(Not (Val WCK3) And Not (Stable WCK3)), 
+	Not (Val SH_RAM_1_))]))|_|
+	(RegDrv(RAM3_2_, [(
+	(Not (Val WCK3) And Not (Stable WCK3)), 
+	Not (Val SH_RAM_2_))]))|_|
+	(RegDrv(RAM3_3_, [(
+	(Not (Val WCK3) And Not (Stable WCK3)), 
+	Not (Val SH_RAM_3_))]))|_|
+	(RegDrv(RAM2_0_, [(
+	(Not (Val WCK2) And Not (Stable WCK2)), 
+	Not (Val SH_RAM_0_))]))|_|
+	(RegDrv(RAM2_1_, [(
+	(Not (Val WCK2) And Not (Stable WCK2)), 
+	Not (Val SH_RAM_1_))]))|_|
+	(RegDrv(RAM2_2_, [(
+	(Not (Val WCK2) And Not (Stable WCK2)), 
+	Not (Val SH_RAM_2_))]))|_|
+	(RegDrv(RAM2_3_, [(
+	(Not (Val WCK2) And Not (Stable WCK2)), 
+	Not (Val SH_RAM_3_))]))|_|
+	(RegDrv(RAM1_0_, [(
+	(Not (Val WCK1) And Not (Stable WCK1)), 
+	Not (Val SH_RAM_0_))]))|_|
+	(RegDrv(RAM1_1_, [(
+	(Not (Val WCK1) And Not (Stable WCK1)), 
+	Not (Val SH_RAM_1_))]))|_|
+	(RegDrv(RAM1_2_, [(
+	(Not (Val WCK1) And Not (Stable WCK1)), 
+	Not (Val SH_RAM_2_))]))|_|
+	(RegDrv(RAM1_3_, [(
+	(Not (Val WCK1) And Not (Stable WCK1)), 
+	Not (Val SH_RAM_3_))]))|_|
+	(RegDrv(RAM0_0_, [(
+	(Not (Val WCK0) And Not (Stable WCK0)), 
+	Not (Val SH_RAM_0_))]))|_|
+	(RegDrv(RAM0_1_, [(
+	(Not (Val WCK0) And Not (Stable WCK0)), 
+	Not (Val SH_RAM_1_))]))|_|
+	(RegDrv(RAM0_2_, [(
+	(Not (Val WCK0) And Not (Stable WCK0)), 
+	Not (Val SH_RAM_2_))]))|_|
+	(RegDrv(RAM0_3_, [(
+	(Not (Val WCK0) And Not (Stable WCK0)), 
+	Not (Val SH_RAM_3_))]))|_|
+	(RegDrv(ACCU_0_, [(
+	(Not (Val WCKACCU) And Not (Stable WCKACCU)), 
+	Not (Val ACCU_IN_0_))]))|_|
+	(RegDrv(ACCU_1_, [(
+	(Not (Val WCKACCU) And Not (Stable WCKACCU)), 
+	Not (Val ACCU_IN_1_))]))|_|
+	(RegDrv(ACCU_2_, [(
+	(Not (Val WCKACCU) And Not (Stable WCKACCU)), 
+	Not (Val ACCU_IN_2_))]))|_|
+	(RegDrv(ACCU_3_, [(
+	(Not (Val WCKACCU) And Not (Stable WCKACCU)), 
+	Not (Val ACCU_IN_3_))]));
+
+let AMD = make_fsm AMDs;
+end_abstype AMD AMDs;

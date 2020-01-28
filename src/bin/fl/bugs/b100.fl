@@ -1,0 +1,77 @@
+load "ste.fl";
+
+TYPE "byte" 8;
+ENUM "reg" ["R0","R1","R2","R3"];
+ENUM "cmd" ["PLUS", "INC"];
+
+let regFile =
+    reg_input src_a src_b dest.
+    byte_input _val. 
+    byte_output input1 input2.
+    byte_internal r0 r1 r2 r3.
+    CELL "reg_file" [
+    // Update register with previous command
+    r0 <: (IF is_R0 dest THEN _val ELSE r0),
+    r1 <: (IF is_R1 dest THEN _val ELSE r1),
+    r2 <: (IF is_R2 dest THEN _val ELSE r2),
+    r3 <: (IF is_R3 dest THEN _val ELSE r3),
+    // Get value from src_a into input1
+    input1 <-  (IF is_R0 src_a THEN r0
+	  ELSE (IF is_R1 src_a THEN r1
+	  ELSE (IF is_R2 src_a THEN r2
+	  ELSE r3))),
+    // Get value from src_b into input2
+    input2 <-  (IF is_R0 src_a THEN r0
+	  ELSE (IF is_R1 src_a THEN r1
+	  ELSE (IF is_R2 src_a THEN r2
+	  ELSE r3)))
+    ];
+
+let p_regfile = regFile 'src_a 'src_b 'dest 'alu_output 'alu_input1 'alu_input2;
+let ckt_regfile = pexlif2fsm p_regfile;
+let d_regfile = STE_debug ckt_regfile;
+
+let alu =
+    cmd_input cmd.
+    byte_input in1 in2.
+    byte_output res.
+    CELL "alu" [
+    res <- (IF is_PLUS cmd THEN in1 '+' in2 ELSE in1 '+' '1)
+    ];
+
+let p_alu = alu 'cmd 'in1 'in2 'res;
+let ckt_alu = pexlif2fsm p_alu;
+let d_alu = STE_debug ckt_alu;
+
+let proc =
+    bit_input clk init.
+    cmd_input cmd.
+    reg_input src_reg_a src_reg_b dest_reg.
+    reg_output dest_reg_.
+    byte_output alu_output_.
+    byte_internal alu_input_a alu_input_b alu_output.
+    byte_internal delay_alu.
+    reg_internal delay_dest.
+    CELL "proc" [
+    // Get alu inputs
+    regFile src_reg_a src_reg_b dest_reg_ alu_output_ alu_input_a alu_input_b,
+    // Get new alu output
+    alu cmd alu_input_a alu_input_b alu_output,
+    // Delay alu output and destination register
+    delay_dest <- (IF init THEN R0 ELSE dest_reg),
+    delay_alu <- (IF init THEN '0 ELSE alu_output),
+    re_ff clk delay_dest dest_reg_,
+    re_ff clk delay_alu alu_output_
+    ];    
+
+let p = proc 'clk 'init 'cmd 'src_reg_a 'src_reg_b 'dest_reg 'dest_reg_ 'alu_output_;
+
+//update_vossrc "VERBOSE-FSM-PRINT" "YES";
+let ckt = pexlif2fsm p;
+ckt;
+
+let dd = STE_debug ckt;
+dd;
+
+qsort node_name_cmp ["i1/r3[7:0]", "i1/r2[7:0]", "i1/r1[7:0]", "i1/r0[7:0]"];
+qsort strcmp ["i1/r3[7:0]", "i1/r2[7:0]", "i1/r1[7:0]", "i1/r0[7:0]"];

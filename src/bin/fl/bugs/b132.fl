@@ -1,0 +1,20 @@
+
+lettype tr = BR tr tr | LF int;
+
+let t1 = BR (BR (LF 1) (LF 2)) (LF 3);
+let t2 = BR (BR (LF 1) (LF 2)) (BR (LF 3) (LF 4));
+let t3 = BR (LF 1) (LF 2);
+
+let s1 = [1,2,3,4,5,6];
+let s2 = [4,5,6,7,8];
+
+s1 union s2;
+s1 intersect s2;
+s1 subtract s2;
+
+let s3 = [t1,t2];
+let s4 = [t3];
+
+s3 union s4;
+s3 intersect s4;
+s3 subtract s4;

@@ -1,0 +1,30 @@
+open_overload {mul:: *a -> *a -> *a};
+let imul {i::int} {j::int} = i*j;
+add_open_overload mul imul;
+let fmul {i::float} {j::float} = i*j;
+add_open_overload mul fmul;
+let bmul {i::bv} {j::bv} = i*j;
+add_open_overload mul bmul;
+let i_mul (m1,M1) (m2,M2) = 
+        let p11 = m1 * m2 in
+        let p12 = m1 * M2 in
+        let p21 = M1 * m2 in
+        let p22 = M1 * M2 in
+        let minl l = itlist min (tl l) (hd l) in
+        let maxl l = itlist max (tl l) (hd l) in
+        minl [p11,p12,p21,p22], maxl [p11,p12,p21,p22]
+;
+add_open_overload mul i_mul;
+help "i_mul";
+let lmul l1 l2 = map2 mul l1 l2;
+add_open_overload mul lmul;
+
+let * = mul;
+infix 8 *;  
+
+rvariable "a";
+(1.3,1.5)*(2.9,3.1);	// Wrong answer....
+
+
+
+

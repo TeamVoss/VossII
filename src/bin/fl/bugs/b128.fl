@@ -1,0 +1,21 @@
+load "ste.fl";
+
+TYPE "bv2" 2;
+TYPE "bv4" 4;
+TYPE "bv6" 6;
+TYPE "bv10" 10;
+TYPE "byte" 8;
+TYPE "hword" 16;
+TYPE "word" 32;
+TYPE "dword" 64;
+
+
+STRUCT "flags" [
+                ("EQ_FLAG", "bit"),
+                ("ULESS_FLAG", "bit"),
+                ("LESS_FLAG", "bit"),
+                ("UGR_FLAG", "bit"),
+                ("GR_FLAG", "bit")
+               ]
+;
+

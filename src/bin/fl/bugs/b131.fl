@@ -1,0 +1,468 @@
+load "ste.fl";
+
+TYPE "bv2" 2;
+TYPE "bv4" 4;
+TYPE "bv6" 6;
+TYPE "bv10" 10;
+TYPE "byte" 8;
+TYPE "hword" 16;
+TYPE "word" 32;
+TYPE "dword" 64;
+
+
+STRUCT "flags" [
+		("EQ_FLAG", "bit"),
+		("ULESS_FLAG", "bit"),
+		("LESS_FLAG", "bit"),
+		("UGR_FLAG", "bit"),
+		("GR_FLAG", "bit")
+	       ]
+;
+
+let rf_info = MEM 4 16 32;
+TYPE "rf" (16*32);
+
+let rf_read {addr::bv4} {rf::rf} =
+    hw_word_constr (W_MEM_READ rf_info (hw_destr rf) (hw_destr addr))
+;
+
+let rf_write {rf::rf} {addr::bv4} {data::word} =
+    hw_rf_constr
+	(W_MEM_WRITE rf_info (hw_destr rf) (hw_destr addr) (hw_destr data))
+;
+
+let read_FP rf =  rf_read '15 rf;
+let write_FP rf value = rf_write rf '15 value;
+
+let read_SP rf =  rf_read '14 rf;
+let write_SP rf value = rf_write rf '14 value;
+
+let NBR_MEM_LOCS = 32;
+//let NBR_MEM_LOCS = 16384;
+
+let mem_info = MEM 32 NBR_MEM_LOCS 8;
+
+TYPE "emem" (8*NBR_MEM_LOCS);
+
+let mem_rd {mem::emem} {addr::word} =
+    hw_byte_constr (W_MEM_READ mem_info (hw_destr mem) (hw_destr addr))
+;
+
+let mem_wr {mem::emem} {addr::word} {data::byte} =
+    hw_emem_constr (W_MEM_WRITE mem_info (hw_destr mem) (hw_destr addr) (hw_destr data))
+;
+
+
+let b2h {b1::byte} {b2::byte} =
+    {hw_constr (W_CAT [(hw_destr b1),(hw_destr b2)]):: hword}
+;
+
+let b2w {b1::byte} {b2::byte} {b3::byte} {b4::byte} =
+    {hw_constr (W_CAT [(hw_destr b1),
+		       (hw_destr b2),
+		       (hw_destr b3),
+		       (hw_destr b4)]):: word}
+;
+
+STRUCT "state" [
+		("PC",		"word"),
+		("FLAGS",	"flags"),
+		("RF",		"rf"),
+		//("SREGS",	"???"),
+		("MEM",		"emem")
+];
+
+
+
+let extract_9_0 {h::hword} =
+    let we = hw_destr h in
+    let swe = W_SLICE (9--0) we in
+    {hw_constr swe::bv10}
+;
+
+let extract_15_8 {h::hword} =
+    let we = hw_destr h in
+    let swe = W_SLICE (15--8) we in
+    {hw_constr swe::byte}
+;
+
+let extract_15_10 {h::hword} =
+    let we = hw_destr h in
+    let swe = W_SLICE (15--10) we in
+    {hw_constr swe::bv6}
+;
+
+let extract_15_12 {h::hword} =
+    let we = hw_destr h in
+    let swe = W_SLICE (15--12) we in
+    {hw_constr swe::bv4}
+;
+
+let extract_11_8 {h::hword} =
+    let we = hw_destr h in
+    let swe = W_SLICE (11--8) we in
+    {hw_constr swe::bv4}
+;
+
+let extract_7_4 {h::hword} =
+    let we = hw_destr h in
+    let swe = W_SLICE (7--4) we in
+    {hw_constr swe::bv4}
+;
+
+let extract_3_0 {h::hword} =
+    let we = hw_destr h in
+    let swe = W_SLICE (3--0) we in
+    {hw_constr swe::bv4}
+;
+
+let extract_32_16 {w::word} =
+    let we = hw_destr w in
+    let swe = W_SLICE (31--16) we in
+    {hw_constr swe::hword}
+;
+
+let extract_7_0 {h::word} =
+    let we = hw_destr h in
+    let swe = W_SLICE (7--0) we in
+    {hw_constr swe::byte}
+;
+
+let extract_15_0 {h::word} =
+    let we = hw_destr h in
+    let swe = W_SLICE (15--0) we in
+    {hw_constr swe::hword}
+;
+
+let signed_gt {a:: *a} {b:: *a} =
+    let aw = hw_destr a in
+    let bw = hw_destr b in
+    let sz = hw_size a in
+    let a_sign = W_SLICE [sz-1] aw in
+    let b_sign = W_SLICE [sz-1] bw in
+    let w_res = W_ITE a_sign
+		(
+		    W_ITE b_sign (W_GR aw bw) (W_CONST 1 0)
+		)
+		(
+		    W_ITE b_sign (W_CONST 1 1) (W_GR aw bw)
+		)
+    in
+    {hw_constr w_res::bit}
+;
+
+let NEXT =
+    state_input state.
+    state_output next_state.
+    internal pc flags eq uless less ugr gr rf mem instr imm imm_7_0 imm_15_0.
+    internal instr_11_8 instr_7_4 instr_3_0 short_rA rA rB mem_read_sz.
+    internal rb_imm_32_16 read_addr read_addr1 read_addr2 read_addr3.
+    internal mem_data next_pc instr_9_0 br_target pc' do_wb wb_adr wb_d eq'.
+    internal ugt' gt' lt' ult' raw_flags flags' rf' mem'.
+    bit_internal is_ADD is_AND is_ASHL is_ASHR is_BEQ is_BGE is_BGEU is_BGT.
+    bit_internal is_BGTU is_BLE is_BLEU is_BLT is_BLTU is_BNE is_CMP is_DEC.
+    bit_internal is_DIV is_GSR is_INC is_JMP is_JMPA is_JSR is_JSRA is_LDA_B.
+    bit_internal is_LDA_L is_LDA_S is_LDI_B is_LDI_L is_LDI_S is_LDO_B is_LDO_L.
+    bit_internal is_LDO_S is_LD_B is_LD_L is_LD_S is_LSHR is_MOD is_MOV is_MUL.
+    bit_internal is_NEG is_NOP is_NOT is_OR is_POP is_PUSH is_RET is_SSR.
+    bit_internal is_STA_B is_STA_L is_STA_S is_STO_B is_STO_L is_STO_S is_ST_B.
+    bit_internal is_ST_L is_ST_S is_SUB_L is_SWI is_UDIV is_UMOD is_XOR.
+    //
+    CELL "Draw_hfl_code NEXT 1" [
+	//
+	// Extract current state elements
+	//
+	pc    <- state-->PC,
+	flags <- state-->FLAGS,
+	eq <- flags-->EQ_FLAG,
+	uless <- flags-->ULESS_FLAG,
+	less <- flags-->LESS_FLAG,
+	ugr <- flags-->UGR_FLAG,
+	gr <- flags-->GR_FLAG,
+	rf  <- state-->RF,
+	mem  <- state-->MEM,
+	//
+	// Now read instructions and (potentially) immediate values
+	//
+	instr <- b2h (mem_rd mem pc) (mem_rd mem (pc '+' '1)),
+	imm <- b2w (mem_rd mem (pc '+' '2)) (mem_rd mem (pc '+' '3))
+		      (mem_rd mem (pc '+' '4)) (mem_rd mem (pc '+' '5)),
+	imm_7_0 <- extract_7_0 imm,
+	imm_15_0 <- extract_15_0 imm,
+	//
+	// Extract subfields
+	//
+	instr_11_8 <- extract_11_8 instr,
+	instr_7_4 <- extract_7_4 instr,
+	instr_3_0 <- extract_3_0 instr,
+	//
+	// Decode instruction
+	//
+	is_ADD <- (extract_15_8 instr '=' '0b00000101),
+	is_AND <- (extract_15_8 instr '=' '0b00100110),
+	is_ASHL <- (extract_15_8 instr '=' '0b00101000),
+	is_ASHR <- (extract_15_8 instr '=' '0b00101101),
+	is_BEQ <- (extract_15_10 instr '=' '0b110000),
+	is_BGE <- (extract_15_10 instr '=' '0b110110),
+	is_BGEU <- (extract_15_10 instr '=' '0b111000),
+	is_BGT <- (extract_15_10 instr '=' '0b110011),
+	is_BGTU <- (extract_15_10 instr '=' '0b110101),
+	is_BLE <- (extract_15_10 instr '=' '0b110111),
+	is_BLEU <- (extract_15_10 instr '=' '0b111001),
+	is_BLT <- (extract_15_10 instr '=' '0b110010),
+	is_BLTU <- (extract_15_10 instr '=' '0b110100),
+	is_BNE <- (extract_15_10 instr '=' '0b110001),
+	is_CMP <- (extract_15_8 instr '=' '0b00001110),
+	is_DEC <- (extract_15_12 instr '=' '0b1001),
+	is_DIV <- (extract_15_8 instr '=' '0b00110001),
+	is_GSR <- (extract_15_12 instr '=' '0b1010),
+	is_INC <- (extract_15_12 instr '=' '0b1000),
+	is_JMP <- (extract_15_8 instr '=' '0b00100101),
+	is_JMPA <- (extract_15_8 instr '=' '0b00011010),
+	is_JSR <- (extract_15_8 instr '=' '0b00011001),
+	is_JSRA <- (extract_15_8 instr '=' '0b00000011),
+	is_LDA_B <- (extract_15_8 instr '=' '0b00011101),
+	is_LDA_L <- (extract_15_8 instr '=' '0b00001000),
+	is_LDA_S <- (extract_15_8 instr '=' '0b00100010),
+	is_LDI_B <- (extract_15_8 instr '=' '0b00011011),
+	is_LDI_L <- (extract_15_8 instr '=' '0b00000001),
+	is_LDI_S <- (extract_15_8 instr '=' '0b00100000),
+	is_LDO_B <- (extract_15_8 instr '=' '0b00110110),
+	is_LDO_L <- (extract_15_8 instr '=' '0b00001100),
+	is_LDO_S <- (extract_15_8 instr '=' '0b00111000),
+	is_LD_B <- (extract_15_8 instr '=' '0b00011100),
+	is_LD_L <- (extract_15_8 instr '=' '0b00001010),
+	is_LD_S <- (extract_15_8 instr '=' '0b00100001),
+	is_LSHR <- (extract_15_8 instr '=' '0b00100111),
+	is_MOD <- (extract_15_8 instr '=' '0b00110011),
+	is_MOV <- (extract_15_8 instr '=' '0b00000010),
+	is_MUL <- (extract_15_8 instr '=' '0b00101111),
+	is_NEG <- (extract_15_8 instr '=' '0b00101010),
+	is_NOP <- (extract_15_8 instr '=' '0b00000000),
+	is_NOT <- (extract_15_8 instr '=' '0b00101100),
+	is_OR <- (extract_15_8 instr '=' '0b00101011),
+	is_POP <- (extract_15_8 instr '=' '0b00000111),
+	is_PUSH <- (extract_15_8 instr '=' '0b00000110),
+	is_RET <- (extract_15_8 instr '=' '0b00000100),
+	is_SSR <- (extract_15_12 instr '=' '0b1011),
+	is_STA_B <- (extract_15_8 instr '=' '0b00011111),
+	is_STA_L <- (extract_15_8 instr '=' '0b00001001),
+	is_STA_S <- (extract_15_8 instr '=' '0b00100100),
+	is_STO_B <- (extract_15_8 instr '=' '0b00110111),
+	is_STO_L <- (extract_15_8 instr '=' '0b00001101),
+	is_STO_S <- (extract_15_8 instr '=' '0b00111001),
+	is_ST_B <- (extract_15_8 instr '=' '0b00011110),
+	is_ST_L <- (extract_15_8 instr '=' '0b00001011),
+	is_ST_S <- (extract_15_8 instr '=' '0b00100011),
+	is_SUB_L <- (extract_15_8 instr '=' '0b00101001),
+	is_SWI <- (extract_15_8 instr '=' '0b00110000),
+	is_UDIV <- (extract_15_8 instr '=' '0b00110010),
+	is_UMOD <- (extract_15_8 instr '=' '0b00110100),
+	is_XOR <- (extract_15_8 instr '=' '0b00101110),
+	//
+	// Register read
+	//
+	short_rA <- rf_read instr_11_8 rf,
+	rA <- rf_read instr_7_4 rf,
+	rB <- rf_read instr_3_0 rf,
+	//
+	// Memory read
+	//
+	CASE mem_read_sz [
+		is_LD_B   --- '0b01, 
+		is_LDA_B  --- '0b01,
+		is_LDO_B  --- '0b01,
+		is_LD_S   --- '0b10,
+		is_LDA_S  --- '0b10,
+		is_LDO_S  --- '0b10,
+		is_LD_L   --- '0b11,
+		is_LDA_L  --- '0b11,
+		is_LDO_L  --- '0b11,
+		is_POP    --- '0b11]  {'0b00::bv2},
+	rb_imm_32_16 <- rB '+' (ZX (extract_32_16 imm)),
+	CASE read_addr [
+		is_LD_B   --- rB, 
+		is_LD_L   --- rB,
+		is_LD_S   --- rB,
+		is_LDA_B  --- imm,
+		is_LDA_L  --- imm,
+		is_LDA_S  --- imm,
+		is_LDO_B  --- rb_imm_32_16,
+		is_LDO_L  --- rb_imm_32_16,
+		is_LDO_S  --- rb_imm_32_16,
+		is_POP    --- rB]  '0,
+	read_addr1 <- read_addr '+' '1,
+	read_addr2 <- read_addr '+' '2,
+	read_addr3 <- read_addr '+' '3,
+	CASE mem_data [
+		(mem_read_sz '=' '0b00) --- '0,
+		(mem_read_sz '=' '0b01) --- (ZX (mem_rd mem read_addr)),
+		(mem_read_sz '=' '0b10) --- (ZX (b2h (mem_rd mem read_addr)
+						     (mem_rd mem read_addr1)))
+		] (b2w (mem_rd mem read_addr)  (mem_rd mem read_addr1)
+		       (mem_rd mem read_addr2) (mem_rd mem read_addr3)),
+	//
+	// PC update
+	//
+	next_pc <- pc '+' '2,
+	instr_9_0 <- extract_9_0 instr,
+	br_target <- pc '+' '2 '*' SX instr_9_0,
+	CASE pc' [
+		    is_BEQ   --- (eq '?' br_target ':' next_pc),
+		    is_BGE   --- ((eq '|' gr) '?' br_target ':' next_pc),
+		    is_BGEU  --- ((eq '|' ugr) '?' br_target ':' next_pc),
+		    is_BGT   --- (gr '?' br_target ':' next_pc),
+		    is_BGTU  --- (ugr '?' br_target ':' next_pc),
+		    is_BLE   --- ((eq '|' less) '?' br_target ':' next_pc),
+		    is_BLEU  --- ((eq '|' uless) '?' br_target ':' next_pc),
+		    is_BLT   --- (less '?' br_target ':' next_pc),
+		    is_BLTU  --- (uless '?' br_target ':' next_pc),
+		    is_BNE   --- (eq '?' next_pc ':' br_target ),
+		    is_JMP   --- rA,
+		    is_JMPA  --- imm,
+		    is_JSR   --- rA,
+		    is_JSRA  --- imm,
+		    is_LDA_B --- (pc '+' '6),
+		    is_LDA_L --- (pc '+' '6),
+		    is_LDA_S --- (pc '+' '6),
+		    is_LDI_B --- (pc '+' '6),
+		    is_LDI_L --- (pc '+' '6),
+		    is_LDI_S --- (pc '+' '6),
+		    is_LDO_B --- (pc '+' '4),
+		    is_LDO_L --- (pc '+' '4),
+		    is_LDO_S --- (pc '+' '4)
+		] next_pc,
+	//
+	// ALU ops
+	//
+	do_wb <- is_ADD '|' is_AND '|' is_ASHL '|'
+		    is_ASHR '|' is_DEC '|' is_DIV '|'
+		    is_INC '|' is_JSR '|' is_JSRA '|'
+		    is_LDA_B '|' is_LDA_L '|' is_LDA_S '|'
+		    is_LDI_B '|' is_LDI_L '|' is_LDI_S '|'
+		    is_LDO_B '|' is_LDO_L '|' is_LDO_S '|'
+		    is_LD_B '|' is_LD_L '|' is_LD_S '|'
+		    is_LSHR '|' is_MOD '|' is_MOV '|'
+		    is_MUL '|' is_NEG '|' is_NOT '|'
+		    is_OR '|' is_POP '|' is_PUSH,
+	CASE wb_adr [
+			  is_DEC --- instr_11_8,
+			  is_INC --- instr_11_8
+			] instr_7_4,
+	CASE wb_d [
+			  is_ADD   --- (rA '+' rB),
+			  is_AND   --- (rA '&' rB),
+			  is_ASHL  --- (rA '<<' rB),
+			  is_ASHR  --- (rA '|>>' rB),
+			  is_DEC   --- (short_rA '-' imm),
+			  is_DIV   --- (rA '/' rB),
+			  is_INC   --- (short_rA '+' imm),
+			  is_LDA_B --- mem_data,
+			  is_LDA_S --- mem_data,
+			  is_LDA_L --- mem_data,
+			  is_LDI_B --- (ZX imm_7_0),
+			  is_LDI_S --- (ZX imm_15_0),
+			  is_LDI_L --- imm,
+			  is_LDO_B --- mem_data,
+			  is_LDO_S --- mem_data,
+			  is_LDO_L --- mem_data,
+			  is_LD_B  --- mem_data,
+			  is_LD_S  --- mem_data,
+			  is_LD_L  --- mem_data,
+			  is_LSHR  --- (rA '>>' rB),
+			  is_MOD   --- (rA '%' rB),
+			  is_MOV   --- rB,
+			  is_MUL   --- (rA '*' rB),
+			  is_NEG   --- ('0 '-' rB),
+			  is_NOT   --- ('~' rB),
+			  is_OR    --- (rA '|' rB),
+			  is_POP   --- mem_data,
+			  is_PUSH  --- (rA '-' '4)
+			] 'X,
+	// Flags
+	eq' <- rA '=' rB,
+	ugt' <- rA '>' rB,
+	gt' <- signed_gt rA rB,
+	lt' <- signed_gt rB rA,
+	ult' <- rB '>' rA,
+	raw_flags <- mk_flags eq' ult' lt' ugt' gt',
+	flags' <- (IF is_CMP THEN raw_flags ELSE flags),
+	//
+	rf' <- (IF do_wb THEN (rf_write rf wb_adr wb_d) ELSE rf),
+	//
+	mem' <- mem,
+	next_state <- mk_state pc' flags' rf' mem'
+];
+
+11111111111111111;
+
+let NS =
+    bit_input	reset.
+    state_input S0.
+    state_input state.
+    state_output n_state.
+    state_internal raw_n_state.
+    CELL "Draw_hfl_code NS 3" [
+	NEXT state raw_n_state,
+	n_state <- (IF reset THEN S0 ELSE raw_n_state)
+];
+
+let Moxie = 
+    bit_input	clk.
+    bit_input	reset.
+    state_input	S0.
+    word_output	pc.
+    word_output	r0.
+    word_output	r1.
+    word_output	r2.
+    word_output	r3.
+    word_output	r4.
+    word_output	r5.
+    word_output	r6.
+    word_output	r7.
+    word_output	r8.
+    word_output	r9.
+    word_output	r10.
+    word_output	r11.
+    word_output	r12.
+    word_output	r13.
+    word_output	sp.
+    word_output	fp.
+    state_internal  n_state state.
+    CELL "moxie" [
+	NS reset S0 state n_state,
+	re_ff clk n_state state,
+	pc <- state-->PC,
+	r0 <- rf_read '0   (state-->RF),
+	r1 <- rf_read '1   (state-->RF),
+	r2 <- rf_read '2   (state-->RF),
+	r3 <- rf_read '3   (state-->RF),
+	r4 <- rf_read '4   (state-->RF),
+	r5 <- rf_read '5   (state-->RF),
+	r6 <- rf_read '6   (state-->RF),
+	r7 <- rf_read '7   (state-->RF),
+	r8 <- rf_read '8   (state-->RF),
+	r9 <- rf_read '9   (state-->RF),
+	r10 <- rf_read '10 (state-->RF),
+	r11 <- rf_read '11 (state-->RF),
+	r12 <- rf_read '12 (state-->RF),
+	r13 <- rf_read '13 (state-->RF),
+	sp <- rf_read '14  (state-->RF),
+	fp <- rf_read '15  (state-->RF)
+];
+
+let p = (Moxie 'clk 'reset 'S0 'pc
+	       'r0 'r1 'r2 'r3 'r4 'r5 'r6 'r7 'r8
+	       'r9 'r10 'r11 'r12 'r13 'sp 'fp)
+;
+
+time (p fseq 1);
+
+let ckt = pexlif2fsm p;
+time ckt;
+
+let vis = STE_debug ckt;
+
+vis;
+
+

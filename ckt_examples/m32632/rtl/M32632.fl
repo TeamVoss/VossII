@@ -1,0 +1,46 @@
+//==========================================================================
+//
+// Example of Verilog reading
+//
+//==========================================================================
+
+update_vossrc "RECURSION-CALL-LIMIT" "50000";
+
+load "ste.fl";
+
+let p = verilog2pexlif "" "M32632" [
+				    "M32632.v",
+				    "STEUERUNG.v",
+				    "ICACHE.v",
+				    "DCACHE.v",
+				    "CACHE_LOGIK.v",
+				    "ALIGNER.v",
+				    "REGISTERS.v",
+				    "SP_FPU.v",
+				    "DP_FPU.v",
+				    "I_PFAD.v",
+				    "ICACHE_SM.v",
+				    "ADDR_UNIT.v",
+				    "DATENPFAD.v",
+				    "STEUER_MISC.v",
+				    "DECODER.v",
+				    "TOP_MISC.v"
+				  ] []
+;
+
+p fseq 111111111;
+
+
+let ckt = pexlif2fsm p;
+
+wtime ckt;
+
+let vis = STE_debug ckt;
+wtime vis;
+
+let ste = random_simulation vis
+	    [("BCLK","01")]
+	    [("BRESET","11110"),("ENWR","000000-")]
+	    50;
+ste;
+

@@ -1,0 +1,34 @@
+
+tcl_eval ["tk appname a"];
+
+let fl_1 x = (printf "x=%d and res=%d\n" x (10/x)) fseq (10/x);
+export_to_tcl fl_1;
+
+let fl_foo [lx,ly,ux,uy] =
+    fprintf stderr "BBox: (%d,%d) (%d,%d)\n" lx ly ux uy
+;
+export_to_tcl fl_foo;
+
+1111111111;
+
+let q = tcl_eval [
+    "proc foo {t} { WriteStdOut \"<[fl_1 $t]>\" }",
+    "proc bar {i} { fl_foo [.t.c bbox all] }",
+    "toplevel .t",
+    "canvas .t.c -width 200 -height 200",
+    ".t.c create line 0 0 100 100 100 50 150 150", 
+    "button .t.b1 -text AAA -command {foo 1}", 
+    "button .t.b2 -text BBB -command {foo 2}", 
+    "button .t.b3 -text CCC -command {foo 3}", 
+    "button .t.b4 -text CCC -command {foo 0}", 
+    "button .t.b5 -text BBOX -command {bar 3}", 
+    "pack .t.c -side top -fill both -expand yes",
+    "pack .t.b1 -side top -fill x -expand yes",
+    "pack .t.b2 -side top -fill x -expand yes",
+    "pack .t.b3 -side top -fill x -expand yes",
+    "pack .t.b4 -side top -fill x -expand yes",
+    "pack .t.b5 -side top -fill x -expand yes"
+];
+
+q;
+

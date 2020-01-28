@@ -1,0 +1,91 @@
+\section{.sil format}
+
+The .sil file format is reserved for SILOS II gate netlists.
+In fact, the silos2exe converter supports only a quite small subset of the
+SILOS II format.
+
+To introduce the format, consider the following small example:
+\begin{hol}
+$********* GAte macros with delay parameters *******************
+.macro CMOS4Xor2 i1 i2 / o
+        o .xor 390,25.0 410,22.0 2.5*i1 2.5*i2
+.eom
+
+.macro CMOS4Nand2 i1 i2 / o
+        o .nand 150,19.0 210,22.0 2.0*i1 2.0*i2
+.eom
+
+.macro CMOS4Nand3 i1 i2 i3 / o
+        o .nand 180,21.0 240,24.0 2.0*i1 2.0*i2 2.0*i3
+.eom
+
+
+$********* Main circuit *******************
+.TITLE ADDER   (On: Mon Feb  8 16:57:12 1993
+(X1 CMOS4Xor2 a b t1
+(X2 CMOS4Xor2 t1 cin result
+(n1 CMOS4Nand2 a b t2
+(n2 CMOS4Nand2 a cin t3
+(n3 CMOS4Nand2 cin b t4
+(n4 CMOS4Nand3 t2 t3 t4 cout
+
+$********* End of netlist file *******************
+\end{hol}
+
+First, the .xor, and .nand commands refer to two of the 9 built-in
+function types.
+The numbers after the .xor component represent the rise-delay
+and the fall-delay of the component and is calculated
+as the first number plus the second number times the fanout load.
+The multiplicative factors in front of input signals are used to
+denote the load factor.
+The macro definitions can be nested.
+However, the scoping rules are not well defined (silos2exe uses dynamic
+scoping), and thus it is recommended that all macros have distinct names.
+Finally, the format of a macro call is: (instance-name name-of-macro
+followed by arguments.
+
+\subsection{Syntax of .sil format supported by silos2exe}
+
+\begin{hol}
+line            : alias\_line 
+                | macro\_def 
+                | component 
+                | macro\_call 
+                | 
+
+alias\_line      : $ string = string
+
+macro\_def       : .macro string {string}+ 
+                           {line}*
+                  .eom
+
+macro\_call      : ( string string {input}+
+
+component       : string .buf delays {input}+
+                | string .clk number string
+                | string .or delays {input}+
+                | string .nor delays {input}+
+                | string .nand delays {input}+
+                | string .and delays {input}+
+                | string .xor delays {input}+
+                | string .inv delays {input}+
+                | string .tbuf delays {input}+
+
+delays          : delay delay
+                | /* empty */
+
+delay           : number
+                | number , number
+                | number , float
+
+input           : load string
+                | load - string
+
+load            : number *
+                | float *
+                | /* empty */
+
+\end{hol}
+
+

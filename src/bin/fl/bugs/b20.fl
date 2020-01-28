@@ -1,0 +1,11 @@
+
+letrec fib 0 = 1
+ /\    fib 1 = 1
+ /\    fib n = fib (n-1) + fib (n-2)
+;
+
+printf "==== Test of interrupt ====\n";
+printf "Hit interrupt and try different alternatives!\n";
+
+// Test of interrupts
+fib 30;

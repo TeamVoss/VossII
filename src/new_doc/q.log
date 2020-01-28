@@ -1,0 +1,46 @@
+This is CTeX, NeXT Version 3.1a (format=lplain 91.3.6)  12 FEB 1995 00:05
+**q.tex
+(q.tex
+LaTeX Version 2.09 <7 Dec 1989>
+(defs.tex (/usr/lib/tex/inputs/epsf.tex
+\epsffilein=\read0
+\epsfxsize=\dimen99
+\epsfysize=\dimen100
+\epsftsize=\dimen101
+\epsfrsize=\dimen102
+\epsftmp=\dimen103
+\pspoints=\dimen104
+)
+\c@theorem=\count78
+\c@corollary=\count79
+\c@lemma=\count80
+\c@proposition=\count81
+) (def2.tex
+(/usr/lib/tex/inputs/epsf.tex
+\epsffilein=\read1
+\epsfxsize=\dimen105
+\epsfysize=\dimen106
+\epsftsize=\dimen107
+\epsfrsize=\dimen108
+\epsftmp=\dimen109
+\pspoints=\dimen110
+)
+LaTeX error.  See LaTeX manual for explanation.
+              Type  H <return>  for immediate help.
+! Command name 'symbinary' already used.
+\@latexerr ...for immediate help.}\errmessage {#1}
+                                                  
+...
+l.97 \newcommand{\symbinary}{{\cal B}(\variables)}
+                                                  
+? E
+ 
+Here is how much of TeX's memory you used:
+ 199 strings out of 4464
+ 1524 string characters out of 63277
+ 25626 words of memory out of 262141
+ 2155 multiletter control sequences out of 9500
+ 18996 words of font info for 72 fonts, out of 72000 for 255
+ 14 hyphenation exceptions out of 607
+ 9i,0n,12p,122b,7s stack positions out of 300i,40n,60p,3000b,2000s
+No pages of output.

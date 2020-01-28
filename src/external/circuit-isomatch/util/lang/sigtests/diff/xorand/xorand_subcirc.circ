@@ -1,0 +1,13 @@
+let xorand (in1, in2, in3, in4) -> (out) {
+	let l_and (la, lb) -> (lc) {
+		lc = AND la lb
+	}
+	let r_and (ra, rb) -> (rc) {
+		rc = AND ra rb
+	}
+	la = (NOT in1)
+	lb = (NOT in2)
+	ra = (NOT in3)
+	rb = (NOT in4)
+	out = XOR lc rc
+}

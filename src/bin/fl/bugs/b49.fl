@@ -1,0 +1,27 @@
+let i0 = build_expr_var 0;
+let i1 = build_expr_var 1;
+let i2 = build_expr_var 2;
+let i3 = build_expr_var 3;
+
+let e = build_expr_sub (build_expr_not i1)
+	    (build_expr_div i3 (build_expr_mul i1 i3))
+;
+
+let c = build_comb "complex"
+	    [("A[3:0]","abc[3:0]"),
+	     ("B[3:0]","oink[3:0]"),
+	     ("C[3:0]","moo[3,1]")]
+	    [ ("Y[3:0]", "out[3:0]", e)]
+;
+
+let d = build_delay "del" "out[3:0]" "out__#__[3:0]";
+
+let cc = build_hierarchy "module_A"
+		    [("a[3:0]", "Abc[3:0]"),
+		     ("b[3:0]", "oink[3:0]"),
+		     ("c[3:0]", "moo[3:0]")]
+		    [("o1[3:0]", "out[3:0]")]
+		    [c,d]
+;
+
+get_signature cc;

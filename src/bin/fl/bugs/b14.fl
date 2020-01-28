@@ -1,0 +1,22 @@
+
+let a = variable "a";
+let b = variable "b";
+let c = variable "c";
+let d = variable "d";
+let e = variable "e";
+
+lettype tr = BR tr tr | LF bool;
+
+letrec Ptr (BR t1 t2) = sprintf "(BR %s %s)" (Ptr t1) (Ptr t2)
+  /\   Ptr (LF b) = sprintf "(LF %s)" (bool2str 10 b)
+;
+install_print_function Ptr;
+
+let t2 = BR (BR (LF (a AND b)) (LF T)) (BR (LF F) (LF (a OR b OR c)));
+
+t2;
+
+
+substitute [("a",T),("b",F)] t2;
+
+substitute [("a",a XOR b),("b",c XOR b)] t2;

@@ -1,0 +1,43 @@
+
+VARS "a b c d";
+
+let rows = [
+	[(ref (int2bv 2)), (ref (int2bv 1))],
+	[(ref (int2bv 8)), (ref (int2bv 4))]
+];
+
+let get rows row col =
+    letrec get_item i (e:es) =
+	col = (int2bv i) => (deref e) | get_item (i+1) es
+     /\    get_item i [] = error "Fail 1"
+    in
+    letrec get_line i (l:ls) =
+	row = (int2bv i) => get_item 0 l | get_line (i+1) ls
+     /\    get_line i [] = error "Fail 2"
+    in
+    get_line 0 rows
+;
+
+let set rows row col {value::bv} =
+    letrec set_item i (e:es) =
+	col = (int2bv i) => (e := value) | set_item (i+1) es
+     /\    set_item i [] = error "Fail 1"
+    in
+    letrec set_line i (l:ls) =
+	row = (int2bv i) => set_item 0 l | set_line (i+1) ls
+     /\    set_line i [] = error "Fail 2"
+    in
+    set_line 0 rows
+;
+
+let r = bv_constrained_variable "r[1:0]" (\v. v >= '0 AND v <= '1);
+let c = bv_constrained_variable "c[1:0]" (\v. v >= '0 AND v <= '1);
+r;
+c;
+
+get rows r c;
+
+set rows r c (int2bv 55);
+
+get rows r c;
+get rows '0 '1;

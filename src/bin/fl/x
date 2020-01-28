@@ -1,0 +1,67 @@
+letrec map fn l = l = [] => [] | (fn (hd l)):(map fn (tl l));
+
+let i2bv i = map (\x. x="1") (explode (sprintf "%032b" i));
+
+i2bv 324;
+i2bv 23432423;
+
+let q = printf "A number %d with %032b and %S\n" 12 27 ["a","b","c"];
+q;
+
+let qr = ref 12;
+deref qr;
+
+let foo i = 
+    let q = deref qr in
+    q + i
+;
+
+"1: "^(int2str (foo 1))^"\n";
+"2: "^(int2str (foo 2))^"\n";
+qr := 99;
+"1: "^(int2str (foo 1))^"\n";
+"2: "^(int2str (foo 2))^"\n";
+
+
+
+
+99999999999999;
+
+
+let l1 = [[1,2],[3,4],[1/0,44]];
+let q = val (a:as) = l1 in a;
+
+"q"; q;
+
+let qq = val (a:as) = l1 then a ;
+
+"qq"; qq;
+
+
+let tst x =
+    let q = print "Hi" in
+    [q,q,q] fseq x+1
+;
+
+tst 1;
+tst 2;
+
+let pr = print;
+
+letrec fac n =
+    n = 0 => 1 |
+    (print "Oink  ") seq
+    n*fac (n-1)
+;
+"non_lazy print for fac 10";
+fac 10;
+
+letrec fac n =
+    n = 0 => 1 |
+    (pr "Oink  ") seq
+    n*fac (n-1)
+;
+
+"lazy print for fac 10";
+fac 10;
+

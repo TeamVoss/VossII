@@ -1,0 +1,72 @@
+load "ste.fl";
+
+TYPE "nibble" 4;
+
+let tst =
+    bit_input       clk.
+    bit_input    i1.
+    bit_output   out.
+    internal	    tmp res.
+    CELL "tst" [
+	re_ff clk i1 tmp,
+	res <- (IF (tmp '=' '1) THEN '0 ELSE tmp),
+	re_ff clk res out
+];
+
+let p = tst 'clk 'i1 'out;
+
+//let fp = fopen "/home/cseger/ZAQ" "w";
+//Ppexlif fp p;
+//fclose fp;
+
+//end_abstype p;
+
+time (p fseq 1);
+
+//update_vossrc "VERBOSE-FSM-PRINT" "YES";
+let ckt = pexlif2fsm p;
+time ckt;
+
+let ant1 = "clk" is_clock 5
+	    and "i1" isv "a" from 0 to 2 
+	    and "i1" isv "b" from 2 to 4 
+;
+
+//let s = STE "-e" ckt [] ant1 [] [];
+//s;
+
+//get_trace s "out";
+
+let ant2 = "clk" is_clock 5
+	    and "tmp" isv "a" from 1 to 2 
+	    and "tmp" isv "b" from 3 to 4 
+;
+
+update_vossrc "VERBOSE-STE-RUN" "YES";
+
+let s = STE "-e" ckt [] ant2 [] [];
+s;
+
+//get_trace s "clk";
+
+get_trace s "out";
+
+let nd = "tmp";
+fanin ckt nd;
+
+let nd = "i1/i1/i5/i1/_TmP_1";
+get_trace s nd;
+is_phase_delay ckt nd;
+
+fanin ckt nd;
+
+let nd = hd (fanin ckt nd);
+nd;
+is_phase_delay ckt nd;
+get_trace s nd;
+
+
+//let vis = STE_debug ckt;
+//vis;
+
+//STE "-e" vis [] ant2 [] [];

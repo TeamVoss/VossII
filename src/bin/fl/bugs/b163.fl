@@ -1,0 +1,28 @@
+load "ste.fl";
+
+let test {attrs::(string#string) list} conns =
+    let inps = ["a[3:0]", "b[7:0]"] in
+    let outs = ["result[7:0]"] in
+    let ints = [] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+      _add 8 "foo.v:22" ["result[7:0]"] (_SignExt 8 ["a[3:0]"]) ["0b00101011"] 
+    ] in
+    PINST "test" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+let p = test [] [];
+p;
+
+let p' = clean_pexlif_ios p;
+
+p';
+
+
+//let ckt = pexlif2fsm p;
+//
+//wtime ckt;
+//
+//STE_debug ckt;

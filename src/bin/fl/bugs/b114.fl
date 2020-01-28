@@ -1,0 +1,88 @@
+
+lettype *a gen = GEN {generate::int -> *a};
+
+let gen (GEN fn) = fn;
+
+let choose lo hi = GEN (\n. random lo hi);
+
+// * -> * gen
+let return a = (GEN (\s. a));
+
+// * gen -> (* -> ** gen) -> ** gen
+let >>= (GEN m1) k = GEN (\s. let m2 = gen (k (m1 s)) in m2 s);
+infix 3 >>=;
+
+let ' g f x = g (f x);
+infix 7 ';
+
+// (* -> **) -> * gen -> ** gen
+let lift f ga = ga >>= return ' f;
+
+// (int -> * gen) -> * gen
+let sized fgen = GEN (\s. let m = gen (fgen s) in m s);
+
+// [*] -> * gen
+let elements xs = lift (\n.el n xs) (choose 1 (length xs));
+
+// [* gen] -> * gen
+let oneof gens = elements gens >>= id;
+
+letrec fold_left f acc [] = acc
+    /\ fold_left f acc (x:xs) = fold_left f (f x acc) xs
+;
+
+let sum = fold_left (defix +) 0;
+
+// [int # * gen] -> * gen
+let frequency xs = 
+    letrec pick ((k,x):xs) n = n <= k => x | pick xs (n-k) in
+    (choose 1 (sum (map fst xs))) >>= (pick xs)
+;
+
+open_overload arbitrary;
+open_overload shrink;
+
+let sequence l = GEN (\n. map (\x.gen x n) l);
+
+let i_arbitrary = sized (\n. choose 0 n);
+let b_arbitrary = elements [T,F];
+
+let listG g = sized (\n. (choose 0 n) >>= (\s. sequence (map (\x.g) (1--s)))); 
+let pairG g1 g2  = GEN (\size. (gen g1 size, gen g2 size));
+
+// Trees !
+lettype *a tree = Leaf *a | Branch ({*a} tree) ({*a} tree);
+
+let treeG g = 
+    letrec g_tree 0 = lift Leaf g
+        /\ g_tree n = 
+            let branch = GEN (\s. Branch (gen (g_tree (n/2)) s) (gen (g_tree (n/2)) s)) in
+            frequency [(1,lift Leaf g), (4, branch)]
+    in
+    sized g_tree
+;
+
+letrec prim_Ptree pre fp (Leaf n) = (fprintf fp "%d" n)
+    /\ prim_Ptree pre fp (Branch left right) =
+        (fprintf fp "\n%s├──" pre) fseq 
+        (prim_Ptree (pre ^ "│  ") fp left) fseq
+        (fprintf fp "\n%s└──" pre) fseq
+        (prim_Ptree (pre ^ "   ") fp right)
+;
+
+let Ptree t = (prim_Ptree "" stdout t) fseq "";
+install_print_function Ptree;
+
+
+let l_arbitrary = listG arbitrary;
+let p_arbitrary = pairG arbitrary arbitrary;
+let t_arbitrary = treeG arbitrary;
+
+add_open_overload arbitrary i_arbitrary;
+add_open_overload arbitrary l_arbitrary;
+add_open_overload arbitrary p_arbitrary;
+add_open_overload arbitrary t_arbitrary;
+
+{gen arbitrary 10::(int#int list) list};
+{gen arbitrary 20::{int} tree};
+

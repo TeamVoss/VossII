@@ -1,0 +1,10 @@
+
+let tst x =
+    (fprintf stderr "f: |%s|\n" x) fseq
+    let res = eval "fprintf stderr \"Ahhh\\n\"; letrec fac n = n=0 => 1 | n*fac (n-1);" then
+    (fprintf stderr "Done\n") fseq
+    (eval (sprintf "let oink = \"%s\";\n" x)) fseq
+    res
+;
+
+tst "abc";

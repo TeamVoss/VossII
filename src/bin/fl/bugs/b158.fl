@@ -1,0 +1,19 @@
+
+let fl_int i = i+1;
+export_to_tcl fl_int;
+
+let fl_pair i = (i,i+1);
+export_to_tcl fl_pair;
+
+let fl_list i = 1 -- i;
+export_to_tcl fl_list;
+
+
+tcl_eval [
+	    "foreach v [fl_list 4] { WriteStdErr \"v: $v\n\" }",
+	    "WriteStdErr \"int:  [fl_int 3]\n\"",
+	    "WriteStdErr \"list: [fl_list 3]\n\"",
+	    "WriteStdErr \"pair: [fl_pair 3]\n\"",
+	    "val {l r} [fl_pair 55]",
+	    "WriteStdErr \"l: $l  r:$r\n\""
+	 ];

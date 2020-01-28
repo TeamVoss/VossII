@@ -1,0 +1,278 @@
+
+begin_abstype;
+
+let s0 = ord "0";
+let s9 = ord "9";
+
+let is_digit s =
+    let i = ord s in
+    i >= s0 AND i <= s9
+;
+
+let parse_int es =
+    letrec process i (c:cs) =
+    is_digit c => process (10*i+(ord c-s0)) cs | (i, c:cs)
+     /\    process i [] = i,[]
+    in
+    process 0 es
+;
+
+let extract_protected_name es =
+    letrec look (c:cs) =
+    c != "\\" => c:(look cs) |
+    letrec process cur (c:cs) =
+        c != " " => process (cur^c) cs | (cur^c), cs
+     /\    process cur [] =
+        eprintf "Illegal SystemVerilog name (%s)" (implode es)
+    in
+    val (mc,rem) = process "" (c:cs) in
+    mc:(look rem)
+     /\   look [] = []
+    in
+    look es
+;
+
+let parse_txt es =
+    let es' = extract_protected_name es in
+    letrec process cur (c:cs) =
+    c != "[" => process (cur^c) cs | (cur^"["), cs
+     /\    process cur [] = cur,[] 
+    in
+    process "" es'
+;
+
+lettype range = RANGE_TXT string
+          | RANGE_INTS (int list)
+;
+
+let Prange (RANGE_TXT s) = sprintf "\"%s\"" s
+ /\ Prange (RANGE_INTS il) = sprintf "%S" (map int2str il)
+;
+install_print_function Prange;
+
+clet split_vector v =
+    letrec process es =
+    es = [] => [] |
+    val (txt,rem) = parse_txt es in
+    letrec do_range es =
+        es = [] => [] |
+        val (i,rem) = parse_int es in
+        val (sep:es) = rem in
+        sep = ":" =>
+	val (j,rem) = parse_int es in
+	val (sep:es) = rem in
+	sep = "]" => (RANGE_INTS (i--j)):(process rem) |
+	sep = "," => (RANGE_INTS (i--j)):(do_range es) |
+	eprintf "Illegal vector range. (Unexpected |%s|)" sep
+        |
+        sep = "," => (RANGE_INTS [i]):(do_range es)
+        |
+        sep = "]" => (RANGE_INTS [i]):(process rem)
+        |
+        eprintf "Illegal vector range. (Unexpected |%s|)" sep
+    in
+    (RANGE_TXT txt):(do_range rem)
+    in
+    letrec merge_range ((RANGE_INTS il1):(RANGE_INTS il2):rem) =
+    merge_range ((RANGE_INTS (il1@il2)):rem)
+     /\    merge_range ((RANGE_INTS il):rem) =
+    (RANGE_INTS il):(merge_range rem)
+     /\    merge_range ((RANGE_TXT s):rem) =
+    (RANGE_TXT s):(merge_range rem)
+     /\    merge_range [] = []
+    in
+    merge_range (process (explode v))
+;
+
+clet md_expand_vector v =
+    let ranges = split_vector v in
+    letrec expand ((RANGE_TXT base):rem) =
+    map (\s. base^s) (expand rem)
+     /\    expand ((RANGE_INTS il):rem) =
+    let rem_res = expand rem in
+    flatmap (\i. map (\s. sprintf "%d%s" i s) rem_res) il
+     /\    expand [] = [""]
+    in
+    expand ranges
+;
+
+// Multi dimensional vector expansion
+clet md_expand_vectors vl = flatmap md_expand_vector vl;
+
+let idx_compress sort contiguous il =
+    letrec rev_iqsort [] = []
+     /\    rev_iqsort (e:es) =
+        (rev_iqsort (filter (\i. i>e) es))@
+        [e]@
+        (rev_iqsort (filter (\i.i<e) es))
+    in
+    let sil = sort => rev_iqsort il | il in
+    letrec merge f t (i:is) =
+        i = (t-1) => merge f i is |
+    i = (t+1) => merge f i is |
+        f = t => (int2str f):(merge i i is) |
+        (sprintf "%d:%d" f t):(merge i i is)
+     /\    merge f t [] =
+        f = t => [int2str t] | [sprintf "%d:%d" f t]
+    in
+    let ranges = merge (hd sil) (hd sil) (tl sil) then
+    contiguous => ranges |
+    [list2str T "" "," "" id ranges]
+;
+
+
+let range2vecs sort contiguous rl =
+    letrec conv ((RANGE_TXT s):r) = map (\w.s^w) (conv r)
+     /\    conv ((RANGE_INTS l):r) =
+        let ranges = idx_compress sort contiguous l then
+        let rem = conv r then
+        flatmap (\r. map (\sr. r^sr) rem) ranges
+     /\    conv [] = [""]
+    in
+    conv rl
+;
+
+let gen_extract_vectors sort contiguous vl =
+    let vl = setify vl in
+    let range_list = map split_vector vl in
+    let try_merge rl1 rl2 =
+        length rl1 != length rl2 => [rl1,rl2] |
+        letrec merge pre ((RANGE_TXT s1):r1s) ((RANGE_TXT s2):r2s) =
+            s1 != s2 => [rl1,rl2] | merge (pre@[RANGE_TXT s1]) r1s r2s
+         /\    merge pre ((RANGE_INTS l1):r1s) ((RANGE_INTS l2):r2s) =
+                l1 == l2 => merge (pre@[RANGE_INTS l1]) r1s r2s |
+                r1s != r2s => [rl1,rl2] |
+                [pre@[RANGE_INTS (l1 union l2)]@r1s]
+         /\    merge pre _ _ = [rl1, rl2]
+        in
+        merge [] rl1 rl2
+    in
+    letrec extract1 cur (r:rs) =
+        let r = try_merge cur r in
+        length r = 1 => extract1 (hd r) rs |
+        (el 2 r):(extract1 (el 1 r) rs)
+     /\    extract1 cur [] = [cur]
+    in
+    letrec repeat cnt rl =
+        cnt = 0 => rl |
+        let l1 = length rl in
+        let new_rl = extract1 (hd rl) (tl rl) in
+        let l2 = length new_rl in
+        l1 = l2 => repeat (cnt-1) new_rl | repeat (length new_rl) new_rl
+    in
+    let range_res = repeat (length range_list) range_list in
+    flatmap (range2vecs sort contiguous) range_res
+;
+
+// Multidimensional extraction of vectors from a list of nodes/vectors
+// Only contiguous vectors will be created.
+let old_extract_vectors vl    = gen_extract_vectors T T vl;
+
+// Multidimensional extraction of vectors from a list of nodes/vectors
+// Potentially non-contiguous vectors can be created (e.g., "a[4,2:0]")
+let old_md_extract_vectors vl = gen_extract_vectors T F vl;
+
+let merge_int (RANGE_INTS a_range) (RANGE_INTS b_range) =
+    let j = hd b_range in
+    let i = last a_range in
+    length a_range = 1 =>
+        ((j = (i-1)) OR (j = (i+1))) =>
+            [(RANGE_INTS (i:b_range))] | []
+    |
+    let i1 = last (butlast a_range) in
+    (i1 > i) AND (j = (i-1)) => [(RANGE_INTS (a_range@b_range))] |
+    (i1 < i) AND (j = (i+1)) => [(RANGE_INTS (a_range@b_range))] |
+    []
+ /\ merge_int _ _ = []
+;
+
+letrec old_merge_vectors vl =
+    let vl = setify vl in
+    let range_list = map split_vector vl in
+    letrec merge cur (rl:rls) =
+        letrec cmp pre (a:as) (b:bs) =
+            a == b => cmp (pre@[a]) as bs | [(pre,a,b,as,bs)]
+         /\    cmp pre _ _ = []
+        in
+        let opt_res = cmp [] cur rl in
+        opt_res = [] => cur:(merge rl rls) |
+        val (pre,a,b,as,bs) = hd opt_res in
+        as != bs => cur:(merge rl rls) |
+        let opt_merge = merge_int a b in
+        opt_merge = [] => cur:(merge rl rls) |
+        let cur' = pre@opt_merge@as in
+        merge cur' rls
+      /\   merge cur [] = [cur]
+    in
+    flatmap (range2vecs F T) (merge (hd range_list) (tl range_list))
+;
+
+
+// Given a list of node vectors, return a list of "atoms" (vectors) that
+// have the property that every node in an atom is member of exactly the
+// same input vectors. Intuitively, vector_atomize split big vectors into
+// smaller ones so that every node in the smaller vector is used the same way.
+let old_vector_atomize vec_list =
+    letrec expand i (v:vs) =
+        (map (\n. n,i) (md_expand_vector v))@(expand (i+1) vs)
+     /\    expand i [] = []
+    in
+    let use_nds = expand 1 vec_list then
+    let same_nds = partition fst use_nds then
+    let usage = map (\p. (fst (hd p)), map snd p) same_nds then
+    let same_usage = partition snd usage then
+    flatmap (\p. extract_vectors (map fst p)) same_usage
+;
+
+end_abstype old_md_expand_vector
+        old_md_expand_vectors
+        old_extract_vectors
+        old_md_extract_vectors
+        old_merge_vectors
+        old_vector_atomize
+;
+
+
+
+
+md_extract_vectors ["a[4:1]","a[5:3]", "a[3:0]"];
+
+merge_vectors ["f[4]","f[3]","f[1]","f[0]"];
+
+let r01 = merge_vectors [];
+let r02 = merge_vectors ["a"];
+let r03 = merge_vectors ["b[2]"];
+let r04 = merge_vectors ["c[4]","c[3]"];
+let r05 = merge_vectors ["d[4]","d[1]"];
+let r06 = merge_vectors ["e[4]","e[3]","e[1]"];
+let r07 = merge_vectors ["f[4]","f[3]","f[1]","f[0]"];
+let r08 = merge_vectors ["g[1]","g[2]","g[3]","g[4]"];
+let r09 = merge_vectors ["g[1]","g[2]","gg[3]","gg[3]"];
+let r10 = merge_vectors ["a[0][1]", "a[0][0]", "a[1][1]", "a[1][0]", "a[2][1]", "a[2][0]"];
+let r11 = merge_vectors ["a[0][1]", "a[0][2]", "a[1][1]", "a[1][0]", "a[2][1]", "a[2][0]"];
+
+let old_r01 = old_merge_vectors [];
+let old_r02 = old_merge_vectors ["a"];
+let old_r03 = old_merge_vectors ["b[2]"];
+let old_r04 = old_merge_vectors ["c[4]","c[3]"];
+let old_r05 = old_merge_vectors ["d[4]","d[1]"];
+let old_r06 = old_merge_vectors ["e[4]","e[3]","e[1]"];
+let old_r07 = old_merge_vectors ["f[4]","f[3]","f[1]","f[0]"];
+let old_r08 = old_merge_vectors ["g[1]","g[2]","g[3]","g[4]"];
+let old_r09 = old_merge_vectors ["g[1]","g[2]","gg[3]","gg[3]"];
+let old_r10 = old_merge_vectors ["a[0][1]", "a[0][0]", "a[1][1]", "a[1][0]", "a[2][1]", "a[2][0]"];
+let old_r11 = old_merge_vectors ["a[0][1]", "a[0][2]", "a[1][1]", "a[1][0]", "a[2][1]", "a[2][0]"];
+
+
+
+"r01 = old_r01"; old_r01 == r01;
+"r02 = old_r02"; old_r02 == r02;
+"r03 = old_r03"; old_r03 == r03;
+"r04 = old_r04"; old_r04 == r04;
+"r05 = old_r05"; old_r05 == r05;
+"r06 = old_r06"; old_r06 == r06;
+"r07 = old_r07"; old_r07 == r07;
+"r08 = old_r08"; old_r08 == r08;
+"r09 = old_r09"; old_r09 == r09;
+"r10 = old_r10"; old_r10 == r10;
+"r11 = old_r11"; old_r11 == r11;

@@ -1,0 +1,449 @@
+
+let mk_name sz base = sz = 1 => base | sprintf "%s[%d:0]" base (sz-1);
+
+// Function to determine if a node is a user given or automatically created.
+let is_user_given s =
+    NOT (str_is_substr "__tmp" s) AND
+    NOT (str_is_substr "_TMP_" s) AND
+    NOT (str_is_substr "TmP_" s)
+;
+
+let pr_indices indices =
+    letrec merge msb cur (idx:rem) =
+	idx = cur-1 => merge msb idx rem |
+	msb > cur => (sprintf "%d:%d" msb cur):(merge idx idx rem) |
+	(int2str msb):(merge idx idx rem)
+     /\    merge msb cur [] =
+	msb > cur => [(sprintf "%d:%d" msb cur)] | [(int2str msb)]
+    in
+    let i0 = hd indices then
+    let ranges = merge i0 i0 (tl indices) then
+    list2str T "[" "," "]" id ranges
+;
+
+    
+let update_fn_get_lhs (W_UPDATE_FN lhs rhs) = lhs
+ /\ update_fn_get_lhs (W_PHASE_DELAY lhs rhs) = lhs
+;
+let update_fn_get_rhs (W_UPDATE_FN lhs rhs) = rhs
+ /\ update_fn_get_rhs (W_PHASE_DELAY lhs rhs) = rhs
+;
+
+let Pupdate_fn (W_UPDATE_FN lhs rhs) =
+    sprintf "%s <- %s" (Pwexpr lhs) (Pwexpr rhs)
+ /\ Pupdate_fn (W_PHASE_DELAY lhs rhs) =
+    sprintf "%s <: %s" (Pwexpr lhs) (Pwexpr rhs)
+;
+install_print_function Pupdate_fn;
+
+
+let pexlif_get_name (PINST name attrs leaf fa_inps fa_outs ints cont) = name;
+let pexlif_get_leaf (PINST name attrs leaf fa_inps fa_outs ints cont) = leaf;
+let pexlif_get_fa_inps (PINST name attrs leaf fa_inps fa_outs ints cont) = fa_inps;
+let pexlif_get_fa_outs (PINST name attrs leaf fa_inps fa_outs ints cont) = fa_outs;
+let pexlif_get_internals (PINST name attrs leaf fa_inps fa_outs ints cont) = ints;
+let pexlif_get_content (PINST name attrs leaf fa_inps fa_outs ints cont) = cont;
+let content_get_children (P_HIER children) = children;
+let content_get_leaf (P_LEAF fns) = fns;
+let update_fn_get_update_fun_lhs (W_UPDATE_FN lhs rhs) = lhs
+ /\ update_fn_get_update_fun_lhs (W_PHASE_DELAY lhs rhs) = lhs;
+let update_fn_get_update_fun_rhs (W_UPDATE_FN lhs rhs) = rhs
+ /\ update_fn_get_update_fun_rhs (W_PHASE_DELAY lhs rhs) = rhs;
+
+letrec prim_Ppexlif ind fp (inst,pexlif) =
+    val (PINST name attrs leaf inps outs ints body) = pexlif then
+    let sattrs = list2str T "[" "," "]" (\(a,v). sprintf "%s->%s" a v) attrs in
+    let sleaf = leaf => "T" | "F" then
+    (fprintf fp "%s:\n%*s(PINST \"%s\" %s %s\n" inst ind "" name sattrs sleaf)
+    fseq
+    let sinp  = list2str T "[" "," "]" (\(f,a). sprintf "(%s,%S)" f a) inps in
+    (fprintf fp "%*s  %s\n" ind "" sinp) fseq
+    let sout  = list2str T "[" "," "]" (\(f,a). sprintf "(%s,%S)" f a) outs in
+    (fprintf fp "%*s  %s\n" ind "" sout) fseq
+    let sints = list2str T "[" "," "]" id ints then
+    (fprintf fp "%*s  %s\n" ind "" sints) fseq
+    let prim_Pcontent ind fp (P_HIER children) =
+	letrec pp cnt (ch:chs) =
+	    let inst' = sprintf "%si%d/" inst cnt in
+	    (prim_Ppexlif (ind+3) fp (inst', ch)) fseq
+	    (pp (cnt+1) chs)
+	 /\    pp cnt [] = ()
+	in
+	pp 1 children
+     /\ prim_Pcontent ind fp (P_LEAF fns) =
+	(fprintf fp "%*s LEAF [\n" ind "") fseq
+	let pr ufn = fprintf fp "%*s%s\n" (ind+3) "" (Pupdate_fn ufn) in
+	(foreach pr fns) fseq
+	(fprintf fp "%*s ]\n" ind "")
+    in
+    (prim_Pcontent (ind+1) fp body) fseq
+    (fprintf fp "%*s)\n" ind "")
+;
+
+let Ppexlif fp pexlif = prim_Ppexlif 0 fp ("",pexlif);
+
+let pretty_pexlif p = (Ppexlif stdout p) fseq "";
+install_print_function pretty_pexlif;
+
+let Emit_pexlif file pexlif =
+    let fp = fopen file "w" then
+    (prim_Ppexlif 0 fp ("",pexlif)) fseq
+    (fclose fp) fseq
+    (printf "Saved ASCI version of pexlif in %s\n" file)
+;
+
+let base_get_lhs_vars we =
+    letrec get_names (W_VAR sz b) =
+	    sz = 1 => [b] | md_expand_vector (mk_name sz b)
+     /\    get_names (W_EXPLICIT_VAR sz b) =
+	    md_expand_vector b
+     /\	   get_names (W_SLICE indices (W_VAR sz b)) =
+	    let v = list2str T (b^"[") "," "]" int2str indices then
+	    md_expand_vector v
+     /\	   get_names (W_NAMED_SLICE name indices (W_VAR sz b)) =
+	    let v = list2str T (b^"[") "," "]" int2str indices then
+	    md_expand_vector v
+     /\	   get_names (W_SLICE indices w) =
+	let l = get_names w in
+	let sz = length l in
+	map (\idx. el (sz-idx) l) indices
+     /\	   get_names (W_NAMED_SLICE name indices w) =
+	let l = get_names w in
+	let sz = length l in
+	map (\idx. el (sz-idx) l) indices
+     /\    get_names (W_CAT parts) =
+	    flat (map get_names parts)
+     /\    get_names other =
+	eprintf "Illegal lhs expression\n(%s)" (Pwexpr other)
+    in
+    get_names we
+;
+
+let get_lhs_vars we = merge_vectors (base_get_lhs_vars we);
+
+
+let valid_lhs we =
+    letrec rec_ok (W_VAR sz b) = T
+     /\    rec_ok (W_EXPLICIT_VAR sz b) = T
+     /\    rec_ok (W_SLICE indices w) = rec_ok w
+     /\    rec_ok (W_NAMED_SLICE name indices w) = rec_ok w
+     /\    rec_ok (W_CAT parts) = itlist (\w.\r. rec_ok w AND r) parts T
+     /\    rec_ok other = F
+    in
+    rec_ok we
+;
+
+clet cexpand_vectors vl =
+    let exp1 v =
+	str_is_prefix "0b" v => tl (tl (explode v)) | md_expand_vector v
+    in
+    flatmap exp1 vl
+;
+
+clet cmerge_vectors nl =
+    letrec merge_consts cur (v:vs) =
+	v = "0" => merge_consts (cur^"0") vs |
+	v = "1" => merge_consts (cur^"1") vs |
+	v = "x" => merge_consts (cur^"x") vs |
+	cur != "" => cur:v:(merge_consts "" vs) | v:(merge_consts "" vs)
+     /\    merge_consts cur [] = cur = "" => [] | [cur]
+    in
+    merge_vectors (merge_consts "" nl)
+;
+
+let w_depends we =
+    let raw_res = ref [] then
+    letrec dep (W_X sz) = ()
+     /\    dep (W_NAMED_CONST name sz v) = ()
+     /\    dep (W_CONST sz v) = ()
+     /\    dep (W_VAR sz b) = (raw_res := ((mk_name sz b):(deref raw_res)))
+     /\    dep (W_EXPLICIT_VAR sz n) = (raw_res := (n:(deref raw_res)))
+     /\    dep (W_AND a b) = (dep a) fseq (dep b)
+     /\    dep (W_OR  a b) = (dep a) fseq (dep b)
+     /\    dep (W_PRED name cond) = (dep cond)
+     /\    dep (W_EQ  a b) = (dep a) fseq (dep b)
+     /\    dep (W_GR  a b) = (dep a) fseq (dep b)
+     /\    dep (W_ADD a b) = (dep a) fseq (dep b)
+     /\    dep (W_SUB a b) = (dep a) fseq (dep b)
+     /\    dep (W_MUL a b) = (dep a) fseq (dep b)
+     /\    dep (W_DIV a b) = (dep a) fseq (dep b)
+     /\    dep (W_MOD a b) = (dep a) fseq (dep b)
+     /\    dep (W_SHL a b) = (dep a) fseq (dep b)
+     /\    dep (W_SHR a b) = (dep a) fseq (dep b)
+     /\    dep (W_ASHR a b) = (dep a) fseq (dep b)
+     /\    dep (W_SX sz w) = (dep w)
+     /\    dep (W_ZX sz w) = (dep w)
+     /\    dep (W_NOT a)   = dep a
+     /\    dep (W_ITE c t e) = (dep c) fseq(dep t) fseq(dep e)
+     /\    dep (W_SLICE indices w) = dep w
+     /\    dep (W_NAMED_SLICE name indices w) = dep w
+     /\    dep (W_CAT parts) = foreach dep parts
+     /\    dep (W_MEM_READ info mem addr) = (dep mem) fseq (dep addr)
+     /\    dep (W_MEM_WRITE info mem addr data) =
+            (dep mem) fseq (dep addr) fseq (dep data)
+    in
+    (dep we) fseq
+    let res1 = setify (rev (deref raw_res)) then
+    let res2 = extract_vectors res1 then
+    length res1 = length res2 => res1 | qsort node_name_cmp res2
+;
+
+letrec wexpr_size wexpr =
+    let get_size2 a b =
+	let a_sz = wexpr_size a in
+	let b_sz = wexpr_size b in
+	a_sz != b_sz =>
+	    eprintf "Size mismatch in wexpr expression\n%d=|%s|\n%d=|%s|)"
+		    a_sz (Pwexpr a) b_sz (Pwexpr b)
+	|
+	a_sz
+    in
+    let wsz (W_X sz) = sz
+     /\ wsz (W_CONST sz v) = sz
+     /\ wsz (W_NAMED_CONST name sz v) = sz
+     /\ wsz (W_VAR sz b) = sz
+     /\ wsz (W_EXPLICIT_VAR sz b) = sz
+     /\ wsz (W_AND a b) = get_size2 a b
+     /\ wsz (W_OR a b) = get_size2 a b
+     /\ wsz (W_NOT a) = wexpr_size a
+     /\ wsz (W_PRED name cond) = 1
+     /\ wsz (W_EQ a b) =
+	let a_sz = wexpr_size a in
+	let b_sz = wexpr_size b in
+	a_sz != b_sz =>
+	    eprintf "Size mismatch in W_EQ\n%d=|%s|\n%d=|%s|)"
+		    a_sz (Pwexpr a) b_sz (Pwexpr b)
+	| 1
+     /\ wsz (W_GR a b) =
+	let a_sz = wexpr_size a in
+	let b_sz = wexpr_size b in
+	a_sz != b_sz =>
+	    eprintf "Size mismatch in W_GR\n%d=|%s|\n%d=|%s|)"
+		    a_sz (Pwexpr a) b_sz (Pwexpr b)
+	| 1
+     /\ wsz (W_ADD a b)  = get_size2 a b
+     /\ wsz (W_SUB a b)  = get_size2 a b
+     /\ wsz (W_MUL a b)  = get_size2 a b
+     /\ wsz (W_DIV a b)  = get_size2 a b
+     /\ wsz (W_MOD a b)  = get_size2 a b
+     /\ wsz (W_SHL a b)  = get_size2 a b
+     /\ wsz (W_SHR a b)  = get_size2 a b
+     /\ wsz (W_ASHR a b) = get_size2 a b
+     /\ wsz (W_SX sz w)  = sz
+     /\ wsz (W_ZX sz w)  = sz
+     /\ wsz (W_ITE c a b) =
+	wexpr_size c != 1 => eprintf "Condition in W_ITE not of size 1!" |
+	get_size2 a b
+     /\ wsz (W_SLICE indices w) = length indices
+     /\ wsz (W_NAMED_SLICE name indices w) = length indices
+     /\ wsz (W_CAT wl) = itlist (\w.\r. wexpr_size w + r) wl 0
+     /\ wsz (W_MEM_READ info mem addr) =
+	val (MEM a_sz lines d_sz) = info in
+	d_sz
+     /\ wsz (W_MEM_WRITE info mem addr d) = wexpr_size mem
+    in
+    wsz wexpr
+;
+
+let check_memory a_sz lines d_sz addr mem =
+	let mem_sz = wexpr_size mem in
+	let addr_sz = wexpr_size addr in
+	addr_sz != a_sz =>
+	    eprintf "Memory address of incorrect size (%d!=%d)" addr_sz a_sz
+	|
+	(mem_sz % d_sz != 0) =>
+	    eprintf "Memory size (%d) not multiple of word size (%d)"
+		    mem_sz d_sz
+	|
+	(mem_sz / d_sz) != lines =>
+	    eprintf "Memory size %d not same as declaration %d"
+		    (mem_sz/d_sz) lines
+	|
+	let n = bits_needed (lines-1) in
+	a_sz < n =>
+	    eprintf "Write address too small for memory (%d<%d)" a_sz n
+	|
+	()
+;
+
+begin_abstype;
+
+
+cletrec wexpr_is_binary (W_X sz) = F
+ /\     wexpr_is_binary (W_NAMED_CONST name sz v) = T
+ /\     wexpr_is_binary (W_CONST sz v) = T
+ /\     wexpr_is_binary (W_VAR sz b) = T
+ /\     wexpr_is_binary (W_EXPLICIT_VAR sz n) = T
+ /\     wexpr_is_binary (W_AND a b) =
+	    (wexpr_is_binary a) AND (wexpr_is_binary b)
+ /\     wexpr_is_binary (W_OR a b) = (wexpr_is_binary a) AND (wexpr_is_binary b)
+ /\     wexpr_is_binary (W_NOT a) = (wexpr_is_binary a)
+ /\     wexpr_is_binary (W_PRED name cond) = wexpr_is_binary cond
+ /\     wexpr_is_binary (W_EQ a b) = (wexpr_is_binary a) AND (wexpr_is_binary b)
+ /\     wexpr_is_binary (W_GR a b) = (wexpr_is_binary a) AND (wexpr_is_binary b)
+ /\     wexpr_is_binary (W_ADD a b) =
+	    (wexpr_is_binary a) AND (wexpr_is_binary b)
+ /\     wexpr_is_binary (W_SUB a b) =
+	    (wexpr_is_binary a) AND (wexpr_is_binary b)
+ /\     wexpr_is_binary (W_MUL a b) =
+	    (wexpr_is_binary a) AND (wexpr_is_binary b)
+ /\     wexpr_is_binary (W_DIV a b) =
+	    (wexpr_is_binary a) AND (wexpr_is_binary b)
+ /\     wexpr_is_binary (W_MOD a b) =
+	    (wexpr_is_binary a) AND (wexpr_is_binary b)
+ /\     wexpr_is_binary (W_SHL a b) =
+	    (wexpr_is_binary a) AND (wexpr_is_binary b)
+ /\     wexpr_is_binary (W_SHR a b) =
+	    (wexpr_is_binary a) AND (wexpr_is_binary b)
+ /\     wexpr_is_binary (W_ASHR a b) =
+	    (wexpr_is_binary a) AND (wexpr_is_binary b)
+ /\     wexpr_is_binary (W_SX sz w) = wexpr_is_binary w
+ /\     wexpr_is_binary (W_ZX sz w) = wexpr_is_binary w
+ /\     wexpr_is_binary (W_ITE c t e) =
+	    wexpr_is_binary c AND wexpr_is_binary t AND wexpr_is_binary e
+ /\     wexpr_is_binary (W_SLICE indices w) = wexpr_is_binary w
+ /\     wexpr_is_binary (W_NAMED_SLICE name indices w) = wexpr_is_binary w
+ /\     wexpr_is_binary (W_CAT wl) =
+	    itlist (\w.\l. (wexpr_is_binary w) AND l) wl T
+ /\     wexpr_is_binary (W_MEM_READ info mem addr) =
+	    wexpr_is_binary mem AND wexpr_is_binary addr
+ /\     wexpr_is_binary (W_MEM_WRITE info mem addr d) =
+	    wexpr_is_binary mem AND wexpr_is_binary addr AND wexpr_is_binary d
+;
+
+
+let dT = T;
+let dF = F;
+let dX = variable "X";
+let dvariable n = variable n;
+let dNOT a = NOT a;
+let dAND = defix AND;
+infix 4 dAND;
+let dOR  = defix OR;
+infix 3 dOR;
+let dXOR = defix XOR;
+infix 4 dXOR;
+let dXNOR = defix XNOR;
+infix 4 dXNOR;
+
+// open_overload dTHEN;
+let dTHEN_1 c (t,e) = (c dAND t) dOR (dNOT c dAND e);
+
+let dTHEN_2 c (lt,le) = map2 (\t.\e. dTHEN_1 c (t,e)) lt le;
+
+let dTHEN_3 c ((lt1,lt2),(le1,le2)) =
+	(dTHEN_2 c (lt1,le1)), (dTHEN_2 c (lt2,le2));
+
+
+overload dTHEN dTHEN_1 dTHEN_2 dTHEN_3;
+
+let gT = T;
+let gF = F;
+let gvariable = dvariable;
+let gNOT = dNOT;
+let gAND = defix dAND;
+infix 4 gAND;
+let gXNOR = defix dXNOR;
+infix 4 gXNOR;
+let gXOR = defix dXOR;
+infix 4 gXOR;
+let gOR = defix dOR;
+infix 3 gOR;
+let gIF c = c;
+let gTHEN c te = dTHEN c te;
+let gELSE t e = (t,e);
+if_then_else_binder gTHEN gELSE;
+let gEQUIV a b = a == b;
+infix 5 gEQUIV;
+letrec dveq (a:as) (b:bs) = a dXNOR b dAND (dveq as bs)
+ /\    dveq []     []     = dT
+;
+let gEQUAL a b = dveq a b;
+infix 5 gEQUAL;
+let gdepends = depends;
+
+load "gen_u_arithm.fl";
+
+cletrec wexpr2bool (W_NAMED_CONST name sz v) =
+	    v >= 0 => int2fbv sz v | int2fbv sz (2**sz+v)
+ /\     wexpr2bool (W_CONST sz v) =
+	    v >= 0 => int2fbv sz v | int2fbv sz (2**sz+v)
+ /\     wexpr2bool (W_VAR sz b) =
+	map dvariable (md_expand_vector (mk_name sz b))
+ /\     wexpr2bool (W_EXPLICIT_VAR sz n) =
+	map dvariable (md_expand_vector n)
+ /\     wexpr2bool (W_AND a b) =
+	    map2 (defix dAND) (wexpr2bool a) (wexpr2bool b)
+ /\     wexpr2bool (W_OR a b) =
+	    map2 (defix dOR) (wexpr2bool a) (wexpr2bool b)
+ /\     wexpr2bool (W_NOT a) = map dNOT (wexpr2bool a)
+ /\     wexpr2bool (W_PRED name cond) = wexpr2bool cond
+ /\     wexpr2bool (W_EQ a b) =
+	[(wexpr2bool a) '=' (wexpr2bool b)]
+ /\     wexpr2bool (W_GR a b) =
+	[(wexpr2bool a) '>' (wexpr2bool b)]
+ /\     wexpr2bool (W_ADD a b) = (wexpr2bool a) '+' (wexpr2bool b)
+ /\     wexpr2bool (W_SUB a b) = (wexpr2bool a) '-' (wexpr2bool b)
+ /\     wexpr2bool (W_MUL a b) = (wexpr2bool a) '*' (wexpr2bool b)
+ /\     wexpr2bool (W_DIV a b) = (wexpr2bool a) '/' (wexpr2bool b)
+ /\     wexpr2bool (W_MOD a b) = (wexpr2bool a) '%' (wexpr2bool b)
+ /\     wexpr2bool (W_SHL a b) = (wexpr2bool a) '<<' (wexpr2bool b)
+ /\     wexpr2bool (W_SHR a b) = (wexpr2bool a) '>>' (wexpr2bool b)
+ /\     wexpr2bool (W_ASHR a b) = (wexpr2bool a) '|>>' (wexpr2bool b)
+ /\     wexpr2bool (W_SX sz w) =
+	    let short = wexpr2bool w in
+	    let l = length short in
+	    (replicate (sz-l) (hd short))@short
+ /\     wexpr2bool (W_ZX sz w) =
+	    let short = wexpr2bool w in
+	    let l = length short in
+	    (replicate (sz-l) dF)@short
+ /\     wexpr2bool (W_ITE c t e) =
+	val [cond] = wexpr2bool c in
+	let tv = wexpr2bool t in
+	let ev = wexpr2bool e in
+	IF cond THEN tv ELSE ev
+ /\     wexpr2bool (W_SLICE indices w) =
+	    let bv = wexpr2bool w in
+	    let l = length bv in
+	    map (\idx. el (l-idx) bv) indices
+ /\     wexpr2bool (W_NAMED_SLICE name indices w) =
+	    let bv = wexpr2bool w in
+	    let l = length bv in
+	    map (\idx. el (l-idx) bv) indices
+ /\     wexpr2bool (W_CAT wl) = itlist (\w.\l. (wexpr2bool w)@l) wl []
+ /\     wexpr2bool (W_MEM_READ info mem addr) =
+	    val (MEM a_sz lines d_sz) = info in
+	    (check_memory a_sz lines d_sz addr mem) fseq
+	    letrec read i =
+		i >= lines => W_X d_sz |
+		let range = (d_sz*(i+1)-1) downto (d_sz*i) in
+		let cond = W_EQ (W_CONST a_sz i) addr in
+		W_ITE cond (W_SLICE range mem) (read (i+1))
+	    in
+	    wexpr2bool (read 0)
+ /\     wexpr2bool (W_MEM_WRITE info mem addr d) =
+	    val (MEM a_sz lines d_sz) = info in
+	    (check_memory a_sz lines d_sz addr mem) fseq
+	    letrec write i =
+		i >= lines => [] |
+		let range = (d_sz*(i+1)-1) downto (d_sz*i) in
+		let cond = W_EQ (W_CONST a_sz i) addr in
+		let dr = W_ITE cond d (W_SLICE range mem) in
+		(wexpr2bool dr):(write (i+1))
+	    in
+	    flat (rev (write 0))
+;
+
+end_abstype wexpr_is_binary wexpr2bool;
+
+let extract_pexlif_hierarchy pexlif hierarchy =
+    let indices = map (sscanf "i%d") (str_split hierarchy "/") in
+    letrec get (idx:idxs) p =
+        let children = content_get_children (pexlif_get_content p) in
+        get idxs (el idx children)
+     /\    get [] p = p
+    in
+    get indices pexlif
+;
+

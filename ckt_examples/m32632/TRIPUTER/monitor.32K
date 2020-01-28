@@ -1,0 +1,473 @@
+; MONITOR for TRIPUTER V0.1
+; 27 May 2017
+sramsize  .equ x'8000
+
+	movd x'20000010,r0
+	jump r0
+
+	.align 16
+	movd x'20400000,r1	; address of LEDs
+	movqd 0,0(r1)		; all went off
+	movd x'FFFF,4(r1)		; the seven segment went off
+	lprd cfg,x'BF6
+	lprd sp,x'300
+	lprd intbase,x'300
+	addr nmi,@x'304
+	movd x'20200000,r7	; UART - fix Register
+	addr welcome,r0
+	bsr string
+; SRAM-Test : Bit Test
+	movqw 1,r2
+	movd x'20100000,r3
+l01:	movw r2,0(r3)		; write
+	addqd 2,r3
+	addw r2,r2
+	cmpqw 0,r2
+	bne l01
+	movqw 1,r2
+	movqw 0,r3
+l02:  cmpw 0(r3),r2		; read
+	bne err
+	addqd 2,r3
+	addw r2,r2
+	cmpqw 0,r2
+	bne l02
+	movl datfp,-15(r3)
+	cmpl datfp,-15(r3)
+	bne err
+; Address steping
+	movd x'20100000,r3
+	movd x'20000,r2		; Initialize on 0
+l03:	movqd 0,0(r3)
+	addqd 4,r3
+	acbd -1,r2,l03
+	movd x'20100000,r3	; Test of 0 and 1 write
+	movd x'40000,r2
+l04:	cmpqw 0,0(r3)
+	bne err
+	movqw -1,0(r3)
+	addqd 2,r3
+	acbd -1,r2,l04
+	movd x'20100000,r3	; Test on 1 and 0 write
+	movd x'40000,r2
+l05:	cmpqw -1,0(r3)
+	bne err
+	movqw 0,0(r3)
+	addqd 2,r3
+	acbd -1,r2,l05
+	movd x'20100000,r3	; Test on 0
+	movd x'40000,r2
+l06:	cmpqw 0,0(r3)
+	bne err
+	addqd 2,r3
+	acbd -1,r2,l06
+	addr sram_ok,r0
+	bsr string
+; INT vector points to SRAM
+	movd x'20100300,r3
+	addr nmi,4(r3)
+	addr int,0(r3)
+	lprd intbase,r3
+	lprd sp,x'20100300
+	lprd sb,x'20100400	; working area
+	movqd 0,-4(sb)		; counter in NMI
+	sbitb 31,x'300004(r7)	; NMI enable
+; iDRAM-Test : Bit Test
+	movqd 1,r2
+	movqd 0,r3
+l21:	movd r2,0(r3)		; write
+	addqd 4,r3
+	addd r2,r2
+	cmpqd 0,r2
+	bne l21
+	movqd 1,r2
+	movqd 0,r3
+l22:  cmpd 0(r3),r2		; read
+	bne err
+	addqd 4,r3
+	addd r2,r2
+	cmpqd 0,r2
+	bne l22
+	movl datfp,-15(r3)
+	cmpl datfp,-15(r3)
+	bne err
+; Address stepping
+	movqd 0,r3
+	movw sramsize,r2		; Initialize to 0
+l23:	movqd 0,0(r3)
+	addqd 4,r3
+	acbw -1,r2,l23
+	movqd 0,r3			; Test on 0 and 1 write
+	movw sramsize,r2
+l24:	cmpqd 0,0(r3)
+	bne err
+	movqd -1,0(r3)
+	addqd 4,r3
+	acbw -1,r2,l24
+	movqd 0,r3			; Test on 1 und 0 write
+	movd sramsize,r2
+l25:	cmpqd -1,0(r3)
+	bne err
+	movqd 0,0(r3)
+	addqd 4,r3
+	acbw -1,r2,l25
+	movqd 0,r3			; Test on 0
+	movw sramsize,r2
+l26:	cmpqd 0,0(r3)
+	bne err
+	addqd 4,r3
+	acbw -1,r2,l26
+; Now all Data right initialize
+	movd x'300,r0
+	lprd sp,r0
+	lprd sb,x'400		; working area
+	addr int,0(r0)
+	addr nmi,4(r0)
+	lprd intbase,r0
+	movqd 0,-8(sb)		; readpointer of RX buffer
+	movqd 0,-12(sb)		; writepointer of RX buffer
+	movqb 0,-4(sb)		; count byte for NMI
+	movqd 0,-20(sb)		; pointer for Dump
+	addr idram_ok,r0
+	bsr string
+	bispsrw x'800		; Int enable
+	sbitb 9,0(r7)		; UART RX Int on
+	addr string,-24(sb)	; save address of string service routine
+; ***************************************************************
+; Endless loop : wait on Input from UART
+; ***************************************************************
+new:	movd x'20240002,-2(sb)
+	sprd sb,r0
+	bsr string
+	movqd 0,-16(sb)		; Number of characters in buffer
+loop:	wait
+	cmpd -8(sb),-12(sb)	; has the UART something received?
+	beq loop			; No
+; Auswertung
+	movd -8(sb),r1
+	movb x'100(sb)[r1:b],r0
+	addqb 1,-8(sb)
+	checkb r1,cvalid,r0	; special character ?
+	bfs sys1			; Yes
+	movd -16(sb),r1
+	cmpqd 0,r1
+	bne sys2
+	cmpb '+',r0
+	beq sys3
+	cmpb '-',r0
+	beq sys4
+sys2:	movb r0,0(sb)[r1:b]
+	addr 1(r1),-16(sb)
+sys0:	bsr out
+	br loop
+sys1:	cmpb 8,r0			; Delete
+	bne sys5
+	cmpqd 0,-16(sb)
+	beq loop
+	addqd -1,-16(sb)
+	bsr out
+	movb ' ',r0
+	bsr out
+	movb 8,r0
+	br sys0
+sys5:	cmpb 13,r0			; CR only output
+	beq sys0
+	cmpb 10,r0			; LF now analyzing input
+	bne new
+; Analyzing input:
+	bsr out
+	sprd sb,r2
+	movd -16(sb),r1		; Number of characters in buffer
+sys7:	cmpqd 0,r1
+	beq new
+	movb 0(r2),r0
+	addqd 1,r2
+	addqd -1,r1
+	cmpb ' ',r0
+	beq sys7			; next character
+	bicb x'20,r0		; only capital letters
+	movqd 0,r6
+	cmpb 'L',r0			; "Load"
+	beq sys6
+	movqd 1,r6
+	cmpb 'R',r0			; "Run"
+	beq sys6
+	movqd 2,r6
+	cmpb 'D',r0			; "Dump"
+	beq sys6	
+	br erin			; Error in input
+; now look for ' ' and address input
+sys6: cmpqd 0,r1
+	beq erin			; no input any more
+	cmpb ' ',0(r2)
+	addqd 1,r2
+	addqd -1,r1
+	bne sys6
+; now look for characters
+sys8:	cmpqd 0,r1
+	beq erin
+	cmpb ' ',0(r2)
+	addqd 1,r2
+	addqd -1,r1
+	beq sys8
+; Addresse build
+	movqd 0,r4
+sy10:	movb -1(r2),r3
+	checkb r5,cziff,r3
+	bfc sy11
+	bicb x'20,r3
+	checkb r5,cabc,r3
+	bfs erin			; illegal character -> Abort
+	addb 10,r5
+sy11:	ashd 4,r4
+	orb r5,r4
+	cmpqd 0,r1
+	beq sys9
+	addqd 1,r2
+	addqd -1,r1
+	br sy10
+; Now execute ...
+	.align 4
+sys9: casew sy12[r6:w]
+sy12:	.word syld-sys9
+	.word sygo-sys9
+	.word sydu-sys9
+; Program Call
+sygo:	jsr r4
+	movd x'20200000,r7
+	br new
+; make Dump , R4 is pointer
+sys4:	subd 512,-20(sb)
+sys3:	movd -20(sb),r4
+	movb 13,r0			; make CR before
+	bsr out
+sydu:	movb 16,r5			; Number of Lines
+sy18:	sprd sb,r0			; Pointer to String
+	movzbd 28,r1
+sy13:	extd r1,r4,r2,4
+	movb datah[r2:b],0(r0)
+	addqd 1,r0
+	addqb -4,r1
+	cmpqb -4,r1
+	bne sy13
+	movb 16,r6
+sy15:	movb ' ',0(r0)
+	addqd 1,r0
+	addr -1(r6),r2
+	andb 3,r2
+	cmpqb 3,r2
+	bne sy14
+	movb ' ',0(r0)
+	addqd 1,r0
+sy14: extsd 0(r4),r2,4,4
+	movb datah[r2:b],0(r0)
+	extsd 0(r4),r2,0,4
+	movb datah[r2:b],1(r0)
+	addqd 2,r0
+	addqd 1,r4
+	acbb -1,r6,sy15
+	movw x'2720,0(r0)
+	addqd 2,r0
+	addr -16(r4),r4
+	movb 16,r6
+sy16:	movb 0(r4),r2
+	checkb r1,cvalid,r2
+	bfc sy17
+	movb '.',r2
+sy17:	movb r2,0(r0)
+	addqd 1,r0
+	addqd 1,r4
+	acbb -1,r6,sy16
+	movd x'0A0D27,0(r0)
+	addqd 3,r0
+	movzbw r0,-2(sb)
+	sprd sb,r0
+	bsr string
+	acbb -1,r5,sy18
+	movd r4,-20(sb)
+	br new
+; Example:
+; ":200000006DA60BF757A000000C80CF0F00D7A1FFFFFE00D4A315165C7810D4A30D185C7800"
+; ":007FE001A0"
+; R4 pointer to memory
+; R5 "0" counter
+syld:	movqd 0,r5
+sy23:	bsr getchar
+	cmpb ':',r0
+	bne abort			; Abort if not ':' - what happens after this don't care
+	movqd 0,r6			; Checksum=0
+	bsr getbyte
+	cmpqb 0,r0
+	beq sy19			; End
+	movb r0,r1
+	bsr getbyte
+	movzbd r0,r2
+	lshd 8,r2
+	bsr getbyte
+	movb r0,r2
+	bsr getbyte
+	cmpqb 0,r0
+	bne abort			; if not 0 - Abort. Limited to 64K 
+sy20:	bsr getbyte
+	movb r0,r4[r2:b]
+	addqd 1,r2
+	addqd 1,r5
+	acbb -1,r1,sy20
+	bsr getbyte
+	cmpqd 0,r6
+	bne abort
+sy21:	bsr getchar			; CR and LF read
+	cmpb 10,r0			; there are Files without CR !
+	bne sy21
+; show how many load up to now R2 -> decimal
+	movd 10000,r0
+	addr 1(sb),r3
+	movd x'D0006,-2(sb)
+	movd r5,r2
+sy22:	movd r2,r1
+	divd r0,r1
+	orb x'30,r1
+	movb r1,0(r3)
+	addqd 1,r3
+	modd r0,r2
+	divd 10,r0
+	cmpqd 0,r0
+	bne sy22
+	sprd sb,r0
+	bsr string
+	br sy23
+; ******* Load finished *******
+sy19: movqb 4,r1
+sy24:	bsr getbyte
+	acbb -1,r1,sy24
+	cmpqd 0,r6
+	bne abort
+sy25:	bsr getchar			; CR and LF read
+	cmpb 10,r0
+	bne sy25
+	addr crlf,r0
+sy26:	bsr string
+	br new
+
+erin:	addr erinfo,r0
+	br sy26
+
+getchar:
+	save [r1]
+gec1:	cmpd -8(sb),-12(sb)
+	beq gec1
+	movd -8(sb),r1
+	movb x'100(sb)[r1:b],r0
+	addqb 1,-8(sb)
+	restore [r1]
+	ret 0
+
+getbyte:
+	save [r1,r2]
+	bsr getchar
+	checkb r1,cziff,r0
+	bfc geb1
+	bicb x'20,r0
+	checkb r1,cabc,r0
+	bfc geb2
+	orw x'A00,r6
+geb2:	addb 10,r1
+geb1:	ashd 4,r1
+	bsr getchar
+	checkb r2,cziff,r0
+	bfc geb3
+	bicb x'20,r0
+	checkb r2,cabc,r0
+	bfc geb4
+	orw x'A00,r6
+geb4:	addb 10,r2
+geb3:	orb r2,r1
+	addb r1,r6			; add to Checksum
+	movb r1,r0
+	restore [r1,r2]
+	ret 0
+
+abort:
+	addr lderr,r0
+	bsr string
+	br new
+
+out:	tbitb 11,0(r7)
+	bfs out
+	movb r0,0(r7)
+	ret 0
+
+string:
+	save [r1,r7]
+	movd x'20200000,r7
+	movw -2(r0),r1
+st3:	cmpqw 0,r1
+	beq st1
+st2:	tbitb 11,0(r7)
+	bfs st2
+	movb 0(r0),0(r7)
+	addqd 1,r0
+	acbw -1,r1,st2
+st1:	restore [r1,r7]
+	ret 0
+	
+datal:  ; 0	1    2    3    4    5    6    7    8    9    A    B    C    D    E    F
+ .byte x'3F,6,x'5B,x'4F,x'66,x'6D,x'7D,x'07,x'7F,x'6F,x'77,x'7C,x'39,x'5E,x'79,x'71
+
+datah: .byte '0123456789ABCDEF'
+
+	.align 4
+datfp:	.double x'87654321,x'0FEDCBA9
+cvalid:	.byte x'7E,x'20
+cziff:	.byte '90'
+cabc:		.byte 'FA'
+
+		.word txt_1-sram_ok
+sram_ok:	.byte '512K SRAM ok.',13,10
+txt_1:	.word txt_2-welcome
+welcome:	.byte 13,10,'Hardware: TRIPUTER V0.1 , 27 May 2017'
+		.byte 13,10,'Software: MONITOR  V0.1 , 27 May 2017',13,10
+txt_2:	.word txt_3-idram_ok
+idram_ok:	.byte '128K iDRAM ok.',13,10
+txt_3:	.word txt_4-error
+error:	.byte 'Memory Fault !!!',13,10
+txt_4:	.word txt_6-lderr
+lderr:	.byte 13,10,'Error in Load!',13,10
+txt_6:	.word txt_7-crlf
+crlf:		.byte 13,10
+txt_7:	.word txt_8-erinfo
+erinfo:	.byte 'Error in input!',13,10
+txt_8:
+
+	.align 4
+nmi:	save [r0,r1]
+	movb -4(sb),r0
+	extsd r0,r1,0,4
+	comb datal[r1:b],x'200004(r7)
+	extsd r0,r1,4,4
+	comb datal[r1:b],x'200005(r7)
+	bispsrb 1
+	addpb 0,r0
+	cmpb x'60,r0
+	beq nmi1
+nmi2:	movb r0,-4(sb)
+	restore [r0,r1]
+	rett 0
+nmi1:	movqb 0,r0
+	br nmi2
+
+	.align 4
+int:	save [r0]		; RX UART
+	movd -12(sb),r0
+	movb 0(r7),x'100(sb)[r0:b]
+	addqb 1,-12(sb)
+	movb x'100(sb)[r0:b],x'200000(r7)
+	movb r0,x'200002(r7)
+	restore [r0]
+	reti
+
+err:	addr error,r0
+	bsr string
+err1:	comw x'4040,4(r1)	; 0 = leuchten
+	br err1
+

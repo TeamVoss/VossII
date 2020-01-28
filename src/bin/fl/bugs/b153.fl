@@ -1,0 +1,8 @@
+
+lettype tr = BR tr tr | LF;
+
+rvariable "a";
+
+let simpl_table = ref {(tbl_create 1000):: {bv,tr} tbl};
+
+

@@ -1,0 +1,46 @@
+load "zzz";
+
+fib 25;
+
+// test
+// another test
+
+
+let f x =
+	let d = x+x in
+	let q = d*d in
+	q + 3*x
+;
+
+12;
+
+let q = 12;
+
+let qq 22= 12;
+
+
+tcl_eval ["after 100 [list $::voss2_top_level_txtwin tag configure stdin_color -background red]"];
+
+tcl_eval ["after 100 [list $::voss2_top_level_txtwin configure -background #fdf3cc]"];
+
+tcl_eval ["$::voss2_top_level_txtwin configure -background #fff3cc"];
+
+tcl_eval ["$::voss2_top_level_txtwin configure -background #fff0b0"];
+
+tcl_eval ["$::voss2_top_level_txtwin configure -background #fff2cb"];
+
+#fff2cb
+
+
+
+
+
+1+1; 1+2;
+
+
+tcl_eval ["after 100 {.foo.t insert end [$::voss2_top_level_txtwin index promptEnd]}"];
+
+
+tcl_eval ["toplevel .foo", "text .foo.t", "pack .foo.t -expand y -fill both"];
+
+

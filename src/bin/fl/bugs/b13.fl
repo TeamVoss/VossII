@@ -1,0 +1,33 @@
+
+forward_declare {my_rev :: *a list -> *a list};
+
+let my_rev (l:ls) = (my_rev ls)@[l]
+ /\ my_rev [] = []
+;
+
+
+forward_declare {my_rev2 :: int list -> int list};
+
+let my_rev2 (l:ls) = (my_rev2 ls)@[l,l]
+ /\ my_rev2 [] = []
+;
+
+
+forward_declare {my_rev3 :: *a list -> (int # *a) list};
+
+let my_rev3 (l:ls) = (my_rev3 ls)@[((length ls + 1),l)]
+ /\ my_rev3 [] = []
+;
+
+forward_declare {my_rev4 :: (*a # *b) list -> (*a # *b) list};
+
+let my_rev4 (l:ls) = (my_rev4 ls)@[l,l]
+ /\ my_rev4 [] = []
+;
+
+// Failure:
+fprintf stderr "--- EXPECT AN ERROR HERE ---- -\n";
+forward_declare {my_rev5 :: *a list -> *a list};
+let my_rev5 (l:ls) = (my_rev5 ls)@["a",l]
+ /\ my_rev5 [] = []
+;

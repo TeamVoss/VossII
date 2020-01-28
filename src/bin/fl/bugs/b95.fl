@@ -1,0 +1,125 @@
+
+
+
+let bev1 = int2bev 0;
+0; bev1;
+
+let bev2 = int2bev 19;
+19; bev2;
+
+let bev3 = int2bev (-8);
+-8; bev3;
+
+-3; int2bev (-3);
+
+let bev4 = bev_variable "a[5:0]";
+"a[5:0]"; bev4;
+let bev5 = bev_variable "b[2:0]";
+"b[2:0]"; bev5;
+
+"-----ADD-----";
+"a"; bev_add (int2bev 0) (bev_variable "a[5:0]");
+17; bev_add (int2bev 3) (int2bev 14);
+11; bev_add (int2bev (-3)) (int2bev 14);
+-4; bev_add (int2bev (-8)) (int2bev 4);
+
+
+"-----SUB-----";
+"a"; bev_sub (bev_variable "a[5:0]") (int2bev 0);
+-11; bev_sub (int2bev 3) (int2bev 14);
+-17; bev_sub (int2bev (-3)) (int2bev 14);
+4; bev_sub (int2bev (-4)) (int2bev (-8));
+
+"-----MUL 1-----";
+0; bev_mul (bev_variable "a[5:0]") (int2bev 0);
+42; bev_mul (int2bev 3) (int2bev 14);
+-42; bev_mul (int2bev (-3)) (int2bev 14);
+32; bev_mul (int2bev (-4)) (int2bev (-8));
+
+"-----MUL 2-----";
+0; bev_mul (bev_variable "a[5:0]") (int2bev 0);
+42; bev_mul (int2bev 14) (int2bev 3);
+-42; bev_mul (int2bev 14) (int2bev (-3));
+32; bev_mul (int2bev (-8)) (int2bev (-4));
+
+"-----DIV -----";
+"a[5:0]"; bev_div (bev_variable "a[5:0]") (int2bev 1);
+7; bev_div (int2bev 14) (int2bev 2);
+2; bev_div (int2bev 14) (int2bev 7);
+-7; bev_div (int2bev (-14)) (int2bev 2);
+-2; bev_div (int2bev (-14)) (int2bev 7);
+-7; bev_div (int2bev 14) (int2bev (-2));
+-2; bev_div (int2bev 14) (int2bev (-7));
+7; bev_div (int2bev (-14)) (int2bev (-2));
+2; bev_div (int2bev (-14)) (int2bev (-7));
+4; bev_div (int2bev (14)) (int2bev (3));
+-4; bev_div (int2bev (-14)) (int2bev (3));
+-4; bev_div (int2bev (14)) (int2bev (-3));
+4; bev_div (int2bev (-14)) (int2bev (-3));
+
+"----- MOD -----";
+"a[5:0]"; bev_mod (bev_variable "a[5:0]") (int2bev 1);
+"a[0]"; bev_mod (bev_variable "a[5:0]") (int2bev 2);
+"a[1:0]"; bev_mod (bev_ZX (bev_variable "a[5:0]")) (int2bev 4);
+7; bev_mod (int2bev 14) (int2bev 2);
+2; bev_mod (int2bev 14) (int2bev 7);
+-7; bev_mod (int2bev (-14)) (int2bev 2);
+-2; bev_mod (int2bev (-14)) (int2bev 7);
+-7; bev_mod (int2bev 14) (int2bev (-2));
+-2; bev_mod (int2bev 14) (int2bev (-7));
+7; bev_mod (int2bev (-14)) (int2bev (-2));
+2; bev_mod (int2bev (-14)) (int2bev (-7));
+4; bev_mod (int2bev (14)) (int2bev (3));
+-4; bev_mod (int2bev (-14)) (int2bev (3));
+-4; bev_mod (int2bev (14)) (int2bev (-3));
+4; bev_mod (int2bev (-14)) (int2bev (-3));
+
+
+"----- bev2int o intbev ------";
+map (\i. bev2int (int2bev i)) (-17 -- 17);
+
+"------ bev_less -----";
+bT == (bev_less (int2bev (-3)) (int2bev (12)));
+bF == (bev_less (int2bev (-3)) (int2bev (-3)));
+bF == (bev_less (int2bev (3) ) (int2bev (-3)));
+bF == (bev_less (int2bev (0) ) (int2bev (-3)));
+bF == (bev_less (int2bev (0) ) (int2bev (0)));
+bT == (bev_less (int2bev (0) ) (int2bev (12)));
+bF == (bev_less (int2bev (12)) (int2bev (-2)));
+bF == (bev_less (int2bev (0) ) (int2bev (-2)));
+bT == (bev_less (int2bev (-8)) (int2bev (-2)));
+
+"------ bev_leq -----";
+bT == (bev_leq (int2bev (-3)) (int2bev (12)));
+bT == (bev_leq (int2bev (-3)) (int2bev (-3)));
+bF == (bev_leq (int2bev (3) ) (int2bev (-3)));
+bF == (bev_leq (int2bev (0) ) (int2bev (-3)));
+bT == (bev_leq (int2bev (0) ) (int2bev (0)));
+bT == (bev_leq (int2bev (0) ) (int2bev (12)));
+bF == (bev_leq (int2bev (12)) (int2bev (-2)));
+bF == (bev_leq (int2bev (0) ) (int2bev (-2)));
+bT == (bev_leq (int2bev (-8)) (int2bev (-2)));
+
+"------ bev_greater -----";
+bF == (bev_greater (int2bev (-3)) (int2bev (12)));
+bF == (bev_greater (int2bev (-3)) (int2bev (-3)));
+bT == (bev_greater (int2bev (3) ) (int2bev (-3)));
+bT == (bev_greater (int2bev (0) ) (int2bev (-3)));
+bF == (bev_greater (int2bev (0) ) (int2bev (0)));
+bF == (bev_greater (int2bev (0) ) (int2bev (12)));
+bT == (bev_greater (int2bev (12)) (int2bev (-2)));
+bT == (bev_greater (int2bev (0) ) (int2bev (-2)));
+bF == (bev_greater (int2bev (-8)) (int2bev (-2)));
+
+"------ bev_geq -----";
+bF == (bev_geq (int2bev (-3)) (int2bev (12)));
+bT == (bev_geq (int2bev (-3)) (int2bev (-3)));
+bT == (bev_geq (int2bev (3) ) (int2bev (-3)));
+bT == (bev_geq (int2bev (0) ) (int2bev (-3)));
+bT == (bev_geq (int2bev (0) ) (int2bev (0)));
+bF == (bev_geq (int2bev (0) ) (int2bev (12)));
+bT == (bev_geq (int2bev (12)) (int2bev (-2)));
+bT == (bev_geq (int2bev (0) ) (int2bev (-2)));
+bF == (bev_geq (int2bev (-8)) (int2bev (-2)));
+
+

@@ -1,0 +1,7 @@
+VARS "a b c";
+
+let e = (a = b) AND (a != c);
+
+e;
+
+truth_cover ["a","b", "c"] e;

@@ -1,0 +1,46 @@
+let tst_div (i,j) =
+    let bi = int2bv i in
+    let bj = int2bv j in
+    let r = i / j in
+    let br = bv_div bi bj in
+    r = (bv2int br)
+;
+
+let tst_mod (i,j) =
+    let bi = int2bv i in
+    let bj = int2bv j in
+    let r = i % j in
+    let br = bv_mod bi bj in
+    r = (bv2int br)
+;
+
+let cases = filter (\(i,j). j != 0)
+                   (flatmap (\i. map (\j.(i,j)) (-10--10)) (-10--10))
+;
+
+setify (map tst_div cases);
+setify (map tst_mod cases);
+
+filter (\p. NOT (tst_mod p)) cases;
+
+let show (i,j) =
+    let do (i,j) =
+	let bi = int2bv i in
+	let bj = int2bv j in
+	let q = i / j in
+	let bq = bv2int (bv_div bi bj) in
+	let r = i % j in
+	let br = bv2int (bv_mod bi bj) in
+	(fprintf stderr "%3d/%3d=%3d [%3d]  " i j q bq) fseq
+	(fprintf stderr "%3d%%%3d=%3d [%3d]\n" i j r br)
+    in
+    do (i,       j) fseq
+    do (i,    -1*j) fseq
+    do (-1*i,    j) fseq
+    do (-1*i, -1*j) 
+;
+
+
+show (3,2);
+
+show (10,3);

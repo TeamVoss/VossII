@@ -1,0 +1,5 @@
+let xorand (in1, in2, in3, in4) -> (out) {
+	and1 = AND (NOT in4) (NOT in3)
+	and2 = AND (NOT in1) (NOT in2)
+	out = XOR and1 and2
+}

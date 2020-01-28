@@ -1,0 +1,25 @@
+load "bool_arithm.fl";
+
+let SZ = 16;
+
+let MAX = 10;
+
+let ZERO = int2fbv SZ 0;
+let ONE = int2fbv SZ 1;
+let TWO = int2fbv SZ 2;
+let THREE = int2fbv SZ 3;
+let INF = int2fbv SZ (2**(SZ/4));
+
+// Version 1:
+cletrec test v =
+    IF (v = ONE) THEN ZERO ELSE
+    ONE '+' (
+        IF (last v) THEN test (THREE '*' v '+' ONE) ELSE (v '/' TWO)
+    )
+;
+
+test (int2fbv SZ 3);
+test (int2fbv SZ 19);
+
+test (ZX SZ (variable_vector "a[2:0]"));
+

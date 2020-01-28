@@ -1,0 +1,401 @@
+lettype color = RGB {valid::bool} {r::bv} {g::bv} {b::bv};
+
+let rgb2color r g b = RGB T (int2bv r) (int2bv g) (int2bv b);
+
+let no_color = RGB F (int2bv 0) (int2bv 0) (int2bv 0);
+
+// A few selected colors
+let blue = rgb2color 0 0 255;
+let red = rgb2color 255 0 0;
+let yellow = rgb2color 255 255 0;
+let black = rgb2color 0 0 0;
+let white = rgb2color 255 255 255;
+
+lettype canvas = CANVAS
+                    {name::string}
+		    {rows::int}
+		    {cols::int}
+		    {scolor_r:: color ref}
+;
+
+let get_canvas_name (CANVAS name rows cols scolor) = name;
+
+let get_canvas_color (CANVAS name rows cols scolor) = deref scolor;
+
+let get_rows_and_cols canvas =
+    val (CANVAS name rows cols scr) = canvas then
+    rows, cols
+;
+
+let is_pow2 n = n == (2**(log2 n));
+
+let mk_canvas name rows cols =
+    NOT (is_pow2 rows) => eprintf "rows (%d) not a power of 2" rows |
+    NOT (is_pow2 cols) => eprintf "cols (%d) not a power of 2" cols |
+    CANVAS name rows cols (ref (RGB F '0 '0 '0))
+;
+non_lazy mk_canvas;
+
+
+let get_pixel arr row col =
+    val (CANVAS name rows cols scr) = arr in
+    let x = bv_constrained_variable "C[15:0]" (\v.  '0 <= v AND v < ''cols) in
+    let y = bv_constrained_variable "R[15:0]" (\v.  '0 <= v AND v < ''rows) in
+    let pvars = depends (x,y) then
+    let sub = fparam pvars ((x = col) AND (y = row)) then
+    let sc = deref scr in
+    substitute sub sc
+;
+
+let set_pixel arr col row value =
+    val (CANVAS name rows cols scr) = arr in
+    let x = bv_constrained_variable "C[15:0]" (\v.  '0 <= v AND v < ''cols) in
+    let y = bv_constrained_variable "R[15:0]" (\v.  '0 <= v AND v < ''rows) in
+    let sc = deref scr in
+    let sc' = ((x = col) AND (y = row)) => value | sc then
+    (scr := sc')
+;
+non_lazy set_pixel;
+    
+// ======================================================================
+//  Draw a line
+// ======================================================================
+// Bresenham's line algorithm
+// void plotLine(int x0, int y0, int x1, int y1)
+// {
+//     int dx = abs(x1-x0)
+//     int sx = x0<x1 ? 1 : -1;
+//     int dy = -abs(y1-y0);
+//     int sy = y0<y1 ? 1 : -1;
+//     int err = dx+dy;
+//     int e2; /* error value e_xy */
+//
+//     for(;;) {
+//      setPixel(x0,y0);
+//      if ( x0==x1 AND y0==y1 ) break;
+//      e2 = 2*err;
+//      if (e2 >= dy) {
+//          err = err + dy;
+//          x0 = x0 + sx;
+//      }
+//      if (e2 <= dx) {
+//          err = err + dx;
+//          y0 = y0 + sy;
+//      }
+//     }
+// }
+//
+let draw_line (x0,y0) (x1,y1) color canvas =
+    //
+    let dx = abs (x1 - x0) then
+    let sx = (x0 < x1) => '1 | '-1 then
+    let dy = '-1 * abs(y1 - y0) then
+    let sy = (y0 < y1) => '1 | '-1 then
+    let err = dx + dy then
+    letrec step err x0 y0 =
+        (set_pixel canvas x0 y0 (color)) fseq
+	((x0 = x1) AND (y0 = y1)) => () |
+        (
+            let e2 = '2 * err then
+            val (err, x0) =
+                ( (e2 >= dy) ) => ((err + dy),(x0 + sx) )
+                                  | (err,x0)
+            in
+            val (err, y0) =
+                ( (e2 <= dx) ) => ((err + dx),(y0 + sy) )
+                                  | (err,y0)
+            in
+            step err x0 y0
+        )
+    in
+    (step err x0 y0) fseq
+    canvas
+;
+
+// ======================================================================
+//  Draw a circle
+// ======================================================================
+//
+// void plotCircle(int xm, int ym, int r)
+// {
+//    int x = -r, y = 0, err = 2-2*r; /* II. Quadrant */
+//    do {
+//       setPixel(xm-x, ym+y); /*   I. Quadrant */
+//       setPixel(xm-y, ym-x); /*  II. Quadrant */
+//       setPixel(xm+x, ym-y); /* III. Quadrant */
+//       setPixel(xm+y, ym+x); /*  IV. Quadrant */
+//       r = err;
+//       if (r <= y) {
+//      y++;
+//      err = err + y*2 + 1;           /* e_xy+e_y < 0 */
+//       }
+//       if (r > x OR err > y) {
+//      x++;
+//      err = err + x*2 + 1; /* e_xy+e_x > 0 or no 2nd y-step */
+//       }
+//    } while (x < 0);
+// }
+//
+let draw_circle (xc,yc) rad color canvas =
+    let x = '-1 * rad then
+    let y = '0 then
+    let err = '2 - '2 * rad then
+    letrec step cond r err x y =
+        cond == F => () |
+        (set_pixel canvas (xc - x) (yc + y) (color)) fseq
+        (set_pixel canvas (xc - y) (yc - x) (color)) fseq
+        (set_pixel canvas (xc + x) (yc - y) (color)) fseq
+        (set_pixel canvas (xc + y) (yc + x) (color)) fseq
+        let r = err then
+        val (y,err) =
+            ( cond AND (r <= y) ) => (
+                let y = y + '1 then
+                let err = err + '2*y + '1 then
+                (y,err)
+            ) | (y,err)
+        then
+        val (x,err) =
+            ( cond AND ((r > x) OR (err > y)) ) => (
+                let x = x + '1 then
+                let err = err + '2*x + '1 then
+                (x,err)
+            ) | (x,err)
+        then
+        let rcond = x >= '0 then
+        (cond AND rcond) => () | (step (cond AND NOT rcond) r err x y)
+    in
+    (step T rad err x y) fseq
+    canvas
+;
+
+// ======================================================================
+//  Draw a ellipse
+// ======================================================================
+// void plotEllipseRect(int x0, int y0, int x1, int y1)
+// {
+//     int a = abs(x1-x0);
+//     int b = abs(y1-y0);
+//     int b1 = b&1;
+//     long dx = 4*(1-a)*b*b;
+//     long dy = 4*(b1+1)*a*a;
+//     long err = dx+dy+b1*a*a;
+//     long e2;
+//     if (x0 > x1) {
+// 	x0 = x1;
+// 	x1 = x1+a;
+//     }
+//     if (y0 > y1) {
+// 	y0 = y1;
+//     }
+//     y0 = y0+(b+1)/2;
+//     y1 = y0-b1;
+//     a *= 8*a;
+//     b1 = 8*b*b;
+//     do {
+// 	setPixel(x1, y0);
+// 	setPixel(x0, y0);
+// 	setPixel(x0, y1);
+// 	setPixel(x1, y1);
+// 	e2 = 2*err;
+// 	if (e2 <= dy) {
+// 	    y0++;
+// 	    y1--;
+// 	    dy = dy+a;
+// 	    err = err+dy;
+// 	}
+// 	if (e2 >= dx || 2*err > dy) {
+// 	    x0++;
+// 	    x1--;
+// 	    dx = dx+b1;
+// 	    err = err+dx;
+// 	}
+//     } while (x0 <= x1);
+//     while (y0-y1 < b) {
+// 	setPixel(x0-1, y0);
+// 	setPixel(x1+1, y0); 
+// 	setPixel(x0-1, y1);
+// 	setPixel(x1+1, y1); 
+// 	y0 = y0+1;
+// 	y1 = y1-1;
+//     }
+// }
+let draw_ellipse (x0,y0) (x1,y1) color canvas =
+    let a = abs(x1-x0) in
+    let b = abs(y1-y0) in
+    let b1 = b % '2 in
+    let dx = '4*('1-a)*b*b in
+    let dy = '4*(b1 + '1)*a*a in
+    let err = dx+dy+b1*a*a in
+    val (x0,x1) = (x0 > x1) => (x1, x1+a) | (x0,x1) in
+    let y0 = (y0 > y1) => y1 | y0 in
+    let y0 = y0+(b + '1) / '2 in
+    let y1 = y0-b1 in
+    let a = '8*a*a in
+    let b1 = '8*b*b in
+    letrec while_loop1 x0 y0 x1 y1 err dx dy =
+	(set_pixel canvas x1 y0 (color)) fseq
+	(set_pixel canvas x0 y0 (color)) fseq
+	(set_pixel canvas x0 y1 (color)) fseq
+	(set_pixel canvas x1 y1 (color)) fseq
+	let e2 = '2*err in
+	val (y0,y1,dy,err) = 
+	    NOT (e2 <= dy) => (y0,y1,dy,err) |
+		let y0 = y0 + '1 in
+		let y1 = y1 - '1 in
+		let dy = dy+a in
+		let err = err+dy in
+		(y0,y1,dy,err)
+	in
+	val (x0,x1,dx,err) =
+	    NOT (e2 >= dx OR (('2*err) > dy) ) => (x0,x1,dx,err) |
+		let x0 = x0 + '1 in
+		let x1 = x1 - '1 in
+		let dx = dx+b1 in
+		let err = err+dx in
+		(x0,x1,dx,err)
+	in
+	x0 <= x1 => while_loop1 x0 y0 x1 y1 err dx dy | (x0,y0,x1,y1)
+    in
+    val (x0,y0,x1,y1) = while_loop1 x0 y0 x1 y1 err dx dy then
+    letrec while_loop2 x0 y0 x1 y1 =
+	(y0 - y1) >= b => () |
+	(set_pixel canvas (x0 - '1) y0 (color)) fseq
+	(set_pixel canvas (x1 + '1) y0 (color)) fseq
+	(set_pixel canvas (x0 - '1) y1 (color)) fseq
+	(set_pixel canvas (x1 + '1) y1 (color)) fseq
+	let y0 = y0 + '1 in
+	let y1 = y1 - '1 in
+	while_loop2 x0 y0 x1 y1
+    in
+    (while_loop2 x0 y0 x1 y1) fseq
+    canvas
+;
+
+// Create a bv that encodes every integer between min and max symbolically
+// using variables whose names are based on 'base'.
+// Usage: mk_srange base min max;
+let mk_srange base min max =
+    let bits = 2+(bits_needed max) then
+    let name = sprintf "%s[%d:0]" base bits then
+    let in_range v = v >= (nat2bv min) AND v <= (nat2bv max) in
+    bv_constrained_variable name in_range
+;
+
+
+var_order ["v0[7:5]","v0[3:2]","v1[7:5]","v1[3:2]","v2[6:2]","v3[7:5]","v3[2]","v4[7:5]","v4[3:2]","v5[6]","v6[5:1]","v7[6]","v8[7:4]","v9[7:6]","v10[7]","v12[6]","v13[6]","v16[7]","C[15]","R[15]","v3[3]","v5[5:2]","v7[5:2]","v9[5]","v10[6]","v11[7:5]","v12[5:3]","v13[5]","v14[6]","v15[7]","v16[6]","v0[4]","C[3:2]","C[14]","R[14]","v9[3:2]","v10[5]","v11[3]","v13[4]","v14[5]","v15[6]","v16[5]","v0[1]","C[13]","R[13]","v14[4]","v15[5]","C[1]","v0[0]","C[4]","v2[1]","v3[4]","v2[0]","v3[1]","v5[1]","C[12:7]","C[5:6]","R[12:7]","R[5:6]","v5[0]","v3[0]","R[4]","v1[4]","v1[1:0]","R[3:2]","v4[4]","v4[1:0]","R[1:0]","C[0]","v8[3:0]","v7[1:0]","v6[0]","v9[0:1]","v9[4]","v10[4:0]","v11[4]","v11[2:0]","v12[0:2]","v15[4:2]","v13[3:1]","v15[1]","v13[0]","v15[0]","v14[3:0]","v16[0:4]"];
+
+//update_vossrc "DYNAMIC-ORDERING" "NO";
+
+let SZ = 64;
+let ROWS = SZ;
+let COLS = SZ;
+let _ROWS = nat2bv ROWS;
+let _COLS = nat2bv COLS;
+
+let anon_cnt = ref 0;
+
+let roughly1 x percent =
+    let fSZ = int2float SZ in
+    let frac = (int2float percent)/100.0 in
+    let lower = round ((x*(1.0-frac))*fSZ) then
+    let lower = max 1 lower then
+    let upper = round ((x*(1.0+frac))*fSZ) then
+    let upper = min (SZ-1) upper then
+    let base = sprintf "v%d" (deref anon_cnt) then
+    (anon_cnt := (deref anon_cnt + 1)) fseq
+    mk_srange base lower upper
+;
+
+let roughly2 (x,y) percent =
+    let X = roughly1 x percent then
+    let Y = roughly1 y percent then
+    X,Y
+;
+
+overload roughly roughly1 roughly2;
+
+let empty_canvas name = mk_canvas name ROWS COLS;
+non_lazy empty_canvas;
+
+let draw_figure cmds {canvas::canvas} = 
+    letrec do_draw canvas (cmd:cmds) =
+	let canvas' = cmd canvas then
+	do_draw canvas' cmds
+     /\    do_draw canvas [] = canvas
+    in
+    do_draw canvas cmds
+;
+
+let draw_arrow length h_width h_height color canvas =
+    let x1 = (_COLS-(length+h_height))/ '2 then
+    let y1 = _ROWS/ '2 then
+    let x2 = x1 + length then
+    let x3 = x2 + h_height then
+    let y2 = y1 - h_width then
+    let y3 = y1 + h_width then
+    draw_figure [
+	draw_line (x1,y1) (x3,y1) color,
+	draw_line (x2,y2) (x3,y1) color,
+	draw_line (x2,y3) (x3,y1) color
+    ] canvas
+;
+
+let len = bv_constrained_variable "l[7:0]" (\l. l >= '4 AND l <= '28);
+
+let ht =  bv_constrained_variable "h[7:0]"
+		(\h. h > '0 AND h < (len / '6) AND ((h+len) < '28));
+
+let wid = bv_constrained_variable "w[7:0]" (\w. w > '0 AND w < (len / '5));
+
+
+let c = draw_arrow len wid ht yellow (empty_canvas "a");
+//time (c fseq 1);
+//VIS 12 c;
+
+
+let draw_octagon (x,y) radius color canvas =
+    let shift = 12 in
+    let a = round((int2float (2**shift))*(sin (pi / 8.0))) in
+    let b = round((int2float (2**shift))*(cos (pi / 8.0))) in
+    let short = bv_ashr (radius * ''a) shift in
+    let long = bv_ashr (radius * ''b) shift in
+    let p1 = (x-short), (y+long) in
+    let p2 = (x+short), (y+long) in
+    let p3 = (x+long),  (y+short) in
+    let p4 = (x+long),  (y-short) in
+    let p5 = (x+short), (y-long) in
+    let p6 = (x-short), (y-long) in
+    let p7 = (x-long),  (y-short) in
+    let p8 = (x-long),  (y+short) in
+    draw_figure [
+	draw_line p1 p2 color,
+	draw_line p2 p3 color,
+	draw_line p3 p4 color,
+	draw_line p4 p5 color,
+	draw_line p5 p6 color,
+	draw_line p6 p7 color,
+	draw_line p7 p8 color,
+	draw_line p8 p1 color
+    ] canvas
+;
+
+
+let c0 = draw_figure [
+    draw_octagon (roughly (0.5,0.5) 20) (roughly 0.3 10) blue
+] (empty_canvas "c");
+wtime c0;
+
+//VIS 12 c0;
+
+
+let c1 = draw_figure [
+    draw_octagon (roughly (0.5,0.5) 20) (roughly 0.3 10) blue,
+    draw_ellipse (roughly (0.2,0.3) 10) (roughly (0.7,0.5) 20) blue,
+    draw_circle (roughly (0.5,0.5) 10) (roughly 0.4 20) white,
+    draw_line (roughly (0.3,0.3) 50) (roughly (0.7,0.7) 50) yellow
+] (empty_canvas "b");
+
+wtime c1;
+
+//length (depends c1);
+//VIS 12 c1;

@@ -1,0 +1,89 @@
+//--------- type definitions------------------
+
+//The {*a}range type defines an interval 
+//between a lower bound and an upper bound
+lettype *a range = RANGE *a *a;
+
+//NOTE - implementation of interval arithmetic follows
+//T. Hickey, Q. Ju, and M. H. Van Emden. 2001. 
+//Interval arithmetic: From principles to implementation. 
+//J. ACM 48, 5 (September 2001), 1038-1068. 
+//DOI=http://dx.doi.org/10.1145/502102.502106
+
+
+//Constructor for the range type
+let mk_range l h = 
+    l > h => error "low-lim > high-lim" |
+    (RANGE l h)
+;
+
+//utilities for the range type
+//converts an integer range to a float range
+let intr2floatr {r::{int} range} =
+    val(RANGE li hi) = r in
+    mk_range (int2float li) (int2float hi)
+;
+
+//converts an integer range to a bv range
+let intr2bvr {r::{int} range} =
+    val (RANGE li hi) = r in
+    mk_range (int2bv li) (int2bv hi)
+;
+
+//Pretty printers for int, float and bv ranges
+let Prangei (RANGE {l::int} {h::int}) = (printf "(%d,%d)" l h) seq "";
+let Prangeb (RANGE {l::bv} {h::bv}) = 
+    let bv2str b =
+        let bl = bv2list b in  
+        list2str T "<" "," ">" (\b. bool2str 5 b) bl
+    in
+    (printf "(%s,%s)" (bv2str l) (bv2str h)) seq "";
+let Prangef (RANGE {l::float} {h::float}) =
+    (printf "(%s,%s)" (float2str l) (float2str h)) seq "";
+
+install_print_function Prangei;
+install_print_function Prangeb;
+install_print_function Prangef;
+
+//--------- add ops-----------------------
+
+open_overload {opadd :: *a -> *b -> *c};
+
+//int-int version
+let iadd {i::int} {j::int} = i+j;
+add_open_overload opadd iadd;
+
+//float-float version
+let fadd {i::float} {j::float} = i+j;
+add_open_overload opadd fadd;
+
+//bv-bv version
+let badd {i::bv} {j::bv} = i+j;
+add_open_overload opadd badd;
+
+//range-range version
+let radd {i::{*a} range} {j::{*a} range} =
+    val (RANGE il ih) = i in
+    val (RANGE jl jh) = j in
+    mk_range (opadd il jl) (opadd ih jh)
+;
+add_open_overload opadd radd;
+
+//range-scalar version
+let radds {i::{*a} range} {j:: *a} =
+    val (RANGE il ih) = i in
+    mk_range (opadd il j) (opadd ih j)
+;
+add_open_overload opadd radds;
+
+//scalar-range version
+let saddr {j:: *a} {i::{*a} range} = radds i j;
+add_open_overload opadd saddr;
+
+//----------- examples ------------------
+let r1 = mk_range (-1) 1;
+
+opadd r1 1; //works
+help "opadd";
+rvariable "a";
+opadd 1 r1; //fails

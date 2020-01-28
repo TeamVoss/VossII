@@ -1,0 +1,15 @@
+val (appname:rem) = ARGS;
+let ARGS = rem;
+let ARGS =
+    ARGS != [] AND (hd ARGS == "--help") =>
+	val (flag:pattern:sidx:rem) = ARGS in
+	(tcl_eval [sprintf "screen_capture:show_help_example {%s} %s"
+			    pattern sidx
+		  ]
+	) fseq
+	butfirstn 3 ARGS 
+    | ARGS
+;
+(tcl_eval ["source full_window_capture.tcl",
+	  sprintf "tk appname %s" appname
+	 ]) fseq ();

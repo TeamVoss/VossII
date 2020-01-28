@@ -1,0 +1,12 @@
+load "ste.fl";
+
+rvariable "a";
+
+letrec write_rec addr di {[]:: *a list} i = {[]:: *a list}
+ /\    write_rec addr di {(l:ls):: *a list} i =
+        let rem = {write_rec addr di ls (i+1):: *a list} then
+        let t_l = di:rem then
+        let e_l = l:rem then
+        IF ( addr '=' `i ) THEN t_l ELSE e_l
+;
+

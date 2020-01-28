@@ -1,0 +1,14 @@
+
+let i = 2**63;
+let j = 9223372036854775808; // Correct answer.
+
+int2str i;
+
+i = j; // Yes!
+
+int2str i;
+int2str j;
+
+i = (sscanf "%d" (int2str i));
+(sscanf "%d" (int2str i));
+

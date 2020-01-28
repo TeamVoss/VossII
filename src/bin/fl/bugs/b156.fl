@@ -1,0 +1,26 @@
+load "ste.fl";
+
+let maj =
+    bit_input	a b c.
+    bit_output	out.
+//    CELL "draw_hfl_code MAJ 3" [
+    CELL "draw_hfl_code MAJ 1" [
+	out <- a '&' b '|' a '&' c '|' b '&' c
+];
+
+let maj2 =
+    bit_input	a b c.
+    bit_output	out.
+    CELL "draw_hfl {MAJ of 3}" [
+	out <- a '&' b '|' a '&' c '|' b '&' c
+];
+
+let tst =
+    bit_input	a b c.
+    bit_output	out.
+    CELL "tst" [
+	maj2 a b c out
+];
+
+STE_debug (pexlif2fsm (tst 'a 'b 'c 'out));
+

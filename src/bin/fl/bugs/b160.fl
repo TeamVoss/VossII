@@ -1,0 +1,32 @@
+
+let fl_big_list cnt = "q":(replicate cnt "a[3]");
+export_to_tcl fl_big_list;
+
+
+tcl_eval ["fl_big_list 3"];
+
+tcl_eval ["catch {destroy .c}",
+	  "toplevel .c",
+	  "canvas .c.c -width 300 -height 300",
+	  ".c.c create rectangle 10 10 200 200",
+	  "pack .c.c -side top -fill both -expand y",
+	  "post_popup .c.c [list [fl_big_list 3]] 10 10"
+];
+
+tcl_eval ["set l [fl_big_list 4]",
+	  "WriteStdErr \"|l|=[llength $l]\n\""
+	 ]
+;
+
+
+tcl_eval ((map (\(i,j). sprintf "lappend l {%d %d}" i j) (replicate 100 (1,2)))
+	 @ ["WriteStdErr \"|l|=[llength $l]\n\""])
+;
+
+
+let q = tcl_eval ["set l [fl_big_list 995]",
+		  "WriteStdErr \"|l|=[llength $l]\n\""
+		 ]
+;
+
+

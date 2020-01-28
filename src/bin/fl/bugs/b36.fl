@@ -1,0 +1,17 @@
+load "bool_arithm.fl";
+
+let a = variable_vector  "a[5:0]";
+let b = variable_vector  "b[5:0]";
+
+var_order ((depends a)@(depends b));
+
+let res = a ''+'' b;
+
+draw_bdds T res;
+draw_bdds F res;
+
+
+var_order (interleave [(depends a),(depends b)]);
+
+draw_bdds T res;
+draw_bdds F res;

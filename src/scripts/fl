@@ -1,0 +1,9 @@
+
+# Raise the stack size limit to avoid core dumps before the builtin
+# stack limit gets triggered.
+unlimit stacksize
+# Run fl without randomization of the virtual address space
+# This will allow more predictable crashes that can be debugged!!!
+# I don't care (at the moment) how much more vulnerable the program is.....
+setarch `uname -m` -R $BIN_DIR/fl.bin $argv[1-]
+

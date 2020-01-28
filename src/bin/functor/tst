@@ -1,0 +1,2 @@
+let foo x = fprintf stderr "A nice %d letters" (`sz`+x) seq `sz`;
+let bar y = foo `sz` + 4;

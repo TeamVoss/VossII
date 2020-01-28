@@ -1,0 +1,36 @@
+
+let as = md_expand_vector "a[31:0]";
+let bs = md_expand_vector "b[31:0]";
+
+let a = map variable as;
+let b = map variable bs;
+
+// Bad order
+var_order (as@bs);
+
+let add av bv =
+    letrec add_rec (a:as) (b:bs) cin =
+	(a XOR b XOR cin):(add_rec as bs (a AND b OR a AND cin OR b AND cin))
+     /\    add_rec [] [] cin = []
+    in
+    rev (add_rec (rev av) (rev bv) F)
+;
+
+let sum = add a b;
+
+
+let hwb bv =
+    letrec cnt (b:bs) =
+	let rem = cnt bs in
+	b => ((tl rem)@[F]) | rem
+     /\    cnt [] = (replicate (length bv) F)@[T]
+    in
+    let ones = butlast (cnt bv) in
+    let bv_res = map2 (defix AND) ones bv in
+    let out = itlist (defix OR) bv_res F in
+    out
+;
+
+let big = hwb sum;
+
+bdd_size [big];

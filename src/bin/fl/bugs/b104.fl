@@ -1,0 +1,28 @@
+load "ste.fl";
+
+TYPE "foo" 4;
+
+let tst =
+    bit_input clk.
+    foo_input d.
+    foo_output res.
+    CELL "tst" [
+	re_ff clk d res
+];
+
+let p = tst 'clk 'd 'res;
+
+update_vossrc "VERBOSE-FSM-PRINT" "YES";
+let ckt = pexlif2fsm p;
+ckt;
+
+let s = STE_debug ckt;
+s;
+
+let ant = 
+	    ("clk" isv "0b0" from 0 to 1) and
+	    ("clk" isv "0b1" from 1 to 2) and
+	    ("d[3:0]" isv "0b0" from 0 to 2)
+;
+
+STE "" s [] ant [] (map (\n.n,0,3) (nodes ckt));

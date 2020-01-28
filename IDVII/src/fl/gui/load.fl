@@ -1,0 +1,2 @@
+(load (DIR^"sch_draw/load.fl")) fseq
+();

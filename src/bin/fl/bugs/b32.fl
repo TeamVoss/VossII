@@ -1,0 +1,12 @@
+let ckt = load_exe "bugs/z.exe";
+
+STE "-e -m 5" ckt []
+        [(T,"a",T, 0,10), (T,"b",T, 0,10)]
+        []
+        [("a",0,10),("b",0,10),("_0_[0]",0,10)]
+;
+
+//get_node_val ckt "_0_[0]";
+//map (get_node_val ckt) (fanin ckt "_0_[0]");
+//
+//print_fsm ckt;

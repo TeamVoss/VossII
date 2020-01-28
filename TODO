@@ -1,0 +1,94 @@
+ENHANCEMENTS needed:
+====================
+
+1)  Make the Show BDD colors and Show values (as well as the time) "sticky" 
+    for New fanin.
+
+2)  Display the values of multi-dimensional variables as a list of values
+
+3)  Add waveform viewer
+
+4)  Add "user grouping" to the visualizer
+
+5)  Support multi-output drawing objects
+
+6)  Provide back-annotation to Verilog and a Verilog viewer (with values?)
+
+7)  Provide user-defined pretty printers for signal values
+
+8)  
+
+
+
+
+
+TODO to move Voss to "more or less" forte equivalent.
+======================================================
+
+
+1) Add dynamic weakening to the STE engine
+
+2) Add bSTE
+
+3) Add tables to fl
+
+4) Add SMT solver (?)
+
+5) Add fork primitive
+
+6) Add GUI based debugger.
+
+7) Add named fields in type constructors + default values.
+
+8) Add nlet functionality + defaults
+
+9) Add fanin_dfs, _bfs and fanout_... functionality. 
+
+10) Add timeout command.
+
+11) Fix clet/cletrec for arguments that are reference variables.
+    Need to copy the current value into new refvar and keep that new
+    node as the cached argument.
+
+12) Add clean_clet <fn>.
+
+
+DONE: 
+=====
+
+1)  Add non_lazy 
+2)  Add then
+3)  Add FSEQ
+4)  Add printf/sprintf/fprintf functions
+5)  Add fopen, fclose, fflush functions
+6)  Add proper GUI front end (90% done)
+7)  Add gen_catch
+8)  Add tcl_eval and proper front end
+9)  Add extapi functionality (simple version)
+10) Add help system
+11) Add bexpr
+12) Add the DIR functions.
+11) Add SAT solver
+12) Add if-then-else binder
+13) Add save_xyz and load_xyz for any monomorphic type xyz
+14) Add dot drawing of g_ptr for debugging
+15) Add the  'let foo x when (x > 12) = ... type of guarded definition.
+16) Make load a proper function
+17) Add support for external parsers
+18) Add support for creating temporary files (in the VossII tmp directory)
+19) Add open_overload
+20) Add implicitly overloaded functions
+21) Add large number of list functions
+22) Add circuit visualization support
+23) Add proper zero-delay RTL simulation
+24) Create Verilog compiler
+25) Add top-level val()
+26) Replace def_list with a proper symbol table
+
+0) Fix the tcl_eval and callbacks to handle very large strings (send directly
+instead of going through an internal string representation).
+
+12) Fix open_overload to allow polymorphic functions to be overloaded.
+    That would allow functions to be extended to pairs and lists etc!
+
+13) Add definition of polymorphic type constructors (e.g., *a tree)

@@ -1,0 +1,213 @@
+
+lettype *a gen = GEN {generate::int -> *a};
+
+let gen (GEN fn) = fn;
+
+let choose lo hi = GEN (\n. random lo hi);
+
+// * -> * gen
+let return a = (GEN (\s. a));
+
+// * gen -> (* -> ** gen) -> ** gen
+let >>= (GEN m1) k = GEN (\s. let m2 = gen (k (m1 s)) in m2 s);
+infix 3 >>=;
+
+let ' g f x = g (f x);
+infix 7 ';
+
+// (* -> **) -> * gen -> ** gen
+let lift f ga = ga >>= return ' f;
+
+// (* -> ** -> ***) -> * gen -> ** gen -> *** gen
+let lift2 f ga gb = GEN (\s. f (gen ga s) (gen gb s));
+
+let lift3 f ga gb gc = GEN (\s. f (gen ga s) (gen gb s) (gen gc s));
+
+// (int -> * gen) -> * gen
+let sized fgen = GEN (\s. let m = gen (fgen s) in m s);
+
+// [*] -> * gen
+let elements xs = lift (\n.el n xs) (choose 1 (length xs));
+
+// [* gen] -> * gen
+let oneof gens = elements gens >>= id;
+
+letrec fold_left f acc [] = acc
+    /\ fold_left f acc (x:xs) = fold_left f (f x acc) xs
+;
+
+let sum = fold_left (defix +) 0;
+
+// [int # * gen] -> * gen
+let frequency xs = 
+    letrec pick ((k,x):xs) n = n <= k => x | pick xs (n-k) in
+    (choose 1 (sum (map fst xs))) >>= (pick xs)
+;
+
+
+let sequence l = GEN (\n. map (\x.gen x n) l);
+
+// ### Generator ###
+open_overload arbitrary;
+
+let i_arbitrary = sized (\n. choose 0 n);
+let b_arbitrary = elements [T,F];
+
+let listG g = sized (\n. (choose 0 n) >>= (\s. sequence (map (\x.g) (1--s)))); 
+let pairG g1 g2  = GEN (\size. (gen g1 size, gen g2 size));
+
+// Trees !
+lettype *a tree = Leaf *a | Branch ({*a} tree) ({*a} tree);
+
+let treeG g = 
+    letrec g_tree 0 = lift Leaf g
+        /\ g_tree n = frequency [
+            (1,lift Leaf g), 
+            (4, lift2 Branch (g_tree (n/2)) (g_tree (n/2)))
+            ]
+    in
+    sized g_tree
+;
+
+letrec prim_Ptree pre fp (Leaf n) = (fprintf fp "%d" n)
+    /\ prim_Ptree pre fp (Branch (Leaf left) (Leaf right)) =
+        (fprintf fp "\n%s├── %d" pre left) fseq
+        (fprintf fp "\n%s└── %d" pre right) 
+    /\ prim_Ptree pre fp (Branch (Leaf left) right) =
+        (fprintf fp "\n%s├── %d" pre left) fseq
+        (fprintf fp "\n%s└──┐" pre) fseq
+        (prim_Ptree (pre ^ "   ") fp right)
+    /\ prim_Ptree pre fp (Branch left (Leaf right)) =
+        (fprintf fp "\n%s├──┐" pre) fseq
+        (prim_Ptree (pre ^ "│  ") fp left) fseq
+        (fprintf fp "\n%s└── %d" pre right)
+    /\ prim_Ptree pre fp (Branch left right) =
+        (fprintf fp "\n%s├──┐" pre) fseq
+        (prim_Ptree (pre ^ "│  ") fp left) fseq
+        (fprintf fp "\n%s└──┐" pre) fseq
+        (prim_Ptree (pre ^ "   ") fp right)
+;
+
+let Ptree t = (prim_Ptree "" stdout t) fseq "";
+install_print_function Ptree;
+
+
+let l_arbitrary = listG arbitrary;
+let p_arbitrary = pairG arbitrary arbitrary;
+let t_arbitrary = treeG arbitrary;
+
+add_open_overload arbitrary i_arbitrary;
+add_open_overload arbitrary l_arbitrary;
+add_open_overload arbitrary p_arbitrary;
+add_open_overload arbitrary t_arbitrary;
+
+{gen arbitrary 10::(int#int list) list};
+{gen arbitrary 20::{int} tree};
+
+
+load "ste.fl";
+
+let random_el l = el (random 1 (length l)) l;
+
+let wexprG gen expr_sz ok_vars = 
+    letrec g_wexpr expr_sz 0 =
+        frequency [
+            (3, lift (W_VAR expr_sz) (elements (assoc expr_sz ok_vars))),
+            (2, lift (\n. W_CONST expr_sz (n%2**expr_sz)) gen)
+        ]
+        /\ g_wexpr expr_sz n =
+        frequency [
+            (2, lift (W_VAR expr_sz) (elements (assoc expr_sz ok_vars))),
+            (1, lift (\n. W_CONST expr_sz (n%2**expr_sz)) gen),
+            (2, lift2 W_ADD (g_wexpr expr_sz (n/2)) (g_wexpr expr_sz (n/2))),
+            (2, lift2 W_SUB (g_wexpr expr_sz (n/2)) (g_wexpr expr_sz (n/2))),
+            (1, lift2 W_MUL (g_wexpr expr_sz (n/2)) (g_wexpr expr_sz (n/2))),
+            (1, lift2 W_DIV (g_wexpr expr_sz (n/2)) (g_wexpr expr_sz (n/2))),
+            (1, lift2 W_AND (g_wexpr expr_sz (n/2)) (g_wexpr expr_sz (n/2))),
+            (1, lift2 W_OR  (g_wexpr expr_sz (n/2)) (g_wexpr expr_sz (n/2))),
+            (1, let new_sz = fst (random_el ok_vars) in
+                let cond_gen = oneof [
+                    (lift2 W_EQ (g_wexpr new_sz (n/2)) (g_wexpr new_sz (n/2))),
+                    (lift2 W_GR (g_wexpr new_sz (n/2)) (g_wexpr new_sz (n/2)))
+                ] in
+                lift3 W_ITE cond_gen (g_wexpr expr_sz (n/2)) (g_wexpr expr_sz (n/2)))
+        ]
+    in
+    sized (g_wexpr expr_sz)
+;
+
+let wexpr_arbitrary = wexprG i_arbitrary;
+gen (wexpr_arbitrary 8 [(8,["in1","in2","in3"])]) 10;
+
+// assoc_add replace or add a new pair of key,value inside an association list
+letrec assoc_add k v [] = [(k,v)]
+    /\ assoc_add k v ((k',v'):l) = k' = k => (k',v):l | (k',v'):(assoc_add k v l);
+
+//let pinst_arbitrary name = sized (\n.
+//    let nb_input = gen i_arbitrary n in
+//    let nb_output = gen i_arbitrary n in
+//    let base_in = map (\n. "in" ^ (int2str n)) (1--nb_input) in
+//    let base_out = map (\n. "out" ^ (int2str n)) (1--nb_output) in
+//    let fa_in = map (\s.let s2 = s^"[7:0]" in (s2,[s2])) base_in in
+//    let fa_out = map (\s.let s2 = s^"[7:0]" in (s2,[s2])) base_out in
+//    // Generate the update_fns
+//    let fn_updates = fst (fold_left (\(sz,out).\(ups,ok_vars).
+//        let fn = W_UPDATE_FN (W_VAR sz out) (gen (wexpr_arbitrary sz ok_vars) n) in
+//        let ok_vars = assoc_add (sz, out:(assoc sz ok_vars)) ok_vars in
+//        ((fn:ups),ok_vars)
+//    ) ([],[(8,base_in)]) (map (\x.(8,x)) base_out)) in
+//    return (PINST name [] T fa_in fa_out [] fn_updates)
+//);
+
+// ### SHRINKER ###
+open_overload shrink;
+
+let i_shrink n =
+    n = 0 => []
+  | letrec right_dicho m acc =
+        m = 0 => acc | m = (-1) => (n+1):acc | right_dicho (m/2) ((n-m):acc) in
+    rev (right_dicho n (n<0 => [-n] | []))
+;
+
+let pairS s1 s2 (e1,e2) = 
+    (map (\se. (se,e2)) (s1 e1)) @ (map (\se. (e1,se)) (s2 e2))
+;
+
+letrec @ [] l = l
+    /\ @ (x:xs) l = x:(append xs l)
+;
+
+infix 9 @;
+
+let listS s l =
+    letrec shrink1 [] = []
+	/\ shrink1 (x:xs) = (map (\xx. xx:xs) (s x)) @ 
+			    (map (defix : x) (shrink1 xs))
+    in
+    letrec deleteN n l = 
+	length l < n => [] 
+      | (butfirstn n l):(map (\ll. (firstn n l)@ll) (deleteN n (butfirstn n l)))
+    in
+    letrec aux [] n = []
+	/\ aux l 1 = (deleteN 1 l) @ (shrink1 l) 
+	/\ aux l n = (deleteN n l) @ (aux l ((n+1)/2))
+    in aux l (length l)
+;
+
+letrec t_shrink (Leaf n) = map Leaf (shrink n)
+    /\ t_shrink (Branch left right) = [left, right]@
+		    (map (\(l,r).Branch l r) (shrink (left, right)))
+;
+
+let p_shrink = pairS shrink shrink;
+let l_shrink = listS shrink;
+
+add_open_overload shrink i_shrink;
+add_open_overload shrink p_shrink;
+add_open_overload shrink l_shrink;
+add_open_overload shrink t_shrink;
+
+let t = {gen arbitrary 10::{int} tree};
+
+//rvariable "a";
+shrink (10,42);

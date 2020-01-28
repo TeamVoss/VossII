@@ -1,0 +1,94 @@
+
+sprintf "%04b" (0);
+sprintf "%04b" (2);
+sprintf "%04b" (-2);
+sprintf "%4b" (0);
+sprintf "%4b" (2);
+sprintf "%4b" (-2);
+sprintf "%b" (0);
+sprintf "%b" (2);
+sprintf "%b" (-2);
+
+sprintf "%-04b" (0);
+sprintf "%-04b" (2);
+sprintf "%-04b" (-2);
+sprintf "%-4b" (0);
+sprintf "%-4b" (2);
+sprintf "%-4b" (-2);
+sprintf "%-b" (0);
+sprintf "%-b" (2);
+sprintf "%-b" (-2);
+
+
+sprintf "%04x" (0);
+sprintf "%04x" (2);
+sprintf "%04x" (-2);
+sprintf "%4x" (0);
+sprintf "%4x" (2);
+sprintf "%4x" (-2);
+sprintf "%x" (0);
+sprintf "%x" (2);
+sprintf "%x" (-2);
+
+sprintf "%-04x" (0);
+sprintf "%-04x" (2);
+sprintf "%-04x" (-2);
+sprintf "%-4x" (0);
+sprintf "%-4x" (2);
+sprintf "%-4x" (-2);
+sprintf "%-x" (0);
+sprintf "%-x" (2);
+sprintf "%-x" (-2);
+
+sprintf "%04o" (0);
+sprintf "%04o" (2);
+sprintf "%04o" (-2);
+sprintf "%4o" (0);
+sprintf "%4o" (2);
+sprintf "%4o" (-2);
+sprintf "%o" (0);
+sprintf "%o" (2);
+sprintf "%o" (-2);
+
+sprintf "%-04o" (0);
+sprintf "%-04o" (2);
+sprintf "%-04o" (-2);
+sprintf "%-4o" (0);
+sprintf "%-4o" (2);
+sprintf "%-4o" (-2);
+sprintf "%-o" (0);
+sprintf "%-o" (2);
+sprintf "%-o" (-2);
+
+sprintf "%04d" (0);
+sprintf "%04d" (2);
+sprintf "%04d" (-2);
+sprintf "%4d" (0);
+sprintf "%4d" (2);
+sprintf "%4d" (-2);
+sprintf "%d" (0);
+sprintf "%d" (2);
+sprintf "%d" (-2);
+
+sprintf "%-04d" (0);
+sprintf "%-04d" (2);
+sprintf "%-04d" (-2);
+sprintf "%-4d" (0);
+sprintf "%-4d" (2);
+sprintf "%-4d" (-2);
+sprintf "%-d" (0);
+sprintf "%-d" (2);
+sprintf "%-d" (-2);
+
+
+sprintf "%x" 17;
+sprintf "%o" 17;
+sprintf "%d" 17;
+sprintf "%x" (-17);
+sprintf "%o" (-17);
+sprintf "%d" (-17);
+
+sprintf "%b" 17;
+sprintf "%b" (-17);
+sprintf "%8b" (17);
+sprintf "%8b" (-17);

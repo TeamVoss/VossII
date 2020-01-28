@@ -1,0 +1,13 @@
+let i_inc i = i+1;
+let s_inc i = i^"1";
+
+open_overload {inc:: *a -> *a} i_inc s_inc;
+
+help "inc";
+
+let double x = inc (inc x);
+
+help "double";
+
+double 12;
+double "00";

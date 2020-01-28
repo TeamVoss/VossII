@@ -1,0 +1,4 @@
+let half_adder (a, b) -> (r, s) {
+    r = AND a b
+    s = XOR a b
+}

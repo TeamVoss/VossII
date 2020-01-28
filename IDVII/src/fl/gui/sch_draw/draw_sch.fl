@@ -1,0 +1,1247 @@
+let Init_sch_draw =
+  tcl_eval [
+   sprintf "set ::imagedir %s%s" DIR "images",
+   sprintf
+     "load %s../../../../schematic_draw_module.so"
+     DIR,
+   sprintf "source %s/draw_sch.tcl" DIR,
+   sprintf "source %s/waveform.tcl" DIR
+  ]
+;
+Init_sch_draw;
+
+let dbg_tcl_eval l =
+    (fprintf stderr "CMDS:\n") fseq
+    (foreach (fprintf stderr "%s\n") l) fseq
+    (tcl_eval l)
+;
+
+let big_tcl_eval l =
+//    length l < 10 => tcl_eval l |
+    let fp = mktemp "tcl_eval" then
+    (foreach (fprintf fp "%s\n") l) fseq
+    let filename = stream2filename fp then
+//    (fprintf fp "exec /bin/rm -f %s\n" filename) fseq
+    (fclose fp) fseq
+    let res = tcl_eval [sprintf "source %s" filename] then
+    res
+;
+
+
+let Create_Dummy_Placement =
+    (tcl_eval ["catch {destroy .c9999999}",
+          "frame .c9999999",
+          "frame .c9999999.cc",
+          "canvas .c9999999.cc.c",
+          "set cur_zoom_factor(.c9999999.cc.c) 100.0",
+          "set ::sc(.c9999999.cc.c) $::base_sc",
+          "set ::tfont(.c9999999.cc.c) $::base_tfont",
+          "set ::mfont(.c9999999.cc.c) $::base_mfont",
+          "set ::sfont(.c9999999.cc.c) $::base_sfont"
+         ]) fseq
+    ()
+;
+Create_Dummy_Placement;
+
+// -------------------------------------------------------------
+
+let cur_canvas = ref "";
+
+let w2root w = "."^(el 2 (str_split w "."));
+
+let w2vfsm_ref = ref {[]:: (string#vfsm) list};
+
+let register_vfsm vfsm canvas =
+    let w = w2root canvas then
+    let old = filter (\p. fst p != w) (deref w2vfsm_ref) then
+    (w2vfsm_ref := ((w,vfsm):old))
+;
+non_lazy register_vfsm;
+
+let dassoc cmd key al =
+    (assoc key al) catch
+    (eprintf "Cannot find %s in %S when doing %s\n" key (map fst al) cmd)
+;
+
+let w2vfsm canvas =
+    let root = w2root canvas then
+    dassoc "w2vfsm" root (deref w2vfsm_ref)
+;
+non_lazy w2vfsm;
+
+let canvas2fsm canvas = vfsm2fsm (w2vfsm canvas);
+let canvas2ste canvas = deref (vfsm2ste_r (w2vfsm canvas));
+let canvas2current_time_r canvas = vfsm2cur_time_r (w2vfsm canvas);
+let canvas2waveform canvas = deref (vfsm2wvr (w2vfsm canvas));
+let canvas2stop_list_r canvas = vfsm2stop_list_r (w2vfsm canvas);
+let canvas2selection_r canvas = vfsm2selection_r (w2vfsm canvas);
+let canvas2hll_r canvas = vfsm2hll_r (w2vfsm canvas);
+let canvas2dl_r canvas = vfsm2dl_r (w2vfsm canvas);
+let canvas2canvases_r canvas = vfsm2canvases_r (w2vfsm canvas);
+
+let canvas2vis canvas =
+    let cs = deref (canvas2canvases_r canvas) then
+    dassoc "canvas2vis" canvas cs
+;
+
+let fl_c2w canvas = canvas2waveform canvas;
+export_to_tcl fl_c2w;
+
+let ste_debug_cnt_ref = ref 0;
+let mk_ste_debug_window {dummy::void} =
+    let idx = deref ste_debug_cnt_ref + 1 then
+    (ste_debug_cnt_ref := idx) fseq
+    sprintf ".ste_debug_%d" idx
+;
+non_lazy mk_ste_debug_window;
+
+let STE_debug fsm =
+    let w = mk_ste_debug_window () then
+    (tcl_eval [sprintf "create_ste_debugger %s" w]) fseq
+    let ste0 = STE "" fsm [] [] [] [] then
+    let res = STEV_ENV
+		      w
+		      fsm
+		      (ref ste0)
+		      (ref "")
+		      (ref 0)
+		      (ref [])
+		      (ref [])
+		      (ref [])
+		      (ref [])
+		      (ref [])
+		      (ref [])
+    then
+    (register_vfsm res w) fseq
+    let wvf = tcl_eval ["nb:create_node_browser "^w] then
+    ((vfsm2wvr res) := wvf) fseq
+    (tcl_eval ["sl:create_stop_node_browser "^w]) fseq
+    res
+;
+
+
+let vSTE opts vfsm wl ant cons trl =
+    let fsm = vfsm2fsm vfsm then
+    let ste = STE opts fsm wl ant cons trl then
+    ((vfsm2ste_r vfsm) := ste) fseq
+    (tcl_eval [sprintf "wv:set_new_max_time %s 1" (deref (vfsm2wvr vfsm))]) fseq
+    ste
+;
+overload STE STE vSTE;
+
+let bvSTE opts vfsm wl ant cons trl =
+    let fsm = vfsm2fsm vfsm then
+    let ste = bSTE opts fsm wl ant cons trl then
+    ((vfsm2ste_r vfsm) := ste) fseq
+    ste
+;
+overload bSTE bSTE bvSTE;
+
+let fl_add_fsm root_window fsm_window vec =
+    let vfsm = w2vfsm root_window then
+    let rfsms = vfsm2fsms_r vfsm then
+    let old = filter (\(c,_). c != fsm_window) (deref rfsms) then
+    (rfsms := ((fsm_window,vec):old))
+;
+export_to_tcl fl_add_fsm;
+
+let fl_remove_fsm root_window fsm_window =
+    let vfsm = w2vfsm root_window then
+    let rfsms = vfsm2fsms_r vfsm then
+    let old = filter (\(c,_). c != fsm_window) (deref rfsms) then
+    (rfsms := old)
+;
+export_to_tcl fl_remove_fsm;
+
+let fl_get_active_fsms root_window =
+    let vfsm = w2vfsm root_window then
+    let rfsms = vfsm2fsms_r vfsm then
+    deref rfsms
+;
+export_to_tcl fl_get_active_fsms;
+
+let add_active_sch_tab_window vfsm canvas vis =
+    let rcanvas_list = vfsm2canvases_r vfsm then
+    let old = filter (\(c,_). c != canvas) (deref rcanvas_list) then
+    (rcanvas_list := ((canvas,vis):old))
+;
+
+let fl_remove_active_sch_tab_window canvas =
+    let vfsm = w2vfsm canvas then
+    let rcanvas_list = vfsm2canvases_r vfsm then
+    let new = filter (\(c,_). c != canvas) (deref rcanvas_list) then
+    (rcanvas_list := new)
+;
+export_to_tcl fl_remove_active_sch_tab_window;
+
+let fl_get_active_sch_tab_windows canvas =
+    let vfsm = w2vfsm canvas then
+    let rcanvas_list = vfsm2canvases_r vfsm then
+    map fst (deref rcanvas_list)
+;
+export_to_tcl fl_get_active_sch_tab_windows;
+
+let get_new_sch_canvas w draw_level =
+    let tw_c = tcl_eval [sprintf "get_new_sch_canvas %s %d" w draw_level] then
+    val [tab_w, canvas] = str_split tw_c " " then
+    (tab_w, canvas)
+;
+
+let gen_draw_fanin vfsm draw_level levels vecs =
+    let stop_list = deref (vfsm2stop_list_r vfsm) then
+    let fsm = vfsm2fsm vfsm then 
+    let w = vfsm2id vfsm then
+    let vis = visualize_fanin fsm stop_list [] levels vecs draw_level then
+    val (tab_window, c) = get_new_sch_canvas w draw_level then
+    (add_active_sch_tab_window vfsm c vis) fseq
+    val (final_res, cmds) = visualisation2tcl vis then
+    (big_tcl_eval ("create_sch":cmds)) fseq
+    (cur_canvas := c) fseq
+    (tcl_eval [
+                sprintf "%s delete all" c,
+                sprintf "draw_network %s $%s" c final_res,
+                "update",
+		sprintf "bind %s <Map> {fl_update_colors %s}"  c c,
+		sprintf "fl_update_colors %s"  c,
+                sprintf "set_scrollregion %s" c
+              ]) fseq
+    c
+;
+
+let draw_inside vfsm cur_draw_level vecs =
+    let fsm = vfsm2fsm vfsm then 
+    let nds = md_expand_vectors vecs then
+    let stop_list = deref (vfsm2stop_list_r vfsm) then
+    let ifc_list =
+	flatmap snd (get_visualization_fanins fsm (hd nds) cur_draw_level)
+    then
+    let w = vfsm2id vfsm then
+    let draw_level = cur_draw_level+1 in
+    let vis = visualize_fanin fsm stop_list ifc_list 100 vecs draw_level then
+    val (tab_window, c) = get_new_sch_canvas w draw_level then
+    (add_active_sch_tab_window vfsm c vis) fseq
+    val (final_res, cmds) = visualisation2tcl vis then
+    (big_tcl_eval ("create_sch":cmds)) fseq
+    (cur_canvas := c) fseq
+    (tcl_eval [
+                sprintf "%s delete all" c,
+                sprintf "draw_network %s $%s" c final_res,
+                "update",
+		sprintf "bind %s <Map> {fl_update_colors %s}"  c c,
+		sprintf "fl_update_colors %s"  c,
+                sprintf "set_scrollregion %s" c
+              ]) fseq
+    c
+;
+
+
+// =====================================================================
+// Callback functions
+// =====================================================================
+
+let fl_tag2vec canvas tag =
+    let vis = canvas2vis canvas then
+    visualization_anon2real vis tag
+;
+export_to_tcl fl_tag2vec;
+
+let fl_vecs2tags canvas vecs =
+    str_is_prefix ".c9999999" canvas => ["_"] |
+    let vis = canvas2vis canvas then
+    val (fpots,ppots) = visualization_vecs2tags vis T vecs then
+    let is_vecs an = (visualization_anon2real vis an) = vecs in
+    let res = filter is_vecs fpots then
+    res
+;
+export_to_tcl fl_vecs2tags;
+
+
+let fl_draw_fanin_by_name canvas draw_level levels vecs =
+    let vfsm = w2vfsm canvas then
+    gen_draw_fanin vfsm draw_level levels vecs
+;
+export_to_tcl fl_draw_fanin_by_name;
+
+let fl_draw_inside canvas cur_draw_level tag =
+    let vfsm = w2vfsm canvas then
+    let vecs = fl_tag2vec canvas tag then
+    draw_inside vfsm cur_draw_level vecs
+;
+export_to_tcl fl_draw_inside;
+
+
+let fl_draw_fanin_by_tag canvas draw_level levels tag =
+    let vfsm = w2vfsm canvas then
+    let vec = fl_tag2vec canvas tag then
+    let c = gen_draw_fanin vfsm draw_level levels vec then
+    c
+;
+export_to_tcl fl_draw_fanin_by_tag;
+
+let fl_is_vector_name name = md_size name > 1;
+export_to_tcl fl_is_vector_name;
+
+let fl_is_vector canvas tag =
+    str_is_prefix ".c9999999" canvas => F |
+    let vecs = fl_tag2vec canvas tag in
+    vecs = [] =>
+	(fprintf stderr "Cannot map %s in %s\n" tag canvas) seq F
+    |
+    length vecs > 1 => T |
+    md_size (hd vecs) > 1
+;               
+export_to_tcl fl_is_vector;
+
+let fl_get_global_time canvas = deref (canvas2current_time_r canvas);
+export_to_tcl fl_get_global_time;
+
+let fl_set_global_time canvas t =
+    let rtime = canvas2current_time_r canvas in
+    (rtime := t) 
+;
+export_to_tcl fl_set_global_time;
+
+let compress l =
+    letrec compr cnt cur (v:vs) =
+	v == cur => compr (cnt+1) cur vs |
+	cnt < 3 => (replicate cnt cur)@(compr 1 v vs) |
+	(sprintf "%s^%d" cur cnt):(compr 1 v vs)
+     /\    compr cnt cur [] =
+	cnt < 3 => (replicate cnt cur) |
+	[(sprintf "%s^%d" cur cnt)]
+    in
+    compr 1 (hd l) (tl l)
+;
+
+let my_bool2str f =
+    let s = bool2str 5 f in
+    let l = str_split s " " in
+    let s' = list2str T "" "" "" id l in
+    let ll = str_split s' "+" in
+    list2str T "" "+\n" "" id ll
+;
+
+let fl_get_STE_maxtime w =
+    let ste = canvas2ste w then
+    get_STE_maxtime ste
+;
+export_to_tcl fl_get_STE_maxtime;
+
+let merge_traces trls =
+    let cmp a b = b-a in
+    let time_points = qsort cmp (setify (map fst (flat trls))) then
+    letrec mk (ct:cts) trl =
+        let getv ((t,HL):rem) = ct = t => (HL,rem) | (HL,((t,HL):rem)) in
+        val (resl,rem_trl) = unzip (map getv trl) then
+        (ct, resl):(mk cts rem_trl)
+      /\   mk [] trl = []
+    in
+    mk time_points trls
+;
+
+let fl_wv_get_short w vec t =
+    let ste = canvas2ste w then
+    let type = get_ste_type ste then
+    let nds = md_expand_vector vec in
+    length nds > 128 => "..." |
+    let opt_states = node2value_list (ste2fsm ste) (hd nds) in
+    type = "bdd" =>
+	let get_val nd = (T,(get_trace_val ste nd t)) catch (F,(T,T)) in
+	let vals = map get_val nds then
+	let val2s (is_traced,HL) =
+	    NOT is_traced => "_" |
+	    HL == (T,F) => "1" |
+	    HL == (F,T) => "0" |
+	    HL == (T,T) => "X" |
+	    HL == (F,F) => "OVERCONSTRAINED" |
+	    val (H,L) = HL in
+	    (H == NOT L) => "S" |
+	    (NOT L AND NOT H) == F =>
+	       H == T => "0X" | 
+	       L == T => "X1" | 
+	       "0X1"
+	    |
+	    "OVERCONSTRAINED"
+	in
+	let vs = map val2s vals then
+	let alts = setify vs then
+	(alts subtract ["0","1"]) = [] =>
+	    let s = implode vs then
+	    opt_states != [] =>
+		let i = sscanf "%b" s in
+		assoc i opt_states
+	    |
+	    let res = length nds >= 4 =>
+			sprintf "0x%x" (sscanf "%b" s) | (implode vs)
+	    then
+	    strlen res > 30 => "..." | res
+	|
+	length alts = 1 => hd alts |
+	let res = list2str T "{" "," "}" id (compress vs) then
+	strlen res > 30 => "..." | res
+    |
+    type = "bexpr" =>
+	let definitely_unsat f = ((bget_model [f] 10) = []) catch F in
+	let definitely_sat f = ((bget_model [f] 10) != []) catch F in
+	let bget_val nd = (T,(bget_trace_val ste nd t)) catch (F,(bT,bT)) in
+	let val2s nd =
+	    val (is_traced,HL) = bget_val nd then
+	    NOT is_traced => "_" |
+	    HL == (bT,bF) => "1" |
+	    HL == (bF,bT) => "0" |
+	    HL == (bT,bT) => "X" |
+	    HL == (bF,bF) => "OVERCONSTRAINED" |
+	    val (H,L) = HL in
+	    definitely_unsat (H bXNOR L) => "S" |
+	    definitely_sat ((bNOT H) bAND (bNOT L)) => "OVERCONSTRAINED" |
+	    definitely_unsat (bNOT H) => "0X" |
+	    definitely_unsat (bNOT L) => "X1"
+				       | "0X1"
+	in
+	let vs = map val2s nds then
+	let alts = setify vs then
+	(alts subtract ["0","1"]) = [] =>
+	    let s = implode vs then
+	    length nds >= 4 => sprintf "0x%x" (sscanf "%b" s) | (implode vs)
+	|
+	length alts = 1 =>
+	    let res = hd alts then
+	    strlen res > 30 => "..." | res
+	|
+	let res = list2str T "{" "," "}" id (compress vs) then
+	strlen res > 30 => "..." | res
+    |
+    "_"
+;
+export_to_tcl fl_wv_get_short;
+
+let info_leq l1 l2 =
+    letrec leq ((v1,(H1,L1)):r1) ((v2,(H2,L2)):r2) =
+	v1 AND v2 AND (NOT H2 OR H1) AND (NOT L2 OR L1) AND (leq r1 r2)
+     /\    leq [] [] = T
+    in
+    leq l1 l2
+;
+
+let fl_get_short_value w vecs compute_alternatives =
+    let vfsm = w2vfsm w then
+    let ste = deref (vfsm2ste_r vfsm) then
+    let type = get_ste_type ste then
+    let fsm = ste2fsm ste then
+    let t = deref (vfsm2cur_time_r vfsm) then
+    let nds = md_expand_vectors vecs in
+    let opt_states = node2value_list fsm (hd nds) in
+    type = "bdd" =>
+	let get_val nd = (T,(get_trace_val ste nd t)) catch (F,(T,T)) in
+	let vals = map get_val nds then
+	let val2s (is_traced,HL) =
+	    NOT is_traced => "_" |
+	    HL == (T,F) => "1" |
+	    HL == (F,T) => "0" |
+	    HL == (T,T) => "X" |
+	    HL == (F,F) => "OVERCONSTRAINED" |
+	    val (H,L) = HL in
+	    (H == NOT L) => "S" |
+	    (NOT L AND NOT H) == F =>
+	       H == T => "0X" | 
+	       L == T => "X1" | 
+	       "0X1"
+	    |
+	    "OVERCONSTRAINED"
+	in
+	let vs = map val2s vals then
+	let alts = setify vs then
+	(alts subtract ["0","1"]) = [] =>
+	    let s = implode vs then
+	    opt_states != [] =>
+		// An ENUM (e.g. state machine)
+		let i = sscanf "%b" s in
+		assoc i opt_states
+	    |   
+	    let res = length nds >= 4 =>
+			sprintf "0x%x" (sscanf "%b" s) | (implode vs)
+	    then
+	    strlen res > 30 => "..." | res
+	|
+	(compute_alternatives AND (opt_states != [])) =>
+	    // Compute all alternatives that can match the result
+	    let bits = length nds in
+	    let tst (idx,name) =
+		let es = explode (sprintf "%0*b" bits idx) in
+		let cnv b = (T,(b="1" => (T,F) | (F,T))) in
+		let pat = map cnv es in
+		NOT ((info_leq vals pat) == F)
+	    in
+	    let alts = filter tst opt_states then
+	    list2str T "" "/" "" snd alts
+	|
+	length alts = 1 => hd alts |
+	let res = list2str T "{" "," "}" id (compress vs) then
+	strlen res > 30 => "..." | res
+    |
+    type = "bexpr" =>
+	let definitely_unsat f = ((bget_model [f] 10) = []) catch F in
+	let definitely_sat f = ((bget_model [f] 10) != []) catch F in
+	let bget_val nd = (T,(bget_trace_val ste nd t)) catch (F,(bT,bT)) in
+	let val2s nd =
+	    val (is_traced,HL) = bget_val nd then
+	    NOT is_traced => "_" |
+	    HL == (bT,bF) => "1" |
+	    HL == (bF,bT) => "0" |
+	    HL == (bT,bT) => "X" |
+	    HL == (bF,bF) => "OVERCONSTRAINED" |
+	    val (H,L) = HL in
+	    definitely_unsat (H bXNOR L) => "S" |
+	    definitely_sat ((bNOT H) bAND (bNOT L)) => "OVERCONSTRAINED" |
+	    definitely_unsat (bNOT H) => "0X" |
+	    definitely_unsat (bNOT L) => "X1"
+				       | "0X1"
+	in
+	let vs = map val2s nds then
+	let alts = setify vs then
+	(alts subtract ["0","1"]) = [] =>
+	    let s = implode vs then
+	    length nds >= 4 => sprintf "0x%x" (sscanf "%b" s) | (implode vs)
+	|
+	length alts = 1 =>
+	    let res = hd alts then
+	    strlen res > 30 => "..." | res
+	|
+	let res = list2str T "{" "," "}" id (compress vs) then
+	strlen res > 30 => "..." | res
+    |
+    "_"
+;
+export_to_tcl fl_get_short_value;
+
+let fl_get_short_value_from_aname canvas tag =
+    let w = w2root canvas in
+    let vecs = fl_tag2vec canvas tag then
+    fl_get_short_value w vecs
+;
+export_to_tcl fl_get_short_value_from_aname;
+
+let fl_get_long_value canvas tag =
+    let ste = canvas2ste canvas then
+    let type = get_ste_type ste then
+    let t = deref (canvas2current_time_r canvas) then
+    let vecs = fl_tag2vec canvas tag then
+    let nds = md_expand_vectors vecs in
+    type = "bdd" =>
+	let get_val nd = (get_trace_val ste nd t) catch (T,T) in
+	let vals = map get_val nds then
+	let is_const HL =
+	    (HL == (T,F)) OR (HL == (F,T)) OR (HL == (T,T)) OR (HL == (F,F))
+	in
+	let mk_range cur =
+	    let r = rev cur in
+	    let vs = merge_vectors (map fst r) then
+	    let v = hd vs then
+	    let vals = map snd r then
+	    let non_binary HL = NOT (HL == (T,F)) AND NOT (HL == (F,T)) in
+	    let idx = find_first0 non_binary vals then
+	    idx = 0 =>
+		let b = implode (map (\(H,L). H=>"1"| "0") vals) then
+		let d = length r >= 4 => sprintf "0x%x" (sscanf "%b" b) | b in
+		(v,[d])
+	    |
+	    let val2s (HL) =
+		HL == (T,F) => "1" |
+		HL == (F,T) => "0" |
+		HL == (T,T) => "X" |
+		"T"
+	    in
+	    (v, [implode (map val2s vals)])
+	in
+	letrec group cur (nd:nds) (HL:HLs) =
+	    is_const HL => group ((nd,HL):cur) nds HLs |
+	    cur != [] => (mk_range cur):(group []  (nd:nds) (HL:HLs)) |
+	    let ovc = (HL = (F,F)) in
+	    NOT (ovc == F) => (nd,["OVERCONSTRAINED"]):(group [] nds HLs) |
+	    let one   = (HL = (T,F)) in
+	    let X     = (HL = (T,T)) in
+	    X == F => (nd,[bool2str 3 one]):(group [] nds HLs) |
+	    let one_s = bool2str 3 one then
+	    let X_s   = bool2str 3 X then
+	    (nd, [one_s, (sprintf "  + X(%s)" X_s)]):(group [] nds HLs)
+	 /\   group cur [] [] =
+	    cur = [] => [] |
+	    [mk_range cur]
+	in
+	let raw_res = group [] nds vals then
+	length raw_res = 1 => 
+	    let res = list2str T "" "\n" "" id (snd (hd raw_res)) then
+	    strlen res > 30 => "..." | res
+	|
+	let slen = (itlist (\p.\m. max (strlen (fst p)) m) raw_res 0)+3 then
+	let slen = (slen > 40) => 40 | slen in
+	let p_range (vec,exprs) =
+	    let sep = sprintf "%*s\n" slen "" then
+	    let es = list2str T "" sep "" id exprs then
+	    sprintf "%*s: %s" slen vec es
+	in
+	let res = list2str T "" "\n" "" p_range raw_res then
+	strlen res > 30 => "..." | res
+    |
+    type = "bexpr" =>
+	let get_val nd = (bget_trace_val ste nd t) catch (bT,bT) in
+	let vals = map get_val nds then
+	let definitely_unsat f = ((bget_model [f] 10) = []) catch F in
+	let definitely_sat f = ((bget_model [f] 10) != []) catch F in
+	let is_const HL =
+	    (HL == (bT,bF)) OR (HL == (bF,bT)) OR   
+	    (HL == (bT,bT)) OR (HL == (bF,bF))
+	in
+	let mk_range cur =
+	    let r = rev cur in
+	    let vs = merge_vectors (map fst r) then
+	    let v = hd vs then
+	    let vals = map snd r then
+	    let non_binary HL = NOT (HL == (bT,bF)) AND NOT (HL == (bF,bT)) in
+	    let idx = find_first0 non_binary vals then
+	    idx = 0 =>
+		let b = implode (map (\(H,L). (H==bT)=>"1"| "0") vals) then
+		let d = length r >= 4 => sprintf "0x%x" (sscanf "%b" b) | b in
+		(v,[d])
+	    |
+	    let val2s (HL) =
+		HL == (bT,bF) => "1" |
+		HL == (bF,bT) => "0" |
+		HL == (bT,bT) => "X" |
+		"T"
+	    in
+	    (v, [implode (map val2s vals)])
+	in
+	letrec group cur (nd:nds) (HL:HLs) =
+	    is_const HL => group ((nd,HL):cur) nds HLs |
+	    cur != [] => (mk_range cur):(group []  (nd:nds) (HL:HLs)) |
+	    val (H,L) = HL in
+	    let ovc = (bNOT H) bAND (bNOT L) in
+	    definitely_sat ovc => (nd,["OVERCONSTRAINED"]):(group [] nds HLs) |
+	    let one   = H bAND (bNOT L) in
+	    let X     = H bAND L in
+	    definitely_unsat X => 
+		(nd,[bexpr2str 3 one]):(group [] nds HLs)
+	    |
+	    let one_s = bexpr2str 3 one then
+	    let X_s   = bexpr2str 3 X then
+	    (nd, [one_s, (sprintf "  + X(%s)" X_s)]):(group [] nds HLs)
+	 /\   group cur [] [] =
+	    cur = [] => [] |
+	    [mk_range cur]
+	in
+	let raw_res = group [] nds vals then
+	length raw_res = 1 =>
+	    let res = list2str T "" "\n" "" id (snd (hd raw_res)) then
+	    strlen res > 30 => "..." | res
+	|
+	let slen = (itlist (\p.\m. max (strlen (fst p)) m) raw_res 0)+3 then
+	let slen = (slen > 40) => 40 | slen in
+	let p_range (vec,exprs) =
+	    let sep = sprintf "%*s\n" slen "" then
+	    let es = list2str T "" sep "" id exprs then
+	    sprintf "%*s: %s" slen vec es
+	in
+	let res = list2str T "" "\n" "" p_range raw_res then
+	strlen res > 30 => "..." | res
+    |
+    "-"
+;
+export_to_tcl fl_get_long_value;
+
+let split_multi_dim v =
+    let parts = str_split v "[" in
+    length parts <= 2 => [v] |
+    let nds = md_expand_vector v in
+    let sep_fn n = butlast (str_split n "[") in
+    let svs = partition sep_fn nds then
+    flatmap md_extract_vectors svs
+;
+
+let base_get_complete_value ste vectors t =
+    let type = get_ste_type ste then
+    let process v =
+	let nds = md_expand_vector v in
+	type = "bdd" =>
+	    let get_val nd = (get_trace_val ste nd t) catch (T,T) in
+	    let vals = map get_val nds then
+	    let is_const HL =
+		(HL == (T,F)) OR (HL == (F,T)) OR (HL == (T,T)) OR (HL == (F,F))
+	    in
+	    let mk_range cur =
+		let r = rev cur in
+		let vs = merge_vectors (map fst r) then
+		let v = hd vs then
+		let vals = map snd r then
+		let non_binary HL = NOT (HL == (T,F)) AND NOT (HL == (F,T)) in
+		let idx = find_first0 non_binary vals then
+		idx = 0 =>
+		    let b = implode (map (\(H,L). H=>"1"| "0") vals) then
+		    let d =
+			length r >= 4 => sprintf "0x%x" (sscanf "%b" b) | b
+		    in
+		    (v,[d])
+		|
+		let val2s (HL) =
+		    HL == (T,F) => "1" |
+		    HL == (F,T) => "0" |
+		    HL == (T,T) => "X" |
+		    "T"
+		in
+		(v, [implode (map val2s vals)])
+	    in
+	    letrec group cur (nd:nds) (HL:HLs) =
+		is_const HL => group ((nd,HL):cur) nds HLs |
+		cur != [] => (mk_range cur):(group []  (nd:nds) (HL:HLs)) |
+		let ovc = (HL = (F,F)) in
+		NOT (ovc == F) => (nd,["OVERCONSTRAINED"]):(group [] nds HLs) |
+		let one   = (HL = (T,F)) in
+		let X     = (HL = (T,T)) in
+		X == F => (nd,[bool2str 3 one]):(group [] nds HLs) |
+		let one_s = bool2str 3 one then
+		let X_s   = bool2str 3 X then
+		(nd, [one_s, (sprintf "  + X(%s)" X_s)]):(group [] nds HLs)
+	     /\   group cur [] [] =
+		cur = [] => [] |
+		[mk_range cur]
+	    in
+	    let raw_res = group [] nds vals then
+	    length raw_res = 1 => list2str T "" "\n" "" id (snd (hd raw_res)) |
+	    let slen = (itlist (\p.\m. max (strlen (fst p)) m) raw_res 0)+3 then
+	    let slen = (slen > 40) => 40 | slen in
+	    let p_range (vec,exprs) =
+		let sep = sprintf "%*s\n" slen "" then
+		let es = list2str T "" sep "" id exprs then
+		sprintf "%*s: %s" slen vec es
+	    in
+	    list2str T "" "\n" "" p_range raw_res
+	|
+	type = "bexpr" =>
+	    let get_val nd = (bget_trace_val ste nd t) catch (bT,bT) in
+	    let definitely_unsat f = ((bget_model [f] 10) = []) catch F in
+	    let definitely_sat f = ((bget_model [f] 10) != []) catch F in
+	    let vals = map get_val nds then
+	    let is_const HL =
+		(HL == (bT,bF)) OR (HL == (bF,bT)) OR
+		(HL == (bT,bT)) OR (HL == (bF,bF))
+	    in
+	    let mk_range cur =
+		let r = rev cur in
+		let vs = merge_vectors (map fst r) then
+		let v = hd vs then
+		let vals = map snd r then
+		let non_binary HL =
+		    NOT (HL == (bT,bF)) AND NOT (HL == (bF,bT))
+		in
+		let idx = find_first0 non_binary vals then
+		idx = 0 =>
+		    let b = implode (map (\(H,L). (H==bT)=>"1"| "0") vals) then
+		    let d =
+			length r >= 4 => sprintf "0x%x" (sscanf "%b" b) | b
+		    in
+		    (v,[d])
+		|
+		let val2s (HL) =
+		    HL == (bT,bF) => "1" |
+		    HL == (bF,bT) => "0" |
+		    HL == (bT,bT) => "X" |
+		    "T"
+		in
+		(v, [implode (map val2s vals)])
+	    in
+	    letrec group cur (nd:nds) (HL:HLs) =
+		is_const HL => group ((nd,HL):cur) nds HLs |
+		cur != [] => (mk_range cur):(group []  (nd:nds) (HL:HLs)) |
+		val (H,L) = HL in
+		let ovc = (bNOT H) bAND (bNOT L) in
+		definitely_sat ovc =>
+		    (nd,["OVERCONSTRAINED"]):(group [] nds HLs)
+		|
+		let one   = H bAND (bNOT L) in
+		let X     = H bAND L in
+		definitely_unsat X => 
+		    (nd,[bexpr2str 3 one]):(group [] nds HLs)
+		|
+		let one_s = bexpr2str 3 one then
+		let X_s   = bexpr2str 3 X then
+		(nd, [one_s, (sprintf "  + X(%s)" X_s)]):(group [] nds HLs)
+	     /\   group cur [] [] =
+		cur = [] => [] |
+		[mk_range cur]
+	    in
+	    let raw_res = group [] nds vals then
+	    length raw_res = 1 => list2str T "" "\n" "" id (snd (hd raw_res)) |
+	    let slen = (itlist (\p.\m. max (strlen (fst p)) m) raw_res 0)+3 then
+	    let slen = (slen > 40) => 40 | slen in
+	    let p_range (vec,exprs) =
+		let sep = sprintf "%*s\n" slen "" then
+		let es = list2str T "" sep "" id exprs then
+		sprintf "%*s: %s" slen vec es
+	    in
+	    list2str T "" "\n" "" p_range raw_res
+	|
+	"-"
+    in
+    let vecs = flatmap split_multi_dim vectors then
+    let len = sitlist (\v.\r. max r (strlen v)) vecs 0 in
+    let do1 v =
+	let res = process v then
+	str_is_substr "\n" res =>
+	    sprintf "%*s:\n%s" len v res
+	|
+	    sprintf "%*s: %s" len v res
+    in
+    map do1 vecs
+;
+
+let fl_get_complete_value canvas tag =
+    let ste = canvas2ste canvas then
+    let t = deref (canvas2current_time_r canvas) then
+    let vecs = fl_tag2vec canvas tag then
+    base_get_complete_value ste vecs t
+;
+export_to_tcl fl_get_complete_value;
+
+let fl_wv_get_complete_value w vec t =
+    let ste = canvas2ste w then
+    base_get_complete_value ste [vec] t
+;
+export_to_tcl fl_wv_get_complete_value;
+
+let fl_get_vectors canvas source pattern max_cnt =
+    let vfsm = w2vfsm canvas then
+    let fsm = vfsm2fsm vfsm then 
+    let raw_sel =
+	source = "Inputs" => (inputs fsm) |
+	source = "Outputs" => (outputs fsm) |
+	source = "User Given" => (filter is_user_given (vectors fsm)) |
+	source = "All" => (vectors fsm) |
+	["What???"]
+    in
+    let res = filter (str_match pattern) raw_sel then
+    length res > max_cnt => (firstn max_cnt res)@["..."] | res
+;
+export_to_tcl fl_get_vectors;
+
+let weaken_color color =
+    color = "red" => "pink" |
+    color = "blue" => "#7a7aff" |
+    color = "DarkOrchid1" => "#e3abff" |
+    color = "magenta2" => "#ee94ee" |
+    color = "DarkOrange1" => "#eebf91" |
+    color = "green" => "#6da16d" |
+    color = "gold3" => "#cdc38b" |
+    color = "yellow" => "#ffffa8" |
+    color = "cyan" => "#a3ffff" |
+    color = "purple" => "#805f80" |
+    color = "brown" => "#a57575" |
+    color
+;
+
+
+let update_colors vfsm =
+  (
+    let selection = deref (vfsm2selection_r vfsm) then
+    let base_highlights = deref (vfsm2hll_r vfsm) then
+    let dep_highlights  = deref (vfsm2dl_r vfsm) then
+    let highlights = map hd (partition fst (base_highlights@dep_highlights)) in
+    let active_canvases = deref (vfsm2canvases_r vfsm) then
+    let do_one_canvas (c,vis) =
+	let send color anon =
+	    (tcl_eval [
+		sprintf "cb:prim_set_wire_color %s %s %s" c anon color]) fseq ()
+	in
+	let do_one_col l =
+	    l = [] => () |
+	    let color = snd (hd l) in
+	    let vecs = md_extract_vectors (map fst l) in
+	    val (full_anons, part_anons) =
+		visualization_vecs2tags vis T vecs
+	    then
+	    (foreach (send color) full_anons) fseq
+	    (foreach (send (weaken_color color)) part_anons)
+	in
+	(tcl_eval [sprintf "cb:restore_original_colors %s" c]) fseq
+	(foreach do_one_col (partition snd highlights)) fseq
+	// Now do selection since it overrides other colors
+	(do_one_col (map (\v.v,"red") selection))
+    in
+    (foreach do_one_canvas active_canvases) fseq
+    // Now update the waveform window too
+    let w = deref (vfsm2wvr vfsm) then
+    (tcl_eval [sprintf "wv:restore_original_colors %s" w]) fseq
+    let do_one_col l =
+	l = [] => () | (
+	let color = snd (hd l) then
+	let vecs = md_extract_vectors (map fst l) then
+	let do vec = sprintf "wv:prim_set_name_color %s {%s} %s;" w vec color in
+	let cmds = map do vecs then
+	(tcl_eval cmds) fseq ())
+    in
+    (foreach do_one_col (partition snd highlights)) fseq
+    // Now do selection since it overrides other colors
+    (do_one_col (map (\v.v,"red") selection))
+ ) gen_catch (\msg. (fprintf stderr "Failure: %s\n" msg)) 
+;
+non_lazy update_colors;
+
+let set_highlight_color vfsm color vecs =
+    let hll_r = vfsm2hll_r vfsm then
+    let old = filter (\(v,col). NOT (mem v vecs)) (deref hll_r) then
+    let new = map (\v.v,color) vecs in
+    (hll_r := (new@old)) fseq
+    (update_colors vfsm)
+;
+
+let fl_set_wv_highlight_color w color vec =
+    let vfsm = w2vfsm w then
+    set_highlight_color vfsm color [vec]
+;
+export_to_tcl fl_set_wv_highlight_color;
+
+    
+let fl_set_sch_highlight_color c color tag =
+    let vfsm = w2vfsm c then
+    let vecs = fl_tag2vec c tag then
+    set_highlight_color vfsm color vecs
+;
+export_to_tcl fl_set_sch_highlight_color;
+
+let get_current_canvas {dummy::void} = (deref cur_canvas);
+non_lazy get_current_canvas;
+
+let get_current_vis {dummy::void} = canvas2vis (get_current_canvas ());
+non_lazy get_current_vis;
+
+
+let fl_update_colors c =
+    (cur_canvas := c) fseq
+    let vfsm = w2vfsm c then
+    update_colors vfsm
+;
+export_to_tcl fl_update_colors;
+
+let bdepends_on exprs cprefix =
+    val (check, other) = split (\v. string_hd v = cprefix) (bdepends exprs) then
+    check = [] => F |
+    let sub = map (\n. n, bvariable ("_##_"^n)) check then
+    let exprs' = bsubstitute sub exprs then
+    let cmp (H1,L1) (H2,L2) = (H1 bXOR H2) bOR (L1 bXOR L2) in
+    let diff = itlist (defix bOR) (map2 cmp exprs exprs') bF then
+    ((bget_model [diff] 100) != []) catch T
+;
+
+let get_dependency_color ste t nds =
+    let type = get_ste_type ste then
+    let deps =
+	type = "bdd" =>
+	    let vs = (map (\n. get_trace_val ste n t) nds) catch [] then
+	    setify (map string_hd (depends vs))
+	|
+	type = "bexpr" =>
+	    let vs = (map (\n. bget_trace_val ste n t) nds) catch [] then
+	    let pots = setify (map string_hd (bdepends vs)) then
+	    filter (bdepends_on vs) pots
+	|
+	eprintf "get_dependency_color on non-binary (%s) STE run" type
+    then
+    deps = [] => "" |
+    length deps > 1 => "pink" |
+    deps = ["g"] => "green" |
+    deps = ["b"] => "blue" |
+    deps = ["y"] => "yellow" |
+    deps = ["r"] => "red" |
+    "brown"
+;
+
+let fl_set_color_by_bdd_prefix mode c =
+  (
+    (cur_canvas := c) fseq
+    let vis   = canvas2vis c then
+    let dl_r = canvas2dl_r c then
+    let ste   = canvas2ste c then
+    let t = deref (canvas2current_time_r c) then
+    let anon_vis = visualize_get_shown_anons vis then
+    let get_color an =
+	mode = "off" => [] |
+	let vecs = visualization_anon2real vis an in
+	let nds = md_expand_vectors vecs in
+	let col = get_dependency_color ste t nds then
+	col = "" => [] |
+	map (\v. v,col) vecs
+    in
+    let cols = flatmap get_color anon_vis then
+    (dl_r := cols)
+  ) catch ()
+;
+export_to_tcl fl_set_color_by_bdd_prefix;
+
+let base_get_waveform w vec show_depend =
+    let ste = canvas2ste w then
+    let type = get_ste_type ste then
+    let nds = md_expand_vector vec in
+    let opt_states = node2value_list (ste2fsm ste) (hd nds) in
+    let max_time = get_STE_maxtime ste then
+    type = "bdd" =>
+        let traces = (map (get_trace ste) nds) catch [] then
+        traces = [] => [(max_time,"X", "white"),(0,"-", "white")] |
+        let vec_trace = merge_traces traces then
+        let mk_tr (time,vals) =
+	    let color = 
+		NOT show_depend => "white" |
+		let col = get_dependency_color ste time nds then
+		col == "" => "white" | col
+	    in
+            let val2s HL =
+                HL == (T,F) => "1" |
+                HL == (F,T) => "0" |
+                HL == (T,T) => "+" |
+                HL == (F,F) => "*" |
+                val (H,L) = HL in
+                (H == NOT L) => "S" |
+                (NOT L AND NOT H) == F =>
+                   H == T => "S0X" |
+                   L == T => "SX1" |
+                   "S0X1"
+                |
+                "*"
+            in  
+            let vs = map val2s vals then
+            let alts = setify vs then
+            let sv =
+                (alts subtract ["0","1"]) = [] =>
+                    let s = implode vs then
+		    opt_states != [] =>
+                        // An ENUM (e.g. state machine)
+			let i = sscanf "%b" s in
+			assoc i opt_states
+                    |   
+                    length nds >= 4 => sprintf "0x%x" (sscanf "%b" s)
+                                     | (implode vs) 
+                |
+                length alts = 1 => hd alts |
+                list2str T "{" "," "}" id (compress vs)
+            in
+            (time, sv, color)
+        in
+        map mk_tr vec_trace
+    |
+    eprintf "fl_get_waveform not implemented yet for %s" type
+;
+
+let _fl_get_waveform_ref = ref [(1,"","")];
+
+let fl_get_waveform_cnt w vec show_depend =
+    let res = base_get_waveform w vec show_depend then
+    (_fl_get_waveform_ref := res) fseq
+    (length res+99)/100
+;
+export_to_tcl fl_get_waveform_cnt;
+
+let fl_get_waveform_res idx =
+    let rem = butfirstn (idx*100) (deref _fl_get_waveform_ref) then
+    length rem <= 100 => rem | firstn 100 rem
+;
+export_to_tcl fl_get_waveform_res;
+
+
+
+let fl_set_selection canvas {op::string} {vecs::string list} =
+    let vfsm = w2vfsm canvas then
+    let active_canvases = deref (vfsm2canvases_r vfsm) then
+    let rselection = vfsm2selection_r vfsm then
+    let old_selection = deref rselection then
+    let set_selection vsel =
+	(rselection := vsel) fseq
+	(fl_update_colors canvas) fseq
+	let rnds = extract_vectors vsel then
+	let tcl_sel = list2str T "{" " " "}" id rnds then
+	let cmd2 = [ "selection clear",
+		     sprintf "set ::x_selection %s" tcl_sel,
+		     "selection own ." ]
+	then
+	(tcl_eval cmd2) fseq ()
+    in
+    op = "SET_SELECTION" =>
+	vecs = ["_"] => set_selection [] | set_selection vecs
+    |
+    op = "MODIFY_SELECTION" =>
+	vecs = ["_"] => () |
+	let to_remove = old_selection intersect vecs then
+	let new_selection = (vecs union old_selection) subtract to_remove then
+	set_selection new_selection
+    |
+    (fprintf stderr "Unknown selection command (%s)\n" op)
+;
+export_to_tcl fl_set_selection;
+
+let fl_get_anon_selected canvas =
+    let vfsm = w2vfsm canvas then
+    let rselection = vfsm2selection_r vfsm then
+    let cur_selection = deref rselection then
+    cur_selection
+;
+export_to_tcl fl_get_anon_selected;
+
+
+let fl_top_level_add_stop_nd w vec =
+    let vfsm = w2vfsm w then
+    let stop_list_r = vfsm2stop_list_r vfsm then
+    let old = deref stop_list_r then
+    (stop_list_r := ([vec] union old))
+;
+export_to_tcl fl_top_level_add_stop_nd;
+
+let fl_add_stop_nd canvas tag =
+    let vfsm = w2vfsm canvas then
+    let stop_list_r = vfsm2stop_list_r vfsm then
+    let vecs = fl_tag2vec canvas tag then
+    let old = deref stop_list_r then
+    (stop_list_r := (vecs union old)) fseq
+    (visualization_set_stop_nodes (canvas2vis canvas) (deref stop_list_r))
+;
+export_to_tcl fl_add_stop_nd;
+
+let fl_get_stop_nodes canvas =
+    let vfsm = w2vfsm canvas then
+    let stop_list_r = vfsm2stop_list_r vfsm then
+    let res = qsort node_name_cmp (deref stop_list_r) then
+    res
+;
+export_to_tcl fl_get_stop_nodes;
+
+let fl_delete_stop_nd canvas vec =
+    let vfsm = w2vfsm canvas then
+    let stop_list_r = vfsm2stop_list_r vfsm then
+    let old = deref stop_list_r then
+    (stop_list_r := (old subtract [vec])) fseq
+    ((visualization_set_stop_nodes (canvas2vis canvas) (deref stop_list_r))
+     catch ())
+;
+export_to_tcl fl_delete_stop_nd;
+
+let fl_expand_fanin c draw_level levels tag =
+    let vis = canvas2vis c then
+    let vis = visualize_expand_fanin vis tag levels draw_level then
+    val (final_res, cmds) = visualisation2tcl vis then
+    (big_tcl_eval ("create_sch":cmds)) fseq
+    (tcl_eval [
+                sprintf "%s delete all" c,
+                sprintf "draw_network %s $%s" c final_res,
+                "update",
+                sprintf "bind %s <Map> {fl_update_colors %s}"  c c,
+                sprintf "set_scrollregion %s" c
+              ]) fseq
+    ()
+;
+export_to_tcl fl_expand_fanin;
+
+let fl_undo_expansion c =
+    let vis = canvas2vis c then
+    let vis = visualize_undo vis then
+    val (final_res, cmds) = visualisation2tcl vis then
+    (big_tcl_eval ("create_sch":cmds)) fseq
+    (tcl_eval [
+                sprintf "%s delete all" c,
+                sprintf "draw_network %s $%s" c final_res,
+                "update",
+                sprintf "bind %s <Map> {fl_update_colors %s}"  c c,
+                sprintf "set_scrollregion %s" c
+              ]) fseq
+    ()
+;
+export_to_tcl fl_undo_expansion;
+
+let fl_hide_fanin c tag make_it_stop_node =
+    (make_it_stop_node => (fl_add_stop_nd c tag) | ()) fseq
+    let vis = canvas2vis c then
+    let vis = visualize_hide_fanin vis tag 0 then
+    val (final_res, cmds) = visualisation2tcl vis then
+    (big_tcl_eval ("create_sch":cmds)) fseq
+    (tcl_eval [
+                sprintf "%s delete all" c,
+                sprintf "draw_network %s $%s" c final_res,
+                "update",
+                sprintf "bind %s <Map> {fl_update_colors %s}"  c c,
+                sprintf "set_scrollregion %s" c
+              ]) fseq
+    ()
+;
+export_to_tcl fl_hide_fanin;
+
+
+// Create random inputs to the circuit and simulate it.
+//
+//  vis	    an active visualization of a circuit.
+//
+//  clks    a list of (name,pat) pairs where name refers to the
+//	    clock signal and pat describes the (infinitely) repeating pattern.
+//
+//  resets  a list of (name,pat) pairs where name refers to the
+//	    reset signal and pat describes the first phases to invoke the
+//	    reset of the circuit. If the final value of the reset pattern
+//	    is -, then the signal will be given random inputs. If the final
+//	    value is 0 or 1, this value will be repeated infinitely often.
+//
+//  cnt	    for how many phases the circuit should be simulated.
+//
+// Usage:
+// random_simulation vis clks resets cnt;
+//
+let random_simulation {vis::vfsm} clks resets cnt =
+    let ckt = vfsm2fsm vis in
+    let s2b s = s = "0" => F | s = "1" => T |
+		eprintf "Pattern with non-0/1 value (%s)" s
+    in
+    // Clocks
+    let mk_clk (clk,pat) =
+	pat = "" => eprintf "Clk %s not given a pattern" clk |
+	let vs = map s2b (explode pat) in
+	let len = length vs in
+	let all =
+	    firstn (cnt+1) (flat (replicate ((cnt+2*len)/len) vs))
+	then
+	let mk v t = (T,clk,v,t,t+1) in
+	map2 mk all (0 upto (length all-1))
+    in
+    let clk_ant = flatmap mk_clk clks then
+    let clk_nds = map fst clks then
+    // Resets
+    let mk_reset (reset,pat) =
+	let ps = explode pat in
+	let final = last ps in
+	let initial = butlast ps in
+	let len = length initial in
+	let mk v t = (T,reset,v,t,t+1) in
+	let ant0 = map2 mk (map s2b initial) (0 upto (len-1)) in
+	final = "-"  =>
+	    let mk_random t = (T,reset,(random 0 1)=1,t,t+1) in
+	    ant0@(map mk_random (len upto cnt))
+	|
+	(T,reset,s2b final,len,cnt):ant0
+    in
+    let reset_ant = flatmap mk_reset resets then
+    let reset_nds = map fst resets then
+    //
+    let raw_inps = md_expand_vectors (inputs ckt) in
+    let inps = raw_inps subtract (clk_nds@reset_nds) in
+    letrec mk_at_time t (nd:nds) =
+        t < 0 => [] |
+        let v = (random 0 1) = 1 in
+        (T,nd,v,t,t+1):(mk_at_time t nds)
+     /\    mk_at_time t [] = mk_at_time (t-1) inps
+    in
+    let ant_inps = inps = [] => [] | mk_at_time cnt inps then
+    //
+    let ant = clk_ant@reset_ant@ant_inps in
+    STE "-e" vis [] ant [] []
+;
+
+// ======================================================================
+//  fl API to drawing routine(s)
+// ======================================================================
+
+let draw_fanin levels draw_level vecs =
+    let canvas = get_current_canvas () then
+    fl_draw_fanin_by_name canvas draw_level levels vecs
+;

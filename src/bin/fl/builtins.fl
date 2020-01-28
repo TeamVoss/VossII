@@ -1,0 +1,1409 @@
+// Convert the BDD f to a string.
+// The format of the expression is decided by the vossrc option PRINT-FORMAT
+// (the default is sum-of-product (SOP).
+// The maximum nymber of products to print is decided by the sz argument.
+let bool2str sz f = (defix bool2str) sz f;
+
+// Return the total number of BDD nodes needed to represent all the
+// boolean functions in e.
+// Usage: bdd_size e;
+let bdd_size e = defix bdd_size e;
+
+// Load a previously saved list of BDDs into memory from the file filename.
+// NOTE: The variable ordering does not have to be the same as when
+// the BDD was saved. However, using a different ordering may csause
+// the BDDs to grow exponentially.
+let bdd_load filename = defix bdd_load filename;
+
+// Perform cnt dynamic reorderings of the BDDs in memory.
+// See the Preference manu for options controlling the re-ordering process.
+let bdd_reorder cnt = defix bdd_reorder cnt;
+non_lazy bdd_reorder;
+
+// Return the fl call stack.
+// Usage: get_stack_trace ();
+let get_stack_trace = defix get_stack_trace;
+non_lazy get_stack_trace;
+
+// Save the BDDs fs to the file filename.
+let bdd_save filename fs = defix bdd_save filename fs;
+
+// Convert the ASCII integer code i to a character.
+let chr i = defix chr i;
+
+// Return the variables any BDDs in e depend on.
+let depends e = defix depends e;
+
+// Dereference the reference variable dr. In other words, return the value
+// stored in dr.
+let deref dr = defix deref dr;
+non_lazy deref;
+
+// Raise an exception with msg as error message.
+// See also eprintf that makes it easier to create meaningful error messages.
+let error msg = defix error msg;
+
+// Return T if the list l is empty
+let empty l = defix empty l;
+
+// Convert a string s to a list of its characters.
+// For example: explode "abc" --> ["a", "b", "c"]
+let explode s = defix explode s;
+
+// Given an fsm ckt and a node nd in the circuit, return the list of
+// nodes driving nd.
+// Note that this is determined purely structurally.
+let fanin ckt nd = (defix fanin) ckt nd;
+
+// Given an fsm ckt and a node nd in the circuit, return the
+// list of nodes driven by nd.
+// Note that this is determined purely structurally.
+let fanout ckt nd = defix fanout ckt nd;
+
+// Return the greatest common divisr of the integers i and j.
+let gcd i j = defix gcd i j;
+
+// fopen filename mode opens a file or pipeline for reading and/or writing.
+// Mode is a string beginning with one of the sequences below,
+// which are interpreted as follows:
+// 
+//      r   Open the file for reading.  The stream is
+//          positioned at the beginning of the file.
+// 
+//      r+  Open the file for reading and writing.  The
+//          stream is positioned at the begiing of the
+//          file.
+// 
+//       w   Open the file for writing.  The file will have
+//           length zero. If the file does not exist it is
+//           created, if it did exist, then it is truncated.
+// 
+//      w+  Open the file for reading and writing. The file
+//          has length zero. If the file did not exist it is
+//          created, if it did exist, then it is truncated.
+// 
+//      a   Open the file for writing.  If the file did not
+//          exist it is created with length zero.  The
+//          stream is positioned at the end of the file.
+// 
+//      a+  Open the file for reading and writing.  If the
+//          file did not exist it is created with length
+//          zero.  The stream is position at the end of the
+//          file.
+// 
+//     |r   Open a pipe for reading.  The file parameter is
+//          interpreted as command and the stream attached to
+//          the beginning of the output from that command.
+// 
+//     |w   Open a pipe for writing.  The file parameter is
+//          interpreted as a command that will get its input
+//          from the stream.
+// 
+// If the file cannot be opened, the function raises an exception.
+let fopen filename mode = defix fopen filename mode;
+non_lazy fopen;
+
+// Create a unique temporary file in VossII's temp directory using
+// basename as a base for the temporary name.
+// mktemp also opens the file for writing and returns the stream.
+// To get the name of the resulting file, see stream2filename.
+let mktemp basename = defix mktemp basename;
+non_lazy mktemp;
+
+// Create a unique temporary directory in VossII's temp directory using
+// basename as a base for the temporary name.
+// The function returns the name of the created directory.
+let mktempd basename = defix mktempd basename;
+non_lazy mktempd;
+
+// Given a stream fp, return the name of the file/pipe command it was
+// opened with.
+let stream2filename fp = defix stream2filename fp;
+
+// Close the stream fp previously opened by fopen.
+// Note that stdin, stdout, and stderr cannot be closed.
+// If the  stream  was used for output, any buffered data is written first.
+let fclose fp = defix fclose fp;
+non_lazy fclose;
+
+
+// Write all buffered data for the given output or update stream fp
+let fflush fp = defix fflush fp;
+non_lazy fflush;
+
+
+// Perform symbolic trajectory evaluation on circuit ckt. 
+// Returns an ste object that can be queried for traces, results, etc.
+// 
+// The options argument is a string that can contain a combination of the
+// following flags:
+// 
+//    -a     Abort the STE at the first error.
+//
+//    -e     Compute and trace the value for every node in the circuit.
+//	     The default is to only compute nodes in the transitive fanin
+//	     cone of nodes in the consequent or trace list.
+//
+//    -m t   Abort the STE run after t phases has been simulated.
+// 
+// The weak_list (wl) is a list of 4-tuples of the form (w,nd,f,t) to be
+// read as: when w holds, weaken the excitation function of node nd from
+// time f up to, but not including, time t.
+// 
+// Both the antecedent (ant) and consequent (cons) lists are lists of
+// 5-tuples of the form (w,nd,v,f,t) to be read as:
+// when w holds, impose the constraint that the node nd should take on
+// at least the value v from time f up to, but not including, time t.
+// 
+// The trace_list (trl) is a list of triples of the form (n,f,t) and should
+// be read as: trace node nd from time f up to, but not including, time t.
+// 
+// NOTE: If the STE run aborts for some reason (interrupt, timeout,
+//       "-a" flag, etc.), all traces are terminated with an X value at
+//       the time it aborted.  This means that if STE aborts due to an
+//       antecedent failure, for example, the trace will no longer have
+//       the values (at that time).  This will make debugging a bit
+//       more difficult (but not impossible) but makes it safer since
+//       possibly erroneous trace values are eliminated.
+//
+// 
+let STE options ckt wl ant cons trl = defix STE options ckt wl ant cons trl;
+
+// Return the result of the STE run ste.
+// The type argument decides what result is returned:
+// If type is:
+//	"antOK"	    the condition under which the antecedent is self-consistent
+//	"trajOK	    the condition under which the antecedent is can be asserted
+//		    without contradictory values.
+//	"consOK"    the condition under which the consequent is self-consistent
+//	"checkOK"   the condition under which the consequent is less than or
+//		    equal to the circuit values.
+//	"implies"   (antOK AND trajOK) ==> (consOK AND checkOK)
+//	"strong"    andOK AND trajOK AND consOK and checkOK
+//
+// If the type is the empty string, strong is assumed.
+//
+let get_ste_result ste type = defix get_ste_result ste type;
+
+// Return the result of the bSTE run ste.
+// The type argument decides what result is returned:
+// If type is:
+//	"antOK"	    the condition under which the antecedent is self-consistent
+//	"trajOK"    the condition under which the antecedent is can be asserted
+//		    without contradictory values.
+//	"consOK"    the condition under which the consequent is self-consistent
+//	"checkOK"   the condition under which the consequent is less than or
+//		    equal to the circuit values.
+//	"implies"   (antOK AND trajOK) ==> (consOK AND checkOK)
+//	"strong"    andOK AND trajOK AND consOK and checkOK
+//
+// If the type is the empty string, strong is assumed.
+//
+let bget_ste_result = defix bget_ste_result;
+
+// Return the first element of the pair p.
+let fst p = defix fst p;
+
+// Return the names of every functions:
+//	whose name matches name_pat AND
+//	that was defined in a file whose name matches file_pat AND
+//	that has at least one argument matching arg_pat AND
+//	whose return type matches res_pat
+let get_matching_functions name_pat file_pat arg_pat res_pat =
+    defix get_matching_functions name_pat file_pat arg_pat res_pat
+;
+
+// Get the current value of the vossrc (option) variable key.
+// If key does not exists, an empty string is returned.
+let get_vossrc key = defix get_vossrc key;
+
+// Return the head of the list l.
+let hd l = defix hd l;
+
+// Return the help information available for function fun.
+let help fun = defix help fun;
+
+// Transform the list of characters cl to a single string.
+let implode cl = defix implode cl;
+
+// Convert the integer i to a string.
+let int2str i = defix int2str i;
+
+// Load a file into fl's interpreter.
+// Note that the DIR keyword can be used to prepend the directory the
+// current file being loaded resides in. Thus, if file foo.fl is in
+// /abc/def/gh/foo.fl and foo.fl contains load (DIR^"../qq/bar.fl"); then
+// fl will load the file /abc/def/qq/bar.fl no matter from where fl was
+// originally started from.
+let load file = defix _load file T;
+
+
+// Determine whether there is an x such that the linear program given by
+// A*x rel b is feasible or not. Intuitively, A is a mXn matrix of
+// coefficients, rel is a mX1 matrix of relations ('<','<=','>','>=','=','<>')
+// and b is a mX1 matrix of values.
+// More precisely, system is a list of rows, each row being a triple
+// (coeff_list, relation, value).
+let LP system = defix LP system;
+
+// Return the negation of Boolean value (BDD) f.
+let NOT f = defix NOT f;
+
+// Return the (infinitely precise) integer obtained by negating each bit in i.
+let intNOT i = defix intNOT i;
+
+// Return a list of all nodes in the circuit ckt.
+let nodes ckt = defix nodes ckt;
+
+// Given the string c representing a single character, return its ASCII code.
+let ord c = defix ord c;
+
+// Print out string s to stdout.
+// See printf/fprintf for more versatile functions.
+let print s = defix print s;
+non_lazy print;
+
+// Return the width of the tree of BDDs represented in e.
+// In other words, return the number of BDD nodes with variable v1,
+// followed by the number of BDD nodes with variable v2, etc., where
+// v1 preceeds v2 etc. in the BDD variable ordering.
+let profile e = defix profile e;
+
+// Return a random T or F value determined by the Unix random function.
+// Note that rvariable name will always return the same value for the same
+// name within the same VossII session.
+let rvariable name = defix rvariable name;
+
+// Universally quantify out all the variables in var_expr in the expression e.
+let quant_forall var_expr e = defix quant_forall var_expr e;
+
+// Existentially quantify out all the variables in var_expr in the expression e.
+let quant_thereis var_expr e = defix quant_thereis var_expr e;
+
+// Return the second part of the pair p.
+let snd p = defix snd p;
+
+// Perform the simultaneous substitution defined by subs_list on every
+// element of type bool in argument obj.
+// Subs_list is a list of (varname,fn) pairs, where varname is a
+// name of a bdd variable and fn is any Boolean function.
+//
+// Usage: substitute subs_list obj;
+//
+let substitute subs_list obj = defix substitute subs_list obj;
+
+// Convert the list bl of bools to the corresponding natural number.
+// Fails if the list is not scalar (Ts and Fs only).
+let bv2num bl = defix bv2num bl;
+
+// Convert the list bl of bexprs to the corresponding natural number.
+// Fails if the list is not scalar (bTs and bFs only).
+let bev2num bl = defix bev2num bl;
+
+// Determine whether the file filename exists.
+let file_exists filename = defix file_exists filename;
+
+// If b is not scalar, returns the tripple (var_name, true-branch, false-branch)
+let top_cofactor b = defix top_cofactor b;
+
+// Draw (using dot) the forrest of BDDs given in bool_list.
+// If draw_neg is T, draw the (true) internal BDD using negated edges (red).
+// If draw_neg is F, draw the BDD without negated pointer.
+// The true-edge is drawn solid and the false-edge is drawn dotted.
+// Usage: draw_bdds draw_neg bool_list;
+let draw_bdds draw_neg bool_list = defix draw_bdds draw_neg bool_list;
+
+// Execute cmd as a Bourne shell command and return the exit status.
+// Note: The output of cmd will go to 'stdout' (whatever that may be).
+//       To capture the output of cmd, use: fopen (with "|r" mode) or exec.
+let system cmd = defix system cmd;
+
+// Send the list of statement in pgm to the remote tcl process.
+// Return the result of the last statement.
+let tcl_eval pgm = defix tcl_eval pgm;
+non_lazy tcl_eval;
+
+// Return the tail of the list l.
+// If l is empty, an exception will be raised.
+let tl l = defix tl l;
+
+// Evaluate e and return the pair (e',t), where e' is the result of
+// fully evaluating e and t is the time it takes to evaluate e.
+let time e = defix time e;
+
+// Update the value of the vossrc (option) key and set its
+// new value to v. The function returns the old value.
+// If the variable did not exist before, an emtpy string is returned.
+let update_vossrc key v = defix update_vossrc key v;
+
+// Return a signature for the BDD b.
+// NOTE: the signature is only guaranteed to stay the same during a
+// single VossII session. 
+let bdd_signature b = defix bdd_signature b;
+
+// Return the BDD representing the function 'name'.
+let variable name = defix variable name;
+
+// Install a BDD variable order according to 'list'.
+// It is acceptable to use vector notation so for example
+// var_order ["a[3:0]", "b", "c[0:2]"] would be the same as
+// var_order ["a[3]","a[2]","a[1]","a[0]","b","c[0]","c[1]","c[2]"].
+// If there already are BDDs created using these variables, this operation
+// may be very slow an require excessive amounts of memory.
+// Any variables not mentioned in 'list' will keep their relative order and
+// will be placed after all the variables in 'list'.
+// Returns the (complete) variable order obtained after the re-ordering.
+// Tips: If you just want to get the current variable order, use: var_order [];
+//
+let var_order l = md_merge_vectors (var_order (md_expand_vectors l));
+non_lazy var_order;
+
+// Compute the conjunction of 'e1' and 'e2'.
+let AND e1 e2 = defix AND e1 e2;
+
+// Compute the disjunction of 'e1' and 'e2'.
+let OR e1 e2 = defix OR e1 e2;
+
+
+// Compute the exclusive or of 'e1' and 'e2'.
+let XOR e1 e2 = defix XOR e1 e2;
+
+// Compute the exclusive or of 'e1' and 'e2'.
+let XNOR e1 e2 = defix XNOR e1 e2;
+
+// Perform the bitwise AND of the (infinitely precise) integers 'i1' and 'i2'.
+let intAND i1 i2 = defix intAND i1 i2;
+
+
+// Perform the bitwise OR of the (infinitely precise) integers 'i1' and 'i2'.
+let intOR i1 i2 = defix intOR i1 i2;
+
+
+// Perform the bitwise XOR of the (infinitely precise) integers 'i1' and 'i2'.
+let intXOR i1 i2 = defix intXOR i1 i2;
+
+// Return the modulus of a and b.
+// Note VossII uses the definition that the modulus is always bounded between
+// 0 and b-1.
+let % a b = defix % a b;
+
+// Multiply a and b.
+let * a b = defix * a b;
+
+
+// Divide 'a' with 'b'.
+let / a b = defix / a b;
+
+// Usage:  !<var>. <expr>
+// Example: !a.!b. NOT (a AND b) = (NOT a) OR (NOT b);
+//
+// Introduce a Boolean variable and universally quantify it out.
+let ! = defix !;
+
+// Usage:  ?<var>. <expr>
+// Example: ?a.?b. NOT (a AND b) = (NOT a) OR (NOT b);
+//
+// Introduce a Boolean variable and existentially quantify it out.
+let ? = defix ?;
+
+// Add 'a' and 'b'.
+let + a b = defix + a b;
+
+// Subtract 'b' from 'a'.
+let - a b = defix - a b;
+
+// Cons element e ono the list l, i.e., create a new list that has e
+// as first element and the remaining elements the same as in l.
+// Usage:  e:l;
+let : = defix :;
+
+// Catenate the string 's1' with the string 's2'.
+let ^ s1 s2 = defix ^ s1 s2;
+
+// Return whether 'a' is less than 'b'.
+let < a b = defix < a b;
+
+
+// Return whether 'a' is less or equal than 'b'.
+let <= a b = defix <= a b;
+
+// Determine if 'a' is identical to 'b'.
+// For all data types except bool, '=' and '==' are the same.
+// However, for bools (BDDS) '==' returns T iff 'a' and 'b' are identical,
+// and '=' returns the condition under which 'a' is the same as 'b'.
+let == a b = defix == a b;
+
+// Assign the the reference variable 'rv' the value 'v'.
+let := rv v = defix := rv v;
+non_lazy :=;
+
+// Compute the condition under which 'a' is not equal to 'b'.
+let != a b = defix != a b;
+
+
+// Return whether 'a' is greater than 'b'.
+let > a b = defix > a b;
+
+
+// Return whether 'a' is greater thn or equal to 'b'.
+let >= a b = defix >= a b;
+
+
+// Evaluate 'e'. If 'e' does not raise an exception, return the result of
+// evaluating 'e'. If the evaluation of 'e' raises an exception, return 'f'.
+let catch e f = defix catch e f;
+
+// Evaluate 'e'. If 'e' does not raise an exception, return the result of
+// evaluating 'e'. If the evaluation of 'e' raises an exception with error
+// message msg, the return (error_fun msg), i.e., apply the function to
+// the error message.
+let gen_catch e error_fun = defix gen_catch e error_fun;
+
+// Fully evaluate 'e1'; throw away the result, and return 'e2'.
+let fseq e1 e2 = defix fseq e1 e2;
+non_lazy fseq;
+
+// Evaluate 'e1' to weak head normal form; throw away the result,
+// and return 'e2'.
+let seq e1 e2 = defix seq e1 e2;
+non_lazy seq;
+
+// Bexpr for TRUE
+let bT = defix bT;
+
+// Bexpr for FALSE
+let bF = defix bF;
+
+// Bexpr variable for 'name'
+let bvariable name = defix bvariable name;
+
+// Negate bexpr a;
+let bNOT a = defix bNOT a;
+
+// Form conjuction of bexprs a1 and a2;
+// A simulator + SAT solver with a small timeout is used to keep
+// the bexpr result canonical. However, no guarantee for functional identity.
+let bAND a1 a2 = defix bAND a1 a2;
+
+
+// Form disjunction of bexprs a1 and a2;
+// A simulator + SAT solver with a small timeout is used to keep
+// the bexpr result canonical. However, no guarantee for functional identity.
+let bOR a1 a2 = defix bOR a1 a2;
+
+
+// Form the exclusive OR of bexprs a1 and a2;
+// A simulator + SAT solver with a small timeout is used to keep
+// the bexpr result canonical. However, no guarantee for functional identity.
+let bXOR a1 a2 = defix bXOR a1 a2;
+
+// Form the exclusive NOR of bexprs a1 and a2;
+// A simulator + SAT solver with a small timeout is used to keep
+// the bexpr result canonical. However, no guarantee for functional identity.
+let bXNOR a1 a2 = defix bXNOR a1 a2;
+
+
+// Return the total size of all the bexprs in e
+let bsize e = defix bsize e;
+
+// Perform the simultaneous substitution defined by the substitution
+// list subst_list on every Boolean expression in the object e.
+// NOTE: the e object must be a concrete type (no functions).
+// The subst_list is a list of (varname,fn) pairs, where varname is a
+// name of a variable and fn is any bexpr.
+let bsubstitute subst_list e = defix bsubstitute subst_list e;
+
+
+// Return a string representation of expr printing at most prods AND terms.
+// Usage: bexpr2str prods expr;
+let bexpr2str prods expr = defix bexpr2str prods expr;
+
+// Return a list of every bexpr variables that is used anywhere in e.
+// NOTE: the e object must be a concrete type (no functions).
+let bdepends e = defix bdepends e;
+
+// Using minisat, try to find a model that satisfies all the bexprs in conds
+// The search is limited to time_limit seconds.
+// If there is no model, return the empty list.
+// If every model satisfies conds, then return a dummy [("",bT)] list.
+// Otherwise return a substitution list that is one model (i.e., an
+// assignment that makes all the expressions in conds true).
+let bget_model conds time_limit = defix bget_model conds time_limit;
+
+// Save a list of bexprs to a file.
+// Usage: bexpr_save file_name list_of_bexprs
+let bexpr_save file_name list_of_bexprs =
+	defix bexpr_save file_name list_of_bexprs;
+
+// Load previously saved bexprs from a file.
+// Usage: bexpr_load file_name
+let bexpr_load file_name = defix bexpr_load file_name;
+
+// Return the type of bexpr b.
+// Possible values are:
+//	const_0
+//	const_1
+//	variable
+//	not-variable
+//	and
+//	not-and
+//
+let bget_type b = defix bget_type b;
+
+// If b is an AND operation, return its two arguments.
+let bget_arguments b = defix bget_arguments b;
+
+// If b is a bvariable, return the name of the variable.
+let bget_variable b = defix bget_variable b;
+
+// Return the symbolic if-then-else of expressions e1 and e2 based
+// on condition cond.  Note that e1 and e2 must be identical in structure
+// and only differ in bexpr values.
+// Returns a structure identical to e1 (and e2) but in which every bexpr
+// is the result of an ITE over condition cond for e1 and e2.
+//
+// Usage: bITE cond e1 e2
+let bITE cond e1 e2 = defix bITE cond e1 e2;
+
+// Negate every boolean in the structure e.
+// Usage: gen_bNOT e;
+let gen_bNOT e = defix gen_bNOT e;
+
+// If e1 and e2 are structurally ideantical, then gen_bOR returns the same
+// structure but in which every bexpr will be the bOR of e1's and
+// e2's expressions.
+//
+// Usage: gen_bOR e1 e2;
+let gen_bOR e1 e2 = defix gen_bOR e1 e2;
+
+// If e1 and e2 are structurally ideantical, then gen_bAND returns the same
+// structure but in which every bexpr will be the bAND of e1's and
+// e2's expressions.
+//
+// Usage: gen_bAND e1 e2;
+let gen_bAND e1 e2 = defix gen_bAND e1 e2;
+
+// Return the bexpr denoting the case in which e1 is equal to e2.
+// Note that e1 and e2 must be identical in structure and only
+// differ in bexpr values.
+//
+// Usage: bEqual e1 e2
+let bEqual e1 e2 = defix bEqual e1 e2;
+
+// Return the length of the string s
+let strlen s = defix strlen s;
+
+// Determine if string s matches a pattern pat that is a shell wildcard pattern.
+// Usage: str_match pat s;
+let str_match pat s = defix str_match pat s;
+
+// Compare two strings and return an integer that:
+//	is less than 0	    if s1 is lexicographically less than s2
+//	is equal to 0	    if s1 is equal to s2
+//	is greater than 0   if s1 is lexicographically greater than s2
+// Usage: strcmp s1 s2;
+let strcmp s1 s2 = defix strcmp s1 s2;
+
+// Given a filename, return the canonicalized absolute pathname
+let file_fullname filename = defix file_fullname filename;
+
+// Return T iff pre is a prefix of the string s.
+// Usage: str_is_prefix pre s
+let str_is_prefix pre s = defix str_is_prefix pre s;
+
+// Return T iff post is a suffix of the string s.
+// Usage: str_is_suffix post s;
+let str_is_suffix post s = defix str_is_suffix post s;
+
+// Split s into sublists wherever split_string occurs.
+// Note: split_string can consist of several characters.
+// Usage: str_split string split_string
+let str_split s split_string = defix str_split s split_string;
+
+// Initialize the random number generator with integer 'seed'.
+// Note: 0 <= seed < 2**32
+// Usage: srandom seed;
+let srandom seed = defix srandom seed;
+non_lazy srandom;
+
+// Returns a (pseudo-)random integer i such that 0 <= i < 2**bits.
+// Usage: random2 bits;
+let random2 bits = defix random2 bits;
+non_lazy random2;
+
+// Find the corresponding value to x in the association list assoc_list.
+// Usage: assoc x l;
+let assoc x assoc_list = defix assoc x assoc_list;
+
+// Keep only the elements of l that satisfy the predice pred
+// Usage: filter pred l;
+let filter pred l = defix filter pred l;
+
+// Split a list of elements into two lists according to predicate pred.
+// The first element of the resulting pair contains all the elements from
+// list l that satisfies pred. The second element of the pair is the remaining.
+// Note: it is an error to use a predicate that does not return T or F.
+// Usage: split pred l;
+let split pred l = defix split pred l;
+
+// Partition list l according to the function fun
+// In other words, return a list of lists so that every element in 
+// one of the lists would yield the same result from applying fun to them.
+// Usage: partition fun l;
+let partition fun l = defix partition fun l;
+
+// Remove duplicates in list l.
+// Usage: setify l;
+let setify l = defix setify l;
+
+// Flatten the list ll of lists by appending all the elements in the sublists
+// Usage: flat ll;
+let flat ll = defix flat ll;
+
+// Compute the union of the two lists l1 and l2
+// It is assumed the lists l1 and l2 do not have duplicates.
+let union l1 l2 = defix union l1 l2;
+infix 6 union;
+
+// Compute the intersection of two lists
+// It is assumed the lists l1 and l2 do not have duplicates.
+let intersect l1 l2 = defix intersect l1 l2;
+infix 7 intersect;
+
+// Remove every element in l1 that is in l2
+// It is assumed the lists l1 and l2 do not have duplicates.
+let subtract l1 l2 = defix subtract l1 l2;
+infix 7 subtract;
+
+// Determine if x is a member of the list l
+let mem x l = defix mem x l;
+
+// Reverse the list l
+// Usage: rev l;
+let rev l = defix rev l;
+
+// Find the index of the first element in l satisfying predicate pred.
+// Returns 0 if no element satisfies pred.
+// Usage: find_first0 pred l;
+let find_first0 pred l = defix find_first0 pred l;
+
+// Find the index of the first element in l satisfying predicate pred.
+// Raises an exception if no element satisfies pred.
+// Usage: find_first pred l;
+let find_first pred l =
+    let res = find_first0 pred l in
+    res = 0 => error "No element satisfying predicate in find_first" |
+    res
+; 
+
+// Return the indices of all elements in l for which pred is satisfied.
+// Usage: find_all pred l
+let find_all pred l = defix find_all pred l;
+
+// Return T iff needle is a substring of haystack.
+// Usage: str_is_substr needle haystack;
+let str_is_substr needle haystack = defix str_is_substr needle haystack;
+
+// Return the length of list l.
+let length l = defix length l;
+
+// Execute cmd as a Bourne shell command.
+// Returns a pair of the exit status and a list of all the output (to stdout)
+// in which the newlines have been removed.
+// Usage: exec cmd;
+let exec cmd = defix exec cmd;
+
+//  Append list yl to the list xl
+let append xl yl = defix append xl yl;
+
+// Return the last element in list l.
+let last l = defix last l;
+
+// Select the elements given by the indices in indices from list l.
+// Usage: gather l indices;
+let gather l indices = defix gather l indices;
+
+// Find the value x that is associated with y in association list assoc_list.
+// Usage: rev_assoc y assoc_list;
+let rev_assoc y assoc_list = defix rev_assoc y assoc_list;
+
+// Multi dimensional vector expansion
+// Expands a list of vectors into the corresponding list of node names.
+// Uses "SystemVerilog compatible" naming conventions.
+// Thus: a substring starting with \ and continuing until first space
+// is treated as a monolitic string.
+// Ranges can be given as:
+//	1) single indices, e.g.,  a[3]
+//	2) ranges, e.g., a[31:4]
+//	3) comma-separated ranges, e.g., a[31:24, 15:8,4,1:0]
+//
+let md_expand_vectors vec_list = defix md_expand_vectors vec_list;
+
+// Multi dimensional vector expansion
+// Expands a vector vec into the corresponding list of node names.
+// Uses "SystemVerilog compatible" naming conventions.
+// Thus: a substring starting with \ and continuing until first space
+// is treated as a monolitic string.
+// Ranges can be given as:
+//	1) single indices, e.g.,  a[3]
+//	2) ranges, e.g., a[31:4]
+//	3) comma-separated ranges, e.g., a[31:24, 15:8,4,1:0]
+//
+let md_expand_vector vec = defix md_expand_vector vec;
+
+// Returns T if fl is run in -noX mode. Otherwise returns F.
+let noX = defix noX;
+
+// Multidimensional extraction of vectors from a list of nodes/vectors
+// Order of nodes is irrelevant and duplicates are removed.
+// Potentially non-contiguous vectors can be created (e.g., "a[4,2:0]")
+let md_extract_vectors name_list = (defix md_extract_vectors) name_list;
+
+// Multidimensional extraction of vectors from a list of nodes/vectors
+// Order of nodes is irrelevant and duplicates are removed.
+// Only contiguous vectors are created (e.g., "a[4]", "a[2:0]")
+let extract_vectors name_list = (defix extract_vectors) name_list;
+
+// Multidimensional merging of vectors from a list of nodes/vectors
+// Nodes are only merged in MSB to LSB direction.
+// Potentially non-contiguous vectors can be created (e.g., "a[4,2:0]")
+let md_merge_vectors name_list = (defix md_merge_vectors) name_list;
+
+// Multidimensional merging of vectors from a list of nodes/vectors
+// Nodes are only merged in MSB to LSB direction.
+// Only contiguous vectors are created (e.g., "a[4]", "a[2:0]")
+let merge_vectors name_list = (defix merge_vectors) name_list;
+
+// Check if a function named 'name' has been defined.
+// Usage:  is_defined name;
+let is_defined name = defix is_defined name;
+
+// Test if the open file desriptor fp is at EOF.
+let feof fp = defix feof fp;
+
+// Read a line from the open filedescriptor fp.
+// Function fails if fp is not open for reading.
+// Usage: fgets fp;
+let fgets fp = defix fgets fp;
+non_lazy fgets;
+
+// Return the string consisting of the last cnt characters in s.
+// Usage: string_lastn s cnt;
+let string_lastn s cnt = defix string_lastn s cnt;
+
+// Return the string consisting of all but the last cnt characters in s.
+// Usage: string_butlastn s cnt;
+let string_butlastn s cnt = defix string_butlastn s cnt;
+
+
+// Free all cached (memoized) data from clet/cletrec functions.
+let clean_clets = defix clean_clets;
+non_lazy clean_clets;
+
+// Convert a float to a string
+let float2str f = defix float2str f;
+
+// Convert a string to a floating point number.
+// The string should be of the form: [-]{digit}*.{digit}+{e[-]{digit}+}?
+let str2float s = defix str2float s;
+
+// Convert an integer to a float.
+let int2float i = defix int2float i;
+
+// Add two floating point numbers
+let fadd f1 f2 = defix fadd f1 f2;
+
+// Subtract two floating point numbers
+let fsub f1 f2 = defix fsub f1 f2;
+
+// Multiply two floating point numbers
+let fmul f1 f2 = defix fmul f1 f2;
+
+// Divide two floating point numbers
+let fdiv f1 f2 = defix fdiv f1 f2;
+
+// Compute b to the power of p when both b and p are floats.
+// Usage: pow b p;
+let pow b p = defix pow b p;
+
+// Return true iff a > b, where a and b are floats.
+// Usage: fgt a b;
+let fgt a b = defix fgt a b;
+
+// Return true iff a >= b, where a and b are floats.
+// Usage: fge a b;
+let fge a b = defix fge a b;
+
+// Return true iff a == b, where a and b are floats.
+// Usage: feq a b;
+let feq a b = defix feq a b;
+
+// Return true iff a != b, where a and b are floats.
+// Usage: fne a b;
+let fne a b = defix fne a b;
+
+// #
+// Return true iff a < b, where a and b are floats.
+// Usage: flt a b;
+let flt a b = defix flt a b;
+
+// Return true iff a <= b, where a and b are floats.
+// Usage: fle a b;
+let fle a b = defix fle a b;
+
+// Return the floor of a float.
+let floor f = defix floor f;
+
+// Return the ceiling of a float.
+let ceil f = defix ceil f;
+
+// Return the rounded to nearest integer of a float
+let round f = defix round f;
+
+// Return the square root of a float.
+let sqrt f = defix sqrt f;
+
+// Return e to the power of a float.
+let exp f = defix exp f;
+
+// Return the natural logarithm of a float.
+let log f = defix log f;
+
+// Return the base-10 logarithm of a float.
+let log10 f = defix log10 f;
+
+// Return sin of a float.
+let sin f = defix sin f;
+
+// Return cos of a float.
+let cos f = defix cos f;
+
+// Return tan of a float.
+let tan f = defix tan f;
+
+// Return arcsin of a float.
+let asin f = defix asin f;
+
+// Return arccos of a float.
+let acos f = defix acos f;
+
+// Return arctan of a float.
+let atan f = defix atan f;
+
+// Look for the string needle in the string haystack.
+// If it is found, return the location for the first occurence.
+// If it is not found, return 0.
+// Usage: strstr haystack needle;
+let strstr haystack needle = defix strstr haystack needle;
+
+// Return the substring of s starting at loc and which is len long.
+// If cnt < 0, return all of the string starting at loc.
+// Usage: substr s loc cnt;
+let substr s loc cnt = defix substr s loc cnt;
+
+// Given a string s and a prefix and suffix string, return the string
+// between the prefix and suffix strings.
+// Usage: trim pref suff s;
+let trim pref suff s = defix trim pref suff s;
+
+
+// Split a string into substrings of length sz.
+// Usage: str_cluster s sz;
+let str_cluster s sz = defix str_cluster s sz;
+
+// Return element idx from list l. 
+// Elements are indexed from 1.
+// Usage: el idx l;
+let el idx l = defix el idx l;
+
+// Return everything but the last element in list
+let butlast l = defix butlast l;
+
+// Return the first cnt elements of the list l.
+// Usage: firstn cnt l;
+let firstn cnt l = defix firstn cnt l;
+
+// Return the list obtained by dropping the first cnt elements of list l.
+// Usage: butfirstn cnt l;
+let butfirstn cnt l = defix butfirstn cnt l;
+
+// Return the last cnt elements of the list l.
+// Usage: lastn cnt l;
+let lastn cnt l = defix lastn cnt l;
+
+// Return all but the last cnt elements of list l.
+// Usage: butlastn cnt l;
+let butlastn cnt l = defix butlastn cnt l;
+
+// Find the first element satisfying the predicate pred in list l.
+// Usage: find pred l;
+let find pred l = defix find pred l;
+
+// Return the current evaluation context.
+// For example when evaluating the expression:
+//    (variable "a") => ((variable "b") => E1 | E2) | E3
+// get_cur_eval_cond would return a&b inside E1,
+//				  a&~b inside E2, and
+//				  ~a inside E3.
+//
+// Usage: get_cur_eval_cond ();
+let get_cur_eval_cond = defix get_cur_eval_cond;
+non_lazy get_cur_eval_cond;
+
+// Sort a list of elements using the cmp_fun comparison function.
+// cmp_fun takes two elements from the list and should return:
+//    >0 if the first element is to be viewed as larger than the second
+//    <0 if the first element is to be viewed as smaller than the second
+//     0 if the the two elements are to be viewed as same
+// For elements that are viewed as the same, their final order is undefined.
+//
+// Usage: qsort cmp_fun l;
+let qsort cmp_fun l = defix qsort cmp_fun l;
+
+// Create a table with an initial size of init_sz.
+// The size arguments is only used to create the initial table.
+// As elements are inserted, the table will grow automatically.
+// Usage: tbl_create init_sz;
+let tbl_create init_sz = defix tbl_create init_sz;
+non_lazy tbl_create;
+
+// Determine whether key is in table tbl.
+// Usage: tbl_member tbl key;
+let tbl_member tbl key = defix tbl_member tbl key;
+
+// Return the data associated with key in table tbl.
+// Usage: tbl_get tbl key;
+let tbl_get tbl key = defix tbl_get tbl key;
+
+// Insert data under key in table tbl.
+// Note that the function returns the new table.
+// Usage: tbl_insert tbl key data;
+let tbl_insert tbl key data = defix tbl_insert tbl key data;
+
+// Delete the data under key in table tbl.
+// Note that the function returns the new table.
+// Usage: tbl_delete tbl key;
+let tbl_delete tbl key = defix tbl_delete tbl key;
+
+// Clean the table tbl.
+// Note that the function returns the new table.
+// Usage: tbl_clear tbl;
+let tbl_clear tbl = defix tbl_clear tbl;
+
+// Given a table, return a list of all (key,data) pairs in the table.
+// Note: the order in which the keys are returned is undefined.
+let tbl2list tbl = defix tbl2list tbl;
+
+// Given a list of (key,data) pairs, create a table for this association.
+let list2tbl key_data_list = defix list2tbl key_data_list;
+
+// Return the integer bv represents. If bv is symbolic, the function fails.
+// Usage: bv2int bv;
+let bv2int bv = defix bv2int bv;
+
+// Convert bv to a list of bools of the same length.
+let bv2list bv = defix bv2list bv;
+
+// Print out a (potentially shortened) human readable version of bv.
+// The argument sz limits the size of the individual BDDs.
+// Usage: bv2str sz bv;
+let bv2str sz bv = defix bv2str sz bv;
+
+// Return the addition of av and bv (all as 2's complement bitvectors).
+// Usage: bv_add av bv;
+let bv_add av bv = defix bv_add av bv;
+
+// Return the bitwise AND of botvectors av and bv.
+// The shorter bv is sign-extended to match the length of the bigger one.
+// Usage: bv_AND av bv;
+let bv_AND av bv = defix bv_AND av bv;
+
+// Return av shifted right arithmetically n steps. 
+// Usage: bv_ashr bv n; 
+let bv_ashr bv n = defix bv_ashr bv n;
+
+// Return av divided by bv.
+// If bv is 0, the result is undefined.
+// Usage: bv_div av bv;
+let bv_div av bv = defix bv_div av bv;
+
+// Return the condition under which the (signed) bitvector av is greater than
+// or equal to the (signed) bitvector bv.
+// Usage: bv_geq av bv;
+let bv_geq av bv = defix bv_geq av bv;
+
+// Return the condition under which the (signed) bitvector av is greater than
+// the (signed) bitvector bv.
+// Usage: bv_greater av bv;
+let bv_greater av bv = defix bv_greater av bv;
+
+// Return the condition under which the (signed) bitvector av is less than
+// or equal to the (signed) bitvector bv.
+// Usage: bv_leq av bv;
+let bv_leq av bv = defix bv_leq av bv;
+
+// Return the condition under which the (signed) bitvector av is less than
+// the (signed) bitvector bv.
+// Usage: bv_less av bv;
+let bv_less av bv = defix bv_less av bv;
+
+// Return av mod bv.
+// If bv is 0, the result is undefined.
+// Usage: bv_mod av bv;
+let bv_mod av bv = defix bv_mod av bv;
+
+// Return av multiplied by bv.
+// Usage: bv_mul av bv;
+let bv_mul av bv = defix bv_mul av bv;
+
+// Return the bitwise negated version of av.
+// Usage: bv_NOT av;
+let bv_NOT av = defix bv_NOT av;
+
+// Return the bitwise OR of bitvectors av and bv.
+// The shorter bv is sign-extended to match the length of the bigger one.
+// Usage: bv_OR av bv;
+let bv_OR av bv = defix bv_OR av bv;
+
+// Return the number of bits used in the bitvector bv.
+// Usage: bv_size bv;
+let bv_size bv = defix bv_size bv;
+
+// Return the subtraction of av and bv (all as 2's complement bitvectors).
+// Usage: bv_sub av bv;
+let bv_sub av bv = defix bv_sub av bv;
+
+// Return a bitvector defined by the vector v.
+// NOTE: the bitvector is a signed number. If a positive variable is needed
+// use  bv_ZX (bv_variable v);
+// Usage: bv_variable v;
+let bv_variable vec = defix bv_variable vec;
+
+// Return the bitwise XNOR of botvectors av and bv.
+// The shorter bv is sign-extended to match the length of the bigger one.
+// Usage: bv_XNOR av bv;
+let bv_XNOR av bv = defix bv_XNOR av bv;
+
+// Return the bitwise XOR of botvectors av and bv.
+// The shorter bv is sign-extended to match the length of the bigger one.
+// Usage: bv_XOR av bv;
+let bv_XOR av bv = defix bv_XOR av bv;
+
+// Zero extend bv. In practice: if bv currently starts with a F, then 
+// return it. Otherwise prepend a F to bv.
+// Usage: bv_ZX bv;
+let bv_ZX bv = defix bv_ZX bv;
+
+// Convert the integer i to a bitvector. 
+// Note that bitvectors are 2's complement.
+// Usage: int2bv i;
+let int2bv i = defix int2bv i;
+
+// Convert a list l of bools (MSB is head of list) to a bv.
+// Usage: list2bv l;
+let list2bv l = defix list2bv l;
+
+// The Boolean value for true.
+let T = defix T;
+
+// The Boolean value for false.
+let F = defix F;
+
+// Returns the fixity declare for op.
+// If op is not defined, or no fixity has been declared for it, return nonfix.
+// Usage: get_fixity op;
+let get_fixity op = defix get_fixity op;
+
+
+// %%%%%%%%%%%%%%%%%%%%%%%
+
+// Draw the internal graph structure for e at most levels down.
+// Note that the function does not force the evaluation of e and thus
+// one can see the combinator graph if e is not forced.
+// The function is meant for debugging purposes, so beware...!
+// Usage: draw_graph levels e;
+let draw_graph levels e = defix draw_graph levels e;
+
+// Given a list of variables (vars) and a boolean function (f), return
+// the number of assignemnts to the variables in vars that makes f true.
+// If f depends on a variable not in vars, the function fails.
+// Usage: truth_cover vars f;
+let truth_cover vars f = defix truth_cover vars f;
+
+// Return the minisat literal used to represent the bexpr be.
+// Usage: bget_sat_literal be;
+let bget_sat_literal be = defix bget_sat_literal be;
+
+// Return a bexpr derived in a naive way from the BDD b;
+// Usage: bool2bexpr b;
+let bool2bexpr b = defix bool2bexpr b;
+
+// Return the number of nodes in the (multi-dimensional) vector vec.
+// Effectively an efficient way of doing length (md_expand_vector vec);
+// Usage: md_size vec;
+let md_size vec = defix md_size vec;
+
+// Is similar to strcmp except it treats indices inside square brackets
+// as numbers and thus: "a" < "ab" and "a[1]" < "a[10]", etc.
+// Usage: node_name_cmp s1 s2;
+let node_name_cmp s1 s2 = defix node_name_cmp s1 s2;
+
+// If fl is invoked with arguments (after the last flags), these arguments
+// will be placed in the list ARGS.
+let ARGS = defix ARGS;
+
+// Evaluate an expression e and return the pair (e',t) where t is the
+// wall time (as a string) it took to fully evaluate e.
+// Usage: wtime e;
+let wtime e = defix wtime e;
+
+// Evaluate the function fun::*a->void on every element in the list l.
+// Meant to be used for functions with side-effect only since all results
+// are trown away.
+let foreach fun l = defix foreach fun l;
+
+// A strict version of itlist (often significantly faster!).
+// Computes: fun (el 1 l) (fun (el 2 l) (... (fun (last l) init)...))
+// Usage: sitlist fun l init;
+let sitlist fun l init = defix sitlist fun l init;
+
+// Return the integer bev represents. If bev is symbolic, the function fails.
+// Usage: bev2int bev;
+let bev2int bev = defix bev2int bev;
+
+// Convert bev to a list of bexprs of the same length.
+let bev2list bev = defix bev2list bev;
+
+// Print out a (potentially shortened) human readable version of bev.
+// The argument sz limits the size of the individual bexprs.
+// Usage: bev2str sz bev;
+let bev2str sz bev = defix bev2str sz bev;
+
+// Return the addition of av and bev (all as 2's complement bitvectors).
+// Usage: bev_add av bev;
+let bev_add aev bev = defix bev_add aev bev;
+
+// Return the bitwise AND of botvectors av and bev.
+// The shorter bev is sign-extended to match the length of the bigger one.
+// Usage: bev_AND av bev;
+let bev_AND aev bev = defix bev_AND aev bev;
+
+// Return av shifted right arithmetically n steps. 
+// Usage: bev_ashr bev n; 
+let bev_ashr aev bev = defix bev_ashr aev bev;
+
+// Return av divided by bev.
+// If bev is 0, the result is undefined.
+// Usage: bev_div av bev;
+let bev_div aev bev = defix bev_div aev bev;
+
+// Return the condition under which the (signed) bitvector av is greater than
+// or equal to the (signed) bitvector bev.
+// Usage: bev_geq av bev;
+let bev_geq aev bev = defix bev_geq aev bev;
+
+// Return the condition under which the (signed) bitvector av is greater than
+// the (signed) bitvector bev.
+// Usage: bev_greater av bev;
+let bev_greater aev bev = defix bev_greater aev bev;
+
+// Return the condition under which the (signed) bitvector av is less than
+// or equal to the (signed) bitvector bev.
+// Usage: bev_leq av bev;
+let bev_leq aev bev = defix bev_leq aev bev;
+
+// Return the condition under which the (signed) bitvector av is less than
+// the (signed) bitvector bev.
+// Usage: bev_less av bev;
+let bev_less aev bev = defix bev_less aev bev;
+
+// Return av mod bev.
+// If bev is 0, the result is undefined.
+// Usage: bev_mod av bev;
+let bev_mod aev bev = defix bev_mod aev bev;
+
+// Return av multiplied by bev.
+// Usage: bev_mul av bev;
+let bev_mul aev bev = defix bev_mul aev bev;
+
+// Return the bitwise negated version of av.
+// Usage: bev_NOT bev;
+let bev_NOT bev = defix bev_NOT bev;
+
+// Return the bitwise OR of botvectors av and bev.
+// The shorter bev is sign-extended to match the length of the bigger one.
+// Usage: bev_OR av bev;
+let bev_OR aev bev = defix bev_OR aev bev;
+
+// Return the number of bits used in the bitvector bev.
+// Usage: bev_size bev;
+let bev_size bev = defix bev_size bev;
+
+// Return the subtraction of av and bev (all as 2's complement bitvectors).
+// Usage: bev_sub av bev;
+let bev_sub aev bev = defix bev_sub aev bev;
+
+// Return a bitvector defined by the vector vec.
+// NOTE: the bitvector is a signed number. If a positive variable is needed
+// use  bev_ZX (bev_variable v);
+// Usage: bev_variable v;
+let bev_variable vec = defix bev_variable vec;
+
+// Return the bitwise XNOR of botvectors av and bev.
+// The shorter bev is sign-extended to match the length of the bigger one.
+// Usage: bev_XNOR av bev;
+let bev_XNOR aev bev = defix bev_XNOR aev bev;
+
+// Return the bitwise XOR of botvectors av and bev.
+// The shorter bev is sign-extended to match the length of the bigger one.
+// Usage: bev_XOR av bev;
+let bev_XOR aev bev = defix bev_XOR aev bev;
+
+// Zero extend bev. In practice: if bev currently starts with a F, then 
+// return it. Otherwise prepend a F to bev.
+// Usage: bev_ZX bev;
+let bev_ZX bev = defix bev_ZX bev;
+
+// Convert the integer i to a bitvector. 
+// Note that bitvectors are 2's complement.
+// Usage: int2bev i;
+let int2bev i = defix int2bev i;
+
+// Convert a list l of bexprs (MSB is head of list) to a bev.
+// Usage: list2bev l;
+let list2bev l = defix list2bev l;
+
+
+// Determine whether there is an x such that the linear program given by
+// A*x rel b is feasible or not. Intuitively, A is a mXn matrix of
+// coefficients, rel is a mX1 matrix of relations ('<','<=','>','>=','=','<>')
+// and b is a mX1 matrix of values.
+// More precisely, system is a list of rows, each row being a triple
+// (coeff_list, relation, value).
+// If it is feasible, return a feasible solution (as rationals).
+// Usage LPsol system;
+let LPsol system = defix LPsol system;
+
+// Convert a pexlif p to an fsm model for fast simulation.
+// Usage: pexlif2fsm p;
+let pexlif2fsm p = defix pexlif2fsm p;
+
+// Perform symbolic trajectory evaluation on circuit ckt using bexprs.
+// Returns an ste object that can be queried for traces, results, etc.
+// 
+// The options argument is a string that can contain a combination of the
+// following flags:
+// 
+//    -a     Abort the STE at the first error.
+//
+//    -e     Compute and trace the value for every node in the circuit.
+//	     The default is to only compute nodes in the transitive fanin
+//	     cone of nodes in the consequent or trace list.
+//
+//    -m t   Abort the STE run after t phases has been simulated.
+// 
+// The weak_list (wl) is a list of 4-tuples of the form (w,nd,f,t) to be
+// read as: when w holds, weaken the excitation function of node nd from
+// time f up to, but not including, time t.
+// 
+// Both the antecedent (ant) and consequent (cons) lists are lists of
+// 5-tuples of the form (w,nd,v,f,t) to be read as:
+// when w holds, impose the constraint that the node nd should take on
+// at least the value v from time f up to, but not including, time t.
+// 
+// The trace_list (trl) is a list of triples of the form (n,f,t) and should
+// be read as: trace node nd from time f up to, but not including, time t.
+// 
+// NOTE: If the STE run aborts for some reason (interrupt, timeout,
+//       "-a" flag, etc.), all traces are terminated with an X value at
+//       the time it aborted.  This means that if STE aborts due to an
+//       antecedent failure, for example, the trace will no longer have
+//       the values (at that time).  This will make debugging a bit
+//       more difficult (but not impossible) but makes it safer since
+//       possibly erroneous trace values are eliminated.
+//
+// 
+let bSTE options ckt wl ant cons trl = defix bSTE options ckt wl ant cons trl;
+
+// Return the fsm that was used to create the STE result ste.
+// Usage: ste2fsm ste;
+let ste2fsm ste = defix ste2fsm ste;
+
+// Return a list of all nodes (as vectors) in the circuit ckt.
+// Usage: vectors ckt;
+let vectors ckt = defix vectors ckt;
+
+// Return a list of all inputs in the circuit ckt.
+// Usage: inputs ckt;
+let inputs ckt = defix inputs ckt;
+
+// Return a list of all outputs in the circuit ckt.
+// Usage: outputs ckt;
+let outputs ckt = defix outputs ckt;
+
+
+// Return a list of all (vectors) that have visualization
+// information in circuit ckt at level draw_level.
+// Usage: visualization_nodes ckt draw_level;
+let visualization_nodes ckt draw_level =
+	defix visualization_nodes ckt draw_level
+;
+
+// Return T if the node nd in circuit ckt is a phase delay node.
+// Usage: is_phase_delay ckt nd;
+let is_phase_delay ckt nd = defix is_phase_delay ckt nd;
+
+// Return a list of all nodes that can be reached from nds going backwards
+// in circuit ckt until stop_pred is satisfied.
+// Usage: fanin_dfs ckt stop_pred nds ;
+let fanin_dfs ckt stop_pred nds = defix fanin_dfs ckt stop_pred nds;
+
+// Return a list of all nodes that can be reached from nds going forwards
+// in circuit ckt until stop_pred is satisfied.
+// Usage: fanout_dfs ckt stop_pred nds ;
+let fanout_dfs ckt stop_pred nds = defix fanout_dfs ckt stop_pred nds;
+
+// Given a node nd in circuit ckt, return the vector that the node belongs to.
+// Usage: node2vector ckt nd;
+let node2vector ckt nd = defix node2vector ckt nd;
+
+// Given an ste object, return the type of simulation that created it.
+// Today, it will be one of "bdd" or "bexpr";
+// Usage: get_ste_type ste;
+let get_ste_type ste = defix get_ste_type ste;
+
+// Given an node name nd in circuit ckt, return nd's declared name.
+// For example, a node "i42/i22/i39/d" might have been declared as "foo"
+// three levels of hierachy above and passed down as arguments in module
+// instantiations.
+// Usage: basename ckt nd;
+let basename ckt nd = defix basename ckt nd;
+
+// Given an STE object ste and node nd, return a trace list of the node.
+// A trace list is a list of (time,H,L) values in reverse order for when
+// the node changed during simulation.
+// NOTE: Unless the STE run was ran with the -e flag, only nodes in the
+// trace list to the STE command will have trace lists avaiable.
+// Usage: get_trace ste nd;
+let get_trace ste nd = defix get_trace ste nd;
+
+
+// Given an bSTE object ste and node nd, return a trace list of the node.
+// A trace list is a list of (time,H,L) values in reverse order for when
+// the node changed during simulation.
+// NOTE: Unless the bSTE run was ran with the -e flag, only nodes in the
+// trace list to the bSTE command will have trace lists avaiable.
+// Usage: bget_trace ste nd;
+let bget_trace ste nd = defix bget_trace ste nd;
+
+// If node nd was traced in the STE run creating the STE object ste, then
+// (get_trace_val ckt nd time) will return the (high,low) pair for the value
+// on node nd at time time.
+// Usage: get_trace_val ste nd time;
+let get_trace_val ste nd time = defix get_trace_val ste nd time;
+
+// If node nd was traced in the bSTE run creating the STE object ste, then
+// (get_trace_val ckt nd time) will return the (high,low) pair for the value
+// on node nd at time time.
+// Usage: bget_trace_val ste nd t;
+let bget_trace_val ste nd time = defix bget_trace_val ste nd time;

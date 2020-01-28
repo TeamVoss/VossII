@@ -1,0 +1,19 @@
+lettype dummy = DUMMY ((int#bexpr#bexpr) list);
+
+val (DUMMY res1) = read_dummy "bugs/b140.bexpr";
+
+res1 fseq 1;
+
+let rres1 = map (bexpr2bdd ) res1;
+rres1 fseq 2;
+
+let tt = map (bexpr2bdd ) res1;
+tt fseq 2;
+
+(bexpr2bdd  (el 4 res1)) == (bexpr2bdd  (el 4 res1));
+
+(el 4 rres1) == (el 4 tt);
+
+rres1 == tt => fprintf stdout "tt Ok\n" | fprintf stderr "tt Unequal\n";
+
+map2 (\e.\f. e == f) rres1 tt;

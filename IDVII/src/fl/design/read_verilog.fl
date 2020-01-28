@@ -1,0 +1,96 @@
+let last_pexlif_ref = ref {(error "No pexlif read"):: pexlif};
+
+let find_search_path flags =
+    NOT (str_is_substr "-I" flags) => ["."] |
+    let alts = tl (str_split flags "-I") in
+    let extract s =
+	let alt = hd (str_split s " ") then
+	str_split alt ":"
+    in
+    (flatmap extract alts)@["."]
+;
+
+let find_file search_paths name =
+    string_hd name = "/" => 
+	file_exists name => [name] |
+	[]
+    |
+    letrec look (p:ps) =
+	let afile = sprintf "%s/%s" p name in
+	file_exists afile => [afile] |
+	look ps
+     /\    look [] = []
+    in
+    look search_paths
+;
+
+// Compile Verilog to VossII's internal Fsm type.
+//
+// Usage: read_verilog flags top_level_module file_list
+// where
+//	flags		 = are yosys read_verilog flags (see yosys documentation
+//	top_level_module = 
+let verilog2pexlif flags top_level_module file_list additional_files =
+    // Create tmp directory and copy all files to it
+    let tmp_dir = mktempd (sprintf "%s_verilog" top_level_module) then
+    let paths = find_search_path flags then
+    let copy_file file =
+	let base_name = last (str_split file "/") then
+	let afiles = find_file paths file then
+	afiles = [] => eprintf "Cannot find file %s in verilog2pexlif" file |
+	let afile = hd afiles in
+	(system (sprintf "/bin/cp %s %s/%s" afile tmp_dir base_name)) != 0 =>
+	    eprintf "Failed to copy %s to %s\n" file tmp_dir
+	|
+	base_name   
+    in
+    let base_names = map copy_file file_list then
+    // Now just copy over the additional files
+    (map copy_file additional_files) fseq
+    // Create script file
+    let script_file = sprintf "%s/script.ys" tmp_dir then
+    let sfp = fopen script_file "w" then
+    let files = list2str T "" " " "" id base_names then
+    (fprintf sfp "read_verilog %s %s\n" flags files) fseq
+    (fprintf sfp "hierarchy -check -top %s\n" top_level_module) fseq
+    (fprintf sfp "proc; opt\n") fseq
+    (fprintf sfp "rename -enumerate -pattern TmP_%%\n") fseq
+    (fprintf sfp "opt\n") fseq
+    (fprintf sfp "write_pexlif -noalias -icells -gates -impltf _out.fl\n") fseq
+    // Run yosys
+    let cmd = sprintf "cd %s; yosys script.ys  > yosys.log 2>&1" tmp_dir then
+    (system cmd) != 0 =>
+	noX =>
+	    eprintf "yosys failed. See %s/yosys.log for datails" tmp_dir
+	|
+	    ((report_result_in_file "Yosys failed."
+		    (tmp_dir^"/yosys.log") [("Ok","0")]) fseq
+	     eprintf "yosys failed. See %s/yosys.log for datails" tmp_dir)
+    |
+    (
+    noX =>
+	fprintf stderr "-W- Check %s/yosys.log for Verilog warnings!\n" tmp_dir
+    |
+	((report_result_in_file "Yosys results:" 
+		    (tmp_dir^"/yosys.log") [("Ok","0")]) fseq ())
+    )
+    fseq
+    // Covert fl to pexlif
+    (load (sprintf "%s/_out.fl" tmp_dir)) fseq
+    let fl_cmd = 
+	(sprintf "last_pexlif_ref := ") ^
+	(sprintf "(%s [(\"instance\", \"%s\")] []);"
+		 top_level_module top_level_module)
+    in
+    (eval fl_cmd) fseq
+    let p = deref last_pexlif_ref then
+    (last_pexlif_ref := error "No pexlif read") seq
+    p
+;
+
+let verilog2fsm flags top_level_module file_list additional_files =
+    let p =
+	verilog2pexlif flags top_level_module file_list additional_files
+    then
+    pexlif2fsm p
+;

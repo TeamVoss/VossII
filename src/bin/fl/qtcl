@@ -1,0 +1,69 @@
+# graph: simple interactive graph editor
+
+canvas .c
+pack .c
+
+proc mkNode {x y} {                     ;# Create new node at (x,y)
+        global nodeX nodeY edgeFirst edgeSecond
+        set new [.c create oval [expr $x-10] [expr $y-10] \
+                        [expr $x+10] [expr $y+10] -outline black \
+                        -fill white -tags node]
+        set nodeX($new) $x
+        set nodeY($new) $y
+        set edgeFirst($new) {}
+        set edgeSecond($new) {}
+}
+
+proc mkEdge {first second} {            ;# Create edge between nodes
+        global nodeX nodeY edgeFirst edgeSecond
+        set edge [.c create line $nodeX($first) $nodeY($first) \
+                        $nodeX($second) $nodeY($second)]
+        .c lower $edge
+        lappend edgeFirst($first) $edge
+        lappend edgeSecond($second) $edge
+}
+
+bind .c <Button-1> {mkNode %x %y}
+.c bind node <Any-Enter> {
+        .c itemconfigure current -fill black
+}
+.c bind node <Any-Leave> {
+        .c itemconfigure current -fill white
+}
+bind .c 1 {set firstNode [.c find withtag current]}
+bind .c 2 {
+        set curNode [.c find withtag current]
+        if {($firstNode != "") && ($curNode != "")} {
+                mkEdge $firstNode $curNode
+        }
+}
+focus .c
+
+proc moveNode {node xDist yDist} {
+        global nodeX nodeY edgeFirst edgeSecond
+        .c move $node $xDist $yDist
+        incr nodeX($node) $xDist
+        incr nodeY($node) $yDist
+        foreach edge $edgeFirst($node) {
+                .c coords $edge $nodeX($node) $nodeY($node) \
+                                [lindex [.c coords $edge] 2] \
+                                [lindex [.c coords $edge] 3]
+        }
+        foreach edge $edgeSecond($node) {
+                .c coords $edge [lindex [.c coords $edge] 0] \
+                                [lindex [.c coords $edge] 1] \
+                                $nodeX($node) $nodeY($node)
+        }
+}
+
+.c bind node <Button-2> {
+        set curX %x
+        set curY %y
+}
+.c bind node <B2-Motion> {
+        moveNode [.c find withtag current] [expr %x-$curX] \
+                        [expr %y-$curY]
+        set curX %x
+        set curY %y
+}
+

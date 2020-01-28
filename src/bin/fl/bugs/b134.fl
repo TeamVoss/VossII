@@ -1,0 +1,53 @@
+load "ste.fl";
+
+TYPE "nible" 2;
+TYPE "byte" 4;
+
+MEMORY "rf" [(3,"nible")] "byte";
+
+let tst =
+    rf_input    rf.
+    nible_input wa.
+    nible_input ra.
+    byte_input idata.
+    rf_output   rf'.
+    byte_output out.
+    CELL "tst" [
+        Write_rf rf wa idata rf',
+        Read_rf rf' ra out
+];
+
+let p = tst 'rf 'wa 'ra 'idata 'rf' 'out;
+
+update_vossrc "VERBOSE-FSM-PRINT" "YES";
+let ckt = pexlif2fsm p;
+ckt;
+
+//let v = STE_debug ckt;
+//v;
+
+let mk_addr =
+    let mkw wa =
+	let mkr ra =
+	    let start = wa*3+ra in
+	    "ra[1:0]" isv (sprintf "0x%x" ra) from start to (start+1)
+	in
+	(flatmap mkr [0,1,2]) and
+	("wa[1:0]" isv (sprintf "0x%x" wa) from (wa*3) to ((wa+1)*3))
+    in
+    flatmap mkw [0,1,2]
+;
+
+
+let ant =
+        "rf[2:0][3:0]" isv "d[2:0][3:0]" from 0 to 9 and
+	mk_addr and
+        "idata[3:0]" isv "0x6" from 0 to 9
+;
+
+update_vossrc "VERBOSE-STE-RUN" "YES";
+
+STE "" ckt [] ant [] (map (\n. n,0,10) (nodes ckt));
+
+//STE "-e" v [] ant [] [];
+

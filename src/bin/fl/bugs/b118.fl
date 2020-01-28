@@ -1,0 +1,80 @@
+load "ste.fl";
+
+
+TYPE "bv3" 3;
+
+let tst = 
+    bv3_input	pstate.
+    bit_output	out.
+    CELL "tst" [
+	out <- (pstate '=' '0b110)
+];
+
+
+let p = tst 'pstate 'out;
+p;
+
+let ckt = pexlif2fsm p;
+ckt;
+
+let vis = STE_debug ckt;
+//vis;
+
+STE "-e" ckt [] ("pstate[2:0]" isv "a[2:0]" from 0 to 1) [] [];
+
+
+let p = 
+    PINST "tst" [] F 
+	[("pstate[2:0]",["pstate[2:0]"])]
+	[("out",["out"])]
+	[]
+	(P_HIER [
+	      (PINST "draw_rtl {=}" [] T
+		  [("A[2:0]",["pstate[2:0]"]),("B[2:0]",["0b110"])]
+		  [("Y",["out"])]
+		  []
+		  (P_LEAF [
+		    W_UPDATE_FN (W_VAR 1 "Y") (W_EQ (W_VAR 3 "A") (W_VAR 3 "B"))
+		  ])
+	     )
+	    ]
+	)
+;
+
+
+
+let ckt = pexlif2fsm p;
+ckt;
+
+let vis = STE_debug ckt;
+//vis;
+
+STE "-e" ckt [] ("pstate[2:0]" isv "a[2:0]" from 0 to 1) [] [];
+
+
+
+let tst3 {attrs::(string#string) list} conns =
+    let inps = ["pstate[2:0]"] in
+    let outs = ["out"] in
+    let ints = md_extract_vectors ["TmP_79"] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+	_buf 1 "My.v:123" ["out"] ["TmP_79"],
+        _eq 3 "CACHE_LOGIK.v:734" ["TmP_79"] ["pstate[2:0]"] ["0b110"] 
+    ] in
+    PINST "tst3" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+let p = tst3 [] [];
+
+let ckt = pexlif2fsm p;
+ckt;
+
+let vis = STE_debug ckt;
+vis;
+
+STE "-e" vis [] ("pstate[2:0]" isv "a[2:0]" from 0 to 1) [] [];
+
+

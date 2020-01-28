@@ -1,0 +1,57 @@
+load "bool_arithm.fl";
+
+VARS "x[9:0] y[9:0]";
+
+let rows = 
+    let mk i =
+	let v = sprintf "d[%d][127:0]" i in
+	map variable (md_expand_vector v)
+    in
+    map mk (0--127)
+;
+
+update_vossrc "DYNAMIC-ORDERING" "NO";
+
+x;
+y;
+rows fseq 1;
+
+let image = 
+    let exp line = (replicate (1024-128) F)@line in
+    let empty_line = replicate 1024 F in
+    (replicate (1024-128) empty_line)@
+    (map exp rows)
+;
+
+length image;
+setify (map length image);
+
+let q = var_order (interleave (map md_expand_vector ["x[9:0]", "y[9:0]"]));
+q fseq 1;
+
+
+let shift_row delta rows =
+    let lines = length rows then
+    let line_size = length (hd rows) then
+    let empty_line = replicate line_size F then
+    let empty_window = replicate lines empty_line then
+    let rows' = rows@empty_window in
+    letrec sel_rows line =
+	line >= lines => empty_window |
+	IF (delta '=' (nat2fbv 10 line)) THEN
+	    (firstn lines (butfirstn line rows'))
+	ELSE
+	    sel_rows (line+1)
+    in
+    sel_rows 0
+;
+
+let rr = shift_row x image;
+
+//update_vossrc "VERBOSE-GARBAGE-COLLECTION" "YES";
+
+bdd_reorder 0;
+rvariable "a";
+
+//rr fseq 1;
+

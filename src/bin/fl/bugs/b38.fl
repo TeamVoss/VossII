@@ -1,0 +1,40 @@
+
+let s0 = "";
+let s1 = "a";
+let s2 = "ab";
+let s3a = "abc";
+let s3b = "xbc";
+
+strlen s0 == 0;
+strlen s1 == 1;
+strlen s2 == 2;
+strlen s3a == 3;
+strlen s3b == 3;
+
+str_is_prefix s0 s0 == T;
+str_is_prefix s1 s1 == T;
+str_is_prefix s3a s3a == T;
+str_is_prefix s3a s3b == F;
+str_is_prefix s2 s3a == T;
+str_is_prefix s2 s3b == F;
+
+str_is_suffix s0 s0 == T;
+str_is_suffix s0 s2 == T;
+str_is_suffix "c" s3a == T;
+str_is_suffix "bc" s3a == T;
+str_is_suffix "abc" s3a == T;
+str_is_suffix "b" s3a == F;
+
+str_is_substr s0 s0 == T;
+str_is_substr s1 s1 == T;
+str_is_substr s3a s3a == T;
+str_is_substr s3a s3b == F;
+str_is_substr s2 s3a == T;
+str_is_substr s2 s3b == F;
+str_is_substr "ab" "jqkjabqjkq" == T;
+
+str_split "abcdefcedfc" "c";
+str_split "abcdefcedfc" "q";
+str_split "abcdefcedfc" "";
+str_split "abcdefcedfc" "cd";
+str_split "abcdfcedfc" "df";

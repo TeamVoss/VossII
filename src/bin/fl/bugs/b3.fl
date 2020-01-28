@@ -1,0 +1,84 @@
+let a = bvariable "a";
+let b = bvariable "b";
+let c = bvariable "c";
+
+let e1 = a bAND b;
+let e2 = bNOT (a bOR b);
+let e3 = a bXOR b bAND bNOT a bOR c;
+let e4 = (bNOT a) bAND (bNOT b);
+let e5 = (bNOT a) bAND b;
+let eqs = [e1,e2,e3];
+
+gen_bexpr2bdd [] [e1,e2,e3];
+gen_bexpr2bdd [("c",T)] [e1,e2,e3];
+gen_bexpr2bdd [("c",F)] [e1,e2,e3];
+gen_bexpr2bdd [("c",variable "a")] [e1,e2,e3];
+
+gen_bexpr2bdd [] e3;
+gen_bexpr2bdd [("c",T)] e3;
+gen_bexpr2bdd [("c",F)] e3;
+gen_bexpr2bdd [("c",variable "a")] e3;
+
+gen_bexpr2bdd [] ((e3,e2),e1);
+
+bsize [e1];
+bsize [e2];
+bsize [e3];
+bsize [e1,e2,e3];
+
+let sub0 = [];
+let sub1 = [("a",bT)];
+let sub2 = [("a",bvariable "b")];
+let sub3 = [("a", bvariable "b"), ("b", bvariable "a"), ("c", bT)];
+let sub4 = [("a", bvariable "b"), ("b", bvariable "a"), ("c", bF)];
+
+bsubstitute sub0 e3;
+bsubstitute sub1 e3;
+bsubstitute sub2 e3;
+bsubstitute sub3 e3;
+bsubstitute sub4 e3;
+
+bsubstitute sub0 eqs;
+bsubstitute sub1 eqs;
+bsubstitute sub2 eqs;
+bsubstitute sub3 eqs;
+bsubstitute sub4 eqs;
+
+lettype tr = BR tr tr | LEAF bexpr;
+let Ptr tr =
+    letrec pr (BR t1 t2) = sprintf "(BR %s %s)" (pr t1) (pr t2)
+     /\    pr (LEAF be) = sprintf "(LEAF %s)" (bexpr2str 5 be)
+    in
+    (pr tr)^"\n"
+;
+install_print_function Ptr;
+
+bsubstitute sub3 (eqs,e1, LEAF e2);
+bsubstitute sub4 (eqs,e1, LEAF e2);
+
+bdepends bT;
+bdepends bF;
+bdepends a;
+bdepends e1;
+bdepends (e1,e2);
+
+"e3:";
+e3;
+bdepends e3;
+
+"(e1,LEAF e3)";
+(e1,LEAF e3);
+bdepends (e1,LEAF e3);
+
+"eqs";
+eqs;
+bdepends eqs;
+
+
+printf "bget_model (e4 bXNOR e2); (%s): " (bexpr2str 10 (e4 bXNOR e2)); bget_model [(e4 bXNOR e2)] 10;
+printf "bget_model (e4 bXOR e2); (%s): " (bexpr2str 10 (e4 bXOR e2)); bget_model [(e4 bXOR e2)] 10;
+
+printf "bget_model a; (%s): "(bexpr2str 10 a); bget_model [a] 10;
+
+printf "bget_model (e4 bXNOR e5); (%s): "(bexpr2str 10 (e4 bXNOR e5)); bget_model [(e4 bXNOR e5)] 10;
+printf "bget_model (e4 bXOR e5); (%s): "(bexpr2str 10 (e4 bXOR e5)); bget_model [(e4 bXOR e5)] 10;

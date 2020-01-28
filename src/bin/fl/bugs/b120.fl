@@ -1,0 +1,192 @@
+load "ste.fl";
+
+let ex1 =
+    bit_input a b c.
+    bit_output o.
+    CELL "ex1" [
+	o <- a '|' b '|' c
+];
+
+let p = ex1 'a 'b 'c 'o;
+
+p;
+
+let ckt = pexlif2fsm p;
+ckt;
+
+let vis = STE_debug ckt;
+//vis;
+
+let ant =
+    ("a" isv "0" and "b" isv "0" and "c" isv "0") from 0 to 1 and
+    ("a" isv "0" and "b" isv "1" and "c" isv "0") from 1 to 2
+;
+
+let ste = STE "-e" vis [] ant [] [];
+//ste;
+
+
+let ant =
+    ("a" isv "0" and "b" isv "0" and "c" isv "0") from 0 to 1 and
+    ("a" isv "A" and "b" isv "Q" and "c" isv "0") from 1 to 2
+;
+
+let ste = STE "-e" vis [] ant [] [];
+//ste;
+
+VARS "x y z";
+
+let prop =
+ x AND NOT y AND NOT z OR
+ NOT x AND y AND NOT z OR
+ NOT x AND NOT y AND z 
+;
+
+let sub = param prop;
+
+let ant = substitute sub (
+    ("a" isv "x" and "b" isv "y" and "c" isv "z") from 0 to 1
+);
+
+let ste = STE "-e" vis [] ant [] [];
+//ste;
+
+
+
+let ex2 =
+    bit_input ctrl.
+    bit_input H L.
+    bit_output o.
+    CELL "ex2" [
+	o <- (IF ctrl THEN H ELSE L)
+];
+
+let p = ex2 'ctrl 'H 'L 'o;
+
+let ckt = pexlif2fsm p;
+
+let vis = STE_debug ckt;
+//vis;
+
+let ant = 
+    ("ctrl" isv "0" from 0 to 1) and
+    ("ctrl" isv "1" from 1 to 2) and
+    ("ctrl" isv "b1" from 2 to 3) and
+    ("ctrl" isv "r1" from 3 to 4) and
+    ("H" isv "r0" from 0 to 4) and
+    ("L" isv "b0" from 0 to 4)
+;
+
+let ste = STE "-e" vis [] ant [] [];
+//ste;
+
+
+TYPE "byte" 8;
+
+let ex3 =
+    bit_input  mode.
+    byte_input v.
+    bit_input H L.
+    bit_output o.
+    byte_internal tmp.
+    bit_internal    ctrl.
+    CELL "ex2" [
+	tmp <- (IF mode THEN v ELSE (v '&' '0x7f)),
+	ctrl <- (tmp '>=' '0x80),
+	o <- (IF ctrl THEN H ELSE L)
+];
+
+let p = ex3 'mode 'v 'H 'L 'o;
+
+let ckt = pexlif2fsm p;
+
+let vis = STE_debug ckt;
+//vis;
+
+let user n = NOT (str_is_substr "TmP" n);
+
+fanin_dfs ckt user ["ctrl"];
+
+
+let ant = 
+    ("mode" isv "0" from 0 to 2) and
+    ("mode" isv "1" from 2 to 4) and
+    ("v[7:0]" isv "b0[7:0]" from 0 to 1) and
+    ("v[7:0]" isv "r0[7:0]" from 1 to 2) and
+    ("v[7:0]" isv "b1[7:0]" from 2 to 3) and
+    ("v[7:0]" isv "r1[7:0]" from 3 to 4) and
+    ("H" isv "r0" from 0 to 4) and
+    ("L" isv "b0" from 0 to 4)
+;
+
+let ste = STE "-e" vis [] ant [] [];
+//ste;
+
+let ex4 =
+    bit_input  mode.
+    byte_input v.
+    bit_input H L.
+    bit_output o.
+    byte_internal tmp.
+    bit_internal    ctrl.
+    CELL "ex2" [
+	tmp <- (IF mode THEN v ELSE (v '&' '0x80)), // <<< Mistake!
+	ctrl <- (tmp '>=' '0x80),
+	o <- (IF ctrl THEN H ELSE L)
+];
+
+let p = ex4 'mode 'v 'H 'L 'o;
+
+let ckt = pexlif2fsm p;
+
+let vis = STE_debug ckt;
+//vis;
+
+let ant = 
+    ("mode" isv "0" from 0 to 2) and
+    ("mode" isv "1" from 2 to 4) and
+    ("v[7:0]" isv "b0[7:0]" from 0 to 1) and
+    ("v[7:0]" isv "r0[7:0]" from 1 to 2) and
+    ("v[7:0]" isv "b1[7:0]" from 2 to 3) and
+    ("v[7:0]" isv "r1[7:0]" from 3 to 4) and
+    ("H" isv "r0" from 0 to 4) and
+    ("L" isv "b0" from 0 to 4)
+;
+
+let ste = STE "-e" vis [] ant [] [];
+//ste;
+
+TYPE "nibble" 4;
+
+let ex5 =
+    bit_input clk.
+    bit_input reset.
+    nibble_input h0 l0.
+    nibble_output out.
+    nibble_internal l h new_h new_l.
+    CELL "ex5" [
+	new_h <- (IF reset THEN h0 ELSE (IF (h '>' '3) THEN (h '-' '1) ELSE h)),
+	new_l <- (IF reset THEN l0 ELSE (IF (h '>' '3) THEN (l '+' l) ELSE l)),
+	re_ff clk new_h h,
+	re_ff clk new_l l,
+	out <- l
+];
+
+let p = ex5 'clk 'reset 'h0 'l0 'out;
+
+let ckt = pexlif2fsm p;
+
+let vis = STE_debug ckt;
+vis;
+
+let ant = 
+    (map (\i. T,"clk",(i%2=1),i,i+1) (0 upto 50)) and
+    ("reset" isv "1" from 0 to 2) and
+    ("reset" isv "0" from 2 to 50) and
+    ("l0[3:0]" isv "0x1" from 0 to 2) and
+    ("h0[3:0]" isv "r[3:0]" from 0 to 2)
+;
+
+
+let ste = STE "-e" vis [] ant [] [];
+//ste;

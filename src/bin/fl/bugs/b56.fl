@@ -1,0 +1,14 @@
+
+VARS "a b c d e f g";
+
+variable "a";
+1 == (truth_cover ["a","b"] (a AND NOT b));
+var_order ["d", "b", "a", "c"];
+1 == (truth_cover ["a","b"] (a AND NOT b));
+0 == (truth_cover ["a","b"] F);
+4 == (truth_cover ["a","b"] T);
+2 == (truth_cover ["a","b"] a);
+2 == (truth_cover ["a","b"] (NOT a));
+2 == (truth_cover ["a","b"] b);
+2 == (truth_cover ["a","b"] (NOT b));
+2 == (truth_cover ["a","b"] (a = b));

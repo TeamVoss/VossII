@@ -1,0 +1,44 @@
+let av = map (\i. bvariable (sprintf "a[%d]" i)) (31--0);
+let bv = map (\i. bvariable (sprintf "b[%d]" i)) (31--0);
+
+
+let ext_gen_bvadd av bv c =
+    length av != length bv => error "Length mismatch for ext_gen_bvadd" |
+    letrec add (a:as) (b:bs) cin =
+        let cout = a bAND b bOR a bAND cin bOR b bAND cin in
+        (a bXOR b bXOR cin):(add as bs cout)
+     /\    add [] [] cin = [cin]
+    in
+    rev (add (rev av) (rev bv) c)
+;
+
+clet fbvadd av bv = tl (ext_gen_bvadd av bv bF);
+
+clet fbvsub av bv = tl (ext_gen_bvadd av (map bNOT bv) bT);
+
+clet fbvmult av bv =
+    let sz = length av in
+    sz != length bv => eprintf "Length mismatch for inputs to fbvmult" |
+   letrec bvmult xv [] = replicate sz bF
+     /\    bvmult xv (y:ys) =
+	let ysz = length ys in
+        let prod = map ((defix bAND) y)
+		       ((butfirstn ysz xv) @ (replicate ysz bF))
+        in
+        fbvadd prod (bvmult xv ys)
+    in
+    bvmult av bv
+;
+
+let p = fbvmult av bv;
+let r =
+    map (\s. s = "1" => bT | bF) (explode "00011111011011111111011000101101")
+;
+
+"TEST";
+let t = bEqual p r;
+let sub = bget_model [t] 100;
+sub;
+
+let vsub = bget_vector_model [t] 100;
+vsub;

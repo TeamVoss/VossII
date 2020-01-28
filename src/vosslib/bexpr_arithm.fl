@@ -1,0 +1,76 @@
+fprintf stderr "============================================\n";
+fprintf stderr "Obsolete library. Migrate to bev_* functions!\n";
+fprintf stderr "============================================\n";
+
+let gT = bT;
+let gF = bF;
+let gvariable = bvariable;
+let gNOT = bNOT;
+let gAND = defix bAND;
+infix 4 gAND;
+let gXNOR = defix bXNOR;
+infix 4 gXNOR;
+let gXOR = defix bXOR;
+infix 4 gXOR;
+let gOR = defix bOR;
+infix 3 gOR;
+let gIF c = c;
+let gTHEN c (t,e) = bITE c t e;
+let gELSE t e = (t,e);
+if_then_else_binder gTHEN gELSE;
+let gEQUIV a b = (bget_model [bNOT (bEqual a b)] 100) == [];
+infix 5 gEQUIV;
+let gEQUAL a b = bEqual a b;
+infix 5 gEQUAL;
+let gdepends = bdepends;
+
+load (DIR^"/gen_arithm.fl");
+
+begin_abstype; 
+
+clet BDD_get_minimum_value bv =
+    letrec find first (b:bs) =
+        (b == T) => T:(find F bs) |
+        (b == F) => F:(find F bs) |
+        let cond = first => b | NOT b in
+        let psub = param cond in
+        let bs' = substitute psub bs then
+        first:(find F bs')
+     /\    find first [] = []
+    in
+    let r = find T bv then
+    bv2num r
+;
+
+// Given a symbolic bitvector interpreted as a signed 2's complement number,
+// find the smallest integer that the bitvector can represent. 
+// Note that this requires conversion to BDDs and thus may blow up!!!
+clet get_minimum_value bv =
+    let bdds = bexpr2bdd [] bv in
+    BDD_get_minimum_value bdds
+;
+
+clet BDD_get_maximum_value bv =
+    letrec find first (b:bs) =
+        b == T => T:(find F bs) |
+        b == F => F:(find F bs) |
+        let cond = first => NOT b | b in
+        let psub = param cond in
+        let bs' = substitute psub bs then
+        (NOT first):(find F bs')
+     /\    find first [] = []
+    in
+    let r = find T bv then
+    bv2num r
+;
+
+// Given a symbolic bitvector interpreted as a signed 2's complement number,
+// find the largest integer that the bitvector can represent. 
+// Note that this requires conversion to BDDs and thus may blow up!!!
+clet get_maximum_value bv =
+    let bdds = bexpr2bdd [] bv in
+    BDD_get_maximum_value bdds
+;
+
+end_abstype get_minimum_value get_maximum_value;
+

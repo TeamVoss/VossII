@@ -1,0 +1,4 @@
+unsetenv TCL_LIBRARY
+unsetenv TK_LIBRARY
+# setenv TCL_LIBRARY /home/cseger/Voss/distribution/bin/fl/tcl_doc/src/tcl7.4/library
+# setenv TK_LIBRARY /home/cseger/Voss/distribution/bin/fl/tcl_doc/src/tk4.0/library

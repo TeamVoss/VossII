@@ -1,0 +1,38 @@
+load "ste.fl";
+
+TYPE "word" 32;
+TYPE "bv4" 4;
+
+let rf_info = MEM 4 16 32;
+TYPE "rf" (16*32);
+
+
+let rf_read {addr::bv4} {rf::rf} =
+    hw_word_constr (W_MEM_READ rf_info (hw_destr rf) (hw_destr addr))
+;
+
+let rf_write {rf::rf} {addr::bv4} {data::word} =
+    hw_rf_constr
+        (W_MEM_WRITE rf_info (hw_destr rf) (hw_destr addr) (hw_destr data))
+;
+
+let {r0::bv4} = '10;
+let {rf::rf} = '0;
+
+let rf' = (rf_write rf r0 '42);
+rf';
+
+rf_read r0 rf';
+
+rf_read '0 rf';
+rf_read '1 rf';
+rf_read '2 rf';
+rf_read '3 rf';
+rf_read '4 rf';
+rf_read '9 rf';
+rf_read '10 rf';
+rf_read '11 rf';
+rf_read '15 rf';
+
+r0;
+

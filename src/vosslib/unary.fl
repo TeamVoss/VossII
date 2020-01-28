@@ -1,0 +1,145 @@
+// Bitvector definitions of arithmetic operations. Uses unary representation
+//
+//
+
+// -------------------------------------------------------------------------
+// Useful help functions
+// -------------------------------------------------------------------------
+
+// If-then-else extended to lists
+let ite_l cond thenl elsel =
+    ((length thenl) != (length elsel)) => error "len(thenl)!=len(elsel)" |
+    letrec rite_l thenl elsel =
+        ([] = thenl) => [] |
+            ((cond AND (hd thenl)) OR (NOT(cond) AND (hd elsel))):
+            (rite_l (tl thenl) (tl elsel)) in
+    rite_l thenl elsel;
+
+
+// -------------------------------------------------------------------------
+// Conversion functions
+// -------------------------------------------------------------------------
+
+// num2bv size number -- Convert number to a Boolean vector of size 2^'size'
+let num2bv size n =
+    letrec pow2 size = (size=0) => 1 | 2*(pow2 (size-1)) in
+    let Size = pow2 size in
+    letrec rnum2bv size n = (size=0)=> [] |
+        ((n=size) => [T] | [F]) @ (rnum2bv (size-1) n) in
+    n < Size => rnum2bv Size (n+1) | error "num2bv: too large number";
+
+// bin2unary bl -- Convert number from binary to unary representation
+let bin2unary bl =
+    letrec runary bl = ([] = bl) => [T] |
+        let b = hd bl in
+        let child = runary (tl bl) in
+        let left = map (\x. (b AND x)) child in
+        let right = map (\x. (NOT(b) AND x)) child in
+        left @ right in
+    runary bl;
+
+// value av -- Convert a Boolean vector to corresponding number
+let value l =
+        letrec rcheck l = ([] = l) => T |
+            let li = hd l in
+            ((li = T) OR (li = F)) AND (rcheck (tl l)) in
+        letrec rval l n res =
+            ([] = l) => res |
+                let li = hd l in
+                (rval (tl l) (n-1) ((li=T) => (n-1) | res)) in 
+        (rcheck l) => (rval l (length l) 0) | 
+                error "Cannot evaluate symbolic expression in value";
+
+
+// -------------------------------------------------------------------------
+// Extraction functions
+// -------------------------------------------------------------------------
+let list_prefix n av = (n > (length av)) =>
+        error "Vector shorter than requested prefix" |
+        letrec list_prefix n av = (n = 0) => [] |
+                (hd av) : (list_prefix (n-1) (tl av)) in
+        list_prefix n av;
+
+let list_suffix n av = (n > (length av)) =>
+        error "Vector shorter than requested suffix" |
+        (rev (list_prefix n (rev av)));
+
+
+// -------------------------------------------------------------------------
+// Arithmetic functions
+// -------------------------------------------------------------------------
+
+// addition
+let add av bv =
+    ((length av) != (length bv)) =>
+        error "Addition of two vectors of different size" |
+    letrec const0 av = ([] = av)=> [] | (F : (const0 (tl av))) in
+    letrec radd av bv =
+        ([] = bv) => (const0 av) |
+            let b = (hd bv) in
+            (ite_l b av (radd ((tl av) @ [F]) (tl bv))) in
+    radd av (rev bv);
+
+// increment
+let increment av =
+    (tl av) @ [F];
+
+// decrement
+let decrement av =
+    F : (rev (tl (rev av)));
+
+// subtraction
+let subtract av bv =
+    rev (add (rev av) bv);
+
+// -------------------------------------------------------------------------
+// Comparison functions
+// -------------------------------------------------------------------------
+
+let greater av bv =
+    ((length av) != (length bv)) =>
+        error "Relation > between two vectors of different size" |
+    letrec greater al bl = ([] = al) => F |
+            let ai = (hd al) in
+            let bi = (hd bl) in
+            (ai AND (NOT bi)) OR (greater (tl al) (tl bl)) in
+    greater av bv;
+
+let equal av bv =
+    ((length av) != (length bv)) =>
+        error "Relation = between two vectors of different size" |
+    letrec equal av bv = ([] = av) => T |
+                ((hd av) AND (hd bv)) AND (equal (tl av) (tl bv)) in
+    equal av bv;
+
+let geq av bv = 
+    ((length av) != (length bv)) =>
+        error "Relation >= between two vectors of different size" |
+    (greater av bv) OR (equal av bv);
+
+let less av bv =
+    ((length av) != (length bv)) =>
+        error "Relation < between two vectors of different size" |
+    greater bv av;
+
+let leq av bv = 
+    ((length av) != (length bv)) =>
+        error "Relation <= between two vectors of different size" |
+    (greater bv av) OR (equal av bv);
+
+
+// Bitwise operations
+// -------------------------------------------------------------------------
+
+let bitwise fn av bv =
+    ((length av) != (length bv)) =>
+        error "Bitwise AND between two vectors of different size" |
+    letrec bitwise fn av bv = ([] = av) => [] |
+        [fn (hd av) (hd bv)] @ (bitwise fn (tl av) (tl bv)) in
+    bitwise fn av bv;
+
+let bvAND av bv = bitwise (\x.\y. x AND y) av bv;
+let bvOR av bv = bitwise (\x.\y. x OR y) av bv;
+let bvXOR av bv = bitwise (\x.\y. x XOR y) av bv;
+let bvNOT av = map (\x. NOT x) av;
+

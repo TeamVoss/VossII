@@ -1,0 +1,260 @@
+// Verificaion of multplier array + sticky bit computation
+let PATH s = "/isd/local/generic/projects/FP_mult/" ^ s;
+
+load (PATH "V3/VossProver.fl");
+load (PATH "verification/Marks.fl");
+
+// Circuit
+//let FPMultCkt = load_exe (PATH "vhdl/FP_Mult.alpha.exe");
+let FPMultCkt = load_exe (PATH "vhdl/FP_Mult.sun4.exe");
+
+
+// Input variables
+
+let signif_a = (nvar "a")<|51--0|> + '2 ** '52;
+let signif_b = (nvar "b")<|51--0|> + '2 ** '52;
+
+// Output variables from the Booth recoder
+let sign i = (nvar ("s."^(int2str i)))<|0|>;
+let magn i = (nvar ("m."^(int2str i)))<|2--0|>;
+
+// ======================================================
+// Check Booth recoder
+let ValidBoothRecoding =
+        let lp i = '8 ** 'i * ('1 - '2*(sign i))*(magn i) in
+        signif_a<|52--0|> ==
+                ((lp 0)+(lp 1)+(lp 2)+(lp 3)+(lp 4)+(lp 5)+(lp 6)+
+                 (lp 7) +(lp 8) +(lp 9) +(lp 10) +(lp 11) +(lp 12) +
+                 (lp 13) +(lp 14) +(lp 15) +(lp 16) +(lp 17));
+
+let RangeCondition =
+	((magn 0) <= '4) AND ((magn 1) <= '4) AND
+	((magn 2) <= '4) AND ((magn 3) <= '4) AND
+	((magn 4) <= '4) AND ((magn 5) <= '4) AND
+	((magn 6) <= '4) AND ((magn 7) <= '4) AND
+	((magn 8) <= '4) AND ((magn 9) <= '4) AND
+	((magn 10) <= '4) AND ((magn 11) <= '4) AND
+	((magn 12) <= '4) AND ((magn 13) <= '4) AND
+	((magn 14) <= '4) AND ((magn 15) <= '4) AND
+	((magn 16) <= '4) AND ((magn 17) <= '4);
+
+let ant = (Sig1Eq signif_a) and
+          (Sig2Eq signif_b) and
+          (gen_clock ClkNde CLOCK_CYCLE CLOCK_PHASE 10);
+
+let cons =
+        letrec check_sign_magn n = n < 0 => UNC |
+                ((Sig1SgnAddRecodeEq n) (sign n)) and
+                ((Sig1MagAddRecodeEq n) (magn n)) and
+                (check_sign_magn (n-1)) in
+        check_sign_magn 17;
+
+let relation = ValidBoothRecoding AND RangeCondition;
+
+let stage1_assertion = mk_named_goal
+                        ``(RTA FPMultCkt ant cons relation)'';
+
+let ps = SET_GOAL stage1_assertion;
+let BoothRecodeLemma = BY_BDD ps;
+
+let var_orderAddRecode =
+  (
+     let  Sig1 i  = "N"^(int2str i)^".a" in
+     let  Mag1 i  = "N"^(int2str (i%3))^".m."^(int2str (i/3)) in
+     let  Sgn1 i  = "N0."^ "s."^(int2str i)  in
+  flat
+   ([
+             Sgn1 (17),
+             Sig1 (52), Mag1 (52), Mag1 (51),
+             Sig1 (51)
+   ] :
+   (map (\i. let i3 = 3*i in
+            [Sgn1 (i),
+             Sig1 (i3+2), Mag1 (i3+2),
+             Sig1 (i3+1), Mag1 (i3+1), Mag1 (i3),
+             Sig1 (i3)
+            ]
+      )
+      (16 downto 0)
+   )));
+
+
+//var_order var_orderAddRecode;
+//BoothRecodeLemma;
+
+// ======================================================
+// Check the multiplication of magnitude results for
+// Inputs to the Carry Save Adders
+
+let prod_var = (nvar "prod_var")<<56--0>>;
+
+let ant n = (Sig2Eq signif_b) and
+	    ((Sig1SgnAddRecodeEq n) (sign n)) and
+            ((Sig1MagAddRecodeEq n) (magn n)) and
+	    (gen_clock ClkNde CLOCK_CYCLE CLOCK_PHASE 10);
+
+let cons n = (ProductNdeRowEq n prod_var);
+
+let relation n =
+	((magn n) <= '4) ==>
+	    (prod_var == ((magn n)*('1 - '2*(sign n))*signif_b));
+
+
+let assertion i = mk_named_goal
+			``(RTA FPMultCkt (ant i) (cons i) (relation i))'';
+
+let ps i = SET_GOAL (assertion i);
+
+let order n = ordering_heuristic (prod_var + ((magn n)*signif_b));
+
+//BY_BDD (ps 1);
+
+let q = relation 1;
+order 1;
+q;
+zz;
+
+// Carry and Sum variables for intermediate variables
+let c_i = (nvar "ci")<<56--0>>;
+let s_i = (nvar "si")<<55--0>>;
+let c_o = (nvar "co")<<56--0>>;
+let s_o = (nvar "so")<<55--0>>;
+
+// Carry and Sum variables for final result of stage 2 
+let car_v = (nvar "car")<<55--0>>;
+let sum_v = (nvar "sum")<<55--0>>;
+
+// -------------------------
+// ALL STAGE 2:
+
+// Mult-array Row 0
+//let ant =
+//	(Sig1Eq signif_a) and (Sig2Eq signif_b) and
+////	(gen_clock ClkNde CLOCK_CYCLE CLOCK_PHASE 10);
+//
+//let cons =
+//	((Carry_Out_Nde_Row 0) isv c_v) and
+//	((Sum_Out_Nde_Row 0) isv s_v);
+//
+
+
+// Inductive specification
+// Stage i
+
+let ant {i::int} =
+	(gen_clock ClkNde CLOCK_CYCLE CLOCK_PHASE 10) and
+	(CarryOutNdeRowEq (i-1) c_i) and
+	(SumOutNdeRowEq (i-1) s_i) and
+	(Sig1MagAddRecodeEq i (magn i)) and
+	(Sig1SgnAddRecodeEq i (sign i)) and
+	(Sig2Eq signif_b);
+
+let cons {i::int} =
+	(CarryOutNdeRowEq i c_o) and
+	(SumOutNdeRowEq i s_o);
+
+let relation {i::int} = ((c_i + s_i) / '8 +
+			 xx_i
+//			 (('1 - '2*(sign i))*(magn i)*signif_b - (sign i))
+ 			) == (c_o + s_o);
+
+
+let inductive_lemma {i::int} =
+	mk_named_goal ``(RTA FPMultCkt (ant i) (cons i) (relation i))'';
+
+let ps i = SET_GOAL (inductive_lemma i);
+
+let order_hint {i::int} =
+	ordering_heuristic (
+	((c_i + s_i) / '8 + ((magn i)*signif_b)) + (c_o + s_o));
+
+
+let bdd_size_ibv (expr,sgn) = bdd_size (sgn:expr);
+
+let bdd_size_N = bdd_size_ibv o N2ibv;
+
+let partial_product_i = (c_i + s_i) / '8;
+// w=51 -> 275 nodes
+
+let product           = (('1 - '2*(sign 1))*(magn 1)*signif_b - (sign 1));
+let product_ibv       = N2ibv product;
+// w=51 -> 1657 nodes
+
+let lhs = partial_product_i + product;
+// w=51 -> XXXXX ;  
+let partial_product_o = (c_o + s_o);
+// 280 nodes;
+
+
+ordering_heuristic ((c_i + s_i) / '8 + xx_i + c_o + s_o);
+
+zzzzzzzzzzz;
+
+let q = ps 1;
+//order_hint 1;
+//load "orders";
+
+let z = B2b (relation 1);
+
+
+z seq 1;
+BY_BDD q;
+
+
+// Check
+let ValidBoothRecoding =
+        let lp i = '8 ** 'i * ('1 - '2*(sign i))*(magn i) in
+        signif_a<|52--0|> ==
+                ((lp 0)+(lp 1)+(lp 2)+(lp 3)+(lp 4)+(lp 5)+(lp 6)+
+                 (lp 7) +(lp 8) +(lp 9) +(lp 10) +(lp 11) +(lp 12) +
+                 (lp 13) +(lp 14) +(lp 15) +(lp 16) +(lp 17));
+
+
+let ant = (Sig1Eq signif_a) and
+	  (Sig2Eq signif_b) and
+	  (gen_clock ClkNde CLOCK_CYCLE CLOCK_PHASE 10);
+
+let cons1 = Sig2x3AddRecodeEq (('3*signif_b)<<54--0>>);
+let stage1_assertion1 = mk_named_goal ``(FTA FPMultCkt ant cons1)'';
+let ps1 = SET_GOAL stage1_assertion1;
+
+BY_BDD ps1; // OK!
+
+let cons2 =
+	letrec check_sign_magn n = n < 0 => UNC |
+		((Sig1SgnAddRecodeEq n) (sign n)) and
+		((Sig1MagAddRecodeEq n) (magn n)) and
+		(check_sign_magn (n-1)) in
+	check_sign_magn 17;
+
+let stage1_assertion2 = mk_named_goal
+			``(RTA FPMultCkt ant cons2 ValidBoothRecoding)'';
+
+let ps2 = SET_GOAL stage1_assertion2;
+
+let var_orderAddRecode =
+  (
+     let  Sig1 i  = "N"^(int2str i)^".a" in
+     let  Mag1 i  = "N"^(int2str (i%3))^".m."^(int2str (i/3)) in
+     let  Sgn1 i  = "N0."^ "s."^(int2str i)  in
+  flat
+   ([
+             Sgn1 (17),
+             Sig1 (52), Mag1 (52), Mag1 (51),
+             Sig1 (51)
+   ] :
+   (map (\i. let i3 = 3*i in
+            [Sgn1 (i),
+             Sig1 (i3+2), Mag1 (i3+2),
+             Sig1 (i3+1), Mag1 (i3+1), Mag1 (i3),
+             Sig1 (i3)
+            ]
+      )
+      (16 downto 0)
+   )));
+var_order var_orderAddRecode;
+
+//"BY_BDD ps2";
+BY_BDD ps2;
+
+//draw_fanin_cone FPMultCkt "Sticky_MultShift" 80;

@@ -1,0 +1,42 @@
+load "ste.fl";
+
+TYPE "nible" 2;
+TYPE "byte" 2;
+
+
+MEMORY "md" [(2,"bit"),(3,"nible")] "byte";
+
+
+let tst =
+    md_input    rf.
+    bit_input   s1.
+    nible_input d1.
+    byte_input  din.
+    md_output   rr.
+    CELL "tst" [
+        Write_md rf s1 d1 din rr
+];
+
+let p = tst 'rf 's1 'd1 'din 'rr;
+
+update_vossrc "VERBOSE-FSM-PRINT" "YES";
+let ckt = pexlif2fsm p;
+ckt;
+
+//let v = STE_debug ckt;
+//v;
+
+let ant =
+        "rf[1:0][2:0][1:0]" isv "0x0" from 0 to 1 and
+        "s1" isv "0x0" from 0 to 1 and
+        "d1[1:0]" isv "0x0" from 0 to 1 and
+        "din[1:0]" isv "0x2" from 0 to 1
+;
+
+update_vossrc "VERBOSE-STE-RUN" "YES";
+
+//let res = STE "-e" v [] ant [] [];
+let res = STE "-e" ckt [] ant [] [];
+res;
+
+

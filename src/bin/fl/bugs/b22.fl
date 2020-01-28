@@ -1,0 +1,16 @@
+1, sscanf "abc" "abc";
+
+2, (sscanf "abc" " abc") gen_catch (\msg. fprintf stderr "%s\n" msg);
+
+3, (sscanf "abc" "def") gen_catch (\msg. fprintf stderr "%s\n" msg);
+
+4, sscanf "%d" "43";
+
+5, sscanf "%3d" "4301";
+
+6, sscanf "%3o" "4301";
+
+7, sscanf "%b" "10101";
+
+8, sscanf "%3b%04b" "1010111";
+

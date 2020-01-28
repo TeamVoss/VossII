@@ -1,0 +1,167 @@
+\section{Informal specification of AMD2901}
+\label{AMD2901spec}
+
+The \IX{Am 2901} four-bit microprocessor slice
+(from Advanced Micro Devices Inc.)
+is a high-speed cascadable \IX{ALU} intended for use in CPUs, peripheral 
+controllers and programmable microprocessors. 
+The data is 4 bits wide at all points.
+
+\subsection*{Functional Blocks}
+
+The main functional blocks in \IX{AMD2901} are as follows:
+\begin{enumerate}
+\item
+A 16-word by four bit two port RAM, with an up/down shifter at the input.
+\begin{enumerate}
+\item
+Port A is an output port.
+\item
+Port B is a bidirectional port. 
+\end{enumerate}
+\item
+A register (called Q) with an up/down shifter at the input
+\item
+An ALU source selector which select two inputs out of the following :
+\begin{enumerate}
+\item
+Port A of RAM
+\item
+Port B of RAM
+\item
+Q register output
+\item
+External data input
+\item
+Logical 0
+\end{enumerate}
+\item
+A 4-bit ALU, capable of performing arithmetic and logical functions on the 
+selected source words.
+\item
+A destination selector which decides :
+\begin{enumerate}
+\item
+whether to load the ALU output (with or without shifting) into the RAM.
+\item
+whether to load the ALU output (with or without shifting) or the
+Q register contents (with shifting) into the Q register
+\item
+whether the ALU output or the Port A contents should be forwarded to
+the External data output.
+\end{enumerate}
+\end{enumerate}
+
+{\em NOTE:} The destination selector is not shown as an explicit block in the
+figure. Its parts are included in the RAM, Q-register and output selector.
+
+\subsection*{Inputs and Output Ports}
+
+\begin{center}
+\begin{tabular}{|r|r|c|l|} \hline
+  Port & Type  &Bit  &                                                       \\
+       &       &width&      Description                                       \\ \hline
+     I &    in & 9   & Instruction word (discussed later)                     \\ \hline
+  Aadd &    in & 4   & Address input to RAM (for READ)                       \\ \hline
+  Badd &    in & 4   & Address input to RAM (for READ / WRITE )              \\ \hline
+     D &    in & 4   & Data input to chip                                     \\ \hline
+     Y &   out & 4   & Data output from chip                                  \\ \hline
+  RAM0 & inout & 1   & Up/down shifter port connected to LSB of RAM           \\ \hline
+  RAM3 & inout & 1   & Up/down shifter port connected to MSB of RAM           \\ \hline
+    Q0 & inout & 1   & Up/down shifter port connected to LSB of Q-register    \\ \hline
+    Q3 & inout & 1   & Up/down shifter port connected to MSB of Q-register    \\ \hline
+   CLK &    in & 1   & clock                                                  \\ \hline
+    C0 &    in & 1   & Carry input to ALU                                     \\ \hline
+ OEbar &    in & 1   & Tri-state driver input (if this is not asserted,      \\
+       &       &     &   the data output Y will be tri-stated to HIGH-Z )     \\ \hline
+    C4 &   out & 1   & Carry output from ALU                                  \\ \hline
+  Gbar &   out & 1   & Generate term from ALU for carry lookahead             \\ \hline
+  Pbar &   out & 1   & Propagate term from ALU for carry lookahead            \\ \hline
+   OVR &   out & 1   & Overflow output from ALU (this signals that an         \\
+       &       &     & overflow has occurred, while performing the operation) \\ \hline
+    F3 &   out & 1   & MSB of the ALU output                                  \\ \hline
+   F30 &   out & 1   & Zero signal (asserted if the all 4 bits of ALU        \\
+       &       &     &      output are zero).                                 \\ \hline
+\end{tabular}
+\end{center}
+
+\subsection*{The Instruction Set}
+
+The Am 2901 has a 9-bit instruction, which has three 3-bit fields whose 
+functions are as follows :
+\begin{enumerate}
+\item
+I2 downto I0: controls ALU source selector
+\item
+I5 downto I3: controls ALU function
+\item
+I8 downto I6: controls destination selector
+\end{enumerate}
+
+\subsubsection{ALU Source Operands Selected}
+
+\begin{center}
+\begin{tabular}{|c|c|c|} \hline
+      Bit        &  \multicolumn{2}{c|}{ALU source} \\ 
+     field       &  \multicolumn{2}{c|}{operands selected} \\ \hline
+   I2 I1 I0      &       RE       &      S        \\  \hline
+      000        &       A        &      Q        \\  \hline
+      001        &       A        &      B        \\  \hline
+      010        &       0        &      Q        \\  \hline
+      011        &       0        &      B        \\  \hline
+      100        &       0        &      A        \\  \hline
+      101        &       D        &      A        \\  \hline
+      110        &       D        &      Q        \\  \hline
+      111        &       D        &      0        \\  \hline
+\end{tabular}
+\end{center}
+{\em Note:} RE and S are the two outputs of the ALU source selector. 
+
+
+\subsubsection{ALU Function}
+
+\begin{center}
+\begin{tabular}{|c|l|l|} \hline
+      Bit        &  \multicolumn{2}{c|}{ALU function} \\
+     field       &  \multicolumn{2}{c|}{(output \verb!-->! F)}\\ \cline{2-3}
+   I5 I4 I3      &     C0 = 0      &    C0 = 1     \\ \hline
+      000        &   RE + S        & RE + S + 1    \\ \hline
+      001        &   S - RE - 1    & S - RE        \\ \hline
+      010        &   RE - S - 1    & RE - S        \\ \hline
+      011        &   RE or S       & RE or S       \\ \hline
+      100        &   RE and S      & RE and S      \\ \hline
+      101        &   not(RE) and S & not(RE) and S \\ \hline
+      110        &   RE xor S      & RE xor S      \\ \hline
+      111        &   RE xnor S     & RE xnor S     \\ \hline
+\end{tabular}
+\end{center}
+
+{\em Note:} C0 is the carry-in input. F is the output of the ALU.
+
+
+\subsubsection{ALU Destination}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|c|} \hline
+    Bit   & \multicolumn{2}{c|}{RAM} & \multicolumn{2}{c|}{Q-REG.}    &        &    \multicolumn{2}{c|}{RAM}     &  \multicolumn{2}{c|}{Q-REG.} \\
+   field  & \multicolumn{2}{c|}{function}  &  \multicolumn{2}{c|}{function}   &   Y    &  \multicolumn{2}{c|}{shifter}   & \multicolumn{2}{c|}{shifter} \\ \hline
+ I8 I7 I6 & SHIFT & LOAD & SHIFT & LOAD &        &RAM0 & RAM3 & Q0 & Q3 \\ \hline
+   000    &  ---  & ---  & ---   &   F  &    F   & --- & ---  &--- &--- \\ \hline
+   001    &  ---  & ---  &  ---  & ---  &    F   & --- & ---  &--- &--- \\ \hline
+   010    & ---   &  F   &  ---  & ---  &    A   & --- & ---  &--- &--- \\ \hline
+   011    & ---   &  F   &  ---  & ---  &    F   & --- & ---  &--- &--- \\ \hline
+   100    & down  &  F/2 & down  &  Q/2 &    F   & out &  in  &out & in \\ \hline
+   101    & down  &  F/2 &  ---  & ---  &    F   & out &  in  &out &--- \\ \hline
+   110    &  up   &  2F  &  up   &  2Q  &    F   &  in & out  & in &out \\ \hline
+   111    &  up   &  2F  &  ---  & ---  &    F   &  in & out  &--- &out \\ \hline
+\end{tabular}
+\end{center}
+
+
+{\em Note:}  Data that is loaded into the RAM is written at the RAM word pointed
+to by the address input Badd.
+Note also that the bidirectional ports are active only when some 
+shifting is being done. 
+Finally, whenever a bidirectional port is NOT being used as an output by
+the Am2901, the Am2901 chip tristates it from its own side. Then, 
+it can be used as an input from the external world or it may be 
+left inactive. 

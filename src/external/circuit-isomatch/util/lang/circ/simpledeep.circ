@@ -1,0 +1,15 @@
+let root (a, b) -> (z, zr) {
+  let d1 (a, b) -> (r2, y) {
+    let d2 (a, b) -> (r, x) {
+      let d3 (a, b) -> (s) {
+        s = XOR a b
+      }
+      r = AND a b
+      x = s
+    }
+    r = r2
+    y = x
+  }
+  z = AND a y
+  zr = r2
+}

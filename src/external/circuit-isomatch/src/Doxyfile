@@ -1,0 +1,13 @@
+PROJECT_NAME        = "isomatch"
+
+OUTPUT_DIRECTORY    = "../docs"
+OUTPUT_LANGUAGE     = English
+WARNINGS            = YES
+EXTRACT_ALL         = YES
+FILE_PATTERNS       = *.h *.cpp *.c
+RECURSIVE           = YES
+
+GENERATE_HTML       = YES
+GENERATE_LATEX      = NO
+GENERATE_MAN        = NO
+QUIET               = YES

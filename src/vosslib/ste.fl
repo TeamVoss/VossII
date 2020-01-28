@@ -1,0 +1,2 @@
+cload (DIR^"../IDVII/src/fl/design/load.fl");
+cload (DIR^"../IDVII/src/fl/gui/sch_draw/load.fl");

@@ -1,0 +1,15 @@
+
+let all_funs = get_matching_functions "*" "*" "*" "*";
+
+let is_undoc fun =
+    (
+	let txt = help fun then
+	str_is_substr "File:  builtin" txt
+    ) catch T
+;
+
+let missing = filter is_undoc all_funs;
+
+length missing;
+
+list2str T "\n" "\n" "\n" id missing;

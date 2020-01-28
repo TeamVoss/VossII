@@ -1,0 +1,10 @@
+letrec fib 0 = 1
+ /\    fib 1 = 1
+ /\    fib n = fib (n-1) + fib (n-2)
+;
+
+let e1 = fib 30;
+time e1;
+
+let e1 = fib 30;
+wtime e1;

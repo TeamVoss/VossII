@@ -1,0 +1,69 @@
+//load "bool_arithm.fl";
+load "bexpr_arithm.fl";
+
+update_vossrc "BEXPR-SAT-TIME-LIMIT" "0";
+
+let SZ = 11;	// Enough for unsigned numbers <= 1023
+//let SZ = 12;	// Enough for unsigned numbers <= 2047
+//let SZ = 13;	// Enough for unsigned numbers <= 4095
+//let SZ = 14;	// Enough for unsigned numbers <= 8191
+//let SZ = 15;	// Enough for unsigned numbers <= 16369
+//let SZ = 16;	// Enough for unsigned numbers <= 32749
+//let SZ = 17;	// Enough for unsigned numbers <= 65521
+//let SZ = 18;	// Enough for unsigned numbers <= 131063
+
+// Pick an example p
+let p = 
+	SZ = 11 => 1009 |
+	SZ = 12 => 2039 |
+	SZ = 13 => 4091 |
+	SZ = 14 => 8179 |
+	SZ = 15 => 16369 |
+	SZ = 16 => 32749 |
+	SZ = 17 => 65521 |
+	SZ = 18 => 131063 |
+	99999
+;
+
+let expexted = 
+ 	     // With SAT     Without SAT
+	SZ = 11 => 2755	    | // 3072 |
+	SZ = 12 => 3692 |
+	SZ = 13 => 4369 |
+	SZ = 14 => 5103 |
+	SZ = 15 => 5894 |
+	SZ = 16 => 6742 |
+	SZ = 17 => 7647 |
+	SZ = 18 => 8609 |
+	0-1
+;
+	
+
+//let p = 2039;
+//let p = 4091;
+//let p = 8179;
+
+let DSZ = 2*SZ;
+
+let pv = int2fbv DSZ p;
+
+let as = md_expand_vector (sprintf "a[%d:0]" (SZ-2));
+let bs = md_expand_vector (sprintf "b[%d:0]" (SZ-2));
+
+//var_order (interleave [as,bs]);
+//update_vossrc "DYNAMIC-ORDERING" "NO";
+
+let av = ZX DSZ (map bvariable as);
+let bv = ZX DSZ (map bvariable bs);
+
+let mres = ZX DSZ (fbvmult av bv);
+time (mres fseq 1);
+
+let spec =
+    let mres = ZX DSZ (fbvmult av bv) in
+    fbvmod mres pv
+;
+
+rvariable "aaa";
+let q = bsize spec;
+q;

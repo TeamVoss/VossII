@@ -1,0 +1,11 @@
+let fp = mktemp "abc";
+fp;
+
+stream2filename fp;
+
+fprintf fp "Test Test Test\n";
+
+fclose fp;
+
+stream2filename fp;
+

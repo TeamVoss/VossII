@@ -1,0 +1,5 @@
+let do_load file = (cload (sprintf "%s/%s" DIR file)) fseq ();
+foreach do_load [
+                "b79b.fl"
+];
+

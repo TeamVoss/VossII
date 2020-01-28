@@ -1,0 +1,21 @@
+
+let a = (bev_variable "a[8:0]");
+
+let d = bev_div a (int2bev 8);
+
+let dd = bev_ashr a 3;
+
+length (bev2list d);
+length (bev2list dd);
+
+
+
+let a = (bv_variable "a[8:0]");
+
+let d = bv_div a (int2bv 8);
+
+let dd = bv_ashr a 3;
+
+length (bv2list d);
+length (bv2list dd);
+

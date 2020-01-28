@@ -1,0 +1,61 @@
+//==========================================================================
+//
+// Simple example of:
+//		Scalar simulation
+//		Symbolic simulation
+//		Abstract symbolic simulation
+//
+//==========================================================================
+load "ste.fl";
+
+let simple =
+    bit_input clk.
+    bit_input a b c.
+    bit_output o.
+    bit_internal tmp mid.
+    CELL "simple" [
+	re_ff clk tmp mid,
+	o <- '~' mid,
+	tmp <- a '&' (b '|' c)
+];
+
+let ckt = pexlif2fsm (simple 'clk 'a 'b 'c 'o);
+
+let vis = STE_debug ckt;
+
+vis;
+
+let ant = (map (\i. T,"clk", (i%2=1), i, i+1) (0--10)) and
+	  "a" isv "1" from 0 to 2 and 
+	  "b" isv "0" from 0 to 2 and 
+	  "c" isv "1" from 0 to 2 and 
+	  "a" isv "1" from 2 to 4 and 
+	  "b" isv "0" from 2 to 4 and 
+	  "c" isv "0" from 2 to 4 and
+	  "a" isv "0" from 4 to 6 and 
+	  "b" isv "1" from 4 to 6 and 
+	  "c" isv "1" from 4 to 6
+;
+STE "-e" vis [] ant [] [];
+    
+
+let ant = (map (\i. T,"clk", (i%2=1), i, i+1) (0--10)) and
+	  "a" isv "A" from 0 to 2 and 
+	  "b" isv "B" from 0 to 2 and 
+	  "c" isv "C" from 0 to 2 and 
+	  "a" isv "K" from 2 to 4 and 
+	  "b" isv "L" from 2 to 4 and 
+	  "c" isv "M" from 2 to 4
+;
+STE "-e" vis [] ant [] [];
+
+let ant = (map (\i. T,"clk", (i%2=1), i, i+1) (0--10)) and
+	  "a" isv "1" from 0 to 2 and 
+	  "b" isv "rB" from 0 to 2 and 
+	  "c" isv "rC" from 0 to 2 and 
+	  "a" isv "rK" from 2 to 4 and 
+	  "b" isv "bL" from 2 to 4 and 
+	  "c" isv "bM" from 2 to 4
+;
+STE "-e" vis [] ant [] [];
+

@@ -1,0 +1,39 @@
+load "ste.fl";
+
+TYPE "byte" 8;
+
+
+let ckt1 = 
+        byte_input a b c.
+        byte_output out.
+        CELL "hi" [
+        out <- a '+' b '+' c
+];
+
+let ckt = 
+        byte_input a b c.
+        output ok.
+        internal res1 res2.
+        CELL "test" [
+                ckt1 a b c res1,
+                ckt1 c b a res2,
+                ok <- res1 '=' res2
+];
+
+let p = ckt 'a 'b 'c 'ok;
+
+let dd = pexlif2fsm p;
+dd;
+
+
+let vfsm = STE_debug dd;
+vfsm;
+
+let ant0 =
+  ("a[7:0]" isv "A[7:0]" from 0 to 2) and
+  ("b[7:0]" isv "B[7:0]0x0" from 0 to 2) and
+  ("c[7:0]" isv "C[7:0]0x40" from 0 to 2)
+;
+
+STE "" vfsm [] ant0 [] (map (\n.n,0,3) (nodes dd));
+

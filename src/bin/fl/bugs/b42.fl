@@ -1,0 +1,7 @@
+lettype tr = BR tr tr | LF int;
+
+lettype tr2 =
+	    BR1 tr2 tr2 |
+	    LF2 bool |
+	    LF3 int
+;

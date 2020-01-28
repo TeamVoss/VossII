@@ -1,0 +1,11 @@
+#!/bin/csh
+set cnt=$argv[1]
+
+set cnt = `expr $cnt - 1`
+fl.bin -D -noX -f bugs/b1bdd.fl
+set st=$status
+while ($st == 0 && $cnt > 0)
+    set cnt = `expr $cnt - 1`
+    fl.bin -D -noX -f bugs/b1bdd.fl
+    set st=$status
+end

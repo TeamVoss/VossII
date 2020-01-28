@@ -1,0 +1,100 @@
+load "bool_arithm.fl";
+
+let SZ = 32;
+
+let MAX = 50;
+
+let ZERO  = int2fbv SZ 0;
+let ONE   = int2fbv SZ 1;
+let TWO   = int2fbv SZ 2;
+let THREE = int2fbv SZ 3;
+let INF   = int2fbv SZ (2**(SZ/4));
+
+// Version 1:
+cletrec test v =
+    IF (v = ONE) THEN ZERO ELSE
+    ONE '+' (
+	IF (last v) THEN test (THREE '*' v '+' ONE) ELSE (v '/' TWO)
+    )
+;
+
+test (int2fbv SZ 3);
+test (int2fbv SZ 19);
+
+let symb = (ZX SZ (variable_vector "a[2:0]")) '+' ONE;
+//test symb;
+
+
+cletrec test_rec cnt v =
+    (cnt <= 0) => INF |
+    IF (v = ONE) THEN ZERO ELSE
+    ONE '+' (
+	IF (last v) THEN (test_rec (cnt-1) (THREE '*' v '+' ONE))
+		    ELSE (test_rec (cnt-1) (v '/' TWO))
+    )
+;
+
+clet test2 v = test_rec MAX v;
+
+//test2 symb;
+
+test2 (int2fbv SZ 3);
+test2 (int2fbv SZ 19);
+test2 (int2fbv SZ 256);
+//setify (map (\i. bv2num (test2 (int2fbv SZ i))) (2 -- 99));
+//test2 (ZX SZ (variable_vector "a[7:0]"));
+
+
+let one_itertion (done,v) =
+    IF (done OR (v '=' ONE)) THEN
+	(T,ONE)
+    ELSE
+	(F, (IF (last v) THEN (THREE '*' v '+' ONE)
+			 ELSE (v '/' TWO)))
+;
+
+
+let test v =
+    letrec iterate cnt (done,v) =
+	IF (done == T) THEN int2fbv SZ cnt ELSE
+	val (done',v') = one_itertion (done,v) then
+	iterate (cnt+1) (done',v')
+    in
+    iterate 0 (F,v)
+;
+
+
+test (int2fbv SZ 3);
+test (int2fbv SZ 19);
+//test symb;
+
+let big_symb = (ZX SZ (variable_vector "a[7:0]")) '+' ONE;
+//test big_symb;
+
+let test_n cnt v =
+    letrec do i dv = i = 0 => dv |
+		     let new = one_itertion dv then
+		     do (i-1) new
+    in
+    do cnt (F,v)
+;
+
+"===================================================================";
+rvariable "a";
+let e = test_n 40 big_symb then (rvariable "a") fseq e;
+"===================================================================";
+rvariable "a";
+let e = test_n 40 big_symb then (rvariable "a") fseq e;
+"===================================================================";
+rvariable "a";
+let e = test_n 40 big_symb then (rvariable "a") fseq e;
+"===================================================================";
+rvariable "a";
+let e = test_n 40 big_symb then (rvariable "a") fseq e;
+"===================================================================";
+rvariable "a";
+let e = test_n 40 big_symb then (rvariable "a") fseq e;
+"===================================================================";
+rvariable "a";
+let e = test_n 40 big_symb then (rvariable "a") fseq e;
+

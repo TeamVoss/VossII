@@ -1,0 +1,40 @@
+#ifndef _h_clock_
+#define _h_clock_
+
+double deltaT(void);
+#endif /* _h_clock_ */
+
+/*  
+ *   clock.c 
+ */
+
+#include <unistd.h>
+#include <sys/param.h>
+#include <time.h>
+#include <sys/times.h>
+#include <limits.h>
+
+#include "util.h"
+#include "clock.h"
+
+
+double deltaT(void)
+{
+   static int FirstTime = TRUE;
+   struct tms t1;
+   static struct tms t2;
+   double ret;
+
+   if (FirstTime) {
+     FirstTime = FALSE;
+     (void) times(&t2);
+     return(0.0);
+     }
+
+   (void) times(&t1);
+   ret = (t1.tms_utime - t2.tms_utime) / ((double) CLK_TCK);
+   t2 = t1;
+
+   return(ret);
+}
+

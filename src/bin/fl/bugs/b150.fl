@@ -1,0 +1,11 @@
+
+let t1 = {tbl_create 100 :: {string#int} tbl};
+
+let t2 = tbl_create 100;
+
+let t3 = tbl_insert (tbl_create 100)  "a" 1;
+
+t3;
+
+tbl2list t3;
+

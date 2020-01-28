@@ -1,0 +1,11 @@
+
+let fp = fopen "/tmp/123" "w";
+
+fprintf fp "Ahh\n";
+
+fclose fp;
+
+bdd_reorder 1;
+var_order [];
+
+fclose fp;

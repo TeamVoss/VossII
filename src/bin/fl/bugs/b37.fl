@@ -1,0 +1,313 @@
+update_vossrc "DYNAMIC-ORDERING" "NO";
+
+lettype subst_info =
+	SUBST_INFO
+	    {c_qvars:: bool}		// Current state vars (as BDD)
+	    {n_qvars:: bool}		// Next state vars (as BDD)
+	    {c2n_fun :: *a -> *a}	// Function to move current->next
+	    {n2c_fun :: *b -> *b}	// Function to move next->current
+	    {n2m_fun :: *e -> *e}	// Function to move next->tmp
+	    {m2n_fun :: *f -> *f}	// Function to move tmp->next
+;
+
+// Helpful shorthands
+let c2n si f =
+    val (SUBST_INFO cqv nqv c2n n2c n2m m2n) = si in
+    c2n f
+;
+let n2c si f =
+    val (SUBST_INFO cqv nqv c2n n2c n2m m2n) = si in
+    n2c f
+;
+let n2m si f =
+    val (SUBST_INFO cqv nqv c2n n2c n2m m2n) = si in
+    n2m f
+;
+let m2n si f =
+    val (SUBST_INFO cqv nqv c2n n2c n2m m2n) = si in
+    m2n f
+;
+
+let existentially_quantify_cur si expr =
+    val (SUBST_INFO cqv nqv c2n n2c n2m m2n) = si in
+    quant_thereis cqv expr
+;
+
+let existentially_quantify_next si expr =
+    val (SUBST_INFO cqv nqv c2n n2c n2m m2n) = si in
+    quant_thereis nqv expr
+;
+
+let univerally_quantify_cur si expr =
+    val (SUBST_INFO cqv nqv c2n n2c n2m m2n) = si in
+    quant_forall cqv expr
+;
+
+let univerally_quantify_next si expr =
+    val (SUBST_INFO cqv nqv c2n n2c n2m m2n) = si in
+    quant_forall nqv expr
+;
+
+// Function to create the various part of the substitution record
+let mk_subst_info cur_vars =
+    let insert_suffix suf n =
+	let pts = str_split n "[" in
+	list2str T "" "[" "" id ((hd pts^suf):(tl pts))
+    in
+    let mk_c2n_sub v = v, (insert_suffix "_n" v) in
+    let c2n_name_sub = map mk_c2n_sub cur_vars in
+    let mk_n2m_sub v = (insert_suffix "_n" v), (insert_suffix "_m" v) in
+    let n2m_name_sub = map mk_n2m_sub cur_vars in
+    let cur_vars_in_bdd_order =
+	let in_place = ((var_order []) intersect cur_vars) in
+	let remain = cur_vars subtract in_place in
+	in_place@remain
+    in
+    let mk_var_pair v =
+	let v_n = assoc v c2n_name_sub in
+	let v_m = assoc v_n n2m_name_sub in
+	[v, v_n, v_m]
+    in
+    let new_order = flatmap mk_var_pair cur_vars_in_bdd_order in
+    (var_order new_order) fseq
+    let c2n_sub = map (\(c,n). c, variable n) c2n_name_sub in
+    let c2n_fun f = substitute c2n_sub f in
+    let n2c_sub = map (\(c,n). n, variable c) c2n_name_sub in
+    let n2c_fun f = substitute n2c_sub f in
+    let n2m_sub = map (\(n,m). n, variable m) n2m_name_sub in
+    let n2m_fun f = substitute n2m_sub f in
+    let m2n_sub = map (\(n,m). m, variable n) n2m_name_sub in
+    let m2n_fun f = substitute m2n_sub f in
+    let cqv = itlist (\p.\r. snd p AND r) n2c_sub T in
+    let nqv = itlist (\p.\r. snd p AND r) c2n_sub T in
+    SUBST_INFO cqv nqv c2n_fun n2c_fun n2m_fun m2n_fun
+;
+
+// A data type to represent a model
+lettype model = MODEL
+		    {si:: subst_info}	// The needed substitution stuff...
+		    {TR::bool}		// Transition relation
+		    {init::bool}	// Initial state predicate
+		    {bad::bool}		// Bad state predicate
+;
+
+// Function to create a model given:
+//  a) the state variables
+//  b) a function that takes a state and returns the new state
+//  c) an initial state predicate
+//  d) a bad-state predicate
+//
+let mk_model state next_state_function init_pred bad_state_pred =
+    let state_vars = depends state in
+    let si = mk_subst_info (md_expand_vectors state_vars) in
+    let new_state = c2n si state in
+    let next_state = next_state_function state in
+    length next_state != length state =>
+	error "Length mismatch between state and next_state_function"
+    |
+    let non_det_vars = (depends next_state) subtract state_vars in
+    let ndv = itlist (\v.\r. variable v AND r) non_det_vars T in
+    let TR = quant_thereis ndv (new_state = next_state) in
+    MODEL si TR init_pred bad_state_pred
+;
+
+// Convenient shorthands
+let get_model_si (MODEL si TR init bad) = si;
+let get_model_TR (MODEL si TR init bad) = TR;
+let get_model_init (MODEL si TR init bad) = init;
+let get_model_bad (MODEL si TR init bad) = bad;
+let get_model_vars (MODEL si TR init bad) = depends [TR,init,bad];
+
+// A function to explore a 
+let get_behaviors n vs f =
+    let real_vs = md_expand_vectors vs in
+    enumerate_examples n real_vs f
+;
+
+
+let reachable model =
+    let si = get_model_si model in
+    let TR = get_model_TR model in
+    let init = get_model_init model in
+    letrec fwd_reach TR so_far =
+	(print ".") seq
+	let next = so_far AND TR in
+	let next_frontier = existentially_quantify_cur si next in
+	let frontier = n2c si next_frontier in
+	let new_set = so_far OR frontier in
+	new_set == so_far => so_far | fwd_reach TR new_set
+    in
+    fwd_reach TR init
+;
+
+let potential_bad model =
+    let si = get_model_si model in
+    let TR = get_model_TR model in
+    let bad = get_model_bad model in
+    letrec backwards_search TR so_far =
+	(print ".") seq
+	let next = (c2n si so_far) AND TR in
+	let frontier = existentially_quantify_next si next in
+	let new_set = so_far OR frontier in
+	new_set == so_far => so_far | backwards_search TR new_set
+    in
+    backwards_search TR bad
+;
+
+
+let square_transition_relation si TR =
+    let T0 = TR in
+    let T1 = n2m si TR in
+    let T2 = c2n si T1 in
+    let TnT = T AND T2 in
+    let TTm = existentially_quantify_next si TnT in
+    let TT = m2n si TTm in
+    TR OR TT
+; 
+
+let reachable2 model =
+    let si = get_model_si model in
+    let TR_0 = get_model_TR model in
+    let init = get_model_init model in
+    letrec fwd_reach TR so_far =
+	(print ".") seq
+	let TR' = square_transition_relation si TR in
+	let next = so_far AND TR' in
+	let next_frontier = existentially_quantify_cur si next in
+	let frontier = n2c si next_frontier in
+	let new_set = so_far OR frontier in
+	new_set == so_far => so_far | fwd_reach TR' new_set
+    in
+    fwd_reach TR_0 init
+;
+
+let potential_bad2 model =
+    let si = get_model_si model in
+    let TR_0 = get_model_TR model in
+    let bad = get_model_bad model in
+    letrec backwards_search TR so_far =
+	(print ".") seq
+	let TR' = square_transition_relation si TR in
+	let next = (c2n si so_far) AND TR' in
+	let frontier = existentially_quantify_next si next in
+	let new_set = so_far OR frontier in
+	new_set == so_far => so_far | backwards_search TR' new_set
+    in
+    backwards_search TR_0 bad
+;
+
+cload "bool_u_arithm.fl";
+
+// State variables
+let cnt = variable_vector "c[15:0]";
+
+(var_order (depends cnt)) fseq ();
+
+let param_counter_function N cnt =
+    let zero = int2fbv 16 0 in
+    let one  = int2fbv 16 1 in
+    let MAX  = int2fbv 16 N in
+    //
+    IF (cnt '<' MAX) THEN (cnt '+' one) ELSE 
+    IF (cnt '=' MAX) THEN zero ELSE cnt
+;
+
+let initial_state = cnt '=' (int2fbv 16 0);
+let bad_states N = cnt '>' (int2fbv 16 N);
+
+let counter_3 =
+    mk_model cnt (param_counter_function 3) initial_state (bad_states 3)
+;
+
+let counter_10 =
+    mk_model cnt (param_counter_function 10) initial_state (bad_states 10)
+;
+
+let counter_100 =
+    mk_model cnt (param_counter_function 100) initial_state (bad_states 100)
+;
+
+let counter_1000 =
+    mk_model cnt (param_counter_function 1000) initial_state (bad_states 1000)
+;
+
+let counter_10000 =
+    mk_model cnt (param_counter_function 10000) initial_state (bad_states 10000)
+;
+
+// =====================================================================
+// Explore model
+
+// Notice the behavior of the circuit is captured in the transition relation
+//get_behaviors 20 ["c[15:0]", "c_n[15:0]"] (get_model_TR counter_10);
+//
+//get_behaviors 20 ["c[15:0]"] (get_model_init counter_10);
+//
+//get_behaviors 20 ["c[15:0]"] (get_model_bad counter_10);
+
+
+// Look at model_counter.fl
+
+// =========== tiny model ==================
+
+let reach = reachable counter_3;
+
+reach;
+
+get_behaviors 10 (md_expand_vector "c[15:0]") reach;
+
+(get_model_bad counter_3) AND reach;
+
+
+let bstates = potential_bad counter_3;
+
+(get_model_init counter_3) AND bstates;
+
+reach == NOT bstates;
+
+
+
+// =========== medium sized model ==================
+
+let states = reachable counter_1000;
+
+(get_model_bad counter_1000) AND states;
+
+let bstates = potential_bad counter_1000;
+
+(get_model_init counter_1000) AND bstates;
+
+states == NOT bstates;
+
+
+// =========== large model ==================
+
+// NOTE:
+// NOTE: You need to invoke fl with "unlimit stacksize" or something similar...
+// NOTE:
+
+update_vossrc "RECURSION-CALL-LIMIT" "50000";
+
+let states = reachable counter_10000;
+
+(get_model_bad counter_10000) AND states;
+
+let bstates = potential_bad counter_10000;
+
+(get_model_init counter_10000) AND bstates;
+
+states == NOT bstates;
+
+
+// =========== large model iterative squaring ==================
+
+let states = reachable2 counter_10000;
+
+(get_model_bad counter_10000) AND states;
+
+let bstates = potential_bad counter_10000;
+
+(get_model_init counter_10000) AND bstates;
+
+states == NOT bstates;
+

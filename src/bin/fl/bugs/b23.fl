@@ -1,0 +1,26 @@
+
+let ' s =
+    let l = strlen s in
+    str_is_prefix "0b" s =>
+	let i = sscanf "0b%b" s in
+	map (\s. s = "1") (explode (sprintf "%b" i))
+    |
+    str_is_prefix "0x" s =>
+	let i = sscanf "0x%x" s in
+	map (\s. s = "1") (explode (sprintf "%b" i))|
+    let c = ord (hd (explode s)) in
+    c >= ord "0" AND c <= ord "9" =>
+	let i = sscanf "%d" s in
+	map (\s. s = "1") (explode (sprintf "%b" i))
+    |
+    map variable (md_expand_vector s)
+;
+
+free_binder ';
+
+
+
+'0b101010;
+'0xaf;
+'12;
+'a;

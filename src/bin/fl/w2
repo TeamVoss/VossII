@@ -1,0 +1,128 @@
+load "defaults.fl";
+
+lettype iexpr =   Iconst int
+		| Ivar string
+                | Plus iexpr iexpr
+                | Minus iexpr iexpr
+		| Times iexpr iexpr
+		| Bits iexpr int int
+		;
+
+let ' i = Iconst i;
+let '* a b = Times a b;
+let '+ a b = Plus a b;
+let '- a b = Minus a b;
+
+prefix 0 ';
+let << e a = Bits e a;
+let -- a b = a b;
+let >> a = a;
+postfix >>;
+infix 2 <<;
+infix 1 --;
+
+infix 5 '*;
+infix 4 '+;
+infix 4 '-;
+
+letrec PRiexpr (Iconst i) = (int2str i)
+ /\    PRiexpr (Ivar s) = s
+ /\    PRiexpr (Plus e1 e2) = "("^(PRiexpr e1) ^ " '+ " ^ (PRiexpr e2)^")"
+ /\    PRiexpr (Minus e1 e2) = "("^(PRiexpr e1) ^ " '- " ^ (PRiexpr e2)^")"
+ /\    PRiexpr (Times e1 e2) = (PRiexpr e1) ^ " '* " ^ (PRiexpr e2)
+ /\    PRiexpr (Bits e1 f t) = "(" ^ (PRiexpr e1)^ ") <<"^
+				(int2str f)^"--"^(int2str t)^">>";
+
+install_print_function PRiexpr;
+
+// Iconst to bitvector
+letrec ic2bv i = ((i%2)=1):(ic2bv (i/2));
+
+// Ivar to bitvector
+letrec iv2bv s n = (variable (s^(int2str n))):(iv2bv s (n+1));
+
+// Bitvector addition
+letrec add [] [] cin = add [F] [F] cin
+ /\    add [] b cin = add [F] b cin
+ /\    add a [] cin = add a [F] cin
+ /\    add (a:ar) (b:br) cin = (a XOR b XOR cin):
+				(add ar br (a AND b OR a AND cin OR b AND cin));
+
+letrec gmap fn [] = (fn F):(gmap fn [])
+ /\    gmap fn (a:r) = (fn a):(gmap fn r);
+
+// Bitvector complementation
+letrec ones_complement l = gmap NOT l;
+
+// Bitvector subtraction
+let sub l1 l2 = add l1 (gmap NOT l2) T;
+
+// Bitvector multiplication
+letrec mult (a:r) b = add (gmap (\bit. a AND bit) b) (F:(mult r b)) F
+ /\    mult [] b = mult [F] b;
+
+// Bitvector mod 2^i
+letrec take 0 l = []
+ /\    take i (h:r) = h:(take (i-1) r);
+letrec drop 0 l = l
+ /\    drop i (h:r) = drop (i-1) r;
+
+
+letrec i2bv (Iconst i) = ic2bv i
+ /\    i2bv (Ivar s) = iv2bv s 0
+ /\    i2bv (Plus e1 e2) = add (i2bv e1) (i2bv e2) F
+ /\    i2bv (Minus e1 e2) = sub (i2bv e1) (i2bv e2)
+ /\    i2bv (Times e1 e2) = mult (i2bv e1) (i2bv e2)
+ /\    i2bv (Bits e1 i j) = 
+		i <= j => drop i (take (j+1) (i2bv e1))
+			| rev (drop j (take (i+1) (i2bv e1)));
+
+
+let MBW = 128;
+
+let eq0 l =
+	letrec check n [] = T
+	 /\    check 0 (a:r) = NOT a
+	 /\    check n (a:r) = NOT a AND (check (n-1) r) in
+	check MBW l;
+
+let gr0 l =
+	letrec msb n [v] = v
+	 /\    msb 0 (a:r) = a
+	 /\    msb n (a:r) = msb (n-1) r
+	 /\    msb n [] = F in
+	NOT (msb MBW l);
+
+lettype B = Ngr0 iexpr
+	  | Neq0 iexpr
+	  ;
+
+letrec prB (Ngr0 i) = print (PRiexpr i) seq  " > 0"
+ /\    prB (Neq0 i) = print (PRiexpr i) seq  " = 0";
+
+install_print_function prB;
+
+let '> a b = Ngr0 (a '- b);
+let '= a b = Neq0 (a '- b);
+
+infix 2 '>;
+infix 2 '=;
+
+letrec B2bool (Ngr0 i) = gr0 (i2bv i)
+ /\    B2bool (Neq0 i) = eq0 (i2bv i);
+
+
+
+
+
+let e1  = '5 '* '3 <<0--5>>;	// Little endian
+let e1' = '5 '* '3 <<5--0>>;	// Big endian
+
+let e2 = (Iconst 5) '* (Iconst 5) <<0--4>>;
+let e3 = (Times (Times (Iconst 3) (Iconst 4)) (Iconst 4)) <<4--4>>;
+let e4 = (Times (Ivar "a") (Ivar "b")) <<0--5>>;
+let e5 = (Plus (Minus (Ivar "a") (Ivar "b")) (Ivar "b")) <<0--10>>;
+
+
+let a = (Ivar "a")<<15--0>>;
+let b = (Ivar "b")<<15--0>>;

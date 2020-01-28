@@ -1,0 +1,32 @@
+get_matching_functions "len*" "*" "*" "*";
+
+node_name_cmp "a" "ab";
+node_name_cmp "ab" "a";
+node_name_cmp "ab" "ab";
+node_name_cmp "a[1]" "a[1]";
+node_name_cmp "a[1]" "a[2]";
+node_name_cmp "a[1]" "a[11]";
+node_name_cmp "a[2]" "a[1]";
+node_name_cmp "a[11]" "a[1]";
+node_name_cmp "a[11]" "a[11]";
+node_name_cmp "a11" "a11";
+node_name_cmp "a11" "a11b";
+
+
+//node_name_cmp "a[1]" "a[10]";
+
+qsort node_name_cmp (md_expand_vectors ["a[11:0]", "ab[1:0]", "b[0:3]"]);
+
+
+let all_funs = get_matching_functions "*" "*" "*" "*";
+
+let is_undoc fun =
+    (
+	let txt = help fun then
+	str_is_substr "File:  builtin" txt
+    ) catch T
+;
+
+let missing = filter is_undoc all_funs;
+
+length missing;

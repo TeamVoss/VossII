@@ -1,0 +1,7 @@
+cload "bool_u_arithm.fl";
+
+// State variables
+let cnt = variable_vector "c[15:0]";
+
+depends cnt;
+

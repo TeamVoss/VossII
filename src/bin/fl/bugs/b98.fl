@@ -1,0 +1,48 @@
+load "ste.fl";
+
+TYPE "byte" 8;
+
+let dff =
+        bit_input clk.
+        input din.
+        output dout.
+        internal _clk.
+        internal _din _dout.
+        CELL "draw_dff" [
+        _clk <: clk,
+        _din <: din,
+        _dout <: dout,
+        dout <- (IF ('~' _clk '&' clk) THEN _din ELSE _dout)
+];
+
+let counter =
+        bit_input load clk.
+        byte_input init.
+        byte_output cnt.
+        internal new.
+        CELL "counter" [
+        new <- (IF load THEN init ELSE (cnt '+' '1)),
+        dff clk new cnt
+];
+
+let pp = counter 'load 'clk 'init 'cnt;
+//pp;
+
+//update_vossrc "VERBOSE-FSM-PRINT" "YES";
+
+let ckt = pexlif2fsm pp;
+ckt;
+
+let vfsm = STE_debug ckt;
+vfsm;
+
+//visualization_nodes ckt;
+
+let ant = (map (\t. (T,"clk", (t%2=1), t, t+1)) (0 -- 30)) and
+          ("load" isv "0x1" from 0 to 2) and
+          ("load" isv "0x0" from 2 to 30) and
+          ("init[7:0]" isv "0x5" from 0 to 2)
+;
+
+STE "" vfsm [] ant [] (map (\n.n,0,30) (nodes ckt));
+

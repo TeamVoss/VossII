@@ -1,0 +1,13 @@
+#
+unlimit stacksize
+set file=`mktemp /tmp/REGRES_XXXXXX`
+foreach f (`ls bugs/*.fl`)
+    if( $f == "bugs/b79b.fl" ) continue
+    if( $f == "bugs/b79.fl" ) continue
+    if( $f == "bugs/87.fl" ) continue
+    if( $f == "bugs/94.fl" ) continue
+    echo "=============== $f ==================="
+    cat $f > $file
+    echo "quit;" >> $file
+    fl -f $file
+end

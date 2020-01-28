@@ -1,0 +1,10 @@
+let cmp a b = a-b;
+let l = 1--200000;
+let l' = qsort cmp l;
+wtime (l' fseq 2);
+
+let l = rev l;
+let l'' = qsort cmp l;
+wtime (l'' fseq 2);
+
+l' == l'';

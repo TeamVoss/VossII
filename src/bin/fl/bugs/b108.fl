@@ -1,0 +1,17 @@
+load "ste.fl";
+
+
+TYPE "byte" 8;
+
+let t1 = 
+    byte_input	a b.
+    bit_input	c.
+    byte_input	d.
+    byte_output	o.
+    CELL "tst" [
+	o <- (IF c THEN (a '+' b) ELSE d)
+];
+
+
+t1 'a 'b 'c 'd 'o;
+

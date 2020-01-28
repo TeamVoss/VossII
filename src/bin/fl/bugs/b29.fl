@@ -1,0 +1,29 @@
+
+
+let fun1 x = x+1;
+let fun2 y = y+2;
+let fun3 y = y+3;
+
+begin_abstype;
+
+let fun2 y = y-1;
+
+begin_abstype;
+
+let fun1 x = x^"";
+let fun2 x = x/2;
+
+let bar x = x*x;
+
+end_abstype bar;
+
+fun1 0;
+fun2 0;
+
+end_abstype bar fun2;
+
+fun1;
+fun2;
+fun3;
+
+

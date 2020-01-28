@@ -1,0 +1,29 @@
+lettype tr = BR tr tr | LF int;
+
+rvariable "a";
+//let f x = x+1;
+
+clet g x y z = x+y+z;
+
+//letrec h x (a:as) = a+(h x as)
+// /\    h x [] = x
+//;
+
+letrec map2 fn l1 l2 =
+    empty l1 => empty l2 => [] | error "list2 longer than list1 in map2" |
+    empty l2 => error "list1 longer than list2 in map2" |
+    val (a:as) = l1 in
+    val (b:bs) = l2 in
+    (fn a b):(map2 fn as bs)
+;
+
+
+letrec sz (BR a b) = sz a + sz b
+ /\    sz (LF i) = 1;
+
+let is_sym (BR (BR a b) (BR c d)) assuming ((a = c) AND (b = d)) = T
+ /\ is_sym other = F
+;
+
+
+let ii x (a:as) = x + a;

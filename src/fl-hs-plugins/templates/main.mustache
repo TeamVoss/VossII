@@ -1,0 +1,16 @@
+module Main where
+import Language.FL.Plugin
+
+foreign export ccall "fl_init" fl_init :: FlInit
+
+fl_init :: FlInit
+fl_init = flInit main
+
+main :: IO Plugin
+main = return Plugin
+  { pluginName = "{{plugin-name}}"
+  , pluginVersion = 0
+  , pluginExports =
+    [ export "hello" $ \name -> "Hello, " ++ name ++ "!"
+    ]
+  }

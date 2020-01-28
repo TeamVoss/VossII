@@ -1,0 +1,84 @@
+\documentclass[11pt]{article}
+
+\makeindex
+
+\textwidth 165.1truemm
+\textheight 232truemm
+\oddsidemargin  0truemm
+\evensidemargin 0truemm
+\topmargin 0truemm
+\headheight 0truemm
+\headsep 0truemm
+
+\title{fl --- A Functional Language for Formal Verification\\
+User's Guide\\
+\mbox{}
+% \\
+}
+
+\author{
+\parbox[t]{3.0in}{%
+\begin{center}
+Carl-Johan H. Seger\\
+Email: cjhseger@gmail.com
+\end{center}}}
+
+\input hol_macros
+\input defs
+
+
+% ====================================================================
+%		Start of paper
+% ====================================================================
+
+
+\begin{document}
+%\special{!userdict begin /bop-hook{gsave 250 120 translate 65 rotate
+%/Times-Roman findfont 160 scalefont setfont
+%0 100 moveto 0.7 setgray (DRAFT) show
+%/Times-Roman findfont 72 scalefont setfont
+%10 0 moveto 0.7 setgray (Do not distribute) show grestore}def end}
+
+\maketitle{}
+\begin{abstract}
+
+Fl consists essentially of five main parts: a general, strongly typed,
+functional language, an efficient implementation of Ordered Binary Decision
+Diagrams (OBDDs) built into the functional language, an efficient SAT solver integrated into the language, extensive visualization capabilities, and a
+symbolic simulation engine for Verilog RTL designs.
+Since the interface language to fl is a fully general
+functional language in which OBDDs and an efficient SAT solver have
+been built in, the verification system is not only
+useful for carrying out symbolic trajectory evaluation (STE), but also
+for experimenting with various verification (formal and informal) techniques
+that require the use of OBDDs and/or SAT solvers.
+
+This document is intended as both a user's guide and (to some extent)
+a reference guide.
+\end{abstract}
+
+
+\newpage
+\tableofcontents   % Uncomment for final version to generate table of content
+% \newpage
+% \listoffigures     % Uncomment for final version to generate list of figures
+% \listoftables      % Uncomment for final version to generate list of tables
+\newpage
+\input 02_fl
+\input 03_bv
+\input 04_hfl
+\input 05_ste
+%\newpage
+%\part{Reference Manual}
+%\newpage
+%\input 06_fl-syntax
+%\input 07_built-in-fl
+%\newpage
+%\input 08_vossrc
+%\newpage
+%\input 09_standard-library
+%\newpage
+%\input 16_biblio
+\newpage
+\input glossary
+\end{document}

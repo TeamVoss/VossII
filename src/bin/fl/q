@@ -1,0 +1,41 @@
+tcl_eval ["source qtcl"] [];
+
+let pgm = [
+"scrollbar .scroll -command \".list yview\"",
+"pack .scroll -side right -fill y",
+"listbox .list -yscroll \".scroll set\" -relief sunken -width 20 -height 20 -setgrid yes",
+"pack .list -side left -fill both -expand yes",
+"wm minsize . 1 1",
+"proc browse {dir file} {
+    global env
+    if {[string compare $dir \".\"] != 0} {set file $dir/$file}
+    if [file isdirectory $file] {"
+^"        exec browse $file &
+    } else {
+        if [file isfile $file] {
+            if [info exists env(EDITOR)] {"
+^"                eval exec $env(EDITOR) $file &
+            } else {
+                exec xedit $file &"
+^"            }
+        } else {
+            puts stdout \"??? isn't a directory or regular file\""
+^"        }
+    }
+}",
+"set dir \".\"",
+"foreach i [exec ls -a $dir] {
+    .list insert end $i
+}",
+"bind all <Control-c> {destroy .}",
+"bind .list <Double-Button-1> {foreach i [selection get] {browse $dir $i}}"
+];
+
+
+//tcl_eval [
+//	"button .b -text \"Is this nice or what?\" -command {fn1 \"a\"}",
+//	"button .c -text \"Alternative?\" -command {fn1 \"b\"}",
+//	"button .d -text \"Exit\" -command {destroy .}",
+//	"pack .b .c .d",
+//	"return 12"] [("fn1", \sl. (print (hd sl)) seq "1")];
+//

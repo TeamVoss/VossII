@@ -1,0 +1,105 @@
+begin_abstype;
+
+load "ste.fl";
+
+TYPE "byte" 8;
+
+let t1 =
+    bit_input a b c.
+    bit_output r.
+    bit_internal mid nmid.
+    CELL "t1" [
+	nmid <- a '&' b,
+	mid <- '~' nmid,
+	r <- mid '|' c
+];
+
+let p = t1 'a 'b 'c 'r;
+p;
+help "p";
+
+let v1 =
+    byte_input a b.
+    byte_output r.
+    CELL "add" [
+	r <- a '+' b
+];
+
+//let p = v1 'a 'b 'r;
+
+
+let atest =
+    byte_input a b c.
+    bit_output gr.
+    byte_internal sum.
+    CELL "atest" [
+	sum <- a '+' b,
+	gr <- sum '>=' c
+];
+
+let majority =
+    bit_input a b c.
+    bit_output o.
+    bit_internal a1 a2 a3.
+    CELL "majority" [
+	a1 <- a '&' b,
+	a2 <- a '&' c,
+	a3 <- b '&' c,
+	o <- a1 '|' a2 '|' a3
+];
+
+
+let simple =
+    byte_input u v x.
+    bit_input a b c.
+    bit_output o gr.
+    bit_internal mid tmp one.
+    CELL "simple" [
+	mid <- a '&' b,
+	one <- '1,
+	majority a b one tmp,
+	atest u v x gr,
+	o <- mid '|' tmp
+];
+
+//let p = simple 'u 'v 'x 'a 'b 'c 'o 'gr;
+
+end_abstype p;
+
+p;
+
+let fsm = pexlif2fsm p;
+
+update_vossrc "VERBOSE-FSM-PRINT" "YES";
+//update_vossrc "VERBOSE-STE-RUN" "YES";
+fsm;
+
+let ste = STE "" fsm [] [(T,"a",variable "a",0,2),
+		         (T,"b",variable "b",0,2),
+		         (T,"c",variable "c",0,1)] []
+			(map (\n.n,0,3) (nodes fsm))
+;
+
+ste;
+
+get_trace ste "r";
+
+get_trace_val ste "r" 0;
+get_trace_val ste "r" 1;
+get_trace_val ste "r" 2;
+
+get_trace ste "mid";
+
+let nds = nodes fsm;
+//nds;
+
+//fanout fsm "mid";
+
+//fanin fsm "mid";
+
+let pr fsm fp n = 
+    fprintf fp "%s<%s>: %S %S" n (node2vector fsm n) (fanin fsm n) (fanout fsm n)
+;
+
+list2fp stdout T "" "\n" "\n" (pr fsm) nds;
+

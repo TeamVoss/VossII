@@ -1,0 +1,8 @@
+let d x = x+x;	// d is an implicitly overloaded function
+let s x = x^x;	// s is a simple function
+let e = d 1;
+overload qq d s;
+rvariable "a";
+qq "a";
+qq 1;
+qq 2.1;

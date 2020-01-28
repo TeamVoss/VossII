@@ -1,0 +1,3 @@
+tcl_eval ["source screen_capture.tcl",
+	  sprintf "tk appname %s" (hd ARGS)
+	 ];

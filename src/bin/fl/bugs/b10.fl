@@ -1,0 +1,14 @@
+
+lettype e =
+	  EVAR string
+	| EPLUS e e
+	| EMUL e e
+	| ECOND b e e
+andlettype b =
+	  BVAR string
+	| BAND b b 
+	| GEQ e e
+	| BNOT b
+;
+
+read_e ;

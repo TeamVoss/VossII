@@ -1,0 +1,49 @@
+let ff_misclass y_ls y_ps misclassmat =
+    let updtmiss y_l y_p =
+        y_l != y_p =>
+            let idx = el (y_p+1) (el (y_l+1) misclassmat) then
+            let pval = deref idx then
+            (printf "%d-%d-%d-" y_l y_p pval) fseq
+            (idx:= (pval+1)) fseq (printf "->%d\n" (deref idx)) fseq ()
+        | ()
+    in
+    map2 updtmiss y_ls y_ps
+;
+
+let l = [ref 0, ref 1, ref 2];
+deref (el 1 l);
+deref (el 2 l);
+deref (el 3 l);
+
+(el 1 l) := 99;
+deref (el 1 l);
+deref (el 2 l);
+deref (el 3 l);
+
+letrec fl_el i l =
+    l = [] => error "Out of bounds in fl_el" |
+    i = 1 => hd l |
+    fl_el (i-1) (tl l)
+;
+
+let l = [ref 0, ref 1, ref 2];
+deref (fl_el 1 l);
+deref (fl_el 2 l);
+deref (fl_el 3 l);
+
+(fl_el 1 l) := 99;
+deref (fl_el 1 l);
+deref (fl_el 2 l);
+deref (fl_el 3 l);
+
+
+
+let mapmap f llt = map (\lt. map f lt) llt;
+
+let mcmat = mapmap (\t. ref t) (replicate 10 (replicate 10 0));
+
+ff_misclass [1,2] [2,3] mcmat;
+
+mapmap (\t. deref t) mcmat;
+
+

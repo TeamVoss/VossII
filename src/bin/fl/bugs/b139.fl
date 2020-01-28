@@ -1,0 +1,210 @@
+//==========================================================================
+//
+// Data-dependent completion signal design example
+//
+//==========================================================================
+load "ste.fl";
+update_vossrc "VERBOSE-GARBAGE-COLLECTION" "YES";
+update_vossrc "DYNAMIC-ORDERING" "NO";
+update_vossrc "BEXPR-SAT-TIME-LIMIT" "0";
+
+TYPE "word" 16;
+
+let collatz = 
+    bit_input clk.
+    bit_input start.
+    word_input t0.
+    bit_output done.
+    word_output out.
+    word_internal length.
+    word_internal t newt new_length.
+    bit_internal eq1 new_done.
+    bit_internal is_even is_odd.
+//    CELL "draw_hfl_code data_dependent 3" [
+    CELL "data_dependent" [
+	re_ff clk newt t,
+	eq1 <- (t '=' '1), 
+	is_even <- ((t '%' '2) '=' '0), 
+	is_odd <- '~' is_even,
+	CASE newt [
+	    start --- t0,
+	    eq1 --- t,
+	    is_odd --- ('3 '*' t '+' '1),
+	    is_even --- (t '/' '2)
+	] t,
+	CASE new_length [
+	    start --- '0,
+	    eq1   --- length
+	] (length '+' '1),
+	CASE new_done [
+	    start --- '0,
+	    eq1   --- '1
+	] done,
+	re_ff clk new_done done,
+	re_ff clk new_length length,
+	re_ff_en clk eq1 length out
+];
+
+let ckt = pexlif2fsm (collatz 'clk 'start 't0 'done 'out);
+//let vis0 = STE_debug ckt;
+//vis;
+
+let test_harness =
+    bit_input clk.
+    bit_input start.
+    word_input	t0.
+    word_output	out.
+    word_output	timer.
+    bit_internal done.
+    word_internal new_timer.
+    CELL "test_harness" [
+	collatz clk start t0 done out,
+	CASE new_timer [
+	    start --- '0,
+	    done  --- timer
+	] (timer '+' '1),
+	re_ff clk new_timer timer
+];
+
+let ckt = pexlif2fsm (test_harness 'clk 'start 't0 'out 'timer);
+//let vis = STE_debug ckt;
+//let bvis = STE_debug ckt;
+
+let mk_clk cycles =
+    map (\i. T, "clk", (i % 2 = 1), i, i+1) (0 upto (2*cycles-1))
+;
+
+//update_vossrc "DYNAMIC-ORDERING" "NO";
+
+//let A =
+//    (replicate 5 F)@
+//    (bv2list (bv_constrained_variable "r_a[15:0]"
+//			(\v. (v > (int2bv 0)) AND (v < (int2bv 1024)))))
+//;
+
+let A =
+    (replicate 2 F)@
+    (bv2list (bv_constrained_variable "r_a[15:0]"
+                        (\v. (v > (int2bv 0)) AND (v < (int2bv 8192)))))
+;
+
+
+let N = 20;
+
+
+let ant =  "clk" is_clock N and
+	  "t0[15:0]" isv A and
+	  "start" isv "0x1" from 0 to 2 and
+	  "start" isv "0x0" from 2 to (2*N)
+;
+
+let bant = map (\(w,n,v,f,t). bdd2bexpr w, n, bdd2bexpr v,f,t) ant;
+
+let ste = STE "-e" ckt [] ant [] [];
+
+let bste = bSTE "-e" ckt [] bant [] [];
+
+ste;
+bste;
+
+
+let cmp1 nd =
+    let tr = get_trace ste nd then
+    let btr = bget_trace bste nd then
+    let times = qsort (defix -) (setify ((map fst tr) @ (map fst btr))) then
+    letrec cmp (t:ts) =
+	val (H,L) = get_trace_val ste nd t then
+	val (bH,bL) = bget_trace_val bste nd t then
+	let H2 = bexpr2bdd bH then
+	let L2 = bexpr2bdd bL then
+	((H == H2) AND (L == L2)) => cmp ts |
+	[(t,(H,L),(H2,L2),(bH,bL))]
+     /\   cmp [] = []
+    in
+    cmp times
+;
+
+let all_nds = nodes ckt;
+
+
+let N = 20;
+
+let spec1 = map (\t. t, get_trace_val ste "i1/new_done" t) (0--N);
+spec1 fseq 0;
+
+let res1 = map (\t. t, bget_trace_val bste "i1/new_done" t) (0--N);
+res1 fseq 1;
+
+let rres1 = map bexpr2bdd res1;
+rres1 fseq 2;
+
+1111111111111111111111111111111111111111111;
+spec1 == rres1 => fprintf stdout "Ok\n" | fprintf stderr "Unequal\n";
+
+let tst nd =
+    let bv = bget_trace_val bste nd 4 in
+    let v = get_trace_val ste nd 4 in
+    (bexpr2bdd bv) == v
+;
+
+map tst (fanin ckt "i1/new_done");
+map tst (fanin ckt "i1/i7/i2/i1/_TmP_1");
+map tst (fanin ckt "i1/eq1");
+tst "i1/t[12]";
+last(fanin ckt "i1/t[12]");
+tst "i1/i1/i1/i5/i1/_TmP_3[0]";
+last (fanin ckt "i1/i1/i1/i5/i1/_TmP_3[0]");
+
+tst "i1/i1/i1/q_o[0]";
+last (fanin ckt "i1/i1/i1/q_o[0]");
+
+tst "i1/t[0]";
+last (fanin ckt "i1/t[0]");
+
+bexpr2bdd (el 4 res1);
+el 4 spec1;
+
+find_first0 (\i. NOT ((el i spec1 == el i rres1))) (1--N);
+
+let tt = map (bexpr2bdd) res1;
+tt fseq 2;
+
+let tst3 nd =
+    let bv = bget_trace_val bste nd 3 in
+    let v = get_trace_val ste nd 3 in
+    (bexpr2bdd bv) == v
+;
+
+tst3 "i1/newt[0]";
+last (fanin ckt "i1/newt[0]");
+
+999999999999999999999999999999999999999;
+rres1 == tt => fprintf stdout "tt Ok\n" | fprintf stderr "tt Unequal\n";
+
+let spec1' = map (\t. t, get_trace_val ste "i1/new_done" t) (0--N);
+spec1' fseq 0;
+
+let res1' = map (\t. t, bget_trace_val bste "i1/new_done" t) (0--N);
+res1' fseq 1;
+
+let rres1' = map (bexpr2bdd) res1';
+rres1' fseq 2;
+
+2222222222222222222222222222222222222222222;
+spec1' == rres1' => fprintf stdout "Ok\n" | fprintf stderr "Unequal\n";
+spec1 == spec1' =>  fprintf stdout "spec Ok\n" | fprintf stderr "spec Unequal\n";
+res1 == res1' =>  fprintf stdout "res1 Ok\n" | fprintf stderr "res1 Unequal\n";
+
+
+let spec1 = map (\t. t, get_trace_val ste "i1/new_done" t) (0--N);
+spec1 fseq 0;
+
+let res1 = map (\t. t, bget_trace_val bste "i1/new_done" t) (0--N);
+res1 fseq 1;
+
+let rres1 = map (bexpr2bdd ) res1;
+rres1 fseq 2;
+
+3333333333333333333333333333333333333333333;
+spec1 == rres1 => fprintf stdout "Ok\n" | fprintf stderr "Unequal\n";
+

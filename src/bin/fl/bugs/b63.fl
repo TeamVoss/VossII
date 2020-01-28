@@ -1,0 +1,36 @@
+lettype scol = SCOL bool int;
+lettype acol = ACOL bool string;
+
+let scol2str (SCOL b i) = b => sprintf "1-[%d]" i | sprintf "0-[%d]" i;
+let acol2str (ACOL b s) = b => sprintf "2-<%s>" s | sprintf "0-<%s>" s;
+
+overload col2str scol2str acol2str;
+
+col2str (SCOL T 2);
+col2str (ACOL T "Hi");
+
+help "col2str";
+
+rvariable "a";
+map col2str [(SCOL T 99)];
+map col2str [(ACOL T "ohh")];
+
+
+
+strstr "A very long and boring sentence." "long";
+strstr "A very long and boring sentence." ".";
+strstr "A very long and boring sentence." "longg";
+strstr "A very long and boring sentence." "e";
+
+substr "A very long and boring sentence." 1 5;
+substr "A very long and boring sentence." 10 5;
+substr "A very long and boring sentence." 10 (-1);
+substr "A very long and boring sentence." 31 2;
+
+
+trim "\"" "\"" " \"123221\",";
+
+trim "<{" "}>" "a good }> with <{This is really it!}> or is it?";
+
+
+str_cluster "1234567890" 2;

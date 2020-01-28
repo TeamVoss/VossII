@@ -1,0 +1,23 @@
+//var_order [];
+
+let a = variable "a";
+let b = variable "b";
+let c = variable "c";
+let d = variable "d";
+
+a;
+b;
+c;
+d;
+
+var_order [];
+
+let e = a AND c OR b AND d;
+e;
+let e' = bdd_current2next e;
+e';
+var_order [];
+bdd_size e;
+bdd_reorder 1;
+var_order [];
+bdd_size e;

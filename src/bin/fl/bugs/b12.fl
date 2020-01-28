@@ -1,0 +1,73 @@
+lettype e =
+	  EVAR string
+	| ECONST int
+	| EPLUS e e
+	| EMUL e e
+	| ECOND b e e
+andlettype b =
+	  BVAR string
+	| BCONST bool
+	| BCONSTE bexpr
+	| BAND b b 
+	| GEQ e e
+	| BNOT b
+;
+
+forward_declare {P_b:: b->string};
+
+letrec P_e (EVAR s) = s
+ /\    P_e (ECONST i) = int2str i
+ /\    P_e (EPLUS e1 e2) = sprintf "(%s + %s)" (P_e e1) (P_e e2)
+ /\    P_e (EMUL e1 e2) = sprintf "(%s * %s)" (P_e e1) (P_e e2)
+ /\    P_e (ECOND c t e) = sprintf "(%s? %s : %s)" (P_b c) (P_e t) (P_e e)
+;
+
+
+letrec P_b (BVAR s) = s
+ /\    P_b (BCONST b) = bool2str 10 b
+ /\    P_b (BCONSTE be) = bexpr2str 10 be
+ /\    P_b (BAND b1 b2) = sprintf "(%s && %s)" (P_b b1) (P_b b2)
+ /\    P_b (GEQ e1 e2) = sprintf "(%s >= %s)" (P_e e1) (P_e e2)
+ /\    P_b (BNOT b1) = sprintf "~(%s)" (P_b b1)
+;
+
+
+
+let e1 = ECOND 
+	    (BAND
+		(BAND (BVAR "a")
+		      (BAND (BCONST (variable "a[1]" XOR variable "a[0]"))
+			    (BCONSTE (bvariable "b[1]" bXOR bvariable "b[0]"))
+		      )
+		)
+		(GEQ (EVAR "b") (ECONST 0))
+	    )
+	    (EVAR "b")
+	    (EPLUS (EVAR "b") (ECONST 1))
+;
+
+P_e e1;
+
+let e2 = ECOND 
+	    (BAND
+		(BAND (BVAR "a")
+		      (BAND (BCONST (variable "a[1]" XOR variable "a[0]"))
+			    (BCONSTE (bvariable "b[2]" bXOR bvariable "b[1]"))
+		      )
+		)
+		(GEQ (EVAR "b") (ECONST 0))
+	    )
+	    (EVAR "b")
+	    (EPLUS (EVAR "b") (ECONST 1))
+;
+
+P_e e2;
+
+bEqual e1 e2;
+
+bexpr2bdd [it];
+
+let q = bITE (bvariable "c") e1 e2;
+P_e q;
+
+

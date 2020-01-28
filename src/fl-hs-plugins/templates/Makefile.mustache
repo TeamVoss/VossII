@@ -1,0 +1,12 @@
+.PHONY: build clean install
+
+build:
+	cabal v1-install --only-dependencies
+	cabal v1-build
+
+clean:
+	cabal v1-clean
+
+install: build
+	mkdir -p {{install-dir}}
+	cp dist/build/{{plugin-name}}/lib{{plugin-name}}.so* {{install-dir}}/lib{{plugin-name}}.so

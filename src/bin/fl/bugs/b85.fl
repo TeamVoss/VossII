@@ -1,0 +1,42 @@
+// Code to test LPsol
+
+
+let mk_row MIN MAX cols =
+    let Arow = map (\c. random MIN MAX) (1--cols) then
+    let rel = 
+	let sel = random 1 6 then
+	sel = 1 => "<" |
+	sel = 2 => "<=" |
+	sel = 3 => ">" |
+	sel = 4 => ">=" |
+	sel = 5 => "=" |
+	"<>"
+    then
+    let rval = random MIN MAX then
+    (Arow, rel, rval)
+;
+non_lazy mk_row;
+
+
+let mk_test MIN MAX m n =
+    map (\r. mk_row MIN MAX n) (1--m)
+;
+non_lazy mk_test;
+
+
+let mk_tests MIN MAX m n cnt =
+    let problems = map (\c. mk_test MIN MAX m n) (1 upto cnt) then
+    map (\p. (LP p, LPsol p)) problems
+;
+
+let run_test MIN MAX m n cnt =
+    (fprintf stdout "\nRunning %d tests with %d rows, %d columns " cnt m n) seq
+    (fprintf stdout "and coefficients between %d and %d\n" MIN MAX) fseq
+    let tests = mk_tests MIN MAX m n cnt in
+    let inf = length (filter (\p. NOT (fst p)) tests) in
+    fprintf stdout "Out of %d tests, %d were infeasible\n" cnt inf
+;
+
+run_test (-20) 20 20 7 100;
+
+run_test 1 5 15 10 100;

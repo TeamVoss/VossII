@@ -1,0 +1,65 @@
+let fp = fopen "bugs/b57.fl" "r";
+
+letrec read fp =
+    feof fp => [] |
+    let line = fgets fp then
+    (fprintf stderr "%s" line) fseq
+    line:(read fp)
+;
+
+read fp;
+
+
+let read_file file =
+    let fp = fopen file "r" then
+    letrec read fp =
+        let line = fgets fp then
+        line = "" => [] |
+        let real_line = string_butlastn line 1 then
+        real_line:(read fp)
+    in
+    let res = read fp then
+    (fclose fp) fseq
+    res
+;
+
+new_type_abbrev bv = ((bool#bool) list);
+lettype color =
+                COL {red::bv} {green::bv} {blue::bv}
+;
+
+let DONT_CARE = COL (replicate 8 (T,T)) (replicate 8 (T,T)) (replicate 8 (T,T));
+
+let get_xpm_image file =
+    let raw_content = tl (tl (read_file file)) then
+    let cnv s =
+        string_butlastn (string_tl s) 1
+    in
+    let content = map cnv raw_content then
+    val (rows,cols,colors,chars) = sscanf "%d %d %d %d" (el 1 content) then
+    let cols =
+        let lines = firstn colors (tl content) then
+        let cnv l =
+(fprintf stderr "Converting: |%s|\n" l) fseq
+            let key = string_hd l in
+            let rest = el 2 (str_split l "#") in
+//            str_is_substr "None" l => (key, DONT_CARE) |
+            str_is_substr "None" l => (key, (1,2,3)) |
+            val (r,g,b) = sscanf "%2x%2x%2x" rest then
+(fprintf stderr "Got: %d %d %d\n" r g b) fseq
+//            let i2dr i =
+//                    map (\c. c = "1" => (T,F) | (F,T))
+//                        (explode (sprintf "%08b" i))
+//            in
+//            key, (COL (i2dr r) (i2dr g) (i2dr b))
+            key, (r,g,b)
+        in
+        map cnv lines
+    then
+cols;
+
+let q = get_xpm_image "bugs/SpeedLimit70.xpm";
+q fseq 1;
+
+//draw_graph 10 q;
+

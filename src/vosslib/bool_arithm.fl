@@ -1,0 +1,61 @@
+fprintf stderr "============================================\n";
+fprintf stderr "Obsolete library. Migrate to bv_* functions!\n";
+fprintf stderr "============================================\n";
+
+let gT = T;
+let gF = F;
+let gvariable = variable;
+let gNOT = NOT;
+let gAND = defix AND;
+infix 4 gAND;
+let gXNOR = defix XNOR;
+infix 4 gXNOR;
+let gXOR = defix XOR;
+infix 4 gXOR;
+let gOR = defix OR;
+infix 3 gOR;
+let gIF c = c;
+let gTHEN c (t,e) = c => t | e;
+let gELSE t e = (t,e);
+if_then_else_binder gTHEN gELSE;
+let gEQUIV a b = a == b;
+infix 5 gEQUIV;
+let gEQUAL a b = a = b;
+infix 5 gEQUAL;
+let gdepends = depends;
+
+load (DIR^"/gen_arithm.fl");
+
+
+// Given a symbolic bitvector interpreted as a signed 2's complement number,
+// find the smallest integer that the bitvector can represent. 
+clet get_minimum_value bv =
+    letrec find first (b:bs) =
+        (b == T) => T:(find F bs) |
+        (b == F) => F:(find F bs) |
+        let cond = first => b | NOT b in
+        let psub = param cond in
+        let bs' = substitute psub bs then
+        first:(find F bs')
+     /\    find first [] = []
+    in
+    let r = find T bv then
+    dbv2int r
+;
+
+// Given a symbolic bitvector interpreted as a signed 2's complement number,
+// find the largest integer that the bitvector can represent. 
+clet get_maximum_value bv =
+    letrec find first (b:bs) =
+        b == T => T:(find F bs) |
+        b == F => F:(find F bs) |
+        let cond = first => NOT b | b in
+        let psub = param cond in
+        let bs' = substitute psub bs then
+        (NOT first):(find F bs')
+     /\    find first [] = []
+    in
+    let r = find T bv then
+    dbv2int r
+;
+

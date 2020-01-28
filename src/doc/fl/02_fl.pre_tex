@@ -1,0 +1,1656 @@
+\section{Fl---The Meta Language of {\voss}}
+
+In this section we provide an introduction to the functional language fl.
+
+Similar to many theorem provers (e.g., the HOL%
+\index{HOL}%
+{}
+system~\cite{HOLsystem,HOLbook}) the
+{\voss} command language for the verification system is a general
+purpose programming language%
+\index{programming language}%
+{}.
+In fact, the fl language shows a strong degree of influence from
+the version of ML%
+\index{ML}%
+{} used in the HOL-88%
+\index{HOL-88}%
+{} system.
+However, there are several differences:  many syntactic but some
+more fundamental.
+In particular, the functional language used in {\voss} has lazy evaluation
+semantics.
+In other words, no expression is evaluated until it is
+absolutely needed.
+Similarly, no expression is evaluated more than once.
+Another difference is that Boolean functions are first-class
+objects and can be created, evaluated, compared and printed out.
+For efficiency reasons these Boolean functions are represented as
+ordered binary decision diagrams%
+\index{ordered binary decision diagrams}%
+{}. 
+
+Fl is an interactive language.
+At top-level one can for example: define functions (possibly of arity 0),
+define new concrete types,
+evaluate expressions, and
+modify the parser.
+In this section we introduce the language by several examples.
+
+\subsection{Invoking fl}
+
+If the {\voss} system is installed on your system
+and you have the suitable search path set up, it suffices
+to type \verb@fl@ to get a stand-alone version of fl.
+
+\FULLSCREEN{forte_start.jpg}
+
+Note that the VOSS-LIBRARY-DIRECTORY%
+\index{VOSS-LIBRARY-DIRECTORY}%
+{} is installation dependent.
+We return to this below and in Section~\ref{vossrc}.
+
+The fl program can take a number of arguments.
+\index{command-line arguments}
+In particular, 
+\begin{description}
+%
+\item[-f n]
+Start fl by first reading in the content of the file named n.
+%
+\item[-I dir]
+Set the default search directory%
+\index{search directory}%
+{} to dir.
+%
+\item[-noX or \-\-noX]
+do not use the graphical (X-windows) interface.
+Useful when running batch oriented jobs.
+Note that any calls to graphics primitives, will fail with a run time
+exception when fl is run in the -noX mode.
+\item[-use\_stdin or \-\-use\_stdin]
+Read inputs also from stdin as well as from the graphical interface.
+\item[-use\_stdout \-\-use\_stdout]
+Read inputs also from stdin as well as from the graphical interface.
+\item[\-\-read\_input\_from\_file filename]
+Read inputs continously from the file 'filename'.
+\item[\-\-write\_output\_to\_file filename]
+Write outputs to the file 'filename' in addition to the graphical
+user interface.
+\item[-r i]
+Initialize the random number%
+\index{random number}%
+{} generator with the seed i.
+This allows the {\tt rvariable}
+\index{rvariable}%
+{} command to create new sets
+of random variable values.
+See the rvariable command description in Section~\ref{rvariable} for
+more details.
+\item[-v fn]
+Store the variable ordering obtained by dynamic variable re-ordering%
+\index{variable re-ordering}%
+{}
+in the file fn.
+\index{dynamic variable re-ordering}
+\item[-h or \-\-help]
+Print out the available options and quit.
+\end{description}
+
+Any additional arguments to fl will be stored in the fl expression ARGS as
+a list of strings.
+For example:
+\begin{hol}
+% fl We must do 123 situps
+\end{hol} 
+would yield:
+
+\FULLSCREEN{forte_with_args_start.jpg}
+
+\subsection{Help system}
+
+To make it easier to use fl, there is an automatically generated help system
+available by pushing the "Help" button in top rigth corner of
+the user interface.
+Whenever a function is defined, it is added to the online help system.
+Furthermore, if the function declaration is preceeded by some comments
+(lines started with //), the comments will be displayed together with
+information of the fixity (if any), number and types of input arguments, as
+well as the type of the result of the function.
+The help system allow the user to serach by name, file, argument type(s) or
+resulting type using regular globbing style patterns.
+Also, if the function is defined by fl code, there will be a live link to the
+code used to define the function.
+For example, searching for functions with the word AND in them yield:
+
+\FULLSCREEN{forte_help.jpg}
+
+\subsection{Expressions}
+\index{expressions}
+The Fl prompt%
+\index{prompt}%
+{} is : so lines beginning with this contain
+the user's input; all other lines are output of the system.
+%%%START_CODE%%%%
+2+3;
+%%%END_CODE%%%%
+Here we simply evaluated the expression 2+3 and fl reduced
+it to normal form; in this case computed the result 5.
+
+Note that {\voss} stores the result of the most recent expression
+in a variable called {\tt it}.
+\index{it}%
+Thus, if you evalute an expression, you can get a ``handle'' to it by using
+{\tt it}.
+%%%START_CODE%%%%
+2+3;
+it;
+%%%END_CODE%%%%
+
+\subsection{Declarations}
+
+The declaration%
+\index{declaration}%
+\index{declaration@toplevel}%
+{} let x = e binds a computation of e to
+the variable x.
+Note that it does not evaluate e (since the language is lazy%
+\index{lazy}%
+{}).
+Only if x is printed or used in some other expression that is evaluated
+will it be evaluated.
+Also, once e is evaluated, x will refer to the result of the evaluation
+rather than the computation.
+Hence, the expression e is evaluated at most once, but it may
+not be evaluated at all.
+%%%START_CODE%%%%
+let x = 3+3;
+%%%END_CODE%%%%
+Note that when expressions are bound to variables, the system simply
+prints out the inferred type%
+\index{inferred type}%
+{} of the expression. We will return to
+the typing scheme in fl later.
+For now, it suffices to say that fl tries to find as general type as
+possible that is consistent with the type of the expression.
+
+A declaration%
+\index{declaration@local}%
+{} can be made local to the evaluation of an expression
+e by evaluating the expression decl in e.
+For example:
+%%%START_CODE%%%%
+let y = let x = 4 in x-5;
+%%%END_CODE%%%%
+would bind the expression 4 to x only inside the expression
+bound to y. Thus, we get:
+%%%START_CODE%%%%
+let x = 2;
+let y = let x = 4 in x-5;
+x;
+y;
+%%%END_CODE%%%%
+fl is lexically scoped%
+\index{scoping}%
+{}, and thus
+the binding in effect at the time of definition is the one used.
+In other words, if we write:
+%%%START_CODE%%%%
+let x = 2;
+let y = x*5;
+let x = 12;
+%%%END_CODE%%%%
+and we then evaluate y we will get 10
+rather than 60.
+
+
+To bind several expressions%
+\index{simultaneous bindings}
+to several variables at the same time, a special keyword {\tt val}
+\index{val}%
+{}
+is available to take a complicated object apart automatically.
+For example, if q is an expression of type (int\verb@#@bool) then
+we could write:
+%%%START_CODE%%%%
+let top_level q =
+	val (i,b) = q in
+	i < 3 => b | F
+;
+top_level (12,variable "a");
+top_level (-2,variable "a");
+%%%END_CODE%%%%
+or
+%%%START_CODE%%%%
+val (a:b:rest) = [1,2,3,4,5];
+a;
+b;
+rest;
+%%%END_CODE%%%%
+
+In general, the expression to the right of the val keyword
+can be an arbitrary complex pattern similar to the patterns%
+\index{patterns}%
+{}
+allowed in function definitions and lambda expressions.
+For more details, see the section on pattern matching on page~\ref{val}.
+
+\subsection{Functions}
+
+To define a function%
+\index{function}%
+{} f with formal parameter x and body e one performs
+the declaration: let f x = e.
+To apply the function f to an actual parameter e one evaluates
+the expression f e.
+%%%START_CODE%%%%
+let f x = x+2;
+f 4;
+%%%END_CODE%%%%
+Note that the type inferred for f is essentially ``a function taking
+an int as argument and returning an int''.
+Applications binds more tightly than anything else in fl; thus for example:
+f 3 * 4 would be evaluated as: ((f 3)*4) and thus yield 20.
+
+Functions of several arguments can also be defined:
+%%%START_CODE%%%%
+let add x y = x+2*y;
+add 1 4;
+let f = add 1;
+f 4;
+%%%END_CODE%%%%
+Applications associate%
+\index{association rules}%
+{} to the left so add 3 4 means (add 3) 4. In the
+expression add 3, the
+function add is partially applied to 3; the resulting value is the
+function of type int\funarrow int which
+adds 3 to twice its argument. Thus add takes its arguments one at a time.
+We could have made add take a single argument of the cartesian product%
+\index{cartesian product}%
+{}
+type (int\verb@#@int):
+%%%START_CODE%%%%
+let add (x,y) = x+2*y;
+add (3,4);
+%%%END_CODE%%%%
+As well as taking structured arguments (e.g. (3,4)) functions may also return
+structured results:
+%%%START_CODE%%%%
+let manhat_dist (x1,y1) (x2,y2) = (x2-x1, y2-y1);
+manhat_dist (1,1) (3,5);
+let geometric_dist (x1,y1) (x2,y2) = sqrt ( (pow 2.0 (x1-x2)) + (pow 2.0 (y1-y2)));
+geometric_dist (1.0,1.0) (3.0,5.0);
+%%%END_CODE%%%%
+The latter function illustrates the use of floats as well as integers.
+
+Trying to print%
+\index{print}%
+{} a function with insufficient number of actual arguments
+yield a dash for the function and the type of the expression is printed out.
+For example:
+%%%START_CODE%%%%
+(5, manhat_dist (1,2));
+%%%END_CODE%%%%
+The only exception to this rule is for concrete types
+for which the user has installed a printing function%
+\index{printing function}%
+{}.
+For more details of concrete types, see page~\ref{concreteTypes}.
+
+\subsection{Recursion}
+
+The following is an attempt to define the factorial function:
+%%%START_CODE%%%%
+let fact n = n=0 => 1 | n*fact (n-1);
+%%%END_CODE%%%%
+The problem is that any free variables in the body of a function have
+the bindings they had
+just before the function was declared; fact is such a free variable
+in the body of the declaration
+above, and since it is not defined before its own declaration, an error
+results. To make things
+clear consider:
+%%%START_CODE%%%%
+let f n = n+1;
+let f n = n=0 => 1 | n*f (n-1);
+f 3;
+%%%END_CODE%%%%
+Here 3 results in the evaluation of 3*(f 2), but now the first f is
+used so f 2 evaluates to 2+1=3.
+To make a function declaration hold within its own body, letrec%
+\index{letrec}%
+{}
+instead of let must be used.
+The correct recursive%
+\index{recursive}%
+{} definition of the factorial function is thus:
+%%%START_CODE%%%%
+letrec fact n = n=0 => 1 | n*fact (n-1);
+fact 5;
+%%%END_CODE%%%%
+
+It should be pointed out that fl currently does not allow direct definition
+of mutually recursive functions%
+\index{mutually recursive functions}%
+{}.
+For an example on how this limitation can be dealt with, see
+the subsection on concrete type decalartions.
+
+\subsection{Tuples}
+
+If $e\_1, e\_2, \ldots , e\_n$ have types $t\_1, t\_2, \ldots , t\_n$, then
+the fl expression $(e\_1, e\_2, \ldots , e\_n)$ have type
+$t\_1$\verb@#@$t\_2$\verb@#@$\ldots$\verb@#@$t\_n$.
+The standard functions on tuples are fst%
+\index{fst}%
+{} (first), snd%
+\index{snd}%
+{} (second), and the infix
+operation , (pair%
+\index{pair}%
+{}).
+%%%START_CODE%%%%
+let q = ((1,2),3);
+let qq = (1,2,3);
+q;
+qq;
+let qqq = (1,"abc");
+qqq;
+%%%END_CODE%%%%
+
+\subsection{Lists}
+
+If $e\_1, e\_2, \ldots , e\_n$ have type $t$, then the fl expression
+$[e\_1, e\_2, \ldots , e\_n]$ has type ($t$ list%
+\index{list}%
+{}).
+The standard functions on lists are hd%
+\index{hd}%
+{} (head%
+\index{head}%
+{}), tl%
+\index{tl}%
+{} (tail%
+\index{tail}%
+{}), []%
+\index{[]}%
+{} (the empty list%
+\index{empty list}%
+{}), and the infix operation : (cons%
+\index{cons}%
+{}).
+Note that all elements of a list must have the same type (compare
+this with a tuple where the size is determined but each member of
+the tuple can have different type).
+%%%START_CODE%%%%
+let l = [1,2,3,3,2,1,2];
+hd l;
+tl l;
+0:l;
+length l;
+letrec odd_even (a:b:rem) =
+    val (r_odd, r_even) = odd_even rem then
+    (a:r_odd), (b:r_even)
+ /\    odd_even [a] = [a],[]
+ /\    odd_even [] = [], []
+;
+val (odd,even) = odd_even (1--20);
+odd;
+even;
+%%%END_CODE%%%%
+
+There are a large number of list functions built into fl.
+For example:
+%%%START_CODE%%%%
+let l1 = 1 upto 8;
+let l2 = 13 downto 1;
+let l3 = 1--100;
+l1 @ l2;
+lastn 5 l1;
+butlast l2; 
+firstn 7 l3;
+butfirstn 96 l3;
+cluster 4 (1--20);
+let ll = [l1, l2, [4,8,12]];
+flat ll;
+%%%END_CODE%%%%
+To find all such functions, use the help system and search for functions
+whose argument type matches "*list*".
+
+
+\subsection{Strings}
+
+A sequence of characters enclosed between \verb@"@ is a string%
+\index{string}%
+{}.
+The standard functions on strings are \verb@^@ (catenation%
+\index{catenation}%
+{}), explode%
+\index{explode}%
+{}
+(make string into list of strings) and
+implode%
+\index{implode}%
+{} (make list of strings into single string).
+There a numerous other string functions. 
+For example:
+%%%START_CODE%%%%
+
+let q = "abc and _12!@@#";
+let qq = "qw\"q qw";
+q^qq;
+explode q;
+implode ["1", "2"];
+filter (str_is_prefix "a") ["abc", "Ava", "vad", "bbAb", "aaa"];
+filter (str_is_suffix "a") ["abc", "Ava", "vad", "bbAb", "aaa"];
+filter (str_match "*a*") ["abc", "Ava", "vad", "bbAb", "aaa"];
+qsort strcmp ["abc", "Ava", "vad", "bbAb", "aaa"];
+let s = "A funny story often told is the story of";
+strlen s;
+strstr s "is";
+substr s 1 25;
+substr s 26 (-1);
+sprintf "%s: %032b (%d)" "abc" 1423 1423;
+%%%END_CODE%%%%
+
+\subsection{Polymorphism}
+
+The list processing functions hd, tl, etc. can be used on all types of lists.
+%%%START_CODE%%%%
+hd [1,2,3];
+hd ["abc", "edf"];
+(hd ["a", "b"]), hd [4,2,1];
+let q = [T,T,F];
+hd q;
+%%%END_CODE%%%%
+Thus hd has several types; for example, it is used above with types
+(int list) \funarrow int,
+(string list) \funarrow string, and (bool list) \funarrow bool.
+In fact if ty is any type then hd has the type (ty list) \funarrow ty.
+Functions, like hd, with many types are called polymorphic%
+\index{polymorphic}%
+{},
+and fl uses type variables%
+\index{type variables}%
+{} *, **, ***, etc. to represent their types.
+%%%START_CODE%%%%
+let f x = hd x;
+
+letrec map2 fn [] [] = []
+ /\    map2 fn (a:as) (b:bs) = (fn a b) : (map2 fn as bs)
+ /\    map2 fn _ _ = error "Lists of different length in map2"
+;
+
+letrec fact n = n=0 => 1 | n*fact (n-1);
+let binom n k = (fact n) / ((fact k) * (fact (n-k)));
+map2 binom [8,8,8,8,8,8,8,8,8] [0,1,2,3,4,5,6,7,8];
+%%%END_CODE%%%%
+The fl function map2%
+\index{map}%
+{} takes a function f (with argument types * and ** result
+type ***), and two lists l1
+(of elements of type *) and l2 (of elements of type **), and returns
+the list obtained by applying
+f to each pair of elements of l1 and l2.
+Map2 can be used at any instance of its type: above, *, **, and
+*** were instantiated to int;
+
+below, * is instantiated to (int list) and ** to bool. Notice that the
+instance need  not be  specified; it is determined by the type checker.
+%%%START_CODE%%%%
+let capitalize s = (chr ((ord (string_hd s))+(ord "A")-(ord "a")))^(string_tl s);
+let classify name type = sprintf "%s is a %s" (capitalize name) type;
+map2 classify ["john", "anna", "betsy", "bob"] ["boy","girl","girl","boy"];
+%%%END_CODE%%%%
+
+It should be pointed out that fl has a polymorphic type system that
+is sightly different from
+standard ML's. In particular, only ``top-level'' user-defined functions
+can be polymorphic. In
+other words, the following works as we would expect.
+%%%START_CODE%%%%
+let null l = l = [];
+let f x y = null x OR null y;
+f [1,2,3] ["abc", "cdef"];
+%%%END_CODE%%%%
+However, if we use the same declaration inside the expression, it must
+be monomorphic%
+\index{monomorphic}%
+{}. In other
+words, the following example fails.
+%%%START_CODE%%%%
+let f x y =
+    let null l = l = [] in
+    null x OR null y
+;
+f [1,2,3] ["abc", "cdef"];
+%%%END_CODE%%%%
+In this respect, fl is similar to the functional language called
+Miranda\footnote{Miranda is a trademark of
+Research Software Ltd.}~\cite{Miranda}.
+
+\subsection{Type Annotations}
+Sometimes it is useful to inform the type inference mechanism
+of fl what type is expected.
+This is particularly useful when there is an obscure type error in the
+expression you are trying to define. 
+Annotating expressions with the type one expects them to have is often a
+very efficient method for finding the problem.
+This is particularly common when using overloaded functions.
+
+In fl a variable or expression can be annotated%
+\index{type annotation}%
+{} with its expected
+type by enclosing it in curly braces and decorate the expression
+with a type expression.
+For example, if we would like to define a function ihd that
+return the head of a list, but that only can be used on integer lists,
+we could define ihd as follows:
+%%%START_CODE%%%%
+let ihd {l::int list} = hd l;
+%%%END_CODE%%%%
+
+A more subtle example is the following.
+Assume we have overloaded the operator + to either
+operate over strings or integers.
+We then want to extend this overloading
+with yet another function over bools.
+This can be done as:
+%%%START_CODE%%%%
+let iplus {a::int} {b::int} = a+b;
+let splus {a::string} {b::string} = a^b;
+overload + iplus splus;
+let foo a b = a OR b;
+overload + + foo;
+infix 2 +;
+1+2;
+"a"+"bc";
+T+F;
+%%%END_CODE%%%%
+If we now were to write a function that applies the + function to three
+arguments, we could accomplish this by defining:
+%%%START_CODE%%%%
+let f x y z = x+y+z;
+f 1 2 3;
+f "a" "b" "s";
+f F F T;
+%%%END_CODE%%%%
+However, note that the type inferred for f is more general than one might like.
+After all, all the arguments to f as well as its return type, must have the
+same type.
+To capture this, a slightly better definition of f would be:
+%%%START_CODE%%%%
+let f {x:: *a} {y:: *a} {z:: *a} = {x+y+z:: *a};
+%%%END_CODE%%%%
+Here we also demonstrate how polymorphic types can be defined.
+One warning: make sure there is a space between the :: and the *a so that
+the parser does not try to look up the symbol ::*a!
+
+\subsection{Lambda Expressions}
+
+The expression \verb@\@x.e evaluates to a function with formal parameter x
+and body e. Thus the
+declaration let f x = e is equivalent to let f = \verb@\@x.e. The character
+\verb@\@ is our representation of lambda,
+and expressions like \verb@\@x.e are called lambda-expressions%
+\index{lambda-expressions}%
+{}.
+%%%START_CODE%%%%
+\x.x+1;
+let q = \x.x+1;
+q 1;
+map (\x.x*x) [1,2,3,4,5];
+%%%END_CODE%%%%
+
+\subsection{Failures}
+
+Some standard functions fail at run-time on certain arguments.
+When this happen, an exception is raised.
+If that exception is not captured (more below), the failure will propagate
+to the top-level and an error message will be printed out and any
+(possibly nested) loads will be aborted.
+In addition to builtin functions failing, a failure%
+\index{failure}%
+{} with string "msg" may also be
+generated explicitly by evaluating the expression error "msg" (or more
+generally error%
+\index{error}%
+{} e where e has type string).
+%%%START_CODE%%%%
+hd(tl [2]);
+1/0;
+error "My message";
+let select idx l =
+    idx < 1 OR idx > length l =>
+	eprintf "select called with illegal index (%d)" idx
+    |
+    el idx l
+;
+select 10 [1,2,3,4];
+%%%END_CODE%%%%
+
+A failure can be caught%
+\index{catch a failure}%
+{} by catch%
+\index{catch}%
+{}; the value of the expression $e\_1$ catch
+$e\_2$ is that of $e\_1$, unless
+$e\_1$ causes a failure, in which case it is the value of $e\_2$.
+If one wants to examine the error message, one can use gen\_catch instead
+of catch. However, the right-hand side expression to gen\_catch must
+be a function taking the error message as argument.
+For example:
+%%%START_CODE%%%%
+let half x = (x % 2) = 1 => eprintf "HALF_ERR: f2 is given an odd number (%d)" x
+			| x/2
+;
+letrec  robust_half x = 
+    (half x) gen_catch
+    (\msg. str_is_prefix "HALF_ERR" msg => robust_half (x+1) | error msg)
+;
+
+robust_half 2;
+robust_half 3;
+robust_half (1/0);
+%%%END_CODE%%%%
+Here we catch only errors with "HALF\_ERR" in the error message.
+
+One important
+property of catch and gen\_catch is that they are
+(very) strict in their first argument. In other words, (hd ($e\_1$ catch
+$e\_2$)) will completely evaluate $e\_1$
+even though only the first element in the list may be needed. In view
+of fl's lazy semantics%
+\index{lazy semantics}%
+{}, the
+use of catch should be very carefully considered.
+
+\subsection{Boolean Expressions}
+
+All Boolean expressions%
+\index{Boolean expression}%
+{} in fl are maintained as ordered binary decision
+diagrams. Hence, it
+is very easy to compare complex Boolean expressions and to combine
+them in different ways.
+Boolean variables%
+\index{Boolean variable}%
+{} are created by variable%
+\index{variable}%
+{} s, where s is of type string.
+The system uses name
+equivalence, and thus
+%%%START_CODE%%%%
+let v = variable "v";
+v=v;
+variable "v" = variable"v";
+%%%END_CODE%%%%
+
+The constants true%
+\index{true}%
+{} and false%
+\index{false}%
+{} are denoted T and F respectively. The
+standard boolean functions
+are available, i.e., AND%
+\index{AND}%
+{}, OR%
+\index{OR}%
+{}, NOT%
+\index{NOT}%
+{}, XOR%
+\index{XOR}%
+{}, and =%
+\index{=}%
+{} are all defined for objects of type Boolean.
+Furthermore, there
+is a special identity%
+\index{identity}%
+{} operator ==%
+\index{==}%
+{} that return true or false depending
+on whether the two arguments
+represent the same Boolean function or not.
+
+Note that unless a oreding has been installed explcitly (more below), the
+variable ordering%
+\index{variable ordering}%
+{} in the OBDD representation is defined
+by the order in which each variable function call {\em gets evaluated}.
+Since fl is a fully lazy language%
+\index{lazy language}%
+{}, and thus the order in which expressions
+are evaluated is often difficult to predict, it is strongly recommended
+that each variable declaration is forced to be evaluated before it
+is being used.
+Alternatively, one can request that fl re-orders the variables
+by evaluating the function var\_order%
+\index{var\_order}%
+{} and give as argument a list
+of variable names.
+fl will then apply the dynamic variable re-ordering mechanism and
+enforce that the variables mentioned in the list will be the first
+arguments and that they will occur in exactly this order.
+%%%START_CODE%%%%
+let a = variable "a";
+let b = variable "b";
+a AND b;
+a OR b;
+NOT a AND NOT b AND T;
+a = b;
+a == b;
+(a=b) == (a AND b OR NOT a AND NOT b);
+%%%END_CODE%%%%
+
+The default style for printing Boolean expressions%
+\index{printing Boolean expressions}%
+{} is as a sum-of-products%
+\index{sum-of-products}%
+{}.
+Since this may require printing an extremely large expression, there
+is a user-setable limit on how many products that will be printed
+and the maximum size of a product.
+For more details how to modify these two parameters, see Section~\ref{vossrc}.
+
+\subsection{Quantifiers}
+
+There are several ways of using quantification%
+\index{quantification}%
+{}.
+The ``traditional'' !x. e%
+\index{!.\,e}%
+{} (for all x) and ?x. e%
+\index{?x.\,e}%
+{}
+(there is an x) can be used as long as the type of x and e is bool.
+In addition, you can also quantify away a variable in an expression
+by quant\_forall%
+\index{quant\_forall}%
+{} v e or quant\_thereis%
+\index{quant\_thereis}%
+{} v e.
+%%%START_CODE%%%%
+!a. ?b. (a XOR b);
+let a = variable "a"; let b = variable "b"; let c = variable "c";
+a AND b OR c;
+Quant_forall ["a"] (a AND b OR c);
+Quant_thereis ["a","c"] (a AND b OR c);
+%%%END_CODE%%%%
+In fact, quant\_forall and quant\_thereis quantifies away all variables
+in the first Boolean expression.
+For example:
+%%%START_CODE%%%%
+let v s = variable s;
+let a = v "a"; let b = v "b"; let c = v "c"; let d = v "d";
+let ex = (a AND NOT b);
+ex;
+let nex = ex AND (a=c) AND (b=d);
+Quant_thereis ["a","b"] nex;
+%%%END_CODE%%%%
+Note that the actual Boolean expression used as first argument is irrelevant.
+The only important fact is on what variables the expression depends.
+
+\subsection{Dependencies}
+
+Sometimes it is useful to find out which Boolean variables a
+Boolean function actually depends on.
+The built-in function depends%
+\index{depends}%
+{} takes a list of elements of type
+bool and return the union of the variables these functions depend on.
+For example:
+%%%START_CODE%%%%
+let v s = variable s;
+let a = v "a"; let b = v "b"; let c = v "c"; let d = v "d";
+let ex1 = (a=c) AND d;
+let ex2 = a = b;
+depends [ex1];
+depends [ex1,ex2];
+%%%END_CODE%%%%
+
+Note that the order of the variables in the list returned by depends
+is the variable order of the OBDD representation.
+
+\subsection{Substitutions}
+
+Given a Boolean function represented as an OBDD, it is convenient to
+be able to apply the function to some arguments.
+This can be accomplished by the substitute%
+\index{substitute}%
+{} command that takes a
+list of (variable name, expression) and an expression in which the
+simultaneous substitution%
+\index{substitution}%
+{} is to be made.
+For example,:
+%%%START_CODE%%%%
+let v s = variable s;
+let a = v "a"; let b = v "b"; let c = v "c"; let d = v "d";
+let ex = (a AND NOT b);
+ex;
+substitute [("a", c), ("b", d)] ex;
+%%%END_CODE%%%%
+
+It should be pointed out that there are no restrictions on the expressions
+in the substitutions.
+In particular, it is possible to ``swap'' variables.
+We illustrate this by continuing the example above:
+%%%START_CODE%%%%
+ex;
+substitute [("a", b), ("b", a)] ex;
+%%%END_CODE%%%%
+
+\subsection{Type Abbreviations}
+\index{type abbreviations}
+
+Types can be given names:
+%%%START_CODE%%%%
+new_type_abbrev pair = int#int;
+let p = (1,2);
+%%%END_CODE%%%%
+However, as can be seen from the example, the system does not
+make any distinction between the new type name
+and the actual type. It is purely a short hand that is useful when
+defining concrete types below.
+
+\subsection{Concrete Types}
+
+New types (rather than mere abbreviations) can also be defined.
+Concrete types%
+\index{concrete type}%
+{} are types
+defined by a set of constructors%
+\index{type constructor}%
+{} which can be used to create objects
+of that type and also (in
+patterns) to decompose objects of that type. For example, to define
+a type card one could use the
+construct type:
+%%%START_CODE%%%%
+lettype card = king | queen | jack | other int;
+%%%END_CODE%%%%
+Such a declaration declares king, queen, jack and other as constructors
+and gives them
+values. The value of a 0-ary constructor such as king is the constant
+value king. The value of a
+constructor such as other is a function that given an integer value
+n produces other(n).
+%%%START_CODE%%%%
+king;
+other 9;
+%%%END_CODE%%%%
+
+Note that there is no print routine%
+\index{print routine}%
+{} for concrete types. If a print
+routine is desired, one has to
+define it.
+To define functions that take their argument from a concrete type,
+we introduce the idea of pattern matching%
+\index{pattern matching}%
+{}.
+In particular
+\begin{hol}
+let f pat1 = e1
+ /\verb@\@ f pat2 = e2
+ /\verb@\@ ...
+ /\verb@\@ f patn = en;
+\end{hol}
+denotes a function that given a value v selects the first pattern that
+matches $v$, say pati, binds the variables of pati to
+the corresponding components of the value $v$ and then evaluates the
+expression ei.
+We could for example define a print function for the cards in the following way:
+%%%START_CODE%%%%
+let pr_card king = "K"
+  /\  pr_card queen = "Q"
+  /\  pr_card jack = "J"
+  /\  pr_card (other n) = int2str n;
+pr_card king;
+pr_card queen;
+pr_card jack;
+pr_card (other 5);
+%%%END_CODE%%%%
+If we now issue the top-level command 
+%%%START_CODE%%%%
+install_print_function pr_card;
+%%%END_CODE%%%%
+\index{install\_print\_function}
+every time we evaluate an expression of type card this routine would
+be called and the string printed out on standard out.
+
+Although pattern matching is often sufficient, sometimes one needs
+to match on some predicate, rather than just the type constructor.
+For this case, fl provides an {\tt assuming} keyword. 
+For example:
+%%%START_CODE%%%%
+letrec collatz 1 = [1]
+ /\    collatz n assuming (n % 2 = 0) = n:(collatz (n/2))
+ /\    collatz n assuming (n % 2 = 1) = n:(collatz (3*n+1))
+;
+collatz 7;
+%%%END_CODE%%%%
+
+Mutually recursive types%
+\index{mutually recursive types}%
+{} can also be defined. To do so, use the keyword andlettype for the
+subsequent types.  For example:
+%%%START_CODE%%%%
+lettype	   IExpr = Ivar string | Plus IExpr IExpr | ITE BExpr IExpr IExpr
+andlettype BExpr = And BExpr BExpr | GEQ IExpr IExpr;
+%%%END_CODE%%%%
+defines two mutually recursive concrete data types for integer expressions
+and Boolean expressions (very simple versions!).
+
+Currently, fl does not provide any direct way of defining
+mutually recursive functions%
+\index{mutually recursive functions}%
+{}.
+The easiest work-around is to pass the later defined functions as
+parameters to the earlier function.
+After all functions have been defined, one can re-define the early ones.
+To illustrate the approach, consider writing functions that converts
+objects of type IExpr and BExpr to strings.
+One possible solution is as follows:
+%%%START_CODE%%%%
+let prIExpr prBexpr expr =
+    letrec prIExpr (Ivar s) = s
+     /\    prIExpr (Plus a b) = (prIExpr a)^" + "^(prIExpr b)
+     /\    prIExpr (ITE c t e) = "if "^(prBexpr c)^" then "^
+                                 (prIExpr t)^" else "^(prIExpr e) in
+    prIExpr expr
+;
+letrec prBExpr (And a b) = (prBExpr a) ^ " AND " ^ (prBExpr b)
+   /\    prBExpr (GEQ a b) = (prIExpr prBExpr a)^" >= "^
+			     (prIExpr prBExpr b)
+;
+let prIExpr e = prIExpr prBExpr e;
+%%%END_CODE%%%%
+Note that we simply pass prBExpr as an argument to the initial definition
+of prIExpr.
+
+A slightly easier approach is to use the forward\_declare mechanism.
+With this, we get:
+%%%START_CODE%%%%
+forward_declare {prBexpr::BExpr->string};
+letrec prIExpr (Ivar s) = s
+ /\    prIExpr (Plus a b) = (prIExpr a)^" + "^(prIExpr b)
+ /\    prIExpr (ITE c t e) = "if "^(prBexpr c)^" then "^
+			     (prIExpr t)^" else "^(prIExpr e)
+;
+letrec prBExpr (And a b) = (prBExpr a) ^ " AND " ^ (prBExpr b)
+ /\    prBExpr (GEQ a b) = (prIExpr a)^" >= "^ (prIExpr b)
+;
+%%%END_CODE%%%%
+which is much easier to write, allthough it requires one to declare
+the type of the forward function(s).
+
+\subsection{Abstract Types}
+
+In fl one can also hide the definitions of types, type constructors,
+and functions.
+By enclosing a sequence of type declarations and function definitions
+within begin\_abstype%
+\index{begin\_abstype}%
+{}
+end\_abstype%
+\index{end\_abstype}%
+{} elist, only the constructors and/or functions mentioned
+in the elist will be visible and accessible for other functions
+and definitions. Thus, one can protect a concrete type and only
+make some abstract constructor functions available. To illustrate the
+concept, consider defining a
+concrete type called theorem. The only way we would like the user to
+be able to create a new theorem is to give a Boolean expression that
+denotes a tautology (something always true).
+First we define the basic expression type.
+%%%START_CODE%%%%
+
+lettype expr =  E_FORALL string expr |
+                E_VAR string |
+                E_TRUE |
+                E_AND expr expr |
+                E_NOT expr
+;
+
+%%%END_CODE%%%%
+
+For convenenience we define a (simple) pretty printer and install it.
+
+%%%START_CODE%%%%
+
+let Pexpr expr =
+    letrec do_print indent (E_FORALL s e) =
+	(printf "(E_FORALL %s\n%*s" s (indent+2) "") fseq
+	(do_print (indent+2) e) fseq
+	(printf "%*s)\n" indent "")
+     /\    do_print indent (E_VAR s) = printf "%s\n" s
+     /\    do_print indent (E_TRUE) = printf "T\n"
+     /\    do_print indent (E_AND e1 e2) =
+	(printf "(E_AND\n%*s" (indent+2) "") fseq
+	(do_print (indent+2) e1) fseq
+	(printf "%*s" (indent+2) "") fseq
+	(do_print (indent+2) e2) fseq
+	(printf "%*s)\n" indent "")
+     /\    do_print indent (E_NOT e) =
+	(printf "(E_NOT\n%*s" (indent+2) "") fseq
+	(do_print (indent+2) e) fseq
+	(printf "%*s)\n" indent "")
+    in
+    (do_print 0 expr) fseq
+    ""
+;
+install_print_function Pexpr;
+
+let e = E_FORALL "a" (E_AND (E_VAR "a") (E_NOT (E_AND E_TRUE (E_VAR "a"))));
+
+e;
+
+%%%END_CODE%%%%
+
+To make it more conveneient to input expressions, one usually defines
+operators and give them suitable fixities.
+%%%START_CODE%%%%
+
+let ~ e = E_NOT e;
+prefix 0 ~;
+let && a b = E_AND a b;
+infix 4 &&;
+let || a b = E_NOT (E_AND (E_NOT a) (E_NOT b));
+infix 3 ||;
+let forall fn s = E_FORALL s (fn (E_VAR s));
+binder forall;
+let thereis fn s = E_NOT (E_FORALL s (E_NOT (fn (E_VAR s))));
+binder thereis;
+let ^^ a b = ~a && ~b || a && b;
+infix 4 ^^;
+
+// Example
+let e = forall a b. thereis c. ~(a^^b) || ~(a^^(c^^b));
+
+%%%END_CODE%%%%
+
+We then define the concrete type theorem and the constructor function
+is\_taut. Note that we
+also define a couple of help functions. However, only the is\_taut function
+is exported out of the
+abstract type%
+\index{abstract type}%
+{}, and thus is the only way of creating a theorem.
+%%%START_CODE%%%%
+
+begin_abstype;
+
+let empty_state = [];
+let add_to_state state var value = (var,value):state;
+let lookup var state =
+    (assoc var state) catch
+    eprintf "Cannot find variable %s (not bound?)" var
+;
+
+let expr2bool e =
+    letrec eval (E_FORALL s e) state =
+	    let state0 = add_to_state state s T in
+	    let state1 = add_to_state state s F in
+	    (eval e state0) AND (eval e state1)
+     /\	   eval (E_VAR s) state = lookup s state 
+     /\	   eval (E_TRUE) state = T
+     /\    eval (E_AND e1 e2) state = (eval e1 state) AND (eval e2 state)
+     /\    eval (E_NOT e) state = NOT (eval e state)
+    in
+    eval e empty_state
+;
+
+lettype theorem = THM expr;
+let Ptheorem t =
+    let PP (THM e) = fprintf stdout "Expression is a theorem\n" in
+    (PP t) fseq ""
+;
+install_print_function Ptheorem;
+
+let is_taut e =
+    (expr2bool e == T) => THM e | error "Expression is not a theorem"
+;
+end_abstype is_taut;
+
+%%%END_CODE%%%%
+
+We can now use this very safe theorem system, since we can only generate
+theorems that are tautologies.
+For example
+%%%START_CODE%%%%
+
+let e = forall a b. thereis c. ~(a^^b) || ~(a^^(c^^b));
+is_taut e;
+let f = thereis c. forall a b. ~(a^^b) || ~(a^^(c^^b));
+is_taut f;
+let g = forall a b c. ~(a^^b) || ~(a^^(c^^b));
+is_taut g;
+
+%%%END_CODE%%%%
+
+\subsection{Fixity Operators}
+
+In order to make the fl code more readable, there is extensive
+support for changing the fixity of operators or functions.
+
+
+if\_then\_else\_binder 
+postfix 
+nonfix
+prefix 0
+prefix 1
+binder
+infix 0-9
+infixr 0-9
+infix\_unary
+
+change the parsing of variables or 
+
+
+declare
+a function to be infix%
+\index{infix}%
+{} (associating from the left), infixr%
+\index{infixr}%
+{}
+(associating from the right), nonfix%
+\index{nonfix}%
+{} (no fixity at all), prefix
+\index{prefix}%
+{} (prefix operator with tighter binding than ``normal'' function definitions),
+postfix%
+\index{postfix}%
+{}, or
+of a binder%
+\index{binder}%
+{} type.
+For the infix and infixr directives, the precedence can be given as
+a number from 1 to 9, where a higher number binds tighter.
+Similarly, prefix also takes a precedence number, but only 0 or 1.
+Note that prefix and postfix functions bind higher than any infix function.
+Beware that the fixity declaration modifies the parser and
+thus remains in effect whether
+the function is exported out of an abstract data type or note.
+As an illustration of this idea, consider the following example:
+%%%START_CODE%%%%
+
+lettype expr = Val int |
+               Mult expr expr |
+               Plus expr expr |
+               Negate expr;
+letrec eval (Val i) = i
+  /\   eval (Mult e1 e2) = (eval e1) * (eval e2)
+  /\   eval (Plus e1 e2) = (eval e1) + (eval e2)
+  /\   eval (Negate e1) = 0-(eval e1)
+;
+let ** a b = Mult a b;
+let ++ a b = Plus a b;
+infix 4 **;
+infix 3 ++;
+let ' i = Val i;
+prefix 0 ';
+let q = '1 ++ Negate '2 ** Negate '4;
+eval q;
+
+%%%END_CODE%%%%
+
+The next example illustrates how postfix declarations can make the
+code more readable.
+%%%START_CODE%%%%
+
+let ns i = 1000*i;
+postfix ns;
+let to a b = (a,b);
+infix 3 to;
+2 ns to 4 ns;
+
+%%%END_CODE%%%%
+
+Our final example deals with more advanced binder declarations.
+The command binder takes a function and makes it into a binder, i.e., an
+object that introduces a new bound variable in an expression.
+Note that the type of the function declared to be a binder must be
+(*\funarrow **)\funarrow string\funarrow **, since the first argument of
+a binder function will be a lambda expression and the second argument will
+be a string with the name of the bound variable.
+Thus, if a function f has been declared as a binder, then
+f x.E will be parsed as f (\protect\verb!\! x.E) "x".
+
+%%%START_CODE%%%%
+
+// Syntactic sugaring
+let forall fn s = E_FORALL s (fn (E_VAR s));
+binder forall;
+let ' v = E_VAR v;
+free_binder ';
+let && = E_AND;
+infix 4 &&;
+let || a b = E_NOT (E_AND (E_NOT a) (E_NOT b));
+infix 3 ||;
+
+'a && 'b;
+
+forall a b c. a || b && c;
+
+%%%END_CODE%%%%
+
+\subsection{Overloading}
+
+fl supports a limited amount of user defined overloading%
+\index{overloading}%
+{} of functions
+and operators.
+However, in order to avoid an exponential type inference algorithm, the
+overloaded operators must be resolved from the types of their arguments only. 
+To illustrate the construct, consider the following example:
+%%%START_CODE%%%%
+let pplus ({a::int},{b::int}) (c,d) = (a+c, b+d);
+let pprod ({a::int},{b::int}) (c,d) = (a*c, b*d);
+overload + + pplus;
+overload * * pprod;
+(1,2)+(3,4)*(9,3*2);
+%%%END_CODE%%%%
+Here we overloaded the symbols + and *.
+Note that we essentially added new meanings to + and * since we included
+the (built-in) versions as possible candidates.
+
+Finally, overloaded operators and functions can of course also
+be declared infix, binders, or postfix as any other function or operator.
+
+\subsection{Quotation of Expressions}
+\index{quotation of expression}
+Sometimes it is convenient to retain the actual text that was used
+to denote an expression.
+By enclosing the expression in \verb@``@ and \verb@''@, fl will return
+a pair consisting of the text of the expression as well as the expression
+itself.
+%%%START_CODE%%%%
+`` 1+3*4 '';
+%%%END_CODE%%%%
+Note that it is advisable to include an extra space after the opening quotes
+and before the closing quotes since the parser otherwise is likely to
+view the quotes as being part of an operator or variable.
+
+% \subsection{Circuit Models}
+% 
+% Since the main use of the fl system, and its historical root, is related
+% to hardware verification, there are a number of built-in
+% functions specifically tailored towards hardware modeling
+% and symbolic trajectory evaluation in particular. 
+% Internally, a circuit is represented by a list of nodes (names),
+% and a next state function%
+% \index{next state function}%
+% {}.
+% The next state function is mapping the current state of the circuit
+% (including the current values on the inputs) to a new state
+% of the circuit.
+% Since the circuit representation is intended for trajectory evaluation,
+% the value domain for each node in the circuit is $\{0,1,\X,\top\}$
+% and thus the next state function consists of quaternary%
+% \index{quaternary}%
+% {} (four-valued)
+% extensions of the usual Boolean function.
+% The type of such circuit is fsm%
+% \index{fsm}%
+% {} (for finite state machine%
+% \index{finite state machine}%
+% {}) and, by
+% default, it does not have a print function (since the machines
+% are usually much too large to be meaningful anyway to the user.
+% However, for the curious reader, the command print\_fsm%
+% \index{print\_fsm}%
+% {} will print out
+% a pretty complete version of the state machine.
+% Note that for efficiency reasons, the next state function also
+% contains delay and fan-in and fan-out information to aid in the
+% efficient simulation.
+% 
+% In general, there are two ways of creating a fsm object:
+% \begin{enumerate}
+% \item
+% Loading a pre-compiled version of a circuit in .exe format.
+% \item
+% Converting a fl structure into an fsm.
+% \end{enumerate}
+% 
+% \subsubsection{Loading a .exe File}
+% 
+% If the original circuit was described in Berkeley .sim format or
+% as a SILOS II gate list, there are programs distributed with the
+% system that can be used to compile an fsm model directly from
+% these formats.
+% The common format for such pre-compiled circuit model is a (binary)
+% file with a .exe%
+% \index{.exe file}%
+% {} suffix.
+% %In Section~\ref{CompanionTools} we discuss in more detail how
+% %to create such .exe file.
+% Loading in the .exe file and making it an fsm object simply
+% involves calling the load\_exe function.
+% 
+% For example, if there is a full\_adder.exe file in the current
+% working directory, the following command would create an fsm object
+% of the circuit.
+% %%%START_CODE%%%%
+% let ckt1 = load_exe "full_adder.exe";
+% %%%END_CODE%%%%
+% Note that there is no theoretical limit on the number of circuit that can
+% be loaded into the fl system at any particular point in time.
+% However, since fsm models are often quite large, it is generally
+% advisable not to load more models than absolutely necessary.
+% %(In most cases, only one model will be used, but there are times
+% %when several models can be useful. We will return to this later
+% %in Section~\ref{ModelChecking}.)
+% 
+% \subsubsection{Creating an fsm Object Inside fl}
+% \label{makeSTEsection}
+% 
+% {\bf Warning:} This addition is fairly young and has thus not
+% been extensively tested. Also, it leaves quite a bit to
+% be desired in terms of not being very ``clean and simple''.
+% For a reader that is more interested in using the {\voss} system rather
+% than writing a new conversion program from some other netlist format, this
+% section can be skipped.
+% 
+% The main routine for creating an fsm object is make\_fsm%
+% \index{make\_fsm}%
+% {}.
+% The type of make\_fsm is (Set)\funarrow (fsm)\footnote{Currently, when
+% fl is invoked, the type of make\_fsm is actually (*)\funarrow (fsm), but
+% this is a bug that will be removed in the next release.}
+% Before going into how an object of type Set%
+% \index{Set}%
+% {} can be constructed, we
+% need to make a small digression and introduce the quaternary logic type.
+% For historical reasons, the name of the quaternary objects is tern%
+% \index{tern}%
+% {},
+% and tern is defined as the concrete type:
+% %%%START_CODE%%%%
+% lettype tern =  One |
+%                 Zero |
+%                 X |
+%                 Z |
+%                 Val string |
+%                 And tern tern |
+%                 Or tern tern |
+%                 Not tern |
+%                 Glb tern tern |
+%                 Lub tern tern
+% ;
+% %%%END_CODE%%%%
+% where One%
+% \index{One}%
+% {}, Zero%
+% \index{Zero}%
+% {}, X%
+% \index{X}%
+% {},  And%
+% \index{And}%
+% {}, Or%
+% \index{Or}%
+% {}, and Not%
+% \index{Not}%
+% {} are the obvious functions.
+% Glb%
+% \index{Glb}%
+% {} stands for the greatest lower bound and Lub%
+% \index{Lub}%
+% {} for the least upper bound.
+% Z%
+% \index{Z}%
+% {} is used to represent the top value%
+% \index{top value}%
+% {}.
+% Finally, Val%
+% \index{Val}%
+% {} s is used to refer to the value on node s.
+% Thus, as a concrete example, the next state function of a node "o" may
+% be described as (Not (And (Val "in1") (Val "in2"))).
+% 
+% There are four constructor functions for an object of type Set:
+% \begin{enumerate}
+% \item
+% Empty%
+% \index{Empty}%
+% {},
+% \item
+% Element%
+% \index{Element}%
+% {} (string\verb@#@((tern\verb@#@tern) list)),
+% \item
+% Union%
+% \index{Union}%
+% {} Set Set, and
+% \item
+% Sequential%
+% \index{Sequential}%
+% {} Set Set.
+% \end{enumerate}
+% The Empty is introduced to make writing functions that generate
+% objects of type Set easier.
+% Element is the constructor that actually introduces new nodes and
+% also give driver functions for the node.
+% In general, Element n gvl, will create a node named n.
+% This node will at least have (more about this later) the drivers
+% listed in the gvl list.
+% A driver is simply a pair of quaternary expressions:
+% the first object of the pair is a guard, and the second part
+% is the value being driven when the guard is true.
+% For a combinational node, the driver list is a single pair whose
+% guard is One and whose value component is the next state function
+% of the gate.
+% For more complex nodes, like register nodes or bus nodes, the guard-value
+% list is often much longer.
+% 
+% The Union construct is used to gather a collection of these Element
+% declarations so that an fsm can eventually be made.
+% Finally, the Sequential constructor takes two objects S1 and S2 of
+% type Set and merges them into a single object of type Set.
+% In that sense, Sequential behaves exactly like Union.
+% The difference is how the two deal with nodes defined in both set S1 and set S2
+% and for which both nodes may have at least one of their guards enabled
+% at the same time.
+% Union will find the greatest lower bound of the values being driven
+% at the same time whereas Sequential will assume that the driver in the
+% second set overrides the driver in the first.
+% To illustrate the difference, consider the following example:
+% %%%START_CODE%%%%
+% let a = Element ("in1", [(One, One)]);
+% let b = Element ("in1", [(One, Zero)]);
+% let ex1 = Union a b;
+% let ex2 = Sequential a b;
+% let m1 = make\_fsm ex1;
+% let m2 = make\_fsm ex2;
+% m1;
+% %%%END_CODE%%%%
+% Now m1 and m2 will both be fsm models with a single node called in1.
+% However, in m1, the next state function of in1 will be $\X$, since that
+% is the most we can say from the inconsistent driver commands given
+% in the example.
+% On the other hand, the next state function of the in1 node in m2 will be Zero.
+% 
+% For an example of using this facility, the directory HDL in the demo
+% distribution illustrates how one can go about defining a new description
+% language in order to create an fsm object.
+% 
+% \subsection{Queries to the Circuit Model}
+% 
+% There are five built-in functions that are useful in dealing with
+% an fsm model: nodes%
+% \index{nodes}%
+% {}, fanin%
+% \index{fanin}%
+% {}, fanout%
+% \index{fanout}%
+% {}, is\_stable%
+% \index{is\_stable}%
+% {}, and get\_node\_val%
+% \index{get\_node\_val}%
+% {}.
+% Nodes takes an fsm model and returns a {\em list of lists} of circuit nodes.
+% The reason for the double listing is that a node may have more than
+% one name (only from .exe file translations).
+% Fanin takes an fsm model and a name of a node and returns the
+% list of node names that the next state function depend on.
+% Fanout works in a similar way, but for the fanout nodes.
+% Is\_stable returns T (true) if the circuit is currently stable.
+% It is mainly used when the simulation is aborted at some
+% particular time with the "-m" option to STE.
+% Finally, get\_node\_val takes an fsm object and the name of a node
+% and returns the encoded version of the current value of the node.
+% The encoding used is: $\X = (T,T)$, $1=(T,F)$, $0=(F,T)$, and $\top=(F,F)$.
+% Of course, the two Boolean values are often Boolean functions over some
+% variables.
+% The main use of the get\_node\_val function is when the simulation
+% is aborted for some reason.
+% Get\_node\_val can then be used to probe the current state of the system.
+% For example, assuming there is a full\_adder.exe file in the current
+% working directory, we would get:
+% %%%START_CODE%%%%
+% let ckt = load_exe "full_adder.exe";
+% nodes ckt;
+% ..[["cout"],["t4"],["t3"],["t2"],["result"],["cin"],["t1"],["b"],["a"]]
+% fanin ckt "cout";
+% fanout ckt "t3";
+% fanout ckt "t4";
+% fanout ckt "a";
+% get_node_val ckt "t2";
+% %%%END_CODE%%%%
+% 
+% If the user also loads in the "default.fl" standard library, there is
+% the very useful function {\em excitation}%
+% \index{excitation}
+% that also takes an fsm model
+% and a node name, but that returns the next state function for binary inputs.
+% Note, however, that the current version of the excitation function
+% only works correctly for unit delay nodes.
+% %%%START_CODE%%%%
+% load "defaults.fl";
+% excitation ckt "cout";
+% %%%END_CODE%%%%
+% We will return to this in Section~\ref{vossrc}.
+% 
+% \subsection{Symbolic Trajectory Evaluation}
+% 
+% There is actually only one built-in command for symbolic trajectory%
+% \index{symbolic trajectory evaluation}%
+% {}
+% evaluation called STE%
+% \index{STE}%
+% {}.
+% In general, STE determines, through symbolic trajectory evaluation, whether
+% an antecedent/consequent pair hold in for some circuit.
+% STE will return a Boolean function that gives the condition for the
+% verification to succeed.
+% For most applications the desired return value is T.
+% 
+% In general STE is invoked as
+% %%%START_CODE%%%%
+% STE options fsm weak_list ant_list cons_list trace_list
+% %%%END_CODE%%%%
+% where options%
+% \index{STE options}%
+% {} is a string that can contain a combinations of the
+% following flags:
+% \begin{description}
+% \item[-a] Abort%
+% \index{abort STE}%
+% {} the verification at the first antecedent or consequent failure.
+% If the verification is aborted, STE will return a Boolean function that
+% gives {\em the condition for this failure to manifest itself}.
+% Note that this is contrary to STE's usual behavior which is to return
+% the Boolean function that gives the conditions for the verification to
+% succeed.
+% \item [-m n]
+% Abort the verification after reaching time n.
+% \item [-e]
+% Evaluate evey node in the circuit whether the node is in the
+% fan-in tree of some node that is checked or traced or not.
+% In other words, with the -e option, the simulator will compute
+% the value on every node. Normally, a node whose value
+% cannot be observed (directly or indirectly) is simply kept at X.
+% Of course, the STE command can run significantly slower with the
+% -e option, so beware!
+% \item [-i]
+% Allow antecedent failures%
+% \index{antecedent failures}%
+% {}.
+% In other words, compute a straight implication.
+% The normal behavior of the verification process is to disallow
+% antecedent failures.
+% Thus the default verification condition is both to check that every
+% trajectory the circuit can go thorough that is consistent with the
+% antecedent is also consistent with the consequent, and that there
+% is at least one (real) circuit trajectory that is consistent
+% with the antecedent.
+% \item [-n]
+% Allow over-constrained values, i.e., allow nodes to take
+% on the top value in the value lattice.
+% Normally, over-constrained values are viewed as failures.
+% \item[-w]
+% Do not print out warning messages%
+% \index{warning messages}%
+% {}.
+% \item[-t s]
+% In addition to printing out trace messages on stderr, also send
+% the trace events in Postscript%
+% \index{Postscript waveform}%
+% {} format to the file s.
+% By previewing or printing out the file the user gets a waveform diagram for
+% the traced signals.
+% \item[-T s]
+% Same as -t, but generate Postscript code in landscape mode.
+% \end{description}
+% 
+% The second argument to STE must be an object of the fsm type representing
+% a circuit that is to be simulated.
+% 
+% The weak\_list is a list of 4-tuples.
+% Each 4-tuple is of the form (g,n,f,t), where $n$ is a node name, $f$ and $t$
+% denote start and stop times, and $g$ is a Boolean function
+% denoting the domain for which this node should be weakened%
+% \index{weakened}%
+% {}.
+% For assignments making the guard true, the next state function of the
+% circuit node is set to $X$.
+% This is often useful when verifying a subsystem of a larger system
+% that has shared input signals.
+% By weakening%
+% \index{weakening}%
+% {} the model, unnecessary computations does not have
+% to be performed.
+% Note that weakening a model is a ``safe'' operation in that
+% the monotonicity of the circuit models guarantee that if we
+% can verify something in the weakened model, then that same property
+% is guaranteed to hold in the original model.
+% 
+% The ant\_list and cons\_list are  both lists of five-tuples.
+% Each five-tuple%
+% \index{five-tuple}%
+% {} is of the form $(g,n,v,s,t)$, where $g$ is a Boolean function
+% denoting the domain for which this assertion/check should be carried out,
+% $n$ is the name of a node, $v$ is the value to be asserted/checked, and
+% $s$ and $t$ denote the start and stop times for this assertion/check
+% respectively.
+% 
+% Finally, the last argument to STE is a list of triples.
+% Each triple is of the form $(n,s,t)$, where $n$ is a name of a node
+% to be traced%
+% \index{traced}%
+% {} and $s$ and $t$ are the start and stop times for this
+% trace respectively.
+% 
+% Of course, in practice, it would be quite tedious to have to
+% write all specifications in terms of lists of five-tuples.
+% Consequently, a small language (actually a small set of useful functions)
+% has been defined in the library file "verification.fl".
+% These functions make it much easier to write specification.
+% However, it should be remembered that when the verification
+% is actually performed, all these higher level constructs gets translated
+% down to the two lists of five-tuples.
+% 
+% For more details on how to use the STE function, we refer the reader
+% to Section~\ref{tutorial}.

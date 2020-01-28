@@ -1,0 +1,26 @@
+let fl_test (il,msg,j,k) =
+    let i = itlist (defix +) il 100 in
+    sprintf "%s: %d" msg (i+2*j+3*k)
+;
+export_to_tcl fl_test;
+
+tcl_eval ["WriteStdOut \"I get: [fl_test {{1 2 3 4} {{A test if this is ok} {2 3}}}]\\n\""];
+
+99999999;
+
+
+let fl_inc i = i+1;
+export_to_tcl fl_inc;
+
+1;
+
+tcl_eval [ "WriteStdOut {I get}" ];
+
+tcl_eval ["WriteStdOut {I get: {1 2 3}}"];
+
+tcl_eval ["WriteStdOut \"I get: {1 2 3}\""];
+
+tcl_eval ["WriteStdOut \"I get: {1 2 3}\""];
+
+
+

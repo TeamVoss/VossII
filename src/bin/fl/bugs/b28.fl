@@ -1,0 +1,20 @@
+
+let dbg1_ref = ref {[]:: (
+                          (bool list)#
+                          (bool list)#
+                          (bool list)#
+                          (bool list)#
+                          (bool list)#
+                          bool#
+                          (bool list)
+                        ) list};
+
+let q x = dbg1_ref := (x:(deref dbg1_ref));
+
+bvariable "a";
+let record1 C S rC rS approx_sum approx_neg res =
+ {C:: bool list} fseq{S:: bool list} fseq{rC:: bool list} fseq{rS:: bool list} fseq{approx_sum:: bool list} fseq{approx_neg:: bool} fseq{res:: bool list} fseq
+//    dbg1_ref :=
+        ((C,S,rC,rS,approx_sum,approx_neg,res),(deref dbg1_ref))
+;
+

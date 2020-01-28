@@ -1,0 +1,72 @@
+load "bool_arithm.fl";
+
+overload + + ''+'';
+infix 7 +;
+
+overload - - ''-'';
+infix 7 -;
+
+overload * * ''*'';
+infix 8 *;
+
+overload / / ''/'';
+infix 8 /;
+
+overload % % ''%'';
+infix 8 %;
+
+overload <= <= ''<='';
+infix 5 <=; 
+
+overload < < ''<'';
+infix 5 <;
+
+overload >= >= ''>='';
+infix 5 >=; 
+
+overload > > ''>'';
+infix 5 >;
+
+let s2dbv s = int2dbv (sscanf "%d" s);
+let s2int s = sscanf "%d" s;
+overload ' s2dbv s2int;
+free_binder ';
+
+let neg_s2int s = ((0-1)*(sscanf "%d" s));
+let neg_s2dbv s = int2dbv ((0-1)*(sscanf "%d" s));
+overload '- neg_s2int neg_s2dbv;
+free_binder '-;
+
+let ieq {i::int} {j::int} = i = j;
+let beq1 {a::bool} b = [a] ''='' [b];
+let beq {a::bool list} b = a ''='' b;
+overload = ieq beq beq1;
+
+let iSX {sz::int} {i::int} = i;
+let bvSX {sz::int} {bv::bool list} = (replicate (sz-length bv) (hd bv))@bv;
+overload SX iSX bvSX;
+
+lettype {*a} slist = SLIST (bool list) (*a list);
+
+let empty = SLIST [F] [];
+
+let cons e (SLIST len l) = SLIST (len + '1) (e:l);
+
+rvariable "a";
+let sfilter fn {l:: {*a} slist} =
+    val (SLIST len ll) = l in
+    letrec look i items = i > len => empty |
+                let e = hd items in
+                let es = tl items in
+                (fn e => (cons e (look (i+ '1) es)) | (look (i+ '1) es))
+    in
+    look [F,T] ll
+;
+
+rvariable "a";
+let sappend {l1:: {*a} slist} {l2:: {*a} slist} =
+    val (SLIST len1 il1) = l1 in
+    val (SLIST len2 il2) = l2 in
+    let len = len1 + len2 in
+len;
+

@@ -1,0 +1,3 @@
+let andordwdaddad (in1_, in2_, in3_) -> (out_) {
+	out_ = AND (OR in3_ in1_) in2_
+}

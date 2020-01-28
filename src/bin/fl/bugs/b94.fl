@@ -1,0 +1,22 @@
+load "rationals.fl";
+
+let q = [
+    [[0.3, -0.2], [0.4, 0.121]],
+    [[0.3, -0.2], [0.4, 0.121]],
+    [[0.3, -0.2], [0.4, 0.121]]
+];
+
+let cnv1 f = str2rat (float2str f);
+
+let cnvl l = map cnv1 l;
+
+let cnvll ll = map cnvl ll;
+
+let cnvlll lll = map cnvll lll;
+
+let qq = cnvlll q;  // Correct
+qq;
+
+let qq = cnvll q;   // Type error
+
+

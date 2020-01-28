@@ -1,0 +1,730 @@
+\section{Syntax Summary}
+
+This is a (somewhat edited) version of the parser for fl. Since fl
+is still evolving, the actual
+syntax accepted by the program may differ slightly from this one. However,
+I have tried to make
+the grammar as close as possible to the parser in Voss 1.8b.
+
+\begin{hol}
+/* Top level commands */
+
+pgm             : pgm ';' stmt
+                | stmt
+                ;
+
+stmt            : expr
+                | decl
+                | type_decl
+                | 'install_print_function' expr
+                | '{' simple_type '}' decl
+                | 'print_all_fns'
+                | 'postfix' var_or_infix
+                | 'nonfix' var_or_infix
+                | 'binder' var_or_infix
+                | 'infix' NUMBER var_or_infix
+                | 'infixr' NUMBER var_or_infix
+                | 'begin_abstype'
+                | 'end_abstype' var_or_infix_list
+                | /* Empty */
+                ;
+
+var_or_infix    : VART 
+                | INFIX_VAR
+                | INFIXR_VAR
+                | POSTFIX_VAR 
+                | BINDER_VAR 
+                ;
+
+var_or_infix_list : var_list var_or_infix
+                  | var_or_infix
+                  ;
+\end{hol}
+\begin{hol}
+/* Declarations */
+decl            : 'let' fn_defs
+                | 'letrec' fn_defs
+                ;
+
+fn_defs         : fn_def '/\.' fn_defs
+                | fn_def
+                ;
+fn_def          : var_or_infix lhs_expr_list
+                | '(' var_or_infix lhs_expr_list ')'
+                ;
+lhs_expr_list   : expr1 lhs_expr_list
+                | '=' top_expr
+                ;
+\end{hol}
+\begin{hol}
+/* Type declarations */
+type_decl       : 'lettype' type_name '=' type_expr_list
+                | 'new_type_abbrev' var_or_infix '=' simple_type
+                ;
+type_name       : type_name ',' var_or_infix
+                | var_or_infix
+                ;
+type_expr_list  : type_expr_list ',' type_expr
+                | type_expr
+                ;
+type_expr       : type_expr '|' type
+                | type
+                ;
+type            : var_or_infix type_list
+                ;
+
+type_list       : type_list simple_type
+                | /* Empty */
+                ;
+simple_type     : var_or_infix
+                | simple_type '->' simple_type
+                | simple_type '#' simple_type
+                | simple_type 'list'
+                | '(' simple_type ')'
+                ;
+\end{hol}
+\begin{hol}
+/* Expressions */
+top_expr        : expr ;
+
+expr            : decl 'in' expr
+                | 'val' expr1 '=' expr 'in' expr
+                | '\.' expr1 '.' expr
+                | BINDER_VAR expr1 '.' expr
+                | expr '=>' expr '|' expr
+                | expr POSTFIX_VAR
+                | expr INFIX_VAR expr
+                | expr INFIXR_VAR\ expr
+                | expr ',' expr
+                | expr '=' expr
+                | expr05
+                ;
+expr05          : expr05 expr1
+                | expr1
+                ;
+
+expr1           : '[' expr_list ']'
+                | '[' ']'
+                | '(' expr ')'
+                | expr2
+                ;
+
+expr_list       : rev_expr_list
+                ;
+
+rev_expr_list   : rev_expr_list ',' expr
+                | expr
+                ;
+
+expr2           : VART
+                | NUMBER
+                | '[]'
+                | '" ... "'
+                | 'quit'
+                ;
+\end{hol}
+
+\subsection{Reserved Words in fl}
+
+The following list contains all identifiers that are currently defined
+in fl. This list will likely change in future releases.
+\begin{quote}
+{\bf
+begin\_abstype
+binder
+end\_abstype
+forall\_last
+HOL\_DEF
+HOL\_EXPR
+infix
+infixr
+in
+install\_print\_function
+let
+letrec
+lettype
+HOLlettype
+list
+new\_type\_abbrev
+nonfix
+overload
+postfix
+val
+quit}
+\end{quote}
+In addition, the following symbols are also defined and cannot be
+redefined:
+\begin{quote}
+{\bf
+\verb@=>@
+\verb@->@
+\verb@|@
+=
+\verb@#@
+\verb@/\@
+\verb@\@
+::
+}
+\end{quote}
+
+\newpage
+\section{Buit-in Functions and Commands}
+
+The following subsections contain all built-in functions and
+top-level comamands in fl.
+Most of them are described in the tutorial section, but this section
+should be viewed as the reference section.
+
+\subsection{Functions}
+
+
+Note that all these functions can be redefined by the user or
+by library files, and thus the table is only valid for ``raw'' fl.
+The functions are given in alphabetical order.
+
+\begin{description}
+
+\index{bool2str}
+\FlFunction{bool2str}{bool\funarrow string}{bool2str f}{%
+Convert the Boolean function {\tt f} to a Boolean expression
+and return a string that prints out this expression.
+Note that the expression can be truncated if the size
+of the Boolean expression exceeds some threshold.
+For more details, see the section on printing
+Boolean functions on page~\protect\ref{printBooleans}.}
+
+\index{bdd\_size}
+\FlFunction{bdd\_size}{(bool list)\funarrow int}{bdd\_size [f1,f2,...,fn]}{%
+Return the number of OBDD nodes needed to represent the functions
+f1, f2, ..., fn.
+Note that bdd\_size[f1]+bdd\_size[f2] is usually significant
+larger than bdd\_size[f1,f2], due to sharing in the OBDD structure.}
+
+\index{bdd\_load}
+\FlFunction{bdd\_load}{string\funarrow (bool list)}{bdd\_load FileName}{%
+Read in the OBDD functions from file FileName.
+This fucntion assumes the OBDDs were saved in the format
+used by bdd\_save.}
+
+\index{bdd\_reorder}
+\FlFunction{bdd\_reorder}{int\funarrow bool}{bdd\_reorder n}{%
+Invoke the dynamic variable re-ordering routine in order
+to reduce the size of the OBDDs.
+The parameter $n$ denote the number of times the
+re-ordering should be done.
+}
+
+\index{bdd\_save}
+\FlFunction{bdd\_save}{string\funarrow ((bool list)\funarrow bool)}{%
+bdd\_save FileName [f1,f2,...,fn]}{%
+Save the OBDDs rooted at f1, f2, ..., fn.
+The format of the saved file is in itself a valid fl program
+and thus is fairly self-explanatory.
+}
+
+\index{chr}
+\FlFunction{chr}{int\funarrow string}{chr n}{%
+Return the string (of length 1) of the character corresponding
+to the ASCII code n.
+If n is less than 0 or greater than 127, the function fails with
+a ranger error message.
+}
+
+
+\index{depends}
+\FlFunction{depends}{(bool list)\funarrow (string list)}{depends [f1, f2, ..., fn]}{%
+Return the list of names of Boolean variables that the functions
+f1, f2, ..., fn depends on.
+Note that the order of the variables in the string correspond to the
+OBDD variable ordering.
+}
+
+\index{error}
+\FlFunction{error}{string\funarrow failure}{error msg}{%
+Raise an exception with error message msg.
+}
+
+\index{empty}
+\FlFunction{empty}{(*list)\funarrow bool}{empty l}{%
+Return T (true) if list l is empty. Otherwise return F (false).
+%%% CJS: Is this one needed anymore given pattern matching?
+}
+
+\index{explode}
+\FlFunction{explode}{string\funarrow (string list)}{explode s}{%
+Convert the string s into a list of strings of length 1.
+}
+
+\index{eval}
+\FlFunction{eval}{string\funarrow bool)}{eval s}{%
+Eval writes out the string s on a temporary file, redirects
+fl's standard input to this file and returns T if this was succsessful.
+Otherwise it return F and leaves the standard input as before.
+Note that this function is most useful at the top level
+where it can be used to implement reference variables.}
+
+\index{fanin}
+\FlFunction{fanin}{fsm\funarrow (string\funarrow (string list))}{fanin ckt n}{%
+For fsm object ckt, return the list of node names that the next state
+function for node s depends on.
+}
+
+\index{fanout}
+\FlFunction{fanout}{fsm\funarrow (string\funarrow (string list))}{fanout ckt n}{%
+For fsm object ckt, return the list of node names whose next state
+functions depend on the value of node s.
+Note that fanout uses the topology of ckt to detremine fanout.
+Thus, it is possible that the function is conservative and returns
+node names that, functionally speaking, are not in the fanout set of node s.
+}
+
+\index{STE}
+\FlFunction{STE}{string\funarrow fsm\funarrow (fourtuple list) \funarrow (fivetuple list)\funarrow (fivetuple list)\funarrow ((string\#int\#int) list)\funarrow bool\\ where fourtuple is bool\#string\#int\#int and fivetuple is bool\#string\#bool\#int\#int}{STE options ckt ant cons tracenodes}{%
+Perform symbolic trajectory evaluation on the circuit ckt.
+The options is a string that give various options to the
+symbolic trajectory evaluator.
+Currently recognized options are:
+\begin{description}
+\item[-a] Abort the verification at the first antecedent or consequent failure.
+If the verification is aborted, STE will return a Boolean function that
+gives {\em the condition for this failure to manifest itself}.
+Note that this is contrary to STE's usual behavior which is to return
+the Boolean function that gives the conditions for the verification to
+succeed.
+\item [-m n]
+Abort the verification after reaching time n.
+\item [-i]
+Allow antecedent failures.
+In other words, compute a straight implication.
+The normal behavior of the verification process is to disallow
+antecedent failures.
+Thus the default verification condition is both to check that every
+trajectory the circuit can go thorough that is consistent with the
+antecedent is also consistent with the consequent, and that there
+is at least one (real) circuit trajectory that is consistent
+with the antecedent.
+\item[-w]
+Do not print out warning messages.
+\item[-t s]
+In addition to printing out trace messages on stderr, also send
+the trace events in Postscript format to the file s.
+By previewing or printing out the file the user gets a waveform diagram for
+the traced signals.
+\item[-T s]
+Same as -t, but generate Postscript code in landscape mode.
+\end{description}
+For more details about symbolic trajectory evaluation, see
+Section~\protect\ref{SymbTrajSection}.
+}
+
+\index{fst}
+\FlFunction{fst}{(*\#**)\funarrow *}{fst obj}{Return the first part of a pair.}
+
+\index{get\_node\_val}
+\FlFunction{get\_node\_val}{fsm\funarrow (string\funarrow (bool\#bool))}{get\_node\_val fsm nd}{%
+Return the current value on node nd in the model structure fsm.
+This function is mostly useful after evaluating an STE command
+using the -a (abort) or -m (maximum number of steps) options.
+The pairs of Boolean functions returned represent the high
+and low values respectively.
+As usual, the encoding is 0=(F,T), 1=(T,F), X=(T,T), and top=(F,F).}
+
+\index{get\_delays}
+\FlFunction{get\_delays}{fsm\funarrow (string\funarrow ((int\#int)\#(int\#int)))}{%
+get\_delays fsm nd}{%
+Return the tuple
+((min-rise-delay, max-rise-delay), (min-fall-delay, max-fall-delay))
+for the node nd in the model structure fsm.}
+
+\index{hd}
+\FlFunction{hd}{(* list)\funarrow *}{hd l}{Return the head (first element) of a
+list.}
+%%%CJS: Should hd be removed given pattern matching?
+
+\index{implode}
+\FlFunction{implode}{(string list)\funarrow string}{implode sl}{%
+Concatenate the strings in sl and return the resulting string.
+Note that there is a limit on how big a string can be.
+Currently this limit is around 16,000 character.
+Note also, that currently the strings are not garbage collected.
+However, all strings are made unique internally and thus only
+the total number of distinct strings determines the memory usage
+for the strings.}
+%%%CSJ: Do I actually need to say this here?
+
+\index{int2str}
+\FlFunction{int2str}{int\funarrow string}{int2str i}{Returns a string version
+of the integer i.
+If i is negative the string will begin with a minus sign.}
+
+\index{is\_stable}
+\FlFunction{is\_stable}{fsm\funarrow bool}{is\_stable ckt}{%
+Returns true if the circuit ckt is currently stable, i.e., no
+the value on each node equals its excitation.
+This function is mostly useful after evaluating an STE command
+using the -a (abort) or -m (maximum number of steps) options.}
+
+\index{load}
+\FlFunction{load}{string\funarrow bool}{load fn}{%
+Re-direct standard input to read from the file fn until the
+file is exhausted at which point it is restored to its current
+source.
+Returns T (true) if the file can be found.
+Returns F otherwise.
+If an error occurs during reading a file, all nested
+reads are terminated and the system returns to the
+user level prompt.}
+
+\index{load\_exe}
+\FlFunction{load\_exe}{string\funarrow fsm}{load\_exe fn}{%
+Loads an fsm object described in the .exe format
+stored in the file named fn.
+Note that node delays can be provided in a companion
+file (with same name but with suffix .del).
+}
+%%%CJS: Does it now use the same search path as for .vossrc???
+
+\index{make\_fsm}
+\FlFunction{make\_fsm}{Set\funarrow fsm}{make\_fsm cl}{%
+Converts a next state function defined as the concrete data type Set
+to the internal fsm object.
+For more details on the Set data type, see Section~\protect\ref{makeSTEsection}.
+}
+
+\index{NOT}
+\FlFunction{NOT}{bool\funarrow bool}{NOT f}{Returns the negation of the
+Boolean function f.}
+
+\index{nodes}
+\FlFunction{nodes}{fsm\funarrow ((string list) list)}{nodes fsm}{%
+Returns the list of nodes that the model structure fsm contains.
+For each node, the list of names (including aliases) are returned.}
+
+\index{ord}
+\FlFunction{ord}{string\funarrow int}{ord s}{%
+Returns the ASCII code for the first character in the string.
+The function fails with a length constraint message if it is not
+given a string of length 1.}
+
+\index{print}
+\FlFunction{print}{string\funarrow string}{print s}{%
+Prints out the string s on standard output and returns
+an emtpy string.
+Note that due to fl's lazy semantics, constants will
+usually only be printed out once.
+For example,
+\vspace{-5mm}
+\begin{hol}
+let ans = print "OK"; ans; ans; ans;
+\end{hol}
+will only print out "OK" once, rather than three times.
+The usual work-around is to catenate constant strings
+with some variable string and then print out the final string.}
+
+\index{print\_fsm}
+\FlFunction{print\_fsm}{fsm\funarrow string}{print\_fsm fsm}{%
+Prints out the internal representation of a model structure.
+For more details of the format, see Sections~\protect\ref{fsmStructureSection}. }
+
+\index{profile}
+\FlFunction{profile}{(bool list)\funarrow (int list)}{profile l}{%
+Returns the widths of the OBDD multigraph indicated by the
+list of Boolean functions in l.
+Note that this routines correctly accounts for sharing.
+If individual function sizes are needed, call profile
+with singelton lists.
+User's rarely call this function directly, but rather calls the
+function bdd\_profile defined in the defaults.fl file which
+prints out a graphical profile of the OBDD multigraph.}
+
+\index{rvariable}
+\FlFunction{rvariable}{string\funarrow bool}{rvariable s}{
+\label{rvariable}
+Returns a random Boolean value.
+Note that there is only one value associated with each variable name s.
+Thus, (rvariable "a") == (rvariable "b") always holds.}
+
+%%%CJS: Should these be removed?
+%\index{relprod\_thereis}
+%\FlFunction{relprod\_thereis}{(bool list)\funarrow (int list)}{profile l}{ }
+%\index{relprod\_forall}
+%\FlFunction{relprod\_forall}{(bool list)\funarrow (int list)}{profile l}{ }
+
+\index{quant\_forall}
+\FlFunction{quant\_forall}{bool\funarrow (bool\funarrow bool)}{quant\_forall vf f}{%
+Returns the result of universally quantifying out all variables
+occuring in the Boolean function vf from the Boolean function f. }
+
+\index{quant\_thereis}
+\FlFunction{quant\_thereis}{bool\funarrow (bool\funarrow bool)}{quant\_thereis vf f}{%
+Returns the result of existentially quantifying out all variables
+occuring in the Boolean function vf from the Boolean function f. }
+
+\index{snd}
+\FlFunction{snd}{(*\#**)\funarrow **}{snd obj}{Returns the second part of a pair.}
+
+\index{save\_exe}
+\FlFunction{save\_exe}{fsm\funarrow (string\funarrow bool)}{save\_exe fsm s}{%
+Save the model structure fsm in the exe format in file s.
+Returns true if it is successful and false otherwise.}
+
+%%%CJS: Should these be removed?
+%\index{string\_hd}
+%\FlFunction{string\_hd}{string\funarrow string}{profile l}{ }
+%\index{string\_tl}
+%\FlFunction{string\_tl}{string\funarrow string}{profile l}{ }
+
+\index{substitute}
+\FlFunction{substitute}{((string\#bool) list)\funarrow (bool\funarrow bool)}{substitute sl f}{%
+Simultaneously perform the substitutions given in the substitution list
+sl in the Boolean function f.
+A substitution in the list is a pair--variable to be substituted and
+boolean function to be substituted in.
+Formally, given the substitution list $\mbox{sl}=[(v_1,f_1),\ldots,(v_n,f_n)]$,
+we have $\mbox{substitute sl f} =
+\exists v_1. \ldots \exists v_n.\; ((v_1=f_1) \wedge \ldots \wedge(v_n=f_n) \wedge f)$.
+}
+
+\index{system}
+\FlFunction{system}{string\funarrow int}{system s}{%
+System causes the string s to be given to sh(1) as input as
+if the string had been typed as a command at a terminal.
+The current process waits until the shell has completed, then
+returns the exit status of the shell.}
+
+%%%CJS: Should these be removed?
+%\index{SUC}
+%\FlFunction{SUC}{int\funarrow int}{profile l}{ }
+
+\index{tl}
+\FlFunction{tl}{(* list)\funarrow (* list)}{tl l}{%
+Returns the tail (all but the first element) of a list.
+Fails and raises an exception on the empty list.}
+%%%CJS: Should tl be removed given pattern matching?
+
+\index{time}
+\FlFunction{time}{*\funarrow (*\#string)}{time e}{%
+Evaluate e and return the pair (e,t), where t is a string
+containing the usertime used to evaluate e.
+Note that the laziness of fl may make consecutive invocations
+require vastly different amount of time.
+On HP machines, time returns the wall time. This is a ``feature''
+that is likely to be removed soon. }
+
+\index{trace}
+\FlFunction{trace}{string\funarrow fsm\funarrow (fourtuple list) \funarrow (fivetuple list)\funarrow (fivetuple list)\funarrow ((string\#int\#int) list)\funarrow bool\\ where fourtuple is bool\#string\#int\#int and fivetuple is bool\#string\#bool\#int\#int}{trace options ckt ant cons tracenodes}{%
+Performs the same operations as STE (with the same arguments), but
+returns a list of node changes.
+For each node in the trace list and for each time t that node change
+value,  a tripple (t,H,L) is added to a list that is returned by
+the trace command.
+The H and L are the boolean functions for the high and low
+value on a node using the standard encoding, i.e., 0 is (F,T),
+1 is (T,F), X is (T,T) and overconstrained is (F,F).
+Note that the command is eager and thus the whole trace is
+computed before the list is returned.
+As a result, the command can be very expensive to evaluate since
+there may be a large number of distinct Boolean functions
+generated that must be rememberd (and thus not garbage collected). }
+
+\index{variable}
+\FlFunction{variable}{string\funarrow bool}{variable s}{%
+Returns the Boolean function that is T if the Boolean variable
+s is T and F otherwise.}
+
+\index{var\_order}
+\FlFunction{var\_order}{(string list)\funarrow bool}{var\_order l}{%
+Re-orders the Boolean variables so that the variables
+listed in l will be the first variables in the OBDD ordering.}
+
+\index{AND}
+\FlFunction{AND}{bool\funarrow (bool\funarrow bool)}{f AND g}{%
+Computes the AND of two Boolean functions.}
+
+\index{OR}
+\FlFunction{OR}{bool\funarrow (bool\funarrow bool)}{f OR g}{%
+Computes the OR of two Boolean functions.}
+
+\index{XOR}
+\FlFunction{XOR}{bool\funarrow (bool\funarrow bool)}{f XOR g}{%
+Computes the XOR of two Boolean functions.}
+
+\index{\%}
+\FlFunction{\%}{int\funarrow (int\funarrow int)}{f\%g}{%
+Computes f MOD  g.
+Note that fl uses arbitrary precision integers.}
+
+\index{*}
+\FlFunction{*}{int\funarrow (int\funarrow int)}{f*g}{%
+Computes f times g.
+Note that fl uses arbitrary precision integers.  }
+
+\index{/}
+\FlFunction{/}{int\funarrow (int\funarrow int)}{f/g}{%
+Computes f divided by g.
+Note that fl uses arbitrary precision integers.  }
+
+\index{+}
+\FlFunction{+}{int\funarrow (int\funarrow int)}{f+g}{%
+Computes f plus g.
+Note that fl uses arbitrary precision integers.  }
+
+\index{-}
+\FlFunction{-}{int\funarrow (int\funarrow int)}{f-g}{%
+Computes f minus g.
+Note that fl uses arbitrary precision integers.}
+
+\index{:}
+\FlFunction{:}{*\funarrow (* list)\funarrow (* list)}{e:l}{%
+Inserts element e as the first element in the list l.}
+
+
+%\index{\verb@^@}
+\FlFunction{\protect\mbox{\protect\^{} }}{string\funarrow (string\funarrow string)}{f \protect\mbox{\protect\^{} } s}{%
+Catenates strings f and s and return the result.
+Note that the maximum string length in fl is currently
+about 16,000 characters and strings longer than that are
+simply truncated (after a warning message is printed out
+to standard error).}
+
+\index{$<$}
+\FlFunction{$<$}{int\funarrow (int\funarrow bool)}{f$<$g}{%
+Returns T if f$<$g and F otherwise.}
+
+\index{$<$=}
+\FlFunction{$<$=}{int\funarrow (int\funarrow bool)}{f$<$=g}{%
+Returns T if f$<=$g and F otherwise.}
+
+\index{$>$}
+\FlFunction{$>$}{int\funarrow (int\funarrow bool)}{f$>$g}{%
+Returns T if f$>$g and F otherwise.}
+
+\index{$>$=}
+\FlFunction{$>$=}{int\funarrow (int\funarrow bool)}{f$>$=g}{%
+Returns T if f$>=$g and F otherwise.}
+
+\index{=}
+\FlFunction{=}{*\funarrow (*\funarrow bool)}{f=g}{%
+If f and g are Boolean functions, f=g returns the exclusive
+NOR of the two functions.
+If f and g are any other functions, the result is T if the two
+functions have the same name and F otherwise.
+For other values, f=g returns T if f and g are structurally
+equal and F otherwise.}
+
+\index{==}
+\FlFunction{==}{*\funarrow (*\funarrow bool)}{f==g}{%
+If f and g are Boolean functions, f==g returns T if the two
+functions are equal and F otherwise.
+For other values, f==g and f=g behaves identically.}
+
+\index{\!=}
+\FlFunction{!=}{*\funarrow (*\funarrow bool)}{f!=g}{%
+If f and g are Boolean functions, f!=g returns the exclusive
+OR of the two functions.
+If f and g are any other functions, the result is F if the two
+functions have the same name and T otherwise.
+For other values, f!=g returns F if f and g are structurally
+equal and T otherwise.}
+
+\index{catch}
+\FlFunction{catch}{*\funarrow *\funarrow *}{e catch f}{%
+Forces a complete evaluation of e.
+If e results in an exception f is returned.
+Otherwise the result of evaluating e is returned.}
+
+\index{seq}
+\FlFunction{seq}{*\funarrow **\funarrow **}{e seq f}{%
+Evaluates first e and then f and returns the result of evaluating f.}
+
+\end{description}
+
+\subsection{Top-level commands}
+
+The following set of functions/commands are only available at the
+top level, i.e., directly after a prompt (if the session had been done
+interactively).
+Most of these commands modify the way fl parses input or presents output
+and are meant to make it easier to embed other languages in fl.
+As with all such user-defined changes to the parser, havoc can easily
+break out. 
+Thus, we strongly sugest that careful consideration be given
+to which operators/functions that will be overloaded, made infix or
+postfix, and which types gets userdefined print routines.
+\begin{description}
+\index{install\_print\_function}
+\FlFunction{install\_print\_function}{(*\funarrow string)\funarrow ()}{install\_print\_function f}{%
+Install\_print\_function takes a function f of type *\funarrow string,
+where * is a concrete type (defined using lettype) and installs
+this function as the pretty printer for objects of type *.
+Thus whenever an object of type * gets evaluated at the top level, fl
+will automatically call the function f and print out the resulting string.
+Note that only concrete types can have pretty printer functions
+associated with them.
+}
+\index{binder}
+\FlFunction{binder}{((*\funarrow **)\funarrow string\funarrow **)\funarrow ()}{binder f}{\mbox{}}
+Binder takes a function and makes it into a binder, i.e., an object that
+can introduce a new bound variable in an expression.
+Note that the type of the function must be (*\funarrow **)\funarrow string\funarrow **,
+since the first argument of a binder function will be a lambda expression
+and the second argument will be a string with the name of the bound variable.
+Thus, if a function f has been declared as a binder, then
+f x.E will be parsed as f (\protect\verb!\! x.E) "x".
+\index{postfix}
+\FlFunction{postfix}{(*\funarrow **)\funarrow ()}{postfix f}{%
+Postfix takes a name of a function and modifies the parser so
+that the function will be parsed as a postfix operator.
+Postfix operators have higher precedence than infix, infixr, and
+prefix functions.
+}
+\index{nonfix}
+\FlFunction{nonfix}{(*\funarrow **)\funarrow ()}{nonfix f}{%
+Nonfix takes a name of a function and removes the special parsing of
+the function. If the function is not declared as a binder, postfix,
+infix or infixr operator, nonfix is (essentially) a no-op.
+}
+\index{infix}
+\FlFunction{infix}{(int\funarrow *\funarrow **)\funarrow ()}{infix p f}{%
+Infix takes a number p between 0 and 9 and a function or operator f.
+The command causes the parser to view f as an infix operator with
+precedence p that associates to the left.
+}
+\index{infixr}
+\FlFunction{infixr}{(int\funarrow *\funarrow **)\funarrow ()}{infixr p f}{%
+Infixr takes a number p between 0 and 9 and a function or operator f.
+The command causes the parser to view f as an infixr operator with
+precedence p that associates to the right.
+}
+\FlCommand{overload}{overload s f1 f2 f3 ... fn}{%
+Overload takes a name s and a list of names (f1 .. fn)
+(possibly decorated with type) of functions or operators.
+From here on, the fl parser will overload the name s
+to denote anyone of the functions.
+Note that the oveloading in fl is somewhat restricted, since only
+the argument types are used in resolving the overloading.
+As a result, it is often necessary to type the arguments
+to a function explicitly in order for fl to succeed in
+resolving the function requested.
+As usual, with overloading, it is easy to create programs that
+appears to be correct, but that denotes something completely
+different.
+Thus, we strongly suggest the overloading of operators should be
+used sparingly.
+}
+\FlCommand{begin\_abs\_type}{begin\_abs\_type;}{%
+Begin\_adt starts the definition of a (possibly nested)
+abstract data type.
+}
+\FlCommand{end\_abs\_type}{end\_abs\_type f1 f2 ... fn;}{%
+End\_abs\_type takes a list of functions and/or type constructors to
+be exported from the abstract data type.
+Thus of all the functions and operators defined inside the abstract
+data type, only the ones listed after end\_abs\_type will be visible
+to other functions.
+}
+\FlCommand{set\_prompt}{set\_prompt s;}{%
+Change the interactive prompt to the string s.
+}
+\end{description}
+

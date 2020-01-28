@@ -1,0 +1,12 @@
+load "ste.fl";
+
+let p = 
+    PINST "tst" [] T [] [] ["foo[1:0][1:0]"] (P_LEAF [])
+;
+
+update_vossrc "VERBOSE-FSM-PRINT" "YES";
+
+let ckt = pexlif2fsm p;
+ckt;
+
+nodes ckt;

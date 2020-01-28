@@ -1,0 +1,40 @@
+
+slettype foo = FOO int (foo list)
+	     | BAR int int
+;
+
+
+letrec oink (FOO i [(FOO b st1)]) = e1
+ /\    oint (BAR i j) = e2
+...
+
+
+==========>>>>>>>>>>>>>>>>
+
+lettype foo = __S_foo ({bv} opt) ({int} opt) ({foo list} opt) ({int opt});
+
+let _t_FOO = int2bv 1;
+let _t_BAR = int2bv 2;
+
+let FOO i l = __S_foo (SOME _t_FOO) (SOME i) (SOME l) NONE;
+let BAR i j = __S_foo (SOME _t_BAR) (SOME i) NONE (SOME j);
+
+let __is_FOO (__S_foo (SOME tp) _ _ _) = (tp = _t_FOO)
+ /\ __is_FOO other = error "Illegal type"
+;
+
+let __is_BAR (__S_foo (SOME tp) _ _ _) = (tp = _t_BAR)
+ /\ __is_BAR other = error "Illegal type"
+;
+
+val __FOO_arg1 (__S_foo _ (SOME i) _ _) = i;
+val __FOO_arg2 (__S_foo _ _ (SOME l) _) = l;
+val __BAR_arg1 (__S_foo _ (SOME i) _ _) = i;
+val __BAR_arg2 (__S_foo _ _ _ (SOME i)) = i;
+
+
+letrec oink a =
+    __is_FOO a => 
+	let i = __FOO_arg1 a in
+	let arg2 = __FOO_arg2 a in
+	

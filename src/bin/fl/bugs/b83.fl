@@ -1,0 +1,147 @@
+
+
+
+let bv1 = int2bv 0;
+0; bv1;
+
+let bv2 = int2bv 19;
+19; bv2;
+
+let bv3 = int2bv (-8);
+-8; bv3;
+
+-3; int2bv (-3);
+
+let bv4 = bv_variable "a[5:0]";
+"a[5:0]"; bv4;
+let bv5 = bv_variable "b[2:0]";
+"b[2:0]"; bv5;
+
+"-----ADD-----";
+"a"; bv_add (int2bv 0) (bv_variable "a[5:0]");
+17; bv_add (int2bv 3) (int2bv 14);
+11; bv_add (int2bv (-3)) (int2bv 14);
+-4; bv_add (int2bv (-8)) (int2bv 4);
+
+
+"-----SUB-----";
+"a"; bv_sub (bv_variable "a[5:0]") (int2bv 0);
+-11; bv_sub (int2bv 3) (int2bv 14);
+-17; bv_sub (int2bv (-3)) (int2bv 14);
+4; bv_sub (int2bv (-4)) (int2bv (-8));
+
+"-----MUL 1-----";
+0; bv_mul (bv_variable "a[5:0]") (int2bv 0);
+42; bv_mul (int2bv 3) (int2bv 14);
+-42; bv_mul (int2bv (-3)) (int2bv 14);
+32; bv_mul (int2bv (-4)) (int2bv (-8));
+
+"-----MUL 2-----";
+0; bv_mul (bv_variable "a[5:0]") (int2bv 0);
+42; bv_mul (int2bv 14) (int2bv 3);
+-42; bv_mul (int2bv 14) (int2bv (-3));
+32; bv_mul (int2bv (-8)) (int2bv (-4));
+
+"-----DIV -----";
+"a[5:0]"; bv_div (bv_variable "a[5:0]") (int2bv 1);
+7; bv_div (int2bv 14) (int2bv 2);
+2; bv_div (int2bv 14) (int2bv 7);
+-7; bv_div (int2bv (-14)) (int2bv 2);
+-2; bv_div (int2bv (-14)) (int2bv 7);
+-7; bv_div (int2bv 14) (int2bv (-2));
+-2; bv_div (int2bv 14) (int2bv (-7));
+7; bv_div (int2bv (-14)) (int2bv (-2));
+2; bv_div (int2bv (-14)) (int2bv (-7));
+4; bv_div (int2bv (14)) (int2bv (3));
+-4; bv_div (int2bv (-14)) (int2bv (3));
+-4; bv_div (int2bv (14)) (int2bv (-3));
+4; bv_div (int2bv (-14)) (int2bv (-3));
+
+"----- MOD -----";
+"a[5:0]"; bv_mod (bv_variable "a[5:0]") (int2bv 1);
+"a[0]"; bv_mod (bv_variable "a[5:0]") (int2bv 2);
+"a[1:0]"; bv_mod (bv_ZX (bv_variable "a[5:0]")) (int2bv 4);
+7; bv_mod (int2bv 14) (int2bv 2);
+2; bv_mod (int2bv 14) (int2bv 7);
+-7; bv_mod (int2bv (-14)) (int2bv 2);
+-2; bv_mod (int2bv (-14)) (int2bv 7);
+-7; bv_mod (int2bv 14) (int2bv (-2));
+-2; bv_mod (int2bv 14) (int2bv (-7));
+7; bv_mod (int2bv (-14)) (int2bv (-2));
+2; bv_mod (int2bv (-14)) (int2bv (-7));
+4; bv_mod (int2bv (14)) (int2bv (3));
+-4; bv_mod (int2bv (-14)) (int2bv (3));
+-4; bv_mod (int2bv (14)) (int2bv (-3));
+4; bv_mod (int2bv (-14)) (int2bv (-3));
+
+
+"----- bv2int o intbv ------";
+map (\i. bv2int (int2bv i)) (-17 -- 17);
+
+"------ bv_less -----";
+T == (bv_less (int2bv (-3)) (int2bv (12)));
+F == (bv_less (int2bv (-3)) (int2bv (-3)));
+F == (bv_less (int2bv (3) ) (int2bv (-3)));
+F == (bv_less (int2bv (0) ) (int2bv (-3)));
+F == (bv_less (int2bv (0) ) (int2bv (0)));
+T == (bv_less (int2bv (0) ) (int2bv (12)));
+F == (bv_less (int2bv (12)) (int2bv (-2)));
+F == (bv_less (int2bv (0) ) (int2bv (-2)));
+T == (bv_less (int2bv (-8)) (int2bv (-2)));
+
+"------ bv_leq -----";
+T == (bv_leq (int2bv (-3)) (int2bv (12)));
+T == (bv_leq (int2bv (-3)) (int2bv (-3)));
+F == (bv_leq (int2bv (3) ) (int2bv (-3)));
+F == (bv_leq (int2bv (0) ) (int2bv (-3)));
+T == (bv_leq (int2bv (0) ) (int2bv (0)));
+T == (bv_leq (int2bv (0) ) (int2bv (12)));
+F == (bv_leq (int2bv (12)) (int2bv (-2)));
+F == (bv_leq (int2bv (0) ) (int2bv (-2)));
+T == (bv_leq (int2bv (-8)) (int2bv (-2)));
+
+"------ bv_greater -----";
+F == (bv_greater (int2bv (-3)) (int2bv (12)));
+F == (bv_greater (int2bv (-3)) (int2bv (-3)));
+T == (bv_greater (int2bv (3) ) (int2bv (-3)));
+T == (bv_greater (int2bv (0) ) (int2bv (-3)));
+F == (bv_greater (int2bv (0) ) (int2bv (0)));
+F == (bv_greater (int2bv (0) ) (int2bv (12)));
+T == (bv_greater (int2bv (12)) (int2bv (-2)));
+T == (bv_greater (int2bv (0) ) (int2bv (-2)));
+F == (bv_greater (int2bv (-8)) (int2bv (-2)));
+
+"------ bv_geq -----";
+F == (bv_geq (int2bv (-3)) (int2bv (12)));
+T == (bv_geq (int2bv (-3)) (int2bv (-3)));
+T == (bv_geq (int2bv (3) ) (int2bv (-3)));
+T == (bv_geq (int2bv (0) ) (int2bv (-3)));
+T == (bv_geq (int2bv (0) ) (int2bv (0)));
+F == (bv_geq (int2bv (0) ) (int2bv (12)));
+T == (bv_geq (int2bv (12)) (int2bv (-2)));
+T == (bv_geq (int2bv (0) ) (int2bv (-2)));
+F == (bv_geq (int2bv (-8)) (int2bv (-2)));
+
+
+"----- collatz -------";
+//update_vossrc "DYNAMIC-ORDERING" "NO";
+cletrec step n =
+    n <= '1 => '0 |
+    (n % '2) = '1 => '1 + step ('3*n+ '1)
+		   | '1 + step (n / '2)
+;
+
+let res = map (\i. step i) (1--1023);
+time (res fseq 999);
+itlist max res 0;
+
+
+
+let collatz n = 
+    let res = step {n:: *a} then
+    {res:: *a}
+;
+
+update_vossrc "DYNAMIC-ORDERING" "NO";
+let q = collatz  ((bv_ZX (bv_variable "a[9:0]")) + '1);
+time (q fseq 1);

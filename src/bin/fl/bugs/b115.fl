@@ -1,0 +1,10 @@
+load "ste.fl";
+
+TYPE "dt" 3;
+TYPE "at" 2;
+TYPE "mt" 9;
+let p = MEM_WRITE "CPU_REGS" {'d::dt} {'e::bit} {'a::at} {'m::mt};
+p;
+
+pexlif2fsm p;
+

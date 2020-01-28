@@ -1,0 +1,333 @@
+load "ste.fl";
+
+// ###### UTILITY FUNCTIONS ######
+
+// assoc_add replace or add a new pair of key,value inside an association list
+letrec assoc_add k v [] = [(k,v)]
+    /\ assoc_add k v ((k',v'):l) = k' = k => (k',v):l | (k',v'):(assoc_add k v l);
+
+// rename assoc to assoc_find
+let assoc_find = assoc;
+
+// fold_left function
+letrec fold_left f acc [] = acc
+    /\ fold_left f acc (x:xs) = fold_left f (f x acc) xs;
+
+letrec fold_left2 f acc [] [] = acc
+    /\ fold_left2 f acc (x:xs) (y:ys) = fold_left2 f (f x y acc) xs ys
+;
+
+// Extract the name from a PINTST var :
+// e.g. name[0:7] -> (name,0,7)
+// e.g. bit_name[7] -> (bit_name,7,7)
+// e.g. bit_name -> (bit_name,0,0)
+let extract var =
+    let lbrack = strstr var "[" in
+    let scolon = strstr var ":" in
+    let name = substr var 1 (lbrack - 1) in
+      lbrack = 0 => (var,0,0)
+    | scolon = 0 => (name, let i = sscanf "[%d]" (substr var lbrack (-1)) in (i,i))
+    | (name, sscanf "[%d:%d]" (substr var lbrack (-1)));
+
+// Extract the base name
+let base var = fst (extract var);
+
+
+
+// ###### ENVIRONMENT DEFINITION ######
+new_type_abbrev env = (string#int) list;
+lettype env_hier = ENV {assoc::env} {delay::env} {children::env_hier list};
+
+letrec prim_Penv_hier ind fp (ENV assoc delay children) =
+    let sassoc = list2str T "[" "," "]" (\(n,v). sprintf "(%s -> %d)" n v) assoc in
+    let sdelay = list2str T "[" "," "]" (\(n,v). sprintf "(%s -> %d)" n v) delay in
+    (fprintf fp "%*s Assoc: %s\n" ind "" sassoc) fseq
+    (fprintf fp "%*s Delay: %s\n" ind "" sdelay) fseq
+    foreach (prim_Penv_hier (ind+3) fp) children
+;
+
+let Penv_hier env = (prim_Penv_hier 0 stdout env) fseq "";
+install_print_function Penv_hier;
+
+letrec init_env_hier (PINST _ _ _ inps outs internals content) =
+    let assoc = fold_left (\(n,_).\acc. ((base n),0):acc) [] (inps@outs) in
+    let assoc = fold_left (\n.\acc. ((base n),0):acc) assoc internals in
+    let children (P_HIER pexlifs) = map init_env_hier pexlifs
+     /\ children (P_LEAF _) = []
+    in
+    ENV assoc [] (children content)
+;
+
+letrec write_inputs (ENV assoc delays children) inputs =
+    let assoc = fold_left (\(n,v). assoc_add n v) assoc inputs in
+    ENV assoc delays children
+;
+
+
+// ###### OPERATIONS ON INTEGERS : SLICES AND SHIFTS ######
+
+// Boolean list to integer
+let bl2int x = bv2int (list2bv x);
+
+// Extract an int slice from an int
+let int_slice i fst sec =
+    val (hi,lo) = (fst>sec) => (fst,sec) | (sec,fst) in
+    let size = 64 in
+    let bl = int2bl size i in
+    bl2int (butfirstn (size-hi-1) (butlastn lo bl));
+
+// Extract a boolean list slice from an int
+let blist_slice i fst sec =
+    val (hi,lo) = (fst>sec) => (fst,sec) | (sec,fst) in
+    let size = 64 in
+    let bl = int2bl size i in
+    butfirstn (size-hi-1) (butlastn lo bl);
+
+// Update a given slice of an int
+// e.g. update_slice 3 1 [TTF] [TFTFTFTF] = [TFTFTTFF]
+let update_slice hi lo new_slice i =
+    let sz = 64 in
+    let bl = int2bl sz i in
+    bl2int ((firstn (sz-hi-1) bl) @ new_slice @ (lastn lo bl));
+
+let r_shift a b = bl2int (butlastn b (int2bl 64 a));
+
+let l_shift a b = bl2int ((int2bl 64 a) @ (replicate b F));
+
+// ###### CASE P_HIER ######
+
+// Copy values from the parent environment
+let pass_values parent_assoc (PINST _ _ _ fa_inps fa_outs internals _) (ENV assoc delay children) =
+    let take_value vals =
+        bl2int ( flat (
+            map
+            (\var. val (name,hi,lo) = extract var in
+                   blist_slice (assoc_find name parent_assoc) hi lo)
+            vals
+        )) in
+    let assoc = fold_left
+        (\(name,vals).assoc_add (base name) (take_value vals))
+        assoc (fa_inps @ fa_outs) in
+    ENV assoc delay children
+;
+
+// Update the current environment with the environment of one of its child
+let update_env child_env (PINST _ _ _ _ child_outs _ _) env =
+    // Update from one variable
+    let update_one (out_var, out_composition) env =
+        let out_var = base out_var in
+        fst ( fold_left
+            (\name. \(env,blist).
+                val (name,hi,lo) = extract name in
+                let size = hi - lo + 1 in
+                let new_slice = lastn size blist in
+                let last_val = assoc_find name env in
+                let updated_val = update_slice hi lo new_slice last_val in
+                (
+                    assoc_add name updated_val env,
+                    butlastn size blist
+                )
+            ) (env, int2bl 64 (assoc_find out_var child_env)) (rev out_composition)) in
+    fold_left update_one env child_outs
+;
+
+// ###### CASE P_LEAF ######
+
+// Interpret a w_expression given an environment env
+letrec wexpr2int env (W_X _) = 0
+   /\  wexpr2int env (W_CONST _ v) = v
+   /\  wexpr2int env (W_NAMED_CONST _ _ v) = v
+   /\  wexpr2int env (W_VAR sz base) = assoc base env
+   /\  wexpr2int env (W_AND a b) =
+            let ia = wexpr2int env a in
+            let ib = wexpr2int env b in
+            bv2int (bv_AND (int2bv ia) (int2bv ib))
+   /\  wexpr2int env (W_OR a b) =
+            let ia = wexpr2int env a in
+            let ib = wexpr2int env b in
+            bv2int (bv_OR (int2bv ia) (int2bv ib))
+   /\ wexpr2int env (W_NOT a) = bv2int (bv_NOT (int2bv (wexpr2int env a)))
+   /\ wexpr2int env (W_EQ a b) = (wexpr2int env a) = (wexpr2int env b) => 1 | 0
+   /\ wexpr2int env (W_PRED name cond) = 0
+   /\ wexpr2int env (W_GR a b) = 0
+   /\ wexpr2int env (W_ADD a b) = (wexpr2int env a) + (wexpr2int env b)
+   /\ wexpr2int env (W_SUB a b) = (wexpr2int env a) - (wexpr2int env b)
+   /\ wexpr2int env (W_MUL a b) = (wexpr2int env a) * (wexpr2int env b)
+   /\ wexpr2int env (W_DIV a b) = (wexpr2int env a) / (wexpr2int env b)
+   /\ wexpr2int env (W_MOD a b) = (wexpr2int env a) % (wexpr2int env b)
+   /\ wexpr2int env (W_SHL a b) = l_shift (wexpr2int env a) (wexpr2int env b)
+   /\ wexpr2int env (W_SHR a b) = r_shift (wexpr2int env a) (wexpr2int env b)
+   /\ wexpr2int env (W_ITE cond t e) =
+        (wexpr2int env cond) = 0 => (wexpr2int env e) | (wexpr2int env t)
+   /\ wexpr2int env other = 0;
+
+// Update the current environment by processing one update function.
+let process_update_fn (W_UPDATE_FN lhs rhs) (ENV assoc delay children) =
+    let lhs_names = base_get_lhs_vars lhs in
+    let rhs_val = int2bl 64 (wexpr2int assoc rhs) in
+    let assoc = fst
+    ( fold_left
+        (\name_. \(assoc,blist).
+            val (name,hi,lo) = extract name_ in
+            let size = hi - lo + 1 in
+            let new_slice = lastn size blist in
+            let last_val = assoc_find name assoc in
+            let updated_val = update_slice hi lo new_slice last_val in
+            (
+                assoc_add name updated_val assoc,
+                butlastn size blist
+            )
+        ) (assoc, rhs_val) (rev lhs_names)
+    ) in ENV assoc delay children
+ /\ process_update_fn (W_PHASE_DELAY lhs rhs) (ENV assoc delay children) =
+    let lhs_names = base_get_lhs_vars lhs in
+    let rhs_val = int2bl 64 (wexpr2int assoc rhs) in
+    // Copy old value of [lhs names] from assoc to delay
+    let delay = fold_left
+        (\name. let name = base name in assoc_add name (assoc_find name assoc))
+        delay lhs_names in
+    // Update these values
+    let delay = fst
+    ( fold_left
+        (\name_. \(delay,blist).
+            val (name,hi,lo) = extract name_ in
+            let size = hi - lo + 1 in
+            let new_slice = lastn size blist in
+            let last_val = assoc_find name delay in
+            let updated_val = update_slice hi lo new_slice last_val in
+            (
+                assoc_add name updated_val delay,
+                butlastn size blist
+            )
+        ) (delay, rhs_val) (rev lhs_names)
+    ) in ENV assoc delay children
+;
+
+// ###### INTERPRETER ######
+
+// Compute one cycle
+letrec one_cycle env (PINST name attrs leaf fa_inps fa_outs internals (P_LEAF update_fns)) =
+            fold_left process_update_fn env update_fns
+    /\ one_cycle env (PINST name attrs leaf fa_inps fa_outs internals (P_HIER children)) =
+        val (ENV assoc delay children_env) = env in
+        val (assoc,children_env) = fold_left
+            (\(child,child_env). \(assoc,children_env).
+                let child_env = pass_values assoc child child_env in
+                let child_env = one_cycle child_env child in
+                val (ENV child_assoc _ _) = child_env in
+                (update_env child_assoc child assoc, child_env:children_env))    
+        (assoc,[]) (zip children children_env) in
+        (ENV assoc delay (rev children_env))
+;
+
+let env_get_assoc (ENV assoc _ _) = assoc;
+let pexlif_get_children p = content_get_children (pexlif_get_content p);
+
+letrec write_delays (ENV assoc delays children_env) pexlif =
+    let assoc = fold_left (\(n,v). assoc_add n v) assoc delays in
+    let children_env =
+        children_env = [] => []
+      | map2 write_delays children_env (pexlif_get_children pexlif) in
+    let assoc =
+        children_env = [] => assoc
+      | fold_left2 update_env assoc (map env_get_assoc children_env) (pexlif_get_children pexlif) in
+    ENV assoc [] children_env
+;
+
+let int_one_cycle pexlif inputs env =
+    let env = write_inputs (write_delays env pexlif) inputs in
+    one_cycle env pexlif
+;
+
+let int_all pexlif = fold_left (int_one_cycle pexlif);
+
+// ###### CHECKING ######
+// Inputs will be of the form string#(int#int#int list) list
+
+let format_inputs ins =
+    let fmt base = flatmap (\(v,t0,t1). map (\t. (t,base,v)) (t0--(t1-1))) in
+    let cmp x y = fst x > fst y => 1 | fst x = fst y => 0 | -1 in
+    let ins = qsort cmp (flatmap (\(base,vals). fmt base vals) ins) in
+    val (ins,_,acc2) = fold_left
+        (\(t,n,v).\(acc,cur_t,acc2).
+            t = cur_t => (acc,cur_t,(n,v):acc2)
+          | ((acc2:acc),t,[(n,v)]))
+        ([],0,[]) ins in
+    rev (acc2:ins)
+;
+
+let inputs2ant ckt =
+    let ant0 = map (\n.(T,n,F,0,1)) (filter (is_phase_delay ckt) (nodes ckt)) in
+    let fa_ins = map (\v.base v,v) (inputs ckt) in
+    let cnv base (iv,t0,t1) =
+        val (ok,vec) = (T, assoc base fa_ins) catch (F,"") in
+        ok => vec isv (sprintf "%d" iv) from t0 to t1 | []
+    in
+    let cnv_base base acc = fold_left (\x.(defix @) (cnv base x)) acc in
+    fold_left (\(base,vals).\acc. cnv_base base acc vals) ant0
+;
+
+let my_assoc s l = (assoc s l) catch (
+        (fprintf stderr "Cannot find %s in %S\n" s (map fst l)) seq error "Bu");
+
+let assoc_find = my_assoc;
+
+let sim2outs sim env =
+    let ckt = ste2fsm sim in
+    let outs = outputs ckt in
+    let inps = inputs ckt in
+    let al = map (\v. fst (extract v), v) (nodes ckt) in
+    let cnv n HL = HL == (T,F) => T |
+                 HL == (F,T) => F |
+                 (eprintf "Non-boolean value on %s (%B,%B)" n (fst HL) (snd HL))
+    in
+    let read (base,iv) =
+        let vec = my_assoc base al in
+        let nds = md_expand_vector vec in
+        let vals = bl2int (map (\n. cnv n (get_trace_val sim n 0)) nds) in
+        vec,vals
+    in
+    map read env
+;
+
+
+let check pexlif inps t =
+    let env = init_env_hier pexlif in
+    let ckt = pexlif2fsm pexlif in
+    let sim = STE "" ckt [] (inputs2ant ckt inps) []
+                (map (\n.n,0,t) (nodes ckt)) then
+    let f_inps = format_inputs inps in
+    val (ENV INT_res _ _) = int_all pexlif env f_inps in
+    let STE_res = sim2outs sim INT_res in
+    let truths = map
+    (\(n,_).
+        val (name,hi,lo) = extract n in
+        (int_slice (assoc_find name INT_res) hi lo) = (assoc_find n STE_res)
+    ) (pexlif_get_fa_outs pexlif) in
+    fold_left (defix AND) T truths
+;
+
+
+//###### TESTS ######
+
+TYPE "byte" 8;
+
+let delayed_adder =
+    byte_input a.
+    byte_internal d_a.
+    byte_output res.
+    CELL "adder" [
+        res <- a '+' d_a,
+        d_a <: res
+    ];
+
+let p_d_adder = delayed_adder 'a 'res;
+let ckt_d_adder = pexlif2fsm p_d_adder;
+//STE_debug ckt_d_adder;
+
+let env = init_env_hier p_d_adder;
+let ckt_in = [("a",[(1,0,11)])];
+
+check p_d_adder ckt_in 10;
+
+

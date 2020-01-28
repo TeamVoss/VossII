@@ -1,0 +1,413 @@
+let SZ = 16;
+
+lettype iexpr =       
+            I_CONST {v::int}
+        |   I_VAR {name::string}            
+        |   I_EQ {a::iexpr} {b::iexpr}
+        |   I_GT {a::iexpr} {b::iexpr}
+        |   I_GTE {a::iexpr} {b::iexpr}        
+        |   I_LT {a::iexpr} {b::iexpr}
+        |   I_LTE {a::iexpr} {b::iexpr}        
+        |   I_ADD {a::iexpr} {b::iexpr}
+        |   I_SUB {a::iexpr} {b::iexpr}
+        |   I_MUL {a::iexpr} {b::iexpr}
+        |   I_DIV {a::iexpr} {b::iexpr}
+        |   I_MOD {a::iexpr} {b::iexpr}
+        |   I_ITE {cond::iexpr} {t::iexpr} {e::iexpr}
+        |   I_ABS {a::iexpr}
+        |   I_AND {a::iexpr} {b::iexpr}
+        |   I_OR {a::iexpr} {b::iexpr}
+        |   I_NOT {a::iexpr}        
+;
+
+letrec Piexpr (I_CONST v) = sprintf "%d" v
+/\     Piexpr (I_VAR n)   = n
+/\     Piexpr (I_EQ a b)  = sprintf "(%s == %s)" (Piexpr a) (Piexpr b)
+/\     Piexpr (I_GT a b)  = sprintf "(%s > %s)" (Piexpr a) (Piexpr b)
+/\     Piexpr (I_GTE a b) = sprintf "(%s >= %s)" (Piexpr a) (Piexpr b)
+/\     Piexpr (I_LT a b)  = sprintf "(%s < %s)" (Piexpr a) (Piexpr b)
+/\     Piexpr (I_LTE a b) = sprintf "(%s <= %s)" (Piexpr a) (Piexpr b)
+/\     Piexpr (I_ADD a b) = sprintf "(%s + %s)" (Piexpr a) (Piexpr b)
+/\     Piexpr (I_SUB a b) = sprintf "(%s - %s)" (Piexpr a) (Piexpr b)
+/\     Piexpr (I_MUL a b) = sprintf "(%s * %s)" (Piexpr a) (Piexpr b)
+/\     Piexpr (I_ITE c t e) =
+			sprintf "(IF %s THEN %s ELSE %s)" (Piexpr c) (Piexpr t) (Piexpr e)
+/\     Piexpr (I_ABS a) = sprintf "(abs(%s))" (Piexpr a)
+/\     Piexpr (I_AND a b) = sprintf "%s AND %s" (Piexpr a) (Piexpr b)
+/\     Piexpr (I_NOT a) = sprintf "NOT(%s)" (Piexpr a)
+;
+
+install_print_function Piexpr;
+
+lettype expr = EXPR iexpr bv;
+
+let Pexpr (EXPR iexpr bv) =
+    Piexpr iexpr
+;
+install_print_function Pexpr;
+
+//-----------------user functions----------------
+let var name =
+    let ie = I_VAR name in
+    let bv = bv_ZX (bv_variable (sprintf "%s[%d:0]" name (SZ-2))) in
+    EXPR ie bv
+;
+
+let constrained_var name f =
+    let ie = I_VAR name in
+    let name = (bv_variable (sprintf "%s[%d:0]" name (SZ-2))) in
+    let bv = bv_ZX name in
+    let raw = EXPR ie bv in
+    val (EXPR _ b) = f(raw) then
+    let cond = bv_eq b (int2bv 1) in
+    let bv' = substitute (fparam (depends name) cond) name in
+    (EXPR ie bv')
+;   
+
+    
+
+let const v =
+    let ie = I_CONST v in
+    let bv = int2bv v in
+    EXPR ie bv
+;
+
+let eq (EXPR e1 b1) (EXPR e2 b2) =
+    let cond = (bv_eq b1 b2) => T | F in
+    cond == T =>  EXPR (I_CONST 1) (int2bv 1) |
+    cond == F =>  EXPR (I_CONST 0) (int2bv 0) |
+    EXPR (I_EQ e1 e2) (cond => (int2bv 1) | (int2bv 0))
+;
+overload = = eq;
+
+let gt (EXPR e1 b1) (EXPR e2 b2) =
+    let cond = (bv_greater b1 b2) => T | F in
+    cond == T =>  EXPR (I_CONST 1) (int2bv 1) |
+    cond == F =>  EXPR (I_CONST 0) (int2bv 0) |
+    EXPR (I_GT e1 e2) (cond => (int2bv 1) | (int2bv 0))
+;
+overload > > gt;
+
+let gte (EXPR e1 b1) (EXPR e2 b2) =
+    let cond = (bv_geq b1 b2) => T | F in
+    cond == T => EXPR (I_CONST 1) (int2bv 1)|
+    cond == F => EXPR (I_CONST 0) (int2bv 0)|
+    EXPR (I_GTE e1 e2) (cond => (int2bv 1) | (int2bv 0))
+;
+
+overload >= >= gte;
+
+let lt (EXPR e1 b1) (EXPR e2 b2) =
+    let cond = (bv_less b1 b2) => T | F in
+    cond == T =>  EXPR (I_CONST 1) (int2bv 1) |
+    cond == F =>  EXPR (I_CONST 0) (int2bv 0) |
+    EXPR (I_LT e1 e2) (cond => (int2bv 1) | (int2bv 0))
+;
+overload < < lt;
+
+let lte (EXPR e1 b1) (EXPR e2 b2) =
+    let cond = (bv_leq b1 b2) => T | F in
+    cond == T => EXPR (I_CONST 1) (int2bv 1) |
+    cond == F => EXPR (I_CONST 0) (int2bv 0) |
+    EXPR (I_LTE e1 e2) (cond => (int2bv 1) | (int2bv 0))
+;
+overload <= <= lte;
+
+let and (EXPR e1 b1) (EXPR e2 b2) = 
+    let cond = ((bv_AND b1 b2) = (int2bv 1)) => T | F in
+    cond == T => EXPR (I_CONST 1) (int2bv 1)|
+    cond == F => EXPR (I_CONST 0) (int2bv 0)|
+    EXPR (I_AND e1 e2) (cond => (int2bv 1) | (int2bv 0))
+;
+overload AND AND and;
+
+let or (EXPR e1 b1) (EXPR e2 b2) = 
+    let cond = ((bv_OR b1 b2) = (int2bv 1)) => T | F in
+    cond == T => EXPR (I_CONST 1) (int2bv 1)|
+    cond == F => EXPR (I_CONST 0) (int2bv 0)|
+    EXPR (I_OR e1 e2) (cond => (int2bv 1) | (int2bv 0))
+;
+overload OR OR or;
+
+let not (EXPR e1 b1) =
+    let cond = ((bv_NOT b1) = (int2bv 1)) => T | F in
+	cond == T => EXPR (I_CONST 1) (int2bv 1) |
+	cond == F => EXPR (I_CONST 0) (int2bv 0) |
+    EXPR (I_NOT e1) (bv_NOT b1)
+;
+overload NOT NOT not;
+
+let add (EXPR e1 b1) (EXPR e2 b2) =
+    let cond = bv_add b1 b2 in
+    (depends cond) == [] =>     
+        EXPR (I_CONST (bv2int cond)) cond
+    |   EXPR (I_ADD e1 e2) cond
+;
+overload + + add;
+
+let sub (EXPR e1 b1) (EXPR e2 b2) = 
+    let cond = bv_sub b1 b2 in
+    (depends cond) == [] =>     
+        EXPR (I_CONST (bv2int cond)) cond
+    |   EXPR (I_SUB e1 e2) cond
+;
+overload - - sub;
+
+let mul (EXPR e1 b1) (EXPR e2 b2) = 
+    let cond = bv_mul b1 b2 in
+    (depends cond) == [] =>     
+        EXPR (I_CONST (bv2int cond)) cond
+    |   EXPR (I_MUL e1 e2) cond
+;
+overload * * mul;
+
+let IF c = c;
+let ELSE t e = (t,e);
+
+open_overload {THEN:: expr-> (*a # *a) -> *a};
+if_then_else_binder THEN ELSE;
+
+
+let THENvoid {c :: expr} {(t,e) :: (void # void)} = 
+    val (EXPR ec bc) = c then
+	let cond = (bc = '1) => T | F then
+	cond == T => t |
+	cond == F => e |
+    (cond => t | e) fseq () 
+;
+add_open_overload THEN THENvoid;
+
+let THENexpr c (t,e) =
+    val (EXPR ec bc) = c then
+	let cond = (bc = '1) => T | F then
+	cond == T => t |
+	cond == F => e |
+	val (ot, oe) = cond => (SOME t, NONE) | (NONE, SOME e) then
+	val (SOME (EXPR et bt)) = ot then
+	val (SOME (EXPR ee be)) = oe then
+	let e = I_ITE ec et ee then
+	let b = cond => bt | be then
+	EXPR e b
+;
+add_open_overload THEN THENexpr;
+
+let THENp c (({t1 :: *a},{t2 :: *b}),({e1 :: *a},{e2 :: *b})) = 
+    val (EXPR ec bc) = c in
+	let cond = (bc = '1) => T | F in
+	cond == T => (t1,t2) |
+	cond == F => (e1,e2) |
+    (((defix THEN) c (t1,e1)), ((defix THEN) c (t2,e2)))
+;
+add_open_overload THEN THENp;
+
+letrec THENl c (ts,es) =
+    val (EXPR ec bc) = c in
+	let cond = (bc = '1) => T | F in
+	cond == T => ts |
+	cond == F => es |
+	ts == [] =>
+		es != [] => error "List length mismatch in symbolic if-then-else" |
+		[]
+	|
+    ((defix THEN) c (hd ts, hd es)):(THENl c (tl ts,tl es))
+;
+add_open_overload THEN THENl;
+
+let abs (EXPR e1 b1) = 
+    let cond = (bv_less b1 (int2bv 0)) => T | F in
+    cond == T => (EXPR e1 b1) * (const (-1)) |
+    cond == F => (EXPR e1 b1) |
+    EXPR (I_ABS e1) (cond => bv_mul b1 (int2bv (-1)) | b1)
+;
+
+let I_T = EXPR (I_CONST 1) (int2bv 1);
+let I_F = {NOT I_T:: expr};
+let col2str (valid,color) =
+    valid = I_T => "white" |
+    valid = I_F => "black" |
+    "grey"
+;
+
+// A few selected colors
+let black = EXPR (I_CONST 0) (int2bv 0);
+let white = EXPR (I_CONST 255) (int2bv 255);
+lettype coord = COORD {x::bv} {y::bv};
+
+lettype canvas = CANVAS
+                    {name::string}
+                    ((((expr#expr) ref) list) list)
+;
+
+let get_canvas_name (CANVAS name rows) = name;
+
+let get_rows_and_cols canvas =
+    val (CANVAS name rows) = canvas then
+    (length rows), (length (hd rows))
+;
+
+let Pcanvas (CANVAS name rows) =
+    let col2fp fp e = fprintf fp "%s" (col2str (deref e)) in
+    let row2str fp l = list2fp fp T "{" "\n\t" "}" col2fp l in
+    list2fp stdout T "{" "\n" "}" row2str rows
+;
+
+let image2tcl fp (CANVAS name rows) =
+    let col2fp fp e = fprintf fp "%s" (col2str (deref e)) in
+    let row2str fp l = list2fp fp T "{" "\n\t" "}" col2fp l in
+    list2fp fp T "{" "\n" "}" row2str rows
+;
+
+
+let mk_canvas name rows cols =
+    let default = I_F, black in
+    let mk_pixel i = ref (i seq default) then
+    let mk_line i = map mk_pixel (1--(i seq cols)) then
+    let rows = map mk_line (1--rows) in
+    CANVAS name rows
+;
+non_lazy mk_canvas;
+
+let set_pixel arr col row value =
+    letrec write_c c (rp:rps) =
+	let cond = eq col (const c) in
+	IF cond THEN (rp := (IF cond THEN value ELSE (deref rp)))
+	ELSE (write_c (c+1) rps)
+     /\    write_c r [] = ()
+    in
+    letrec write_r r (l:ls) =
+	IF (eq row (const r)) THEN (write_c 0 l)
+	ELSE (write_r (r+1) ls)
+     /\    write_r r [] = ()
+    in
+    val (CANVAS name rows) = arr in
+    write_r 0 rows
+;
+
+
+
+// ---- Visualization code ------
+let Init_Tcl = tcl_eval [sprintf "source %s/visualize.tcl" DIR];
+//Init_Tcl;
+
+let DRexamples images =
+    let cnt = length images in
+    val (rows, cols) = get_rows_and_cols (hd images) in
+    let max_per_row = min cnt (max 1 (400/(2*cols+3))) in
+    let rows_needed = (cnt+max_per_row-1)/max_per_row in
+    Init_Tcl fseq
+    let wc = tcl_eval [ sprintf "create_example_canvas %d %d %d %d"
+                                rows cols rows_needed max_per_row]
+    then
+    let fp = mktemp "visualize" then
+    letrec draw_ex cs cnt =
+        cs = [] => () |
+        val (c:cs) = cs then
+//        (fprintf fp "draw_example %s {%s} %d " wc (get_canvas_name c) cnt) seq
+        (fprintf fp "draw_example %s {} %d " wc cnt) seq
+        (image2tcl fp c) fseq
+        (fprintf fp "\n\n") fseq
+        (draw_ex cs (cnt+1))
+    in
+    (draw_ex images 0) fseq
+    let fname = stream2filename fp then
+    (fprintf fp "update\n%s config -scrollregion [%s bbox all]" wc wc) fseq
+    (fclose fp) fseq
+    (tcl_eval [sprintf "source %s" fname]) fseq
+    ()
+;
+
+let bv2fixlist size bv =
+    let l = bv2list bv in
+    let len = length l in
+    len >= size => lastn size l |
+    (replicate (size-len) (hd l))@l
+;
+
+//let depends_canvas canvas =
+    //val (CANVAS name rows) = canvas in
+    //let get_bs 
+
+let get_example image =
+    let ns = depends image then
+    let l = length ns then
+    let i = random 0 (2**l-1) then
+    let vs = bv2fixlist l (int2bv i) then
+    let sub = zip ns vs then
+    val (CANVAS name rows) = substitute sub image then
+    let vecs = md_extract_vectors ns then
+    let pr vec =
+        let nds = md_expand_vector vec then
+        let i = bl2int (F:(map (\n. assoc n sub) nds)) then
+        length nds > 7 => sprintf "%s=%x" vec i
+                        | sprintf "%s=%0*b" vec (length nds) i
+    in
+    let name' = list2str T "" "\n" "" pr vecs then
+    CANVAS name' rows
+;
+
+let duplicate_cell rc =
+    val (valid,color) = deref rc then
+    ref (valid,color)
+;
+non_lazy duplicate_cell;
+
+let duplicate_line line = map (\rc. duplicate_cell rc) line;
+non_lazy duplicate_line;
+
+let duplicate_canvas cnt canvas =
+    val (CANVAS name rows) = canvas then
+    let mk i =
+        let rows' = map (\line. duplicate_line line) rows then
+        CANVAS name rows'
+    in
+    map mk (1--cnt)
+;
+
+let VIS cnt image =
+    DRexamples (map get_example (duplicate_canvas cnt image))
+;
+
+update_vossrc "RECURSION-CALL-LIMIT" "100000";
+
+let SZ = '28;
+let empty_canvas name = mk_canvas name SZ SZ;
+non_lazy empty_canvas;
+
+let canvas = empty_canvas "c";
+//set_pixel canvas (const 0) (const 0) (I_T,white);
+
+let draw_line (x0,y0) (x1,y1) {color::expr} {canvas::canvas} =    
+    let dx = abs (x1 - x0) then
+    let sx = IF (x0 < x1) THEN (const 1) ELSE (const (-1)) then
+    let dy = (const (-1)) * abs(y1 - y0) then
+    let sy = IF (y0 < y1) THEN (const 1) ELSE (const (-1)) then
+    let err = dx + dy then
+    letrec step err x0 y0 =
+	(set_pixel canvas x0 y0 (I_T,color)) fseq
+	IF ((eq x0 x1) AND (eq y0 y1)) THEN () ELSE (
+	    let e2 = (const 2) * err then
+	    val (err, x0) =
+		IF (e2 >= dy) THEN ((err + dy),(x0 + sx)) ELSE (err,x0)
+	    then
+	    val (err, y0) =
+		IF (e2 <= dx) THEN ((err + dx),(y0 + sy)) ELSE (err,y0)
+	    then
+	    step err x0 y0
+	)
+    in
+    (step err x0 y0) fseq
+    canvas
+;
+
+let x = constrained_var "x" (\x. (x >= (const 0) AND (x <= (const 15))));
+let y = constrained_var "y" (\y. (y >= (const 0) AND (y <= (const 15))));
+
+let l = draw_line ((const 0),(const 0)) (x,y) white canvas;
+l;
+
+val (CANVAS nm r_rows) = l;
+
+let rows = map (map deref) r_rows;
+
+el 1 (el 2 rows);
+

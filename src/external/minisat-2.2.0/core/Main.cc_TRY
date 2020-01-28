@@ -1,0 +1,93 @@
+/*****************************************************************************************[Main.cc]
+Copyright (c) 2003-2006, Niklas Een, Niklas Sorensson
+Copyright (c) 2007-2010, Niklas Sorensson
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge, publish, distribute,
+sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or
+substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
+OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+**************************************************************************************************/
+
+#include <errno.h>
+
+#include <signal.h>
+#include <zlib.h>
+
+#include "utils/System.h"
+#include "utils/ParseUtils.h"
+#include "utils/Options.h"
+#include "core/Dimacs.h"
+#include "core/Solver.h"
+
+using namespace Minisat;
+
+//=================================================================================================
+
+static Solver S;
+
+
+//=================================================================================================
+// Main:
+
+void
+get_problem()
+{
+    int a = (int) (S.newVar());
+    int b = (int) (S.newVar());
+    int res = (int) (S.newVar());
+    fprintf(stderr, "a: %d, b: %d, res: %d\n", a, b, res);
+    Lit lres = mkLit(res);
+    Lit ll   = mkLit(a);
+    Lit lr   = mkLit(b);
+    vec<Lit> c1, c2, c3;
+    c1.push(~lres); c1.push(ll); S.addClause_(c1);
+    c2.push(~lres); c2.push(lr); S.addClause_(c2);
+    c3.push(lres); c3.push(~ll); c3.push(~lr); S.addClause_(c3);
+}
+
+
+int main(int argc, char** argv)
+{
+    
+#if defined(__linux__)
+    fpu_control_t oldcw, newcw;
+    _FPU_GETCW(oldcw); newcw = (oldcw & ~_FPU_EXTENDED) | _FPU_DOUBLE; _FPU_SETCW(newcw);
+    printf("WARNING: for repeatability, setting FPU to use double precision\n");
+#endif
+    // Extra options:
+    //
+    S.verbosity = 9;
+
+    get_problem();
+
+    if (!S.simplify()){
+	printf("IMMEDIATELY UNSATISFIABLE\n");
+	exit(20);
+    }
+
+    vec<Lit> as;
+#if 0
+    as.push( ~mkLit(0) );
+    as.push( mkLit(0) );
+#endif
+    as.push( mkLit(2) );
+
+    bool ret = S.solve(as);
+    if( ret ) {
+	fprintf(stderr, "SATISFIABLE\n");
+    } else {
+	fprintf(stderr, "UNSATISFIABLE\n");
+    }
+    
+    return 0;
+}

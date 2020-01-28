@@ -1,0 +1,1555 @@
+\section{Examples of using the Voss System}
+\label{tutorial}
+
+In this section we will give some examples of
+symbolic trajectory evaluation and how the Voss system
+can be used for other verification tasks.
+The specification programs and circuit descriptions for these examples
+are available in the directory {\bf demos} in the Voss distribution.
+
+\subsection{AMD2901}
+
+Our first example of symbolic trajectory evaluation is the
+verification of two different\footnote{We actually have three different
+netlist descriptions of the circuit: behavioral VHDL, structural
+VHDL, and EDIF.  All of these are taken from the Alliance 2.0 distribution.}
+descriptions of the 2901%
+\index{2901}%
+{} ALU bitslice%
+\index{ALU bitslice}%
+{} from Advanced Micro Devices%
+\index{Advanced Micro Devices}%
+{}.
+In \fig{AMD2901} we show a high level schematic of the circuit.
+As can be seen in the figure, the circuit contains both some
+non-trivial combinational circuitry and a fair amount of state
+storing registers.
+Of course, it is not a very complex design, but it is not
+an altogether trivial one either.
+For a typical, fairly informal, specification%
+\index{informal, specification}%
+{} of the design, we refer the
+reader to Appendix~\ref{AMD2901spec}.
+\FIG{AMD2901}{Block diagram of AMD 2901}{AMD2901}
+
+In this section we will go through the verification, and its various
+alternatives, in a fair amount of detail.
+In the later parts of the document, we will only highlight
+some specific characteristics for the other verification tasks.
+
+Our first verification task is to verify that a behavioral VHDL%
+\index{behavioral VHDL}%
+{} model of the circuit is correct.
+In particular, we will discuss how to derive the fsm model of the design,
+how to structure a specification/verification file, how to debug the
+circuit (and the specification!), and how to deal with the issue of
+variable ordering.
+The code for the tutorial is available in the directory
+demos/AMD2901/behavioral\_VHDL in the demo distribution.
+
+\subsubsection{Creating the fsm Model}
+
+Before we can verify the circuit, we must obtain an fsm model that
+can be used in the symbolic trajectory evaluation.
+In this case, the behavioral VHDL model is defined in the file amd2901\_beh.vbe.
+We are using the convention that behavioral VHDL%
+\index{VHDL!behavioral}\index{VHDL!structural}%
+{} models have filenames
+ending with .vbe%
+\index{.vbe}%
+{}, structural VHDL files have suffix .vst%
+\index{.vst}%
+{}, EDIF%
+\index{EDIF}%
+{} files
+have suffix .edi%
+\index{.edi}%
+{}, and sim%
+\index{sim}%
+{} and ntk%
+\index{ntk}%
+{} files have suffices .sim%
+\index{.sim}%
+{} and .ntk%
+\index{.ntk}%
+{}
+respectively.
+In this case, we are using the behavioral VHDL model.
+For a more detailed discussion on what subset of VHDL that is
+supported, we refer the reader to Appendix~\ref{VHDL}.
+
+The program convert2fl%
+\index{convert2fl}%
+{} can be used to convert the .vbe
+(as well as .vst and .edi) file to a .fl file, ready to be loaded
+into FL.
+\begin{hol}
+% ls
+amd2901\_beh.vbe  spec.fl
+% convert2fl amd2901\_beh.vbe
+% ls
+amd2901\_beh.fl   amd2901\_beh.vbe  spec.fl
+\end{hol}
+
+It is worth looking at the amd2901\_beh.fl file a bit closer.
+The file looks roughly as shown in \fig{amd2901.beh.fl}:
+
+\begin{figure}[hbtp]
+\begin{hol}
+begin\_abstype;
+load "EXE.fl";
+
+
+// Behavioral Description for Entity amd
+
+
+let VSSP = "vssp";
+let VDDP = "vddp";
+let VSS = "vss";
+let VDD = "vdd";
+let Y\_0\_ = "y[0]";
+...
+let ACCU\_3\_ = "accu[3]";
+{Set} let AMD =
+        (Output (COUT,
+        (((Val C\_SUMRS\_3\_) And (Not (Val I\_3\_) And Not (Val I\_4\_)
+         And Not (Val I\_5\_))) Or (((Val C\_DIFSR\_3\_) And ((Val I\_3\_)
+         And Not (Val I\_4\_) And Not (Val I\_5\_))) Or ((Val C\_DIFRS\_3\_)
+         And (Not (Val I\_3\_) And (Val I\_4\_) And Not (Val I\_5\_)
+        ))))))|\_|
+...
+        (BusDrv(Y\_1\_, [(
+        Not (Val NOE),
+        (((Val RA\_1\_) And (Not (Val I\_6\_) And (Val I\_7\_) And
+        Not (Val I\_8\_))) Or ((((((((Val ALU\_OUT\_1\_) And (Not (Val I\_6\_)
+         And Not (Val I\_7\_) And Not (Val I\_8\_))) Or ((Val ALU\_OUT\_1\_)
+         And ((Val I\_6\_) And Not (Val I\_7\_) And Not (Val I\_8\_)
+        ))) Or ((Val ALU\_OUT\_1\_) And ((Val I\_6\_) And (Val I\_7\_)
+         And Not (Val I\_8\_)))) Or ((Val ALU\_OUT\_1\_) And (Not (Val I\_6\_)
+         And Not (Val I\_7\_) And (Val I\_8\_)))) Or ((Val ALU\_OUT\_1\_)
+         And ((Val I\_6\_) And Not (Val I\_7\_) And (Val I\_8\_)))
+        ) Or ((Val ALU\_OUT\_1\_) And (Not (Val I\_6\_) And (Val I\_7\_)
+         And (Val I\_8\_)))) Or ((Val ALU\_OUT\_1\_) And ((Val I\_6\_)
+         And (Val I\_7\_) And (Val I\_8\_))))))]))|\_|
+...
+        (RegDrv(ACCU\_3\_, [(
+        (Not (Val WCKACCU) And Not (Stable WCKACCU)),
+        Not (Val ACCU\_IN\_3\_))]));
+
+let AMD = make\_fsm AMD;
+end\_abstype AMD;
+\end{hol}
+\caption{Structure of FL file obtained by convert2fl.}
+\label{amd2901.beh.fl}
+\end{figure}
+
+The file begins by encapsulating all the definitions inside an abstract
+data type.
+By only exporting the final result in the end, we effectively achieve
+information hiding%
+\index{information hiding}%
+{}.
+We then load in the library EXE.fl that contains all the functions
+used to create an object of type Set that eventually will be used
+to create the fsm object.
+The file then contains a large number of definitions used to
+create names that are easier to use in the translation.
+Finally, the real set of next state functions are given.
+There are four basic types of nodes: input%
+\index{input node}%
+{}, output%
+\index{output node}%
+{}, bus%
+\index{bus node}%
+{}, and
+register%
+\index{register node}%
+{} nodes.
+An input node has no next state function%
+\index{next state function}%
+{} given, and thus will always
+become $\X$ unless the value on the node is asserted.
+An output node always take on the value of the next state function.
+A bus node has several drivers%
+\index{signal drivers}%
+{} and takes on the value $\X$ if
+no-one is driving the node.
+Finally, a register node can also have several drivers.
+However, if no driver is active, it keeps its latest value.
+If there are more than one driver active for a bus or register node, the
+resulting value will be the greatest lower bound%
+\index{greatest lower bound}%
+{} of the different values
+being driven.
+In other words, if all active drivers agree on the value, this will
+be the value of the next state function.
+On the other hand, if the active drivers disagree on the value, the
+next state will be $\X$.
+
+Once all nodes, and their associated next state functions, have
+been given, the FL program proceed to convert the FL Set object to an
+fsm object by invoking make\_fsm%
+\index{make\_fsm}%
+{}.
+Finally, only the obtained fsm object is exported out from the abstract
+data type, and thus, loading amd2901\_beh.fl will only define
+the fsm object named AMD.
+
+\subsubsection{Structuring the Specification File}
+
+Although strictly speaking not necessary, it has been our experience
+that following a fairly standardized style%
+\index{style}%
+{} when writing a
+specification/verification program helps both in debugging as well
+as in breaking down the verification task into manageable sub tasks. 
+The format we will describe here has been used quite successfully in
+teaching the Voss system to a couple of graduate classes
+and appears to work well.
+
+Before we go into the details of the structure of the file, it is
+worth spending a moment discussing how to work with the fl system.
+The typical work mode in a window environment%
+\index{window environment}%
+{} (or emacs%
+\index{emacs}%
+{})
+is to develop the specification script in a standard text editor and
+then cut and paste%
+\index{cut and paste}%
+{} the code into a running copy of fl to make sure
+no syntax errors slip by and also to try things out.
+In general, for programmers used with compiled languages, the largest
+hurdle to overcome is the idea that you should {\em not} write the whole
+program before testing parts of it.
+In fact, it is often useful to test every new function defined
+with some arguments just to make sure they appear to be correct.
+Also, quitting the fl session once-in-a-while and reloading the
+definitions directly from the edited file, ensures that
+no definitions gets forgotten to be put it.
+
+The structure of a specification%
+\index{structure of specification}%
+{}/verification file is
+broadly divided into the following sections:
+\begin{enumerate}
+\item
+Loading of needed library files and circuit model(s).
+\item
+Defining short hands%
+\index{short hands}%
+{} for the actual names of nodes in the
+circuit that needs to be asserted/checked.
+\item
+Defining the clocking scheme%
+\index{clocking scheme}%
+{}.
+In particular, define the length of a clock cycle, set-up and hold
+times etc.
+\item
+Define timing and node abstraction functions%
+\index{abstraction function}%
+{} that allows the
+high-level specification to be stated in terms of abstract
+entities, rather than be cluttered with details that are
+largely irrelevant.
+\item
+Declaring the Boolean variables needed in the verification process.
+This also includes some function for declaring the variables in some
+suitable order to achieve acceptable OBDD performance.
+\item 
+High-level specification functions that denotes the desired
+behavior of the system.
+\item
+Verification conditions in the form of antecedent%
+\index{antecedent}%
+{} and consequent%
+\index{consequent}%
+{}
+definitions.
+\end{enumerate}
+
+Loading the library files and the circuit model is usually
+quite straightforward.
+In our case we simply have:
+\begin{hol}
+load "verification.fl";
+load "arithm.fl";
+
+// ------------------------------------------------------------------
+// Load fsm model (called AMD)
+load "amd2901\_beh.fl";
+\end{hol}
+
+Finding the names of circuit nodes%
+\index{circuit node names}%
+{} is usually tedious, but
+not overly difficult.
+Also, it is highly dependent on the source of the circuit and how
+well it is documented.
+One major practical difference between traditional simulation and
+trajectory evaluation, is the  need to
+find names on internal state storing elements%
+\index{internal state storing elements}%
+{} in the circuit.
+In other words, finding the names of the nodes in some of the
+latches that store important state.
+It should be emphasized though that the registers that has to be
+exposed are the ones that naturally would be discussed when
+describing the behavior of the circuit.
+Thus, fortunately, it is often the case that some of the internal
+registers in the control logic never need to be exposed.
+
+In our case, we need to find the names of all inputs, outputs, and all
+the names of the RAM cells and the Q register cells.
+There are several ways of doing this, but a combination
+of looking at the .vbe and the translated .fl file in addition
+to loading the file and giving the command:
+{\tt nodes AMD},
+\index{nodes}%
+will suffice to find the names of the nodes.
+In \fig{AMD2901NodeNames} we show the definitions we use.
+\begin{figure}[hbtp]
+\begin{hol}
+// Short-hands for circuit nodes
+let I     = ["i[8]", "i[7]", "i[6]", "i[5]", "i[4]",
+             "i[3]", "i[2]", "i[1]", "i[0]"];
+let Aadd  = ["a[3]", "a[2]", "a[1]", "a[0]"];
+let Badd  = ["b[3]", "b[2]", "b[1]", "b[0]"];
+let D     = ["d[3]", "d[2]", "d[1]", "d[0]"];
+let Y     = ["y[3]", "y[2]", "y[1]", "y[0]"];
+let RAM0  = "r0";
+let RAM3  = "r3";
+let Q0    = "q0";
+let Q3    = "q3";
+let CLK   = "ck";
+let C0    = "cin";
+let OEbar = "noe";
+let C4    = "cout";
+let Gbar  = "ng";
+let Pbar  = "np";
+let OVR   = "ovr";
+let F3    = "signe";
+let F30   = "zero";
+
+let FUNC  = "fonc";
+let TEST  = "test";
+
+// Names of register nodes
+let Q   = [  "accu[3]", "accu[2]", "accu[1]", "accu[0]"  ];
+let ram = [ ["ram0[3]", "ram0[2]", "ram0[1]", "ram0[0]"],
+            ["ram1[3]", "ram1[2]", "ram1[1]", "ram1[0]"],
+            ["ram2[3]", "ram2[2]", "ram2[1]", "ram2[0]"],
+            ["ram3[3]", "ram3[2]", "ram3[1]", "ram3[0]"],
+            ["ram4[3]", "ram4[2]", "ram4[1]", "ram4[0]"],
+            ["ram5[3]", "ram5[2]", "ram5[1]", "ram5[0]"],
+            ["ram6[3]", "ram6[2]", "ram6[1]", "ram6[0]"],
+            ["ram7[3]", "ram7[2]", "ram7[1]", "ram7[0]"],
+            ["ram8[3]", "ram8[2]", "ram8[1]", "ram8[0]"],
+            ["ram9[3]", "ram9[2]", "ram9[1]", "ram9[0]"],
+            ["ram10[3]", "ram10[2]", "ram10[1]", "ram10[0]"],
+            ["ram11[3]", "ram11[2]", "ram11[1]", "ram11[0]"],
+            ["ram12[3]", "ram12[2]", "ram12[1]", "ram12[0]"],
+            ["ram13[3]", "ram13[2]", "ram13[1]", "ram13[0]"],
+            ["ram14[3]", "ram14[2]", "ram14[1]", "ram14[0]"],
+            ["ram15[3]", "ram15[2]", "ram15[1]", "ram15[0]"] ];
+
+\end{hol}
+\caption{Definition of short-hands for the node names.}
+\label{AMD2901NodeNames}
+\end{figure}
+Note that we actually explicitly listed all the nodes.
+If there are very many nodes, it is often more convenient to define 
+a function that creates these lists of nodes.
+For example, we could have replaced the big listing of all the
+RAM cell names with the (equivalent) definition
+\begin{hol}
+let ram =
+        let rv = rev (node\_vector "ram" 16) in
+        let mk\_nd\_vec name = [name^"[3]",name^"[2]",name^"[1]",name^"[0]"] in
+        map mk\_nd\_vec rv;
+\end{hol}
+
+Defining the clocking scheme and timing parameters%
+\index{timing parameters}%
+{} are often
+relatively straightforward as well.
+When using a unit delay%
+\index{unit delay}%
+{} model, the only constraint on the length
+of the cycle is usually that it must be long enough for the circuit
+to stabilize between consecutive clock signals.
+Of course, if a more accurate delay model is used, the exact value
+of the clock cycle must be in terms of the basic time unit%
+\index{basic time unit}%
+{} that
+was used in the circuit description.
+In the current release of Voss, only circuit descriptions in Silos netlist
+format can use average%
+\index{average delay}%
+{}, minimum%
+\index{minimum delay}%
+{}, maximum%
+\index{maximum delay}%
+{} and bounded delay%
+\index{bounded delay}%
+{} timing
+models\footnote{Actually, switch-level models can also use this feature
+if the .exe file is accompanied by a .del%
+\index{.del}%
+{} file that contains min/max rise
+and fall delays for all the nodes in the circuit. For more details, the
+reader is referred to page~\pageref{DelayAnnotation}.} and thus
+usually the values for clock cycle length etc. are fairly arbitrary.
+For our example, we use the following definitions:
+\begin{hol}
+// Clocking scheme
+let PHASE     = 50;
+let CYCLE     = 2*PHASE;
+let LATCH\_DEL = 5;
+let HOLD      = 5;
+let cycle n   = (n-1)*CYCLE;
+let phiL n    = (n-1)*CYCLE;
+let phiH n    = (n-1)*CYCLE+PHASE;
+\end{hol}
+Note that we also define some convenient functions for abstracting
+the time references.
+Thus, we define functions that map from an abstract cycle count and
+relative position in the clock cycle, to the actual circuit time.
+For example, the function phiH maps an abstract cycle count $n$ to
+the actual circuit time when the clock signal goes high
+in cycle $n$.
+
+The next part of the specification file---abstraction functions%
+\index{abstraction functions}%
+{}
+for inputs, outputs, and latch signals---is often the most difficult to
+get right.
+In particular, unless the design is using a very well defined
+clocking methodology%
+\index{clocking methodology}%
+{}, it is usually non-trivial to determine
+on what node at what time a latch is ``storing its value%
+\index{storing its value}%
+{}''.
+However, there is a very useful trick in determining this
+information---simulation%
+\index{simulation}%
+{}.
+We will return to this topic when we discuss how to debug
+circuits and specifications.
+%In fact, simulation is very useful to track down bugs encountered
+%during the verification effort and thus we refer the reader to
+%Section~\ref{Simulation} for how to accomplish this inside the
+%Voss environment.
+
+For our verification effort, we first define a clocking function
+that, given a parameter $n$, will create the assertion list needed
+for assuming that the input signal "ck" (named CLK above) takes on
+the proper values at the proper times.
+To illustrate the definition, below we include both the definition
+of clock\_cyc, as well as an example of applying clock\_cyc to the argument 2.
+\begin{hol}
+: letrec clock\_cyc n = (n = 0) => UNC |
+    (CLK is F from (phiL n) to (phiH n))@
+    (CLK is T from (phiH n) to (cycle (n+1)))@
+    (clock\_cyc (n-1));
+clock\_cyc::(int) -> (((bool # (string # (bool # (int # int)))) list))
+: clock\_cyc 2;
+[(T,"ck",F,100,150),(T,"ck",T,150,200),(T,"ck",F,0,50),
+ (T,"ck",T,50,100),(F,"",F,0,0)]
+\end{hol}
+The input and output signal abstraction functions are fairly
+straighforward.
+The only subtle point is that they need to take set-up and hold times into
+account.
+In this case, we can get by with a set-up time of $0$.
+\begin{hol}
+// Input signals timing
+let inB cyc = (phiL cyc)+HOLD;
+let inE cyc = (phiL (cyc+1))+HOLD;
+let AaddIs addr cyc = Aadd isv addr from (inB cyc) to (inE cyc);
+let BaddIs addr cyc = Badd isv addr from (inB cyc) to (inE cyc);
+let D\_is val cyc = D isv val from (inB cyc) to (inE cyc);
+let I\_is val cyc = I isv val from (inB cyc) to (inE cyc);
+let C0\_is val cyc = C0 is val from (inB cyc) to (inE cyc);
+let Q0\_is val cyc = Q0 is val from (inB cyc) to (inE cyc);
+let Q3\_is val cyc = Q3 is val from (inB cyc) to (inE cyc);
+let RAM0\_is val cyc = RAM0 is val from (inB cyc) to (inE cyc);
+let RAM3\_is val cyc = RAM3 is val from (inB cyc) to (inE cyc);
+
+// Output signals timing
+let Y\_is val cyc = Y isv val from (phiH (cyc-1)) to (phiL cyc);
+\end{hol}
+
+The abstraction functions for the latches is more intricate.
+There are three properties an abstraction function must
+answer:
+\begin{enumerate}
+\item
+On what node(s) is this value stored.
+\item
+When is the value stable.
+\item
+What encoding%
+\index{encoding}%
+{} is used.
+\end{enumerate}
+If we first look at the accumulator register definition Q\_is,
+\begin{hol}
+let Q\_is val cyc = Q isv (bvNOT val)
+		    from ((phiL cyc)+LATCH\_DEL) to ((phiL cyc)+LATCH\_DEL)+1;
+\end{hol}
+we can see that the nodes that correspond to these signals are
+called "accu[3]", "accu[2]", "accu[1]", and "accu[0]".
+Furthermore, the signals are stable from the phiL plus latch delay
+for one time unit.
+Finally, the values are actually stored complemented%
+\index{complemented}%
+{} on the node.
+
+\begin{hol}
+let RamIs addr val cyc =
+    let ram\_is n = (n isv (bvNOT val))
+                   from ((phiL cyc)+LATCH\_DEL) to ((phiL cyc)+LATCH\_DEL+1) in
+    SymbIndex ram addr ram\_is;
+\end{hol}
+The RamIs function above illustrates a more sophisticated abstraction mapping.
+The function takes three arguments: a 4-bit address, a value to
+be asserted/checked, and the abstract cycle in which the addressed
+nodes should take on this value.
+What makes the function more involved is that the address argument
+can be a vector of Boolean functions.
+Thus, at simulation time it may be impossible to determine which RAM
+cell is intended.
+More precisely, the address may refer to more than one location depending
+on the assignments to some set of Boolean variables.
+This situation is a typical example of {\em symbolic indexing}---selecting
+\index{symbolic indexing}%
+\index{symbolic selection}%
+an element in a list by providing a symbolic address.
+The solution to this common case is to use the when condition in a
+subtle way.
+Rather than trying to figure out which node is actually referred to by
+the address, we will create a five-tuple assertion/check for {\em each}
+node in the list.
+However, the five-tuple for cell $i$ will have as its guard%
+\index{guard}%
+{} a Boolean
+expression that is only true for interpretations in which the number
+represented by the address vector equals $i$.
+
+To better illustrate symbolic indexing, consider a somewhat simpler
+example. Suppose we have a list with four nodes: a0, a1, a2, and a3.
+Assume furthermore that we would like to say that the node on address i
+should be asserted/checked to take on the Boolean value u for 100 time units.
+However, the address i is given as a bitvector and may contain Boolean
+variables. Thus depending on the values on these Boolean variable, we may
+in fact select different nodes in the list.
+Here we show how SymbIndex can be used to derive a list of five-tuples that
+indeed matches this intuition.
+\begin{hol}
+: let ex\_arr = ["a0", "a1", "a2", "a3"];
+ex\_arr::(string list)
+: SymbIndex ex\_arr [F,T] (\verb!\!n. n is (variable "u") for 100);
+[(F,"a0",u,0,100),(T,"a1",u,0,100),(F,"a2",u,0,100),(F,"a3",u,0,100)]
+: SymbIndex ex\_arr [variable "i1", variable "i0"]
+ 	    (\verb!\!n. n is (variable "u") for 100);
+[(i0'&i1',"a0",u,0,100),
+ (i0&i1',"a1",u,0,100),
+ (i0'&i1,"a2",u,0,100),
+ (i0&i1,"a3",u,0,100)]
+\end{hol}
+Note that both invocations result in one five-tuple for each node in the list.
+However, the guard expression differ.
+In fact, for the first example, where the address is fully defined, all
+but one node have their guard equal to false.
+For the second example, the guard for node $i$ is a boolean expression
+that must hold for the address to be equal to $i$.
+
+After the abstraction functions are defined, we go on to introduce the
+Boolean variables%
+\index{Boolean variable}%
+{} needed for the verification.
+In general, since the complexity of the verification%
+\index{complexity of the verification}%
+{} task
+depend very greatly on the number of Boolean variables, it is
+often extremely useful to formulate the correctness statement in such
+a way that it minimizes the number of Boolean variables needed.
+The verification of the AMD2901 contains an excellent example
+of this.
+Consider verifying that the built-in RAM gets updated properly.
+One way of doing this would be to assert that each RAM cell contained a
+distinct Boolean variable before an instruction is performed and that
+every memory cell not addressed in the operation keep its value and the
+destination register(s) take on their proper values.
+However, this would require at least $16*4+4=70$ Boolean variables.
+On the other hand, we could rephrase the correctness statement in the
+following way:
+Suppose RAM-cell $i$, for some arbitrary address $i$ between $0$ and $15$,
+contains some value $u$, then after performing an operation, the content
+of word $i$ should still be $u$, unless $i$ was the destination address of the
+operation in which case word $i$ should contain the result of the computation.
+If we now represent the address $i$ as a vector of four Boolean variables,
+we will be able to carry out the verification using only $4+4=8$ variables---a
+reduction by more than 60 variables!
+In general, this approach of using symbolic indexing and Boolean variables
+to select the different cases, is the single most powerful aspect of symbolic
+trajectory evaluation.
+In general, it allows us to verify properties of circuits much larger
+than what more traditional symbolic model checking algorithms can handle.
+
+Returning to our example, we have chosen not to completely minimize
+the number of Boolean variables used, but rather keep the number small,
+except when it is more convenient to use a larger number of variables.
+In particular, we use a fully symbolic version of the instruction word, 
+input addresses, and what is stored in the two addresses and what is
+currently stored in the accumulator register.
+\begin{hol}
+// Boolean variables
+// Instruction
+let i = variable\_vector "i" 9;
+// Addresses
+let Aa = variable\_vector "Aa" 4;
+let Ab = variable\_vector "Ab" 4;
+// Data
+let a = variable\_vector "a." 4;
+let b = variable\_vector "b." 4;
+let d = variable\_vector "d." 4;
+let q = variable\_vector "q." 4;
+let c = variable "c";
+let q0 = variable "q0";
+let q3 = variable "q3";
+let ram0 = variable "ram0";
+let ram3 = variable "ram3";
+\end{hol}
+
+The next task to accomplish is to force the evaluation of these
+variable declarations so that a suitable variable ordering%
+\index{variable ordering}%
+{} for the
+OBDD routines is accomplished.
+This task is fairly ad-hoc.
+However, there are some ``rules-of-thumb%
+\index{rules-of-thumb}%
+{}'' that appears to work well.
+First of all, any variable vectors that will be added or subtracted
+should have their variables interleaved%
+\index{interleaved}%
+{} in the variable ordering with their
+most significant bits first. 
+Secondly, variables that greatly affect the control%
+\index{control}%
+{} actions of the
+system should appear early in the ordering.
+One point making is that one does not have to declare an ordering
+for all variables since an undeclared variable will eventually
+be declared automatically when it is used.
+However, by declaring the variables, the user retains control over
+the ordering and thus can more easily vary the ordering if that
+is deemed necessary.
+In our case, the variable ordering we selected it pretty much the
+obvious first attempt.
+In Section~\ref{OBDDordering} we return to this topic with some
+techniques that can be helpful in determining acceptable
+variable orderings.
+Again we see the benefits of using as few Boolean variables
+as possible---here fewer variables have to be ordered.
+\begin{hol}
+// Variable ordering (could be tuned!)
+let myvar\_order = i @ (interleave [a,b,d,q]) @ (interleave [Aa,Ab]);
+declare myvar\_order;
+\end{hol}
+
+We are now ready for defining the {\em desired} behavior of the circuit.
+Here we are separating the abstract functionality%
+\index{abstract functionality}%
+{} description from
+the actual timing of the various signals.
+Thus we start by defining functions that denote the desired behavior
+of the circuit.
+In order to make this functional specification as readable as possible,
+we begin by introducing some helpful functions.
+\begin{hol}
+// Useful help functions
+let getALUsrc  [I8,I7,I6,I5,I4,I3,I2,I1,I0] = [I2,I1,I0];
+let getALUfun  [I8,I7,I6,I5,I4,I3,I2,I1,I0] = [I5,I4,I3];
+let getALUdest [I8,I7,I6,I5,I4,I3,I2,I1,I0] = [I8,I7,I6];
+let ALUsrc = getALUsrc i;
+let ALUfun = getALUfun i;
+let ALUdest = getALUdest i;
+let member iv lv = itlist (\verb!\!e.\verb!\!r. (iv equal e) OR r) lv F;
+let ITEv c t e = (map (\verb!\!v. c AND v) t) bvOR (map (\verb!\!v. (NOT c) AND v) e);
+\end{hol}
+Next we define functions that are direct translations of the
+various tables used in the informal specification of the AMD2901, 
+as given in Appendix~\ref{AMD2901spec}.
+Thus we first define two functions that compute what the arguments
+to the ALU should be.
+\begin{hol}
+let RE = ITEv (member ALUsrc [[F,F,F],[F,F,T]]) a
+        (ITEv (member ALUsrc [[F,T,F],[F,T,T],[T,F,F]]) [F,F,F,F]
+        (d));
+
+let S  = ITEv (member ALUsrc [[F,F,F],[F,T,F],[T,T,F]]) q
+        (ITEv (member ALUsrc [[F,F,T],[F,T,T]]) b
+        (ITEv (member ALUsrc [[T,F,F],[T,F,T]]) a
+        ([F,F,F,F])));
+\end{hol}
+Next, we take these results and apply the proper function to
+compute the desired output of the operation.
+There is only one subtle point in this example: it would have been
+tempting to use the name F for the result and in fact FL allows you to do so.
+However, that would mean that there would be no way to refer to ``false''
+after re-defining F.
+Consequently, we use {\tt Fr} as the name of the result.
+\begin{hol}
+let Fr = ITEv (ALUfun equal [F,F,F]) (RE add S add [F,F,F,c])
+        (ITEv (ALUfun equal [F,F,T]) ((bvNOT RE) add S add [F,F,F,c])
+        (ITEv (ALUfun equal [F,T,F]) (RE add (bvNOT S) add [F,F,F,c])
+        (ITEv (ALUfun equal [F,T,T]) (RE bvOR S)
+        (ITEv (ALUfun equal [T,F,F]) (RE bvAND S)
+        (ITEv (ALUfun equal [T,F,T]) ((bvNOT RE) bvAND S)
+        (ITEv (ALUfun equal [T,T,F]) (RE bvXOR S)
+        (bvNOT (RE bvXOR S))))))));
+\end{hol}
+
+We are now ready to state the various correctness statements and
+the verification conditions that we wish to check.
+This is done by defining a collection of antecedent/consequent pairs.
+Intuitively, one can view an antecedent/consequent pair (A,C) as saying:
+if, during the lifetime of this system, we ever encounter a sequence of
+states satisfying the formula A, then that same sequence of states
+should also satisfy the formula C.
+In our case, two antecedent/consequent pairs suffice: the first
+one deals mostly with that all ``good'' things happen as they should,
+the second verifies that no ``bad'' things happen.
+
+Intuitively, the first assertion is of the form:
+\begin{quote}
+Assume the circuit is clocked properly and all the inputs signals take
+on their respective values at the correct time. Assume also
+that the address inputs are $Aa$ and $Ab$ respectively and that
+word $Aa$ in the RAM contains the word $a$ and that word $Ab$ in the RAM
+contains the word $b$.
+Finally, assume the accumulator contains the value $q$.
+Then, one cycle later, depending on the destination field of the
+instruction being executed, the output, the accumulator, or
+the word $Ab$ in the RAM will hold the proper values.
+\end{quote}
+There is one subtle point in the above formulation.
+What if $Aa$ is equal to $Ab$?
+In other words, what happens if both address lines point to the
+same word in memory.
+Clearly, this must mean that $a$ and $b$ must be equal (since $a$ and $b$
+are meant to represent the current values in words $Aa$ and $Ab$ in the RAM).
+We deal with this subtle point by defining a ``consistent%
+\index{consistent}%
+{}'' predicate
+that we use as a guard in several ``when'' conditions to ensure
+inconsistent assignments are ignored.
+More specifically, we define:
+\begin{hol}
+let consistent = (NOT (Ab equal Aa)) OR (a equal b);
+\end{hol}
+
+With this in place, we define the first antecedent as:
+\begin{hol}
+let ant1 = (FUNC is T for (cycle 3)) @
+           (TEST is F for (cycle 3)) @
+           (OEbar is F for (cycle 3)) @
+           (clock\_cyc 2) @
+           (I\_is i 1) @
+           (AaddIs Aa 1) @
+           (BaddIs Ab 1) @
+           (RamIs Aa a 1) @
+           ((RamIs Ab b 1) when consistent) @
+           (D\_is d 1) @
+           (Q\_is q 1) @
+           ((C0\_is c 1) when (member ALUfun [[F,F,F],[F,F,T],[F,T,F]])) @
+           ((Q3\_is q3 1) when (ALUdest equal [T,F,F])) @
+           ((Q0\_is q0 1) when (ALUdest equal [T,T,F])) @
+           ((RAM3\_is ram3 1) when (member ALUdest [[T,F,F],[T,F,T]])) @
+           ((RAM0\_is ram0 1) when (member ALUdest [[T,T,F],[T,T,T]]));
+\end{hol}
+and the first consequent:
+\begin{hol}
+let cons1 = (
+             // Check outputs
+             ((Y\_is Fr 2) when (NOT (ALUdest equal [F,T,F]))) @
+             ((Y\_is a 2) when (ALUdest equal [F,T,F])) @
+             // Check accumulator
+             ((Q\_is Fr 2) when (ALUdest equal [F,F,F])) @
+             ((Q\_is (q3:(butlast q)) 2) when (ALUdest equal [T,F,F])) @
+             ((Q\_is ((tl q)@[q0]) 2) when (ALUdest equal [T,T,F])) @
+             ((Q\_is q 2) when
+                   (member ALUdest [[F,F,T],[F,T,F],[F,T,T],[T,F,T],[T,T,T]])) @
+             // Check RAM
+             ((RamIs Ab b 2) when (member ALUdest [[F,F,F],[F,F,T]])) @
+             ((RamIs Ab Fr 2) when (member ALUdest [[F,T,F],[F,T,T]])) @
+             ((RamIs Ab (ram3:(butlast Fr)) 2)
+                            when (member ALUdest [[T,F,F],[T,F,T]])) @
+             ((RamIs Ab ((tl Fr)@[ram0]) 2)
+                            when (member ALUdest [[T,T,F],[T,T,T]]))
+            ) when consistent;
+\end{hol}
+
+We then call the STE function to carry out the symbolic trajectory evaluation
+and return the expression for which this assertion to holds in the
+circuit AMD.
+Thus, we define:
+\begin{hol}
+let check1 = STE "" AMD [] ant1 cons1 [];
+\end{hol}
+
+For the ``nothing bad happens'' verification, we specify a
+simpler assertion and calls STE.
+\begin{hol}
+// If Ram[Aaddr]=a /\ ((NOT load\_regfile) OR (Baddr != Aaddr))
+//   then we should have Ram[Aaddr]=a one cycle later
+let ant2 = (FUNC is T for (cycle 3)) @
+           (TEST is F for (cycle 3)) @
+           (clock\_cyc 2) @
+           (I\_is i 1) @
+           (BaddIs Ab 1) @
+           (RamIs Aa a 1);
+
+let cons2 = (RamIs Aa a 2) when ((member ALUdest [[F,F,F],[F,F,T]]) OR
+                                 NOT (Aa equal Ab));
+
+let check2 = STE "" AMD [] ant2 cons2 [];
+\end{hol}
+ Finally, we get the final correctness statement, in which we require
+both ckeck1 and check2 to hold:
+\begin{hol}
+check1 AND check2;
+\end{hol}
+
+\subsubsection{Carrying out the Verification}
+
+Once the specification script has be written, running the
+verifier is straightforward: simply load the file into FL.
+In our case we would get an output like the one shown in \fig{FLrun}.
+
+As can be seen, the final result of the verification is T, indicating
+that indeed the circuit satisfies both verification conditions {\em
+for every possible assignment to the Boolean variables}.
+Since we are using $38$ Boolean variables, we actually
+verify more than $10^{11}$ different antecedent/consequent pairs
+with this verification run!
+
+Before we go into how to find errors in the circuit and/or specification, 
+it is worth while explaining the output of the verification process.
+First a word about garbage collection.
+There are two types of user-visible garbage collections: garbage collection
+related to executing the functional language, and garbage collection
+related to the OBDD representation.
+The first one is virtually always very quick and can usually be ignored.
+The second type, OBDD garbage collection is much more time consuming.
+It is often a sign of a poor variable ordering.
+However, a single OBDD garbage collection is usually acceptable.
+If there are more than one during a single verification attempt, experimenting
+with different variable orderings can pay off handsomely.
+
+During the verification process\footnote{Actually during
+the evaluation of the STE command.} the system outputs a period for
+every unit delay that it has to run the simulator.
+Since the simulator and the assert/check procedures are using event-scheduling%
+\index{event-scheduling}%
+{},
+the system will often reach ``stable%
+\index{stable}%
+{}'' states where nothing is going to happen
+until the next change in an assert or check.
+When the system reaches such a state, it prints out a ``stable at time''
+message, and jumps ahead to the next ``interesting'' point in time.
+Finally, at every time an assert or check event occurs, the system
+will print out a ``Time:'' message.
+Although these periods and time commands convey relatively little
+information, they are often very useful in gouging the progress of
+the verification process. In fact, they are often the first sign of
+poor variable orderings, since the simulation process appears to have
+ground to a halt.
+When this happens, it is sometimes useful to abort the run, restart it
+but with a ``-m' command to the STE function to abort the simulation
+run in a proper manner, and use some of the OBDD profiling functions
+that are defined in the dafault.fl library.
+We will return to this later.
+
+\begin{figure}[hbtp]
+\begin{hol}
+% fl -f spec.fl
+      /\verb!\!
+     /  \verb!\!/\verb!\!
+ /\verb!\! /      \verb!\!
+/  Voss 1.5 \verb!\!
+VOSS-LIBRARY-DIRECTORY = /isd/local/generic/lib/vosslib
+
+-Loading file spec.fl
+-Loading file verification.fl
+: T
+-Loading file defaults.fl
+T
+-Loading file arithm.fl
+T
+-Loading file defaults.fl
+T
+-Loading file amd2901\_beh.fl
+T
+-Loading file EXE.fl
+T
+Start garbage collection ...(Used=21138(Shared=303) Freed:33616)...done
+T
+"Verify the circuit"
+..Start garbage collection ...(Used=24543(Shared=814) Freed:46596)...done
+......  stable at time 3
+Time: 5
+.Time: 6
+..........  stable at time 15
+Time: 50
+....  stable at time 53
+Time: 100
+...Start garbage collection ...(Used=24458(Shared=738) Freed:46681)...
+Start bdd garbage collection.
+Start with: 189328(189327) bdd nodes in use
+Finished bdd garbage collection.
+Currently: 136506(136506) bdd nodes in use
+done
+..Time: 105
+.Time: 106
+....  stable at time 109
+Time: 150
+....  stable at time 153
+Time: 200
+......  stable at time 3
+Time: 5
+.Time: 6
+..........  stable at time 15
+Time: 50
+....  stable at time 53
+Time: 100
+.....Time: 105
+.Time: 106
+....  stable at time 109
+Time: 150
+....  stable at time 153
+Time: 200
+T
+\end{hol}
+\caption{Output of FL running the AMD2901 spec.fl file.}
+\label{FLrun}
+\end{figure}
+
+\subsubsection{Debugging a Design and/or Specification}
+
+Although the above script looked quite simple and straightforward
+and the verification only took a few minutes (if even that), clearly it
+is not always this easy.
+In fact, in practice, what counts more than verification speed is
+how difficult it is to discover and track down errors in the circuit
+and/or the specification\footnote{Although, in theory, the specification
+should always be correct and only the circuit contain errors, in practice
+it is very common to have errors in both.}.
+This is one area where trajectory evaluation is quite powerful.
+Part of this is of course that the approach resembles simulation%
+\index{simulation}%
+{} to
+a large extent, and thus is fairly natural to many designers.
+
+To illustrate some of the techniques that can be employed using the
+Voss system, we will return to the AMD 2901 verification.
+This time, however, we will use an incorrect specification
+and show how to track this down.
+In the file ``err\_spec.fl'' in the demos/AMD2901/behavioral\_VHDL
+directory, we have a specification file that contains two
+errors: the Q\_is abstraction function does not say that the values
+are stored negated, and the timing of the carry-in signal is incorrect.
+When loading this program and forcing {\tt check1} to be evaluated,
+we get a response that (after being cut down significantly) looks like:
+\begin{hol}
+: check1;
+..Start garbage collection ...(Used=24497(Shared=817) Freed:46642)...done
+......  stable at time 3
+Time: 5
+.Time: 6
+..........  stable at time 15
+Time: 50
+.Warning: Consequent failure at time 50 on node y[3] 
+Current value:i8&i5&i4&i3&i2&i1&i0&d.3' + i8&i4&i3&i2&i1&i0'&d.3&q.3' +
+   i8&i5&i4&i3&i1&i0'&d.3'&q.3 + i4&i3&i2&i1'&i0&a.3&d.3 +
+   i8&i5&i4&i3&i2&i0&a.3'&d.3' OR ...  +
+ X(i8&i5'&i4&i3'&i2&i1&i0&d.2'&d.1'&d.0' +
+   i8&i5'&i4&i3'&i2&i1&i0'&d.2&q.2'&d.1&q.1'&d.0&q.0' +
+   i8&i5'&i4&i3'&i2&i1&i0'&d.2&q.2'&d.1&q.1'&d.0'&q.0 +
+   i8&i5'&i4&i3'&i2&i1&i0'&d.2&q.2'&d.1'&q.1&d.0&q.0' +
+   i8&i5'&i4&i3'&i2&i1&i0'&d.2&q.2'&d.1'&q.1&d.0'&q.0 OR ... )
+Expected value:i5&i4&i3&i2&i1&i0&a.3&b.3&d.3'&a.2&b.2&a.1&b.1&a.0&b.0 +
+   i5&i4&i3&i2&i1&i0&a.3&d.3'&Aa0&Ab0' + i5&i4&i3&i2&i1&i0&a.3&d.3'&Aa0'&Ab0 +
+   i5&i4&i3&i2&i1&i0&a.3&d.3'&Aa1&Ab1' + i5&i4&i3&i2&i1&i0&a.3&d.3'&Aa1'&Ab1
+   OR ...  +
+  X(a.0&b.0'&Aa3&Ab3&Aa2&Ab2&Aa1&Ab1&Aa0&Ab0 +
+    a.0&b.0'&Aa3&Ab3&Aa2&Ab2&Aa1&Ab1&Aa0'&Ab0' +
+    a.0&b.0'&Aa3&Ab3&Aa2&Ab2&Aa1'&Ab1'&Aa0&Ab0 +
+    a.0&b.0'&Aa3&Ab3&Aa2&Ab2&Aa1'&Ab1'&Aa0'&Ab0' +
+    a.0&b.0'&Aa3&Ab3&Aa2'&Ab2'&Aa1&Ab1&Aa0&Ab0 OR ... )
+Strong disagreement when:i8&i5&i4&i1&i0'&a.3&b.3&a.2&b.2&a.1&b.1&a.0&b.0 +
+    i8&i5&i4&i1&i0'&Aa0&Ab0' + i8&i5&i4&i1&i0'&Aa0'&Ab0 +
+    i8&i5&i4&i1&i0'&Aa1&Ab1' + i8&i5&i4&i1&i0'&Aa1'&Ab1 OR ... 
+
+ * * * 
+...  stable at time 202
+Time: 205
+
+------WARNING: Some errors not reported
+i6&i5&i0 + a.0&b.0'&Aa3&Ab3&Aa2&Ab2&Aa1&Ab1&Aa0&Ab0 +
+a.0&b.0'&Aa3&Ab3&Aa2&Ab2&Aa1&Ab1&Aa0'&Ab0' +
+a.0&b.0'&Aa3&Ab3&Aa2&Ab2&Aa1'&Ab1'&Aa0&Ab0 +
+a.0&b.0'&Aa3&Ab3&Aa2&Ab2&Aa1'&Ab1'&Aa0'&Ab0' OR ... 
+\end{hol}
+First of all, the system complains at the first node it finds an error.
+For every error it find (up to a user setable limit), the system
+will print out
+\begin{enumerate}
+\item
+The current value on the node.
+\item
+The expected value on the node.
+\item
+The condition for this error to show up.
+\end{enumerate}
+For the first two values, the print routine prints out the values
+in the form {\tt f1 + X(f2)}, where {\tt f1} and {\tt f2} look like
+Boolean expressions, but should be read as quaternary%
+\index{quaternary}%
+{} extensions of
+the Boolean expression.
+One should read this formula as: if {\tt f1} is equal to 1, then the expression
+is equal to 1.
+If both {\tt f1} and {\tt f2} are equal to 0, then the expression is equal
+to 0.
+In all other cases the expression is equal to $\X$.
+
+The third statement that is printed out at a consequent failure is
+the Boolean condition that must hold for this error to manifest itself.
+Here we distinguish between two types of errors: weak and strong disagreements%
+\index{strong disagreement}%
+\index{weak disagreement}%
+{}.
+A strong disagreement means that there is some assignment to all the Boolean
+variables in currently used so that the node value is 1 and the expected
+value is 0, or vice versa.
+This is clearly an error.
+A weak disagreement, on the other hand, signifies that the value on the
+node is $\X$ when a Boolean value was expected.
+This error condition is not a clear-cut as the strong disagreement, since
+it is possible that the pessimism%
+\index{pessimism}%
+{} inherent with using $\X$ as an unknown
+value, may generate responses that have more $\X$'s than absolutely necessary. 
+However, in practice, it usually means that a dependency%
+\index{dependency}%
+{} on some signal
+was forgotten and thus this signal did not have a value asserted and
+consequently stayed at $\X$.
+
+Finally, the result of the verification (after all the error messages)
+is the Boolean condition for when the whole verification is successful.
+This result can sometimes give a clue to what went wrong.
+
+Although the above expressions are often very helpful, they are
+very difficult to read and understand.
+Consequently, we load in the HighLowEx.fl%
+\index{HighLowEx.fl}%
+\index{counter example}%
+{} library to get access
+to some concrete example generating functions.
+For example, we would get:
+\begin{hol}
+: load "HighLowEx.fl";
+-Loading file HighLowEx.fl
+T
+-Loading file defaults.fl
+T
+
+: let vl = [(" I",i),("Aa",Aa),("Ab",Ab),(" a",a),(" b",b),(" d",d),(" q",q)];
+vl::((string # (bool list)) list)
+: Lexpl vl (check1 AND consistent);
+"
+ I = 001011000
+Aa = 0000
+Ab = 0001
+ a = 1111
+ b = 0000
+ d = 0000
+ q = ----
+
+"
+\end{hol}
+showing that one instruction that does work as specified is
+the OR function between word 0 in the RAM and the content of the accumulator
+assuming the value stored in the word 0 consists of all 1's.
+
+Although the above may help us pinpoint the error, it is usually
+easier to catch the error as soon as they happen.
+Consequently, we will modify the STE command and give it the -a option
+that will force the symbolic simulation to abort%
+\index{abort}%
+{} at the first error
+encountered.
+We now get:
+\begin{hol}
+: let trac1 = STE "-a" AMD [] ant1 cons1 [];
+trac1::bool
+: trac1;
+......  stable at time 3
+Time: 5
+.Time: 6
+..........  stable at time 15
+Time: 50
+.Warning: Consequent failure at time 50 on node y[3] 
+Current value:i8&i5&i4&i3&i2&i1&i0&d.3' + i8&i4&i3&i2&i1&i0'&d.3&q.3' OR ... +
+  X(i8&i5'&i4&i3'&i2&i1&i0&d.2'&d.1'&d.0' +
+    i8&i5'&i4&i3'&i2&i1&i0'&d.2&q.2'&d.1&q.1'&d.0&q.0' OR ... )
+Expected value:i5&i4&i3&i2&i1&i0&a.3&b.3&d.3'&a.2&b.2&a.1&b.1&a.0&b.0 +
+  i5&i4&i3&i2&i1&i0&a.3&d.3'&Aa0&Ab0' OR ...  +
+ X(a.0&b.0'&Aa3&Ab3&Aa2&Ab2&Aa1&Ab1&Aa0&Ab0 +
+   a.0&b.0'&Aa3&Ab3&Aa2&Ab2&Aa1&Ab1&Aa0'&Ab0' OR ... )
+Strong disagreement when:i8&i5&i4&i1&i0'&a.3&b.3&a.2&b.2&a.1&b.1&a.0&b.0 +
+   i8&i5&i4&i1&i0'&Aa0&Ab0' + i8&i5&i4&i1&i0'&Aa0'&Ab0 +
+   i8&i5&i4&i1&i0'&Aa1&Ab1' + i8&i5&i4&i1&i0'&Aa1'&Ab1 OR ... 
+\end{hol}
+The important point here is that the return value of STE with the -a
+flag is the condition under which the error manifests itself.
+Thus, using the Lexp or Hexpl functions can give us a concrete
+example to run to see what went wrong.
+\begin{hol}
+: Lexpl vl trac1;
+"
+ I = 000000000
+Aa = 0000
+Ab = 0000
+ a = 0000
+ b = 0000
+ d = 0000
+ q = -001
+
+c = 0
+"
+\end{hol}
+
+The best approach now is to re-run the verification but instead
+of using all the Boolean variables, we would use these values.
+A useful trick here is to over-ride%
+\index{over-ride}%
+{} the definitions of the
+variable shorthands.
+For example, we modify err\_spec.fl as follows:
+\begin{hol}
+let i = variable\_vector "i" 9;
+let i = [F,F,F,F,F,F,F,F,F];
+// Addresses
+let Aa = variable\_vector "Aa" 4;
+let Aa = [F,F,F,F];
+let Ab = variable\_vector "Ab" 4;
+let Ab = [F,F,F,F];
+// Data
+let a = variable\_vector "a." 4;
+let a = [F,F,F,F];
+let b = variable\_vector "b." 4;
+let b = [F,F,F,F];
+let d = variable\_vector "d." 4;
+let d = [F,F,F,F];
+let q = variable\_vector "q." 4;
+let q = [F,F,F,T];
+let c = variable "c";
+let c = F;
+\end{hol}
+
+Since FL is lexically scoped, the file must be reloaded%
+\index{reloaded}%
+{}.
+However, before doing so, it is convenient also to add some
+tracing%
+\index{tracing}%
+{} commands in the verification run to get a picture of what
+is going on.
+There are two additions we must to for this to happen.
+First we must select some set of nodes to be traced.
+In this case it is natural to chose the clock and the $y$ outputs.
+In order to get an easy to read waveform diagram, we also
+give a -T plot.ps (or -t plot.ps if we do not want the
+plot to be in landscape mode) to the options of the STE command.
+In other words, we will have:
+\begin{hol}
+let tr\_list = [CLK] @ Y;
+let trac1 = STE "-T plot2.ps" AMD [] ant1 cons1
+		(map (\verb!\!node. (node,0,cycle 3)) tr\_list);
+trac1;
+\end{hol}
+at the end of the specification file.
+Once this file has been loaded, a postscript file containing the
+waveform diagram%
+\index{waveform diagram}%
+{} shown in \fig{plot1} will be generated.
+\FIG{plot1}{Waveform diagram generated from trace commands.}{plot1}
+From this file, we can see that {\tt y[0]} has an $\X$ value
+when it should be $0$, and that all the other $y$ nodes have their
+wrong values.
+Although strong disagreements are often easier to trace, in view
+of the fact that the instruction that we are considering is addition,
+it makes sense to find the root of the incorrect value on {\tt y[0]} first.
+In this case, the obvious method is to trace all fanin nodes%
+\index{fanin nodes}%
+{} to {\tt y[0]}.
+However, it is also useful to see the functionality of the next state
+function for the node.
+In the following small script we work ourselves backwards by using
+the built-in {\tt fanin} function and the {\tt excitation}%
+\index{excitation}%
+{} function
+defined in default.fl.
+\begin{hol}
+: fanin AMD "y[0]";
+["i[7]","i[6]","i[8]","alu\_out[0]","ra[0]","noe"]
+: excitation AMD "y[0]";
+..
+Trace started for node: y[0] 
+        Current value:X
+.Time: 1
+.Trace: Node y[0]  at time 1: i[6]&alu\_out[0]&noe' + i[8]&alu\_out[0]&noe'
+    + i[7]&i[6]'&i[8]'&ra[0]&noe' + i[7]'&alu\_out[0]&noe' + X(noe)
+Time: 2
+
+Trace ended for node: y[0] 
+"i[6]&alu\_out[0]&noe' + i[8]&alu\_out[0]&noe' +
+ i[7]&i[6]'&i[8]'&ra[0]&noe' + i[7]'&alu\_out[0]&noe' + X(noe)"
+: fanin AMD "alu\_out[0]";
+["i[4]","i[3]","i[5]","s[0]","r[0]","difrs[0]","difsr[0]","sumrs[0]"]
+: STE "-T plot2.ps" AMD [] ant1 cons1 (map (\verb!\!node. (node,0,cycle 3)) tr\_list);
+\end{hol}
+After this, we would get a waveform diagram like the one shown in \fig{plot2}.
+\FIG{plot2}{Second waveform diagram generated from trace commands.}{plot2}
+Continuing like this, by finding the fanin nodes, tracing them, possibly
+finding the next state function, we can eventually determine that the {\tt cin}
+node has the wrong value and thus discover that error in the specification.
+Similarly, one can relatively easily find the error in the Q\_is function.
+Of course, in practice there are often errors in the circuit design itself
+too, but the same methodology often works well also for this type of errors.
+
+Finally a word about the waveform diagrams.
+In Table~\ref{wavformtable} we give a key for interpreting the
+different patterns%
+\index{patterns}%
+{} that can emerge.
+Note that for symbolic expressions, the information printed out
+to stderr is often needed to fully interpret%
+\index{interpret}%
+{} the waveform diagram.
+Nevertheless, being able to see the waveforms are often invaluable
+when determining what values are stored where and when.
+
+\begin{figure}[hbtp]
+\begin{center}
+\begin{tabular}{|r|r|c|l|} \hline
+Pattern & Interpretation \\ \hline
+grey & $\X$ \\ \hline
+low solid line & $0$ \\ \hline
+high solid line & $0$ \\ \hline
+low and high solid line & symbolic expression that can be 0 or 1 \\ \hline
+grey with solid low line & symbolic expression that can be 0 or $\X$ \\ \hline
+grey with solid high line & symbolic expression that can be 1 or $\X$ \\ \hline
+grey with solid high and low lines & symbolic expression that can be 0, 1 or $\X$ \\ \hline
+black & overconstrained signal ($\top$) \\ \hline
+\end{tabular}
+\end{center}
+\caption{Patterns and their meaning in waveform diagrams.}
+\label{wavformtable}
+\end{figure}
+
+\subsubsection{Variable Ordering}
+\label{OBDDordering}
+
+It used to be that the user had to come up the a
+good variable ordering in order to get the STE to go through.
+With the incorporation of dynamic re-ordering%
+\index{dynamic re-ordering}%
+{}, this requirement
+has essentially disappeared.
+However, since re-orderings are very slow, it is well worth
+to capitalize as much as possible from them.
+Hence, the recommended approach is to first try to come up with
+a plausible ordering.
+If the ordering is poor, a re-ordering will take place.
+Save the result of this re-ordering by cutting from the output
+(or by giving fl the -v flag) and insert it in your verification
+script.
+
+If the problem you have is likely to be computationally expensive,
+it is often useful to spend 24-48 hours of CPU time
+to get some reasonably good orderings.
+Once these orderings have been obtained, 
+abort the execution, change the .vossrc file
+so that re-orderings are not allowed anymore, and re-start fl.
+This way you will not waste all your time trying (often in vain)
+to find a better ordering, but at the same time you use the best ordering
+the system could find.
+
+On the other hand, experience has shown that finding variable orderings%
+\index{finding variable ordering}%
+{}
+are not as difficult as it may first appear.
+First of all, since the Boolean variables are used in a very
+explicit fashion in symbolic trajectory evaluation, the user has a
+much better understanding of the use of the various variables.
+Also,  the fact that we often reduce the number of variables needed
+very significantly by using symbolic indexing, means that there
+are fewer variables around and thus the need for good ordering
+is less critical.
+
+To simplify the task of selecting good variable ordering there are
+some useful functions provided in the Voss system.
+Perhaps the most useful ones are: bdd\_size%
+\index{bdd\_size}%
+{} and bdd\_profile%
+\index{bdd\_profile}%
+{}.
+Both take a list of Boolean functions as argument.
+Bdd\_size will return the width of the multi-root OBDD defined by
+these Boolean functions for each variable at least one of the Boolean
+functions depends on.
+Bdd\_profile, on the other hand, prints out a histogram%
+\index{histogram}%
+{} to give a quick
+visual picture of the shape of the OBDDs.
+To illustrate this, consider the AMD2901 example again and
+concentrate on a good variable ordering for the {\tt Fr} values.
+We will show two OBDD profiles: the first one with the instruction
+variables last, the second one with these variables first.
+As will be seen, the difference is very significant!
+\begin{hol}
+: myvar\_order;
+[a.3,b.3,d.3,q.3,a.2,b.2,d.2,q.2,a.1,b.1,d.1,q.1,a.0,b.0,d.0,q.0,
+ Aa3,Ab3,Aa2,Ab2,Aa1,Ab1,Aa0,Ab0,i8,i7,i6,i5,i4,i3,i2,i1,i0]
+: bdd\_profile Fr;
+"
+a.3* 1
+b.3* 2
+d.3* 4
+q.3* 8
+a.2* 17
+b.2* 34
+d.2* 68
+q.2* 136
+a.1** 273
+b.1*** 546
+d.1***** 964
+q.1********* 1928
+a.0************** 2961
+b.0************************* 5282
+d.0*************************************** 8260
+q.0******************************************************************** 14536
+ i5**************************************************************** 13840
+ i4**************************************************************** 13808
+ i3********************************************************************** 14946
+ i2******************** 4157
+ i1* 180
+ i0* 12
+  c* 2
+"
+\end{hol}
+
+\begin{hol}
+: myvar\_order;
+ [i8,i7,i6,i5,i4,i3,i2,i1,i0,a.3,b.3,d.3,q.3,a.2,b.2,d.2,q.2,
+  a.1,b.1,d.1,q.1,a.0,b.0,d.0,q.0,Aa3,Ab3,Aa2,Ab2,Aa1,Ab1,Aa0,Ab0]
+: bdd\_profile Fr;
+"
+ i5**** 4
+ i4******* 8
+ i3************* 16
+ i2************************ 31
+ i1**************************************** 52
+ i0********************************************************************** 92
+a.3******************** 26
+b.3********* 11
+d.3************** 18
+q.3************* 17
+a.2************************************** 50
+b.2****************** 23
+d.2**************************** 36
+q.2*************************** 35
+a.1************************************** 50
+b.1****************** 23
+d.1**************************** 36
+q.1*************************** 35
+a.0******************************** 42
+b.0********* 11
+d.0***************** 22
+q.0********* 11
+  c** 2
+"
+\end{hol}
+
+\subsubsection{Pragmatics of Symbolic Trajectory Evaluation}
+
+It is generally a good idea to start verifying a single property
+and then successively add more cases and do a more complete job.
+The main benefit with this approach is that the first verification
+runs, when the timing is probably (certainly?) not quite right and the
+knowledge of how the circuit works is still somewhat limited, will
+be fast and thus reduce the turn-around time during the debugging.
+Also, if available, having a parameterizable%
+\index{parameterized circuit}%
+{} version of the circuit
+is a definite win, since the development process can be done
+against a much smaller circuit and the long running verification
+tasks can be done with verification scripts that are very likely to be
+close to correct.
+
+
+\subsubsection{Structural VHDL Description}
+
+Given the above verification script, it is natural to ask how much of this
+work can be re-used%
+\index{re-use of verification results}%
+{} for verification tasks later in the design process.
+What is pleasant about the methodology described above is that
+almost all of the specification file can remain unchanged!
+To illustrate this, consider verifying a complete structural
+implementation of the AMD 2901 circuit.
+In demos/AM2901/structural\_VHDL we have the code for this design.
+We also have the spec.fl file which contains the verification script.
+What is satisfying about the example is the fact that the only
+thing that has changed from the behavioral verification script is
+the node name section.
+
+\section{A\mbox{$>$}B circuit}
+
+In the directory demos/AgreaterB there are three subdirectories:
+behavioral\_vhdl, switch\_level, and comparison.
+In behavioral\_vhdl there is a behavioral description of
+a circuit that reads in two 32-bit unsigned integers $a$ and $b$
+and determines whether $a>b$ and $b>0$.
+In the same directory there is also a small verification script that
+verifies that this is indeed the behavior of the program.
+
+In switch\_level there is a fairly complex switch-level implementation
+of the same circuit.
+The implementation uses pre-charged domino-CMOS%
+\index{domino-CMOS}%
+{}%
+\index{pre-charged domino-CMOS}%
+{} logic and requires
+a fairly sophisticated switch-level simulator%
+\index{switch-level simulator}%
+{} to be simulated.
+In the same directory there is also a spec.fl file that contains
+a small verification script that verifies that if the circuit
+is clocked properly and the input signals are stable at the right time, 
+the output of the circuit does indeed take on the correct value.
+
+Finally, in the directory comparison there is a small verification
+script that can be used to compare%
+\index{compare}%
+{} two implementations of combinational
+logic.
+However, it is more sophisticated than that since it allows either
+implementation to be clocked.
+In the file ``check\_equality.fl'' we use this function to
+compare the two implementations.
+
+\section{Binary2BCD}
+
+In the directory demos/Binary2BCD there is a structural VHDL
+implementation of a circuit that takes an 8-bit unsigned binary input
+and after some 11(?) clock cycles have converted this value into
+a three digit BCD number%
+\index{BCD number}%
+{}.
+What is interesting in this verification task is that we use a {\em relational} %
+\index{relational specification}%
+specification.
+In other words, we never say what the output should be, we only say that
+it should have certain properties.
+In particular, if we convert both the BCD output and the original input
+to decimal numbers, we should always get the same number.
+
+For specifications where it is difficult to define a function that
+actually computes the desired result, using a relational style
+can often be very helpful.
+Note, however, that we must use much more Boolean variables is this
+style, and thus it is only recommended for specifications in which
+the desired function is difficult to compute.
+
+\section{Mead and Conway Stack}
+
+In the directory demos/MC\_stack there is an NMOS%
+\index{NMOS}%
+{} stack, as described
+by Mead and Conway%
+\index{Mead and Conway}%
+{}, and a verification script.
+The verification is another example of using symbolic indexing.
+
+\section{Tamarack3}
+
+A complete verification of a switch-level implementation of the
+Tamarack III%
+\index{Tamarack III}%
+{} processor.
+The specification uses a style that is very natural
+for micro-coded designs%
+\index{micro-coded design}%
+{}.
+The specification is also interesting because it illustrates
+the use of an invariant%
+\index{invariant}%
+{}.
+In this case the invariant is simply that the micro-program counter
+is always 0 after each complete instruction.
+
+\section{UART}
+
+A structural VHDL implementation of a programmable UART%
+\index{UART}%
+{} circuit.
+The spec.fl file contains a partial specification that illustrates
+the first step away from traditional simulation.
+Again this is accomplished by an invariant. 
+
+\section{McMillan}
+
+A complete verification of a pipelined%
+\index{pipelined}%
+{} integer unit of a typical
+RISC processor.
+The datapath has a four-stage pipeline with by-pass and stall logic.
+The circuit is modeled at the switch-level.
+This verification is the most complex among all the examples
+in this demo directory.
+In particular, the abstract specification is un-pipelined and uses
+the recent history of the inputs to compute a quite sophisticated
+abstraction function%
+\index{abstraction function}%
+{} for where (and when) a register contains some
+value.
+Depending on the previous two instructions and the
+previous cycles stall signal, the content of a register $i$ may either
+be in one of the pipe-registers or be in the register file.
+
+\section{Model Checking}
+
+In the directory demos/ModelChecking there are a couple of files
+that illustrates the ease in which symbolic model checking%
+\index{model checking}%
+{}%
+\index{symbolic model checking}%
+{} can be
+implemented in FL.
+Although the next state relation is actually given explicitly
+in the two examples (of a transition arbiter), there is nothing
+stopping you from using trajectory evaluation to derive the
+next state relation.
+An example of this will very likely be included in the next release.
+

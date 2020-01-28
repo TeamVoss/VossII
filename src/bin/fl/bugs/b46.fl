@@ -1,0 +1,23 @@
+
+let l = map (\i. i,3*i) (1--10);
+
+let ll = l @ [(fprintf stderr "Forced\n") fseq (33,99)];
+
+find_first0 (\(i,vv). vv = 9) l;
+
+find_first0 (\(i,vv). vv = 9) ll;
+
+find_first0 (\(i,vv). i = 10) ll;
+
+find_first0 (\(i,vv). i = 11) ll;
+
+let ll = l @ [(fprintf stderr "Forced\n") fseq (33,99)];
+
+find_first0 (\(i,vv). vv = 99) ll;
+
+find_all (\(i,vv). (vv % 2) = 0) ll;
+
+find_all (\(i,vv). (i % 3) = 0) ll;
+
+//el 0 [1];
+

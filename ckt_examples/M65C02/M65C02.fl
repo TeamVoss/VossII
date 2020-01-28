@@ -1,0 +1,461 @@
+load "ste.fl";
+
+// Load design.
+let p = verilog2pexlif "-I." "M65C02_Core"
+  [
+    "M65C02_Core.v",
+      "M65C02_MPCv4.v",
+      "M65C02_AddrGen.v",
+      "M65C02_ALU.v",
+        "M65C02_BCD.v",
+        "M65C02_BIN.v"
+  ] [];
+
+let ckt = pexlif2fsm p;
+
+let vis = STE_debug ckt;
+
+// Start the GUI
+vis;
+
+// Load ROM.
+let ROM_ant file rom MAX_TIME =
+    let fp = fopen file "r" then
+    letrec rd addr =
+	let line = fgets fp then
+	line == "" => [] |
+	let loc = sprintf "%s[%d][31:0]" rom addr then
+	let vs = map (\c.c="1") (butlast (explode line)) in
+	(map2 (\n.\v. (T,n,v,0,MAX_TIME)) (md_expand_vector loc) vs):
+	(rd (addr+1))
+    in
+    let lines = rd 0 then
+    (fclose fp) fseq
+    flat lines
+;
+
+// As bv2list truncates its values I need to make sure their length is kept.
+let fixed_bv2list bits sign_ext bv =
+  let l = bv2list bv in
+  let len = length l in
+  len > bits => eprintf "bv doesn't fit in %d bits" bits |
+  len = bits => l |
+  let rep_bit = sign_ext => (hd l) | F in
+  (replicate (bits-len) rep_bit)@l
+;
+
+// -----------------------------------------------------------------------------
+// Markus Aronsson - Verifying the 65C02's ADC instruction.
+// -----------------------------------------------------------------------------
+//
+// The 65C02 is a little-endian 8-bit processor with a 16-bit address bus and
+// five 8-bit visible registers: an accumulator (A), two index registers (X&Y),
+// a stack pointer (S), and a processor status word (PSW). The 6502 processor
+// internally has a 16-bit register for its program counter (PC) to address
+// 65,536 different 8-bit memory locations (or I/O locations).
+//
+// Processor status word consists of 8 bit flags: N Z C I D B 1 V
+//
+//     Name (ID)   | Bit | Comment
+//     ------------|-----|-------------------------------------------------
+//     (C)arry     | 0   | Holds the carry result for arithmetic and shift.
+//     (Z)ero      | 1   | Set when the ALU result is zero.
+//     (I)nterrupt | 2   | Masks external IRQ interrupts when set.
+//     (D)ecimal   | 3   | Decimal mode for adder.
+//                 | 4   | Reserved, used for breaks.
+//                 | 5   | Reserved, always 1.
+//     O(v)erflow  | 6   | Set by adder for arithmetic overflow.
+//     (N)egative  | 7   | Set when MSB of ALU is set.
+//
+// (Although the two reserved bits B and 1 are part of the documentation, they
+// are not used internally and the PSW actually consists of six bits. Also, FL
+// refers to it as 'i49/PSW[5:0]'.)
+//
+// While the 6502 supports a number of instructions with different addressing
+// modes, we focus our attention on its "Add Memory to Accumulator with Carry"
+// instruction (ADC). We can describe ADC operationally as:
+//
+//     A + M + C -> A, C    N Z C I D V
+//                          + + + - - +
+//
+// That is, the ADC instruction adds the accumulator, operand (M), and carry
+// together and stores the result back into the accumulator and carry. After
+// which the N, Z, C, and V, bits of the PSW have all been updated while the I
+// and D bits remain unchanged. The operand depends on what addressing mode was
+// used, and 8 different addressing modes are supported for ADC in total:
+//
+//  Syntax | Tag | Name                | Address | Comment
+//  -------|-----|---------------------|---------|------------------------------
+//  X,ind  | 000 | X-indexed, indirect | ($LL,X) | operand is zeropage address;
+//         |     |                     |         | effective address is word in
+//         |     |                     |         | (LL + X, LL + X + 1), inc.
+//         |     |                     |         | without carry: C.w($00LL + X)
+//         |     |                     |         |
+//  zpg    | 001 | zeropage	       | $LL     | operand is zeropage address
+//         |     |                     |         | (hi-byte is zero,
+//         |     |                     |         | address = $00LL)
+//         |     |                     |         |
+//  #      | 010 | immediate           | #$BB    | operand is byte BB
+//         |     |                     |         |
+//  abs    | 011 | absolute            | $LLHH   | operand is address $HHLL *
+//         |     |                     |         |
+//  ind,Y  | 100 | indirect, Y-indexed | ($LL),Y | operand is zeropage address;
+//         |     |                     |         | effective address is word in
+//         |     |                     |         | (LL, LL + 1) incremented by Y
+//         |     |                     |         | with carry: C.w($00LL) + Y
+//         |     |                     |         |
+//  zpg,X  | 101 | zeropage, X-indexed | $LL,X   | operand is zeropage address;
+//         |     |                     |         | effective address is address
+//         |     |                     |         | incremented by X without
+//         |     |                     |         | carry **
+//         |     |                     |         |
+//  abs,X  | 110 | absolute, X-indexed | $LLHH,X | operand is address; effective
+//         |     |                     |         | address is address
+//	   |     |                     |         | incremented by X with
+//         |     |                     |         | carry **
+//         |     |                     |         |
+//  abs,Y  | 111 | absolute, Y-indexed | $LLHH,Y | operand is address; effective
+//         |     |                     |         | address is address 
+//         |     |                     |         | incremented by Y with 
+//         |     |                     |         | carry **
+//
+// Note:
+//
+//   * 16-bit address words are little endian, lo(w)-byte first, followed by the
+//     hi(gh)-byte. (An assembler will use a human readable, big-endian notation
+//     as in $HHLL.)
+// 
+//  ** The available 16-bit address space is conceived as consisting of pages
+//     of 256 bytes each, with address hi-bytes represententing the page index.
+//     An increment with carry may affect the hi-byte and may thus result in a
+//     crossing of page boundaries, adding an extra cycle to the execution.
+//     (Implementation wise, this behaviour is known to be buggy but also
+//     optional as it is controlled by a wait signal (Wt), hence I'll skip it.)
+//     Increments without carry do not affect the hi-byte of an address and no
+//     page transitions do occur. Generally, increments of 16-bit addresses
+//     include a carry, increments of zeropage addresses don't. Notably this is
+//     not related in any way to the state of the carry bit of the accumulator.
+//
+// The previous addressing mode's tag form a part of each instructions opcode.
+// For ADC, the entire code is 011ttt01, where t are the tag bits. Putting it
+// all together, the opcodes for different modes of ADC are:
+//
+//     Addressing mode | Hex | Len | Timing
+//     ------------------------------------
+//     #               | 69  | 2   | 2
+//     zp              | 65  | 2   | 3
+//     zp,X            | 75  | 2   | 4
+//     abs             | 6D  | 3   | 4
+//     abs,X           | 7D  | 3   | 4+
+//     abs,Y           | 79  | 3   | 4+
+//     (zp,X)          | 61  | 2   | 6
+//     (zp),Y          | 71  | 2   | 5+
+//
+// Where (+1) indicates an extra cycle in case a page boundry is crossed.
+//
+// -----------------------------------------------------------------------------
+// The M65C02 is a microprogrammed implementation.
+// -----------------------------------------------------------------------------
+//
+// There are two microprogram memories used. The first, "M65C02_Decoder_ROM",
+// provides the control of the ALU during the execute phase. The second,
+// "M65C02_uPgm_V3a", provides the control of the core. That is, the second
+// microprogram implements each addressing mode, deals with interrupts and BRK,
+// and controls the fetching and execution of all instructions.
+//
+// When a instruction is present on the input data bus, it is captured into the
+// instruction register (IR) but it is simultaneously applied to the address bus
+// of the two microprogram ROMs. That is at least what its documentation says.
+// In reality, the microprogram ROM, "M65C02_uPgm_V3a", control the read enable
+// flag (CE_IR) of the instruction decoder rom, "M65C02_Decoder_ROM". The
+// execution of instructions thus start when a instructions address is picked up
+// by the microprogram ROM and then enabled by the instruction ROM. A common
+// input data bus (DI) is used for all communication with the microprogram
+// controller.
+//
+// The Instruction decode table in "M65C02_uPgm_V3a" has an entry for each
+// opcode and, instead of being organized in numerical order, the table is
+// organized by rows: the least significant nibble and the most significant
+// nibble of the opcode are swapped. The implementation of the microprogram is
+// first based on the addressing mode, and then on the ALU function. Single
+// cycle instructions will be easily recognized in the following table because
+// their table entry use the BRV3 MPC instruction. Multi-cycle instructions use
+// the BRV0 MPC instruction to vector a microroutine in the lower 256 words of
+// the microprogram ROM/RAM. The decode table, filtered for ADC is:
+//
+//     Microprogram Word Format: I BA, Wt, En, NA, PC, IO, DI, SP, Reg_WE, ISR
+//
+//     ------------------------------------------------------------------------
+//     -- Row 1 : 0x01-0xF1
+//     -------------------------------------------------------------------------
+//     0x0116 _ADC_dpXi: 41D90780 BRV0 _RO_DPXI,0,1,,Pls,IF,OP1  -- Read DP Ptr
+//     0x0117 _ADC_dpiY: 41F10780 BRV0 _RO_DPIY,0,1,,Pls,IF,OP1  -- Read DP Ptr
+//     -------------------------------------------------------------------------
+//     -- Row 2 : 0x02-0xF2
+//     -------------------------------------------------------------------------
+//     0x0127 _ADC_dpi: 41C10780 BRV0 _RO_DPI,0,1,,Pls,IF,OP1    -- Read DP
+//     -------------------------------------------------------------------------
+//     -- Row 5 : 0x05-0xF5
+//     -------------------------------------------------------------------------
+//     0x0156 _ADC_dp:  41A90780 BRV0 _RO_DP,0,1,,Pls,IF,OP1     -- Read DP
+//     0x0157 _ADC_dpX: 41B10780 BRV0 _RO_DPX,0,1,,Pls,IF,OP1    -- Read DP
+//     -------------------------------------------------------------------------
+//     -- Row 9 : 0x09-0xF9
+//     -------------------------------------------------------------------------
+//     0x0196 _ADC_imm:  31010780 BMW _Imm,0,1,,Pls,IF,OP1       -- Read Imm
+//								 -- Operand
+//     0x0197 _ADC_absY: 42290780 BRV0 _RO_AbsY,0,1,,Pls,IF,OP1  -- Read Mem
+//								 -- Ptr Lo
+//     -------------------------------------------------------------------------
+//     -- Row D : 0x0D-0xFD
+//     -------------------------------------------------------------------------
+//     0x01D6 _ADC_abs:  42090780 BRV0 _RO_Abs,0,1,,Pls,IF,OP1   -- Read Dst
+//								 -- Ptr Lo
+//     0x01D7 _ADC_absX: 42190780 BRV0 _RO_AbsX,0,1,,Pls,IF,OP1  -- Read Dst
+//								 -- Ptr Lo
+//
+// (The two nodes I have not mentioned before in this table, BA and Reg_WE, are
+// part of the microroutine that controls what registers to update/enable during
+// for a specific addressing mode, as mentioned above.)
+//
+// Having decoded an instruction, the microprogram controller then initiates the
+// necessary memory reads to fetch the operands. The addressing mode table above
+// describes the end result of this procedure for the different modes.The system
+// internally uses its two operands registers (OP1 and OP2) to temporarily hold
+// its address before values are read, where OP1 holds the lower bits of the
+// address and OP2 holds the upper bits, if needed. Any address a microroutine
+// wants to read is put on the address output (AO).
+//
+// Also, as instruction have variable length execution times, the microprogram
+// controller is clocked by a microcycle controller (MC) that triggers an enable
+// (Rdy) on every fourth positive clock edge.
+//
+// Verifying that the ADC, for an accumulator loaded with vector 'a' and operand
+// of 'b', indeed puts 'a+b' on the output thus require that we:
+//
+//   1) Instruct the microprogram decoder to initiate an ADC instruction of
+//      some addressing mode. Rather than setting the pipeline register for the
+//      instruction decoder (uPL) directly, I'll initate an ADC by setting the
+//      decoder's address (MA) to point to the microroutine that initiates the
+//      addition (as given by the above table).
+//
+//   2) Put the opcode for that ADC on the data input for the instruction
+//      decoder in the following microcycle, which will be stored in its pipe-
+//      lined register (IDEC).
+//
+//   3) Feed the addresses/values matching the chosen addressing mode in the
+//      microcycles they are required.
+//
+// Note that I focus my verification on the different addressing modes, and will
+// ignore some details of ADC, like its decimal mode (it is a silly and strange
+// mode that and I want nothing to do with).
+//
+// Anoter note: the ALU consists of a few units but AU is the interesting one.
+//
+// -----------------------------------------------------------------------------
+
+let N      = 50;                                    // Simulation length.
+let a      = bv_variable "a[7:0]";                  // Accumulator sym. value.
+let b      = bv_variable "b[7:0]";                  // Operand sym. value.
+let res    = tl (fixed_bv2list 9 T (bv_add a b));   // Expected result.
+                                                    // Expected carry flag.
+let carry  = (bv_AND (bv_add (bv_ZX a) (bv_ZX b)) (int2bv 256)) != (int2bv 0);
+let zero   = res = (replicate 8 F);                 // Expected zero flag.
+let static =
+    // Microprogram setup.
+    "MC[2:0]"      isv "0b100"     from 0 to 1 and  // Microcycle controller.
+    "uPL[31:28]"   isv "0b0101"    from 0 to 1 and  // Instruction field.
+    "i51/dRst"     isv "0"         from 0 to 1 and  // Delayed reset.
+    "i49/PSW[5:0]" isv "0b000100"  from 0 to 2 and  // Program status word.
+    "OP1[7:0]"     isv "0x0"       from 0 to 1 and  // Operand one.
+    "OP2[7:0]"     isv "0x0"       from 0 to 1 and  // Operand two.
+    // Constant.
+    "Clk"  is_clock (N/2)      and                  // Clock.
+    "Rst"  isv "0" from 0 to N and                  // Reset.
+    "Wait" isv "0" from 0 to N and                  // Memory Wait.
+    "Int"  isv "0" from 0 to N and                  // Interrupt.
+    "xIRQ" isv "0" from 0 to N and                  // Interrupt Mask.
+    // ROM.
+    ROM_ant "M65C02_uPgm_V3a.coe"    "uP_ROM" N and // Program ROM.
+    ROM_ant "M65C02_Decoder_ROM.coe" "ID_ROM" N     // Instruction ROM.
+;
+
+// Shorthands.
+let a_bv = fixed_bv2list 8 T a;
+let b_bv = fixed_bv2list 8 T b;
+
+// -----------------------------------------------------------------------------
+// 0x196 _ADC_imm, opcode 0x69.
+let ant =
+    "A[7:0]"  isv a_bv    from 0 to 2  and
+    "BA[8:0]" isv "0x196" from 0 to 1  and
+    "DI[7:0]" isv "0x69"  from 0 to 2  and
+    "DI[7:0]" isv b_bv    from 8 to 10 and
+    static
+;
+let cons =
+    "A[7:0]"     isv res     from 17 to 18 and
+    // Here we can also check the PSW.
+    "i49/PSW[0]" isv [carry] from 17 to 18 and
+    "i49/PSW[1]" isv [zero]  from 17 to 18
+;
+
+// -----------------------------------------------------------------------------
+// 0x156 _ADC_dp, opcode 0x65, NA <= OP1.
+let ant =
+    "A[7:0]"  isv a_bv     from 0  to 2  and
+    "BA[8:0]" isv "0x156"  from 0  to 1  and
+    "DI[7:0]" isv "0x65"   from 0  to 2  and
+    "DI[7:0]" isv "m[7:0]" from 8  to 10 and // OP1 address.
+    "DI[7:0]" isv b_bv     from 16 to 18 and
+    static
+;
+let mem  = bv_variable "m[7:0]";
+let addr = (replicate 8 F) @ (bv2list mem);
+let cons =
+    "AO[15:0]" isv addr from 9  to 10 and
+    "A[7:0]"   isv res  from 25 to 26
+;
+
+// -----------------------------------------------------------------------------
+// 0x0157 _ADC_dpX, opcode 0x75, NA <= OP1 + X.
+let ant =
+    "A[7:0]"  isv a_bv     from 0  to 2  and
+    "X[7:0]"  isv "x[7:0]" from 0  to 2  and
+    "BA[8:0]" isv "0x157"  from 0  to 1  and
+    "DI[7:0]" isv "0x75"   from 0  to 2  and
+    "DI[7:0]" isv "m[7:0]" from 8  to 10 and // OP1 address.
+    "DI[7:0]" isv b_bv     from 16 to 18 and
+    static
+;
+let mem  = bv_variable "m[7:0]";
+let x    = bv_variable "x[7:0]";
+let addr = (replicate 8 F) @ (tl (bv2list (bv_add mem x)));
+let cons =
+    "AO[15:0]" isv addr from 9  to 10 and
+    "A[7:0]"   isv res  from 25 to 26
+;
+
+// -----------------------------------------------------------------------------
+// 0x01D6 _ADC_abs, opcode 6D, NA <= {OP2, OP1}.
+let ant =
+    "A[7:0]"  isv a_bv      from 0  to 2  and
+    "BA[8:0]" isv "0x1D6"   from 0  to 1  and
+    "DI[7:0]" isv "0x6D"    from 0  to 2  and
+    "DI[7:0]" isv "m1[7:0]" from 8  to 10 and // OP1 address.
+    "DI[7:0]" isv "m2[7:0]" from 16 to 18 and // OP2 address.
+    "DI[7:0]" isv b_bv      from 24 to 26 and
+    static
+;
+let mem1 = bv_variable "m1[7:0]";
+let mem2 = bv_variable "m2[7:0]";
+let addr = (bv2list mem2) @ (bv2list mem1);
+let cons =
+    "AO[15:0]" isv addr from 17 to 18 and
+    "A[7:0]"   isv res  from 33 to 34
+;
+
+// -----------------------------------------------------------------------------
+// 0x01D7 _ADC_absX, opcode 7D, NA <= {OP2, OP1} + X.
+let ant =
+    "A[7:0]"  isv a_bv      from 0  to 2  and
+    "X[7:0]"  isv "x[7:0]"  from 0  to 2  and
+    "BA[8:0]" isv "0x1D7"   from 0  to 1  and
+    "DI[7:0]" isv "0x7D"    from 0  to 2  and
+    "DI[7:0]" isv "m1[7:0]" from 8  to 10 and // OP1 address.
+    "DI[7:0]" isv "m2[7:0]" from 16 to 18 and // OP2 address.
+    "DI[7:0]" isv b_bv      from 24 to 26 and
+    static
+;
+let x    = bv_variable "x[7:0]";
+let mem1 = bv_variable "m1[7:0]";
+let mem2 = bv_variable "m2[7:0]";
+let tmpM = list2bv ((bv2list mem2) @ (bv2list mem1));
+let tmpX = list2bv ((replicate 8 F) @ (bv2list x));
+let addr = tl (bv2list (bv_add tmpM tmpX));
+let cons =
+    "AO[15:0]" isv addr from 17 to 18 and
+    "A[7:0]"   isv res  from 33 to 34
+;
+
+// -----------------------------------------------------------------------------
+// 0x0197 _ADC_absY, opcode 79, NA <= {OP2, OP1} + Y.
+let ant =
+    "A[7:0]"  isv a_bv      from 0  to 2  and
+    "Y[7:0]"  isv "y[7:0]"  from 0  to 2  and
+    "BA[8:0]" isv "0x197"   from 0  to 1  and
+    "DI[7:0]" isv "0x79"    from 0  to 2  and
+    "DI[7:0]" isv "m1[7:0]" from 8  to 10 and // OP1 address.
+    "DI[7:0]" isv "m2[7:0]" from 16 to 18 and // OP2 address.
+    "DI[7:0]" isv b_bv      from 24 to 26 and 
+    static
+;
+let y    = bv_variable "y[7:0]";
+let mem1 = bv_variable "m1[7:0]";
+let mem2 = bv_variable "m2[7:0]";
+let tmpM = list2bv ((bv2list mem2) @ (bv2list mem1));
+let tmpY = list2bv ((replicate 8 F) @ (bv2list y));
+let addr = tl (bv2list (bv_add tmpM tmpY));
+let cons =
+    "AO[15:0]" isv addr from 17 to 18 and
+    "A[7:0]"   isv res  from 33 to 34
+;
+
+// -----------------------------------------------------------------------------
+// 0x0116 _ADC_dpXi, opcode 61, NA <= OP1 + X, NA <= OP1 + 1, NA <= {OP2, OP1}.
+let ant =
+    "A[7:0]"  isv a_bv      from 0  to 2  and
+    "X[7:0]"  isv "x[7:0]"  from 0  to 2  and
+    "BA[8:0]" isv "0x116"   from 0  to 1  and
+    "DI[7:0]" isv "0x61"    from 0  to 2  and
+    "DI[7:0]" isv "i[7:0]"  from 8  to 10 and // OP1 indirect address.
+    "DI[7:0]" isv "lo[7:0]" from 16 to 18 and // OP1 low address bits.
+    "DI[7:0]" isv "hi[7:0]" from 24 to 26 and // OP2 high address bits.
+    "DI[7:0]" isv b_bv      from 32 to 34 and
+    static
+;
+let ind    = bv_variable "i[7:0]";
+let lo     = bv_variable "lo[7:0]";
+let hi     = bv_variable "hi[7:0]";
+let addrLO = (replicate 8 F) @ (tl (bv2list (bv_add ind x)));
+let addrHI = (replicate 8 F) @ (tl (bv2list (bv_add (bv_add ind x) (int2bv 1))));
+let addr   = (bv2list hi) @ (bv2list lo);
+let cons   =
+    "AO[15:0]" isv addrLO from 9  to 10 and
+    "AO[15:0]" isv addrHI from 17 to 18 and // Bug found! (+1) was imp. wrongly.
+    "AO[15:0]" isv addr   from 25 to 26 and
+    "A[7:0]"   isv res    from 41 to 42
+;
+
+// -----------------------------------------------------------------------------
+// 0x0117 _ADC_dpiY, opcode 71, NA <= OP1, NA <= OP1 + 1, NA <= {OP2, OP1} + Y.
+let ant =
+    "A[7:0]"  isv a_bv      from 0  to 2  and
+    "Y[7:0]"  isv "y[7:0]"  from 0  to 2  and
+    "BA[8:0]" isv "0x117"   from 0  to 1  and
+    "DI[7:0]" isv "0x71"    from 0  to 2  and
+    "DI[7:0]" isv "i[7:0]"  from 8  to 10 and // OP1 indirect address.
+    "DI[7:0]" isv "lo[7:0]" from 16 to 18 and // OP1 low address bits.
+    "DI[7:0]" isv "hi[7:0]" from 24 to 26 and // OP2 high address bits.
+    "DI[7:0]" isv b_bv      from 32 to 34 and
+    static
+;
+let ind    = bv_variable "i[7:0]";
+let lo     = bv_variable "lo[7:0]";
+let hi     = bv_variable "hi[7:0]";
+let addrLO = (replicate 8 F) @ (bv2list ind);
+let addrHI = (replicate 8 F) @ (tl (bv2list (bv_add ind (int2bv 1))));
+let tmpA   = list2bv ((bv2list hi) @ (bv2list lo));
+let tmpY   = list2bv ((replicate 8 F) @ (bv2list y));
+let addr   = tl (bv2list (bv_add tmpA tmpY));
+let cons   =
+    "AO[15:0]" isv addrLO from 9  to 10 and
+    "AO[15:0]" isv addrHI from 17 to 18 and
+    "AO[15:0]" isv addr   from 25 to 26 and
+    "A[7:0]"   isv res    from 41 to 42
+;
+
+// -----------------------------------------------------------------------------
+// Run STE simulation.
+let ste  = STE "-e" vis [] ant cons [];
+ste;

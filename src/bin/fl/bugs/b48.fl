@@ -1,0 +1,30 @@
+// Test of error reporting
+
+// Syntax errror
+let f x =
+    let d = x+ in
+    3*d
+;
+
+// Type annotation syntax error 
+let f x =
+    let d = {x:int},1 in
+    d
+;
+
+// Tcl error
+let f x =
+    let d = tcl_eval ["foo "^x] then
+    d+1
+;
+
+// Tcl error
+let f x =
+    let d = tcl_eval ["foo "^x] in
+    d+1
+;
+
+lettype foo =
+    TREE foo foo |
+    LF {a:int}		// Syntax error in type declaration
+;

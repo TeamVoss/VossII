@@ -1,0 +1,170 @@
+load "bool_arithm.fl";
+
+// Pick the prime number to use
+let p = 1009;
+
+// Add one bit to ensure result is positive
+let SZ = bits_needed p + 1;
+
+nonfix ';
+let ' i = int2fbv SZ i;
+
+// Double size to handle multiplication
+let DSZ = 2*SZ;
+
+// Bitvector version of p
+let pv = int2fbv SZ p;
+let minus_pv = int2fbv SZ (0-p);
+
+let as = md_expand_vector (sprintf "a[%d:0]" (SZ-1));
+let bs = md_expand_vector (sprintf "b[%d:0]" (SZ-1));
+
+// Simple BDD ordering
+var_order (interleave [as,bs]);
+update_vossrc "DYNAMIC-ORDERING" "NO";
+
+
+// Provide a variable vector that represents an arbitrary number 0 < x < p-1
+let mk_arb base_name =
+    let names = md_expand_vector (sprintf "%s[%d:0]" base_name (SZ-1)) then
+    let v = map variable names then
+    let condition = (v '>=' '0) AND (v '<' pv) then
+    let sub = param condition then
+    substitute sub v
+;
+
+let av = mk_arb "a";
+let bv = mk_arb "b";
+
+// =========================================================================
+// The specification: (a*b)%p
+// =========================================================================
+let spec_expr = 
+    // Make sure we don't get overflow, so zero extend the vectors and then
+    // return only the least significant digits.
+    let a = ZX DSZ av then
+    let b = ZX DSZ bv then
+    let p = ZX DSZ pv then
+    let res = (a '*' b) '%' p then
+    lastn SZ res
+;
+
+//bdd_size spec_expr;
+
+// =========================================================================
+// The implementation 1: Use mod-p addres in building multiplier
+// =========================================================================
+
+// Specification function for
+//	If a > p subtact p from a.
+// Not a good implementation since it involves two subtractions.
+let cond_sub v = IF (v '>=' pv) THEN v '-' pv ELSE v; 
+
+// Same as cond_sub, except only one subtration operation
+// 
+let cond_sub2 v = 
+    let tmp = v '-' pv in
+    IF (hd tmp) THEN v ELSE tmp
+;
+
+// Verify you can replace cond_sub with cond_sub2
+let vc1 = cond_sub av == cond_sub2 av;
+// vc1;
+
+// A function to perform addition mod p (assuming av and bv are less than p)
+let add_mod_p av bv = cond_sub2 (av '+' bv);
+
+
+// The first implemetation idea
+let imp1_expr =
+    // Make a%p and b%p.
+    // Note that the bitwidth is selected so a < 2*p and thus cond_sub suffices.
+    // Now iteratively compute the (2**i * a)%p and the (pp+rest)%p 
+    letrec mul_step cur_ap (b:bs) =
+	let partial_prod = map (defix AND b) cur_ap in
+	let new_ap = cond_sub2 (cur_ap '<<' '1) in
+	add_mod_p partial_prod (mul_step new_ap bs)
+     /\    mul_step cur_ap [] = '0
+    in
+    mul_step av (rev bv)
+;
+
+// Verify our first implementation is correct
+let vc2 = (spec_expr == imp1_expr);
+// vc2;
+
+
+
+// =========================================================================
+// The implementation 2: Use carry save mod-p addres in building multiplier
+// =========================================================================
+
+let CSA3 av bv cv =
+    let s = av '^' bv '^' cv in
+    let c = av '&' bv '|' av '&' cv '|' bv '&' cv in
+    (tl c @ [F]), s
+;
+
+let CSA2 av bv =
+    let s = av '^' bv in
+    let c = av '&' bv in
+    (tl c @ [F]), s
+;
+
+let CSA4 av bv cv dv =
+    val (c1,s1) = CSA3 av bv cv in
+    CSA3 c1 s1 dv
+;
+
+let add_mod_p_v2 av bv =
+    val (c1,s1) = CSA3 av bv minus_pv in
+    val (c2,s2) = CSA2 av bv in
+    let sum3 = (c1 '+' s1) in 
+    let sum2 = (c2 '+' s2) in 
+    let neg = (hd sum3) in
+    IF neg THEN sum2 ELSE sum3
+;
+
+let vc3 = add_mod_p_v2 av bv == add_mod_p av bv;
+// vc3;
+
+
+let APPROX_BITS = 3;
+
+let approx_CS_sub_p (C,S) =
+    val (rC,rS) = CSA3 C S minus_pv in
+    let approx_sum = ((firstn APPROX_BITS rC) '+' (firstn APPROX_BITS rS)) in
+    let approx_neg = hd approx_sum in
+    IF approx_neg THEN (C,S) ELSE (rC,rS)
+;
+
+let approx_CSA_mod_p (aC,aS) (bC,bS) =
+    val (c1,s1) = CSA4 aC aS bC bS in
+    val (rc1,rs1) = CSA3 c1 s1 minus_pv in
+    let approx_sum =
+	((firstn APPROX_BITS rc1) '+' (firstn APPROX_BITS rs1))
+    in
+    let approx_neg = hd approx_sum in
+    IF approx_neg THEN (c1,s1) ELSE (rc1,rs1)
+;
+
+
+// The second implemetation idea
+let imp2_expr =
+    // Make a%p and b%p.
+    letrec mul_step (cur_apC,cur_apS) (b:bs) =
+	let ppC = map (defix AND b) cur_apC in
+	let ppS = map (defix AND b) cur_apS in
+	let new_ap =
+	    approx_CS_sub_p ((cur_apC '<<' '1),(cur_apS '<<' '1))
+	in
+	approx_CSA_mod_p (ppC,ppS) (mul_step new_ap bs)
+     /\    mul_step cur_ap [] = '0,'0
+    in
+    val (C,S) = mul_step (av,'0) (rev bv) in
+    let sum = C '+' S in
+    cond_sub2 sum
+;
+
+imp2_expr;
+

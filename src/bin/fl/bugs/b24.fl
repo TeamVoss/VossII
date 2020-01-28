@@ -1,0 +1,35 @@
+let i_inc i = i+1;
+let s_inc i = i^"1";
+overload inc i_inc s_inc;
+
+let i_dec i = i+1;
+let s_dec i = i^"1";
+overload dec i_dec s_dec;
+
+help "inc";
+
+11111;
+let double = \inc. (\x. inc (inc x));
+22222;
+
+double inc 1;
+3333;
+
+double inc "00";
+44444;
+
+lettype tr = BR tr tr | LFi int | LFs string;
+
+letrec t_inc (BR t1 t2) = BR (t_inc t1) (t_inc t2)
+ /\    t_inc (LFi i) = LFi (dec (inc i))
+ /\    t_inc (LFs s) = LFs (inc s)
+;
+//55555;
+
+let would_be_nice x = inc (inc x);
+6666;
+bvariable "a";
+would_be_nice 1;
+77777;
+would_be_nice "a";
+88888;

@@ -1,0 +1,91 @@
+open_overload {inc:: *a -> *a};
+
+let double {x :: *a} =
+    let d = inc x in
+    inc {d :: *a}
+;
+
+let i_inc x = x+1;
+add_open_overload inc i_inc;
+
+double 1;
+
+let s_inc x = x^"+";
+add_open_overload inc s_inc;
+
+double 1;
+double "A";
+
+load "bool_arithm.fl";
+
+open_overload {bv_size:: *a -> int};
+
+open_overload {bv_destr:: *a -> (bool list)};
+open_overload {bv_constr:: (bool list) -> *a};
+
+
+lettype bv0 = BV0 (bool list);
+let bv0_constr li = (BV0 li);
+let bv0_size (BV0 l) = 0;
+let bv0_destr (BV0 li) = li;
+add_open_overload bv_size bv0_size;
+add_open_overload bv_destr bv0_destr;
+add_open_overload bv_constr bv0_constr;
+
+lettype bv1 = BV1 (bool list);
+let bv1_constr l = (BV1 l);
+let bv1_size (BV1 l) = 1;
+let bv1_destr (BV1 l) = l;
+add_open_overload bv_size bv1_size;
+add_open_overload bv_destr bv1_destr;
+add_open_overload bv_constr bv1_constr;
+
+lettype bv2 = BV2 (bool list);
+let bv2_constr l = (BV2 l);
+let bv2_size (BV2 l) = 2;
+let bv2_destr (BV2 l) = l;
+add_open_overload bv_size bv2_size;
+add_open_overload bv_destr bv2_destr;
+add_open_overload bv_constr bv2_constr;
+
+lettype bv3 = BV3 (bool list);
+let bv3_constr l = (BV3 l);
+let bv3_size (BV3 l) = 3;
+let bv3_destr (BV3 l) = l;
+add_open_overload bv_size bv3_size;
+add_open_overload bv_destr bv3_destr;
+add_open_overload bv_constr bv3_constr;
+
+lettype bv4 = BV4 (bool list);
+let bv4_constr l = (BV4 l);
+let bv4_size (BV4 l) = 4;
+let bv4_destr (BV4 l) = l;
+add_open_overload bv_size bv4_size;
+add_open_overload bv_destr bv4_destr;
+add_open_overload bv_constr bv4_constr;
+
+let add {b1:: *a} {b2:: *a} =
+    let bl1 = {bv_destr b1::bool list} in
+    let bl2 = {bv_destr b2::bool list} in
+    let resl = bl1 ''+'' bl2 in
+    let res = bv_constr resl in
+    {res:: *a}
+;
+
+
+(BV3 [F,F,T]);
+bv_destr (BV3 [F,F,T]);
+
+{add (BV3 [F,F,T]) (BV3 [F,T,T]):: bv3};
+
+rvariable "bbbbbb";
+bv_destr (add (BV3 [F,F,T]) (BV3 [F,T,T]));
+
+rvariable "ccccc";
+add (add (BV3 [F,F,T]) (BV3 [F,T,T])) (BV3 [F,T,F]);
+
+bv_destr it;
+
+rvariable "dddddd";
+bv_destr (add (BV3 [F,T,T]) (BV3 [F,T,T]));
+

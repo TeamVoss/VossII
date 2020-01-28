@@ -1,0 +1,34 @@
+load "ste.fl";
+
+TYPE "hword" 16;
+TYPE "word" 32;
+
+let NBR_MEM_LOCS = 32;
+//let NBR_MEM_LOCS = 16384;
+
+let mem_info = MEM 32 NBR_MEM_LOCS 8;
+
+TYPE "emem" (8*NBR_MEM_LOCS);
+
+
+let extract_32_16 {w::word} =
+    let we = hw_destr w in
+    let swe = W_SLICE (31--16) we in
+    {hw_constr swe::hword}
+;
+
+let BUG =
+    word_input	imm.
+    word_output out.
+    CELL "Draw_hfl_code NEXT 1" [
+	out <- (ZX (extract_32_16 imm))
+];
+
+let p = BUG 'imm 'out;
+
+p;
+
+let ckt = pexlif2fsm p;
+ckt;
+
+STE "-e" ckt [] [] [] [];

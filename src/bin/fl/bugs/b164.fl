@@ -1,0 +1,8 @@
+load "ste.fl";
+
+let N = 2;
+
+rvariable "a";
+
+internal_array (N+2) {aa:: bit list} {bb:: bit list}. (CELL "A" []);
+

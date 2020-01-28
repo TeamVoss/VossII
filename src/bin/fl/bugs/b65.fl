@@ -1,0 +1,113 @@
+let FAIL_OK e =
+    e gen_catch 
+    \msg. ((fprintf stderr "Command failed:\n%s\n" msg) fseq [])
+;
+
+let l = [1,2,3,4,5];
+
+butlast l;
+butlast (rev l);
+
+butlast [1];
+
+"firstn";
+
+firstn 0 l;
+firstn 1 l;
+firstn 2 l;
+firstn 3 l;
+firstn 4 l;
+firstn 5 l;
+//firstn 6 l;
+
+let ll =
+    ((fprintf stderr "1") fseq 1):
+    ((fprintf stderr "2") fseq 2):
+    ((fprintf stderr "3") fseq 3):
+    ((fprintf stderr "4") fseq 4):
+    ((fprintf stderr "5") fseq 5):
+    ((fprintf stderr "6") fseq 6):
+    []
+;
+
+firstn 4 ll;
+firstn 0 ll;
+firstn 1 ll;
+firstn 2 ll;
+firstn 3 ll;
+firstn 4 ll;
+firstn 5 ll;
+
+"butfirstn";
+
+let ll =
+    ((fprintf stderr "1") fseq 1):
+    ((fprintf stderr "2") fseq 2):
+    ((fprintf stderr "3") fseq 3):
+    ((fprintf stderr "4") fseq 4):
+    ((fprintf stderr "5") fseq 5):
+    ((fprintf stderr "6") fseq 6):
+    []
+;
+
+butfirstn 4 ll;
+butfirstn 0 ll;
+butfirstn 1 ll;
+butfirstn 2 ll;
+butfirstn 3 ll;
+butfirstn 4 ll;
+butfirstn 5 ll;
+FAIL_OK (butfirstn 6 ll);
+FAIL_OK (butfirstn 7 ll);
+
+
+"lastn";
+
+let ll =
+    ((fprintf stderr "1") fseq 1):
+    ((fprintf stderr "2") fseq 2):
+    ((fprintf stderr "3") fseq 3):
+    ((fprintf stderr "4") fseq 4):
+    ((fprintf stderr "5") fseq 5):
+    ((fprintf stderr "6") fseq 6):
+    []
+;
+
+lastn 0 ll;
+lastn 1 ll;
+lastn 2 ll;
+lastn 3 ll;
+lastn 4 ll;
+lastn 5 ll;
+lastn 6 ll;
+FAIL_OK (lastn 7 ll);
+
+"butlastn";
+
+let ll =
+    ((fprintf stderr "1") fseq 1):
+    ((fprintf stderr "2") fseq 2):
+    ((fprintf stderr "3") fseq 3):
+    ((fprintf stderr "4") fseq 4):
+    ((fprintf stderr "5") fseq 5):
+    ((fprintf stderr "6") fseq 6):
+    []
+;
+
+butlastn 0 ll;
+butlastn 1 ll;
+butlastn 2 ll;
+butlastn 3 ll;
+butlastn 4 ll;
+butlastn 5 ll;
+butlastn 6 ll;
+FAIL_OK (butlastn 7 ll);
+
+"find";
+
+let l3 = [(1,"a"), (2,"b"), (3,"c"), (4,"d")];
+
+find (\x. fst x = 3) l3;
+find (\x. snd x = "d") l3;
+find (\x. x = (2,"b")) l3;
+(find (\x. x = (3,"b")) l3) gen_catch (\msg. (fprintf stderr "Failed:\n%s\n" msg) fseq (99,"--"));

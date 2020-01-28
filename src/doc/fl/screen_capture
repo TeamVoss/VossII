@@ -1,0 +1,24 @@
+
+set aname [exec mktemp -u]
+
+exec fl -f screen_capture.fl $aname &
+
+after 1000
+
+
+proc create_voss2_images {ifiles} {
+    foreach ifile [lsort $ifiles] {
+	set ofile "[file rootname $ifile].jpg"
+	set fp [open $ifile "r"]
+	set cmds [read $fp]
+	send $::aname screen_capture:do_cmds [list $cmds]
+	close $fp
+	send $::aname screen_capture:do_capture $ofile
+    }
+}
+
+create_voss2_images $argv
+
+catch {send $::aname screen_capture:do_cmds [list "quit\;"]}
+
+exit

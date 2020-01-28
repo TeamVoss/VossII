@@ -1,0 +1,22 @@
+let extract_pexlif_hierarchy pexlif hierarchy =
+    let indices = map (sscanf "i%d") (str_split hierarchy "/") in
+    letrec get (idx:idxs) p =
+        let children = content_get_children (pexlif_get_content p) in
+        get idxs (el idx children)
+     /\    get [] p = p
+    in
+    get indices pexlif
+;
+
+let extract_pexlif_by_name pexlif name_pat =
+    letrec search p =
+        val (PINST name attrs leaf _ _ _ content) = p in
+        (strstr name name_pat) != 0 => [p] |
+        leaf => [] |
+        str_is_substr "draw_" name => [] |
+        let children = content_get_children (pexlif_get_content p) in
+        flatmap search children
+    in
+    search pexlif
+;
+

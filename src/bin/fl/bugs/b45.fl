@@ -1,0 +1,45 @@
+// Testing assoc and filter
+
+
+// Find the corresponding value to x in the association list l
+letrec old_assoc x l = empty l => error "old_assoc failed to find element" |
+                let h = hd l in
+                (fst h) == x => (snd h) | old_assoc x (tl l);
+
+let N = 3000;
+
+let l = map (\i. int2str i, 3*i) (1--N);
+
+time (old_assoc "99" l);
+time (old_assoc (int2str (N-2)) l);
+time (old_assoc "999" l);
+
+time (assoc "1" l);
+time (assoc "2" l);
+time (assoc "99" l);
+time (assoc (int2str (N-2)) l);
+time (assoc "999" l);
+
+filter (\i. (i%2) = 0) (1--5);
+
+filter (\(f,s).s = 33) l;
+
+let old_partition fun l =
+    let tmp = map (\n.n, fun n) l in
+    letrec group ((a,fa):rs) =
+    let same = filter (\p. snd p == fa) rs in
+    let rem = filter (\p. snd p != fa) rs in
+    (a:(map fst same)):(group rem)
+     /\    group [] = []
+    in
+    group tmp
+;
+
+let r1 = old_partition (\(s,i). (i % 17)) l;
+time (r1 fseq 1);
+
+let r2 = partition (\(s,i). (i % 17)) l;
+time (r2 fseq 1);
+
+r1 == r2;
+

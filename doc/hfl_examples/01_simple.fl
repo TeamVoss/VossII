@@ -1,0 +1,47 @@
+load "ste.fl";
+
+TYPE "byte" 8;
+
+ENUM "color" ["blue", "red"];
+
+
+let ckt1 =
+        byte_input a b c.
+        byte_output out.
+        CELL "hi" [
+        out <- a '+' b '-' c
+];
+
+
+let ckt2 =
+        bit_input   clk.
+        byte_input  a b.
+        byte_output res.
+        internal    tmp1 tmp2 mid.
+        CELL "ckt2" [
+            tmp1 <- a '-' b,
+            tmp2 <- a '*' b,
+            ckt1 a tmp1 tmp2 mid,
+            re_ff clk mid res
+];
+
+
+let p = ckt2 'clk 'a 'b 'res;
+
+let ckt = pexlif2fsm p;
+let vis = STE_debug ckt;
+vis;
+
+let ant =
+    "clk" isv "0" from 0 to 1 and
+    "clk" isv "1" from 1 to 2 and
+    "clk" isv "0" from 2 to 3 and
+    "clk" isv "1" from 3 to 4 and
+    "a[7:0]" isv "0x23" from 0 to 2 and
+    "b[7:0]" isv "0x14" from 0 to 2 and
+    "a[7:0]" isv "A[7:0]" from 2 to 4 and
+    "b[7:0]" isv "0x1" from 2 to 4
+;
+
+STE "-e" vis [] ant [] [];
+

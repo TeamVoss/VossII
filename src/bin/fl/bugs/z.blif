@@ -1,0 +1,8 @@
+.model z
+.inputs a b
+.outputs o
+.names a b _0_[0]
+11 1
+.names _0_[0] o
+0 1
+.end

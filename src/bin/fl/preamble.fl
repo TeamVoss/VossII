@@ -1,0 +1,1430 @@
+(_load (DIR^"builtins.fl") F) fseq ();
+
+// Convert a natural number to a bitvector.
+let nat2bv n =
+    n < 0 => eprintf "nat2bv of negative number %d" n |
+    bv_ZX (int2bv n)
+;
+
+let pi = 3.1415926535897932;
+
+let i_unary_minus {i::int} = 0-i;
+let f_unary_minus {f::float} = fsub 0.0 f;
+let bv_unary_minus {bv::bv} = bv_sub (int2bv 0) bv;
+let bev_unary_minus {bv::bev} = bev_sub (int2bev 0) bv;
+overload {unary_minus:: *a -> *a} i_unary_minus f_unary_minus bv_unary_minus bev_unary_minus;
+
+let i_minus i j = i-j;
+let f_minus i j = fsub i j;
+overload {- :: *a -> *a -> *a} i_minus f_minus bv_sub bev_sub;
+infix_unary 7 - unary_minus;
+
+let i_plus i j = i+j;
+let f_plus i j = fadd i j;
+let bv_plus i j = bv_add i j;
+let bev_plus i j = bev_add i j;
+overload {+ :: *a -> *a -> *a} i_plus f_plus bv_plus bev_plus;
+infix 7 +;
+
+let i_mul i j = i*j;
+let f_mul i j = fmul i j;
+overload {* :: *a -> *a -> *a} i_mul f_mul bv_mul bev_mul;
+infix 8 *;
+
+let i_div i j = i/j;
+let f_div i j = fdiv i j;
+overload {/ :: *a -> *a -> *a} i_div f_div bv_div bev_div;
+infix 8 /;
+
+let i_mod {i::int} {j::int} = i % j;
+overload {% :: *a -> *a -> *a} i_mod bv_mod bev_mod;
+infix 8 %;
+
+let i_lt i j = i < j;
+let f_lt i j = flt i j;
+overload {< :: *a -> *a -> bool} i_lt f_lt bv_less bev_less;
+infix 5 <;
+
+let i_le i j = i <= j;
+let f_le i j = fle i j;
+overload {<= :: *a -> *a -> bool} i_le f_le bv_leq bev_leq;
+infix 5 <=;
+
+let i_gt i j = i > j;
+let f_gt i j = fgt i j;
+overload {> :: *a -> *a -> bool} i_gt f_gt bv_greater bev_greater;
+infix 5 >;
+
+let i_ge i j = i >= j;
+let f_ge i j = fge i j;
+overload {>= :: *a -> *a -> bool} i_ge f_ge bv_geq bev_geq;
+infix 5 >=;
+
+let s2bv s = int2bv (sscanf "%d" s);
+let s2bev s = int2bev (sscanf "%d" s);
+let s2int s = sscanf "%d" s;
+let s2float s = str2float s;
+overload {' :: string-> *a} s2bv s2bev s2int s2float;
+free_binder ';
+
+let neg_s2bv s = int2bv ((0-1)*(sscanf "%d" s));
+let neg_s2bev s = int2bev ((0-1)*(sscanf "%d" s));
+let neg_s2int s = ((0-1)*(sscanf "%d" s));
+let neg_s2float s = ((0.0-1.0)*(str2float s));
+overload {'- :: string -> *a} neg_s2int neg_s2bv neg_s2bev neg_s2float;
+free_binder '-;
+
+
+let i2i {i::int} = i;
+overload {'' :: int -> *a} i2i int2float int2bv int2bev;
+
+// Return the minimum of x and y
+let min x y = x < y => x | y;
+
+// Return the maximum of x and y
+let max x y = x > y => x | y;
+
+let quit = exit 0;
+
+let stdout = fopen "stdout" "w";
+let stderr = fopen "stderr" "w";
+
+export_to_tcl update_vossrc;
+export_to_tcl get_vossrc;
+export_to_tcl help;
+export_to_tcl get_matching_functions;
+
+
+// Identity function
+let id a = a;
+
+let IF c = c;
+let ELSE {t:: *a} {e:: *a} = (t,e);
+
+let bTHEN c (t,e) = c => t | e;
+let bevTHEN {c::bexpr} ({t::bev},{e::bev}) =
+    let cb = list2bev [c] then
+    bev_OR (bev_AND cb t) (bev_AND (bev_NOT cb) e)
+;
+overload THEN bTHEN bevTHEN;
+if_then_else_binder THEN ELSE;
+
+// Convert a BDD to a bexpr.
+// NOTE: The bexpr will (usually) be much larger than necessary since
+// the conversion is directly from the BDD structure.
+cletrec bdd2bexpr b =
+    b == T => bT |
+    b == F => bF |
+    val (v,H,L) = top_cofactor b in
+    let ve = bvariable v then
+    let He = bdd2bexpr H then
+    let Le = bdd2bexpr L then
+    ve bAND He bOR bNOT ve bAND Le
+;
+
+
+
+// Generate the list of integers starting from f and going up to t
+let upto f t =
+    letrec gen i = i > t => [] | i:(gen (i+1)) in
+    gen f
+;
+infix 6 upto;
+
+// Generate the list of integers starting from f and going down to t
+let downto f t =
+    letrec gen i = i < t => [] | i:(gen (i-1)) in
+    gen f
+;
+infix 6 downto;
+
+// Generate the list of integers from f to t inclusive
+// If f < t it generates an increasing list.
+// If f > t it genetates a decreasing list.
+let -- f t =
+    f < t => f upto t | f downto t
+;
+infix 6 --;
+
+//  Append list yl to the list xl
+let @ = defix append;
+infix 9 @;
+
+// Return a list with at most cnt elements from l.
+// If the list has more than cnt elements, the tail list is appended
+// after the first cnt elements.
+// Common usage is:  atmost 5 l ["..."]; 
+// Usage: atmost cnt l trunc_list;
+let atmost cnt l trunc_list = length l <= cnt => l | (firstn cnt l)@trunc_list;
+
+// Create list by duplicating first argument arg2 times
+letrec replicate n x =
+    n < 0 => eprintf "replicate with count < 0 (%d)" n |
+    n=0 => [] | x:(replicate (n-1) x)
+;
+
+// (map fn list) -- Apply function fn to every element of list l.
+letrec map fn l = empty l => [] | (fn (hd l)):(map fn (tl l));
+
+// (map2 fn l1 l2) - Apply the binary function fn to every elements in
+// l1 and l2, i.e., if l1 = [a1,a2,...,an] and l2 = [b1,b2,...,bn],then
+// map2 fn l1 l2 will return the list:
+// [(fn a1 b1), (fn a2 b2), ..., (fn an bn)].
+// It is an error if the lengths of the lists are not the same.
+//
+letrec map2 fn l1 l2 =
+    empty l1 => empty l2 => [] | error "list2 longer than list1 in map2" |
+    empty l2 => error "list1 longer than list2 in map2" |
+    val (a:as) = l1 in
+    val (b:bs) = l2 in
+    (fn a b):(map2 fn as bs)
+;
+
+// (map3 fn l1 l2 l3) - Apply the function fn to every elements in
+// l1, l2 and l3, i.e., if l1 = [a1,a2,...,an], l2 = [b1,b2,...,bn], and
+// l3 = [c1,c2,...,cn], then map3 fn l1 l2 l3 will return the list:
+// [(fn a1 b1 c1), (fn a2 b2 c2), ..., (fn an bn cn)].
+// It is an error if the lengths of the lists are not the same.
+//
+letrec map3 fn l1 l2 l3 =
+    empty l1 => empty l2 =>
+			    empty l3 => [] |
+			    error "list3 longer than lists 1 and 2 in map3"
+			  |
+			    error "list2 longer than list1 in map3"
+	     |
+	        empty l2 =>
+			    error "list1 longer than list2 in map3"
+		|
+		empty l3 =>
+			    error "list3 shorter than lists 1 and 2 in map3"
+    |
+    val (a:as) = l1 in
+    val (b:bs) = l2 in
+    val (c:cs) = l3 in
+    (fn a b c):(map3 fn as bs cs)
+;
+
+// Apply f to every element of list and join the results together.
+// Computes: f (el 1 l) (f (el 2 l) (f (el 3 l) (... (f (last l) x))...)))
+// NOTE: This is the lazy version. See sitlist for a strict version (and often
+// more efficient)
+// Usage: itlist f l x;
+letrec itlist f l x = empty l => x | f (hd l) (itlist f (tl l) x);
+
+// Merge the elements in the list l by repeadedly applying the function fn
+// Usage: accumulate fn l;
+letrec accumulate fn l = itlist fn (tl l) (hd l);
+
+// Reverese iteration list
+letrec rev_itlist f l x = empty l => x | rev_itlist f (tl l) (f (hd l) x);
+
+// Apply the list creating function fn to every element in l and append
+// all the resulting lists together.
+letrec flatmap fn l =
+    empty l => [] |
+    (fn (hd l))@(flatmap fn (tl l))
+;
+
+// Group list l into segments of size sz.
+// Examples:
+// : cluster 4 (1--12);
+// [[1,2,3,4],[5,6,7,8],[9,10,11,12]]
+//
+// Usage: cluster sz l;
+let cluster sz l =
+    sz <= 0 => eprintf "cluster called with no-positive size (%d)" sz |
+    (length l % sz) != 0 =>
+        eprintf
+           "cluster called with list of length %d which is not a multiple of %d"
+           (length l) sz
+    |
+    letrec process cl =
+        cl = [] => [] |
+        (firstn sz cl):(process (butfirstn sz cl))
+    in
+    process l
+;
+
+// (interleave ll) -- Interleave elements from the list (of lists)
+letrec interleave ll = (empty ll) => [] |
+        letrec hdlist ll = (empty ll) => [] |
+                let head = hd ll in
+                let nw = (empty head) => [] | [(hd (head))] in
+                nw @ (hdlist (tl ll)) in
+        letrec rem ll = (empty ll) => [] |
+                let head = hd ll in
+                let rm = (empty head)=>[] | [(tl (head))] in
+                rm @ (rem (tl ll)) in
+        (hdlist ll) @ (interleave (rem ll));
+
+// Take twp lists of the same length and return a list of pairs 
+letrec zip l1 l2 =
+        empty l1 =>
+            empty l2 => [] | error "Lenght mismatch in zip"
+        |
+            empty l2 => error "Lenght mismatch in zip"
+        |
+            (hd l1, hd l2):(zip (tl l1) (tl l2))
+;
+
+// Take a list of pairs pl and return a pair of lists 
+letrec unzip pl = empty pl => ([],[]) | 
+		let res = unzip (tl pl) in
+		let h = hd pl in
+		(((fst h):(fst res)), ((snd h):(snd res)));
+
+
+// Convert a list to a string
+// Usage: list2str print_empty_list pre sep post pr_fun l, where
+//	print_empty_list    decides whether a pre^post or "" will be the result
+//			    on an empty list
+//	pre		    The string that will be prepended before the list
+//	sep		    The separator string between elements
+//	post		    The string that will be appended after the list
+//	pr_fun		    A function that converts an element of the list
+//			    to a string.
+//	l		    List of elements to print
+let list2str print_empty_list pre sep post pr_fun l =
+    l = [] => print_empty_list => pre^post | "" |
+    let sl = map pr_fun l then
+    letrec do csep (e:es) =
+	csep:e:(do sep es)
+     /\	   do csep [] = [post]
+    in
+    implode (do pre sl)
+;
+
+// Print out a list to a stream
+// Usage: list2fp fp print_empty_list pre sep post pr_fun l, where
+//	fp		    stream to write to
+//	print_empty_list    decides whether a pre^post or "" will be the result
+//			    on an empty list
+//	pre		    The string that will be prepended before the list
+//	sep		    The separator string between elements
+//	post		    The string that will be appended after the list
+//	pr_fun		    A function that printf an element of the list
+//			    to a string.
+//	l		    List of elements to print
+let list2fp fp print_empty_list pre sep post pr_fun l =
+    l = [] => print_empty_list => fprintf fp "%s%s" pre post | () |
+    letrec do csep (e:es) =
+	(fprintf fp "%s" csep) fseq
+	{(pr_fun fp e)::void} fseq
+	(do sep es)
+     /\	   do csep [] = fprintf fp "%s" post
+    in
+    (do pre l)
+;
+
+// log2 n -- floor of log_2(n)
+let log2 n =
+    n <= 0 =>
+	eprintf "Cannot compute log2 for non-positive numbers (%d)" n
+    |
+    letrec log n = (n = 1) => 0 | 1+(log (n/2)) in
+    log n
+;
+
+let ipow base n =
+    letrec pow n = n = 0 => 1 | base*(pow (n-1)) in
+    pow n
+;
+let bvpow base n =
+    letrec pow n = n = (int2bv 0) => (int2bv 1) | base*(pow (n-(int2bv 1))) in
+    pow n
+;
+
+// Raise base to the power of n
+overload {** :: *a -> *a -> *a} ipow pow bvpow;
+infix 9 **;
+
+// Convert a list of bools to a signed integer.
+let bl2int bv = 
+    let sz = length bv in
+    (hd bv) => -1*(2**sz-(bv2num bv)) | (bv2num bv) 
+;
+
+// Convert a signed integer to a list of bools.
+let int2bl bits i =
+    let es = explode (sprintf "%0*b" bits i) then
+    map (\e. e = "1") es
+;
+
+// Convert a bv to fixed size bitlist.
+//	bits:	    the desired length of list
+//	sign_ext:   whether the bv should be sign extended or zero extended
+//		    (in case it is shorter than the desired length)
+//
+// Usage: fixed_bv2list bits sign_ext bv;
+let fixed_bv2list bits sign_ext bv =
+    let l = bv2list bv in
+    let len = length l in
+    len > bits => eprintf "bv doesn't fit in %d bits" bits |
+    len = bits => l |
+    let rep_bit = sign_ext => (hd l) | F in
+    (replicate (bits-len) rep_bit)@l
+;
+
+// Compute the condition for two bitvectors to be equal.
+let bv_eq {a::bv} {b::bv} = a = b;
+
+//let bev_eq {a::bev} {b::bev} = 
+
+// Compute the condition for two bitvectors not to be equal.
+let bv_neq {a::bv} {b::bv} = a != b;
+
+// Compute a substitution for all variables that must take on 
+// some value for cond to be satisfied.
+// For example, if cond = a & b & c' + a & b' & c'
+// forcing cond will return [("a",T),("c",F)]
+cletrec forcing cond =
+    cond == T => [] |
+    cond == F => [] |
+    val (v,H,L) = top_cofactor cond in
+    H == F => (v,F):(forcing L) |
+    L == F => (v,T):(forcing H) |
+    H == T => [] |
+    L == T => [] |
+    (forcing H) intersect (forcing L)
+;
+
+// Compute an assignment to the variables that cond depends on so that
+// cond is satisfied. If there is a choice for some variable, preference
+// determined whether T or F should be selected.
+// Usage: example preference cond
+let example preference cond =
+    letrec select f (v:vs) =
+        let H = substitute [(v,T)] f in
+        let L = substitute [(v,F)] f in
+        H == F => (v,F):(select L vs) |
+        L == F => (v,T):(select H vs) |
+        preference => (v,T):(select H vs) | (v,F):(select L vs)
+     /\    select f [] = []
+    in
+    select cond (depends [cond])
+;
+
+
+// Given a list of node vectors, return a list of "atoms" (vectors) that
+// have the property that every node in an atom is member of exactly the
+// same input vectors. Intuitively, vector_atomize split big vectors into
+// smaller ones so that every node in the smaller vector is used the same way.
+let vector_atomize vec_list =
+    letrec expand i (v:vs) =
+        (map (\n. n,i) (md_expand_vector v))@(expand (i+1) vs)
+     /\    expand i [] = []
+    in
+    let use_nds = expand 1 vec_list then
+    let same_nds = partition fst use_nds then
+    let usage = map (\p. (fst (hd p)), map snd p) same_nds then
+    let same_usage = partition snd usage then
+    flatmap (\p. extract_vectors (map fst p)) same_usage
+;
+
+
+// Using minisat, try to find a model that satisfies all the bexpr in arg1
+// The search is limited to arg2 seconds.
+// If there is no model, return the empty list.
+// If every model satisfies arg1, then return a dummy [("",bT)] list.
+// Otherwise return a substitution list that is a model (i.e., an
+// assignment that makes all the expressions in arg1 true).
+// The bget_vector_model differs from bget_model in that it returns the
+// model pairs as vectors.
+let bget_vector_model bexprs time_limit =
+    let model = bget_model bexprs time_limit in
+    let vecs = md_extract_vectors (map fst model) in
+    let collect_vals v =
+	let nds = md_expand_vector v in
+	let vs  = map (\n. assoc n model) nds in
+	let bin = map (\b. (b == bT) => "1" | "0") vs in
+	letrec cnv cur (b:bs) = cnv (2*cur + ((b = "1")=>1|0)) bs
+	 /\    cnv cur [] = cur
+	in
+	let i = cnv 0 bin in
+	(v, sprintf "%s (0x%x)" (implode bin) i)
+    in
+    map collect_vals vecs
+;
+
+
+begin_abstype;
+
+letrec select f (v:vs) =
+    let H = substitute [(v,T)] f in
+    let L = substitute [(v,F)] f in
+    L == F => T:(select H vs) | F:(select L vs)
+ /\    select f [] = []
+;
+
+// Make a string that is the pretty printed version when all the
+// vars have exprs values.
+//
+// Usage: print_vectors vars exprs;
+//
+let print_vectors vars exprs =
+    let sub = zip vars exprs in
+    let mk1 v =
+	let nds = md_expand_vector v in
+	let len = length nds in
+	let es = map (\n. assoc n sub) nds in
+	let e = bv2num es in
+	len > 4 => sprintf "%s=0x%x" v e | sprintf "%s=%0*b" v len e
+    in
+    list2str T "" " " "" mk1 (extract_vectors vars)
+;
+
+// Enumerate at most max_examples assignments to vars that satisfies f.
+// Usage: enumerate_examples max_examples vars f;
+let enumerate_examples max_examples vars f =
+    let vv = map variable vars in
+    letrec gen1 cnt fun =
+        cnt > max_examples => ["..."] |
+        fun == F => [] |
+        let ex = select fun vars in
+	let n = print_vectors vars ex in
+        n:(gen1 (cnt+1) (fun AND NOT (vv = ex)))
+    in
+    let examples = gen1 1 f in
+    let pid fp s = fprintf fp "%s" s in
+    list2fp stdout T "\n" "\n" "\n" pid examples
+;
+
+end_abstype print_vectors enumerate_examples;
+
+begin_abstype;
+let loaded_files_ref = ref {[]::string list};
+
+// Load the fl file 'filename' if it has not been loaded before.
+// Usage: cload filename;
+let cload filename =
+    let name1 = filename in
+    let lib = get_vossrc "VOSS-LIBRARY-DIRECTORY" in
+    let name2 = sprintf "%s/%s" lib filename in
+    let full_name1 = (file_fullname name1) catch name1 in
+    let full_name2 = (file_fullname name2) catch name2 in
+    ((mem full_name1 (deref loaded_files_ref)) OR
+     (mem full_name2 (deref loaded_files_ref)))
+    =>
+	get_vossrc "VERBOSE_CLOAD_IGNORES" != "" =>
+	    fprintf stderr
+		    "Trying to load a previously loaded file (%s). Ignored!"
+		    filename
+	|
+	()
+    |
+    let full_name = 
+	(file_exists full_name1) =>
+	    ((_load full_name1 F) seq full_name1) gen_catch
+	    (\msg.  eprintf "Failed to load |%s|\n%s\n" full_name1 msg)
+	|
+	(file_exists full_name2) =>
+	    ((_load full_name2 F) seq full_name2) gen_catch
+	    (\msg.  eprintf "Failed to load |%s|\n%s\n" full_name2 msg)
+	|
+	eprintf "Cannot find file %s" filename
+    then
+    (loaded_files_ref := (full_name:(deref loaded_files_ref)))
+;
+non_lazy cload;
+end_abstype cload;
+
+// Replace all curent state variables (not ending in _n) with their
+// corresponding next-state variables in all the BDDs in fs.
+// All other variables remain as they were.
+// NOTE: If fs already depends on one of the new next-state variables, 
+// you will likely not get what you expect, so beware!
+// Usage: bdd_current2next fs;
+let bdd_current2next f =
+    let vs = depends [f] in
+    let mk_c2n n = str_is_suffix "_n" n => [] | [(n, variable (n^"_n"))] in
+    let sub = flatmap mk_c2n vs in
+    substitute sub f
+;
+
+
+// Replace all next-state variables (ending in _n) with their
+// corresponding current-state variables in all the BDDs in fs.
+// All other variables remain as they were.
+// NOTE: If fs already depends on one of the new current-state variables, 
+// you will likely not get what you expect, so beware!
+// Usage: bdd_next2current fs;
+let bdd_next2current f =
+    let vs = depends [f] in
+    let mk_n2c n =
+	NOT (str_is_suffix "_n" n) => [] |
+	[(n, variable (string_butlastn n 2))]
+    in
+    let sub = flatmap mk_n2c vs in
+    substitute sub f
+;
+
+// Existentially quantify out all the variables in 'vars' from f.
+// Usage: Quant_thereis vars f;
+let Quant_thereis vars f =
+    let qv = itlist (\n.\r. variable n AND r) vars T in
+    quant_thereis qv f
+;
+
+// Existentially quantify out all the variables in vars from f.
+// Usage: Quant_forall vars f;
+let Quant_forall vars f =
+    let qv = itlist (\n.\r. variable n AND r) vars T in
+    quant_forall qv f
+;
+
+// Return the number of bits required to represent n as a
+// binary (unsigned) vector.
+let bits_needed n =
+    n == 0 => 1 |
+    let r = log2 n then
+    2**r <= n => r+1 | r
+;
+
+// Return a number 2**k such that 2**k >= n and 2**(k-1) < n.
+// Usage: nearest_power_of_2 n;
+let nearest_power_of_2 n =
+    let lg2n = log2 n in
+    (2**lg2n) == n => n | 2**(lg2n+1)
+;
+
+
+// Return a random integer between min and max (inclusive).
+// Usage: random min max;
+let random min max =
+    min = max => min |
+    min > max => eprintf "random with min(%d) > max(%d)" min max |
+    let imax = max-min+1 in
+    let l_imax = log2 imax in
+    (2**l_imax) == imax =>
+        // Use the builtin random2
+        min + (random2 l_imax)
+    |
+    let n_max = 10000*imax in
+    let l_n_max = log2 n_max in
+    let n_max = 2**l_n_max in
+    letrec find_random try =
+        try < ((n_max/imax)*imax) => try % imax |
+        find_random (random2 l_n_max)
+    in
+    min+(find_random (random2 l_n_max))
+;
+non_lazy random;
+
+// Return a unique integer representing the content of filename.
+// Uses SHA256 for signature computation to ensure (almost guaranteed)
+// uniqueness.
+let file_signature file =
+    NOT (file_exists file) => eprintf "File %s does not exist." file |
+    let cmd = sprintf "openssl dgst -sha256 %s" file in
+    val (status,resl) = exec cmd then
+    status != 0 => eprintf "Command failed: %s" cmd |
+    sscanf " %x" (el 2 (str_split (hd resl) "="))
+;
+
+lettype window = WINDOW {window_name::string};
+
+// Create a top-level window with the msg_header text highlighted followed by
+// msg_details. Also create a list of buttons, one for each (name,ret_val)
+// pair in return_alts.
+// The function returns a handle to the window and a call to get_window_result
+// with this handle will wait to a button to be pressed when pressed,
+// the window will be destroyed and ret_val returned.
+// 
+// NOTE: Only functional in normal (i.e., not -noX) mode!
+let report_result msg_header msg_details return_alts =
+    let pre = sprintf "util:report_result {%s} {%s} {"
+		      msg_header msg_details
+    then
+    let pfn (txt,ret) = sprintf "{%s %s}" txt ret in
+    let cmd = list2str T pre " " "}" pfn return_alts then
+    let w = tcl_eval [cmd] then
+    (WINDOW w)
+;
+non_lazy report_result;
+
+// Takes a handle to a prompt window waits for a button to be pressed.
+// When a button is pressed, the prompt window will be destroyed and button's
+// ret_val will be returned.
+let get_window_result window =
+    val (WINDOW w) = window then
+    tcl_eval [sprintf "util:wait_for_button %s" w]
+;
+
+
+// Create a top-level window with the msg_header text highlighted followed by
+// the content of the msg_file file.
+// Also create a list of buttons, one for each (name,ret_val) pair
+// in return_alts. The button will be named "name" and when pressed,
+// the window will be destroyed and ret_val returned.
+// 
+// NOTE: Only functional in normal (i.e., not -noX) mode!
+let report_result_in_file msg msg_file return_alts =
+    let pre = sprintf "util:report_result_in_file {%s} {%s} {" msg msg_file then
+    let pfn (txt,ret) = sprintf "{%s %s}" txt ret in
+    let cmd = list2str T pre " " "}" pfn return_alts then
+    let w = tcl_eval [cmd] then
+    (WINDOW w)
+;
+non_lazy report_result_in_file;
+
+
+begin_abstype;
+// ----------------------------------------------------------------------
+// Set representation using arbitrary precision integers to make
+// union, intersection, negation, membership fast.
+// NOTE: The maximum element is ~(RECURSION-CALL-LIMIT-4).
+//
+
+lettype iset = ISET int;
+
+// Convert a list of integers (>=1) as members of a set into an iset which
+// is an efficient representation for sets.
+// NOTE: The maximum element usable is approximately (RECURSION-CALL-LIMIT-4).
+cletrec set2iset set =
+    let add e i =
+        e <= 0 => eprintf "Illegal set member (%d). Should be >= 1." e |
+        (2**(e-1)) intOR i
+    in
+    ISET (itlist add set 0)
+;
+
+// Return the list of elements in the iset. Elements are numbers 1, 2, 3, ...
+cletrec iset2set iset =
+    val (ISET i) = iset in
+    i = 0 => [] | 
+    letrec try ci pow = 
+        ci = 0 => [] |
+        (ci intAND 4294967295) = 0 => try (ci/4294967296) (pow+32) |
+        (ci intAND 65535) = 0 => try (ci/65536) (pow+16) |
+        (ci intAND 255) = 0 => try (ci/256) (pow+8) |
+        (ci intAND 15) = 0 => try (ci/16) (pow+4) |
+        (ci intAND 1) = 0 => try (ci/2) (pow+1) |
+        pow:(try (ci/2) (pow+1))
+    in
+    try i 1
+;
+
+// Test if element e is in the iset 'iset'.
+// Usage: imem iset e;
+let imem iset e =
+    e <= 0 => eprintf "Illegal imem argument (%d). Should be >= 1." e |
+    val (ISET i) = iset in
+    (i intAND (2**(e-1))) != 0
+;
+
+// Compute the union of isets is1 and is2.
+let iunion is1 is2 =
+    val (ISET i1) = is1 in
+    val (ISET i2) = is2 in
+    ISET (i1 intOR i2)
+;
+infix 6 iunion;
+
+// Compute the intersection of isets is1 and is2.
+let iintersect is1 is2 =
+    val (ISET i1) = is1 in
+    val (ISET i2) = is2 in
+    ISET (i1 intAND i2)
+;
+infix 7 iintersect;
+
+// Compute the set difference of isets is1 and is2.
+let isubtract is1 is2 =
+    val (ISET i1) = is1 in
+    val (ISET i2) = is2 in
+    ISET (i1 intAND (intNOT i2))
+;
+infix 7 isubtract;
+
+// Return the number of elements in iset.
+cletrec ipop_cnt iset =
+    val (ISET i) = iset in
+    i = 0 => 0 | 
+    letrec try ci pow =
+        ci = 0 => 0 |
+        (ci intAND 4294967295) = 0 => try (ci/4294967296) (pow+32) |
+        (ci intAND 65535) = 0 => try (ci/65536) (pow+16) |
+        (ci intAND 255) = 0 => try (ci/256) (pow+8) |
+        (ci intAND 15) = 0 => try (ci/16) (pow+4) |
+        (ci intAND 1) = 0 => try (ci/2) (pow+1) |
+        1+(try (ci/2) (pow+1))
+    in
+    try i 1
+;
+
+end_abstype set2iset iset2set imem iunion iintersect isubtract ipop_cnt;
+
+//
+// A list of all primes.
+// NOTE: it's an infinite list and thus one needs to do (firstn N primes)
+// for some suitably selected N if you want to see the list!
+//
+let primes =
+    letrec lfilter pred l =
+        l = [] => [] |
+        val (e:es) = l in
+        (pred e)=> e:(lfilter pred es) | (lfilter pred es)
+    in
+    letrec sieve (i:is) =
+        i:(sieve (lfilter (\j. (j % i) != 0) is))
+    in
+    letrec nat i = i:(nat (i+1)) in
+    sieve (nat 2)
+;
+
+// Draw a profile of the BDDs in the expression e.
+let draw_bdd_profile e =
+    let data = profile e then
+    let p2s (v,w) = sprintf "{{%s} %d}" v w in
+    let cmd = list2str T "draw_bdd_profile {" " " "}" p2s data then
+    tcl_eval [cmd]
+;
+
+// A convenient shorthand for bottom.
+let undefined = error "Undefined";
+
+// A convenient funtion to quickly create a collection of identifiers for
+// Boolean variables or vectors of Boolean variables.
+// For example:
+//   VARS "a[2:0] b[1:0] c d";
+// is a shorthand for:
+//   let a = [variable "a[2]", variable "a[1]", variable "a[0]"];
+//   let b = [variable "b[1]", variable "b[0]"];
+//   let c = variable "c";
+//   let d = variable "d";
+//   var_order ["a[2]", "a[1]", "a[0]", "b[1]", "b[0]", "c", "d"];
+//
+let VARS s =
+    let ss = str_split s " " in
+    let mk1 v =
+        let parts = str_split v "[" then
+        length parts = 1 => (v,[v]) |
+        let nds = md_expand_vector v then
+        (hd parts, nds)
+    in
+    let id_nds = map mk1 ss then
+    let p = partition fst id_nds then
+    let idx = find_first0 (\l. length l > 1) p then
+    idx != 0 =>
+        eprintf "Cannot declare %s twice." (fst (hd (el idx p)))
+    |
+    let vs = flatmap snd id_nds then
+    (var_order vs) fseq
+    let decl (name,nds) =
+        length nds = 1 =>
+            ((eval (sprintf "let %s = variable \"%s\";" name (hd nds))) fseq ())
+        |
+            let pre = sprintf "let %s = [" name in
+            let pp nd = sprintf "variable \"%s\"" nd in
+            let cmd = list2str T pre ", " "];" pp nds in
+            (eval cmd fseq ())
+    in
+    foreach decl id_nds
+;
+
+
+begin_abstype;
+
+lettype eq_info = EQ_INFO
+		    // Number of functions
+		    {cnt::int}
+		    // Map function_index -> (cur_fun, cur_dep) references
+		    {main_list::(int#((bool ref)#((string list) ref))) list}
+		    // Map var_name -> function list that depends on var
+		    {v2is :: (string#((int list) ref)) list}
+		    // Map var_name -> number of functions that depends on var
+		    {v2cnts :: (string#(int ref)) list}
+;
+
+let early_quant_thereis_preamble qvars {fns::bool list} =
+    let qvars = qvars intersect (depends fns) then
+    let v2is = map (\v. v, ref []) qvars then
+    let v2cnts = map (\v.v, ref 0) qvars then
+    letrec mk_info idx (f:fs) =
+	let dep = qvars intersect depends f then
+	let add_idx v =
+	    let r_is = assoc v v2is then
+	    (r_is := (idx:(deref r_is))) fseq
+	    let r_cnt = assoc v v2cnts then
+	    (r_cnt := (deref r_cnt + 1))
+	in
+	(foreach add_idx dep) fseq
+	(idx, ((ref f), (ref dep))):(mk_info (idx+1) fs)
+     /\    mk_info idx [] = []
+    in
+    let main_list = mk_info 1 fns then
+    let cnt = length main_list then
+    // Lists:
+    //	main_list = index -> (function ref, depends ref)
+    //	v2is	  = variable -> (index list ref)
+    //	v2cnts	  = variable -> (length ref)
+    EQ_INFO cnt main_list v2is v2cnts
+;
+
+let find_smallest info vars =
+    val (EQ_INFO cnt main_list v2is v2cnts) = info in
+    letrec find_min c_var c_size vs =
+        vs = [] =>
+	    c_var |
+        val (v:vs) = vs in
+        let cnt = deref (assoc v v2cnts) in
+        cnt < c_size => find_min v cnt vs | find_min c_var c_size vs
+    in
+    find_min "" (2**60) vars
+;
+
+
+letrec AND_list l =
+    let l = setify l then
+    let ll = length l in
+    ll = 1 => hd l |
+    ll = 2 => (el 1 l) AND (el 2 l) |
+    letrec find_smallest idx1 sz1 idx2 sz2 idx es =
+	es = [] => (idx1, idx2) |
+	val (e:es) = es in
+	let sz = bdd_size e in
+	sz < sz1 => find_smallest idx sz idx1 sz1 (idx+1) es |
+	sz < sz2 => find_smallest idx1 sz1 idx sz (idx+1) es |
+	find_smallest idx1 sz1 idx2 sz2 (idx+1) es
+    in
+    val (idx1,idx2) = find_smallest 0 (2**63) 0 (2**63) 1 l then
+    let f1 = el idx1 l in
+    let f2 = el idx2 l in
+    let f = f1 AND f2 then
+    let rem_indices = (1 upto ll) subtract [idx1,idx2] in
+    let rem = map (\i. el i l) rem_indices then
+    let new_l = f:rem then
+    AND_list new_l
+;
+
+// Merge
+let merge_funs info indices =
+    val (EQ_INFO cnt main_list v2is v2cnts) = info in
+    val (idx:rem_indices) = indices then
+    val (r_funs, r_deps) = unzip (map (\i. assoc i main_list) indices) then
+//    let new_fun = AND_list (map deref r_funs) then
+    let new_fun = itlist (\rf.\r. deref rf AND r) r_funs T then
+    let new_dep = setify (flatmap deref r_deps) then
+    val (rf1:rfs) = r_funs then
+    (rf1 := new_fun) fseq (foreach (\r. r := T) rfs) fseq
+    val (rd:rds) = r_deps then
+    (rd := new_dep) fseq (foreach (\r. r := []) rds) fseq
+    let update v =
+	let r_is = assoc v v2is then
+	let r_cnt = assoc v v2cnts then
+	let new_is = (idx:(deref r_is subtract indices)) then
+	let new_cnt = length new_is then
+	(r_is := new_is) fseq (r_cnt := new_cnt)
+    in
+    (foreach update new_dep)
+;
+
+
+// A heuristically efficient function to existentially quantify out
+// qvars from an implicitly conjunction of functions in the list fns.
+//
+// Note that the result is still an implicit conjunction of the
+// resulting functions (usually with much fewer functions).
+//
+// Usage: early_quant_thereis qvars fns;
+let early_quant_thereis qvars fns =
+    let avars = qvars intersect (depends fns) then
+    let relevant f = (avars intersect (depends f)) != [] in
+    val (rfns, other) = split relevant fns then
+    let info = early_quant_thereis_preamble avars rfns then
+    val (EQ_INFO cnt main_list v2is v2cnts) = info then
+    letrec do vars =
+	vars = [] =>
+	    let get_fn (idx,(rfn,rdep)) =
+		    let f = deref rfn in
+		    f == T => [] | [f]
+	    in
+	    let res = flatmap get_fn main_list then
+	    res = [] => [T] | res
+	|
+	let smallest_v = find_smallest info vars then
+	let indices = deref (assoc smallest_v v2is) then
+	(merge_funs info indices) fseq
+        val [idx] = deref (assoc smallest_v v2is) in
+	val (rfn,rdep) = assoc idx main_list then
+        let fn = deref rfn in
+        let dep = deref rdep in
+	let vars_only_here = filter (\v. deref (assoc v v2cnts) = 1) dep then
+	let f = Quant_thereis vars_only_here fn then
+        (rfn := f) fseq
+        (rdep := (dep subtract vars_only_here)) fseq
+        do (vars subtract vars_only_here)
+    in
+    (do avars)@other
+;
+
+end_abstype early_quant_thereis;
+
+begin_abstype;
+
+cletrec parametric [] f = []
+ /\    parametric (n:r) f =
+    let high = substitute [(n,T)] f in
+    let low  = substitute [(n,F)] f in
+    (high == F) => F:(parametric r low) |
+    (low == F) => T:(parametric r high) |
+    let vn = variable n in
+    vn:(vn => (parametric r high) | (parametric r low))
+;
+
+// Return the parametric representation for a condition cond.
+clet param cond =
+    cond == F => error "Param called with F condition." |
+    let vars = depends [cond] in
+    zip vars (parametric vars cond)
+;
+
+
+// Generalized param that only solves for some variables. The other
+// variables are treated as symbolic constants.
+//
+// Usage: fparam vars_to_solve_for function.
+//
+cletrec fparam vars f = vars = [] => [] |
+    let Quant_thereis vs f =
+        quant_thereis (itlist (\v.\r. variable v OR r) vs F) f
+    in
+    let nvariable s = bdd_current2next (variable s) in
+    val (v:vs) = vars in
+    f == T => map (\v. v, nvariable v) (v:vs) |
+    let hi = substitute [(v,T)] f in
+    hi == F =>
+        // Must be 0
+        let lo = substitute [(v,F)] f in
+        (v,F):(fparam vs lo)
+    |
+    hi == f =>
+        // Does not depend on v
+        let hq = Quant_thereis vs hi in
+        let pv = nvariable v in
+        let bit = pv AND hq in
+        (v,bit):(fparam vs f)
+    |
+    let lo = substitute [(v,F)] f in
+    lo == F =>
+        // Must be 1
+        (v,T):(fparam vs hi)
+    |
+    let hq = Quant_thereis vs hi in
+    let lq = Quant_thereis vs lo in
+    let pv = nvariable v in
+    let bit = (hq => (lq => pv | T) | F) in
+    (v,bit):(bit => (fparam vs hi) | (fparam vs lo))
+;
+
+end_abstype param fparam;
+
+let iabs i = i < 0 => -1*i | i;
+let fabs f = f < 0.0 => -1.0*f | f;
+let bvabs bv = bv < (int2bv 0) => ('0 - bv) | bv;
+let bevabs {bev::bev} = 
+    let is_neg = list2bev [(bev < (int2bev 0))] in
+    let neg = (int2bev 0) - bev in
+    bev_OR (bev_AND is_neg neg) (bev_AND (bev_NOT is_neg) bev)
+;
+overload {abs :: *a -> *a} iabs fabs bvabs bevabs;
+
+
+// Transpose a list with n elements that each are an m-element list to
+// an m-element list that each consists of an n-element list
+// For exammpe:
+//	transpose [[1,2,3],[4,5,6]];
+//  yields:
+//	[[1,4],[2,5],[3,6]]
+// Usage: transpose l;
+let transpose ll =
+    letrec tr rr =
+        hd rr = [] => [] |
+        (map hd rr):(tr (map tl rr))
+    in
+    tr ll
+;
+
+lettype *a opt = NONE | SOME *a;
+
+// Determine if an optional object actually has a value.
+let has_value (SOME a) = T
+ /\ has_value NONE = F;
+
+// Get the value of an optional object (assuming has_value is true!)
+let get_value (SOME a) = a
+ /\ get_value NONE = error "get_value on NONE"
+;
+
+lettype leaftype =
+		INT int
+	    |   STRING string
+	    |   BOOL bool
+	    |   BEXPR bexpr
+	    |	EXT_OBJ int
+	    |   PRIM_FN int
+;
+
+lettype term =
+		APPLY term term
+	    |   VAR string
+	    |   LAMBDA string term
+	    |   LEAF leaftype
+	    |   CONS term term
+	    |	NIL
+;
+
+
+begin_abstype;
+let prim_fns = [
+		(0, "P_S"), (1, "P_K"), (2, "P_I"), (3, "P_C"), (4, "P_B"),
+		(5, "P_Y"), (6, "P_HEAD"), (7, "P_TAIL"), (8, "P_CONS"),
+		(9, "P_PLUS"), (10, "P_MINUS"), (15, "P_TIMES"),
+		(16, "P_DIVIDE"), (18, "P_COND"), (19, "P_LESS"), (20, "P_LEQ"),
+		(21, "P_GREATER"), (22, "P_GEQ"), (23, "P_EQUAL"),
+		(24, "P_NOT_EQUAL"), (25, "P_VAR"), (26, "P_CAT"),
+		(27, "P_EMPTY"), (28, "P_LOAD"), (29, "P_ERROR"), (30, "P_SEQ"),
+		(31, "P_SPRIME"), (32, "P_CPRIME"), (33, "P_BSTAR"),
+		(34, "P_HELP"), (35, "P_GET_MATCHING_FNS"), (36, "P_FORALL"),
+		(37, "P_THEREIS"), (38, "P_PRINT"), (39, "P_DEBUG"),
+		(40, "P_IDENTICAL"), (41, "P_STRING_HD"), (42, "P_STRING_TL"),
+		(43, "P_FAIL"), (44, "P_IS_CONS"), (45, "P_CATCH"),
+		(46, "P_SUC"), (47, "P_CONSTR_EQ"), (48, "P_QUANT_FORALL"),
+		(49, "P_QUANT_THEREIS"), (50, "P_PFAIL"), (51, "P_PCATCH"),
+		(52, "P_ORD"), (53, "P_CHR"), (54, "P_TUPLE"), (55, "P_FST"),
+		(56, "P_SND"), (58, "P_EXPLODE"),
+		(59, "P_IMPLODE"), (60, "P_DEPENDS"), (61, "P_BOOL2STR"),
+		(62, "P_INT2STR"), (63, "P_TIME"), (64, "P_BDD_SIZE"),
+		(65, "P_SUBSTITUTE"), (66, "P_LOAD_EXE"),
+		(68, "P_PRINT_STE"), (69, "P_BPRIME"), (70, "P_FANIN_LIST"),
+		(71, "P_NODES"), (72, "P_PROFILE"), (73, "P_GET_NODE_VAL"),
+		(74, "P_FANOUT_LIST"), (75, "P_GET_DELAYS"), (76, "P_TRACE"),
+		(77, "P_SAVE_FSM"), (78, "P_BDD_SAVE"), (79, "P_BDD_LOAD"),
+		(80, "P_BDD_REORDER"), (81, "P_RELPROD_THEREIS"),
+		(82, "P_RELPROD_FORALL"), (83, "P_RVAR"), (84, "P_VAR_ORDER"),
+		(85, "P_SYSTEM"), (86, "P_EVAL"), (87, "P_GCD"), (88, "P_LP"),
+		(89, "P_CACHE"), (90, "P_IS_TUPLE"), (91, "P_STRICT_CONS"),
+		(92, "P_STRICT_TUPLE"), (93, "P_FSM_OBJECT"),
+		(94, "P_IS_STABLE"), (95, "P_MK_REF_VAR"),
+		(96, "P_DEREFERENCE"), (97, "P_UPDATE_RVAR"), (98, "P_REF_VAR"),
+		(99, "P_WRITE_TO_FILE"), (100, "P_BVAND"), (101, "P_BVOR"),
+		(102, "P_BVXOR"), (103, "P_BVNOT"), (104, "P_GET_EXCIT"),
+		(105, "P_TCL_EVAL"), (106, "P_FSEQ"), (107, "P_NSEQ"),
+		(108, "P_PRINTF"), (109, "P_SPRINTF"), (110, "P_EPRINTF"),
+		(111, "P_FPRINTF"), (112, "P_FILEFP"), (113, "P_FOPEN"),
+		(114, "P_FCLOSE"), (115, "P_FFLUSH"), (116, "P_GEN_CATCH"),
+		(117, "P_GET_VOSSRC"), (118, "P_UPDATE_VOSSRC"),
+		(119, "P_EXTAPI_FN"), (120, "P_SAVE_GRAPH"),
+		(121, "P_LOAD_GRAPH"), (122, "P_EXIT"), (123, "P_THEN"),
+		(124, "P_SSCANF"), (125, "P_UNTYPE"), (126, "P_UNQUOTE"),
+		(1022, "P_VOID"), (200, "P_START_SUPER_COMB"),
+		(1023, "P_ILLEGAL")
+];
+clet primfn2name i = assoc i prim_fns;
+end_abstype primfn2name;
+
+let Pleaftype (INT i) = sprintf "%d" i
+ /\ Pleaftype (STRING s) = sprintf "\"%s\"" s
+ /\ Pleaftype (BOOL b) = sprintf "%B" b
+ /\ Pleaftype (BEXPR be) = bexpr2str 10 be
+ /\ Pleaftype (EXT_OBJ i) = sprintf "EXT_OBJ %d" i
+ /\ Pleaftype (PRIM_FN i) = primfn2name i
+;
+
+// Pretty printer for terms.
+let Pterm t =
+    let is_infix (APPLY (APPLY (VAR fn) a1) a2) =
+        str_is_prefix "infix" (get_fixity fn)
+     /\ is_infix _ = F
+    in
+    letrec pr prec e assuming (is_infix e) =
+        val (APPLY (APPLY (VAR fn) a1) a2) = e in
+        let fixity = sscanf "%d" (el 2 (str_split (get_fixity fn) " ")) in
+        (prec >= fixity => (fprintf stdout "(") | ()) fseq
+        (pr fixity a1) fseq
+        (fprintf stdout "%s" fn) fseq
+        (pr fixity a2) fseq
+        (prec >= fixity => (fprintf stdout ")") | ())
+     /\    pr prec (APPLY t1 t2) =
+            (prec > 9 => (fprintf stdout "(") | ()) fseq
+            (pr 9 t1) fseq
+            (fprintf stdout " ") fseq
+            (pr 9 t2) fseq
+            (prec > 9 => (fprintf stdout ")") | ())
+     /\    pr prec (LAMBDA s t) =
+            (prec > 4 => (fprintf stdout "(") | ()) fseq
+            (fprintf stdout "\\%s." s) fseq
+            (pr 4 t) fseq
+            (prec > 4 => (fprintf stdout ")") | ())
+     /\    pr prec (CONS t1 t2) =
+            (prec > 3 => (fprintf stdout "(") | ()) fseq
+            (pr 3 t1) fseq
+            (fprintf stdout ":") fseq
+            (pr 3 t2) fseq
+            (prec > 3 => (fprintf stdout ")") | ())
+     /\    pr prec (VAR s) =
+            fprintf stdout "%s" s
+     /\    pr prec (NIL) =
+            fprintf stdout "NIL"
+     /\    pr prec (LEAF lt) =
+            fprintf stdout "%s" (Pleaftype lt)
+    in
+    (pr 0 t) fseq (fprintf stdout "\n") fseq ""
+;
+
+install_print_function Pterm;
+
+// Create a bv that satisfies the constraint pred_fun.
+// Pred_fun is given as a function of the generated bv_variable.
+// For example: 
+// bv_constrained_variable "a[4:0]"
+// 			   (\v. v > '0 AND v < '10 AND ((v % '2) = '1));
+//
+// Usage: bv_constrained_variable vec pred_fun;
+let bv_constrained_variable vec pred =
+    let v = bv_variable vec then
+    let cond = pred v then
+    cond == F => error "Constraint not satisfiable!" |
+    substitute (fparam (depends v) cond) v
+;
+
+// Function that computes the condition under which the bitvector v
+// has exactly one bit high.
+let mutex v = 
+    v <= '0 => F |
+    v = (bv_AND v ('-1*v))
+;
+
+
+// Function for printing some (cnt) examples that the bv can denote.
+// Usage: bv_examples cnt bv;
+//
+let bv_examples cnt bv =
+    let add_example cur ex =
+        mem ex cur => (T,cur) |
+        let cur' = ex:cur in
+        ((length cur') < cnt), cur'
+    in
+    let lbv = bv_size bv in
+    let vs = depends bv then
+    let lvs = length vs in
+    let ints = 0 -- (2**(length vs)-1) then
+    letrec mk cur (i:ii) =
+        let sub =
+            vs = [] => [] |
+            let iv = tl (bv2list (int2bv i)) in
+            let iv = (replicate (lvs-length iv) F)@iv in
+            zip vs iv then
+        let bv0 = substitute sub bv then
+        val (keep_going, cur') = add_example cur (bv2int bv0) in
+        keep_going => mk cur' ii | cur'
+     /\    mk cur [] = cur
+    in
+    let il = mk [] ints in
+    let exs = qsort (defix -) il then
+    let sz = bv_size bv in
+    let p1 fp i = fprintf fp "%0*b" sz i in
+    let end = length exs > cnt => "\n...\n" | "\n" in
+    list2fp stdout T "" "\n" end p1 exs
+;
+
+lettype mem = MEM
+                {addr_size::int}
+                {lines::int}
+                {data_size::int}
+;
+
+lettype wexpr =
+            W_X {sz::int}
+        |   W_CONST {sz::int} {v::int}
+        |   W_NAMED_CONST {name::string} {sz::int} {v::int}
+        |   W_VAR {sz::int} {base::string}
+	|   W_EXPLICIT_VAR {sz::int} {name::string}
+        |   W_AND {a::wexpr} {b::wexpr}
+        |   W_OR {a::wexpr} {b::wexpr}
+        |   W_NOT {a::wexpr}
+        |   W_EQ {a::wexpr} {b::wexpr}
+        |   W_PRED {name::string} {cond::wexpr}
+        |   W_GR {a::wexpr} {b::wexpr}
+        |   W_ADD {a::wexpr} {b::wexpr}
+        |   W_SUB {a::wexpr} {b::wexpr}
+        |   W_MUL {a::wexpr} {b::wexpr}
+        |   W_DIV {a::wexpr} {b::wexpr}
+        |   W_MOD {a::wexpr} {b::wexpr}
+        |   W_SHL {a::wexpr} {b::wexpr}
+        |   W_SHR {a::wexpr} {b::wexpr}
+        |   W_ASHR {a::wexpr} {b::wexpr}
+        |   W_SX  {sz::int}  {w::wexpr}
+        |   W_ZX  {sz::int}  {w::wexpr}
+        |   W_ITE {cond::wexpr} {t::wexpr} {e::wexpr}
+        |   W_SLICE {indices::int list} {w::wexpr}
+        |   W_NAMED_SLICE {name::string} {indices::int list} {w::wexpr}
+        |   W_CAT {parts::wexpr list}
+        |   W_MEM_READ {info::mem} {mem::wexpr} {addr::wexpr}
+        |   W_MEM_WRITE {info::mem} {mem::wexpr} {addr::wexpr} {data::wexpr}
+;
+
+begin_abstype;
+let mk_name sz base = sz = 1 => base | sprintf "%s[%d:0]" base (sz-1);
+
+let pr_indices indices =
+    letrec merge msb cur (idx:rem) =
+        idx = cur-1 => merge msb idx rem |
+        msb > cur => (sprintf "%d:%d" msb cur):(merge idx idx rem) |
+        (int2str msb):(merge idx idx rem)
+     /\    merge msb cur [] =
+        msb > cur => [(sprintf "%d:%d" msb cur)] | [(int2str msb)]
+    in
+    let i0 = hd indices then
+    let ranges = merge i0 i0 (tl indices) then
+    list2str T "[" "," "]" id ranges
+;
+
+letrec Pwexpr (W_X sz) = sprintf "X[%d:0]" (sz-1)
+ /\    Pwexpr (W_NAMED_CONST name sz v) = name
+ /\    Pwexpr (W_CONST sz v) =
+        sz < 5 OR ((sz % 4) != 0) =>
+            sprintf "0b%0*b" sz v
+        |
+            sprintf "0x%0*x" (sz/4) v
+ /\    Pwexpr (W_VAR sz base) = mk_name sz base
+ /\    Pwexpr (W_EXPLICIT_VAR sz name) = name
+ /\    Pwexpr (W_AND a b) = sprintf "(%s & %s)" (Pwexpr a) (Pwexpr b)
+ /\    Pwexpr (W_OR  a b) = sprintf "(%s | %s)" (Pwexpr a) (Pwexpr b)
+ /\    Pwexpr (W_NOT a) = sprintf "~(%s)" (Pwexpr a)
+ /\    Pwexpr (W_PRED name cond) = sprintf "(%s::%s)" name (Pwexpr cond)
+ /\    Pwexpr (W_EQ  a b) = sprintf "(%s = %s)" (Pwexpr a) (Pwexpr b)
+ /\    Pwexpr (W_GR  a b) = sprintf "(%s > %s)" (Pwexpr a) (Pwexpr b)
+ /\    Pwexpr (W_ADD a b) = sprintf "(%s + %s)" (Pwexpr a) (Pwexpr b)
+ /\    Pwexpr (W_SUB a b) = sprintf "(%s - %s)" (Pwexpr a) (Pwexpr b)
+ /\    Pwexpr (W_MUL a b) = sprintf "(%s * %s)" (Pwexpr a) (Pwexpr b)
+ /\    Pwexpr (W_DIV a b) = sprintf "(%s / %s)" (Pwexpr a) (Pwexpr b)
+ /\    Pwexpr (W_MOD a b) = sprintf "(%s %% %s)" (Pwexpr a) (Pwexpr b)
+ /\    Pwexpr (W_SHL a b) = sprintf "(%s << %s)" (Pwexpr a) (Pwexpr b)
+ /\    Pwexpr (W_SHR a b) = sprintf "(%s >> %s)" (Pwexpr a) (Pwexpr b)
+ /\    Pwexpr (W_ASHR a b) = sprintf "(%s |>> %s)" (Pwexpr a) (Pwexpr b)
+ /\    Pwexpr (W_SX sz w) = sprintf "(SX %d %s)" sz (Pwexpr w)
+ /\    Pwexpr (W_ZX sz w) = sprintf "(ZX %d %s)" sz (Pwexpr w)
+ /\    Pwexpr (W_ITE c t e) =
+            sprintf "(IF %s THEN %s ELSE %s)" (Pwexpr c) (Pwexpr t) (Pwexpr e)
+ /\    Pwexpr (W_SLICE indices w) =
+            let vec = pr_indices indices then
+            sprintf "(%s)%s" (Pwexpr w) vec
+ /\    Pwexpr (W_NAMED_SLICE name indices w) =
+            let vec = pr_indices indices then
+            sprintf "(%s)-->%s%s" (Pwexpr w) name vec
+ /\    Pwexpr (W_CAT parts) =
+            list2str T "<" ", " ">" Pwexpr parts
+ /\    Pwexpr (W_MEM_READ info mem addr) =
+        sprintf "%s[%s]" (Pwexpr mem) (Pwexpr addr)
+ /\    Pwexpr (W_MEM_WRITE info mem addr d) =
+        sprintf "(%s[%s]<-%s)" (Pwexpr mem) (Pwexpr addr) (Pwexpr d)
+;
+install_print_function Pwexpr;
+
+end_abstype Pwexpr;
+
+lettype update_fn =
+            W_UPDATE_FN {lhs::wexpr} {rhs::wexpr}
+        |   W_PHASE_DELAY {lhs::wexpr} {rhs::wexpr}
+;
+
+lettype pexlif =
+        PINST
+            {name::string}
+            {attrs::(string#string) list}
+            {leaf::bool}
+            {fa_inps:: (string#(string list)) list}
+            {fa_outs:: (string#(string list)) list}
+            {internals:: string list}
+            {content::content}
+andlettype content =
+            P_HIER {children::pexlif list}
+        |   P_LEAF {fns::update_fn list}
+;
+
+// Convert any bexpr occuring in "e" to a BDD.
+// Currently only defined to bexprs, lists, pairs and list of pairs of bexprs.
+// Usage: bexpr2bdd e;
+open_overload {bexpr2bdd :: *a -> *b};
+let bexpr2bdd_be {b::bexpr} =
+    let res = prim_bexpr2bdd b in
+    {res::bool}
+;
+add_open_overload bexpr2bdd bexpr2bdd_be;
+let bexpr2bdd_bool {b::bool} = b;
+add_open_overload bexpr2bdd bexpr2bdd_bool;
+let bexpr2bdd_int  {b::int} = b;
+add_open_overload bexpr2bdd bexpr2bdd_int;
+let bexpr2bdd_float  {b::float} = b;
+add_open_overload bexpr2bdd bexpr2bdd_float;
+let bexpr2bdd_string  {b::string} = b;
+add_open_overload bexpr2bdd bexpr2bdd_string;
+let bexpr2bdd_void  {b::void} = b;
+add_open_overload bexpr2bdd bexpr2bdd_void;
+let bexpr2bdd_list  l = map (bexpr2bdd ) l;
+add_open_overload bexpr2bdd bexpr2bdd_list;
+let bexpr2bdd_pair  (a,b) = 
+    ((bexpr2bdd a), (bexpr2bdd b))
+;
+add_open_overload bexpr2bdd bexpr2bdd_pair;
+
+let gen_bexpr2bdd sub e =
+    let e' = bsubstitute sub e then
+    bexpr2bdd e'
+;
+
+begin_abstype;
+
+let state = ref {[]:: string list};
+
+let fl_set_gui_return txt =
+    state := ((deref state)@[txt])
+;
+export_to_tcl fl_set_gui_return;
+
+// Pop up a window prompting the user for input.
+// Example of use
+// prompt_for_inputs "Test" [("Give name", ""), ("Give size", "3")];
+// Returns a list of the text field from the user or an empty list
+// if the user prush the Cancel button.
+//
+// Usage: prompt_for_inputs title label_default_list;
+let prompt_for_inputs title text_fields =
+    let pr (lbl,default) = sprintf "{{%s} {%s}}" lbl default in
+    let pre = sprintf "gui_io:get_data {%s} {" title then
+    let cmd = list2str T pre " " "}" pr text_fields then
+    (state := []) fseq
+    (tcl_eval [cmd]) fseq
+    deref state
+;
+
+end_abstype prompt_for_inputs;
+
+let open_preferences {dummy::void} =
+    (tcl_eval ["after 100 set_preferences"]) fseq ()
+;
+
+let open_help {dummy::void} =
+    (tcl_eval ["after 100 ::voss2_help::help_start"]) fseq ()
+;
+
+let WTIME name e =
+    val (e', time) = wtime e then
+    (fprintf stderr "\nTime for %s: %s\n" name time) fseq
+    e'
+;
+
+let font_tiny    = "-*-courier-bold-r-normal-*-10-*-*-*-*-*-*-*";
+let font_small   = "-*-courier-bold-r-normal-*-12-*-*-*-*-*-*-*";
+let font_normal  = "-*-courier-bold-r-normal-*-14-*-*-*-*-*-*-*";
+let font_large     = "-*-courier-bold-r-normal-*-16-*-*-*-*-*-*-*";
+let font_larger  = "-*-courier-bold-r-normal-*-18-*-*-*-*-*-*-*";
+let font_largest = "-*-courier-bold-r-normal-*-20-*-*-*-*-*-*-*";
+
+// Change the text font used in the fl gui.
+let set_font font_name =
+    tcl_eval [sprintf "change_fonts %s" font_name]
+;
+non_lazy set_font;

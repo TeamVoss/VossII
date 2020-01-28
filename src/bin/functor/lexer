@@ -1,0 +1,69 @@
+
+%{
+static char intra_sep = ' ';
+static int empty = 1;
+
+static char buf[1000];
+
+static char *
+protect(char *s)
+{
+    char *p = buf;
+    while( *s ) {
+	if( *s == '"' ) {
+	    *p = '\\'; p++;
+	    *p = '"'; p++;
+	} else {
+	    *p = *s;
+	    p++;
+	}
+	s++;
+    }
+    *p = *s;
+    return buf;
+}
+
+%}
+
+%%
+
+\`[^`]*\`	    {
+			yytext[yyleng-1] = 0;
+			printf("%c%s", intra_sep, &(yytext[1]));
+			empty = 0;
+			intra_sep = '^';
+		    }
+
+[^`\n]*		    {
+			printf("%c\"%s\"", intra_sep, protect(yytext));
+			empty = 0;
+			intra_sep = '^';
+		    }
+
+"\n"		    {
+			if( empty == 1 ) {
+			    printf("\"\",\n");
+			} else {
+			    printf(",\n");
+			}
+			intra_sep = ' ';
+			empty = 1;
+		    }
+
+%%
+
+int
+yywrap() 
+{
+    return 1;
+}
+
+int
+main(int argc, char *argv[])
+{
+    printf("[\n");
+    yylex();
+    if( empty == 1 ) printf(" \"\"");
+    printf("\n]\n");
+}
+

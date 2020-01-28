@@ -1,0 +1,19 @@
+To get key-bindings for fl include the line
+
+source <path_to_VossII>/modes/vim/fl.vim   in your ~/.vimrc file
+
+You now get some useful key bindings:
+
+@f (or @F) start fl
+@q (or @Q) quit fl
+
+@@	    send the current line to fl
+@}	    send from the current line to end of paragraph to fl
+@{	    send from the beginning of the current paragraph to the current line
+@z (or @Z)  send from the current line to the mark z to fl
+@a (or @A)  send from the mark a to the mark z to fl
+
+@?	    print out help for the symbol at the current location
+
+@o (or @O)  open a window that has all of fl's stdout so far.
+

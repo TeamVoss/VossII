@@ -1,0 +1,39 @@
+letrec i_merge ilist =
+    letrec merge cur_dir cur_start cur_last (n:ns) =
+        (cur_dir = 1) AND (n = cur_last+1) =>
+            merge cur_dir cur_start n ns
+        |
+        (cur_dir = -1) AND (n = cur_last-1) =>
+            merge cur_dir cur_start n ns
+        |
+        (cur_dir = 0) AND (n = cur_last+1) =>
+            merge 1 cur_start n ns
+        |
+        (cur_dir = 0) AND (n = cur_last-1) =>
+            merge (-1) cur_start n ns
+        |
+        (cur_start, cur_last):(merge 0 n n ns)
+     /\   merge cur_dir cur_start cur_last [] = [(cur_start, cur_last)]
+    in
+    ilist = [] => [] |
+    val (i:il) = ilist in
+    merge 0 i i il
+;
+
+let i_merge1 n (res,cur_dir, cur_start, cur_last) =
+    (cur_dir = -2) => (res,0,n,n) |
+    (cur_dir = 1) AND (n = cur_last+1) => (res,cur_dir,cur_start,n) |
+    (cur_dir = -1) AND (n = cur_last-1) => (res,cur_dir,cur_start,n) |
+    (cur_dir = 0) AND (n = cur_last+1) => (res,1,cur_start,n) |
+    (cur_dir = 0) AND (n = cur_last-1) => (res,-1,cur_start,n) |
+    (((cur_last, cur_start):res),0,n,n)
+;
+
+let j_merge ilist =
+    val (res,cdir,cur_start,cur_end) = sitlist i_merge1 ilist ([],-2,0,0) in
+    (cur_end,cur_start):res
+;
+
+j_merge ([6,5,4,3,1,2]);
+
+//i_merge [6,5,4,3,1,2];

@@ -1,0 +1,913 @@
+let Init_Tcl = tcl_eval [sprintf "source %s/visualize.tcl" DIR];
+
+let read_file file =
+    let fp = fopen file "r" then
+    letrec read fp =
+	let line = fgets fp then
+	line = "" => [] |
+	let real_line = string_butlastn line 1 then
+	real_line:(read fp)
+    in
+    let res = read fp then
+    (fclose fp) fseq
+    res
+;
+
+lettype scolor =
+		SCOL {valid::bool} {red::int} {green::int} {blue::int}
+;
+
+let Pscolor (SCOL v r g b) =
+    v == F => "Dont' care" |
+    v == T => sprintf "(%d,%d,%d)" r g b 
+	    | "Symbolic"
+;
+install_print_function Pscolor;
+
+lettype simg = SIMG ((scolor list) list);
+
+let get_xpm_image file =
+    let DONT_CARE = SCOL F 0 0 0 in
+    let raw_content = tl (tl (read_file file)) then
+    let content = map (trim "\"" "\"")  raw_content then
+    val (cols,rows,colors,chars) = sscanf "%d %d %d %d" (el 1 content) then
+    let content = tl content then
+    let cols =
+	let lines = firstn colors content then
+	let cnv l =
+	    let key = substr l 1 chars then
+	    let rest = substr l (chars+2) (-1) then
+	    str_is_substr "None" l =>
+		(key, DONT_CARE) |
+	    val (r,g,b) = 
+	    sscanf "c #%2x%2x%2x" rest then
+	    key, (SCOL T r g b)
+	in
+	map cnv lines
+    then
+    let content = firstn rows (butfirstn colors content) then
+    let convert_line l =
+	let l2 = str_cluster l chars then
+	let cnv s =
+	    (assoc s cols) catch
+	    (eprintf "Cannot find color |%s|\nin line\n%s\n" s l) in
+	(map cnv l2)
+    in
+    SIMG (map convert_line content)
+;
+
+let write_xpm_image name simage =
+    val (SIMG rows) = simage then
+    let is_valid color =
+	val (SCOL valid r g b) = color in
+	valid
+    in
+    let colors = setify (filter is_valid (flat rows)) then
+    let color_map = zip colors (map chr (35 -- (35+(length colors)-1))) then
+    let r = length rows then
+    let c = length (hd rows) then
+    let file = sprintf "%s.xpm" name then
+    let fp = fopen file "w" then
+    (fprintf fp "/* XPM */\n") fseq
+    (fprintf fp "static char * %s[] = \{\n" name) fseq
+    (fprintf fp "\"%d %d %d 1\",\n" c r (length colors+1)) fseq
+    (fprintf fp "\" \t c None\",\n") fseq
+    let pr_col_map ((SCOL v r g b),symbol) =
+	fprintf fp "\"%s\tc #%02x%02x%02x\",\n" symbol r g b
+    in
+    (foreach pr_col_map color_map) fseq
+    let pr_col c =
+	NOT (is_valid c) => fprintf fp " " | fprintf fp "%s" (assoc c color_map)
+    in
+    let pr_row end row =
+	(fprintf fp "\"") fseq
+	(foreach pr_col row) fseq
+	(fprintf fp "\"%s\n" end)
+    in
+    (foreach (pr_row ",") (butlast rows)) fseq
+    (pr_row "\};" (last rows)) fseq
+    (fclose fp)
+;
+
+let get_scll (SIMG cll) = cll;
+
+let get_rows_and_cols_s simage =
+    val (SIMG rrs) = simage in
+    let rows = length rrs in
+    let cols = length (hd rrs) in
+    (rows, cols)
+;
+
+clet scol2str e =
+    depends e != [] => "pink" |
+    val (SCOL valid r g b) = e in
+    valid == F => "grey" |
+    sprintf "#%02x%02x%02x" r g b
+;
+
+let scalar v = (depends v) == [];
+
+let hex2color h =
+    val (r,g,b) = sscanf "#%2x%2x%2x" h then
+    (SCOL T r g b)
+;
+
+// Official colors for Swedish street signs
+let Pantone_294_C_ljusbla = hex2color "#003F87";
+let Pantone_282_C_morkbla = hex2color "#002654";
+let Pantone_335_C_gron    = hex2color "#007C66";
+let Pantone_185_C_rod     = hex2color "#E8112D";
+let Pantone_116_C_gul     = hex2color "#FCD116";
+let Pantone_430_C_ljusgra = hex2color "#919693";
+let Pantone_152_C_orange  = hex2color "#DD7500";
+let Pantone_469_C_brun    = hex2color "#603311";
+
+
+clet rgb2hsv scol =
+    val (SCOL v r g b) = scol in
+    NOT (v == T) => error "Can only convert valid colors" |
+    let R = int2float r / 255.0 in
+    let G = int2float g / 255.0 in
+    let B = int2float b / 255.0 in
+    let Cmin = min R (min G B) in
+    let Cmax = max R (max G B) in
+    let delta = Cmax - Cmin in
+    let V = round (100.0*Cmax) in
+    let S = round (100.0 * ((Cmax = 0.0) => 0.0 | delta / Cmax)) in
+    let H' = 
+	Cmax = Cmin => 0.0 |	// For simplicity
+	Cmax == R => (G - B)/delta |
+	Cmax == G => 2.0+(B-R)/delta
+		   | 4.0+(R-G)/delta
+    in
+    let H = (round (60.0*H')) % 360 in
+    (H,S,V)
+;
+
+let hsv2rgb hsv =
+    val (h,s,v) = hsv in
+    s = 0 =>
+	let V = round (255.0 * (int2float v) / 100.0) then
+	SCOL T V V V
+    |
+    let H = h >= 360 => 0.0 | int2float h in
+    let S = (int2float s)/100.0 in
+    let V = (int2float v)/100.0 in
+    let hh = H/60.0 in
+    let i = floor hh in
+    let ff = hh - (int2float i) in
+    let p = V*(1.0-S) in
+    let q = V*(1.0-(S*ff)) in
+    let t = V*(1.0-(S*(1.0-ff))) in
+    val (r,g,b) =
+	    i = 0 => (V,t,p) |
+	    i = 1 => (q,V,p) |
+	    i = 2 => (p,V,t) |
+	    i = 3 => (p,q,V) |
+	    i = 4 => (t,p,V) |
+		     (V,p,q)
+    in
+    let R = round (r*255.0) in
+    let G = round (g*255.0) in
+    let B = round (b*255.0) in
+    (SCOL T R G B)
+;
+
+//
+//let color_diff c1 c2 =
+//    val (SCOL valid  R1 G1 B1) = c1 in
+//    val (SCOL valid  R2 G2 B2) = c2 in
+//    let ravg = (R1+R2)/2 then
+//    let deltaR = R1-R2 in
+//    let deltaG = G1-G2 in
+//    let deltaB = B1-B2 in
+//    let deltaC_sq =
+//      2*deltaR**2 + 
+//      4*deltaG**2 + 
+//      3*deltaB**2 + 
+//      (ravg*(deltaR**2 - deltaB**2)/256)
+//    in
+//    round (sqrt (int2float deltaC_sq))
+//; 
+//
+//let not_ok i =  
+//    (i % 1000 = 0 => fprintf stderr "%d\n" i | ()) fseq
+//    val (r,g,b) = sscanf "%02x%02x%02x" (sprintf "%06x" i) in
+//    let scol = SCOL T r g b in
+//    let hsv = rgb2hsv scol in
+//    let scol' = hsv2rgb hsv in
+//    (color_diff scol scol') > 10
+//;
+//
+//let alts = 0--(2**24-1);
+//let failed = find_first0 not_ok alts;
+//failed;
+//
+//let alts = 10000000--11000000;
+//find_first0 not_ok alts;
+
+//
+//// According to: https://en.wikipedia.org/wiki/Color_difference
+//let color_diff c1 c2 =
+//    val (SCOL valid  R1 G1 B1) = c1 in
+//    val (SCOL valid  R2 G2 B2) = c2 in
+//    let ravg = (R1+R2)/2 then
+//    let deltaR = R1-R2 in
+//    let deltaG = G1-G2 in
+//    let deltaB = B1-B2 in
+//    let deltaC_sq =
+//	2*deltaR**2 +
+//	4*deltaG**2 +
+//	3*deltaB**2 +
+//	(ravg*(deltaR**2 - deltaB**2)/256)
+//    in
+//    round (sqrt (int2float deltaC_sq))
+//;
+//
+//
+//color_diff Pantone_116_C_gul (SCOL T 255 210 0);    // 32
+//color_diff Pantone_116_C_gul (SCOL T 188 117 25);   // 214
+//color_diff Pantone_116_C_gul (SCOL T 255 248 56);   // 92
+//color_diff Pantone_116_C_gul (SCOL T 73 58 27);   // 419
+//
+//color_diff Pantone_116_C_gul Pantone_185_C_rod;
+//color_diff Pantone_116_C_gul Pantone_152_C_orange;  // 37669
+
+load "bool_arithm.fl";
+
+//let sign_image = get_xpm_image "SpeedLimit70.xpm";
+//let sign_image = get_xpm_image "Stop.xpm";
+
+let sign_image = get_xpm_image (DIR^"/OfficialSpeedLimit70.xpm");
+let example_01 = get_xpm_image (DIR^"/ex_70_01.xpm");
+
+//time (sign_image fseq 1);
+//time (example_01 fseq 0);
+
+// =====================================================================
+// Abstract color representation
+// =====================================================================
+lettype acolor = ACOL
+		    {valid::bool} 
+		    {is_black::bool} 
+		    {is_red::bool} 
+		    {is_yellow::bool} 
+;
+
+lettype aimg = AIMG ((acolor list) list);
+
+let is_invalid = ACOL F F F F;
+let is_black   = ACOL T T F F;
+let is_red     = ACOL T F T F;
+let is_yellow  = ACOL T F F T;
+let is_other   = ACOL T F F F;
+
+let is_valid acolor =
+    val (ACOL valid r g b) = acolor in
+    valid
+;
+
+let Pacolor m =
+    is_black == m => "Black" |
+    is_red == m => "Red" |
+    is_yellow == m => "Yellow" |
+    is_other == m => "other" |
+    val (ACOL v ib ir iy) = m in
+    v == F => "Don't care" |
+    NOT (v == T) => "Symbolic valid condition" |
+    let bd = depends ib in
+    let rd = depends ir in
+    let yd = depends iy in
+    bd = [] =>
+	    rd = [] => "Symbolic (sometimes yellow)"
+	    |
+	    yd = [] => "Symbolic (sometimes red)"
+		     | "Symbolic (sometimes red, sometimes yellow)"
+    |
+	rd = [] =>
+	    yd = [] => "Symbolic (sometimes black)"
+	             | "Symbolic (sometimes black, sometimes yellow)"
+	|
+	    yd = [] => "Symbolic (sometimes black, sometimes red)"
+		 | "Symbolic (sometimes black, sometimes red, sometimes yellow)"
+;
+install_print_function Pacolor;
+
+clet acol2str e =
+    depends e != [] => "pink" |
+    val (ACOL valid ib ir iy) = e in
+    let bry = (ib,ir,iy) in
+    bry = (T,F,F) => "#010101" |
+    bry = (F,T,F) => "#E8112D" |
+    bry = (F,F,T) => "#FCD116" |
+    "#7F7F7F"
+;
+
+overload col2str scol2str acol2str;
+
+
+clet scol2acolor scol =
+    val (SCOL valid  R G B) = scol in
+    NOT valid => is_invalid |
+    val (H,S,V) = rgb2hsv scol in
+    V <= 20 => is_black |
+    40 <= H AND H <= 64 => is_yellow |
+    H <= 15 OR H >= 345 => is_red |
+    is_other
+;
+
+let simg2aimg simage =
+    val (SIMG rows) = simage then
+    let rows' = map (map scol2acolor) rows then
+    AIMG rows'
+;
+
+let get_rows_and_cols_a aimage =
+    val (AIMG rrs) = aimage in
+    let rows = length rrs in
+    let cols = length (hd rrs) in
+    (rows, cols)
+;
+
+overload get_rows_and_cols get_rows_and_cols_s get_rows_and_cols_a;
+
+let get_acll (AIMG cll) = cll;
+overload get_cll get_scll get_acll;
+
+let aimage2xpm name aimg =
+    val (rows,cols) = get_rows_and_cols_a aimg in
+    let fp = fopen (name^".xpm") "w" then
+    (fprintf fp "/* XPM */\n") fseq
+    (fprintf fp "static char * %s[] = {\n" name) fseq
+    (fprintf fp "\"%d %d 6 1\",\n" cols rows) fseq
+    (fprintf fp "\" \tc None\",\n") fseq
+    (fprintf fp "\"s\tc #ffa3b6\",\n") fseq
+    (fprintf fp "\"b\tc #010101\",\n") fseq
+    (fprintf fp "\"r\tc #e8112d\",\n") fseq
+    (fprintf fp "\"y\tc #fcd116\",\n") fseq
+    (fprintf fp "\".\tc #7f7f7f\",\n") fseq
+    depends aimg = [] =>
+	let emit_line fp l =
+	    let emit_pixel acol =
+		acol = is_invalid => fprintf fp " " |
+		acol = is_black   => fprintf fp "b" |
+		acol = is_red     => fprintf fp "r" |
+		acol = is_yellow  => fprintf fp "y" |
+		fprintf fp "."
+	    in
+	    (fprintf fp "\"") fseq
+	    (foreach emit_pixel l) fseq
+	    (fprintf fp "\"")
+	in
+	list2fp fp T "" ",\n" "};\n" emit_line (get_acll aimg)
+    |
+	let emit_line fp l =
+	    let emit_pixel fp acol =
+		depends acol != [] => fprintf fp "s" |
+		val (ACOL valid ib ir iy) = acol in
+		valid == F => fprintf fp " " |
+		let bry = (ib,ir,iy) in
+		bry = (T,F,F) => fprintf fp "b" |
+		bry = (F,T,F) => fprintf fp "r" |
+		bry = (F,F,T) => fprintf fp "y"
+			       | fprintf fp "."
+	    in
+	    list2fp fp T "\"" "" "\"" emit_pixel l
+	in
+	list2fp fp T "" ",\n" "};\n" emit_line (get_acll aimg)
+;
+
+
+let image2tcl fp e =
+    let cll = get_cll e in
+    let col2fp fp e = fprintf fp "%s" (col2str e) in
+    let row2str fp l = list2fp fp T "{" "\n\t" "}" col2fp l in
+    list2fp fp T "{" "\n" "}" row2str cll
+;
+
+let DRexamples images =
+    let cnt = length images in
+    val (rows, cols) = get_rows_and_cols (hd images) in
+    let max_per_row = max 1 (600/(cols+3)) in
+    let rows_needed = (cnt+max_per_row-1)/max_per_row in
+    Init_Tcl fseq
+    let wc = tcl_eval [ sprintf "create_example_canvas %d %d %d %d"
+				rows cols rows_needed max_per_row]
+    then
+    let fp = mktemp "visualize" then
+    letrec draw_ex cs cnt =
+        cs = [] => () |
+        val (c:cs) = cs then
+	(fprintf fp "draw_example %s %d " wc cnt) fseq
+	(image2tcl fp c) fseq
+	(fprintf fp "\n\n") fseq
+        (draw_ex cs (cnt+1))
+    in
+    (draw_ex images 0) fseq
+    let fname = stream2filename fp then
+    (fclose fp) fseq
+    (tcl_eval [sprintf "source %s" fname]) fseq
+    ()
+;
+
+let get_example image =
+    let ns = depends image then
+    let l = length ns then
+    let i = random 0 (2**l-1) then
+    let vs = tl (int2fbv (l+1) i) then
+    let sub = zip ns vs then
+    substitute sub image
+;
+
+let get_random_scol scol =
+    val (SCOL v r g b) = scol in
+    v => scol |
+    let r = random 0 255 then
+    let g = random 0 255 then
+    let b = random 0 255 then
+    (SCOL T r g b)
+;
+
+
+let get_random_acol acol =
+    let BLACK_V = 20 in
+    val (ACOL v ib ir iy) = acol then
+    NOT v =>
+	// Completely random color
+	let r = random 0 255 then
+	let g = random 0 255 then
+	let b = random 0 255 then
+	(SCOL T r g b)
+    |
+    ib => 
+	// Random black
+	// i.e., V <= BLACK_V
+	let V = random 0 BLACK_V then
+	let S = random 0 100 then
+	let H = random 0 359 then
+	hsv2rgb (H,S,V)
+    |
+    ir =>
+	// Random red
+	let V = random (BLACK_V+1) 100 then
+	let H = random 40 64 then
+	let S = random 0 100 then
+	hsv2rgb (H,S,V)
+    |
+    iy =>
+	// Random yellow
+	let V = random (BLACK_V+1) 100 then
+	let H = (random 345 375) % 360 then
+	let S = random 0 100 then
+	hsv2rgb (H,S,V)
+    |
+	// Random other color
+	let V = random (BLACK_V+1) 100 then
+	let H =
+	    let tmp = random 9 303 then
+	    tmp >= 24 => tmp+41 | tmp+16
+	then
+	let S = random 0 100 then
+	hsv2rgb (H,S,V)
+;
+
+overload get_random_col get_random_scol get_random_acol;
+
+let get_full_example img =
+    let scalar = get_example img then
+    let rr = get_cll scalar then
+    let choose_row row = map get_random_col row in
+    let rr' = map choose_row rr then
+    SIMG rr'
+;
+
+let VIS_full image = DRexamples (map get_full_example (replicate 64 image));
+let VIS image = DRexamples (map get_example (replicate 64 image));
+
+let IMG_SZ = 1024;
+let SZ = 16;
+
+let vvec name = F:(variable_vector (sprintf "%s[%d:0]" name (SZ-2)));
+
+let num2bv n = int2fbv SZ n;
+
+let ' i = num2bv (sscanf "%d" i);
+free_binder ';
+
+let Iv =
+    let i = vvec "i" then
+    let cond = i '<' (nat2fbv SZ IMG_SZ) in
+    let sub = param cond then
+    substitute sub i
+;
+
+let Jv =
+    let j = vvec "j" then
+    let cond = j '<' (nat2fbv SZ IMG_SZ) in
+    let sub = param cond then
+    substitute sub j
+;
+
+let DONT_CARE = ACOL F F F F;
+
+let image2simage image =
+    val (rows, cols) = get_rows_and_cols image in
+    val (AIMG rrs) = image then
+    let i_big = vvec "i" then
+    let i = Iv then
+    let j_big = vvec "j" then
+    let j = Jv then
+    let outside = (i_big '>=' num2bv rows) OR (j_big '>=' num2bv cols) then
+    IF outside THEN DONT_CARE ELSE (
+    letrec sel_row row (r:rs) =
+	let rcond = j = (nat2fbv SZ row) then
+	letrec sel_col col (c:cs) =
+	    let ccond = i = (nat2fbv SZ col) then
+	    IF( ccond ) THEN c ELSE (sel_col (col-1) cs)
+	 /\    sel_col col [] = DONT_CARE
+	in
+	let col_res = sel_col (cols-1) r then
+(fprintf stderr "Done row: %d\n" row) fseq
+	IF( rcond ) THEN col_res ELSE (sel_row (row+1) rs)
+     /\    sel_row row [] = DONT_CARE
+    in
+    sel_row 0 rrs
+);
+
+//time (example_01 fseq 0);
+//let a_example_01 = simg2aimg example_01;
+//time (a_example_01 fseq 1);
+
+//DRexamples [example_01];
+//DRexamples [a_example_01];
+
+
+time (sign_image fseq 1);
+
+let a_sign_image = simg2aimg sign_image;
+time (a_sign_image fseq 1);
+
+let s_sign_image = image2simage a_sign_image;
+//update_vossrc "DYNAMIC-ORDERING" "NO";
+//time (s_sign_image fseq 2);
+//bdd_size s_sign_image;
+
+//length (depends s_sign_image);
+
+//bdd_reorder 2;
+//bdd_size s_sign_image;
+
+
+//update_vossrc "DYNAMIC-ORDERING" "NO";
+//time (s_example_01 fseq 1);
+//bdd_size s_example_01;
+
+clet mk_sub v i =
+    let v' = filter (\v. depends v != []) v in
+    let len = length v' in
+    let bv = map (\s. s = "1") (explode (sprintf "%0*b" len i)) in
+    let vars = map (\v. hd (depends v)) v' in
+    zip vars bv
+;
+
+let simage2image_simple rows cols simage =
+    letrec mk_row r =
+	r >= rows => [] |
+	let rsub = mk_sub Jv r in
+	letrec mk_col c =
+	    c < 0 => [] |
+	    let csub = mk_sub Iv c in
+	    (substitute (csub@rsub) simage):(mk_col (c-1))
+	in
+	let row = mk_col (cols-1) then
+(fprintf stderr "Done row %d\n" r) fseq
+	row:(mk_row (r+1))
+    in
+    AIMG (mk_row 0)
+;
+
+let simage2image rows cols {simage::acolor} =
+    let is_pow2 n = 2**(log2 n) == n in
+    NOT (is_pow2 rows) =>
+	simage2image_simple rows cols simage
+    |
+    NOT (is_pow2 cols) =>
+	simage2image_simple rows cols simage
+    |
+    let get_var e =
+	let vs = depends e in
+	vs = [] => [] | [hd vs]
+    in
+    let raw_row_vars = flatmap get_var Jv in
+    let lrows = log2 rows in
+    let row_vars = lastn lrows raw_row_vars in
+    let rem_rsub = map (\v.v,F) (butlastn lrows raw_row_vars) in
+    let raw_col_vars = flatmap get_var Iv in
+    let lcols = log2 cols in
+    let col_vars = lastn lcols raw_col_vars in
+    let rem_csub = map (\v.v,F) (butlastn lcols raw_col_vars) in
+    let act_simage = substitute (rem_rsub @ rem_csub) simage then
+    letrec mk_rows (rv:rvs) pimage =
+	let pimage0 = substitute [(rv,F)] pimage then
+	let pimage1 = substitute [(rv,T)] pimage then
+	(mk_rows rvs pimage0)@(mk_rows rvs pimage1)
+     /\    mk_rows [] cimage =
+	letrec mk_cols (cv:cvs) pcimage =
+	    let pcimage0 = substitute [(cv,F)] pcimage then
+	    let pcimage1 = substitute [(cv,T)] pcimage then
+	    (mk_cols cvs pcimage1)@(mk_cols cvs pcimage0)
+	 /\    mk_cols [] pcimage = [pcimage]
+	in
+	[mk_cols col_vars cimage]
+    in
+    AIMG (mk_rows row_vars act_simage)
+;
+
+//let SCALE_FACTOR = '1024;
+let SCALE_FACTOR = '256;
+
+let old_symb_el idx l default =
+    letrec sel i (e:es) =
+	IF ((int2fbv SZ i) '=' idx) THEN e ELSE
+	sel (i-1) es
+      /\   sel i [] = default
+    in
+    sel (length l -1) l
+;
+
+let symb_el idx l default =
+    let n = length l in
+    let nearest_power_of_2 =
+	let lg2n = log2 n in
+	(2**lg2n) == n => n | 2**(lg2n+1)
+    in
+    let l' = (replicate (nearest_power_of_2-n) default)@l in
+    let bits = log2 nearest_power_of_2 then
+    let msd = butlastn bits idx in
+    let msd_cond = msd '=' (replicate (length idx - bits) F) then
+    letrec sel (b:bs) ls =
+	let m = length ls in
+	let m2 = m/2 in
+	let high = firstn m2 ls then
+	let low =  butfirstn m2 ls then
+	IF b THEN (sel bs high) ELSE (sel bs low)
+     /\   sel [] [e] = e
+    in
+    IF msd_cond THEN (sel (lastn bits idx) l') ELSE default
+;
+
+(old_symb_el ('3) (map (int2fbv 5) (15--0)) (int2fbv 5 7)) ==
+(symb_el ('3) (map (int2fbv 5) (15--0)) (int2fbv 5 7));
+
+(old_symb_el ('2) (map (int2fbv 5) (15--0)) (int2fbv 5 7)) ==
+(symb_el ('2) (map (int2fbv 5) (15--0)) (int2fbv 5 7));
+
+(old_symb_el ('1) (map (int2fbv 5) (15--0)) (int2fbv 5 7)) ==
+(symb_el ('1) (map (int2fbv 5) (15--0)) (int2fbv 5 7));
+
+(old_symb_el ('99) (map (int2fbv 5) (15--0)) (int2fbv 5 7)) ==
+(symb_el ('99) (map (int2fbv 5) (15--0)) (int2fbv 5 7));
+
+(let p = vvec "p" in old_symb_el p (map (int2fbv 5) (15--0)) (int2fbv 5 7))
+==
+(let p = vvec "p" in symb_el p (map (int2fbv 5) (15--0)) (int2fbv 5 7));
+
+    
+let scale_image scale image =
+    val (AIMG rows) = image then
+    let sz = length rows in
+    let empty_line = replicate sz DONT_CARE then
+    letrec rscale row rows =
+	row >= sz => [] |
+	let o_row = SCALE_FACTOR '*' (int2fbv SZ row) '/' scale then
+	(symb_el o_row rows empty_line):(rscale (row+1) rows)
+    in
+    let rows' = rev (rscale 0 rows) then
+    AIMG (transpose (rev (rscale 0 (transpose rows'))))
+;
+
+
+let mk_cond_sub v scale =
+    let sz2  = 2*SZ in
+    let p    = ZX sz2 scale in
+    let P    = ZX sz2 SCALE_FACTOR in
+    let i    = ZX sz2 v then
+    let i'   = bdd_current2next i then
+    let ip1  = ZX sz2 (v '+' '1) then
+    let ip1' = bdd_current2next ip1 then
+    //
+    let min = i'   '*' p then
+    let mid = i    '*' P then
+    let max = ip1' '*' p then
+    let cond = (min '<=' mid) AND (mid '<' max) then
+    fparam (depends i') cond
+;
+
+let old_scale_simage scale {simage::color} =
+    let simage' = bdd_current2next simage then
+    let sub1 = mk_cond_sub Iv scale then
+    let sub2 = mk_cond_sub Jv scale then
+    let sub = sub1 @ sub2 in
+    substitute sub simage'
+;
+
+
+let gentle_substitute sub e =
+    let cmp (v1,e1) (v2,e2) = (bdd_size e1)-(bdd_size e2) in
+    let sub' = qsort cmp sub then
+    letrec do_sub (v_e:rem) e =
+	let e' = substitute [v_e] e then
+	do_sub rem e'
+     /\    do_sub [] e = e
+    in
+    do_sub sub' e
+;
+
+let scale_simage scale {simage::acolor} =
+    let sz1 = SZ in
+    let sz2 = SZ+8 in
+    //
+    let i_s = md_expand_vector (sprintf "i[%d:0]" (SZ-2)) then
+    let i = ZX sz2 Iv then
+    let i' = ((ZX sz2 SCALE_FACTOR) '*' i) '/' (ZX sz2 scale) then
+    let isub = zip i_s (bdd_current2next (lastn (length i_s) i')) then
+(fprintf stderr "|isub|: %d\n" (bdd_size isub)) fseq
+    //
+    let j_s = md_expand_vector (sprintf "j[%d:0]" (SZ-2)) then
+    let j = ZX sz2 Jv then
+    let j' = ((ZX sz2 SCALE_FACTOR) '*' j) '/' (ZX sz2 scale) then
+    let jsub = zip j_s (bdd_current2next (lastn (length j_s) j')) then
+(fprintf stderr "|jsub|: %d\n" (bdd_size jsub)) fseq
+    //
+    let res' = gentle_substitute (isub@jsub) simage then
+    bdd_next2current res'
+;
+
+
+let translate_simage deltax deltay simage =
+    let mk_sub v e =
+	let vs = depends v in
+	vs = [] => [] | [(hd vs, e)]
+    in
+    let i    = Iv then
+    let ei   = i '-' deltax then
+    let subx = flat (map2 mk_sub i ei) then
+    let j    = Jv then
+    let ej   = j '-' deltay then
+    let suby = flat (map2 mk_sub j ej) then
+    let sub = subx@suby in
+    gentle_substitute sub simage
+;
+
+
+//let MIN_SIZE = SCALE_FACTOR '/' '4; 
+//let MAX_SIZE = '3 '*' SCALE_FACTOR '/' '4; 
+
+let MIN_SIZE = '16;
+let MAX_SIZE = '128;
+
+
+let find_max bv =
+    letrec find i (b:bs) =
+	b == F => find (i-1) bs |
+	let csub = param b in
+	let bs' = substitute csub bs in
+	2**i + (find (i-1) bs')
+     /\   find i [] = 0
+    in
+    find (length bv -1) bv
+;
+
+let find_min bv =
+    letrec find i (b:bs) =
+	b == T => 2**i + (find (i-1) bs) |
+	b == F => (find (i-1) bs) |
+	let csub = param (NOT b) in
+	let bs' = substitute csub bs in
+	(find (i-1) bs')
+     /\   find i [] = 0
+    in
+    find (length bv -1) bv
+;
+
+let scale_aimage scale image =
+    val (AIMG rows) = image then
+    let cur_rows = length rows in
+    let cur_cols = length (hd rows) in
+    let do_scaling old_sz new_sz rows =
+	let empty_line1 = replicate (length (hd rows)) DONT_CARE then
+	let osz = num2bv old_sz in
+	letrec rscale row rows =
+	    row >= new_sz => [] |
+	    let o_row = (osz '*' (int2fbv SZ row)) '/' scale then
+	    (symb_el o_row rows empty_line1):(rscale (row+1) rows)
+	in
+	rev (rscale 0 rows)
+    in
+    let sz = find_max scale then
+    let rows' = do_scaling cur_rows sz rows then
+    let rows'' = transpose ((do_scaling cur_cols sz (transpose rows'))) then
+    AIMG rows''
+;
+
+
+let adjust_aimage new_cols new_rows image =
+    val (AIMG rows) = image then
+    let cur_rows = length rows in
+    let cur_cols = length (hd rows) in
+    let row_pref = replicate (new_cols-cur_cols) DONT_CARE then
+    let expand_row r = row_pref @ r in
+    let rows' = map expand_row rows then
+    let empty_row = replicate new_cols DONT_CARE then
+    let rows'' = (replicate (new_rows - cur_rows) empty_row)@rows' then
+    AIMG rows''
+;
+
+let scaled_a_sign_image =
+    let p = vvec "p" then
+    let cond = (MIN_SIZE '<=' p) AND (p '<' MAX_SIZE) then
+    let sub = param cond then
+    let p' = substitute sub p then
+    scale_aimage p' a_sign_image 
+;
+
+
+update_vossrc "DYNAMIC-ORDERING" "NO";
+time (scaled_a_sign_image fseq 1);
+
+get_rows_and_cols scaled_a_sign_image;
+
+//VIS scaled_a_sign_image;
+
+let full_scaled_a_sign_image = adjust_aimage 1280 960 scaled_a_sign_image;
+
+time (full_scaled_a_sign_image fseq 22);
+
+get_rows_and_cols full_scaled_a_sign_image;
+
+md_extract_vectors (depends full_scaled_a_sign_image);
+
+
+let translate_aimage deltax deltay image =
+    val (AIMG rows) = image then
+    val (nbr_rows,nbr_cols) = get_rows_and_cols image then
+    let shift_row delta rows =
+	let lines = length rows in
+	let line_size = length (hd rows) in
+	let empty_line = replicate line_size DONT_CARE then
+	let empty_window = replicate lines empty_line in
+	let rows' = rows@empty_window in
+	letrec sel_rows line =
+	    line >= lines => empty_window |
+	    IF (delta '=' (int2fbv SZ line)) THEN
+		(firstn lines (butfirstn line rows'))
+	    ELSE
+		sel_rows (line+1)
+	in
+	sel_rows 0
+    in
+    let rows' = shift_row deltax rows then
+    AIMG (transpose (shift_row deltay (transpose rows')))
+;
+
+
+let scaled_and_placed_sign_image =
+    let img = full_scaled_a_sign_image then
+    val (rows,cols) = get_rows_and_cols img then
+    let dx = vvec "x" then
+    let cond1 = dx '<' (nat2fbv SZ cols) then
+    let dx' = substitute (param cond1) dx then
+    let dy = vvec "y" then
+    let cond2 = dy '<' (nat2fbv SZ rows) then
+    let dy' = substitute (param cond2) dy then
+    translate_aimage dx' dy' img
+;
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+//bdd_reorder 2;
+
+let simage = image2simage full_scaled_a_sign_image;
+
+//bdd_reorder 2;
+
+bdd_size simage;
+
+//bdd_reorder 2;
+//bdd_size simage;
+
+//time (bdd_size example_01);
+
+//let starget = image2simage a_example_01;
+//bdd_size starget;
+
+//bdd_reorder 2;
+//bdd_size starget;
+
+val (ACOL spec_valid spec_r spec_g spec_b) = simage;
+
+bdd_size spec_r;
+bdd_size spec_g;
+bdd_size spec_r;
+
+truth_cover (md_expand_vectors ["i[14:0]", "j[14:0]"]) spec_r;

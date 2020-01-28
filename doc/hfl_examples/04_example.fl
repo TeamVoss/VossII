@@ -1,0 +1,107 @@
+//==========================================================================
+//
+// Data-independent completion signal design example
+//
+//==========================================================================
+
+load "ste.fl";
+update_vossrc "DYNAMIC-ORDERING" "NO";
+
+TYPE "word" 16;
+
+let safe_collatz = 
+    bit_input clk.
+    bit_input start.
+    word_input t0.
+    bit_output done.
+    word_output out.
+    word_internal length.
+    word_internal t newt new_length cnt new_cnt.
+    bit_internal eq1 int_done not_int_done.
+    bit_internal is_even is_odd new_done.
+    CELL "draw_hfl_code data_independent 3" [
+	re_ff clk newt t,
+	eq1 <- (t '=' '1), 
+	is_even <- ((t '%' '2) '=' '0), 
+	is_odd <- '~' is_even,
+	CASE newt [
+	    start --- t0,
+	    eq1 --- t,
+	    is_odd --- ('3 '*' t '+' '1),
+	    is_even --- (t '/' '2)
+	] t,
+	CASE new_length [
+	    start --- '0,
+	    eq1   --- length
+	] (length '+' '1),
+	not_int_done <- cnt '!=' '0,
+	int_done <- '~' not_int_done,
+	CASE new_cnt [
+	    start --- '156,
+	    not_int_done --- (cnt '-' '1)
+	] cnt,
+	CASE new_done [
+	    start --- '0,
+	    (int_done '&' eq1)   --- '1
+	] done,
+	re_ff clk new_done done,
+	re_ff clk new_cnt cnt,
+	re_ff clk new_length length,
+	re_ff_en clk int_done length out
+];
+
+
+let ckt = pexlif2fsm (safe_collatz 'clk 'start 't0 'done 'out);
+let vis0 = STE_debug ckt;
+//vis0;
+
+let test_harness =
+    bit_input clk.
+    bit_input start.
+    word_input	t0.
+    word_output	out.
+    word_output	timer.
+    bit_internal done.
+    word_internal new_timer.
+    CELL "test_harness" [
+	safe_collatz clk start t0 done out,
+	CASE new_timer [
+	    start --- '0,
+	    done  --- timer
+	] (timer '+' '1),
+	re_ff clk new_timer timer
+];
+
+let ckt = pexlif2fsm (test_harness 'clk 'start 't0 'out 'timer);
+let vis1 = STE_debug ckt;
+//vis1;
+
+
+
+let mk_clk cycles =
+    map (\i. T, "clk", (i % 2 = 1), i, i+1) (0 upto (2*cycles-1))
+;
+
+update_vossrc "DYNAMIC-ORDERING" "NO";
+
+let A =
+    (replicate 5 F)@
+    (bv2list (bv_constrained_variable "r_a[15:0]"
+			(\v. (v > (int2bv 0)) AND (v < (int2bv 1024)))))
+;
+
+
+let N = 200;
+
+
+let ant = mk_clk N and
+	  "t0[15:0]" isv A and
+	  "start" isv "0x1" from 0 to 2 and
+	  "start" isv "0x0" from 2 to (2*N)
+;
+
+let ste = STE "-e" vis1 [] ant [] [];
+
+let run0 = vis0;
+let run1 = vis1 fseq ste;
+

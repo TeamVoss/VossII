@@ -1,0 +1,186 @@
+
+let is_number str =
+    let non_digit s = 
+	let v = ord s then
+	(v < ord "0") OR (v > ord "9")
+    in
+    (find_first0 non_digit (explode str)) = 0
+;
+
+let bs_isv vec v =
+    let nds = md_expand_vector vec in
+    let sz = length nds in
+    let vs = (
+	let s2l s = map (\s. (s = "1") => bT | bF) (explode s) in
+	str_is_prefix "0x" v =>
+	    s2l (sprintf "%0*b" sz (sscanf "0x%x" v))
+	|
+	str_is_prefix "0b" v =>
+	    s2l (sprintf "%0*b" sz (sscanf "0b%b" v))
+	|
+	is_number v =>
+	    s2l (sprintf "%0*b" sz (sscanf "%d" v))
+	|
+	(sz = 1) AND (v = "T") => [bT] |
+	(sz = 1) AND (v = "F") => [bF] |
+	let ss = md_expand_vector v then
+	length ss != sz => error "nope" |
+	map bvariable ss
+    ) catch 
+	eprintf "Length mismatch in isv (|%s| != |%s|)" vec v
+    in
+    map2 (\n.\v. (bT,n,v,0,1)) nds vs
+;
+
+let bb_isv vec value_list =
+    let nds = md_expand_vector vec in
+    let sz = length nds in
+    length value_list != sz =>
+	eprintf "Length mismatch in isv for %s\n" vec
+    |
+    map2 (\n.\v. (bT,n,{v::bexpr},0,1)) nds value_list
+;
+
+let bbv_isv vec bv =
+    let nds = md_expand_vector vec in
+    let sz = length nds in
+    let vl = map (bexpr2bdd []) (bv2list bv) in
+    let szl = length vl in
+    szl > sz => eprintf "bv larger than fits in %s" vec |
+    let value_list = (replicate (sz-szl) (hd vl))@vl in
+    map2 (\n.\v. (bT,n,{v::bexpr},0,1)) nds value_list
+;
+
+let s_isv vec v =
+    let nds = md_expand_vector vec in
+    let sz = length nds in
+    let vs = (
+	let s2l s = map (\s. s = "1") (explode s) in
+	str_is_prefix "0x" v =>
+	    s2l (sprintf "%0*b" sz (sscanf "0x%x" v))
+	|
+	str_is_prefix "0b" v =>
+	    s2l (sprintf "%0*b" sz (sscanf "0b%b" v))
+	|
+	is_number v =>
+	    s2l (sprintf "%0*b" sz (sscanf "%d" v))
+	|
+	(sz = 1) AND (v = "T") => [T] |
+	(sz = 1) AND (v = "F") => [F] |
+	let ss = md_expand_vector v then
+	length ss != sz => error "nope" |
+	map variable ss
+    ) catch 
+	eprintf "Length mismatch in isv (|%s| != |%s|)" vec v
+    in
+    map2 (\n.\v. (T,n,v,0,1)) nds vs
+;
+
+let b_isv vec value_list =
+    let nds = md_expand_vector vec in
+    let sz = length nds in
+    length value_list != sz =>
+	eprintf "Length mismatch in isv for %s\n" vec
+    |
+    map2 (\n.\v. (T,n,{v::bool},0,1)) nds value_list
+;
+
+let bv_isv vec bv =
+    let nds = md_expand_vector vec in
+    let sz = length nds in
+    let vl = bv2list bv in
+    let szl = length vl in
+    szl > sz => eprintf "bv larger than fits in %s" vec |
+    let value_list = (replicate (sz-szl) (hd vl))@vl in
+    map2 (\n.\v. (T,n,{v::bool},0,1)) nds value_list
+;
+
+// A simple interface for defining 5-tuple lists for (b)STE runs.
+// There are several versions, but you basically say:
+// vector_name isv value.
+// Vector_name is simply the name of the vector/node as a string.
+// Value can be several things:
+//	A constant, e.g., "0", "1", "0b1001", "0x3fa8", etc.
+//	A variable name, e.g., "d", "c[3:0]", "m[3:0][7:0]", etc.
+//	A list of bools, e.g., [F,T,T], [F,T, variable "b"]. etc.
+//	A list of bexprs, e.g., [bF,bT,bT], [bF,bT, bvariable "b"]. etc.
+//	A bv, e.g., (bv_constrained_variable "a[3:0]" (\v. v > '0 AND v < '10)
+//
+// Depending on the usage, it can either generate (bool#string#bool#int#int)
+// tuple lists or (bexpr#string#bexpr#int#int) lists.
+//
+overload isv bs_isv bb_isv bbv_isv s_isv b_isv bv_isv;
+infix 4 isv;
+
+let bdd_from {l::(bool#string#bool#int#int) list} f =
+    map (\(w,n,v,_,t). (w,n,v,f,t)) l
+;
+
+let bexpr_from {l::(bexpr#string#bexpr#int#int) list} f =
+    map (\(w,n,v,_,t). (w,n,v,f,t)) l
+;
+
+// A simple interface for defining 5-tuple lists for (b)STE runs.
+// This function sets all the "from" time values to t.
+// Usage:    five_tuple_list from t;
+overload from bdd_from bexpr_from;
+infix 4 from;
+
+let bdd_to {l::(bool#string#bool#int#int) list} t =
+    map (\(w,n,v,f,_). (w,n,v,f,t)) l
+;
+
+let bexpr_to {l::(bexpr#string#bexpr#int#int) list} t =
+    map (\(w,n,v,f,_). (w,n,v,f,t)) l
+;
+
+// A simple interface for defining 5-tuple lists for (b)STE runs.
+// This function sets all the "to" time values to t.
+// Usage:    five_tuple_list to t;
+overload to bdd_to bexpr_to;
+infix 3 to;
+
+let bdd_and {ant1::(bool#string#bool#int#int) list} ant2 =
+    ant1 @ ant2
+;
+
+let bexpr_and {ant1::(bexpr#string#bexpr#int#int) list} ant2 =
+    ant1 @ ant2
+;
+
+// A simple interface for defining 5-tuple lists for (b)STE runs.
+// This function catenates two five-tuple lists of the same type.
+overload and bdd_and bexpr_and;
+infix 1 and;
+
+let bdd_when {ant::(bool#string#bool#int#int) list} {cond::bool} =
+    map (\(w,n,v,f,t). (cond AND w),n,v,f,t) ant
+;
+
+let bexpr_when {ant::(bexpr#string#bexpr#int#int) list} {cond::bexpr} =
+    map (\(w,n,v,f,t). (cond bAND w),n,v,f,t) ant
+;
+
+// A simple interface for defining 5-tuple lists for (b)STE runs.
+// This function conjucts the condition cond into every five-tuple.
+// Usage:  five_tuple_list when cond;
+overload when bdd_when bexpr_when;
+infix 2 when;
+
+let gen_clock clk_signal cycles =
+    map (\i. (T,{clk_signal::string}, ((i%2)=1),i, i+1)) (0 upto (2*cycles))
+;
+
+
+let bdd_is_clock nd cycles = map (\i. T, nd, (i%2=0), i, i+1) (0--(2*cycles-1));
+
+let bexpr_is_clock nd cycles =
+    map (\i. bT, nd, ((i%2=0)=>bT|bF), i, i+1) (0--(2*cycles-1))
+;
+
+// A simple interface for defining 5-tuple lists for (b)STE runs.
+// Define a node nd to be a clock and generate cycs cycles of values.
+// Usage: nd is_clock cycs;
+overload is_clock bdd_is_clock bexpr_is_clock;
+infix 2 is_clock;
+

@@ -1,0 +1,117 @@
+load "ste.fl";
+
+TYPE "byte" 3;
+
+let tst =
+    byte_input a b.
+    byte_output o1 o2 o3.
+    CELL "tst" [
+        o1 <- a '*' b,
+        o2 <- a '/' b,
+        o3 <- a '%' b
+];
+
+let p = tst 'a 'b 'o1 'o2 'o3;
+let ckt = pexlif2fsm p;
+update_vossrc "VERBOSE-FSM-PRINT" "YES";
+ckt;
+
+let vis = STE_debug ckt;
+vis;
+
+let ste =
+    let a = {'a::byte} in
+    let b = {'b::byte} in
+    STE "-e" vis [] ( 
+		      (a isv 'a from 0 to 1) and
+		      (b isv '2 from 0 to 1)
+		    ) [] [];
+ste;
+
+let ste =
+    let a = {'a::byte} in
+    let b = {'b::byte} in
+    STE "-e" vis [] ( 
+		      (a isv '0 from 0 to 8) and
+		      (b isv '0 from 0 to 1) and
+		      (b isv '1 from 1 to 2) and
+		      (b isv '2 from 2 to 3) and
+		      (b isv '3 from 3 to 4) and
+		      (b isv '4 from 4 to 5) and
+		      (b isv '5 from 5 to 6) and
+		      (b isv '6 from 6 to 7) and
+		      (b isv '7 from 7 to 8) and
+
+		      (a isv '1 from 10 to 18) and
+		      (b isv '0 from 10 to 11) and
+		      (b isv '1 from 11 to 12) and
+		      (b isv '2 from 12 to 13) and
+		      (b isv '3 from 13 to 14) and
+		      (b isv '4 from 14 to 15) and
+		      (b isv '5 from 15 to 16) and
+		      (b isv '6 from 16 to 17) and
+		      (b isv '7 from 17 to 18) and
+
+		      (a isv '2 from 20 to 28) and
+		      (b isv '0 from 20 to 21) and
+		      (b isv '1 from 21 to 22) and
+		      (b isv '2 from 22 to 23) and
+		      (b isv '3 from 23 to 24) and
+		      (b isv '4 from 24 to 25) and
+		      (b isv '5 from 25 to 26) and
+		      (b isv '6 from 26 to 27) and
+		      (b isv '7 from 27 to 28) and
+
+		      (a isv '3 from 30 to 38) and
+		      (b isv '0 from 30 to 31) and
+		      (b isv '1 from 31 to 32) and
+		      (b isv '2 from 32 to 33) and
+		      (b isv '3 from 33 to 34) and
+		      (b isv '4 from 34 to 35) and
+		      (b isv '5 from 35 to 36) and
+		      (b isv '6 from 36 to 37) and
+		      (b isv '7 from 37 to 38) and
+
+		      (a isv '4 from 40 to 48) and
+		      (b isv '0 from 40 to 41) and
+		      (b isv '1 from 41 to 42) and
+		      (b isv '2 from 42 to 43) and
+		      (b isv '3 from 43 to 44) and
+		      (b isv '4 from 44 to 45) and
+		      (b isv '5 from 45 to 46) and
+		      (b isv '6 from 46 to 47) and
+		      (b isv '7 from 47 to 48) and
+
+		      (a isv '5 from 50 to 58) and
+		      (b isv '0 from 50 to 51) and
+		      (b isv '1 from 51 to 52) and
+		      (b isv '2 from 52 to 53) and
+		      (b isv '3 from 53 to 54) and
+		      (b isv '4 from 54 to 55) and
+		      (b isv '5 from 55 to 56) and
+		      (b isv '6 from 56 to 57) and
+		      (b isv '7 from 57 to 58) and
+
+		      (a isv '6 from 60 to 68) and
+		      (b isv '0 from 60 to 61) and
+		      (b isv '1 from 61 to 62) and
+		      (b isv '2 from 62 to 63) and
+		      (b isv '3 from 63 to 64) and
+		      (b isv '4 from 64 to 65) and
+		      (b isv '5 from 65 to 66) and
+		      (b isv '6 from 66 to 67) and
+		      (b isv '7 from 67 to 68) and
+
+		      (a isv '7 from 70 to 78) and
+		      (b isv '0 from 70 to 71) and
+		      (b isv '1 from 71 to 72) and
+		      (b isv '2 from 72 to 73) and
+		      (b isv '3 from 73 to 74) and
+		      (b isv '4 from 74 to 75) and
+		      (b isv '5 from 75 to 76) and
+		      (b isv '6 from 76 to 77) and
+		      (b isv '7 from 77 to 78) 
+
+		    ) [] []
+;
+

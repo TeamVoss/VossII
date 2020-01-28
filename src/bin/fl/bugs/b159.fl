@@ -1,0 +1,26 @@
+load "ste.fl";
+
+ENUM "states" ["INIT", "REQ", "ACK", "DONE"];
+
+let tst =
+    bit_input clk reset a.
+    bit_output o1.
+    states_internal state.
+    CELL "tst" [
+        (Moore_FSM "Test" clk state
+            (reset, INIT)
+            [
+                INIT          --- a ---  REQ,
+                REQ          --- '~' a ---  ACK,
+                ACK          ---  a ---  DONE
+            ]
+	),
+	o1 <- (state '=' DONE)
+];
+
+let p = tst 'clk 'reset 'a 'o1;
+//p;
+
+let ckt = pexlif2fsm p;
+
+node2value_list ckt "state[1]";

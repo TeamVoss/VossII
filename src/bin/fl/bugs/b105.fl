@@ -1,0 +1,235 @@
+load "ste.fl";
+
+let BYTE_SIZE		= 8;
+let ADDR_SIZE		= 32;
+//let LINES		= 256;		// Number of cache lines
+let LINES		= 16;		// Number of cache lines
+let BYTES_IN_CACHE_LINE = 8;		// Number of bytes in cache line
+
+//let BYTE_SIZE		= 4;
+//let ADDR_SIZE		= 8;
+//let LINES		= 4;		// Number of cache lines
+//let BYTES_IN_CACHE_LINE = 4;		// Number of bytes in cache line
+
+let TAG_SIZE		= ADDR_SIZE-(log2 LINES)-(log2 BYTES_IN_CACHE_LINE);
+
+let SEC_TAG_SIZE	= 8;		// Size of security tag (unary encoding)
+
+let SIZE_DIFF_STATE	= 4;		// Number of entries in diff-state
+
+TYPE "diff_state_cnt" (bits_needed SIZE_DIFF_STATE);
+
+TYPE "byte" BYTE_SIZE;
+TYPE "cache_line" (BYTE_SIZE*BYTES_IN_CACHE_LINE);;
+
+TYPE "stag_field"  SEC_TAG_SIZE;
+TYPE "atag_field"  TAG_SIZE;
+TYPE "line_addr"   (log2 LINES);
+TYPE "byte_addr"    (log2 BYTES_IN_CACHE_LINE);
+
+
+STRUCT "addr" [ ("aTag", "atag_field"),
+		("line", "line_addr"),
+		("byte", "byte_addr")
+];
+
+STRUCT "ext_cache_line" [
+	    ("valid", "bit"),
+	    ("dirty", "bit"),
+	    ("aTag", "atag_field"),
+	    ("sTag", "stag_field"),
+	    ("data", "cache_line")
+];
+
+let EXT_CACHE_LINE_SIZE = get_hw_type_size "ext_cache_line";
+
+
+let gen_cache_line i = ((sprintf "Line_%d" i), "ext_cache_line");
+
+STRUCT "cache" (map gen_cache_line (0--(LINES-1)));
+
+let read_mem addr M do =
+	let asz = hw_size addr then 
+	let sz = hw_size do then 
+	let lines = (hw_size M)/sz then
+	let addr = hw_destr addr then
+	let M = hw_destr M then
+	let do = hw_destr do then
+	let outs = map (\n.n,[n]) (w_depends do) then
+	let inps = map (\n.n,[n])
+		       (qsort node_name_cmp ((w_depends addr)@(w_depends M)))
+	then
+	letrec read i =
+	    let line = W_SLICE (((i+1)*sz-1) downto (i*sz)) M then
+	    i = 0 => line |
+	    let cond = W_EQ addr (W_CONST asz i) then
+	    W_ITE cond line (read (i-1))
+	in
+	let body = P_LEAF [W_UPDATE_FN do (read (lines-1))] then
+	PINST "read_mem" [] T inps outs [] body
+;
+
+let write_mem addr di {M:: *a} {Mnew:: *a} =
+	let asz = hw_size addr then 
+	let sz = hw_size di then 
+	let lines = (hw_size M)/sz then
+	let addr = hw_destr addr then
+	let di = hw_destr di then
+	let M = hw_destr M then
+	let Mnew = hw_destr Mnew then
+	let outs = map (\n.n,[n]) (w_depends Mnew) then
+	let inps = map (\n.n,[n])
+		       (qsort node_name_cmp
+			      ((w_depends addr)@(w_depends di)@(w_depends M)))
+	then
+	letrec write i =
+		i < 0 => [] |
+		let old = W_SLICE (((i+1)*sz-1) downto (i*sz)) M then
+		let cond = W_EQ addr (W_CONST asz i) then
+		let res = W_ITE cond di old then
+		res:(write (i-1))
+	in
+	let M' = W_CAT (write (lines-1)) then
+	let body = P_LEAF [W_UPDATE_FN Mnew M'] then
+	PINST "write_mem" [] T inps outs [] body
+;
+
+let memory =
+    line_addr_input	    rd_addr.
+    ext_cache_line_input    d_in.
+    bit_input		    reset.
+    bit_input		    w_en.
+    line_addr_input	    wr_addr.
+    ext_cache_line_output   d_out.
+    cache_internal	    cache new_cache tmp_cache.
+    CELL (sprintf "draw_mem_with_reset %d" (hw_size cache/hw_size d_out))  [
+	read_mem rd_addr cache d_out,
+	write_mem wr_addr d_in cache tmp_cache,
+	new_cache <- (reset '?' '0 ':' ((w_en '?' tmp_cache ':' cache))),
+	cache <: new_cache
+];
+
+ENUM "cache_fsm" ["Normal",
+		  "Miss_Normal",
+		  "Miss_StoreDiff",
+		  "Miss_FullDS",
+		  "Restore",
+		  "Illegal"
+		 ]
+;
+
+
+let get_mem_data =
+	addr_input		addr_from_CPU.
+	stag_field_input	cur_psTag.
+	cache_line_input	data_from_MM.
+	ext_cache_line_output	edata_from_MM.
+	CELL "get_mem_data" [
+	    edata_from_MM-->aTag <- addr_from_CPU-->aTag,
+	    edata_from_MM-->valid <- '1,
+	    edata_from_MM-->dirty <- '0,
+	    edata_from_MM-->sTag <- cur_psTag,
+	    edata_from_MM-->data <- data_from_MM
+];
+
+
+let control_fsm =
+    bit_input		    clk.
+    bit_input		    reset.
+    ext_cache_line_input    edata.
+    bit_input		    valid_data_from_MM.
+    stag_field_input	    cur_psTag.
+    bit_input		    match.
+    //
+    diff_state_cnt_output   dcnt.
+    cache_fsm_output	    state.
+    //
+    cache_fsm_internal	    new_state.
+    bit_internal	    match_sTag normal_full normal_copy normal_miss.
+    diff_state_cnt_internal new_dcnt.
+    //
+    CELL "control_fsm" [
+	match_sTag <- edata-->valid '&' (edata-->sTag '=' cur_psTag),
+	(Moore_FSM "CtrlFSM" clk state
+	    (reset, Normal)
+	    [
+		Normal --- match --- Normal,
+		Normal --- match_sTag --- Miss_Normal,
+		Normal --- (dcnt '<' `SIZE_DIFF_STATE) --- Miss_StoreDiff,
+		Normal --- default --- Miss_FullDS,
+		Miss_Normal --- valid_data_from_MM --- Normal,
+		Miss_StoreDiff --- default --- Miss_Normal,
+		Miss_FullDS --- valid_data_from_MM --- Normal
+	    ]
+	),
+	//
+	CASE new_dcnt [
+		    reset		      --- '0,
+		    (is_Miss_StoreDiff state) --- (dcnt '+' '1),
+		    (is_Restore state)	      --- (dcnt '-' '1)
+		    ] dcnt,
+	re_ff clk new_dcnt dcnt
+];
+
+let extract_pexlif_hierarchy pexlif hierarchy =
+    let indices = map (sscanf "i%d") (str_split hierarchy "/") in
+    letrec get (idx:idxs) p =
+	let children = content_get_children (pexlif_get_content p) in
+        get idxs (el idx children)
+     /\    get [] p = p
+    in
+    get indices pexlif
+;
+
+
+let diff_state_cache =
+    bit_input		    clk.
+    bit_input		    reset.
+    stag_field_input	    cur_psTag.		// Current process tag
+    addr_input		    addr_from_CPU.
+    bit_output		    valid_to_CPU.
+    cache_line_output	    data_to_CPU.
+    bit_output		    valid_addr_to_MM.
+    addr_output		    addr_to_MM.
+    bit_input		    valid_data_from_MM.
+    cache_line_input	    data_from_MM.
+    //
+    internal		    edata edata_from_MM raw_match eout line_addr.
+    cache_fsm_internal	    state new_state.
+    bit_internal	    normal_miss normal_copy normal_full match_sTag.
+    diff_state_cnt_internal dcnt.
+    bit_internal wr_en match.
+    CELL "read_cache" [
+	line_addr <- addr_from_CPU-->line,
+	get_mem_data addr_from_CPU cur_psTag data_from_MM edata_from_MM,
+	memory line_addr edata_from_MM reset wr_en (addr_from_CPU-->line) edata,
+	wr_en <- (is_Miss_Normal state) '&' valid_data_from_MM,
+	raw_match <- (edata-->aTag) '=' (addr_from_CPU-->aTag),
+	match <- raw_match '&' edata-->valid,
+	eout <- (edata-->data),
+	re_ff clk match valid_to_CPU,
+	re_ff clk (edata-->data) data_to_CPU,
+	//
+	re_ff_en clk match addr_from_CPU addr_to_MM,
+	control_fsm clk reset edata valid_data_from_MM cur_psTag
+		    match dcnt state
+];
+
+let p = diff_state_cache 'clk 'reset 'cur_psTag 'addr_from_CPU 'valid_to_CPU
+			 'data_to_CPU 'valid_addr_to_MM 'addr_to_MM
+			 'valid_data_from_MM 'data_from_MM
+;
+
+time (p fseq 1);
+
+//update_vossrc "VERBOSE-FSM-PRINT" "YES";
+let ckt = pexlif2fsm p;
+time ckt;
+
+//get_visualization_fanins ckt "data_to_CPU[15]";
+//{'e::ext_cache_line}-->data;
+
+let vis = STE_debug ckt;
+
+vis;
+

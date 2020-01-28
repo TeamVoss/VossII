@@ -1,0 +1,138 @@
+
+// -----------------------------------------------
+// Basic programming
+// -----------------------------------------------
+
+letrec fac 0 = 1
+ /\    fac n = n*fac (n-1)
+;
+
+fac 100;
+
+
+// -----------------------------------------------
+// BDD based Boolean function manipulations
+// -----------------------------------------------
+
+let a = variable "a";
+let b = variable "b";
+let c = variable "c";
+
+let ==> a b = NOT a OR b;
+infix 2 ==>;
+
+let ex1 = a ==> a XOR c;
+ex1;
+
+let ex2 = NOT (a AND b AND c);
+ex2;
+
+ex1 == ex2;
+
+let same = (ex1 = ex2);
+same;
+
+(quant_thereis b (ex1 = ex2)) == T;
+
+(quant_forall b (ex1 = ex2)) == T;
+
+param same;
+
+substitute (param same) same;
+
+fparam ["b"] same;
+
+
+// ----------------------------------------------------------------
+// And-Invert DAG (bexpr)  based Boolean function manipulations
+// ----------------------------------------------------------------
+
+let a = bvariable "a"; let b = bvariable "b"; let c = bvariable "c";
+
+let ==> a b = bNOT a bOR b; infix 2 ==>;
+
+let ex1 = a ==> a bXOR c; ex1;
+
+let ex2 = bNOT (a bAND b bAND c); ex2;
+
+let not_same = bNOT (ex1 bXNOR ex2); not_same;
+
+bexpr2bdd [] [not_same];
+
+bget_model [not_same] 10;
+
+bget_model [bNOT a, not_same] 10;
+
+
+
+// ----------------------------------------------------------------
+// More complex BDD based manipulation
+// ----------------------------------------------------------------
+
+load "bool_arithm.fl";
+
+// Pick the prime number to use
+let p = 1009;
+
+let SZ = bits_needed p;
+
+// Add one bit to ensure the multiplication result stays positive
+let DSZ = 2*SZ+1;
+
+// Bitvector version of p
+let pv = int2fbv DSZ p;
+
+let as = md_expand_vector (sprintf "a[%d:0]" (SZ-1));
+let bs = md_expand_vector (sprintf "b[%d:0]" (SZ-1));
+
+// Simple BDD ordering
+var_order (interleave [as,bs]);
+update_vossrc "DYNAMIC-ORDERING" "NO";
+
+let av = ZX DSZ (map variable as);
+let bv = ZX DSZ (map variable bs);
+
+// The specification: (a*b)%p
+let spec_fun av bv = (av '*' bv) '%' pv;
+
+/// Implementation helper functions
+
+// Specification function for
+//	If a > p subtact p from a.
+// Not a good implementation since it involves two subtractions.
+let cond_sub v = (v '>=' pv) => v '-' pv | v; 
+
+// Same as cond_sub, except only one subtration operation
+// 
+let cond_sub2 v = 
+    let tmp = v '-' pv in
+    hd tmp => v | tmp
+;
+
+// Verify you can replace cond_sub with cond_sub2
+cond_sub av == cond_sub2 av;
+cond_sub bv == cond_sub2 bv;
+
+// A function to perform addition mod p (assuming av and bv are less than p)
+let add_mod_p av bv = cond_sub2 (av '+' bv);
+
+// The first implemetation idea
+let imp_fun av bv =
+    // Make a%p and b%p.
+    // Note that the bitwidth is selected so a < 2*p and thus cond_sub suffices.
+    let ap = cond_sub2 av in
+    let bp = cond_sub2 bv in
+    // Make the constant 1 as a bitvector
+    let _1 = int2fbv DSZ 1 in
+    // Now iteratively compute the (2**i * a)%p and the (pp+rest)%p 
+    letrec mul_step cur_ap (b:bs) =
+	let partial_prod = map (defix AND b) cur_ap in
+	let new_ap = cond_sub2 (cur_ap '<<' _1) in
+	add_mod_p partial_prod (mul_step new_ap bs)
+     /\    mul_step cur_ap [] = replicate DSZ F
+    in
+    mul_step ap (rev bp)
+;
+
+time (spec_fun av bv == imp_fun av bv);
+

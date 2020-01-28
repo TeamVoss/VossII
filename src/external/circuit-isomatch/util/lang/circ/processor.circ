@@ -1,0 +1,2552 @@
+let root (registers1087) -> (reg1090, reg1099) {
+  let opcode_getter (root0, root1) -> (root2, root3) {
+    let wire_expand0 (opcode_getter6) -> (wire_expand09) {
+      wire_expand07 = MERGE opcode_getter6 opcode_getter6
+      wire_expand08 = MERGE wire_expand07 wire_expand07
+      wire_expand09 = MERGE wire_expand08 wire_expand08
+    }
+
+    let wire_expand1 (opcode_getter11) -> (wire_expand120) {
+      wire_expand112 = MERGE opcode_getter11 opcode_getter11
+      wire_expand113 = MERGE wire_expand112 wire_expand112
+      wire_expand114 = MERGE wire_expand113 wire_expand113
+      wire_expand115 = MERGE wire_expand114 wire_expand114
+      wire_expand116 = MERGE wire_expand115 wire_expand115
+      wire_expand117 = MERGE wire_expand112 opcode_getter11
+      wire_expand118 = MERGE wire_expand113 wire_expand117
+      wire_expand119 = MERGE wire_expand115 wire_expand118
+      wire_expand120 = MERGE wire_expand116 wire_expand119
+    }
+
+    let wire_expand2 (opcode_getter22) -> (wire_expand226) {
+      wire_expand223 = MERGE opcode_getter22 opcode_getter22
+      wire_expand224 = MERGE wire_expand223 wire_expand223
+      wire_expand225 = MERGE wire_expand224 wire_expand224
+      wire_expand226 = MERGE wire_expand225 wire_expand223
+    }
+
+    let wire_expand3 (opcode_getter28) -> (wire_expand336) {
+      wire_expand329 = MERGE opcode_getter28 opcode_getter28
+      wire_expand330 = MERGE wire_expand329 wire_expand329
+      wire_expand331 = MERGE wire_expand330 wire_expand330
+      wire_expand332 = MERGE wire_expand331 wire_expand331
+      wire_expand333 = MERGE wire_expand332 wire_expand332
+      wire_expand334 = MERGE wire_expand330 opcode_getter28
+      wire_expand335 = MERGE wire_expand332 wire_expand334
+      wire_expand336 = MERGE wire_expand333 wire_expand335
+    }
+
+    opcode_getter4 = SLICE root0 48 64
+    root2 = SLICE opcode_getter5 60 64
+    opcode_getter6 = 1
+    opcode_getter10 = MERGE root1 wire_expand09
+    opcode_getter11 = 1
+    opcode_getter21 = MERGE wire_expand120 opcode_getter10
+    opcode_getter22 = 1
+    opcode_getter27 = MERGE root1 wire_expand226
+    opcode_getter28 = 1
+    opcode_getter37 = MERGE wire_expand336 opcode_getter27
+    opcode_getter38 = AND opcode_getter21 opcode_getter37
+    root3 = AND opcode_getter5 opcode_getter38
+  }
+
+  let alu (root39, root40, root41, root42, root43) -> (root44, root45) {
+    let wire_expand4 (alu46) -> (wire_expand452) {
+      wire_expand447 = MERGE alu46 alu46
+      wire_expand448 = MERGE wire_expand447 wire_expand447
+      wire_expand449 = MERGE wire_expand448 wire_expand448
+      wire_expand450 = MERGE wire_expand449 wire_expand449
+      wire_expand451 = MERGE wire_expand450 wire_expand450
+      wire_expand452 = MERGE wire_expand451 wire_expand451
+    }
+
+    let wire_expand5 (alu54) -> (wire_expand560) {
+      wire_expand555 = MERGE alu54 alu54
+      wire_expand556 = MERGE wire_expand555 wire_expand555
+      wire_expand557 = MERGE wire_expand556 wire_expand556
+      wire_expand558 = MERGE wire_expand557 wire_expand557
+      wire_expand559 = MERGE wire_expand558 wire_expand558
+      wire_expand560 = MERGE wire_expand559 wire_expand559
+    }
+
+    let full_adder_words (alu53, alu61, alu65) -> (full_adder_words640, full_adder637, full_adder_words641) {
+      let full_adder (full_adder_words66, full_adder_words67, alu65) -> (full_adder73, full_adder71) {
+        full_adder68 = AND full_adder_words66 full_adder_words67
+        full_adder69 = OR full_adder_words66 full_adder_words67
+        full_adder70 = AND full_adder69 alu65
+        full_adder71 = OR full_adder68 full_adder70
+        full_adder72 = XOR full_adder_words66 full_adder_words67
+        full_adder73 = XOR full_adder72 alu65
+      }
+
+      let full_adder (full_adder_words74, full_adder_words75, full_adder71) -> (full_adder81, full_adder79) {
+        full_adder76 = AND full_adder_words74 full_adder_words75
+        full_adder77 = OR full_adder_words74 full_adder_words75
+        full_adder78 = AND full_adder77 full_adder71
+        full_adder79 = OR full_adder76 full_adder78
+        full_adder80 = XOR full_adder_words74 full_adder_words75
+        full_adder81 = XOR full_adder80 full_adder71
+      }
+
+      let full_adder (full_adder_words83, full_adder_words84, full_adder79) -> (full_adder90, full_adder88) {
+        full_adder85 = AND full_adder_words83 full_adder_words84
+        full_adder86 = OR full_adder_words83 full_adder_words84
+        full_adder87 = AND full_adder86 full_adder79
+        full_adder88 = OR full_adder85 full_adder87
+        full_adder89 = XOR full_adder_words83 full_adder_words84
+        full_adder90 = XOR full_adder89 full_adder79
+      }
+
+      let full_adder (full_adder_words92, full_adder_words93, full_adder88) -> (full_adder99, full_adder97) {
+        full_adder94 = AND full_adder_words92 full_adder_words93
+        full_adder95 = OR full_adder_words92 full_adder_words93
+        full_adder96 = AND full_adder95 full_adder88
+        full_adder97 = OR full_adder94 full_adder96
+        full_adder98 = XOR full_adder_words92 full_adder_words93
+        full_adder99 = XOR full_adder98 full_adder88
+      }
+
+      let full_adder (full_adder_words101, full_adder_words102, full_adder97) -> (full_adder108, full_adder106) {
+        full_adder103 = AND full_adder_words101 full_adder_words102
+        full_adder104 = OR full_adder_words101 full_adder_words102
+        full_adder105 = AND full_adder104 full_adder97
+        full_adder106 = OR full_adder103 full_adder105
+        full_adder107 = XOR full_adder_words101 full_adder_words102
+        full_adder108 = XOR full_adder107 full_adder97
+      }
+
+      let full_adder (full_adder_words110, full_adder_words111, full_adder106) -> (full_adder117, full_adder115) {
+        full_adder112 = AND full_adder_words110 full_adder_words111
+        full_adder113 = OR full_adder_words110 full_adder_words111
+        full_adder114 = AND full_adder113 full_adder106
+        full_adder115 = OR full_adder112 full_adder114
+        full_adder116 = XOR full_adder_words110 full_adder_words111
+        full_adder117 = XOR full_adder116 full_adder106
+      }
+
+      let full_adder (full_adder_words119, full_adder_words120, full_adder115) -> (full_adder126, full_adder124) {
+        full_adder121 = AND full_adder_words119 full_adder_words120
+        full_adder122 = OR full_adder_words119 full_adder_words120
+        full_adder123 = AND full_adder122 full_adder115
+        full_adder124 = OR full_adder121 full_adder123
+        full_adder125 = XOR full_adder_words119 full_adder_words120
+        full_adder126 = XOR full_adder125 full_adder115
+      }
+
+      let full_adder (full_adder_words128, full_adder_words129, full_adder124) -> (full_adder135, full_adder133) {
+        full_adder130 = AND full_adder_words128 full_adder_words129
+        full_adder131 = OR full_adder_words128 full_adder_words129
+        full_adder132 = AND full_adder131 full_adder124
+        full_adder133 = OR full_adder130 full_adder132
+        full_adder134 = XOR full_adder_words128 full_adder_words129
+        full_adder135 = XOR full_adder134 full_adder124
+      }
+
+      let full_adder (full_adder_words137, full_adder_words138, full_adder133) -> (full_adder144, full_adder142) {
+        full_adder139 = AND full_adder_words137 full_adder_words138
+        full_adder140 = OR full_adder_words137 full_adder_words138
+        full_adder141 = AND full_adder140 full_adder133
+        full_adder142 = OR full_adder139 full_adder141
+        full_adder143 = XOR full_adder_words137 full_adder_words138
+        full_adder144 = XOR full_adder143 full_adder133
+      }
+
+      let full_adder (full_adder_words146, full_adder_words147, full_adder142) -> (full_adder153, full_adder151) {
+        full_adder148 = AND full_adder_words146 full_adder_words147
+        full_adder149 = OR full_adder_words146 full_adder_words147
+        full_adder150 = AND full_adder149 full_adder142
+        full_adder151 = OR full_adder148 full_adder150
+        full_adder152 = XOR full_adder_words146 full_adder_words147
+        full_adder153 = XOR full_adder152 full_adder142
+      }
+
+      let full_adder (full_adder_words155, full_adder_words156, full_adder151) -> (full_adder162, full_adder160) {
+        full_adder157 = AND full_adder_words155 full_adder_words156
+        full_adder158 = OR full_adder_words155 full_adder_words156
+        full_adder159 = AND full_adder158 full_adder151
+        full_adder160 = OR full_adder157 full_adder159
+        full_adder161 = XOR full_adder_words155 full_adder_words156
+        full_adder162 = XOR full_adder161 full_adder151
+      }
+
+      let full_adder (full_adder_words164, full_adder_words165, full_adder160) -> (full_adder171, full_adder169) {
+        full_adder166 = AND full_adder_words164 full_adder_words165
+        full_adder167 = OR full_adder_words164 full_adder_words165
+        full_adder168 = AND full_adder167 full_adder160
+        full_adder169 = OR full_adder166 full_adder168
+        full_adder170 = XOR full_adder_words164 full_adder_words165
+        full_adder171 = XOR full_adder170 full_adder160
+      }
+
+      let full_adder (full_adder_words173, full_adder_words174, full_adder169) -> (full_adder180, full_adder178) {
+        full_adder175 = AND full_adder_words173 full_adder_words174
+        full_adder176 = OR full_adder_words173 full_adder_words174
+        full_adder177 = AND full_adder176 full_adder169
+        full_adder178 = OR full_adder175 full_adder177
+        full_adder179 = XOR full_adder_words173 full_adder_words174
+        full_adder180 = XOR full_adder179 full_adder169
+      }
+
+      let full_adder (full_adder_words182, full_adder_words183, full_adder178) -> (full_adder189, full_adder187) {
+        full_adder184 = AND full_adder_words182 full_adder_words183
+        full_adder185 = OR full_adder_words182 full_adder_words183
+        full_adder186 = AND full_adder185 full_adder178
+        full_adder187 = OR full_adder184 full_adder186
+        full_adder188 = XOR full_adder_words182 full_adder_words183
+        full_adder189 = XOR full_adder188 full_adder178
+      }
+
+      let full_adder (full_adder_words191, full_adder_words192, full_adder187) -> (full_adder198, full_adder196) {
+        full_adder193 = AND full_adder_words191 full_adder_words192
+        full_adder194 = OR full_adder_words191 full_adder_words192
+        full_adder195 = AND full_adder194 full_adder187
+        full_adder196 = OR full_adder193 full_adder195
+        full_adder197 = XOR full_adder_words191 full_adder_words192
+        full_adder198 = XOR full_adder197 full_adder187
+      }
+
+      let full_adder (full_adder_words200, full_adder_words201, full_adder196) -> (full_adder207, full_adder205) {
+        full_adder202 = AND full_adder_words200 full_adder_words201
+        full_adder203 = OR full_adder_words200 full_adder_words201
+        full_adder204 = AND full_adder203 full_adder196
+        full_adder205 = OR full_adder202 full_adder204
+        full_adder206 = XOR full_adder_words200 full_adder_words201
+        full_adder207 = XOR full_adder206 full_adder196
+      }
+
+      let full_adder (full_adder_words209, full_adder_words210, full_adder205) -> (full_adder216, full_adder214) {
+        full_adder211 = AND full_adder_words209 full_adder_words210
+        full_adder212 = OR full_adder_words209 full_adder_words210
+        full_adder213 = AND full_adder212 full_adder205
+        full_adder214 = OR full_adder211 full_adder213
+        full_adder215 = XOR full_adder_words209 full_adder_words210
+        full_adder216 = XOR full_adder215 full_adder205
+      }
+
+      let full_adder (full_adder_words218, full_adder_words219, full_adder214) -> (full_adder225, full_adder223) {
+        full_adder220 = AND full_adder_words218 full_adder_words219
+        full_adder221 = OR full_adder_words218 full_adder_words219
+        full_adder222 = AND full_adder221 full_adder214
+        full_adder223 = OR full_adder220 full_adder222
+        full_adder224 = XOR full_adder_words218 full_adder_words219
+        full_adder225 = XOR full_adder224 full_adder214
+      }
+
+      let full_adder (full_adder_words227, full_adder_words228, full_adder223) -> (full_adder234, full_adder232) {
+        full_adder229 = AND full_adder_words227 full_adder_words228
+        full_adder230 = OR full_adder_words227 full_adder_words228
+        full_adder231 = AND full_adder230 full_adder223
+        full_adder232 = OR full_adder229 full_adder231
+        full_adder233 = XOR full_adder_words227 full_adder_words228
+        full_adder234 = XOR full_adder233 full_adder223
+      }
+
+      let full_adder (full_adder_words236, full_adder_words237, full_adder232) -> (full_adder243, full_adder241) {
+        full_adder238 = AND full_adder_words236 full_adder_words237
+        full_adder239 = OR full_adder_words236 full_adder_words237
+        full_adder240 = AND full_adder239 full_adder232
+        full_adder241 = OR full_adder238 full_adder240
+        full_adder242 = XOR full_adder_words236 full_adder_words237
+        full_adder243 = XOR full_adder242 full_adder232
+      }
+
+      let full_adder (full_adder_words245, full_adder_words246, full_adder241) -> (full_adder252, full_adder250) {
+        full_adder247 = AND full_adder_words245 full_adder_words246
+        full_adder248 = OR full_adder_words245 full_adder_words246
+        full_adder249 = AND full_adder248 full_adder241
+        full_adder250 = OR full_adder247 full_adder249
+        full_adder251 = XOR full_adder_words245 full_adder_words246
+        full_adder252 = XOR full_adder251 full_adder241
+      }
+
+      let full_adder (full_adder_words254, full_adder_words255, full_adder250) -> (full_adder261, full_adder259) {
+        full_adder256 = AND full_adder_words254 full_adder_words255
+        full_adder257 = OR full_adder_words254 full_adder_words255
+        full_adder258 = AND full_adder257 full_adder250
+        full_adder259 = OR full_adder256 full_adder258
+        full_adder260 = XOR full_adder_words254 full_adder_words255
+        full_adder261 = XOR full_adder260 full_adder250
+      }
+
+      let full_adder (full_adder_words263, full_adder_words264, full_adder259) -> (full_adder270, full_adder268) {
+        full_adder265 = AND full_adder_words263 full_adder_words264
+        full_adder266 = OR full_adder_words263 full_adder_words264
+        full_adder267 = AND full_adder266 full_adder259
+        full_adder268 = OR full_adder265 full_adder267
+        full_adder269 = XOR full_adder_words263 full_adder_words264
+        full_adder270 = XOR full_adder269 full_adder259
+      }
+
+      let full_adder (full_adder_words272, full_adder_words273, full_adder268) -> (full_adder279, full_adder277) {
+        full_adder274 = AND full_adder_words272 full_adder_words273
+        full_adder275 = OR full_adder_words272 full_adder_words273
+        full_adder276 = AND full_adder275 full_adder268
+        full_adder277 = OR full_adder274 full_adder276
+        full_adder278 = XOR full_adder_words272 full_adder_words273
+        full_adder279 = XOR full_adder278 full_adder268
+      }
+
+      let full_adder (full_adder_words281, full_adder_words282, full_adder277) -> (full_adder288, full_adder286) {
+        full_adder283 = AND full_adder_words281 full_adder_words282
+        full_adder284 = OR full_adder_words281 full_adder_words282
+        full_adder285 = AND full_adder284 full_adder277
+        full_adder286 = OR full_adder283 full_adder285
+        full_adder287 = XOR full_adder_words281 full_adder_words282
+        full_adder288 = XOR full_adder287 full_adder277
+      }
+
+      let full_adder (full_adder_words290, full_adder_words291, full_adder286) -> (full_adder297, full_adder295) {
+        full_adder292 = AND full_adder_words290 full_adder_words291
+        full_adder293 = OR full_adder_words290 full_adder_words291
+        full_adder294 = AND full_adder293 full_adder286
+        full_adder295 = OR full_adder292 full_adder294
+        full_adder296 = XOR full_adder_words290 full_adder_words291
+        full_adder297 = XOR full_adder296 full_adder286
+      }
+
+      let full_adder (full_adder_words299, full_adder_words300, full_adder295) -> (full_adder306, full_adder304) {
+        full_adder301 = AND full_adder_words299 full_adder_words300
+        full_adder302 = OR full_adder_words299 full_adder_words300
+        full_adder303 = AND full_adder302 full_adder295
+        full_adder304 = OR full_adder301 full_adder303
+        full_adder305 = XOR full_adder_words299 full_adder_words300
+        full_adder306 = XOR full_adder305 full_adder295
+      }
+
+      let full_adder (full_adder_words308, full_adder_words309, full_adder304) -> (full_adder315, full_adder313) {
+        full_adder310 = AND full_adder_words308 full_adder_words309
+        full_adder311 = OR full_adder_words308 full_adder_words309
+        full_adder312 = AND full_adder311 full_adder304
+        full_adder313 = OR full_adder310 full_adder312
+        full_adder314 = XOR full_adder_words308 full_adder_words309
+        full_adder315 = XOR full_adder314 full_adder304
+      }
+
+      let full_adder (full_adder_words317, full_adder_words318, full_adder313) -> (full_adder324, full_adder322) {
+        full_adder319 = AND full_adder_words317 full_adder_words318
+        full_adder320 = OR full_adder_words317 full_adder_words318
+        full_adder321 = AND full_adder320 full_adder313
+        full_adder322 = OR full_adder319 full_adder321
+        full_adder323 = XOR full_adder_words317 full_adder_words318
+        full_adder324 = XOR full_adder323 full_adder313
+      }
+
+      let full_adder (full_adder_words326, full_adder_words327, full_adder322) -> (full_adder333, full_adder331) {
+        full_adder328 = AND full_adder_words326 full_adder_words327
+        full_adder329 = OR full_adder_words326 full_adder_words327
+        full_adder330 = AND full_adder329 full_adder322
+        full_adder331 = OR full_adder328 full_adder330
+        full_adder332 = XOR full_adder_words326 full_adder_words327
+        full_adder333 = XOR full_adder332 full_adder322
+      }
+
+      let full_adder (full_adder_words335, full_adder_words336, full_adder331) -> (full_adder342, full_adder340) {
+        full_adder337 = AND full_adder_words335 full_adder_words336
+        full_adder338 = OR full_adder_words335 full_adder_words336
+        full_adder339 = AND full_adder338 full_adder331
+        full_adder340 = OR full_adder337 full_adder339
+        full_adder341 = XOR full_adder_words335 full_adder_words336
+        full_adder342 = XOR full_adder341 full_adder331
+      }
+
+      let full_adder (full_adder_words344, full_adder_words345, full_adder340) -> (full_adder351, full_adder349) {
+        full_adder346 = AND full_adder_words344 full_adder_words345
+        full_adder347 = OR full_adder_words344 full_adder_words345
+        full_adder348 = AND full_adder347 full_adder340
+        full_adder349 = OR full_adder346 full_adder348
+        full_adder350 = XOR full_adder_words344 full_adder_words345
+        full_adder351 = XOR full_adder350 full_adder340
+      }
+
+      let full_adder (full_adder_words353, full_adder_words354, full_adder349) -> (full_adder360, full_adder358) {
+        full_adder355 = AND full_adder_words353 full_adder_words354
+        full_adder356 = OR full_adder_words353 full_adder_words354
+        full_adder357 = AND full_adder356 full_adder349
+        full_adder358 = OR full_adder355 full_adder357
+        full_adder359 = XOR full_adder_words353 full_adder_words354
+        full_adder360 = XOR full_adder359 full_adder349
+      }
+
+      let full_adder (full_adder_words362, full_adder_words363, full_adder358) -> (full_adder369, full_adder367) {
+        full_adder364 = AND full_adder_words362 full_adder_words363
+        full_adder365 = OR full_adder_words362 full_adder_words363
+        full_adder366 = AND full_adder365 full_adder358
+        full_adder367 = OR full_adder364 full_adder366
+        full_adder368 = XOR full_adder_words362 full_adder_words363
+        full_adder369 = XOR full_adder368 full_adder358
+      }
+
+      let full_adder (full_adder_words371, full_adder_words372, full_adder367) -> (full_adder378, full_adder376) {
+        full_adder373 = AND full_adder_words371 full_adder_words372
+        full_adder374 = OR full_adder_words371 full_adder_words372
+        full_adder375 = AND full_adder374 full_adder367
+        full_adder376 = OR full_adder373 full_adder375
+        full_adder377 = XOR full_adder_words371 full_adder_words372
+        full_adder378 = XOR full_adder377 full_adder367
+      }
+
+      let full_adder (full_adder_words380, full_adder_words381, full_adder376) -> (full_adder387, full_adder385) {
+        full_adder382 = AND full_adder_words380 full_adder_words381
+        full_adder383 = OR full_adder_words380 full_adder_words381
+        full_adder384 = AND full_adder383 full_adder376
+        full_adder385 = OR full_adder382 full_adder384
+        full_adder386 = XOR full_adder_words380 full_adder_words381
+        full_adder387 = XOR full_adder386 full_adder376
+      }
+
+      let full_adder (full_adder_words389, full_adder_words390, full_adder385) -> (full_adder396, full_adder394) {
+        full_adder391 = AND full_adder_words389 full_adder_words390
+        full_adder392 = OR full_adder_words389 full_adder_words390
+        full_adder393 = AND full_adder392 full_adder385
+        full_adder394 = OR full_adder391 full_adder393
+        full_adder395 = XOR full_adder_words389 full_adder_words390
+        full_adder396 = XOR full_adder395 full_adder385
+      }
+
+      let full_adder (full_adder_words398, full_adder_words399, full_adder394) -> (full_adder405, full_adder403) {
+        full_adder400 = AND full_adder_words398 full_adder_words399
+        full_adder401 = OR full_adder_words398 full_adder_words399
+        full_adder402 = AND full_adder401 full_adder394
+        full_adder403 = OR full_adder400 full_adder402
+        full_adder404 = XOR full_adder_words398 full_adder_words399
+        full_adder405 = XOR full_adder404 full_adder394
+      }
+
+      let full_adder (full_adder_words407, full_adder_words408, full_adder403) -> (full_adder414, full_adder412) {
+        full_adder409 = AND full_adder_words407 full_adder_words408
+        full_adder410 = OR full_adder_words407 full_adder_words408
+        full_adder411 = AND full_adder410 full_adder403
+        full_adder412 = OR full_adder409 full_adder411
+        full_adder413 = XOR full_adder_words407 full_adder_words408
+        full_adder414 = XOR full_adder413 full_adder403
+      }
+
+      let full_adder (full_adder_words416, full_adder_words417, full_adder412) -> (full_adder423, full_adder421) {
+        full_adder418 = AND full_adder_words416 full_adder_words417
+        full_adder419 = OR full_adder_words416 full_adder_words417
+        full_adder420 = AND full_adder419 full_adder412
+        full_adder421 = OR full_adder418 full_adder420
+        full_adder422 = XOR full_adder_words416 full_adder_words417
+        full_adder423 = XOR full_adder422 full_adder412
+      }
+
+      let full_adder (full_adder_words425, full_adder_words426, full_adder421) -> (full_adder432, full_adder430) {
+        full_adder427 = AND full_adder_words425 full_adder_words426
+        full_adder428 = OR full_adder_words425 full_adder_words426
+        full_adder429 = AND full_adder428 full_adder421
+        full_adder430 = OR full_adder427 full_adder429
+        full_adder431 = XOR full_adder_words425 full_adder_words426
+        full_adder432 = XOR full_adder431 full_adder421
+      }
+
+      let full_adder (full_adder_words434, full_adder_words435, full_adder430) -> (full_adder441, full_adder439) {
+        full_adder436 = AND full_adder_words434 full_adder_words435
+        full_adder437 = OR full_adder_words434 full_adder_words435
+        full_adder438 = AND full_adder437 full_adder430
+        full_adder439 = OR full_adder436 full_adder438
+        full_adder440 = XOR full_adder_words434 full_adder_words435
+        full_adder441 = XOR full_adder440 full_adder430
+      }
+
+      let full_adder (full_adder_words443, full_adder_words444, full_adder439) -> (full_adder450, full_adder448) {
+        full_adder445 = AND full_adder_words443 full_adder_words444
+        full_adder446 = OR full_adder_words443 full_adder_words444
+        full_adder447 = AND full_adder446 full_adder439
+        full_adder448 = OR full_adder445 full_adder447
+        full_adder449 = XOR full_adder_words443 full_adder_words444
+        full_adder450 = XOR full_adder449 full_adder439
+      }
+
+      let full_adder (full_adder_words452, full_adder_words453, full_adder448) -> (full_adder459, full_adder457) {
+        full_adder454 = AND full_adder_words452 full_adder_words453
+        full_adder455 = OR full_adder_words452 full_adder_words453
+        full_adder456 = AND full_adder455 full_adder448
+        full_adder457 = OR full_adder454 full_adder456
+        full_adder458 = XOR full_adder_words452 full_adder_words453
+        full_adder459 = XOR full_adder458 full_adder448
+      }
+
+      let full_adder (full_adder_words461, full_adder_words462, full_adder457) -> (full_adder468, full_adder466) {
+        full_adder463 = AND full_adder_words461 full_adder_words462
+        full_adder464 = OR full_adder_words461 full_adder_words462
+        full_adder465 = AND full_adder464 full_adder457
+        full_adder466 = OR full_adder463 full_adder465
+        full_adder467 = XOR full_adder_words461 full_adder_words462
+        full_adder468 = XOR full_adder467 full_adder457
+      }
+
+      let full_adder (full_adder_words470, full_adder_words471, full_adder466) -> (full_adder477, full_adder475) {
+        full_adder472 = AND full_adder_words470 full_adder_words471
+        full_adder473 = OR full_adder_words470 full_adder_words471
+        full_adder474 = AND full_adder473 full_adder466
+        full_adder475 = OR full_adder472 full_adder474
+        full_adder476 = XOR full_adder_words470 full_adder_words471
+        full_adder477 = XOR full_adder476 full_adder466
+      }
+
+      let full_adder (full_adder_words479, full_adder_words480, full_adder475) -> (full_adder486, full_adder484) {
+        full_adder481 = AND full_adder_words479 full_adder_words480
+        full_adder482 = OR full_adder_words479 full_adder_words480
+        full_adder483 = AND full_adder482 full_adder475
+        full_adder484 = OR full_adder481 full_adder483
+        full_adder485 = XOR full_adder_words479 full_adder_words480
+        full_adder486 = XOR full_adder485 full_adder475
+      }
+
+      let full_adder (full_adder_words488, full_adder_words489, full_adder484) -> (full_adder495, full_adder493) {
+        full_adder490 = AND full_adder_words488 full_adder_words489
+        full_adder491 = OR full_adder_words488 full_adder_words489
+        full_adder492 = AND full_adder491 full_adder484
+        full_adder493 = OR full_adder490 full_adder492
+        full_adder494 = XOR full_adder_words488 full_adder_words489
+        full_adder495 = XOR full_adder494 full_adder484
+      }
+
+      let full_adder (full_adder_words497, full_adder_words498, full_adder493) -> (full_adder504, full_adder502) {
+        full_adder499 = AND full_adder_words497 full_adder_words498
+        full_adder500 = OR full_adder_words497 full_adder_words498
+        full_adder501 = AND full_adder500 full_adder493
+        full_adder502 = OR full_adder499 full_adder501
+        full_adder503 = XOR full_adder_words497 full_adder_words498
+        full_adder504 = XOR full_adder503 full_adder493
+      }
+
+      let full_adder (full_adder_words506, full_adder_words507, full_adder502) -> (full_adder513, full_adder511) {
+        full_adder508 = AND full_adder_words506 full_adder_words507
+        full_adder509 = OR full_adder_words506 full_adder_words507
+        full_adder510 = AND full_adder509 full_adder502
+        full_adder511 = OR full_adder508 full_adder510
+        full_adder512 = XOR full_adder_words506 full_adder_words507
+        full_adder513 = XOR full_adder512 full_adder502
+      }
+
+      let full_adder (full_adder_words515, full_adder_words516, full_adder511) -> (full_adder522, full_adder520) {
+        full_adder517 = AND full_adder_words515 full_adder_words516
+        full_adder518 = OR full_adder_words515 full_adder_words516
+        full_adder519 = AND full_adder518 full_adder511
+        full_adder520 = OR full_adder517 full_adder519
+        full_adder521 = XOR full_adder_words515 full_adder_words516
+        full_adder522 = XOR full_adder521 full_adder511
+      }
+
+      let full_adder (full_adder_words524, full_adder_words525, full_adder520) -> (full_adder531, full_adder529) {
+        full_adder526 = AND full_adder_words524 full_adder_words525
+        full_adder527 = OR full_adder_words524 full_adder_words525
+        full_adder528 = AND full_adder527 full_adder520
+        full_adder529 = OR full_adder526 full_adder528
+        full_adder530 = XOR full_adder_words524 full_adder_words525
+        full_adder531 = XOR full_adder530 full_adder520
+      }
+
+      let full_adder (full_adder_words533, full_adder_words534, full_adder529) -> (full_adder540, full_adder538) {
+        full_adder535 = AND full_adder_words533 full_adder_words534
+        full_adder536 = OR full_adder_words533 full_adder_words534
+        full_adder537 = AND full_adder536 full_adder529
+        full_adder538 = OR full_adder535 full_adder537
+        full_adder539 = XOR full_adder_words533 full_adder_words534
+        full_adder540 = XOR full_adder539 full_adder529
+      }
+
+      let full_adder (full_adder_words542, full_adder_words543, full_adder538) -> (full_adder549, full_adder547) {
+        full_adder544 = AND full_adder_words542 full_adder_words543
+        full_adder545 = OR full_adder_words542 full_adder_words543
+        full_adder546 = AND full_adder545 full_adder538
+        full_adder547 = OR full_adder544 full_adder546
+        full_adder548 = XOR full_adder_words542 full_adder_words543
+        full_adder549 = XOR full_adder548 full_adder538
+      }
+
+      let full_adder (full_adder_words551, full_adder_words552, full_adder547) -> (full_adder558, full_adder556) {
+        full_adder553 = AND full_adder_words551 full_adder_words552
+        full_adder554 = OR full_adder_words551 full_adder_words552
+        full_adder555 = AND full_adder554 full_adder547
+        full_adder556 = OR full_adder553 full_adder555
+        full_adder557 = XOR full_adder_words551 full_adder_words552
+        full_adder558 = XOR full_adder557 full_adder547
+      }
+
+      let full_adder (full_adder_words560, full_adder_words561, full_adder556) -> (full_adder567, full_adder565) {
+        full_adder562 = AND full_adder_words560 full_adder_words561
+        full_adder563 = OR full_adder_words560 full_adder_words561
+        full_adder564 = AND full_adder563 full_adder556
+        full_adder565 = OR full_adder562 full_adder564
+        full_adder566 = XOR full_adder_words560 full_adder_words561
+        full_adder567 = XOR full_adder566 full_adder556
+      }
+
+      let full_adder (full_adder_words569, full_adder_words570, full_adder565) -> (full_adder576, full_adder574) {
+        full_adder571 = AND full_adder_words569 full_adder_words570
+        full_adder572 = OR full_adder_words569 full_adder_words570
+        full_adder573 = AND full_adder572 full_adder565
+        full_adder574 = OR full_adder571 full_adder573
+        full_adder575 = XOR full_adder_words569 full_adder_words570
+        full_adder576 = XOR full_adder575 full_adder565
+      }
+
+      let full_adder (full_adder_words578, full_adder_words579, full_adder574) -> (full_adder585, full_adder583) {
+        full_adder580 = AND full_adder_words578 full_adder_words579
+        full_adder581 = OR full_adder_words578 full_adder_words579
+        full_adder582 = AND full_adder581 full_adder574
+        full_adder583 = OR full_adder580 full_adder582
+        full_adder584 = XOR full_adder_words578 full_adder_words579
+        full_adder585 = XOR full_adder584 full_adder574
+      }
+
+      let full_adder (full_adder_words587, full_adder_words588, full_adder583) -> (full_adder594, full_adder592) {
+        full_adder589 = AND full_adder_words587 full_adder_words588
+        full_adder590 = OR full_adder_words587 full_adder_words588
+        full_adder591 = AND full_adder590 full_adder583
+        full_adder592 = OR full_adder589 full_adder591
+        full_adder593 = XOR full_adder_words587 full_adder_words588
+        full_adder594 = XOR full_adder593 full_adder583
+      }
+
+      let full_adder (full_adder_words596, full_adder_words597, full_adder592) -> (full_adder603, full_adder601) {
+        full_adder598 = AND full_adder_words596 full_adder_words597
+        full_adder599 = OR full_adder_words596 full_adder_words597
+        full_adder600 = AND full_adder599 full_adder592
+        full_adder601 = OR full_adder598 full_adder600
+        full_adder602 = XOR full_adder_words596 full_adder_words597
+        full_adder603 = XOR full_adder602 full_adder592
+      }
+
+      let full_adder (full_adder_words605, full_adder_words606, full_adder601) -> (full_adder612, full_adder610) {
+        full_adder607 = AND full_adder_words605 full_adder_words606
+        full_adder608 = OR full_adder_words605 full_adder_words606
+        full_adder609 = AND full_adder608 full_adder601
+        full_adder610 = OR full_adder607 full_adder609
+        full_adder611 = XOR full_adder_words605 full_adder_words606
+        full_adder612 = XOR full_adder611 full_adder601
+      }
+
+      let full_adder (full_adder_words614, full_adder_words615, full_adder610) -> (full_adder621, full_adder619) {
+        full_adder616 = AND full_adder_words614 full_adder_words615
+        full_adder617 = OR full_adder_words614 full_adder_words615
+        full_adder618 = AND full_adder617 full_adder610
+        full_adder619 = OR full_adder616 full_adder618
+        full_adder620 = XOR full_adder_words614 full_adder_words615
+        full_adder621 = XOR full_adder620 full_adder610
+      }
+
+      let full_adder (full_adder_words623, full_adder_words624, full_adder619) -> (full_adder630, full_adder628) {
+        full_adder625 = AND full_adder_words623 full_adder_words624
+        full_adder626 = OR full_adder_words623 full_adder_words624
+        full_adder627 = AND full_adder626 full_adder619
+        full_adder628 = OR full_adder625 full_adder627
+        full_adder629 = XOR full_adder_words623 full_adder_words624
+        full_adder630 = XOR full_adder629 full_adder619
+      }
+
+      let full_adder (full_adder_words632, full_adder_words633, full_adder628) -> (full_adder639, full_adder637) {
+        full_adder634 = AND full_adder_words632 full_adder_words633
+        full_adder635 = OR full_adder_words632 full_adder_words633
+        full_adder636 = AND full_adder635 full_adder628
+        full_adder637 = OR full_adder634 full_adder636
+        full_adder638 = XOR full_adder_words632 full_adder_words633
+        full_adder639 = XOR full_adder638 full_adder628
+      }
+
+      full_adder_words66 = SLICE alu53 63 64
+      full_adder_words67 = SLICE alu61 63 64
+      full_adder_words74 = SLICE alu53 62 63
+      full_adder_words75 = SLICE alu61 62 63
+      full_adder_words82 = MERGE full_adder81 full_adder73
+      full_adder_words83 = SLICE alu53 61 62
+      full_adder_words84 = SLICE alu61 61 62
+      full_adder_words91 = MERGE full_adder90 full_adder_words82
+      full_adder_words92 = SLICE alu53 60 61
+      full_adder_words93 = SLICE alu61 60 61
+      full_adder_words100 = MERGE full_adder99 full_adder_words91
+      full_adder_words101 = SLICE alu53 59 60
+      full_adder_words102 = SLICE alu61 59 60
+      full_adder_words109 = MERGE full_adder108 full_adder_words100
+      full_adder_words110 = SLICE alu53 58 59
+      full_adder_words111 = SLICE alu61 58 59
+      full_adder_words118 = MERGE full_adder117 full_adder_words109
+      full_adder_words119 = SLICE alu53 57 58
+      full_adder_words120 = SLICE alu61 57 58
+      full_adder_words127 = MERGE full_adder126 full_adder_words118
+      full_adder_words128 = SLICE alu53 56 57
+      full_adder_words129 = SLICE alu61 56 57
+      full_adder_words136 = MERGE full_adder135 full_adder_words127
+      full_adder_words137 = SLICE alu53 55 56
+      full_adder_words138 = SLICE alu61 55 56
+      full_adder_words145 = MERGE full_adder144 full_adder_words136
+      full_adder_words146 = SLICE alu53 54 55
+      full_adder_words147 = SLICE alu61 54 55
+      full_adder_words154 = MERGE full_adder153 full_adder_words145
+      full_adder_words155 = SLICE alu53 53 54
+      full_adder_words156 = SLICE alu61 53 54
+      full_adder_words163 = MERGE full_adder162 full_adder_words154
+      full_adder_words164 = SLICE alu53 52 53
+      full_adder_words165 = SLICE alu61 52 53
+      full_adder_words172 = MERGE full_adder171 full_adder_words163
+      full_adder_words173 = SLICE alu53 51 52
+      full_adder_words174 = SLICE alu61 51 52
+      full_adder_words181 = MERGE full_adder180 full_adder_words172
+      full_adder_words182 = SLICE alu53 50 51
+      full_adder_words183 = SLICE alu61 50 51
+      full_adder_words190 = MERGE full_adder189 full_adder_words181
+      full_adder_words191 = SLICE alu53 49 50
+      full_adder_words192 = SLICE alu61 49 50
+      full_adder_words199 = MERGE full_adder198 full_adder_words190
+      full_adder_words200 = SLICE alu53 48 49
+      full_adder_words201 = SLICE alu61 48 49
+      full_adder_words208 = MERGE full_adder207 full_adder_words199
+      full_adder_words209 = SLICE alu53 47 48
+      full_adder_words210 = SLICE alu61 47 48
+      full_adder_words217 = MERGE full_adder216 full_adder_words208
+      full_adder_words218 = SLICE alu53 46 47
+      full_adder_words219 = SLICE alu61 46 47
+      full_adder_words226 = MERGE full_adder225 full_adder_words217
+      full_adder_words227 = SLICE alu53 45 46
+      full_adder_words228 = SLICE alu61 45 46
+      full_adder_words235 = MERGE full_adder234 full_adder_words226
+      full_adder_words236 = SLICE alu53 44 45
+      full_adder_words237 = SLICE alu61 44 45
+      full_adder_words244 = MERGE full_adder243 full_adder_words235
+      full_adder_words245 = SLICE alu53 43 44
+      full_adder_words246 = SLICE alu61 43 44
+      full_adder_words253 = MERGE full_adder252 full_adder_words244
+      full_adder_words254 = SLICE alu53 42 43
+      full_adder_words255 = SLICE alu61 42 43
+      full_adder_words262 = MERGE full_adder261 full_adder_words253
+      full_adder_words263 = SLICE alu53 41 42
+      full_adder_words264 = SLICE alu61 41 42
+      full_adder_words271 = MERGE full_adder270 full_adder_words262
+      full_adder_words272 = SLICE alu53 40 41
+      full_adder_words273 = SLICE alu61 40 41
+      full_adder_words280 = MERGE full_adder279 full_adder_words271
+      full_adder_words281 = SLICE alu53 39 40
+      full_adder_words282 = SLICE alu61 39 40
+      full_adder_words289 = MERGE full_adder288 full_adder_words280
+      full_adder_words290 = SLICE alu53 38 39
+      full_adder_words291 = SLICE alu61 38 39
+      full_adder_words298 = MERGE full_adder297 full_adder_words289
+      full_adder_words299 = SLICE alu53 37 38
+      full_adder_words300 = SLICE alu61 37 38
+      full_adder_words307 = MERGE full_adder306 full_adder_words298
+      full_adder_words308 = SLICE alu53 36 37
+      full_adder_words309 = SLICE alu61 36 37
+      full_adder_words316 = MERGE full_adder315 full_adder_words307
+      full_adder_words317 = SLICE alu53 35 36
+      full_adder_words318 = SLICE alu61 35 36
+      full_adder_words325 = MERGE full_adder324 full_adder_words316
+      full_adder_words326 = SLICE alu53 34 35
+      full_adder_words327 = SLICE alu61 34 35
+      full_adder_words334 = MERGE full_adder333 full_adder_words325
+      full_adder_words335 = SLICE alu53 33 34
+      full_adder_words336 = SLICE alu61 33 34
+      full_adder_words343 = MERGE full_adder342 full_adder_words334
+      full_adder_words344 = SLICE alu53 32 33
+      full_adder_words345 = SLICE alu61 32 33
+      full_adder_words352 = MERGE full_adder351 full_adder_words343
+      full_adder_words353 = SLICE alu53 31 32
+      full_adder_words354 = SLICE alu61 31 32
+      full_adder_words361 = MERGE full_adder360 full_adder_words352
+      full_adder_words362 = SLICE alu53 30 31
+      full_adder_words363 = SLICE alu61 30 31
+      full_adder_words370 = MERGE full_adder369 full_adder_words361
+      full_adder_words371 = SLICE alu53 29 30
+      full_adder_words372 = SLICE alu61 29 30
+      full_adder_words379 = MERGE full_adder378 full_adder_words370
+      full_adder_words380 = SLICE alu53 28 29
+      full_adder_words381 = SLICE alu61 28 29
+      full_adder_words388 = MERGE full_adder387 full_adder_words379
+      full_adder_words389 = SLICE alu53 27 28
+      full_adder_words390 = SLICE alu61 27 28
+      full_adder_words397 = MERGE full_adder396 full_adder_words388
+      full_adder_words398 = SLICE alu53 26 27
+      full_adder_words399 = SLICE alu61 26 27
+      full_adder_words406 = MERGE full_adder405 full_adder_words397
+      full_adder_words407 = SLICE alu53 25 26
+      full_adder_words408 = SLICE alu61 25 26
+      full_adder_words415 = MERGE full_adder414 full_adder_words406
+      full_adder_words416 = SLICE alu53 24 25
+      full_adder_words417 = SLICE alu61 24 25
+      full_adder_words424 = MERGE full_adder423 full_adder_words415
+      full_adder_words425 = SLICE alu53 23 24
+      full_adder_words426 = SLICE alu61 23 24
+      full_adder_words433 = MERGE full_adder432 full_adder_words424
+      full_adder_words434 = SLICE alu53 22 23
+      full_adder_words435 = SLICE alu61 22 23
+      full_adder_words442 = MERGE full_adder441 full_adder_words433
+      full_adder_words443 = SLICE alu53 21 22
+      full_adder_words444 = SLICE alu61 21 22
+      full_adder_words451 = MERGE full_adder450 full_adder_words442
+      full_adder_words452 = SLICE alu53 20 21
+      full_adder_words453 = SLICE alu61 20 21
+      full_adder_words460 = MERGE full_adder459 full_adder_words451
+      full_adder_words461 = SLICE alu53 19 20
+      full_adder_words462 = SLICE alu61 19 20
+      full_adder_words469 = MERGE full_adder468 full_adder_words460
+      full_adder_words470 = SLICE alu53 18 19
+      full_adder_words471 = SLICE alu61 18 19
+      full_adder_words478 = MERGE full_adder477 full_adder_words469
+      full_adder_words479 = SLICE alu53 17 18
+      full_adder_words480 = SLICE alu61 17 18
+      full_adder_words487 = MERGE full_adder486 full_adder_words478
+      full_adder_words488 = SLICE alu53 16 17
+      full_adder_words489 = SLICE alu61 16 17
+      full_adder_words496 = MERGE full_adder495 full_adder_words487
+      full_adder_words497 = SLICE alu53 15 16
+      full_adder_words498 = SLICE alu61 15 16
+      full_adder_words505 = MERGE full_adder504 full_adder_words496
+      full_adder_words506 = SLICE alu53 14 15
+      full_adder_words507 = SLICE alu61 14 15
+      full_adder_words514 = MERGE full_adder513 full_adder_words505
+      full_adder_words515 = SLICE alu53 13 14
+      full_adder_words516 = SLICE alu61 13 14
+      full_adder_words523 = MERGE full_adder522 full_adder_words514
+      full_adder_words524 = SLICE alu53 12 13
+      full_adder_words525 = SLICE alu61 12 13
+      full_adder_words532 = MERGE full_adder531 full_adder_words523
+      full_adder_words533 = SLICE alu53 11 12
+      full_adder_words534 = SLICE alu61 11 12
+      full_adder_words541 = MERGE full_adder540 full_adder_words532
+      full_adder_words542 = SLICE alu53 10 11
+      full_adder_words543 = SLICE alu61 10 11
+      full_adder_words550 = MERGE full_adder549 full_adder_words541
+      full_adder_words551 = SLICE alu53 9 10
+      full_adder_words552 = SLICE alu61 9 10
+      full_adder_words559 = MERGE full_adder558 full_adder_words550
+      full_adder_words560 = SLICE alu53 8 9
+      full_adder_words561 = SLICE alu61 8 9
+      full_adder_words568 = MERGE full_adder567 full_adder_words559
+      full_adder_words569 = SLICE alu53 7 8
+      full_adder_words570 = SLICE alu61 7 8
+      full_adder_words577 = MERGE full_adder576 full_adder_words568
+      full_adder_words578 = SLICE alu53 6 7
+      full_adder_words579 = SLICE alu61 6 7
+      full_adder_words586 = MERGE full_adder585 full_adder_words577
+      full_adder_words587 = SLICE alu53 5 6
+      full_adder_words588 = SLICE alu61 5 6
+      full_adder_words595 = MERGE full_adder594 full_adder_words586
+      full_adder_words596 = SLICE alu53 4 5
+      full_adder_words597 = SLICE alu61 4 5
+      full_adder_words604 = MERGE full_adder603 full_adder_words595
+      full_adder_words605 = SLICE alu53 3 4
+      full_adder_words606 = SLICE alu61 3 4
+      full_adder_words613 = MERGE full_adder612 full_adder_words604
+      full_adder_words614 = SLICE alu53 2 3
+      full_adder_words615 = SLICE alu61 2 3
+      full_adder_words622 = MERGE full_adder621 full_adder_words613
+      full_adder_words623 = SLICE alu53 1 2
+      full_adder_words624 = SLICE alu61 1 2
+      full_adder_words631 = MERGE full_adder630 full_adder_words622
+      full_adder_words632 = SLICE alu53 0 1
+      full_adder_words633 = SLICE alu61 0 1
+      full_adder_words640 = MERGE full_adder639 full_adder_words631
+      full_adder_words641 = XOR full_adder628 full_adder637
+    }
+
+    let wire_expand6 (alu645) -> (wire_expand6651) {
+      wire_expand6646 = MERGE alu645 alu645
+      wire_expand6647 = MERGE wire_expand6646 wire_expand6646
+      wire_expand6648 = MERGE wire_expand6647 wire_expand6647
+      wire_expand6649 = MERGE wire_expand6648 wire_expand6648
+      wire_expand6650 = MERGE wire_expand6649 wire_expand6649
+      wire_expand6651 = MERGE wire_expand6650 wire_expand6650
+    }
+
+    let wire_expand7 (alu653) -> (wire_expand7659) {
+      wire_expand7654 = MERGE alu653 alu653
+      wire_expand7655 = MERGE wire_expand7654 wire_expand7654
+      wire_expand7656 = MERGE wire_expand7655 wire_expand7655
+      wire_expand7657 = MERGE wire_expand7656 wire_expand7656
+      wire_expand7658 = MERGE wire_expand7657 wire_expand7657
+      wire_expand7659 = MERGE wire_expand7658 wire_expand7658
+    }
+
+    let wire_expand8 (alu661) -> (wire_expand8667) {
+      wire_expand8662 = MERGE alu661 alu661
+      wire_expand8663 = MERGE wire_expand8662 wire_expand8662
+      wire_expand8664 = MERGE wire_expand8663 wire_expand8663
+      wire_expand8665 = MERGE wire_expand8664 wire_expand8664
+      wire_expand8666 = MERGE wire_expand8665 wire_expand8665
+      wire_expand8667 = MERGE wire_expand8666 wire_expand8666
+    }
+
+    let or_all (root44) -> (or_all685) {
+      or_all668 = SLICE root44 32 64
+      or_all669 = SLICE root44 0 32
+      or_all670 = OR or_all668 or_all669
+      or_all671 = SLICE or_all670 16 32
+      or_all672 = SLICE or_all670 0 16
+      or_all673 = OR or_all671 or_all672
+      or_all674 = SLICE or_all673 8 16
+      or_all675 = SLICE or_all673 0 8
+      or_all676 = OR or_all674 or_all675
+      or_all677 = SLICE or_all676 4 8
+      or_all678 = SLICE or_all676 0 4
+      or_all679 = OR or_all677 or_all678
+      or_all680 = SLICE or_all679 2 4
+      or_all681 = SLICE or_all679 0 2
+      or_all682 = OR or_all680 or_all681
+      or_all683 = SLICE or_all682 1 2
+      or_all684 = SLICE or_all682 0 1
+      or_all685 = OR or_all683 or_all684
+    }
+
+    alu46 = SLICE root39 2 3
+    alu53 = XOR root41 wire_expand452
+    alu54 = SLICE root39 0 1
+    alu61 = XOR root42 wire_expand560
+    alu62 = SLICE root39 0 1
+    alu63 = SLICE root39 2 3
+    alu64 = OR alu62 alu63
+    alu65 = TRI root43 root40
+    alu65 = TRI alu64 (NOT root40)
+    alu642 = XOR root41 alu61
+    alu643 = OR root41 alu61
+    alu644 = AND root41 alu61
+    alu645 = SLICE root39 3 4
+    alu652 = TRI alu643 wire_expand6651
+    alu652 = TRI alu642 (NOT wire_expand6651)
+    alu653 = SLICE root39 2 3
+    alu660 = TRI alu644 wire_expand7659
+    alu660 = TRI alu652 (NOT wire_expand7659)
+    alu661 = SLICE root39 1 2
+    root44 = TRI alu660 wire_expand8667
+    root44 = TRI full_adder_words640 (NOT wire_expand8667)
+    alu686 = NOT or_all685
+    alu687 = SLICE root44 0 1
+    alu688 = MERGE alu686 alu687
+    alu689 = MERGE full_adder637 alu688
+    root45 = MERGE full_adder_words641 alu689
+  }
+
+  let registers (root690, root691, root692, root693, root694) -> (root695, root696, root0) {
+    let incr (root0) -> (incr1079) {
+      let half_adder (incr704, incr825) -> (half_adder827, half_adder826) {
+        half_adder826 = AND incr704 incr825
+        half_adder827 = XOR incr704 incr825
+      }
+
+      let half_adder (incr705, half_adder826) -> (half_adder829, half_adder828) {
+        half_adder828 = AND incr705 half_adder826
+        half_adder829 = XOR incr705 half_adder826
+      }
+
+      let half_adder (incr707, half_adder828) -> (half_adder831, half_adder830) {
+        half_adder830 = AND incr707 half_adder828
+        half_adder831 = XOR incr707 half_adder828
+      }
+
+      let half_adder (incr708, half_adder830) -> (half_adder833, half_adder832) {
+        half_adder832 = AND incr708 half_adder830
+        half_adder833 = XOR incr708 half_adder830
+      }
+
+      let half_adder (incr711, half_adder832) -> (half_adder835, half_adder834) {
+        half_adder834 = AND incr711 half_adder832
+        half_adder835 = XOR incr711 half_adder832
+      }
+
+      let half_adder (incr712, half_adder834) -> (half_adder837, half_adder836) {
+        half_adder836 = AND incr712 half_adder834
+        half_adder837 = XOR incr712 half_adder834
+      }
+
+      let half_adder (incr714, half_adder836) -> (half_adder839, half_adder838) {
+        half_adder838 = AND incr714 half_adder836
+        half_adder839 = XOR incr714 half_adder836
+      }
+
+      let half_adder (incr715, half_adder838) -> (half_adder841, half_adder840) {
+        half_adder840 = AND incr715 half_adder838
+        half_adder841 = XOR incr715 half_adder838
+      }
+
+      let half_adder (incr719, half_adder840) -> (half_adder843, half_adder842) {
+        half_adder842 = AND incr719 half_adder840
+        half_adder843 = XOR incr719 half_adder840
+      }
+
+      let half_adder (incr720, half_adder842) -> (half_adder845, half_adder844) {
+        half_adder844 = AND incr720 half_adder842
+        half_adder845 = XOR incr720 half_adder842
+      }
+
+      let half_adder (incr722, half_adder844) -> (half_adder847, half_adder846) {
+        half_adder846 = AND incr722 half_adder844
+        half_adder847 = XOR incr722 half_adder844
+      }
+
+      let half_adder (incr723, half_adder846) -> (half_adder849, half_adder848) {
+        half_adder848 = AND incr723 half_adder846
+        half_adder849 = XOR incr723 half_adder846
+      }
+
+      let half_adder (incr726, half_adder848) -> (half_adder851, half_adder850) {
+        half_adder850 = AND incr726 half_adder848
+        half_adder851 = XOR incr726 half_adder848
+      }
+
+      let half_adder (incr727, half_adder850) -> (half_adder853, half_adder852) {
+        half_adder852 = AND incr727 half_adder850
+        half_adder853 = XOR incr727 half_adder850
+      }
+
+      let half_adder (incr729, half_adder852) -> (half_adder855, half_adder854) {
+        half_adder854 = AND incr729 half_adder852
+        half_adder855 = XOR incr729 half_adder852
+      }
+
+      let half_adder (incr730, half_adder854) -> (half_adder857, half_adder856) {
+        half_adder856 = AND incr730 half_adder854
+        half_adder857 = XOR incr730 half_adder854
+      }
+
+      let half_adder (incr735, half_adder856) -> (half_adder859, half_adder858) {
+        half_adder858 = AND incr735 half_adder856
+        half_adder859 = XOR incr735 half_adder856
+      }
+
+      let half_adder (incr736, half_adder858) -> (half_adder861, half_adder860) {
+        half_adder860 = AND incr736 half_adder858
+        half_adder861 = XOR incr736 half_adder858
+      }
+
+      let half_adder (incr738, half_adder860) -> (half_adder863, half_adder862) {
+        half_adder862 = AND incr738 half_adder860
+        half_adder863 = XOR incr738 half_adder860
+      }
+
+      let half_adder (incr739, half_adder862) -> (half_adder865, half_adder864) {
+        half_adder864 = AND incr739 half_adder862
+        half_adder865 = XOR incr739 half_adder862
+      }
+
+      let half_adder (incr742, half_adder864) -> (half_adder867, half_adder866) {
+        half_adder866 = AND incr742 half_adder864
+        half_adder867 = XOR incr742 half_adder864
+      }
+
+      let half_adder (incr743, half_adder866) -> (half_adder869, half_adder868) {
+        half_adder868 = AND incr743 half_adder866
+        half_adder869 = XOR incr743 half_adder866
+      }
+
+      let half_adder (incr745, half_adder868) -> (half_adder871, half_adder870) {
+        half_adder870 = AND incr745 half_adder868
+        half_adder871 = XOR incr745 half_adder868
+      }
+
+      let half_adder (incr746, half_adder870) -> (half_adder873, half_adder872) {
+        half_adder872 = AND incr746 half_adder870
+        half_adder873 = XOR incr746 half_adder870
+      }
+
+      let half_adder (incr750, half_adder872) -> (half_adder875, half_adder874) {
+        half_adder874 = AND incr750 half_adder872
+        half_adder875 = XOR incr750 half_adder872
+      }
+
+      let half_adder (incr751, half_adder874) -> (half_adder877, half_adder876) {
+        half_adder876 = AND incr751 half_adder874
+        half_adder877 = XOR incr751 half_adder874
+      }
+
+      let half_adder (incr753, half_adder876) -> (half_adder879, half_adder878) {
+        half_adder878 = AND incr753 half_adder876
+        half_adder879 = XOR incr753 half_adder876
+      }
+
+      let half_adder (incr754, half_adder878) -> (half_adder881, half_adder880) {
+        half_adder880 = AND incr754 half_adder878
+        half_adder881 = XOR incr754 half_adder878
+      }
+
+      let half_adder (incr757, half_adder880) -> (half_adder883, half_adder882) {
+        half_adder882 = AND incr757 half_adder880
+        half_adder883 = XOR incr757 half_adder880
+      }
+
+      let half_adder (incr758, half_adder882) -> (half_adder885, half_adder884) {
+        half_adder884 = AND incr758 half_adder882
+        half_adder885 = XOR incr758 half_adder882
+      }
+
+      let half_adder (incr760, half_adder884) -> (half_adder887, half_adder886) {
+        half_adder886 = AND incr760 half_adder884
+        half_adder887 = XOR incr760 half_adder884
+      }
+
+      let half_adder (incr761, half_adder886) -> (half_adder889, half_adder888) {
+        half_adder888 = AND incr761 half_adder886
+        half_adder889 = XOR incr761 half_adder886
+      }
+
+      let half_adder (incr767, half_adder888) -> (half_adder891, half_adder890) {
+        half_adder890 = AND incr767 half_adder888
+        half_adder891 = XOR incr767 half_adder888
+      }
+
+      let half_adder (incr768, half_adder890) -> (half_adder893, half_adder892) {
+        half_adder892 = AND incr768 half_adder890
+        half_adder893 = XOR incr768 half_adder890
+      }
+
+      let half_adder (incr770, half_adder892) -> (half_adder895, half_adder894) {
+        half_adder894 = AND incr770 half_adder892
+        half_adder895 = XOR incr770 half_adder892
+      }
+
+      let half_adder (incr771, half_adder894) -> (half_adder897, half_adder896) {
+        half_adder896 = AND incr771 half_adder894
+        half_adder897 = XOR incr771 half_adder894
+      }
+
+      let half_adder (incr774, half_adder896) -> (half_adder899, half_adder898) {
+        half_adder898 = AND incr774 half_adder896
+        half_adder899 = XOR incr774 half_adder896
+      }
+
+      let half_adder (incr775, half_adder898) -> (half_adder901, half_adder900) {
+        half_adder900 = AND incr775 half_adder898
+        half_adder901 = XOR incr775 half_adder898
+      }
+
+      let half_adder (incr777, half_adder900) -> (half_adder903, half_adder902) {
+        half_adder902 = AND incr777 half_adder900
+        half_adder903 = XOR incr777 half_adder900
+      }
+
+      let half_adder (incr778, half_adder902) -> (half_adder905, half_adder904) {
+        half_adder904 = AND incr778 half_adder902
+        half_adder905 = XOR incr778 half_adder902
+      }
+
+      let half_adder (incr782, half_adder904) -> (half_adder907, half_adder906) {
+        half_adder906 = AND incr782 half_adder904
+        half_adder907 = XOR incr782 half_adder904
+      }
+
+      let half_adder (incr783, half_adder906) -> (half_adder909, half_adder908) {
+        half_adder908 = AND incr783 half_adder906
+        half_adder909 = XOR incr783 half_adder906
+      }
+
+      let half_adder (incr785, half_adder908) -> (half_adder911, half_adder910) {
+        half_adder910 = AND incr785 half_adder908
+        half_adder911 = XOR incr785 half_adder908
+      }
+
+      let half_adder (incr786, half_adder910) -> (half_adder913, half_adder912) {
+        half_adder912 = AND incr786 half_adder910
+        half_adder913 = XOR incr786 half_adder910
+      }
+
+      let half_adder (incr789, half_adder912) -> (half_adder915, half_adder914) {
+        half_adder914 = AND incr789 half_adder912
+        half_adder915 = XOR incr789 half_adder912
+      }
+
+      let half_adder (incr790, half_adder914) -> (half_adder917, half_adder916) {
+        half_adder916 = AND incr790 half_adder914
+        half_adder917 = XOR incr790 half_adder914
+      }
+
+      let half_adder (incr792, half_adder916) -> (half_adder919, half_adder918) {
+        half_adder918 = AND incr792 half_adder916
+        half_adder919 = XOR incr792 half_adder916
+      }
+
+      let half_adder (incr793, half_adder918) -> (half_adder921, half_adder920) {
+        half_adder920 = AND incr793 half_adder918
+        half_adder921 = XOR incr793 half_adder918
+      }
+
+      let half_adder (incr798, half_adder920) -> (half_adder923, half_adder922) {
+        half_adder922 = AND incr798 half_adder920
+        half_adder923 = XOR incr798 half_adder920
+      }
+
+      let half_adder (incr799, half_adder922) -> (half_adder925, half_adder924) {
+        half_adder924 = AND incr799 half_adder922
+        half_adder925 = XOR incr799 half_adder922
+      }
+
+      let half_adder (incr801, half_adder924) -> (half_adder927, half_adder926) {
+        half_adder926 = AND incr801 half_adder924
+        half_adder927 = XOR incr801 half_adder924
+      }
+
+      let half_adder (incr802, half_adder926) -> (half_adder929, half_adder928) {
+        half_adder928 = AND incr802 half_adder926
+        half_adder929 = XOR incr802 half_adder926
+      }
+
+      let half_adder (incr805, half_adder928) -> (half_adder931, half_adder930) {
+        half_adder930 = AND incr805 half_adder928
+        half_adder931 = XOR incr805 half_adder928
+      }
+
+      let half_adder (incr806, half_adder930) -> (half_adder933, half_adder932) {
+        half_adder932 = AND incr806 half_adder930
+        half_adder933 = XOR incr806 half_adder930
+      }
+
+      let half_adder (incr808, half_adder932) -> (half_adder935, half_adder934) {
+        half_adder934 = AND incr808 half_adder932
+        half_adder935 = XOR incr808 half_adder932
+      }
+
+      let half_adder (incr809, half_adder934) -> (half_adder937, half_adder936) {
+        half_adder936 = AND incr809 half_adder934
+        half_adder937 = XOR incr809 half_adder934
+      }
+
+      let half_adder (incr813, half_adder936) -> (half_adder939, half_adder938) {
+        half_adder938 = AND incr813 half_adder936
+        half_adder939 = XOR incr813 half_adder936
+      }
+
+      let half_adder (incr814, half_adder938) -> (half_adder941, half_adder940) {
+        half_adder940 = AND incr814 half_adder938
+        half_adder941 = XOR incr814 half_adder938
+      }
+
+      let half_adder (incr816, half_adder940) -> (half_adder943, half_adder942) {
+        half_adder942 = AND incr816 half_adder940
+        half_adder943 = XOR incr816 half_adder940
+      }
+
+      let half_adder (incr817, half_adder942) -> (half_adder945, half_adder944) {
+        half_adder944 = AND incr817 half_adder942
+        half_adder945 = XOR incr817 half_adder942
+      }
+
+      let half_adder (incr820, half_adder944) -> (half_adder947, half_adder946) {
+        half_adder946 = AND incr820 half_adder944
+        half_adder947 = XOR incr820 half_adder944
+      }
+
+      let half_adder (incr821, half_adder946) -> (half_adder949, half_adder948) {
+        half_adder948 = AND incr821 half_adder946
+        half_adder949 = XOR incr821 half_adder946
+      }
+
+      let half_adder (incr823, half_adder948) -> (half_adder951, half_adder950) {
+        half_adder950 = AND incr823 half_adder948
+        half_adder951 = XOR incr823 half_adder948
+      }
+
+      let half_adder (incr824, half_adder950) -> (half_adder953, half_adder952) {
+        half_adder952 = AND incr824 half_adder950
+        half_adder953 = XOR incr824 half_adder950
+      }
+
+      incr699 = SLICE root0 32 64
+      incr700 = SLICE incr699 16 32
+      incr701 = SLICE incr700 8 16
+      incr702 = SLICE incr701 4 8
+      incr703 = SLICE incr702 2 4
+      incr704 = SLICE incr703 1 2
+      incr705 = SLICE incr703 0 1
+      incr706 = SLICE incr702 0 2
+      incr707 = SLICE incr706 1 2
+      incr708 = SLICE incr706 0 1
+      incr709 = SLICE incr701 0 4
+      incr710 = SLICE incr709 2 4
+      incr711 = SLICE incr710 1 2
+      incr712 = SLICE incr710 0 1
+      incr713 = SLICE incr709 0 2
+      incr714 = SLICE incr713 1 2
+      incr715 = SLICE incr713 0 1
+      incr716 = SLICE incr700 0 8
+      incr717 = SLICE incr716 4 8
+      incr718 = SLICE incr717 2 4
+      incr719 = SLICE incr718 1 2
+      incr720 = SLICE incr718 0 1
+      incr721 = SLICE incr717 0 2
+      incr722 = SLICE incr721 1 2
+      incr723 = SLICE incr721 0 1
+      incr724 = SLICE incr716 0 4
+      incr725 = SLICE incr724 2 4
+      incr726 = SLICE incr725 1 2
+      incr727 = SLICE incr725 0 1
+      incr728 = SLICE incr724 0 2
+      incr729 = SLICE incr728 1 2
+      incr730 = SLICE incr728 0 1
+      incr731 = SLICE incr699 0 16
+      incr732 = SLICE incr731 8 16
+      incr733 = SLICE incr732 4 8
+      incr734 = SLICE incr733 2 4
+      incr735 = SLICE incr734 1 2
+      incr736 = SLICE incr734 0 1
+      incr737 = SLICE incr733 0 2
+      incr738 = SLICE incr737 1 2
+      incr739 = SLICE incr737 0 1
+      incr740 = SLICE incr732 0 4
+      incr741 = SLICE incr740 2 4
+      incr742 = SLICE incr741 1 2
+      incr743 = SLICE incr741 0 1
+      incr744 = SLICE incr740 0 2
+      incr745 = SLICE incr744 1 2
+      incr746 = SLICE incr744 0 1
+      incr747 = SLICE incr731 0 8
+      incr748 = SLICE incr747 4 8
+      incr749 = SLICE incr748 2 4
+      incr750 = SLICE incr749 1 2
+      incr751 = SLICE incr749 0 1
+      incr752 = SLICE incr748 0 2
+      incr753 = SLICE incr752 1 2
+      incr754 = SLICE incr752 0 1
+      incr755 = SLICE incr747 0 4
+      incr756 = SLICE incr755 2 4
+      incr757 = SLICE incr756 1 2
+      incr758 = SLICE incr756 0 1
+      incr759 = SLICE incr755 0 2
+      incr760 = SLICE incr759 1 2
+      incr761 = SLICE incr759 0 1
+      incr762 = SLICE root0 0 32
+      incr763 = SLICE incr762 16 32
+      incr764 = SLICE incr763 8 16
+      incr765 = SLICE incr764 4 8
+      incr766 = SLICE incr765 2 4
+      incr767 = SLICE incr766 1 2
+      incr768 = SLICE incr766 0 1
+      incr769 = SLICE incr765 0 2
+      incr770 = SLICE incr769 1 2
+      incr771 = SLICE incr769 0 1
+      incr772 = SLICE incr764 0 4
+      incr773 = SLICE incr772 2 4
+      incr774 = SLICE incr773 1 2
+      incr775 = SLICE incr773 0 1
+      incr776 = SLICE incr772 0 2
+      incr777 = SLICE incr776 1 2
+      incr778 = SLICE incr776 0 1
+      incr779 = SLICE incr763 0 8
+      incr780 = SLICE incr779 4 8
+      incr781 = SLICE incr780 2 4
+      incr782 = SLICE incr781 1 2
+      incr783 = SLICE incr781 0 1
+      incr784 = SLICE incr780 0 2
+      incr785 = SLICE incr784 1 2
+      incr786 = SLICE incr784 0 1
+      incr787 = SLICE incr779 0 4
+      incr788 = SLICE incr787 2 4
+      incr789 = SLICE incr788 1 2
+      incr790 = SLICE incr788 0 1
+      incr791 = SLICE incr787 0 2
+      incr792 = SLICE incr791 1 2
+      incr793 = SLICE incr791 0 1
+      incr794 = SLICE incr762 0 16
+      incr795 = SLICE incr794 8 16
+      incr796 = SLICE incr795 4 8
+      incr797 = SLICE incr796 2 4
+      incr798 = SLICE incr797 1 2
+      incr799 = SLICE incr797 0 1
+      incr800 = SLICE incr796 0 2
+      incr801 = SLICE incr800 1 2
+      incr802 = SLICE incr800 0 1
+      incr803 = SLICE incr795 0 4
+      incr804 = SLICE incr803 2 4
+      incr805 = SLICE incr804 1 2
+      incr806 = SLICE incr804 0 1
+      incr807 = SLICE incr803 0 2
+      incr808 = SLICE incr807 1 2
+      incr809 = SLICE incr807 0 1
+      incr810 = SLICE incr794 0 8
+      incr811 = SLICE incr810 4 8
+      incr812 = SLICE incr811 2 4
+      incr813 = SLICE incr812 1 2
+      incr814 = SLICE incr812 0 1
+      incr815 = SLICE incr811 0 2
+      incr816 = SLICE incr815 1 2
+      incr817 = SLICE incr815 0 1
+      incr818 = SLICE incr810 0 4
+      incr819 = SLICE incr818 2 4
+      incr820 = SLICE incr819 1 2
+      incr821 = SLICE incr819 0 1
+      incr822 = SLICE incr818 0 2
+      incr823 = SLICE incr822 1 2
+      incr824 = SLICE incr822 0 1
+      incr825 = 1
+      incr954 = MERGE half_adder829 half_adder827
+      incr955 = MERGE half_adder833 half_adder831
+      incr956 = MERGE incr955 incr954
+      incr957 = MERGE half_adder837 half_adder835
+      incr958 = MERGE half_adder841 half_adder839
+      incr959 = MERGE incr958 incr957
+      incr960 = MERGE incr959 incr956
+      incr961 = MERGE half_adder845 half_adder843
+      incr962 = MERGE half_adder849 half_adder847
+      incr963 = MERGE incr962 incr961
+      incr964 = MERGE half_adder853 half_adder851
+      incr965 = MERGE half_adder857 half_adder855
+      incr966 = MERGE incr965 incr964
+      incr967 = MERGE incr966 incr963
+      incr968 = MERGE incr967 incr960
+      incr969 = MERGE half_adder861 half_adder859
+      incr970 = MERGE half_adder865 half_adder863
+      incr971 = MERGE incr970 incr969
+      incr972 = MERGE half_adder869 half_adder867
+      incr973 = MERGE half_adder873 half_adder871
+      incr974 = MERGE incr973 incr972
+      incr975 = MERGE incr974 incr971
+      incr976 = MERGE half_adder877 half_adder875
+      incr977 = MERGE half_adder881 half_adder879
+      incr978 = MERGE incr977 incr976
+      incr979 = MERGE half_adder885 half_adder883
+      incr980 = MERGE half_adder889 half_adder887
+      incr981 = MERGE incr980 incr979
+      incr982 = MERGE incr981 incr978
+      incr983 = MERGE incr982 incr975
+      incr984 = MERGE incr983 incr968
+      incr985 = MERGE half_adder893 half_adder891
+      incr986 = MERGE half_adder897 half_adder895
+      incr987 = MERGE incr986 incr985
+      incr988 = MERGE half_adder901 half_adder899
+      incr989 = MERGE half_adder905 half_adder903
+      incr990 = MERGE incr989 incr988
+      incr991 = MERGE incr990 incr987
+      incr992 = MERGE half_adder909 half_adder907
+      incr993 = MERGE half_adder913 half_adder911
+      incr994 = MERGE incr993 incr992
+      incr995 = MERGE half_adder917 half_adder915
+      incr996 = MERGE half_adder921 half_adder919
+      incr997 = MERGE incr996 incr995
+      incr998 = MERGE incr997 incr994
+      incr999 = MERGE incr998 incr991
+      incr1000 = MERGE half_adder925 half_adder923
+      incr1001 = MERGE half_adder929 half_adder927
+      incr1002 = MERGE incr1001 incr1000
+      incr1003 = MERGE half_adder933 half_adder931
+      incr1004 = MERGE half_adder937 half_adder935
+      incr1005 = MERGE incr1004 incr1003
+      incr1006 = MERGE incr1005 incr1002
+      incr1007 = MERGE half_adder941 half_adder939
+      incr1008 = MERGE half_adder945 half_adder943
+      incr1009 = MERGE incr1008 incr1007
+      incr1010 = MERGE half_adder949 half_adder947
+      incr1011 = MERGE half_adder953 half_adder951
+      incr1012 = MERGE incr1011 incr1010
+      incr1013 = MERGE incr1012 incr1009
+      incr1014 = MERGE incr1013 incr1006
+      incr1015 = MERGE incr1014 incr999
+      incr1016 = MERGE incr1015 incr984
+      incr1017 = MERGE half_adder829 half_adder827
+      incr1018 = MERGE half_adder833 half_adder831
+      incr1019 = MERGE incr1018 incr1017
+      incr1020 = MERGE half_adder837 half_adder835
+      incr1021 = MERGE half_adder841 half_adder839
+      incr1022 = MERGE incr1021 incr1020
+      incr1023 = MERGE incr1022 incr1019
+      incr1024 = MERGE half_adder845 half_adder843
+      incr1025 = MERGE half_adder849 half_adder847
+      incr1026 = MERGE incr1025 incr1024
+      incr1027 = MERGE half_adder853 half_adder851
+      incr1028 = MERGE half_adder857 half_adder855
+      incr1029 = MERGE incr1028 incr1027
+      incr1030 = MERGE incr1029 incr1026
+      incr1031 = MERGE incr1030 incr1023
+      incr1032 = MERGE half_adder861 half_adder859
+      incr1033 = MERGE half_adder865 half_adder863
+      incr1034 = MERGE incr1033 incr1032
+      incr1035 = MERGE half_adder869 half_adder867
+      incr1036 = MERGE half_adder873 half_adder871
+      incr1037 = MERGE incr1036 incr1035
+      incr1038 = MERGE incr1037 incr1034
+      incr1039 = MERGE half_adder877 half_adder875
+      incr1040 = MERGE half_adder881 half_adder879
+      incr1041 = MERGE incr1040 incr1039
+      incr1042 = MERGE half_adder885 half_adder883
+      incr1043 = MERGE half_adder889 half_adder887
+      incr1044 = MERGE incr1043 incr1042
+      incr1045 = MERGE incr1044 incr1041
+      incr1046 = MERGE incr1045 incr1038
+      incr1047 = MERGE incr1046 incr1031
+      incr1048 = MERGE half_adder893 half_adder891
+      incr1049 = MERGE half_adder897 half_adder895
+      incr1050 = MERGE incr1049 incr1048
+      incr1051 = MERGE half_adder901 half_adder899
+      incr1052 = MERGE half_adder905 half_adder903
+      incr1053 = MERGE incr1052 incr1051
+      incr1054 = MERGE incr1053 incr1050
+      incr1055 = MERGE half_adder909 half_adder907
+      incr1056 = MERGE half_adder913 half_adder911
+      incr1057 = MERGE incr1056 incr1055
+      incr1058 = MERGE half_adder917 half_adder915
+      incr1059 = MERGE half_adder921 half_adder919
+      incr1060 = MERGE incr1059 incr1058
+      incr1061 = MERGE incr1060 incr1057
+      incr1062 = MERGE incr1061 incr1054
+      incr1063 = MERGE half_adder925 half_adder923
+      incr1064 = MERGE half_adder929 half_adder927
+      incr1065 = MERGE incr1064 incr1063
+      incr1066 = MERGE half_adder933 half_adder931
+      incr1067 = MERGE half_adder937 half_adder935
+      incr1068 = MERGE incr1067 incr1066
+      incr1069 = MERGE incr1068 incr1065
+      incr1070 = MERGE half_adder941 half_adder939
+      incr1071 = MERGE half_adder945 half_adder943
+      incr1072 = MERGE incr1071 incr1070
+      incr1073 = MERGE half_adder949 half_adder947
+      incr1074 = MERGE half_adder953 half_adder951
+      incr1075 = MERGE incr1074 incr1073
+      incr1076 = MERGE incr1075 incr1072
+      incr1077 = MERGE incr1076 incr1069
+      incr1078 = MERGE incr1077 incr1062
+      incr1079 = MERGE incr1078 incr1047
+    }
+
+    let wire_expand9 (registers697) -> (wire_expand91085) {
+      wire_expand91080 = MERGE registers697 registers697
+      wire_expand91081 = MERGE wire_expand91080 wire_expand91080
+      wire_expand91082 = MERGE wire_expand91081 wire_expand91081
+      wire_expand91083 = MERGE wire_expand91082 wire_expand91082
+      wire_expand91084 = MERGE wire_expand91083 wire_expand91083
+      wire_expand91085 = MERGE wire_expand91084 wire_expand91084
+    }
+
+    let reg (root694, registers1088) -> (reg1090) {
+      let wire_expand10 (registers1088) -> (wire_expand101096) {
+        wire_expand101091 = MERGE registers1088 registers1088
+        wire_expand101092 = MERGE wire_expand101091 wire_expand101091
+        wire_expand101093 = MERGE wire_expand101092 wire_expand101092
+        wire_expand101094 = MERGE wire_expand101093 wire_expand101093
+        wire_expand101095 = MERGE wire_expand101094 wire_expand101094
+        wire_expand101096 = MERGE wire_expand101095 wire_expand101095
+      }
+
+      reg1090 = DELAY reg1089
+      reg1089 = TRI root694 wire_expand101096
+      reg1089 = TRI reg1090 (NOT wire_expand101096)
+    }
+
+    let reg (root694, registers1097) -> (reg1099) {
+      let wire_expand11 (registers1097) -> (wire_expand111105) {
+        wire_expand111100 = MERGE registers1097 registers1097
+        wire_expand111101 = MERGE wire_expand111100 wire_expand111100
+        wire_expand111102 = MERGE wire_expand111101 wire_expand111101
+        wire_expand111103 = MERGE wire_expand111102 wire_expand111102
+        wire_expand111104 = MERGE wire_expand111103 wire_expand111103
+        wire_expand111105 = MERGE wire_expand111104 wire_expand111104
+      }
+
+      reg1099 = DELAY reg1098
+      reg1098 = TRI root694 wire_expand111105
+      reg1098 = TRI reg1099 (NOT wire_expand111105)
+    }
+
+    let reg (root694, registers1106) -> (reg1108) {
+      let wire_expand12 (registers1106) -> (wire_expand121114) {
+        wire_expand121109 = MERGE registers1106 registers1106
+        wire_expand121110 = MERGE wire_expand121109 wire_expand121109
+        wire_expand121111 = MERGE wire_expand121110 wire_expand121110
+        wire_expand121112 = MERGE wire_expand121111 wire_expand121111
+        wire_expand121113 = MERGE wire_expand121112 wire_expand121112
+        wire_expand121114 = MERGE wire_expand121113 wire_expand121113
+      }
+
+      reg1108 = DELAY reg1107
+      reg1107 = TRI root694 wire_expand121114
+      reg1107 = TRI reg1108 (NOT wire_expand121114)
+    }
+
+    let reg (root694, registers1115) -> (reg1117) {
+      let wire_expand13 (registers1115) -> (wire_expand131123) {
+        wire_expand131118 = MERGE registers1115 registers1115
+        wire_expand131119 = MERGE wire_expand131118 wire_expand131118
+        wire_expand131120 = MERGE wire_expand131119 wire_expand131119
+        wire_expand131121 = MERGE wire_expand131120 wire_expand131120
+        wire_expand131122 = MERGE wire_expand131121 wire_expand131121
+        wire_expand131123 = MERGE wire_expand131122 wire_expand131122
+      }
+
+      reg1117 = DELAY reg1116
+      reg1116 = TRI root694 wire_expand131123
+      reg1116 = TRI reg1117 (NOT wire_expand131123)
+    }
+
+    let reg (root694, registers1124) -> (reg1126) {
+      let wire_expand14 (registers1124) -> (wire_expand141132) {
+        wire_expand141127 = MERGE registers1124 registers1124
+        wire_expand141128 = MERGE wire_expand141127 wire_expand141127
+        wire_expand141129 = MERGE wire_expand141128 wire_expand141128
+        wire_expand141130 = MERGE wire_expand141129 wire_expand141129
+        wire_expand141131 = MERGE wire_expand141130 wire_expand141130
+        wire_expand141132 = MERGE wire_expand141131 wire_expand141131
+      }
+
+      reg1126 = DELAY reg1125
+      reg1125 = TRI root694 wire_expand141132
+      reg1125 = TRI reg1126 (NOT wire_expand141132)
+    }
+
+    let reg (root694, registers1133) -> (reg1135) {
+      let wire_expand15 (registers1133) -> (wire_expand151141) {
+        wire_expand151136 = MERGE registers1133 registers1133
+        wire_expand151137 = MERGE wire_expand151136 wire_expand151136
+        wire_expand151138 = MERGE wire_expand151137 wire_expand151137
+        wire_expand151139 = MERGE wire_expand151138 wire_expand151138
+        wire_expand151140 = MERGE wire_expand151139 wire_expand151139
+        wire_expand151141 = MERGE wire_expand151140 wire_expand151140
+      }
+
+      reg1135 = DELAY reg1134
+      reg1134 = TRI root694 wire_expand151141
+      reg1134 = TRI reg1135 (NOT wire_expand151141)
+    }
+
+    let reg (root694, registers1142) -> (reg1144) {
+      let wire_expand16 (registers1142) -> (wire_expand161150) {
+        wire_expand161145 = MERGE registers1142 registers1142
+        wire_expand161146 = MERGE wire_expand161145 wire_expand161145
+        wire_expand161147 = MERGE wire_expand161146 wire_expand161146
+        wire_expand161148 = MERGE wire_expand161147 wire_expand161147
+        wire_expand161149 = MERGE wire_expand161148 wire_expand161148
+        wire_expand161150 = MERGE wire_expand161149 wire_expand161149
+      }
+
+      reg1144 = DELAY reg1143
+      reg1143 = TRI root694 wire_expand161150
+      reg1143 = TRI reg1144 (NOT wire_expand161150)
+    }
+
+    let reg (root694, registers1151) -> (reg1153) {
+      let wire_expand17 (registers1151) -> (wire_expand171159) {
+        wire_expand171154 = MERGE registers1151 registers1151
+        wire_expand171155 = MERGE wire_expand171154 wire_expand171154
+        wire_expand171156 = MERGE wire_expand171155 wire_expand171155
+        wire_expand171157 = MERGE wire_expand171156 wire_expand171156
+        wire_expand171158 = MERGE wire_expand171157 wire_expand171157
+        wire_expand171159 = MERGE wire_expand171158 wire_expand171158
+      }
+
+      reg1153 = DELAY reg1152
+      reg1152 = TRI root694 wire_expand171159
+      reg1152 = TRI reg1153 (NOT wire_expand171159)
+    }
+
+    let reg (root694, registers1160) -> (reg1162) {
+      let wire_expand18 (registers1160) -> (wire_expand181168) {
+        wire_expand181163 = MERGE registers1160 registers1160
+        wire_expand181164 = MERGE wire_expand181163 wire_expand181163
+        wire_expand181165 = MERGE wire_expand181164 wire_expand181164
+        wire_expand181166 = MERGE wire_expand181165 wire_expand181165
+        wire_expand181167 = MERGE wire_expand181166 wire_expand181166
+        wire_expand181168 = MERGE wire_expand181167 wire_expand181167
+      }
+
+      reg1162 = DELAY reg1161
+      reg1161 = TRI root694 wire_expand181168
+      reg1161 = TRI reg1162 (NOT wire_expand181168)
+    }
+
+    let reg (root694, registers1169) -> (reg1171) {
+      let wire_expand19 (registers1169) -> (wire_expand191177) {
+        wire_expand191172 = MERGE registers1169 registers1169
+        wire_expand191173 = MERGE wire_expand191172 wire_expand191172
+        wire_expand191174 = MERGE wire_expand191173 wire_expand191173
+        wire_expand191175 = MERGE wire_expand191174 wire_expand191174
+        wire_expand191176 = MERGE wire_expand191175 wire_expand191175
+        wire_expand191177 = MERGE wire_expand191176 wire_expand191176
+      }
+
+      reg1171 = DELAY reg1170
+      reg1170 = TRI root694 wire_expand191177
+      reg1170 = TRI reg1171 (NOT wire_expand191177)
+    }
+
+    let reg (root694, registers1178) -> (reg1180) {
+      let wire_expand20 (registers1178) -> (wire_expand201186) {
+        wire_expand201181 = MERGE registers1178 registers1178
+        wire_expand201182 = MERGE wire_expand201181 wire_expand201181
+        wire_expand201183 = MERGE wire_expand201182 wire_expand201182
+        wire_expand201184 = MERGE wire_expand201183 wire_expand201183
+        wire_expand201185 = MERGE wire_expand201184 wire_expand201184
+        wire_expand201186 = MERGE wire_expand201185 wire_expand201185
+      }
+
+      reg1180 = DELAY reg1179
+      reg1179 = TRI root694 wire_expand201186
+      reg1179 = TRI reg1180 (NOT wire_expand201186)
+    }
+
+    let reg (root694, registers1187) -> (reg1189) {
+      let wire_expand21 (registers1187) -> (wire_expand211195) {
+        wire_expand211190 = MERGE registers1187 registers1187
+        wire_expand211191 = MERGE wire_expand211190 wire_expand211190
+        wire_expand211192 = MERGE wire_expand211191 wire_expand211191
+        wire_expand211193 = MERGE wire_expand211192 wire_expand211192
+        wire_expand211194 = MERGE wire_expand211193 wire_expand211193
+        wire_expand211195 = MERGE wire_expand211194 wire_expand211194
+      }
+
+      reg1189 = DELAY reg1188
+      reg1188 = TRI root694 wire_expand211195
+      reg1188 = TRI reg1189 (NOT wire_expand211195)
+    }
+
+    let reg (root694, registers1196) -> (reg1198) {
+      let wire_expand22 (registers1196) -> (wire_expand221204) {
+        wire_expand221199 = MERGE registers1196 registers1196
+        wire_expand221200 = MERGE wire_expand221199 wire_expand221199
+        wire_expand221201 = MERGE wire_expand221200 wire_expand221200
+        wire_expand221202 = MERGE wire_expand221201 wire_expand221201
+        wire_expand221203 = MERGE wire_expand221202 wire_expand221202
+        wire_expand221204 = MERGE wire_expand221203 wire_expand221203
+      }
+
+      reg1198 = DELAY reg1197
+      reg1197 = TRI root694 wire_expand221204
+      reg1197 = TRI reg1198 (NOT wire_expand221204)
+    }
+
+    let reg (root694, registers1205) -> (reg1207) {
+      let wire_expand23 (registers1205) -> (wire_expand231213) {
+        wire_expand231208 = MERGE registers1205 registers1205
+        wire_expand231209 = MERGE wire_expand231208 wire_expand231208
+        wire_expand231210 = MERGE wire_expand231209 wire_expand231209
+        wire_expand231211 = MERGE wire_expand231210 wire_expand231210
+        wire_expand231212 = MERGE wire_expand231211 wire_expand231211
+        wire_expand231213 = MERGE wire_expand231212 wire_expand231212
+      }
+
+      reg1207 = DELAY reg1206
+      reg1206 = TRI root694 wire_expand231213
+      reg1206 = TRI reg1207 (NOT wire_expand231213)
+    }
+
+    let wire_expand24 (registers1214) -> (wire_expand241220) {
+      wire_expand241215 = MERGE registers1214 registers1214
+      wire_expand241216 = MERGE wire_expand241215 wire_expand241215
+      wire_expand241217 = MERGE wire_expand241216 wire_expand241216
+      wire_expand241218 = MERGE wire_expand241217 wire_expand241217
+      wire_expand241219 = MERGE wire_expand241218 wire_expand241218
+      wire_expand241220 = MERGE wire_expand241219 wire_expand241219
+    }
+
+    let wire_expand25 (registers1222) -> (wire_expand251228) {
+      wire_expand251223 = MERGE registers1222 registers1222
+      wire_expand251224 = MERGE wire_expand251223 wire_expand251223
+      wire_expand251225 = MERGE wire_expand251224 wire_expand251224
+      wire_expand251226 = MERGE wire_expand251225 wire_expand251225
+      wire_expand251227 = MERGE wire_expand251226 wire_expand251226
+      wire_expand251228 = MERGE wire_expand251227 wire_expand251227
+    }
+
+    let wire_expand26 (registers1230) -> (wire_expand261236) {
+      wire_expand261231 = MERGE registers1230 registers1230
+      wire_expand261232 = MERGE wire_expand261231 wire_expand261231
+      wire_expand261233 = MERGE wire_expand261232 wire_expand261232
+      wire_expand261234 = MERGE wire_expand261233 wire_expand261233
+      wire_expand261235 = MERGE wire_expand261234 wire_expand261234
+      wire_expand261236 = MERGE wire_expand261235 wire_expand261235
+    }
+
+    let wire_expand27 (registers1238) -> (wire_expand271244) {
+      wire_expand271239 = MERGE registers1238 registers1238
+      wire_expand271240 = MERGE wire_expand271239 wire_expand271239
+      wire_expand271241 = MERGE wire_expand271240 wire_expand271240
+      wire_expand271242 = MERGE wire_expand271241 wire_expand271241
+      wire_expand271243 = MERGE wire_expand271242 wire_expand271242
+      wire_expand271244 = MERGE wire_expand271243 wire_expand271243
+    }
+
+    let wire_expand28 (registers1246) -> (wire_expand281252) {
+      wire_expand281247 = MERGE registers1246 registers1246
+      wire_expand281248 = MERGE wire_expand281247 wire_expand281247
+      wire_expand281249 = MERGE wire_expand281248 wire_expand281248
+      wire_expand281250 = MERGE wire_expand281249 wire_expand281249
+      wire_expand281251 = MERGE wire_expand281250 wire_expand281250
+      wire_expand281252 = MERGE wire_expand281251 wire_expand281251
+    }
+
+    let wire_expand29 (registers1254) -> (wire_expand291260) {
+      wire_expand291255 = MERGE registers1254 registers1254
+      wire_expand291256 = MERGE wire_expand291255 wire_expand291255
+      wire_expand291257 = MERGE wire_expand291256 wire_expand291256
+      wire_expand291258 = MERGE wire_expand291257 wire_expand291257
+      wire_expand291259 = MERGE wire_expand291258 wire_expand291258
+      wire_expand291260 = MERGE wire_expand291259 wire_expand291259
+    }
+
+    let wire_expand30 (registers1262) -> (wire_expand301268) {
+      wire_expand301263 = MERGE registers1262 registers1262
+      wire_expand301264 = MERGE wire_expand301263 wire_expand301263
+      wire_expand301265 = MERGE wire_expand301264 wire_expand301264
+      wire_expand301266 = MERGE wire_expand301265 wire_expand301265
+      wire_expand301267 = MERGE wire_expand301266 wire_expand301266
+      wire_expand301268 = MERGE wire_expand301267 wire_expand301267
+    }
+
+    let wire_expand31 (registers1270) -> (wire_expand311276) {
+      wire_expand311271 = MERGE registers1270 registers1270
+      wire_expand311272 = MERGE wire_expand311271 wire_expand311271
+      wire_expand311273 = MERGE wire_expand311272 wire_expand311272
+      wire_expand311274 = MERGE wire_expand311273 wire_expand311273
+      wire_expand311275 = MERGE wire_expand311274 wire_expand311274
+      wire_expand311276 = MERGE wire_expand311275 wire_expand311275
+    }
+
+    let wire_expand32 (registers1278) -> (wire_expand321284) {
+      wire_expand321279 = MERGE registers1278 registers1278
+      wire_expand321280 = MERGE wire_expand321279 wire_expand321279
+      wire_expand321281 = MERGE wire_expand321280 wire_expand321280
+      wire_expand321282 = MERGE wire_expand321281 wire_expand321281
+      wire_expand321283 = MERGE wire_expand321282 wire_expand321282
+      wire_expand321284 = MERGE wire_expand321283 wire_expand321283
+    }
+
+    let wire_expand33 (registers1286) -> (wire_expand331292) {
+      wire_expand331287 = MERGE registers1286 registers1286
+      wire_expand331288 = MERGE wire_expand331287 wire_expand331287
+      wire_expand331289 = MERGE wire_expand331288 wire_expand331288
+      wire_expand331290 = MERGE wire_expand331289 wire_expand331289
+      wire_expand331291 = MERGE wire_expand331290 wire_expand331290
+      wire_expand331292 = MERGE wire_expand331291 wire_expand331291
+    }
+
+    let wire_expand34 (registers1294) -> (wire_expand341300) {
+      wire_expand341295 = MERGE registers1294 registers1294
+      wire_expand341296 = MERGE wire_expand341295 wire_expand341295
+      wire_expand341297 = MERGE wire_expand341296 wire_expand341296
+      wire_expand341298 = MERGE wire_expand341297 wire_expand341297
+      wire_expand341299 = MERGE wire_expand341298 wire_expand341298
+      wire_expand341300 = MERGE wire_expand341299 wire_expand341299
+    }
+
+    let wire_expand35 (registers1302) -> (wire_expand351308) {
+      wire_expand351303 = MERGE registers1302 registers1302
+      wire_expand351304 = MERGE wire_expand351303 wire_expand351303
+      wire_expand351305 = MERGE wire_expand351304 wire_expand351304
+      wire_expand351306 = MERGE wire_expand351305 wire_expand351305
+      wire_expand351307 = MERGE wire_expand351306 wire_expand351306
+      wire_expand351308 = MERGE wire_expand351307 wire_expand351307
+    }
+
+    let wire_expand36 (registers1310) -> (wire_expand361316) {
+      wire_expand361311 = MERGE registers1310 registers1310
+      wire_expand361312 = MERGE wire_expand361311 wire_expand361311
+      wire_expand361313 = MERGE wire_expand361312 wire_expand361312
+      wire_expand361314 = MERGE wire_expand361313 wire_expand361313
+      wire_expand361315 = MERGE wire_expand361314 wire_expand361314
+      wire_expand361316 = MERGE wire_expand361315 wire_expand361315
+    }
+
+    let wire_expand37 (registers1318) -> (wire_expand371324) {
+      wire_expand371319 = MERGE registers1318 registers1318
+      wire_expand371320 = MERGE wire_expand371319 wire_expand371319
+      wire_expand371321 = MERGE wire_expand371320 wire_expand371320
+      wire_expand371322 = MERGE wire_expand371321 wire_expand371321
+      wire_expand371323 = MERGE wire_expand371322 wire_expand371322
+      wire_expand371324 = MERGE wire_expand371323 wire_expand371323
+    }
+
+    let wire_expand38 (registers1326) -> (wire_expand381332) {
+      wire_expand381327 = MERGE registers1326 registers1326
+      wire_expand381328 = MERGE wire_expand381327 wire_expand381327
+      wire_expand381329 = MERGE wire_expand381328 wire_expand381328
+      wire_expand381330 = MERGE wire_expand381329 wire_expand381329
+      wire_expand381331 = MERGE wire_expand381330 wire_expand381330
+      wire_expand381332 = MERGE wire_expand381331 wire_expand381331
+    }
+
+    let wire_expand39 (registers1333) -> (wire_expand391339) {
+      wire_expand391334 = MERGE registers1333 registers1333
+      wire_expand391335 = MERGE wire_expand391334 wire_expand391334
+      wire_expand391336 = MERGE wire_expand391335 wire_expand391335
+      wire_expand391337 = MERGE wire_expand391336 wire_expand391336
+      wire_expand391338 = MERGE wire_expand391337 wire_expand391337
+      wire_expand391339 = MERGE wire_expand391338 wire_expand391338
+    }
+
+    let wire_expand40 (registers1341) -> (wire_expand401347) {
+      wire_expand401342 = MERGE registers1341 registers1341
+      wire_expand401343 = MERGE wire_expand401342 wire_expand401342
+      wire_expand401344 = MERGE wire_expand401343 wire_expand401343
+      wire_expand401345 = MERGE wire_expand401344 wire_expand401344
+      wire_expand401346 = MERGE wire_expand401345 wire_expand401345
+      wire_expand401347 = MERGE wire_expand401346 wire_expand401346
+    }
+
+    let wire_expand41 (registers1349) -> (wire_expand411355) {
+      wire_expand411350 = MERGE registers1349 registers1349
+      wire_expand411351 = MERGE wire_expand411350 wire_expand411350
+      wire_expand411352 = MERGE wire_expand411351 wire_expand411351
+      wire_expand411353 = MERGE wire_expand411352 wire_expand411352
+      wire_expand411354 = MERGE wire_expand411353 wire_expand411353
+      wire_expand411355 = MERGE wire_expand411354 wire_expand411354
+    }
+
+    let wire_expand42 (registers1357) -> (wire_expand421363) {
+      wire_expand421358 = MERGE registers1357 registers1357
+      wire_expand421359 = MERGE wire_expand421358 wire_expand421358
+      wire_expand421360 = MERGE wire_expand421359 wire_expand421359
+      wire_expand421361 = MERGE wire_expand421360 wire_expand421360
+      wire_expand421362 = MERGE wire_expand421361 wire_expand421361
+      wire_expand421363 = MERGE wire_expand421362 wire_expand421362
+    }
+
+    let wire_expand43 (registers1365) -> (wire_expand431371) {
+      wire_expand431366 = MERGE registers1365 registers1365
+      wire_expand431367 = MERGE wire_expand431366 wire_expand431366
+      wire_expand431368 = MERGE wire_expand431367 wire_expand431367
+      wire_expand431369 = MERGE wire_expand431368 wire_expand431368
+      wire_expand431370 = MERGE wire_expand431369 wire_expand431369
+      wire_expand431371 = MERGE wire_expand431370 wire_expand431370
+    }
+
+    let wire_expand44 (registers1373) -> (wire_expand441379) {
+      wire_expand441374 = MERGE registers1373 registers1373
+      wire_expand441375 = MERGE wire_expand441374 wire_expand441374
+      wire_expand441376 = MERGE wire_expand441375 wire_expand441375
+      wire_expand441377 = MERGE wire_expand441376 wire_expand441376
+      wire_expand441378 = MERGE wire_expand441377 wire_expand441377
+      wire_expand441379 = MERGE wire_expand441378 wire_expand441378
+    }
+
+    let wire_expand45 (registers1381) -> (wire_expand451387) {
+      wire_expand451382 = MERGE registers1381 registers1381
+      wire_expand451383 = MERGE wire_expand451382 wire_expand451382
+      wire_expand451384 = MERGE wire_expand451383 wire_expand451383
+      wire_expand451385 = MERGE wire_expand451384 wire_expand451384
+      wire_expand451386 = MERGE wire_expand451385 wire_expand451385
+      wire_expand451387 = MERGE wire_expand451386 wire_expand451386
+    }
+
+    let wire_expand46 (registers1389) -> (wire_expand461395) {
+      wire_expand461390 = MERGE registers1389 registers1389
+      wire_expand461391 = MERGE wire_expand461390 wire_expand461390
+      wire_expand461392 = MERGE wire_expand461391 wire_expand461391
+      wire_expand461393 = MERGE wire_expand461392 wire_expand461392
+      wire_expand461394 = MERGE wire_expand461393 wire_expand461393
+      wire_expand461395 = MERGE wire_expand461394 wire_expand461394
+    }
+
+    let wire_expand47 (registers1397) -> (wire_expand471403) {
+      wire_expand471398 = MERGE registers1397 registers1397
+      wire_expand471399 = MERGE wire_expand471398 wire_expand471398
+      wire_expand471400 = MERGE wire_expand471399 wire_expand471399
+      wire_expand471401 = MERGE wire_expand471400 wire_expand471400
+      wire_expand471402 = MERGE wire_expand471401 wire_expand471401
+      wire_expand471403 = MERGE wire_expand471402 wire_expand471402
+    }
+
+    let wire_expand48 (registers1405) -> (wire_expand481411) {
+      wire_expand481406 = MERGE registers1405 registers1405
+      wire_expand481407 = MERGE wire_expand481406 wire_expand481406
+      wire_expand481408 = MERGE wire_expand481407 wire_expand481407
+      wire_expand481409 = MERGE wire_expand481408 wire_expand481408
+      wire_expand481410 = MERGE wire_expand481409 wire_expand481409
+      wire_expand481411 = MERGE wire_expand481410 wire_expand481410
+    }
+
+    let wire_expand49 (registers1413) -> (wire_expand491419) {
+      wire_expand491414 = MERGE registers1413 registers1413
+      wire_expand491415 = MERGE wire_expand491414 wire_expand491414
+      wire_expand491416 = MERGE wire_expand491415 wire_expand491415
+      wire_expand491417 = MERGE wire_expand491416 wire_expand491416
+      wire_expand491418 = MERGE wire_expand491417 wire_expand491417
+      wire_expand491419 = MERGE wire_expand491418 wire_expand491418
+    }
+
+    let wire_expand50 (registers1421) -> (wire_expand501427) {
+      wire_expand501422 = MERGE registers1421 registers1421
+      wire_expand501423 = MERGE wire_expand501422 wire_expand501422
+      wire_expand501424 = MERGE wire_expand501423 wire_expand501423
+      wire_expand501425 = MERGE wire_expand501424 wire_expand501424
+      wire_expand501426 = MERGE wire_expand501425 wire_expand501425
+      wire_expand501427 = MERGE wire_expand501426 wire_expand501426
+    }
+
+    let wire_expand51 (registers1429) -> (wire_expand511435) {
+      wire_expand511430 = MERGE registers1429 registers1429
+      wire_expand511431 = MERGE wire_expand511430 wire_expand511430
+      wire_expand511432 = MERGE wire_expand511431 wire_expand511431
+      wire_expand511433 = MERGE wire_expand511432 wire_expand511432
+      wire_expand511434 = MERGE wire_expand511433 wire_expand511433
+      wire_expand511435 = MERGE wire_expand511434 wire_expand511434
+    }
+
+    let wire_expand52 (registers1437) -> (wire_expand521443) {
+      wire_expand521438 = MERGE registers1437 registers1437
+      wire_expand521439 = MERGE wire_expand521438 wire_expand521438
+      wire_expand521440 = MERGE wire_expand521439 wire_expand521439
+      wire_expand521441 = MERGE wire_expand521440 wire_expand521440
+      wire_expand521442 = MERGE wire_expand521441 wire_expand521441
+      wire_expand521443 = MERGE wire_expand521442 wire_expand521442
+    }
+
+    let wire_expand53 (registers1445) -> (wire_expand531451) {
+      wire_expand531446 = MERGE registers1445 registers1445
+      wire_expand531447 = MERGE wire_expand531446 wire_expand531446
+      wire_expand531448 = MERGE wire_expand531447 wire_expand531447
+      wire_expand531449 = MERGE wire_expand531448 wire_expand531448
+      wire_expand531450 = MERGE wire_expand531449 wire_expand531449
+      wire_expand531451 = MERGE wire_expand531450 wire_expand531450
+    }
+
+    root0 = DELAY registers698
+    registers698 = TRI root694 wire_expand91085
+    registers698 = TRI incr1079 (NOT wire_expand91085)
+    registers1214 = SLICE root691 3 4
+    registers1221 = TRI registers1087 wire_expand241220
+    registers1221 = TRI root0 (NOT wire_expand241220)
+    registers1222 = SLICE root691 3 4
+    registers1229 = TRI reg1099 wire_expand251228
+    registers1229 = TRI reg1090 (NOT wire_expand251228)
+    registers1230 = SLICE root691 2 3
+    registers1237 = TRI registers1229 wire_expand261236
+    registers1237 = TRI registers1221 (NOT wire_expand261236)
+    registers1238 = SLICE root691 3 4
+    registers1245 = TRI reg1117 wire_expand271244
+    registers1245 = TRI reg1108 (NOT wire_expand271244)
+    registers1246 = SLICE root691 3 4
+    registers1253 = TRI reg1135 wire_expand281252
+    registers1253 = TRI reg1126 (NOT wire_expand281252)
+    registers1254 = SLICE root691 2 3
+    registers1261 = TRI registers1253 wire_expand291260
+    registers1261 = TRI registers1245 (NOT wire_expand291260)
+    registers1262 = SLICE root691 1 2
+    registers1269 = TRI registers1261 wire_expand301268
+    registers1269 = TRI registers1237 (NOT wire_expand301268)
+    registers1270 = SLICE root691 3 4
+    registers1277 = TRI reg1153 wire_expand311276
+    registers1277 = TRI reg1144 (NOT wire_expand311276)
+    registers1278 = SLICE root691 3 4
+    registers1285 = TRI reg1171 wire_expand321284
+    registers1285 = TRI reg1162 (NOT wire_expand321284)
+    registers1286 = SLICE root691 2 3
+    registers1293 = TRI registers1285 wire_expand331292
+    registers1293 = TRI registers1277 (NOT wire_expand331292)
+    registers1294 = SLICE root691 3 4
+    registers1301 = TRI reg1189 wire_expand341300
+    registers1301 = TRI reg1180 (NOT wire_expand341300)
+    registers1302 = SLICE root691 3 4
+    registers1309 = TRI reg1207 wire_expand351308
+    registers1309 = TRI reg1198 (NOT wire_expand351308)
+    registers1310 = SLICE root691 2 3
+    registers1317 = TRI registers1309 wire_expand361316
+    registers1317 = TRI registers1301 (NOT wire_expand361316)
+    registers1318 = SLICE root691 1 2
+    registers1325 = TRI registers1317 wire_expand371324
+    registers1325 = TRI registers1293 (NOT wire_expand371324)
+    registers1326 = SLICE root691 0 1
+    root695 = TRI registers1325 wire_expand381332
+    root695 = TRI registers1269 (NOT wire_expand381332)
+    registers1333 = SLICE root692 3 4
+    registers1340 = TRI registers1087 wire_expand391339
+    registers1340 = TRI root0 (NOT wire_expand391339)
+    registers1341 = SLICE root692 3 4
+    registers1348 = TRI reg1099 wire_expand401347
+    registers1348 = TRI reg1090 (NOT wire_expand401347)
+    registers1349 = SLICE root692 2 3
+    registers1356 = TRI registers1348 wire_expand411355
+    registers1356 = TRI registers1340 (NOT wire_expand411355)
+    registers1357 = SLICE root692 3 4
+    registers1364 = TRI reg1117 wire_expand421363
+    registers1364 = TRI reg1108 (NOT wire_expand421363)
+    registers1365 = SLICE root692 3 4
+    registers1372 = TRI reg1135 wire_expand431371
+    registers1372 = TRI reg1126 (NOT wire_expand431371)
+    registers1373 = SLICE root692 2 3
+    registers1380 = TRI registers1372 wire_expand441379
+    registers1380 = TRI registers1364 (NOT wire_expand441379)
+    registers1381 = SLICE root692 1 2
+    registers1388 = TRI registers1380 wire_expand451387
+    registers1388 = TRI registers1356 (NOT wire_expand451387)
+    registers1389 = SLICE root692 3 4
+    registers1396 = TRI reg1153 wire_expand461395
+    registers1396 = TRI reg1144 (NOT wire_expand461395)
+    registers1397 = SLICE root692 3 4
+    registers1404 = TRI reg1171 wire_expand471403
+    registers1404 = TRI reg1162 (NOT wire_expand471403)
+    registers1405 = SLICE root692 2 3
+    registers1412 = TRI registers1404 wire_expand481411
+    registers1412 = TRI registers1396 (NOT wire_expand481411)
+    registers1413 = SLICE root692 3 4
+    registers1420 = TRI reg1189 wire_expand491419
+    registers1420 = TRI reg1180 (NOT wire_expand491419)
+    registers1421 = SLICE root692 3 4
+    registers1428 = TRI reg1207 wire_expand501427
+    registers1428 = TRI reg1198 (NOT wire_expand501427)
+    registers1429 = SLICE root692 2 3
+    registers1436 = TRI registers1428 wire_expand511435
+    registers1436 = TRI registers1420 (NOT wire_expand511435)
+    registers1437 = SLICE root692 1 2
+    registers1444 = TRI registers1436 wire_expand521443
+    registers1444 = TRI registers1412 (NOT wire_expand521443)
+    registers1445 = SLICE root692 0 1
+    root696 = TRI registers1444 wire_expand531451
+    root696 = TRI registers1388 (NOT wire_expand531451)
+    registers1452 = SLICE root693 0 1
+    registers1453 = NOT registers1452
+    registers1454 = AND registers1453 root690
+    registers1455 = SLICE root693 1 2
+    registers1456 = NOT registers1455
+    registers1457 = AND registers1456 registers1454
+    registers1458 = SLICE root693 2 3
+    registers1459 = NOT registers1458
+    registers1460 = AND registers1459 registers1457
+    registers1461 = SLICE root693 3 4
+    registers1086 = AND registers1461 registers1460
+    registers1462 = NOT registers1461
+    registers697 = AND registers1462 registers1460
+    registers1463 = AND registers1458 registers1457
+    registers1464 = SLICE root693 3 4
+    registers1097 = AND registers1464 registers1463
+    registers1465 = NOT registers1464
+    registers1088 = AND registers1465 registers1463
+    registers1466 = AND registers1455 registers1454
+    registers1467 = SLICE root693 2 3
+    registers1468 = NOT registers1467
+    registers1469 = AND registers1468 registers1466
+    registers1470 = SLICE root693 3 4
+    registers1115 = AND registers1470 registers1469
+    registers1471 = NOT registers1470
+    registers1106 = AND registers1471 registers1469
+    registers1472 = AND registers1467 registers1466
+    registers1473 = SLICE root693 3 4
+    registers1133 = AND registers1473 registers1472
+    registers1474 = NOT registers1473
+    registers1124 = AND registers1474 registers1472
+    registers1475 = AND registers1452 root690
+    registers1476 = SLICE root693 1 2
+    registers1477 = NOT registers1476
+    registers1478 = AND registers1477 registers1475
+    registers1479 = SLICE root693 2 3
+    registers1480 = NOT registers1479
+    registers1481 = AND registers1480 registers1478
+    registers1482 = SLICE root693 3 4
+    registers1151 = AND registers1482 registers1481
+    registers1483 = NOT registers1482
+    registers1142 = AND registers1483 registers1481
+    registers1484 = AND registers1479 registers1478
+    registers1485 = SLICE root693 3 4
+    registers1169 = AND registers1485 registers1484
+    registers1486 = NOT registers1485
+    registers1160 = AND registers1486 registers1484
+    registers1487 = AND registers1476 registers1475
+    registers1488 = SLICE root693 2 3
+    registers1489 = NOT registers1488
+    registers1490 = AND registers1489 registers1487
+    registers1491 = SLICE root693 3 4
+    registers1187 = AND registers1491 registers1490
+    registers1492 = NOT registers1491
+    registers1178 = AND registers1492 registers1490
+    registers1493 = AND registers1488 registers1487
+    registers1494 = SLICE root693 3 4
+    registers1205 = AND registers1494 registers1493
+    registers1495 = NOT registers1494
+    registers1196 = AND registers1495 registers1493
+  }
+
+  let op1processor (root1496, root1497, root695) -> (root691, root41) {
+    let wire_expand54 (op1processor1498) -> (wire_expand541504) {
+      wire_expand541499 = MERGE op1processor1498 op1processor1498
+      wire_expand541500 = MERGE wire_expand541499 wire_expand541499
+      wire_expand541501 = MERGE wire_expand541500 wire_expand541500
+      wire_expand541502 = MERGE wire_expand541501 wire_expand541501
+      wire_expand541503 = MERGE wire_expand541502 wire_expand541502
+      wire_expand541504 = MERGE wire_expand541503 wire_expand541503
+    }
+
+    let wire_expand55 (root1497) -> (wire_expand551510) {
+      wire_expand551505 = MERGE root1497 root1497
+      wire_expand551506 = MERGE wire_expand551505 wire_expand551505
+      wire_expand551507 = MERGE wire_expand551506 wire_expand551506
+      wire_expand551508 = MERGE wire_expand551507 wire_expand551507
+      wire_expand551509 = MERGE wire_expand551508 wire_expand551508
+      wire_expand551510 = MERGE wire_expand551509 wire_expand551509
+    }
+
+    root691 = root1496
+    op1processor1498 = 0
+    root41 = TRI wire_expand541504 wire_expand551510
+    root41 = TRI root695 (NOT wire_expand551510)
+  }
+
+  let op2processor (root1511, root696) -> (root692, root42) {
+    let wire_expand56 (op2processor1513) -> (wire_expand561519) {
+      wire_expand561514 = MERGE op2processor1513 op2processor1513
+      wire_expand561515 = MERGE wire_expand561514 wire_expand561514
+      wire_expand561516 = MERGE wire_expand561515 wire_expand561515
+      wire_expand561517 = MERGE wire_expand561516 wire_expand561516
+      wire_expand561518 = MERGE wire_expand561517 wire_expand561517
+      wire_expand561519 = MERGE wire_expand561518 wire_expand561517
+    }
+
+    let wire_expand57 (op2processor1521) -> (wire_expand571527) {
+      wire_expand571522 = MERGE op2processor1521 op2processor1521
+      wire_expand571523 = MERGE wire_expand571522 wire_expand571522
+      wire_expand571524 = MERGE wire_expand571523 wire_expand571523
+      wire_expand571525 = MERGE wire_expand571524 wire_expand571524
+      wire_expand571526 = MERGE wire_expand571525 wire_expand571525
+      wire_expand571527 = MERGE wire_expand571526 wire_expand571526
+    }
+
+    let shifter (op2processor1528, op2processor1529, op2processor1530) -> (shifter1611) {
+      let wire_expand58 (shifter1539) -> (wire_expand581545) {
+        wire_expand581540 = MERGE shifter1539 shifter1539
+        wire_expand581541 = MERGE wire_expand581540 wire_expand581540
+        wire_expand581542 = MERGE wire_expand581541 wire_expand581541
+        wire_expand581543 = MERGE wire_expand581542 wire_expand581542
+        wire_expand581544 = MERGE wire_expand581543 wire_expand581543
+        wire_expand581545 = MERGE wire_expand581544 wire_expand581544
+      }
+
+      let wire_expand59 (shifter1546) -> (wire_expand591547) {
+        wire_expand591547 = MERGE shifter1546 shifter1546
+      }
+
+      let wire_expand60 (shifter1550) -> (wire_expand601556) {
+        wire_expand601551 = MERGE shifter1550 shifter1550
+        wire_expand601552 = MERGE wire_expand601551 wire_expand601551
+        wire_expand601553 = MERGE wire_expand601552 wire_expand601552
+        wire_expand601554 = MERGE wire_expand601553 wire_expand601553
+        wire_expand601555 = MERGE wire_expand601554 wire_expand601554
+        wire_expand601556 = MERGE wire_expand601555 wire_expand601555
+      }
+
+      let wire_expand61 (shifter1557) -> (wire_expand611559) {
+        wire_expand611558 = MERGE shifter1557 shifter1557
+        wire_expand611559 = MERGE wire_expand611558 wire_expand611558
+      }
+
+      let wire_expand62 (shifter1562) -> (wire_expand621568) {
+        wire_expand621563 = MERGE shifter1562 shifter1562
+        wire_expand621564 = MERGE wire_expand621563 wire_expand621563
+        wire_expand621565 = MERGE wire_expand621564 wire_expand621564
+        wire_expand621566 = MERGE wire_expand621565 wire_expand621565
+        wire_expand621567 = MERGE wire_expand621566 wire_expand621566
+        wire_expand621568 = MERGE wire_expand621567 wire_expand621567
+      }
+
+      let wire_expand63 (shifter1569) -> (wire_expand631572) {
+        wire_expand631570 = MERGE shifter1569 shifter1569
+        wire_expand631571 = MERGE wire_expand631570 wire_expand631570
+        wire_expand631572 = MERGE wire_expand631571 wire_expand631571
+      }
+
+      let wire_expand64 (shifter1575) -> (wire_expand641581) {
+        wire_expand641576 = MERGE shifter1575 shifter1575
+        wire_expand641577 = MERGE wire_expand641576 wire_expand641576
+        wire_expand641578 = MERGE wire_expand641577 wire_expand641577
+        wire_expand641579 = MERGE wire_expand641578 wire_expand641578
+        wire_expand641580 = MERGE wire_expand641579 wire_expand641579
+        wire_expand641581 = MERGE wire_expand641580 wire_expand641580
+      }
+
+      let wire_expand65 (shifter1582) -> (wire_expand651586) {
+        wire_expand651583 = MERGE shifter1582 shifter1582
+        wire_expand651584 = MERGE wire_expand651583 wire_expand651583
+        wire_expand651585 = MERGE wire_expand651584 wire_expand651584
+        wire_expand651586 = MERGE wire_expand651585 wire_expand651585
+      }
+
+      let wire_expand66 (shifter1589) -> (wire_expand661595) {
+        wire_expand661590 = MERGE shifter1589 shifter1589
+        wire_expand661591 = MERGE wire_expand661590 wire_expand661590
+        wire_expand661592 = MERGE wire_expand661591 wire_expand661591
+        wire_expand661593 = MERGE wire_expand661592 wire_expand661592
+        wire_expand661594 = MERGE wire_expand661593 wire_expand661593
+        wire_expand661595 = MERGE wire_expand661594 wire_expand661594
+      }
+
+      let wire_expand67 (shifter1596) -> (wire_expand671601) {
+        wire_expand671597 = MERGE shifter1596 shifter1596
+        wire_expand671598 = MERGE wire_expand671597 wire_expand671597
+        wire_expand671599 = MERGE wire_expand671598 wire_expand671598
+        wire_expand671600 = MERGE wire_expand671599 wire_expand671599
+        wire_expand671601 = MERGE wire_expand671600 wire_expand671600
+      }
+
+      let wire_expand68 (shifter1604) -> (wire_expand681610) {
+        wire_expand681605 = MERGE shifter1604 shifter1604
+        wire_expand681606 = MERGE wire_expand681605 wire_expand681605
+        wire_expand681607 = MERGE wire_expand681606 wire_expand681606
+        wire_expand681608 = MERGE wire_expand681607 wire_expand681607
+        wire_expand681609 = MERGE wire_expand681608 wire_expand681608
+        wire_expand681610 = MERGE wire_expand681609 wire_expand681609
+      }
+
+      shifter1536 = 0
+      shifter1537 = SLICE op2processor1528 1 64
+      shifter1538 = MERGE shifter1537 shifter1536
+      shifter1539 = SLICE op2processor1530 5 6
+      shifter1531 = TRI shifter1538 wire_expand581545
+      shifter1531 = TRI op2processor1528 (NOT wire_expand581545)
+      shifter1546 = 0
+      shifter1548 = SLICE shifter1531 2 64
+      shifter1549 = MERGE shifter1548 wire_expand591547
+      shifter1550 = SLICE op2processor1530 4 5
+      shifter1532 = TRI shifter1549 wire_expand601556
+      shifter1532 = TRI shifter1531 (NOT wire_expand601556)
+      shifter1557 = 0
+      shifter1560 = SLICE shifter1532 4 64
+      shifter1561 = MERGE shifter1560 wire_expand611559
+      shifter1562 = SLICE op2processor1530 3 4
+      shifter1533 = TRI shifter1561 wire_expand621568
+      shifter1533 = TRI shifter1532 (NOT wire_expand621568)
+      shifter1569 = 0
+      shifter1573 = SLICE shifter1533 8 64
+      shifter1574 = MERGE shifter1573 wire_expand631572
+      shifter1575 = SLICE op2processor1530 2 3
+      shifter1534 = TRI shifter1574 wire_expand641581
+      shifter1534 = TRI shifter1533 (NOT wire_expand641581)
+      shifter1582 = 0
+      shifter1587 = SLICE shifter1534 16 64
+      shifter1588 = MERGE shifter1587 wire_expand651586
+      shifter1589 = SLICE op2processor1530 1 2
+      shifter1535 = TRI shifter1588 wire_expand661595
+      shifter1535 = TRI shifter1534 (NOT wire_expand661595)
+      shifter1596 = 0
+      shifter1602 = SLICE shifter1535 32 64
+      shifter1603 = MERGE shifter1602 wire_expand671601
+      shifter1604 = SLICE op2processor1530 0 1
+      shifter1611 = TRI shifter1603 wire_expand681610
+      shifter1611 = TRI shifter1535 (NOT wire_expand681610)
+    }
+
+    let shifter (op2processor1528, op2processor1529, op2processor1530) -> (shifter1704) {
+      let wire_expand69 (shifter1622) -> (wire_expand691628) {
+        wire_expand691623 = MERGE shifter1622 shifter1622
+        wire_expand691624 = MERGE wire_expand691623 wire_expand691623
+        wire_expand691625 = MERGE wire_expand691624 wire_expand691624
+        wire_expand691626 = MERGE wire_expand691625 wire_expand691625
+        wire_expand691627 = MERGE wire_expand691626 wire_expand691626
+        wire_expand691628 = MERGE wire_expand691627 wire_expand691627
+      }
+
+      let wire_expand70 (shifter1631) -> (wire_expand701633) {
+        wire_expand701633 = MERGE shifter1631 shifter1631
+      }
+
+      let wire_expand71 (shifter1635) -> (wire_expand711641) {
+        wire_expand711636 = MERGE shifter1635 shifter1635
+        wire_expand711637 = MERGE wire_expand711636 wire_expand711636
+        wire_expand711638 = MERGE wire_expand711637 wire_expand711637
+        wire_expand711639 = MERGE wire_expand711638 wire_expand711638
+        wire_expand711640 = MERGE wire_expand711639 wire_expand711639
+        wire_expand711641 = MERGE wire_expand711640 wire_expand711640
+      }
+
+      let wire_expand72 (shifter1644) -> (wire_expand721647) {
+        wire_expand721646 = MERGE shifter1644 shifter1644
+        wire_expand721647 = MERGE wire_expand721646 wire_expand721646
+      }
+
+      let wire_expand73 (shifter1649) -> (wire_expand731655) {
+        wire_expand731650 = MERGE shifter1649 shifter1649
+        wire_expand731651 = MERGE wire_expand731650 wire_expand731650
+        wire_expand731652 = MERGE wire_expand731651 wire_expand731651
+        wire_expand731653 = MERGE wire_expand731652 wire_expand731652
+        wire_expand731654 = MERGE wire_expand731653 wire_expand731653
+        wire_expand731655 = MERGE wire_expand731654 wire_expand731654
+      }
+
+      let wire_expand74 (shifter1658) -> (wire_expand741662) {
+        wire_expand741660 = MERGE shifter1658 shifter1658
+        wire_expand741661 = MERGE wire_expand741660 wire_expand741660
+        wire_expand741662 = MERGE wire_expand741661 wire_expand741661
+      }
+
+      let wire_expand75 (shifter1664) -> (wire_expand751670) {
+        wire_expand751665 = MERGE shifter1664 shifter1664
+        wire_expand751666 = MERGE wire_expand751665 wire_expand751665
+        wire_expand751667 = MERGE wire_expand751666 wire_expand751666
+        wire_expand751668 = MERGE wire_expand751667 wire_expand751667
+        wire_expand751669 = MERGE wire_expand751668 wire_expand751668
+        wire_expand751670 = MERGE wire_expand751669 wire_expand751669
+      }
+
+      let wire_expand76 (shifter1673) -> (wire_expand761678) {
+        wire_expand761675 = MERGE shifter1673 shifter1673
+        wire_expand761676 = MERGE wire_expand761675 wire_expand761675
+        wire_expand761677 = MERGE wire_expand761676 wire_expand761676
+        wire_expand761678 = MERGE wire_expand761677 wire_expand761677
+      }
+
+      let wire_expand77 (shifter1680) -> (wire_expand771686) {
+        wire_expand771681 = MERGE shifter1680 shifter1680
+        wire_expand771682 = MERGE wire_expand771681 wire_expand771681
+        wire_expand771683 = MERGE wire_expand771682 wire_expand771682
+        wire_expand771684 = MERGE wire_expand771683 wire_expand771683
+        wire_expand771685 = MERGE wire_expand771684 wire_expand771684
+        wire_expand771686 = MERGE wire_expand771685 wire_expand771685
+      }
+
+      let wire_expand78 (shifter1689) -> (wire_expand781695) {
+        wire_expand781691 = MERGE shifter1689 shifter1689
+        wire_expand781692 = MERGE wire_expand781691 wire_expand781691
+        wire_expand781693 = MERGE wire_expand781692 wire_expand781692
+        wire_expand781694 = MERGE wire_expand781693 wire_expand781693
+        wire_expand781695 = MERGE wire_expand781694 wire_expand781694
+      }
+
+      let wire_expand79 (shifter1697) -> (wire_expand791703) {
+        wire_expand791698 = MERGE shifter1697 shifter1697
+        wire_expand791699 = MERGE wire_expand791698 wire_expand791698
+        wire_expand791700 = MERGE wire_expand791699 wire_expand791699
+        wire_expand791701 = MERGE wire_expand791700 wire_expand791700
+        wire_expand791702 = MERGE wire_expand791701 wire_expand791701
+        wire_expand791703 = MERGE wire_expand791702 wire_expand791702
+      }
+
+      shifter1617 = SLICE op2processor1528 0 1
+      shifter1618 = SLICE op2processor1529 1 2
+      shifter1619 = AND shifter1617 shifter1618
+      shifter1620 = SLICE op2processor1528 0 63
+      shifter1621 = MERGE shifter1619 shifter1620
+      shifter1622 = SLICE op2processor1530 5 6
+      shifter1612 = TRI shifter1621 wire_expand691628
+      shifter1612 = TRI op2processor1528 (NOT wire_expand691628)
+      shifter1629 = SLICE shifter1612 0 1
+      shifter1630 = SLICE op2processor1529 1 2
+      shifter1631 = AND shifter1629 shifter1630
+      shifter1632 = SLICE shifter1612 0 62
+      shifter1634 = MERGE wire_expand701633 shifter1632
+      shifter1635 = SLICE op2processor1530 4 5
+      shifter1613 = TRI shifter1634 wire_expand711641
+      shifter1613 = TRI shifter1612 (NOT wire_expand711641)
+      shifter1642 = SLICE shifter1613 0 1
+      shifter1643 = SLICE op2processor1529 1 2
+      shifter1644 = AND shifter1642 shifter1643
+      shifter1645 = SLICE shifter1613 0 60
+      shifter1648 = MERGE wire_expand721647 shifter1645
+      shifter1649 = SLICE op2processor1530 3 4
+      shifter1614 = TRI shifter1648 wire_expand731655
+      shifter1614 = TRI shifter1613 (NOT wire_expand731655)
+      shifter1656 = SLICE shifter1614 0 1
+      shifter1657 = SLICE op2processor1529 1 2
+      shifter1658 = AND shifter1656 shifter1657
+      shifter1659 = SLICE shifter1614 0 56
+      shifter1663 = MERGE wire_expand741662 shifter1659
+      shifter1664 = SLICE op2processor1530 2 3
+      shifter1615 = TRI shifter1663 wire_expand751670
+      shifter1615 = TRI shifter1614 (NOT wire_expand751670)
+      shifter1671 = SLICE shifter1615 0 1
+      shifter1672 = SLICE op2processor1529 1 2
+      shifter1673 = AND shifter1671 shifter1672
+      shifter1674 = SLICE shifter1615 0 48
+      shifter1679 = MERGE wire_expand761678 shifter1674
+      shifter1680 = SLICE op2processor1530 1 2
+      shifter1616 = TRI shifter1679 wire_expand771686
+      shifter1616 = TRI shifter1615 (NOT wire_expand771686)
+      shifter1687 = SLICE shifter1616 0 1
+      shifter1688 = SLICE op2processor1529 1 2
+      shifter1689 = AND shifter1687 shifter1688
+      shifter1690 = SLICE shifter1616 0 32
+      shifter1696 = MERGE wire_expand781695 shifter1690
+      shifter1697 = SLICE op2processor1530 0 1
+      shifter1704 = TRI shifter1696 wire_expand791703
+      shifter1704 = TRI shifter1616 (NOT wire_expand791703)
+    }
+
+    let wire_expand80 (op2processor1705) -> (wire_expand801711) {
+      wire_expand801706 = MERGE op2processor1705 op2processor1705
+      wire_expand801707 = MERGE wire_expand801706 wire_expand801706
+      wire_expand801708 = MERGE wire_expand801707 wire_expand801707
+      wire_expand801709 = MERGE wire_expand801708 wire_expand801708
+      wire_expand801710 = MERGE wire_expand801709 wire_expand801709
+      wire_expand801711 = MERGE wire_expand801710 wire_expand801710
+    }
+
+    root692 = SLICE root1511 20 24
+    op2processor1512 = SLICE root1511 8 24
+    op2processor1513 = 0
+    op2processor1520 = MERGE wire_expand561519 op2processor1512
+    op2processor1521 = SLICE root1511 24 25
+    op2processor1528 = TRI root696 wire_expand571527
+    op2processor1528 = TRI op2processor1520 (NOT wire_expand571527)
+    op2processor1529 = SLICE root1511 6 8
+    op2processor1530 = SLICE root1511 0 6
+    op2processor1705 = SLICE op2processor1529 0 1
+    root42 = TRI shifter1704 wire_expand801711
+    root42 = TRI shifter1611 (NOT wire_expand801711)
+  }
+
+  let flags (root45, root1712, root2) -> (root1, root1713, flags1716) {
+    let wire_expand81 (root1712) -> (wire_expand811715) {
+      wire_expand811714 = MERGE root1712 root1712
+      wire_expand811715 = MERGE wire_expand811714 wire_expand811714
+    }
+
+    flags1717 = TRI root45 wire_expand811715
+    flags1717 = TRI flags1716 (NOT wire_expand811715)
+    flags1716 = DELAY flags1717
+    flags1718 = SLICE root2 3 4
+    flags1719 = SLICE root2 2 3
+    flags1720 = SLICE root2 1 2
+    flags1721 = SLICE root2 0 1
+    flags1722 = SLICE flags1716 2 3
+    flags1723 = SLICE flags1716 1 2
+    flags1724 = SLICE flags1716 3 4
+    flags1725 = SLICE flags1716 0 1
+    flags1726 = NOT flags1722
+    flags1727 = AND flags1724 flags1725
+    flags1728 = OR flags1724 flags1725
+    flags1729 = NOT flags1728
+    flags1730 = OR flags1727 flags1729
+    flags1731 = TRI flags1723 flags1719
+    flags1731 = TRI flags1722 (NOT flags1719)
+    flags1732 = TRI flags1725 flags1719
+    flags1732 = TRI flags1724 (NOT flags1719)
+    flags1733 = TRI flags1732 flags1720
+    flags1733 = TRI flags1731 (NOT flags1720)
+    flags1734 = AND flags1723 flags1726
+    flags1735 = TRI flags1730 flags1719
+    flags1735 = TRI flags1734 (NOT flags1719)
+    flags1736 = AND flags1730 flags1726
+    flags1737 = 1
+    flags1738 = TRI flags1737 flags1719
+    flags1738 = TRI flags1736 (NOT flags1719)
+    flags1739 = TRI flags1738 flags1720
+    flags1739 = TRI flags1735 (NOT flags1720)
+    flags1740 = TRI flags1739 flags1721
+    flags1740 = TRI flags1733 (NOT flags1721)
+    root1 = XOR flags1718 flags1740
+  }
+
+  let memory_unit (root39, root41, root42) -> (root1741) {
+    let wire_expand82 (memory_unit1744) -> (wire_expand821751) {
+      wire_expand821748 = MERGE memory_unit1744 memory_unit1744
+      wire_expand821749 = MERGE wire_expand821748 wire_expand821748
+      wire_expand821750 = MERGE wire_expand821749 wire_expand821749
+      wire_expand821751 = MERGE wire_expand821750 wire_expand821750
+    }
+
+    memory_unit1742 = SLICE root39 3 4
+    memory_unit1743 = SLICE root39 0 1
+    memory_unit1744 = AND memory_unit1742 memory_unit1743
+    memory_unit1745 = SLICE root39 2 3
+    memory_unit1746 = AND memory_unit1744 memory_unit1745
+    memory_unit1747 = SLICE root42 48 64
+    memory_unit1752 = AND memory_unit1747 wire_expand821751
+    memory_unit1753 = memory_unit1752
+  }
+
+  let result_selector (root39, root1741, root44) -> (root694) {
+    let wire_expand83 (result_selector1756) -> (wire_expand831762) {
+      wire_expand831757 = MERGE result_selector1756 result_selector1756
+      wire_expand831758 = MERGE wire_expand831757 wire_expand831757
+      wire_expand831759 = MERGE wire_expand831758 wire_expand831758
+      wire_expand831760 = MERGE wire_expand831759 wire_expand831759
+      wire_expand831761 = MERGE wire_expand831760 wire_expand831760
+      wire_expand831762 = MERGE wire_expand831761 wire_expand831761
+    }
+
+    result_selector1754 = SLICE root39 3 4
+    result_selector1755 = SLICE root39 0 1
+    result_selector1756 = AND result_selector1754 result_selector1755
+    root694 = TRI root1741 wire_expand831762
+    root694 = TRI root44 (NOT wire_expand831762)
+  }
+
+  root39 = SLICE root3 56 60
+  root40 = SLICE root3 54 55
+  root690 = SLICE root3 55 56
+  root693 = SLICE root3 49 53
+  root1496 = SLICE root3 45 49
+  root1497 = SLICE root3 44 45
+  root1511 = SLICE root3 19 44
+  root1712 = SLICE root3 53 54
+  root43 = SLICE root1713 1 2
+}
+

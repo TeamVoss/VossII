@@ -1,0 +1,5 @@
+load "ste.fl";
+
+let p = read_pexlif (DIR^"/b53.pexlif");
+
+//pexlif2fsm p;

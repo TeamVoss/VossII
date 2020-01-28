@@ -1,0 +1,57 @@
+Comment lines start with "!", and the first several lines are a header made of
+comment lines where you can put Voss's name, a timestamp, the command line, and
+things like that to identify the file.  The header ends with a blank line.
+
+Then there are a bunch of comments that name the signals and assign them to
+columns in the trace file.  Successive characters of the signal name appear
+in successive lines of the file, all in the column assigned to the signal.
+That is, you read each signal name in a column from top to bottom.  Here's an
+example that names the signals "foo", "bar", and "another":
+
+!    a
+!    n
+!    o
+!    t
+!  fbh
+!  oae
+!  orr
+
+Where several signals combine to form a bus, they have to appear consecutively
+and in order, but since you'll dump signals in whatever order the user asks for
+them, that doesn't matter to you.
+
+The data lines in the file start with an optional timestamp, then list the
+value of each signal in its column.  Values may be 0, 1, x (undefined), or z.
+You may as well dump overconstrained signals as Z.  So, for example, the value
+of a three-bit bus called "s" at times 0 through 2 is represented like this:
+
+!  sss
+!  <<<
+!  210
+!  >>>
+0  0xx
+1  1zz
+2  101
+
+The signals' values must stay in the proper columns.  For example, when you get
+to 10, don't make the timestamp field wider:
+
+10 111  <- ok
+10  111  <- bad
+
+Dinotrace can also suck in files which don't have any timestamp.  Just put the
+signals down:
+
+!sss
+!<<<
+!210
+!>>>
+ 0xx
+ 1zz
+
+If you use timestamps, it might be easier for humans, and you can skip lines
+where no signals have changed since the last printing.
+
+Also, to save disk space, your program can pipe the output through compress,
+and dinotrace will uncompress on reading.
+

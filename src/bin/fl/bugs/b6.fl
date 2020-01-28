@@ -1,0 +1,47 @@
+let a = bvariable "a";
+let b = bvariable "b";
+let c = bvariable "c";
+
+let e1 = a bAND b;
+let e2 = bNOT (a bOR b);
+let e3 = a bXOR b bAND bNOT a bOR c;
+let e4 = (bNOT a) bAND (bNOT b);
+let e5 = (bNOT a) bAND b;
+let eqs = [e1,e2,e3];
+
+//gen_bexpr2bdd [] [e1,e2,e3];
+//gen_bexpr2bdd [("c",T)] [e1,e2,e3];
+//gen_bexpr2bdd [("c",F)] [e1,e2,e3];
+//gen_bexpr2bdd [("c",variable "a")] [e1,e2,e3];
+
+//bsize [e1];
+//bsize [e2];
+//bsize [e3];
+//bsize [e1,e2,e3];
+
+let sub0 = [];
+let sub1 = [("a",bT)];
+let sub2 = [("a",bvariable "b")];
+let sub3 = [("a", bvariable "b"), ("b", bvariable "a"), ("c", bT)];
+let sub4 = [("a", bvariable "b"), ("b", bvariable "a"), ("c", bF)];
+
+//bsubstitute sub0 e3;
+//bsubstitute sub1 e3;
+//bsubstitute sub2 e3;
+//bsubstitute sub3 e3;
+//bsubstitute sub4 e3;
+
+//bsubstitute sub0 eqs;
+bsubstitute sub1 eqs;
+bsubstitute sub2 eqs;
+bsubstitute sub3 eqs;
+bsubstitute sub4 eqs;
+
+1111111;
+let e6 = e4 bXNOR e5;
+"e6"; e6;
+printf "bget_model (e4 bXNOR e5); (%s): "(bexpr2str 10 (e4 bXNOR e5)); bget_model [(e4 bXNOR e5)] 10;
+22222222;
+printf "bget_model (e4 bXOR e5); (%s): "(bexpr2str 10 (e4 bXOR e5)); bget_model [(e4 bXOR e5)] 10;
+
+99999;

@@ -1,0 +1,13 @@
+let pf a b = (a,b);
+let lf a b = [a,b];
+overload f pf lf;
+
+let iadd a b = a+b+0;
+
+rvariable "a";
+val (a,b) = f 1 2 in iadd a b;
+
+hd (f 1 2) + 1;
+fst (f "a" "b") = "a";
+
+//hd (f 1 2);

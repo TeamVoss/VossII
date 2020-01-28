@@ -1,0 +1,45 @@
+If the visualization dumps core, do the following:
+
+1) Find the tcl_eval_XXXXXX file in the /tmp/voss2_<USER>_XXXXXX directory.
+
+2) Prepend:
+
+source /home/cseger/VossII/src/bin/fl/utils.tcl
+set ::imagedir /home/cseger/VossII/IDVII/src/fl/gui/sch_draw/images
+load /home/cseger/VossII/src/external/visualization/schematic_draw_module.so
+source /home/cseger/VossII/IDVII/src/fl/gui/sch_draw/draw_sch.tcl
+proc fl_is_vector {args} { return 0 }
+proc fl_set_local_time {args} { return 0 }
+proc fl_set_color_by_bdd_prefix {args} { return 0 }
+proc fl_update_colors {args} { return 0 }
+set w .ste_debug
+create_ste_debugger $w
+val {tw c} [get_new_sch_canvas $w 0]
+proc clean_name {name} {
+    if { [regexp "^{\(.*\)}$" $name dummy base] } {
+        set name $base
+    }
+    return $name
+}
+proc fl_tag2vec {c s} { return $s; }
+proc fl_vecs2tags {c s} { return $s; }
+proc fl_is_vector_name { s } {
+	if { [string first {[} $s] != -1 } {
+	    return 1;
+	} else {
+	    return 0;
+	}
+}
+
+
+
+to the file and append 
+
+draw_network $c $tr_123 # Replace tr_123 with the last object id in the file
+
+3) Now do gdb wish and r -f file_name
+
+4) Happy debugging.....
+
+HINT: Almost all bugs are wrong number of inputs for the drawing function.
+Poor coding style to blame.... One day, I'll fix it! I promise!

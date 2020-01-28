@@ -1,0 +1,19 @@
+let a = bvariable "a";
+let b = bvariable "b";
+let c = bvariable "c";
+
+let e1 = a bAND b;
+let e2 = bNOT (a bOR b);
+let e3 = a bXOR b bAND bNOT a bOR c;
+let e4 = (bNOT a) bAND (bNOT b);
+let e5 = (bNOT a) bAND b;
+let e6 = e4 bXNOR e5;
+
+"e1"; e1;
+"e2"; e2;
+"e3"; e3;
+"e4"; e4;
+"e5"; e5;
+"e5"; e6;
+
+bget_model [e6] 5;

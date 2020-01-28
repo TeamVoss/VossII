@@ -1,0 +1,306 @@
+load "defaults.fl";
+
+var_order [
+         "_c1.r", "_c1.d", "c1.r", "c1.d", "_s1", "s1", "c1.g", "_c1.g", "_y1",
+         "y1", "_z1", "z1", "_t1", "t1", "_x1", "x1", "_u1", "u1", "_v1",
+         "v1", "w1", "_w1", "_v2", "v2", "_w2", "w2", "_u2", "u2", "_t2",
+         "t2", "z2", "_z2", "_c2.d", "c2.d", "_c2.g", "c2.g", "c2.r",
+         "_c2.r", "x2", "_x2", "_s2", "_y2", "s2", "y2"];
+
+lettype expr =	AX expr |
+		AG expr |
+		AF expr |
+		AU expr expr |
+		EX expr |
+		EG expr |
+		EF expr |
+		EU expr expr |
+		Equal expr expr |
+		And expr expr |
+		Or expr expr |
+		Not expr |
+		True |
+		False |
+		Var string
+		;
+
+let U e1 e2 = (e1,e2);
+infix 3 U;
+let A (e1,e2) = AU e1 e2;
+let E (e1,e2) = EU e1 e2;
+let and e1 e2 = And e1 e2;
+infix 5 and;
+let or e1 e2 = Or e1 e2;
+infix 4 or;
+let not e = Not e;
+let ==> e1 e2 = e2 or (not e1);
+infix 3 ==>;
+let _=_ a b = Equal a b;
+infix 6 _=_;
+
+let implies a b = b OR (NOT a);
+infix 1 implies;
+
+let ^^ s t = (print s) seq (print t) seq "";
+infix 1 ^^;
+
+
+letrec	prE (Var s) = s /\
+	prE (False)  = "F" /\
+	prE (True)  = "T" /\
+	prE (Not e)  = "~(" ^^ (prE e) ^^ ")" /\
+	prE (Or e1 e2)  = "(" ^^ (prE e1) ^^ " + " ^^ (prE e2) ^^ ")" /\
+	prE (Equal e1 e2)  = (prE e1) ^^ " _=_ " ^^ (prE e2) /\
+	prE (And e1 e2)  = (prE e1) ^^ " & " ^^ (prE e2) /\
+	prE (EU e1 e2)  = "(E(" ^^ (prE e1) ^^ ")U(" ^^ (prE e2) ^^ "))" /\
+	prE (EF e)  = "(EF " ^^ (prE e) ^^ ")" /\
+	prE (EG e)  = "(EG " ^^ (prE e) ^^ ")" /\
+	prE (EX e)  = "(EX " ^^ (prE e) ^^ ")" /\
+	prE (AU e1 e2)  = "(A(" ^^ (prE e1) ^^ ")U(" ^^ (prE e2) ^^ "))" /\
+	prE (AF e)  = "(AF " ^^ (prE e) ^^ ")" /\
+	prE (AG e)  = "(AG " ^^ (prE e) ^^ ")" /\
+	prE (AX e)  = "(AX " ^^ (prE e) ^^ ")";
+
+install_print_function prE;
+
+
+// Model from_state to_state next_state_relation
+
+lettype model = Model
+		    (string list)	// nl = Names of nodes
+		    (bool list)		// s  = Current state variable list
+		    (bool list)		// S  = Next state variable list
+		    bool		// R  = Transition relation
+		    bool		// init = Initial state predicate
+		    bool		// qs = quantification expression for s
+		    bool		// qS = quantification expression for S
+		    ((string#bool) list)// subs  = Substitution list s->S
+		    ((string#bool) list)// rsubs = Substitution list S->s
+		;
+
+let make_model nl s S R init =
+	let l_nl = length nl in
+	let l_s = length s in
+	let l_S = length S in
+	let ok = (l_nl = l_s) AND (l_nl = l_S) in
+	let qs = itlist (\p.\r. p AND r) s T in
+	let qS = itlist (\p.\r. p AND r) S T in
+	letrec subs frl tol = frl=[] => [] |
+			     ((hd (depends [hd frl])),(hd tol)):
+				(subs (tl frl) (tl tol)) in
+	ok => (Model nl s S R init qs qS (subs s S) (subs S s)) |
+	      error "Not a properly formed model";
+
+
+let cVar name (Model nl s S R init qs qS subs2S subS2s) =
+    letrec find ndl yvl = ndl = [] =>
+		    error ("Error: Cannot find node named "^name) |
+		    (hd ndl) = name => (hd yvl) | find (tl ndl) (tl yvl) in
+    find nl s;
+
+
+let cAX f (Model nl s S R init qs qS subs2S subS2s) =
+	let fy  = (substitute subs2S f) in
+	quant_forall qS (R implies fy);
+
+
+let cAG f (Model nl s S R init qs qS subs2S subS2s) =
+	letrec AGr sf =
+	    let newf =
+		let sfy  = (substitute subs2S sf) in
+		quant_forall qS (f AND (R implies sfy)) in
+	    newf == sf => sf | AGr newf in
+	AGr T;
+
+
+let cAF f (Model nl s S R init qs qS subs2S subS2s) = 
+	letrec AFr sf =
+	    let newf =
+		let sfy  = (substitute subs2S sf) in
+		quant_forall qS (f OR (R implies sfy)) in
+	    newf == sf => sf | AFr newf in
+	AFr F;
+
+let cAU f g (Model nl s S R init qs qS subs2S subS2s) = 
+	letrec AUr sf =
+	    let newf =
+		let sfy  = (substitute subs2S sf) in
+		quant_forall qS (g OR (f AND (R implies sfy))) in
+	    newf == sf => sf | AUr newf in
+	AUr F;
+
+let cEX f m = NOT (cAX (NOT f) m);
+let cEG f m = NOT (cAF (NOT f) m);
+let cEF f m = NOT (cAG (NOT f) m);
+let cEU f g m = NOT ((cAU (NOT g) ((NOT f) OR (NOT g)) m) OR (cAG (NOT g) m)); 
+
+letrec	mc m (Var s) = cVar s m /\
+	mc m (False)  = F /\
+	mc m (True)  = T /\
+	mc m (Not e)  = NOT (mc m e) /\
+	mc m (Or e1 e2)  = (mc m e1) OR (mc m e2) /\
+	mc m (Equal e1 e2)  = ((mc m e1) = (mc m e2)) /\
+	mc m (And e1 e2)  = (mc m e1) AND (mc m e2) /\
+	mc m (EU e1 e2)  = cEU (mc m e1) (mc m e2) m /\
+	mc m (EF e)  = cEF (mc m e) m /\
+	mc m (EG e)  = cEG (mc m e) m /\
+	mc m (EX e)  = cEX (mc m e) m /\
+	mc m (AU e1 e2)  = cAU (mc m e1) (mc m e2) m /\
+	mc m (AF e)  = cAF (mc m e) m /\
+	mc m (AG e)  = cAG (mc m e) m /\
+	mc m (AX e)  = cAX (mc m e) m;
+
+
+// Check that the set of states satisfying f contains all initial states. 
+let MC (Model nl s S R init qs qS subs2S subS2s) f =
+	let sat_set = mc (Model nl s S R init qs qS subs2S subS2s) f in
+	(init implies sat_set) == T;
+
+
+// %$%%%%%%%%% Example
+
+let Inverter nd = NOT nd;
+let Buffer nd = nd;
+let Xor a b = a XOR b;
+let Xnor a b = NOT (a XOR b);
+let Nand a b = NOT (a AND b);
+let C_elem a b c = a AND b OR a AND c OR b AND c;
+let Latch e d q = e AND d OR NOT e AND q;
+let iLatch e d q = e AND q OR NOT e AND d;
+
+
+let TransArbiter =
+    let name_list = ["c1.r", "c1.d", "c1.g", "s1", "x1", "y1", "u1",
+		     "t1", "z1", "v1", "w1", "v2", "w2", "z2", "t2", "u2",
+		     "y2", "s2", "x2", "c2.g", "c2.d", "c2.r"] in
+    let s = map (\n. variable n) name_list in
+    let S = map (\n. variable ("_"^n)) name_list in
+    let TransRel s S =
+	let NextFn [c1_r, c1_d, c1_g, s1, x1, y1, u1, t1, z1, v1,
+		    w1, v2, w2, z2, t2, u2, y2, s2, x2, c2_g, c2_d, c2_r] = [
+		Inverter c1_g,		// C1_R
+		Buffer c1_g,		// C1_D
+		C_elem z1 y1 c1_g,	// C1_G
+		iLatch x1 c1_r s1,	// S1
+		Inverter w1,		// X1
+		Latch x1 s1 y1,		// Y1
+		Xor s1 c1_g,		// U1
+		Xnor c1_d y1,		// T1
+		Xnor c1_d t1,		// Z1
+		Latch t1 u1 v1,		// V1
+		Nand v2 v1,		// W1
+		Nand w1 w2,		// V2
+		Latch t2 u2 w2,		// W2
+		Xnor t2 c2_d,		// Z2
+		Xnor c2_d y2,		// T2
+		Xor c2_g s2,		// U2
+		Latch x2 s2 y2,		// Y2
+		iLatch x2 c2_r s2,	// S2
+		Inverter v2,		// X2
+		C_elem z2 y2 c2_g,	// C2_G
+		Buffer c2_g,		// C2_D
+		Inverter c2_g		// C2_R
+	    ] in
+	letrec rest_same [] [] = T /\
+	       rest_same (n:rn) (oo:ro) = (n=oo) AND (rest_same rn ro) in
+	letrec choice [] [] [] = T /\
+	       choice (s:rs) (S:rS) (Y:rY) = ((S = s)AND(choice rs rS rY))
+					    OR
+					     ((S=Y)AND(rest_same rs rS)) in
+	letrec not_same [] [] = F /\
+	       not_same (a:b) (c:d) = NOT (a = c) OR (not_same b d) in
+	(not_same s S) AND
+	(choice s S (NextFn s)) in
+    let init [c1_r, c1_d, c1_g, s1, x1, y1, u1, t1, z1, v1,
+	      w1, v2, w2, z2, t2, u2, y2, s2, x2, c2_g, c2_d, c2_r] =
+		(NOT (c1_r OR c1_g OR c1_d OR c2_r OR c2_g OR c2_d))
+		AND (NOT (s1 OR y1 OR u1 OR v1 OR z1 OR x1)) AND t1 AND w1
+		AND (NOT (s2 OR y2 OR u2 OR w2 OR z2 OR x2)) AND t2 AND v2 in
+    (declare (interleave [s,S])) seq
+    (make_model name_list s S (TransRel s S) (init s));
+
+
+
+
+// %%%%%%%%%%%%%%%%
+
+let example_subst exp vl =
+            letrec exmp [] exp = [] /\
+                   exmp (h:t) exp =
+                        let vn = hd (depends [h]) in
+                        let newH = substitute [(vn, T)] exp in
+                        let newL = substitute [(vn, F)] exp in
+                        (newH == T) => [(vn, T)] |
+                        (newH == F) => (vn, F):(exmp t newL) |
+                                       (vn, T):(exmp t newH) in
+            exmp vl exp;
+
+let clean sl = map (\p. snd p) sl;
+
+let counterAX f (Model nl s S R init qs qS subs2S subS2s) =
+	let fy  = (substitute subs2S f) in
+	let counter_cond = init AND R AND (NOT fy) in
+	let start = example_subst (quant_thereis qS counter_cond) s in
+	let final = example_subst (substitute start counter_cond) s in
+	[start, final];
+
+
+// THIS IS THE LATEST...
+
+let nl = "
+";
+
+let diff_seq sll =
+	let prn s = itlist (\p.\r.(fst p)^", "^r) s nl in
+	let prs s = itlist (\p.\r.((snd p)=>"1"|"0")^r) s "" in
+	letrec differ [] [] = ""
+	 /\    differ ((n1,v1):r1) ((n2,v2):r2) = v1!=v2 => n1 | differ r1 r2 in
+	letrec dfs [s] = (prn s)^(prs s)
+	  /\   dfs (s0:(s1:r)) = (dfs (s1:r))^"->"^(differ s0 s1)^"->"^nl^
+				 (prs s0) in
+	let rsll = rev sll in
+	(dfs rsll);
+
+
+letrec find_sub [] e = []
+ /\    find_sub (sn:rsn) e =
+		let HE = substitute [(sn,T)] e in
+		let LE = substitute [(sn,F)] e in
+		HE == F =>
+		    (sn,F):(find_sub rsn LE) |
+		    (sn,T):(find_sub rsn HE);
+
+let counterAG f (Model nl s S R init qs qS subs2S subS2s) = 
+    letrec Approx sf =
+	NOT ((init implies sf) == T) => [sf] |
+	    let newf =
+		let sfy  = (substitute subs2S sf) in
+		quant_forall qS (f AND (R implies sfy)) in
+	    sf:(Approx newf) in
+    let ref_seq = Approx T in
+    letrec diff (s0:(s1:(s2:rest))) = (s0 AND NOT s1):(diff (s1:(s2:rest))) /\
+           diff [s1, final]         = [init AND (NOT final)] in
+    let ex_seq = rev (diff ref_seq) in
+    let snl = map (\v. hd (depends [v])) s in
+    let sub1 = find_sub snl (hd ex_seq) in
+    letrec exseq cur [] = [cur] /\
+           exseq cur (t:rtl) =
+                let next = find_sub snl
+			      ((substitute subS2s (substitute cur R)) AND t) in
+                cur:(exseq next rtl) in
+    exseq sub1 (tl ex_seq);
+
+
+
+let privileged g r d = (g _=_ r) and (not (d _=_ r));
+let q = counterAG (mc TransArbiter
+		(not ((privileged (Var "c1.g")(Var "c1.r")(Var "c1.d"))
+                           and
+                           (privileged (Var "c2.g")(Var "c2.r")(Var "c2.d")))))
+	TransArbiter;
+
+
+time (diff_seq q);
+let e = AG (not ((privileged (Var "c1.g")(Var "c1.r")(Var "c1.d")) and
+	         (privileged (Var "c2.g")(Var "c2.r")(Var "c2.d"))));
+e;

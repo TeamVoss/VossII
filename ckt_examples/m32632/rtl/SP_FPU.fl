@@ -1,0 +1,10 @@
+load "ste.fl";
+
+let ckt = verilog2fsm "" "SP_FPU" ["SP_FPU.v"] [];
+time ckt;
+
+let vis = STE_debug ckt;
+
+vis;
+
+random_simulation vis [("BCLK","01")] [] 30;

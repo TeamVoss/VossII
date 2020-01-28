@@ -1,0 +1,22 @@
+load "ste.fl";
+
+TYPE "byte" 8;
+
+let tst =
+    byte_input a b c.
+    byte_output o1 o2 o3 o4 o5 o6.
+    CELL "tst" [
+	o1 <- a '-' b,
+	o2 <- b '-' a,
+	o3 <- a '-' b '-' c,
+	o4 <- a '-' c '-' b,
+	o5 <- a '-' '1,
+	o6 <- '1 '-' a
+];
+
+let p = tst 'a 'b 'c 'o1 'o2 'o3 'o4 'o5 'o6;
+
+let ckt = pexlif2fsm p;
+
+STE_debug ckt;
+

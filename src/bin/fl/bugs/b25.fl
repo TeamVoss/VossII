@@ -1,0 +1,479 @@
+load "bexpr_arithm.fl";
+
+lettype wexpr =
+	    W_UNKNOWN {sz::int}
+	|   W_CONST {sz::int} {v::int}
+	|   W_VAR {sz::int} {base::string}
+	|   W_AND {a::wexpr} {b::wexpr}
+	|   W_OR {a::wexpr} {b::wexpr}
+	|   W_NOT {a::wexpr}
+	|   W_EQ {a::wexpr} {b::wexpr}
+	|   W_GR {a::wexpr} {b::wexpr}
+	|   W_ADD {a::wexpr} {b::wexpr}
+	|   W_SUB {a::wexpr} {b::wexpr}
+	|   W_MUL {a::wexpr} {b::wexpr}
+	|   W_DIV {a::wexpr} {b::wexpr}
+	|   W_MOD {a::wexpr} {b::wexpr}
+	|   W_ITE {cond::wexpr} {t::wexpr} {e::wexpr}
+	|   W_SLICE {msb::int} {lsb::int} {w::wexpr}
+	|   W_CAT {parts::wexpr list}
+	|   MEMORY {a_sz::int} {d_sz::int} {lines::(wexpr#wexpr) list}
+	|   MEM_READ {mem::wexpr} {addr::wexpr}
+	|   MEM_WRITE {mem::wexpr} {addr::wexpr} {data::wexpr}
+;
+
+letrec P_wexpr (W_UNKNOWN sz) =
+	sprintf "X[%d:0]" (sz-1)
+ /\    P_wexpr (W_CONST sz v) =
+	sz < 5 OR ((sz % 4) != 0) =>
+	    sprintf "0b%0*b" sz v
+	|
+	    sprintf "0x%0*x" (sz/4) v
+ /\    P_wexpr (W_VAR sz base) =
+	    sprintf "%s[%d:0]" base (sz-1)
+ /\    P_wexpr (W_AND a b) = sprintf "(%s & %s)" (P_wexpr a) (P_wexpr b)
+ /\    P_wexpr (W_OR  a b) = sprintf "(%s | %s)" (P_wexpr a) (P_wexpr b)
+ /\    P_wexpr (W_NOT a) = sprintf "~(%s)" (P_wexpr a)
+ /\    P_wexpr (W_EQ  a b) = sprintf "(%s = %s)" (P_wexpr a) (P_wexpr b)
+ /\    P_wexpr (W_GR  a b) = sprintf "(%s > %s)" (P_wexpr a) (P_wexpr b)
+ /\    P_wexpr (W_ADD a b) = sprintf "(%s + %s)" (P_wexpr a) (P_wexpr b)
+ /\    P_wexpr (W_SUB a b) = sprintf "(%s - %s)" (P_wexpr a) (P_wexpr b)
+ /\    P_wexpr (W_MUL a b) = sprintf "(%s * %s)" (P_wexpr a) (P_wexpr b)
+ /\    P_wexpr (W_DIV a b) = sprintf "(%s / %s)" (P_wexpr a) (P_wexpr b)
+ /\    P_wexpr (W_MOD a b) = sprintf "(%s %% %s)" (P_wexpr a) (P_wexpr b)
+ /\    P_wexpr (W_ITE c t e) =
+	    sprintf "IF %s THEN %s ELSE %s" (P_wexpr c) (P_wexpr t) (P_wexpr e)
+ /\    P_wexpr (W_SLICE msb lsb w) =
+	    sprintf "(%s)[%d:%d]" (P_wexpr w) msb lsb
+ /\    P_wexpr (W_CAT parts) =
+	    list2str T "[" ", " "}" P_wexpr parts
+ /\    P_wexpr (MEMORY asz dsz lines) =
+	let pre = sprintf "(MEMORY %d %d [\n\t" asz dsz in
+	let p1 (a,d) = sprintf "%s->%s}" (P_wexpr a) (P_wexpr d) in
+	list2str T pre ",\n\t" "])" p1 lines
+ /\    P_wexpr (MEM_READ mem addr) =
+	sprintf "%s[%s]" (P_wexpr mem) (P_wexpr addr)
+ /\    P_wexpr (MEM_WRITE mem addr d) =
+	sprintf "(%s[%s]<-%s)" (P_wexpr mem) (P_wexpr addr) (P_wexpr d)
+;
+install_print_function P_wexpr;
+
+
+letrec get_memory_dims (MEMORY asz dsz lines) = length lines, asz, dsz
+ /\    get_memory_dims (MEM_WRITE mem a d) = get_memory_dims mem
+ /\    get_memory_dims other = error "get_memory_dims: Not a memory"
+;
+
+cletrec expand_mem_ops (MEM_WRITE mem addr data) =
+	val (MEMORY asz dsz lines) = expand_mem_ops mem in
+	let wr1 (a,d) = a, (W_ITE (W_EQ addr a) data d) in
+	MEMORY asz dsz (map wr1 lines)
+ /\    expand_mem_ops mem = mem
+;
+
+
+letrec wexpr_size wexpr =
+    let get_size2 a b =
+	let a_sz = wexpr_size a in
+	let b_sz = wexpr_size b in
+	a_sz != b_sz =>
+	    eprintf "Size mismatch in wexpr expression (%d != %d)" a_sz b_sz
+	|
+	a_sz
+    in
+    let wsz (W_UNKNOWN sz) = sz
+     /\ wsz (W_CONST sz v) = sz
+     /\ wsz (W_VAR sz b) = sz
+     /\ wsz (W_AND a b) = get_size2 a b
+     /\ wsz (W_OR a b) = get_size2 a b
+     /\ wsz (W_NOT a) = wexpr_size a
+     /\ wsz (W_EQ a b) =
+	let a_sz = wexpr_size a in
+	let b_sz = wexpr_size b in
+	a_sz != b_sz => eprintf "Size mismatch in W_EQ (%d != %d)" a_sz b_sz | 1
+     /\ wsz (W_GR a b) =
+	let a_sz = wexpr_size a in
+	let b_sz = wexpr_size b in
+	a_sz != b_sz => eprintf "Size mismatch in W_GR (%d != %d)" a_sz b_sz | 1
+     /\ wsz (W_ADD a b) = get_size2 a b
+     /\ wsz (W_SUB a b) = get_size2 a b
+     /\ wsz (W_MUL a b) = get_size2 a b
+     /\ wsz (W_DIV a b) = get_size2 a b
+     /\ wsz (W_MOD a b) = get_size2 a b
+     /\ wsz (W_ITE c a b) =
+	wexpr_size c != 1 => error "Condition in W_ITE not of size 1!" |
+	get_size2 a b
+     /\ wsz (W_SLICE msb lsb w) = msb-lsb+1
+     /\ wsz (W_CAT wl) = itlist (\w.\r. wexpr_size w + r) wl 0
+     /\ wsz (MEMORY asz dsz lines) =
+	    letrec memory_check ((a,d):ls) =
+		wexpr_size a != asz =>
+		    error "Address size mismatch in MEMORY"
+		|
+		wexpr_size d != dsz =>
+		    error "Data size mismatch in W_MEM_READ"
+		|
+		memory_check ls
+	     /\   memory_check [] = (length lines)*(asz+dsz)
+	    in
+	    memory_check lines
+     /\ wsz (MEM_READ mem addr) =
+	    letrec get_memory_dsz (MEMORY asz dsz lines) = dsz
+	     /\    get_memory_dsz (MEM_WRITE mem asz d) = 
+		    let mdsz = get_memory_dsz mem in
+		    let ddsz = wexpr_size d in
+		    mdsz != ddsz => error "Data size mismatch in MEM_WRITE" |
+		    mdsz
+	     /\    get_memory_dsz other = 
+		    error "Illegal memory read"
+	    in
+	    get_memory_dsz mem
+     /\ wsz (MEM_WRITE mem addr d) = wexpr_size mem
+    in
+    wsz wexpr
+;
+
+new_type_abbrev dualrail = (bexpr#bexpr);
+
+let node2drname name =
+    let pts = str_split "[" name in
+    let Hname = list2str T "" "[" "" id ((hd pts^".H"):(tl pts)) in
+    let Lname = list2str T "" "[" "" id ((hd pts^".L"):(tl pts)) in
+    (Hname, Lname)
+;
+
+let bv2dualrail sub bv = 
+    letrec be2dr be =
+	be == bT => (bT,bF) |
+	be == bF => (bF,bT) |
+	let tp = bget_type be in
+	str_is_prefix "not-" tp =>
+	    val (H,L) = be2dr (bNOT be) in
+	    (L,H)
+	|
+	tp == "variable" =>
+	    let name = bget_variable be in
+	    (assoc name sub) catch
+	    val (Hname, Lname) = node2drname name in
+	    (bvariable Hname, bvariable Lname)
+	|
+	val (a,b) = bget_arguments be in
+	val (aH,aL) = be2dr a in
+	val (bH,bL) = be2dr b in
+	(aH bAND bH, aL bOR bL)
+    in
+    map be2dr bv
+;
+
+let dualr_bin_fun fn av bv =
+    let sz = length av in
+    sz != length bv =>
+        eprintf "Length mismatch for dualr_bin_fun (%d != %d)\n" sz (length bv)
+    |
+    let an = sprintf "a[%d:0]" (sz-1) in
+    let bn = sprintf "b[%d:0]" (sz-1) in
+    let sub = (zip (md_expand_vector an) av)@ (zip (md_expand_vector bn) bv) in
+    let a = variable_vector an in
+    let b = variable_vector an in
+    let res = fn a b in
+    bv2dualrail sub res
+;
+
+let meet av bv =
+    let meet1 (aH,aL) (bH,bL) = (aH bOR bH, aL bOR bL) in
+    map2 meet1 av bv
+;
+
+letrec wexpr2dualr (W_UNKNOWN sz) = replicate sz (bT,bT)
+ /\    wexpr2dualr (W_CONST sz v) = map (\b.b,bNOT b) (int2fbv sz v)
+ /\    wexpr2dualr (W_VAR sz b) =
+	map (\b.b,bNOT b) (variable_vector (sprintf "%s[%d:0]" b (sz-1)))
+ /\    wexpr2dualr (W_AND a b) =
+	    let bvAND av bv = map2 (defix bAND) av bv in
+	    dualr_bin_fun bvAND (wexpr2dualr a) (wexpr2dualr b)
+ /\    wexpr2dualr (W_OR a b) =
+	    let bvOR av bv = map2 (defix bOR) av bv in
+	    dualr_bin_fun bvOR (wexpr2dualr a) (wexpr2dualr b)
+ /\    wexpr2dualr (W_NOT a) =
+	    map (\(H,L).L,H) (wexpr2dualr a)
+ /\    wexpr2dualr (W_EQ a b) =
+	let eq_fn av bv = [av ''='' bv] in
+	dualr_bin_fun eq_fn (wexpr2dualr a) (wexpr2dualr b)
+ /\    wexpr2dualr (W_GR a b) =
+	let gr_fn av bv = [av ''>'' bv] in
+	dualr_bin_fun gr_fn (wexpr2dualr a) (wexpr2dualr b)
+ /\    wexpr2dualr (W_ADD a b) =
+	    dualr_bin_fun (defix ''+'') (wexpr2dualr a) (wexpr2dualr b)
+ /\    wexpr2dualr (W_SUB a b) =
+	    dualr_bin_fun (defix ''-'') (wexpr2dualr a) (wexpr2dualr b)
+ /\    wexpr2dualr (W_MUL a b) =
+	    dualr_bin_fun (defix ''*'') (wexpr2dualr a) (wexpr2dualr b)
+ /\    wexpr2dualr (W_DIV a b) =
+	    dualr_bin_fun (defix ''/'') (wexpr2dualr a) (wexpr2dualr b)
+ /\    wexpr2dualr (W_MOD a b) =
+	    dualr_bin_fun (defix ''%'') (wexpr2dualr a) (wexpr2dualr b)
+ /\    wexpr2dualr (W_ITE c t e) =
+	val [(cH,cL)] = wexpr2dualr c in
+	let tv = wexpr2dualr t in
+	let ev = wexpr2dualr e in
+	let is_one = cH bAND bNOT cL in
+	let is_zero = bNOT cH bAND cL in
+	IF is_one THEN tv ELSE (
+	IF is_zero THEN ev ELSE (
+	    meet tv ev
+	))
+ /\    wexpr2dualr (W_SLICE msb lsb w) =
+	    let bv = wexpr2dualr w in
+	    let l = length bv in
+	    butlastn lsb (butfirstn (l-msb-1) bv)
+ /\    wexpr2dualr (W_CAT wl) = itlist (\w.\l. (wexpr2dualr w)@l) wl []
+ /\    wexpr2dualr (MEMORY asz dsz lines) =
+	let mk (a,d) = (wexpr2dualr a)@(wexpr2dualr d) in
+	flatmap mk lines
+ /\    wexpr2dualr (MEM_READ mem addr) =
+	val (MEMORY asz dsz lines) = expand_mem_ops mem in
+	let rd (a,d) r = W_ITE (W_EQ a addr) d r in
+	let res = itlist rd lines (W_UNKNOWN dsz) in
+	wexpr2dualr res
+ /\    wexpr2dualr (MEM_WRITE mem addr d) =
+	wexpr2dualr (expand_mem_ops (MEM_WRITE mem addr d))
+;
+
+
+lettype update_fn =
+	W_UPDATE_FN {lhs::wexpr} {rhs::wexpr}
+    |	W_PHASE_DELAY {lhs::wexpr} {rhs::wexpr}
+;
+
+let Pupdate_fn (W_UPDATE_FN lhs rhs) =	
+    sprintf "%s <- %s" (P_wexpr lhs) (P_wexpr rhs)
+ /\ Pupdate_fn (W_PHASE_DELAY lhs rhs) =
+    sprintf "%s <: %s" (P_wexpr lhs) (P_wexpr rhs)
+;
+install_print_function Pupdate_fn;
+
+lettype pexlif =
+	PINST
+	    {name::string}
+	    {leaf::bool}
+	    {fa_inps:: (string#(string list)) list}
+	    {fa_outs:: (string#(string list)) list}
+	    {internals:: string list}
+	    {content::content}
+andlettype content =
+	  P_HIER {children::pexlif list}
+	| P_LEAF {fns::update_fn list}
+;
+
+forward_declare {prim_Pcontent:: int->content->string};
+
+letrec prim_Ppexlif ind pexlif =
+    val (PINST name leaf inps outs ints body) = pexlif in
+    let s = implode (("\n":(replicate ind " "))@["["]) in
+    let s2 = implode (("\n":(replicate (ind+3) " "))@["["]) in
+    let inp = list2str T s2 "," "]" (\(f,a). sprintf "(%s,%S)" f a) inps in
+    let out = list2str T s2 "," "]" (\(f,a). sprintf "(%s,%S)" f a) outs in
+    let int = list2str T s2 "," "]" id ints in
+    let rem = prim_Pcontent (ind+6) body in
+    sprintf "(PINST %s %B %s %s %s %s)" name leaf inp out int rem
+;
+
+let prim_Pcontent ind (P_HIER children) =
+    let s2 = implode (("\n":(replicate (ind+3) " "))@["["]) in
+    list2str T s2 ", " "]" (prim_Ppexlif (ind+6)) children
+ /\ prim_Pcontent ind (P_LEAF fns) =
+    let s2 = implode (("\n":(replicate (ind+3) " "))@["["]) in
+    let pr ufn = sprintf "\n%*s%s" (ind+3) " " (Pupdate_fn ufn) in
+    list2str T s2 ", " "]" pr fns
+;
+let Ppexlif pexlif = prim_Ppexlif 0 pexlif;
+install_print_function Ppexlif;
+
+let get_lhs_vars we =
+    letrec get_names (W_VAR sz b) =
+	sz = 1 => [b] | md_expand_vector (sprintf "%s[%d:0]" b (sz-1))
+     /\	   get_names (W_SLICE msb lsb w) =
+	let l = get_names w in
+	butlastn lsb (lastn (msb+1) l)
+     /\    get_names (W_CAT parts) = itlist (\w.\r. get_names w @ r) parts []
+     /\    get_names other = error "Illegal lhs expression"
+    in
+    merge_vectors (get_names we)
+;
+
+let w_depends we =
+    letrec dep (W_UNKNOWN sz) = []
+     /\    dep (W_CONST sz v) = []
+     /\    dep (W_VAR sz b) = md_expand_vector (sprintf "%s[%d:0]" b (sz-1))
+     /\    dep (W_AND a b) = (dep a) union (dep b)
+     /\    dep (W_OR  a b) = (dep a) union (dep b)
+     /\    dep (W_EQ  a b) = (dep a) union (dep b)
+     /\    dep (W_GR  a b) = (dep a) union (dep b)
+     /\    dep (W_ADD a b) = (dep a) union (dep b)
+     /\    dep (W_SUB a b) = (dep a) union (dep b)
+     /\    dep (W_MUL a b) = (dep a) union (dep b)
+     /\    dep (W_DIV a b) = (dep a) union (dep b)
+     /\    dep (W_MOD a b) = (dep a) union (dep b)
+     /\    dep (W_NOT a)   = dep a
+     /\    dep (W_ITE c t e) = (dep c) union(dep t) union(dep e)
+     /\    dep (W_SLICE msb lsb w) = dep w
+     /\    dep (W_CAT parts) = itlist (\w.\r. dep w union r) parts []
+     /\    dep (MEMORY asz dsz lines) =
+	    setify (flatmap (\(a,d). (dep a) union (dep d)) lines)
+     /\    dep (MEM_READ mem addr) =
+	    (dep mem) union (dep addr)
+     /\    dep (MEM_WRITE mem addr data) =
+	    (dep mem) union (dep addr) union (dep data)
+    in
+    extract_vectors (dep we)
+;
+
+let valid_lhs we =
+    letrec rec_ok (W_VAR sz b) = T
+     /\    rec_ok (W_SLICE msb lsb w) = rec_ok w
+     /\    rec_ok (W_CAT parts) = itlist (\w.\r. rec_ok w AND r) parts T
+     /\    rec_ok other = F
+    in
+    rec_ok we
+;
+
+let <- lhs rhs =
+    let l_sz = wexpr_size lhs in
+    let r_sz = wexpr_size rhs in
+    l_sz != r_sz =>
+	eprintf "Size mismatch in update function (%d!=%d)" l_sz r_sz
+    |
+    NOT (valid_lhs lhs) =>
+	eprintf "%s is not a valid lhs expression" (P_wexpr lhs)
+    |
+    W_UPDATE_FN lhs rhs
+;
+infix 2 <-;
+
+let <: lhs rhs =
+    let l_sz = wexpr_size lhs in
+    let r_sz = wexpr_size rhs in
+    l_sz != r_sz =>
+	eprintf "Size mismatch in phases delay (%d!=%d)" l_sz r_sz
+    |
+    NOT (valid_lhs lhs) =>
+	eprintf "%s is not a valid lhs expression" (P_wexpr lhs)
+    |
+    W_PHASE_DELAY lhs rhs
+;
+infix 2 <:;
+
+
+
+
+let pexlif2fsm pexlif =
+    let tassoc al key = (assoc key al) catch key in
+    letrec do_flat inst_name cur_sub (PINST name leaf inps outs ints body) =
+	let tr_io (fv, avl) =
+	    let fs = md_expand_vector fv in
+	    let as = map (tassoc cur_sub) (md_expand_vectors avl) in
+	    zip fs as
+	in
+	let io_sub = flatmap tr_io (inps@outs) in
+	let tr_int v =
+	    let nds = md_expand_vector v in
+	    map (\n. n, sprintf "%s%s" inst_name n) nds
+	in
+	let int_sub = flatmap tr_int ints in
+	let new_sub = io_sub@int_sub in
+	let flat (P_HIER children) =
+	    letrec process cnt (ch:chs) =
+		let new_inst_name = sprintf "%sinst_%d/" inst_name cnt in
+		(do_flat new_inst_name new_sub ch)@(process (cnt+1) chs)
+	     /\    process cnt [] = []
+	    in
+	    process 1 children
+	 /\  flat (P_LEAF fns) =
+	    let mk_bsub (f,a) =
+		val (fH,fL) = node2drname f in
+		val (aH,aL) = node2drname a in
+		[(fH,bvariable aH), (fL,bvariable aL)]
+	    in
+	    let bsub = flatmap mk_bsub new_sub in
+	    let process (W_UPDATE_FN lhs rhs) =
+		let l_vars = get_lhs_vars lhs in
+		let r_exprs = bsubstitute bsub (wexpr2dualr rhs) in
+		map2 (\l.\e. (l,F,e)) l_vars r_exprs
+	      /\ process (W_PHASE_DELAY lhs rhs) =
+		let l_vars = get_lhs_vars lhs in
+		let r_exprs = bsubstitute bsub (wexpr2dualr rhs) in
+		map2 (\l.\e. (l,T,e)) l_vars r_exprs
+	    in
+	    flatmap process fns
+	in
+	flat body
+    in
+    do_flat "" [] pexlif
+;
+
+
+let CELL {name::string} {body::pexlif list} = PINST "" F [] [] [] (P_HIER body);
+
+let eval_fl_code l =
+    let fp = mktemp "eval_fl_code" then
+    let fname = stream2filename  fp then
+    (map (fprintf fp "%s\n") l) fseq
+    (fclose fp) fseq
+    (_load fname F) fseq
+    (system (sprintf "/bin/rm -f %s" fname)) fseq
+    ()
+;
+
+let hw_types_decl_ref = ref {[]::string list};
+
+let mk_input destr_fn size_fn body_fun {f::string} acc =
+	\{aa:: *a}. 
+	    let a = destr_fn aa in
+	    let av = get_lhs_vars a in
+	    let acc' name body =
+		val (PINST n leaf inps outs ints body) = acc name body in
+		PINST name leaf ((f,av):inps) outs ints body
+	    in
+	    let wf = W_VAR (size_fn aa) f in
+	    body_fun wf acc'
+;
+
+let TYPE name size =
+    let current = deref hw_types_decl_ref in
+    mem name current => eprintf "A hw type called %s is already defined" name |
+    let new = name:current in
+    (hw_types_decl_ref := new) fseq
+    let ssz = sprintf "%d" size in
+    let ssize =
+	list2str T "overload hw_size " " " "" (sprintf "hw_%s_size") new
+    in
+    let sdestr =
+	list2str T "overload hw_destr " " " "" (sprintf "hw_%s_destr") new
+    in
+    let sinps =
+	list2str T "overload input " " " "" (sprintf "%s_input") new
+    in
+    eval_fl_code
+    <{ 
+	lettype `name` = BV_`name` wexpr;
+	let hw_`name`_size {bv::`name`} = `ssz`;
+	`ssize`;
+	let hw_`name`_destr (BV_`name` w) = w;
+	`sdestr`;
+	let `name`_input = mk_input hw_`name`_destr hw_`name`_size;
+	`sinps`;
+	binder_with_accumulator `name`_input CELL;
+	binder_with_accumulator input CELL;
+    }> "functor"
+;
+
+
+
+
+
+
+TYPE "aaa" 12;
+
+TYPE "bbb" 3;
+
+help "input";

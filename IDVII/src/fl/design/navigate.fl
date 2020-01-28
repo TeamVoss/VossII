@@ -1,0 +1,173 @@
+// Library defining fuinctions to draw the fanin or fanout tree
+// of a circuit node.
+//
+// Functions provided:
+//	show_fanin_cone ckt node columns 
+//	show_fanout_cone ckt node columns
+//
+begin_abstype;
+
+let vfanin ckt v =
+    letrec get_real_fanin nd =
+	let fi = fanin ckt nd in
+	val (user,tmp) = split is_user_given fi in
+	user @ (flatmap (get_real_fanin) tmp)
+    in
+    md_extract_vectors (flatmap get_real_fanin (md_expand_vector v))
+;
+
+let vfanout ckt v =
+    letrec get_real_fanout nd =
+	let fo = fanout ckt nd in
+	val (user,tmp) = split is_user_given fo in
+	user @ (flatmap (get_real_fanout) tmp)
+    in
+    md_extract_vectors (flatmap get_real_fanout (md_expand_vector v))
+;
+
+let dbg_ref = ref [""];
+
+
+let up_arrow = implode (map chr [27,91,65]);
+let down_arrow = implode (map chr [27,91,66]);
+let right_arrow = implode (map chr [27,91,67]);
+let left_arrow = implode (map chr [27,91,68]);
+
+letrec repeat 0 fn = ""
+ /\    repeat n fn = fn ^ (repeat (n-1) fn);
+
+let move_up n_rows =  repeat n_rows up_arrow;
+let move_down n_rows =  repeat n_rows down_arrow;
+let line_spaces n_rows =  repeat n_rows "\n";
+let move_left n_cols =  repeat n_cols left_arrow;
+let move_right n_cols =  repeat n_cols right_arrow;
+
+
+let draw_h_line n = repeat n "-";
+let draw_v_line n = repeat n ("|"^down_arrow^left_arrow);
+let draw_v_line_up n = repeat n (up_arrow^"|"^left_arrow);
+
+//let clear_and_draw fn = (print "\n\n") seq (print fn);
+
+let window_cnt_ref = ref 0;
+
+let clear_and_draw fn = 
+    let w = sprintf ".w%d" (deref window_cnt_ref) then
+    (window_cnt_ref := (deref window_cnt_ref + 1)) fseq
+    let fp = mktemp "fanin_out_drawing" then
+    let file = stream2filename fp then
+    (fclose fp) fseq
+    (save file "\n\n\n") fseq
+    (save file fn) fseq
+    (save file "\n") fseq
+    let pgm = 
+	(sprintf "toplevel %s" w):
+	(sprintf "button %s.destroy -text Close -command {destroy %s}" w w):
+	(sprintf "pack %s.destroy -side bottom -fill x" w):
+	(sprintf "scrollbar %s.vs -command {%s.txt yview}" w w):
+	(sprintf "pack %s.vs -side right -fill y" w):
+	(sprintf "scrollbar %s.hs -orient horizontal -command {%s.txt xview}"
+		 w w):
+	(sprintf "pack %s.hs -side bottom -fill x" w):
+	(
+	    (sprintf "text %s.txt -yscrollcommand {%s.vs set}" w w)^
+	    (sprintf " -xscrollcommand {%s.hs set}" w)^
+	    (sprintf " -setgrid 1 -width 2000 -height 40")^
+	    (sprintf " -font {-*-courier-bold-r-normal-*-10-*-*-*-*-*-*-*}")^
+	    (sprintf " -background white -wrap none")
+	):
+	(sprintf "pack %s.txt -side left -fill both -expand 1" w):
+	(
+	    (sprintf "set fl [open %s]; " file)^
+	    (sprintf "set data [read $fl]; ")^
+	    (sprintf "close $fl; ")^
+	    (sprintf "%s.txt insert 0.0 $data" w)
+	):
+	("update idletasks"):
+	(sprintf "wm geometry %s 200x70" w):
+	[]
+    in
+    (dbg_ref := pgm) fseq
+    tcl_eval pgm
+;
+//    (print "\n\n") seq (print fn);
+
+
+
+let strlen s = length (explode s);
+
+
+letrec place_fanin_cone ckt fn node done remaining =
+	let nstr = fn node in
+	let len = strlen nstr in
+	(len + 13) > remaining => (((move_left 5)^"... -+"^left_arrow,2),done) |
+	(mem node done) =>
+	    let pr_str = (move_left ((len)+2))^nstr^" *+"^(left_arrow) in
+	    ((pr_str,2),done) |
+	let rest = remaining - len - 7 in
+	letrec process [] pdone = ([],pdone)
+	 /\    process (s:r) pdone =
+		val (res,ndone') = place_fanin_cone ckt fn s pdone rest in
+		val (tres,fdone) = process r ndone' in
+		(res:tres, fdone) in
+	let done' = (mem node done) => done | node:done in
+	val (s_tr,done') = process (vfanin ckt node) done' in
+	let sum_height = itlist (\(s,h).\r. h+r) s_tr 0 in
+	let height = sum_height > 1 => sum_height | 2 in
+	letrec pr_subtr [] = ""
+	 /\    pr_subtr [(p,h)] = p
+	 /\    pr_subtr ((p,h):r) = p^(draw_v_line_up h)^(pr_subtr r)^
+				   (move_down h) in
+	let res = pr_subtr s_tr in
+	let lstr = length s_tr in
+	let splitchs = lstr = 0 => "   " | (lstr = 1) => "-- " | "+- " in
+	(((move_left (len+7))^res^(splitchs^"\""^nstr^"\" -+"^left_arrow),
+	 height), done');
+
+
+let show_fanin_cone ckt node columns =
+	val ((prstr, height),_) = place_fanin_cone ckt (\s.s) node [] columns in
+	let final = (line_spaces (height+2))^(move_right columns)^prstr in
+	(clear_and_draw final) seq (print "\n\n");
+
+
+
+
+letrec place_fanout_cone ckt fn node done remaining =
+	let nstr = fn node in
+	let len = strlen nstr in
+	(len + 13) > remaining => (("+- ..."^(move_left 6),2),done) |
+	(mem node done) =>
+	    let pr_str = "+* "^nstr^(move_left ((len)+3)) in
+	    ((pr_str,2),done) |
+	let rest = remaining - len - 7 in
+	letrec process [] pdone = ([],pdone)
+	 /\    process (s:r) pdone =
+		val (res,ndone') = place_fanout_cone ckt fn s pdone rest in
+		val (tres,fdone) = process r ndone' in
+		(res:tres, fdone) in
+	let done' = (mem node done) => done | node:done in
+	val (s_tr,done') = process (vfanout ckt node) done' in
+	let sum_height = itlist (\(s,h).\r. h+r) s_tr 0 in
+	let height = sum_height > 1 => sum_height | 2 in
+	letrec pr_subtr [] = ""
+	 /\    pr_subtr [(p,h)] = p
+	 /\    pr_subtr ((p,h):r) =
+		    p^(draw_v_line_up h)^(pr_subtr r)^(move_down h)
+	in
+	let res = pr_subtr s_tr in
+	let lstr = length s_tr in
+	let splitchs = lstr = 0 => "   " | (lstr = 1) => " --" | " -+" in
+	((("+- \""^nstr^"\""^splitchs^left_arrow^res^(move_left (len+7))),
+	    height), done');
+
+
+let show_fanout_cone ckt node columns =
+	val ((prstr, height),_) =
+	    place_fanout_cone ckt (\s.s) node [] columns
+	in
+	let final = (line_spaces (height+2))^"   "^prstr in
+	(clear_and_draw final) seq (print "\n\n");
+
+end_abstype show_fanin_cone show_fanout_cone;
+

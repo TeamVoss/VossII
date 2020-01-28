@@ -1,0 +1,598 @@
+%x EXTERN_PARSING
+
+let     [a-zA-Z\_]
+bindig  [0-1]
+dig     [0-9]
+hexdig  [0-9a-fA-F]
+white	[\ \t]
+nowhite	[a-zA-Z0-9'\_]
+symbol	[!%&$#+\-*/:<=>?@\\~`'^|\_]
+
+%{
+
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#pragma GCC diagnostic ignored "-Wunused-function"
+
+#include <strings.h>
+#include "fl.h"
+#include "y.tab.h"
+#include <unistd.h>
+
+#undef YYLMAX
+#define YYLMAX                  15000           // For really long lines
+#define YY_DECL                 int yylex (YYSTYPE *lvalp)
+
+YY_DECL;
+
+int Get_Infix(string s);
+void Exit(int);
+
+
+typedef struct old_yyin_rec {
+        int		old_line_nbr;
+        string		old_file_name;
+        string		old_DIR;
+        YY_BUFFER_STATE	old_buffer;
+        FILE		*old_fid;
+	bool		remove_after;
+        old_yyin_ptr	next;
+} old_yyin_rec;
+
+
+extern bool		file_load;
+extern bool	        gui_mode;
+extern int		line_nbr;
+extern str_mgr		strings;
+extern string		prompt;
+extern bool		RCverbose_eval_command;
+
+string                  DIR;        /* Current directory */
+char			prev_lines[2][YYLMAX+1];
+int			last_inp;
+old_yyin_ptr	        cur_file = NULL;
+string		        cur_file_name = "stdin";
+jmp_buf			*start_envp;
+
+static bool reading_external_parse_inps = FALSE;
+static rec_mgr		yyin_rec_mgr;
+static int 		print_prompt = 1;
+static char		pbuf[64];
+static char		lbuf[64];
+static bool		cur_quote;
+static FILE		*ext_parse_fp;
+static string		ext_parse_tmp_file;
+#define MAX_QUOTE_SIZE	16000
+static char		cmd_buf[1024];
+
+static string		expand_string(string s);
+static void		start_extern_parsing();
+static void		end_extern_parsing(string cmd);
+
+static struct keyword_rec {
+        char	*name;
+        int 	token;} keywords[] = {
+//
+    {"andlettype", AND_LETTYPE},
+    {"add_open_overload", ADD_OPEN_OVERLOAD},
+    {"assuming", QUALIFIED_BY},
+    {"begin_abstype", BEGIN_ADT},
+    {"binder", BINDER},
+    {"binder_with_accumulator", BINDER_WITH_ACC},
+    {"sized_binder_with_accumulator", SZ_BINDER_WITH_ACC},
+    {"clear_fixities", CLEAR_FIXITIES},
+    {"clet", C_LET},
+    {"cletrec", C_LETREC},
+    {"end_abstype", END_ADT},
+    {"export_to_tcl", EXPORT_TO_TCL},
+    {"forward_declare", FORWARD_DECLARE},
+    {"free_binder", FREE_BINDER},
+    {"if_then_else_binder", IF_THEN_ELSE_BINDER},
+    {"then_binder", THEN_BINDER},
+    {"else_binder", ELSE_BINDER},
+    {"infix", INFIX},
+    {"infix_unary", INFIX_UNARY},
+    {"infixr", INFIXR},
+    {"then", THEN},
+    {"in", IN},
+    {"install_print_function", INSTALL_PFN},
+    {"let", LET},
+    {"letrec", LETREC},
+    {"lettype", LETTYPE},
+    {"list", LIST},
+    {"new_type_abbrev", TYPE_ABREV},
+    {"non_lazy", NON_LAZY},
+    {"nonfix", NONFIX},
+    {"open_overload", OPEN_OVERLOAD},
+    {"overload", OVERLOAD},
+    {"postfix", POSTFIX},
+    {"prefix", PREFIX},
+    {"print_fixities", PRINT_FIXITIES},
+    {"ref", REF},
+    {"val", VAL}
+};
+
+static int nbr_keywords = sizeof(keywords)/sizeof(struct keyword_rec);
+
+static struct symb_name_rec {
+        char	*name;
+        int	token;} symbwords[] = {
+					{"=>", THEN_COND},
+					{"->", FN_TYPE},
+					{"|", ELSE_COND},
+					{"=", EQUAL},
+					{"#", CROSSPROD},
+					{"/\\", CONJ},
+					{"\\", LAMBDA},
+					{"::", TYPE_SEP}
+				      };
+
+static int nbr_symbwords = sizeof(symbwords)/sizeof(struct symb_name_rec);
+
+static hash_record      keyword_tbl;
+static hash_record      symbword_tbl;
+
+
+#if 0
+#define RETURN(v, t)	{						\
+			    print_prompt=0;				\
+			    strcat(prev_lines[0], (char *)yytext);	\
+			    last_inp = strlen((char*)yytext);		\
+			    fprintf(stderr, "%s -->%s\n", yytext,t);	\
+			    return(v);					\
+			}
+#else
+#define RETURN(v, t)	{						\
+			    print_prompt = 0;				\
+			    strcat(prev_lines[0], (char *)yytext);	\
+			    last_inp = strlen((char *)yytext);		\
+			    return(v);					\
+			}
+#endif
+
+%}
+
+%%
+
+<<EOF>>				    {
+					if( reading_external_parse_inps ) {
+					    yypop_buffer_state();
+					    reading_external_parse_inps = FALSE;
+					} else {
+					    yyterminate();
+					}
+				    }
+__FILE__			    {
+                                        lvalp->str_t = cur_file_name;
+                                        RETURN(STRINGT, "_STRINGT");
+				    }
+__LINE__			    {
+					sprintf(lbuf, "%d", line_nbr);
+                                        lvalp->str_t = wastrsave(&strings,lbuf);
+					RETURN(DEC_NUMBER, "_DEC_NUMBER");
+				    }
+
+DIR                                 {
+                                        lvalp->str_t = DIR;
+                                        RETURN(STRINGT, "_STRINGT");
+                                    }
+printf                              { RETURN(PRINTFT,  "PRINTF"); }
+fprintf                             { RETURN(FPRINTFT, "FPRINTF"); }
+sprintf                             { RETURN(SPRINTFT, "SPRINTF"); }
+eprintf                             { RETURN(EPRINTFT, "EPRINTF"); }
+sscanf                              { RETURN(SSCANFT,  "SSCANF"); }
+
+
+"<{"{white}*/"\n"		    { start_extern_parsing(); }
+<EXTERN_PARSING>"}>"{white}+"\""[^"]*\" { end_extern_parsing(&(yytext[2])); }
+<EXTERN_PARSING>[^\n\}]+	    { fputs(yytext,ext_parse_fp); }
+<EXTERN_PARSING>"\n"		    {
+					line_nbr++;
+					fputc('\n',ext_parse_fp);
+				    }
+<EXTERN_PARSING>.		    { fputc(yytext[0],ext_parse_fp); }
+
+set_line_number\ [0-9]+;	    {
+					line_nbr = atoi(&yytext[16])-1;
+					prev_lines[0][0] = '\0';
+					last_inp = 0;
+				    }
+
+set_file_name\ \"[^"]+\";	    {
+					string start = index(yytext, '"');
+					string end = rindex(yytext, '"');
+					char tmp = *end;
+					*end = 0;
+					cur_file_name =
+						wastrsave(&strings, start);
+					*end = tmp;
+					prev_lines[0][0] = '\0';
+					last_inp = 0;
+				    }
+
+^set_prompt[ \t]+\"[^"]+\"[ \t]*\;\n {
+				    char *p, *q;
+				    p = (char *) (&yytext[10]);
+				    while( *p != '"' )
+					p++;
+				    p++;
+				    q = pbuf;
+				    while( *p != '"' ) {
+					*q = *p;
+					p++;
+					q++;
+				    }
+				    *q = '\0';
+				    prompt = wastrsave(&strings, pbuf);
+				    if( file_load ) {
+					line_nbr++; 
+				    } else {
+                                        Emit_prompt("");
+				    }
+			}
+
+^\/\/\/[^\n]*		{
+			    /* Commented out code. Just ignore it */
+			}
+
+^\/\/[^\n]*		{
+			    /* Documentation comment */
+			    AddComment(&(yytext[2]));
+			}
+\/\/[^\n]*		{ /* comments */ }
+
+defix\ [\ \t]*{let}({nowhite})* {
+			    int *tokenp;
+			    string s;
+			    s = (string) &(yytext[6]);
+			    while( *s && (*s == ' ' || *s == '\t') )
+				s++;
+			    tokenp = (int *) find_hash(&keyword_tbl,
+						       (pointer) s);
+			    if( tokenp != NULL ) {
+				lvalp->loc_t.file = cur_file_name;
+				lvalp->loc_t.line = line_nbr;
+				RETURN(*tokenp, yytext);
+			    }
+			    lvalp->str_t = wastrsave(&strings, s);
+			    RETURN(VART, "_VART"); 
+			}
+
+{let}({nowhite})*	{
+			    int *tokenp;
+			    tokenp = (int *) find_hash(&keyword_tbl,
+						       (pointer) yytext);
+			    if( tokenp != NULL ) {
+				lvalp->loc_t.file = cur_file_name;
+				lvalp->loc_t.line = line_nbr;
+				RETURN(*tokenp, yytext);
+			    }
+			    lvalp->str_t = wastrsave(&strings, (string) yytext);
+			    RETURN(Get_Infix(lvalp->str_t), "_VART"); 
+			}
+
+\`			{
+			    if( cur_quote ) {
+				RETURN(UNQUOTE, "_UNQUOTE");
+			    } else {
+				REJECT;
+			    }
+			}
+
+\[\:			{
+			    cur_quote = TRUE;
+			    RETURN(BEGIN_QUOTE, "_BEGIN_QUOTE");
+			}
+
+\:\]			{
+			    cur_quote = FALSE;
+			    RETURN(END_QUOTE, "_END_QUOTE");
+			}
+
+
+defix\ [\ \t]*{symbol}({symbol})* {
+                            int *tokenp;
+                            string s;
+                            s = (string) &(yytext[6]);
+                            while( *s && (*s == ' ' || *s == '\t') )
+                                s++;
+                            tokenp = (int *) find_hash(&symbword_tbl,
+                                                       (pointer) s);
+                            if( tokenp != NULL )
+                                RETURN(*tokenp, yytext);
+                            lvalp->str_t = wastrsave(&strings, s);
+                            RETURN(VART, "_VART");
+			}
+
+{symbol}({symbol})*	{
+			    int *tokenp;
+			    tokenp = (int *) find_hash(&symbword_tbl,
+						       (pointer) yytext);
+			    if( tokenp != NULL )
+				RETURN(*tokenp, yytext);
+			    lvalp->str_t = wastrsave(&strings, (string) yytext);
+			    RETURN(Get_Infix(lvalp->str_t), "_VART"); 
+			}
+
+\.			{ RETURN(DOT, "_DOT"); }
+\,			{ RETURN(COMMA, "_COMMA"); }
+\;			{ RETURN(SEMICOLON, "_SEMICOLON"); }
+\(			{ RETURN(LPAR, "_LPAR"); }
+\)			{ RETURN(RPAR, "_RPAR"); }
+\{			{ RETURN(LCURL, "_LCURL"); }
+\}			{ RETURN(RCURL, "_RCURL"); }
+\[\]			{ RETURN(NILT, "_NIL"); }
+\[			{ RETURN(LBRACK, "_LBRACK"); }
+\]			{ RETURN(RBRACK, "_RBRACK"); }
+
+"0b"{bindig}({bindig})*	{
+			    lvalp->str_t = wastrsave(&strings, &(yytext[2]));
+			    RETURN(BIN_NUMBER, "_BIN_NUMBER");
+			}
+
+"0x"{hexdig}({hexdig})*	{
+			    lvalp->str_t = wastrsave(&strings, &(yytext[2]));
+			    RETURN(HEX_NUMBER, "_HEX_NUMBER");
+			}
+
+{dig}*\.{dig}{dig}*(e\-?{dig}{dig}*)?    {
+			    lvalp->str_t = wastrsave(&strings, (string) yytext);
+			    RETURN(FLOAT_NUMBER, "_FLOAT_NUMBER");
+			}
+
+{dig}({dig})*		{
+			    lvalp->str_t = wastrsave(&strings, (string) yytext);
+			    RETURN(DEC_NUMBER, "_DEC_NUMBER");
+			}
+
+(\"([^\"\\]|(\\.))*\") 	{ 
+			    yytext[yyleng-1] = 0;
+			    lvalp->str_t=expand_string((string)(&(yytext[1])));
+			    RETURN(STRINGT, "_STRINGT");
+			}
+\n			{
+			    strcat(prev_lines[0], (string) yytext);
+			    strcpy(prev_lines[1], prev_lines[0]);
+			    prev_lines[0][0] = '\0';
+			    last_inp = 0;
+			    line_nbr++;
+			}
+\ 			{
+			    strcat(prev_lines[0], (string) yytext);
+			    last_inp = strlen((string) yytext);
+			}
+\t			{
+			    strcat(prev_lines[0], (string) yytext);
+			    last_inp = strlen((string) yytext);
+			}
+\r                      { }
+.			{
+			    FP(err_fp,
+			 "\nLEX Warning: Unknown character |%s|(%d). Ignored\n",
+			       (string) yytext, (int) yytext[0]);
+			}
+%%
+
+void
+Init_lexer()
+{
+    int i;
+    new_mgr(&yyin_rec_mgr, sizeof(old_yyin_rec));
+    create_hash(&keyword_tbl, 5*nbr_keywords/4, str_hash, str_equ);
+    for(i = 0; i < nbr_keywords; i++)
+	insert_hash(&keyword_tbl, (pointer) keywords[i].name,
+				  (pointer) &(keywords[i].token));
+
+    create_hash(&symbword_tbl, 5*nbr_symbwords/4, str_hash, str_equ);
+    for(i = 0; i < nbr_symbwords; i++)
+	insert_hash(&symbword_tbl, (pointer) symbwords[i].name,
+				   (pointer) &(symbwords[i].token));
+    cur_quote = FALSE;
+    prev_lines[0][0] = '\0';
+    prev_lines[1][0] = '\0';
+    last_inp = 0;
+    static char path[1024];
+    strtemp(getcwd(path,1024));
+    DIR = wastrsave(&strings, charappend('/'));
+    cur_file_name = wastrsave(&strings, "stdin");
+}
+
+int yywrap() { return 1; }
+
+static string
+expand_string(string s)
+{
+    string res;
+    res = strtemp("");
+    while(*s) {
+	if( *s == '\n' )
+	    line_nbr++;
+	if( *s == '\\' ) {
+	    s++;
+	    switch( *s ) {
+		case 'n': res = charappend('\n'); break;
+		case '"': res = charappend('"'); break;
+		case 't': res = charappend('\t'); break;
+		default:  res = charappend(*s); break;
+	    }
+	} else {
+	    res = charappend(*s);
+	}
+	s++;
+    }
+    return(wastrsave(&strings, res));
+}
+
+bool
+do_parse(bool flush)
+{
+    bool ok;
+    eval_ctx_rec ctx;
+    Record_eval_context(&ctx);
+    jmp_buf eval_env;
+    start_envp = &eval_env;
+    switch( setjmp(*start_envp) ) {
+        case 0:
+            /* All ok */
+	    if( flush ) { YY_FLUSH_BUFFER; }
+            yyparse();
+            ok = TRUE;
+            break;
+        case 1:
+            /* Return from a failure */
+            ok = FALSE;
+            break;
+        default:
+            DIE("Should never happen");
+            break;
+    }
+    Restore_eval_context(&ctx);
+    return ok;
+}
+
+bool
+perform_fl_command(string txt)
+{
+    YY_BUFFER_STATE old_buffer = YY_CURRENT_BUFFER;
+    YY_BUFFER_STATE cmd_buffer = yy_scan_string(txt);
+    prev_lines[0][0] = '\0';
+    Set_default_break_handler();
+    bool old_file_load = file_load;
+    if( RCverbose_eval_command )
+	file_load = FALSE;
+    bool ok = do_parse(FALSE);
+    yy_delete_buffer(cmd_buffer);
+    yy_switch_to_buffer(old_buffer);
+    file_load = old_file_load;
+    return ok;
+}
+
+static void
+start_extern_parsing()
+{
+    if( !Mk_output_file_in_tmp_dir("ext_parse",
+				    &ext_parse_fp,
+				    &ext_parse_tmp_file) )
+    {
+	FP(err_fp, "Cannot create temp file\n");
+	return;
+    }
+    BEGIN EXTERN_PARSING;
+}
+
+static void
+end_extern_parsing(string cmd)
+{
+    // Remove leading white space
+    while( *cmd && *cmd != '\"' ) {
+	cmd++;
+    }
+    cmd++;
+    string e = cmd;
+    while( *e && (*e != '\"')) {
+	e++;
+    }
+    *e = '\0';
+    fclose(ext_parse_fp);
+    string binpath = getenv("VOSS-BINARY-DIRECTORY");
+    Sprintf(cmd_buf, "%s/%s < %s > %s_out",
+		 binpath, cmd, ext_parse_tmp_file, ext_parse_tmp_file);
+    if( system(cmd_buf) != 0 ) {
+	FP(err_fp, "External parse of %s failed.\n", ext_parse_tmp_file);
+	BEGIN INITIAL;
+	return;
+    }
+    BEGIN INITIAL;
+    Sprintf(cmd_buf, "%s_out", ext_parse_tmp_file);
+    FILE *res_fid;
+    if( (res_fid = Tryopen(cmd_buf, "r", NULL)) == NULL ) {
+	FP(err_fp, "External parse failed to load %s.\n", cmd_buf);
+	return;
+    }
+    reading_external_parse_inps = TRUE;
+    yypush_buffer_state(yy_create_buffer(res_fid, YY_BUF_SIZE));
+}
+
+void
+Start_stdin_parsing()
+{
+    yyin = stdin;
+    yy_switch_to_buffer(yy_create_buffer(yyin, YY_BUF_SIZE));
+}
+
+int
+Read_from_file(string name, bool verbose, bool remove_after)
+{
+    extern FILE *yyin;
+    FILE *new_fid;
+    string  full_name;
+    new_fid = Tryopen(name, "r", &full_name);
+    if( new_fid == NULL ) {
+	return( 1 );
+    } else {
+	old_yyin_ptr new;
+	new = (old_yyin_ptr) new_rec(&yyin_rec_mgr);
+	new->old_file_name = cur_file_name;
+	cur_file_name = full_name;
+	new->old_buffer = YY_CURRENT_BUFFER;
+	new->old_fid = yyin;
+	new->old_line_nbr = line_nbr;
+
+	new->old_DIR = DIR;
+	eval_ctx_rec ctx;
+	Record_eval_context(&ctx);
+	DIR = Get_DIR(full_name);
+	line_nbr = 1;
+	new->remove_after = remove_after;
+	new->next = cur_file;
+	cur_file = new;
+	bool old_file_load = file_load;
+	file_load = TRUE;
+	if( verbose ) {
+	    FP(stdout_fp, "-Loading file %s:\n", cur_file_name);
+	}
+	yyin = new_fid;
+	yy_switch_to_buffer(yy_create_buffer(yyin, YY_BUF_SIZE));
+	BEGIN(INITIAL);
+	jmp_buf eval_env;
+	start_envp = &eval_env;
+	bool ok;
+	switch( setjmp(*start_envp) ) {
+	    case 0:
+		/* All ok */
+		yyparse();
+		ok = TRUE;
+		break;
+	    case 1:
+		/* Return from a failure */
+		ok = FALSE;
+		break;
+	    default:
+		DIE("Should never happen");
+		break;
+	}
+	yyin = Return_to_old_fid();
+	Restore_eval_context(&ctx);
+	file_load = old_file_load;
+	return( ok?  0 : 2 );
+    }
+}
+
+
+FILE *
+Return_to_old_fid()
+{
+    FILE *ret;
+    old_yyin_ptr tmp;
+    yy_delete_buffer(YY_CURRENT_BUFFER);
+    if( cur_file->remove_after )
+	unlink(cur_file_name);
+    tmp = cur_file;
+    ret = tmp->old_fid;
+    line_nbr = tmp->old_line_nbr;
+    cur_file_name = tmp->old_file_name;
+    yy_switch_to_buffer(tmp->old_buffer);
+    cur_file = tmp->next;
+    DIR = tmp->old_DIR;
+    free_rec(&yyin_rec_mgr, (pointer) tmp);
+    return ret;
+}

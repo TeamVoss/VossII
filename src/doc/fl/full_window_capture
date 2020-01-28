@@ -1,0 +1,19 @@
+
+set aname [exec mktemp -u]
+
+set ofile [lindex $argv 0]
+set rem [lrange $argv 1 end]
+
+eval exec fl -f full_window_capture.fl $aname $rem &
+
+after 1000
+
+if { $rem != "" } {
+    send $aname screen_capture:do_cmd [list "ARGS\;"]
+}
+
+send $aname screen_capture:do_full_window_capture $ofile
+
+catch {send $aname screen_capture:do_cmds [list "quit\;"]}
+
+exit

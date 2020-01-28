@@ -1,0 +1,39 @@
+load "bool_arithm.fl";
+
+let list2 = [
+    [F,F,T,F,F,F,T],
+    [F,F,F,F,F,F,T],
+    [F,T,T,T,F,F,T],
+    [F,T,T,F,T,T,T],
+    [F,F,T,T,F,F,T]
+];
+
+VARS "idx[4:0]";
+let cond =  
+    (idx '<' (int2fbv (length idx) (length list2))) AND
+    (idx '>=' (int2fbv (length idx) 0))
+;   
+let sub = param cond;
+let idx2 = substitute sub idx;
+idx2;
+
+
+rvariable "a";
+
+let sel bv l =
+    letrec sel (b:bs) l =
+        let n = 2**(length bs) in
+        val (low,high) =
+            length l <= n => l,[] | (firstn n l), (butfirstn n l)
+        in
+        b == F => sel bs low |
+        b == T => sel bs high  |
+        b => (sel bs high) | (sel bs low)
+     /\ sel [] l = 
+        hd l
+    in
+    sel bv l
+;
+
+sel idx2 list2;
+

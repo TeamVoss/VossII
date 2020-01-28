@@ -1,0 +1,92 @@
+lettype edge_type = RaisingEdge | FallingEdge | ActiveHigh | ActiveLow;
+
+let latch_pat canv x y type =
+12;
+
+let buf_pat canv x y out_neg fc tag =
+    let ht = 30 in
+    let wid = 30 in
+    let inv_rad = 4 in
+    let ul = " "^(int2str x)^" "^(int2str y) in
+    let ll = " "^(int2str x)^" "^(int2str (y+ht)) in
+    let mid = " "^(int2str (x+wid))^" "^(int2str (y+ht/2)) in
+    let inv = out_neg => canv^" create oval "^
+	    (int2str (x+wid))^" "^(int2str (y+ht/2-inv_rad))^" "^
+	    (int2str (x+wid+2*inv_rad))^" "^(int2str (y+ht/2+inv_rad))^
+	    " -outline yellow -fill "^fc^" -tags "^tag^"\n" | "" in
+    canv^" create polygon "^ul^ll^mid^ul^" -outline yellow -fill "^fc^
+    " -tags "^tag^"\n"^inv;
+
+
+
+let and_pat canv x y out_neg fc = 
+    let ht = 40 in
+    let wid = 40 in
+    let inv_rad = 5 in
+    let ul = " "^(int2str x)^" "^(int2str y) in
+    let ll = " "^(int2str x)^" "^(int2str (y+ht)) in
+    let lr = " "^(int2str (x+3*wid/4))^" "^(int2str (y+ht)) in
+    let mid = " "^(int2str (x+wid))^" "^(int2str (y+ht/2)) in
+    let ur = " "^(int2str (x+3*wid/4))^" "^(int2str y) in
+    let inv = out_neg => canv^" create oval "^
+	    (int2str (x-3+wid))^" "^(int2str (y+ht/2-inv_rad))^" "^
+	    (int2str (x-3+wid+2*inv_rad))^" "^(int2str (y+ht/2+inv_rad))^
+	    " -outline yellow -fill "^fc^"\n" | "" in
+    canv^" create polygon "^ul^ll^ll^lr^mid^ur^ul^ul^
+	    " -smooth yes -outline yellow -fill "^fc^"\n"^inv;
+    
+
+let or_pat canv x y out_neg is_xor fc =
+    let ht = 40 in
+    let wid = 40 in
+    let inv_rad = 5 in
+    let ul = " "^(int2str x)^" "^(int2str y) in
+    let ml = " "^(int2str (x+ht/6))^" "^(int2str (y+ht/2)) in
+    let ll = " "^(int2str x)^" "^(int2str (y+ht)) in
+    let xor = canv^" create line "^ul^ul^ml^ll^ll^
+		   " -fill yellow -smooth yes\n" in
+    let iorpat x =
+	let ul = " "^(int2str x)^" "^(int2str y) in
+	let ml = " "^(int2str (x+ht/6))^" "^(int2str (y+ht/2)) in
+	let ll = " "^(int2str x)^" "^(int2str (y+ht)) in
+	let ladj = " "^(int2str (x+wid/4))^" "^(int2str (y+ht)) in
+	let lr = " "^(int2str (x+2*wid/3))^" "^(int2str (y+6*ht/7)) in
+	let mid = " "^(int2str (x+wid))^" "^(int2str (y+ht/2)) in
+	let ur = " "^(int2str (x+2*wid/3))^" "^(int2str (y+ht/7)) in
+	let uadj = " "^(int2str (x+wid/4))^" "^(int2str y) in
+	let inv = out_neg => canv^" create oval "^
+	    (int2str (x-1+wid))^" "^(int2str (y+ht/2-inv_rad))^" "^
+	    (int2str (x-1+wid+2*inv_rad))^" "^(int2str (y+ht/2+inv_rad))^
+	    " -outline yellow -fill "^fc^"\n" | "" in
+	canv^" create polygon "^ul^ul^ml^ll^ll^ladj^lr^mid^mid^ur^uadj^ul^ul^
+	    " -smooth yes -splinestep 10 -outline yellow -fill "^fc^"\n"^inv in
+    is_xor => xor^(iorpat (x+5)) | (iorpat x);
+
+
+let q l = tcl_eval
+	("canvas .c -background black -xscrollcommand \".hscroll set\" "^
+	 "-yscrollcommand {.vscroll set } "^
+	 "-scrollregion {-11c -11c 50c 20c}":
+	 "scrollbar .hscroll -orient horiz -command {.c xview}":
+	 "pack .hscroll -side bottom -fill x":
+	 "scrollbar .vscroll -command {.c yview}":
+	 "pack .vscroll -side right -fill y":
+         "button .b -text Close -command {destroy .}":
+         "pack .b -side bottom -fill x":
+	 "pack .c -fill both -expand yes":
+	 "wm geometry . =400x300+0+105":
+	 l) [];
+
+q [
+   (buf_pat ".c" 100 50 F "{}" "a"),
+   (buf_pat ".c" 200 50 T "yellow" "b"),
+   (or_pat ".c" 100 100 F F "red"),
+   (or_pat ".c" 200 100 T T "violet"),
+   (or_pat ".c" 100 600 F F "white"),
+   (or_pat ".c" 200 600 T T "green"),
+   (and_pat ".c" 100 150 F "grey"),
+   (and_pat ".c" 200 150 T "pink")];
+
+// xxxxxxxxxxxxxxxx;
+
+// pattern outx outy -> (tcl_draw_string,[(in1x,in2y),(in2x,in2y),...])

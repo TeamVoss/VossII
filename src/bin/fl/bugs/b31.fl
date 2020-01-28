@@ -1,0 +1,5 @@
+let ckt = load_exe "output.exe";
+
+let nds = nodes ckt;
+
+length nds;

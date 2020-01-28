@@ -1,0 +1,72 @@
+
+lettype vfsm =
+	    STEV_ENV
+		{id::string}
+		{fsm::fsm}
+		{ster::ste ref}
+		{waveform_canvas::string ref}
+		{time_ref::int ref}
+		{stop_list::(string list) ref}
+		{selection_list::(string list) ref}
+		{highlight_list::((string#string) list) ref}
+		{depend_list::((string#string) list) ref}
+		{canvas_list :: (((string#vis)list) ref)}
+		{fsm_list :: (((string#string)list) ref)}
+;
+
+
+let vfsm2id vfsm =
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr) = vfsm in
+    id
+;
+
+let vfsm2fsm vfsm =
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr) = vfsm in
+    fsm
+;
+
+let vfsm2ste_r vfsm =
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr) = vfsm in
+    ster
+;
+
+let vfsm2wvr vfsm =
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr) = vfsm in
+    wvr
+;
+
+let vfsm2cur_time_r vfsm =
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr) = vfsm in
+    tr
+;
+
+let vfsm2stop_list_r vfsm =
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr) = vfsm in
+    stopr
+;
+
+let vfsm2selection_r vfsm =
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr) = vfsm in
+    selr
+;
+
+let vfsm2canvases_r vfsm =
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr) = vfsm in
+    cvsr
+;
+
+let vfsm2fsms_r vfsm =
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr) = vfsm in
+    fsmr
+;
+
+let vfsm2hll_r vfsm =
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr) = vfsm in
+    hlr
+;
+
+let vfsm2dl_r vfsm =
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr) = vfsm in
+    dlr
+;
+

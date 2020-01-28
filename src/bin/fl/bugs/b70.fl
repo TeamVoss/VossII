@@ -1,0 +1,20 @@
+lettype tr = BR tr tr | LF;
+
+letrec cnt (BR t1 t2) = cnt t1 + cnt t2
+ /\    cnt LF = 1
+;
+
+
+let t1 = BR (BR (BR LF LF) LF) (BR LF (BR LF LF));
+
+cnt t1;
+
+lettype tr2 = BR tr2 tr2 | LF int;
+
+letrec cnt2 (BR t1 t2) = cnt2 t1 + cnt2 t2
+ /\    cnt2 (LF i) = i
+;
+
+let t2 = BR (BR (BR (LF 1) (LF 2)) (LF 3)) (BR (LF 1) (BR (LF 1) (LF 5)));
+
+cnt2 t2;

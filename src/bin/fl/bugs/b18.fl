@@ -1,0 +1,8 @@
+// Test of external scanner
+
+let f =
+<{
+    12+99+999999999999999
+ }> "cat -" ;
+ 
+f;

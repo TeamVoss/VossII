@@ -1,0 +1,29 @@
+// Test of clet/cletrec
+
+letrec fib 1 = 1
+ /\    fib 2 = 1
+ /\    fib n = fib (n-1) + fib (n-2)
+;
+
+fib 30;
+
+cletrec fib 1 = 1
+  /\    fib 2 = 1
+  /\    fib n = fib (n-1) + fib (n-2)
+;
+
+fib 30;
+
+
+cletrec fib2 rv 1 = deref rv
+  /\    fib2 rv 2 = deref rv
+  /\    fib2 rv n = (fib2 rv (n-1)) + (fib2 rv (n-2))
+;
+
+
+let mrv = ref 1;
+
+fib2 mrv 30;
+
+mrv := 2;
+fib2 mrv 30;

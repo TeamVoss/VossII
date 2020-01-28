@@ -1,0 +1,26 @@
+update_vossrc "VERBOSE-IMAGE-PRINT" "YES";
+import_xpm_image (DIR^"small.xpm");
+
+update_vossrc "VERBOSE-IMAGE-PRINT" "NO";
+
+let im1 = import_xpm_image (DIR^"ex1.xpm");
+
+wtime im1;
+
+let im2 = hsv_filter im1 (0,40) (0,255) (10,255) (255,0,0);
+let im3 = hsv_filter im1 (-40,40) (0,255) (10,255) (255,0,0);
+let im4 = hsv_filter im1 (-110,40) (0,255) (10,255) (255,0,0);
+
+let im5 = hsv_filter im1 (18,40) (0,255) (20,255) (255,255,0);
+
+wtime im2;
+wtime im3;
+wtime im4;
+wtime im5;
+
+wtime (export_to_ppm im2 (DIR^"ex1.ppm"));
+wtime (export_to_ppm im3 (DIR^"ex2.ppm"));
+wtime (export_to_ppm im4 (DIR^"ex3.ppm"));
+wtime (export_to_ppm im5 (DIR^"ex4.ppm"));
+
+

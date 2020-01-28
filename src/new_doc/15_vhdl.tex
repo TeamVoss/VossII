@@ -1,0 +1,207 @@
+\section{VHDL Support}
+\label{VHDL}
+
+The support for behavioral and structural VHDL%
+\index{VHDL}%
+{} is through a translation
+program derived from the Alliance%
+\index{Alliance}%
+{} 1.1 distribution. 
+Since the Alliance 1.1 tools are distributed under the Free Software
+Foundations license agreement, the source to this translator is
+available to whoever wants it.
+
+The VHDL subset supported is fully compatible with the IEEE VHDL standard
+ref. 1076 (1987).
+Hopefully this means that any program that is acceptable to the convert2fl%
+\index{convert2fl}%
+{}
+program, will also be acceptable to commercial synthesis and simulation tools. 
+However, I don't give any guarantees.
+Below we outline the main restrictions of the VHDL subset we support.
+
+A VHDL description of a circuit consists of two parts:
+the external view and the internal view.
+The external view defines the name of the circuit and its interface.
+The interface is a list of ports.
+Each port is specified by its name, mode, type, possible constraint, and its
+kind.
+The mode of a port depends only on the manner the port is used inside the
+circuit (in the internal view of the circuit).
+If the value is to be read in the view of the description, the port must
+be declared with the mode {\em in}.
+If the value is to be written by the internal view, the port must
+be declared with the mode {\em out}.
+If the internal view will both read and write to the port, the mode of the
+port must be {\em inout}.
+
+Only {\em structural} and {\em behavioral data flow} representations
+are supported as internal view.
+Furthermore, it is not possible to mix behavioral and structural
+descriptions of a single entity.
+The convert2fl program requires also that each entity is contained in
+a file with the same name as the entity (lower case letters only!).
+If the description of the entity is structural, the suffix must be .vst,
+whereas if the description if behavioral, the suffix should be .vbe.
+
+A typical VHDL description of a circuit will consist of a collection
+of files creating a structural hierarchy of .vst files with behavioral
+.vbe descriptions of the leaf nodes in the hierarchy.
+Note that the convert2fl program will first search for a behavioral
+description of an entity.
+Only if this fails, will the program look for a structural description
+of the entity\footnote{If convert2fl fails to find either a .vbe or .vst
+description, it looks for an EDIF description (.edi suffix)}.
+
+\subsection{Types Supported}
+
+The following set of predefined types has been defined.
+No other user-defined types are currently supported.
+\begin{description}
+\item[bit]
+The predefined standard bit type ('0' or '1').
+In the Voss system, this type is monotonically extended to the
+quaternary domain.
+\item[bit\_vector]
+An array of bits.
+\item[mux\_bit]
+A resolved subtype of bit using the {\em mux} resolution function.
+This function computes the greatest lower bound of the actively
+driven signals.
+If all drivers are disconnected, the value of the signal will be $\X$.
+Note that signal of type mux\_bit must be declared with the kind {\em bus}.
+\item[mux\_vector]
+An array of mux\_bits.
+\item[reg\_bit]
+A resolved subtype of bit using the {\em reg} resolution function.
+This function computes the greatest lower bound of the actively
+driven signals.
+If all drivers are disconnected, the value of
+the signal will retain its old value.
+Note that signal of type reg\_bit must be declared
+with the kind {\em register}.
+\item[reg\_vector]
+An array of reg\_bits.
+\end{description}
+
+\subsection{Structural VHDL Supported}
+
+The declaration part of a structural description includes
+signal declarations and component declarations.
+A signal can be declared to have any of the types mentioned above. 
+
+A component declaration must be declared with exactly the same port description
+as in its entity specification.
+This means that local ports are to be declared with the same name, type,
+kind, and in the same order as in the entity specification.
+
+A structural description is a set of component instantiation statements.
+The ports of the instance are connected to each other through other signals
+through a port map specification.
+Both explicit and implicit port map specifications are supported.
+The current version does not allow unconnected ports (the {\em open}
+mode is not supported).
+
+Finally, only the catenation operator (\&) can be used in the actual pat
+(effective signal connected to a formal port) in a port map specification.
+
+Note that the {\em generate} statement is not currently supported
+(unfortunately!).
+
+\subsection{Behavioral VHDL Supported}
+
+The only type of statements supported by convert2fl are the following
+concurrent statements:
+\begin{enumerate}
+\item
+simple signal assignment
+\item
+conditional signal assignment
+\item
+selected signal assignment
+\item
+block statement
+\end{enumerate}
+
+When using concurrent statements, an ordinary signal can be assigned only once.
+The value of the signal must be explicitly defined by the signal assignment
+(for example, in a selected signal assignment, the value
+of the target signal must be defined for every value that the select
+expression can take on).
+
+The above constraint is often too harsh when designing hardware
+that have their control distributed (e.g., precharged lines, distributed
+multiplexors, busses, etc.).
+To remedy this, VHDL uses guarded-resolved signals.
+A resolved signal is a signal declared with a resolved subtype.
+A resolved subtype is a type together with a resolution function.
+A resolved signal can be assigned by multiple signal assignments.
+Depending on the value of each driver, the resolution function determines
+the effective value of the signal.
+
+A guarded signal is a resolved signal with drivers that can be disconnected.
+A guarded signal must be assigned inside a {\em block} statement
+through a {\em guarded} signal assignment.
+
+To illustrate this, consider the following example of a distributed multiplexor:
+\begin{hol}
+signal DistributedMux : mux\_bit bus;
+
+begin
+    FirstDriver: block (Sel1 = '1' )
+    begin
+        DistributedMux <= guarded Data1;
+    end block;
+
+    SecondDriver: block (Sel2 = '1' )
+    begin
+        DistributedMux <= guarded Data2;
+    end block;
+end
+\end{hol}
+
+Sequential elements must be explicitly declared using he type
+{\em reg\_bit} or {\em reg\_vector} (and must be of kind {\em register}).
+A sequential element must be assigned inside a {\em block} statement
+by a {\em guarded} signal assignment.
+For example, a falling edge triggered D flip-flop could be defined as:
+\begin{hol}
+signal Reg : reg\_bit register;
+
+begin
+    flip\_flop: block (ck = '0' and not ck'STABLE)
+    begin
+        Reg <= guarded Din;
+    end block;
+end;
+\end{hol}
+On the other hand, a rising edge triggered D flip-flop with asynchronous
+reset (active low) may be defined as:
+\begin{hol}
+
+signal Reg : reg\_bit register;
+
+begin
+    flip\_flop : block ((ck = '0' and not ck'stable) or (resetb = '0'))
+    begin
+        Reg <= guarded (resetb and Din);
+    end block;
+\end{hol}
+
+Finally, level sensitive latch can be defined as:
+\begin{hol}
+
+signal Reg : reg\_bit register;
+
+begin
+    latch : block (ck = '1')
+    begin
+        Reg <= guarded Din;
+    end block;
+\end{hol}
+
+The subset of VHDL supported by convert2fl includes only the following
+built-in VHDL operators: {\bf not, and, or, xor, nor, nand, \&, =, /=}.
+These operators can be applied on all types supported.
+Note that other standard VHDL operators (most notably the arithmetic
+and comparison operators) are not supported in this release.

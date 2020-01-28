@@ -1,0 +1,393 @@
+
+\subsection{Hardware Models}
+
+
+
+%%%START_CODE%%%%
+it;
+%%%END_CODE%%%%
+
+
+
+
+% \subsection{Circuit Models}
+% 
+% Since the main use of the fl system, and its historical root, is related
+% to hardware verification, there are a number of built-in
+% functions specifically tailored towards hardware modeling
+% and symbolic trajectory evaluation in particular. 
+% Internally, a circuit is represented by a list of nodes (names),
+% and a next state function%
+% \index{next state function}%
+% {}.
+% The next state function is mapping the current state of the circuit
+% (including the current values on the inputs) to a new state
+% of the circuit.
+% Since the circuit representation is intended for trajectory evaluation,
+% the value domain for each node in the circuit is $\{0,1,\X,\top\}$
+% and thus the next state function consists of quaternary%
+% \index{quaternary}%
+% {} (four-valued)
+% extensions of the usual Boolean function.
+% The type of such circuit is fsm%
+% \index{fsm}%
+% {} (for finite state machine%
+% \index{finite state machine}%
+% {}) and, by
+% default, it does not have a print function (since the machines
+% are usually much too large to be meaningful anyway to the user.
+% However, for the curious reader, the command print\_fsm%
+% \index{print\_fsm}%
+% {} will print out
+% a pretty complete version of the state machine.
+% Note that for efficiency reasons, the next state function also
+% contains delay and fan-in and fan-out information to aid in the
+% efficient simulation.
+% 
+% In general, there are two ways of creating a fsm object:
+% \begin{enumerate}
+% \item
+% Loading a pre-compiled version of a circuit in .exe format.
+% \item
+% Converting a fl structure into an fsm.
+% \end{enumerate}
+% 
+% \subsubsection{Loading a .exe File}
+% 
+% If the original circuit was described in Berkeley .sim format or
+% as a SILOS II gate list, there are programs distributed with the
+% system that can be used to compile an fsm model directly from
+% these formats.
+% The common format for such pre-compiled circuit model is a (binary)
+% file with a .exe%
+% \index{.exe file}%
+% {} suffix.
+% %In Section~\ref{CompanionTools} we discuss in more detail how
+% %to create such .exe file.
+% Loading in the .exe file and making it an fsm object simply
+% involves calling the load\_exe function.
+% 
+% For example, if there is a full\_adder.exe file in the current
+% working directory, the following command would create an fsm object
+% of the circuit.
+% %%%START_CODE%%%%
+% let ckt1 = load_exe "full_adder.exe";
+% %%%END_CODE%%%%
+% Note that there is no theoretical limit on the number of circuit that can
+% be loaded into the fl system at any particular point in time.
+% However, since fsm models are often quite large, it is generally
+% advisable not to load more models than absolutely necessary.
+% %(In most cases, only one model will be used, but there are times
+% %when several models can be useful. We will return to this later
+% %in Section~\ref{ModelChecking}.)
+% 
+% \subsubsection{Creating an fsm Object Inside fl}
+% \label{makeSTEsection}
+% 
+% {\bf Warning:} This addition is fairly young and has thus not
+% been extensively tested. Also, it leaves quite a bit to
+% be desired in terms of not being very ``clean and simple''.
+% For a reader that is more interested in using the {\voss} system rather
+% than writing a new conversion program from some other netlist format, this
+% section can be skipped.
+% 
+% The main routine for creating an fsm object is make\_fsm%
+% \index{make\_fsm}%
+% {}.
+% The type of make\_fsm is (Set)\funarrow (fsm)\footnote{Currently, when
+% fl is invoked, the type of make\_fsm is actually (*)\funarrow (fsm), but
+% this is a bug that will be removed in the next release.}
+% Before going into how an object of type Set%
+% \index{Set}%
+% {} can be constructed, we
+% need to make a small digression and introduce the quaternary logic type.
+% For historical reasons, the name of the quaternary objects is tern%
+% \index{tern}%
+% {},
+% and tern is defined as the concrete type:
+% %%%START_CODE%%%%
+% lettype tern =  One |
+%                 Zero |
+%                 X |
+%                 Z |
+%                 Val string |
+%                 And tern tern |
+%                 Or tern tern |
+%                 Not tern |
+%                 Glb tern tern |
+%                 Lub tern tern
+% ;
+% %%%END_CODE%%%%
+% where One%
+% \index{One}%
+% {}, Zero%
+% \index{Zero}%
+% {}, X%
+% \index{X}%
+% {},  And%
+% \index{And}%
+% {}, Or%
+% \index{Or}%
+% {}, and Not%
+% \index{Not}%
+% {} are the obvious functions.
+% Glb%
+% \index{Glb}%
+% {} stands for the greatest lower bound and Lub%
+% \index{Lub}%
+% {} for the least upper bound.
+% Z%
+% \index{Z}%
+% {} is used to represent the top value%
+% \index{top value}%
+% {}.
+% Finally, Val%
+% \index{Val}%
+% {} s is used to refer to the value on node s.
+% Thus, as a concrete example, the next state function of a node "o" may
+% be described as (Not (And (Val "in1") (Val "in2"))).
+% 
+% There are four constructor functions for an object of type Set:
+% \begin{enumerate}
+% \item
+% Empty%
+% \index{Empty}%
+% {},
+% \item
+% Element%
+% \index{Element}%
+% {} (string\verb@#@((tern\verb@#@tern) list)),
+% \item
+% Union%
+% \index{Union}%
+% {} Set Set, and
+% \item
+% Sequential%
+% \index{Sequential}%
+% {} Set Set.
+% \end{enumerate}
+% The Empty is introduced to make writing functions that generate
+% objects of type Set easier.
+% Element is the constructor that actually introduces new nodes and
+% also give driver functions for the node.
+% In general, Element n gvl, will create a node named n.
+% This node will at least have (more about this later) the drivers
+% listed in the gvl list.
+% A driver is simply a pair of quaternary expressions:
+% the first object of the pair is a guard, and the second part
+% is the value being driven when the guard is true.
+% For a combinational node, the driver list is a single pair whose
+% guard is One and whose value component is the next state function
+% of the gate.
+% For more complex nodes, like register nodes or bus nodes, the guard-value
+% list is often much longer.
+% 
+% The Union construct is used to gather a collection of these Element
+% declarations so that an fsm can eventually be made.
+% Finally, the Sequential constructor takes two objects S1 and S2 of
+% type Set and merges them into a single object of type Set.
+% In that sense, Sequential behaves exactly like Union.
+% The difference is how the two deal with nodes defined in both set S1 and set S2
+% and for which both nodes may have at least one of their guards enabled
+% at the same time.
+% Union will find the greatest lower bound of the values being driven
+% at the same time whereas Sequential will assume that the driver in the
+% second set overrides the driver in the first.
+% To illustrate the difference, consider the following example:
+% %%%START_CODE%%%%
+% let a = Element ("in1", [(One, One)]);
+% let b = Element ("in1", [(One, Zero)]);
+% let ex1 = Union a b;
+% let ex2 = Sequential a b;
+% let m1 = make\_fsm ex1;
+% let m2 = make\_fsm ex2;
+% m1;
+% %%%END_CODE%%%%
+% Now m1 and m2 will both be fsm models with a single node called in1.
+% However, in m1, the next state function of in1 will be $\X$, since that
+% is the most we can say from the inconsistent driver commands given
+% in the example.
+% On the other hand, the next state function of the in1 node in m2 will be Zero.
+% 
+% For an example of using this facility, the directory HDL in the demo
+% distribution illustrates how one can go about defining a new description
+% language in order to create an fsm object.
+% 
+% \subsection{Queries to the Circuit Model}
+% 
+% There are five built-in functions that are useful in dealing with
+% an fsm model: nodes%
+% \index{nodes}%
+% {}, fanin%
+% \index{fanin}%
+% {}, fanout%
+% \index{fanout}%
+% {}, is\_stable%
+% \index{is\_stable}%
+% {}, and get\_node\_val%
+% \index{get\_node\_val}%
+% {}.
+% Nodes takes an fsm model and returns a {\em list of lists} of circuit nodes.
+% The reason for the double listing is that a node may have more than
+% one name (only from .exe file translations).
+% Fanin takes an fsm model and a name of a node and returns the
+% list of node names that the next state function depend on.
+% Fanout works in a similar way, but for the fanout nodes.
+% Is\_stable returns T (true) if the circuit is currently stable.
+% It is mainly used when the simulation is aborted at some
+% particular time with the "-m" option to STE.
+% Finally, get\_node\_val takes an fsm object and the name of a node
+% and returns the encoded version of the current value of the node.
+% The encoding used is: $\X = (T,T)$, $1=(T,F)$, $0=(F,T)$, and $\top=(F,F)$.
+% Of course, the two Boolean values are often Boolean functions over some
+% variables.
+% The main use of the get\_node\_val function is when the simulation
+% is aborted for some reason.
+% Get\_node\_val can then be used to probe the current state of the system.
+% For example, assuming there is a full\_adder.exe file in the current
+% working directory, we would get:
+% %%%START_CODE%%%%
+% let ckt = load_exe "full_adder.exe";
+% nodes ckt;
+% ..[["cout"],["t4"],["t3"],["t2"],["result"],["cin"],["t1"],["b"],["a"]]
+% fanin ckt "cout";
+% fanout ckt "t3";
+% fanout ckt "t4";
+% fanout ckt "a";
+% get_node_val ckt "t2";
+% %%%END_CODE%%%%
+% 
+% If the user also loads in the "default.fl" standard library, there is
+% the very useful function {\em excitation}%
+% \index{excitation}
+% that also takes an fsm model
+% and a node name, but that returns the next state function for binary inputs.
+% Note, however, that the current version of the excitation function
+% only works correctly for unit delay nodes.
+% %%%START_CODE%%%%
+% load "defaults.fl";
+% excitation ckt "cout";
+% %%%END_CODE%%%%
+% We will return to this in Section~\ref{vossrc}.
+% 
+% \subsection{Symbolic Trajectory Evaluation}
+% 
+% There is actually only one built-in command for symbolic trajectory%
+% \index{symbolic trajectory evaluation}%
+% {}
+% evaluation called STE%
+% \index{STE}%
+% {}.
+% In general, STE determines, through symbolic trajectory evaluation, whether
+% an antecedent/consequent pair hold in for some circuit.
+% STE will return a Boolean function that gives the condition for the
+% verification to succeed.
+% For most applications the desired return value is T.
+% 
+% In general STE is invoked as
+% %%%START_CODE%%%%
+% STE options fsm weak_list ant_list cons_list trace_list
+% %%%END_CODE%%%%
+% where options%
+% \index{STE options}%
+% {} is a string that can contain a combinations of the
+% following flags:
+% \begin{description}
+% \item[-a] Abort%
+% \index{abort STE}%
+% {} the verification at the first antecedent or consequent failure.
+% If the verification is aborted, STE will return a Boolean function that
+% gives {\em the condition for this failure to manifest itself}.
+% Note that this is contrary to STE's usual behavior which is to return
+% the Boolean function that gives the conditions for the verification to
+% succeed.
+% \item [-m n]
+% Abort the verification after reaching time n.
+% \item [-e]
+% Evaluate evey node in the circuit whether the node is in the
+% fan-in tree of some node that is checked or traced or not.
+% In other words, with the -e option, the simulator will compute
+% the value on every node. Normally, a node whose value
+% cannot be observed (directly or indirectly) is simply kept at X.
+% Of course, the STE command can run significantly slower with the
+% -e option, so beware!
+% \item [-i]
+% Allow antecedent failures%
+% \index{antecedent failures}%
+% {}.
+% In other words, compute a straight implication.
+% The normal behavior of the verification process is to disallow
+% antecedent failures.
+% Thus the default verification condition is both to check that every
+% trajectory the circuit can go thorough that is consistent with the
+% antecedent is also consistent with the consequent, and that there
+% is at least one (real) circuit trajectory that is consistent
+% with the antecedent.
+% \item [-n]
+% Allow over-constrained values, i.e., allow nodes to take
+% on the top value in the value lattice.
+% Normally, over-constrained values are viewed as failures.
+% \item[-w]
+% Do not print out warning messages%
+% \index{warning messages}%
+% {}.
+% \item[-t s]
+% In addition to printing out trace messages on stderr, also send
+% the trace events in Postscript%
+% \index{Postscript waveform}%
+% {} format to the file s.
+% By previewing or printing out the file the user gets a waveform diagram for
+% the traced signals.
+% \item[-T s]
+% Same as -t, but generate Postscript code in landscape mode.
+% \end{description}
+% 
+% The second argument to STE must be an object of the fsm type representing
+% a circuit that is to be simulated.
+% 
+% The weak\_list is a list of 4-tuples.
+% Each 4-tuple is of the form (g,n,f,t), where $n$ is a node name, $f$ and $t$
+% denote start and stop times, and $g$ is a Boolean function
+% denoting the domain for which this node should be weakened%
+% \index{weakened}%
+% {}.
+% For assignments making the guard true, the next state function of the
+% circuit node is set to $X$.
+% This is often useful when verifying a subsystem of a larger system
+% that has shared input signals.
+% By weakening%
+% \index{weakening}%
+% {} the model, unnecessary computations does not have
+% to be performed.
+% Note that weakening a model is a ``safe'' operation in that
+% the monotonicity of the circuit models guarantee that if we
+% can verify something in the weakened model, then that same property
+% is guaranteed to hold in the original model.
+% 
+% The ant\_list and cons\_list are  both lists of five-tuples.
+% Each five-tuple%
+% \index{five-tuple}%
+% {} is of the form $(g,n,v,s,t)$, where $g$ is a Boolean function
+% denoting the domain for which this assertion/check should be carried out,
+% $n$ is the name of a node, $v$ is the value to be asserted/checked, and
+% $s$ and $t$ denote the start and stop times for this assertion/check
+% respectively.
+% 
+% Finally, the last argument to STE is a list of triples.
+% Each triple is of the form $(n,s,t)$, where $n$ is a name of a node
+% to be traced%
+% \index{traced}%
+% {} and $s$ and $t$ are the start and stop times for this
+% trace respectively.
+% 
+% Of course, in practice, it would be quite tedious to have to
+% write all specifications in terms of lists of five-tuples.
+% Consequently, a small language (actually a small set of useful functions)
+% has been defined in the library file "verification.fl".
+% These functions make it much easier to write specification.
+% However, it should be remembered that when the verification
+% is actually performed, all these higher level constructs gets translated
+% down to the two lists of five-tuples.
+% 
+% For more details on how to use the STE function, we refer the reader
+% to Section~\ref{tutorial}.

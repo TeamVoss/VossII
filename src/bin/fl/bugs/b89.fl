@@ -1,0 +1,99 @@
+
+let tst_bouble = \{i::int}. i+i;
+
+tst_bouble 12;
+
+let iinc {i::int} = i+1;
+let finc {i::float} = i+1.0;
+let binc {i::bv} = i + '1;
+overload {inc:: *a -> *a} iinc finc binc;
+
+let incinc i = inc (inc i);
+
+incinc;
+
+incinc 1;
+
+let double a = a + a;
+
+double 1;
+double 1.1;
+double (int2bv 1);
+
+let tripp x = x+x+x;
+
+tripp 1;
+tripp 1.1;
+tripp (int2bv 1);
+
+
+let icat {i::int} {j::int} = i+j;
+let scat {s::string} {t::string} = s^t;
+overload {foo1:: *a -> *a -> *a}  icat scat;
+
+
+let lfoo l1 l2 = map2 foo1 l1 l2;
+
+overload {foo:: *a -> *a -> *a} lfoo icat scat;
+
+help "foo";
+
+foo 1 2;
+foo "a" "b";
+
+rvariable "a";
+foo [1] [2];
+
+
+help "foo";
+
+foo [1,2,3] [4,5,6];
+foo ["a", "b", "c"] ["1", "2", "3"];
+
+foo 1 2;	// Does not resolve! Why????
+foo "a" "b";	// Does not resolve! Why????
+foo1 "a" "b";
+foo1 1 2;
+
+open_overload {bv_destr:: *a -> bv};
+open_overload {bv_constr:: bv -> *a};
+
+lettype bv0 = BV0 bv;
+let bv0_constr li = (BV0 li);
+let bv0_destr (BV0 li) = li;
+add_open_overload bv_destr bv0_destr;
+add_open_overload bv_constr bv0_constr;
+
+lettype bv1 = BV1 bv;
+let bv1_constr l = (BV1 l);
+let bv1_destr (BV1 l) = l;
+add_open_overload bv_destr bv1_destr;
+add_open_overload bv_constr bv1_constr;
+
+lettype bv2 = BV2 bv;
+let bv2_constr l = (BV2 l);
+let bv2_destr (BV2 l) = l;
+add_open_overload bv_destr bv2_destr;
+add_open_overload bv_constr bv2_constr;
+
+lettype bv3 = BV3 bv;
+let bv3_constr l = (BV3 l);
+let bv3_destr (BV3 l) = l;
+add_open_overload bv_destr bv3_destr;
+add_open_overload bv_constr bv3_constr;
+
+
+rvariable "a";
+let add {b1:: *a} {b2:: *a} =
+    let bl1 = {bv_destr b1::bv} in
+    let bl2 = {bv_destr b2::bv} in
+    let resl = bl1 + bl2 in
+    let res = bv_constr resl in
+    {res:: *a}
+;
+
+bv_destr (add (BV3 (list2bv [F,F,T])) (BV3 (list2bv [F,T,F])));
+
+{add (add (BV3 (list2bv [F,F,T])) (BV3 (list2bv [F,T,T]))) (BV3 (list2bv [F,T,F])):: bv3};
+
+bv_destr it;

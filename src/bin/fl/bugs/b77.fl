@@ -1,0 +1,32 @@
+load "ste.fl";
+
+TYPE "byte" 8;
+
+let tst =
+    byte_input inp.
+    byte_output zero.
+    CELL "tst" [
+        zero <- inp
+//        zero <- '0
+];
+
+let p = tst 'inp 'zero;
+let ckt = pexlif2fsm p; 
+let session = STE_debug ckt;
+session;
+draw_fanin session 2 "zero[7:0]";
+
+let tst =
+    byte_input inp.
+    byte_output zero.
+    CELL "tst" [
+        zero <- '0
+];
+
+rvariable "a";
+
+let p = tst 'inp 'zero;
+let ckt = pexlif2fsm p; 
+let session = STE_debug ckt;
+session;
+draw_fanin session 2 "zero[7:0]";

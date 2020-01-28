@@ -1,0 +1,26 @@
+load "ste.fl";
+
+
+TYPE "byte" 8;
+
+let tst =
+    bit_input	    clk reset en.
+    byte_input	    a b.
+    byte_output	    o.
+    byte_internal   ad bd tmp t1 t2.
+    CELL "tst" [
+	re_ff_en clk '1 a ad,
+	re_ff_en clk en b bd,
+	tmp <- ad '+' bd,
+	re_ff_en ('~' clk) ('~' en) tmp o,
+	        always_ff (posedge clk) [
+            t1 <== (IF reset THEN '0 ELSE (IF en THEN tmp ELSE t1)),
+            t2 <== t1,
+            o <== t2
+        ]
+];
+
+let p = tst 'clk 'reset 'en 'a 'b 'o;
+let ckt = pexlif2fsm p;
+
+STE_debug ckt;

@@ -1,0 +1,87 @@
+(system "/bin/rm -f /tmp/q1") fseq ();
+(system "/bin/rm -f /tmp/q2") fseq ();
+(system "/bin/rm -f /tmp/q22") fseq ();
+(system "/bin/rm -f /tmp/q3") fseq ();
+(system "/bin/rm -f /tmp/q4") fseq ();
+
+lettype tr = BR tr tr | LF int;
+
+letrec Ptr (BR t1 t2) = sprintf "(BR %s %s)" (Ptr t1) (Ptr t2)
+ /\    Ptr (LF i)     = sprintf "(LF %d)" i
+;
+install_print_function Ptr;
+
+letrec fac n = n=0 => 1 | n*fac (n-1);
+
+let t1 = LF 5;
+let q1 = write_tr "/tmp/q1" t1;
+q1;
+let r1 = read_tr "/tmp/q1";
+"1"; t1 == r1;
+
+let t2 = BR (BR (BR (LF 1) (LF 2)) (BR (LF (fac 100)) (LF 4))) (LF 5);
+let q2 = write_tr "/tmp/q2" t2;
+q2;
+
+let q22 = t2 fseq (write_tr "/tmp/q22" t2);
+let q22 = (write_tr "/tmp/q22" t2);
+q22;
+
+let r2 = read_tr "/tmp/q2";
+"2"; t2 == r2;
+let r22 = read_tr "/tmp/q22";
+"22"; t2 == r22;
+
+
+
+"t2 == r22"; t2 == r22;
+"(Ptr t2) == (Ptr r22)"; (Ptr t2) == (Ptr r22);
+
+
+lettype e =
+	  EVAR string
+	| ECONST int
+	| EPLUS e e
+	| EMUL e e
+	| ECOND b e e
+andlettype b =
+	  BVAR string
+	| BCONST bool
+	| BCONSTE bexpr
+	| BAND b b 
+	| GEQ e e
+	| BNOT b
+;
+
+let ex = ECOND 
+	    (BAND
+		(BAND (BVAR "a")
+		      (BAND (BCONST (variable "a[1]" XOR variable "a[0]"))
+			    (BCONSTE (bvariable "b[1]" bXOR bvariable "b[0]"))
+		      )
+		)
+		(GEQ (EVAR "b") (ECONST 0))
+	    )
+	    (EVAR "b")
+	    (EPLUS (EVAR "b") (ECONST 1))
+;
+
+// Unevaluated
+let q3 = write_e "/tmp/q3" ex;
+q3;
+let r3 = read_e "/tmp/q3";
+
+"3"; ex == r3;
+
+// Evaluated
+let q4 = ex fseq (write_e "/tmp/q4" ex);
+q4;
+let r4 = read_e "/tmp/q4";
+
+"4"; ex == r4;
+
+(system "/bin/rm -f /tmp/q1") fseq ();
+(system "/bin/rm -f /tmp/q2") fseq ();
+(system "/bin/rm -f /tmp/q22") fseq ();
+(system "/bin/rm -f /tmp/q3") fseq ();
+(system "/bin/rm -f /tmp/q4") fseq ();

@@ -1,0 +1,12 @@
+load "ste.fl";
+
+let tst =
+    input   {p:: bit#bit}.
+    bit_output  o1 o2.
+    CELL "tst" [
+	o1 <- fst p,
+	o2 <- snd p
+];
+
+pexlif2fsm (tst {('a,'b):: bit#bit} 'o1 'o2);
+

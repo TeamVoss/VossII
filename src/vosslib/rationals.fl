@@ -1,0 +1,102 @@
+// Library for representing rational numbers.
+
+lettype rat = RAT int int;
+
+// Make a rational
+clet mk_rat d n = 
+    let c = gcd d n in
+    RAT (d/c) (n/c)
+;
+
+// Convert a decimal number (as a string) to a rational
+// Syntax:  1.32	    -- non-repeating decimal
+//	    0.343...	    -- infinitely repeating 3
+//	    1.225{123}...   -- infinitely repeating 123 pattern
+let str2rat s =
+    val (sign,s) = str_is_prefix "-" s => -1,(substr s 2 (-1)) | 1,s in
+    let mk_srat n d = mk_rat (sign*n) d in
+    let s2i ss = sscanf "%d" ss in
+    let l = str_split s "." in
+    length l = 1 => RAT (s2i s) 1 |
+    length l = 2 => 
+	let ll = strlen (el 2 l) in
+	let scale = 10**ll in
+	mk_srat ((scale*(s2i (el 1 l)))+(s2i (el 2 l))) scale
+    |
+    let int = el 1 l in
+    let frac = el 2 l in
+    NOT (str_is_substr "{" frac) =>
+	// Last digit is repeated infinitely often
+	let lfrac = strlen frac in
+	let g_fact = 10**(lfrac-1) in
+	let int = g_fact * (s2i int) + s2i (substr frac 1 (lfrac-1)) in
+	let last_digit = s2i (substr frac lfrac 1) in
+	(mk_srat (9*int+last_digit) (9*g_fact))
+    |
+    NOT (str_is_suffix "}" frac) =>
+	eprintf "Syntax error in str2rat (%s)" s |
+    let ll = str_split frac "{" in
+    let pre = el 1 ll in
+    let g_fact = 10**(strlen pre) in
+    let int = g_fact * (s2i int) + s2i pre in
+    let repeat = hd (str_split (el 2 ll) "}") in
+    let lrep = strlen repeat in
+    let div = 10**lrep - 1 in
+    let last_digit = s2i repeat in
+    mk_srat (div*int + last_digit) (div*g_fact)
+;
+
+let Prat (RAT d n) =
+    n = 1 => int2str d |
+    sprintf "%d/%d" d n
+;
+install_print_function Prat;
+
+// Add two rational numbers
+let '+' r1 r2 =
+    val (RAT d1 n1) = r1 in
+    val (RAT d2 n2) = r2 in
+    let d = d1*n2 + d2*n1 in
+    let n = n1 * n2 in
+    mk_rat d n
+;
+infix 7 '+';
+
+// Subtract two rational numbers
+let '-' r1 r2 =
+    val (RAT d1 n1) = r1 in
+    val (RAT d2 n2) = r2 in
+    let d = d1*n2 - d2*n1 in
+    let n = n1 * n2 in
+    mk_rat d n
+;
+infix 7 '-';
+
+// Multiply two rational numbers
+let '*' r1 r2 =
+    val (RAT d1 n1) = r1 in
+    val (RAT d2 n2) = r2 in
+    let d = d1*d2 in
+    let n = n1*n2 in
+    mk_rat d n
+;
+infix 8 '*';
+
+// Divide two rational numbers
+let '/' r1 r2 =
+    val (RAT d1 n1) = r1 in
+    val (RAT d2 n2) = r2 in
+    let d = d1*n2 in
+    let n = n1*d2 in
+    mk_rat d n
+;
+infix 8 '/';
+
+let floor r =
+    val (RAT d n) = r in
+    d/n;
+
+let round r =
+    val (RAT d n) = r in
+    (((d*10)/n)+5)/10;
+

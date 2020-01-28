@@ -1,0 +1,37 @@
+let a = bvariable "a";
+let b = bvariable "b";
+let c = bvariable "c";
+
+let e = a bAND b bXOR (c bOR b);
+
+
+let l = [bF, bT, a, b, a bAND b, a bOR b, e];
+//let l = [e];
+l;
+
+bexpr_save "/tmp/q" l;
+
+let q = bexpr_load "/tmp/q";
+q;
+
+let be_is_identical b1 b2 =
+    let diff (b1,b2) = b1 bXOR b2 in
+    let not_same = itlist (\b12.\r. diff b12 bOR r) (zip b1 b2) bF then
+    let model = bget_model [not_same] 1000 then
+    model = [] => T |
+    let not_same' = bsubstitute model not_same then
+    let bns = hd (bexpr2bdd [not_same]) then
+    (fprintf stderr "Not same: %s with result %S --> %s from %s\n"
+	     (bexpr2str 10 not_same)
+	     (map (\ (n,v). sprintf "%s->%s" n (v==bT=>"1" | "0")) model)
+	     (bexpr2str 10 not_same')
+	     (bool2str 100 bns)
+    ) fseq F
+;
+
+
+printf "Loaded is%sthe same as the original\n"
+        ( (be_is_identical q l) => " " | " NOT ")
+;
+
+(system "/bin/rm -f /tmp/q") fseq ();

@@ -1,0 +1,33 @@
+let adder (a1, b1, c1, a2, b2, c2) -> (ao, bo, co, carry) {
+	let half (half_a, half_b) -> (half_s, half_carry) {
+		half_s = XOR half_a half_b
+		half_carry = AND half_a half_b
+	}
+
+	let fullB (fullB_a, fullB_b, fullB_cIn) -> (fullB_s, fullB_cOut) {
+		fullB_xorAB = XOR fullB_b fullB_a
+		fullB_s = XOR fullB_xorAB fullB_cIn
+		fullB_cOut = OR (AND fullB_b fullB_a) (AND fullB_cIn fullB_xorAB)
+	}
+	let fullC (fullC_a, fullC_b, fullC_cIn) -> (fullC_s, fullC_cOut) {
+		fullC_xorAB = XOR fullC_a fullC_b
+		fullC_s = XOR fullC_xorAB fullC_cIn
+		fullC_cOut = OR (AND fullC_a fullC_b) (AND fullC_cIn fullC_xorAB)
+	}
+
+	ao = half_s
+	bo = fullB_s
+	co = fullC_s
+	carry = fullC_cOut
+
+	half_a = a1
+	half_b = a2
+
+	fullB_a = b1
+	fullB_b = b2
+	fullB_cIn = half_carry
+
+	fullC_a = c1
+	fullC_b = c2
+	fullC_cIn = fullB_cOut
+}

@@ -1,0 +1,28 @@
+fprintf stderr "============================================\n";
+fprintf stderr "Obsolete library. Migrate to bv_* functions!\n";
+fprintf stderr "============================================\n";
+
+let gT = T;
+let gF = F;
+let gvariable = variable;
+let gNOT = NOT;
+let gAND = defix AND;
+infix 4 gAND;
+let gXNOR = defix XNOR;
+infix 4 gXNOR;
+let gXOR = defix XOR;
+infix 4 gXOR;
+let gOR = defix OR;
+infix 3 gOR;
+let gIF c = c;
+let gTHEN c (t,e) = c => t | e;
+let gELSE t e = (t,e);
+if_then_else_binder gTHEN gELSE;
+let gEQUIV a b = a == b;
+infix 5 gEQUIV;
+let gEQUAL a b = a = b;
+infix 5 gEQUAL;
+let gdepends = depends;
+
+load (DIR^"/gen_u_arithm.fl");
+

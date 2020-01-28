@@ -1,0 +1,15 @@
+load "ste.fl";
+    
+let p = verilog2pexlif "-Ibugs/m6502" "M65C02_Core" [
+                                    "M65C02_Core.v",
+                                    "M65C02_ALU.v",
+                                    "M65C02_AddrGen.v",
+                                    "M65C02_MPCv4.v",
+                                    "M65C02_BCD.v",
+                                    "M65C02_BIN.v"
+                                  ] []
+;
+
+let ckt = pexlif2fsm p;
+wtime ckt;
+

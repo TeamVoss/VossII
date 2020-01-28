@@ -1,0 +1,64 @@
+clet old_md_expand_vectors vl = flatmap md_expand_vector vl;
+
+let r01 = md_expand_vectors [];
+let r02 = md_expand_vectors ["a"];
+let r03 = md_expand_vectors ["b[2]"];
+let r04 = md_expand_vectors ["c[4:3]"];
+let r05 = md_expand_vectors ["d[4,1]"];
+let r06 = md_expand_vectors ["e[4:3,1]"];
+let r07 = md_expand_vectors ["f[4:3,1:0]"];
+let r08 = md_expand_vectors ["g[4:3,1:0]"];
+let r09 = md_expand_vectors ["q[32:29,21,17:15,3]", "a"];
+let r10 = md_expand_vectors ["q[32:29,21,17:15,3]", "b[2]"];
+let r11 = md_expand_vectors ["q[32:29,21,17:15,3]", "c[4:3]"];
+let r12 = md_expand_vectors ["q[32:29,21,17:15,3]", "d[4,1]"];
+let r13 = md_expand_vectors ["q[32:29,21,17:15,3]", "e[4:3,1]"];
+let r14 = md_expand_vectors ["q[32:29,21,17:15,3]", "f[4:3,1:0]"];
+let r15 = md_expand_vectors ["q[32:29,21,17:15,3]", "g[4:3,1:0]"];
+let r16 = md_expand_vectors ["\\a[3:0].foo[12:9].oink [2:0]", "q[32:29,21,17:15,3]", "c[4:3]"];
+let r17 = md_expand_vectors ["\\a[3:0].foo[12:9].oink ba[2:1]", "q[32:29,21,17:15,3]", "d[4,1]"];
+let r18 = md_expand_vectors ["\\a[3:0].foo[12:9].oink c.v", "q[32:29,21,17:15,3]", "e[4:3,1]"];
+let r19 = md_expand_vectors ["\\a[3:0].foo[12:9].oink valid", "q[32:29,21,17:15,3]", "f[4:3,1:0]"];
+
+
+let old_r01 = old_md_expand_vectors [];
+let old_r02 = old_md_expand_vectors ["a"];
+let old_r03 = old_md_expand_vectors ["b[2]"];
+let old_r04 = old_md_expand_vectors ["c[4:3]"];
+let old_r05 = old_md_expand_vectors ["d[4,1]"];
+let old_r06 = old_md_expand_vectors ["e[4:3,1]"];
+let old_r07 = old_md_expand_vectors ["f[4:3,1:0]"];
+let old_r08 = old_md_expand_vectors ["g[4:3,1:0]"];
+let old_r09 = old_md_expand_vectors ["q[32:29,21,17:15,3]", "a"];
+let old_r10 = old_md_expand_vectors ["q[32:29,21,17:15,3]", "b[2]"];
+let old_r11 = old_md_expand_vectors ["q[32:29,21,17:15,3]", "c[4:3]"];
+let old_r12 = old_md_expand_vectors ["q[32:29,21,17:15,3]", "d[4,1]"];
+let old_r13 = old_md_expand_vectors ["q[32:29,21,17:15,3]", "e[4:3,1]"];
+let old_r14 = old_md_expand_vectors ["q[32:29,21,17:15,3]", "f[4:3,1:0]"];
+let old_r15 = old_md_expand_vectors ["q[32:29,21,17:15,3]", "g[4:3,1:0]"];
+let old_r16 = old_md_expand_vectors ["\\a[3:0].foo[12:9].oink [2:0]", "q[32:29,21,17:15,3]", "c[4:3]"];
+let old_r17 = old_md_expand_vectors ["\\a[3:0].foo[12:9].oink ba[2:1]", "q[32:29,21,17:15,3]", "d[4,1]"];
+let old_r18 = old_md_expand_vectors ["\\a[3:0].foo[12:9].oink c.v", "q[32:29,21,17:15,3]", "e[4:3,1]"];
+let old_r19 = old_md_expand_vectors ["\\a[3:0].foo[12:9].oink valid", "q[32:29,21,17:15,3]", "f[4:3,1:0]"];
+
+
+"r01 = old_r01"; r01 == old_r01;
+"r02 = old_r02"; r02 == old_r02;
+"r03 = old_r03"; r03 == old_r03;
+"r04 = old_r04"; r04 == old_r04;
+"r05 = old_r05"; r05 == old_r05;
+"r06 = old_r06"; r06 == old_r06;
+"r07 = old_r07"; r07 == old_r07;
+"r08 = old_r08"; r08 == old_r08;
+"r09 = old_r09"; r09 == old_r09;
+"r10 = old_r10"; r10 == old_r10;
+"r11 = old_r11"; r11 == old_r11;
+"r12 = old_r12"; r12 == old_r12;
+"r13 = old_r13"; r13 == old_r13;
+"r14 = old_r14"; r14 == old_r14;
+"r15 = old_r15"; r15 == old_r15;
+"r16 = old_r16"; r16 == old_r16;
+"r17 = old_r17"; r17 == old_r17;
+"r18 = old_r18"; r18 == old_r18;
+"r19 = old_r19"; r19 == old_r19;
+

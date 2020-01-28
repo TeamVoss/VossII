@@ -1,0 +1,22 @@
+update_vossrc "RECURSION-CALL-LIMIT" "50000";
+
+load "ste.fl";
+
+let p = verilog2pexlif "" "DCACHE" ["DCACHE.v",
+				    "ALIGNER.v",
+				    "CACHE_LOGIK.v"
+				   ] [];
+
+time (p fseq 1);
+
+
+let ckt = pexlif2fsm p;
+time ckt;
+
+let vis = STE_debug ckt;
+vis;
+
+let ste = random_simulation vis [("BCLK","01")] [("ENWR","000000-")] 30;
+ste;
+
+

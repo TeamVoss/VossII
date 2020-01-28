@@ -1,0 +1,691 @@
+begin_abstype;
+
+// Create a vector of boolean variables.
+// The size of the vector is determined by its name.
+// For example a[31:0] would be 32 bits wide whereas "fo[3,1][2:0]" would
+// be 6 elements long (named fo[3][2], fo[3][1], fo[3][0], fo[1][2], fo[1][1],
+// and fo[1][0]).
+let variable_vector v = map gvariable (md_expand_vector v);
+
+// Remove leading duplicated values
+let bv_trim res =
+    letrec trim (b1:b2:bs) =
+	(b1 == b2) => trim (b2:bs) | (b1:b2:bs)
+     /\    trim [b] = [b]
+     /\    trim [] = [gF]
+    in
+    (trim res)
+;
+
+// Zero extend a bitvector bv to lengh l
+let ZX l bv =
+    length bv > l => eprintf "Cannot zero-extend a vector of length %d to %d"
+			     (length bv) l
+    |
+    (replicate (l-length bv) gF)@bv
+;
+
+// Sign extend a bitvector bv to lengh l
+let SX l bv =
+    length bv > l => eprintf "Cannot sign-extend a vector of length %d to %d"
+			     (length bv) l
+    |
+    (replicate (l-length bv) (hd bv))@bv
+;
+
+// Make two bitvectors the same size by sign extending the smaller one
+let SX2 e1 e2 =
+    let l1 = length e1 in
+    let l2 = length e2 in
+    let l = max l1 l2 in
+    (SX l e1), (SX l e2)
+;
+
+// Make two bitvectors the same size by zero extending the smaller one
+let ZX2 e1 e2 =
+    let l1 = length e1 in
+    let l2 = length e2 in
+    let l = max l1 l2 in
+    (ZX l e1), (ZX l e2)
+;
+
+// Create a 2's complement bitvector constant for integer v
+clet int2dbv v =
+    let av = v >= 0 => v | -1*v in
+    let sz = (bits_needed av)+2 then
+    let int2boolstrs sz i = 
+        // this is needed to avoid problems with *really* big strings
+        // (like those needed to initialize 64kB arrays)
+        let big = 32768 in
+        let bigger = 2**big in
+        sz < big => (explode (sprintf "%0*b" sz i)) |
+        letrec bigstr sz i =
+	    (sz<big) => explode (sprintf "%0*b" sz i) |
+            // really big
+            (bigstr (sz-big) (i/bigger))@
+            (explode (sprintf "%0*b" big (i%bigger)))
+        in
+        bigstr sz i
+    in
+    let vv = v >= 0 => v | 2**sz+v in
+    bv_trim (map (\b. b = "1" => gT | gF) (int2boolstrs sz vv))
+;
+
+// Convert an integer i to a fixed size bitvector of size sz.
+// Usage: int2fbv sz i;
+clet int2fbv sz i = SX sz (int2dbv i);
+
+// Create a 2's complement bitvector constant for positive number v
+clet nat2dbv v =
+    v < 0 => eprintf "nat2dbv on negative number (%d)" v |
+    let sz = bits_needed v then
+    let int2boolstrs sz i =
+        // this is needed to avoid problems with *really* big strings
+        // (like those needed to initialize 64kB arrays)
+        let big = 32768 in
+        let bigger = 2**big in
+        sz < big => (explode (sprintf "%0*b" sz i)) |
+        letrec bigstr sz i =
+            (sz<big) => explode (sprintf "%0*b" sz i) |
+            // really big
+            (bigstr (sz-big) (i/bigger))@
+            (explode (sprintf "%0*b" big (i%bigger)))
+        in
+        bigstr sz i
+    in
+    map (\b. b = "1" => gT | gF) (int2boolstrs sz v)
+;
+
+// Convert a positive number i to a fixed size bitvector of size sz.
+// Usage: nat2fbv sz i;
+clet nat2fbv sz i = ZX sz (nat2dbv i);
+
+// Check if dynamic bitvector is equal to zero
+let dbv_is_zero b = itlist (\b.\r. r gAND gNOT b) b gT;
+
+// Check if fixed sized bitvector is equal to zero
+let fbv_is_zero b = itlist (\b.\r. r gAND gNOT b) b gT;
+
+// MUX function for two dynamic bitvectors.
+clet dbvMUX cond tv ev =
+    val (tv,ev) = SX2 tv ev in
+    bv_trim (cond gTHEN tv gELSE ev)
+;
+
+// MUX function for two fixed size bitvectors.
+clet fbvMUX cond tv ev =
+    length tv != length ev => error "Length mismatch for fbvMUX" |
+    cond gTHEN tv gELSE ev
+;
+
+// Bitvector equality function (return the condition for which av = bv).
+clet dbveq av bv =
+    val (av,bv) = SX2 av bv in
+    av gEQUAL bv
+;
+
+// Bitvector equality function (return the condition for which av = bv).
+let ''='' av bv = dbveq av bv;
+infix 5 ''='';
+
+// Bitvector equality function for fixed sized bitvectors.
+// The function returns the condition for which av = bv.
+clet fbveq av bv =
+    length av != length bv => error "Length mismatch for fbveq" |
+    av gEQUAL bv
+;
+
+// Bitvector equality function for fixed sized bitvectors.
+// The function returns the condition for which av = bv.
+let '=' av bv = fbveq av bv;
+infix 5 '=';
+
+// Bitvector in-equality function (return the condition for which av != bv).
+clet dbvneq av bv =
+    val (av,bv) = SX2 av bv in
+    gNOT (av gEQUAL bv)
+;
+
+// Bitvector in-equality function (return the condition for which av != bv).
+let ''!='' av bv = dbvneq av bv;
+infix 5 ''!='';
+
+// Bitvector in-equality function for fixed sized bitvectors
+// THe function returns the condition for which av != bv.
+clet fbvneq av bv =
+    length av != length bv => error "Length mismatch for fbvneq" |
+    gNOT (av gEQUAL bv)
+;
+
+// Bitvector in-equality function for fixed sized bitvectors
+// THe function returns the condition for which av != bv.
+let '!=' av bv = dbvneq av bv;
+infix 5 '!=';
+
+// Add two n-bit lists and a carryin and genererate an n+1 bit result.
+let ext_gen_bvadd av bv c =
+    length av != length bv =>
+	eprintf "Length mismatch for ext_gen_bvadd (%d != %d)\n"
+		(length av) (length bv)
+    |
+    letrec add (a:as) (b:bs) cin =
+        let cout = a gAND b gOR a gAND cin gOR b gAND cin in
+        (a gXOR b gXOR cin):(add as bs cout)
+     /\    add [] [] cin = [cin]
+    in
+    rev (add (rev av) (rev bv) c)
+;
+
+let get_sign_abs bv =
+    let neg = hd bv in
+    let sz = length bv in
+    let neg_bv = tl (ext_gen_bvadd (replicate sz gF) (map gNOT bv) gT) in 
+    let abs = gIF neg gTHEN neg_bv gELSE bv in
+    (neg,abs)
+;
+
+let get_sign_abs2 av bv =
+    val (neg_a,abs_a) = get_sign_abs av in
+    val (neg_b,abs_b) = get_sign_abs bv in
+    let l_a = length abs_a in
+    let l_b = length abs_b in
+    let l = max l_a l_b in
+    let ext_abs_a = (replicate (l-l_a) gF)@abs_a in
+    let ext_abs_b = (replicate (l-l_b) gF)@abs_b in
+    (neg_a, ext_abs_a), (neg_b, ext_abs_b)
+;
+
+letrec bvless (a:as) (b:bs) = b gAND gNOT a gOR (a gXNOR b) gAND (bvless as bs)
+ /\    bvless []     []     = gF
+;
+
+// bitvector less than for dynamically sized bitvectors
+clet dbvless av bv =
+    val (av,bv) = SX2 av bv in
+    gIF (hd av) gTHEN (
+	gIF (hd bv) gTHEN (
+	    bvless av bv // Both negative
+	) gELSE (
+	    gT		// neg < pos
+	)
+    ) gELSE (
+	gIF (hd bv) gTHEN (
+	    gF		// pos !< neg
+	) gELSE (
+	    bvless av bv // Both positive
+	)
+    )
+;
+
+// bitvector less than for dynamically sized bitvectors
+let ''<'' av bv = dbvless av bv;
+infix 5 ''<'';
+
+// bitvector less than for fixed sized bitvectors
+clet fbvless av bv =
+    length av != length bv => error "Length mismatch for fbvlss" |
+    gIF (hd av) gTHEN (
+	gIF (hd bv) gTHEN (
+	    bvless av bv // Both negative
+	) gELSE (
+	    gT		// neg < pos
+	)
+    ) gELSE (
+	gIF (hd bv) gTHEN (
+	    gF		// pos !< neg
+	) gELSE (
+	    bvless av bv // Both positive
+	)
+    )
+;
+
+// bitvector less than for fixed sized bitvectors
+let '<' av bv = fbvless av bv;
+infix 5 '<';
+
+// bitvector less or equal for dynamically sized bitvectors
+clet dbvleq av bv = (dbveq av bv) gOR (dbvless av bv);
+
+// bitvector less or equal for dynamically sized bitvectors
+let ''<='' av bv = dbvleq av bv;
+infix 5 ''<='';
+
+// bitvector less or equal for fixed sized bitvectors
+clet fbvleq av bv = (fbveq av bv) gOR (fbvless av bv);
+
+// bitvector less or equal for fixed sized bitvectors
+let '<=' av bv = dbvleq av bv;
+infix 5 '<=';
+
+// bitvector greater then for dynamically sized bitvectors
+clet dbvgreater av bv = dbvless bv av;
+
+// bitvector greater then for dynamically sized bitvectors
+let ''>'' = dbvgreater;
+infix 5 ''>'';
+
+// bitvector greater then for fixed sized bitvectors
+clet fbvgreater av bv = fbvless bv av;
+
+// bitvector greater then for fixed sized bitvectors
+let '>' = fbvgreater;
+infix 5 '>';
+
+
+// bitvector less or equal for dynamically sized bitvectors
+clet dbvgeq av bv = dbvleq bv av;
+
+// bitvector less or equal for dynamically sized bitvectors
+let ''>='' av bv = dbvgeq av bv;
+infix 5 ''>='';
+
+// bitvector less or equal for fixed sized bitvectors
+clet fbvgeq av bv = fbvleq bv av;
+
+// bitvector less or equal for fixed sized bitvectors
+let '>=' av bv = fbvgeq av bv;
+infix 5 '>=';
+
+// Add two dynamic bitvectors.
+clet dbvadd av bv =
+    val (av,bv) = SX2 av bv in
+    bv_trim (tl (ext_gen_bvadd (hd av:av) (hd bv:bv) gF))
+;
+
+// Add two dynamic bitvectors.
+let ''+'' av bv = dbvadd av bv;
+infix 7 ''+'';
+
+// Fixed size bitvector addition.
+clet fbvadd av bv = tl (ext_gen_bvadd av bv gF);
+
+// Fixed size bitvector addition.
+let '+' av bv = fbvadd av bv;
+infix 7 '+';
+
+// Fixed size bitvector subtraction.
+clet fbvsub av bv = tl (ext_gen_bvadd av (map gNOT bv) gT);
+
+// Fixed size bitvector subtraction.
+let '-' av bv = fbvsub av bv;
+infix 7 '-';
+
+// Subtract two dynamic bitvectors 
+clet dbvsub av bv =
+    val (av,bv) = SX2 av bv in
+    bv_trim (tl (ext_gen_bvadd (hd av:av) (map gNOT (hd bv:bv)) gT))
+;
+
+// Subtract two dynamic bitvectors 
+let ''-'' av bv = dbvsub av bv;
+infix 7 ''-'';
+
+// Negate (2''s complement) a dynamic bitvector
+clet dbvnegate av = dbvsub (int2dbv 0) av;
+
+// Negate (2''s complement) a fixed size bitvector
+clet fbvnegate av = fbvsub (int2fbv (length av) 0) av;
+
+// Unsigned multiplication of dynamically sized bitvectors
+clet dbvmult av bv =
+    val (av,bv) = length av < length bv => (bv,av) | (av,bv) in
+    let neg_a = hd av in
+    let aav = gIF neg_a gTHEN (dbvnegate av) gELSE av in
+    let neg_b = hd bv in
+    let abv = gIF neg_b gTHEN (dbvnegate bv) gELSE bv in
+    letrec bvmult xv [] = [gF]
+     /\    bvmult xv (y:ys) =
+        let prod = gF:(map ((defix gAND) y) (xv @ (replicate (length ys) gF)))
+        in
+        dbvadd prod (bvmult xv ys)
+    in
+    let ares = bvmult aav abv then
+    let neg = neg_a gXOR neg_b then
+    gIF neg gTHEN (dbvnegate ares) gELSE ares
+;
+
+// Unsigned multiplication of dynamically sized bitvectors
+let ''*'' av bv = dbvmult av bv;
+infix 8 ''*'';
+
+let fbv_const_mult av cv =
+    letrec mul a (c:cs) =
+	c gEQUIV gT => fbvadd a (mul ((tl a)@[gF]) cs)
+		    |  mul ((tl a)@[gF]) cs
+     /\    mul a [] = (replicate (length av) gF)
+    in
+    (hd cv) gEQUIV gF => mul av (rev cv) |
+    let cv'' = fbvnegate cv in
+    fbvnegate (mul av (rev cv''))
+;
+
+// Unsigned multiplication of fixed sized bitvectors
+clet fbvmult av bv =
+    gdepends av = [] => fbv_const_mult bv av |
+    gdepends bv = [] => fbv_const_mult av bv |
+    let sz = length av in
+    sz != length bv => eprintf "Length mismatch for inputs to fbvmult" |
+    let neg_a = hd av in
+    let aav = gIF neg_a gTHEN (fbvnegate av) gELSE av in
+    let neg_b = hd bv in
+    let abv = gIF neg_b gTHEN (fbvnegate bv) gELSE bv in
+    letrec bvmult xv [] = replicate sz gF
+     /\    bvmult xv (y:ys) =
+        let pprod = map ((defix gAND) y)
+		    (lastn sz (xv @ (replicate (length ys) gF)))
+        in
+        fbvadd pprod (bvmult xv ys)
+    in
+    let ares = bvmult aav abv then
+    let neg = neg_a gXOR neg_b then
+    gIF neg gTHEN (fbvnegate ares) gELSE ares
+;
+
+// Unsigned multiplication of fixed sized bitvectors
+let '*' av bv = fbvmult av bv;
+infix 8 '*';
+
+
+let constant_power_of_two bv =
+    gdepends bv != [] => -1 |
+    letrec cnt_zeros (b:bs) =
+	let rem = cnt_zeros bs in
+	rem < 0 => rem |
+	b gEQUIV gT => -1 | 1+rem
+      /\   cnt_zeros [] = 0
+    in
+    letrec find_first_one (b:bs) =
+	b gEQUIV gT => cnt_zeros bs |
+	find_first_one bs
+     /\    find_first_one [] = -1
+    in
+    find_first_one bv
+;
+
+let fixed_ext_bvdiv av bv =
+    let sz = length av in
+    sz != length bv => eprintf "Length mismatch for inputs to fixed_ext_bvdiv" |
+    let cnt = constant_power_of_two bv in
+    cnt >= 0 =>
+	let q = (replicate cnt gF)@(butlastn cnt av) in
+	let r = (replicate (sz-cnt) gF)@(lastn cnt av) in
+	(q,r)
+    |
+    letrec step Q R (n:ns) =
+        let R'' = (tl R)@[n] in
+        val (Q', R') =
+            gIF (dbvgeq R'' bv) gTHEN ((tl Q)@[gT]), (fbvsub R'' bv)
+			       gELSE ((tl Q)@[gF]), R''
+        in
+        step Q' R' ns
+     /\    step Q R [] = (Q,R)
+    in
+    let Q0 = replicate (length av) gF in
+    let R0 = replicate (length av) gF in
+    val (Q,R) = step Q0 R0 av in
+    let Qfinal = SX sz (bv_trim Q) in
+    let Rfinal = ZX sz (bv_trim R) in
+    Qfinal, Rfinal
+;
+
+// Fixed size bitvector division
+clet fbvdiv nv dv = fst (fixed_ext_bvdiv nv dv);
+
+let '/' av bv = fbvdiv av bv;
+infix 8 '/';
+
+// Fixed size bitvector modulus
+clet fbvmod nv dv = snd (fixed_ext_bvdiv nv dv);
+
+let '%' av bv = fbvmod av bv;
+infix 8 '%';
+
+//
+// bitvector general division av/dv
+// basic "long-hand" division
+// Returns a pair: (quotion, remainder)
+//
+clet ext_bvdiv nv dv =
+    val ((n_sign, n_abs), (d_sign,d_abs)) = get_sign_abs2 nv dv then
+    val (q,r) = fixed_ext_bvdiv n_abs d_abs then
+    let res_sign = n_sign gXOR d_sign then
+    let q_res = gIF res_sign gTHEN (dbvnegate q) gELSE q in
+    (bv_trim q_res, bv_trim r)
+;
+
+// bitvector division (nv/dv) for dynamically sized bitvectors
+clet dbvdiv nv dv = fst (ext_bvdiv nv dv);
+
+let ''/'' av bv = dbvdiv av bv;
+infix 8 ''/'';
+
+// bitvector modulus operation (nv % dv) for dynamically sized bitvectors
+clet dbvmod nv dv = snd (ext_bvdiv nv dv);
+
+// bitvector modulus operation (nv % dv) for dynamically sized bitvectors
+let ''%'' av bv = dbvmod av bv;
+infix 8 ''%'';
+
+// Shift av right arithmetically by the amount bv for fixed sized bitvectors.
+let fbvashr av bv =
+    let sz = length av in
+    sz != length bv => error "Length mismatch in fbvashr" |
+    let msb = hd av in
+    let zero = replicate sz msb in
+    gIF (bv '>=' int2fbv sz sz) gTHEN zero gELSE
+    letrec shift cur cnt i =
+	i = 0 => zero |
+	gIF (cnt '=' zero) gTHEN cur gELSE
+	shift ([msb] @ butlast cur) (cnt '-' (int2fbv sz 1)) (i-1)
+    in
+    shift av bv (length av)
+;
+
+// Shift av arithmetically right by the amount in bv for fixed sized bitvectors.
+let '|>>' av bv = fbvashr av bv;
+infix 9 '|>>';
+
+// Shift av arithmetically right by the amount bv for dynamically sized bitvectors.
+let dbvashr av bv =
+    val (av,bv) = ZX2 av bv in
+    bv_trim (fbvashr av bv)
+;
+
+// Shift av arithmetically right by the amount bv for dynamically sized bitvectors.
+let ''|>>'' av bv = dbvashr av bv;
+infix 9 ''|>>'';
+
+
+// Shift av right logically by the amount in bv for fixed sized bitvectors.
+let fbvshr av bv =
+    let sz = length av in
+    sz != length bv => error "Length mismatch in fbvshr" |
+    let zero = replicate sz gF in
+    gIF (bv '>=' int2fbv sz sz) gTHEN zero gELSE
+    letrec shift cur cnt i =
+	i = 0 => zero |
+	gIF (cnt '=' zero) gTHEN cur gELSE
+	shift ([gF] @ butlast cur) (cnt '-' (int2fbv sz 1)) (i-1)
+    in
+    shift av bv (length av)
+;
+
+// Shift av logically right by the amount in bv for fixed sized bitvectors.
+let '>>' av bv = fbvshr av bv;
+infix 9 '>>';
+
+// Shift av logically right by the amount bv for dynamically sized bitvectors.
+let dbvshr av bv =
+    val (av,bv) = ZX2 av bv in
+    bv_trim (fbvshr av bv)
+;
+
+// Shift av logically right by the amount bv for dynamically sized bitvectors.
+let ''>>'' av bv = dbvshr av bv;
+infix 9 ''<<'';
+
+
+// Shift av left by the amount in bv for fixed sized bitvectors.
+let fbvshl av bv =
+    let sz = length av in
+    sz != length bv => error "Length mismatch in fbvshl" |
+    let zero = replicate sz gF in
+    gIF (bv ''>='' int2fbv sz sz) gTHEN zero gELSE
+    letrec shift cur cnt i =
+	i = 0 => zero |
+	gIF (cnt '=' zero) gTHEN cur gELSE
+	shift (tl cur @ [gF]) (cnt '-' (int2fbv sz 1)) (i-1)
+    in
+    shift av bv (length av)
+;
+
+// Shift av left by the amount in bv for fixed sized bitvectors.
+let '<<' av bv = fbvshl av bv;
+infix 9 '<<';
+
+// Shift av left by the amount in bv for dynamically sized bitvectors.
+let dbvshl av bv =
+    val (av,bv) = SX2 av bv in
+    bv_trim (fbvshl av bv)
+;
+
+// Shift av left by the amount in bv for dynamically sized bitvectors.
+let ''<<'' av bv = dbvshl av bv;
+infix 9 ''<<'';
+
+// Convert a scalar bitvector to the corresponding integer.
+clet bv2int bv =
+    gdepends bv != [] =>
+	eprintf "bv2int for symbolic vector (depends on %S)" (gdepends bv)
+    |
+    val (neg,abs) = gIF (hd bv) gTHEN (gT, (dbvnegate bv)) gELSE (gF,bv) in
+    let bit2i b = (b gEQUIV gT) => 1 | 0 in
+    letrec b2i cur (b:bs) =  b2i (2*cur + bit2i b) bs
+      /\   b2i cur [] = cur
+    in
+    let abs_i = b2i 0 abs in
+    gIF neg gTHEN -abs_i gELSE abs_i
+;
+
+// Convert a scalar bitvector to the corresponding integer.
+let dbv2int bv = bv2int bv;
+
+// Convert a scalar bitvector to the corresponding integer.
+let fbv2int bv = bv2int bv;
+
+
+let gen_bitwise fn av bv =
+    letrec process fn av bv = (av = []) => [] |
+	(fn (hd av) (hd bv)):(process fn (tl av) (tl bv)) in
+    process fn av bv
+;
+
+// Perform a bitwise gAND between two dynamic vectors.
+clet dbvgAND av bv =
+    val (av,bv) = SX2 av bv in
+    bv_trim (gen_bitwise (defix gAND) av bv)
+;
+
+// Perform a bitwise gAND between two dynamic vectors.
+let ''&'' av bv = dbvgAND av bv;
+infix 4 ''&'';
+
+// Perform a bitwise gOR between two dynamic vectors.
+clet dbvgOR av bv =
+    val (av,bv) = SX2 av bv in
+    bv_trim (gen_bitwise (defix gOR) av bv)
+;
+
+// Perform a bitwise gOR between two dynamic vectors.
+let ''|'' av bv = dbvgOR av bv;
+infix 3 ''|'';
+
+// Perform a bitwise gXOR between two dynamic vectors.
+clet dbvgXOR av bv =
+    val (av,bv) = SX2 av bv in
+    bv_trim (gen_bitwise (defix gXOR) av bv)
+;
+
+// Perform a bitwise gXOR between two dynamic vectors.
+let ''^'' av bv = dbvgXOR av bv;
+infix 4 ''^'';
+
+// Perform a bitwise gNOT of a dynamic vector.
+clet dbvgNOT av = bv_trim (map gNOT av);
+
+
+// Perform a bitwise gAND between fixed sized bitvectors.
+clet fbvgAND av bv = 
+    ((length av) != (length bv)) =>
+        error "Bitwise gAND between two vectors of different size" |
+    gen_bitwise (defix gAND) av bv
+;
+
+// Perform a bitwise gAND between fixed sized bitvectors.
+let '&' av bv = fbvgAND av bv;
+infix 4 '&';
+
+// Perform a bitwise gOR between fixed sized bitvectors.
+clet fbvgOR av bv = 
+    ((length av) != (length bv)) =>
+        error "Bitwise gOR between two vectors of different size" |
+    gen_bitwise (defix gOR) av bv
+;
+
+// Perform a bitwise gOR between fixed sized bitvectors.
+let '|' av bv = fbvgOR av bv;
+infix 3 '|';
+
+// Perform a bitwise gXOR between fixed sized bitvectors.
+clet fbvgXOR av bv = 
+    ((length av) != (length bv)) =>
+        error "Bitwise gXOR between two vectors of different size" |
+    gen_bitwise (defix gXOR) av bv
+;
+
+// Perform a bitwise gXOR between fixed sized bitvectors.
+let '^' av bv = fbvgXOR av bv;
+infix 4 '^';
+
+// Perform a bitwise gNOT on a fixed size bitvector
+let fbvgNOT av = map gNOT av;
+
+let IF c = gIF c;
+let ELSE t e = (defix gELSE) t e;
+let THEN c te = (defix gTHEN) c te;
+if_then_else_binder THEN ELSE;
+
+let abs v =
+    let zero = int2fbv (length v) 0 in
+    IF (v '>=' zero) THEN v ELSE (zero '-' v)
+;
+
+end_abstype
+    // Dynamically sized bitvector operations
+    dbv2int dbvadd dbvgAND dbvdiv dbveq dbvgeq dbvgreater dbv_is_zero dbvleq
+    dbvless dbvmod dbvmult dbvMUX dbvnegate dbvneq dbvgNOT dbvgOR dbvsub dbvgXOR
+    dbvshl
+    ''^'' ''<='' ''<'' ''='' ''>='' ''>'' ''|'' ''-'' ''!='' ''/'' ''*''
+    ''&'' ''%'' ''+'' ''<<'' ''>>'' ''|>>''
+    // Fixed sized bitvector operations
+    fbv2int fbvadd fbvgAND fbvdiv fbveq fbvgeq fbvgreater fbv_is_zero fbvleq
+    fbvless fbvmod fbvmult fbvMUX fbvnegate fbvneq fbvgNOT fbvgOR fbvsub fbvgXOR
+    fbvshl
+    '^' '<=' '<' '=' '>=' '>' '|' '-' '!=' '/' '*' '&' '%' '+' '<<' '>>' '|>>'
+    // Misc. useful
+    variable_vector
+    get_maximum_value
+    get_minimum_value
+    int2dbv
+    int2fbv
+    nat2dbv
+    nat2fbv
+    SX
+    SX2
+    ZX
+    ZX2
+    IF
+    THEN
+    ELSE
+    abs
+;

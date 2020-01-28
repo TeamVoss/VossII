@@ -1,0 +1,30 @@
+
+let a = bvariable "a";
+let b = bvariable "b";
+let c = bvariable "c";
+let d = bvariable "d";
+
+lettype tr = BR tr tr | LF (bexpr list);
+
+letrec Ptr tr =
+    letrec P i (BR t1 t2) =
+	sprintf "%*s%s\n%*s%s" i "" (P (i+4) t1) i "" (P (i+4) t2)
+     /\    P i (LF bl) =
+	let sbl = list2str T "[" ", " "]" (\b. bexpr2str 10 b) bl in
+	sprintf "%*s%s" i "" sbl
+    in
+    printf "\n%s\n" (P 0 tr)
+;
+
+let ex1 = BR (BR (LF [bF]) (LF [bT])) (LF [a,b,c]);
+let ex2 = BR (BR (LF [bT]) (LF [bT])) (LF [a,bT,c]);
+
+let r1 = gen_bOR ex1 ex2;
+
+r1;
+
+Ptr ex1;
+Ptr ex2;
+Ptr r1;
+
+

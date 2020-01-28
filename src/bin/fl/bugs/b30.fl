@@ -1,0 +1,257 @@
+load "bool_arithm.fl";
+
+// Pick the prime number to use
+//let p = 1009;	// Works
+//let p = 317;	// Does not work
+//let p = 971;	// Does not work
+//let p = 509;	// Does not work
+//let p = 7;	// Does not work
+//let p = 11;	// Does not work
+//let p = 13;	// Does not work
+//let p = 17;	// Does not work
+let p = 19;	// Does not work
+
+// Add one bit to ensure result is positive
+let SZ = bits_needed p + 1;
+
+let ' i = int2fbv SZ i;
+prefix 1 ';
+
+// Double size to handle multiplication
+let DSZ = 2*SZ;
+
+// Bitvector version of p
+let pv = int2fbv SZ p;
+let minus_pv = int2fbv SZ (0-p);
+
+let as = md_expand_vector (sprintf "a[%d:0]" (SZ-1));
+let bs = md_expand_vector (sprintf "b[%d:0]" (SZ-1));
+
+// Simple BDD ordering
+var_order (interleave [as,bs]);
+update_vossrc "DYNAMIC-ORDERING" "NO";
+
+
+// Provide a variable vector that represents an arbitrary number 0 < x < p-1
+let mk_arb base_name =
+    let names = md_expand_vector (sprintf "%s[%d:0]" base_name (SZ-1)) then
+    let v = map variable names then
+    let condition = (v '>=' '0) AND (v '<' pv) then
+    let sub = param condition then
+    substitute sub v
+;
+
+let Av = mk_arb "a";
+let Bv = mk_arb "b";
+
+// =========================================================================
+// The specification: (a*b)%p
+// =========================================================================
+let spec_expr av bv = 
+    // Make sure we don't get overflow, so zero extend the vectors and then
+    // return only the least significant digits.
+    let a = ZX DSZ av then
+    let b = ZX DSZ bv then
+    let p = ZX DSZ pv then
+    let res = (a '*' b) '%' p then
+    lastn SZ res
+;
+
+//bdd_size (spec_expr Av Bv);
+
+// =========================================================================
+// Implementation 1: Use mod-p addres in building multiplier
+// =========================================================================
+
+// Specification function for
+//	If a > p subtact p from a.
+// Not a good implementation since it involves two subtractions.
+let cond_sub v = IF (v '>=' pv) THEN v '-' pv ELSE v; 
+
+// Same as cond_sub, except only one subtration operation
+// 
+let cond_sub2 v = 
+    let tmp = v '-' (SX (length v) pv) in
+    IF (hd tmp) THEN v ELSE tmp
+;
+
+// Verify you can replace cond_sub with cond_sub2
+let vc1 = cond_sub Av == cond_sub2 Av;
+//vc1;
+
+// A function to perform addition mod p (assuming av and bv are less than p)
+let add_mod_p av bv = cond_sub2 (av '+' bv);
+
+
+// The first implemetation idea
+let imp1_expr av bv =
+    // Make a%p and b%p.
+    // Note that the bitwidth is selected so a < 2*p and thus cond_sub suffices.
+    // Now iteratively compute the (2**i * a)%p and the (pp+rest)%p 
+    letrec mul_step cur_ap (b:bs) =
+	let partial_prod = map (defix AND b) cur_ap in
+	let new_ap = cond_sub2 (cur_ap '<<' '1) in
+	add_mod_p partial_prod (mul_step new_ap bs)
+     /\    mul_step cur_ap [] = '0
+    in
+    mul_step av (rev bv)
+;
+
+// Verify implementation is correct
+let vc2 = (spec_expr Av Bv == imp1_expr Av Bv);
+// vc2;
+
+// =========================================================================
+// Implementation 2: Use carry save mod-p addres in building multiplier
+// Note that we need to do both -p and -2p now due to approximation issues
+// =========================================================================
+
+// Need more bits since we need to represent -2*p
+let ESZ = SZ+1;
+// Select number of bits used for approximate sum
+// Run complete FV until it fails...
+let APPROX_BITS = 2;
+
+let minus_2pv = int2fbv ESZ (0-2*p);
+
+let CSA3 av bv cv =
+    let s = av '^' bv '^' cv in
+    let c = av '&' bv '|' av '&' cv '|' bv '&' cv in
+    (tl c @ [F]), s
+;
+
+let CSA2 av bv =
+    let s = av '^' bv in
+    let c = av '&' bv in
+    (tl c @ [F]), s
+;
+
+let CSA4 av bv cv dv =
+    val (c1,s1) = CSA3 av bv cv in
+    CSA3 c1 s1 dv
+;
+
+let approx_CS_sub_p (C,S) =
+    val (rC,rS) = CSA3 C S (SX ESZ minus_pv) in
+    val (r2C,r2S) = CSA3 C S (SX ESZ minus_2pv) in
+    let approx2_sum =
+	((firstn APPROX_BITS r2C) '+' (firstn APPROX_BITS r2S))
+    in
+    let approx2_neg = hd approx2_sum in
+    let approx_sum =
+	((firstn APPROX_BITS rC) '+' (firstn APPROX_BITS rS))
+    in
+    let approx_neg = hd approx_sum in
+    IF approx_neg THEN (C,S) ELSE
+    IF approx2_neg THEN (rC,rS) ELSE (r2C,r2S)
+;
+
+let approx_CSA_mod_p (aC,aS) (bC,bS) =
+    val (c1,s1) = CSA4 aC aS bC bS in
+    val (rc1,rs1) = CSA3 c1 s1 (SX ESZ minus_pv) in
+    val (rc2,rs2) = CSA3 c1 s1 (SX ESZ minus_2pv) in
+    let approx_sum =
+	((firstn APPROX_BITS rc1) '+' (firstn APPROX_BITS rs1))
+    in
+    let approx_neg = hd approx_sum in
+    let approx2_sum =
+	((firstn APPROX_BITS rc2) '+' (firstn APPROX_BITS rs2))
+    in
+    let approx2_neg = hd approx2_sum in
+    IF approx_neg THEN (c1,s1) ELSE
+    IF approx2_neg THEN (rc1,rs1) ELSE (rc2,rs2)
+;
+
+let final_mod_p_adder C S =
+    val (c1,s1) = CSA3 C S (SX ESZ minus_pv) in
+    val (c2,s2) = CSA2 C S in
+    let sum3 = (c1 '+' s1) in 
+    let sum2 = (c2 '+' s2) in
+    let neg = (hd sum3) in
+    IF neg THEN sum2 ELSE sum3
+;
+
+let imp2_expr av bv =
+    let _zero = int2fbv ESZ 0 in
+    let _one  = int2fbv ESZ 1 in
+    letrec mul_step (cur_apC,cur_apS) (b:bs) =
+	let ppC = map (defix AND b) cur_apC then
+	let ppS = map (defix AND b) cur_apS then
+	let new_ap =
+	    approx_CS_sub_p ((cur_apC '<<' _one),(cur_apS '<<' _one))
+	then
+	approx_CSA_mod_p (ppC,ppS) (mul_step new_ap bs)
+     /\    mul_step cur_ap [] = _zero,_zero
+    in
+    val (C,S) = mul_step ((SX ESZ av),_zero) (rev bv) in
+    // Final full sized carry propagate summation
+    lastn SZ (final_mod_p_adder C S)
+;
+
+let vc3 = (spec_expr Av Bv = imp2_expr Av Bv);
+
+let tst i =
+    let tv = ' i in
+    (spec_expr tv Bv = imp2_expr tv Bv)
+;
+
+let test range =
+    let indices = find_all (\i. NOT (tst i)) range in
+    map (\idx. el idx range) indices
+;
+
+let tst2 i j =
+    let av = ' i in
+    let bv = ' j in
+    (spec_expr av bv = imp2_expr av bv)
+;   
+
+
+// =========================================================================
+// Implementation 3: Same as implementation 2 except since the approximation
+// only requires a single bit, replace the adder with an XOR gate
+// =========================================================================
+
+let approx_CS_sub_p (C,S) =
+    val (rC,rS) = CSA3 C S (SX ESZ minus_pv) in
+    val (r2C,r2S) = CSA3 C S (SX ESZ minus_2pv) in
+    let approx2_neg = (hd r2C) XOR (hd r2S) in
+    let approx_neg = (hd rC) XOR (hd rS) in
+    IF approx_neg THEN (C,S) ELSE
+    IF approx2_neg THEN (rC,rS) ELSE (r2C,r2S)
+;
+
+let approx_CSA_mod_p (aC,aS) (bC,bS) =
+    val (c1,s1) = CSA4 aC aS bC bS in
+    val (rc1,rs1) = CSA3 c1 s1 (SX ESZ minus_pv) in
+    val (rc2,rs2) = CSA3 c1 s1 (SX ESZ minus_2pv) in
+    let approx_neg = (hd rc1) XOR (hd rs1) in
+    let approx2_neg = (hd rc2) XOR (hd rs2) in
+    IF approx_neg THEN (c1,s1) ELSE
+    IF approx2_neg THEN (rc1,rs1) ELSE (rc2,rs2)
+;
+
+let imp3_expr av bv =
+    let _zero = int2fbv ESZ 0 in
+    let _one  = int2fbv ESZ 1 in
+    letrec mul_step (cur_apC,cur_apS) (b:bs) =
+	let ppC = map (defix AND b) cur_apC then
+	let ppS = map (defix AND b) cur_apS then
+	let new_ap =
+	    approx_CS_sub_p ((cur_apC '<<' _one),(cur_apS '<<' _one))
+	then
+	approx_CSA_mod_p (ppC,ppS) (mul_step new_ap bs)
+     /\    mul_step cur_ap [] = _zero,_zero
+    in
+    // Since the MSB of b is always F, dont map over it.
+    val (C,S) = mul_step ((SX ESZ av),_zero) (rev (tl bv)) in
+    // Final full sized carry propagate summation
+    lastn SZ (final_mod_p_adder C S)
+;
+
+let vc4 = (spec_expr Av Bv = imp3_expr Av Bv);
+//vc4;
+
+vc4;
+NOT it;
+bool2str 100 it;

@@ -1,0 +1,128 @@
+update_vossrc "VERBOSE-GARBAGE-COLLECTION" "YES";
+
+lettype tst = TST {i::int} {f::float};
+
+let Ptst (TST i f) =
+    sprintf "(TST %d %s)" i (float2str f)
+;
+install_print_function Ptst;
+
+let q1 = TST 12 2.34e9;
+
+q1;
+
+write_tst "NNN_tst_NNN" q1;
+
+let q2 = read_tst "NNN_tst_NNN";
+
+q2;
+
+"Should be equal";
+q1 == q2;
+
+system "/bin/rm NNN_tst_NNN";
+
+
+let f1 = str2float "1.5923";
+let f2 = str2float "3.1415926";
+
+
+
+f1;
+f2;
+
+fadd f1 f1;
+fadd f1 f2;
+fsub f1 f1;
+fsub f1 f2;
+fsub (fadd f1 f2) f2;
+
+
+fmul f1 f1;
+fmul f1 f2;
+fdiv f1 f1;
+fdiv f1 f2;
+fdiv (fmul f1 f2) f2;
+
+fgt f1 f1;
+fge f1 f1;
+feq f1 f1;
+fne f1 f1;
+flt f1 f1;
+fle f1 f1;
+
+fgt f1 f2;
+fge f1 f2;
+feq f1 f2;
+fne f1 f2;
+flt f1 f2;
+fle f1 f2;
+
+fgt f2 f1;
+fge f2 f1;
+feq f2 f1;
+fne f2 f1;
+flt f2 f1;
+fle f2 f1;
+
+f1; floor f1; ceil f1; round f1;
+f2; floor f2; ceil f2; round f2;
+
+let f1 = str2float "-1.5923";
+let f2 = str2float "-3.1415926";
+
+f1;
+f2;
+
+fadd f1 f1;
+fadd f1 f2;
+fsub f1 f1;
+fsub f1 f2;
+fsub (fadd f1 f2) f2;
+
+
+fmul f1 f1;
+fmul f1 f2;
+fdiv f1 f1;
+fdiv f1 f2;
+fdiv (fmul f1 f2) f2;
+
+fgt f1 f1;
+fge f1 f1;
+feq f1 f1;
+fne f1 f1;
+flt f1 f1;
+fle f1 f1;
+
+fgt f1 f2;
+fge f1 f2;
+feq f1 f2;
+fne f1 f2;
+flt f1 f2;
+fle f1 f2;
+
+fgt f2 f1;
+fge f2 f1;
+feq f2 f1;
+fne f2 f1;
+flt f2 f1;
+fle f2 f1;
+
+f1; floor f1; ceil f1; round f1;
+f2; floor f2; ceil f2; round f2;
+
+
+sqrt 2.0;
+sqrt 4.0;
+log 2.71;
+log10 10.0;
+log10 100000000000.0;
+pow (sqrt 2.0) 2.0;
+exp (log 2.71);
+sin (fdiv 3.1415 4.0);
+cos (fdiv 3.1415 4.0);
+tan (fdiv 3.1415 4.0);
+(fdiv 3.1415 4.0);
+asin (sin (fdiv 3.1415 4.0));
+acos (cos (fdiv 3.1415 4.0));
+atan (tan (fdiv 3.1415 4.0));

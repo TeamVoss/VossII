@@ -1,0 +1,120 @@
+let tONE  = (T,F);
+let tZERO = (F,T);
+let tX    = (T,T);
+let tAND (aH,aL) (bH,bL) = (aH AND bH, aL OR bL);
+let tOR  (aH,aL) (bH,bL) = (aH OR bH, aL AND bL);
+let tNOT (aH,aL) = (aL, aH);
+let tXOR a b = tOR (tAND a (tNOT b)) (tAND (tNOT a) b);
+
+let ~ = tNOT;
+let && = tAND;
+infix 4 &&;
+let || = tOR;
+infix 3 ||;
+let ^^ = tXOR;
+infix 4 ^^;
+
+let '=' a b = ~(a ^^ b);
+infix 4 '=';
+
+let bv2dr bv = map (\v. v => (T,F) | (F,T)) bv;
+
+let ==> a b = NOT a OR b;
+infix 2 ==>;
+
+letrec tleqn ((aH,aL):as) ((bH,bL):bs) =
+	    ((bH ==> aH) AND (bL ==> aL)) AND (tleqn as bs)
+ /\    tleqn [] [] = T
+;
+
+let tleq1 a b = tleqn [a] [b];
+
+overload '<=' tleqn tleq1;
+infix 1 '<=';
+
+let in_range1 HL = (HL = tONE) OR (HL = tZERO) OR (HL = tX);
+let in_rangen HLs = itlist (\HL.\r. in_range1 HL AND r) HLs T;
+overload in_range in_range1 in_rangen;
+
+
+let tern_ext fn = 
+    let v2dr s =
+	val [base,idx] = str_split s "[" in
+	let H = variable (sprintf "%sH[%s" base idx) in
+	let L = variable (sprintf "%sL[%s" base idx) in
+	(H,L)
+    in
+    let vars = depends fn in
+    let bv  = map variable vars in
+    let drv = map v2dr vars in
+    let H = Quant_thereis vars ((drv '<=' (bv2dr bv)) AND fn) in
+    let L = Quant_thereis vars ((drv '<=' (bv2dr bv)) AND (NOT fn)) in
+    (H,L)
+;
+
+
+// =====================================
+
+update_vossrc "DYNAMIC-ORDERING" "NO";
+update_vossrc "VERBOSE-GARBAGE-COLLECTION" "YES";
+
+VARS "aH[3:0] aL[3:0] bH[3:0] bL[3:0] a[3:0] b[3:0]";
+aH; aL; bH; bL; a; b;
+var_order (interleave
+		(map md_expand_vector ["aH[3:0]",
+				       "aL[3:0]",
+				       "bH[3:0]",
+				       "bL[3:0]",
+				       "a[3:0]",
+				       "b[3:0]"]));
+
+//tern_ext ((variable "q") AND (variable "z"));
+//tern_ext ((variable "q") OR (variable "z"));
+//tern_ext ((variable "q") XOR (variable "z"));
+
+let av = zip aH aL;
+let bv = zip bH bL;
+
+letrec tryEQ (a:as) (b:bs) = (a '=' b) && (tryEQ as bs)
+ /\    tryEQ [] [] = tONE;
+
+let EQ = tryEQ av bv;
+
+let specEQ = 
+    let fn = a = b in
+    tern_ext fn
+;
+
+let teEQ = 
+    let H = Quant_thereis (depends [a,b]) (
+		(av '<=' (bv2dr a)) AND
+		(bv '<=' (bv2dr b)) AND (a = b))
+    in
+    let L = Quant_thereis (depends [a,b]) (
+		(av '<=' (bv2dr a)) AND
+		(bv '<=' (bv2dr b)) AND (a != b))
+    in
+    (H,L)
+;
+
+specEQ == teEQ;
+(in_range (av@bv)) ==> (teEQ = EQ);
+
+
+let impGR =
+    letrec tryGR (a:as) (b:bs) =
+	    (a && ~b) || (a '=' b) && (tryGR as bs)
+     /\    tryGR [] [] = tZERO
+    in
+    tryGR av bv
+;
+
+let specGR = 
+    letrec gr (a:as) (b:bs) = a AND NOT b OR (a = b) AND (gr as bs)
+     /\    gr [] [] = F
+    in
+    let fn = gr a b in
+    tern_ext fn
+;
+
+specGR == impGR;

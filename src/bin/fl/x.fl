@@ -1,0 +1,7 @@
+tcl_eval [
+    "label .l -text {Hiiiii}",
+    "button .b -text Ok -command {destroy .}",
+    "pack .l",
+    "pack .b",
+    "update"] []
+;
