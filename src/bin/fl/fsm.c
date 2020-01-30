@@ -1334,7 +1334,12 @@ fanin_dfs(g_ptr redex)
     int cnt = 0;
     while( !IS_NIL(nodes) ) {
 	string node = GET_STRING(GET_CONS_HD(nodes));
-	unint idx = name2idx(node);
+	int idx = name2idx(node);
+	if( idx < 0 ) {
+	    pop_fsm();
+	    MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	    return;
+	}
 	push_buf(&todo_buf, &idx);
 	cnt++;
 	nodes = GET_CONS_TL(nodes);

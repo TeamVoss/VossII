@@ -2253,7 +2253,7 @@ let SELECT inp addr out = (
             ) ('X)
 ]) inp addr out;
 
-let DECODER_vv inp out = (
+let DECODER inp out = (
     input   inp.
     output  out.
     let isz = hw_size inp in
@@ -2268,7 +2268,7 @@ let DECODER_vv inp out = (
 	out <- hw_constr (W_CAT (map mk ((2**(hw_size inp)-1) downto 0)))
 ]) inp out;
 
-let DECODER_vb inp {outs:: bit list} = (
+let DECODER_list inp {outs:: bit list} = (
     input	inp.
     list_output	outs.
     let isz = hw_size inp in
@@ -2282,9 +2282,7 @@ let DECODER_vb inp {outs:: bit list} = (
 	map2 (\i.\o. o <- (inp '=' (''i))) ((2**(hw_size inp)-1) downto 0) outs
 )) inp outs;
 
-overload DECODER DECODER_vv DECODER_vb;
-
-let EN_DECODER_vv enable inp out = (
+let EN_DECODER enable inp out = (
     bit_input	enable.
     input	inp.
     output	out.
@@ -2300,7 +2298,7 @@ let EN_DECODER_vv enable inp out = (
 	out <- hw_constr (W_CAT (map mk ((2**(hw_size inp)-1) downto 0)))
 ]) enable inp out;
 
-let EN_DECODER_vb enable inp {outs:: bit list} = (
+let EN_DECODER_list enable inp {outs:: bit list} = (
     bit_input	enable.
     input	inp.
     list_output	outs.
@@ -2316,7 +2314,6 @@ let EN_DECODER_vb enable inp {outs:: bit list} = (
 	     ((2**(hw_size inp)-1) downto 0) outs
 )) enable inp outs;
 
-overload EN_DECODER EN_DECODER_vv EN_DECODER_vb;
 
 let --- a b = (a, b);
 infixr 2 ---;

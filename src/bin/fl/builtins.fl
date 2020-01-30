@@ -1367,6 +1367,19 @@ let fanout_dfs ckt stop_pred nds = defix fanout_dfs ckt stop_pred nds;
 // Usage: node2vector ckt nd;
 let node2vector ckt nd = defix node2vector ckt nd;
 
+// If there was an attribute named node_values_<vec> in the original pexlif,
+// where <vec> is the vector name that the node nd is part of, this
+// function returns a list of pairs (i,nm) where the value i is
+// the encoding of the name nm.
+// This function allows enumerated types to be give their original
+// names rather than their encoded names for waveform diagrams and
+// backannotation.
+//
+// Currently only HFL programs using enumerated types
+// support this functionality.
+//
+let node2value_list ckt nd = defix node2value_list ckt nd;
+
 // Given an ste object, return the type of simulation that created it.
 // Today, it will be one of "bdd" or "bexpr";
 // Usage: get_ste_type ste;

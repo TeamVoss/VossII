@@ -119,23 +119,58 @@ let STE_debug fsm =
     res
 ;
 
+// Perform symbolic trajectory evaluation on circuit ckt.
+// Returns an ste object that can be queried for traces, results, etc.
+//
+// The options argument is a string that can contain a combination of the
+// following flags:
+//
+//    -a     Abort the STE at the first error.
+//
+//    -e     Compute and trace the value for every node in the circuit.
+//           The default is to only compute nodes in the transitive fanin
+//           cone of nodes in the consequent or trace list.
+//
+//    -m t   Abort the STE run after t phases has been simulated.
+//
+// The weak_list (wl) is a list of 4-tuples of the form (w,nd,f,t) to be
+// read as: when w holds, weaken the excitation function of node nd from
+// time f up to, but not including, time t.
+//
+// Both the antecedent (ant) and consequent (cons) lists are lists of
+// 5-tuples of the form (w,nd,v,f,t) to be read as:
+// when w holds, impose the constraint that the node nd should take on
+// at least the value v from time f up to, but not including, time t.
+//
+// The trace_list (trl) is a list of triples of the form (n,f,t) and should
+// be read as: trace node nd from time f up to, but not including, time t.
+//
+// NOTE: If the STE run aborts for some reason (interrupt, timeout,
+//       "-a" flag, etc.), all traces are terminated with an X value at
+//       the time it aborted.  This means that if STE aborts due to an
+//       antecedent failure, for example, the trace will no longer have
+//       the values (at that time).  This will make debugging a bit
+//       more difficult (but not impossible) but makes it safer since
+//       possibly erroneous trace values are eliminated.
+//
+let bool_STE opts ckt wl ant cons trl = STE opts ckt wl ant cons trl;
 
-let vSTE opts vfsm wl ant cons trl =
+let vfsm_STE opts vfsm wl ant cons trl =
     let fsm = vfsm2fsm vfsm then
     let ste = STE opts fsm wl ant cons trl then
     ((vfsm2ste_r vfsm) := ste) fseq
     (tcl_eval [sprintf "wv:set_new_max_time %s 1" (deref (vfsm2wvr vfsm))]) fseq
     ste
 ;
-overload STE STE vSTE;
+overload STE bool_STE vfsm_STE;
 
-let bvSTE opts vfsm wl ant cons trl =
+let bvfsm_STE opts vfsm wl ant cons trl =
     let fsm = vfsm2fsm vfsm then
     let ste = bSTE opts fsm wl ant cons trl then
     ((vfsm2ste_r vfsm) := ste) fseq
     ste
 ;
-overload bSTE bSTE bvSTE;
+overload bSTE bSTE bvfsm_STE;
 
 let fl_add_fsm root_window fsm_window vec =
     let vfsm = w2vfsm root_window then

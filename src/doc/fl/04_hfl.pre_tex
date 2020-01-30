@@ -1,14 +1,248 @@
 
 \subsection{Hardware Models}
 
+An important part of the {\voss} system is its symbolic trajectory evaluation
+(STE) formal verification engine.
+Intuitively, STE is a generalization of a symbolic simulator in which the
+Boolean domain has been extended to a lattice structure and thus
+combines symbolic varaibles/expressions and lattice operations.
+For the STE system to work, a model of some hardware is needed.
+Currently, {\voss} provides two ways of getting such a model: 1) by reading in
+a Verilog description using, a slightly extended, Yosys~\cite{yosys} system
+or define the model directly in an extension of fl, called HFL.
+Either way, an fl datatype called pexlif will be created first.
+This datatype captures hiearchy, wire names, and RTL level assignments
+(both instantaneous as well as delayed) of the hardware.
+For further use, the pexlif is often compiled to a more
+efficient model, called fsm..
+We will return to this later.
 
 
+\subsubsection{Pexlif}
+
+The pexlif datatype is meant to be used to represent hardware modelled at
+a register transfer level.
+In other words, a pexlif model captures the design hierarchy (including
+the wire names) as well as the zero-delay combinational parts and the
+phase delay parts.
+More specifically, the pexlif (and associated types) are defined as:
+\begin{hol}
+lettype pexlif =
+        PINST 
+            \{name::string\} 
+            \{attrs::(string#string) list\}
+            \{leaf::bool\}
+            \{fa_inps:: (string#(string list)) list\}
+            \{fa_outs:: (string#(string list)) list\}
+            \{internals:: string list\}
+            \{content::content\}
+andlettype content = 
+            P_HIER \{children::pexlif list\}
+        |   P_LEAF \{fns::update_fn list\}
+;
+\end{hol}
+and
+\begin{hol}
+lettype update_fn =
+            W_UPDATE_FN \{lhs::wexpr\} \{rhs::wexpr\}
+        |   W_PHASE_DELAY \{lhs::wexpr\} \{rhs::wexpr\}
+;
+\end{hol}
+The word-level expressions (wexpr)%
+\index{wexpr}
+are defined as:
+\begin{hol}
+lettype wexpr =
+            W_X \{sz::int\}
+        |   W_CONST \{sz::int\} \{v::int\}
+        |   W_NAMED_CONST \{name::string\} \{sz::int\} \{v::int\}
+        |   W_VAR \{sz::int\} \{base::string\}
+        |   W_EXPLICIT_VAR \{sz::int\} \{name::string\}
+        |   W_AND \{a::wexpr\} \{b::wexpr\}
+        |   W_OR \{a::wexpr\} \{b::wexpr\}
+        |   W_NOT \{a::wexpr\} 
+        |   W_EQ \{a::wexpr\} \{b::wexpr\}
+        |   W_PRED \{name::string\} \{cond::wexpr\}
+        |   W_GR \{a::wexpr\} \{b::wexpr\}
+        |   W_ADD \{a::wexpr\} \{b::wexpr\}
+        |   W_SUB \{a::wexpr\} \{b::wexpr\}
+        |   W_MUL \{a::wexpr\} \{b::wexpr\}
+        |   W_DIV \{a::wexpr\} \{b::wexpr\}
+        |   W_MOD \{a::wexpr\} \{b::wexpr\}
+        |   W_SHL \{a::wexpr\} \{b::wexpr\}
+        |   W_SHR \{a::wexpr\} \{b::wexpr\}
+        |   W_ASHR \{a::wexpr\} \{b::wexpr\}
+        |   W_SX  \{sz::int\}  \{w::wexpr\}
+        |   W_ZX  \{sz::int\}  \{w::wexpr\}
+        |   W_ITE \{cond::wexpr\} \{t::wexpr\} \{e::wexpr\}
+        |   W_SLICE \{indices::int list\} \{w::wexpr\}
+        |   W_NAMED_SLICE \{name::string\} \{indices::int list\} \{w::wexpr\}
+        |   W_CAT \{parts::wexpr list\}
+        |   W_MEM_READ \{info::mem\} \{mem::wexpr\} \{addr::wexpr\}
+        |   W_MEM_WRITE \{info::mem\} \{mem::wexpr\} \{addr::wexpr\} \{data::wexpr\}
+;
+\end{hol}
+where
+\begin{hol}
+lettype mem = MEM
+                \{addr_size::int\}
+                \{lines::int\}
+                \{data_size::int\}
+;
+\end{hol}
+and is used to represent the various expressions in an RTL model.
+
+
+To illustrate a simple function operating over a pexlif, here is one
+computing the number of (internal) wires in a model:
 %%%START_CODE%%%%
-it;
+let get_children (P_HIER ch) = ch
+ /\ get_children (P_LEAF _) = []
+;
+
+letrec number_of_wires (PINST name opts leaf fa_inps fa_outs ints content) =
+    let local = length (md_expand_vectors ints) in
+    leaf => local |
+    itlist (\pp. \r. number_of_wires pp+r) (get_children content) local
+;
+%%%END_CODE%%%%
+A more interesting function might be one that extracts a sub circuit
+based on its name:
+%%%START_CODE%%%%
+letrec extract_subckts target p =
+    val (PINST name opts leaf fa_inps fa_outs ints content) = p in
+    str_is_suffix target name => [p] |
+    leaf => [] |
+    flatmap (extract_subckts target) (get_children content)
+;
+%%%END_CODE%%%%
+Here we used only the sufix of the name to match.
+
+\subsubsection{HFL}
+
+
+\subsubsection{Verilog models}
+
+{\voss} uses the Yosys system to provide a fairly complete Verilog 2005
+parser, type checker, elaborator, and lightweight synthesis path.
+As a result, there is an fl function, called verilog2pexlif%
+\index{verilog2pexlif}
+that reads in Verilog file(s) and converts the model into a pexlif.
+In order to use it though, a standard library called "ste.fl" must first
+be loaded.
+
+For example, if there are two files small.v and small\_lib.v in the
+directory verilog\_examples, that look like:
+\begin{hol}
+// File: small_lib.v
+module  mux2(
+    din_0      , // Mux first input
+    din_1      , // Mux Second input
+    sel        , // Select input
+    mux_out      // Mux output
+);
+//-----------Input Ports---------------
+input din_0, din_1, sel ;
+//-----------Output Ports---------------
+output mux_out;
+//------------Internal Variables--------
+reg  mux_out;
+//-------------Code Starts Here---------
+always @*
+begin : MUX
+ case(sel ) 
+    1'b0 : mux_out = din_0;
+    1'b1 : mux_out = din_1;
+ endcase 
+end
+endmodule
+\end{hol}
+and
+\begin{hol}
+// File: small.v
+module  mux4(
+    din_0      , // Mux first input
+    din_1      , // Mux Second input
+    din_2      , // Mux Thirsd input
+    din_3      , // Mux Fourth input
+    sel        , // Select input
+    mux_out      // Mux output
+);
+//-----------Input Ports---------------
+input din_0, din_1, din_2, din_3 ;
+input [1:0] sel ;
+//-----------Output Ports---------------
+output mux_out;
+//------------Internal Variables--------
+reg  mux_out;
+reg  mid01, mid23;
+//-------------Code Starts Here---------
+    mux2 mux1  (.din_0(din_0), .din_1(din_1), .sel(sel[0]), .mux_out(mid01));
+    mux2 mux2  (.din_0(din_2), .din_1(din_3), .sel(sel[0]), .mux_out(mid23));
+    mux2 mux12 (.din_0(mid01), .din_1(mid23), .sel(sel[1]), .mux_out(mux_out));
+
+endmodule
+\end{hol}
+We could now do:
+%%%START_CODE%%%%
+load "ste.fl";
+let p = verilog2pexlif "-Iverilog_examples"	    // Yosys flags
+                       "mux4"			    // Top-level module
+                        ["small.v", "small_lib.v"]  // Files to read & compile
+                        []			    // Additional files needed
+;
+%%%END_CODE%%%%
+followed by:
+%%%START_CODE%%%%
+number_of_wires p;
+%%%END_CODE%%%%
+or
+%%%START_CODE%%%%
+extract_subckts "not" p;
 %%%END_CODE%%%%
 
+\subsubsection{fsm}
 
+Although the pexlif format is convenient for representing a circuit, it is
+not very efficient for simulation.
+Thus, an internal datatype, called fsm, is used.
+A pexlif can be converted to an fsm by simply calling pexlif2fsm.
+%%%START_CODE%%%%
+let ckt = pexlif2fsm p;
+ckt;
+%%%END_CODE%%%%
 
+There a number of functions that operate on the fsm datatype.
+For example:
+%%%START_CODE%%%%
+// Get a list of all inputs to the circuit
+inputs ckt;
+
+// Get a list of all outputs of the circuit
+outputs ckt;
+
+// Return the immediate fanin from a node in a circuit.
+fanin ckt "mux_out";
+
+// Return the immediate fanout from a node in a circuit.
+fanout ckt "mid01";
+
+// Find the full vector given a node in it.
+node2vector ckt "sel[0]";
+
+// Use fanin_dfs to recursively go back until a toplevel node is encounterd
+let top_fanin ckt nd =
+    let toplevel n = NOT (str_is_substr "/" n) in
+    let all_inps = fanin_dfs ckt toplevel [nd] in
+    let top_level_inps = filter toplevel all_inps in
+    top_level_inps subtract [nd]
+;
+
+top_fanin ckt "mux_out";
+%%%END_CODE%%%%
+
+As usual, use the help system to find all functions that can be applied to
+an fsm.
 
 % \subsection{Circuit Models}
 % 

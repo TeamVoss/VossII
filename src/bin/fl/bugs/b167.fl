@@ -1,0 +1,22 @@
+load "ste.fl";
+
+let p = verilog2pexlif "-Ibugs/b167_verilog_examples"
+		       "mux4"
+			["small.v", "small_lib.v"]
+		        []
+;
+
+// update_vossrc "VERBOSE-FSM-PRINT" "YES";
+
+let ckt = pexlif2fsm p;
+ckt;
+
+let top_fanin ckt nd =
+    let toplevel n = NOT (str_is_substr "/" n) in
+    let all_inps = fanin_dfs ckt toplevel [nd] in
+    let top_level_inps = filter toplevel all_inps in
+    top_level_inps subtract [nd]
+;  
+
+top_fanin ckt "moux_out";
+

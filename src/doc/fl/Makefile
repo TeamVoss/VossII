@@ -1,15 +1,13 @@
 #
-DOCS =  fl_guide.tex 02_fl.tex 03_bv.tex 04_hfl.tex 05_ste.tex \
+DOCS =  fl_guide.tex 02_fl.tex 03_bv.tex 04_hfl.tex \
+	05_ste.tex \
 	06_fl-syntax.tex 07_built-in-fl.tex \
 	08_vossrc.tex 09_standard-library.tex \
 	16_biblio.tex
 
-fl_guide.pdf: $(DOCS)
-	@-mkdir -p figs
-	wish ./full_window_capture figs/forte_start.jpg
-	wish ./full_window_capture figs/forte_with_args_start.jpg We must do 123 situps
-	wish ./full_window_capture figs/forte_help.jpg --help "*AND*" 0
-	wish ./screen_capture code/code*.fl
+FIGS = figs/forte_start.jpg figs/forte_with_args_start.jpg figs/forte_help.jpg
+
+fl_guide.pdf: $(DOCS) $(FIGS)
 	touch glossary.tex
 	pdflatex fl_guide.tex
 	sed -e "s/ }/}/" fl_guide.idx \
@@ -28,6 +26,19 @@ install: fl_guide.pdf
 %.tex: %.pre_tex
 	@-mkdir -p code
 	@-gawk -v code_cnt=`ls code/*.fl | wc -l` -f pre_process.awk < $< > $@
+
+
+figs/forte_start.jpg: 
+	@-mkdir -p figs
+	wish ./full_window_capture figs/forte_start.jpg
+
+figs/forte_with_args_start.jpg:
+	@-mkdir -p figs
+	wish ./full_window_capture figs/forte_with_args_start.jpg We must do 123 situps
+
+figs/forte_help.jpg:
+	@-mkdir -p figs
+	wish ./full_window_capture figs/forte_help.jpg --help "*AND*" 0
 
 clean:
 	-@rm -f fl_guide.pdf $(DOCS)
