@@ -261,7 +261,7 @@ The read\_foo takes a memory and a list of addresses (one for each dimension
 of the memory) and returns the value in that memory location.
 The write\_foo takes a memory and a list of addresses and a new data value
 and returns the new memory in which the data at the selected address has been 
-replaced with the new_data.
+replaced with the new\_data.
 The Read\_foo and Write\_foo functions are functions that create a pexlif
 for the corresponding operation (and thus has a better visualization).
 We will return to these later.
