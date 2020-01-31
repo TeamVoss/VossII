@@ -364,8 +364,23 @@ let gdepends = depends;
 
 load "gen_u_arithm.fl";
 
+let x_var_cnt = ref 0;
+
+let mk_xvars sz =
+    let idx = deref x_var_cnt then
+    (x_var_cnt := (idx+1)) fseq
+    let base = sprintf "#Xvar%d" idx then
+    map dvariable (md_expand_vector (mk_name sz base))
+;
+
 cletrec wexpr2bool (W_NAMED_CONST name sz v) =
 	    v >= 0 => int2fbv sz v | int2fbv sz (2**sz+v)
+ /\     wexpr2bool (W_X sz) =
+	    // Generate new unique BDD variables for X's
+	    // A bit of a hack, but there is no clean solution to this
+	    // that I can think of. The rigth answer would probably have
+	    // a wexpr2dualrail but that's pretty cumbersome too
+	    mk_xvars sz
  /\     wexpr2bool (W_CONST sz v) =
 	    v >= 0 => int2fbv sz v | int2fbv sz (2**sz+v)
  /\     wexpr2bool (W_VAR sz b) =
@@ -433,6 +448,8 @@ cletrec wexpr2bool (W_NAMED_CONST name sz v) =
 		(wexpr2bool dr):(write (i+1))
 	    in
 	    flat (rev (write 0))
+ /\     wexpr2bool other =
+	(draw_graph 10 other) fseq error "No pattern matched in wexpr2bool"
 ;
 
 end_abstype wexpr_is_binary wexpr2bool;

@@ -1,5 +1,5 @@
 
-\subsection{Symbolic Trajectory Evaluation and Verification}
+\section{Symbolic Trajectory Evaluation and Verification}
 
 There is currently only one built-in command for symbolic trajectory%
 \index{symbolic trajectory evaluation}%

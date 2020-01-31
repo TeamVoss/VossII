@@ -1,5 +1,5 @@
 
-\subsection{Hardware Models}
+\section{Hardware Models}
 
 An important part of the {\voss} system is its symbolic trajectory evaluation
 (STE) formal verification engine.
@@ -18,7 +18,7 @@ efficient model, called fsm..
 We will return to this later.
 
 
-\subsubsection{Pexlif}
+\subsection{Pexlif}
 
 The pexlif datatype is meant to be used to represent hardware modelled at
 a register transfer level.
@@ -118,10 +118,181 @@ letrec extract_subckts target p =
 %%%END_CODE%%%%
 Here we used only the sufix of the name to match.
 
-\subsubsection{HFL}
+\subsection{HFL}
+
+In order to model hardware efficiently and with type safety, a deeply
+embedded hardware description language, called HFL, has been created.
+Since it is deeply embedded in fl, one can use many/most of fl's mechanisms
+for describing the hardware. 
+For example, it is quite easy to define a hardware structure recursively.
+
+There are two parts to HFL: 1) a set of functions to create hardware types,
+and 2) functions (many with special binder fixity) for describing the hardware.
+
+\subsubsection{HFL Types}
+
+A hardware type is effectively a algebraic datatype in fl for which a number
+of destructor, constructor, and misc. other functions have been created.
+There are four basic ways of creating a hardware type:
+TYPE\index{TYPE}, ENUM\index{ENUM}, STRUCT\index{STRUCT}, and
+MEMORY\index{MEMORY}.
+The ENUM and STRUCT have two versions depending on how much control is needed
+to define the encoding.
+More precisely:
+\begin{hol}
+TYPE typename size
+
+ENUM typename [name]
+ENUM typename [(name,encoding)]
+
+STRUCT typename [(fieldname,type)]
+STRUCT typename [(fieldname,type,indices)]
+
+MEMORY typename [size] wordtype
+\end{hol}
+
+To illustrate how to declare such types and how to extract/update
+fileds, consider the following simple example:
+%%%START_CODE%%%%
+load "ste.fl";	// Must be loaded for HFL
+
+TYPE "byte" 8;
+TYPE "addr" 8;
+TYPE "pc" 29;
+{'a::byte};
+{'a::addr};
+{'a::pc};
+%%%END_CODE%%%%
+Here we declared three simple hardware types for vectors of size 4 and 8
+respectively.
+Note that although both byte and addr are of size 8, they are different types
+and thus
+%%%START_CODE%%%%
+{'1::byte} '+' {'1::byte};  // Ok
+{'1::byte} '+' {'1::addr};  // Fails typechecking
+%%%END_CODE%%%%
+
+To continue the example with the two types of ENUM:
+%%%START_CODE%%%%
+ENUM "op" ["ADD", "JMP", "NOP"];
+ENUM "state" [("INIT", 1), ("FETCH", 2), ("EXECUTE", 4), ("WB", 8)];
+{'a::op};
+{'a::state};
+ADD;
+NOP;
+INIT;
+WB;
+%%%END_CODE%%%%
+where the second type gives an explicit encoding.
+Note that it is valid to give the same encoding to two different
+constants (although definitely not recommended!).
+Note also that evaluating this command will create (zero-arity) functions
+for the enumerated constants.
+Note that these functions are overloaded (if needed) so that two differnt
+ENUMs can have the same named constants.
+It is up to the typechecking to resolve the usage so that the correct
+encoding is used.
+Sometimes, this will require a typecast.
+
+Since enumerated types do not have any numerical value, it is
+an error to try to perform aritmetic operations on them.
+For example:
+%%%START_CODE%%%%
+ADD '+' JMP;
+%%%END_CODE%%%%
+fails.
+(Note that since fl does not have dependent types, the failure is a
+runtime failure triggered when the pexlif is built.)
+
+The STRUCT function creates a bitvector as well as accessor functions for
+the different fields.
+The first version of STRUCT is simply useful when creating ``bundles'' of
+other vectors.
+For example:
+%%%START_CODE%%%%
+STRUCT "bundle" [("high","byte"),("low","byte")];
+'a-->high;			    // Extract field
+'a<--high ? '0xab;		    // Update field
+'a<--high ? '0xab <-- low ? '0xba;  // Nested updates
+%%%END_CODE%%%%
+The more general STRUCT function allows the fields to overlap.
+Since the system cannot easily determine the size of the resulting
+type, the user has to give the size.
+Also, each field now consists of three items: the name of the field,
+the type of the field, and a list of indices in the vector that this
+field refers to.
+For example:
+%%%START_CODE%%%%
+STRUCT "opcode" 32 [
+                    ("opcode", "op", [31,29]),  // Non-contigous!
+                    ("dest", "addr", (23--16)),
+                    ("src1", "addr", (15--8)),
+                    ("src2", "addr", (7--0)),
+                    ("target", "pc", (28--0))
+                    ]
+;
+
+'a-->opcode;
+'a-->dest;
+'a-->target;
+
+'0<--opcode ? ADD
+  <--dest   ? '0x1
+  <--src1   ? '0x2
+  <--src2   ? '0x3
+;
+
+'0<--opcode ? JMP
+  <--target ? '0xabba
+;
+%%%END_CODE%%%%
+
+Finally, the MEMORY construct is used to create, possibly multi-dimensional,
+arrays.
+When a MEMORY type ``foo'' is created, there are four additional functions
+created:
+\begin{hol}
+read_foo  {mem:: foo} addr_1 addr_2 ... addr_n
+write_foo {mem:: foo} addr_1 addr_2 ... addr_n new_data
+Read_foo  {mem:: foo} addr_1 addr_2 ... addr_n out_name
+Write_foo {mem:: foo} addr_1 addr_2 ... addr_n new_data new_mem
+\end{hol}
+The read\_foo takes a memory and a list of addresses (one for each dimension
+of the memory) and returns the value in that memory location.
+The write\_foo takes a memory and a list of addresses and a new data value
+and returns the new memory in which the data at the selected address has been 
+replaced with the new_data.
+The Read\_foo and Write\_foo functions are functions that create a pexlif
+for the corresponding operation (and thus has a better visualization).
+We will return to these later.
+
+A simple example of MEMORY could be:
+%%%START_CODE%%%%
+MEMORY "regfile" [(10,"addr")] "byte";
+{'a::regfile};
+read_regfile 'a '0x3;
+write_regfile 'a '0x0 '0xab;
+write_regfile 'a '0x3 'd;
+%%%END_CODE%%%%
+
+A more complex example:
+%%%START_CODE%%%%
+MEMORY "array" [(4,"addr"),(5,"addr")] "byte";
+{'a::array};
+read_array 'a '0x3 '0x1;
+write_array 'a '0x0 '0x0 '0xab;
+write_array 'a '0x3 '0x2 'd;
+%%%END_CODE%%%%
+
+\subsubsection{HFL Expressions}
+
+To make it more convenient 
+
+\subsubsection{HFL Circuit Descriptions}
 
 
-\subsubsection{Verilog models}
+
+\subsection{Verilog models}
 
 {\voss} uses the Yosys system to provide a fairly complete Verilog 2005
 parser, type checker, elaborator, and lightweight synthesis path.
@@ -201,7 +372,7 @@ or
 extract_subckts "not" p;
 %%%END_CODE%%%%
 
-\subsubsection{fsm}
+\subsection{fsm}
 
 Although the pexlif format is convenient for representing a circuit, it is
 not very efficient for simulation.

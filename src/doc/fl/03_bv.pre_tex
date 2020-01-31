@@ -1,5 +1,5 @@
 
-\subsection{Bitvectors}
+\section{Bitvectors}
 
 To ease writing specifications and creating code for bitvector arithmetic,
 a builtin type ``bv'' \index{bv}%

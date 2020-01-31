@@ -22,7 +22,7 @@ let CELL {name::string} {body::pexlif list} =
 //	{'a::byte}
 // creates a byte with 8 symbolic variables named a[7] downto a[0].
 //
-let ' s =
+let make_const_or_var s =
     let sz = hw_size {undefined:: *r} in
     let w =
 	str_is_prefix "0x" s =>
@@ -43,10 +43,12 @@ let ' s =
     in
     {hw_constr w:: *r}
 ;
+nonfix ';
+overload ' ' make_const_or_var;
 free_binder ';
 
 // Convert a negative integer to a hw type.
-let '- s =
+let neg_make_const_or_var s =
     let sz = hw_size {undefined:: *r} in
     let w =
 	str_is_prefix "0x" s =>
@@ -67,6 +69,8 @@ let '- s =
     in
     {hw_constr w:: *r}
 ;
+nonfix '-;
+overload '- '- neg_make_const_or_var;
 free_binder '-;
 
 let _i2_const i =
@@ -1134,7 +1138,6 @@ let core_TYPE name size is_arithmetic value_list =
 	    =
 		(defix list_output) body_fun fs acc
 	;
-
 	binder_with_accumulator `name`_input CELL;
 	binder_with_accumulator `name`_output CELL;
 	binder_with_accumulator `name`_internal CELL;
@@ -1333,6 +1336,13 @@ let MEMORY name size_list word_type =
 	let base_and_dims = list2str T "(base^\"" "" post gen size_list in
 	sprintf "W_EXPLICIT_VAR %d %s" tot_size base_and_dims
     in
+    let saddr_list =
+        letrec mk_args cnt ((lns,atp):rem) =
+            (sprintf " {addr%d :: %s}" cnt atp)^(mk_args (cnt+1) rem)
+         /\    mk_args cnt [] = " " 
+        in
+        mk_args 1 size_list
+    in
     let saddr_args =
         letrec mk_args cnt ((lns,atp):rem) =
             (sprintf "    %s_input  addr%d.\n" atp cnt)^(mk_args (cnt+1) rem)
@@ -1394,6 +1404,17 @@ let MEMORY name size_list word_type =
 	binder_with_accumulator `name`_output CELL;
 	binder_with_accumulator `name`_internal CELL;
 	let `name`_info = MEM `s_addr_sz` `stot_lines` `swidth`;
+	let read_`name` {mem :: `name`} `saddr_list` =
+		hw_`word_type`_constr (W_MEM_READ `name`_info
+						  (hw_`name`_destr mem)
+						  (`saddr_w_adr_comp`))
+	;
+	let write_`name` {mem :: `name`} `saddr_list` {din:: `word_type`} =
+		hw_`name`_constr (W_MEM_WRITE `name`_info
+					      (hw_`name`_destr mem)
+					      (`saddr_w_adr_comp`)
+					      (hw_destr din))
+	;
 	let Read_`name` =
 	    `name`_input        mem.
 	    `saddr_args`
@@ -1466,7 +1487,7 @@ let base_STRUCT_explicit name size field_list do_check =
     let declare_field (fn, type, bits) =
 	let ranges = i_merge bits then
 	let pr_range (f,t) = sprintf "(%d -- %d)" f t in
-        let indices = list2str T "" "@" "" pr_range ranges in
+        let indices = list2str T "(" "@" ")" pr_range ranges in
         let cmd =
             sprintf
 		"let _%s s = BV_%s (W_NAMED_SLICE \"%s\" %s (hw_%s_destr s));"

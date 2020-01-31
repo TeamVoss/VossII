@@ -37,7 +37,7 @@ evaluate expressions, and
 modify the parser.
 In this section we introduce the language by several examples.
 
-\subsection{Invoking fl}
+\section{Invoking fl}
 
 If the {\voss} system is installed on your system
 and you have the suitable search path set up, it suffices
@@ -107,7 +107,7 @@ would yield:
 
 \FULLSCREEN{forte_with_args_start.jpg}
 
-\subsection{Help system}
+\section{Help system}
 
 To make it easier to use fl, there is an automatically generated help system
 available by pushing the "Help" button in top rigth corner of
@@ -125,7 +125,7 @@ For example, searching for functions with the word AND in them yield:
 
 \FULLSCREEN{forte_help.jpg}
 
-\subsection{Expressions}
+\section{Expressions}
 \index{expressions}
 The Fl prompt%
 \index{prompt}%
@@ -147,7 +147,7 @@ Thus, if you evalute an expression, you can get a ``handle'' to it by using
 it;
 %%%END_CODE%%%%
 
-\subsection{Declarations}
+\section{Declarations}
 
 The declaration%
 \index{declaration}%
@@ -235,7 +235,7 @@ can be an arbitrary complex pattern similar to the patterns%
 allowed in function definitions and lambda expressions.
 For more details, see the section on pattern matching on page~\ref{val}.
 
-\subsection{Functions}
+\section{Functions}
 
 To define a function%
 \index{function}%
@@ -299,7 +299,7 @@ for which the user has installed a printing function%
 {}.
 For more details of concrete types, see page~\ref{concreteTypes}.
 
-\subsection{Recursion}
+\section{Recursion}
 
 The following is an attempt to define the factorial function:
 %%%START_CODE%%%%
@@ -336,9 +336,9 @@ of mutually recursive functions%
 \index{mutually recursive functions}%
 {}.
 For an example on how this limitation can be dealt with, see
-the subsection on concrete type decalartions.
+the section on concrete type decalartions.
 
-\subsection{Tuples}
+\section{Tuples}
 
 If $e\_1, e\_2, \ldots , e\_n$ have types $t\_1, t\_2, \ldots , t\_n$, then
 the fl expression $(e\_1, e\_2, \ldots , e\_n)$ have type
@@ -360,7 +360,7 @@ let qqq = (1,"abc");
 qqq;
 %%%END_CODE%%%%
 
-\subsection{Lists}
+\section{Lists}
 
 If $e\_1, e\_2, \ldots , e\_n$ have type $t$, then the fl expression
 $[e\_1, e\_2, \ldots , e\_n]$ has type ($t$ list%
@@ -420,7 +420,7 @@ To find all such functions, use the help system and search for functions
 whose argument type matches "*list*".
 
 
-\subsection{Strings}
+\section{Strings}
 
 A sequence of characters enclosed between \verb@"@ is a string%
 \index{string}%
@@ -455,7 +455,7 @@ substr s 26 (-1);
 sprintf "%s: %032b (%d)" "abc" 1423 1423;
 %%%END_CODE%%%%
 
-\subsection{Polymorphism}
+\section{Polymorphism}
 
 The list processing functions hd, tl, etc. can be used on all types of lists.
 %%%START_CODE%%%%
@@ -531,7 +531,7 @@ In this respect, fl is similar to the functional language called
 Miranda\footnote{Miranda is a trademark of
 Research Software Ltd.}~\cite{Miranda}.
 
-\subsection{Type Annotations}
+\section{Type Annotations}
 Sometimes it is useful to inform the type inference mechanism
 of fl what type is expected.
 This is particularly useful when there is an obscure type error in the
@@ -588,7 +588,7 @@ Here we also demonstrate how polymorphic types can be defined.
 One warning: make sure there is a space between the :: and the *a so that
 the parser does not try to look up the symbol ::*a!
 
-\subsection{Lambda Expressions}
+\section{Lambda Expressions}
 
 The expression \verb@\@x.e evaluates to a function with formal parameter x
 and body e. Thus the
@@ -604,7 +604,7 @@ q 1;
 map (\x.x*x) [1,2,3,4,5];
 %%%END_CODE%%%%
 
-\subsection{Failures}
+\section{Failures}
 
 Some standard functions fail at run-time on certain arguments.
 When this happen, an exception is raised.
@@ -667,7 +667,7 @@ of fl's lazy semantics%
 {}, the
 use of catch should be very carefully considered.
 
-\subsection{Boolean Expressions}
+\section{Boolean Expressions}
 
 All Boolean expressions%
 \index{Boolean expression}%
@@ -754,7 +754,7 @@ is a user-setable limit on how many products that will be printed
 and the maximum size of a product.
 For more details how to modify these two parameters, see Section~\ref{vossrc}.
 
-\subsection{Quantifiers}
+\section{Quantifiers}
 
 There are several ways of using quantification%
 \index{quantification}%
@@ -792,7 +792,7 @@ Quant_thereis ["a","b"] nex;
 Note that the actual Boolean expression used as first argument is irrelevant.
 The only important fact is on what variables the expression depends.
 
-\subsection{Dependencies}
+\section{Dependencies}
 
 Sometimes it is useful to find out which Boolean variables a
 Boolean function actually depends on.
@@ -813,7 +813,7 @@ depends [ex1,ex2];
 Note that the order of the variables in the list returned by depends
 is the variable order of the OBDD representation.
 
-\subsection{Substitutions}
+\section{Substitutions}
 
 Given a Boolean function represented as an OBDD, it is convenient to
 be able to apply the function to some arguments.
@@ -842,7 +842,7 @@ ex;
 substitute [("a", b), ("b", a)] ex;
 %%%END_CODE%%%%
 
-\subsection{Type Abbreviations}
+\section{Type Abbreviations}
 \index{type abbreviations}
 
 Types can be given names:
@@ -855,7 +855,7 @@ make any distinction between the new type name
 and the actual type. It is purely a short hand that is useful when
 defining concrete types below.
 
-\subsection{Concrete Types}
+\section{Concrete Types}
 
 New types (rather than mere abbreviations) can also be defined.
 Concrete types%
@@ -987,7 +987,7 @@ letrec prBExpr (And a b) = (prBExpr a) ^ " AND " ^ (prBExpr b)
 which is much easier to write, allthough it requires one to declare
 the type of the forward function(s).
 
-\subsection{Abstract Types}
+\section{Abstract Types}
 
 In fl one can also hide the definitions of types, type constructors,
 and functions.
@@ -1131,7 +1131,7 @@ is_taut g;
 
 %%%END_CODE%%%%
 
-\subsection{Fixity Operators}
+\section{Fixity Operators}
 
 In order to make the fl code more readable, there is extensive
 support for changing the fixity of operators or functions.
@@ -1237,7 +1237,7 @@ forall a b c. a || b && c;
 
 %%%END_CODE%%%%
 
-\subsection{Overloading}
+\section{Overloading}
 
 fl supports a limited amount of user defined overloading%
 \index{overloading}%

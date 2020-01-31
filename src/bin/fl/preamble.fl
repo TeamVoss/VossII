@@ -60,20 +60,28 @@ let f_ge i j = fge i j;
 overload {>= :: *a -> *a -> bool} i_ge f_ge bv_geq bev_geq;
 infix 5 >=;
 
-let s2bv s = int2bv (sscanf "%d" s);
-let s2bev s = int2bev (sscanf "%d" s);
-let s2int s = sscanf "%d" s;
+let gen_str2int s =
+    str_is_prefix "0x" s => sscanf "0x%x" s |
+    str_is_prefix "0b" s => sscanf "0b%b" s |
+    let s0 = string_hd s in
+    let os = ord s0 in
+    (ord "0" <= os) AND (os <= ord "9") => sscanf "%d" s |
+    eprintf "%s is not a valid integer" s
+;
+
+let s2bv s = int2bv (gen_str2int s);
+let s2bev s = int2bev (gen_str2int s);
+let s2int s = gen_str2int s;
 let s2float s = str2float s;
 overload {' :: string-> *a} s2bv s2bev s2int s2float;
 free_binder ';
 
-let neg_s2bv s = int2bv ((0-1)*(sscanf "%d" s));
-let neg_s2bev s = int2bev ((0-1)*(sscanf "%d" s));
-let neg_s2int s = ((0-1)*(sscanf "%d" s));
+let neg_s2bv s = int2bv ((0-1)*(gen_str2int s));
+let neg_s2bev s = int2bev ((0-1)*(gen_str2int s));
+let neg_s2int s = ((0-1)*(gen_str2int s));
 let neg_s2float s = ((0.0-1.0)*(str2float s));
 overload {'- :: string -> *a} neg_s2int neg_s2bv neg_s2bev neg_s2float;
 free_binder '-;
-
 
 let i2i {i::int} = i;
 overload {'' :: int -> *a} i2i int2float int2bv int2bev;
