@@ -83,12 +83,13 @@ docker_package:
 
 package: clean yosys_clean
 	make install LINKFLAG=-static
+	make -C doc/fl
 	rm -r ../voss ; true
 	install -m 755 -d ../voss/
 	install -m 755 -d ../voss/bin
 	install -m 755 -d ../voss/doc
 
-	install -m 755 -s -t ../voss/bin 
+	install -m 755 -s -t ../voss/bin
 	install -m 755 -s -t ../voss/bin ../bin/fl
 	install -m 755 -s -t ../voss/bin ../bin/functor
 	install -m 755 -s -t ../voss/bin ../bin/yosys

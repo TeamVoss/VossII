@@ -37,14 +37,13 @@ proc screen_capture:do_cmds {cmds} {
 
 proc screen_capture:do_full_window_capture {ofile} {
     set wid [winfo id .]
-    exec xwd -id $wid | xwdtopnm | pnmtojpeg > $ofile 2> /dev/null
+    exec import -window $wid $ofile
 }
 
 proc screen_capture:do_capture {ofile} {
     set wid [winfo id .]
     set y_sz [expr [.voss2.t count -update -ypixels 1.0 end] + 35] 
-    exec xwd -id $wid | xwdtopnm | pnmcut -height $y_sz | \
-			pnmtojpeg > $ofile 2> /dev/null
+    exec import -window $wid png:- | convert -crop x$y_sz+0+0 png:- $ofile
 }
 
 proc screen_capture:show_help_example {pat idx} {

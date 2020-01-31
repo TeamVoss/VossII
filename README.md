@@ -47,7 +47,7 @@ build dependencies:
 ```shell
 sudo apt-get install gcc g++ doxygen flex bison gawk \
                      libz-dev tcl-dev tk-dev libc6-dev \
-                     clang libreadline-dev python3
+                     clang libreadline-dev python3 imagemagick
 ```
 
 Then, from the root of the VossII repository (assuming you've already
