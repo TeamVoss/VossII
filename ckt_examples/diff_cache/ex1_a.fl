@@ -4,7 +4,6 @@
 //
 //==========================================================================
 load "ste.fl";
-update_vossrc "DYNAMIC-ORDERING" "NO";
 
 TYPE "word" 16;
 
@@ -15,95 +14,96 @@ let collatz =
     bit_output done.
     word_output out.
     word_internal length.
-    word_internal t newt new_length.
-    bit_internal eq1 new_done.
+    word_internal t.
+    bit_internal eq1.
     bit_internal is_even is_odd.
     CELL "draw_hier data_dependent" [
-	re_ff clk newt t,
 	eq1 <- (t '=' '1), 
 	is_even <- ((t '%' '2) '=' '0), 
 	is_odd <- '~' is_even,
-	CASE newt [
-	    start --- t0,
-	    eq1 --- t,
-	    is_odd --- ('3 '*' t '+' '1),
-	    is_even --- (t '/' '2)
-	] t,
-	CASE new_length [
-	    start --- '0,
-	    eq1   --- length
-	] (length '+' '1),
-	CASE new_done [
-	    start --- '0,
-	    eq1   --- '1
-	] done,
-	re_ff clk new_done done,
-	re_ff clk new_length length,
+	STATE clk t [
+	    start	      --- t0,
+	    (t '=' '1)	      --- t,
+	    (t '%' '2 '=' '1) --- ('3 '*' t '+' '1),
+	    (t '%' '2 '=' '0) --- (t '/' '2)
+	],
+	STATE clk length [
+	    start	--- '0,
+	    (t '!=' '1)	--- (length '+' '1)
+	],
+	STATE clk done [
+	    start	--- '0,
+	    (t '=' '1)	--- '1
+	],
 	re_ff_en clk eq1 length out
 ];
 
-let ckt = pexlif2fsm (collatz 'clk 'start 't0 'done 'out);
-let vis0 = STE_debug ckt;
-//vis;
-
 let test_harness =
-    bit_input clk.
-    bit_input start.
+    bit_input	clk.
+    bit_input	start.
     word_input	t0.
-    word_output	out.
+    word_input	max_cnt.
     word_output	timer.
+    bit_output	in_range.
+    //
     bit_internal done.
-    word_internal new_timer.
+    word_internal out.
     CELL "test_harness" [
 	collatz clk start t0 done out,
-	CASE new_timer [
-	    start --- '0,
-	    done  --- timer
-	] (timer '+' '1),
-	re_ff clk new_timer timer
+	STATE clk timer [
+	    start     --- '0,
+	    '~' done  --- (timer '+' '1)
+	],
+	in_range <- (out '<=' max_cnt)
 ];
 
-let ckt = pexlif2fsm (test_harness 'clk 'start 't0 'out 'timer);
-let vis1 = STE_debug ckt;
-vis1;
-
-let mk_clk cycles =
-    map (\i. T, "clk", (i % 2 = 1), i, i+1) (0 upto (2*cycles-1))
-;
-
-update_vossrc "DYNAMIC-ORDERING" "NO";
-
-//let A =
-//    (replicate 5 F)@
-//    (bv2list (bv_constrained_variable "r_a[15:0]"
-//			(\v. (v > (int2bv 0)) AND (v < (int2bv 1024)))))
-//;
-
-let A =
-    (replicate 2 F)@
-    (bv2list (bv_constrained_variable "r_a[15:0]"
-			(\v. (v > (int2bv 0)) AND (v < (int2bv 8192)))))
-;
+let ckt = pexlif2fsm (test_harness 'clk 'start 't0 'max_cnt 'out 'in_range);
+let vis = STE_debug ckt;
+vis;
 
 
 let N = 200;
 
+// Try some scalar inputs
+let ant = "clk" is_clock N
+	and
+	  "t0[15:0]" is "26" for 1 cycle
+	and
+	  "start" is "0x1" for 1 cycle followed_by "0" for (N-2) cycles
+	and
+	  "max_cnt[15:0]" is "100" for N cycles
+;
+STE "-e" vis [] ant [] [];
 
-let ant = "clk" is_clock N and
-	  "t0[15:0]" isv A and
-	  "start" isv "0x1" from 0 to 2 and
-	  "start" isv "0x0" from 2 to (2*N)
+
+let ant = "clk" is_clock N
+	and
+	  "t0[15:0]" is "173" for 1 cycle
+	and
+	  "start" is "0x1" for 1 cycle followed_by "0" for (N-2) cycles
+	and
+	  "max_cnt[15:0]" is "100" for N cycles
+;
+STE "-e" vis [] ant [] [];
+
+// Now try symbolic inputs constrained to lie between 1 and 1000
+let A = bv_constrained_variable "r_a[15:0]"
+			(\v. (v > (int2bv 0)) AND (v < (int2bv 1000)))
 ;
 
-let ste = STE "-e" vis1 [] ant [] [];
-//ste;
+let spec = bv_constrained_variable "spec[15:0]" (\v. (v > (int2bv 190)));
 
-let run1 = vis0;
-let run2 = vis1 fseq ste;
+let ant = "clk" is_clock N
+	and
+	  "t0[15:0]" is A for 1 cycle
+	and
+	  "start" is "0x1" for 1 cycle followed_by "0" for (N-2) cycles
+	and
+	  "max_cnt[15:0]" is spec for N cycles
+;
 
-wtime run2;
+let cons = "in_range" is "0x1" in_cycle (N-1);
 
-//let ste = STE "-e" ckt [] ant [] [];
-
-//get_trace ste "clk";
+update_vossrc "DYNAMIC-ORDERING" "NO";
+STE "-e" vis [] ant cons [];
 

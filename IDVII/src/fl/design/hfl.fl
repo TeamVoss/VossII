@@ -2540,7 +2540,7 @@ add_open_overload hw_mk_var hw__pair__mk_var;
 let hw__list__destr as = W_CAT (map hw_destr as);
 add_open_overload hw_destr hw__list__destr;
 
-lettype values =  STR_VAL	    {v::string}
+lettype values =  STR_VAL   {v::string}
 		| BV_VAL    {v::bv}
 		| BL_VAL    {v:: bool list}
 ;
@@ -2557,17 +2557,24 @@ postfix cycles;
 let cycle cnt = 2*cnt;
 postfix cycle;
 
-let in_phase v ph = [(T,v,ph,ph+1)];
+let s_in_phase v ph = [(T,STR_VAL v,ph,ph+1)];
+let bv_in_phase v ph = [(T,BV_VAL v,ph,ph+1)];
+let bl_in_phase v ph = [(T,BL_VAL v,ph,ph+1)];
+overload in_phase s_in_phase bv_in_phase bl_in_phase;
 infix 6 in_phase;
 
-let at_phase v ph = [(T,v,ph,ph)];
-infix 6 at_phase;
-
-let in_cycle v cyc = [(T,v,2*cyc,2*cyc+2)];
+let s_in_cycle v cyc = [(T,STR_VAL v,2*cyc,2*cyc+2)];
+let bv_in_cycle v cyc = [(T,BV_VAL v,2*cyc,2*cyc+2)];
+let bl_in_cycle v cyc = [(T,BL_VAL v,2*cyc,2*cyc+2)];
+overload in_cycle s_in_cycle bv_in_cycle bl_in_cycle;
 infix 6 in_cycle;
 
-let at_cycle v cyc = [(T,v,2*cyc,2*cyc)];
-infix 6 at_cycle;
+// Keep???
+//let at_phase v ph = [(T,v,ph,ph)];
+//infix 6 at_phase;
+//
+//let at_cycle v cyc = [(T,v,2*cyc,2*cyc)];
+//infix 6 at_cycle;
 
 let sfor1 {v::string} {cnt::int} = [(F,STR_VAL v,0,cnt)];
 let sfor2 [({fixed::bool},{v::string},{start::int},{end::int})] cnt =
@@ -2608,7 +2615,6 @@ let otherwise vt (v,end) =
     vt@(add_default 0 defined)
 ;
 infix 3 otherwise;
-    
 
 let until v cyc = (v,cyc);
 infix 4 until;

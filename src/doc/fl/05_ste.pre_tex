@@ -84,6 +84,36 @@ These functions make it much easier to write specification.
 However, it should be remembered that when the verification
 is actually performed, all these higher level constructs gets translated
 down to the two lists of five-tuples.
+The DSL has the grammar:
+\begin{hol}
+    antecedent    : trace 'and' antecedent
+                  | trace
+ 
+    trace         : <node_name> is values
+                  | <vector_name> is values
+ 
+    values        : time_sequence
+                  | time_sequence 'otherwise' value 'until' duration
+ 
+    time_sequence : timed_value
+                  | timed_value 'followed_by' time_sequence
+ 
+    timed_value   : value 'for' duration
+                  | value 'in_phase' <integer>
+                  | value 'in_cycle' <integer>
+ 
+    duration      : <integer> 'phase'
+                  | <integer> 'phases'
+                  | <integer> 'cycle'
+                  | <integer> 'cycles'
+ 
+    value         : "0x..."     // Hex constant
+                  | "0b..."     // Binary constant
+                  | "<integer>" // Decimal constant
+                  | "[a-zA-Z]..."       // Variable, e.g., a[3:0], b[1:0][2:0]
+                  | <bv>                // Any bv of suitable size (or smaller)
+                  | <bool list> // Of the same length as vector
+\end{hol}
 
 For more details on how to use the STE function to perform formal
 verification, we refer the reader to Section~\ref{tutorial}.
