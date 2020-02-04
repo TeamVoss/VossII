@@ -1915,15 +1915,20 @@ visualization_vecs2tags(g_ptr redex)
 	    exact_found = TRUE;
 	    used = TRUE;
 	} else {
+	    int nds = 0;
+	    int matches = 0;
 	    FOREACH_NODE(nd, *ipp) {
+		nds++;
 		if( find_hash(&idx_tbl, INT2PTR(nd)) != NULL ) {
-		    used = TRUE;
-		    // Cannot use break (FOREACH_NODE is double nested for loop)
-		    goto do_the_rest;
+		    matches++;
 		}
 	    }
+	    if( matches > 0 ) {
+		used = TRUE;
+		if( nds == matches )
+		    exact_found = TRUE;
+	    }
 	}
-      do_the_rest:
 	if( used ) {
 	    Sprintf(buf, "an%06d", anon);
 	    string an = wastrsave(&strings, buf);

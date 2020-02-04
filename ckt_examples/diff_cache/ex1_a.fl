@@ -57,7 +57,7 @@ let test_harness =
 	in_range <- (out '<=' max_cnt)
 ];
 
-let ckt = pexlif2fsm (test_harness 'clk 'start 't0 'max_cnt 'out 'in_range);
+let ckt = pexlif2fsm (test_harness 'clk 'start 't0 'max_cnt 'timer 'in_range);
 let vis = STE_debug ckt;
 vis;
 

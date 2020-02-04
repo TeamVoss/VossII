@@ -291,10 +291,10 @@ letrec EMM_rec =
 let EMM name =
     addr_input          addr.
     cache_line_output   out.
-    list_internal DISTINCT_LOCATIONS data_l addr_l.
+    list_internal DISTINCT_LOCATIONS EMM_dta EMM_adr.
     let pfn = sprintf "draw_hier {EMM %s (%d)}" name DISTINCT_LOCATIONS in
     CELL pfn [
-	EMM_rec data_l addr_l addr out
+	EMM_rec EMM_dta EMM_adr addr out
 ];
 
 let RAM_model =
@@ -332,20 +332,20 @@ let vis_RAM = STE_debug ckt_RAM;
 //vis_RAM;
 
 
-let mk_EMM_ant ckt name (MEM addr_data_list) =
+let mk_EMM_ant ckt (MEM addr_data_list) =
     length addr_data_list > DISTINCT_LOCATIONS =>
 	eprintf "Too many address/data pairs in mk_EMM_ant!" 
     |
-    let l1 = filter (str_is_substr name) (vectors ckt) then
-    length l1 != 2 => eprintf "More than one %s set of nodes" name |
-    let pref = hd (str_split (hd l1) name) in
+    let l1 = filter (str_is_substr "EMM_") (vectors ckt) then
+    length l1 != 2 => eprintf "More than one %s set of nodes" "EMM_" |
+    let pref = hd (str_split (hd l1) "EMM_") in
     let asz = hw_size {'0::addr} in
     let dsz = hw_size {'0::cache_line} in
     let mk_a_vec i = 
-	{mk_var (sprintf "%s%s_adr[%d][%d:0]" pref name i (asz-1))::addr}
+	{mk_var (sprintf "%sEMM_adr[%d][%d:0]" pref i (asz-1))::addr}
     in
     let mk_d_vec i =
-	{mk_var (sprintf "%s%s_dta[%d][%d:0]" pref name i (dsz-1))::cache_line}
+	{mk_var (sprintf "%sEMM_dta[%d][%d:0]" pref i (dsz-1))::cache_line}
     in
     letrec mk i ((a,d):rem) =
 	((mk_a_vec i) isv' a from 0 to 1) and
@@ -355,9 +355,6 @@ let mk_EMM_ant ckt name (MEM addr_data_list) =
     in
     mk 0 addr_data_list
 ;
-
-
-
 
 // ===================== Cache ============================
 
@@ -491,10 +488,9 @@ time ckt;
 let vis = STE_debug ckt;
 vis;
 
-
 let basic_ant cycs =
-	(map (\i.T,"clk",(i%2=1),i,i+1) (0 upto 2*cycs)) and
-	[(T,"reset",T,0,2),(T,"reset",F,2,2*cycs)]
+	"clk" is_clock cycs and
+	"reset" is "1" for 1 cycle followed_by "0" for (cycs-1) cycles
 ;
 
 let high_addr {base::addr} =
@@ -524,11 +520,11 @@ let memory = MEM [
                      (A3 --- 'r_d1)
 ];
 
-let EMM_ant = mk_EMM_ant ckt "MEM_EMM" memory;
+let EMM_ant = mk_EMM_ant ckt memory;
 
 let run pgm =
     let ROM_ant = mk_CPU_ROM ckt pgm then
-    let ant = (basic_ant 250) and ROM_ant and EMM_ant in
+    let ant = (basic_ant 125) and ROM_ant and EMM_ant in
     (STE "-e" vis [] ant [] []) fseq pgm
 ;
 

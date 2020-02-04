@@ -25,37 +25,51 @@ let vis = STE_debug ckt;
 
 vis;
 
-let ant = (map (\i. T,"clk", (i%2=1), i, i+1) (0--10)) and
-	  "a" isv "1" from 0 to 2 and 
-	  "b" isv "0" from 0 to 2 and 
-	  "c" isv "1" from 0 to 2 and 
-	  "a" isv "1" from 2 to 4 and 
-	  "b" isv "0" from 2 to 4 and 
-	  "c" isv "0" from 2 to 4 and
-	  "a" isv "0" from 4 to 6 and 
-	  "b" isv "1" from 4 to 6 and 
-	  "c" isv "1" from 4 to 6
+let ant =
+	  "clk" is_clock 5
+	and
+	  "a" is "1" for 1 cycle followed_by
+		 "1" for 1 cycle followed_by
+		 "0" for 1 cycle
+	and
+	  "b" is "0" for 1 cycle followed_by
+		 "0" for 1 cycle followed_by
+		 "1" for 1 cycle
+	and
+	  "c" is "1" for 1 cycle followed_by
+		 "0" for 1 cycle followed_by
+		 "1" for 1 cycle
 ;
-STE "-e" vis [] ant [] [];
-    
 
-let ant = (map (\i. T,"clk", (i%2=1), i, i+1) (0--10)) and
-	  "a" isv "A" from 0 to 2 and 
-	  "b" isv "B" from 0 to 2 and 
-	  "c" isv "C" from 0 to 2 and 
-	  "a" isv "K" from 2 to 4 and 
-	  "b" isv "L" from 2 to 4 and 
-	  "c" isv "M" from 2 to 4
-;
 STE "-e" vis [] ant [] [];
 
-let ant = (map (\i. T,"clk", (i%2=1), i, i+1) (0--10)) and
-	  "a" isv "1" from 0 to 2 and 
-	  "b" isv "rB" from 0 to 2 and 
-	  "c" isv "rC" from 0 to 2 and 
-	  "a" isv "rK" from 2 to 4 and 
-	  "b" isv "bL" from 2 to 4 and 
-	  "c" isv "bM" from 2 to 4
+
+let ant =
+	  "clk" is_clock 5
+	and
+	  "a" is "A" for 1 cycle followed_by
+		 "K" for 1 cycle
+	and
+	  "b" is "B" for 1 cycle followed_by
+		 "L" for 1 cycle
+	and
+	  "c" is "C" for 1 cycle followed_by
+		 "M" for 1 cycle
+;
+STE "-e" vis [] ant [] [];
+
+
+let ant =
+	  "clk" is_clock 5
+	and
+	  "a" is "1" for 1 cycle followed_by
+		 "rK" for 1 cycle
+	and
+	  "b" is "rB" for 1 cycle followed_by
+		 "bL" for 1 cycle
+	and
+	  "c" is "rC" for 1 cycle followed_by
+		 "bM" for 1 cycle
 ;
 STE "-e" vis [] ant [] [];
 
