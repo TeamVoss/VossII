@@ -1,7 +1,18 @@
 Getting Started with VossII and fl
 ==================================
 
-Voss II is a software suite for describing visualising, analysing and proving
+This tutorial is an introduction to the VossII software suite, and the "fl"
+programming language used to interface with it.
+The tutorial assumes that you are familiar with at least one other programming
+language, and after completing it you will be able to read and write simple
+programs in fl, as well as know where to look for more in-depth information
+on any particular fl-related topic.
+
+
+What is fl?
+-----------
+
+VossII is a software suite for describing visualising, analysing and proving
 properties about integrated circuits.
 
 Similar to many theorem provers, the VossII command language
@@ -110,9 +121,8 @@ Unsurprisingly, this results in the interpreter echoing back _"Hello, world!"_
 However, `print` is commonly a statement, but fl, being a functional language,
 does not have statements - only expressions.
 
-Since all expressions have types, this begs the question: what is the type of
-`print`?
-
+Since we know that all expressions have types, this begs the question:
+what is the type of `print`?
 We can find out by simply typing the function `print` without giving it an
 argument.
 
@@ -153,7 +163,7 @@ rich library of types right out of the box:
 * `float`/`double`: single and double precision floating point numbers;
 * `string`: 8 bit ASCII strings;
 * `bool`: Boolean functions encoded using binary decision diagrams;
-* `list *`: lists where all elements have the same type `*`;
+* `* list`: lists where all elements have the same type `*`;
 * `* # ** # ...`: tuples whose elements may have different types;
 * `* -> ** -> ... -> ***`: functions from type `*`, `**`, etc. to `***`;
 * ...and many more.
@@ -202,9 +212,9 @@ whereas an underscore will just match the value and *not* bind it.
 
 ```fl
 let to_string 0 = "zero"
- /\ to_string 1 = "one"
- /\ to_string _ = "many"
- ;
+   /\ to_string 1 = "one"
+   /\ to_string _ = "many"
+   ;
 
 to_string 0;
 ```
@@ -217,16 +227,16 @@ Thus, the following attempt to write the factorial function fails miserably:
 
 ```fl
 let fac 0 = 1
- /\ fac n = n*fac (n-1)
- ;
+   /\ fac n = n*fac (n-1)
+   ;
 ```
 
 Instead, we must use the `letrec` keyword to define recursive functions:
 
 ```fl
 letrec fac 0 = 1
-    /\ fac n = n*fac (n-1)
-    ;
+      /\ fac n = n*fac (n-1)
+      ;
 
 fac 5;
 ```
@@ -272,9 +282,27 @@ let firstForStrings ({x :: string}, _) = x;
 let addTwoInts x y = {(x + y) :: int};
 ```
 
+fl employs lexical scoping.
+This means that a function which refers to some other identifier
+will keep referring to the identifier which was in scope
+*at the time of definition*, even if that identifier is later redefined.
+Consider this example, where `two` is overwritten, but the return value of
+the function `addTwo` which refers to it remains the same.
 
-Expressions and Scripts
------------------------
+```fl
+let two = 2;
+let addTwo x = two + x;
+let two = 3;
+addTwo 2;
+```
+
+This is in contrast to dynamically scoped languages like Emacs Lisp, where
+functions instead use the version of the identifier in scope at the time
+of application.
+
+
+Scripts
+-------
 
 Expressions may be either typed into the interpreter directly, or stored
 in a _script_ for later execution.
@@ -286,6 +314,13 @@ To try it out, save the following program to a file named `hello.fl`:
 print "Hello, World!\n";
 print "This print brought to you by a .fl script!\n";
 ````
+
+<div class="tip">
+When invoked from the interpreter, the `load` function looks for script files
+relative to the current working directory.
+When invoked from a script file, it will look for script files
+*relative to the directory of the calling script*.
+</div>
 
 Then, load it in the interpreter:
 
@@ -319,3 +354,122 @@ It is worth reiterating, that comments placed before a constant of function
 definition will be picked up and displayed by the help system when viewing
 that entry, to properly documenting your code is highly recommended!
 
+
+More About Types
+----------------
+
+In addition to the built-in ones, fl allows you to define your own data types
+using the `lettype` keyword. Each type consists of one or more
+*data constructors* which each have zero or more *arguments*.
+For instance, we can model a playing card using the following types:
+
+<div class="warning">
+A word of warning: while it is possible to redefine a previously declared type,
+any function referring to that type must also be defined anew, with the new
+type definition in scope.
+
+The behavior of a function referring to a type which has been redefined is
+undefined!
+</div>
+
+```fl
+lettype suit = spades | hearts | clubs | diamonds;
+lettype rank = ace | king | queen | jack | numeric int;
+lettype card = card suit rank;
+
+let aceOfSpades = card spades ace;
+let twoOfHearts = card hearts (numeric 2);
+```
+
+Note how fl lists all of the new definitions introduced by the `rank`
+type declaration:
+
+* `ace`, `king`, `queen` and `jack`: the data constructors of the type, which
+    can be used to create new values of the type and to match them in patterns.
+* `write_rank`: an automatically generated function which writes its argument
+    to a file. One such function is generated for each new type.
+* `read_rank`: counterpart to `write_rank`, this function reads a `rank` back
+    from a file previously created by `write_rank`.
+
+After declaring our own data types, we can also *pattern match* on their
+data constructors. A constructor pattern takes the form of
+`<constructor> arg1 arg2 ...`.
+As a concrete example, we may want to define a function which tells us
+whether the first of two card ranks is higher than the second one:
+
+<div class="tip">
+While not listed by fl, each new type also gets an automatically
+derived instance of the equality (`==`) and inequality (`!=`) operators.
+Thus, you can do things like `ace == king` or
+`card spades jack != card clubs (numeric 1)` without having to write any
+extra boilerplate!
+</div>
+
+```fl
+lettype rank = ace | king | queen | jack | numeric int;
+
+let cardValue ace         = 14
+   /\ cardValue king        = 13
+   /\ cardValue queen       = 13
+   /\ cardValue jack        = 13
+   /\ cardValue (numeric n) = n
+   ;
+
+let better a b = cardValue a > cardValue b;
+```
+
+We can also use the `new_type_abbrev` keyword to define *type synonyms*,
+for types which already exist but may have
+some particular semantics in our problem domain.
+We may want to, say, define a hand of cards as a `list` of `card`s:
+
+```fl
+lettype suit = spades | hearts | clubs | diamonds;
+lettype rank = ace | king | queen | jack | numeric int;
+lettype card = card suit rank;
+
+new_type_abbrev hand = card list;
+let myHand = {[aceOfSpades, twoOfHearts] :: hand};
+```
+
+
+Booleans and Binary Decision Diagrams
+-------------------------------------
+TODO
+
+
+Overloading Functions
+---------------------
+TODO
+
+
+What Next?
+----------
+
+Congratulations on completing this tutorial!
+Hopefully, you are now equipped to confidently find your way around the fl
+language and its interpreter.
+
+What is your next step on your journey to VossII mastery?
+A few suggestions:
+
+* learn more about the embedded hardware description language and how to use it
+    to visualize, simulate and debug hardware descriptions;
+* explore the functions available to you, either using the integrated help
+    system or using the fl user guide;
+* install and configure an editor integration; or
+* learn how you can write and call high-performance Haskell programs from your
+    fl programs.
+
+Documentation about the hardware description language, visualization,
+and (almost) all of fl's built-in functions can be found in the
+VossII user guide. You will find this guide in
+[our release repository](https://github.com/TeamVoss/VossReleases/blob/master/doc/fl_guide.pdf),
+or at `doc/fl_guide.pdf` in the VossII source or binary distribution.
+
+More information about installing and configuring editor integrations is
+available from
+[here](https://github.com/TeamVoss/VossReleases/tree/master/modes),
+and the complete guide to using and building fl plugins in Haskell
+can be found
+[here](https://github.com/TeamVoss/VossReleases/blob/master/doc/fl_plugins.md).
