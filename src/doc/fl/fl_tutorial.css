@@ -1,0 +1,32 @@
+#spacer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    background-color: #f8f8ff;
+}
+
+#spacer > main {
+    max-width: 90%;
+    width: 60em;
+    margin: auto;
+    margin-top: 1em;
+    margin-bottom: 1em;
+    padding: 2em;
+    line-height: 1.5em;
+    padding-top: 0.25em;
+    border-radius: 0.5em;
+    font-size: 13pt;
+    font-family: sans-serif;
+    background-color: white;
+}
+
+#spacer h1, #spacer h2 {
+    line-height: 1.5em;
+}
+
+main img {
+    max-width: 90%;
+}

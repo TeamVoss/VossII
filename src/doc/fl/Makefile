@@ -16,6 +16,12 @@ fl_guide.pdf: $(DOCS) $(FIGS)
 	pdflatex fl_guide.tex
 	pdflatex fl_guide.tex
 
+fl_tutorial.html: fl_tutorial.md $(FIGS)
+	@-mkdir -p tut_code
+	@-gawk -v code_cnt=`ls tut_code | egrep .fl$ | wc -l` -f tut_pre_process.awk < $< > fl_tutorial_tmp.md
+	pandoc -i fl_tutorial_tmp.md -o fl_tutorial_tmp.html
+	awk '/<\/main>/{while(getline line<"fl_tutorial_tmp.html"){print line}} //' fl_tutorial_template.html > fl_tutorial.html
+
 preview: fl_guide.pdf
 	xpdf fl_guide.pdf
 
@@ -28,7 +34,7 @@ install: fl_guide.pdf
 	@-gawk -v code_cnt=`ls code/*.fl | wc -l` -f pre_process.awk < $< > $@
 
 
-figs/forte_start.jpg: 
+figs/forte_start.jpg:
 	@-mkdir -p figs
 	wish ./full_window_capture figs/forte_start.jpg
 
@@ -42,7 +48,9 @@ figs/forte_help.jpg:
 
 clean:
 	-@rm -f fl_guide.pdf $(DOCS)
+	-@rm -f fl_tutorial_tmp.md fl_tutorial_tmp.html fl_tutorial.html
 	-@rm -rf code
+	-@rm -rf tut_code
 	-@rm -rf figs
 	-@rm -f fl_guide.aux
 	-@rm -f fl_guide.ilg
@@ -55,6 +63,3 @@ clean:
 	-@rm -f glossary.tex
 	-@rm -f fl_guide.out
 	-@rm -f fl_guide.ind
-
-
-

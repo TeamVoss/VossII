@@ -83,12 +83,16 @@ docker_package:
 
 package: clean yosys_clean
 	make install LINKFLAG=-static
+	make -C doc/fl
 	rm -r ../voss ; true
 	install -m 755 -d ../voss/
 	install -m 755 -d ../voss/bin
 	install -m 755 -d ../voss/doc
+	install -m 755 -d ../voss/modes
+	install -m 755 -d ../voss/modes/emacs
+	install -m 755 -d ../voss/modes/vim
 
-	install -m 755 -s -t ../voss/bin 
+	install -m 755 -s -t ../voss/bin
 	install -m 755 -s -t ../voss/bin ../bin/fl
 	install -m 755 -s -t ../voss/bin ../bin/functor
 	install -m 755 -s -t ../voss/bin ../bin/yosys
@@ -100,6 +104,12 @@ package: clean yosys_clean
 
 	install -m 644 -t ../voss/doc ../doc/fl_guide.pdf
 	install -m 644 -t ../voss/doc ../doc/fl_plugins.md
+
+	install -m 644 -t ../voss/modes/emacs ../modes/emacs/fl-mode.el
+	install -m 644 -t ../voss/modes/emacs ../modes/emacs/README.md
+
+	install -m 644 -t ../voss/modes/vim ../modes/vim/fl.vimrc
+	install -m 644 -t ../voss/modes/vim ../modes/vim/README
 
 	cp -r ../doc/hfl_examples ../voss/doc/
 	cp -r ../modes            ../voss/
