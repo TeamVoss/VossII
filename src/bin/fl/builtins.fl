@@ -1,3 +1,13 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
+// Dummy
+let ___z = 0;
+
+
+
 // Convert the BDD f to a string.
 // The format of the expression is decided by the vossrc option PRINT-FORMAT
 // (the default is sum-of-product (SOP).
@@ -1217,6 +1227,12 @@ let bev_leq aev bev = defix bev_leq aev bev;
 // Usage: bev_less av bev;
 let bev_less aev bev = defix bev_less aev bev;
 
+// Compute the condition for two (bexpr) bitvectors to be equal.
+let bev_eq a b = (defix bev_eq) a b;
+
+// Compute the condition for two (bexpr) bitvectors not to be equal.
+let bev_neq a b = (defix bev_neq) a b;
+
 // Return av mod bev.
 // If bev is 0, the result is undefined.
 // Usage: bev_mod av bev;
@@ -1384,6 +1400,9 @@ let node2value_list ckt nd = defix node2value_list ckt nd;
 // Today, it will be one of "bdd" or "bexpr";
 // Usage: get_ste_type ste;
 let get_ste_type ste = defix get_ste_type ste;
+
+// Return the end time for the STE run ste.
+let get_ste_maxtime ste = defix get_ste_maxtime ste;
 
 // Given an node name nd in circuit ckt, return nd's declared name.
 // For example, a node "i42/i22/i39/d" might have been declared as "foo"

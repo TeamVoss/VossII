@@ -1,2 +1,7 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 cload (DIR^"../IDVII/src/fl/design/load.fl");
 cload (DIR^"../IDVII/src/fl/gui/sch_draw/load.fl");

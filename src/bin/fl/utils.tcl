@@ -1,3 +1,8 @@
+;#########################################################################
+;# Copyright 2020 Carl-Johan Seger
+;# SPDX-License-Identifier: Apache-2.0
+;#########################################################################
+
 set ::util_window_cnt 0
 
 set base_tfont  [font actual {{bitstream vera sans mono} 8}]

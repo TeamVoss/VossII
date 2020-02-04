@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 lettype color = RGB {valid::bool} {r::bv} {g::bv} {b::bv};
 
 let rgb2color r g b = RGB T (int2bv r) (int2bv g) (int2bv b);

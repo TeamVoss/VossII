@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 1, sscanf "abc" "abc";
 
 2, (sscanf "abc" " abc") gen_catch (\msg. fprintf stderr "%s\n" msg);

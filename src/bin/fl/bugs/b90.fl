@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 open_overload {add:: *a -> *a -> *a};
 let iadd {i::int} {j::int} = i+j;
 add_open_overload add iadd;

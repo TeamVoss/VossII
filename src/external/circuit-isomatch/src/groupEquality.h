@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 /** Contains a few useful functions to check whether a group is equal to
  * another group (formally). Included for `CircuitGroup`.
  */

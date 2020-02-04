@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 clet old_md_expand_vectors vl = flatmap md_expand_vector vl;
 
 let r01 = md_expand_vectors [];

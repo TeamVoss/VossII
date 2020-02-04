@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 #include "circuitGroup.h"
 #include "dotPrint.h"
 #include "signatureConstants.h"

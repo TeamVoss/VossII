@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 /* Data types common to fl and its plugins.
  * Note that when included by plugins, graph manipulation macros always have
  * "paranoia checks" turned off, as said checks are implemented as functions

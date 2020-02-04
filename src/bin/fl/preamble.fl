@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 (_load (DIR^"builtins.fl") F) fseq ();
 
 // Convert a natural number to a bitvector.
@@ -376,8 +381,6 @@ let fixed_bv2list bits sign_ext bv =
 
 // Compute the condition for two bitvectors to be equal.
 let bv_eq {a::bv} {b::bv} = a = b;
-
-//let bev_eq {a::bev} {b::bev} = 
 
 // Compute the condition for two bitvectors not to be equal.
 let bv_neq {a::bv} {b::bv} = a != b;

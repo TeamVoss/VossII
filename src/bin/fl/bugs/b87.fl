@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 update_vossrc "DYNAMIC-ORDERING" "NO";
 
 lettype color = RGB {r::bv} {g::bv} {b::bv};

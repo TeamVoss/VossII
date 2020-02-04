@@ -1,6 +1,11 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 /********************************************************************
 *                                                                   *
-*     Copyright (C) 1994 Catherine Leung, Mark Greenstreet          *
+*     Original author (C) 1994 Catherine Leung, Mark Greenstreet    *
 *     Edited by Carl-Johan Seger, 1995                              *
 *     and Sólrún Halla Einarsdóttir, 2018                           *
 *                                                                   *

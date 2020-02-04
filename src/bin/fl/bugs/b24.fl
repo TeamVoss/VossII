@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 let i_inc i = i+1;
 let s_inc i = i^"1";
 overload inc i_inc s_inc;

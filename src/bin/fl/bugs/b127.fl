@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 letrec i_merge ilist =
     letrec merge cur_dir cur_start cur_last (n:ns) =
         (cur_dir = 1) AND (n = cur_last+1) =>

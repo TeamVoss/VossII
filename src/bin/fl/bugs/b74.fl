@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 let d x = x+x;	// d is an implicitly overloaded function
 let s x = x^x;	// s is a simple function
 let e = d 1;

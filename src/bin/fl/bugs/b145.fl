@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 lettype color = RGB {r::bv} {g::bv} {b::bv};
 
 let col2str (valid,(RGB rv gv bv)) =

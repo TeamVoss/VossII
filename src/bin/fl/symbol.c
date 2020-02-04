@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 #include "symbol.h"
 #include "graph.h"
 #include "typecheck.h"
@@ -102,6 +107,7 @@ Init_symbol()
     dummy->start_line_nbr = 1;
     dummy->end_line_nbr   = 1;
     dummy->comments	  = NULL;
+    dummy->arg_names	  = NULL;
     dummy->non_lazy       = FALSE;
     dummy->forward	  = FALSE;
     dummy->expr           = NULL;
@@ -264,6 +270,7 @@ Add_Destructors(string name, typeExp_ptr new_type,
 	tmp->overload_list = NULL;
 	tmp->implicit_args = NULL;
 	tmp->comments      = NULL;
+	tmp->arg_names     = NULL;
 	tmp->next          = newfnp;
 	newfnp             = tmp;
 	insert_hash(&Constructor_Table, (pointer) (fnp->name),
@@ -300,6 +307,7 @@ Add_Destructors(string name, typeExp_ptr new_type,
 	save_fun->overload_list  = NULL;
 	save_fun->implicit_args  = NULL;
 	save_fun->comments	 = NULL;
+	save_fun->arg_names      = NULL;
 	save_fun->next           = newfnp;
 	newfnp		     = save_fun;
 	// Load function
@@ -327,6 +335,7 @@ Add_Destructors(string name, typeExp_ptr new_type,
 	load_fun->implicit_args  = NULL;
 	load_fun->next           = newfnp;
 	load_fun->comments	 = NULL;
+	load_fun->arg_names	 = NULL;
 	newfnp		     = load_fun;
     }
     //
@@ -388,6 +397,7 @@ InsertOverloadDef(string name, bool open_overload, oll_ptr alts,
     ret->open_overload  = open_overload;
     ret->overload_list  = alts;
     ret->comments	= NULL;
+    ret->arg_names	= NULL;
     ret->visible        = TRUE;
     ret->non_lazy       = FALSE;
     ret->forward        = FALSE;
@@ -444,6 +454,7 @@ Make_forward_declare(string name, typeExp_ptr type, symbol_tbl_ptr stbl,
     ret->start_line_nbr = start_line;
     ret->end_line_nbr   = line_nbr;
     ret->comments	= NULL;
+    ret->arg_names	= NULL;
     ret->non_lazy       = FALSE;
     ret->name           = name;
     ret->expr           = expr;
@@ -954,6 +965,7 @@ Add_ExtAPI_Function(string name, string strictness,
     ret->start_line_nbr = 0;
     ret->end_line_nbr   = 0;
     ret->comments       = NULL;
+    ret->arg_names      = NULL;
     ret->non_lazy       = non_lazy;
     ret->forward        = FALSE;
     ret->name           = name;

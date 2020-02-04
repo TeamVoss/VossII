@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 let Init_sch_draw =
   tcl_eval [
    sprintf "set ::imagedir %s%s" DIR "images",
@@ -356,11 +361,11 @@ let my_bool2str f =
     list2str T "" "+\n" "" id ll
 ;
 
-let fl_get_STE_maxtime w =
+let fl_get_ste_maxtime w =
     let ste = canvas2ste w then
-    get_STE_maxtime ste
+    get_ste_maxtime ste
 ;
-export_to_tcl fl_get_STE_maxtime;
+export_to_tcl fl_get_ste_maxtime;
 
 let merge_traces trls =
     let cmp a b = b-a in
@@ -1016,7 +1021,7 @@ let base_get_waveform w vec show_depend =
     let type = get_ste_type ste then
     let nds = md_expand_vector vec in
     let opt_states = node2value_list (ste2fsm ste) (hd nds) in
-    let max_time = get_STE_maxtime ste then
+    let max_time = get_ste_maxtime ste then
     type = "bdd" =>
         let traces = (map (get_trace ste) nds) catch [] then
         traces = [] => [(max_time,"X", "white"),(0,"-", "white")] |

@@ -1,3 +1,8 @@
+;#########################################################################
+;# Copyright 2020 Carl-Johan Seger
+;# SPDX-License-Identifier: Apache-2.0
+;#########################################################################
+
 set ::wv_phase_width	    15
 set ::wv_height		    20
 set ::wv_sep		    5
@@ -638,7 +643,7 @@ proc wv:prim_add_waveform {w vec} {
     set wx $wf.xscroll
 
     unpost_popup $ww
-    set new_maxtime [fl_get_STE_maxtime $w]
+    set new_maxtime [fl_get_ste_maxtime $w]
     if { $new_maxtime != $::wv_info($f,maxtime) } {
 	wv:set_new_max_time $w 0
     }
@@ -822,7 +827,7 @@ proc wv:set_new_max_time {w force} {
     set ww $wf.waveforms
     set wx $wf.xscroll
     
-    set new_maxtime [fl_get_STE_maxtime $w]
+    set new_maxtime [fl_get_ste_maxtime $w]
     if { !$force && $new_maxtime == $::wv_info($f,maxtime) } { return }
 
     set ::wv_info($f,maxtime) $new_maxtime
@@ -854,7 +859,7 @@ proc wv:toggle_show_depend {w} {
     set wt $wf.time_scale
     set ww $wf.waveforms
     
-    set new_maxtime [fl_get_STE_maxtime $w]
+    set new_maxtime [fl_get_ste_maxtime $w]
 
     set ::wv_info($f,maxtime) $new_maxtime
     if [info exists ::wv_info($f,vectors)] {

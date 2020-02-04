@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 let FAIL_OK e =
     e gen_catch 
     \msg. ((fprintf stderr "Command failed:\n%s\n" msg) fseq [])

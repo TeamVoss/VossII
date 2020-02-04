@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 update_vossrc "VERBOSE-IMAGE-PRINT" "YES";
 import_xpm_image (DIR^"small.xpm");
 

@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 open_overload {hw_type_name:: *a -> string};
 open_overload {hw_mk_var:: *a -> string -> wexpr};
 open_overload {hw_is_arithmetic:: *a -> bool};
@@ -86,8 +91,7 @@ let _s2_var s =
     let w = W_EXPLICIT_VAR sz s in
     {hw_constr w:: *r}
 ;
-
-overload '' _i2_const _s2_var;
+overload '' '' _i2_const _s2_var;
 
 begin_abstype;
 cletrec dep (W_X sz) = []
@@ -754,8 +758,8 @@ let list_input body_fun {base_fs::string} acc =
         \{aa:: (*a list)}. 
             let a = map hw_destr {aa:: *a list} in
             let fs = map (sprintf "%s[%d]" base_fs) ((length aa-1) downto 0) in
-            let sz = hw_size (hd aa) in
-            let wfs = map (hw_mk_var (hd aa)) fs in
+	    let sz = hw_size {undefined:: *a} in
+            let wfs = map (hw_mk_var {undefined:: *a}) fs in
             let f = map hw_constr wfs in
 	    val (expr_pexlifs,avs) =
 		unzip (map (\(fs,aa). get_act_args fs aa) (zip fs aa))
@@ -764,7 +768,8 @@ let list_input body_fun {base_fs::string} acc =
             let acc' name bd =
 		let p0 = acc name bd in
                 val (PINST n attrs leaf inps outs ints body) = p0 in
-                let new_inps = [((hd (md_merge_vectors fv)),
+                let new_inps = aa = [] => [] |
+				[((hd (md_merge_vectors fv)),
 				 (md_merge_vectors (flat avs)))]
 		in
 		val (p_main, p_exprs) =
@@ -860,15 +865,16 @@ let list_output body_fun {base_fs::string} acc =
         \{aa:: *a list}.
             let a = map hw_destr {aa:: *a list} in
             let fs = map (sprintf "%s[%d]" base_fs) ((length aa-1) downto 0) in
-            let sz = hw_size (hd aa) in
-            let wfs = map (hw_mk_var (hd aa)) fs in
+	    let sz = hw_size {undefined:: *a} in
+            let wfs = map (hw_mk_var {undefined:: *a}) fs in
             let f = map hw_constr wfs in
             let av = map get_lhs_vars a in
             let fv = map (\wf. hd (get_lhs_vars wf)) wfs in
             let acc' name bd =
 		let p0 = acc name bd in
                 val (PINST n attrs leaf inps outs ints body) = p0 in
-                let new_outs = [((hd (md_merge_vectors fv)),
+                let new_outs = aa = [] => [] |
+				[((hd (md_merge_vectors fv)),
 				 (md_merge_vectors (flat av)))]
 		in
 		val (p_main, p_exprs) =
@@ -1001,65 +1007,6 @@ let list_internal cnt body_fun {base_fs::string} acc =
     body_fun {f:: *a list} acc'
 ;
 sized_binder_with_accumulator list_internal CELL;
-
-//// Declare list of internal signals to a unit.
-//let list_internal body_fun {fs::string} acc =
-//    NOT (str_is_substr "<" fs) =>
-//	    eprintf "list_internal's name must be of form base<range> (%s)" fs
-//    |
-//    let cnt = 
-//	let range = hd (str_split (el 2 (str_split fs "<")) ">") in
-//	let tmp = sprintf "q[%s]" range in
-//	md_size tmp
-//    in
-//    let base_fs = hd (str_split fs "<") in
-//    let fs = map (sprintf "%s<%d>" base_fs) ((cnt-1) downto 0) in
-//    let sz = hw_size {undefined :: *a} in
-//    let wfs = map (hw_mk_var {undefined :: *a}) fs in
-//    let f  = {map  hw_constr wfs:: *a list} in
-//    let fv = map (\wf. hd (get_lhs_vars wf)) wfs in
-//    let values = hw_values {undefined :: *a} in
-//    let acc' name bd =
-//	let p0 = acc name bd in
-//	val (PINST n attrs leaf inps outs ints body) = p0 in
-//	val (p_main, p_exprs) =
-//	    n = "_WrApPeR_" =>
-//		val (P_HIER pexlifs) = body in
-//		// Get the main pexlif
-//		val (PINST n' attrs' leaf' inps' outs' ints' body') =
-//		    el 1 pexlifs
-//		in
-//		let attrs'' =
-//		    values = "" => attrs' |
-//		    (map (\f. (sprintf "node_values_%s" f), values) fv)@attrs'
-//		in
-//		let prev_expr_pexlifs = tl pexlifs in
-//		let ints'' = fv@ints' in
-//		let p_main' =
-//		    PINST n' attrs'' leaf' inps' outs' ints'' body'
-//		in
-//		(p_main', prev_expr_pexlifs)
-//	    |
-//	    let attrs' =
-//		values = "" => attrs |
-//		(map (\f. (sprintf "node_values_%s" f), values) fv)@attrs
-//	    in
-//	    let p_main' =
-//		PINST n attrs' leaf inps outs (fv@ints) body
-//	    in
-//	    (p_main', [])
-//	in
-//	p_exprs = [] => p_main |
-//	let c_ints = get_tmp_outs p_exprs in
-//	let c_inps = mk_wrap_inps c_ints (p_main:p_exprs) in
-//	let c_outs = mk_wrap_outs [p_main] in
-//	let res = PINST "_WrApPeR_" attrs F c_inps c_outs c_ints
-//		    (P_HIER (p_main:p_exprs)) in
-//	res
-//    in
-//    body_fun {f:: *a list} acc'
-//;
-//binder_with_accumulator list_internal CELL;
 
 
 let hw_types_decl_ref = ref {[]::(string#int) list};
@@ -2057,7 +2004,24 @@ let draw_fsm reset S0 orig_trans base_inps =
     file, states, edges
 ;
 
-let Moore_FSM name clk state (reset,S0) transitions =
+// Create a Moore finite state machine named 'name'.
+// The FSM uses a rising edge triggered flip-flop whose clock is clk.
+// The `state' is the names of the vector of wires that will record the
+// state of the machine.
+// The reset_condition is a pair of (reset_signal, reset_state).
+// Finally, transitions is a list of (from_state, condition, to_state) triples.
+// It is convenient to use the --- function instead of , for the transitions.
+// For example,
+//	(INIT --- req --- PROCESS)
+// is (arguably) easier to read than:
+//	(INIT, req, PROCESS).
+// However, both are equally valid.
+//
+// Note that this function will create an explicit visualization of the
+// finite state machine that can be seen by clicking on the FSM symbol
+// in the circuit browser.
+let Moore_FSM name clk state reset_condition transitions =
+    val (reset,S0) = reset_condition in
     let w_state = hw_destr {state:: *a} in
     let cnv (from_state, cond, to_state) =
 	(hw_destr {from_state:: *a}),
@@ -2576,6 +2540,10 @@ add_open_overload hw_mk_var hw__pair__mk_var;
 let hw__list__destr as = W_CAT (map hw_destr as);
 add_open_overload hw_destr hw__list__destr;
 
+lettype values =  STR_VAL	    {v::string}
+		| BV_VAL    {v::bv}
+		| BL_VAL    {v:: bool list}
+;
 
 let phase cnt = cnt;
 postfix phase;
@@ -2601,11 +2569,20 @@ infix 6 in_cycle;
 let at_cycle v cyc = [(T,v,2*cyc,2*cyc)];
 infix 6 at_cycle;
 
-let for1 {v::string} {cnt::int} = [(F,v,0,cnt)];
-let for2 [({fixed::bool},{v::string},{start::int},{end::int})] cnt =
-    [(fixed, v, start, start+cnt)]
+let sfor1 {v::string} {cnt::int} = [(F,STR_VAL v,0,cnt)];
+let sfor2 [({fixed::bool},{v::string},{start::int},{end::int})] cnt =
+    [(fixed, STR_VAL v, start, start+cnt)]
 ;
-overload for for1 for2;
+let bvfor1 {v::bv} {cnt::int} = [(F,BV_VAL v,0,cnt)];
+let bvfor2 [({fixed::bool},{v::bv},{start::int},{end::int})] cnt =
+    [(fixed, BV_VAL v, start, start+cnt)]
+;
+let blfor1 {v::bool list} {cnt::int} = [(F,BL_VAL v,0,cnt)];
+let blfor2 [({fixed::bool},{v::bool list},{start::int},{end::int})] cnt =
+    [(fixed, BL_VAL v, start, start+cnt)]
+;
+
+overload for sfor1 sfor2 bvfor1 bvfor2 blfor1 blfor2;
 infix 5 for;
 
 let followed_by vtl1 vtl2 =
@@ -2637,7 +2614,43 @@ let until v cyc = (v,cyc);
 infix 4 until;
 
 let is vec vtlist = 
-    flatmap (\(fixed,v,f,t). vec isv v from f to t) vtlist
+    let nds = md_expand_vector vec in
+    let sz = length nds in
+    let cnv (fixed, (STR_VAL v), f , t) =
+	let vs = (
+	    let s2l s = map (\s. s = "1") (explode s) in
+	    str_is_prefix "0x" v =>
+		s2l (sprintf "%0*b" sz (sscanf "0x%x" v))
+	    |
+	    str_is_prefix "0b" v =>
+		s2l (sprintf "%0*b" sz (sscanf "0b%b" v))
+	    |
+	    is_number v =>
+		s2l (sprintf "%0*b" sz (sscanf "%d" v))
+	    |
+	    (sz = 1) AND (v = "T") => [T] |
+	    (sz = 1) AND (v = "F") => [F] |
+	    let ss = md_expand_vector v then
+	    length ss != sz => error "nope" |
+	    map variable ss
+	) catch
+	    eprintf "Length mismatch in is (|%s| != |%s|)" vec v
+	in
+	map2 (\n.\v. (T,n,v,f,t)) nds vs
+     /\ cnv (fixed, (BV_VAL bv), f, t) =
+	bv_size bv > sz =>
+	    eprintf "Length mismatch in is (|%s| != |%s|)" vec (bv2str 3 bv)
+	|
+	let vs = fixed_bv2list sz F bv in
+	map2 (\n.\v. (T,n,v,f,t)) nds vs
+     /\ cnv (fixed, (BL_VAL vs), f, t) =
+	length vs != sz =>
+	    eprintf "Length mismatch in is (|%s| != length of list = %d)"
+		    vec (length vs)
+	|
+	map2 (\n.\v. (T,n,v,f,t)) nds vs
+    in
+    flatmap cnv vtlist
 ;
 infix 2 is;
 
@@ -2665,4 +2678,53 @@ let always_ff gclk assignments =
 
 let <== {lhs:: *a} {rhs:: *a} = (lhs,rhs);
 infix 1 <==;
+
+// Flatten the pexlif until the stop_pred is satisfied.
+// Intermediate wire names are created on demand and are named
+// i<number>/i<number>/.../<name> where the i<number>s refere to
+// the cardinality of a subfub.
+// 
+let flatten_pexlif stop_pred p =
+    letrec do_flat sub pref p =
+        let tr n = (assoc n sub) catch n in
+        val (PINST name attrs leaf fa_inps fa_outs ints content) = p in
+        leaf OR stop_pred p =>
+            let tr_io (f,as) =
+                let as' = md_merge_vectors (map tr (md_expand_vectors as)) in
+                (f,as')
+            in
+            let fa_inps' = map tr_io fa_inps in
+            let fa_outs' = map tr_io fa_outs in
+            [(PINST name attrs leaf fa_inps' fa_outs' ints content)]
+        |
+            val (P_HIER children) = content in
+            let mk_io_sub (f,as) =
+                zip (md_expand_vector f) (map tr (md_expand_vectors as))
+            in
+            let io_sub = flatmap mk_io_sub (fa_inps @ fa_outs) in
+            let mk_int_sub f =
+                map (\n. n, sprintf "%s%s" pref n) (md_expand_vector f)
+            in
+            let int_sub = flatmap mk_int_sub ints in
+            let sub' = io_sub @ int_sub in
+            let prefs = map (sprintf "%si%d/" pref) (1 upto length children) in
+            flat (map2 (do_flat sub') prefs children)
+    in
+    let children = do_flat [] "" p in
+    let wires_used (PINST _ _ _ fa_inps fa_outs _ _) =
+        md_expand_vectors (flatmap snd (fa_inps @ fa_outs))
+    in
+    let all = setify (flatmap wires_used children) in
+    val (PINST name attrs _ fa_inps fa_outs _ _) = p in
+    let ios = md_expand_vectors (flatmap snd (fa_inps @ fa_outs)) in
+    let new_ints = md_extract_vectors (all subtract ios) in
+    (PINST name attrs F fa_inps fa_outs new_ints (P_HIER children))
+;
+
+// A simple stop-predicate for flatten_pexlif that can be used to
+// flatten hierarchical pexlifs down to basic drawing components.
+let is_draw_leaf p =
+    val (PINST name _ _ _ _ _ _) = p in
+    (str_is_prefix "draw_" name) AND NOT (str_is_prefix "draw_hier" name)
+;
 

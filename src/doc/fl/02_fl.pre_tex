@@ -48,7 +48,6 @@ to type \verb@fl@ to get a stand-alone version of fl.
 Note that the VOSS-LIBRARY-DIRECTORY%
 \index{VOSS-LIBRARY-DIRECTORY}%
 {} is installation dependent.
-We return to this below and in Section~\ref{vossrc}.
 
 The fl program can take a number of arguments.
 \index{command-line arguments}
@@ -63,18 +62,18 @@ Set the default search directory%
 \index{search directory}%
 {} to dir.
 %
-\item[-noX or \-\-noX]
+\item[-noX or --noX]
 do not use the graphical (X-windows) interface.
 Useful when running batch oriented jobs.
 Note that any calls to graphics primitives, will fail with a run time
 exception when fl is run in the -noX mode.
-\item[-use\_stdin or \-\-use\_stdin]
+\item[-use\_stdin or --use\_stdin]
 Read inputs also from stdin as well as from the graphical interface.
-\item[-use\_stdout \-\-use\_stdout]
+\item[-use\_stdout --use\_stdout]
 Read inputs also from stdin as well as from the graphical interface.
-\item[\-\-read\_input\_from\_file filename]
+\item[--read\_input\_from\_file filename]
 Read inputs continously from the file 'filename'.
-\item[\-\-write\_output\_to\_file filename]
+\item[--write\_output\_to\_file filename]
 Write outputs to the file 'filename' in addition to the graphical
 user interface.
 \item[-r i]
@@ -93,7 +92,7 @@ Store the variable ordering obtained by dynamic variable re-ordering%
 {}
 in the file fn.
 \index{dynamic variable re-ordering}
-\item[-h or \-\-help]
+\item[-h or --help]
 Print out the available options and quit.
 \end{description}
 
@@ -124,6 +123,21 @@ code used to define the function.
 For example, searching for functions with the word AND in them yield:
 
 \FULLSCREEN{forte_help.jpg}
+
+If the size of the help window is too small, and you don't want to make
+the whole fl window larger, you can click on the ``detach'' button beside
+the Functions tab to detach the help system.
+
+\section{Embedding in editors}
+
+A very convenient way of using {\voss} is to run it within an editor.
+There are currently two supported editors: vim and emacs.
+Both of these provide similar capablities, but using different key-bindings
+to better follow the traditions of each editor.
+For details on how to enable vim or emacs integration, see the
+README files in \verb@<VossII installation directory>/modes/vim@ or
+\verb@<VossII installation directory>/modes/emacs@.
+
 
 \section{Expressions}
 \index{expressions}
@@ -299,7 +313,7 @@ for which the user has installed a printing function%
 {}.
 For more details of concrete types, see page~\ref{concreteTypes}.
 
-\section{Recursion}
+\section{Recursive Functions}
 
 The following is an attempt to define the factorial function:
 %%%START_CODE%%%%
@@ -331,12 +345,35 @@ letrec fact n = n=0 => 1 | n*fact (n-1);
 fact 5;
 %%%END_CODE%%%%
 
-It should be pointed out that fl currently does not allow direct definition
-of mutually recursive functions%
-\index{mutually recursive functions}%
-{}.
-For an example on how this limitation can be dealt with, see
-the section on concrete type decalartions.
+\section{Mutually Recursive Functions}
+
+There is currently no direct support for mutually recursive functions, i.e., 
+declaring a function f that needs to evaluate g, but g needs to evaluate f etc.
+The work-around for this problem is to forward declare one of the functions.
+The command: forward\_declare%
+\index{forward\_declare}
+allows a ``stub'' to be declared.
+When the declarations of this functions comes later, the stub is
+replaced with the actual definition.
+To illustrate this, consider defining functions
+that compute members of the Hofstadter Female and Male sequences:
+%%%START_CODE%%%%
+forward_declare {Male:: int-> int};
+
+letrec Female 0 = 1
+ /\    Female n = n - Male (Female (n-1))
+;
+
+letrec Male 0 = 0
+ /\    Male n = n - Female (Male (n-1))
+;
+
+Female 10;
+
+map Male (1--20);
+%%%END_CODE%%%%
+It should be pointed out that a function that is to be forward
+declared, must be given the same type as it will get once it is defined.
 
 \section{Tuples}
 

@@ -77,8 +77,8 @@ a reference guide.
 %\input 08_vossrc
 %\newpage
 %\input 09_standard-library
-%\newpage
-%\input 16_biblio
+\newpage
+\input 16_biblio
 \newpage
 \input glossary
 \end{document}

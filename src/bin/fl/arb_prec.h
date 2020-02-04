@@ -1,7 +1,12 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 /********************************************************************
 *                                                                   *
-*     Copyright (C) 1994 Mark Greenstreet                           *
-*     Edited by Carl-Johan Seger, 1994				    *
+*     Original author: Mark Greenstreet 1994                        *
+*     Extensively edited by Carl-Johan Seger, 1994, 2016	    *
 *                                                                   *
 *********************************************************************/
 /* arb_prec.h -- header for arb_prec.c */

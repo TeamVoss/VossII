@@ -288,30 +288,14 @@ letrec EMM_rec =
 	(EMM_rec (tl data_l) (tl addr_l) addr rem):[]
 );
 
-let get_vs v = get_lhs_vars (hw_destr v);
-
-let insert_internals internals (PINST name attrs leaf inps outs ints body) =
-    let ints' = md_extract_vectors (internals @ ints) in
-    (PINST name attrs leaf inps outs ints' body)
-;
-
 let EMM name =
     addr_input          addr.
     cache_line_output   out.
+    list_internal DISTINCT_LOCATIONS data_l addr_l.
     let pfn = sprintf "draw_hier {EMM %s (%d)}" name DISTINCT_LOCATIONS in
-    let asz = hw_size {'a::addr}-1 then
-    let dsz = hw_size {'a::cache_line}-1 then
-    let mkd i = {mk_var (sprintf "%s_dta[%d][%d:0]" name i dsz) ::cache_line} in
-    let mka i = {mk_var (sprintf "%s_adr[%d][%d:0]" name i asz) ::addr} in
-    let data_l = map mkd (0 upto (DISTINCT_LOCATIONS-1)) then
-    let addr_l = map mka (0 upto (DISTINCT_LOCATIONS-1)) then
-    let internals =
-	md_extract_vectors ((flatmap get_vs data_l)@(flatmap get_vs addr_l))
-    then
-    insert_internals internals (
     CELL pfn [
 	EMM_rec data_l addr_l addr out
-]);
+];
 
 let RAM_model =
     bit_input		clk.
@@ -345,6 +329,7 @@ let RAM_model =
 let p_RAM = RAM_model 'clk 'reset 'addr 'req 'data 'valid;
 let ckt_RAM = pexlif2fsm p_RAM;
 let vis_RAM = STE_debug ckt_RAM;
+//vis_RAM;
 
 
 let mk_EMM_ant ckt name (MEM addr_data_list) =
@@ -423,6 +408,7 @@ let cache_mem =
 let p_CacheMem = cache_mem 'clk 'reset 'we 'line 'din 'atag 'hit 'dout;
 let ckt_Cache_Mem = pexlif2fsm p_CacheMem;
 let vis_CacheMem = STE_debug ckt_Cache_Mem;
+//vis_CacheMem;
 
 ENUM "cache_fsm" ["C_IDLE", "C_REQ", "C_HIT", "C_MISS", "C_UPDATE"];
 
@@ -471,7 +457,7 @@ let p_CACHE = CACHE 'clk 'reset 'P2C_req 'P2C_addr
 ;
 let ckt_CACHE = pexlif2fsm p_CACHE;
 let vis_CACHE = STE_debug ckt_CACHE;
-//vis;
+//vis_CACHE;
 
 
 // =====================================================================
@@ -498,6 +484,7 @@ let system =
 
 
 let p = system 'clk 'reset 'R0 'R1 'R2 'R3 'timer 'exec;
+
 let ckt = pexlif2fsm p;
 time ckt;
 

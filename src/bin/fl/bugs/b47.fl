@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 let fl_test (il,msg,j,k) =
     let i = itlist (defix +) il 100 in
     sprintf "%s: %d" msg (i+2*j+3*k)

@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 let i0 = build_expr_var 0;
 let i1 = build_expr_var 1;
 let i2 = build_expr_var 2;

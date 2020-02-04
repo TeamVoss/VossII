@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 #ifndef __PLUGIN_ERRLOG_H
 #define __PLUGIN_ERRLOG_H
 #include <stdio.h>

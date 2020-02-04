@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 let extract_pexlif_hierarchy pexlif hierarchy =
     let indices = map (sscanf "i%d") (str_split hierarchy "/") in
     letrec get (idx:idxs) p =

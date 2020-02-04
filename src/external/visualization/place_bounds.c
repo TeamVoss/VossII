@@ -1,8 +1,12 @@
-/************************************************
-*	@Author: Peter Seger			*
-*		2017				*
-************************************************/
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
 
+/************************************************
+*       Original author: Peter Seger 2017       *
+************************************************/
+    
 /* This document provides tools to place line modules and manipulate their posiitons.
    It includes functions to:
 	-Find separation distance between lines

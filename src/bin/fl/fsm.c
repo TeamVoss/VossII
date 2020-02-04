@@ -1,6 +1,11 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 /************************************************************************/
 /*									*/
-/*		Copyright: Carl-Johan Seger, 2019			*/
+/*		Original author: Carl-Johan Seger, 2019			*/
 /*									*/
 /************************************************************************/
 #include "strings.h"	// Need the vector/node name data structures
@@ -895,6 +900,7 @@ DBG_print_sch(string title, sch_ptr sch)
     dbg_print_sch_rec(sch, 0);
 }
 
+#if 0
 static void
 fl_clean_pexlif_ios(g_ptr redex)
 {
@@ -906,6 +912,7 @@ fl_clean_pexlif_ios(g_ptr redex)
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
+#endif
 
 static void
 pexlif2fsm(g_ptr redex)
@@ -1853,7 +1860,7 @@ bget_ste_result(g_ptr redex)
 }
 
 static void
-get_STE_maxtime(g_ptr redex)
+get_ste_maxtime(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
@@ -2225,10 +2232,6 @@ Fsm_Install_Functions()
 			GLmake_arrow(pexlif_tp, fsm_handle_tp),
 			pexlif2fsm);
 
-    Add_ExtAPI_Function("clean_pexlif_ios", "1", FALSE,
-			GLmake_arrow(pexlif_tp, pexlif_tp),
-			fl_clean_pexlif_ios);
-
     typeExp_ptr weak_tp = GLmake_list(
 			    GLmake_tuple(
 				GLmake_bool(),
@@ -2429,7 +2432,7 @@ Fsm_Install_Functions()
 				GLmake_int(), GLmake_string())))),
 			node2value_list);
 
-    Add_ExtAPI_Function("emit_fsm", "11", FALSE,
+    Add_ExtAPI_Function("dbg_emit_fsm", "11", FALSE,
 			GLmake_arrow(fsm_handle_tp,
 				     GLmake_arrow(GLmake_string(),
 						  GLmake_void())),
@@ -2451,9 +2454,9 @@ Fsm_Install_Functions()
 						  GLmake_bexpr())),
 			bget_ste_result);
 
-    Add_ExtAPI_Function("get_STE_maxtime", "1", FALSE,
+    Add_ExtAPI_Function("get_ste_maxtime", "1", FALSE,
 			GLmake_arrow(ste_handle_tp, GLmake_int()),
-			get_STE_maxtime);
+			get_ste_maxtime);
 
     Add_ExtAPI_Function("basename", "11", FALSE,
 			GLmake_arrow(fsm_handle_tp,

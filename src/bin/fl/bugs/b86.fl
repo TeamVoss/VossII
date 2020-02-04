@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 let ff_misclass y_ls y_ps misclassmat =
     let updtmiss y_l y_p =
         y_l != y_p =>

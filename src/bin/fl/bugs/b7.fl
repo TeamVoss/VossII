@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 let av = map (\i. bvariable (sprintf "a[%d]" i)) (31--0);
 let bv = map (\i. bvariable (sprintf "b[%d]" i)) (31--0);
 

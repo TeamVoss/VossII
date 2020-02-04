@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 
 let as = md_expand_vector "a[31:0]";
 let bs = md_expand_vector "b[31:0]";

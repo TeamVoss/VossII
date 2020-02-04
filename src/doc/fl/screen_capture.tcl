@@ -1,3 +1,8 @@
+;#########################################################################
+;# Copyright 2020 Carl-Johan Seger
+;# SPDX-License-Identifier: Apache-2.0
+;#########################################################################
+
 proc screen_capture:do_cmd {cmd} {
     WriteStdIn $cmd
     WriteNewLine {}
