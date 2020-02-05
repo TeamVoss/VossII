@@ -198,6 +198,27 @@ let zero = 0;
 let succ x = x + 1;
 ```
 
+As a functional language, fl lets you declare anonymous functions using
+*lambda expressions*. This can be very handy to, say, separate the traversal
+of some data structure from the operation performed on each element.
+Lambda expressions are of the form `\var. expression`, where `var` is the
+name of the function's argument and `expression` is its body.
+
+The following example uses the built-in function `map` to compute the square
+of each element of a list.
+
+```fl
+map (\x. x*x) [1,2,3,4,5];
+```
+
+Sometimes we may want to create anonymous functions with more than one argument.
+When this is the case, we may simply *nest* lambda expressions:
+
+```fl
+let add = \x. \y. x + y;
+add 5 10;
+```
+
 Functions may use _pattern matching_ to case split on their arguments:
 when the function's argument matches what's found to the _left_ of the `=`,
 return the expression to the _right_.
@@ -435,12 +456,282 @@ let myHand = {[aceOfSpades, twoOfHearts] :: hand};
 
 Booleans and Binary Decision Diagrams
 -------------------------------------
-TODO
+
+Boolean expressions in fl are handled rather differently compared to other
+languages. Instead of being fixed values which are either true or false,
+boolean expressions are literally *expressions*, represented as
+[*ordered binary decision diagrams*](https://en.wikipedia.org/wiki/OBDD),
+or *OBDDs*.
+
+As long as we are content with using expressions built from the atomic `T`
+and `F` constants (representing true and false respectively), Booleans behave
+as in any other language:
+
+```fl
+T AND F;
+T XOR (F OR T);
+IF T THEN (print "hello") ELSE (print "absurdity");
+```
+
+However, once we add *variables* - Boolean expressions with no well-defined
+value - into the mix, things start to get interesting.
+The following example defines a function which given a list of Boolean
+functions returns the Boolean function determining whether there is exactly
+one function in the given list that evaluates to `T`.
+
+<div class="tip">
+There is no connection between the string passed to the `variable` function
+and the identifier to the left of the equality sign. You could just as well
+write `let x = variable "foo";` or `variable "x" == variable "y";`
+</div>
+```fl
+letrec mutex_list (x:xs) = IF x THEN AND_list (map NOT xs) ELSE mutex_list xs
+      /\ mutex_list []     = F
+      ;
+
+let x = variable "x";
+let y = variable "y";
+mutex_list [F, F, F, x, y];
+```
+
+As we can see, the result of applying the `mutex_list` function is not merely
+a `F` or `I don't know, maybe?`, but the exact function that will satisfy the
+predicate described by `mutex_list`!
+
+OBDDs efficiently represent Boolean functions in a *canonical* format,
+meaning that we can easily check whether two very different-looking boolean
+expressions encode the same function.
+In the following example, we verify that DeMorgan's law - i.e. that
+the negation of a conjunction of two values is equivalent to the
+disjunction of the negations of those same values  - holds for all values:
+
+<div class="warning">
+Note that both `==` and `=` can be used in Boolean expressions, but with
+different semantics: `a == b` means "are the expressions `a` and `b`
+literally the same Boolean function", whereas `a = b` denotes the Boolean
+function which is true when `a` and `b` are equal.
+
+Thus, `variable "p" = variable "q"` evaluates to `(p ∧ q) ∨ (¬p ∧ ¬q)`
+while `variable "p" == variable "q"` evaluates to `⊥`.
+</div>
+
+```fl
+let x = variable "x";
+let y = variable "y";
+(NOT (x AND y)) == ((NOT x) OR (NOT y));
+```
+
+As a more complicated example, let's consider the problem of reachability in
+a state space: given a list of possible state transitions
+and a starting state `s`, is it possible to reach a given target state `t`?
+Modeling this problem in a conventional language can be troublesome: how do
+we represent the states and, above all, how do we explore the state space
+to figure out which states are connected?
+
+In fl, we can model the state space as a list of named Boolean variables,
+and the transition table as a list of implication relations.
+If a transition is possible from state `a` to state `b`, then we say that
+that `a` implies `b`.
+We create a list of such transition relations and posit that each such
+Boolean term in the list is valid.
+Then, if the resulting logical conjunction trivially implies a transition
+relation from `s` to `t`, we know that `s` is reachable from `t`.
+
+Thanks to Booleans being represented by OBDDs, both the creation of the
+reachability expression, and checking whether the resulting expression
+is valid, is relatively easy.
+
+<div class="tip">
+Fl supports *fixity declarations* for functions.
+In this example, `infixr 5 implies` means that the function `implies` is used
+as an *infix* function (similar to operators like `+`, `AND`, etc.), and is
+right-associative with priority 5.
+Other possible fixities are `infixl` (for left-associative infix functions),
+and `postfix`.
+</div>
+
+```fl
+let implies a b = (NOT a) OR b;
+infixr 5 implies;
+
+let v s = variable s;
+let transitions = AND_list
+  [ (v "a" implies v "b")
+  , (v "a" implies v "c")
+  , (v "b" implies v "d")
+  , (v "d" implies v "b")
+  , (v "d" implies v "e")
+  , (v "p" implies v "q")
+  ];
+
+let reachable s t = transitions implies (s implies t);
+
+// Reachable: we see a nice, concise T
+reachable (v "a") (v "d");
+
+// Not reachable: we get a formula describing the hypothetical conditions
+// under which q WOULD be reachable.
+reachable (v "a") (v "q");
+```
+
+We can also *quantify* over variables. Either by introducing new, quantified,
+variables with the forall (`!x. expr`) and exists (`?x. expr`) operators,
+or by quantifying over some free variable in a Boolean expression using
+the `Quant_forall` and `Quant_thereis` functions.
+As an example of quantification, consider this alternative
+formulation of DeMorgan's law:
+
+```fl
+!x. !y. NOT (x AND y) = (NOT x) OR (NOT y);
+```
+
+To quantify over a some variable(s) in a pre-existing formula, we instead use
+the `Quant_forall` and `Quant_thereis` functions.
+For instance, note how the `reachable` function of our reachability example
+returns a nice, clear `T` when the goal state is reachable from the
+starting state, but returns a long Boolean formula when it is not.
+To make the output a bit more readable, we can quantify the expression over
+all variables used in the transition table.
+
+<div class="tip">
+The `depends` function takes a Boolean expression and returns the names of the
+variable upon which the expression depends, as a list of strings.
+Very handy in combination with `Quant_forall` and `Quant_thereis`!
+</div>
+
+```fl
+let implies a b = (NOT a) OR b;
+infixr 5 implies;
+
+let v s = variable s;
+let transitions = AND_list
+  [ (v "a" implies v "b")
+  , (v "a" implies v "c")
+  , (v "b" implies v "d")
+  , (v "d" implies v "b")
+  , (v "d" implies v "e")
+  , (v "p" implies v "q")
+  ];
+
+let reachable s t =
+  Quant_forall (depends transitions) transitions implies (s implies t);
+
+reachable (v "a") (v "d");
+reachable (v "a") (v "q");
+```
 
 
-Overloading Functions
----------------------
-TODO
+Visualising Circuits
+--------------------
+
+As fl's main purpose in life is to help you debug and visualise models of
+integrated circuits, it also comes with an embedded language to describe
+circuits and an easy to use visual symbolic simulator for circuits.
+While the description language and details of the simulator are not in the
+scope of this tutorial (see the
+[fl user guide](https://github.com/TeamVoss/VossReleases/blob/master/doc/fl_guide.pdf)
+for that), we will demonstrate how to load and run simulations on a small
+Verilog circuit, to whet your appetite.
+
+For this example we will use the following two Verilog files:
+
+```verilog
+// File: small_lib.v
+module mux2(
+  din_0,  // Mux first input
+  din_1,  // Mux Second input
+  sel,    // Select input
+  mux_out // Mux output
+);
+//-----------Input Ports---------------
+input din_0, din_1, sel ;
+//-----------Output Ports---------------
+output mux_out;
+//------------Internal Variables--------
+reg mux_out;
+//-------------Code Starts Here---------
+always @*
+begin : MUX
+  case(sel)
+    1’b0 : mux_out = din_0;
+    1’b1 : mux_out = din_1;
+  endcase
+end
+endmodule
+```
+
+```verilog
+// File: small.v
+module mux4(
+  din_0,  // Mux first input
+  din_1,  // Mux Second input
+  din_2,  // Mux Thirsd input
+  din_3,  // Mux Fourth input
+  sel,    // Select input
+  mux_out // Mux output
+);
+//-----------Input Ports---------------
+input din_0, din_1, din_2, din_3 ;
+input [1:0] sel ;
+//-----------Output Ports---------------
+output mux_out;
+//------------Internal Variables--------
+reg mux_out;
+reg mid01, mid23;
+//-------------Code Starts Here---------
+mux2 mux1 (.din_0(din_0), .din_1(din_1), .sel(sel[0]), .mux_out(mid01));
+mux2 mux2 (.din_0(din_2), .din_1(din_3), .sel(sel[0]), .mux_out(mid23));
+mux2 mux12 (.din_0(mid01), .din_1(mid23), .sel(sel[1]), .mux_out(mux_out));
+endmodule
+```
+
+Once we have created these files, we can first load fl's
+*Symbolic Trajectory Evaluation* - STE for short - library, and then
+load the Verilog files into fl:
+
+```fl
+load "ste.fl";
+let ckt =
+  verilog2pexlif
+    "-Iverilog_examples"       // Flags to Yosys, which parses the Verilog for us
+    "mux4"                     // Top-level module
+    ["small.v", "small_lib.v"] // Files to read and compile
+    [];                        // Additional files
+```
+
+Then, to use the simulator, we need to first convert the *pexlif* circuit to
+an *fsm*, and load it into the simulator.
+
+```fl
+let fsm = pexlif2fsm ckt;
+STE "" fsm [] [] [] [];
+```
+
+This will load your circuit into the simulator without running any actual
+simulations over it. You will still be able to inspect your circuit, but
+you will not be able to step through it clock for clock.
+
+After doing this, you can launch the visualiser by running `STE_debug fsm;`
+in the interpreter. You will see a window that looks a lot like this:
+
+<div class="tip">
+To be able to step through your circuit clock for clock, track information flows
+through it, visualise state machines present in it, etc., you need to provide
+a list of clock for clock antecedents when calling the `STE` function.
+See the final chapter of
+[the fl user guide](https://github.com/TeamVoss/VossReleases/blob/master/doc/fl_guide.pdf)
+for more information about how to do this.
+</div>
+
+![](tut_img/ste1.jpg)
+
+Select the `mux_out` field in the list to the left, then click the `Fanin`
+button. This will take you to the fanin view of your circuit.
+
+![](tit_img/ste2.jpg)
+
+From here, you can inspect and play around with your circuit to your heart's
+content; extremely handy for finding and diagnosing bugs in your circuits!
 
 
 What Next?
@@ -472,4 +763,5 @@ available from
 [here](https://github.com/TeamVoss/VossReleases/tree/master/modes),
 and the complete guide to using and building fl plugins in Haskell
 can be found
-[here](https://github.com/TeamVoss/VossReleases/blob/master/doc/fl_plugins.md).
+[
+here](https://github.com/TeamVoss/VossReleases/blob/master/doc/fl_plugins.md).
