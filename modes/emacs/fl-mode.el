@@ -43,6 +43,7 @@
     (define-key map "\C-f\C-h" 'fl-help)
     (define-key map "\C-f\C-d" 'fl-describe)
     (define-key map "\C-f\C-p" 'fl-preferences)
+    (define-key map "\C-f\C-t" 'fl-toggle-window)
     map
   )
   "Keymap for fl-mode"
@@ -54,6 +55,7 @@
 
 (defvar fl-process nil)
 (defvar fl-file nil)
+(defvar fl-window-hidden nil)
 
 
 ;;;;; Syntax highlighting
@@ -213,6 +215,7 @@
     )
     (with-current-buffer fl-repl-buffer (fl-repl-setup nil))
     (set-process-sentinel fl-process 'fl-process-sentinel)
+    (setq fl-window-hidden fl-mostly-headless)
   )
 )
 
@@ -283,6 +286,29 @@
   (interactive)
   (fl-send "open_help ();")
   (message "Opening fl help window")
+)
+
+(defun fl-toggle-window ()
+  "Toggles the visibility of the fl interpreter window."
+  (interactive)
+  (if fl-window-hidden
+      (fl-show-window)
+      (fl-hide-window)
+  )
+)
+
+(defun fl-hide-window ()
+  "Hides the fl interpreter window."
+  (interactive)
+  (setq fl-window-hidden t)
+  (fl-send "tcl_eval [\"wm withdraw .\"];")
+)
+
+(defun fl-show-window ()
+  "Shows the fl interpreter window."
+  (interactive)
+  (setq fl-window-hidden nil)
+  (fl-send "tcl_eval [\"wm deiconify .\"];")
 )
 
 (defun fl-preferences ()

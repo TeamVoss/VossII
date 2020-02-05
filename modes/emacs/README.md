@@ -49,6 +49,12 @@ fl-mode makes the following commands available to the user.
     - Open fl's graphical help window.
 * `fl-preferences`
     - Open fl's preferences window.
+* `fl-toggle-window`
+    - Toggles the visibility of the fl interpreter window.
+* `fl-show-window`
+    - Displays the fl interpreter window.
+* `fl-hide-window`
+    - Hides the fl interpreter window.
 
 
 Default keymap
@@ -67,6 +73,7 @@ By default, the following key mappings are installed:
 * `C-f C-d`: display fl help text about the symbol at the cursor.
 * `C-f C-h`: open fl's graphical help window.
 * `C-f C-p`: open fl's preferences window.
+* `C-f C-p`: toggle fl's interpreter window.
 
 Basically, view `C-f` as the "fl-mode hotkey" and the rest (hopefully) makes
 sense.
