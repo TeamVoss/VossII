@@ -485,8 +485,8 @@ and the identifier to the left of the equality sign. You could just as well
 write `let x = variable "foo";` or `variable "x" == variable "y";`
 </div>
 ```fl
-letrec mutex_list (x:xs) = IF x THEN AND_list (map NOT xs) ELSE mutex_list xs
-      /\ mutex_list []     = F
+letrec mutex_list [x]    = F
+      /\ mutex_list (x:xs) = IF x THEN AND_list (map NOT xs) ELSE mutex_list xs
       ;
 
 let x = variable "x";
@@ -635,7 +635,7 @@ Verilog circuit, to whet your appetite.
 
 For this example we will use the following two Verilog files:
 
-```verilog
+````verilog
 // File: small_lib.v
 module mux2(
   din_0,  // Mux first input
@@ -658,14 +658,14 @@ begin : MUX
   endcase
 end
 endmodule
-```
+````
 
-```verilog
+````verilog
 // File: small.v
 module mux4(
   din_0,  // Mux first input
   din_1,  // Mux Second input
-  din_2,  // Mux Thirsd input
+  din_2,  // Mux Third input
   din_3,  // Mux Fourth input
   sel,    // Select input
   mux_out // Mux output
@@ -683,7 +683,7 @@ mux2 mux1 (.din_0(din_0), .din_1(din_1), .sel(sel[0]), .mux_out(mid01));
 mux2 mux2 (.din_0(din_2), .din_1(din_3), .sel(sel[0]), .mux_out(mid23));
 mux2 mux12 (.din_0(mid01), .din_1(mid23), .sel(sel[1]), .mux_out(mux_out));
 endmodule
-```
+````
 
 Once we have created these files, we can first load fl's
 *Symbolic Trajectory Evaluation* - STE for short - library, and then
@@ -728,7 +728,7 @@ for more information about how to do this.
 Select the `mux_out` field in the list to the left, then click the `Fanin`
 button. This will take you to the fanin view of your circuit.
 
-![](tit_img/ste2.jpg)
+![](tut_img/ste2.jpg)
 
 From here, you can inspect and play around with your circuit to your heart's
 content; extremely handy for finding and diagnosing bugs in your circuits!

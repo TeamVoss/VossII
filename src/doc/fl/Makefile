@@ -7,6 +7,8 @@ DOCS =  fl_guide.tex 02_fl.tex 03_bv.tex 04_hfl.tex \
 
 FIGS = figs/forte_start.jpg figs/forte_with_args_start.jpg figs/forte_help.jpg
 
+all: fl_guide.pdf fl_tutorial.html
+
 fl_guide.pdf: $(DOCS) $(FIGS)
 	touch glossary.tex
 	pdflatex fl_guide.tex
@@ -16,7 +18,7 @@ fl_guide.pdf: $(DOCS) $(FIGS)
 	pdflatex fl_guide.tex
 	pdflatex fl_guide.tex
 
-fl_tutorial.html: fl_tutorial.md $(FIGS)
+fl_tutorial.html: fl_tutorial.md $(FIGS) tut_img/*.jpg
 	@-mkdir -p tut_code
 	@-gawk -v code_cnt=`ls tut_code | egrep .fl$ | wc -l` -f tut_pre_process.awk < $< > fl_tutorial_tmp.md
 	pandoc -i fl_tutorial_tmp.md -o fl_tutorial_tmp.html
