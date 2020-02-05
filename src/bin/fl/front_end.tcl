@@ -1297,6 +1297,9 @@ namespace eval voss2_help {
 		pack $f.yscroll -side right -fill y
 		pack $f.xscroll -side bottom -fill x
 		pack $f.t -side right -expand yes -fill both
+	    } else {
+		set f $tb.$wname
+                $tb select $f
 	    }
 	}
 	$lb selection clear 0 end
@@ -1340,6 +1343,13 @@ namespace eval voss2_help {
 	set w_search_frame		$w.nb.f.p.w
 	set w_help_tab_notebook	$w.nb.f.p.e
 
+	set w_special_tab_frame	$w.nb.s
+	set w_special_panedwindow		$w.nb.s.p
+	set w_special_search_frame		$w.nb.s.p.w
+	set w_special_help_tab_notebook		$w.nb.s.p.e
+	set w_special_search_alts	    	$w.nb.s.p.w.alts
+	set w_special_action_buttons    	$w.nb.s.p.w.actions
+
 	set w_search_name_pat	$w.nb.f.p.w.name
 	set w_search_file_pat	$w.nb.f.p.w.file
 	set w_search_arg_pat	$w.nb.f.p.w.arg
@@ -1365,7 +1375,64 @@ namespace eval voss2_help {
 	frame $w_function_tab_frame -relief flat
 	$w.nb add $w_function_tab_frame -text "Functions"
 
+	frame $w_special_tab_frame -relief flat
+	$w.nb add $w_special_tab_frame -text "Special"
+
 	$w.nb select 1
+
+############
+
+	ttk::panedwindow $w_special_panedwindow -orient horizontal
+	pack $w_special_panedwindow -side top -fill both -expand yes
+
+	frame $w_special_search_frame -relief raised
+	$w_special_panedwindow add $w_special_search_frame
+
+	ttk::notebook $w_special_help_tab_notebook
+	$w_special_panedwindow add $w_special_help_tab_notebook
+
+
+	frame $w_special_search_alts -relief flat
+	pack $w_special_search_alts -side top -fill both -expand yes
+
+	ttk::scrollbar $w_special_search_alts.scroll \
+			-command "$w_special_search_alts.list yview"
+	listbox $w_special_search_alts.list \
+		    -yscroll "$w_special_search_alts.scroll set" \
+		    -font $::voss2_txtfont -setgrid 1 -selectmode extended \
+		    -width 30
+	pack $w_special_search_alts.scroll -side right -fill y
+	pack $w_special_search_alts.list -side left -fill both -expand yes
+	
+	frame $w_special_action_buttons -relief raised
+	pack $w_special_action_buttons -side top -fill x
+
+	    button $w_special_action_buttons.quit -text "Quit" \
+		-command ::voss2_help::help_end
+	    pack $w_special_action_buttons.quit -side left -expand yes
+
+	    button $w_special_action_buttons.info -text "Man page" \
+	      -command "::voss2_help::help_show_info \
+				$w_special_search_alts.list \
+				$w_special_help_tab_notebook"
+	    pack $w_special_action_buttons.info -side left -expand yes
+
+	bind $w_special_search_alts.list <Double-Button-1> \
+			"$w_special_action_buttons.info invoke"
+	if [info exists ::voss2_status(hidden_fl_window)] {
+	    wm minsize $::voss2_top_level.voss2_help 100 20
+	} else {
+	    pack $w -side bottom -before $::voss2_info(txtwin) -fill x
+	}
+
+	set lb $w_special_search_alts.list
+	$lb delete 0 end
+	$lb insert end "DIR"
+	$lb insert end "eprintf"
+	$lb insert end "fprintf"
+	$lb insert end "printf"
+	$lb insert end "sprintf"
+	$lb insert end "sscanf"
 
 	ttk::panedwindow $w_panedwindow -orient horizontal
 	pack $w_panedwindow -side top -fill both -expand yes

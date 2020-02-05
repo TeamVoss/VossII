@@ -2540,11 +2540,6 @@ add_open_overload hw_mk_var hw__pair__mk_var;
 let hw__list__destr as = W_CAT (map hw_destr as);
 add_open_overload hw_destr hw__list__destr;
 
-lettype values =  STR_VAL   {v::string}
-		| BV_VAL    {v::bv}
-		| BL_VAL    {v:: bool list}
-;
-
 let phase cnt = cnt;
 postfix phase;
 
@@ -2557,16 +2552,27 @@ postfix cycles;
 let cycle cnt = 2*cnt;
 postfix cycle;
 
+lettype values =  STR_VAL   {v::string}
+		| INT_VAL   {i::int}
+		| BV_VAL    {v::bv}
+		| BL_VAL    {v:: bool list}
+;
+
+
 let s_in_phase v ph = [(T,STR_VAL v,ph,ph+1)];
+let i_in_phase v ph = [(T,INT_VAL v,ph,ph+1)];
 let bv_in_phase v ph = [(T,BV_VAL v,ph,ph+1)];
+let bool_in_phase v ph = [(T,BL_VAL [v],ph,ph+1)];
 let bl_in_phase v ph = [(T,BL_VAL v,ph,ph+1)];
-overload in_phase s_in_phase bv_in_phase bl_in_phase;
+overload in_phase s_in_phase i_in_phase bv_in_phase bool_in_phase bl_in_phase;
 infix 6 in_phase;
 
 let s_in_cycle v cyc = [(T,STR_VAL v,2*cyc,2*cyc+2)];
+let i_in_cycle v cyc = [(T,INT_VAL v,2*cyc,2*cyc+2)];
 let bv_in_cycle v cyc = [(T,BV_VAL v,2*cyc,2*cyc+2)];
+let bool_in_cycle v cyc = [(T,BL_VAL [v],2*cyc,2*cyc+2)];
 let bl_in_cycle v cyc = [(T,BL_VAL v,2*cyc,2*cyc+2)];
-overload in_cycle s_in_cycle bv_in_cycle bl_in_cycle;
+overload in_cycle s_in_cycle i_in_cycle bv_in_cycle bool_in_cycle bl_in_cycle;
 infix 6 in_cycle;
 
 // Keep???
@@ -2580,16 +2586,29 @@ let sfor1 {v::string} {cnt::int} = [(F,STR_VAL v,0,cnt)];
 let sfor2 [({fixed::bool},{v::string},{start::int},{end::int})] cnt =
     [(fixed, STR_VAL v, start, start+cnt)]
 ;
+let ifor1 {i::int} {cnt::int} = [(F,INT_VAL i,0,cnt)];
+let ifor2 [({fixed::bool},{i::int},{start::int},{end::int})] cnt =
+    [(fixed, INT_VAL i, start, start+cnt)]
+;
 let bvfor1 {v::bv} {cnt::int} = [(F,BV_VAL v,0,cnt)];
 let bvfor2 [({fixed::bool},{v::bv},{start::int},{end::int})] cnt =
     [(fixed, BV_VAL v, start, start+cnt)]
+;
+let boolfor1 {v::bool} {cnt::int} = [(F,BL_VAL [v], 0, cnt)];
+let boolfor2 [({fixed::bool},{v::bool},{start::int},{end::int})] cnt =
+    [(fixed, BL_VAL [v], start, start+cnt)]
 ;
 let blfor1 {v::bool list} {cnt::int} = [(F,BL_VAL v,0,cnt)];
 let blfor2 [({fixed::bool},{v::bool list},{start::int},{end::int})] cnt =
     [(fixed, BL_VAL v, start, start+cnt)]
 ;
 
-overload for sfor1 sfor2 bvfor1 bvfor2 blfor1 blfor2;
+overload for sfor1 sfor2
+	     ifor1 ifor2
+	     bvfor1 bvfor2
+	     boolfor1 boolfor2
+	     blfor1 blfor2
+;
 infix 5 for;
 
 let followed_by vtl1 vtl2 =
@@ -2603,7 +2622,7 @@ let followed_by vtl1 vtl2 =
 ;
 infix 4 followed_by;
 
-let otherwise vt (v,end) =
+let gen_otherwise vt (v,end) =
     let is_def (fx,v,f,t) = f upto (t-1) in
     let defined = qsort (defix -) (setify (flatmap is_def vt)) then
     letrec add_default cur (t:ts) =
@@ -2613,6 +2632,18 @@ let otherwise vt (v,end) =
 	cur+1 < end => [(T,v,cur,end)] | []
     in
     vt@(add_default 0 defined)
+;
+
+let s_otherwise vt (v,end) = gen_otherwise vt (STR_VAL v, end);
+let i_otherwise vt (v,end) = gen_otherwise vt (INT_VAL v, end);
+let bv_otherwise vt (v,end) = gen_otherwise vt (BV_VAL v, end);
+let bool_otherwise vt (v,end) = gen_otherwise vt (BL_VAL [v], end);
+let bl_otherwise vt (v,end) = gen_otherwise vt (BL_VAL v, end);
+overload otherwise s_otherwise
+		   i_otherwise
+		   bv_otherwise
+		   bool_otherwise
+		   bl_otherwise
 ;
 infix 3 otherwise;
 
@@ -2642,6 +2673,16 @@ let is vec vtlist =
 	) catch
 	    eprintf "Length mismatch in is (|%s| != |%s|)" vec v
 	in
+	map2 (\n.\v. (T,n,v,f,t)) nds vs
+     /\ cnv (fixed, (INT_VAL i), f, t) =
+	i < (-1*2**(sz-1)) =>
+	    eprintf "Integer %d too small to fit %s" i vec
+	| 
+	i > (2**(sz-1)-1) =>
+	    eprintf "Integer %d too large to fit %s" i vec
+	| 
+	let s = sprintf "%0*b" sz i in
+	let vs = map (\s. s = "1") (explode s) in
 	map2 (\n.\v. (T,n,v,f,t)) nds vs
      /\ cnv (fixed, (BV_VAL bv), f, t) =
 	bv_size bv > sz =>

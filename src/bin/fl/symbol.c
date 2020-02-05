@@ -9,77 +9,419 @@
 #include <fnmatch.h>
 
 /************************************************************************/
-/*			Global Variables Referenced			*/
+/*                      Global Variables Referenced                     */
 /************************************************************************/
-extern str_mgr		strings;
-extern hash_record	Constructor_Table;
-extern hash_record	TypeSignatureTbl;
-extern int		line_nbr;
+extern str_mgr          strings;
+extern hash_record      Constructor_Table;
+extern hash_record      TypeSignatureTbl;
+extern int              line_nbr;
 extern string           cur_file_name;
-extern char		FailBuf[4096];
-extern comment_list_ptr	cur_doc_comments;
+extern char             FailBuf[4096];
+extern comment_list_ptr cur_doc_comments;
 extern FILE             *odests_fp;
-extern buffer		ext_fun_buf;
-extern buffer		ext_obj_buf;
-extern rec_mgr		var_list_rec_mgr;
-extern bool		file_load;
-extern jmp_buf		*start_envp;
+extern buffer           ext_fun_buf;
+extern buffer           ext_obj_buf;
+extern rec_mgr          var_list_rec_mgr;
+extern bool             file_load;
+extern jmp_buf          *start_envp;
 
 /************************************************************************/
-/*			Global Variables Declared			*/
+/*                      Global Variables Declared                       */
 /************************************************************************/
-symbol_tbl_ptr		symb_tbl = NULL;
-rec_mgr			name_list_rec_mgr;
-rec_mgr			impl_arg_rec_mgr;
+symbol_tbl_ptr          symb_tbl = NULL;
+rec_mgr                 name_list_rec_mgr;
+rec_mgr                 impl_arg_rec_mgr;
 
 
 /************************************************************************/
-/*			Local Variables					*/
+/*                      Local Variables                                 */
 /************************************************************************/
-static buffer	    ADT_buf;
-static int	    ADT_level = 1;
-static rec_mgr	    fn_rec_mgr;
-static rec_mgr	    hash_table_mgr;
-static rec_mgr	    oll_rec_mgr;
-static rec_mgr	    symb_tbl_mgr;
-static rec_mgr	    arg_names_rec_mgr;
-static char	    buf[1024];
+static buffer       ADT_buf;
+static int          ADT_level = 1;
+static rec_mgr      fn_rec_mgr;
+static rec_mgr      hash_table_mgr;
+static rec_mgr      oll_rec_mgr;
+static rec_mgr      symb_tbl_mgr;
+static rec_mgr      arg_names_rec_mgr;
+static char         buf[1024];
 static string       s_star;
 static string       s_dummy;
-static char	    help_buf[4096];
-static char	    type_buf[4096];
+static char         help_buf[4096];
+static char         type_buf[4096];
 static hash_record  bound_var_tbl;
-static int	    overloaded_calls;
-static jmp_buf	    context_env;
-static int	    builtins_len;
+static int          overloaded_calls;
+static jmp_buf      context_env;
+static int          builtins_len;
+
+// -------------------------------------------------------------------------
+
+static char DIR_help[] = "\n"
+"Function: DIR\n"
+"\n"
+"Built-in\n"
+"\n"
+"Arguments:\n"
+"\n"
+"Return type: string\n"
+"\n"
+"Fixity: nonfix\n"
+"\n"
+"Description:\n"
+"\n"
+"Contains the name of the directory that the file currently\n"
+"being read is stored in. The string will always end with a slash (/).\n"
+"\n"
+"Common use is to load (DIR^\"name_of_local_file\"); from a master file.\n"
+"Then only the location of the master file needs to be given and all\n"
+"files it needs can be loaded relative to this location.\n"
+;
+
+// -------------------------------------------------------------------------
+
+static char eprintf_help[] = "\n"
+"Function: eprintf\n"
+"\n"
+"Built-in\n"
+"\n"
+"Arguments:\n"
+"  format :: Explicit string.\n"
+"  ...   \n"
+"Type of remaining arguments determined by format.\n"
+"\n"
+"Fixity: nonfix\n"
+"\n"
+"Description:\n"
+"\n"
+"A printf like function that uses a format string and arguments to\n"
+"create a suitable error messgae followed by raising an exception.\n"
+"\n"
+"The format string is composed of zero  or more  directives: ordinary\n"
+"characters (not %), which are copied unchanged to the output stream;\n"
+"and conversion specifications, each of which results in fetching zero\n"
+"or more subsequent arguments. Each conversion specification is\n"
+"introduced by the character %, and ends with a conversion specifier.\n"
+"In between there may be (in this order) zero or more flags, and an\n"
+"optional length modifier.\n"
+"\n"
+"The arguments must correspond properly (after type promotion) with the\n"
+"conversion specifier. The arguments are used in the order given, \n"
+"where each '*' and each conversion specifier asks for the next argument.\n"
+"\n"
+"Flag characters:\n"
+"----------------\n"
+"The character % is followed by zero or more of the following flags:\n"
+"\n"
+"    0   The value should be zero padded.\n"
+"    -   The value should be left justified.\n"
+"\n"
+"Field width:\n"
+"------------\n"
+"\n"
+"An optional decimal digit string (with nonzero first digit) specifying\n"
+"a field width. If the converted value has fewer characters\n"
+"than the field width, it will be padded with spaces on the left (or\n"
+"right, if the left-adjustment flag has been given). Instead of a deci‐\n"
+"mal digit string one may write \"*\"  to specify that the field width is\n"
+"given in the next argument.  A negative field  width is taken as a '-'\n"
+"flag followed by a positive field width.\n"
+"If the resulting value does not fit in the width given, an exception is\n"
+"raised.\n"
+"\n"
+"Conversion specifiers:\n"
+"----------------------\n"
+"    b   the integer argument will be converted to a binary number\n"
+"    o   the integer argument will be converted to an octal number\n"
+"    d   the integer argument will be converted to a signed decimal number\n"
+"    x   the integer argument will be converted to a hexadecimal number\n"
+"    s   the string argument will be copied out\n"
+"    S   the list of strings argument will be copied out enclosed in [] and\n"
+"        each string separated by a comma.\n"
+"    B   the BDD (bool) argument will be converted to a string and copied to\n"
+"        the output\n"
+;
+
+// -------------------------------------------------------------------------
+
+static char fprintf_help[] = "\n"
+"Function: fprintf\n"
+"\n"
+"Built-in\n"
+"\n"
+"Arguments:\n"
+"      fp :: stream\n"
+"  format :: Explicit string.\n"
+"  ...   \n"
+"Type of remaining arguments determined by format.\n"
+"\n"
+"Return type: void\n"
+"\n"
+"Fixity: nonfix\n"
+"\n"
+"Description:\n"
+"\n"
+"A printf like function that uses a format string and arguments to\n"
+"write to the stream fp.\n"
+"\n"
+"The format string is composed of zero  or more  directives: ordinary\n"
+"characters (not %), which are copied unchanged to the output stream;\n"
+"and conversion specifications, each of which results in fetching zero\n"
+"or more subsequent arguments. Each conversion specification is\n"
+"introduced by the character %, and ends with a conversion specifier.\n"
+"In between there may be (in this order) zero or more flags, and an\n"
+"optional length modifier.\n"
+"\n"
+"The arguments must correspond properly (after type promotion) with the\n"
+"conversion specifier. The arguments are used in the order given, \n"
+"where each '*' and each conversion specifier asks for the next argument.\n"
+"\n"
+"Flag characters:\n"
+"----------------\n"
+"The character % is followed by zero or more of the following flags:\n"
+"\n"
+"    0   The value should be zero padded.\n"
+"    -   The value should be left justified.\n"
+"\n"
+"Field width:\n"
+"------------\n"
+"\n"
+"An optional decimal digit string (with nonzero first digit) specifying\n"
+"a field width. If the converted value has fewer characters\n"
+"than the field width, it will be padded with spaces on the left (or\n"
+"right, if the left-adjustment flag has been given). Instead of a deci‐\n"
+"mal digit string one may write \"*\"  to specify that the field width is\n"
+"given in the next argument.  A negative field  width is taken as a '-'\n"
+"flag followed by a positive field width.\n"
+"If the resulting value does not fit in the width given, an exception is\n"
+"raised.\n"
+"\n"
+"Conversion specifiers:\n"
+"----------------------\n"
+"    b   the integer argument will be converted to a binary number\n"
+"    o   the integer argument will be converted to an octal number\n"
+"    d   the integer argument will be converted to a signed decimal number\n"
+"    x   the integer argument will be converted to a hexadecimal number\n"
+"    s   the string argument will be copied out\n"
+"    S   the list of strings argument will be copied out enclosed in [] and\n"
+"        each string separated by a comma.\n"
+"    B   the BDD (bool) argument will be converted to a string and copied to\n"
+"        the output\n"
+;
+
+
+// -------------------------------------------------------------------------
+
+static char printf_help[] = "\n"
+"Function: printf\n"
+"\n"
+"Built-in\n"
+"\n"
+"Arguments:\n"
+"  format :: Explicit string.\n"
+"  ...   \n"
+"Type of remaining arguments determined by format.\n"
+"\n"
+"Return type: void\n"
+"\n"
+"Fixity: nonfix\n"
+"\n"
+"Description:\n"
+"\n"
+"A function that uses a format string and arguments to write to stdout.\n"
+"\n"
+"The format string is composed of zero  or more  directives: ordinary\n"
+"characters (not %), which are copied unchanged to the output stream;\n"
+"and conversion specifications, each of which results in fetching zero\n"
+"or more subsequent arguments. Each conversion specification is\n"
+"introduced by the character %, and ends with a conversion specifier.\n"
+"In between there may be (in this order) zero or more flags, and an\n"
+"optional length modifier.\n"
+"\n"
+"The arguments must correspond properly (after type promotion) with the\n"
+"conversion specifier. The arguments are used in the order given, \n"
+"where each '*' and each conversion specifier asks for the next argument.\n"
+"\n"
+"Flag characters:\n"
+"----------------\n"
+"The character % is followed by zero or more of the following flags:\n"
+"\n"
+"    0   The value should be zero padded.\n"
+"    -   The value should be left justified.\n"
+"\n"
+"Field width:\n"
+"------------\n"
+"\n"
+"An optional decimal digit string (with nonzero first digit) specifying\n"
+"a field width. If the converted value has fewer characters\n"
+"than the field width, it will be padded with spaces on the left (or\n"
+"right, if the left-adjustment flag has been given). Instead of a deci‐\n"
+"mal digit string one may write \"*\"  to specify that the field width is\n"
+"given in the next argument.  A negative field  width is taken as a '-'\n"
+"flag followed by a positive field width.\n"
+"If the resulting value does not fit in the width given, an exception is\n"
+"raised.\n"
+"\n"
+"Conversion specifiers:\n"
+"----------------------\n"
+"    b   the integer argument will be converted to a binary number\n"
+"    o   the integer argument will be converted to an octal number\n"
+"    d   the integer argument will be converted to a signed decimal number\n"
+"    x   the integer argument will be converted to a hexadecimal number\n"
+"    s   the string argument will be copied out\n"
+"    S   the list of strings argument will be copied out enclosed in [] and\n"
+"        each string separated by a comma.\n"
+"    B   the BDD (bool) argument will be converted to a string and copied to\n"
+"        the output\n"
+;
+
+
+// -------------------------------------------------------------------------
+
+static char sprintf_help[] = "\n"
+"Function: sprintf\n"
+"\n"
+"Built-in\n"
+"\n"
+"Arguments:\n"
+"  format :: Explicit string.\n"
+"  ...   \n"
+"Type of remaining arguments determined by format.\n"
+"\n"
+"Return type: string\n"
+"\n"
+"Fixity: nonfix\n"
+"\n"
+"Description:\n"
+"\n"
+"A printf like function that uses a format string and arguments to\n"
+"create a string.\n"
+"\n"
+"The format string is composed of zero  or more  directives: ordinary\n"
+"characters (not %), which are copied unchanged to the output stream;\n"
+"and conversion specifications, each of which results in fetching zero\n"
+"or more subsequent arguments. Each conversion specification is\n"
+"introduced by the character %, and ends with a conversion specifier.\n"
+"In between there may be (in this order) zero or more flags, and an\n"
+"optional length modifier.\n"
+"\n"
+"The arguments must correspond properly (after type promotion) with the\n"
+"conversion specifier. The arguments are used in the order given, \n"
+"where each '*' and each conversion specifier asks for the next argument.\n"
+"\n"
+"Flag characters:\n"
+"----------------\n"
+"The character % is followed by zero or more of the following flags:\n"
+"\n"
+"    0   The value should be zero padded.\n"
+"    -   The value should be left justified.\n"
+"\n"
+"Field width:\n"
+"------------\n"
+"\n"
+"An optional decimal digit string (with nonzero first digit) specifying\n"
+"a field width. If the converted value has fewer characters\n"
+"than the field width, it will be padded with spaces on the left (or\n"
+"right, if the left-adjustment flag has been given). Instead of a deci‐\n"
+"mal digit string one may write \"*\"  to specify that the field width is\n"
+"given in the next argument.  A negative field  width is taken as a '-'\n"
+"flag followed by a positive field width.\n"
+"If the resulting value does not fit in the width given, an exception is\n"
+"raised.\n"
+"\n"
+"Conversion specifiers:\n"
+"----------------------\n"
+"    b   the integer argument will be converted to a binary number\n"
+"    o   the integer argument will be converted to an octal number\n"
+"    d   the integer argument will be converted to a signed decimal number\n"
+"    x   the integer argument will be converted to a hexadecimal number\n"
+"    s   the string argument will be copied out\n"
+"    S   the list of strings argument will be copied out enclosed in [] and\n"
+"        each string separated by a comma.\n"
+"    B   the BDD (bool) argument will be converted to a string and copied to\n"
+"        the output\n"
+;
+
+// -------------------------------------------------------------------------
+
+static char sscanf_help[] = "\n"
+"Function: sscanf\n"
+"\n"
+"Built-in\n"
+"\n"
+"Arguments:\n"
+"  format :: Explicit string.\n"
+"       s :: string\n"
+"\n"
+"Return type:\n"
+"    Determined by format.\n"
+"\n"
+"Fixity: nonfix\n"
+"\n"
+"Description:\n"
+"\n"
+"Scans the input string s according to the format and extracts the\n"
+"corresponding elements.\n"
+"The return type is a tuple of all conversion types.\n"
+"\n"
+"The format string is composed of zero  or more  directives: ordinary\n"
+"characters (not %), which must match the input string, and conversion\n"
+"specifications, each of which results in converting part of the input.\n"
+"\n"
+"Flag characters:\n"
+"----------------\n"
+"The character % is followed by zero or more of the following flags:\n"
+"\n"
+"    0   The value should be zero padded.\n"
+"    -   The value should be left justified.\n"
+"\n"
+"Field width:\n"
+"------------\n"
+"\n"
+"An optional decimal digit string (with nonzero first digit) specifying\n"
+"a field width. If the converted value has fewer characters\n"
+"than the field width, it will be padded with spaces on the left (or\n"
+"right, if the left-adjustment flag has been given). Instead of a deci‐\n"
+"mal digit string one may write \"*\"  to specify that the field width is\n"
+"given in the next argument.  A negative field  width is taken as a '-'\n"
+"flag followed by a positive field width.\n"
+"If the resulting value does not fit in the width given, an exception is\n"
+"raised.\n"
+"\n"
+"Conversion specifiers:\n"
+"----------------------\n"
+"    b   a binary number is read\n"
+"    o   an octal number is read\n"
+"    d   a decimal number is read\n"
+"    x   a hexadecimal number is read\n"
+"    s   a string is read\n"
+;
 
 /************************************************************************/
-/*			Local Functions					*/
+/*                      Local Functions                                 */
 /************************************************************************/
-static symbol_tbl_ptr	create_empty_symb_tbl();
-static g_ptr		add_non_lazy_context_rec(buffer *ctxt,
-						 symbol_tbl_ptr stbl,
-						 g_ptr node);
-static bool		is_non_lazy(symbol_tbl_ptr stbl, string name);
-static bool		check_match(string pat, string s);
-static bool		check_type_match(string arg_pat, string res_pat,
-					 typeExp_ptr type);
-static g_ptr		cond_mk_app(g_ptr old, g_ptr E, g_ptr F);
-static g_ptr		cond_mk_cons(g_ptr old, g_ptr E, g_ptr F);
-static impl_arg_ptr	get_overloaded_calls_rec(impl_arg_ptr l,
-						 symbol_tbl_ptr stbl,
-						 g_ptr node);
-static void		update_stbl(symbol_tbl_ptr stbl, fn_ptr fp);
-static bool		built_in(string filename);
-static bool		already_defined(symbol_tbl_ptr stbl, fn_ptr fp);
-static g_ptr		ignore_P_Y(g_ptr node);
-static g_ptr		ignore_P_DEBUG(g_ptr node);
-static bool		get_named_arg(g_ptr node, string *namep, g_ptr *nextp);
-static g_ptr		ignore_simple_P_PCATCH(g_ptr onode);
-static g_ptr		ignore_P_CACHE(g_ptr onode);
+static symbol_tbl_ptr   create_empty_symb_tbl();
+static g_ptr            add_non_lazy_context_rec(buffer *ctxt,
+                                                 symbol_tbl_ptr stbl,
+                                                 g_ptr node);
+static bool             is_non_lazy(symbol_tbl_ptr stbl, string name);
+static bool             check_match(string pat, string s);
+static bool             check_type_match(string arg_pat, string res_pat,
+                                         typeExp_ptr type);
+static g_ptr            cond_mk_app(g_ptr old, g_ptr E, g_ptr F);
+static g_ptr            cond_mk_cons(g_ptr old, g_ptr E, g_ptr F);
+static impl_arg_ptr     get_overloaded_calls_rec(impl_arg_ptr l,
+                                                 symbol_tbl_ptr stbl,
+                                                 g_ptr node);
+static void             update_stbl(symbol_tbl_ptr stbl, fn_ptr fp);
+static bool             built_in(string filename);
+static bool             already_defined(symbol_tbl_ptr stbl, fn_ptr fp);
+static g_ptr            ignore_P_Y(g_ptr node);
+static g_ptr            ignore_P_DEBUG(g_ptr node);
+static bool             get_named_arg(g_ptr node, string *namep, g_ptr *nextp);
+static g_ptr            ignore_simple_P_PCATCH(g_ptr onode);
+static g_ptr            ignore_P_CACHE(g_ptr onode);
 
 /************************************************************************/
-/*			Public Functions				*/
+/*                      Public Functions                                */
 /************************************************************************/
 
 void
@@ -106,13 +448,13 @@ Init_symbol()
     dummy->file_name      = wastrsave(&strings, "_dummy_");;
     dummy->start_line_nbr = 1;
     dummy->end_line_nbr   = 1;
-    dummy->comments	  = NULL;
-    dummy->arg_names	  = NULL;
+    dummy->comments       = NULL;
+    dummy->arg_names      = NULL;
     dummy->non_lazy       = FALSE;
-    dummy->forward	  = FALSE;
+    dummy->forward        = FALSE;
     dummy->expr           = NULL;
     dummy->super_comb     = NULL;
-    dummy->overload	  = FALSE;
+    dummy->overload       = FALSE;
     dummy->open_overload  = FALSE;
     dummy->overload_list  = NULL;
     dummy->type           = NULL;
@@ -127,26 +469,26 @@ Mark_symbols()
     // Make sure all visible overload versions are visible
     FOR_REC(&fn_rec_mgr, fn_ptr, fp) {
         if( fp->visible && fp->overload_list != NULL ) {
-	    for(oll_ptr ol = fp->overload_list; ol != NULL; ol = ol->next) {
-		ol->fn->visible = TRUE;
-	    }
-	}
+            for(oll_ptr ol = fp->overload_list; ol != NULL; ol = ol->next) {
+                ol->fn->visible = TRUE;
+            }
+        }
     }
     FOR_REC(&fn_rec_mgr, fn_ptr, fp) {
         if( fp->visible ) {
-	    if( fp->expr != NULL ) {
-		Mark(fp->expr);
-		SET_REFCNT(fp->expr, MAX_REF_CNT);
-	    }
+            if( fp->expr != NULL ) {
+                Mark(fp->expr);
+                SET_REFCNT(fp->expr, MAX_REF_CNT);
+            }
             Mark(fp->super_comb);
         } else {
-	    fp->expr = NULL;
-	    fp->type = NULL;
-	    fp->implicit_args = NULL;
-	    fp->overload = FALSE;
-	    fp->open_overload = FALSE;
-	    fp->overload_list = NULL;
-	}
+            fp->expr = NULL;
+            fp->type = NULL;
+            fp->implicit_args = NULL;
+            fp->overload = FALSE;
+            fp->open_overload = FALSE;
+            fp->overload_list = NULL;
+        }
     }
 }
 
@@ -180,7 +522,7 @@ do_setjmp(buffer *contextp, symbol_tbl_ptr stbl, g_ptr *nodep)
 {
     g_ptr res = NULL;
     if( setjmp(context_env) == 0 ) {
-	res = add_non_lazy_context_rec(contextp, stbl, *nodep);
+        res = add_non_lazy_context_rec(contextp, stbl, *nodep);
     }
     return res;
 }
@@ -215,11 +557,11 @@ Merge_fn_defs(symbol_tbl_ptr stbl1, symbol_tbl_ptr stbl2, bool permissive)
     fp->next = stbl2->def_list;
     fp = fp->next;
     while( fp != NULL ) {
-	if( !permissive && already_defined(stbl1, fp) ) {
-	    Rprintf("Duplicated type constructor (%s)", fp->name);
-	}
-	if( fp->visible ) update_stbl(stbl1, fp);
-	fp = fp->next;
+        if( !permissive && already_defined(stbl1, fp) ) {
+            Rprintf("Duplicated type constructor (%s)", fp->name);
+        }
+        if( fp->visible ) update_stbl(stbl1, fp);
+        fp = fp->next;
     }
     free_rec(&hash_table_mgr, (pointer) stbl2->tbl_ptr);
     free_rec(&symb_tbl_mgr, (pointer) stbl2);
@@ -228,10 +570,10 @@ Merge_fn_defs(symbol_tbl_ptr stbl1, symbol_tbl_ptr stbl2, bool permissive)
 
 symbol_tbl_ptr
 Add_Destructors(string name, typeExp_ptr new_type,
-		symbol_tbl_ptr stbl, string file, int start_line)
+                symbol_tbl_ptr stbl, string file, int start_line)
 {
-    fn_ptr 	fnp, newfnp, tmp;
-    string	dest_name;
+    fn_ptr      fnp, newfnp, tmp;
+    string      dest_name;
 
     tstr_ptr tmp_strings = new_temp_str_mgr();
     gen_strtemp(tmp_strings, name);
@@ -241,137 +583,137 @@ Add_Destructors(string name, typeExp_ptr new_type,
     char sep = ' ';
     fn_ptr fnl = stbl->def_list;
     for(fnp = fnl; fnp != NULL; fnp = fnp->next) {
-	// Make type "signature"
-	gen_charappend(tmp_strings, sep);
-	sep = '|';
-	gen_strappend(tmp_strings, " ");
-	gen_strappend(tmp_strings, fnp->name);
-	gen_strappend(tmp_strings, "::");
-	gen_strappend(tmp_strings, Get_tmp_type_string(fnp->type));
-	gen_strappend(tmp_strings, " ");
-	// Create destructor function
-	dest_name          = strtemp("__DeStRuCtOr");
-	dest_name          = strappend(fnp->name);
-	dest_name          = wastrsave(&strings, dest_name);
-	tmp                = (fn_ptr) new_rec(&fn_rec_mgr);
-	tmp->ADT_level	   = ADT_level;
-	tmp->visible       = TRUE;
+        // Make type "signature"
+        gen_charappend(tmp_strings, sep);
+        sep = '|';
+        gen_strappend(tmp_strings, " ");
+        gen_strappend(tmp_strings, fnp->name);
+        gen_strappend(tmp_strings, "::");
+        gen_strappend(tmp_strings, Get_tmp_type_string(fnp->type));
+        gen_strappend(tmp_strings, " ");
+        // Create destructor function
+        dest_name          = strtemp("__DeStRuCtOr");
+        dest_name          = strappend(fnp->name);
+        dest_name          = wastrsave(&strings, dest_name);
+        tmp                = (fn_ptr) new_rec(&fn_rec_mgr);
+        tmp->ADT_level     = ADT_level;
+        tmp->visible       = TRUE;
         tmp->non_lazy      = FALSE;
         tmp->forward       = FALSE;
-	tmp->name          = dest_name;
-	tmp->file_name      = file;
-	tmp->start_line_nbr = start_line;
-	tmp->end_line_nbr   = line_nbr;
-	tmp->expr          = Make_0inp_Primitive(P_I);
-	tmp->super_comb    = Make_0inp_Primitive(P_I);
-	tmp->type          = Fix_Types(&(fnp->type), new_type);
-	tmp->overload	   = FALSE;
-	tmp->open_overload = FALSE;
-	tmp->overload_list = NULL;
-	tmp->implicit_args = NULL;
-	tmp->comments      = NULL;
-	tmp->arg_names     = NULL;
-	tmp->next          = newfnp;
-	newfnp             = tmp;
-	insert_hash(&Constructor_Table, (pointer) (fnp->name),
-					(pointer) (fnp->name));
+        tmp->name          = dest_name;
+        tmp->file_name      = file;
+        tmp->start_line_nbr = start_line;
+        tmp->end_line_nbr   = line_nbr;
+        tmp->expr          = Make_0inp_Primitive(P_I);
+        tmp->super_comb    = Make_0inp_Primitive(P_I);
+        tmp->type          = Fix_Types(&(fnp->type), new_type);
+        tmp->overload      = FALSE;
+        tmp->open_overload = FALSE;
+        tmp->overload_list = NULL;
+        tmp->implicit_args = NULL;
+        tmp->comments      = NULL;
+        tmp->arg_names     = NULL;
+        tmp->next          = newfnp;
+        newfnp             = tmp;
+        insert_hash(&Constructor_Table, (pointer) (fnp->name),
+                                        (pointer) (fnp->name));
     }
     string type_sig = wastrsave(&strings, gen_strappend(tmp_strings, ""));
     if( find_hash(&TypeSignatureTbl, (pointer) name) != NULL )
-	delete_hash(&TypeSignatureTbl, (pointer) name);
+        delete_hash(&TypeSignatureTbl, (pointer) name);
     insert_hash(&TypeSignatureTbl, (pointer) name, type_sig);
     free_temp_str_mgr(tmp_strings);
     if( Is_monomorphic(new_type) ) {
-	// Save function
-	Sprintf(buf, "write_%s", name);
-	string save_fun_name = wastrsave(&strings, buf);
-	g_ptr save_expr = Make_1inp_Primitive(P_SAVE_GRAPH,
-					      Make_STRING_leaf(type_sig));
-	typeExp_ptr save_type = GLmake_arrow(GLmake_string(),
-					 GLmake_arrow(new_type, GLmake_bool()));
-	fn_ptr  save_fun;
-	save_fun = (fn_ptr) new_rec(&fn_rec_mgr);
-	save_fun->visible        = TRUE;
-	save_fun->ADT_level	     = ADT_level;
-	save_fun->non_lazy       = FALSE;
-	save_fun->forward        = FALSE;
-	save_fun->name           = save_fun_name;
-	save_fun->file_name      = file;
-	save_fun->start_line_nbr = start_line;
-	save_fun->end_line_nbr   = line_nbr;
-	save_fun->expr           = save_expr;
-	save_fun->super_comb     = save_expr;    // ????
-	save_fun->type           = save_type;
-	save_fun->overload	     = FALSE;
-	save_fun->open_overload  = FALSE;
-	save_fun->overload_list  = NULL;
-	save_fun->implicit_args  = NULL;
-	save_fun->comments	 = NULL;
-	save_fun->arg_names      = NULL;
-	save_fun->next           = newfnp;
-	newfnp		     = save_fun;
-	// Load function
-	Sprintf(buf, "read_%s", name);
-	string load_fun_name = wastrsave(&strings, buf);
-	g_ptr load_expr = Make_1inp_Primitive(P_LOAD_GRAPH,
-					      Make_STRING_leaf(type_sig));
-	typeExp_ptr load_type = GLmake_arrow(GLmake_string(), new_type);
-	fn_ptr  load_fun;
-	load_fun = (fn_ptr) new_rec(&fn_rec_mgr);
-	load_fun->ADT_level	     = ADT_level;
-	load_fun->visible        = TRUE;
-	load_fun->non_lazy       = FALSE;
-	load_fun->forward        = FALSE;
-	load_fun->name           = load_fun_name;
-	load_fun->file_name      = file;
-	load_fun->start_line_nbr = start_line;
-	load_fun->end_line_nbr   = line_nbr;
-	load_fun->expr           = load_expr;
-	load_fun->super_comb     = load_expr;    // ????
-	load_fun->type           = load_type;
-	load_fun->overload	     = FALSE;
-	load_fun->open_overload  = FALSE;
-	load_fun->overload_list  = NULL;
-	load_fun->implicit_args  = NULL;
-	load_fun->next           = newfnp;
-	load_fun->comments	 = NULL;
-	load_fun->arg_names	 = NULL;
-	newfnp		     = load_fun;
+        // Save function
+        Sprintf(buf, "write_%s", name);
+        string save_fun_name = wastrsave(&strings, buf);
+        g_ptr save_expr = Make_1inp_Primitive(P_SAVE_GRAPH,
+                                              Make_STRING_leaf(type_sig));
+        typeExp_ptr save_type = GLmake_arrow(GLmake_string(),
+                                         GLmake_arrow(new_type, GLmake_bool()));
+        fn_ptr  save_fun;
+        save_fun = (fn_ptr) new_rec(&fn_rec_mgr);
+        save_fun->visible        = TRUE;
+        save_fun->ADT_level          = ADT_level;
+        save_fun->non_lazy       = FALSE;
+        save_fun->forward        = FALSE;
+        save_fun->name           = save_fun_name;
+        save_fun->file_name      = file;
+        save_fun->start_line_nbr = start_line;
+        save_fun->end_line_nbr   = line_nbr;
+        save_fun->expr           = save_expr;
+        save_fun->super_comb     = save_expr;    // ????
+        save_fun->type           = save_type;
+        save_fun->overload           = FALSE;
+        save_fun->open_overload  = FALSE;
+        save_fun->overload_list  = NULL;
+        save_fun->implicit_args  = NULL;
+        save_fun->comments       = NULL;
+        save_fun->arg_names      = NULL;
+        save_fun->next           = newfnp;
+        newfnp               = save_fun;
+        // Load function
+        Sprintf(buf, "read_%s", name);
+        string load_fun_name = wastrsave(&strings, buf);
+        g_ptr load_expr = Make_1inp_Primitive(P_LOAD_GRAPH,
+                                              Make_STRING_leaf(type_sig));
+        typeExp_ptr load_type = GLmake_arrow(GLmake_string(), new_type);
+        fn_ptr  load_fun;
+        load_fun = (fn_ptr) new_rec(&fn_rec_mgr);
+        load_fun->ADT_level          = ADT_level;
+        load_fun->visible        = TRUE;
+        load_fun->non_lazy       = FALSE;
+        load_fun->forward        = FALSE;
+        load_fun->name           = load_fun_name;
+        load_fun->file_name      = file;
+        load_fun->start_line_nbr = start_line;
+        load_fun->end_line_nbr   = line_nbr;
+        load_fun->expr           = load_expr;
+        load_fun->super_comb     = load_expr;    // ????
+        load_fun->type           = load_type;
+        load_fun->overload           = FALSE;
+        load_fun->open_overload  = FALSE;
+        load_fun->overload_list  = NULL;
+        load_fun->implicit_args  = NULL;
+        load_fun->next           = newfnp;
+        load_fun->comments       = NULL;
+        load_fun->arg_names      = NULL;
+        newfnp               = load_fun;
     }
     //
     while( fnl->next != NULL ) { fnl = fnl->next; }
     fnl->next = newfnp;
     while( newfnp != NULL ) {
-	update_stbl(stbl, newfnp);
-	newfnp = newfnp->next;
+        update_stbl(stbl, newfnp);
+        newfnp = newfnp->next;
     }
     return(stbl);
 }
 
 oll_ptr
 Add_To_OverloadList(string name, typeExp_ptr type, oll_ptr l,
-		    string file, int start_line)
+                    string file, int start_line)
 {
     fn_ptr  fn;
     fn = Find_Function_Def(symb_tbl, name);
     if( fn == NULL || !(fn->visible) ) {
-	FP(err_fp, "=== Function %s is not defined ", name);
-	if( file_load )     
-	    FP(err_fp, "around line %d in file %s\n", start_line, file);
-	else
-	    FP(err_fp, "around line %d\n", start_line);
-	Emit_prompt("");
-	longjmp(*start_envp, 1);
+        FP(err_fp, "=== Function %s is not defined ", name);
+        if( file_load )     
+            FP(err_fp, "around line %d in file %s\n", start_line, file);
+        else
+            FP(err_fp, "around line %d\n", start_line);
+        Emit_prompt("");
+        longjmp(*start_envp, 1);
     }
     fn = Find_Overload_Choice(fn, type);
     if( fn == NULL ) {
-	FP(err_fp, "=== No function %s of type %s", name, Type2String(type));
-	if( file_load )     
-	    FP(err_fp, "around line %d in file %s\n", start_line, file);
-	else
-	    FP(err_fp, "around line %d\n", start_line);
-	Emit_prompt("");
-	longjmp(*start_envp, 1);
+        FP(err_fp, "=== No function %s of type %s", name, Type2String(type));
+        if( file_load )     
+            FP(err_fp, "around line %d in file %s\n", start_line, file);
+        else
+            FP(err_fp, "around line %d\n", start_line);
+        Emit_prompt("");
+        longjmp(*start_envp, 1);
     }
     oll_ptr ret;
     ret = (oll_ptr) new_rec(&oll_rec_mgr);
@@ -383,21 +725,21 @@ Add_To_OverloadList(string name, typeExp_ptr type, oll_ptr l,
 
 symbol_tbl_ptr
 InsertOverloadDef(string name, bool open_overload, oll_ptr alts,
-		  typeExp_ptr type, symbol_tbl_ptr stbl,
-		  string file, int start_line)
+                  typeExp_ptr type, symbol_tbl_ptr stbl,
+                  string file, int start_line)
 {
-    fn_ptr	ret;
+    fn_ptr      ret;
     ret                 = (fn_ptr) new_rec(&fn_rec_mgr);
-    ret->ADT_level	= ADT_level;
+    ret->ADT_level      = ADT_level;
     ret->name           = name;
     ret->file_name      = file;
     ret->start_line_nbr = start_line;
     ret->end_line_nbr   = line_nbr;
-    ret->overload	= TRUE;
+    ret->overload       = TRUE;
     ret->open_overload  = open_overload;
     ret->overload_list  = alts;
-    ret->comments	= NULL;
-    ret->arg_names	= NULL;
+    ret->comments       = NULL;
+    ret->arg_names      = NULL;
     ret->visible        = TRUE;
     ret->non_lazy       = FALSE;
     ret->forward        = FALSE;
@@ -413,20 +755,20 @@ InsertOverloadDef(string name, bool open_overload, oll_ptr alts,
 
 symbol_tbl_ptr
 AddToOpenOverloadDef(string name, oll_ptr alts, symbol_tbl_ptr stbl,
-		     string file, int start_line)
+                     string file, int start_line)
 {
     (void) file;
     (void) start_line;
     // Find the open_overload to which alts should be added
     fn_ptr cur = Find_Function_Def(stbl, name);
     if( cur == NULL || cur->open_overload == FALSE ) {
-	FP(err_fp, "%s was not declared as an open_overload\n", name);
-	return stbl;
+        FP(err_fp, "%s was not declared as an open_overload\n", name);
+        return stbl;
     }
     oll_ptr fp = cur->overload_list;
     if( fp == NULL ) {
-	cur->overload_list = alts;
-	return stbl;
+        cur->overload_list = alts;
+        return stbl;
     }
     // We probably should check for overlapping overloads....
     while( fp->next != NULL ) { fp = fp->next; }
@@ -436,7 +778,7 @@ AddToOpenOverloadDef(string name, oll_ptr alts, symbol_tbl_ptr stbl,
 
 symbol_tbl_ptr
 Make_forward_declare(string name, typeExp_ptr type, symbol_tbl_ptr stbl,
-		     string file, int start_line)
+                     string file, int start_line)
 {
     g_ptr err = Make_0inp_Primitive(P_FAIL);
     Fail_pr("%s is forward_declared but used before it is defined\n", name);
@@ -447,19 +789,19 @@ Make_forward_declare(string name, typeExp_ptr type, symbol_tbl_ptr stbl,
     SET_REF_VAR(rv, ref_var);
     g_ptr expr = Make_1inp_Primitive(P_DEREFERENCE, rv);
     fn_ptr ret = (fn_ptr) new_rec(&fn_rec_mgr);
-    ret->ADT_level	= ADT_level;
-    ret->forward	= TRUE;
+    ret->ADT_level      = ADT_level;
+    ret->forward        = TRUE;
     ret->visible        = TRUE;
     ret->file_name      = file;
     ret->start_line_nbr = start_line;
     ret->end_line_nbr   = line_nbr;
-    ret->comments	= NULL;
-    ret->arg_names	= NULL;
+    ret->comments       = NULL;
+    ret->arg_names      = NULL;
     ret->non_lazy       = FALSE;
     ret->name           = name;
     ret->expr           = expr;
     ret->super_comb     = err;
-    ret->overload	= FALSE;
+    ret->overload       = FALSE;
     ret->open_overload  = FALSE;
     ret->overload_list  = NULL;
     ret->type           = type;
@@ -473,80 +815,80 @@ Make_forward_declare(string name, typeExp_ptr type, symbol_tbl_ptr stbl,
 
 symbol_tbl_ptr
 New_fn_def(string name, result_ptr res, symbol_tbl_ptr stbl, bool print,
-	   string file, int start_line, arg_names_ptr arg_names)
+           string file, int start_line, arg_names_ptr arg_names)
 {
-    fn_ptr	ret;
+    fn_ptr      ret;
 
     /* Don't store failed definitions */
     if( res == NULL )
-	return( stbl );
+        return( stbl );
     //
     if( stbl == NULL ) { stbl = create_empty_symb_tbl(); }
     if( cur_doc_comments != NULL ) {
-	// If there are comments, reverse the list (to get it in right order)
-	comment_list_ptr clp = cur_doc_comments;
-	comment_list_ptr prev = NULL;
-	while( clp->next != NULL ) {
-	    comment_list_ptr tmp = clp->next;
-	    clp->next = prev;
-	    prev = clp;
-	    clp = tmp;
-	}
-	clp->next = prev;
-	cur_doc_comments = clp;
+        // If there are comments, reverse the list (to get it in right order)
+        comment_list_ptr clp = cur_doc_comments;
+        comment_list_ptr prev = NULL;
+        while( clp->next != NULL ) {
+            comment_list_ptr tmp = clp->next;
+            clp->next = prev;
+            prev = clp;
+            clp = tmp;
+        }
+        clp->next = prev;
+        cur_doc_comments = clp;
     }
     // Is this the definition of a forward_declare?
     fn_ptr cur = Find_Function_Def(stbl, name);
     if( cur && cur->forward ) {
-	if( !Forward_Declare_Ok(cur->type, res->type) ) {
-	    ErrMsg("-E- Type mismatch for forward_declare of %s\n",
-		   name);
-	    FP(err_fp, "Declared type: ");
-	    Print_Type(cur->type, err_fp, TRUE, TRUE);
-	    FP(err_fp, "Actual type:   ");
-	    Print_Type(res->type, err_fp, TRUE, FALSE);
-	    return stbl;
-	}
-	g_ptr expr = cur->expr;
-	if( !IS_APPLY(expr) ) {
-	    ErrMsg("-E- forward_declare evaluated before defined");
-	    return stbl;
-	}
-	expr = GET_APPLY_RIGHT(expr);
-	ASSERT(IS_REF_VAR(expr));
-	int ref_var = GET_REF_VAR(expr);
-	Set_RefVar(ref_var, res->expr);
-	ret = cur;
+        if( !Forward_Declare_Ok(cur->type, res->type) ) {
+            ErrMsg("-E- Type mismatch for forward_declare of %s\n",
+                   name);
+            FP(err_fp, "Declared type: ");
+            Print_Type(cur->type, err_fp, TRUE, TRUE);
+            FP(err_fp, "Actual type:   ");
+            Print_Type(res->type, err_fp, TRUE, FALSE);
+            return stbl;
+        }
+        g_ptr expr = cur->expr;
+        if( !IS_APPLY(expr) ) {
+            ErrMsg("-E- forward_declare evaluated before defined");
+            return stbl;
+        }
+        expr = GET_APPLY_RIGHT(expr);
+        ASSERT(IS_REF_VAR(expr));
+        int ref_var = GET_REF_VAR(expr);
+        Set_RefVar(ref_var, res->expr);
+        ret = cur;
     } else {
-	ret = (fn_ptr) new_rec(&fn_rec_mgr);
-	ret->ADT_level = ADT_level;
-	ret->name      = name;
-	ret->next      = stbl->def_list;
-	stbl->def_list = ret;
-	update_stbl(stbl, ret);
+        ret = (fn_ptr) new_rec(&fn_rec_mgr);
+        ret->ADT_level = ADT_level;
+        ret->name      = name;
+        ret->next      = stbl->def_list;
+        stbl->def_list = ret;
+        update_stbl(stbl, ret);
     }
     //
     ret->visible        = TRUE;
     ret->file_name      = file;
     ret->start_line_nbr = start_line;
     ret->end_line_nbr   = line_nbr;
-    ret->comments	= cur_doc_comments;
-    ret->arg_names	= arg_names;
+    ret->comments       = cur_doc_comments;
+    ret->arg_names      = arg_names;
     // Prepare to pick up new comments
     cur_doc_comments = NULL;
     ret->non_lazy       = FALSE;
-    ret->forward	= FALSE;
+    ret->forward        = FALSE;
     ret->name           = name;
     ret->expr           = res->expr;
     ret->super_comb     = res->super_comb;
-    ret->overload	= FALSE;
+    ret->overload       = FALSE;
     ret->open_overload  = FALSE;
     ret->overload_list  = NULL;
     ret->type           = res->type;
     ret->implicit_args  = res->implicit_args;
     if( print ) {
-	FP(stdout_fp, "%s::", name);
-	Print_Full_Type(ret, stdout_fp, TRUE, TRUE);
+        FP(stdout_fp, "%s::", name);
+        Print_Full_Type(ret, stdout_fp, TRUE, TRUE);
     }
     return stbl;
 }
@@ -561,18 +903,18 @@ Begin_ADT(symbol_tbl_ptr stbl)
 symbol_tbl_ptr
 End_ADT(symbol_tbl_ptr stbl, var_list_ptr vlp)
 {
-    fn_ptr	 last;
+    fn_ptr       last;
     var_list_ptr vp;
     if( empty_buf(&ADT_buf) ) {
-	FP(err_fp,
-		"Syntax error: end_abstype without matching begin_abstype\n");
-	while( vlp != NULL ) {
-	    vp = vlp;
-	    vlp = vlp->next;
-	    free_rec(&var_list_rec_mgr, (pointer) vp);
-	}
-	ADT_level = 1;
-	return stbl;
+        FP(err_fp,
+                "Syntax error: end_abstype without matching begin_abstype\n");
+        while( vlp != NULL ) {
+            vp = vlp;
+            vlp = vlp->next;
+            free_rec(&var_list_rec_mgr, (pointer) vp);
+        }
+        ADT_level = 1;
+        return stbl;
     }
     ADT_level--;
     pop_buf(&ADT_buf, (pointer) &last);
@@ -582,41 +924,41 @@ End_ADT(symbol_tbl_ptr stbl, var_list_ptr vlp)
     hash_record keep_tbl;
     create_hash(&keep_tbl, 100, str_hash, str_equ);
     while( vlp != NULL ) {
-	vp = vlp;
-	if( find_hash(&keep_tbl, (pointer) vp->name) == NULL ) {
-	    insert_hash(&keep_tbl, (pointer) vp->name, (pointer) vp->name);
-	}
-	vlp = vp->next;
-	free_rec(&var_list_rec_mgr, (pointer) vp);
+        vp = vlp;
+        if( find_hash(&keep_tbl, (pointer) vp->name) == NULL ) {
+            insert_hash(&keep_tbl, (pointer) vp->name, (pointer) vp->name);
+        }
+        vlp = vp->next;
+        free_rec(&var_list_rec_mgr, (pointer) vp);
     }
 
     while( flp != last ) {
-	if( find_hash(&keep_tbl, (pointer) flp->name) != NULL ) {
-	    flp->visible = TRUE;
-	    flp->ADT_level = ADT_level;
-	    insert_hash(stbl->tbl_ptr, (pointer) flp->name, (pointer) flp);
-	} else {
-//	    flp->visible = FALSE;
-	}
-	/* Type constructor status is bounded inside ADT */
-	if( find_hash( &Constructor_Table, (pointer) flp->name ) != NULL )
-	    delete_hash(&Constructor_Table, (pointer) flp->name);
-	flp = flp->next;
+        if( find_hash(&keep_tbl, (pointer) flp->name) != NULL ) {
+            flp->visible = TRUE;
+            flp->ADT_level = ADT_level;
+            insert_hash(stbl->tbl_ptr, (pointer) flp->name, (pointer) flp);
+        } else {
+//          flp->visible = FALSE;
+        }
+        /* Type constructor status is bounded inside ADT */
+        if( find_hash( &Constructor_Table, (pointer) flp->name ) != NULL )
+            delete_hash(&Constructor_Table, (pointer) flp->name);
+        flp = flp->next;
     }
     while( flp != NULL ) {
-	string name = flp->name;
-	if( find_hash(&keep_tbl, (pointer) name) != NULL &&
-	    flp->ADT_level == ADT_level )
-	{
-//	    flp->visible = FALSE;
-	} else {
-	    if( flp->visible &&
-		find_hash(stbl->tbl_ptr, (pointer) name) == NULL)
-	    {
-		insert_hash(stbl->tbl_ptr, (pointer) name, (pointer) flp);
-	    }
-	}
-	flp = flp->next;
+        string name = flp->name;
+        if( find_hash(&keep_tbl, (pointer) name) != NULL &&
+            flp->ADT_level == ADT_level )
+        {
+//          flp->visible = FALSE;
+        } else {
+            if( flp->visible &&
+                find_hash(stbl->tbl_ptr, (pointer) name) == NULL)
+            {
+                insert_hash(stbl->tbl_ptr, (pointer) name, (pointer) flp);
+            }
+        }
+        flp = flp->next;
     }
     dispose_hash(&keep_tbl, NULLFCN);
     return(stbl);
@@ -636,19 +978,19 @@ Find_Function(symbol_tbl_ptr stbl, g_ptr node)
     fn_ptr fp = Find_Function_Def(stbl, GET_VAR(node));
     if( fp == NULL ) return NULL;
     if( fp->overload ) {
-	int cnt;
-	oll_ptr up = fp->overload_list;
-	cnt = GET_VERSION(node);
-	if( cnt == 0 ) { return NULL; }
-	while( cnt > 1 ) {
-	    cnt--;
-	    up = up->next;
-	}
-	INC_REFCNT(up->fn->expr);
-	return(up->fn->expr);
+        int cnt;
+        oll_ptr up = fp->overload_list;
+        cnt = GET_VERSION(node);
+        if( cnt == 0 ) { return NULL; }
+        while( cnt > 1 ) {
+            cnt--;
+            up = up->next;
+        }
+        INC_REFCNT(up->fn->expr);
+        return(up->fn->expr);
     } else {
-	INC_REFCNT(fp->expr);
-	return(fp->expr);
+        INC_REFCNT(fp->expr);
+        return(fp->expr);
     }
 }
 
@@ -663,12 +1005,12 @@ Replace_name(g_ptr node, symbol_tbl_ptr stbl)
             SET_APPLY_RIGHT(node, Replace_name(GET_APPLY_RIGHT(node), stbl));
             return(node);
         case LEAF:
-	    if( IS_USERDEF(node) ) {
-		fn_ptr fn = GET_USERDEF(node);
-		g_ptr res = fn->expr;
-		SET_REFCNT(res, MAX_REF_CNT);
-		return( res );
-	    }
+            if( IS_USERDEF(node) ) {
+                fn_ptr fn = GET_USERDEF(node);
+                g_ptr res = fn->expr;
+                SET_REFCNT(res, MAX_REF_CNT);
+                return( res );
+            }
             /* Fall through */
         default:
             return( node );
@@ -682,160 +1024,177 @@ Replace_name(g_ptr node, symbol_tbl_ptr stbl)
 
 g_ptr
 Get_Matching_Functions(string name_pat,
-		       string file_pat,
-		       string arg_type_pat,
-		       string res_type_pat)
+                       string file_pat,
+                       string arg_type_pat,
+                       string res_type_pat)
 {
-    hash_record	done;
+    hash_record done;
     create_hash(&done, 100, str_hash, str_equ);
     fn_ptr list = symb_tbl->def_list;
     g_ptr res = Make_NIL();
     while( list != NULL ) {
-	if( !list->visible )
-	    goto do_next;
-	if( STREQ(s_dummy, list->name) )
-	    goto do_next;
-	if( strncmp(list->name, "__DeStRuCtOr", 12) == 0 )
-	    goto do_next;
-	if( !check_match(name_pat, list->name) )
-	    goto do_next;
-	if( !check_match(file_pat, list->file_name) )
-	    goto do_next;
-	if( check_type_match(arg_type_pat, res_type_pat, list->type) ) {
-	    if( find_hash(&done, list->name) == NULL ) {
-		res = Make_CONS_ND(Make_STRING_leaf(list->name), res);
-		insert_hash(&done, list->name, list->name);
-	    }
-	    goto do_next;
-	}
-	if( list->overload_list != NULL ) {
-	    oll_ptr cur = list->overload_list;
-	    bool found = FALSE;
-	    while( !found && cur != NULL ) {
-		if( cur->fn->visible &&
-		    check_type_match(arg_type_pat, res_type_pat, cur->fn->type)
-		  )
-		{
-		    found = TRUE;
-		    if( find_hash(&done, list->name) == NULL ) {
-			res = Make_CONS_ND(Make_STRING_leaf(list->name), res);
-			insert_hash(&done, list->name, list->name);
-		    }
-		}
-		cur = cur->next;
-	    }
-	}
+        if( !list->visible )
+            goto do_next;
+        if( STREQ(s_dummy, list->name) )
+            goto do_next;
+        if( strncmp(list->name, "__DeStRuCtOr", 12) == 0 )
+            goto do_next;
+        if( !check_match(name_pat, list->name) )
+            goto do_next;
+        if( !check_match(file_pat, list->file_name) )
+            goto do_next;
+        if( check_type_match(arg_type_pat, res_type_pat, list->type) ) {
+            if( find_hash(&done, list->name) == NULL ) {
+                res = Make_CONS_ND(Make_STRING_leaf(list->name), res);
+                insert_hash(&done, list->name, list->name);
+            }
+            goto do_next;
+        }
+        if( list->overload_list != NULL ) {
+            oll_ptr cur = list->overload_list;
+            bool found = FALSE;
+            while( !found && cur != NULL ) {
+                if( cur->fn->visible &&
+                    check_type_match(arg_type_pat, res_type_pat, cur->fn->type)
+                  )
+                {
+                    found = TRUE;
+                    if( find_hash(&done, list->name) == NULL ) {
+                        res = Make_CONS_ND(Make_STRING_leaf(list->name), res);
+                        insert_hash(&done, list->name, list->name);
+                    }
+                }
+                cur = cur->next;
+            }
+        }
       do_next:
-	list = list->next;
+        list = list->next;
     }
     return res;
 }
+
+static string
+do_special_help(string name)
+{
+    string res = NULL;
+    if( strcmp(name, "DIR") == 0 ) res = DIR_help;
+    if( strcmp(name, "eprintf") == 0 ) res = eprintf_help;
+    if( strcmp(name, "fprintf") == 0 ) res = fprintf_help;
+    if( strcmp(name, "printf") == 0 ) res = printf_help;
+    if( strcmp(name, "sprintf") == 0 ) res = sprintf_help;
+    if( strcmp(name, "sscanf") == 0 ) res = sscanf_help;
+    if( res == NULL ) return NULL;
+    return( wastrsave(&strings, res) );
+}
+
 
 string
 Get_Help(string fun)
 {
     fn_ptr fp = Find_Function_Def(symb_tbl, fun);
-    if( fp == NULL ) { return NULL; }
+    if( fp == NULL ) {
+        return( do_special_help(fun) );
+    }
     if( (odests_fp = fmemopen(help_buf, 4096, "w")) == NULL ) {
-	DIE("Should never happen");
+        DIE("Should never happen");
     }
     FP(FILE_fp, "Function: %s\n\n", fun);
     if( fp->file_name != NULL && !built_in(fp->file_name) ) {
-	FP(FILE_fp, "File:  %s\nStart: %d\nEnd:   %d\n\n",
-		    fp->file_name, fp->start_line_nbr, fp->end_line_nbr);
+        FP(FILE_fp, "File:  %s\nStart: %d\nEnd:   %d\n\n",
+                    fp->file_name, fp->start_line_nbr, fp->end_line_nbr);
     } else {
-	FP(FILE_fp, "Built-in\n\n");
+        FP(FILE_fp, "Built-in\n\n");
     }
     if( fp->overload ) {
-	FP(FILE_fp, "is the overloading of:\n");
-	oll_ptr ofn = fp->overload_list;
-	while( ofn != NULL ) {
-	    FP(FILE_fp, "%s :: ", ofn->fn->name);
-	    Print_Full_Type(ofn->fn, FILE_fp, TRUE, TRUE);
-	    ofn = ofn->next;
-	}
-	FP(FILE_fp, "\nFixity: %s\n", Get_Fixity(fun));
-	if( fp->non_lazy ) FP(FILE_fp, "Non-lazy: Yes\n");
+        FP(FILE_fp, "is the overloading of:\n");
+        oll_ptr ofn = fp->overload_list;
+        while( ofn != NULL ) {
+            FP(FILE_fp, "%s :: ", ofn->fn->name);
+            Print_Full_Type(ofn->fn, FILE_fp, TRUE, TRUE);
+            ofn = ofn->next;
+        }
+        FP(FILE_fp, "\nFixity: %s\n", Get_Fixity(fun));
+        if( fp->non_lazy ) FP(FILE_fp, "Non-lazy: Yes\n");
     } else {
-	typeExp_ptr type = fp->type;
-	if( fp->implicit_args ) {
-	    FP(FILE_fp, "Implicit dependencies:");
-	    impl_arg_ptr np = fp->implicit_args;
-	    hash_record occurences;
-	    create_hash(&occurences, 100, str_hash, str_equ);
-	    for(impl_arg_ptr ia = np; ia != NULL; ia = ia->next) {
-		int cur = 0;
-		if( (cur = PTR2INT(find_hash(&occurences, ia->name))) != 0 ) {
-		    delete_hash(&occurences, ia->name);
-		}
-		cur++;
-		insert_hash(&occurences, ia->name, INT2PTR(cur));
-	    }
-	    int indent = strlen("Implicit dependencies:");
-	    int loc = indent;
-	    char sep = ' ';
-	    while( np != NULL ) {
-		string name = np->name;
-		int arity;
-		if( (arity = PTR2INT(find_hash(&occurences, name))) != 0 ) {
-		    int len = strlen(np->name)+1;
-		    if( (loc+len) > 70 ) {
-			FP(FILE_fp, "%c\n", sep);
-			sep = ' ';
-			FP(FILE_fp, "%*s", indent, " ");
-			loc = indent;
-		    }
-		    if( arity > 1 ) {
-			FP(FILE_fp, "%c%s(%d)", sep, np->name, arity);
-			len += 3;
-		    } else {
-			FP(FILE_fp, "%c%s", sep, np->name);
-		    }
-		    delete_hash(&occurences, name);
-		    loc += len;
-		    sep = ',';
-		}
-		type = Get_Real_Type(type->typelist->next->type);
-		np = np->next;
-	    }
-	    FP(FILE_fp, "\n");
-	}
-	int arg = 1;
-	arg_names_ptr ap = fp->arg_names;
-	int sz = 1;
-	while(ap != NULL ) {
-	    int l = strlen(ap->name);
-	    if( l > sz ) sz = l;
-	    ap = ap->next;
-	}
-	ap = fp->arg_names;
-	FP(FILE_fp, "Arguments:\n");
-	if( ap != NULL ) { sz += 2; }
-	while( type->typeOp == arrow_tp ) {
-	    if( ap != NULL ) {
-		FP(FILE_fp, "%*s: ", sz, ap->name);
-		ap = ap->next;
-	    } else {
-		FP(FILE_fp, "  arg. %d: ", arg);
-	    }
-	    typeExp_ptr arg_type = type->typelist->type;
-	    Print_Type(arg_type, FILE_fp, TRUE, (arg == 1));
-	    type = Get_Real_Type(type->typelist->next->type);
-	    arg++;
-	}
-	FP(FILE_fp, "\nReturn type: ");
-	Print_Type(type, FILE_fp, TRUE, (arg == 1));
-	FP(FILE_fp, "\nFixity: %s\n", Get_Fixity(fun));
-	if( fp->non_lazy ) FP(FILE_fp, "Non-lazy: Yes\n");
-	FP(FILE_fp, "\n");
+        typeExp_ptr type = fp->type;
+        if( fp->implicit_args ) {
+            FP(FILE_fp, "Implicit dependencies:");
+            impl_arg_ptr np = fp->implicit_args;
+            hash_record occurences;
+            create_hash(&occurences, 100, str_hash, str_equ);
+            for(impl_arg_ptr ia = np; ia != NULL; ia = ia->next) {
+                int cur = 0;
+                if( (cur = PTR2INT(find_hash(&occurences, ia->name))) != 0 ) {
+                    delete_hash(&occurences, ia->name);
+                }
+                cur++;
+                insert_hash(&occurences, ia->name, INT2PTR(cur));
+            }
+            int indent = strlen("Implicit dependencies:");
+            int loc = indent;
+            char sep = ' ';
+            while( np != NULL ) {
+                string name = np->name;
+                int arity;
+                if( (arity = PTR2INT(find_hash(&occurences, name))) != 0 ) {
+                    int len = strlen(np->name)+1;
+                    if( (loc+len) > 70 ) {
+                        FP(FILE_fp, "%c\n", sep);
+                        sep = ' ';
+                        FP(FILE_fp, "%*s", indent, " ");
+                        loc = indent;
+                    }
+                    if( arity > 1 ) {
+                        FP(FILE_fp, "%c%s(%d)", sep, np->name, arity);
+                        len += 3;
+                    } else {
+                        FP(FILE_fp, "%c%s", sep, np->name);
+                    }
+                    delete_hash(&occurences, name);
+                    loc += len;
+                    sep = ',';
+                }
+                type = Get_Real_Type(type->typelist->next->type);
+                np = np->next;
+            }
+            FP(FILE_fp, "\n");
+        }
+        int arg = 1;
+        arg_names_ptr ap = fp->arg_names;
+        int sz = 1;
+        while(ap != NULL ) {
+            int l = strlen(ap->name);
+            if( l > sz ) sz = l;
+            ap = ap->next;
+        }
+        ap = fp->arg_names;
+        FP(FILE_fp, "Arguments:\n");
+        if( ap != NULL ) { sz += 2; }
+        while( type->typeOp == arrow_tp ) {
+            if( ap != NULL ) {
+                FP(FILE_fp, "%*s: ", sz, ap->name);
+                ap = ap->next;
+            } else {
+                FP(FILE_fp, "  arg. %d: ", arg);
+            }
+            typeExp_ptr arg_type = type->typelist->type;
+            Print_Type(arg_type, FILE_fp, TRUE, (arg == 1));
+            type = Get_Real_Type(type->typelist->next->type);
+            arg++;
+        }
+        FP(FILE_fp, "\nReturn type: ");
+        Print_Type(type, FILE_fp, TRUE, (arg == 1));
+        FP(FILE_fp, "\nFixity: %s\n", Get_Fixity(fun));
+        if( fp->non_lazy ) FP(FILE_fp, "Non-lazy: Yes\n");
+        FP(FILE_fp, "\n");
     }
     comment_list_ptr clp = fp->comments;
     if( clp != NULL ) 
-	FP(FILE_fp, "Description:\n\n");
+        FP(FILE_fp, "Description:\n\n");
     while( clp != NULL ) {
-	if( clp->comment != NULL )
-	    FP(FILE_fp, "%s\n", clp->comment);
-	clp = clp->next;
+        if( clp->comment != NULL )
+            FP(FILE_fp, "%s\n", clp->comment);
+        clp = clp->next;
     }
     fclose(odests_fp);
     odests_fp = NULL;
@@ -847,23 +1206,23 @@ default_eq_fn(pointer p1, pointer p2, bool identical)
 {
     (void) identical;
     if( p1 == p2 ) {
-	return( B_One() );
+        return( B_One() );
     } else {
-	return( B_Zero() );
+        return( B_Zero() );
     }
 }
 
 int
 Add_ExtAPI_Object(
-	    string name,
-	    void    (*mark_fn)(pointer p),
-	    void    (*sweep_fn)(),
-	    void    (*save_fn)(FILE *fp, pointer p),
-	    pointer (*load_fn)(FILE *fp),
-	    string  (*obj2string)(pointer p),
-	    formula (*eq_fn)(pointer a, pointer b, bool identical),
-	    pointer (*gmap_fn)(gmap_info_ptr ip, pointer a),
-	    pointer (*gmap2_fn)(gmap_info_ptr ip, pointer a, pointer b))
+            string name,
+            void    (*mark_fn)(pointer p),
+            void    (*sweep_fn)(),
+            void    (*save_fn)(FILE *fp, pointer p),
+            pointer (*load_fn)(FILE *fp),
+            string  (*obj2string)(pointer p),
+            formula (*eq_fn)(pointer a, pointer b, bool identical),
+            pointer (*gmap_fn)(gmap_info_ptr ip, pointer a),
+            pointer (*gmap2_fn)(gmap_info_ptr ip, pointer a, pointer b))
 {
     name = wastrsave(&strings, name);
     ext_obj_rec obj;
@@ -876,9 +1235,9 @@ Add_ExtAPI_Object(
     obj.load_fn = load_fn;
     obj.obj2string = obj2string;
     if( eq_fn == NULL ) {
-	obj.eq_fn = default_eq_fn;
+        obj.eq_fn = default_eq_fn;
     } else {
-	obj.eq_fn = eq_fn;
+        obj.eq_fn = eq_fn;
     }
     obj.gmap_fn = gmap_fn;
     obj.gmap2_fn = gmap2_fn;
@@ -912,7 +1271,7 @@ Mark_ext_obj(g_ptr np)
     int class = GET_EXT_OBJ_CLASS(np);
     ext_obj_ptr op = M_LOCATE_BUF(&ext_obj_buf, class);
     if( op->mark_fn != NULL ) {
-	op->mark_fn(GET_EXT_OBJ(np));
+        op->mark_fn(GET_EXT_OBJ(np));
     }
 }
 
@@ -923,7 +1282,7 @@ Save_ext_obj(FILE *fp, g_ptr np)
     int class = GET_EXT_OBJ_CLASS(np);
     ext_obj_ptr op = M_LOCATE_BUF(&ext_obj_buf, class);
     if( op->save_fn != NULL ) {
-	op->save_fn(fp, GET_EXT_OBJ(np));
+        op->save_fn(fp, GET_EXT_OBJ(np));
     }
 }
 
@@ -932,16 +1291,16 @@ Sweep_ext_objs()
 {
     ext_obj_ptr op;
     FOR_BUF(&ext_obj_buf, ext_obj_rec, op) {
-	if( op->sweep_fn != NULL ) {
-	    op->sweep_fn();
-	}
+        if( op->sweep_fn != NULL ) {
+            op->sweep_fn();
+        }
     }
 }
 
 
 void
 Add_ExtAPI_Function(string name, string strictness,
-		    bool non_lazy, typeExp_ptr type, eval_fun_tp fun)
+                    bool non_lazy, typeExp_ptr type, eval_fun_tp fun)
 {
     name = wastrsave(&strings, name);
     ext_fun_rec efr;
@@ -959,7 +1318,7 @@ Add_ExtAPI_Function(string name, string strictness,
     SET_PRIM_FN(expr, P_EXTAPI_FN);
     SET_EXTAPI_FN(expr, id);
     fn_ptr ret = (fn_ptr) new_rec(&fn_rec_mgr);
-    ret->ADT_level	= ADT_level;
+    ret->ADT_level      = ADT_level;
     ret->visible        = TRUE;
     ret->file_name      = wastrsave(&strings, "builtin");
     ret->start_line_nbr = 0;
@@ -971,7 +1330,7 @@ Add_ExtAPI_Function(string name, string strictness,
     ret->name           = name;
     ret->expr           = expr;
     ret->super_comb     = NULL;
-    ret->overload	= FALSE;
+    ret->overload       = FALSE;
     ret->open_overload  = FALSE;
     ret->overload_list  = NULL;
     ret->type           = type;
@@ -1047,7 +1406,7 @@ string
 Get_tmp_type_string(typeExp_ptr type)
 {
     if( (odests_fp = fmemopen(type_buf, 4096, "w")) == NULL ) {
-	DIE("Should never happen");
+        DIE("Should never happen");
     }
     Print_Type(type, FILE_fp, FALSE, TRUE);
     fclose(odests_fp);
@@ -1061,8 +1420,8 @@ PrintAllFuns(symbol_tbl_ptr stbl)
 {
     fn_ptr fp = stbl->def_list;
     while( fp != NULL ) {
-	fprintf(stderr, "%s (%s)\n", fp->name, (fp->visible?"Vis":"Invis"));
-	fp = fp->next;
+        fprintf(stderr, "%s (%s)\n", fp->name, (fp->visible?"Vis":"Invis"));
+        fp = fp->next;
     }
 }
 
@@ -1078,9 +1437,9 @@ is_defined(g_ptr redex)
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     if( Find_Function_Def(symb_tbl, GET_STRING(r)) == NULL ) {
-	MAKE_REDEX_BOOL(redex, B_Zero());
+        MAKE_REDEX_BOOL(redex, B_Zero());
     } else {
-	MAKE_REDEX_BOOL(redex, B_One());
+        MAKE_REDEX_BOOL(redex, B_One());
     }
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -1121,8 +1480,8 @@ Get_argument_names(g_ptr onode)
     if( node == NULL ) { return NULL; }
     int arg_cnt = 0;
     while( IS_LAMBDA(node) ) {
-	arg_cnt++;
-	node = GET_LAMBDA_BODY(node);
+        arg_cnt++;
+        node = GET_LAMBDA_BODY(node);
     }
     if( arg_cnt == 0 ) return NULL;
     if( node == NULL ) return NULL;
@@ -1134,22 +1493,22 @@ Get_argument_names(g_ptr onode)
     buffer args;
     new_buf(&args, 10, sizeof(string));
     for(int i = 0; i < arg_cnt; i++) {
-	string arg;
-	g_ptr next;
-	if( !get_named_arg(node, &arg, &next) ) {
-	    free_buf (&args); 
-	    return NULL;
-	}
-	push_buf(&args, (pointer) &arg);
-	node = next;
+        string arg;
+        g_ptr next;
+        if( !get_named_arg(node, &arg, &next) ) {
+            free_buf (&args); 
+            return NULL;
+        }
+        push_buf(&args, (pointer) &arg);
+        node = next;
     }
     arg_names_ptr res = NULL;
     string  *sp;
     FUB_ROF(&args, string, sp) {
-	arg_names_ptr t = (arg_names_ptr) new_rec(&arg_names_rec_mgr);
-	t->name = *sp;
-	t->next = res;
-	res = t;
+        arg_names_ptr t = (arg_names_ptr) new_rec(&arg_names_rec_mgr);
+        t->name = *sp;
+        t->next = res;
+        res = t;
     }
     free_buf (&args); 
     return res;
@@ -1158,7 +1517,7 @@ Get_argument_names(g_ptr onode)
 
 
 /************************************************************************/
-/*			Local Functions					*/
+/*                      Local Functions                                 */
 /************************************************************************/
 
 static symbol_tbl_ptr
@@ -1186,11 +1545,11 @@ add_binding(string name)
 {
     int cur = PTR2INT(find_hash(&bound_var_tbl, (pointer) name));
     if( cur == 0 ) {
-	insert_hash(&bound_var_tbl, (pointer) name, INT2PTR(2));
+        insert_hash(&bound_var_tbl, (pointer) name, INT2PTR(2));
     } else {
-	cur++;
-	delete_hash(&bound_var_tbl, (pointer) name);
-	insert_hash(&bound_var_tbl, (pointer) name, INT2PTR(cur));
+        cur++;
+        delete_hash(&bound_var_tbl, (pointer) name);
+        insert_hash(&bound_var_tbl, (pointer) name, INT2PTR(cur));
     }
 }
 
@@ -1226,28 +1585,28 @@ get_overloaded_calls_rec(impl_arg_ptr l, symbol_tbl_ptr stbl, g_ptr node)
             l = get_overloaded_calls_rec(l, stbl, GET_CONS_TL(node));
             return( l );
         case LAMBDA_ND:
-	    add_binding(GET_LAMBDA_VAR(node));
+            add_binding(GET_LAMBDA_VAR(node));
             l = get_overloaded_calls_rec(l, stbl, GET_LAMBDA_BODY(node));
-	    remove_binding(GET_LAMBDA_VAR(node));
-	    return( l );
+            remove_binding(GET_LAMBDA_VAR(node));
+            return( l );
         case LEAF:
             if( !IS_VAR(node) ) { return( l ); }
             string name = GET_VAR(node);
-	    if( is_bound(name) ) return( l );
-	    fn_ptr fp = Find_Function_Def(stbl, name);
-	    if( !fp->overload ) return( l );
-	    // Is the overloading resolved already?
-	    if( GET_VERSION(node) != 0 ) return( l );
-	    overloaded_calls++;
+            if( is_bound(name) ) return( l );
+            fn_ptr fp = Find_Function_Def(stbl, name);
+            if( !fp->overload ) return( l );
+            // Is the overloading resolved already?
+            if( GET_VERSION(node) != 0 ) return( l );
+            overloaded_calls++;
             string new_name = tprintf(".impl_arg.%d", overloaded_calls);
             new_name = wastrsave(&strings, new_name);
-	    SET_VAR(node, new_name);
-	    impl_arg_ptr np = (impl_arg_ptr) new_rec(&impl_arg_rec_mgr);
-	    np->name = name;
-	    np->type = fp->type;
-	    np->def = fp;
-	    np->next = l;
-	    return( np );
+            SET_VAR(node, new_name);
+            impl_arg_ptr np = (impl_arg_ptr) new_rec(&impl_arg_rec_mgr);
+            np->name = name;
+            np->type = fp->type;
+            np->def = fp;
+            np->next = l;
+            return( np );
         default:
             DIE("Impossible");
     }
@@ -1273,89 +1632,89 @@ add_non_lazy_context_rec(buffer *ctxt, symbol_tbl_ptr stbl, g_ptr node)
             F = add_non_lazy_context_rec(ctxt, stbl, GET_CONS_TL(node));
             return( cond_mk_cons(node, E, F) );
         case LAMBDA_ND:
-	    name = GET_LAMBDA_VAR(node);
-	    add_binding(name);
-	    // Rename lambda variables to ensure no name capture happens
-	    // when implicit arguments for overloaded identifiers are added
-	    new_name = wastrsave(&strings, tprintf(".%s", name));
-	    line = GET_LAMBDA_LINE_NBR(node);
+            name = GET_LAMBDA_VAR(node);
+            add_binding(name);
+            // Rename lambda variables to ensure no name capture happens
+            // when implicit arguments for overloaded identifiers are added
+            new_name = wastrsave(&strings, tprintf(".%s", name));
+            line = GET_LAMBDA_LINE_NBR(node);
             if( IS_LAMBDA(GET_LAMBDA_BODY(node)) ) {
                 /* Don't need to add this variable to the context */
                 E = add_non_lazy_context_rec(ctxt, stbl, GET_LAMBDA_BODY(node));
-		remove_binding(name);
-		res = Make_Lambda(new_name, E);
-		SET_LAMBDA_LINE_NBR(res, line);
-		MoveTypeHint(node, res, FALSE);
-		return res;
+                remove_binding(name);
+                res = Make_Lambda(new_name, E);
+                SET_LAMBDA_LINE_NBR(res, line);
+                MoveTypeHint(node, res, FALSE);
+                return res;
             } else {
                 /* Add variable to context */
                 push_buf(ctxt, &new_name);
                 E = add_non_lazy_context_rec(ctxt, stbl, GET_LAMBDA_BODY(node));
-		remove_binding(name);
+                remove_binding(name);
                 pop_buf(ctxt, NULL);
-		res = Make_Lambda(new_name, E);
-		SET_LAMBDA_LINE_NBR(res, line);
-		MoveTypeHint(node, res, FALSE);
-		return res;
+                res = Make_Lambda(new_name, E);
+                SET_LAMBDA_LINE_NBR(res, line);
+                MoveTypeHint(node, res, FALSE);
+                return res;
             }
         case LEAF:
             if( !IS_VAR(node) ) {
-		if( !IS_PRIM_FN(node) ) return( node );
-		int pfn = GET_PRIM_FN(node);
-		if( (pfn != P_PRINTF) && (pfn != P_SPRINTF) &&
-		    (pfn != P_EPRINTF) && (pfn != P_FPRINTF) &&
-		    (pfn != P_PRINT) && (pfn != P_MK_REF_VAR) )
-		{
-		    return(node);
-		}
-		// Printf like functions are non-lazy
-		if( COUNT_BUF(ctxt) == 0 ) { return( node ); }
-		ctx_nd = Make_NIL();
-		FOR_BUF(ctxt, string, sp) {
-		    ctx_nd =
-			Make_2inp_Primitive(P_CONS,
-			    Make_1inp_Primitive(P_UNTYPE, Make_VAR_leaf(*sp)),
-			    ctx_nd);
-		}
-		return( Make_2inp_Primitive(P_NSEQ, ctx_nd, node) );
-	    }
+                if( !IS_PRIM_FN(node) ) return( node );
+                int pfn = GET_PRIM_FN(node);
+                if( (pfn != P_PRINTF) && (pfn != P_SPRINTF) &&
+                    (pfn != P_EPRINTF) && (pfn != P_FPRINTF) &&
+                    (pfn != P_PRINT) && (pfn != P_MK_REF_VAR) )
+                {
+                    return(node);
+                }
+                // Printf like functions are non-lazy
+                if( COUNT_BUF(ctxt) == 0 ) { return( node ); }
+                ctx_nd = Make_NIL();
+                FOR_BUF(ctxt, string, sp) {
+                    ctx_nd =
+                        Make_2inp_Primitive(P_CONS,
+                            Make_1inp_Primitive(P_UNTYPE, Make_VAR_leaf(*sp)),
+                            ctx_nd);
+                }
+                return( Make_2inp_Primitive(P_NSEQ, ctx_nd, node) );
+            }
             name = GET_VAR(node);
-	    if( is_bound(name) ) {
-		// Rename bound variables to ensure no name capture happens
-		// when implicit arguments for overloaded identifiers are added
-		string new_name = wastrsave(&strings, tprintf(".%s", name));
-		SET_VAR(node, new_name);
-		return( node );
-	    }
-	    fn_ptr fp = Find_Function_Def(stbl, name);
-	    if( fp == NULL ) {
-		if( file_load )
-		    FP(err_fp, "===Type error around line %d in file %s\n",
-			    GET_LINE_NBR(node), cur_file_name);
-		else
-		    FP(err_fp, "===Type error around line %d\n",
-			    GET_LINE_NBR(node));
-		FP(err_fp, "Unidentified identifier \"%s\"\n", GET_VAR(node));
-		longjmp(context_env, 1);
-	    }
-	    // Add implicit arguments
-	    impl_arg_ptr np = fp->implicit_args;
-	    int v_line_nbr = GET_LINE_NBR(node);
-	    MAKE_REDEX_USERDEF(node, fp);
-	    SET_LINE_NBR(node, v_line_nbr);
-	    while( np != NULL ) {
-		g_ptr ifn = Make_USERDEF_leaf(np->def);
-		SET_LINE_NBR(ifn, v_line_nbr);
-		node = Make_APPL_ND(node, ifn);
-		np = np->next;
-	    }
+            if( is_bound(name) ) {
+                // Rename bound variables to ensure no name capture happens
+                // when implicit arguments for overloaded identifiers are added
+                string new_name = wastrsave(&strings, tprintf(".%s", name));
+                SET_VAR(node, new_name);
+                return( node );
+            }
+            fn_ptr fp = Find_Function_Def(stbl, name);
+            if( fp == NULL ) {
+                if( file_load )
+                    FP(err_fp, "===Type error around line %d in file %s\n",
+                            GET_LINE_NBR(node), cur_file_name);
+                else
+                    FP(err_fp, "===Type error around line %d\n",
+                            GET_LINE_NBR(node));
+                FP(err_fp, "Unidentified identifier \"%s\"\n", GET_VAR(node));
+                longjmp(context_env, 1);
+            }
+            // Add implicit arguments
+            impl_arg_ptr np = fp->implicit_args;
+            int v_line_nbr = GET_LINE_NBR(node);
+            MAKE_REDEX_USERDEF(node, fp);
+            SET_LINE_NBR(node, v_line_nbr);
+            while( np != NULL ) {
+                g_ptr ifn = Make_USERDEF_leaf(np->def);
+                SET_LINE_NBR(ifn, v_line_nbr);
+                node = Make_APPL_ND(node, ifn);
+                np = np->next;
+            }
             if( COUNT_BUF(ctxt) == 0 ) { return( node ); }
             if( !is_non_lazy(stbl, name) ) { return( node ); }
             ctx_nd = Make_NIL();
             FOR_BUF(ctxt, string, sp) {
                 ctx_nd = Make_2inp_Primitive(P_CONS,
-			    Make_1inp_Primitive(P_UNTYPE, Make_VAR_leaf(*sp)),
-			    ctx_nd);
+                            Make_1inp_Primitive(P_UNTYPE, Make_VAR_leaf(*sp)),
+                            ctx_nd);
             }
             return( Make_2inp_Primitive(P_NSEQ, ctx_nd, node) );
         default:
@@ -1377,40 +1736,40 @@ static bool
 check_type_match(string arg_pat, string res_pat, typeExp_ptr type)
 {
     if( STREQ(arg_pat, s_star) ) {
-	if( STREQ(res_pat, s_star) ) { return TRUE; }
-	while( type->typeOp == arrow_tp ) {
-	    type = Get_Real_Type(type->typelist->next->type);
-	}
-	typeExp_ptr ttp = Get_Type(res_pat, NULL, TP_DONT_INSERT);
-	if( ttp != NULL ) {
-	    return( Type_eq(type,ttp) );
-	}
-	return( fnmatch(res_pat, Get_tmp_type_string(type), 0) == 0 );
+        if( STREQ(res_pat, s_star) ) { return TRUE; }
+        while( type->typeOp == arrow_tp ) {
+            type = Get_Real_Type(type->typelist->next->type);
+        }
+        typeExp_ptr ttp = Get_Type(res_pat, NULL, TP_DONT_INSERT);
+        if( ttp != NULL ) {
+            return( Type_eq(type,ttp) );
+        }
+        return( fnmatch(res_pat, Get_tmp_type_string(type), 0) == 0 );
     } else {
-	typeExp_ptr ttp = Get_Type(arg_pat, NULL, TP_DONT_INSERT);
-	bool match = FALSE;
-	while( type->typeOp == arrow_tp ) {
-	    if( !match ) {
-		typeExp_ptr arg_type = type->typelist->type;
-		if( ttp != NULL ) {
-		    if( Type_eq(ttp, arg_type) ) {
-			match = TRUE;
-		    }
-		} else {
-		    if(fnmatch(arg_pat, Get_tmp_type_string(arg_type),0) == 0) {
-			match = TRUE;
-		    }
-		}
-	    }
-	    type = Get_Real_Type(type->typelist->next->type);
-	}
-	if( !match ) { return FALSE; }
-	if( STREQ(res_pat, s_star) ) { return TRUE; }
-	ttp = Get_Type(res_pat, NULL, TP_DONT_INSERT);
-	if( ttp != NULL ) {
-	    return( Type_eq(type,ttp) );
-	}
-	return( fnmatch(res_pat, Get_tmp_type_string(type), 0) == 0 );
+        typeExp_ptr ttp = Get_Type(arg_pat, NULL, TP_DONT_INSERT);
+        bool match = FALSE;
+        while( type->typeOp == arrow_tp ) {
+            if( !match ) {
+                typeExp_ptr arg_type = type->typelist->type;
+                if( ttp != NULL ) {
+                    if( Type_eq(ttp, arg_type) ) {
+                        match = TRUE;
+                    }
+                } else {
+                    if(fnmatch(arg_pat, Get_tmp_type_string(arg_type),0) == 0) {
+                        match = TRUE;
+                    }
+                }
+            }
+            type = Get_Real_Type(type->typelist->next->type);
+        }
+        if( !match ) { return FALSE; }
+        if( STREQ(res_pat, s_star) ) { return TRUE; }
+        ttp = Get_Type(res_pat, NULL, TP_DONT_INSERT);
+        if( ttp != NULL ) {
+            return( Type_eq(type,ttp) );
+        }
+        return( fnmatch(res_pat, Get_tmp_type_string(type), 0) == 0 );
     }
 }
 
@@ -1426,20 +1785,20 @@ cond_mk_app(g_ptr old, g_ptr E, g_ptr F)
             return old;
         } else {
             INC_REFCNT(old_E);
-	    res = Make_APPL_ND(old_E, F);
-	    MoveTypeHint(old, res, FALSE);
-	    return res;
+            res = Make_APPL_ND(old_E, F);
+            MoveTypeHint(old, res, FALSE);
+            return res;
         }
     } else {
         if( old_F == F ) {
             INC_REFCNT(old_F);
             res = Make_APPL_ND(E, old_F);
-	    MoveTypeHint(old, res, FALSE);
-	    return res;
+            MoveTypeHint(old, res, FALSE);
+            return res;
         } else {
             res = Make_APPL_ND(E, F);
-	    MoveTypeHint(old, res, FALSE);
-	    return res;
+            MoveTypeHint(old, res, FALSE);
+            return res;
         }
     }
 }
@@ -1466,19 +1825,19 @@ cond_mk_cons(g_ptr old, g_ptr E, g_ptr F)
         } else {
             INC_REFCNT(old_E);
             res = Make_CONS_ND(old_E, F);
-	    MoveTypeHint(old, res, FALSE);
-	    return res;
+            MoveTypeHint(old, res, FALSE);
+            return res;
         }
     } else {
         if( old_F == F ) {
             INC_REFCNT(old_F);
             res = Make_CONS_ND(E, old_F);
-	    MoveTypeHint(old, res, FALSE);
-	    return res;
+            MoveTypeHint(old, res, FALSE);
+            return res;
         } else {
             res = Make_CONS_ND(E, F);
-	    MoveTypeHint(old, res, FALSE);
-	    return res;
+            MoveTypeHint(old, res, FALSE);
+            return res;
         }
     }
 }
@@ -1496,10 +1855,10 @@ update_stbl(symbol_tbl_ptr stbl, fn_ptr fp)
     string name = fp->name;
     fn_ptr last = (fn_ptr) find_hash(stbl->tbl_ptr,(pointer) name);
     if(last != NULL && last != fp ) {
-	if( last->ADT_level == ADT_level ) {
-//	    last->visible = FALSE;
-	}
-	delete_hash(stbl->tbl_ptr, (pointer) name);
+        if( last->ADT_level == ADT_level ) {
+//          last->visible = FALSE;
+        }
+        delete_hash(stbl->tbl_ptr, (pointer) name);
     }
     insert_hash(stbl->tbl_ptr, (pointer) name, (pointer) fp);
 }

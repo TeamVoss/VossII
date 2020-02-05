@@ -31,13 +31,12 @@ ordered binary decision diagrams%
 {}. 
 
 Fl is an interactive language.
-At top-level one can for example: define functions (possibly of arity 0),
+At the top-level one can for example: define functions (possibly of arity 0),
 define new concrete types,
 evaluate expressions, and
 modify the parser.
-In this section we introduce the language by several examples.
 
-\section{Invoking fl}
+\subsection{Invoking fl}
 
 If the {\voss} system is installed on your system
 and you have the suitable search path set up, it suffices
@@ -106,7 +105,7 @@ would yield:
 
 \FULLSCREEN{forte_with_args_start.jpg}
 
-\section{Help system}
+\subsection{Help system}
 
 To make it easier to use fl, there is an automatically generated help system
 available by pushing the "Help" button in top rigth corner of
@@ -128,7 +127,7 @@ If the size of the help window is too small, and you don't want to make
 the whole fl window larger, you can click on the ``detach'' button beside
 the Functions tab to detach the help system.
 
-\section{Embedding in editors}
+\subsection{Embedding in editors}
 
 A very convenient way of using {\voss} is to run it within an editor.
 There are currently two supported editors: vim and emacs.
@@ -139,7 +138,7 @@ README files in \verb@<VossII installation directory>/modes/vim@ or
 \verb@<VossII installation directory>/modes/emacs@.
 
 
-\section{Expressions}
+\subsection{Expressions}
 \index{expressions}
 The Fl prompt%
 \index{prompt}%
@@ -157,11 +156,493 @@ in a variable called {\tt it}.
 Thus, if you evalute an expression, you can get a ``handle'' to it by using
 {\tt it}.
 %%%START_CODE%%%%
-2+3;
+12 > 5 => 2+3 | 2-3;
 it;
 %%%END_CODE%%%%
+Here we also illustrated the if-then-else%
+\index{if-then-else}%
+{} construct used in fl.
 
-\section{Declarations}
+
+
+
+
+\subsection{Integer Expressions}
+
+{\voss} provides arbitrary precissions integers as default.
+All the usual arithmetic operations are available.
+For example:
+%%%START_CODE%%%%
+123456789*9876543210;
+-121/10;
+2**256;
+2**500 % 17;
+((2**500 % 17) % 7) < 3;
+%%%END_CODE%%%%
+It should be pointed out that all the aritmetic operations are
+overloaded with other data types (e.g., floating point numbers).
+As a result, the type inferred for an expression is sometimes
+more general than expected.
+For example:
+%%%START_CODE%%%%
+let double x = x+x;
+%%%END_CODE%%%%
+is not of type \verb@int->int@, bit more general since it depends on the
+overloaded \verb@+@ function.
+Of course, you can use it on integers as you would expect:
+%%%START_CODE%%%%
+double 12;
+%%%END_CODE%%%%
+We will return to this later.
+
+\subsection{Floating Point  Expressions}
+
+The \verb@float@ type represents double precision floating point numbers.
+A float must have a decimal point and a fraction digit.
+It can additionally have an exponent (e).
+For example:
+%%%START_CODE%%%%
+1.0;
+.34;
+-1.73e-12;
+1.0 / 2.0;
+sin(pi*45.0/180.0);
+round(-3.7);
+%%%END_CODE%%%%
+
+The following floating point operations are available at start:
+\begin{hol}
++ - * /                     -- The normal arithmetic operations
+
+< <= = != > >=              -- The normal relational operations
+
+**                          -- Raised to the power
+
+abs                         -- Absolute value
+ceil                        -- Smallest integer >= value
+floor                       -- Largest integer <= value
+round                       -- Integer closest to value
+
+sqrt                        -- Square root
+
+sin cos tan                 -- Sin, cos, and tangent in radians
+asin acos atan              -- Arcsin, Arccos, etc. in radians
+
+exp                         -- e to the power
+log                         -- Natural logarithm
+log10                       -- Logarithm based 10
+
+float2str                   -- Convert float to a string
+int2float                   -- Convert an integer to a string
+str2float                   -- Convert a string to a float
+
+pi                          -- The constant Pi.
+\end{hol}
+
+
+\subsection{Boolean Expressions}
+
+All Boolean expressions%
+\index{Boolean expression}%
+{} in fl are maintained as ordered binary decision
+diagrams. Hence, it
+is very easy to compare complex Boolean expressions and to combine
+them in different ways.
+
+The constants true\index{true}
+and false\index{false}
+are denoted T and F respectively.
+
+Boolean variables%
+\index{Boolean variable}%
+{} are created by variable%
+\index{variable}%
+{} s, where s is of type string.
+If several variables (including vectors) are needed, the function VARS
+is convenient since it both creates a zero-arity fl function for the
+bit or bitlist (depending on whether the name is a single node name or
+a vector name).
+For example:
+%%%START_CODE%%%%
+variable "q";
+VARS "a b c[3:0] d[1:0][2:0]";
+a;
+b;
+c;
+d;
+%%%END_CODE%%%%
+
+The system uses name equivalence, and thus
+%%%START_CODE%%%%
+let v = variable "v";
+v=v;
+variable "v" = variable"v";
+%%%END_CODE%%%%
+
+The
+standard boolean functions
+are available, i.e., AND%
+\index{AND}%
+{}, OR%
+\index{OR}%
+{}, NOT%
+\index{NOT}%
+{}, XOR%
+\index{XOR}%
+{}, and =%
+\index{=}%
+{} are all defined for objects of type Boolean.
+Furthermore, there
+is a special identity%
+\index{identity}%
+{} operator ==%
+\index{==}%
+{} that return true or false depending
+on whether the two arguments
+represent the same Boolean function or not.
+To illustrate this, consider the following example:
+%%%START_CODE%%%%
+let e1 = a XOR b;
+let e2 = a OR b;
+// Not the same function
+e1 == e2;
+// Under what conditions is e1 equal to e2.
+e1 = e2;
+%%%END_CODE%%%%
+It should be pointed out that the equal and not eaul functions
+(\verb@=@ and \verb@!=@) operate over any strucure.
+
+
+Note that unless an ordering has been installed explcitly (more below), the
+variable ordering%
+\index{variable ordering}%
+{} in the OBDD representation is defined
+by the order in which each variable function call {\em gets evaluated}.
+Since fl is a fully lazy language%
+\index{lazy language}%
+{}, and thus the order in which expressions
+are evaluated is often difficult to predict, it is strongly recommended
+that each variable declaration is forced to be evaluated before it
+is being used.
+Alternatively, one can request that fl re-orders the variables
+by evaluating the function var\_order%
+\index{var\_order}%
+{} and give as argument a list
+of variable names.
+fl will then apply the dynamic variable re-ordering mechanism and
+enforce that the variables mentioned in the list will be the first
+in the global BDD order and that they will occur in exactly this order.
+
+Finally, by default, {\voss} will perform a dynamic re-ordering of the
+BDD variables when certain thresholds are exceeded.
+If this is not desirable, the vossrc variable "DYNAMIC-ORDERING"
+can be set to "NO".
+Similarly, a dynamic variable re-ordering can be triggerd by the
+command \verb@bdd_reorder@%
+\index{bdd\_reorder}%
+{} that takes an integer that determines the total number of sweeps that will
+be performed.
+
+Note that during a dynamic variable re-ordering, a small status window will be
+opened at the bottom of the fl window showing the current status of the
+re-ordering as well as providing a button to abort the re-ordering.
+
+\subsubsection{Displaying and Analyzing BDDs}
+
+The default style for printing Boolean expressions%
+\index{printing Boolean expressions}%
+{} is as a sum-of-products%
+\index{sum-of-products}%
+{}.
+Since this may require printing an extremely large expression, there
+is a user-setable limit on how many products that will be printed
+and the maximum size of a product.
+For more details how to modify these two parameters, see Section~\ref{vossrc}.
+For smaller BDDs, the function draw\_bdds can also be very useful.
+%%%START_CODE%%%%
+VARS "q[2:0] r[2:0]";
+// Force creation
+q fseq r fseq ();
+// Order the variables sequentially
+var_order ((md_expand_vector "q[2:0]")@(md_expand_vector "r[2:0]"));
+draw_bdds T [q = r];
+// Order the variables by interleaving them MSB to LSB
+var_order (interleave [(md_expand_vector "q[3:0]"),
+		       (md_expand_vector "r[3:0]")])
+;
+draw_bdds T [q = r];
+%%%END_CODE%%%%
+which would create the display
+\begin{center}
+\includegraphics[width=0.8\linewidth]{screen_shots/bdd_big.png}
+\end{center}
+and
+\begin{center}
+\includegraphics[width=0.2\linewidth]{screen_shots/bdd_small.png}
+\end{center}
+
+For larger BDDs, there are a number of helpful functions that can
+be used to understand the BDD.
+The are:
+\begin{hol}
+depends
+forcing
+truth_cover 
+example 
+enumerate_examples 
+\end{hol}
+Depends%
+\index{depends}%
+{} is used to return a list of all BDD variables an expression depends on.
+Note that the expression can be of any type since depends will recursively
+traverse the whole expression looking for BDDs.
+
+Forcing f%
+\index{forcing}%
+{} returns a substitution list (list of (variable,value) pairs) for all
+variables that must take on some specific value for f to be true.
+
+Truth\_cover%
+\index{truth\_cover}%
+{} takes a list of variables (vars) and a boolean function (f) and returns
+the number of assignemnts to the variables in vars that makes f true.
+
+Example%
+\index{example}%
+{} takes a preference (true or false) and a BDD f and returns
+a substitution list that makes f true.
+If there is a choice, the preference decides whether T or F should be selected.
+
+Finally, \verb@enumerate_examples@ is a convenient way of getting some
+randomly selected scalar values that makes a BDD true.
+
+\subsubsection{Symbolic If-then-else}
+
+One of the more unusual features of fl is that conditionals%
+\index{conditional}%
+\index{symbolic conditional}%
+{} can be symbolic.
+For example:
+%%%START_CODE%%%%
+let e1 = a XOR b;
+// If-then-else with symbolic condition.
+e1 => a | b;
+%%%END_CODE%%%%
+There is some restrictions on how these types of conditional if-then-elses
+can be used.
+With a few exceptions, both the then-case and the else-case has to be
+structurally the same.
+Effectively, they can only differ in Boolean values.
+Thus
+%%%START_CODE%%%%
+a => (1,[b]) | (1,[a]);
+%%%END_CODE%%%%
+is acceptable, but
+%%%START_CODE%%%%
+a => (1,[b]) | (2,[a]);
+%%%END_CODE%%%%
+is not.
+
+There are two major exceptions to this.
+First, bvs (more about these in Section~\ref{section:bitvectors}) automatically
+adjust to make the structures equal.
+For example:
+%%%START_CODE%%%%
+let v1 = int2bv 3;
+let v2 = int2bv 12;
+let res = a => v1 | v2;
+res;
+%%%END_CODE%%%%
+Note that res effectively encodes symbolically both of the alternatives.
+
+The second exception to the requirement of structural similarity is
+how the constructors for the option type is handled.
+To make it possible to create symbolic data structures, the
+handling of the optional constructors NONE and SOME is enhanced.
+In particular, the optional data type constructor NONE matches not only
+NONE but more importantly the SOME constructor and the result is the
+SOME value.
+An example of using this, consider the following symbolic binary tree structure.
+%%%START_CODE%%%%
+lettype stree = STREE {type::bv}
+                      {o_val:: {bv} opt}        // Use bvs instead of integers!
+                      {o_left :: {stree} opt}
+                      {o_right :: {stree} opt}
+;
+
+// Define constructors for the symbolic binary tree
+let leaf_type = int2bv 0;
+let branch_type = int2bv 1;
+let LF v = STREE leaf_type (SOME (int2bv v)) NONE NONE;
+let BR l r = STREE branch_type NONE (SOME l) (SOME r);
+
+// Define a function that adds up the leaves. Note: bvs are used instead of ints
+letrec sum_leaves (STREE type o_val o_left o_right) =
+        type = leaf_type => get_value o_val |
+        (sum_leaves (get_value o_left)) + (sum_leaves (get_value o_right)) 
+;
+
+let t1 = BR (BR (LF 1) (LF 2)) (LF 3);
+sum_leaves t1;
+
+let t2 = BR (BR (BR (BR (LF 1) (LF 2)) (LF 3)) (LF 4)) (BR (LF 5) (LF 6));
+sum_leaves t2;
+
+// A symbolic tree
+let st = a => t1 | t2;
+
+// Note that sum_leaves still work for it.
+sum_leaves (a => t1 | t2);
+%%%END_CODE%%%%
+
+\subsubsection{Advanced BDD operations}
+
+There are several ways of using quantification%
+\index{quantification}%
+{}.
+The ``traditional'' !x. e%
+\index{!.\,e}%
+{} (for all x) and ?x. e%
+\index{?x.\,e}%
+{}
+(there is an x) can be used as long as the type of x and e is bool.
+In addition, you can also quantify away a variable in an expression
+by Quant\_forall%
+\index{Quant\_forall}%
+{} v e or Quant\_thereis%
+\index{Quant\_thereis}%
+{} v e.
+%%%START_CODE%%%%
+!a. ?b. (a XOR b);
+let a = variable "a"; let b = variable "b"; let c = variable "c";
+a AND b OR c;
+Quant_forall ["a"] (a AND b OR c);
+Quant_thereis ["a","c"] (a AND b OR c);
+%%%END_CODE%%%%
+In fact, Quant\_forall and Quant\_thereis quantifies away all variables
+in the list of variables.
+For example:
+%%%START_CODE%%%%
+let v s = variable s;
+let a = v "a"; let b = v "b"; let c = v "c"; let d = v "d";
+let ex = (a AND NOT b);
+ex;
+let nex = ex AND (a=c) AND (b=d);
+Quant_thereis ["a","b"] nex;
+%%%END_CODE%%%%
+
+A common operation when implementing a symbolic model checker, is
+to perform a quantification for a product of two BDDs.
+Rather than doing the conjunction and then the quantification, the
+functions \verb@relprod_forall@ and \verb@relprod_thereis@ perform
+this combinations of operations much more efficiently.
+
+%
+%
+param
+fparam
+%
+substitute
+
+\subsubsection{Structural BDD operations}
+
+top\_cofactor
+bdd\_signature
+bdd\_save
+bdd\_load
+
+
+\begin{hol}
+
+
+
+\end{hol}
+
+
+Sometimes it is useful to find out which Boolean variables a
+Boolean function actually depends on.
+The built-in function depends%
+\index{depends}%
+{} takes a list of elements of type
+bool and return the union of the variables these functions depend on.
+For example:
+%%%START_CODE%%%%
+let v s = variable s;
+let a = v "a"; let b = v "b"; let c = v "c"; let d = v "d";
+let ex1 = (a=c) AND d;
+let ex2 = a = b;
+depends [ex1];
+depends [ex1,ex2];
+%%%END_CODE%%%%
+
+Note that the order of the variables in the list returned by depends
+is the variable order of the OBDD representation.
+
+Given a Boolean function represented as an OBDD, it is convenient to
+be able to apply the function to some arguments.
+This can be accomplished by the substitute%
+\index{substitute}%
+{} command that takes a
+list of (variable name, expression) and an expression in which the
+simultaneous substitution%
+\index{substitution}%
+{} is to be made.
+For example,:
+%%%START_CODE%%%%
+let v s = variable s;
+let a = v "a"; let b = v "b"; let c = v "c"; let d = v "d";
+let ex = (a AND NOT b);
+ex;
+substitute [("a", c), ("b", d)] ex;
+%%%END_CODE%%%%
+
+It should be pointed out that there are no restrictions on the expressions
+in the substitutions.
+In particular, it is possible to ``swap'' variables.
+We illustrate this by continuing the example above:
+%%%START_CODE%%%%
+ex;
+substitute [("a", b), ("b", a)] ex;
+%%%END_CODE%%%%
+
+
+\subsection{Strings}
+
+A sequence of characters enclosed between \verb@"@ is a string%
+\index{string}%
+{}.
+The standard functions on strings are \verb@^@ (catenation%
+\index{catenation}%
+{}), explode%
+\index{explode}%
+{}
+(make string into list of strings) and
+implode%
+\index{implode}%
+{} (make list of strings into single string).
+There a numerous other string functions. 
+For example:
+%%%START_CODE%%%%
+
+let q = "abc and _12!@@#";
+let qq = "qw\"q qw";
+q^qq;
+explode q;
+implode ["1", "2"];
+filter (str_is_prefix "a") ["abc", "Ava", "vad", "bbAb", "aaa"];
+filter (str_is_suffix "a") ["abc", "Ava", "vad", "bbAb", "aaa"];
+filter (str_match "*a*") ["abc", "Ava", "vad", "bbAb", "aaa"];
+qsort strcmp ["abc", "Ava", "vad", "bbAb", "aaa"];
+let s = "A funny story often told is the story of";
+strlen s;
+strstr s "is";
+substr s 1 25;
+substr s 26 (-1);
+sprintf "%s: %032b (%d)" "abc" 1423 1423;
+%%%END_CODE%%%%
+
+
+\subsection{Declarations}
 
 The declaration%
 \index{declaration}%
@@ -228,8 +709,8 @@ For example, if q is an expression of type (int\verb@#@bool) then
 we could write:
 %%%START_CODE%%%%
 let top_level q =
-	val (i,b) = q in
-	i < 3 => b | F
+        val (i,b) = q in
+        i < 3 => b | F
 ;
 top_level (12,variable "a");
 top_level (-2,variable "a");
@@ -249,7 +730,7 @@ can be an arbitrary complex pattern similar to the patterns%
 allowed in function definitions and lambda expressions.
 For more details, see the section on pattern matching on page~\ref{val}.
 
-\section{Functions}
+\subsection{Functions}
 
 To define a function%
 \index{function}%
@@ -313,7 +794,7 @@ for which the user has installed a printing function%
 {}.
 For more details of concrete types, see page~\ref{concreteTypes}.
 
-\section{Recursive Functions}
+\subsection{Recursive Functions}
 
 The following is an attempt to define the factorial function:
 %%%START_CODE%%%%
@@ -345,7 +826,7 @@ letrec fact n = n=0 => 1 | n*fact (n-1);
 fact 5;
 %%%END_CODE%%%%
 
-\section{Mutually Recursive Functions}
+\subsection{Mutually Recursive Functions}
 
 There is currently no direct support for mutually recursive functions, i.e., 
 declaring a function f that needs to evaluate g, but g needs to evaluate f etc.
@@ -375,7 +856,7 @@ map Male (1--20);
 It should be pointed out that a function that is to be forward
 declared, must be given the same type as it will get once it is defined.
 
-\section{Tuples}
+\subsection{Tuples}
 
 If $e\_1, e\_2, \ldots , e\_n$ have types $t\_1, t\_2, \ldots , t\_n$, then
 the fl expression $(e\_1, e\_2, \ldots , e\_n)$ have type
@@ -397,7 +878,7 @@ let qqq = (1,"abc");
 qqq;
 %%%END_CODE%%%%
 
-\section{Lists}
+\subsection{Lists}
 
 If $e\_1, e\_2, \ldots , e\_n$ have type $t$, then the fl expression
 $[e\_1, e\_2, \ldots , e\_n]$ has type ($t$ list%
@@ -456,43 +937,7 @@ flat ll;
 To find all such functions, use the help system and search for functions
 whose argument type matches "*list*".
 
-
-\section{Strings}
-
-A sequence of characters enclosed between \verb@"@ is a string%
-\index{string}%
-{}.
-The standard functions on strings are \verb@^@ (catenation%
-\index{catenation}%
-{}), explode%
-\index{explode}%
-{}
-(make string into list of strings) and
-implode%
-\index{implode}%
-{} (make list of strings into single string).
-There a numerous other string functions. 
-For example:
-%%%START_CODE%%%%
-
-let q = "abc and _12!@@#";
-let qq = "qw\"q qw";
-q^qq;
-explode q;
-implode ["1", "2"];
-filter (str_is_prefix "a") ["abc", "Ava", "vad", "bbAb", "aaa"];
-filter (str_is_suffix "a") ["abc", "Ava", "vad", "bbAb", "aaa"];
-filter (str_match "*a*") ["abc", "Ava", "vad", "bbAb", "aaa"];
-qsort strcmp ["abc", "Ava", "vad", "bbAb", "aaa"];
-let s = "A funny story often told is the story of";
-strlen s;
-strstr s "is";
-substr s 1 25;
-substr s 26 (-1);
-sprintf "%s: %032b (%d)" "abc" 1423 1423;
-%%%END_CODE%%%%
-
-\section{Polymorphism}
+\subsection{Polymorphism}
 
 The list processing functions hd, tl, etc. can be used on all types of lists.
 %%%START_CODE%%%%
@@ -568,7 +1013,7 @@ In this respect, fl is similar to the functional language called
 Miranda\footnote{Miranda is a trademark of
 Research Software Ltd.}~\cite{Miranda}.
 
-\section{Type Annotations}
+\subsection{Type Annotations}
 Sometimes it is useful to inform the type inference mechanism
 of fl what type is expected.
 This is particularly useful when there is an obscure type error in the
@@ -625,7 +1070,7 @@ Here we also demonstrate how polymorphic types can be defined.
 One warning: make sure there is a space between the :: and the *a so that
 the parser does not try to look up the symbol ::*a!
 
-\section{Lambda Expressions}
+\subsection{Lambda Expressions}
 
 The expression \verb@\@x.e evaluates to a function with formal parameter x
 and body e. Thus the
@@ -641,7 +1086,7 @@ q 1;
 map (\x.x*x) [1,2,3,4,5];
 %%%END_CODE%%%%
 
-\section{Failures}
+\subsection{Failures}
 
 Some standard functions fail at run-time on certain arguments.
 When this happen, an exception is raised.
@@ -661,7 +1106,7 @@ hd(tl [2]);
 error "My message";
 let select idx l =
     idx < 1 OR idx > length l =>
-	eprintf "select called with illegal index (%d)" idx
+        eprintf "select called with illegal index (%d)" idx
     |
     el idx l
 ;
@@ -681,7 +1126,7 @@ be a function taking the error message as argument.
 For example:
 %%%START_CODE%%%%
 let half x = (x % 2) = 1 => eprintf "HALF_ERR: f2 is given an odd number (%d)" x
-			| x/2
+                        | x/2
 ;
 letrec  robust_half x = 
     (half x) gen_catch
@@ -704,182 +1149,7 @@ of fl's lazy semantics%
 {}, the
 use of catch should be very carefully considered.
 
-\section{Boolean Expressions}
-
-All Boolean expressions%
-\index{Boolean expression}%
-{} in fl are maintained as ordered binary decision
-diagrams. Hence, it
-is very easy to compare complex Boolean expressions and to combine
-them in different ways.
-Boolean variables%
-\index{Boolean variable}%
-{} are created by variable%
-\index{variable}%
-{} s, where s is of type string.
-The system uses name
-equivalence, and thus
-%%%START_CODE%%%%
-let v = variable "v";
-v=v;
-variable "v" = variable"v";
-%%%END_CODE%%%%
-
-The constants true%
-\index{true}%
-{} and false%
-\index{false}%
-{} are denoted T and F respectively. The
-standard boolean functions
-are available, i.e., AND%
-\index{AND}%
-{}, OR%
-\index{OR}%
-{}, NOT%
-\index{NOT}%
-{}, XOR%
-\index{XOR}%
-{}, and =%
-\index{=}%
-{} are all defined for objects of type Boolean.
-Furthermore, there
-is a special identity%
-\index{identity}%
-{} operator ==%
-\index{==}%
-{} that return true or false depending
-on whether the two arguments
-represent the same Boolean function or not.
-
-Note that unless a oreding has been installed explcitly (more below), the
-variable ordering%
-\index{variable ordering}%
-{} in the OBDD representation is defined
-by the order in which each variable function call {\em gets evaluated}.
-Since fl is a fully lazy language%
-\index{lazy language}%
-{}, and thus the order in which expressions
-are evaluated is often difficult to predict, it is strongly recommended
-that each variable declaration is forced to be evaluated before it
-is being used.
-Alternatively, one can request that fl re-orders the variables
-by evaluating the function var\_order%
-\index{var\_order}%
-{} and give as argument a list
-of variable names.
-fl will then apply the dynamic variable re-ordering mechanism and
-enforce that the variables mentioned in the list will be the first
-arguments and that they will occur in exactly this order.
-%%%START_CODE%%%%
-let a = variable "a";
-let b = variable "b";
-a AND b;
-a OR b;
-NOT a AND NOT b AND T;
-a = b;
-a == b;
-(a=b) == (a AND b OR NOT a AND NOT b);
-%%%END_CODE%%%%
-
-The default style for printing Boolean expressions%
-\index{printing Boolean expressions}%
-{} is as a sum-of-products%
-\index{sum-of-products}%
-{}.
-Since this may require printing an extremely large expression, there
-is a user-setable limit on how many products that will be printed
-and the maximum size of a product.
-For more details how to modify these two parameters, see Section~\ref{vossrc}.
-
-\section{Quantifiers}
-
-There are several ways of using quantification%
-\index{quantification}%
-{}.
-The ``traditional'' !x. e%
-\index{!.\,e}%
-{} (for all x) and ?x. e%
-\index{?x.\,e}%
-{}
-(there is an x) can be used as long as the type of x and e is bool.
-In addition, you can also quantify away a variable in an expression
-by quant\_forall%
-\index{quant\_forall}%
-{} v e or quant\_thereis%
-\index{quant\_thereis}%
-{} v e.
-%%%START_CODE%%%%
-!a. ?b. (a XOR b);
-let a = variable "a"; let b = variable "b"; let c = variable "c";
-a AND b OR c;
-Quant_forall ["a"] (a AND b OR c);
-Quant_thereis ["a","c"] (a AND b OR c);
-%%%END_CODE%%%%
-In fact, quant\_forall and quant\_thereis quantifies away all variables
-in the first Boolean expression.
-For example:
-%%%START_CODE%%%%
-let v s = variable s;
-let a = v "a"; let b = v "b"; let c = v "c"; let d = v "d";
-let ex = (a AND NOT b);
-ex;
-let nex = ex AND (a=c) AND (b=d);
-Quant_thereis ["a","b"] nex;
-%%%END_CODE%%%%
-Note that the actual Boolean expression used as first argument is irrelevant.
-The only important fact is on what variables the expression depends.
-
-\section{Dependencies}
-
-Sometimes it is useful to find out which Boolean variables a
-Boolean function actually depends on.
-The built-in function depends%
-\index{depends}%
-{} takes a list of elements of type
-bool and return the union of the variables these functions depend on.
-For example:
-%%%START_CODE%%%%
-let v s = variable s;
-let a = v "a"; let b = v "b"; let c = v "c"; let d = v "d";
-let ex1 = (a=c) AND d;
-let ex2 = a = b;
-depends [ex1];
-depends [ex1,ex2];
-%%%END_CODE%%%%
-
-Note that the order of the variables in the list returned by depends
-is the variable order of the OBDD representation.
-
-\section{Substitutions}
-
-Given a Boolean function represented as an OBDD, it is convenient to
-be able to apply the function to some arguments.
-This can be accomplished by the substitute%
-\index{substitute}%
-{} command that takes a
-list of (variable name, expression) and an expression in which the
-simultaneous substitution%
-\index{substitution}%
-{} is to be made.
-For example,:
-%%%START_CODE%%%%
-let v s = variable s;
-let a = v "a"; let b = v "b"; let c = v "c"; let d = v "d";
-let ex = (a AND NOT b);
-ex;
-substitute [("a", c), ("b", d)] ex;
-%%%END_CODE%%%%
-
-It should be pointed out that there are no restrictions on the expressions
-in the substitutions.
-In particular, it is possible to ``swap'' variables.
-We illustrate this by continuing the example above:
-%%%START_CODE%%%%
-ex;
-substitute [("a", b), ("b", a)] ex;
-%%%END_CODE%%%%
-
-\section{Type Abbreviations}
+\subsection{Type Abbreviations}
 \index{type abbreviations}
 
 Types can be given names:
@@ -892,7 +1162,7 @@ make any distinction between the new type name
 and the actual type. It is purely a short hand that is useful when
 defining concrete types below.
 
-\section{Concrete Types}
+\subsection{Concrete Types}
 
 New types (rather than mere abbreviations) can also be defined.
 Concrete types%
@@ -975,7 +1245,7 @@ Mutually recursive types%
 {} can also be defined. To do so, use the keyword andlettype for the
 subsequent types.  For example:
 %%%START_CODE%%%%
-lettype	   IExpr = Ivar string | Plus IExpr IExpr | ITE BExpr IExpr IExpr
+lettype    IExpr = Ivar string | Plus IExpr IExpr | ITE BExpr IExpr IExpr
 andlettype BExpr = And BExpr BExpr | GEQ IExpr IExpr;
 %%%END_CODE%%%%
 defines two mutually recursive concrete data types for integer expressions
@@ -1001,7 +1271,7 @@ let prIExpr prBexpr expr =
 ;
 letrec prBExpr (And a b) = (prBExpr a) ^ " AND " ^ (prBExpr b)
    /\    prBExpr (GEQ a b) = (prIExpr prBExpr a)^" >= "^
-			     (prIExpr prBExpr b)
+                             (prIExpr prBExpr b)
 ;
 let prIExpr e = prIExpr prBExpr e;
 %%%END_CODE%%%%
@@ -1015,7 +1285,7 @@ forward_declare {prBexpr::BExpr->string};
 letrec prIExpr (Ivar s) = s
  /\    prIExpr (Plus a b) = (prIExpr a)^" + "^(prIExpr b)
  /\    prIExpr (ITE c t e) = "if "^(prBexpr c)^" then "^
-			     (prIExpr t)^" else "^(prIExpr e)
+                             (prIExpr t)^" else "^(prIExpr e)
 ;
 letrec prBExpr (And a b) = (prBExpr a) ^ " AND " ^ (prBExpr b)
  /\    prBExpr (GEQ a b) = (prIExpr a)^" >= "^ (prIExpr b)
@@ -1024,7 +1294,7 @@ letrec prBExpr (And a b) = (prBExpr a) ^ " AND " ^ (prBExpr b)
 which is much easier to write, allthough it requires one to declare
 the type of the forward function(s).
 
-\section{Abstract Types}
+\subsection{Abstract Types}
 
 In fl one can also hide the definitions of types, type constructors,
 and functions.
@@ -1060,21 +1330,21 @@ For convenenience we define a (simple) pretty printer and install it.
 
 let Pexpr expr =
     letrec do_print indent (E_FORALL s e) =
-	(printf "(E_FORALL %s\n%*s" s (indent+2) "") fseq
-	(do_print (indent+2) e) fseq
-	(printf "%*s)\n" indent "")
+        (printf "(E_FORALL %s\n%*s" s (indent+2) "") fseq
+        (do_print (indent+2) e) fseq
+        (printf "%*s)\n" indent "")
      /\    do_print indent (E_VAR s) = printf "%s\n" s
      /\    do_print indent (E_TRUE) = printf "T\n"
      /\    do_print indent (E_AND e1 e2) =
-	(printf "(E_AND\n%*s" (indent+2) "") fseq
-	(do_print (indent+2) e1) fseq
-	(printf "%*s" (indent+2) "") fseq
-	(do_print (indent+2) e2) fseq
-	(printf "%*s)\n" indent "")
+        (printf "(E_AND\n%*s" (indent+2) "") fseq
+        (do_print (indent+2) e1) fseq
+        (printf "%*s" (indent+2) "") fseq
+        (do_print (indent+2) e2) fseq
+        (printf "%*s)\n" indent "")
      /\    do_print indent (E_NOT e) =
-	(printf "(E_NOT\n%*s" (indent+2) "") fseq
-	(do_print (indent+2) e) fseq
-	(printf "%*s)\n" indent "")
+        (printf "(E_NOT\n%*s" (indent+2) "") fseq
+        (do_print (indent+2) e) fseq
+        (printf "%*s)\n" indent "")
     in
     (do_print 0 expr) fseq
     ""
@@ -1129,11 +1399,11 @@ let lookup var state =
 
 let expr2bool e =
     letrec eval (E_FORALL s e) state =
-	    let state0 = add_to_state state s T in
-	    let state1 = add_to_state state s F in
-	    (eval e state0) AND (eval e state1)
-     /\	   eval (E_VAR s) state = lookup s state 
-     /\	   eval (E_TRUE) state = T
+            let state0 = add_to_state state s T in
+            let state1 = add_to_state state s F in
+            (eval e state0) AND (eval e state1)
+     /\    eval (E_VAR s) state = lookup s state 
+     /\    eval (E_TRUE) state = T
      /\    eval (E_AND e1 e2) state = (eval e1 state) AND (eval e2 state)
      /\    eval (E_NOT e) state = NOT (eval e state)
     in
@@ -1168,7 +1438,7 @@ is_taut g;
 
 %%%END_CODE%%%%
 
-\section{Fixity Operators}
+\subsection{Fixity Operators}
 
 In order to make the fl code more readable, there is extensive
 support for changing the fixity of operators or functions.
@@ -1274,7 +1544,7 @@ forall a b c. a || b && c;
 
 %%%END_CODE%%%%
 
-\section{Overloading}
+\subsection{Overloading}
 
 fl supports a limited amount of user defined overloading%
 \index{overloading}%

@@ -1,5 +1,5 @@
-
-\section{Bitvectors}
+\subsection{Bitvectors}
+\label{section:bitvectors}
 
 To ease writing specifications and creating code for bitvector arithmetic,
 a builtin type ``bv'' \index{bv}%
@@ -43,15 +43,17 @@ pow2 {'3::bev};
 %%%END_CODE%%%%
 shows how to define pow2 so that it can be used for ints, floats, bvs, and
 bevs (like bvs but using bexprs instead of BDDs for the elements in the list).
-Note that we need to provide a type annotation (*a -> *a) in the declaration
-since otherwise the system would not be able to resolve the overloading without
-both the input type and the output type.
+Note that we need to provide a type annotation \verb@(*a -> *a)@ in the
+declaration since otherwise the system would not be able to resolve
+the overloading without both the input type and the output type.
 
 To create a vector with variables, there are two functions:
 bv\_variable%
 \index{bv\_variable}
 and
-bv\_constrained\_variable%\index{bv\_constrained\_variable}.
+bv\_constrained\_variable%
+\index{bv\_constrained\_variable}%
+.
 Both of these functions take a string as the name of the vector.
 This string defines the size of the vector and multi-dimensional vectors
 can also be created.

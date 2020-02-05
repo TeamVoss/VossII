@@ -57,6 +57,9 @@ This document is intended as both a user's guide and (to some extent)
 a reference guide.
 \end{abstract}
 
+\begin{center}
+\includegraphics[width=0.8\linewidth]{screen_shots/front_page.png}
+\end{center}
 
 \newpage
 \tableofcontents   % Uncomment for final version to generate table of content

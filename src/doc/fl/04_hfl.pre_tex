@@ -1,4 +1,3 @@
-
 \section{Hardware Models}
 
 An important part of the {\voss} system is its symbolic trajectory evaluation
@@ -14,7 +13,7 @@ Either way, an fl datatype called pexlif will be created first.
 This datatype captures hiearchy, wire names, and RTL level assignments
 (both instantaneous as well as delayed) of the hardware.
 For further use, the pexlif is often compiled to a more
-efficient model, called fsm..
+efficient model, called fsm.
 We will return to this later.
 
 
@@ -540,7 +539,7 @@ To illustrate the Moore\_FSM primitive (which is the most complex),
 consider the following example:
 %%%START_CODE%%%%
 // The states of the finite state machine
-ENUM "fsm"  ["IDLE", "REQ", "MISS", "UPDATE", "HIT"];
+ENUM "my_fsm"  ["IDLE", "REQ", "MISS", "UPDATE", "HIT"];
 
 
 let fsm_example =
@@ -551,7 +550,7 @@ let fsm_example =
     bit_output      need_data.
     bit_output      ready.
     //
-    fsm_internal    state.
+    my_fsm_internal    state.
     CELL "draw_hier CACHE" [
         (Moore_FSM "CACHE_FSM" clk state
             (reset, IDLE) [
