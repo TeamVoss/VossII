@@ -28,8 +28,12 @@ preview: fl_guide.pdf
 	xpdf fl_guide.pdf
 
 
-install: fl_guide.pdf
+install: fl_guide.pdf fl_tutorial.html
 	/bin/cp fl_guide.pdf ../../../doc/fl_guide.pdf
+	/bin/mkdir -p ../../../doc/fl_tutorial/tut_code
+	/bin/cp -r fl_tutorial.html fl_tutorial.css tut_img figs ../../../doc/fl_tutorial/
+	/bin/cp fl_tutorial.html ../../../doc/fl_tutorial/index.html
+	/bin/cp tut_code/*.jpg ../../../doc/fl_tutorial/tut_code/
 
 %.tex: %.pre_tex
 	@-mkdir -p code
