@@ -357,7 +357,8 @@ The default style for printing Boolean expressions%
 Since this may require printing an extremely large expression, there
 is a user-setable limit on how many products that will be printed
 and the maximum size of a product.
-For more details how to modify these two parameters, see Section~\ref{vossrc}.
+For more details how to modify these two parameters, see
+Section~\ref{section:vossrc}.
 For smaller BDDs, the function draw\_bdds can also be very useful.
 %%%START_CODE%%%%
 VARS "q[2:0] r[2:0]";
@@ -605,6 +606,50 @@ ex;
 substitute [("a", b), ("b", a)] ex;
 %%%END_CODE%%%%
 
+\subsection{bexpr and SAT}
+
+If you don't want to use BDDs for representing Boolean expressions, fl
+provides \verb@bexpr@, which are essentially AND-INVERT directed acyclic
+graphs.
+Most of the Boolean operations, have a bexpr equivalent that is named the
+same, except prefixed with a b.
+For example:
+%%%START_CODE%%%%
+let a = bvariable "a";
+let b = bvariable "b";
+let c = bvariable "c";
+
+let ex0 = bNOT (a bAND b);
+ex0;
+
+let ex1 = bNOT a bOR bNOT (b bAND (c bOR (b bAND bNOT c)));
+ex1;
+
+let ex2 = bNOT a bOR bNOT (b bAND (c bOR (bNOT b bAND c)));
+ex2;
+%%%END_CODE%%%%
+
+Since bexprs are not canonical, one must use a SAT solver to determine
+whether a bexpr is satisfiable or not.
+Currently {\voss} uses MiniSAT~\cite{miniSAT} through the
+\verb@bget_model@%
+\index{bget\_model}%
+\index{SAT}%
+{} function call.
+
+%%%START_CODE%%%%
+let model = bget_model [(ex0 bXOR ex1)] 10;
+// No model exists when ex0 and ex1 are different (i.e., ex0 == ex1)
+model;
+
+let model = bget_model [(ex0 bXOR ex2)] 10;
+// A model is found
+model;
+
+bsubstitute model ex0;
+bsubstitute model ex2;
+%%%END_CODE%%%%
+
 
 \subsection{Strings}
 
@@ -639,6 +684,83 @@ strstr s "is";
 substr s 1 25;
 substr s 26 (-1);
 sprintf "%s: %032b (%d)" "abc" 1423 1423;
+%%%END_CODE%%%%
+
+\subsection{Printf Family of Functions}
+
+To make the conversion of values to strings easier, there is a
+family of functions called \verb@sprintf@ that takes a format
+string to guide the conversion.
+The type of the sprintf function is determined by the format string
+
+The format string is composed of zero  or more  directives: ordinary
+characters (not \%), which are copied unchanged to the output stream;
+and conversion specifications, each of which results in fetching zero
+or more subsequent arguments. Each conversion specification is
+introduced by the character \%, and ends with a conversion specifier.
+In between there may be (in this order) zero or more flags, and an
+optional length modifier.
+
+The arguments must correspond properly (after type promotion) with the
+conversion specifier. The arguments are used in the order given, 
+where each '*' and each conversion specifier asks for the next argument.
+
+The character \% should be followed by zero or more of the following flags:
+\begin{description}
+\item[0]
+The value should be zero padded.
+\item[-]
+The value should be left justified.
+\end{description}
+After this, one can give an optional decimal digit string (with nonzero
+first digit) specifying a field width.
+If the converted value has fewer characters
+than the field width, it will be padded with spaces on the left (or
+right, if the left-adjustment flag has been given). Instead of a deci‐
+mal digit string one may write \verb@*@  to specify that the field width is
+given in the next argument.  A negative field  width is taken as a '-'
+flag followed by a positive field width.
+If the resulting value does not fit in the width given, an exception is
+raised.
+
+Finally, there is a conversion specifier, which is one of
+\begin{description}
+\item[b]
+the integer argument will be converted to a binary number
+\item[o]
+the integer argument will be converted to an octal number
+\item[d]
+the integer argument will be converted to a signed decimal number
+\item[x]
+the integer argument will be converted to a hexadecimal number
+\item[s]
+the string argument will be copied out
+\item[S]
+the list of strings argument will be copied out enclosed in [] and each string separated by a comma.
+\item[B]
+the BDD (bool) argument will be converted to a string and copied to the output
+\end{description}
+
+For example:
+%%%START_CODE%%%%
+let conv i = sprintf "%0*b is the same as %x or %d\n" 16 i i i;
+conv 2;
+conv 142;
+conv (-142);
+%%%END_CODE%%%%
+
+
+There are also an fprintf\index{fprintf}, printf\index{printf}, and
+eprintf\index{eprintf} versions for writing the resulting string to
+a stream, stdout, or as an error message respectively.
+
+Similarly, there is a \verb@sscanf@ family of functions that can be
+used to parse simple strings to values.
+It uses the same type of format string, except neither 'S' or 'B'
+are accepted.
+For example:
+%%%START_CODE%%%%
+sscanf "(%d,%04b)-->%x" "(12,1101)-->4f";
 %%%END_CODE%%%%
 
 
@@ -855,6 +977,56 @@ map Male (1--20);
 %%%END_CODE%%%%
 It should be pointed out that a function that is to be forward
 declared, must be given the same type as it will get once it is defined.
+
+\subsection{Memoization}
+
+Sometimes, there are pure functions that take relatively simple inputs
+and are heavily used with a relatively small set of inputs
+and that take a long time to compute their results.
+For these types of functions, memoization~\cite{memo-68}%
+\index{memoization}%
+{} is often very useful.
+In fl, a function can be memoized simply by using
+\verb@clet@ or \verb@cletrec@ instead of
+\verb@let@ and \verb@letrec@ respectively.
+The classical example is Fibonacci number:
+%%%START_CODE%%%%
+// Original version
+letrec fib 1 = 1
+ /\    fib 2 = 1
+ /\    fib n = fib (n-1) + fib (n-2)
+;
+
+time (fib 30);
+
+// Memoized version
+cletrec fib 1 = 1
+  /\    fib 2 = 1
+  /\    fib n = fib (n-1) + fib (n-2)
+;
+
+time (fib 30);
+%%%END_CODE%%%%
+
+It is important to remember that a memoized function might not be
+evaluated every time it is called.
+Thus if the functions have side effects (e.g., prints out something),
+the memoization of the function will lead to unexpected results.
+Sometimes all subsequent calls will be found in the memo table.
+Somteimes only some of the subsequent calls will be found.
+Similarly, if the function depends on reference variables (i.e., the function
+is not pure but depends on state holding variables), the result will likely
+be completely incorrect.
+However, if the function is pure, memoizing it will never change the
+result.
+
+It should be poited out that one should not memoize any function.
+Not only can it increase the memory foot print significantly, for
+some functions it will slow down the program.
+In particular, when the arguments can be very large, and thus the
+hashing function take long time, and the computation relatively
+small, memoization is a bad idea.
+
 
 \subsection{Tuples}
 
@@ -1566,3 +1738,99 @@ the (built-in) versions as possible candidates.
 
 Finally, overloaded operators and functions can of course also
 be declared infix, binders, or postfix as any other function or operator.
+
+\subsection{vossrc variables}
+\label{section:vossrc}
+
+The {\voss} system uses some user controllable settings for various
+behaviors.
+All of these can be seen by clicking on "Preference" under the "File"
+menu in the main fl window.
+In addition, on startup, {\voss} will look for a .vossrc file in
+the current directory or your home directory to set these prefereces.
+For a temporary change of one of these settings, use of the gui under
+Preferences is definitely recommended.
+However, if you want a certain setting for a particular fl program/session,
+there are two builtin functions that can be used:
+\verb@get_vossrc@ and \verb@update_vossrc@.
+The first takes a name of a vossrc variable (to get the names of them, see the
+Preference window and click on the ``copy to clipboard'' icon beside the
+name) and returns its current value.
+The second changes it to a new value (and returns the old).
+For example:
+%%%START_CODE%%%%
+// Read the old value
+get_vossrc "DYNAMIC-ORDERING";
+// Update the value
+update_vossrc "DYNAMIC-ORDERING" "NO";
+// Read the new value
+get_vossrc "DYNAMIC-ORDERING";
+%%%END_CODE%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{reference variables}
+
+Although fl is mostly a pure functional language, it has some
+non-functional parts that can be very useful.
+One particular non-functional part is reference variables%
+\index{reference variable}%
+{}.
+A reference variable is like a memory location to which one
+can write new values and programs can get the current value.
+A reference varaible is created by the (psuedo-) function call ref.
+Ref takes a value and returns a refernce to a storage location
+for such values and that initially contain this value.
+One important restiction to reference variables is that the value must
+be monomorphic.
+Thus, \verb@ref []@ is rarely usable, but,
+e.g., \verb@ref {[]::(int#bool) list}@ is needed.
+To access the current value of a reference variable, the function \verb@deref@
+is used.
+Finally, to update the value stored in the reference variable, the infix
+function \verb@:-@ is used.
+An example of using a reference variable to count the number of times
+a function is called could look like:
+%%%START_CODE%%%%
+let cnt_r = ref 1;
+
+letrec fib 1 = 1
+ /\    fib 2 = 1
+ /\    fib n =
+	(cnt_r := (deref cnt_r + 1)) fseq
+	fib (n-1) + fib (n-2)
+;
+
+cnt_r := 0;
+fib 20;
+deref cnt_r;
+
+cletrec mfib 1 = 1
+  /\    mfib 2 = 1
+  /\    mfib n =
+	(cnt_r := (deref cnt_r + 1)) fseq
+	mfib (n-1) + mfib (n-2)
+;
+
+cnt_r := 0;
+mfib 20;
+deref cnt_r;
+%%%END_CODE%%%%
+
+
+\subsection{Laziness revisited}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{tcl interface}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Visualization}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+

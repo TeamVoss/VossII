@@ -191,6 +191,11 @@ R. P. Kurshan, and K. L. McMillan,
 of Integrated Circuits and Systems}, Vol.~10, No.~11 (November, 1991),
 pp.~1356--1371.
 
+\bibitem{memo-68}
+Michie, D.
+``"Memo” Functions and Machine Learning.'',
+{\it Nature}, Vol~218, (1968), pp.~19–22,
+
 \bibitem{mead-80}
 C. A. Mead, and L. Conway,
 {\it Introduction to VLSI Systems},
@@ -233,6 +238,11 @@ Science, University of British Columbia, December 1992.
 \bibitem{Stoy}
 J. Stoy, {\it Denotational Semantics: The Scott-Strachey Approach to
 Programming Language Theory}, MIT Press, 1977.
+
+\bibitem{miniSAT}
+Sörensson, N, and Eén, N.
+``MiniSat 2.1 and MiniSat++'',
+1.0—SAT race 2008 editions. SAT (2009): 31.
 
 \bibitem{Miranda}
 D. Turner, ``MIRANDA: A Non Strict Functional Language with Polymorphic Types'',
