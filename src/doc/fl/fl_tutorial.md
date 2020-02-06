@@ -614,7 +614,7 @@ let transitions = AND_list
   ];
 
 let reachable s t =
-  Quant_forall (depends transitions) transitions implies (s implies t);
+  Quant_forall (depends transitions) (transitions implies (s implies t));
 
 reachable (v "a") (v "d");
 reachable (v "a") (v "q");
