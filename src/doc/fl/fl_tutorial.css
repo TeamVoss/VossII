@@ -60,12 +60,14 @@ pre {
 }
 
 .tip, .warning {
+    clear: both;
     border-radius: 0.5em;
     float: right;
     padding-left: 1em;
     padding-right: 1em;
     max-width: 30%;
     border: 1px solid black;
+    margin-bottom: 1em;
 }
 
 .tip::before, .warning::before {
