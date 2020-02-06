@@ -145,9 +145,11 @@ install_plugin_tools:
 	make -C bin/fl abi_version.h
 	make -C fl-hs-plugins install doc_install PLUGIN_DIR=$(PLUGIN_DIR) BIN_DIR=$(BIN_DIR) DOC_DIR=$(DOC_DIR)
 
-install_plugin_docs:
-	cp doc/fl_plugins.md $(DOC_DIR)/fl_plugins.md
+install_plugin_docs: doc/fl_plugins.pdf
+	cp doc/fl_plugins.pdf $(DOC_DIR)/fl_plugins.pdf
 
+doc/fl_plugins.pdf: doc/fl_plugins.md
+	pandoc -i --pdf-engine=xelatex doc/fl_plugins.md -o doc/fl_plugins.pdf
 
 functor:
 	@cd ./bin/functor; make \
