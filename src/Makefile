@@ -91,6 +91,8 @@ package: clean yosys_clean
 	install -m 755 -d ../voss/modes/emacs
 	install -m 755 -d ../voss/modes/vim
 
+	cp -f doc/README_release.md ../voss/README.md
+
 	install -m 755 -t ../voss/bin ../bin/fl
 	install -m 755 -t ../voss/bin ../bin/functor
 	install -m 755 -t ../voss/bin ../bin/yosys
