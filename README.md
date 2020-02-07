@@ -47,12 +47,15 @@ build dependencies:
 ```shell
 sudo apt-get install gcc g++ doxygen flex bison gawk \
                      libz-dev tcl-dev tk-dev libc6-dev \
-                     clang libreadline-dev python3 imagemagick
+                     clang libreadline-dev python3 imagemagick pandoc
 ```
 
 Then, from the root of the VossII repository (assuming you've already
 cloned it), run:
 
+```shell
+make -C src install
+```
 
 This will build Voss II and install it _into the repository root directory_.
 If you want to build a distributable binary package, you should install run:
