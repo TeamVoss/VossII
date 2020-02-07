@@ -82,7 +82,7 @@ docker_package:
 	docker run --user $(REPO_OWNER) -v `pwd`/..:/vossroot vossii-static-builder
 
 package: clean yosys_clean
-	make install LINKFLAG=-static
+	make install LINKFLAG=-static YOSYS_LDLIBS="-lreadline -ltinfo"
 	rm -r ../voss ; true
 	install -m 755 -d ../voss/
 	install -m 755 -d ../voss/bin
@@ -91,15 +91,14 @@ package: clean yosys_clean
 	install -m 755 -d ../voss/modes/emacs
 	install -m 755 -d ../voss/modes/vim
 
-	install -m 755 -s -t ../voss/bin
-	install -m 755 -s -t ../voss/bin ../bin/fl
-	install -m 755 -s -t ../voss/bin ../bin/functor
-	install -m 755 -s -t ../voss/bin ../bin/yosys
-	install -m 755    -t ../voss/bin ../bin/front_end.tcl
-	install -m 644    -t ../voss/bin ../bin/prefs.tcl
-	install -m 644    -t ../voss/bin ../bin/utils.tcl
-	install -m 644    -t ../voss/bin ../bin/builtins.fl
-	install -m 644    -t ../voss/bin ../bin/preamble.fl
+	install -m 755 -t ../voss/bin ../bin/fl
+	install -m 755 -t ../voss/bin ../bin/functor
+	install -m 755 -t ../voss/bin ../bin/yosys
+	install -m 755 -t ../voss/bin ../bin/front_end.tcl
+	install -m 644 -t ../voss/bin ../bin/prefs.tcl
+	install -m 644 -t ../voss/bin ../bin/utils.tcl
+	install -m 644 -t ../voss/bin ../bin/builtins.fl
+	install -m 644 -t ../voss/bin ../bin/preamble.fl
 
 	install -m 644 -t ../voss/modes/emacs ../modes/emacs/fl-mode.el
 	install -m 644 -t ../voss/modes/emacs ../modes/emacs/README.md

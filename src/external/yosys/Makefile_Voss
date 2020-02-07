@@ -75,7 +75,12 @@ VPATH := $(YOSYS_SRC)
 
 CXXFLAGS := $(CXXFLAGS) -Wall -Wextra -ggdb -I. -I"$(YOSYS_SRC)" -MD -D_YOSYS_ -fPIC -I$(PREFIX)/include
 LDFLAGS := $(LDFLAGS) -L$(LIBDIR)
-LDLIBS := $(LDLIBS) -lstdc++ -lm
+
+# !!!IMPORTANT!!!
+# DO NOT REMOVE READLINE AND TINFO, OR YOU'LL BREAK THE STATIC BUILD!
+LDLIBS := $(LDLIBS) -lstdc++ -lm -lreadline -ltinfo
+
+
 PLUGIN_LDFLAGS :=
 
 PKG_CONFIG ?= pkg-config
