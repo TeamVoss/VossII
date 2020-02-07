@@ -83,7 +83,6 @@ docker_package:
 
 package: clean yosys_clean
 	make install LINKFLAG=-static
-	make -C doc/fl
 	rm -r ../voss ; true
 	install -m 755 -d ../voss/
 	install -m 755 -d ../voss/bin
@@ -108,11 +107,11 @@ package: clean yosys_clean
 	install -m 644 -t ../voss/modes/vim ../modes/vim/fl.vimrc
 	install -m 644 -t ../voss/modes/vim ../modes/vim/README
 
-	cp -r ../doc/* ../voss/doc/
 	cp -r ../modes            ../voss/
 	cp -r ../vosslib          ../voss/
 	cp -r ../IDVII            ../voss/
-	cp -r ../ckt_examples ../voss/
+	cp -r ../ckt_examples     ../voss/
+	cp -r ../doc/*            ../voss/doc/
 
 	cd .. && tar -cjf voss.tar.bz2 voss && chown $(REPO_OWNER) voss.tar.bz2
 	rm -r ../voss
