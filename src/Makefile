@@ -73,7 +73,7 @@ clean_package:
 	rm -rf ../bindist_build ; true
 	git clone .. ../bindist_build
 	chown -R $(REPO_OWNER) ../bindist_build
-	make -C ../bindist_build/src docker_package
+	make -C ../bindist_build/src package
 	cp ../bindist_build/voss.tar.bz2 ../
 	rm -rf ../bindist_build
 
