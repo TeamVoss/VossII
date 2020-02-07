@@ -105,7 +105,7 @@ would yield:
 
 \FULLSCREEN{forte_with_args_start.jpg}
 
-\subsection{Help system}
+\subsection{Help System}
 
 To make it easier to use fl, there is an automatically generated help system
 available by pushing the "Help" button in top right corner of
@@ -127,7 +127,7 @@ If the size of the help window is too small, and you don't want to make
 the whole fl window larger, you can click on the ``detach'' button beside
 the Functions tab to detach the help system.
 
-\subsection{Embedding in editors}
+\subsection{Embedding in Editors}
 
 A very convenient way of using {\voss} is to run it within an editor.
 There are currently two supported editors: vim and emacs.
@@ -417,7 +417,7 @@ If there is a choice, the preference decides whether T or F should be selected.
 Finally, \verb@enumerate_examples@ is a convenient way of getting some
 randomly selected scalar values that makes a BDD true.
 
-\subsubsection{Symbolic If-then-else}
+\subsubsection{Symbolic If-Then-Else}
 
 One of the more unusual features of fl is that conditionals%
 \index{conditional}%
@@ -496,7 +496,7 @@ let st = a => t1 | t2;
 sum_leaves (a => t1 | t2);
 %%%END_CODE%%%%
 
-\subsubsection{Advanced BDD operations}
+\subsubsection{Advanced BDD Operations}
 
 There are several ways of using quantification%
 \index{quantification}%
@@ -658,7 +658,7 @@ as symbolic constants, there is a fparam%
 {} function available.
 See the help system for more details.
 
-\subsubsection{Structural BDD operations}
+\subsubsection{Structural BDD Operations}
 
 Sometimes one needs to write a function that walks over a BDD and perform
 some operation.
@@ -682,7 +682,7 @@ bdd\_load%
 \index{bdd\_load}%
 {} come in handy. 
 
-\subsection{bexpr and SAT}
+\subsection{Bexpr and SAT}
 
 If you don't want to use BDDs for representing Boolean expressions, fl
 provides \verb@bexpr@, which are essentially AND-INVERT directed acyclic
@@ -1803,30 +1803,30 @@ forall a b c. a || b && c;
 
 %%%END_CODE%%%%
 
-\subsection{Overloading}
+% \subsection{Overloading}
+% 
+% fl supports a limited amount of user defined overloading%
+% \index{overloading}%
+% {} of functions
+% and operators.
+% However, in order to avoid an exponential type inference algorithm, the
+% overloaded operators must be resolved from the types of their arguments only. 
+% To illustrate the construct, consider the following example:
+% %%% START_CODE%%%%
+% let pplus ({a::int},{b::int}) (c,d) = (a+c, b+d);
+% let pprod ({a::int},{b::int}) (c,d) = (a*c, b*d);
+% overload + + pplus;
+% overload * * pprod;
+% (1,2)+(3,4)*(9,3*2);
+% %%% END_CODE%%%%
+% Here we overloaded the symbols + and *.
+% Note that we essentially added new meanings to + and * since we included
+% the (built-in) versions as possible candidates.
+% 
+% Finally, overloaded operators and functions can of course also
+% be declared infix, binders, or postfix as any other function or operator.
 
-fl supports a limited amount of user defined overloading%
-\index{overloading}%
-{} of functions
-and operators.
-However, in order to avoid an exponential type inference algorithm, the
-overloaded operators must be resolved from the types of their arguments only. 
-To illustrate the construct, consider the following example:
-%%%START_CODE%%%%
-let pplus ({a::int},{b::int}) (c,d) = (a+c, b+d);
-let pprod ({a::int},{b::int}) (c,d) = (a*c, b*d);
-overload + + pplus;
-overload * * pprod;
-(1,2)+(3,4)*(9,3*2);
-%%%END_CODE%%%%
-Here we overloaded the symbols + and *.
-Note that we essentially added new meanings to + and * since we included
-the (built-in) versions as possible candidates.
-
-Finally, overloaded operators and functions can of course also
-be declared infix, binders, or postfix as any other function or operator.
-
-\subsection{vossrc variables}
+\subsection{Vossrc Variables}
 \label{section:vossrc}
 
 The {\voss} system uses some user controllable settings for various
@@ -1856,7 +1856,7 @@ get_vossrc "DYNAMIC-ORDERING";
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
 
-\subsection{reference variables}
+\subsection{Reference variables}
 
 Although fl is mostly a pure functional language, it has some
 non-functional parts that can be very useful.
