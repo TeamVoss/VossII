@@ -14,6 +14,16 @@ and OpenSUSE. If you're using it on another distribution, we'd love to hear
 from you!
 
 
+Introduction to VossII
+----------------------
+There is a
+["Getting Started with VossII and fl"](https://github.com/TeamVoss/VossII/blob/master/doc/fl_tutorial/fl_tutorial.html)
+
+There is also a mre extensive 
+[User's Guide](https://github.com/TeamVoss/VossII/blob/master/doc/fl_guide.pdf)
+
+
+
 Installation
 ------------
 
