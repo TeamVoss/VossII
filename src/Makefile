@@ -102,7 +102,6 @@ package: clean yosys_clean
 	install -m 644    -t ../voss/bin ../bin/builtins.fl
 	install -m 644    -t ../voss/bin ../bin/preamble.fl
 
-
 	install -m 644 -t ../voss/modes/emacs ../modes/emacs/fl-mode.el
 	install -m 644 -t ../voss/modes/emacs ../modes/emacs/README.md
 
@@ -148,7 +147,7 @@ install_plugin_docs: doc/fl_plugins.pdf
 	cp doc/fl_plugins.pdf $(DOC_DIR)/fl_plugins.pdf
 
 doc/fl_plugins.pdf: doc/fl_plugins.md
-	pandoc -i --pdf-engine=xelatex doc/fl_plugins.md -o doc/fl_plugins.pdf
+	pandoc -i doc/fl_plugins.md -o doc/fl_plugins.pdf
 
 functor:
 	@cd ./bin/functor; make \
