@@ -175,7 +175,7 @@ install_fixed_address: fl functor
 
 install_all: install_all_but_yosys install_yosys
 
-install_all_but_yosys: fl functor ignore_signals install_plugin_docs install_visualization
+install_all_but_yosys: fl functor ignore_signals install_visualization
 	@-mkdir -p $(BIN_DIR)
 	@-unlink $(BIN_DIR)/fl
 	@cp ./bin/fl/fl $(BIN_DIR)/fl
