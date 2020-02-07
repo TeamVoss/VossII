@@ -102,8 +102,6 @@ package: clean yosys_clean
 	install -m 644    -t ../voss/bin ../bin/builtins.fl
 	install -m 644    -t ../voss/bin ../bin/preamble.fl
 
-	install -m 644 -t ../voss/doc ../doc/fl_guide.pdf
-	install -m 644 -t ../voss/doc ../doc/fl_plugins.md
 
 	install -m 644 -t ../voss/modes/emacs ../modes/emacs/fl-mode.el
 	install -m 644 -t ../voss/modes/emacs ../modes/emacs/README.md
@@ -111,10 +109,11 @@ package: clean yosys_clean
 	install -m 644 -t ../voss/modes/vim ../modes/vim/fl.vimrc
 	install -m 644 -t ../voss/modes/vim ../modes/vim/README
 
-	cp -r ../doc/hfl_examples ../voss/doc/
+	cp -r ../doc/* ../voss/doc/
 	cp -r ../modes            ../voss/
 	cp -r ../vosslib          ../voss/
 	cp -r ../IDVII            ../voss/
+	cp -r ../ckt_examples ../voss/
 
 	cd .. && tar -cjf voss.tar.bz2 voss && chown $(REPO_OWNER) voss.tar.bz2
 	rm -r ../voss
