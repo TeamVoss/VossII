@@ -60,6 +60,10 @@ proc screen_capture:do_full_window_capture {ofile} {
 proc screen_capture:do_capture {ofile} {
     set wid [winfo id .]
     set y_sz [expr [.voss2.t count -update -ypixels 1.0 end] + 35] 
+    wm iconify .
+    update
+    wm deiconify .
+    update
     exec import -window $wid png:- | convert -crop x$y_sz+0+0 png:- $ofile
 }
 

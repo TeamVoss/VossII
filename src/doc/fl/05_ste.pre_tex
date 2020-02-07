@@ -132,10 +132,12 @@ let ckt = pexlif2fsm p;
 %%%END_CODE%%%%
 If we now define a simple antecedent, as follows:
 %%%START_CODE%%%%
+
 let ant =
     "din_0" is  "a" for 5 phases
   and
-    "din_1" is	"b" for 5 phases
+    "din_1" is	0 for 1 phase followed_by "0x1" for 2 phases followed_by
+		0 for 1 phase followed_by "b" for 1 phase
   and
     "din_2" is	"c" for 5 phases
   and
@@ -147,6 +149,7 @@ let ant =
 		    "0x3" for 1 phase followed_by
 		    "s[1:0]" for 1 phase
 ;
+
 %%%END_CODE%%%%
 we can run STE
 %%%START_CODE%%%%
@@ -188,6 +191,153 @@ the Fanin button, you get:
 \includegraphics[width=1.0\linewidth]{screen_shots/gui_02.png}
 \end{center}
 
-If you now run STE, but instead of giving 
+If you now run STE, but instead of giving ckt, give it vis (STE is overloaded),
+you can see the values in the GUI.
+%%%START_CODE%%%%
+STE "-e" vis [] ant [] [];
+%%%END_CODE%%%%
+If you now add all the inputs and the output to the Waveforms window
+(by selecting them and clicking the Waveform button), you get (after
+zooming out a bit):
+\begin{center}
+\includegraphics[width=1.0\linewidth]{screen_shots/gui_03.png}
+\end{center}
+By clicking on the time line, you can set the ``current'' time point
+and if you then go back to the fanin viewer and selecting ``Show values''
+you get:
+\begin{center}
+\includegraphics[width=1.0\linewidth]{screen_shots/gui_04.png}
+\end{center}
+To see what the symbolic value ``S'' in the viewer really represent,
+hover over the S or right click on S.
+By clicking on the right or left arrows, you can change the time point.
+Finally, any of the windows in the GUI can be detached (except the first one)
+and later re-attached by clicking on the ``detach'' icon at the top-left
+corner of each pane.
 
+
+\subsection{GUI Commands}
+
+To illustrate the use of the GUI and explain many commands, we will
+use the single precision floating point unit in
+\verb@<VossII installation directory>/ckt_examples/m32632/rtl@.
+If you want to follow along, cd into that directory and execute
+\verb@fl -f SP_FPU.fl@.
+If you do so, you will first be greeted by:
+\begin{center}
+\includegraphics[width=1.0\linewidth]{screen_shots/gui/session_1/gui_000001.png}
+\end{center}
+You can now select one of more of the signals shown.
+If the signal(s) you are interested in are not primary outputs,
+change the Limit search, provide a pattern and click Refresh.
+Here we selected all of the primary outputs and clicked the Fanin button
+obtaining:
+\begin{center}
+\includegraphics[width=1.0\linewidth]{screen_shots/gui/session_1/gui_000002.png}
+\end{center}
+If you now click and hold down the right button while moving the cursor
+down and left, a red arrow and a ``Zoom to fit'' text appears.
+\begin{center}
+\includegraphics[width=1.0\linewidth]{screen_shots/gui/session_1/gui_000003.png}
+\end{center}
+You can also strike up-left, up-right, or down-right while holding the right
+button down for other zoom alternatives.
+If you use the Zoom to fit alternative and release the button, you get:
+\begin{center}
+\includegraphics[width=1.0\linewidth]{screen_shots/gui/session_1/gui_000004.png}
+\end{center}
+Of you zoom in some (mouse wheel can also be used), you can see that hover over
+a wire or box displays the name of the wire or output(s) of box.
+
+If you right click on a wire or box, a pulldown menu appears:
+\begin{center}
+\includegraphics[width=1.0\linewidth]{screen_shots/gui/session_1/gui_000008.png}
+\end{center}
+
+Here we selected the ``Draw inside'' alternative and a new tab gets created
+and we get to see the inside circuitry of that box.
+\begin{center}
+\includegraphics[width=1.0\linewidth]{screen_shots/gui/session_1/gui_000009.png}
+\end{center}
+If we do the same inside this level of hierarchy, like:
+\begin{center}
+\includegraphics[width=1.0\linewidth]{screen_shots/gui/session_1/gui_000010.png}
+\end{center}
+we get:
+\begin{center}
+\includegraphics[width=1.0\linewidth]{screen_shots/gui/session_1/gui_000011.png}
+\end{center}
+
+Since it is easy to get lost when many levels of hierarchy have been
+traversed, it is often very useful to color a wire.
+One can do this either by the pulldown menu described earlier, or simply
+hit a digit between 1 and 9 on the keyboard.
+\begin{center}
+\includegraphics[width=1.0\linewidth]{screen_shots/gui/session_1/gui_000012.png}
+\end{center}
+The important part is that the selected wire will be colored in the
+chosen color in every window in which it occures (including the
+waveform window).
+
+As we illustrated earlier, one can also select wires to add to the
+waveform viewer.
+Here we fist selected all inputs followed by all the output
+after having run a (semi-) random scalar input simulation.
+\begin{center}
+\includegraphics[width=1.0\linewidth]{screen_shots/gui/session_2/gui_000003.png}
+\end{center}
+If there are question marks in the drawing, it means that the value did not
+fit in the space.
+Hovering over it will often provide the value or right clicking to get
+a pulldown menu and then select the ``Show expanded value'' menu item.
+An alternative is to zoom out so that enough room is created.
+
+By clicking on the time line, you can set the current time point, which 
+will be reflected in every window for which ``Show values'' has been selected.
+For example:
+\begin{center}
+\includegraphics[width=1.0\linewidth]{screen_shots/gui/session_2/gui_000005.png}
+\end{center}
+and
+\begin{center}
+\includegraphics[width=1.0\linewidth]{screen_shots/gui/session_2/gui_000006.png}
+\end{center}
+
+If you want to re-order the signals in the waveform viewer, place the cursor
+over the signal you want to move.
+A small green arrow will appear.
+You can now use the up or down arrows to move this signal.
+Similarly, if you hit the Delete key, that signal (with its waveform)
+will be removed from the waveform viewer.
+
+Our final example of GUI features is using a different circuit.
+Now, cd into 
+\verb@<VossII installation directory>/ckt_examples/diff_cache@
+and issue the command \verb@fl -f ex3.fl@.
+This is a circuit defined in HFL and thus there are additional 
+visualization features possible.
+If we select all outputs and click Fanin and then dive into the CPU hierarchy,
+we get:
+\begin{center}
+\includegraphics[width=1.0\linewidth]{screen_shots/gui/session_3/gui_000006.png}
+\end{center}
+Notice that the finite state machine (defined using the Moore\_FSM construct
+in HFL), is drawn specially.
+If you now left click on the symbol, you get an explicit representation
+of the finite state machine:
+\begin{center}
+\includegraphics[width=1.0\linewidth]{screen_shots/gui/session_3/gui_000007.png}
+\end{center}
+where you can hover over states and/or transitions to get the original
+information from HFL displayed.
+
+Furthermore, if have run an STE simulation and you now move the time line,
+the state the machine is in will be highlighted in dark green.
+If the state is partially X or symbolic, every state that it could be in
+will be colored light green.
+
+Finally, if the state is scalar, both the back annotation value shown for
+the output of the state machine as well as the value in the waveform viewer
+will use the name of the state, rather than the encoded value.
+All to make debugging easier!
 
