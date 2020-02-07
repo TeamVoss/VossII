@@ -549,29 +549,33 @@ right-associative with priority 5.
 Other possible fixities are `infixl` (for left-associative infix functions),
 and `postfix`.
 </div>
+<div class="tip">
+The `VARS` function takes a string of space-separated variable names
+and introduces a new variable for each name into the current scope.
+</div>
 
 ```fl
 let implies a b = (NOT a) OR b;
 infixr 5 implies;
 
-let v s = variable s;
+VARS "a b c d e p q";
 let transitions = AND_list
-  [ (v "a" implies v "b")
-  , (v "a" implies v "c")
-  , (v "b" implies v "d")
-  , (v "d" implies v "b")
-  , (v "d" implies v "e")
-  , (v "p" implies v "q")
+  [ (a implies b)
+  , (a implies c)
+  , (b implies d)
+  , (d implies b)
+  , (d implies e)
+  , (p implies q)
   ];
 
 let reachable s t = transitions implies (s implies t);
 
 // Reachable: we see a nice, concise T
-reachable (v "a") (v "d");
+reachable a d;
 
 // Not reachable: we get a formula describing the hypothetical conditions
 // under which q WOULD be reachable.
-reachable (v "a") (v "q");
+reachable a q;
 ```
 
 We can also *quantify* over variables. Either by introducing new, quantified,
@@ -603,21 +607,21 @@ Very handy in combination with `Quant_forall` and `Quant_thereis`!
 let implies a b = (NOT a) OR b;
 infixr 5 implies;
 
-let v s = variable s;
+VARS "a b c d e p q";
 let transitions = AND_list
-  [ (v "a" implies v "b")
-  , (v "a" implies v "c")
-  , (v "b" implies v "d")
-  , (v "d" implies v "b")
-  , (v "d" implies v "e")
-  , (v "p" implies v "q")
+  [ (a implies b)
+  , (a implies c)
+  , (b implies d)
+  , (d implies b)
+  , (d implies e)
+  , (p implies q)
   ];
 
 let reachable s t =
-  Quant_forall (depends transitions) transitions implies (s implies t);
+  Quant_forall (depends transitions) (transitions implies (s implies t));
 
-reachable (v "a") (v "d");
-reachable (v "a") (v "q");
+reachable a d;
+reachable a q;
 ```
 
 

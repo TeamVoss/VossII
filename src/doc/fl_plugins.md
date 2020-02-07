@@ -1,3 +1,6 @@
+---
+monofont: LiberationMono-Regular.ttf
+---
 # A guide to fl plugins
 
 It is possible to extend the functionality of the fl language through the use
