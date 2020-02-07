@@ -1,0 +1,81 @@
+#spacer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    background-color: #f8f8ff;
+}
+
+#spacer > main {
+    max-width: 90%;
+    width: 60em;
+    margin: auto;
+    margin-top: 1em;
+    margin-bottom: 1em;
+    padding: 2em;
+    line-height: 1.5em;
+    padding-top: 0.25em;
+    border-radius: 0.5em;
+    font-size: 13pt;
+    font-family: sans-serif;
+    background-color: white;
+}
+
+#spacer h1, #spacer h2 {
+    line-height: 1.5em;
+}
+
+main img {
+    max-width: 90%;
+    border: 1px solid black;
+}
+
+pre, p code {
+    border-radius: 0.25em;
+    background-color: rgba(200, 200, 200, 0.25);
+    padding: 0.4em;
+    padding-top: 0.15em;
+    padding-bottom: 0.15em;
+    font-size: 12pt;
+}
+
+pre {
+    border-radius: 0.5em !important;
+    padding: 1em !important;
+}
+
+.warning { background-color: #fff0f0; }
+.tip { background-color: #f0fff0; }
+
+.tip::before {
+    content: '✔';
+    color: green;
+}
+
+.warning::before {
+    content: '✘';
+    color: red;
+}
+
+.tip, .warning {
+    border-radius: 0.5em;
+    float: right;
+    padding-left: 1em;
+    padding-right: 1em;
+    max-width: 30%;
+    border: 1px solid black;
+}
+
+.tip::before, .warning::before {
+    font-size: 48pt;
+    float: left;
+    padding-top: 0.5em;
+    padding-right: 0.1em;
+}
+
+.tip p, .warning p {
+    padding-right: 0;
+    margin-right: 0;
+}

@@ -1,0 +1,231 @@
+<html>
+    <head>
+        <title>Getting Started with VossII and Fl</title>
+        <link rel="stylesheet" type="text/css" href="fl_tutorial.css">
+    </head>
+    <body>
+        <div id="spacer">
+            <main>
+<h1 id="getting-started-with-vossii-and-fl">Getting Started with VossII and fl</h1>
+<p>This tutorial is an introduction to the VossII software suite, and the “fl” programming language used to interface with it. The tutorial assumes that you are familiar with at least one other programming language, and after completing it you will be able to read and write simple programs in fl, as well as know where to look for more in-depth information on any particular fl-related topic.</p>
+<h2 id="what-is-fl">What is fl?</h2>
+<p>VossII is a software suite for describing visualising, analysing and proving properties about integrated circuits.</p>
+<p>Similar to many theorem provers, the VossII command language for the verification system is a general purpose programming language. In fact, the fl language shows a strong degree of influence from the version of ML used in the <a href="https://en.wikipedia.org/wiki/HOL_(proof_assistant)">HOL-88 system</a>. However, there are several differences; many syntactic but some more fundamental.</p>
+<p>In particular, the functional language used in VossII has <a href="https://en.wikipedia.org/wiki/Lazy_evaluation">lazy evaluation semantics</a>. In other words, no expression is evaluated until it is absolutely needed. Similarly, no expression is evaluated more than once. Another difference is that Boolean functions are first-class objects and can be created, evaluated, compared and printed out. For efficiency reasons these Boolean functions are represented as ordered binary decision diagrams.</p>
+<h2 id="running-fl">Running fl</h2>
+<p>If the VosSII system installed on your system and available on your <code>$PATH</code>, simply run the command <code>fl</code> in a terminal window to get a stand-alone version of fl.</p>
+<p><img src="figs/forte_start.jpg" /></p>
+<p>The <code>fl</code> program accepts a number of arguments. More specifically:</p>
+<ul class="incremental">
+<li><code>-f FILE</code>: start fl by first reading in the content of the file named <code>FILE</code>.</li>
+<li><code>-I DIR</code>: Set the default search directory to <code>DIR</code>.</li>
+<li><code>-noX</code> or <code>--noX</code>: do not use the graphical (X-windows) interface. Useful when running batch oriented jobs. Note that any calls to graphics primitives will fail with a runtime exception when fl is run in the <code>-noX</code> mode.</li>
+<li><code>-use_stdin</code> or <code>--use_stdin</code>: read input from <code>stdin</code> as well as from the graphical interface.</li>
+<li><code>-use_stdout</code> or <code>--use_stdout</code>: write output from stdout as well as from the graphical interface.</li>
+<li><code>--read_input_from_file FILE</code>: read input continously from the file <code>FILE</code>.</li>
+<li><code>--write_output_to_file FILE</code>: write output to the file <code>FILE</code> in addition to the graphical user interface.</li>
+<li><code>-r SEED</code>: initialize the random number generator with the seed <code>SEED</code>. This allows the <code>rvariable</code> command to create new sets of random variable values. See the <code>rvariable</code> command description in sect. 3 of the fl user’s guide for more details.</li>
+<li><code>-v FILE</code>: store the variable ordering obtained by dynamic variable re-ordering in the file <code>FILE</code>.</li>
+<li><code>-h</code> or <code>--help</code>: print out the available options and quit.</li>
+</ul>
+<p>Any additional arguments to <code>fl</code> will be stored in the fl expression <code>ARGS</code> as a list of strings. For example, the command <code>fl We must do 123 situps</code> would yield:</p>
+<p><img src="figs/forte_with_args_start.jpg" /></p>
+<p>While it is perfectly possible to run the stand-alone fl interpreter in this manner, VossII meant to be used as an interactive tool. As interactive tools are often best used in tight integration with a text editor, we provide VossII integration with Emacs and vim. These integrations provide syntax highlighting and fl command execution directly from the respective text editor.</p>
+<p>You can find these integrations, along with documentation on how to install and use them, in the <code>modes</code> directory of the fl binary and source distributions.</p>
+<h2 id="using-the-help-system">Using the Help System</h2>
+<p>Fl has an interactive help system, which you can access by pressing the <em>Help</em> button in the upper right corner of the stand-alone interpreter or by calling the <code>open_help ()</code> function from within fl.</p>
+<p>Whenever a function is defined, it is added to the online help system. Furthermore, if the function declaration is preceeded by some comments (lines started with //), the comments will be displayed together with information of the fixity (if any), number and types of input arguments, as well as the type of the result of the function. Also, if the function is defined by fl code, there will be a live link to the code used to define the function. The help system allow the user to serach by name, file, argument type(s) or resulting type using regular globbing style patterns.</p>
+<p><img src="figs/forte_help.jpg" /></p>
+<p>Now that we’ve covered the essentials of running the software, let’s jump straight into…</p>
+<h2 id="your-first-fl-program">Your First fl Program</h2>
+<p>Like all self-respecting programming language tutorials, this one starts by writing the <em>Hello World</em> program. Open up the fl interpreter (or the fl mode in your editor, if that’s your style) and enter the following program, which applies the function <code>print</code> to the string <code>"Hello, World!\n"</code>:</p>
+<p><img src="tut_code/code_0001.jpg" /></p>
+<p>Unsurprisingly, this results in the interpreter echoing back <em>“Hello, world!”</em> However, <code>print</code> is commonly a statement, but fl, being a functional language, does not have statements - only expressions.</p>
+<p>Since we know that all expressions have types, this begs the question: what is the type of <code>print</code>? We can find out by simply typing the function <code>print</code> without giving it an argument.</p>
+<p><img src="tut_code/code_0002.jpg" /></p>
+<p>As we can see, <code>print</code> has the type <code>string -&gt; void</code>; a function which takes a single argument of type <code>string</code> and returns a value of type <code>void</code>. While <code>string</code> is relatively self-explanatory, what is the meaning of <code>void</code>?</p>
+<p><code>void</code> is a singleton (i.e. inhabited by a single value) type, which is commonly returned from functions which only exist to perform <em>effects</em>. <code>print</code> is such a function, as it <em>prints</em> its argument to the user interface, and does nothing else.</p>
+<p>As you have probably deduced from these examples, fl uses the semicolon (<code>;</code>) to denote the end of a top-level expression. This means that you can write long expressions, and even string literals, across multiple lines as long as you terminate the expression with a semicolon:</p>
+<p><img src="tut_code/code_0003.jpg" /></p>
+<h2 id="expressions-and-types">Expressions and Types</h2>
+<p>All fl programs consist of zero or more expressions, where each expression has a type. We’ve already seen the <code>string</code> and <code>void</code> types, and fl comes with a rich library of types right out of the box:</p>
+<ul class="incremental">
+<li><code>int</code>: arbitrary precision integers;</li>
+<li><code>float</code>/<code>double</code>: single and double precision floating point numbers;</li>
+<li><code>string</code>: 8 bit ASCII strings;</li>
+<li><code>bool</code>: Boolean functions encoded using binary decision diagrams;</li>
+<li><code>* list</code>: lists where all elements have the same type <code>*</code>;</li>
+<li><code>* # ** # ...</code>: tuples whose elements may have different types;</li>
+<li><code>* -&gt; ** -&gt; ... -&gt; ***</code>: functions from type <code>*</code>, <code>**</code>, etc. to <code>***</code>;</li>
+<li>…and many more.</li>
+</ul>
+<p>Arithmetic expressions behave as you would expect them to in any programming language:</p>
+<p><img src="tut_code/code_0004.jpg" /></p>
+<p>Lists are defined either as a comma-separated list of items enclosed in brackets, or by using the <code>:</code> (“cons”) operator on an element and another list. Tuples are defined as a comma-separated list of items, which may optionally be enclosed in parentheses.</p>
+<p><img src="tut_code/code_0005.jpg" /></p>
+<p>Constants and functions may be declared using the <code>let</code> keyword. For instance, we can define a constant <code>zero</code> and the successor function <code>succ</code> as follows:</p>
+<p><img src="tut_code/code_0006.jpg" /></p>
+<p>As a functional language, fl lets you declare anonymous functions using <em>lambda expressions</em>. This can be very handy to, say, separate the traversal of some data structure from the operation performed on each element. Lambda expressions are of the form <code>\var. expression</code>, where <code>var</code> is the name of the function’s argument and <code>expression</code> is its body.</p>
+<p>The following example uses the built-in function <code>map</code> to compute the square of each element of a list.</p>
+<p><img src="tut_code/code_0007.jpg" /></p>
+<p>Sometimes we may want to create anonymous functions with more than one argument. When this is the case, we may simply <em>nest</em> lambda expressions:</p>
+<p><img src="tut_code/code_0008.jpg" /></p>
+<p>Functions may use <em>pattern matching</em> to case split on their arguments: when the function’s argument matches what’s found to the <em>left</em> of the <code>=</code>, return the expression to the <em>right</em>. For example, we can define the following rather sloppy function to convert an integer to a natural language representation in English.</p>
+<p>Note the use of an underscore as the pattern of the <code>"many"</code> case at the end. An underscore or a variable name matches <em>any</em> value when used in a pattern. The only difference between the two is that using a variable in a pattern will bind the corresponding value to that variable on the right-hand side of the <code>=</code>, whereas an underscore will just match the value and <em>not</em> bind it.</p>
+<p><img src="tut_code/code_0009.jpg" /></p>
+<p>Note the use of the <code>/\</code> “legs” construct to introduce additional cases of the <code>to_string</code> function, and the semicolon terminating the final case.</p>
+<p>It is important to remember that <code>let</code>-bindings are not recursive by default. Thus, the following attempt to write the factorial function fails miserably:</p>
+<p><img src="tut_code/code_0010.jpg" /></p>
+<p>Instead, we must use the <code>letrec</code> keyword to define recursive functions:</p>
+<p><img src="tut_code/code_0011.jpg" /></p>
+<p>While fl is statically typed, we have yet to see any type annotations. This is because fl implicitly infers the type of any expression we write. Numeric literals without decimals are assumed to be of type <code>int</code>, and literals <em>with</em> decimals are assumed to be of type <code>float</code>. Fl always tries infer the most general type for an expression, which means that we can, for instance, write a function to extract the first element of a tuple which works for all tuples:</p>
+<p><img src="tut_code/code_0012.jpg" /></p>
+<p>However, sometimes we want to use more specific types, help the type checker infer our types by providing extra information, or just be explicit about the types of a function. In this case, we can use the <code>::</code> type annotation operator on an expression, and enclose the annotated expression in curly braces:</p>
+<p><img src="tut_code/code_0013.jpg" /></p>
+<p>Note how the type of the function changes from <code>(* # **) -&gt; *</code> to <code>(string # *) -&gt; string</code>, and how we now get a type error if we try to apply the function to a tuple with a non-<code>string</code> first element.</p>
+<p>We can also use type annotations in patterns, to the left of the <code>=</code>, or on a more complex expression rather than just an identifier:</p>
+<p><img src="tut_code/code_0014.jpg" /></p>
+<p>fl employs lexical scoping. This means that a function which refers to some other identifier will keep referring to the identifier which was in scope <em>at the time of definition</em>, even if that identifier is later redefined. Consider this example, where <code>two</code> is overwritten, but the return value of the function <code>addTwo</code> which refers to it remains the same.</p>
+<p><img src="tut_code/code_0015.jpg" /></p>
+<p>This is in contrast to dynamically scoped languages like Emacs Lisp, where functions instead use the version of the identifier in scope at the time of application.</p>
+<h2 id="scripts">Scripts</h2>
+<p>Expressions may be either typed into the interpreter directly, or stored in a <em>script</em> for later execution. Scripts typically have the <code>.fl</code> file extension, and can be loaded using the <code>load</code> function. To try it out, save the following program to a file named <code>hello.fl</code>:</p>
+<pre><code>print &quot;Hello, World!\n&quot;;
+print &quot;This print brought to you by a .fl script!\n&quot;;</code></pre>
+<div class="tip">
+<p>When invoked from the interpreter, the <code>load</code> function looks for script files relative to the current working directory. When invoked from a script file, it will look for script files <em>relative to the directory of the calling script</em>.</p>
+</div>
+<p>Then, load it in the interpreter:</p>
+<p><img src="tut_code/code_0016.jpg" /></p>
+<p>Loading a script will execute the file line by line, as though it were manually typed into the interpreter. This means that you can load a script twice (or more), and the whole file will be executed anew. This is handy when you’ve updated your script and want to make those changes visible to the interpreter. Note, however, that this is equivalent to redeclaring everything in the script. This can cause unpleasant side-effects if you’ve made changes to a type in your script, which some function defined in another script or interactively depends on.</p>
+<p>Fl programs (scripts as well as those entered directly into the interpreter) may have comments, preceded by two slashes:</p>
+<pre><code>print &quot;Hello, World!\n&quot;;
+
+// Look at me, I&#39;m a comment!
+print &quot;This print brought to you by a .fl script!\n&quot;;</code></pre>
+<p>Comments begin with two slashes, and extend until the end of the line. It is worth reiterating, that comments placed before a constant of function definition will be picked up and displayed by the help system when viewing that entry, to properly documenting your code is highly recommended!</p>
+<h2 id="more-about-types">More About Types</h2>
+<p>In addition to the built-in ones, fl allows you to define your own data types using the <code>lettype</code> keyword. Each type consists of one or more <em>data constructors</em> which each have zero or more <em>arguments</em>. For instance, we can model a playing card using the following types:</p>
+<div class="warning">
+<p>A word of warning: while it is possible to redefine a previously declared type, any function referring to that type must also be defined anew, with the new type definition in scope.</p>
+<p>The behavior of a function referring to a type which has been redefined is undefined!</p>
+</div>
+<p><img src="tut_code/code_0017.jpg" /></p>
+<p>Note how fl lists all of the new definitions introduced by the <code>rank</code> type declaration:</p>
+<ul class="incremental">
+<li><code>ace</code>, <code>king</code>, <code>queen</code> and <code>jack</code>: the data constructors of the type, which can be used to create new values of the type and to match them in patterns.</li>
+<li><code>write_rank</code>: an automatically generated function which writes its argument to a file. One such function is generated for each new type.</li>
+<li><code>read_rank</code>: counterpart to <code>write_rank</code>, this function reads a <code>rank</code> back from a file previously created by <code>write_rank</code>.</li>
+</ul>
+<p>After declaring our own data types, we can also <em>pattern match</em> on their data constructors. A constructor pattern takes the form of <code>&lt;constructor&gt; arg1 arg2 ...</code>. As a concrete example, we may want to define a function which tells us whether the first of two card ranks is higher than the second one:</p>
+<div class="tip">
+<p>While not listed by fl, each new type also gets an automatically derived instance of the equality (<code>==</code>) and inequality (<code>!=</code>) operators. Thus, you can do things like <code>ace == king</code> or <code>card spades jack != card clubs (numeric 1)</code> without having to write any extra boilerplate!</p>
+</div>
+<p><img src="tut_code/code_0018.jpg" /></p>
+<p>We can also use the <code>new_type_abbrev</code> keyword to define <em>type synonyms</em>, for types which already exist but may have some particular semantics in our problem domain. We may want to, say, define a hand of cards as a <code>list</code> of <code>card</code>s:</p>
+<p><img src="tut_code/code_0019.jpg" /></p>
+<h2 id="booleans-and-binary-decision-diagrams">Booleans and Binary Decision Diagrams</h2>
+<p>Boolean expressions in fl are handled rather differently compared to other languages. Instead of being fixed values which are either true or false, boolean expressions are literally <em>expressions</em>, represented as <a href="https://en.wikipedia.org/wiki/OBDD"><em>ordered binary decision diagrams</em></a>, or <em>OBDDs</em>.</p>
+<p>As long as we are content with using expressions built from the atomic <code>T</code> and <code>F</code> constants (representing true and false respectively), Booleans behave as in any other language:</p>
+<p><img src="tut_code/code_0020.jpg" /></p>
+<p>However, once we add <em>variables</em> - Boolean expressions with no well-defined value - into the mix, things start to get interesting. The following example defines a function which given a list of Boolean functions returns the Boolean function determining whether there is exactly one function in the given list that evaluates to <code>T</code>.</p>
+<div class="tip">
+<p>There is no connection between the string passed to the <code>variable</code> function and the identifier to the left of the equality sign. You could just as well write <code>let x = variable "foo";</code> or <code>variable "x" == variable "y";</code></p>
+</div>
+<p><img src="tut_code/code_0021.jpg" /></p>
+<p>As we can see, the result of applying the <code>mutex_list</code> function is not merely a <code>F</code> or <code>I don't know, maybe?</code>, but the exact function that will satisfy the predicate described by <code>mutex_list</code>!</p>
+<p>OBDDs efficiently represent Boolean functions in a <em>canonical</em> format, meaning that we can easily check whether two very different-looking boolean expressions encode the same function. In the following example, we verify that DeMorgan’s law - i.e. that the negation of a conjunction of two values is equivalent to the disjunction of the negations of those same values - holds for all values:</p>
+<div class="warning">
+<p>Note that both <code>==</code> and <code>=</code> can be used in Boolean expressions, but with different semantics: <code>a == b</code> means “are the expressions <code>a</code> and <code>b</code> literally the same Boolean function”, whereas <code>a = b</code> denotes the Boolean function which is true when <code>a</code> and <code>b</code> are equal.</p>
+<p>Thus, <code>variable "p" = variable "q"</code> evaluates to <code>(p ∧ q) ∨ (¬p ∧ ¬q)</code> while <code>variable "p" == variable "q"</code> evaluates to <code>⊥</code>.</p>
+</div>
+<p><img src="tut_code/code_0022.jpg" /></p>
+<p>As a more complicated example, let’s consider the problem of reachability in a state space: given a list of possible state transitions and a starting state <code>s</code>, is it possible to reach a given target state <code>t</code>? Modeling this problem in a conventional language can be troublesome: how do we represent the states and, above all, how do we explore the state space to figure out which states are connected?</p>
+<p>In fl, we can model the state space as a list of named Boolean variables, and the transition table as a list of implication relations. If a transition is possible from state <code>a</code> to state <code>b</code>, then we say that that <code>a</code> implies <code>b</code>. We create a list of such transition relations and posit that each such Boolean term in the list is valid. Then, if the resulting logical conjunction trivially implies a transition relation from <code>s</code> to <code>t</code>, we know that <code>s</code> is reachable from <code>t</code>.</p>
+<p>Thanks to Booleans being represented by OBDDs, both the creation of the reachability expression, and checking whether the resulting expression is valid, is relatively easy.</p>
+<div class="tip">
+<p>Fl supports <em>fixity declarations</em> for functions. In this example, <code>infixr 5 implies</code> means that the function <code>implies</code> is used as an <em>infix</em> function (similar to operators like <code>+</code>, <code>AND</code>, etc.), and is right-associative with priority 5. Other possible fixities are <code>infixl</code> (for left-associative infix functions), and <code>postfix</code>.</p>
+</div>
+<p><img src="tut_code/code_0023.jpg" /></p>
+<p>We can also <em>quantify</em> over variables. Either by introducing new, quantified, variables with the forall (<code>!x. expr</code>) and exists (<code>?x. expr</code>) operators, or by quantifying over some free variable in a Boolean expression using the <code>Quant_forall</code> and <code>Quant_thereis</code> functions. As an example of quantification, consider this alternative formulation of DeMorgan’s law:</p>
+<p><img src="tut_code/code_0024.jpg" /></p>
+<p>To quantify over a some variable(s) in a pre-existing formula, we instead use the <code>Quant_forall</code> and <code>Quant_thereis</code> functions. For instance, note how the <code>reachable</code> function of our reachability example returns a nice, clear <code>T</code> when the goal state is reachable from the starting state, but returns a long Boolean formula when it is not. To make the output a bit more readable, we can quantify the expression over all variables used in the transition table.</p>
+<div class="tip">
+<p>The <code>depends</code> function takes a Boolean expression and returns the names of the variable upon which the expression depends, as a list of strings. Very handy in combination with <code>Quant_forall</code> and <code>Quant_thereis</code>!</p>
+</div>
+<p><img src="tut_code/code_0025.jpg" /></p>
+<h2 id="visualising-circuits">Visualising Circuits</h2>
+<p>As fl’s main purpose in life is to help you debug and visualise models of integrated circuits, it also comes with an embedded language to describe circuits and an easy to use visual symbolic simulator for circuits. While the description language and details of the simulator are not in the scope of this tutorial (see the <a href="https://github.com/TeamVoss/VossReleases/blob/master/doc/fl_guide.pdf">fl user guide</a> for that), we will demonstrate how to load and run simulations on a small Verilog circuit, to whet your appetite.</p>
+<p>For this example we will use the following two Verilog files:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode verilog"><code class="sourceCode verilog"><a class="sourceLine" id="cb3-1" title="1"><span class="co">// File: small_lib.v</span></a>
+<a class="sourceLine" id="cb3-2" title="2"><span class="kw">module</span> mux2(</a>
+<a class="sourceLine" id="cb3-3" title="3">  din_<span class="dv">0</span>,  <span class="co">// Mux first input</span></a>
+<a class="sourceLine" id="cb3-4" title="4">  din_<span class="dv">1</span>,  <span class="co">// Mux Second input</span></a>
+<a class="sourceLine" id="cb3-5" title="5">  sel,    <span class="co">// Select input</span></a>
+<a class="sourceLine" id="cb3-6" title="6">  mux_out <span class="co">// Mux output</span></a>
+<a class="sourceLine" id="cb3-7" title="7">);</a>
+<a class="sourceLine" id="cb3-8" title="8"><span class="co">//-----------Input Ports---------------</span></a>
+<a class="sourceLine" id="cb3-9" title="9"><span class="dt">input</span> din_<span class="dv">0</span>, din_<span class="dv">1</span>, sel ;</a>
+<a class="sourceLine" id="cb3-10" title="10"><span class="co">//-----------Output Ports---------------</span></a>
+<a class="sourceLine" id="cb3-11" title="11"><span class="dt">output</span> mux_out;</a>
+<a class="sourceLine" id="cb3-12" title="12"><span class="co">//------------Internal Variables--------</span></a>
+<a class="sourceLine" id="cb3-13" title="13"><span class="dt">reg</span> mux_out;</a>
+<a class="sourceLine" id="cb3-14" title="14"><span class="co">//-------------Code Starts Here---------</span></a>
+<a class="sourceLine" id="cb3-15" title="15"><span class="kw">always</span> @*</a>
+<a class="sourceLine" id="cb3-16" title="16"><span class="kw">begin :</span><span class="dt"> M</span>UX</a>
+<a class="sourceLine" id="cb3-17" title="17">  <span class="kw">case</span>(sel)</a>
+<a class="sourceLine" id="cb3-18" title="18">    1’b0 : mux_out = din_<span class="dv">0</span>;</a>
+<a class="sourceLine" id="cb3-19" title="19">    1’b1 : mux_out = din_<span class="dv">1</span>;</a>
+<a class="sourceLine" id="cb3-20" title="20">  <span class="kw">endcase</span></a>
+<a class="sourceLine" id="cb3-21" title="21"><span class="kw">end</span></a>
+<a class="sourceLine" id="cb3-22" title="22"><span class="kw">endmodule</span></a></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode verilog"><code class="sourceCode verilog"><a class="sourceLine" id="cb4-1" title="1"><span class="co">// File: small.v</span></a>
+<a class="sourceLine" id="cb4-2" title="2"><span class="kw">module</span> mux4(</a>
+<a class="sourceLine" id="cb4-3" title="3">  din_<span class="dv">0</span>,  <span class="co">// Mux first input</span></a>
+<a class="sourceLine" id="cb4-4" title="4">  din_<span class="dv">1</span>,  <span class="co">// Mux Second input</span></a>
+<a class="sourceLine" id="cb4-5" title="5">  din_<span class="dv">2</span>,  <span class="co">// Mux Third input</span></a>
+<a class="sourceLine" id="cb4-6" title="6">  din_<span class="dv">3</span>,  <span class="co">// Mux Fourth input</span></a>
+<a class="sourceLine" id="cb4-7" title="7">  sel,    <span class="co">// Select input</span></a>
+<a class="sourceLine" id="cb4-8" title="8">  mux_out <span class="co">// Mux output</span></a>
+<a class="sourceLine" id="cb4-9" title="9">);</a>
+<a class="sourceLine" id="cb4-10" title="10"><span class="co">//-----------Input Ports---------------</span></a>
+<a class="sourceLine" id="cb4-11" title="11"><span class="dt">input</span> din_<span class="dv">0</span>, din_<span class="dv">1</span>, din_<span class="dv">2</span>, din_<span class="dv">3</span> ;</a>
+<a class="sourceLine" id="cb4-12" title="12"><span class="dt">input</span> [<span class="dv">1</span>:<span class="dv">0</span>] sel ;</a>
+<a class="sourceLine" id="cb4-13" title="13"><span class="co">//-----------Output Ports---------------</span></a>
+<a class="sourceLine" id="cb4-14" title="14"><span class="dt">output</span> mux_out;</a>
+<a class="sourceLine" id="cb4-15" title="15"><span class="co">//------------Internal Variables--------</span></a>
+<a class="sourceLine" id="cb4-16" title="16"><span class="dt">reg</span> mux_out;</a>
+<a class="sourceLine" id="cb4-17" title="17"><span class="dt">reg</span> mid01, mid23;</a>
+<a class="sourceLine" id="cb4-18" title="18"><span class="co">//-------------Code Starts Here---------</span></a>
+<a class="sourceLine" id="cb4-19" title="19">mux2 mux1 (.din_<span class="dv">0</span>(din_<span class="dv">0</span>), .din_<span class="dv">1</span>(din_<span class="dv">1</span>), .sel(sel[<span class="dv">0</span>]), .mux_out(mid01));</a>
+<a class="sourceLine" id="cb4-20" title="20">mux2 mux2 (.din_<span class="dv">0</span>(din_<span class="dv">2</span>), .din_<span class="dv">1</span>(din_<span class="dv">3</span>), .sel(sel[<span class="dv">0</span>]), .mux_out(mid23));</a>
+<a class="sourceLine" id="cb4-21" title="21">mux2 mux12 (.din_<span class="dv">0</span>(mid01), .din_<span class="dv">1</span>(mid23), .sel(sel[<span class="dv">1</span>]), .mux_out(mux_out));</a>
+<a class="sourceLine" id="cb4-22" title="22"><span class="kw">endmodule</span></a></code></pre></div>
+<p>Once we have created these files, we can first load fl’s <em>Symbolic Trajectory Evaluation</em> - STE for short - library, and then load the Verilog files into fl:</p>
+<p><img src="tut_code/code_0026.jpg" /></p>
+<p>Then, to use the simulator, we need to first convert the <em>pexlif</em> circuit to an <em>fsm</em>, and load it into the simulator.</p>
+<p><img src="tut_code/code_0027.jpg" /></p>
+<p>This will load your circuit into the simulator without running any actual simulations over it. You will still be able to inspect your circuit, but you will not be able to step through it clock for clock.</p>
+<p>After doing this, you can launch the visualiser by running <code>STE_debug fsm;</code> in the interpreter. You will see a window that looks a lot like this:</p>
+<div class="tip">
+<p>To be able to step through your circuit clock for clock, track information flows through it, visualise state machines present in it, etc., you need to provide a list of clock for clock antecedents when calling the <code>STE</code> function. See the final chapter of <a href="https://github.com/TeamVoss/VossReleases/blob/master/doc/fl_guide.pdf">the fl user guide</a> for more information about how to do this.</p>
+</div>
+<p><img src="tut_img/ste1.jpg" /></p>
+<p>Select the <code>mux_out</code> field in the list to the left, then click the <code>Fanin</code> button. This will take you to the fanin view of your circuit.</p>
+<p><img src="tut_img/ste2.jpg" /></p>
+<p>From here, you can inspect and play around with your circuit to your heart’s content; extremely handy for finding and diagnosing bugs in your circuits!</p>
+<h2 id="what-next">What Next?</h2>
+<p>Congratulations on completing this tutorial! Hopefully, you are now equipped to confidently find your way around the fl language and its interpreter.</p>
+<p>What is your next step on your journey to VossII mastery? A few suggestions:</p>
+<ul class="incremental">
+<li>learn more about the embedded hardware description language and how to use it to visualize, simulate and debug hardware descriptions;</li>
+<li>explore the functions available to you, either using the integrated help system or using the fl user guide;</li>
+<li>install and configure an editor integration; or</li>
+<li>learn how you can write and call high-performance Haskell programs from your fl programs.</li>
+</ul>
+<p>Documentation about the hardware description language, visualization, and (almost) all of fl’s built-in functions can be found in the VossII user guide. You will find this guide in <a href="https://github.com/TeamVoss/VossReleases/blob/master/doc/fl_guide.pdf">our release repository</a>, or at <code>doc/fl_guide.pdf</code> in the VossII source or binary distribution.</p>
+<p>More information about installing and configuring editor integrations is available from <a href="https://github.com/TeamVoss/VossReleases/tree/master/modes">here</a>, and the complete guide to using and building fl plugins in Haskell can be found <a href="https://github.com/TeamVoss/VossReleases/blob/master/doc/fl_plugins.md">here</a>.</p>
+            </main>
+        </div>
+    </body>
+</html>
