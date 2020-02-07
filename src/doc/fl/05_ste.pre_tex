@@ -156,7 +156,7 @@ ste_res;
 and potentially see the output values on mux\_out:
 %%%START_CODE%%%%
 get_trace ste_res "mux_out";
-
+// See it in increasing time instead.
 rev it;
 %%%END_CODE%%%%
 Note that get\_trace returns a list of triples: $(t,H,L)$, where
@@ -165,4 +165,29 @@ high and low rail values of the node.
 The encoding used is $(T,T)$ is X (unknown/should't matter),
 $(T,F)$ is one, $(F,T)$ is zero, and
 $(F,F)$ is top, or overconstrained.
+
+Although the above interface can be used, {\voss} comes with a GUI
+for visualize a circuit and the result of an STE run.
+To invoke this debugger, issue the command \verb@STE_debug@%
+\index{STE\_debug}%
+{} with the
+fsm as argument.
+%%%START_CODE%%%%
+let vis = STE_debug ckt;
+%%%END_CODE%%%%
+If \verb@vis@ is evaluated a new toplevel window will be opened looking
+like:
+\begin{center}
+\includegraphics[width=1.0\linewidth]{screen_shots/gui_01.png}
+\end{center}
+From here, you can select some nodes (searchable) and ask to see
+their fanin cone.
+For example, if you select the \verb@mux_out@ signal and click on
+the Fanin button, you get:
+\begin{center}
+\includegraphics[width=1.0\linewidth]{screen_shots/gui_02.png}
+\end{center}
+
+If you now run STE, but instead of giving 
+
 

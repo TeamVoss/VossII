@@ -1439,3 +1439,17 @@ let get_trace_val ste nd time = defix get_trace_val ste nd time;
 // on node nd at time time.
 // Usage: bget_trace_val ste nd t;
 let bget_trace_val ste nd time = defix bget_trace_val ste nd time;
+
+// If qvars depends on variables v1, v2, ..., vn, then
+// relprod_thereis qvars e1 e2 computes the same BDD as:
+// Quant_thereis [v1,v2,...,vn] (e1 AND e2).
+// However, it tries to do so much more efficiently. In particular,
+// the BDD for the conjunction is never built.
+let relprod_thereis qvars e1 e2 = (defix relprod_thereis) qvars e1 e2;
+
+// If qvars depends on variables v1, v2, ..., vn, then
+// relprod_forall qvars e1 e2 computes the same BDD as:
+// Quant_forall [v1,v2,...,vn] (e1 AND e2).
+// However, it tries to do so much more efficiently. In particular,
+// the BDD for the conjunction is never built.
+let relprod_forall qvars e1 e2 = (defix relprod_forall) qvars e1 e2;

@@ -420,7 +420,7 @@ g_ptr_to_tcl_string_rec(g_ptr np, typeExp_ptr type)
 	    }
         case int_tp:
             {
-                tappend("%d", GET_INT(np));
+		tappend( Arbi_ToString(GET_AINT(np),10) );
                 return TRUE;
             }
         case bool_tp:

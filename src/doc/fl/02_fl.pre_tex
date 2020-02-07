@@ -71,7 +71,7 @@ Read inputs also from stdin as well as from the graphical interface.
 \item[-use\_stdout --use\_stdout]
 Read inputs also from stdin as well as from the graphical interface.
 \item[--read\_input\_from\_file filename]
-Read inputs continously from the file 'filename'.
+Read inputs continuously from the file 'filename'.
 \item[--write\_output\_to\_file filename]
 Write outputs to the file 'filename' in addition to the graphical
 user interface.
@@ -108,14 +108,14 @@ would yield:
 \subsection{Help system}
 
 To make it easier to use fl, there is an automatically generated help system
-available by pushing the "Help" button in top rigth corner of
+available by pushing the "Help" button in top right corner of
 the user interface.
 Whenever a function is defined, it is added to the online help system.
-Furthermore, if the function declaration is preceeded by some comments
+Furthermore, if the function declaration is preceded by some comments
 (lines started with //), the comments will be displayed together with
 information of the fixity (if any), number and types of input arguments, as
 well as the type of the result of the function.
-The help system allow the user to serach by name, file, argument type(s) or
+The help system allow the user to search by name, file, argument type(s) or
 resulting type using regular globbing style patterns.
 Also, if the function is defined by fl code, there will be a live link to the
 code used to define the function.
@@ -131,7 +131,7 @@ the Functions tab to detach the help system.
 
 A very convenient way of using {\voss} is to run it within an editor.
 There are currently two supported editors: vim and emacs.
-Both of these provide similar capablities, but using different key-bindings
+Both of these provide similar capabilities, but using different key-bindings
 to better follow the traditions of each editor.
 For details on how to enable vim or emacs integration, see the
 README files in \verb@<VossII installation directory>/modes/vim@ or
@@ -153,7 +153,7 @@ it to normal form; in this case computed the result 5.
 Note that {\voss} stores the result of the most recent expression
 in a variable called {\tt it}.
 \index{it}%
-Thus, if you evalute an expression, you can get a ``handle'' to it by using
+Thus, if you evaluate an expression, you can get a ``handle'' to it by using
 {\tt it}.
 %%%START_CODE%%%%
 12 > 5 => 2+3 | 2-3;
@@ -169,7 +169,7 @@ Here we also illustrated the if-then-else%
 
 \subsection{Integer Expressions}
 
-{\voss} provides arbitrary precissions integers as default.
+{\voss} provides arbitrary precisions integers as default.
 All the usual arithmetic operations are available.
 For example:
 %%%START_CODE%%%%
@@ -179,7 +179,7 @@ For example:
 2**500 % 17;
 ((2**500 % 17) % 7) < 3;
 %%%END_CODE%%%%
-It should be pointed out that all the aritmetic operations are
+It should be pointed out that all the arithmetic operations are
 overloaded with other data types (e.g., floating point numbers).
 As a result, the type inferred for an expression is sometimes
 more general than expected.
@@ -260,7 +260,7 @@ Boolean variables%
 {} s, where s is of type string.
 If several variables (including vectors) are needed, the function VARS
 is convenient since it both creates a zero-arity fl function for the
-bit or bitlist (depending on whether the name is a single node name or
+bit or bit-list (depending on whether the name is a single node name or
 a vector name).
 For example:
 %%%START_CODE%%%%
@@ -309,11 +309,11 @@ e1 == e2;
 // Under what conditions is e1 equal to e2.
 e1 = e2;
 %%%END_CODE%%%%
-It should be pointed out that the equal and not eaul functions
-(\verb@=@ and \verb@!=@) operate over any strucure.
+It should be pointed out that the equal and not equal functions
+(\verb@=@ and \verb@!=@) operate over any structure.
 
 
-Note that unless an ordering has been installed explcitly (more below), the
+Note that unless an ordering has been installed explicitly (more below), the
 variable ordering%
 \index{variable ordering}%
 {} in the OBDD representation is defined
@@ -337,7 +337,7 @@ Finally, by default, {\voss} will perform a dynamic re-ordering of the
 BDD variables when certain thresholds are exceeded.
 If this is not desirable, the vossrc variable "DYNAMIC-ORDERING"
 can be set to "NO".
-Similarly, a dynamic variable re-ordering can be triggerd by the
+Similarly, a dynamic variable re-ordering can be triggered by the
 command \verb@bdd_reorder@%
 \index{bdd\_reorder}%
 {} that takes an integer that determines the total number of sweeps that will
@@ -355,7 +355,7 @@ The default style for printing Boolean expressions%
 \index{sum-of-products}%
 {}.
 Since this may require printing an extremely large expression, there
-is a user-setable limit on how many products that will be printed
+is a user-settable limit on how many products that will be printed
 and the maximum size of a product.
 For more details how to modify these two parameters, see
 Section~\ref{section:vossrc}.
@@ -406,7 +406,7 @@ variables that must take on some specific value for f to be true.
 Truth\_cover%
 \index{truth\_cover}%
 {} takes a list of variables (vars) and a boolean function (f) and returns
-the number of assignemnts to the variables in vars that makes f true.
+the number of assignments to the variables in vars that makes f true.
 
 Example%
 \index{example}%
@@ -429,7 +429,7 @@ let e1 = a XOR b;
 // If-then-else with symbolic condition.
 e1 => a | b;
 %%%END_CODE%%%%
-There is some restrictions on how these types of conditional if-then-elses
+There is some restrictions on how these types of conditional if-then-else's
 can be used.
 With a few exceptions, both the then-case and the else-case has to be
 structurally the same.
@@ -535,76 +535,152 @@ Quant_thereis ["a","b"] nex;
 A common operation when implementing a symbolic model checker, is
 to perform a quantification for a product of two BDDs.
 Rather than doing the conjunction and then the quantification, the
-functions \verb@relprod_forall@ and \verb@relprod_thereis@ perform
-this combinations of operations much more efficiently.
+functions
+\verb@relprod_forall@%
+\index{relprod\_forall}%
+{} and
+\verb@relprod_thereis@ perform%
+\index{relprod\_thereis}%
+{} perform this combinations of operations much more efficiently.
+See the help system for more details.
 
-%
-%
-param
-fparam
-%
-substitute
+A common operation with BDDs is to simultaneously substitute some
+expressions for (some) variables in the BDD.
+For this purpose, there is a function called
+\verb@substitute@%
+\index{substitute}%
+{}.
+This function takes a substitution list (list of string name--Boolean
+expression pairs), and an arbitrary fl expression.
+It then traverses the expression and performs the substitution
+on every object of type bool it encounters.
+%%%START_CODE%%%%
+VARS "a b c d";
+let e = [(1,[a AND b XOR c]), (2,[T,T,a,b, d])];
+e;
+substitute [("a",T),("b",F),("c",F),("d",F)] e;
+substitute [("a",b),("b",a)] e;
+%%%END_CODE%%%%
+
+When a BDD variable `x' is created, a ``next-state'' variable `x\_n' is also
+created.
+These two variables are always kept together in the variable order.
+As a result, the size of a BDD in terms of ``current-state'' variables
+is the same as it would in in terms of ``next-state'' variables.
+To make this conversion easier, there are two helpful functions:
+\verb@bdd_current2next@%
+\index{bdd\_current2next}%
+{} and \verb@bdd_next2current@%
+\index{bdd\_next2current}.
+For example,
+%%%START_CODE%%%%
+VARS "s[2:0]";
+
+// Simple forward reachability code
+let image R init =
+    val (next_vars,cur_vars) = split (str_is_suffix "_n") (depends R) in
+    letrec fwd cur =
+	let next = bdd_next2current (Quant_thereis cur_vars (cur AND R)) in
+	let cur' = cur OR next in
+	cur == cur' => cur | fwd cur'
+    in
+    fwd init
+;
+
+// Simple backwards reachability code
+let preimage R init =
+    val (next_vars,cur_vars) = split (str_is_suffix "_n") (depends R) in
+    letrec back cur =
+	let prev = bdd_current2next (Quant_thereis next_vars (cur AND R)) in
+	let cur' = cur OR prev in
+	cur == cur' => cur | back cur'
+    in
+    bdd_next2current (back (bdd_current2next init))
+;
+%%%END_CODE%%%%
+
+With these functions we could now do:
+%%%START_CODE%%%%
+
+// Example of simple state machine
+let transition_relation =
+    let s' = bdd_current2next s in
+    let mk_trans (f,t) = (s = (int2bl 3 f)) AND (s' = (int2bl 3 t)) in
+    let my_fsm = [(0,1),
+		  (1,0), (1,1), (1,2),
+		  (2,5),
+		  (3,4), (3,2),
+		  (4,3),
+		  (5,5)]
+    in
+    itlist (\tr.\r. mk_trans tr OR r) my_fsm F
+;
+
+// Compute the set of states reachable from init
+let init = (s = int2bl 3 0);
+let final_image = image transition_relation init;
+enumerate_examples 20 (depends s) final_image;
+
+// Compute the set of states that could have taken us to final.
+let final = (s = int2bl 3 3);
+let res = preimage transition_relation final;
+enumerate_examples 20 (depends s) res;
+
+%%%END_CODE%%%%
+
+A very common problem is to create a vector of Boolean variables
+but restrict the possible values to be in a set.
+For example, one might want to have a vector of 4 bits that has the
+property that exactly one signal is high.
+For this problem the param%
+\index{param}%
+{} is available.
+Param takes a boolean condition c and returns a substitution list that
+provides expressions for every variable in c such that
+1) every truth assignment to the parametric variables will make c satisfied,
+and 2) for every substitution to the variables in c that makes c satisfied
+there is some truth assignment to the parametric variables so
+(param c) is that substitution.
+%%%START_CODE%%%%
+VARS "a b s[2:0]";
+param (a AND b);
+param (a OR b);
+
+// Note that this is a state vector that only takes on values
+// that are in the final_image and that all states in final_image
+// has some assignment to the variables.
+substitute (param final_image) s;
+%%%END_CODE%%%%
+
+If one wants to solve for only some variables, i.e., treat the remainder
+as symbolic constants, there is a fparam%
+\index{fparam}%
+{} function available.
+See the help system for more details.
 
 \subsubsection{Structural BDD operations}
 
-top\_cofactor
-bdd\_signature
-bdd\_save
-bdd\_load
+Sometimes one needs to write a function that walks over a BDD and perform
+some operation.
+For this task, the functions
+top\_cofactor%
+\index{top\_cofactor}%
+{} and
+bdd\_signature%
+\index{bdd\_signature}%
+{} are useful.
+Of course, it is almost certain that any function walking over a BDD
+needs to be memoized since the BDDs are DAGs and thus a tree structured
+traversal can take time that grows exponentially with the size of the BDD!
 
-
-\begin{hol}
-
-
-
-\end{hol}
-
-
-Sometimes it is useful to find out which Boolean variables a
-Boolean function actually depends on.
-The built-in function depends%
-\index{depends}%
-{} takes a list of elements of type
-bool and return the union of the variables these functions depend on.
-For example:
-%%%START_CODE%%%%
-let v s = variable s;
-let a = v "a"; let b = v "b"; let c = v "c"; let d = v "d";
-let ex1 = (a=c) AND d;
-let ex2 = a = b;
-depends [ex1];
-depends [ex1,ex2];
-%%%END_CODE%%%%
-
-Note that the order of the variables in the list returned by depends
-is the variable order of the OBDD representation.
-
-Given a Boolean function represented as an OBDD, it is convenient to
-be able to apply the function to some arguments.
-This can be accomplished by the substitute%
-\index{substitute}%
-{} command that takes a
-list of (variable name, expression) and an expression in which the
-simultaneous substitution%
-\index{substitution}%
-{} is to be made.
-For example,:
-%%%START_CODE%%%%
-let v s = variable s;
-let a = v "a"; let b = v "b"; let c = v "c"; let d = v "d";
-let ex = (a AND NOT b);
-ex;
-substitute [("a", c), ("b", d)] ex;
-%%%END_CODE%%%%
-
-It should be pointed out that there are no restrictions on the expressions
-in the substitutions.
-In particular, it is possible to ``swap'' variables.
-We illustrate this by continuing the example above:
-%%%START_CODE%%%%
-ex;
-substitute [("a", b), ("b", a)] ex;
-%%%END_CODE%%%%
+Finally, it is sometimes useful to save a collection of BDDs to disk
+to work with them in a fresh {\voss} invocation.
+Thus, bdd\_save%
+\index{bdd\_save}%
+{} and
+bdd\_load%
+\index{bdd\_load}%
+{} come in handy. 
 
 \subsection{bexpr and SAT}
 
@@ -650,6 +726,17 @@ bsubstitute model ex0;
 bsubstitute model ex2;
 %%%END_CODE%%%%
 
+Like with BDDs, there are functions to recursively walk over bexprs.
+Here the relevant functions are:
+bget\_type%
+\index{bget\_type}%
+,
+bget\_arguments%
+\index{bget\_arguments}%
+{} and
+bget\_variable%
+\index{bget\_variable}%
+.
 
 \subsection{Strings}
 
@@ -716,8 +803,8 @@ After this, one can give an optional decimal digit string (with nonzero
 first digit) specifying a field width.
 If the converted value has fewer characters
 than the field width, it will be padded with spaces on the left (or
-right, if the left-adjustment flag has been given). Instead of a deci‐
-mal digit string one may write \verb@*@  to specify that the field width is
+right, if the left-adjustment flag has been given). Instead of a decimal
+digit string one may write \verb@*@  to specify that the field width is
 given in the next argument.  A negative field  width is taken as a '-'
 flag followed by a positive field width.
 If the resulting value does not fit in the width given, an exception is
@@ -883,7 +970,7 @@ expression add 3, the
 function add is partially applied to 3; the resulting value is the
 function of type int\funarrow int which
 adds 3 to twice its argument. Thus add takes its arguments one at a time.
-We could have made add take a single argument of the cartesian product%
+We could have made add take a single argument of the Cartesian product%
 \index{cartesian product}%
 {}
 type (int\verb@#@int):
@@ -1013,14 +1100,14 @@ evaluated every time it is called.
 Thus if the functions have side effects (e.g., prints out something),
 the memoization of the function will lead to unexpected results.
 Sometimes all subsequent calls will be found in the memo table.
-Somteimes only some of the subsequent calls will be found.
+Sometimes only some of the subsequent calls will be found.
 Similarly, if the function depends on reference variables (i.e., the function
 is not pure but depends on state holding variables), the result will likely
 be completely incorrect.
 However, if the function is pure, memoizing it will never change the
 result.
 
-It should be poited out that one should not memoize any function.
+It should be pointed out that one should not memoize any function.
 Not only can it increase the memory foot print significantly, for
 some functions it will slow down the program.
 In particular, when the arguments can be very large, and thus the
@@ -1463,7 +1550,7 @@ letrec prBExpr (And a b) = (prBExpr a) ^ " AND " ^ (prBExpr b)
  /\    prBExpr (GEQ a b) = (prIExpr a)^" >= "^ (prIExpr b)
 ;
 %%%END_CODE%%%%
-which is much easier to write, allthough it requires one to declare
+which is much easier to write, although it requires one to declare
 the type of the forward function(s).
 
 \subsection{Abstract Types}
@@ -1496,7 +1583,7 @@ lettype expr =  E_FORALL string expr |
 
 %%%END_CODE%%%%
 
-For convenenience we define a (simple) pretty printer and install it.
+For convenience we define a (simple) pretty printer and install it.
 
 %%%START_CODE%%%%
 
@@ -1529,7 +1616,7 @@ e;
 
 %%%END_CODE%%%%
 
-To make it more conveneient to input expressions, one usually defines
+To make it more convenient to input expressions, one usually defines
 operators and give them suitable fixities.
 %%%START_CODE%%%%
 
@@ -1747,8 +1834,8 @@ behaviors.
 All of these can be seen by clicking on "Preference" under the "File"
 menu in the main fl window.
 In addition, on startup, {\voss} will look for a .vossrc file in
-the current directory or your home directory to set these prefereces.
-For a temporary change of one of these settings, use of the gui under
+the current directory or your home directory to set these preferences.
+For a temporary change of one of these settings, use of the GUI under
 Preferences is definitely recommended.
 However, if you want a certain setting for a particular fl program/session,
 there are two builtin functions that can be used:
@@ -1778,10 +1865,10 @@ One particular non-functional part is reference variables%
 {}.
 A reference variable is like a memory location to which one
 can write new values and programs can get the current value.
-A reference varaible is created by the (psuedo-) function call ref.
-Ref takes a value and returns a refernce to a storage location
+A reference variable is created by the (psuedo-) function call ref.
+Ref takes a value and returns a reference to a storage location
 for such values and that initially contain this value.
-One important restiction to reference variables is that the value must
+One important restriction to reference variables is that the value must
 be monomorphic.
 Thus, \verb@ref []@ is rarely usable, but,
 e.g., \verb@ref {[]::(int#bool) list}@ is needed.
@@ -1817,20 +1904,229 @@ mfib 20;
 deref cnt_r;
 %%%END_CODE%%%%
 
+\subsection{Tables}
 
-\subsection{Laziness revisited}
+To enable fast lookup, there is a tbl type in fl.
+However, it has some restrictions.
+Although it appears to be functional, e.g., inserting a new (key,data) pair
+yields a new table, this is an illusion.
+Internally, the table is implemented as a stateful hash table and thus
+one always see the latest version.
+%%%START_CODE%%%%
+let t0 = tbl_create 10;
+t0;
+let t1 = tbl_insert t0 1 11;
+t1;
+let t2 = tbl_insert t1 2 11;
+t2;
+tbl_get t2 1;
+tbl_get t2 2;
+// Note!!!
+tbl_get t1 2;
+%%%END_CODE%%%%
+\begin{hol}
+tbl_create	    -- Make a table
+tbl_insert	    -- Make a "new" table by inserting a key and data
+tbl_delete	    -- Make a "new" table by deleting the data linked to key
+tbl_member    	    -- Is a given key in the table
+tbl_get	    	    -- Return the data linked to key
+tbl_clear	    -- Empty the table
+list2tbl	    -- Build a table from a (key,data) list
+tbl2list	    -- Return the (key,data) pairs stored in the table
+\end{hol}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Laziness}
+
+As stated earlier, fl is a lazy language.
+This is mostly true, but there are some subtle exceptions.
+In general, laziness means two aspects:
+1) an expression is never evaluated until it is needed and 
+2) an expression is only evaluated once.
+Once you introduce side effects in the language this causes problems.
+In particular, the second aspect may no longer be what you want.
+In addition, as a consequence of property 1, the order in which 
+expressions get evaluated is difficult to predict.
+
+To mitigate the problem of evaluation order, fl provides two mechanisms.
+First, the (infix) functions
+seq%
+\index{seq}%
+{} and
+fseq%
+\index{fseq}%
+{} can be used to force a particular evaluation order.
+
+Since a very common situation is that we define some expression and would
+like it to be evaluated before we do some more work, we could write this as:
+\begin{hol}
+    ...
+    let e = <big-expression-with-side-effects> in
+    e fseq
+    ...
+\end{hol}
+However, this is so tedious that fl has introduced a short-hand for this:
+then%
+\index{then}%
+{} and thus you can simply write:
+\begin{hol}
+    ...
+    let e = <big-expression-with-side-effects> then
+    ...
+\end{hol}
+to achieve the same effect.
+
+The problem with functions being evaluated once causes problems
+with side effecting functions.
+Consider for example:
+%%%START_CODE%%%%
+let pr name = fprintf stderr "We have now reached: %s\n" name;
+
+letrec fac n =
+    ((n % 2 = 0) => pr "Even" | pr "Odd") fseq
+    n = 0 => 1 | n* fac (n-1)
+;
+
+fac 7;
+fac 11;
+%%%END_CODE%%%%
+Not only do we only get two printouts for the fac 7 evaluation, we get 
+no output the second time we call fac!
+The problem here is that the expressions (pr "Even") and (pr "Odd")
+does not depend on n and thus will only be evaluated once.
+What is needed is somehow introduce a dependency on n in these expressions.
+One approach would be:
+%%%START_CODE%%%%
+let pr name = fprintf stderr "We have now reached: %s\n" name;
+
+letrec fac n =
+    ((n % 2 = 0) => pr (n seq "Even") | pr (n seq "Odd")) fseq
+    n = 0 => 1 | n* fac (n-1)
+;
+
+fac 7;
+fac 11;
+%%%END_CODE%%%%
+in which we introduced a (dummy) dependency on n.
+
+Since situation is quite common when one use side-effecting functions, 
+fl has introduced an automatic mechanism for it.
+By declaring the function pr as
+non\_lazy%
+\index{non\_lazy}%
+{} the compiler will insert such a dummy dependency,
+Thus, the above example is best written as:
+%%%START_CODE%%%%
+let pr name = fprintf stderr "We have now reached: %s\n" name;
+non_lazy pr;
+
+letrec fac n =
+    ((n % 2 = 0) => pr "Even" | pr "Odd") fseq
+    n = 0 => 1 | n* fac (n-1)
+;
+
+fac 7;
+fac 11;
+%%%END_CODE%%%%
 
 \subsection{tcl interface}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%
+The fl interpreter consists of two processes.
+One for the main fl interpreter and one wish process for the graphical
+interface.
+As a result, there is bidirectional a link between the tcl/tk process
+and the fl process and thus fl can call tcl procedures and tcl
+procedures can call fl functions.
+To call tcl from fl, there is a command called
+tcl\_eval%
+\index{tcl\_eval}%
+{} that takes a list of strings and send them over to the running
+tcl interpreter.
+For example: 
+%%%START_CODE%%%%
+let go_on topic =
+    let query = sprintf "Do you want to continue with %s?" topic in
+    tcl_eval [
+	"toplevel .foo",
+	sprintf "label .foo.question -text {%s}" query,
+	"frame .foo.answer",
+	"button .foo.answer.yes -text Yes -command {set res 1}",
+	"button .foo.answer.no  -text No  -command {set res 0}",
+	"pack .foo.question -side top -fill x",
+	"pack .foo.answer -side top -fill x",
+	"pack .foo.answer.yes -side left -expand y -fill x",
+	"pack .foo.answer.no  -side left -expand y -fill x",
+	"update",
+	"i_am_free",
+	"tkwait variable res",
+	"destroy .foo",
+	"set res"
+    ] = "1"
+;
+%%%END_CODE%%%%
+If one now invokes \verb@go_on "computation";@ one would see:
+\begin{center}
+% \includegraphics[width=0.4\linewidth]{screen_shots/go_on.png}
+\includegraphics{screen_shots/go_on.png}
+\end{center}
+and the system would wait for the user to press either.
+Depending on whether the user pressed Yes or No, the expression would return
+true or false.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%
+Of course, in practice the tcl program is usually kept in a separate
+file and the tcl\_eval command simply contains a tcl command to source that
+file.
 
-\subsection{Visualization}
+One thing to note is that the main {\voss} window is in a looked (busy-wait)
+state during evaluations of a tcl\_eval.
+To ``unlock'' it, the tcl command ``i\_am\_free%
+\index{i\_am\_free}%
+'' is needed before waiting for the variable to change.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%
+To have tcl call fl is even easier.
+If you declare an fl function of suitable type (more on that later) and
+add the directive \verb@export_to_tcl@%
+\index{export\_to\_tcl}%
+{} directly after, a tcl procedure will exist with that name and
+that will call the fl function when invoked.
+For example:
+%%%START_CODE%%%%
+letrec fl_fac n = (n = 1) => 1 | n*fl_fac (n-1);
+export_to_tcl fl_fac;
 
+let fac_calc title =
+    tcl_eval [
+	"toplevel .foo",
+	sprintf "label .foo.title -text {%s}" title,
+	"frame .foo.c",
+	"entry .foo.c.inp",
+	"button .foo.c.do -text Compute -command { docomp }",
+	"entry .foo.c.out",
+	"pack .foo.title .foo.c -side top -fill x",
+	"pack .foo.c.inp .foo.c.do .foo.c.out -side left",
+	(
+	    "proc docomp {} {"^
+	    "   set i [.foo.c.inp get];"^
+	    "   set o [fl_fac $i];"^
+	    "   .foo.c.out delete 0 end;"^
+	    "   .foo.c.out insert 0 $o;"^
+	    "}"
+	)
+    ]
+;
 
+%%%END_CODE%%%%
+If one now evaluates \verb@fac_calc "Factorial computation";@, one
+would see:
+\begin{center}
+% \includegraphics[width=0.6\linewidth]{screen_shots/fac_calc.png}
+\includegraphics{screen_shots/fac_calc.png}
+\end{center}
+ 
+Note that the tcl procedure (proc docomp) has to be given as a single string
+in tcl\_eval. Again, putting this code in a separate tcl file is far easier.
+
+Finally, although not a requirement, the convention is to name
+fl functions that will be used as callback functions in tcl with a prefix
+\verb@fl_@.
 
