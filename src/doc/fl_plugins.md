@@ -224,7 +224,7 @@ an fl error to Haskell land during marshalling.
 
 At the time of writing, function names are _not_ checked for conformity with
 fl's parsing rules. This means that you're free to name your functions
-`¯\_(ツ)_/¯` or `( ͡° ͜ʖ ͡°)` and the plugin will still load just fine,
+whatever weird thing you like and the plugin will still load just fine,
 but you won't be able to call those functions from fl.
 
 ### Errors and higher order functions
