@@ -56,7 +56,7 @@ If you want to build your own libraries you will first need to install some
 build dependencies:
 
 ```shell
-sudo apt-get install gcc g++ doxygen flex bison gawk \
+sudo apt-get install gcc g++ doxygen flex bison gawk graphviz \
                      libz-dev tcl-dev tk-dev libc6-dev \
                      clang libreadline-dev python3 imagemagick pandoc
 ```
