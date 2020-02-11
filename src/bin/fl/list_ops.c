@@ -123,8 +123,8 @@ fl_qsort(g_ptr redex)
 	g_ptr res_tail = redex;
 	g_ptr *gp;
 	FOR_BUF(&buf, g_ptr, gp) {
-	    INC_REFCNT(*gp);
 	    APPEND1(res_tail, *gp);
+	    INC_REFCNT(*gp);
 	}
     } else {
 	MAKE_REDEX_FAILURE(redex, FailBuf);
@@ -1005,6 +1005,7 @@ my_union(g_ptr redex)
 	g_ptr d = GET_CONS_HD(set1);
 	if( find_hash(&set, d) == NULL ) {
 	    APPEND1(tail, d);
+	    INC_REFCNT(d);
 	    insert_hash(&set, d, d);
 	}
 	set1 = GET_CONS_TL(set1);
@@ -1013,6 +1014,7 @@ my_union(g_ptr redex)
 	g_ptr d = GET_CONS_HD(set2);
 	if( find_hash(&set, d) == NULL ) {
 	    APPEND1(tail, d);
+	    INC_REFCNT(d);
 	    insert_hash(&set, d, d);
 	}
 	set2 = GET_CONS_TL(set2);
@@ -1048,6 +1050,7 @@ intersect(g_ptr redex)
 	g_ptr d = GET_CONS_HD(set1);
 	if( find_hash(&set, d) != NULL ) {
 	    APPEND1(tail, d);
+	    INC_REFCNT(d);
 	}
 	set1 = GET_CONS_TL(set1);
     }
@@ -1082,6 +1085,7 @@ subtract(g_ptr redex)
 	g_ptr d = GET_CONS_HD(set1);
 	if( find_hash(&set, d) == NULL ) {
 	    APPEND1(tail, d);
+	    INC_REFCNT(d);
 	}
 	set1 = GET_CONS_TL(set1);
     }

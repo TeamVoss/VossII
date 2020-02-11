@@ -834,6 +834,63 @@ let VARS s =
     foreach decl id_nds
 ;
 
+// A convenient funtion to quickly create a collection of identifiers for
+// constrained Boolean variables and/or bvs (vectors of Boolean variables).
+// For example:
+//   cVARS "a[2:0] b[2:0] c d" "(c OR d) AND (a > '0) AND (b > a)";
+// creates fl binders for a, b, c, and d. The former of type bv and the
+// latter of type bool.
+// In addition, the Boolean expressions are the parametric expressions and
+// thus they will satisfy the condition and every way of satisfying
+// the condition is generated for some assignment to the parametric variables.
+// If cond depends on other variables, they will be treated as
+// symbolic constants.
+//
+let cVARS s cond =
+    let ss = str_split s " " in
+    let destr_name v =
+        let parts = str_split v "[" then
+        length parts = 1 => ([(v,v)],[])  |
+        ([], [(hd parts,v)])
+    in
+    val (l_bools, l_bvs) = unzip (map destr_name ss) then
+    let bools = flat l_bools then
+    let bvs   = flat l_bvs then
+    let ids = map fst (bools@bvs) in
+    let p = partition id ids then
+    let idx = find_first0 (\l. length l > 1) p then
+    idx != 0 =>
+        eprintf "Cannot declare %s twice." (hd (el idx p))
+    |
+    (var_order ss) fseq
+    let cmd1 =
+	list2str T "val (" "," ") =\n" fst (bools@bvs)
+    then
+    let cmd2_bool =
+	let pr (n,v) = sprintf "  let %s = variable \"%s\" in" n v in
+	list2str T "" "\n" "\n" pr bools
+    in
+    let cmd2_bv =
+	let pr (n,v) = sprintf "  let %s = bv_variable \"%s\" in" n v in
+	list2str T "" "\n" "\n" pr bvs
+    in
+    let cmd3 = sprintf "  let cond = %s in\n" cond in
+    let cmd4 =
+	sprintf "  cond == F => error \"Constraint unsatisfiable\" |\n"
+    in
+    let cmd5 = 
+	let nds = md_expand_vectors ss then
+	list2str T "  let vs = [" "," "] in\n" (sprintf "\"%s\"") nds
+    in
+    let cmd6 = sprintf "  let sub = fparam vs (%s) then\n" cond in
+    let cmd7 =
+	let pr (n,_) = sprintf "    (substitute sub %s)" n in
+	list2str T "\n  (\n" ",\n" "\n  )\n;" pr (bools@bvs)
+    in
+    let cmd = cmd1^cmd2_bool^cmd2_bv^cmd3^cmd4^cmd5^cmd6^cmd7 in
+    (eval cmd fseq ())
+;
+
 
 begin_abstype;
 
@@ -1218,7 +1275,6 @@ let bv_examples cnt bv =
         let cur' = ex:cur in
         ((length cur') < cnt), cur'
     in
-    let lbv = bv_size bv in
     let vs = depends bv then
     let lvs = length vs in
     let ints = 0 -- (2**(length vs)-1) then

@@ -1,0 +1,364 @@
+lettype atom =
+	  STEADY  {value::bv} {duration::bv}
+	| SLOPE   {from_value::bv} {to_value::bv} {duration::bv}
+	| FOLLOWS {f::atom} {s::atom}
+	| COND    {c::bool} {t::atom} {e::atom}
+	| REPEAT  {cnt::bv} {atom::atom}
+;
+
+letrec get_duration (STEADY _ dur) = dur
+ /\    get_duration (SLOPE _ _ dur) = dur
+ /\    get_duration (FOLLOWS s1 s2) = get_duration s1 + get_duration s2
+ /\    get_duration (COND c t e) = c => get_duration t | get_duration e
+ /\    get_duration (REPEAT cnt s) = cnt * get_duration s
+;
+
+letrec getvalue t (STEADY v dur) =
+	t <= dur => v | '0
+ /\    getvalue t (SLOPE fv tv dur) =
+	t > dur => '0 |
+	(fv+(t*(tv-fv)/dur))
+ /\    getvalue t (FOLLOWS s1 s2) =
+	let d1 = get_duration s1 in
+	t <= d1 => getvalue t s1 | getvalue (t-d1) s2
+ /\    getvalue t (COND c ta ea) = c => getvalue t ta | getvalue t ea
+ /\    getvalue t (REPEAT cnt s) =
+	cnt = '0 => '0 |
+	getvalue t (FOLLOWS s (REPEAT (cnt - '1) s))
+;
+
+let atom2sequence max_time sequence =
+    map (\i. getvalue (int2bv i) sequence) (0 upto (max_time-1))
+;
+
+
+let to_ii from_v to_v = (int2bv from_v, int2bv to_v);
+let to_ib from_v to_v = (int2bv from_v, {to_v::bv});
+let to_bi from_v to_v = ({from_v::bv}, int2bv to_v);
+let to_bb from_v to_v = ({from_v::bv}, {to_v::bv});
+overload --> to_ii to_ib to_bi to_bb;
+infix 5 -->;
+
+
+let steady_ii value time = STEADY (int2bv value) (int2bv time);
+let steady_bi value time = STEADY value (int2bv time);
+let steady_ib value time = STEADY (int2bv value) time;
+let steady_bb value time = STEADY value time;
+overload for steady_ii steady_bi steady_ib steady_bb;
+infix 4 for;
+
+let slope_i (fv,tv) time = SLOPE fv tv (int2bv time);
+let slope_b (fv,tv) time = SLOPE fv tv time;
+overload duration slope_i slope_b;
+infix 4 duration;
+
+let >> l1 l2 = FOLLOWS l1 l2;
+infix 3 >>;
+
+
+let repeat_i al cnt = REPEAT (int2bv cnt) al;
+let repeat_b al cnt = REPEAT cnt al;
+overload ^^ repeat_i repeat_b;
+infix 6 ^^;
+
+let second t = t;
+postfix second;
+
+let seconds t = t;
+postfix seconds;
+
+let If c = c;
+let Else t e = (t,e);
+let Then c (t,e) = COND c t e;
+if_then_else_binder Then Else;
+
+let visualize_sequences sequences =
+    let vs = qsort (defix -) (setify (flat sequences)) in
+    let min_v = hd vs then
+    let max_v = last vs then
+    let c = tcl_eval [sprintf "create_waveform_viewer %d %d" min_v max_v] then
+    let add_waveform ex =
+	let pre = sprintf "add_time_series %s {" c in
+	
+	let cmd = list2str T pre " " "}" int2str ex then
+	(tcl_eval[cmd]) fseq ()
+    in
+    (foreach add_waveform sequences) fseq
+    (tcl_eval ["update idletasks",
+	      sprintf "%s configure -scrollregion [%s bbox all]" c c]) fseq
+    ()
+;
+
+let get_sequence_examples examples {spec::bv list} =
+    let vs = depends spec in
+    let add_example cur ex =
+        mem ex cur => (T,cur) |
+        let cur' = ex:cur in
+        ((length cur') < examples), cur'
+    in
+    let vs = depends spec then
+    let lvs = length vs in
+    let ints = map (\i. random 0 (2**(length vs)-1)) (1--examples) then
+    letrec mk cur (i:ii) =
+        let sub =
+            vs = [] => [] |
+            let iv = tl (bv2list (int2bv i)) in
+            let iv = (replicate (lvs-length iv) F)@iv in
+            zip vs iv then
+        let spec0 = substitute sub spec then
+        val (keep_going, cur') = add_example cur (map bv2int spec0) in
+        keep_going => mk cur' ii | cur'
+     /\    mk cur [] = cur
+    in
+    mk [] ints
+;
+
+
+let test_sequence {spec_seq::bv list} {delta::int} {t_seq::int list} =
+    let b_delta = int2bv delta in
+    length spec_seq != length t_seq =>
+	error "Length mismatch in test_sequence"
+    |
+    letrec tst (sp:sps) (t:ts) =
+	(abs (sp-int2bv t) <= b_delta) AND (tst sps ts)
+     /\    tst [] [] = T
+    in
+    tst spec_seq t_seq
+;
+
+let generate_examples spec noise cnt =
+    let vs = depends spec in
+    let add_example cur ex =
+        mem ex cur => (T,cur) |
+        let cur' = ex:cur in
+        ((length cur') < cnt), cur'
+    in
+    let vs = depends spec then
+    let lvs = length vs in
+    let min = 0 in
+    let max = 2**(length vs)-1 in
+    let ints = map (\i. random min max) (1--cnt) then
+    letrec mk cur (i:ii) =
+        let sub =
+            vs = [] => [] |
+            let iv = tl (bv2list (int2bv i)) in
+            let iv = (replicate (lvs-length iv) F)@iv in
+            zip vs iv then
+        let spec0 = substitute sub spec then
+	let spec1 = map (\v. bv2int v + (random (-1*noise) noise)) spec0 then
+        val (keep_going, cur') = add_example cur spec1 in
+        keep_going => mk cur' ii | cur'
+     /\    mk cur [] = cur
+    in
+    let exs = mk [] ints in
+    exs
+;
+
+
+
+
+
+
+cVARS "t1[8:0] t2[8:0] cnt[3:0] warmup" "(
+			    '5 < t1 AND
+			    t1 < t2 AND
+			    t2 < '30 AND
+			    '0 <= cnt AND
+			    cnt <= '3
+		)"
+;
+
+// Simple example:
+
+let s0 =
+    (
+	0 for t1 seconds
+	>>
+	0 --> 50 duration 10 seconds
+	>>
+	50 --> 100 duration t2 seconds
+	>>
+	100 for 10 seconds
+	>>
+	100 --> 0 duration 10 seconds
+    )
+    >>
+    0 for 20 seconds
+;
+let s0_flat = (atom2sequence 200 s0);
+let v0 = visualize_sequences (get_sequence_examples 40 s0_flat);
+//v0;
+
+let s1 =
+    (
+	0 for t1 seconds
+	>>
+	0 --> 100 duration 10 seconds
+	>>
+	100 for t2 seconds
+	>>
+	100 --> 0 duration 5 seconds
+    )^^cnt
+    >>
+    0 for 20 seconds
+;
+let s1_flat = (atom2sequence 200 s1);
+let v1 = visualize_sequences (get_sequence_examples 40 s1_flat);
+//v1;
+
+let decay_fn n d from_v to_v =
+    let ratio = (int2float n)/(int2float d) in
+    let percent = int2bv (round (100.0 * (1.0 - exp (-3.0*ratio)))) then
+    from_v + ((to_v - from_v)*percent)/int2bv 100
+;
+
+let exp_decay {from_v::bv} {to_v::bv} {time::bv} =
+    If(time <= '1) Then (SLOPE from_v to_v time) Else (
+    If(time <= '2) Then (
+	    let mid_v = decay_fn 1 2 from_v to_v in
+	    (SLOPE from_v mid_v '1) >>
+	    (SLOPE mid_v to_v '1)
+    ) Else (
+    If(time <= '3) Then (
+	    let m13 = decay_fn 1 3 from_v to_v in
+	    let m23 = decay_fn 2 3 from_v to_v in
+	    (SLOPE from_v m13 '1) >>
+	    (SLOPE m13 m23 '1) >>
+	    (SLOPE m23 to_v '1)
+    ) Else (
+    If(time <= '4) Then (
+	    let m14 = decay_fn 1 4 from_v to_v in
+	    let m24 = decay_fn 2 4 from_v to_v in
+	    let m34 = decay_fn 3 4 from_v to_v in
+	    (SLOPE from_v m14 '1) >>
+	    (SLOPE m14 m24 '1) >>
+	    (SLOPE m24 m34 '1) >>
+	    (SLOPE m34 to_v '1)
+    ) Else (
+    If(time <= '5) Then (
+	    let m15 = decay_fn 1 5 from_v to_v in
+	    let m25 = decay_fn 2 5 from_v to_v in
+	    let m35 = decay_fn 3 5 from_v to_v in
+	    let m45 = decay_fn 4 5 from_v to_v in
+	    (SLOPE from_v m15 '1) >>
+	    (SLOPE m15 m25 '1) >>
+	    (SLOPE m25 m35 '1) >>
+	    (SLOPE m35 m45 '1) >>
+	    (SLOPE m45 to_v '1)
+    ) Else (
+    If(time <= '6) Then (
+	    let m16 = decay_fn 1 6 from_v to_v in
+	    let m26 = decay_fn 2 6 from_v to_v in
+	    let m36 = decay_fn 3 6 from_v to_v in
+	    let m46 = decay_fn 4 6 from_v to_v in
+	    let m56 = decay_fn 5 6 from_v to_v in
+	    (SLOPE from_v m16 '1) >>
+	    (SLOPE m16 m26 '1) >>
+	    (SLOPE m26 m36 '1) >>
+	    (SLOPE m36 m46 '1) >>
+	    (SLOPE m46 m56 '1) >>
+	    (SLOPE m56 to_v '1)
+    ) Else (
+    If(time <= '7) Then (
+	    let m17 = decay_fn 1 7 from_v to_v in
+	    let m27 = decay_fn 2 7 from_v to_v in
+	    let m37 = decay_fn 3 7 from_v to_v in
+	    let m47 = decay_fn 4 7 from_v to_v in
+	    let m57 = decay_fn 5 7 from_v to_v in
+	    let m67 = decay_fn 6 7 from_v to_v in
+	    (SLOPE from_v m17 '1) >>
+	    (SLOPE m17 m27 '1) >>
+	    (SLOPE m27 m37 '1) >>
+	    (SLOPE m37 m47 '1) >>
+	    (SLOPE m47 m57 '1) >>
+	    (SLOPE m57 m67 '1) >>
+	    (SLOPE m67 to_v '1)
+    ) Else (
+	    let m18 = decay_fn 1 8 from_v to_v in
+	    let m28 = decay_fn 2 8 from_v to_v in
+	    let m38 = decay_fn 3 8 from_v to_v in
+	    let m48 = decay_fn 4 8 from_v to_v in
+	    let m58 = decay_fn 5 8 from_v to_v in
+	    let m68 = decay_fn 6 8 from_v to_v in
+	    let m78 = decay_fn 7 8 from_v to_v in
+	    let dur i =
+		(int2bv i)*time/int2bv 8 -
+		(int2bv (i-1))*time/int2bv 8
+	    in
+	    (SLOPE from_v m18 (dur 1)) >>
+	    (SLOPE m18 m28  (dur 2)) >>
+	    (SLOPE m28 m38  (dur 3)) >>
+	    (SLOPE m38 m48  (dur 4)) >>
+	    (SLOPE m48 m58  (dur 5)) >>
+	    (SLOPE m58 m68  (dur 6)) >>
+	    (SLOPE m68 m78  (dur 7)) >>
+	    (SLOPE m78 to_v (dur 8)) 
+    )))))))
+;
+
+
+
+let s2 =
+    (
+	If warmup Then (
+	    0-->30 duration 5 seconds
+	    >>
+	    30 for 20 seconds
+	    >>
+	    (exp_decay '30 '0 '5)
+	) Else (
+	    0 for 0 seconds
+	)
+    )
+    >>
+    (
+	0 for t1 seconds
+	>>
+	(exp_decay '0 '100 t1)
+	>>
+	100 for t2 seconds
+	>>
+	(exp_decay '100 '0 t2)
+    )^^cnt
+    >>
+    0 for 20 seconds
+;
+
+let s2_flat = (atom2sequence 400 s2);
+
+var_order ("warmup":(interleave [(md_expand_vector "t1[8:0]"),
+		       (md_expand_vector "t2[8:0]")] @ ["c[3:0]"]));
+
+update_vossrc "DYNAMIC-ORDERING" "NO";
+
+wtime (length s2_flat);
+
+bdd_size s2_flat;
+bdd_reorder 2;
+bdd_size s2_flat;
+2**(length (depends s2_flat));
+
+//visualize_sequences (get_sequence_examples 40 s2_flat);
+
+
+let tests = generate_examples s2_flat 10 100;
+wtime (tests fseq 1);
+
+//visualize_sequences tests;
+
+
+let covered = itlist (\ts. \r. r OR (test_sequence s2_flat 10 ts)) tests F;
+
+bdd_size covered;
+
+let vars = depends s2_flat;
+
+let query sub =
+    let vs = map fst sub in
+    truth_cover (vars subtract vs) (substitute sub covered)
+;
+
+query [];
+query [("warmup_n",F)];
+query [("warmup_n",T)];
+
