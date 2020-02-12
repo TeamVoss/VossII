@@ -485,7 +485,7 @@ and the identifier to the left of the equality sign. You could just as well
 write `let x = variable "foo";` or `variable "x" == variable "y";`
 </div>
 ```fl
-letrec mutex_list [x]    = F
+letrec mutex_list [x]    = x
       /\ mutex_list (x:xs) = IF x THEN AND_list (map NOT xs) ELSE mutex_list xs
       ;
 
