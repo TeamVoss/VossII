@@ -30,7 +30,7 @@ Installation
 
 Download our
 [pre-built binaries](https://github.com/TeamVoss/VossII/releases/latest)
-and unpack them to your directory of choice, then put <installation-directory>/bin in your search path and you will be able to run the fl interpreter by simply invokng fl. Note that you need the <voss dir>/bin in your search path for the Verilog reader to work!
+and unpack them to your directory of choice, then put <installation-directory>/bin in your search path and you will be able to run the fl interpreter by simply invoking fl. Note that you need the <voss dir>/bin in your search path for the Verilog reader to work!
 
 
 Voss II depends on Tk for its graphical bits. If the fl interpreter dies with
@@ -56,7 +56,7 @@ If you want to build your own libraries you will first need to install some
 build dependencies:
 
 ```shell
-sudo apt-get install gcc g++ doxygen flex bison gawk \
+sudo apt-get install gcc g++ doxygen flex bison gawk graphviz \
                      libz-dev tcl-dev tk-dev libc6-dev \
                      clang libreadline-dev python3 imagemagick pandoc
 ```

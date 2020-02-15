@@ -43,7 +43,7 @@ fl: $(OBJ) $(LIB)
 	$(CC) $(CFLAGS) $(INC) -c $<
 
 .cc.o:
-	$(CX) $(CFLAGS) $(CXXFLAGS) $(INC) -c $<
+	$(CX) $(filter-out -std=gnu99,$(CFLAGS)) $(CXXFLAGS) $(INC) -c $<
 
 y.tab.c: language.y fl.h language.h graph.h prefs_ext.h
 	@$(YACC) -d -v language.y
