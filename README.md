@@ -17,7 +17,7 @@ from you!
 Introduction to VossII
 ----------------------
 There is a 
-["Getting Started with VossII and fl"](https://github.com/TeamVoss/VossII/blob/master/doc/GettingStartedWithVossII.pdf)
+["Getting Started with VossII and fl"](https://teamvoss.github.io/tutorial)
 tutorial in the doc/fl_tutorial directory (you can do firefox doc/fl_tutorial/fl_tutorial.html or your choice of browser to see it)
 
 There is also a more extensive 
