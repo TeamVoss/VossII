@@ -2,7 +2,6 @@
 # Top level makefile
 #
 
-
 #
 # Current directory
 #
@@ -46,6 +45,8 @@ CKT_ISO_MATCH_DIR := $(SRC_DIR)/external/circuit-isomatch/src
 VISUALIZATION_DIR := $(SRC_DIR)/external/visualization
 # Plugin directory
 PLUGIN_DIR := $(LIB_DIR)
+# Linking flag passed to yosys makefile
+YOSYS_LINKFLAG := -static
 
 #
 # Flags
@@ -82,7 +83,7 @@ docker_package:
 	docker run --user $(REPO_OWNER) -v `pwd`/..:/vossroot vossii-static-builder
 
 package: clean yosys_clean
-	make install LINKFLAG=-static YOSYS_LDLIBS="-lreadline -ltinfo"
+	make install LINKFLAG=-static
 	rm -r ../voss ; true
 	install -m 755 -d ../voss/
 	install -m 755 -d ../voss/bin
@@ -225,12 +226,13 @@ visualization:
 	make -C "$(VISUALIZATION_DIR)"
 
 .yosys:
-	make -C "$(YOSYS_DIR)" LDFLAGS=$(LINKFLAG) -f Makefile_Voss config-gcc
-	make -C "$(YOSYS_DIR)" LDFLAGS=$(LINKFLAG) -f Makefile_Voss
+	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f Makefile_Voss config-gcc-static
+	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f Makefile_Voss
 	touch .yosys
 
 .yosys_pexlif: $(YOSYS_DIR)/backends/pexlif/pexlif.cc
-	make -C "$(YOSYS_DIR)" LDFLAGS=$(LINKFLAG) -f Makefile_Voss
+	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f Makefile_Voss config-gcc-static
+	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f Makefile_Voss
 	touch .yosys_pexlif
 
 clean:
