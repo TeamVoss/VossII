@@ -657,8 +657,8 @@ reg mux_out;
 always @*
 begin : MUX
   case(sel)
-    1’b0 : mux_out = din_0;
-    1’b1 : mux_out = din_1;
+    1'b0 : mux_out = din_0;
+    1'b1 : mux_out = din_1;
   endcase
 end
 endmodule
