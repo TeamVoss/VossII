@@ -47,6 +47,11 @@ VISUALIZATION_DIR := $(SRC_DIR)/external/visualization
 PLUGIN_DIR := $(LIB_DIR)
 # Linking flag passed to yosys makefile
 YOSYS_LINKFLAG := -static
+# Patch for the yosys makefile to add pexlif backend
+YOSYS_PEXLIF_PATCH := external/yosys_makefile_pexlif_backend.patch
+# Relative path to yosys makefile
+YOSYS_MAKEFILE := $(YOSYS_DIR)/Makefile
+YOSYS_PATCHED_MAKEFILE := $(YOSYS_DIR)/Makefile_VossII
 
 #
 # Flags
@@ -225,14 +230,18 @@ minisat:
 visualization:
 	make -C "$(VISUALIZATION_DIR)"
 
-.yosys:
-	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f Makefile_Voss config-gcc-static
-	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f Makefile_Voss
+$(YOSYS_PATCHED_MAKEFILE):
+	patch -p0 $(YOSYS_MAKEFILE) -o $(YOSYS_PATCHED_MAKEFILE) < $(YOSYS_PEXLIF_PATCH)
+	touch .yosys_makefile_patched
+
+.yosys: $(YOSYS_PATCHED_MAKEFILE)
+	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f $(YOSYS_PATCHED_MAKEFILE) config-gcc-static
+	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f $(YOSYS_PATCHED_MAKEFILE)
 	touch .yosys
 
-.yosys_pexlif: $(YOSYS_DIR)/backends/pexlif/pexlif.cc
-	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f Makefile_Voss config-gcc-static
-	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f Makefile_Voss
+.yosys_pexlif: $(YOSYS_DIR)/backends/pexlif/pexlif.cc $(YOSYS_PATCHED_MAKEFILE)
+	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f $(YOSYS_PATCHED_MAKEFILE) config-gcc-static
+	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f $(YOSYS_PATCHED_MAKEFILE)
 	touch .yosys_pexlif
 
 clean:
@@ -243,4 +252,4 @@ clean:
 	@-make -C external/visualization clean
 
 yosys_clean:
-	@-/bin/rm -f .yosys .yosys_pexlif
+	@-/bin/rm -f .yosys .yosys_pexlif $(YOSYS_PATCHED_MAKEFILE)
