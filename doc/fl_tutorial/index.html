@@ -93,7 +93,8 @@
 <pre><code>print &quot;Hello, World!\n&quot;;
 print &quot;This print brought to you by a .fl script!\n&quot;;</code></pre>
 <div class="tip">
-<p>When invoked from the interpreter, the <code>load</code> function looks for script files relative to the current working directory. When invoked from a script file, it will look for script files <em>relative to the directory of the calling script</em>.</p>
+<p>The <code>load</code> function looks for script files relative to the current working directory.</p>
+<p>To load a script relative to the currently executing script, you can use the <code>DIR</code> environment which contains the directory in which the currently executing script resides.</p>
 </div>
 <p>Then, load it in the interpreter:</p>
 <p><img src="tut_code/code_0016.jpg" /></p>
@@ -146,6 +147,9 @@ print &quot;This print brought to you by a .fl script!\n&quot;;</code></pre>
 <div class="tip">
 <p>Fl supports <em>fixity declarations</em> for functions. In this example, <code>infixr 5 implies</code> means that the function <code>implies</code> is used as an <em>infix</em> function (similar to operators like <code>+</code>, <code>AND</code>, etc.), and is right-associative with priority 5. Other possible fixities are <code>infixl</code> (for left-associative infix functions), and <code>postfix</code>.</p>
 </div>
+<div class="tip">
+<p>The <code>VARS</code> function takes a string of space-separated variable names and introduces a new variable for each name into the current scope.</p>
+</div>
 <p><img src="tut_code/code_0023.jpg" /></p>
 <p>We can also <em>quantify</em> over variables. Either by introducing new, quantified, variables with the forall (<code>!x. expr</code>) and exists (<code>?x. expr</code>) operators, or by quantifying over some free variable in a Boolean expression using the <code>Quant_forall</code> and <code>Quant_thereis</code> functions. As an example of quantification, consider this alternative formulation of DeMorgan’s law:</p>
 <p><img src="tut_code/code_0024.jpg" /></p>
@@ -174,8 +178,8 @@ print &quot;This print brought to you by a .fl script!\n&quot;;</code></pre>
 <a class="sourceLine" id="cb3-15" title="15"><span class="kw">always</span> @*</a>
 <a class="sourceLine" id="cb3-16" title="16"><span class="kw">begin :</span><span class="dt"> M</span>UX</a>
 <a class="sourceLine" id="cb3-17" title="17">  <span class="kw">case</span>(sel)</a>
-<a class="sourceLine" id="cb3-18" title="18">    1’b0 : mux_out = din_<span class="dv">0</span>;</a>
-<a class="sourceLine" id="cb3-19" title="19">    1’b1 : mux_out = din_<span class="dv">1</span>;</a>
+<a class="sourceLine" id="cb3-18" title="18">    <span class="bn">1&#39;b0</span> : mux_out = din_<span class="dv">0</span>;</a>
+<a class="sourceLine" id="cb3-19" title="19">    <span class="bn">1&#39;b1</span> : mux_out = din_<span class="dv">1</span>;</a>
 <a class="sourceLine" id="cb3-20" title="20">  <span class="kw">endcase</span></a>
 <a class="sourceLine" id="cb3-21" title="21"><span class="kw">end</span></a>
 <a class="sourceLine" id="cb3-22" title="22"><span class="kw">endmodule</span></a></code></pre></div>

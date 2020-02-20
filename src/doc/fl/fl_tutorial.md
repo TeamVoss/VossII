@@ -337,10 +337,12 @@ print "This print brought to you by a .fl script!\n";
 ````
 
 <div class="tip">
-When invoked from the interpreter, the `load` function looks for script files
+The `load` function looks for script files
 relative to the current working directory.
-When invoked from a script file, it will look for script files
-*relative to the directory of the calling script*.
+
+To load a script relative to the currently executing script,
+you can use the `DIR` environment which contains the directory in which
+the currently executing script resides.
 </div>
 
 Then, load it in the interpreter:
