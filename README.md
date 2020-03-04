@@ -17,7 +17,7 @@ from you!
 Introduction to VossII
 ----------------------
 There is a 
-["Getting Started with VossII and fl"](https://github.com/TeamVoss/VossII/blob/master/doc/GettingStartedWithVossII.pdf)
+["Getting Started with VossII and fl"](https://teamvoss.github.io/tutorial)
 tutorial in the doc/fl_tutorial directory (you can do firefox doc/fl_tutorial/fl_tutorial.html or your choice of browser to see it)
 
 There is also a more extensive 
@@ -30,7 +30,7 @@ Installation
 
 Download our
 [pre-built binaries](https://github.com/TeamVoss/VossII/releases/latest)
-and unpack them to your directory of choice, then put <installation-directory>/bin in your search path and you will be able to run the fl interpreter by simply invokng fl. Note that you need the <voss dir>/bin in your search path for the Verilog reader to work!
+and unpack them to your directory of choice, then put <installation-directory>/bin in your search path and you will be able to run the fl interpreter by simply invokng fl. Note that you need the <voss dir>/bin in your search path for the Verilog reader to work, and it must be earlier than any paths containing other versions of yosys!
 
 
 Voss II depends on Tk for its graphical bits. If the fl interpreter dies with

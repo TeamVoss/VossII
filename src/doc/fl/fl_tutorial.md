@@ -337,10 +337,12 @@ print "This print brought to you by a .fl script!\n";
 ````
 
 <div class="tip">
-When invoked from the interpreter, the `load` function looks for script files
+The `load` function looks for script files
 relative to the current working directory.
-When invoked from a script file, it will look for script files
-*relative to the directory of the calling script*.
+
+To load a script relative to the currently executing script,
+you can use the `DIR` environment which contains the directory in which
+the currently executing script resides.
 </div>
 
 Then, load it in the interpreter:
@@ -485,7 +487,7 @@ and the identifier to the left of the equality sign. You could just as well
 write `let x = variable "foo";` or `variable "x" == variable "y";`
 </div>
 ```fl
-letrec mutex_list [x]    = F
+letrec mutex_list [x]    = x
       /\ mutex_list (x:xs) = IF x THEN AND_list (map NOT xs) ELSE mutex_list xs
       ;
 
@@ -657,8 +659,8 @@ reg mux_out;
 always @*
 begin : MUX
   case(sel)
-    1’b0 : mux_out = din_0;
-    1’b1 : mux_out = din_1;
+    1'b0 : mux_out = din_0;
+    1'b1 : mux_out = din_1;
   endcase
 end
 endmodule
