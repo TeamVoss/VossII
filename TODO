@@ -1,56 +1,38 @@
 ENHANCEMENTS needed:
 ====================
 
-1)  Make the Show BDD colors and Show values (as well as the time) "sticky" 
-    for New fanin.
+1)  Add "user grouping" to the visualizer
 
-2)  Display the values of multi-dimensional variables as a list of values
+2)  Support multi-output drawing objects. Partially done.
 
-3)  Add waveform viewer
+3)  Provide back-annotation to Verilog and a Verilog viewer (with values?)
 
-4)  Add "user grouping" to the visualizer
-
-5)  Support multi-output drawing objects
-
-6)  Provide back-annotation to Verilog and a Verilog viewer (with values?)
-
-7)  Provide user-defined pretty printers for signal values
-
-8)  
-
-
+4)  Provide user-defined pretty printers for signal values. Partially done.
 
 
 
 TODO to move Voss to "more or less" forte equivalent.
 ======================================================
 
-
 1) Add dynamic weakening to the STE engine
 
-2) Add bSTE
+2) Add SMT solver (?)
 
-3) Add tables to fl
+3) Add fork primitive
 
-4) Add SMT solver (?)
+4) Add GUI based debugger.
 
-5) Add fork primitive
+5) Add named fields in type constructors + default values.
 
-6) Add GUI based debugger.
+6) Add nlet functionality + defaults
 
-7) Add named fields in type constructors + default values.
+7) Add timeout command.
 
-8) Add nlet functionality + defaults
-
-9) Add fanin_dfs, _bfs and fanout_... functionality. 
-
-10) Add timeout command.
-
-11) Fix clet/cletrec for arguments that are reference variables.
+8) Fix clet/cletrec for arguments that are reference variables.
     Need to copy the current value into new refvar and keep that new
     node as the cached argument.
 
-12) Add clean_clet <fn>.
+9) Add clean_clet <fn>.
 
 
 DONE: 
@@ -84,11 +66,14 @@ DONE:
 24) Create Verilog compiler
 25) Add top-level val()
 26) Replace def_list with a proper symbol table
-
-0) Fix the tcl_eval and callbacks to handle very large strings (send directly
+27) Fix the tcl_eval and callbacks to handle very large strings (send directly
 instead of going through an internal string representation).
+28) Fix open_overload to allow polymorphic functions to be overloaded.  That would allow functions to be extended to pairs and lists etc!
+29) Add definition of polymorphic type constructors (e.g., *a tree)
+30)  Make the Show BDD colors and Show values (as well as the time) "sticky" for New fanin.
+31)  Display the values of multi-dimensional variables as a list of values
+32)  Add waveform viewer
+33) Add bSTE
+34) Add tables to fl
+35) Add fanin_dfs, _bfs and fanout_... functionality. 
 
-12) Fix open_overload to allow polymorphic functions to be overloaded.
-    That would allow functions to be extended to pairs and lists etc!
-
-13) Add definition of polymorphic type constructors (e.g., *a tree)

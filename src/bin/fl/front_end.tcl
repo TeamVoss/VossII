@@ -371,6 +371,7 @@ proc create_voss2_top_level_menu {{tm ".voss2.menu"}} {
     $fm add command -label "Large" -command "change_fonts $::voss2_txtfont3"
     $fm add command -label "Larger" -command "change_fonts $::voss2_txtfont4"
     $fm add command -label "Largest" -command "change_fonts $::voss2_txtfont5"
+    $fm add command -label "Huge" -command "change_fonts $::voss2_txtfont6"
 
     # Add a menu for cleaning the VossII text window
     set cm $tm.file.m.cm

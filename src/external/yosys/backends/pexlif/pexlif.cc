@@ -245,7 +245,7 @@ struct PexlifDumper
 	void dump()
 	{
 		f << stringf("\n");
-		f << stringf("let %s {attrs::(string#string) list} conns =\n", cstr(module->name));
+		f << stringf("let Q%s {attrs::(string#string) list} conns =\n", cstr(module->name));
 
 		std::map<int, RTLIL::Wire*> inputs, outputs, internals;
 
@@ -760,7 +760,7 @@ struct PexlifDumper
 				     cstr(cell->getPort(portnames.second)));
 			continue;
 		    }
-		    f << stringf("%s [(\"instance\", \"%s\"), (\"src\", \"%s\")] [\n                ",
+		    f << stringf("Q%s [(\"instance\", \"%s\"), (\"src\", \"%s\")] [\n                ",
 				 cstr(cell->type), (((cell->name).c_str())+1), src.c_str());
 
 		    bool first = true;
@@ -1013,7 +1013,7 @@ struct PexlifBackend : public Backend {
 				if (str[i] == '\\' || str[i] == '#' || str[i] == '=' || str[i] == '<' || str[i] == '>')
 					str[i] = '_';
 			cstr_buf.push_back(str);
-			*f << stringf("forward_declare {%s::((string#string) list) -> ((string#(string list)) list) -> pexlif};\n",
+			*f << stringf("forward_declare {Q%s::((string#string) list) -> ((string#(string list)) list) -> pexlif};\n",
 				      cstr_buf.back().c_str());
 		}
 

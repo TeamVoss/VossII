@@ -36,6 +36,7 @@ extern FILE		*odests_fp;
 /***** PRIVATE VARIABLES *****/
 static int	    nbr_errors_reported;
 static jmp_buf	    node_map_jmp_env;
+static jmp_buf	    event_jmp_env;
 static hash_record  *new_tbl;
 static int	    sch2tcl_cnt = 0;
 static FILE	    *current_fp;
@@ -816,7 +817,11 @@ gSTE(g_ptr redex, value_type type)
 static void
 newSTE(g_ptr redex)
 {
-    gSTE(redex, use_bdds);
+    if( setjmp(event_jmp_env) == 0 ) { 
+	gSTE(redex, use_bdds);
+    } else {
+	MAKE_REDEX_FAILURE(redex, FailBuf);
+    }
 }
 
 static void
@@ -3009,7 +3014,10 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	int from, to;
 	extract_four_tuple(t, &when, &node, &from, &to);
 	int nd_idx = name2idx(node);
-	if(nd_idx < 0) Rprintf("Cannot find node %s in weakening list\n", node);
+	if(nd_idx < 0) {
+	    Fail_pr("Cannot find node %s in weakening list\n", node);
+	    longjmp(event_jmp_env, 1);
+	}
 	event_rec er;
 	er.type = start_weak;
 	er.nd_idx = nd_idx;
@@ -3031,7 +3039,10 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	int from, to;
 	extract_five_tuple(t, &when, &node, &val, &from, &to);
 	int nd_idx = name2idx(node);
-	if(nd_idx < 0) Rprintf("Cannot find node %s in antecedent\n", node);
+	if(nd_idx < 0) {
+	    Fail_pr("Cannot find node %s in antecedent\n", node);
+	    longjmp(event_jmp_env, 1);
+	}
 	event_rec er;
 	er.type = start_ant;
 	er.nd_idx = nd_idx;
@@ -3069,7 +3080,10 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	int from, to;
 	extract_five_tuple(t, &when, &node, &val, &from, &to);
 	int nd_idx = name2idx(node);
-	if(nd_idx < 0) Rprintf("Cannot find node %s in consequent\n", node);
+	if(nd_idx < 0) {
+	    Fail_pr("Cannot find node %s in consequent\n", node);
+	    longjmp(event_jmp_env, 1);
+	}
 	event_rec er;
 	er.type = start_cons;
 	er.nd_idx = nd_idx;
@@ -3106,7 +3120,10 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	int from, to;
 	extract_tripple(t, &node, &from, &to);
 	int nd_idx = name2idx(node);
-	if(nd_idx < 0) Rprintf("Cannot find node %s in trace list\n", node);
+	if(nd_idx < 0) {
+	    Fail_pr("Cannot find node %s in trace list\n", node);
+	    longjmp(event_jmp_env, 1);
+	}
 	event_rec er;
 	er.type = start_trace;
 	er.nd_idx = nd_idx;
@@ -8582,7 +8599,7 @@ clean_pexlif_ios(g_ptr node)
     }
     g_ptr *gpp;
     FOR_BUF(&ch_buf, g_ptr, gpp) {
-	new_children = Make_CONS_ND(*gpp, new_children);
+	APPEND1(new_children_tl, *gpp)
     }
     free_buf(&ch_buf);
     g_ptr new_content = mk_P_HIER(new_children);

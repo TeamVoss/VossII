@@ -16,6 +16,7 @@ set ::voss2_txtfont2    "-*-courier-bold-r-normal-*-14-*-*-*-*-*-*-*"
 set ::voss2_txtfont3    "-*-courier-bold-r-normal-*-16-*-*-*-*-*-*-*"
 set ::voss2_txtfont4    "-*-courier-bold-r-normal-*-18-*-*-*-*-*-*-*"
 set ::voss2_txtfont5    "-*-courier-bold-r-normal-*-20-*-*-*-*-*-*-*"
+set ::voss2_txtfont6    "-*-courier-bold-r-normal-*-24-*-*-*-*-*-*-*"
 set ::voss2_txtfont     $::voss2_txtfont2
 set ::voss2_help_font   $::voss2_txtfont1
 
