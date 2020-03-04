@@ -74,6 +74,14 @@ static arbi_T 		arbi__bvop(arbi_T x, arbi_T y,  Word (*operation)(Word a, Word b
 /********************************************************/
 /*                    PUBLIC FUNCTIONS                  */
 /********************************************************/
+void
+Init_arbi()
+{
+    for(int i = 0; i < MaxBlock; i++) {
+	blocks[i] = NULL;
+    }
+}
+
 int
 Arbi_cmp(arbi_T x, arbi_T y)
 {

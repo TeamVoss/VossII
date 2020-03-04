@@ -40,6 +40,7 @@ Init()
     Init_Paths(getRCvalue("VOSS-BINARY-DIRECTORY"),
 	       getRCvalue("VOSS-LIBRARY-DIRECTORY"));
 
+    Init_arbi();
     B_Init();
     Init_file_ops();
     TC_Init();

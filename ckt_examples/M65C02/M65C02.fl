@@ -18,6 +18,9 @@ let vis = STE_debug ckt;
 // Start the GUI
 vis;
 
+
+let ok = T;
+
 // Load ROM.
 let ROM_ant file rom MAX_TIME =
     let fp = fopen file "r" then
@@ -263,12 +266,12 @@ let carry  = (bv_AND (bv_add (bv_ZX a) (bv_ZX b)) (int2bv 256)) != (int2bv 0);
 let zero   = res = (replicate 8 F);                 // Expected zero flag.
 let static =
     // Microprogram setup.
-    "MC[2:0]"      isv "0b100"     from 0 to 1 and  // Microcycle controller.
-    "uPL[31:28]"   isv "0b0101"    from 0 to 1 and  // Instruction field.
-    "i3/dRst"     isv "0"         from 0 to 1 and  // Delayed reset.
-    "i1/PSW[5:0]" isv "0b000100"  from 0 to 2 and  // Program status word.
-    "OP1[7:0]"     isv "0x0"       from 0 to 1 and  // Operand one.
-    "OP2[7:0]"     isv "0x0"       from 0 to 1 and  // Operand two.
+    "MC[2:0]"      is "0b100"     in_cycle 0 and  // Microcycle controller.
+    "uPL[31:28]"   is "0b0101"    in_cycle 0 and  // Instruction field.
+    "i3/dRst"      is "0x0"       in_cycle 0 and  // Delayed reset.
+    "i1/PSW[5:0]"  is "0b000100"  in_cycle 1 and  // Program status word.
+    "OP1[7:0]"     is "0x0"       in_cycle 0 and  // Operand one.
+    "OP2[7:0]"     is "0x0"       in_cycle 0 and  // Operand two.
     // Constant.
     "Clk"  is_clock (N/2)      and                  // Clock.
     "Rst"  isv "0" from 0 to N and                  // Reset.
@@ -287,84 +290,93 @@ let b_bv = fixed_bv2list 8 T b;
 // -----------------------------------------------------------------------------
 // 0x196 _ADC_imm, opcode 0x69.
 let ant =
-    "A[7:0]"  isv a_bv    from 0 to 2  and
-    "BA[8:0]" isv "0x196" from 0 to 1  and
-    "DI[7:0]" isv "0x69"  from 0 to 2  and
-    "DI[7:0]" isv b_bv    from 8 to 10 and
+    "A[7:0]"  is a_bv    in_cycle 1 and
+    "BA[8:0]" is "0x196" in_cycle 0 and
+    "DI[7:0]" is "0x69"  in_cycle 0 and
+    "DI[7:0]" is b_bv    in_cycle 4 and
     static
 ;
+
 let cons =
-    "A[7:0]"     isv res     from 17 to 18 and
+    "A[7:0]"     is res     in_cycle 9 and
     // Here we can also check the PSW.
-    "i1/PSW[0]" isv [carry] from 17 to 18 and
-    "i1/PSW[1]" isv [zero]  from 17 to 18
+    "i1/PSW[0]" is [carry]  in_cycle 9 and
+    "i1/PSW[1]" is [zero]   in_cycle 9
 ;
+let ste  = STE "-e" vis [] ant cons [];
+let ok = ok AND get_ste_result ste "strong";
 
 // -----------------------------------------------------------------------------
 // 0x156 _ADC_dp, opcode 0x65, NA <= OP1.
 let ant =
-    "A[7:0]"  isv a_bv     from 0  to 2  and
-    "BA[8:0]" isv "0x156"  from 0  to 1  and
-    "DI[7:0]" isv "0x65"   from 0  to 2  and
-    "DI[7:0]" isv "m[7:0]" from 8  to 10 and // OP1 address.
-    "DI[7:0]" isv b_bv     from 16 to 18 and
+    "A[7:0]"  is a_bv     in_cycle 1 and
+    "BA[8:0]" is "0x156"  in_cycle 0 and
+    "DI[7:0]" is "0x65"   in_cycle 0 and
+    "DI[7:0]" is "m[7:0]" in_cycle 4 and // OP1 address.
+    "DI[7:0]" is b_bv     in_cycle 8 and 
     static
 ;
 let mem  = bv_variable "m[7:0]";
 let addr = (replicate 8 F) @ (bv2list mem);
 let cons =
-    "AO[15:0]" isv addr from 9  to 10 and
-    "A[7:0]"   isv res  from 25 to 26
+    "AO[15:0]" is addr in_cycle 5 and
+    "A[7:0]"   is res  in_cycle 13
 ;
+let ste  = STE "-e" vis [] ant cons [];
+let ok = ok AND get_ste_result ste "strong";
 
 // -----------------------------------------------------------------------------
 // 0x0157 _ADC_dpX, opcode 0x75, NA <= OP1 + X.
 let ant =
-    "A[7:0]"  isv a_bv     from 0  to 2  and
-    "X[7:0]"  isv "x[7:0]" from 0  to 2  and
-    "BA[8:0]" isv "0x157"  from 0  to 1  and
-    "DI[7:0]" isv "0x75"   from 0  to 2  and
-    "DI[7:0]" isv "m[7:0]" from 8  to 10 and // OP1 address.
-    "DI[7:0]" isv b_bv     from 16 to 18 and
+    "A[7:0]"  is a_bv     in_cycle 1 and
+    "X[7:0]"  is "x[7:0]" in_cycle 1 and
+    "BA[8:0]" is "0x157"  in_cycle 0 and
+    "DI[7:0]" is "0x75"   in_cycle 0 and
+    "DI[7:0]" is "m[7:0]" in_cycle 4 and // OP1 address.
+    "DI[7:0]" is b_bv     in_cycle 8 and
     static
 ;
 let mem  = bv_variable "m[7:0]";
 let x    = bv_variable "x[7:0]";
 let addr = (replicate 8 F) @ (tl (bv2list (bv_add mem x)));
 let cons =
-    "AO[15:0]" isv addr from 9  to 10 and
-    "A[7:0]"   isv res  from 25 to 26
+    "AO[15:0]" is addr in_cycle 5 and
+    "A[7:0]"   is res  in_cycle 13
 ;
+let ste  = STE "-e" vis [] ant cons [];
+let ok = ok AND get_ste_result ste "strong";
 
 // -----------------------------------------------------------------------------
 // 0x01D6 _ADC_abs, opcode 6D, NA <= {OP2, OP1}.
 let ant =
-    "A[7:0]"  isv a_bv      from 0  to 2  and
-    "BA[8:0]" isv "0x1D6"   from 0  to 1  and
-    "DI[7:0]" isv "0x6D"    from 0  to 2  and
-    "DI[7:0]" isv "m1[7:0]" from 8  to 10 and // OP1 address.
-    "DI[7:0]" isv "m2[7:0]" from 16 to 18 and // OP2 address.
-    "DI[7:0]" isv b_bv      from 24 to 26 and
+    "A[7:0]"  is a_bv      in_cycle 1  and
+    "BA[8:0]" is "0x1D6"   in_cycle 0  and
+    "DI[7:0]" is "0x6D"    in_cycle 0  and
+    "DI[7:0]" is "m1[7:0]" in_cycle 4  and // OP1 address.
+    "DI[7:0]" is "m2[7:0]" in_cycle 8  and // OP2 address.
+    "DI[7:0]" is b_bv      in_cycle 12 and
     static
 ;
 let mem1 = bv_variable "m1[7:0]";
 let mem2 = bv_variable "m2[7:0]";
 let addr = (bv2list mem2) @ (bv2list mem1);
 let cons =
-    "AO[15:0]" isv addr from 17 to 18 and
-    "A[7:0]"   isv res  from 33 to 34
+    "AO[15:0]" is addr in_cycle 9 and
+    "A[7:0]"   is res  in_cycle 17
 ;
+let ste  = STE "-e" vis [] ant cons [];
+let ok = ok AND get_ste_result ste "strong";
 
 // -----------------------------------------------------------------------------
 // 0x01D7 _ADC_absX, opcode 7D, NA <= {OP2, OP1} + X.
 let ant =
-    "A[7:0]"  isv a_bv      from 0  to 2  and
-    "X[7:0]"  isv "x[7:0]"  from 0  to 2  and
-    "BA[8:0]" isv "0x1D7"   from 0  to 1  and
-    "DI[7:0]" isv "0x7D"    from 0  to 2  and
-    "DI[7:0]" isv "m1[7:0]" from 8  to 10 and // OP1 address.
-    "DI[7:0]" isv "m2[7:0]" from 16 to 18 and // OP2 address.
-    "DI[7:0]" isv b_bv      from 24 to 26 and
+    "A[7:0]"  is a_bv      in_cycle 1  and
+    "X[7:0]"  is "x[7:0]"  in_cycle 1  and
+    "BA[8:0]" is "0x1D7"   in_cycle 0  and
+    "DI[7:0]" is "0x7D"    in_cycle 0  and
+    "DI[7:0]" is "m1[7:0]" in_cycle 4 and // OP1 address.
+    "DI[7:0]" is "m2[7:0]" in_cycle 8 and // OP2 address.
+    "DI[7:0]" is b_bv      in_cycle 12 and
     static
 ;
 let x    = bv_variable "x[7:0]";
@@ -374,20 +386,22 @@ let tmpM = list2bv ((bv2list mem2) @ (bv2list mem1));
 let tmpX = list2bv ((replicate 8 F) @ (bv2list x));
 let addr = tl (bv2list (bv_add tmpM tmpX));
 let cons =
-    "AO[15:0]" isv addr from 17 to 18 and
-    "A[7:0]"   isv res  from 33 to 34
+    "AO[15:0]" is addr in_cycle 9 and
+    "A[7:0]"   is res  in_cycle 17
 ;
+let ste  = STE "-e" vis [] ant cons [];
+let ok = ok AND get_ste_result ste "strong";
 
 // -----------------------------------------------------------------------------
 // 0x0197 _ADC_absY, opcode 79, NA <= {OP2, OP1} + Y.
 let ant =
-    "A[7:0]"  isv a_bv      from 0  to 2  and
-    "Y[7:0]"  isv "y[7:0]"  from 0  to 2  and
-    "BA[8:0]" isv "0x197"   from 0  to 1  and
-    "DI[7:0]" isv "0x79"    from 0  to 2  and
-    "DI[7:0]" isv "m1[7:0]" from 8  to 10 and // OP1 address.
-    "DI[7:0]" isv "m2[7:0]" from 16 to 18 and // OP2 address.
-    "DI[7:0]" isv b_bv      from 24 to 26 and 
+    "A[7:0]"  is a_bv      in_cycle 1  and
+    "Y[7:0]"  is "y[7:0]"  in_cycle 1  and
+    "BA[8:0]" is "0x197"   in_cycle 0  and
+    "DI[7:0]" is "0x79"    in_cycle 0  and
+    "DI[7:0]" is "m1[7:0]" in_cycle 4 and // OP1 address.
+    "DI[7:0]" is "m2[7:0]" in_cycle 8 and // OP2 address.
+    "DI[7:0]" is b_bv      in_cycle 12 and 
     static
 ;
 let y    = bv_variable "y[7:0]";
@@ -397,21 +411,24 @@ let tmpM = list2bv ((bv2list mem2) @ (bv2list mem1));
 let tmpY = list2bv ((replicate 8 F) @ (bv2list y));
 let addr = tl (bv2list (bv_add tmpM tmpY));
 let cons =
-    "AO[15:0]" isv addr from 17 to 18 and
-    "A[7:0]"   isv res  from 33 to 34
+    "AO[15:0]" is addr in_cycle 9 and
+    "A[7:0]"   is res  in_cycle 17
 ;
+let ste  = STE "-e" vis [] ant cons [];
+let ok = ok AND get_ste_result ste "strong";
+
 
 // -----------------------------------------------------------------------------
 // 0x0116 _ADC_dpXi, opcode 61, NA <= OP1 + X, NA <= OP1 + 1, NA <= {OP2, OP1}.
 let ant =
-    "A[7:0]"  isv a_bv      from 0  to 2  and
-    "X[7:0]"  isv "x[7:0]"  from 0  to 2  and
-    "BA[8:0]" isv "0x116"   from 0  to 1  and
-    "DI[7:0]" isv "0x61"    from 0  to 2  and
-    "DI[7:0]" isv "i[7:0]"  from 8  to 10 and // OP1 indirect address.
-    "DI[7:0]" isv "lo[7:0]" from 16 to 18 and // OP1 low address bits.
-    "DI[7:0]" isv "hi[7:0]" from 24 to 26 and // OP2 high address bits.
-    "DI[7:0]" isv b_bv      from 32 to 34 and
+    "A[7:0]"  is a_bv      in_cycle 1  and
+    "X[7:0]"  is "x[7:0]"  in_cycle 1  and
+    "BA[8:0]" is "0x116"   in_cycle 0  and
+    "DI[7:0]" is "0x61"    in_cycle 0  and
+    "DI[7:0]" is "i[7:0]"  in_cycle 4 and // OP1 indirect address.
+    "DI[7:0]" is "lo[7:0]" in_cycle 8 and // OP1 low address bits.
+    "DI[7:0]" is "hi[7:0]" in_cycle 12 and // OP2 high address bits.
+    "DI[7:0]" is b_bv      in_cycle 16 and
     static
 ;
 let ind    = bv_variable "i[7:0]";
@@ -421,23 +438,26 @@ let addrLO = (replicate 8 F) @ (tl (bv2list (bv_add ind x)));
 let addrHI = (replicate 8 F) @ (tl (bv2list (bv_add (bv_add ind x) (int2bv 1))));
 let addr   = (bv2list hi) @ (bv2list lo);
 let cons   =
-    "AO[15:0]" isv addrLO from 9  to 10 and
-    "AO[15:0]" isv addrHI from 17 to 18 and // Bug found! (+1) was imp. wrongly.
-    "AO[15:0]" isv addr   from 25 to 26 and
-    "A[7:0]"   isv res    from 41 to 42
+    "AO[15:0]" is addrLO in_cycle 5 and
+    "AO[15:0]" is addrHI in_cycle 9 and // Bug found! (+1) was imp. wrongly.
+    "AO[15:0]" is addr   in_cycle 13 and
+    "A[7:0]"   is res    in_cycle 21
 ;
+let ste  = STE "-e" vis [] ant cons [];
+let ok = ok AND get_ste_result ste "strong";
+
 
 // -----------------------------------------------------------------------------
 // 0x0117 _ADC_dpiY, opcode 71, NA <= OP1, NA <= OP1 + 1, NA <= {OP2, OP1} + Y.
 let ant =
-    "A[7:0]"  isv a_bv      from 0  to 2  and
-    "Y[7:0]"  isv "y[7:0]"  from 0  to 2  and
-    "BA[8:0]" isv "0x117"   from 0  to 1  and
-    "DI[7:0]" isv "0x71"    from 0  to 2  and
-    "DI[7:0]" isv "i[7:0]"  from 8  to 10 and // OP1 indirect address.
-    "DI[7:0]" isv "lo[7:0]" from 16 to 18 and // OP1 low address bits.
-    "DI[7:0]" isv "hi[7:0]" from 24 to 26 and // OP2 high address bits.
-    "DI[7:0]" isv b_bv      from 32 to 34 and
+    "A[7:0]"  is a_bv      in_cycle 1  and
+    "Y[7:0]"  is "y[7:0]"  in_cycle 1  and
+    "BA[8:0]" is "0x117"   in_cycle 0  and
+    "DI[7:0]" is "0x71"    in_cycle 0  and
+    "DI[7:0]" is "i[7:0]"  in_cycle 4 and // OP1 indirect address.
+    "DI[7:0]" is "lo[7:0]" in_cycle 8 and // OP1 low address bits.
+    "DI[7:0]" is "hi[7:0]" in_cycle 12 and // OP2 high address bits.
+    "DI[7:0]" is b_bv      in_cycle 16 and
     static
 ;
 let ind    = bv_variable "i[7:0]";
@@ -449,13 +469,13 @@ let tmpA   = list2bv ((bv2list hi) @ (bv2list lo));
 let tmpY   = list2bv ((replicate 8 F) @ (bv2list y));
 let addr   = tl (bv2list (bv_add tmpA tmpY));
 let cons   =
-    "AO[15:0]" isv addrLO from 9  to 10 and
-    "AO[15:0]" isv addrHI from 17 to 18 and
-    "AO[15:0]" isv addr   from 25 to 26 and
-    "A[7:0]"   isv res    from 41 to 42
+    "AO[15:0]" is addrLO in_cycle 5 and
+    "AO[15:0]" is addrHI in_cycle 9 and
+    "AO[15:0]" is addr   in_cycle 13 and
+    "A[7:0]"   is res    in_cycle 21
 ;
-
-// -----------------------------------------------------------------------------
-// Run STE simulation.
 let ste  = STE "-e" vis [] ant cons [];
-ste;
+let ok = ok AND get_ste_result ste "strong";
+
+ok;
+

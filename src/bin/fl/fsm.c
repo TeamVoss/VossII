@@ -1836,7 +1836,7 @@ gen_get_ste_result(g_ptr redex, value_type type)
 	res = c_OR(c_NOT(ste->assertion_OK),
                    c_OR(c_NOT(ste->validTrajectory),
                         c_AND(ste->checkTrajectory, ste->check_OK)));
-    } else if( strcmp(flag, "all") == 0 || strcmp(flag, "") == 0 ) {
+    } else if( strcmp(flag, "strong") == 0 || strcmp(flag, "") == 0 ) {
 	// All (normal)
 	res = c_AND(ste->assertion_OK,
                    c_AND(ste->validTrajectory,

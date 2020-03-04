@@ -15,6 +15,8 @@
 typedef long int	*arbi_T;
 
 /* ----- Function prototypes for public functions ----- */
+void		Init_arbi();
+
 /* Conversion routines */
 arbi_T		Arbi_FromString(char *s, int base);
 char		*Arbi_ToString(arbi_T n, int base);

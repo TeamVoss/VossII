@@ -514,6 +514,31 @@ fl_main(int argc, char *argv[])
 		    fprintf(to_tcl_fp, "prepare_for_stdin\n");
 		    fflush(to_tcl_fp);
 		    while( fgets(buf, TCL_CMD_BUF_SZ-1, fp) ) {
+			size_t used = strlen(stdin_buf);
+			size_t req  = strlen(buf);
+			// Remove comments if too many...
+			while( used+req+1 >= 2*TCL_CMD_BUF_SZ) {
+			    // Try to remove comments
+			    if( stdin_buf[0] == '/' && stdin_buf[1] == '/' ) {
+				string nl = index(stdin_buf, '\n');
+				if( nl == NULL ) {
+				    // Just remove it all
+				    stdin_buf[0] = 0;
+				    used = 0;
+				} else {
+				    string p = stdin_buf;
+				    while( *nl ) {
+					*p = *(nl+1);
+					p++; nl++;
+				    }
+				    used = strlen(stdin_buf);
+				}
+			    } else {
+				// Just remove it all
+				stdin_buf[0] = 0;
+				used = 0;
+			    }
+			}
 			string res = strcat(stdin_buf, buf);
 			if( !process_commands(res, TRUE) ) {
 			    stdin_buf[0] = 0;

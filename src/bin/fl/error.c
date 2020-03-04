@@ -26,7 +26,7 @@ extern FILE             *to_tcl_fp;
 extern int		RCmax_stack_trace_entries;
 
 /***** PRIVATE VARIABLES *****/
-#define FBUF_MAX_SZ 4095
+#define FBUF_MAX_SZ 16384
 static char fbuf[FBUF_MAX_SZ+1];
 static char safe_buf[2*FBUF_MAX_SZ];
 
