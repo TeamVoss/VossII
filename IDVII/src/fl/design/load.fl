@@ -6,6 +6,7 @@
 (load (DIR^"/STE.fl")) fseq
 (load (DIR^"/util.fl")) fseq
 (load (DIR^"/hfl.fl")) fseq
+(load (DIR^"/monitor.fl")) fseq
 (load (DIR^"/yosys_lib.fl")) fseq
 (load (DIR^"/read_verilog.fl")) fseq
 ();

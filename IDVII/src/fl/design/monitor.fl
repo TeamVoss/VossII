@@ -1,0 +1,105 @@
+begin_abstype;
+
+clet pin2name pin =
+    let path = str_split pin "/" in
+    list2str T "" "_" "" id path
+;
+
+let add_probe pexlif pin =
+    let path = str_split pin "/" in
+    length path = 1 =>
+        val (PINST _ _ _ inps outs ints _) = pexlif in
+        let all_vecs = (map fst (inps@outs))@ints in
+        let all_nds = setify (md_expand_vectors all_vecs) in
+        let pins = md_expand_vector pin in
+        pins subtract all_nds != [] =>
+            eprintf "Missong connection nodes (%S)"
+                (md_extract_vectors (pins subtract all_nds))
+        |
+        pexlif
+    |
+    let name = pin2name pin in
+    let instances = map (sscanf "i%d") (butlast path) in
+    let final = last path in
+    letrec process (PINST nm as lf inps outs ints (P_HIER pxs)) top (idx:idxs) =
+        let pxs_fst = firstn (idx-1) pxs in
+        let px = el idx pxs in
+        let pxs_rem = butfirstn idx pxs in
+        let px' = process px F idxs in
+        let pxs' = pxs_fst @ [px'] @ pxs_rem in
+        top =>
+            PINST nm as lf inps outs (ints@[name]) (P_HIER pxs')
+        |
+            PINST nm as lf inps (outs@[(name,[name])]) ints (P_HIER pxs')
+     /\   process (PINST nm as lf inps outs ints (P_HIER pxs)) top [] =
+        let buf =
+            let sz = md_size pin in
+            let lhs = W_EXPLICIT_VAR sz name in
+            let rhs = W_EXPLICIT_VAR sz final in
+            let fns = [(W_UPDATE_FN lhs rhs)] in
+            PINST "draw_buffer" [] T [(final,[final])]
+                                     [(name,[name])] [] (P_LEAF fns)
+        in
+        top =>
+            PINST nm as lf inps outs (ints@[name]) (P_HIER (pxs@[buf]))
+        |
+            PINST nm as lf inps (outs@[(name,[name])]) ints (P_HIER (pxs@[buf]))
+    in
+    process pexlif T instances
+;
+
+    
+let expand_connection (f_vec, pin) =
+    md_size f_vec != md_size pin =>
+        eprintf "Size mismatch in connection |%s| != |%s|" f_vec pin
+    |
+    let f_nds = md_expand_vector f_vec in
+    let pins  = map pin2name (md_expand_vector pin) in
+    zip f_nds pins
+;
+
+let safely_merge_outputs inps outs ints m_outs =
+    let nds = md_expand_vectors ((map fst (outs@inps))@ints) in
+    let mnds = md_expand_vectors (map fst m_outs) in
+    let in_both = nds intersect mnds in
+    in_both = [] => outs@m_outs |
+    eprintf "Monitor output signal overlaps main circuit signals (%S)"
+        (md_extract_vectors in_both)
+;
+
+// A function to add a monitor circuit to an existing pexlif.
+// A monitor circuit can read any signal in the pexlif,
+// do whatever computation it wants to,
+// and output as many results as it likes.
+// The connections are given as a list of (monitor_signal,main_signal) pairs.
+// A main_signal can be a hierarchical name (e.g., i1/i12/C[3:0]) and
+// the resulting new pexlif will have extra signals created in the hierarchy
+// to send these (internal) signals to the monitor circuit.
+let add_monitor main monitor connections =
+    val (PINST m_nm m_as m_lf m_inps m_outs m_ints m_body) = monitor in
+    let sub = flatmap expand_connection connections in
+    let m_inp_nds = setify (md_expand_vectors (map fst m_inps)) in
+    let conn_nds = map fst sub in
+    conn_nds subtract m_inp_nds != [] =>
+        eprintf "Vector(s) in connection list not monitor inputs (%S)"
+                (md_extract_vectors (conn_nds subtract m_inp_nds))
+    |
+    m_inp_nds subtract conn_nds != [] =>
+        eprintf "Monitor inputs not connected (%S)"
+                (md_extract_vectors (m_inp_nds subtract conn_nds))
+    |
+    let p' = itlist (\(fn,pin).\p. add_probe p pin) connections main in
+    val (PINST nm as lf inps outs ints (P_HIER pxs)) = p' in
+    let connect_inp (fn,_) =
+        let fns = md_expand_vector fn in
+        let as = map (\f. assoc f sub) fns in
+        fn, md_merge_vectors as
+    in
+    let m_inps' = map connect_inp m_inps in
+    let m_outs' = map (\(f,as). f, [f]) m_outs in
+    let monitor' = PINST m_nm m_as m_lf m_inps' m_outs' m_ints m_body in
+    let outs' = safely_merge_outputs inps outs ints m_outs' in
+    (PINST nm as lf inps outs' ints (P_HIER (pxs@[monitor'])))
+;
+
+end_abstype add_monitor;
