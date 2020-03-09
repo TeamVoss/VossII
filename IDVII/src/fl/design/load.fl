@@ -9,4 +9,5 @@
 (load (DIR^"/monitor.fl")) fseq
 (load (DIR^"/yosys_lib.fl")) fseq
 (load (DIR^"/read_verilog.fl")) fseq
+(is_defined "USE_OBSOLETE" => load (DIR^"/obsolete.fl") | T) fseq
 ();
