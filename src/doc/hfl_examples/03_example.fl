@@ -86,11 +86,12 @@ let A =
 
 let N = 200;
 
-
-let ant = "clk" is_clock N and
-	  "t0[15:0]" isv A and
-	  "start" isv "0x1" from 0 to 2 and
-	  "start" isv "0x0" from 2 to (2*N)
+let ant =
+	  "clk" is_clock N
+	and
+	  "t0[15:0]" is A for 1 cycle
+	and
+	  "start" is 1 for 1 cycle otherwise 0 until N cycles
 ;
 
 let ste = STE "-e" vis1 [] ant [] [];

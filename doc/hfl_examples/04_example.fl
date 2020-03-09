@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 //==========================================================================
 //
 // Data-independent completion signal design example
@@ -16,20 +21,19 @@ let safe_collatz =
     bit_output done.
     word_output out.
     word_internal length.
-    word_internal t newt new_length cnt new_cnt.
+    word_internal t new_length cnt new_cnt.
     bit_internal eq1 int_done not_int_done.
     bit_internal is_even is_odd new_done.
-    CELL "draw_hfl_code data_independent 3" [
-	re_ff clk newt t,
+    CELL "draw_hier data_independent" [
 	eq1 <- (t '=' '1), 
 	is_even <- ((t '%' '2) '=' '0), 
 	is_odd <- '~' is_even,
-	CASE newt [
+	STATE clk t [
 	    start --- t0,
 	    eq1 --- t,
 	    is_odd --- ('3 '*' t '+' '1),
 	    is_even --- (t '/' '2)
-	] t,
+	],
 	CASE new_length [
 	    start --- '0,
 	    eq1   --- length
@@ -78,9 +82,6 @@ let vis1 = STE_debug ckt;
 
 
 
-let mk_clk cycles =
-    map (\i. T, "clk", (i % 2 = 1), i, i+1) (0 upto (2*cycles-1))
-;
 
 update_vossrc "DYNAMIC-ORDERING" "NO";
 
@@ -93,15 +94,15 @@ let A =
 
 let N = 200;
 
-
-let ant = mk_clk N and
-	  "t0[15:0]" isv A and
-	  "start" isv "0x1" from 0 to 2 and
-	  "start" isv "0x0" from 2 to (2*N)
+let ant =
+	  "clk" is_clock N
+	and
+	  "t0[15:0]" is A for 1 cycle
+	and
+	  "start" is 1 for 1 cycle otherwise 0 until N cycles
 ;
 
 let ste = STE "-e" vis1 [] ant [] [];
 
-let run0 = vis0;
-let run1 = vis1 fseq ste;
+ste;
 

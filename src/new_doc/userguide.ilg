@@ -1,7 +1,0 @@
-This is makeindex, portable version 2.4 [20-Mar-88].
-Scanning style file my_index_style...........done (11 attributes redefined, 0 ignored).
-Scanning input file userguide.idx2....done (404 entries accepted, 0 rejected).
-Sorting entries......done (3873 comparisons).
-Generating output file glossary.tex....done (413 lines written, 0 warnings).
-Output written in glossary.tex.
-Transcript written in userguide.ilg.

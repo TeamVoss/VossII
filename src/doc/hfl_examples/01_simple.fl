@@ -37,11 +37,11 @@ let vis = STE_debug ckt;
 vis;
 
 let ant =
-    "clk" is_clock 2 and
-    "a[7:0]" isv "0x23" from 0 to 2 and
-    "b[7:0]" isv "0x14" from 0 to 2 and
-    "a[7:0]" isv "A[7:0]" from 2 to 4 and
-    "b[7:0]" isv "0x1" from 2 to 4
+    "clk" is_clock 3 
+  and
+    "a[7:0]" is "0x23" for 1 cycle followed_by "A[7:0]" for 1 cycle
+  and
+    "b[7:0]" is "0x14" for 1 cycle followed_by "0x1" for 1 cycle
 ;
 
 STE "-e" vis [] ant [] [];

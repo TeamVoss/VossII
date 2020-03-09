@@ -274,10 +274,10 @@ let static =
     "OP2[7:0]"     is "0x0"       in_cycle 0 and  // Operand two.
     // Constant.
     "Clk"  is_clock (N/2)      and                  // Clock.
-    "Rst"  isv "0" from 0 to N and                  // Reset.
-    "Wait" isv "0" from 0 to N and                  // Memory Wait.
-    "Int"  isv "0" from 0 to N and                  // Interrupt.
-    "xIRQ" isv "0" from 0 to N and                  // Interrupt Mask.
+    "Rst"  is "0" for N cycles and                  // Reset.
+    "Wait" is "0" for N cycles and                  // Memory Wait.
+    "Int"  is "0" for N cycles and                  // Interrupt.
+    "xIRQ" is "0" for N cycles and                  // Interrupt Mask.
     // ROM.
     ROM_ant "M65C02_uPgm_V3a.coe"    "uP_ROM" N and // Program ROM.
     ROM_ant "M65C02_Decoder_ROM.coe" "ID_ROM" N     // Instruction ROM.

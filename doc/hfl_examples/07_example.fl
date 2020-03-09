@@ -1,3 +1,8 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
 //==========================================================================
 //
 // CPU + diffCACHE + RAM exammple
@@ -97,7 +102,7 @@ let timer_ckt =
     bit_input	keep_timer_running.
     timer_output timer.
     timer_internal new_timer.
-    CELL "timer_ckt" [
+    CELL "draw_hier timer_ckt" [
 	CASE new_timer [
 	    reset_timer		--- '0,
 	    keep_timer_running	--- (timer '+' '1)
@@ -133,7 +138,7 @@ let CPU_model =
     byte_internal	    raw_byte_to_write zero.
     byte_internal	    byte_to_write zero.
     cpu_reg_decoded_internal select_reg.
-    CELL "draw_hfl_code CPU 4" [
+    CELL "draw_hier CPU" [
 	reset_timer <- reset '|' is_Timer_Reset timer_mode,
 	keep_timer_running <- is_Timer_Running timer_mode,
 	execution <- is_P_Idle state,
@@ -223,17 +228,17 @@ lettype op =
 let op2rom name op =
     let sz = hw_size {'0::cpu_rom_data} in
     let v = {hw_constr (W_VAR sz name)::cpu_rom_data} in
-    let select (OP_NOP) = v-->instr isv' NOP
-     /\ select (OP_HALT) = v-->instr isv' STOP
+    let select (OP_NOP) = v-->instr is NOP in_phase 0
+     /\ select (OP_HALT) = v-->instr is STOP in_phase 0
      /\ select (OP_READ a d) =
-		(v-->instr isv' READ_MEM) and
-		(v-->addr isv' a) and
-		(v-->dest isv' d)
-    /\  select (OP_CLR d) = (v-->instr isv' CLEAR_REG) and
-			    (v-->dest isv' d)
-    /\  select (OP_SWITCH) = v-->instr isv' CONTEXT_SWITCH
-    /\  select (OP_START_TIMER) = v-->instr isv' START_TIMER
-    /\  select (OP_STOP_TIMER) = v-->instr isv' STOP_TIMER
+		(v-->instr is READ_MEM in_phase 0) and
+		(v-->addr is a in_phase 0) and
+		(v-->dest is d in_phase 0)
+    /\  select (OP_CLR d) = (v-->instr is CLEAR_REG in_phase 0) and
+			    (v-->dest is d in_phase 0)
+    /\  select (OP_SWITCH) = v-->instr is CONTEXT_SWITCH in_phase 0
+    /\  select (OP_START_TIMER) = v-->instr is START_TIMER in_phase 0
+    /\  select (OP_STOP_TIMER) = v-->instr is STOP_TIMER in_phase 0
     in
     select op
 ;
@@ -279,7 +284,7 @@ let mk_CPU_ROM ckt ops =
 
 let RAM_DELAY = 5;
 
-let DISTINCT_LOCATIONS = 4;
+let DISTINCT_LOCATIONS = 3;
 
 ENUM "ram_state" ["R_IDLE", "R_WAITING", "R_READY"];
 
@@ -296,7 +301,7 @@ letrec EMM_rec =
     addr_input		addr.
     cache_line_output	out.
     cache_line_internal rem.
-    CELL "EMM" (
+    CELL "draw_hier EMM" (
 	data_l = [] => [out <- 'X] |
 	let my_data = hd data_l in
 	let my_addr = hd addr_l in
@@ -306,30 +311,15 @@ letrec EMM_rec =
 	(EMM_rec (tl data_l) (tl addr_l) addr rem):[]
 );
 
-let get_vs v = get_lhs_vars (hw_destr v);
-
-let insert_internals internals (PINST name attrs leaf inps outs ints body) =
-    let ints' = md_extract_vectors (internals @ ints) in
-    (PINST name attrs leaf inps outs ints' body)
-;
-
 let EMM name =
     addr_input          addr.
     cache_line_output   out.
-    let pfn = sprintf "draw_hfl_code {EMM %s (%d)} 1" name DISTINCT_LOCATIONS in
-    let asz = hw_size {'a::addr}-1 then
-    let dsz = hw_size {'a::cache_line}-1 then
-    let mkd i = {mk_var (sprintf "%s_dta[%d][%d:0]" name i dsz) ::cache_line} in
-    let mka i = {mk_var (sprintf "%s_adr[%d][%d:0]" name i asz) ::addr} in
-    let data_l = map mkd (0 upto (DISTINCT_LOCATIONS-1)) then
-    let addr_l = map mka (0 upto (DISTINCT_LOCATIONS-1)) then
-    let internals =
-	md_extract_vectors ((flatmap get_vs data_l)@(flatmap get_vs addr_l))
-    then
-    insert_internals internals (
+    list_internal DISTINCT_LOCATIONS EMM_dta EMM_adr.
+    let pfn = sprintf "draw_hier {EMM %s (%d)}" name DISTINCT_LOCATIONS in
     CELL pfn [
-	EMM_rec data_l addr_l addr out
-]);
+        EMM_rec EMM_dta EMM_adr addr out
+];
+
 
 let RAM_model =
     bit_input		clk.
@@ -342,7 +332,7 @@ let RAM_model =
     ram_state_internal	state.
     bit_internal	timeout.
     byte_internal	n_cnt cnt.
-    CELL "draw_hfl_code RAM 4" [
+    CELL "draw_hier RAM" [
 	EMM "MEM_EMM" addr data,
 	(Moore_FSM "RAM_STATE" clk state
 	(reset, R_IDLE) [
@@ -365,24 +355,24 @@ let ckt_RAM = pexlif2fsm p_RAM;
 let vis_RAM = STE_debug ckt_RAM;
 
 
-let mk_EMM_ant ckt name (MEM addr_data_list) =
+let mk_EMM_ant ckt (MEM addr_data_list) =
     length addr_data_list > DISTINCT_LOCATIONS =>
 	eprintf "Too many address/data pairs in mk_EMM_ant!" 
     |
-    let l1 = filter (str_is_substr name) (vectors ckt) then
-    length l1 != 2 => eprintf "More than one %s set of nodes" name |
-    let pref = hd (str_split (hd l1) name) in
+    let l1 = filter (str_is_substr "EMM_") (vectors ckt) then
+    length l1 != 2 => eprintf "More than one %s set of nodes" "EMM_" |
+    let pref = hd (str_split (hd l1) "EMM_") in
     let asz = hw_size {'0::addr} in
     let dsz = hw_size {'0::cache_line} in
     let mk_a_vec i = 
-	{mk_var (sprintf "%s%s_adr[%d][%d:0]" pref name i (asz-1))::addr}
+	{mk_var (sprintf "%sEMM_adr[%d][%d:0]" pref i (asz-1))::addr}
     in
     let mk_d_vec i =
-	{mk_var (sprintf "%s%s_dta[%d][%d:0]" pref name i (dsz-1))::cache_line}
+	{mk_var (sprintf "%sEMM_dta[%d][%d:0]" pref i (dsz-1))::cache_line}
     in
     letrec mk i ((a,d):rem) =
-	((mk_a_vec i) isv' a from 0 to 1) and
-	((mk_d_vec i) isv' d from 0 to 1) and
+	((mk_a_vec i) is a in_cycle 0) and
+	((mk_d_vec i) is d in_cycle 0) and
 	(mk (i+1) rem)
      /\    mk i [] = []
     in
@@ -446,7 +436,7 @@ let cache_mem =
     bit_output			hit.
     cache_line_output		dout.
     //
-    CELL "draw_hfl_code CacheMem 8" [
+    CELL "draw_hier CacheMem" [
 	cache_rec (LINES-1) clk reset restore trust we line din atag hit dout
 ];
 
@@ -479,7 +469,7 @@ let diffCACHE =
     cache_fsm_internal	state.
     bit_internal	hit store_addr do_latch we.
     addr_internal	match_addr.
-    CELL "Draw_hfl_code diffCACHE 8" [
+    CELL "draw_hier diffCACHE" [
     (Moore_FSM "CACHE_FSM" clk state 
 	(reset, C_IDLE) [
 	    C_IDLE --- P2C_req --- C_REQ,
@@ -524,7 +514,7 @@ let system_witch_cache =
     byte_internal	cR0 cR1 cR2 cR3.
     bit_internal	reset_timer keep_timer_running restore.
     trust_level_internal cur_trust.
-    CELL "system" [
+    CELL "draw_hier system" [
     CPU_model clk reset C2P_valid C2P_data P2C_req P2C_addr
 		        cR0 cR1 cR2 cR3 reset_timer keep_timer_running exec
 			cur_trust restore,
@@ -548,10 +538,9 @@ time ckt;
 let vis = STE_debug ckt;
 vis;
 
-
-let basic_ant cycles =
-	(map (\i.T,"clk",(i%2=1),i,i+1) (0 upto 2*cycles)) and
-	[(T,"reset",T,0,2),(T,"reset",F,2,2*cycles)]
+let basic_ant cycs =
+	"clk" is_clock cycs and
+	"reset" is "1" for 1 cycle followed_by "0" for (cycs-1) cycles
 ;
 
 let high_addr {base::addr} =
@@ -585,11 +574,11 @@ let memory = MEM [
                      (r_A3 --- 'r_d1)
 ];
 
-let EMM_ant = mk_EMM_ant ckt "MEM_EMM" memory;
+let EMM_ant = mk_EMM_ant ckt memory;
 
 let run pgm =
     let ROM_ant = mk_CPU_ROM ckt pgm then
-    let ant = (basic_ant 250) and ROM_ant and EMM_ant in
+    let ant = (basic_ant 125) and ROM_ant and EMM_ant in
     (STE "-e" vis [] ant [] []) fseq pgm
 ;
 
@@ -648,7 +637,7 @@ let run3 = run	[
 let color_by_top_level_type ckt p =
     val (PINST _ _ _ _ _ _ (P_HIER l)) = p in
     let cols = ref ["blue", "green", "red", "yellow", "pink", "brown"] in
-    let vnds = visualization_nodes ckt in
+    let vnds = visualization_nodes ckt 0 in
     let result = ref [] in
     let do (PINST name _ _ fa_inps fa_outs _ _) =
 	(deref cols) = [] => [] |
@@ -662,7 +651,9 @@ let color_by_top_level_type ckt p =
 	letrec traverse nd =
 	    mem nd (deref mine) => () |
 	    (mine := (nd:(deref mine))) fseq
-	    let fi = setify (flatmap snd (get_visualization_fanins ckt nd)) then
+	    let fi =
+		setify (flatmap snd (get_visualization_fanins ckt nd 0))
+	    then
 	    foreach traverse fi
 	in
 	(foreach traverse act_outs) fseq
@@ -680,21 +671,10 @@ let color_by_top_level_type ckt p =
 
 let show_type = color_by_top_level_type ckt p;
 
-
 let vs vec t =
     let ste = canvas2ste (get_current_canvas()) then
     let gt nd = get_trace_val ste nd t in
     md_extract_vectors (depends (map gt (md_expand_vector vec)))
 ;
 
-
-let Q {a::void} =
-    draw_fanin 14 ["i1/timer_mode[1:0]"];
-non_lazy Q;
-
-let user n = NOT (str_is_substr "TMP" n) AND
-	     NOT (str_is_substr "TmP" n) AND
-	     NOT (str_is_substr "tmp" n)
-;
-
-//filter user (fanin_dfs ckt user ["i3/store_addr"]);
+print "Now evaluate run0, run1, or run2\n";
