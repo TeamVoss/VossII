@@ -266,6 +266,11 @@ let dest_XOR (W_OR (W_AND (W_NOT a) b) (W_AND c (W_NOT d))) = [a,b]
  /\ dest_XOR (W_OR (W_AND a (W_NOT b)) (W_AND (W_NOT c) d)) = [a,b]
 ;
 
+let is_LEQ (W_NOT (W_GR a b)) = T
+ /\ is_LEQ _ = F;
+
+let dest_LEQ (W_NOT (W_GR a b)) = [a,b];
+
 let opt_base_compact_wprint inps rhs =
     let special (W_ADD var (W_CONST sz v)) assuming (is_var var AND v < 10) =
 	sprintf "draw_unary_arithm {+%d}" v
@@ -286,6 +291,7 @@ let opt_base_compact_wprint inps rhs =
      /\ special (W_NAMED_SLICE name indices var) assuming (is_var var) =
 	sprintf "draw_field %s" name
      /\  special op assuming (is_XOR op) = "draw_xor2"
+     /\  special op assuming (is_LEQ op) = "draw_binary_arithm {<=}"
      /\  special op assuming (is_binary_base op) = get_binary_draw_cmd op
      /\ special other =
 	let body = base_compact_wprint inps rhs then
@@ -555,6 +561,21 @@ let base_assignment make_draw_command lhs rhs =
 		    PINST pfn [] T inps outs [] body
 		in
 		p:ps
+     /\    split lhs op assuming (is_LEQ op) =
+	    val [a,b] = dest_LEQ op in
+	    val (a',p1) = is_var a => (a,[]) |
+		let mid = mk_tmp (wexpr_size a) then
+		let p1 = split mid a then
+		(mid, p1)
+	    in
+	    val (b',p2) = is_var b => (b,[]) |
+		let mid = mk_tmp (wexpr_size b) then
+		let p1 = split mid b then
+		(mid, p1)
+	    in
+	    let op' = W_NOT (W_GR a' b') in
+	    let p = mk_pinst lhs op' then
+	    p1@p2@[p]
      /\    split lhs op assuming (is_XOR op) =
 	    val [a,b] = dest_XOR op in
 	    val (a',p1) = is_var a => (a,[]) |

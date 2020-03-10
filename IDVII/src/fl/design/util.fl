@@ -469,3 +469,39 @@ let extract_pexlif_hierarchy pexlif hierarchy =
     get indices pexlif
 ;
 
+
+let w_substitute sub we =
+    letrec do (W_VAR sz b) =
+	let n = mk_name sz b in
+	(assoc n sub) catch (W_VAR sz b)
+     /\     do (W_EXPLICIT_VAR sz n) =
+	(assoc n sub) catch (W_EXPLICIT_VAR sz n)
+     /\     do (W_AND a b) = W_AND (do a) (do b)
+     /\     do (W_OR a b)  = W_OR (do a) (do b)
+     /\     do (W_NOT a)   = W_NOT (do a)
+     /\     do (W_PRED name cond) = W_PRED name (do cond)
+     /\     do (W_EQ a b)  = W_EQ (do a) (do b)
+     /\     do (W_GR a b)  = W_GR (do a) (do b)
+     /\     do (W_ADD a b)  = W_ADD (do a) (do b)
+     /\     do (W_SUB a b)  = W_SUB (do a) (do b)
+     /\     do (W_MUL a b)  = W_MUL (do a) (do b)
+     /\     do (W_DIV a b)  = W_DIV (do a) (do b)
+     /\     do (W_MOD a b)  = W_MOD (do a) (do b)
+     /\     do (W_SHL a b)  = W_SHL (do a) (do b)
+     /\     do (W_SHR a b)  = W_SHR (do a) (do b)
+     /\     do (W_ASHR a b) = W_ASHR (do a) (do b)
+     /\     do (W_SX sz a) = W_SX sz (do a)
+     /\     do (W_ZX sz a) = W_ZX sz (do a)
+     /\     do (W_ITE c t e) = W_ITE (do c) (do t) (do e)
+     /\     do (W_SLICE indices w) = (W_SLICE indices (do w))
+     /\     do (W_NAMED_SLICE name indices w) =
+	    (W_NAMED_SLICE name indices (do w))
+     /\     do (W_CAT wl) = W_CAT (map do wl)
+     /\     do (W_MEM_READ info mem addr) =
+		W_MEM_READ info (do mem) (do addr)
+     /\     do (W_MEM_WRITE info mem addr d) =
+		W_MEM_WRITE info (do mem) (do addr) (do d)
+     /\     do other = other
+    in
+    do we
+;
