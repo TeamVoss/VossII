@@ -733,6 +733,7 @@ typedef struct result_rec {
 
 typedef struct comment_list_rec {
         string              comment;
+	int		    line;
         comment_list_ptr    next;
 } comment_list_rec;
 

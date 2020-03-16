@@ -23,8 +23,9 @@ extern bool     gui_mode;
 /************************************************************************/
 /*			Local Variables					*/
 /************************************************************************/
-static int tcl_initialized = 0;
-static buffer tcl_callback_buf;
+static int	    tcl_initialized = 0;
+static buffer	    tcl_callback_buf;
+static tstr_ptr	    tmp_str_buf;
 
 /************************************************************************/
 /*			Local Functions					*/
@@ -43,6 +44,7 @@ Init_tcl()
 {
     tcl_initialized = TCL_MAGIC_NUMBER;
     new_buf(&tcl_callback_buf, 100, sizeof(tcl_callback_rec));
+    tmp_str_buf = new_temp_str_mgr();
 }
 
 bool
@@ -408,30 +410,30 @@ g_ptr_to_tcl_string_rec(g_ptr np, typeExp_ptr type)
             {
                 // Protect the string (if needed)
                 string s = GET_STRING(np);
-		charappend('{');
-		tappend(s);
-		charappend('}');
+		gen_charappend(tmp_str_buf, '{');
+		gen_strappend(tmp_str_buf, s);
+		gen_charappend(tmp_str_buf, '}');
                 return TRUE;
             }
         case void_tp:
 	    {
-                tappend("{}");
+                gen_strappend(tmp_str_buf, "{}");
                 return TRUE;
 	    }
         case int_tp:
             {
-		tappend( Arbi_ToString(GET_AINT(np),10) );
+		gen_strappend(tmp_str_buf,  Arbi_ToString(GET_AINT(np),10) );
                 return TRUE;
             }
         case bool_tp:
             {
                 formula f = GET_BOOL(np);
                 if( f == B_Zero() ) {
-                    charappend('0');
+                    gen_charappend(tmp_str_buf, '0');
                     return TRUE;
                 } else
                 if( f == B_One() ) {
-                    charappend('1');
+                    gen_charappend(tmp_str_buf, '1');
                     return TRUE;
                 }
                 Fail_pr("Cannot return a symbolic expression to tcl");
@@ -441,29 +443,29 @@ g_ptr_to_tcl_string_rec(g_ptr np, typeExp_ptr type)
             {
                 g_ptr li, el;
                 bool first = TRUE;
-                charappend('{');
+                gen_charappend(tmp_str_buf, '{');
                 typeExp_ptr etype = Get_Real_Type(type->typelist->type);
                 FOR_CONS(np, li, el) {
-                    if( !first ) charappend(' ');
+                    if( !first ) gen_charappend(tmp_str_buf, ' ');
                     first = FALSE;
                     if( !g_ptr_to_tcl_string_rec(el, etype) ) { return FALSE; }
                 }
-                charappend('}');
+                gen_charappend(tmp_str_buf, '}');
                 return TRUE;
             }
         case tuple_tp:
             {
                 typeExp_ptr ftype = Get_Real_Type(type->typelist->type);
-                charappend('{');
+                gen_charappend(tmp_str_buf, '{');
                 if( !g_ptr_to_tcl_string_rec(GET_CONS_HD(np), ftype) ) {
                     return FALSE;
                 }
                 typeExp_ptr stype = Get_Real_Type(type->typelist->next->type);
-                charappend(' ');
+                gen_charappend(tmp_str_buf, ' ');
                 if( !g_ptr_to_tcl_string_rec(GET_CONS_TL(np), stype) ) {
                     return FALSE;
                 }
-                charappend('}');
+                gen_charappend(tmp_str_buf, '}');
                 return TRUE;
             }
         default:
@@ -476,7 +478,7 @@ g_ptr_to_tcl_string_rec(g_ptr np, typeExp_ptr type)
 static bool
 g_ptr_to_tcl_string(g_ptr np, typeExp_ptr type, string *resp)
 {
-    string tmp = strtemp("");
+    string tmp = gen_strtemp(tmp_str_buf, "");
     if( !g_ptr_to_tcl_string_rec(np, type) ) {
         *resp = FailBuf;
         return FALSE;

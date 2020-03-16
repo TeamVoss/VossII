@@ -828,6 +828,9 @@ New_fn_def(string name, result_ptr res, symbol_tbl_ptr stbl, bool print,
         // If there are comments, reverse the list (to get it in right order)
         comment_list_ptr clp = cur_doc_comments;
         comment_list_ptr prev = NULL;
+	// Ignore comments inside the function
+	while( clp->next != NULL && clp->line > start_line )
+	    clp = clp->next;
         while( clp->next != NULL ) {
             comment_list_ptr tmp = clp->next;
             clp->next = prev;

@@ -547,6 +547,7 @@ void
 AddComment(string s)
 {
     comment_list_ptr clp = (comment_list_ptr) new_rec(&comment_list_rec_mgr);	    clp->comment = wastrsave(&strings, s);
+    clp->line = line_nbr;
     clp->next = cur_doc_comments;
     cur_doc_comments = clp;
 }
