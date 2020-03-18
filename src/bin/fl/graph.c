@@ -1815,12 +1815,11 @@ gen_map2_rec(gmap_info_ptr ip, g_ptr l, g_ptr r)
 			    SET_FAIL_STRING(res,
 				Fail_pr("Different ref vars in gen_map2"));
 			    return res;
-
 			}
-			l = Get_RefVar(lref_var);
-			g_ptr value = gen_map2_rec(ip, l, l);
+			g_ptr ll = Get_RefVar(lref_var);
+			g_ptr value = gen_map2_rec(ip, ll, ll);
 			if( IS_FAILURE(value) ) return value;
-			if( value == l ) {
+			if( value == ll ) {
 			    INC_REFCNT(l);
 			    return l;
 			}
