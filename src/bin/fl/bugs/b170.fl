@@ -1,0 +1,447 @@
+lettype color = RGB {r::bv} {g::bv} {b::bv};
+
+let col2str (valid,(RGB rv gv bv)) =
+    depends (rv,gv,bv) != [] => "pink" |
+    valid == F => "grey" |
+    sprintf "#%02x%02x%02x" (bv2int rv) (bv2int gv) (bv2int bv)
+;
+
+let rgb2color r g b = RGB (int2bv r) (int2bv g) (int2bv b);
+
+// A few selected colors
+let blue = rgb2color 0 0 255;
+let red = rgb2color 255 0 0;
+let yellow = rgb2color 255 255 0;
+let black = rgb2color 0 0 0;
+let white = rgb2color 255 255 255;
+
+lettype coord = COORD {x::bv} {y::bv};
+
+lettype canvas = CANVAS
+                    {name::string}
+                    ((((bool#color) ref) list) list)
+;
+
+let get_canvas_name (CANVAS name rows) = name;
+
+let get_rows_and_cols canvas =
+    val (CANVAS name rows) = canvas then
+    (length rows), (length (hd rows))
+;
+
+let Pcanvas (CANVAS name rows) =
+    let col2fp fp e = fprintf fp "%s" (col2str (deref e)) in
+    let row2str fp l = list2fp fp T "{" "\n\t" "}" col2fp l in
+    list2fp stdout T "{" "\n" "}" row2str rows
+;
+
+let image2tcl fp (CANVAS name rows) =
+    let col2fp fp e = fprintf fp "%s" (col2str (deref e)) in
+    let row2str fp l = list2fp fp T "{" "\n\t" "}" col2fp l in
+    list2fp fp T "{" "\n" "}" row2str rows
+;
+
+
+let mk_canvas name rows cols =
+    let default = F, (RGB '0 '0 '0) in
+    let mk_pixel i = ref (i seq default) then
+    let mk_line i = map mk_pixel (1--(i seq cols)) then
+    let rows = map mk_line (1--rows) in
+    CANVAS name rows
+;
+non_lazy mk_canvas;
+
+
+let get_pixel arr row col =
+    val (CANVAS name rows) = arr in
+    letrec read_c c (rp:rps) =
+	col = (int2bv c) => (deref rp) | (read_c (c+1) rps)
+     /\    read_c c [] = error "Out of bound column address"
+    in
+    letrec read_r r (l:ls) =
+	row = (int2bv r) => (read_c 0 l) | (read_r (r+1) ls)
+     /\    read_r r [] = error "Out of bound row address"
+    in
+    read_r 0 rows
+;
+
+let set_pixel arr col row value =
+    letrec write_c c (rp:rps) =
+	col = (int2bv c) => (rp := value) | (write_c (c+1) rps)
+     /\    write_c r [] = ()
+    in
+    letrec write_r r (l:ls) =
+	row = (int2bv r) => (write_c 0 l) | (write_r (r+1) ls)
+     /\    write_r r [] = ()
+    in
+    val (CANVAS name rows) = arr in
+    write_r 0 rows
+;
+
+// ---- Visualization code ------
+let Init_Tcl = tcl_eval [sprintf "source %s/b170.tcl" DIR];
+//Init_Tcl;
+
+// Draw several canvases
+let DRexamples images =
+    let cnt = length images in
+    val (rows, cols) = get_rows_and_cols (hd images) in
+    let max_per_row = min cnt (max 1 (400/(2*cols+3))) in
+    let rows_needed = (cnt+max_per_row-1)/max_per_row in
+    Init_Tcl fseq
+    let wc = tcl_eval [ sprintf "create_example_canvas %d %d %d %d"
+                                rows cols rows_needed max_per_row]
+    then
+    let fp = mktemp "visualize" then
+    letrec draw_ex cs cnt =
+        cs = [] => () |
+        val (c:cs) = cs then
+//        (fprintf fp "draw_example %s {%s} %d " wc (get_canvas_name c) cnt) seq
+        (fprintf fp "draw_example %s {} %d " wc cnt) seq
+        (image2tcl fp c) fseq
+        (fprintf fp "\n\n") fseq
+        (draw_ex cs (cnt+1))
+    in
+    (draw_ex images 0) fseq
+    let fname = stream2filename fp then
+    (fprintf fp "update\n%s config -scrollregion [%s bbox all]" wc wc) fseq
+    (fclose fp) fseq
+    (tcl_eval [sprintf "source %s" fname]) fseq
+    ()
+;
+
+let bv2fixlist size bv =
+    let l = bv2list bv in
+    let len = length l in
+    len >= size => lastn size l |
+    (replicate (size-len) (hd l))@l
+;
+
+let get_example image =
+    let ns = depends image then
+    let l = length ns then
+    let i = random 0 (2**l-1) then
+    let vs = bv2fixlist l (int2bv i) then
+    let sub = zip ns vs then
+    val (CANVAS name rows) = substitute sub image then
+    let vecs = md_extract_vectors ns then
+    let pr vec =
+        let nds = md_expand_vector vec then
+        let i = bl2int (F:(map (\n. assoc n sub) nds)) then
+        length nds > 7 => sprintf "%s=%x" vec i
+                        | sprintf "%s=%0*b" vec (length nds) i
+    in
+    let name' = list2str T "" "\n" "" pr vecs then
+    CANVAS name' rows
+;
+
+let duplicate_cell rc =
+    val (valid,color) = deref rc then
+    ref (valid,color)
+;
+non_lazy duplicate_cell;
+
+let duplicate_line line = map (\rc. duplicate_cell rc) line;
+non_lazy duplicate_line;
+
+let duplicate_canvas cnt canvas =
+    val (CANVAS name rows) = canvas then
+    let mk i =
+        let rows' = map (\line. duplicate_line line) rows then
+        CANVAS name rows'
+    in
+    map mk (1--cnt)
+;
+
+let VIS cnt image =
+    DRexamples (map get_example (duplicate_canvas cnt image))
+;
+
+// Create a bv that encodes every integer between min and max symbolically
+// using variables whose names are based on 'base'.
+// Usage: mk_srange base min max;
+let mk_srange base min max =
+    let bits = 2+(bits_needed max) then
+    let name = sprintf "%s[%d:0]" base bits then
+    let in_range v = v >= (nat2bv min) AND v <= (nat2bv max) in
+    bv_constrained_variable name in_range
+;
+
+
+// ======================================================================
+//  Draw a line
+// ======================================================================
+// Bresenham's line algorithm
+// void plotLine(int x0, int y0, int x1, int y1)
+// {
+//     int dx = abs(x1-x0)
+//     int sx = x0<x1 ? 1 : -1;
+//     int dy = -abs(y1-y0);
+//     int sy = y0<y1 ? 1 : -1;
+//     int err = dx+dy;
+//     int e2; /* error value e_xy */
+//
+//     for(;;) {
+//      setPixel(x0,y0);
+//      if ( x0==x1 AND y0==y1 ) break;
+//      e2 = 2*err;
+//      if (e2 >= dy) {
+//          err = err + dy;
+//          x0 = x0 + sx;
+//      }
+//      if (e2 <= dx) {
+//          err = err + dx;
+//          y0 = y0 + sy;
+//      }
+//     }
+// }
+//
+let draw_line (x0,y0) (x1,y1) color canvas =
+    //
+    let dx = abs (x1 - x0) then
+    let sx = (x0 < x1) => '1 | '-1 then
+    let dy = '-1 * abs(y1 - y0) then
+    let sy = (y0 < y1) => '1 | '-1 then
+    let err = dx + dy then
+    letrec step err x0 y0 =
+(fprintf stderr ".") fseq
+        (set_pixel canvas x0 y0 (T,color)) fseq
+	((x0 = x1) AND (y0 = y1)) => () |
+        (
+            let e2 = '2 * err then
+            val (err, x0) =
+                ( (e2 >= dy) ) => ((err + dy),(x0 + sx) )
+                                  | (err,x0)
+            in
+            val (err, y0) =
+                ( (e2 <= dx) ) => ((err + dx),(y0 + sy) )
+                                  | (err,y0)
+            in
+            step err x0 y0
+        )
+    in
+    (step err x0 y0) fseq
+    canvas
+;
+
+// ======================================================================
+//  Draw a circle
+// ======================================================================
+//
+// void plotCircle(int xm, int ym, int r)
+// {
+//    int x = -r, y = 0, err = 2-2*r; /* II. Quadrant */
+//    do {
+//       setPixel(xm-x, ym+y); /*   I. Quadrant */
+//       setPixel(xm-y, ym-x); /*  II. Quadrant */
+//       setPixel(xm+x, ym-y); /* III. Quadrant */
+//       setPixel(xm+y, ym+x); /*  IV. Quadrant */
+//       r = err;
+//       if (r <= y) {
+//      y++;
+//      err = err + y*2 + 1;           /* e_xy+e_y < 0 */
+//       }
+//       if (r > x OR err > y) {
+//      x++;
+//      err = err + x*2 + 1; /* e_xy+e_x > 0 or no 2nd y-step */
+//       }
+//    } while (x < 0);
+// }
+//
+let draw_circle (xc,yc) rad color canvas =
+    let x = '-1 * rad then
+    let y = '0 then
+    let err = '2 - '2 * rad then
+    letrec step cond r err x y =
+        cond == F => () |
+        (set_pixel canvas (xc - x) (yc + y) (T,color)) fseq
+        (set_pixel canvas (xc - y) (yc - x) (T,color)) fseq
+        (set_pixel canvas (xc + x) (yc - y) (T,color)) fseq
+        (set_pixel canvas (xc + y) (yc + x) (T,color)) fseq
+        let r = err then
+        val (y,err) =
+            ( cond AND (r <= y) ) => (
+                let y = y + '1 then
+                let err = err + '2*y + '1 then
+                (y,err)
+            ) | (y,err)
+        then
+        val (x,err) =
+            ( cond AND ((r > x) OR (err > y)) ) => (
+                let x = x + '1 then
+                let err = err + '2*x + '1 then
+                (x,err)
+            ) | (x,err)
+        then
+        let rcond = x >= '0 then
+        (cond AND rcond) => () | (step (cond AND NOT rcond) r err x y)
+    in
+    (step T rad err x y) fseq
+    canvas
+;
+
+// ======================================================================
+//  Draw a ellipse
+// ======================================================================
+// void plotEllipseRect(int x0, int y0, int x1, int y1)
+// {
+//     int a = abs(x1-x0);
+//     int b = abs(y1-y0);
+//     int b1 = b&1;
+//     long dx = 4*(1-a)*b*b;
+//     long dy = 4*(b1+1)*a*a;
+//     long err = dx+dy+b1*a*a;
+//     long e2;
+//     if (x0 > x1) {
+// 	x0 = x1;
+// 	x1 = x1+a;
+//     }
+//     if (y0 > y1) {
+// 	y0 = y1;
+//     }
+//     y0 = y0+(b+1)/2;
+//     y1 = y0-b1;
+//     a *= 8*a;
+//     b1 = 8*b*b;
+//     do {
+// 	setPixel(x1, y0);
+// 	setPixel(x0, y0);
+// 	setPixel(x0, y1);
+// 	setPixel(x1, y1);
+// 	e2 = 2*err;
+// 	if (e2 <= dy) {
+// 	    y0++;
+// 	    y1--;
+// 	    dy = dy+a;
+// 	    err = err+dy;
+// 	}
+// 	if (e2 >= dx || 2*err > dy) {
+// 	    x0++;
+// 	    x1--;
+// 	    dx = dx+b1;
+// 	    err = err+dx;
+// 	}
+//     } while (x0 <= x1);
+//     while (y0-y1 < b) {
+// 	setPixel(x0-1, y0);
+// 	setPixel(x1+1, y0); 
+// 	setPixel(x0-1, y1);
+// 	setPixel(x1+1, y1); 
+// 	y0 = y0+1;
+// 	y1 = y1-1;
+//     }
+// }
+let draw_ellipse (x0,y0) (x1,y1) color canvas =
+    let a = abs(x1-x0) in
+    let b = abs(y1-y0) in
+    let b1 = b % '2 in
+    let dx = '4*('1-a)*b*b in
+    let dy = '4*(b1 + '1)*a*a in
+    let err = dx+dy+b1*a*a in
+    val (x0,x1) = (x0 > x1) => (x1, x1+a) | (x0,x1) in
+    let y0 = (y0 > y1) => y1 | y0 in
+    let y0 = y0+(b + '1) / '2 in
+    let y1 = y0-b1 in
+    let a = '8*a*a in
+    let b1 = '8*b*b in
+    letrec while_loop1 x0 y0 x1 y1 err dx dy =
+	(set_pixel canvas x1 y0 (T,color)) fseq
+	(set_pixel canvas x0 y0 (T,color)) fseq
+	(set_pixel canvas x0 y1 (T,color)) fseq
+	(set_pixel canvas x1 y1 (T,color)) fseq
+	let e2 = '2*err in
+	val (y0,y1,dy,err) = 
+	    NOT (e2 <= dy) => (y0,y1,dy,err) |
+		let y0 = y0 + '1 in
+		let y1 = y1 - '1 in
+		let dy = dy+a in
+		let err = err+dy in
+		(y0,y1,dy,err)
+	in
+	val (x0,x1,dx,err) =
+	    NOT (e2 >= dx OR (('2*err) > dy) ) => (x0,x1,dx,err) |
+		let x0 = x0 + '1 in
+		let x1 = x1 - '1 in
+		let dx = dx+b1 in
+		let err = err+dx in
+		(x0,x1,dx,err)
+	in
+	x0 <= x1 => while_loop1 x0 y0 x1 y1 err dx dy | (x0,y0,x1,y1)
+    in
+    val (x0,y0,x1,y1) = while_loop1 x0 y0 x1 y1 err dx dy then
+    letrec while_loop2 x0 y0 x1 y1 =
+	(y0 - y1) >= b => () |
+	(set_pixel canvas (x0 - '1) y0 (T,color)) fseq
+	(set_pixel canvas (x1 + '1) y0 (T,color)) fseq
+	(set_pixel canvas (x0 - '1) y1 (T,color)) fseq
+	(set_pixel canvas (x1 + '1) y1 (T,color)) fseq
+	let y0 = y0 + '1 in
+	let y1 = y1 - '1 in
+	while_loop2 x0 y0 x1 y1
+    in
+    (while_loop2 x0 y0 x1 y1) fseq
+    canvas
+;
+
+
+//let SZ = 28;
+let SZ = 1;
+let ROWS = SZ;
+let COLS = SZ;
+let _ROWS = nat2bv ROWS;
+let _COLS = nat2bv COLS;
+
+let anon_cnt = ref 0;
+
+let empty_canvas name = mk_canvas name ROWS COLS;
+non_lazy empty_canvas;
+
+let draw_figure cmds {canvas::canvas} = 
+    letrec do_draw canvas (cmd:cmds) =
+	let canvas' = cmd canvas then
+	do_draw canvas' cmds
+     /\    do_draw canvas [] = canvas
+    in
+    do_draw canvas cmds
+;
+
+let draw_arrow length h_width h_height color canvas =
+    let x1 = (_COLS-(length+h_height))/ '2 then
+    let y1 = _ROWS/ '2 then
+    let x2 = x1 + length then
+    let x3 = x2 + h_height then
+    let y2 = y1 - h_width then
+    let y3 = y1 + h_width then
+    draw_figure [
+	draw_line (x1,y1) (x3,y1) color,
+	draw_line (x2,y2) (x3,y1) color,
+	draw_line (x2,y3) (x3,y1) color
+    ] canvas
+;
+
+let draw_wide_circle (x,y) r wid col canvas =
+    letrec draw_c canvas cnt =
+	cnt = '0 => draw_circle (x,y) r col canvas |
+	let canvas' = draw_circle (x,y) (r-cnt) col canvas then
+	let canvas'' = draw_circle (x,y) (r+cnt) col canvas' then
+	draw_c canvas'' (cnt - '1)
+    in
+    draw_c canvas wid
+;
+
+cVARS "r[5:0] x[5:0] y[5:0] w[3:0]"
+    "(r > '3 AND r < '14 AND r < x AND x < ('28-r) AND r < y AND y < ('28-r) AND '0 < w AND w < '3)"
+;
+
+let c0 = empty_canvas "Spec";
+let c = draw_wide_circle (x,y) r w white c0;
+bdd_size c;
+
+val (CANVAS name rows) = c;
+
+let l1 = el 1 rows;
+
+let d1 = el 1 l1; 
+
+deref d1;
+
