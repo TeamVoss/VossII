@@ -51,6 +51,7 @@ Create_Dummy_Placement;
 // -------------------------------------------------------------
 
 let cur_canvas = ref "";
+let cur_vfsm = ref {[]:: vfsm list};
 
 let w2root w = "."^(el 2 (str_split w "."));
 
@@ -104,6 +105,7 @@ let STE_debug fsm =
     let w = mk_ste_debug_window () then
     (tcl_eval [sprintf "create_ste_debugger %s" w]) fseq
     let ste0 = STE "" fsm [] [] [] [] then
+    let cmd = sprintf "let vis = get_current_vis ();" in
     let res = STEV_ENV
 		      w
 		      fsm
@@ -116,13 +118,25 @@ let STE_debug fsm =
 		      (ref [])
 		      (ref [])
 		      (ref [])
+		      (ref [cmd])
     then
+    (cur_vfsm := (res:(deref cur_vfsm))) fseq
     (register_vfsm res w) fseq
-    let wvf = tcl_eval ["nb:create_node_browser "^w] then
+    let wvf = tcl_eval ["nb:create_mandatory_tabs "^w] then
     ((vfsm2wvr res) := wvf) fseq
-    (tcl_eval ["sl:create_stop_node_browser "^w]) fseq
+    (tcl_eval [
+	"update",
+         sprintf "bind %s.nb <Destroy> [list fl_destroy_vfsm %s]" w w
+    ]) fseq
     res
 ;
+
+let fl_destroy_vfsm w =
+    let raw = deref cur_vfsm then
+    let rem = filter (\vfsm. vfsm2id vfsm != w) raw then
+    (cur_vfsm := rem)
+;
+export_to_tcl fl_destroy_vfsm;
 
 // Perform symbolic trajectory evaluation on circuit ckt.
 // Returns an ste object that can be queried for traces, results, etc.
@@ -200,10 +214,19 @@ let fl_get_active_fsms root_window =
 ;
 export_to_tcl fl_get_active_fsms;
 
-let add_active_sch_tab_window vfsm canvas vis =
+let add_command vfsm cmd =
+    let w = vfsm2id vfsm then
+    let cmds_r = vfsm2cmds_r vfsm then
+    (cmds_r := ((deref cmds_r) @ [cmd])) fseq
+    (tcl_eval [sprintf "cmd:update_cmds %s $::cmd_txt(%s)" w w]) fseq
+    ()
+;
+
+let add_active_sch_tab_window vfsm canvas vis cmd =
     let rcanvas_list = vfsm2canvases_r vfsm then
     let old = filter (\(c,_). c != canvas) (deref rcanvas_list) then
-    (rcanvas_list := ((canvas,vis):old))
+    (rcanvas_list := ((canvas,vis):old))  fseq
+    (add_command vfsm cmd)
 ;
 
 let fl_remove_active_sch_tab_window canvas =
@@ -221,11 +244,35 @@ let fl_get_active_sch_tab_windows canvas =
 ;
 export_to_tcl fl_get_active_sch_tab_windows;
 
+let fl_record_waveform_addition w vec =
+    let vfsm = w2vfsm w then
+    let cmd = sprintf "add_waveform vis [\"%s\"];" vec in
+    add_command vfsm cmd
+;
+export_to_tcl fl_record_waveform_addition;
+
+let fl_record_waveform_deletion w idx =
+    let vfsm = w2vfsm w then
+    let cmd = sprintf "delete_waveform vis %d;" idx in
+    add_command vfsm cmd
+;
+export_to_tcl fl_record_waveform_deletion;
+
+let fl_record_waveform_movement w idx dir =
+    let vfsm = w2vfsm w then
+    let cmd = sprintf "move_waveform vis %d %d;" idx dir in
+    add_command vfsm cmd
+;
+export_to_tcl fl_record_waveform_movement;
+
 let get_new_sch_canvas w draw_level =
     let tw_c = tcl_eval [sprintf "get_new_sch_canvas %s %d" w draw_level] then
     val [tab_w, canvas] = str_split tw_c " " then
     (tab_w, canvas)
 ;
+
+let canvas2tab c =
+    sprintf "tab_%s" (string_tl (el 4 (str_split c ".")));
 
 let gen_draw_fanin vfsm draw_level levels vecs =
     let stop_list = deref (vfsm2stop_list_r vfsm) then
@@ -233,7 +280,13 @@ let gen_draw_fanin vfsm draw_level levels vecs =
     let w = vfsm2id vfsm then
     let vis = visualize_fanin fsm stop_list [] levels vecs draw_level then
     val (tab_window, c) = get_new_sch_canvas w draw_level then
-    (add_active_sch_tab_window vfsm c vis) fseq
+    let cmd =	
+	let tab = canvas2tab c then
+	let svecs = list2str T "[" "," "]" (sprintf "\"%s\"") vecs in
+	sprintf "let %s = draw_fanin vis (%d) %d %s;\n%s;"
+		 tab draw_level levels svecs tab
+    in
+    (add_active_sch_tab_window vfsm c vis cmd) fseq
     val (final_res, cmds) = visualisation2tcl vis then
     (big_tcl_eval ("create_sch":cmds)) fseq
     (cur_canvas := c) fseq
@@ -248,7 +301,7 @@ let gen_draw_fanin vfsm draw_level levels vecs =
     c
 ;
 
-let draw_inside vfsm cur_draw_level vecs =
+let gen_draw_inside vfsm cur_draw_level vecs =
     let fsm = vfsm2fsm vfsm then 
     let nds = md_expand_vectors vecs then
     let stop_list = deref (vfsm2stop_list_r vfsm) then
@@ -259,7 +312,13 @@ let draw_inside vfsm cur_draw_level vecs =
     let draw_level = cur_draw_level+1 in
     let vis = visualize_fanin fsm stop_list ifc_list 100 vecs draw_level then
     val (tab_window, c) = get_new_sch_canvas w draw_level then
-    (add_active_sch_tab_window vfsm c vis) fseq
+    let cmd =	
+	let tab = canvas2tab c then
+	let svecs = list2str T "[" "," "]" (sprintf "\"%s\"") vecs in
+	sprintf "let %s = draw_inside vis %d %s;\n%s;" 
+		tab (cur_draw_level+1) svecs tab
+    in
+    (add_active_sch_tab_window vfsm c vis cmd) fseq
     val (final_res, cmds) = visualisation2tcl vis then
     (big_tcl_eval ("create_sch":cmds)) fseq
     (cur_canvas := c) fseq
@@ -305,7 +364,7 @@ export_to_tcl fl_draw_fanin_by_name;
 let fl_draw_inside canvas cur_draw_level tag =
     let vfsm = w2vfsm canvas then
     let vecs = fl_tag2vec canvas tag then
-    draw_inside vfsm cur_draw_level vecs
+    gen_draw_inside vfsm cur_draw_level vecs
 ;
 export_to_tcl fl_draw_inside;
 
@@ -336,10 +395,23 @@ let fl_get_global_time canvas = deref (canvas2current_time_r canvas);
 export_to_tcl fl_get_global_time;
 
 let fl_set_global_time canvas t =
+    let vfsm = w2vfsm canvas then
+    let cmd = sprintf "draw_set_time vis %d;" t then
+    (add_command vfsm cmd) fseq
     let rtime = canvas2current_time_r canvas in
     (rtime := t) 
 ;
 export_to_tcl fl_set_global_time;
+
+let fl_inform_show_value_change c show =
+    let tab = canvas2tab c then
+    let vfsm = w2vfsm c then
+    let show = show = "1" => "T" | "F" in
+    let cmd = sprintf "draw_show_values vis %s %s;" tab show then
+    (add_command vfsm cmd)
+;
+export_to_tcl fl_inform_show_value_change;
+
 
 let compress l =
     letrec compr cnt cur (v:vs) =
@@ -950,7 +1022,11 @@ export_to_tcl fl_set_sch_highlight_color;
 let get_current_canvas {dummy::void} = (deref cur_canvas);
 non_lazy get_current_canvas;
 
-let get_current_vis {dummy::void} = canvas2vis (get_current_canvas ());
+let get_current_vis {dummy::void} = 
+    let cur = deref cur_vfsm then
+    cur = [] => error "No active vfsm" |
+    hd cur
+;
 non_lazy get_current_vis;
 
 
@@ -1066,7 +1142,7 @@ let base_get_waveform w vec show_depend =
         in
         map mk_tr vec_trace
     |
-    eprintf "fl_get_waveform not implemented yet for %s" type
+    eprintf "base_get_waveform not implemented yet for %s" type
 ;
 
 let _fl_get_waveform_ref = ref [(1,"","")];
@@ -1163,6 +1239,15 @@ export_to_tcl fl_delete_stop_nd;
 let fl_expand_fanin c draw_level levels tag =
     let vis = canvas2vis c then
     let vis = visualize_expand_fanin vis tag levels draw_level then
+    let cmd =
+	let tab = canvas2tab c then
+	let vec =
+	    let tags = visualization_anon2real vis tag then
+	    list2str T "[" "," "]" (sprintf "\"%s\"") tags
+	then
+	sprintf "expand_fanin vis %s (%d) %d %s;" tab draw_level levels vec
+    then
+    (add_command (w2vfsm c) cmd) fseq
     val (final_res, cmds) = visualisation2tcl vis then
     (big_tcl_eval ("create_sch":cmds)) fseq
     (tcl_eval [
@@ -1208,6 +1293,12 @@ let fl_hide_fanin c tag make_it_stop_node =
     ()
 ;
 export_to_tcl fl_hide_fanin;
+
+let fl_get_sch_commands w =
+    let vfsm = w2vfsm w then
+    deref (vfsm2cmds_r vfsm)
+;
+export_to_tcl fl_get_sch_commands;
 
 
 // Create random inputs to the circuit and simulate it.
@@ -1281,7 +1372,127 @@ let random_simulation {vis::vfsm} clks resets cnt =
 //  fl API to drawing routine(s)
 // ======================================================================
 
-let draw_fanin levels draw_level vecs =
-    let canvas = get_current_canvas () then
-    fl_draw_fanin_by_name canvas draw_level levels vecs
+
+// Draw a fanin cone from the vectors in vecs.
+//
+// Arguments:
+// vfsm:	    A visualization GUI started with STE_debug.
+//
+// hierarchy_level: At which level of drawing hierarchy to draw the fanin
+//		    Top-level is 0.
+//		    If -1 is given, the drawing will be at a leaf level
+//		    (basically all draw_hier will be ignored)
+//
+// levels:	    How many levels of (user-given) circuits backwards should
+//		    be drawn.
+//
+// vecs:	    The list of vectors to end at (whose fanins to draw)
+//
+// Returns the name of the canvas for the new fanin drawing.
+//
+let draw_fanin vfsm hierarchy_level levels vecs =
+    gen_draw_fanin vfsm hierarchy_level levels vecs
 ;
+
+
+// Draw the inside of a block
+//
+// Arguments:
+// vfsm:	    A visualization GUI started with STE_debug.
+//
+// hierarchy_level: At which level of drawing hierarchy shold the visualization
+//		    be done at.
+//		    It needs to be >= 1.
+//
+// vecs:	    The list of vectors to end at (whose fanins to draw)
+//
+// Returns the name of the canvas for the new fanin drawing.
+//
+let draw_inside vfsm hierarchy_level vecs =
+    gen_draw_inside vfsm (hierarchy_level-1) vecs
+;
+
+// Add the waveforms for the vectors in vecs.
+//
+// Arguments:
+// vfsm:	    A visualization GUI started with STE_debug.
+//
+//
+// vecs:	    The list of vectors to end at (whose fanins to draw)
+//
+let add_waveform vfsm vecs =
+    let w = vfsm2id vfsm then
+    let ww = sprintf "%s.nb.waveform" w then
+    let cmds = map (\v. sprintf "wv:prim_add_waveform %s {%s}" ww v) vecs in
+    (foreach (fl_record_waveform_addition w) vecs) fseq
+    (tcl_eval (cmds@[sprintf "wv:set_time_pointer %s {}" ww])) fseq
+    ()
+;
+
+// Delete waveform 
+//
+// Arguments:
+// vfsm:	    A visualization GUI started with STE_debug.
+//
+//
+// idx:		    Which waveform (starting from 0) to delete
+//
+let delete_waveform vfsm idx =
+    let ww = deref (vfsm2wvr vfsm) then
+    let nn = sprintf "%s.panes.name_frame.names" ww in
+    let cmd = sprintf "wv:delete_waveform %s %d" nn idx in
+    (tcl_eval [cmd, sprintf "wv:set_time_pointer %s {}" ww]) fseq
+    ()
+;
+
+// Move waveform up or down
+//
+// Arguments:
+// vfsm:	    A visualization GUI started with STE_debug.
+//
+// idx:		    Which waveform (starting from 0) to delete
+//
+// dir:		    1/-1 direction to mve the waveform (1=down, -1=up)
+//
+let move_waveform vfsm idx dir =
+    let ww = deref (vfsm2wvr vfsm) then
+    let nn = sprintf "%s.panes.name_frame.names" ww in
+    let cmd = sprintf "wv:move_waveform %s %d %d" nn idx dir in
+    (tcl_eval [cmd, sprintf "wv:set_time_pointer %s {}" ww]) fseq
+    ()
+;
+
+// Set the global time to be t in visualization GUI vfsm.
+// Returns the old time.
+//
+let draw_set_time vfsm t =
+    let w = (vfsm2id vfsm) then
+    let old = tcl_eval [sprintf "set ::vstatus(time,%s)" w] then
+    (tcl_eval [sprintf "set ::vstatus(time,%s) %d" w t]) fseq
+    sscanf "%d" old
+;
+
+// Get the vsfm named 'name'
+let name2vfsm name = w2vfsm name;
+
+//
+let expand_fanin {vsfm::vfsm} c draw_level levels vecs =
+    let tags = fl_vecs2tags c vecs then
+    length tags != 1 =>
+	eprintf "expand_fanin can only be used on a single vector (%S)" vecs
+    |
+    fl_expand_fanin c draw_level levels (hd tags)
+;
+
+
+// Turn on/off backannotation of values on canvas c.
+let draw_show_values {vis::vfsm} c show =
+    let cur = tcl_eval [sprintf "set ::vstatus(show_value,%s)" c] then
+    let toggle = show XOR (cur = "1") then
+    NOT toggle => () |
+    ((tcl_eval [
+	sprintf "set ::vstatus(show_value,%s) %s" c (show => "1" | "0"),
+	sprintf "sch:toggle_show_value_buttons %s [winfo parent %s].menu" c c]
+    ) fseq ())
+;
+

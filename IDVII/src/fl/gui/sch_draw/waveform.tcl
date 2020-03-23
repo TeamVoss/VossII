@@ -428,6 +428,7 @@ proc wv:delete_waveform {nn idx} {
     # Remove the name
     set vecs $::wv_info($f,vectors)
     unset ::wv_info($f,vectors)
+    fl_record_waveform_deletion $f $idx
     for {set i 0} { $i < $idx } {incr i} {
 	lappend ::wv_info($f,vectors) [lindex $vecs $i]
     }
@@ -470,6 +471,7 @@ proc wv:move_waveform {nn idx dir} {
     set nf $pw.name_frame
     set nn $nf.names
 
+    fl_record_waveform_movement $nn $idx $dir
     if ![info exists ::wv_info($f,vectors)] { return 0 }
     if [expr $idx == 0 && $dir == -1] { return 0 }
     set max [expr [llength $::wv_info($f,vectors)]-1]

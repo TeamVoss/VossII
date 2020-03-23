@@ -1,7 +1,5 @@
 cload "ste.fl";
 
-
-
 let wexpr_hw_destr {e::wexpr} = e;
 add_open_overload hw_destr wexpr_hw_destr;
 let wexpr_hw_constr {e::wexpr} = e;
@@ -195,8 +193,17 @@ val (ckt, assume_ant, assert_cons) = rels2STE p assumes asserts;
 let vis = STE_debug ckt;
 vis;
 
+
+
 let res = STE "-e" vis [] (ant@assume_ant) (cons@assert_cons) [];
 res;
+
+load "cmds.fl";
+
+
+
+
+
 
 let sub = example F (NOT (get_ste_result res "strong"));
 sub;

@@ -1,0 +1,24 @@
+load "ste.fl";
+
+ENUM "shadok" ["GA", "BU", "ZO", "MEU"];
+
+ENUM "foobar" ["foo", "bar"];
+
+STRUCT "bla" 6 [
+	("foobar",  "foobar",   [0]),
+	("gibi",    "shadok",   (1--2))
+];
+
+let bug =
+    bla_output blablabla.
+    CELL "bug" [
+        blablabla <-
+            '0<--foobar ? bar
+              <--gibi ? '0
+    ]
+;
+bug 'out;
+
+STE_debug (pexlif2fsm (bug 'out));
+
+

@@ -115,7 +115,6 @@ proc create_ste_debugger {w} {
     ttk::notebook $nb -width 1200 -height 500
     pack $nb -side top -expand y -fill both
     set ::sch_window_cnt($w) 0
-    set ::ste_debugger_notebook $nb
     set root [w2root $w]
     set ::vstatus(time,$root) 0
     trace add variable ::vstatus(time,$root) write \
@@ -131,43 +130,58 @@ proc nb:expand_selected_list {nlb y} {
     nb:update_nb_list $w $nlb
 }
 
-proc nb:create_node_browser {w} {
+proc nb:create_mandatory_tabs {w} {
     set nb $w.nb
     $nb add [frame $nb.browser] -text "Node Browser"
     $nb add [frame $nb.waveform] -text "Waveforms"
     set wvf [wv:create_waveform_viewer $nb.waveform 10]
+
+    # Now make the front page
     $nb select 0
-    set w $nb.browser
-    set ww $w
-    frame $w.f1 -width 400
-    pack $w.f1 -side left -fill y
-    set w $w.f1
- 
-    ttk::labelframe $w.search -text "Search:"
-        labelframe $w.search.lbl -relief flat -text "Limit search to: " \
+    set pw $nb.browser.pw
+    panedwindow $pw -orient horizontal -showhandle yes
+    pack $pw -side top -fill both -expand y
+	frame $pw.node_browser
+	$pw add $pw.node_browser -width 400
+	frame $pw.stop_nodes
+	$pw add $pw.stop_nodes -width 400
+	frame $pw.cmds
+	$pw add $pw.cmds
+    
+    nb:create_node_browser $w $pw.node_browser
+    sl:create_stop_node_browser $w $pw.stop_nodes
+    cm:create_commands $w $pw.cmds
+
+    return $nb.waveform
+}
+
+
+proc nb:create_node_browser {w p} {
+    ttk::labelframe $p.search -text "Search:"
+        labelframe $p.search.lbl -relief flat -text "Limit search to: " \
                 -labelanchor w
-        ttk::combobox $w.search.lbl.c -textvariable ::nodebrowser(source,$w) \
+        ttk::combobox $p.search.lbl.c -textvariable ::nodebrowser(source,$p) \
             -state readonly \
             -values {Inputs Outputs {User Given} All}
-        set ::nodebrowser(source,$w) Outputs
+        set ::nodebrowser(source,$p) Outputs
  
-        labelframe $w.search.pat_lbl -relief flat -text "Pattern: " \
+        labelframe $p.search.pat_lbl -relief flat -text "Pattern: " \
                 -labelanchor w
-        ttk::combobox $w.search.pat_lbl.c \
-		-textvariable ::nodebrowser(pattern,$w)
-        bind $w.search.pat_lbl.c <KeyPress-Return> \
-		[list $w.search.refresh invoke]
-        set ::nodebrowser(pattern,$w) {*}
-        button $w.search.refresh -text Refresh \
-                -command [list nb:update_nb_list $w $w.lf.list]
-    pack $w.search -side top -pady 10 -fill x
-        pack $w.search.lbl -side top -fill x
-            pack $w.search.lbl.c -side top
-        pack $w.search.pat_lbl -side top -fill x
-            pack $w.search.pat_lbl.c -side top
-        pack $w.search.refresh -side top -fill x
+        ttk::combobox $p.search.pat_lbl.c \
+		-textvariable ::nodebrowser(pattern,$p)
+        bind $p.search.pat_lbl.c <KeyPress-Return> \
+		[list $p.search.refresh invoke]
+        set ::nodebrowser(pattern,$p) {*}
+        button $p.search.refresh -text Refresh \
+                -command [list nb:update_nb_list $p $p.lf.list]
+    pack $p.search -side top -pady 10 -fill x
+        pack $p.search.lbl -side top -fill x
+            pack $p.search.lbl.c -side top
+        pack $p.search.pat_lbl -side top -fill x
+            pack $p.search.pat_lbl.c -side top
+        pack $p.search.refresh -side top -fill x
  
-    set f $w.lf
+    set f $p.lf
     frame $f -relief flat
     scrollbar $f.yscroll -command "$f.list yview"
     scrollbar $f.xscroll -orient horizontal -command "$f.list xview"
@@ -180,41 +194,40 @@ proc nb:create_node_browser {w} {
  
     pack $f -side top -fill both -expand yes
  
-    ttk::labelframe $w.opts -text "Options:"
-	labelframe $w.opts.hier -text "Hierarchical drawing:" \
+    ttk::labelframe $p.opts -text "Options:"
+	labelframe $p.opts.hier -text "Hierarchical drawing:" \
 		-labelanchor w -relief flat
-	    frame $w.opts.hier.space
-	    ttk::checkbutton $w.opts.hier.cb \
-		-variable ::nodebrowser(hierarchy,$w)
-	    set ::nodebrowser(hierarchy,$w) 1
-	labelframe $w.opts.levels -text "Levels of fanin:" \
+	    frame $p.opts.hier.space
+	    ttk::checkbutton $p.opts.hier.cb \
+		-variable ::nodebrowser(hierarchy,$p)
+	    set ::nodebrowser(hierarchy,$p) 1
+	labelframe $p.opts.levels -text "Levels of fanin:" \
 		-labelanchor w -relief flat
-	    ttk::combobox $w.opts.levels.c \
-		-textvariable ::nodebrowser(levels,$w)
-	    set ::nodebrowser(levels,$w) 20
-    pack $w.opts -side top -fill x
-        pack $w.opts.hier -side top -fill x
-            pack $w.opts.hier.space -side left -fill x -expand yes
-            pack $w.opts.hier.cb -side right -fill x
-        pack $w.opts.levels -side top -fill x
-            pack $w.opts.levels.c -side top -fill x -expand yes
+	    ttk::combobox $p.opts.levels.c \
+		-textvariable ::nodebrowser(levels,$p)
+	    set ::nodebrowser(levels,$p) 20
+    pack $p.opts -side top -fill x
+        pack $p.opts.hier -side top -fill x
+            pack $p.opts.hier.space -side left -fill x -expand yes
+            pack $p.opts.hier.cb -side right -fill x
+        pack $p.opts.levels -side top -fill x
+            pack $p.opts.levels.c -side top -fill x -expand yes
  
-    ttk::labelframe $w.operations -text "Operation:"
-        button $w.operations.fanin -text Fanin \
-            -command [list nb:draw_fanin $w $f.list]
-        button $w.operations.waveform -text Waveform \
-            -command [list nb:add_waveform $nb.waveform $f.list]
-        button $w.operations.stop -text Stop \
-            -command [list sl:add_stop_node $ww $f.list]
-    pack $w.operations -side top -fill x
-        pack $w.operations.fanin -side left -expand yes
-        pack $w.operations.waveform -side left -expand yes
-        pack $w.operations.stop -side left -expand yes
+    ttk::labelframe $p.operations -text "Operation:"
+        button $p.operations.fanin -text Fanin \
+            -command [list nb:draw_fanin $p $f.list]
+        button $p.operations.waveform -text Waveform \
+            -command [list nb:add_waveform $w.nb.waveform $f.list]
+        button $p.operations.stop -text Stop \
+            -command [list sl:add_stop_node $p $f.list]
+    pack $p.operations -side top -fill x
+        pack $p.operations.fanin -side left -expand yes
+        pack $p.operations.waveform -side left -expand yes
+        pack $p.operations.stop -side left -expand yes
 
-    set ::nodebrowser(max_cnt,$w) 40
+    set ::nodebrowser(max_cnt,$p) 40
  
-    $w.search.refresh invoke
-    return $nb.waveform
+    $p.search.refresh invoke
 }
 
 
@@ -229,37 +242,78 @@ proc nb:update_nb_list {w lb} {
     }
 }
 
-proc sl:create_stop_node_browser {w} {
-    set nb $w.nb
-    set nb_browser_page $nb
-    set w $nb.browser
-    set ww $w
-    frame $w.snf -width 400
-    pack $w.snf -side left -fill y
-    frame $w.f2
-    pack $w.f2 -side left -fill both -expand yes
-    set w $w.snf
-    label $w.lbl -text "Stop nodes"
-    pack $w.lbl -side top -fill x
-    set f $w.lf
+proc sl:create_stop_node_browser {w p} {
+    label $p.lbl -text "Stop nodes"
+    pack $p.lbl -side top -fill x
+    set f $p.lf
     frame $f -relief flat
-    scrollbar $f.yscroll -command "$f.list yview"
-    scrollbar $f.xscroll -orient horizontal -command "$f.list xview"
-    listbox $f.list -setgrid 1 \
-        -yscroll "$f.yscroll set" -xscroll "$f.xscroll set" -selectmode extended
-    pack $f.yscroll -side right -fill y
-    pack $f.xscroll -side bottom -fill x
-    pack $f.list -side top -fill both -expand yes
+	scrollbar $f.yscroll -command "$f.list yview"
+	scrollbar $f.xscroll -orient horizontal -command "$f.list xview"
+	listbox $f.list -setgrid 1 \
+	    -yscroll "$f.yscroll set" -xscroll "$f.xscroll set" \
+	    -selectmode extended
+	pack $f.yscroll -side right -fill y
+	pack $f.xscroll -side bottom -fill x
+	pack $f.list -side top -fill both -expand yes
     pack $f -side top -fill both -expand yes
  
-    set ::stop_list_info($ww,nb) $f.list
-    ttk::labelframe $w.operations -text "Operation:"
-        button $w.operations.b -text Delete \
-            -command [list sl:delete_stop_nd $w $f.list]
-    pack $w.operations -side top -fill x
-        pack $w.operations.b -side top
-    sl:update_stop_node_list $w $w.lf.list
-    bind $nb.browser <Map> [list sl:update_stop_node_list $w $w.lf.list]
+    set ::stop_list_info($w) $f.list
+    ttk::labelframe $p.operations -text "Operation:"
+        button $p.operations.b -text Delete \
+            -command [list sl:delete_stop_nd $p $f.list]
+    pack $p.operations -side top -fill x
+        pack $p.operations.b -side top
+    sl:update_stop_node_list $w $f.list
+    bind $w.nb <<NotebookTabChanged>> [list sl:update_stop_node_list $w $f.list]
+}
+
+proc cm:create_commands {w p} {
+    label $p.lbl -text "Commands"
+    pack $p.lbl -side top -fill x
+    set f $p.lf
+    frame $f -relief flat
+	scrollbar $f.yscroll -command "$f.txt yview"
+	scrollbar $f.xscroll -orient horizontal -command "$f.txt xview"
+	text $f.txt -setgrid 1 \
+	    -yscroll "$f.yscroll set" -xscroll "$f.xscroll set"
+	pack $f.yscroll -side right -fill y
+	pack $f.xscroll -side bottom -fill x
+	pack $f.txt -side top -fill both -expand yes
+    pack $f -side top -fill both -expand yes
+ 
+    set ::cmd_txt($w) $f.txt
+    ttk::labelframe $p.operations -text "Operation:"
+        button $p.operations.b -text Save \
+            -command [list cmd:save_cmds $f.txt]
+        pack $p.operations.b -side top
+    pack $p.operations -side top -fill x
+    cmd:update_cmds $w $f.txt
+    bind $w.nb <<NotebookTabChanged>> +[list cmd:update_cmds $w $f.txt]
+}
+
+proc cmd:save_cmds {txt} {
+    set types {
+        {{VossII Files}      {.fl}        }
+        {{All Files}        *             }
+    }
+    set file [tk_getSaveFile -filetypes $types -defaultextension ".fl" \
+                                 -title "File to save to"]
+    if {$file ne ""} {
+	if [catch {open $file w} fp] {
+	    report_error "Cannot save commands in file $file."
+	    return
+	}
+	puts $fp  [$txt get 1.0 end]
+	close $fp
+    }
+}
+
+proc cmd:update_cmds {w txt} {
+    $txt delete 1.0 end
+    foreach line [fl_get_sch_commands $w] {
+	$txt insert end $line
+	$txt insert end "\n"
+    }
 }
 
 proc sl:add_stop_node {w nlb} {
@@ -267,7 +321,7 @@ proc sl:add_stop_node {w nlb} {
 	set nd [$nlb get $idx]
 	fl_top_level_add_stop_nd $w $nd
     }
-    sl:update_stop_node_list $w $::stop_list_info($w,nb)
+    sl:update_stop_node_list $w $::stop_list_info($w)
 }
 
 proc sl:delete_stop_nd {w lb} {
@@ -299,8 +353,30 @@ proc nb:draw_fanin {w lb} {
 
 proc nb:add_waveform {w lb} {
     foreach idx [$lb curselection] {
-	wv:add_waveform $w [$lb get $idx]
+	set vec [$lb get $idx]
+	wv:add_waveform $w $vec
+	fl_record_waveform_addition $w $vec
     }
+}
+
+proc nb:c2tab {w c} {
+    set nb $w.nb
+    set t [join [lrange [split $c "."] 0 3] "."]
+    set idx [$nb index $t]
+    return $idx
+}
+
+proc nb:tab2c {w name} {
+    set nb $w.nb
+    set idx 0
+    foreach t [$nb tabs] {
+	set tname [$nb tab $idx -text]
+	if { $tname == $name } {
+	    return $t.cc.c
+	}
+	incr idx
+    }
+    error "No tab named $name in notebook under $w"
 }
 
 proc get_new_sch_canvas {w draw_level} {
@@ -339,10 +415,12 @@ proc sch:toggle_show_value_buttons {c f} {
         pack $mb $et $pb -in $tt -side left -fill x -expand 1 \
             -pady 0 -padx 0
 	sch:sch_display_values $c 1
+	fl_inform_show_value_change $c 1
     } else { 
         pack forget $mb $et $pb
         pack forget $tt
 	sch:sch_display_values $c 0
+	fl_inform_show_value_change $c 0
     }
 }
 
@@ -663,8 +741,7 @@ proc cb:sch_canvas_menu {c wx wy sx sy} {
 	-command "after idle \
 	    [list fl_draw_inside $c $::sch_info(draw_level,$c) $nodes]"
 
-    $m add command -label "Add waveform" \
-	-command "wv:add_waveform [fl_c2w $c] [fl_tag2vec $c $nodes]"
+    $m add command -label "Add waveform" -command "sc:add_waveforms $c $nodes"
     
     set mm $m.mark
     catch {destroy $mm}
@@ -707,6 +784,15 @@ proc cb:sch_canvas_menu {c wx wy sx sy} {
 
     tk_popup $m $sx $sy
     return
+}
+
+proc sc:add_waveforms {c nodes} {
+    set w [fl_c2w $c]
+    set vecs [fl_tag2vec $c $nodes]
+    foreach vec $vecs {
+	wv:add_waveform $w $vec
+	fl_record_waveform_addition $w $vec
+    }
 }
 
 proc get_anon_name {tags} {
@@ -2723,14 +2809,9 @@ proc draw_input {txt c tag x y} {
 	    [expr ($xl-[inp_ht $c])] [expr ($y+[inp_ht $c]/2)] \
 	    -outline $gcolor -fill $fc -tags $tag
     add_value_field $c $tag [expr $x-[wire_len $c]] $y
-    set sep ""
-    set res ""
-    foreach t $txt {
-        append res $sep [clean_name $t]
-        set sep "\n"
-    }
     set t [$c create text [expr $xl-[inp_ht $c]-2] $y \
-			    -anchor e -font $mfont($c) -text $res \
+			    -anchor e -font $mfont($c) \
+			    -text [clean_name $txt 1] \
                             -justify right \
 			    -tags $tag -fill $gcolor]
     add_font_tags $c $t _IsTeXt_
@@ -2918,7 +2999,7 @@ proc draw_incomplete {name c tag x y} {
     set right_x [expr $xl - [expr 0.5*[min_sep $c]]]
     add_three_horizontal_dots $c $left_x $right_x $y $tag
     set f2 [$c create text $left_x $y -anchor e -font $mfont($c) \
-		-text $sname -tags $tag]
+		-text [clean_name $sname 1] -tags $tag]
     add_font_tags $c $f2 _IsTeXt_
     add_value_field $c $tag $x $y
     if { [llength [split $tag "\n"]] > 1 } {
@@ -2942,7 +3023,7 @@ proc draw_incomplete_grey {name c tag x y} {
 	set sname ""
     }
     set f2 [$c create text $xl $y -anchor se -font $mfont($c) \
-		-text [format "%s ... " $sname] \
+		-text [format "%s ... " [clean_name $sname 1]] \
 		-tags $tag]
     add_font_tags $c $f2 _IsTeXt_
     add_value_field $c $tag $x $y
@@ -3917,26 +3998,6 @@ proc draw_ff_fe_reset_set {c tag x y} {
 ###########################################################################
 ## Utilities
 ###########################################################################
-
-proc vis_toplevel {w {width {}} {height {}} {title ""}} {
-    toplevel $w
-    set lx [winfo rootx $::ste_debugger_notebook]
-    set ly [winfo rooty $::ste_debugger_notebook]
-    if { $width != {} } {
-        if { $height != {} } {
-            wm geometry $w \
-                [expr $width]x[expr $height]+[expr $lx+2]+[expr $ly+2]
-        } else {
-            wm geometry $w \
-                [expr $width]x[expr $width]+[expr $lx+2]+[expr $ly+2]
-        }
-    } else {
-        wm geometry $w +[expr $lx+2]+[expr $ly+2]
-    }
-    if { $title != "" } {
-        wm title $w $title
-    }
-}
 
 proc fsm:make_state_hierarchical {c state} {
     foreach st $::fsm_machine_info($c,states) {

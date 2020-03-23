@@ -2085,7 +2085,7 @@ visualize_fanin(g_ptr redex)
 	}
 	vecs = GET_CONS_TL(vecs);
     }
-    pfn = gen_strappend(tmp_strs, " }");
+    pfn = gen_strappend(tmp_strs, "}");
     res->pfn = wastrsave(&strings, pfn);
     res->vec = s_DummyOut;
     free_temp_str_mgr(tmp_strs);
@@ -7326,7 +7326,7 @@ is_input(vstate_ptr vsp, ilist_ptr il)
 	charappend('}');
 	vecs = GET_CONS_TL(vecs);
     }
-    strappend(" }");
+    strappend("}");
     pfn = wastrsave(&strings, pfn);
     int anon_cnt = COUNT_BUF(&(vsp->anon_buf));
     push_buf(&(vsp->anon_buf), &il);
@@ -7411,7 +7411,7 @@ limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
 	    charappend('}');
 	    vecs = GET_CONS_TL(vecs);
 	}
-	strappend(" }");
+	strappend("}");
 	pfn = wastrsave(&strings, pfn);
 	sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 	res->vec = anon;
@@ -7482,7 +7482,7 @@ limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
 		charappend('}');
 		vecs = GET_CONS_TL(vecs);
 	    }
-	    strappend(" }");
+	    strappend("}");
 	    pfn = wastrsave(&strings, pfn);
 	    sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 	    res->vec = anon;
@@ -7747,7 +7747,7 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	    charappend('}');
 	    vecs = GET_CONS_TL(vecs);
 	}
-	strappend(" }");
+	strappend("}");
 	pfn = wastrsave(&strings, pfn);
 	sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 	res->vec = anon;
@@ -7817,7 +7817,7 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 		charappend('}');
 		vecs = GET_CONS_TL(vecs);
 	    }
-	    strappend(" }");
+	    strappend("}");
 	    pfn = wastrsave(&strings, pfn);
 	    sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 	    res->vec = anon;

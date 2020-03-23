@@ -212,6 +212,37 @@ let base_compact_wprint inps rhs =
     P 0 rhs
 ;
 
+let inp2tcl inps rhs =
+    let i_map = zip inps (1 upto (length inps)) in
+    letrec P ic pri (W_X sz) = sprintf "X\\[%d:0\\]" (sz-1)
+     /\    P ic pri (W_CONST sz v) =
+	    v < 16 => int2str v |
+	    sz < 5 OR ((sz % 4) != 0) => sprintf "0b%0*b" sz v
+				       | sprintf "0x%x" v
+     /\    P ic pri (W_NAMED_CONST name sz v) = name
+     /\    P ic pri (W_VAR sz base) =
+		let inp = assoc base i_map in
+		sprintf "i%d" inp
+     /\    P ic pri (W_EXPLICIT_VAR sz base) =
+		let inp = assoc base i_map in
+		sprintf "i%d" inp
+     /\    P ic pri (W_SLICE indices w) =
+		let vec = pr_indices indices then
+		pri > 9 => sprintf "(%s%s)" (P ic 9 w) vec
+			 | sprintf "%s%s" (P ic 9 w) vec
+     /\    P ic pri (W_NAMED_SLICE name indices w) =
+		pri > 9 => sprintf "(%s-->%s)" (P ic 9 w) name
+			 | sprintf "%s-->%s" (P ic 9 w) name
+     /\    P ic pri (W_CAT parts) =
+		let ss = map (P T 1) parts then
+		ic OR length parts < 2 =>
+		    list2str T "{" "," "}" id ss
+		|
+		    list2str T "{" ",\n" "}" id ss
+    in
+    P F 0 rhs
+;
+
 let compact_wprint rhs =
     let inps = get_wbase_names rhs then
     base_compact_wprint inps rhs
@@ -307,7 +338,7 @@ let mk_draw_cmd phase_delay rhs =
 	let special (W_NAMED_CONST name sz v) =
 		sprintf "draw_hfl {%s}" name
 	 /\ special rhs =
-		let body = base_compact_wprint inps rhs then
+		let body = inp2tcl inps rhs then
 		sprintf "draw_input %s" body
 	in
 	special rhs

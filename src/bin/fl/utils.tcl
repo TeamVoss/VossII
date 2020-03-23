@@ -322,11 +322,18 @@ proc :gui:return {status w tcnt} {
     destroy $w
 }
 
-proc clean_name {name} {
-    if { [regexp "^{\(.*\)}$" $name --> base] } {
-        set name $base
+proc clean_name {name {repeat 0}} {
+    if { $repeat == 1 } {
+	while { [regexp "^{\(.*\)}$" $name --> base] } {
+	    set name $base
+	}
+	return $name
+    } else {
+	if { [regexp "^{\(.*\)}$" $name --> base] } {
+	    set name $base
+	}
+	return $name
     }
-    return $name
 }
 
 set popup_window_cnt 0
