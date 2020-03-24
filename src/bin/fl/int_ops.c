@@ -337,7 +337,7 @@ Int_ops_Install_Functions()
 			iAND);
     Insert_infix("intAND", 4);
 
-    Add_ExtAPI_Function("intNOT", "11", FALSE,
+    Add_ExtAPI_Function("intNOT", "1", FALSE,
 			 GLmake_arrow(GLmake_int(), GLmake_int()),
 			iNOT);
 

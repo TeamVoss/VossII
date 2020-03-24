@@ -226,6 +226,11 @@ let inp2tcl inps rhs =
      /\    P ic pri (W_EXPLICIT_VAR sz base) =
 		let inp = assoc base i_map in
 		sprintf "i%d" inp
+     /\    P ic pri (W_NOT (W_CONST sz v)) =
+		let v' = intNOT v in
+		sz <= 8 => sprintf "%*b" sz v' |
+		v' < 0 => sprintf "~0x%*x" ((sz+3)/4) v |
+		sprintf "0x%*x" ((sz+3)/4) v'
      /\    P ic pri (W_SLICE indices w) =
 		let vec = pr_indices indices then
 		pri > 9 => sprintf "(%s%s)" (P ic 9 w) vec
@@ -239,6 +244,7 @@ let inp2tcl inps rhs =
 		    list2str T "{" "," "}" id ss
 		|
 		    list2str T "{" ",\n" "}" id ss
+     /\   P ic pri other = base_compact_wprint inps rhs
     in
     P F 0 rhs
 ;
