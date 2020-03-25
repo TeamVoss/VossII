@@ -45,6 +45,7 @@ static rec_mgr      symb_tbl_mgr;
 static rec_mgr      arg_names_rec_mgr;
 static char         buf[1024];
 static string       s_star;
+static string       s_CELL;
 static string       s_dummy;
 static char         help_buf[4096];
 static char         type_buf[4096];
@@ -419,6 +420,8 @@ static g_ptr            ignore_P_DEBUG(g_ptr node);
 static bool             get_named_arg(g_ptr node, string *namep, g_ptr *nextp);
 static g_ptr            ignore_simple_P_PCATCH(g_ptr onode);
 static g_ptr            ignore_P_CACHE(g_ptr onode);
+static bool		get_HFL_arg_name(g_ptr node, string *namep,
+					 g_ptr *next_nodep);
 
 /************************************************************************/
 /*                      Public Functions                                */
@@ -437,6 +440,7 @@ Init_symbol()
     new_mgr(&arg_names_rec_mgr, sizeof(arg_names_rec));
     symb_tbl = create_empty_symb_tbl();
     s_star = wastrsave(&strings, "*");
+    s_CELL = wastrsave(&strings, "CELL");
     s_dummy = wastrsave(&strings, "//DuMmY");
     fn_ptr dummy = (fn_ptr) new_rec(&fn_rec_mgr);
     dummy->ADT_level = ADT_level;
@@ -1477,6 +1481,9 @@ Symbols_Install_Functions()
 arg_names_ptr
 Get_argument_names(g_ptr onode)
 {
+    buffer args;
+    string  *sp;
+    arg_names_ptr res = NULL;
     g_ptr node = onode;
     if( node == NULL ) { return NULL; }
     node = ignore_P_Y(node);
@@ -1486,14 +1493,27 @@ Get_argument_names(g_ptr onode)
         arg_cnt++;
         node = GET_LAMBDA_BODY(node);
     }
-    if( arg_cnt == 0 ) return NULL;
+    if( arg_cnt == 0 ) {
+	node = ignore_P_DEBUG(node);
+	new_buf(&args, 10, sizeof(string));
+	string arg;
+	g_ptr next;
+	while( get_HFL_arg_name(node, &arg, &next) ) {
+	    push_buf(&args, (pointer) &arg);
+	    node = next;
+	}
+	if( COUNT_BUF(&args) == 0 ) {
+            free_buf (&args); 
+            return NULL;
+	}
+	goto make_arg_list;
+    }
     if( node == NULL ) return NULL;
     node = ignore_P_CACHE(node);
     node = ignore_P_DEBUG(node);
     if( node == NULL ) return NULL;
     node = ignore_simple_P_PCATCH(node);
     if( node == NULL ) return NULL;
-    buffer args;
     new_buf(&args, 10, sizeof(string));
     for(int i = 0; i < arg_cnt; i++) {
         string arg;
@@ -1505,8 +1525,7 @@ Get_argument_names(g_ptr onode)
         push_buf(&args, (pointer) &arg);
         node = next;
     }
-    arg_names_ptr res = NULL;
-    string  *sp;
+  make_arg_list:
     FUB_ROF(&args, string, sp) {
         arg_names_ptr t = (arg_names_ptr) new_rec(&arg_names_rec_mgr);
         t->name = *sp;
@@ -1903,6 +1922,29 @@ get_named_arg(g_ptr node, string *namep, g_ptr *next_nodep)
     if( !IS_LAMBDA(node) ) return FALSE;
     *next_nodep = GET_LAMBDA_BODY(node);
     *namep = GET_LAMBDA_VAR(node);
+    return TRUE;
+}
+
+static bool
+get_HFL_arg_name(g_ptr node, string *namep, g_ptr *next_nodep)
+{
+    if( !IS_APPLY(node) ) return FALSE;
+    if( !IS_LEAF_VAR(GET_APPLY_RIGHT(node)) ) return FALSE;
+    if( !STREQ(GET_VAR(GET_APPLY_RIGHT(node)), s_CELL) ) return FALSE;
+    node = GET_APPLY_LEFT(node);
+    if( !IS_APPLY(node) ) return FALSE;
+    if( !IS_STRING(GET_APPLY_RIGHT(node)) ) return FALSE;
+    *namep = GET_STRING(GET_APPLY_RIGHT(node));
+    node = GET_APPLY_LEFT(node);
+    if( !IS_LEAF_VAR(GET_APPLY_LEFT(node)) ) return FALSE;
+    node = GET_APPLY_RIGHT(node);
+    if( !IS_LAMBDA(node) ) return FALSE;
+    if( !STREQ(GET_LAMBDA_VAR(node), *namep) ) return FALSE;
+    node = GET_LAMBDA_BODY(node);
+    if( !IS_LAMBDA(node) ) return FALSE;
+    if( !STREQ(GET_LAMBDA_VAR(node), s_CELL) ) return FALSE;
+    node = GET_LAMBDA_BODY(node);
+    *next_nodep = node;
     return TRUE;
 }
 

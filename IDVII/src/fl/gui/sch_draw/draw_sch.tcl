@@ -3897,6 +3897,14 @@ proc draw_mux5 {c tag x y} {
     return [draw_box_pat 10 {MUXLabel} {} $c $tag $x $y]
 }
 
+proc draw_ah_latch {c tag x y} {
+    return [draw_box_pat 2 {ActHighWaveForm} {Dlabel EdgeLabel} $c $tag $x $y]
+}
+
+proc draw_al_latch {c tag x y} {
+    return [draw_box_pat 2 {ActLowWaveForm} {Dlabel EdgeLabel} $c $tag $x $y]
+}
+
 proc draw_pos_d_latchen {c tag x y} {
     return [draw_box_pat 2 {ActHighWaveForm} {Dlabel EdgeLabel} $c $tag $x $y]
 }

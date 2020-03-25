@@ -1,0 +1,17 @@
+load "ste.fl";
+
+TYPE "byte" 8;
+
+rvariable "a";
+
+let tst =
+    bit_input	a b.
+    byte_input	xv yv.
+    bit_output	out.
+    byte_output	sum.
+    CELL "tst" [
+	out <- a '&' b,
+	sum <- xv '+' yv
+];
+
+

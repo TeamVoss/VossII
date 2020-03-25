@@ -1864,30 +1864,44 @@ let fe_ff clk d q = (
 	MUX TmP_en TmP_d_o TmP_q_o q
 ]) clk d q;
 
-// An active high transparent latch.
-// Uasge: ah_latch en in out;
-let ah_latch en d q = (
-    bit_input clk.
-    input d.
-    output q.
+let base_ah_latch =
+    input	d.
+    bit_input	clk.
+    output	q.
+    //
     internal TmP_q_o.
-    CELL "ah_latch" [
+    CELL "draw_ah_latch" [
 	TmP_q_o <: q,
 	MUX clk d TmP_q_o q
-]) en d q;
+];
 
-// An active low transparent latch.
-// Uasge: al_latch en in out;
-let al_latch en d q = (
+// An active high transparent latch.
+let ah_latch =
     bit_input clk.
     input d.
+    output out.
+    CELL "ah_latch" [
+	base_ah_latch d clk out
+];
+
+let base_al_latch =
+    input d.
+    bit_input clk.
     output q.
     internal TmP_q_o.
-    CELL "al_latch" [
+    CELL "draw_al_latch" [
 	TmP_q_o <: q,
 	MUX clk TmP_q_o d q
-]) en d q;
+];
 
+// An active low transparent latch.
+let al_latch =
+    bit_input clk.
+    input d.
+    output out.
+    CELL "al_latch" [
+	base_al_latch d clk out
+];
 
 let ` {i::int} =
     let sz = hw_size {undefined:: *r} in
