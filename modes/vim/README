@@ -1,6 +1,6 @@
 To get key-bindings for fl include the line
 
-source <path_to_VossII>/modes/vim/fl.vim   in your ~/.vimrc file
+source <path_to_VossII>/modes/vim/fl.vimrc   in your ~/.vimrc file
 
 You now get some useful key bindings:
 
