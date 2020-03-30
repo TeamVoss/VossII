@@ -37,11 +37,16 @@ map <silent> @o   :silent call See_stdout()<CR>G
 
 " --------- Function to append text to the fl_inp file ---------
 function! Send_fl_lines() range
+    let wasnumbered = &number
+    set nonumber
     exe "redir >> " . $fl_inp
     silent echon "set_file_name \"" . expand('%:t') . "\";"
     silent echon "set_line_number " . a:firstline . ";"
     silent exe ": " a:firstline "," a:lastline "p"
     redir END
+    if wasnumbered
+        set number
+    endif
 endf
 
 " --------- Send regions ---------
