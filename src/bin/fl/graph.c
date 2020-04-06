@@ -3834,7 +3834,7 @@ traverse_left(g_ptr oroot)
 			if( is_fail(arg3) ) {
 			    goto arg3_fail3;
 			}
-			current_bdd_cond = B_And(cur_eval_cond, GET_BOOL(arg1));
+			current_bdd_cond = GET_BOOL(arg1);
 			g_ptr res = Gen_map2(s_ite, g_b_ite, arg2, arg3, FALSE);
 			OVERWRITE(redex, res)
 			goto finish3;
@@ -5549,7 +5549,7 @@ g_b_ite(g_ptr l, g_ptr r)
     formula lb = GET_BOOL(l);
     formula rb = GET_BOOL(r);
     formula bres = B_Or(B_And(current_bdd_cond, lb),
-                        B_And(B_Not(current_bdd_cond), rb));
+                        B_And(B_Not(current_bdd_cond),rb));
     if( bres == lb ) {
         INC_REFCNT(l);
         return l;

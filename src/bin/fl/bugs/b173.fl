@@ -1,0 +1,18 @@
+VARS "a b c d e f";
+
+rvariable "a";
+
+let ex =
+    let nA = f => F | T in
+    let nB = e => nA | F in
+    let nC = d => T | nB in
+    let nD = d => F | nB in
+    let nE = c => nD | nC in
+    let nF = b => nE | nB in
+    let nG = a => nE | nF in
+    nG
+;
+
+
+draw_bdds F [ex];
+
