@@ -1764,13 +1764,13 @@ let SX {inp:: *a} =
     {out :: *b}
 ;
 
-let MUX c a b = (
+let MUX =
     bit_input c.
     input a b.
     output out.
     CELL "MUX" [
 	out <- (SX c) '&' a '|' '~'(SX c) '&' b
-]) c a b;
+];
 
 // Needed to make the drawing function happy....
 let base_re_ff =
@@ -1819,39 +1819,36 @@ let base_re_ff_en =
 
 // A rising edge D flip-flop.
 // Usage: re_ff clk d q;
-let re_ff clk d q = (
+let re_ff = 
     bit_input	clk.
     input	d.
     output	q.
     CELL "" [
 	base_re_ff d clk q
-]) clk d q;
+];
 
 // A rising edge D flip-flop with asynchronous reset (acive high).
-// Usage: re_ff_reset clk reset d q;
-let re_ff_reset clk reset d q = (
+let re_ff_reset =
     bit_input	clk.
     bit_input	reset.
     input	d.
     output	q.
     CELL "" [
 	base_re_ff_reset d reset clk q
-]) clk reset d q;
+];
 
 // A rising edge D flip-flop with enable.
-// Usage: re_ff_en clk en d q;
-let re_ff_en clk en d q = (
+let re_ff_en =
     bit_input	clk.
     bit_input	en.
     input	d.
     output	q.
     CELL "" [
 	base_re_ff_en d en clk q
-]) clk en d q;
+];
 
 // A falling edge D flip-flop.
-// Usage: fe_ff clk d q;
-let fe_ff clk d q = (
+let fe_ff = 
     bit_input clk.
     input d.
     output q.
@@ -1862,7 +1859,7 @@ let fe_ff clk d q = (
 	TmP_clk_o <: clk,
 	TmP_en <- TmP_clk_o '&' '~'clk,
 	MUX TmP_en TmP_d_o TmP_q_o q
-]) clk d q;
+];
 
 let base_ah_latch =
     input	d.
@@ -2286,7 +2283,7 @@ let STATE {clk::bit} {state:: *a} {cond_res_list:: (bit # *a) list} =
     PINST "CASE" [] F fa_inps fa_states ints (P_HIER children)
 ;
 
-let SELECT inp addr out = (
+let SELECT =
     input   inp.
     input   addr.
     output  out.
@@ -2308,9 +2305,9 @@ let SELECT inp addr out = (
                       inp~~~(((i+1)*out_sz-1) downto (i*out_sz))))
                 (0--(lines-1))
             ) ('X)
-]) inp addr out;
+];
 
-let DECODER inp out = (
+let DECODER =
     input   inp.
     output  out.
     let isz = hw_size inp in
@@ -2323,11 +2320,11 @@ let DECODER inp out = (
     let mk i = hw_bit_destr (inp '=' (''i)) in
     CELL pfn [
 	out <- hw_constr (W_CAT (map mk ((2**(hw_size inp)-1) downto 0)))
-]) inp out;
+];
 
-let DECODER_list inp {outs:: bit list} = (
+let DECODER_list =
     input	inp.
-    list_output	outs.
+    list_output	{outs:: bit list}.
     let isz = hw_size inp in
     let osz = length outs in
     osz != (2**isz) =>
@@ -2337,9 +2334,9 @@ let DECODER_list inp {outs:: bit list} = (
     let pfn = sprintf "draw_DECODER 0 %d %d" isz osz in
     CELL pfn (
 	map2 (\i.\o. o <- (inp '=' (''i))) ((2**(hw_size inp)-1) downto 0) outs
-)) inp outs;
+);
 
-let EN_DECODER enable inp out = (
+let EN_DECODER =
     bit_input	enable.
     input	inp.
     output	out.
@@ -2353,12 +2350,12 @@ let EN_DECODER enable inp out = (
     let mk i = hw_bit_destr (enable '&' (inp '=' (''i))) in
     CELL pfn [
 	out <- hw_constr (W_CAT (map mk ((2**(hw_size inp)-1) downto 0)))
-]) enable inp out;
+];
 
-let EN_DECODER_list enable inp {outs:: bit list} = (
+let EN_DECODER_list =
     bit_input	enable.
     input	inp.
-    list_output	outs.
+    list_output	{outs :: bit list}.
     let isz = hw_size inp in
     let osz = length outs in
     osz != (2**isz) =>
@@ -2369,7 +2366,7 @@ let EN_DECODER_list enable inp {outs:: bit list} = (
     CELL pfn (
 	map2 (\i.\o. o <- (enable '&' (inp '=' (''i))))
 	     ((2**(hw_size inp)-1) downto 0) outs
-)) enable inp outs;
+);
 
 
 let --- a b = (a, b);
@@ -2527,14 +2524,14 @@ letrec delay_rec N =
         delay_rec (N-1) clk reset tmp2 dout
 ]);
 
-let delay boxed N clk reset din dout = (
+let delay boxed N =
     bit_input   clk.
     bit_input   reset.
     input       din.
     output      dout.
     let pfn = boxed => sprintf "draw_hfl {DEL(%d)}" N | "delay" in
     CELL pfn [(delay_rec N clk reset din dout)]
-) clk reset din dout;
+;
 
 
 let hw__pair__type_name {p:: *a # *b} =

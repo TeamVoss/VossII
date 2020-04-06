@@ -338,12 +338,32 @@ proc clean_name {name {repeat 0}} {
 
 set popup_window_cnt 0
 
-proc post_big_popup_window {lines {title popup_data}} {
+proc vis_toplevel {w {host .} {width {}} {height {}} {title ""}} {
+    toplevel $w
+    set lx [winfo rootx $host]
+    set ly [winfo rooty $host]
+    if { $width != {} } {
+        if { $height != {} } {
+            wm geometry $w \
+                [expr $width]x[expr $height]+[expr $lx+2]+[expr $ly+2]
+        } else {
+            wm geometry $w \
+                [expr $width]x[expr $width]+[expr $lx+2]+[expr $ly+2]
+        }
+    } else {
+        wm geometry $w +[expr $lx+2]+[expr $ly+2]
+    }
+    if { $title != "" } {
+        wm title $w $title
+    }
+}
+
+proc post_big_popup_window {host_window lines {title popup_data}} {
     set w [format {.popup_data_%d} $::popup_window_cnt]
     incr ::popup_window_cnt
     catch {destroy $w}
     if { $lines == {} } return
-    vis_toplevel $w {} {} $title
+    vis_toplevel $w $host_window {} {} $title
     frame $w.txt -relief flat
 	text $w.txt.t -relief sunken -bd 2 \
 		    -yscrollcommand "$w.txt.yscroll set" \
@@ -367,12 +387,12 @@ proc post_big_popup_window {lines {title popup_data}} {
     pack $w.box -side bottom -anchor s
 }
 
-proc post_popup_window {text_item {title popup_data}} {
+proc post_popup_window {host_window text_item {title popup_data}} {
     set w [format {.popup_data_%d} $::popup_window_cnt]
     incr ::popup_window_cnt
     catch {destroy $w}
     if { $text_item == "" } return
-    vis_toplevel $w {} {} $title
+    vis_toplevel $w $host_window {} {} $title
     frame $w.txt -relief flat
 	text $w.txt.t -relief sunken -bd 2 \
 		    -yscrollcommand "$w.txt.yscroll set" \

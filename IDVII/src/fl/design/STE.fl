@@ -12,7 +12,7 @@ let bexpr_and {ant1::(bexpr#string#bexpr#int#int) list} ant2 =
 
 // A simple interface for defining 5-tuple lists for (b)STE runs.
 // This function catenates two five-tuple lists of the same type.
-overload and bdd_and bexpr_and;
+overload and bdd_and; // bexpr_and;
 infix 1 and;
 
 let bdd_when {ant::(bool#string#bool#int#int) list} {cond::bool} =
@@ -26,7 +26,7 @@ let bexpr_when {ant::(bexpr#string#bexpr#int#int) list} {cond::bexpr} =
 // A simple interface for defining 5-tuple lists for (b)STE runs.
 // This function conjucts the condition cond into every five-tuple.
 // Usage:  five_tuple_list when cond;
-overload when bdd_when bexpr_when;
+overload when bdd_when; // bexpr_when;
 infix 2 when;
 
 let bdd_is_clock nd cycles = map (\i. T, nd, (i%2=0), i, i+1) (0--(2*cycles-1));
@@ -38,7 +38,7 @@ let bexpr_is_clock nd cycles =
 // A simple interface for defining 5-tuple lists for (b)STE runs.
 // Define a node nd to be a clock and generate cycs cycles of values.
 // Usage: nd is_clock cycs;
-overload is_clock bdd_is_clock bexpr_is_clock;
+overload is_clock bdd_is_clock; // bexpr_is_clock;
 infix 2 is_clock;
 
 

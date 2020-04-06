@@ -258,7 +258,7 @@ proc wv:ww2f {ww} {
 }
 
 proc wv:post_extended_value {w vec t x y} {
-    post_big_popup_window [fl_wv_get_complete_value $w $vec $t] \
+    post_big_popup_window [fl_c2w $w] [fl_wv_get_complete_value $w $vec $t] \
 		      [format {Value for %s at time %d} $vec $t]
 }
 

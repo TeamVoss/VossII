@@ -886,7 +886,7 @@ proc cb:add_value_menu {c aname x y} {
 proc cb:post_extended_value {c aname x y sep_window} {
     if { $sep_window == 1 } {
         set time [fl_get_global_time $c]
-	post_big_popup_window [fl_get_complete_value $c $aname] \
+	post_big_popup_window [fl_c2w $c] [fl_get_complete_value $c $aname] \
                           [format {Value for %s at time %d} \
 				  [fl_tag2vec $c $aname] $time]
     } else {
@@ -1347,7 +1347,7 @@ proc is_repeat_nd {tags} {
 
 
 proc post_excitation {c node} {
-    post_popup_window [fl_get_excitation $c $node 20]
+    post_popup_window [fl_c2w $c] [fl_get_excitation $c $node 20]
 }
 
 proc popup_excitation {c node x y} {
@@ -1355,7 +1355,7 @@ proc popup_excitation {c node x y} {
 }
 
 proc post_node_name {c node} {
-    post_popup_window [fl_tag2vec $c $node]
+    post_popup_window [fl_c2w $c] [fl_tag2vec $c $node]
 }
 
 proc popup_node_name {c node x y} {
@@ -3851,6 +3851,7 @@ proc ActLowWaveForm {c x y tag} {
 		-tags [list $tag _DoNotChangeColor_]]
     $c move $f1 [expr $x-4*$s] [expr $y+4*$s]
 }
+
 proc RisingEdge {c x y tag} {
     global gcolor mfont
     set s [expr [rect_wid $c]/20]
@@ -3859,6 +3860,22 @@ proc RisingEdge {c x y tag} {
 		-tags [list $tag _DoNotChangeColor_]]
     $c move $f1 [expr $x-4*$s] [expr $y+4*$s]
 }
+
+proc ElasticRisingEdge {c x y tag} {
+    global gcolor mfont
+    set s [expr [rect_wid $c]/20]
+    set f1 [$c create line 0 0 [expr 4*$s] 0 [expr 4*$s] \
+		[expr -8*$s] [expr 8*$s] [expr -8*$s] -fill $gcolor \
+		-tags [list $tag _DoNotChangeColor_]]
+    set f2 [$c create line 0 0 \
+			  [expr 6*$s] 0 \
+			  [expr 6*$s] [expr -8*$s] \
+			  [expr 8*$s] [expr -8*$s] -fill $gcolor \
+		-tags [list $tag _DoNotChangeColor_]]
+    $c move $f1 [expr $x-4*$s] [expr $y+4*$s]
+    $c move $f2 [expr $x-4*$s] [expr $y+4*$s]
+}
+
 proc FallingEdge {c x y tag} {
     global gcolor
     set s [expr [rect_wid $c]/20]
@@ -3943,6 +3960,10 @@ proc draw_ff_fe {c tag x y} {
 
 proc draw_ff_re {c tag x y} {
     return [draw_box_pat 2 {RisingEdge} {Dlabel EdgeLabel} $c $tag $x $y]
+}
+
+proc draw_elastic_re_ff {c tag x y} {
+    return [draw_box_pat 2 {ElasticRisingEdge} {Dlabel EdgeLabel} $c $tag $x $y]
 }
 
 proc draw_dff {c tag x y} {

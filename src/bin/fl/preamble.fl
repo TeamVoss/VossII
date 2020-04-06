@@ -862,7 +862,7 @@ let cVARS s cond =
     idx != 0 =>
         eprintf "Cannot declare %s twice." (hd (el idx p))
     |
-    (var_order ss) fseq
+//    (var_order ss) fseq
     let cmd1 =
 	list2str T "val (" "," ") =\n" fst (bools@bvs)
     then
@@ -882,7 +882,7 @@ let cVARS s cond =
 	let nds = md_expand_vectors ss then
 	list2str T "  let vs = [" "," "] in\n" (sprintf "\"%s\"") nds
     in
-    let cmd6 = sprintf "  let sub = fparam vs (%s) then\n" cond in
+    let cmd6 = sprintf "  let sub = fparam vs cond then\n" in
     let cmd7 =
 	let pr (n,_) = sprintf "    (substitute sub %s)" n in
 	list2str T "\n  (\n" ",\n" "\n  )\n;" pr (bools@bvs)
@@ -1032,30 +1032,53 @@ end_abstype early_quant_thereis;
 
 begin_abstype;
 
-cletrec parametric [] f = []
- /\    parametric (n:r) f =
-    let high = substitute [(n,T)] f in
-    let low  = substitute [(n,F)] f in
-    (high == F) => F:(parametric r low) |
-    (low == F) => T:(parametric r high) |
-    let vn = variable n in
-    vn:(vn => (parametric r high) | (parametric r low))
+//cletrec parametric [] f = []
+// /\    parametric (n:r) f =
+//    f == T => map variable (n:r) |
+//    let high = substitute [(n,T)] f in
+//    let low  = substitute [(n,F)] f in
+//    (high == F) => F:(parametric r low) |
+//    (low == F) => T:(parametric r high) |
+//    let vn = variable n in
+//    vn:(vn => (parametric r high) | (parametric r low))
+//;
+//
+//// Return the parametric representation for a condition cond.
+//clet param cond =
+//    cond == F => error "Param called with F condition." |
+//    let vars = depends [cond] in
+//    zip vars (parametric vars cond)
+//;
+
+cletrec parametric rem_vars f =
+    rem_vars = [] => [] |
+    f == T => (map variable rem_vars) |
+    val (v,H,L) = top_cofactor f then
+    let idx = find_first (\n. n = v) rem_vars then
+    let unconstrained = firstn (idx-1) rem_vars then
+    let rem_vars' = butfirstn idx rem_vars then
+    (map variable unconstrained)@
+    (
+        H == F => F:(parametric rem_vars' L) |
+        L == F => T:(parametric rem_vars' H) |
+        let vn = variable v then
+        vn:(vn => (parametric rem_vars' H) | (parametric rem_vars' L))
+    )
 ;
 
 // Return the parametric representation for a condition cond.
 clet param cond =
     cond == F => error "Param called with F condition." |
-    let vars = depends [cond] in
-    zip vars (parametric vars cond)
+    let vars = depends [cond] then
+    let old = update_vossrc "DYNAMIC-ORDERING" "NO" then
+    let res = zip vars (parametric vars cond) then
+    (update_vossrc "DYNAMIC-ORDERING" old) fseq
+    res
 ;
 
 
-// Generalized param that only solves for some variables. The other
-// variables are treated as symbolic constants.
-//
-// Usage: fparam vars_to_solve_for function.
-//
-cletrec fparam vars f = vars = [] => [] |
+
+cletrec fparam_rec vars f = vars = [] => [] |
     let Quant_thereis vs f =
         quant_thereis (itlist (\v.\r. variable v OR r) vs F) f
     in
@@ -1066,25 +1089,41 @@ cletrec fparam vars f = vars = [] => [] |
     hi == F =>
         // Must be 0
         let lo = substitute [(v,F)] f in
-        (v,F):(fparam vs lo)
+        (v,F):(fparam_rec vs lo)
     |
     hi == f =>
         // Does not depend on v
         let hq = Quant_thereis vs hi in
         let pv = nvariable v in
         let bit = pv AND hq in
-        (v,bit):(fparam vs f)
+        (v,bit):(fparam_rec vs f)
     |
     let lo = substitute [(v,F)] f in
     lo == F =>
         // Must be 1
-        (v,T):(fparam vs hi)
+        (v,T):(fparam_rec vs hi)
     |
     let hq = Quant_thereis vs hi in
     let lq = Quant_thereis vs lo in
     let pv = nvariable v in
     let bit = (hq => (lq => pv | T) | F) in
-    (v,bit):(bit => (fparam vs hi) | (fparam vs lo))
+    (v,bit):(bit => (fparam_rec vs hi) | (fparam_rec vs lo))
+;
+
+// Generalized param that only solves for some variables. The other
+// variables are treated as symbolic constants.
+//
+// Usage: fparam vars_to_solve_for function.
+//
+let fparam vars f =
+    f fseq
+    ((depends f) subtract vars) != [] => fparam_rec vars f |
+    let sub = param f then
+    let cnv v = (v,(bdd_current2next (assoc v sub)))
+		catch
+		(v,(bdd_current2next (variable v)))
+    in
+    map cnv vars
 ;
 
 end_abstype param fparam;
@@ -1496,3 +1535,11 @@ let set_font font_name =
     tcl_eval [sprintf "change_fonts %s" font_name]
 ;
 non_lazy set_font;
+
+// Expand the vectors in vecs and interleave them most significant bit
+// to least significant bit.
+// For example:
+//  vec_interleave ["a[2:0]", "b[4:0]"] yields
+//  ["a[2]","b[4]","a[1]","b[3]","a[0]","b[2]","b[1]","b[0]"]
+//
+let vec_interleave vecs = interleave (map md_expand_vector vecs);

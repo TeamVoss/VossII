@@ -354,20 +354,6 @@ let bdd_signature b = defix bdd_signature b;
 // Return the BDD representing the function 'name'.
 let variable name = defix variable name;
 
-// Install a BDD variable order according to 'list'.
-// It is acceptable to use vector notation so for example
-// var_order ["a[3:0]", "b", "c[0:2]"] would be the same as
-// var_order ["a[3]","a[2]","a[1]","a[0]","b","c[0]","c[1]","c[2]"].
-// If there already are BDDs created using these variables, this operation
-// may be very slow an require excessive amounts of memory.
-// Any variables not mentioned in 'list' will keep their relative order and
-// will be placed after all the variables in 'list'.
-// Returns the (complete) variable order obtained after the re-ordering.
-// Tips: If you just want to get the current variable order, use: var_order [];
-//
-let var_order l = md_merge_vectors (var_order (md_expand_vectors l));
-non_lazy var_order;
-
 // Compute the conjunction of 'e1' and 'e2'.
 let AND e1 e2 = defix AND e1 e2;
 
@@ -1453,3 +1439,17 @@ let relprod_thereis qvars e1 e2 = (defix relprod_thereis) qvars e1 e2;
 // However, it tries to do so much more efficiently. In particular,
 // the BDD for the conjunction is never built.
 let relprod_forall qvars e1 e2 = (defix relprod_forall) qvars e1 e2;
+
+// Install a BDD variable order according to 'list'.
+// It is acceptable to use vector notation so for example
+// var_order ["a[3:0]", "b", "c[0:2]"] would be the same as
+// var_order ["a[3]","a[2]","a[1]","a[0]","b","c[0]","c[1]","c[2]"].
+// If there already are BDDs created using these variables, this operation
+// may be very slow an require excessive amounts of memory.
+// Any variables not mentioned in 'list' will keep their relative order and
+// will be placed after all the variables in 'list'.
+// Returns the (complete) variable order obtained after the re-ordering.
+// Tips: If you just want to get the current variable order, use: var_order [];
+//
+let var_order l = md_merge_vectors (var_order (md_expand_vectors l));
+non_lazy var_order;

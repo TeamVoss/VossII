@@ -149,8 +149,6 @@ typedef struct var_rec {
 } var_rec;
 
 
-
-
 typedef struct {
 	formula	lson;
 	formula	rson;
@@ -230,6 +228,13 @@ typedef struct relprod_cache_rec {
         formula         b;
         formula         result;
 } relprod_cache_rec;
+
+typedef struct param_rec    *param_ptr;
+typedef struct param_rec {
+	formula	    f;
+	param_ptr   next;
+} param_rec;
+
 
 #define B_TRUE              (ONE)
 #define B_FALSE             (ZERO)
