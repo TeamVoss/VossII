@@ -1937,6 +1937,22 @@ infix 9 ~~~;
 
 let default = {'1::bit};
 
+// Covert a hardware type to a list of bits
+let tobits t =
+    let sz = hw_size t in
+    let w = hw_destr t in
+    map (\i. hw_bit_constr (W_SLICE [i] w)) ((sz-1) downto 0)
+;
+
+// Covert a list of bits to a hardware type
+let frombits bl =
+    let rsz = hw_size {'0:: *r} in
+    rsz != length bl =>
+        eprintf "Length mismatch in frombits (%d != %d)" rsz (length bl)
+    |
+    {hw_constr (W_CAT (map hw_bit_destr bl)) :: *r}
+;
+
 //begin_abstype;
 
 let R_excluded e =
@@ -2369,10 +2385,65 @@ let EN_DECODER_list =
 );
 
 
+begin_abstype;
+
+letrec encode_rec =
+    list_input  {bl :: bit list}.
+    bit_output  valid.  
+    output      {addr :: *a}.
+    bit_internal    l_valid h_valid.
+    internal        {l_addr:: *a} {h_addr:: *a} {base:: *a}.
+    CELL "draw_hier ENCODER" (
+        bl = [] => [addr <- '0, valid <- '0] |
+        length bl = 1 => [addr <- '0, valid <- (hd bl)] |
+        let n = length bl in
+        let lsbs = lastn (n/2) bl in
+        let msbs = butlastn (n/2) bl in
+        [   
+            encode_rec lsbs l_valid l_addr,
+            encode_rec msbs h_valid h_addr,
+            valid <- l_valid '|' h_valid,
+            base <- ''(n/2),
+            addr <- (IF l_valid THEN l_addr ELSE (base '|' h_addr))
+        ]   
+);
+
+//
+// A module that takes a list of inputs and returns the address of the
+// least significant input that is 1. If there is at least one
+// such bit, the valid signal is 1. Otherwise valid is 0.
+//
+let list_ENCODER =
+    list_input  {bl :: bit list}.
+    bit_output  valid.
+    output      addr.
+    CELL "draw_hier ENCODER" [
+        let lbl = length bl in
+        let n = bits_needed (lbl-1) in
+        encode_rec ((replicate (2**n-lbl) {'0::bit})@bl) valid addr
+];
+
+//
+// A module that takes an input and returns the address of the
+// least significant bit that is 1. If there is at least one
+// such bit, the valid signal is 1. Otherwise valid is 0.
+//
+let ENCODER =
+    input   iv.
+    bit_output  valid.
+    output      addr.
+    CELL "draw_hier ENCODER" [
+	list_ENCODER (tobits iv) valid addr
+];
+
+end_abstype ENCODER list_ENCODER;
+
+
+
 let --- a b = (a, b);
 infixr 2 ---;
 
-let ROM name lines =
+let ROM name lines addr out = (
     input   addr.
     output  out.
     let a_sz = hw_size addr in
@@ -2398,7 +2469,8 @@ let ROM name lines =
     let lf = P_LEAF ((W_UPDATE_FN w_out (read (lines-1))):keeper) then
     let bd = PINST "" [] F [(s_addr,[s_addr])] [(s_out,[s_out])] [s_mem] lf then
     CELL (sprintf "draw_rom %s %d" name lines) [bd]
-;
+) addr out;
+
 
 let RAM name lines {raddr:: *a} {waddr:: *a} {din:: *d} {we::bit} {out:: *d} =
     let a_sz = hw_size raddr in
@@ -2495,20 +2567,6 @@ let MEM_WRITE name {din:: *d} {we::bit} {waddr:: *a} {mem:: *m} =
     in
     let fa_outs = [(s_mem, (get_lhs_vars (hw_destr mem)))] in
     PINST pfn [] T fa_inps fa_outs [] (P_HIER [wr])
-;
-
-let tobits t =
-    let sz = hw_size t in
-    let w = hw_destr t in
-    map (\i. hw_bit_constr (W_SLICE [i] w)) ((sz-1) downto 0)
-;
-
-let frombits bl =
-    let rsz = hw_size {'0:: *r} in
-    rsz != length bl =>
-        eprintf "Length mismatch in frombits (%d != %d)" rsz (length bl)
-    |
-    {hw_constr (W_CAT (map hw_bit_destr bl)) :: *r}
 ;
 
 letrec delay_rec N =
