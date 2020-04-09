@@ -2476,17 +2476,18 @@ let RAM name lines {raddr:: *a} {waddr:: *a} {din:: *d} {we::bit} {out:: *d} =
     let a_sz = hw_size raddr in
     lines > 2**a_sz => eprintf "Too many lines in RAM for address size" |
     let d_sz = hw_size out in
-    let s_mem = sprintf "%s[%d:0][%d:0]" name (lines-1) (d_sz-1) then
-    let W_raddr = hw_destr raddr in
-    let W_waddr = hw_destr waddr in
-    let W_din = hw_destr din in
-    let W_we = hw_bit_destr we in
-    let W_out = hw_destr out in
-    let s_raddr = sprintf "ra[%d:0]" (a_sz-1) in
-    let s_waddr = sprintf "wa[%d:0]" (a_sz-1) in
-    let s_din = sprintf "din[%d:0]" (d_sz-1) in
-    let s_out = sprintf "out[%d:0]" (d_sz-1) in
-    let s_we = "we" in
+    let mk_name base sz = sz = 1 => base | sprintf "%s[%d:0]" base (sz-1) in
+    let s_mem = mk_name (sprintf "%s[%d:0]" name (lines-1)) d_sz then
+    let s_raddr = mk_name "ra" a_sz in
+    let s_waddr = mk_name "wa" a_sz in
+    let s_we    = "we" in
+    let s_din   = mk_name "din" d_sz in
+    let s_out   = mk_name "out" d_sz in
+    let W_raddr = W_VAR a_sz "ra" in
+    let W_waddr = W_VAR a_sz "wa" in
+    let W_din   = W_VAR d_sz "din" in
+    let W_we    = W_VAR 1 "we" in
+    let W_out   = W_VAR d_sz "out" in
     letrec read i =
         i < 0 => W_X d_sz |
         let line = W_VAR d_sz (sprintf "%s[%d]" name i) in
@@ -2517,13 +2518,13 @@ let RAM name lines {raddr:: *a} {waddr:: *a} {din:: *d} {we::bit} {out:: *d} =
     then
     let pfn = sprintf "draw_ram %s %d" name lines then
     let fa_inps = [
-                  (s_raddr, (get_lhs_vars W_raddr)),
-                  (s_din, (get_lhs_vars W_din)),
-                  (s_we, (get_lhs_vars W_we)),
-                  (s_waddr, (get_lhs_vars W_waddr))
+                  (s_raddr, (get_lhs_vars (hw_destr raddr))),
+                  (s_din, (get_lhs_vars (hw_destr din))),
+                  (s_we, (get_lhs_vars (hw_bit_destr we))),
+                  (s_waddr, (get_lhs_vars (hw_destr waddr)))
                 ]
     in
-    let fa_outs = [(s_out, (get_lhs_vars W_out))] in
+    let fa_outs = [(s_out, (get_lhs_vars (hw_destr out)))] in
     PINST pfn [] T fa_inps fa_outs [s_mem] (P_HIER [rd,wr])
 ;
 

@@ -1333,6 +1333,36 @@ fanin(g_ptr redex)
 }
 
 static void
+excitation_function(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_fsm, g_node;
+    EXTRACT_2_ARGS(redex, g_fsm, g_node);
+    fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
+    string node = GET_STRING(g_node);
+    push_fsm(fsm);
+    int idx = name2idx(node);
+    if( idx < 0 ) {
+	pop_fsm();
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	return;
+    }
+    nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
+    MAKE_REDEX_NIL(redex);
+    int composite = np->composite;
+    if( composite < 0 ) {
+	MAKE_REDEX_STRING(redex, wastrsave(&strings, "Constant or input"));
+    } else {
+	ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, composite);
+	MAKE_REDEX_STRING(redex, wastrsave(&strings, op2str(cp)));
+    }
+    pop_fsm();
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
 fanin_dfs(g_ptr redex)
 {
     g_ptr g_fsm, pred, nodes;
@@ -2399,6 +2429,12 @@ Fsm_Install_Functions()
 				 GLmake_arrow(GLmake_string(),
 					      GLmake_list(GLmake_string()))),
 			fanin);
+
+    Add_ExtAPI_Function("excitation_function", "11", FALSE,
+			GLmake_arrow(fsm_handle_tp,
+				 GLmake_arrow(GLmake_string(),
+					      GLmake_string())),
+			excitation_function);
 
     Add_ExtAPI_Function("fanin_dfs", "111", FALSE,
 			GLmake_arrow(
@@ -4300,7 +4336,7 @@ print_composites(odests fp)
     ncomp_ptr	cp;
     int cnt = 0;
     FOR_BUF(compositesp, ncomp_rec, cp) {
-	FP(fp, " %3d %s sz:%d rank:%d pdel:%d ",
+	FP(fp, " %3d %10s sz:%d rank:%d pdel:%d ",
 		cnt++, op2str(cp),cp->size,cp->rank,cp->phase_delay);
 	FP(fp, "inps: ");
 	char *sep = strtemp("[");
@@ -4760,8 +4796,8 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	cr.size = sz;
 	// Must push the incomplete record on its correct place!
 	push_buf(compositesp, (pointer) &cr);
-	ilist_ptr linps = make_input_arg(l, sz, vtblp, hier, pdel);
-	ilist_ptr rinps = make_input_arg(r, sz, vtblp, hier, pdel);
+	ilist_ptr linps = make_input_arg(l, sz, vtblp, hier, FALSE);
+	ilist_ptr rinps = make_input_arg(r, sz, vtblp, hier, FALSE);
 	ilist_ptr inps = linps;
 	if( linps == NULL ) {
 	    inps = linps = rinps;
@@ -4782,8 +4818,8 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	cr.arg.extension_size = inp_sz;
 	// Must push the incomplete record on its correct place!
 	push_buf(compositesp, (pointer) &cr);
-	ilist_ptr linps = make_input_arg(l, inp_sz, vtblp, hier, pdel);
-	ilist_ptr rinps = make_input_arg(r, inp_sz, vtblp, hier, pdel);
+	ilist_ptr linps = make_input_arg(l, inp_sz, vtblp, hier, FALSE);
+	ilist_ptr rinps = make_input_arg(r, inp_sz, vtblp, hier, FALSE);
 	ilist_ptr inps = linps;
 	if( linps == NULL ) {
 	    inps = linps = rinps;
@@ -4802,14 +4838,14 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	cr.size = sz;
 	// Must push the incomplete record on its correct place!
 	push_buf(compositesp, (pointer) &cr);
-	ilist_ptr inps = make_input_arg(l, sz, vtblp, hier, pdel);
+	ilist_ptr inps = make_input_arg(l, sz, vtblp, hier, FALSE);
 	ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, comp_idx);
 	cp->inps = inps;
 	add_fanouts(inps, comp_idx);
 	return( TRUE );
     }
     if( is_W_PRED(we, &name, &l) ) {
-	if( !compile_expr(vtblp, hier, outs, l, pdel) ) {
+	if( !compile_expr(vtblp, hier, outs, l, FALSE) ) {
 	    return FALSE;
 	}
 	return TRUE;
@@ -4821,7 +4857,7 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	cr.arg.extension_size = inp_sz;
 	// Must push the incomplete record on its correct place!
 	push_buf(compositesp, (pointer) &cr);
-	ilist_ptr inps = make_input_arg(l, inp_sz, vtblp, hier, pdel);
+	ilist_ptr inps = make_input_arg(l, inp_sz, vtblp, hier, FALSE);
 	ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, comp_idx);
 	cp->inps = inps;
 	add_fanouts(inps, comp_idx);
@@ -4834,7 +4870,7 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	cr.arg.extension_size = inp_sz;
 	// Must push the incomplete record on its correct place!
 	push_buf(compositesp, (pointer) &cr);
-	ilist_ptr inps = make_input_arg(l, inp_sz, vtblp, hier, pdel);
+	ilist_ptr inps = make_input_arg(l, inp_sz, vtblp, hier, FALSE);
 	ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, comp_idx);
 	cp->inps = inps;
 	add_fanouts(inps, comp_idx);
@@ -4846,9 +4882,9 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	cr.size = sz;
 	// Must push the incomplete record on its correct place!
 	push_buf(compositesp, (pointer) &cr);
-	ilist_ptr cinps = make_input_arg(cond, 1, vtblp, hier, pdel);
-	ilist_ptr linps = make_input_arg(l, sz, vtblp, hier, pdel);
-	ilist_ptr rinps = make_input_arg(r, sz, vtblp, hier, pdel);
+	ilist_ptr cinps = make_input_arg(cond, 1, vtblp, hier, FALSE);
+	ilist_ptr linps = make_input_arg(l, sz, vtblp, hier, FALSE);
+	ilist_ptr rinps = make_input_arg(r, sz, vtblp, hier, FALSE);
 	ilist_ptr inps = cinps;
 	while(cinps->next != NULL) { cinps = cinps->next; }
 	cinps->next = linps;
@@ -4882,7 +4918,7 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	// Must push the incomplete record on its correct place!
 	push_buf(compositesp, (pointer) &cr);
 	int inp_sz = get_wexpr_size(r);
-	ilist_ptr inps = make_input_arg(r, inp_sz, vtblp, hier, pdel);
+	ilist_ptr inps = make_input_arg(r, inp_sz, vtblp, hier, FALSE);
 	ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, comp_idx);
 	cp->inps = inps;
 	if( inp_sz != compute_ilist_length(inps) ) {
@@ -4918,7 +4954,7 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	while( !IS_NIL(l) ) {
 	    g_ptr e = GET_CONS_HD(l);
 	    int sz = get_wexpr_size(e);
-	    ilist_ptr tmp = make_input_arg(e, sz, vtblp, hier, pdel);
+	    ilist_ptr tmp = make_input_arg(e, sz, vtblp, hier, FALSE);
 	    if( cur == NULL ) {
 		inps = tmp;
 		cur = inps;
@@ -4942,11 +4978,11 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	cr.arg.mem.lines = lines;
 	cr.arg.mem.data_size = d_sz;
 	push_buf(compositesp, (pointer) &cr);
-	ilist_ptr inps = make_input_arg(addr, a_sz, vtblp, hier, pdel);
+	ilist_ptr inps = make_input_arg(addr, a_sz, vtblp, hier, FALSE);
 	ilist_ptr cur = inps;
 	while( cur->next != NULL ) cur = cur->next;
 	int mem_sz = lines * d_sz;
-	cur->next = make_input_arg(mem, mem_sz, vtblp, hier, pdel);
+	cur->next = make_input_arg(mem, mem_sz, vtblp, hier, FALSE);
 	ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, comp_idx);
 	cp->inps = inps;
 	add_fanouts(inps, comp_idx);
@@ -4961,12 +4997,12 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	cr.arg.mem.lines = lines;
 	cr.arg.mem.data_size = d_sz;
 	push_buf(compositesp, (pointer) &cr);
-	ilist_ptr inps = make_input_arg(addr, a_sz, vtblp, hier, pdel);
+	ilist_ptr inps = make_input_arg(addr, a_sz, vtblp, hier, FALSE);
 	ilist_ptr cur = inps;
 	while( cur->next != NULL ) cur = cur->next;
-	cur->next = make_input_arg(data, d_sz, vtblp, hier, pdel);
+	cur->next = make_input_arg(data, d_sz, vtblp, hier, FALSE);
 	while( cur->next != NULL ) cur = cur->next;
-	cur->next = make_input_arg(mem, mem_sz, vtblp, hier, pdel);
+	cur->next = make_input_arg(mem, mem_sz, vtblp, hier, FALSE);
 	ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, comp_idx);
 	cp->inps = inps;
 	add_fanouts(inps, comp_idx);

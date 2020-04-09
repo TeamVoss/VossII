@@ -1,0 +1,40 @@
+load "ste.fl";
+
+TYPE "byte" 4;
+
+STRUCT "p_byte" [("valid", "bit"), ("stop", "bit"), ("data", "byte")];
+
+let EB_join2 =      
+    bit_input   vld_1.
+    bit_output  stp_1. 
+    bit_input   vld_2.
+    bit_output  stp_2.
+    bit_output  vld.
+    bit_input   stp.
+    //
+    bit_internal    m1 m2.
+    CELL "draw_hier join2" [
+        m1 <- '~' (vld '&' m2),
+        m2 <- '~' stp,
+        stp_1 <- vld_1 '&' m1,
+        stp_2 <- vld_2 '&' m1,
+        vld <- vld_1 '&' vld_2
+];
+
+let tst =
+    p_byte_input    a b.
+    p_byte_output   res.
+    //
+    bit_internal    vld stp.
+    CELL "tst" [
+        EB_join2 (a-->valid) (a-->stop) (b-->valid) (b-->stop) vld stp
+];
+
+let p = tst 'a 'b 'res;
+//p;
+
+let ckt = pexlif2fsm p;
+ckt;
+
+visualize_fanin ckt [] [] 5 ["vld"] 0;
+//STE_debug ckt;

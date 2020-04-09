@@ -1,0 +1,92 @@
+load "ste.fl";
+
+let ADDR_SZ = 2;
+let LINES = 2**ADDR_SZ;
+
+TYPE "addr" ADDR_SZ;
+
+TYPE "data" 1;
+
+
+let RAM_example =
+    addr_input  addr.
+    bit_input   write.
+    data_input  din.
+    data_output dout.
+    //
+    CELL "draw_hier RAM" [
+        RAM "mem" LINES addr addr din write dout
+];
+
+let p = (RAM_example 'addr 'write 'din 'dout);
+let ckt = pexlif2fsm p;
+
+p;
+
+update_vossrc "VERBOSE-FSM-PRINT" "YES";
+ckt;
+
+    
+let ant =
+    "addr[1:0]" is 0x0 for 1 phase followed_by
+                   0x1 for 1 phase followed_by
+                   0x2 for 1 phase followed_by
+                   0x3 for 1 phase followed_by
+                   0x0 for 1 phase followed_by
+                   0x1 for 1 phase followed_by
+                   0x2 for 1 phase followed_by
+                   0x3 for 1 phase
+  and
+    "din" is "d0" for 1 phase followed_by
+	     "d1" for 1 phase followed_by
+	     "d2" for 1 phase followed_by
+	     "d3" for 1 phase followed_by
+	     "d4" for 1 phase followed_by
+	     "d5" for 1 phase followed_by
+	     "d6" for 1 phase followed_by
+	     "d7" for 1 phase
+  and
+    "write" is 1 for 4 phases otherwise 0 until 8 phases
+;
+ant;
+
+let ant = [(T, ("addr[1]", (F, (0, 1)))),(T, ("addr[0]", (F, (0, 1)))),(T, ("addr[1]", (F, (1, 2)))),(T, ("addr[0]", (T, (1, 2)))),(T, ("addr[1]", (T, (2, 3)))),(T, ("addr[0]", (F, (2, 3)))),(T, ("addr[1]", (T, (3, 4)))),(T, ("addr[0]", (T, (3, 4)))),(T, ("addr[1]", (F, (4, 5)))),(T, ("addr[0]", (F, (4, 5)))),(T, ("addr[1]", (F, (5, 6)))),(T, ("addr[0]", (T, (5, 6)))),(T, ("addr[1]", (T, (6, 7)))),(T, ("addr[0]", (F, (6, 7)))),(T, ("addr[1]", (T, (7, 8)))),(T, ("addr[0]", (T, (7, 8)))),(T, ("din", ((variable "d0"), (0, 1)))),(T, ("din", ((variable "d1"), (1, 2)))),(T, ("din", ((variable "d2"), (2, 3)))),(T, ("din", ((variable "d3"), (3, 4)))),(T, ("din", ((variable "d4"), (4, 5)))),(T, ("din", ((variable "d5"), (5, 6)))),(T, ("din", ((variable "d6"), (6, 7)))),(T, ("din", ((variable "d7"), (7, 8)))),(T, ("write", (T, (0, 4)))),(T, ("write", (F, (4, 8))))];
+
+update_vossrc "VERBOSE-STE-RUN" "NO";
+
+let vs = STE "-e" ckt [] ant [] [];
+
+let nd = "i1/mem[0]";
+get_trace_val vs nd 0;
+excitation_function ckt nd;
+
+fanin ckt nd;
+map (\n. get_trace_val vs n 0) it;
+
+let nd = "i1/i2/__tmp1[0]";
+excitation_function ckt nd;
+get_trace_val vs nd 0;
+fanin ckt nd;
+map (\n. get_trace_val vs n 0) it;
+
+let nd = "i1/i2/__tmp11";
+excitation_function ckt nd;
+get_trace_val vs nd 0;
+fanin ckt nd;
+map (\n. get_trace_val vs n 0) it;
+
+let nd = "i1/i2/__tmp12";
+excitation_function ckt nd;
+get_trace_val vs nd 0;
+fanin ckt nd;
+map (\n. get_trace_val vs n 0) it;
+
+let nd = "i1/i2/__tmp13[1]";
+excitation_function ckt nd;
+get_trace vs nd;
+
+update_vossrc "VERBOSE-STE-RUN" "YES";
+STE "" ckt [] ant [] [
+("i1/i2/__tmp13[1]",0,10),
+("i1/i2/__tmp13[0]",0,10),
+("i1/i2/__tmp12",0,10)];
