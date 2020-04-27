@@ -148,6 +148,7 @@ static string	    s_W_ZX;
 static string	    s_W_ITE;
 static string	    s_W_SLICE;
 static string	    s_W_NAMED_SLICE;
+static string	    s_W_UPDATE_NAMED_SLICE;
 static string	    s_W_CAT;
 static string	    s_W_MEM_READ;
 static string	    s_W_MEM_WRITE;
@@ -327,6 +328,8 @@ static bool         is_W_ITE(g_ptr node, g_ptr *condp, g_ptr *tp, g_ptr *ep);
 static bool         is_W_SLICE(g_ptr node, g_ptr *idxlistp, g_ptr *ep);
 static bool         is_W_NAMED_SLICE(g_ptr node, string *namep, g_ptr *idxlistp,
                                      g_ptr *ep);
+static bool         is_W_UPDATE_NAMED_SLICE(g_ptr node, g_ptr *basep,
+				    string *namep, g_ptr *idxlistp, g_ptr *ep);
 static bool         is_W_CAT(g_ptr node, g_ptr *listp);
 static bool         destr_MEM(g_ptr node, int *a_szp, int *linesp, int *d_szp);
 static bool         is_W_MEM_READ(g_ptr node, int *a_szp, int *linesp,
@@ -366,6 +369,7 @@ static void         op_ASHR(ncomp_ptr op);
 static void         op_SX(ncomp_ptr op);
 static void         op_ZX(ncomp_ptr op);
 static void         op_SLICE(ncomp_ptr op);
+static void	    op_UPDATE_SLICE(ncomp_ptr op);
 static void         op_WIRE(ncomp_ptr op);
 static void         op_MEM_READ(ncomp_ptr op);
 static void         op_MEM_WRITE(ncomp_ptr op);
@@ -435,7 +439,6 @@ static g_ptr        mk_W_SX(g_ptr sz, g_ptr w);
 static g_ptr        mk_W_ZX(g_ptr sz, g_ptr w);
 static g_ptr        mk_W_ITE(g_ptr cond, g_ptr t, g_ptr e);
 static g_ptr        mk_W_SLICE(g_ptr indices, g_ptr w);
-static g_ptr        mk_W_NAMED_SLICE(g_ptr name, g_ptr indices, g_ptr w);
 static g_ptr        mk_W_CAT(g_ptr parts);
 static g_ptr        mk_W_MEM_READ(g_ptr info, g_ptr mem, g_ptr addr);
 static g_ptr        mk_W_MEM_WRITE(g_ptr info, g_ptr mem, g_ptr addr,
@@ -458,7 +461,6 @@ static string       create_merge_component(int sz, int *ccnt, g_ptr *intsp,
                                            buffer *chbufp);
 static g_ptr        clean_pexlif_ios(g_ptr node);
 static string	    find_instance_name(g_ptr attrs);
-
 
 #define FOREACH_NODE(i, il) \
     for(ilist_ptr _l = il; _l != NULL; _l = _l->next) \
@@ -514,6 +516,7 @@ Fsm_Init()
     s_W_ITE =	       Mk_constructor_name("W_ITE");
     s_W_SLICE =	       Mk_constructor_name("W_SLICE");
     s_W_NAMED_SLICE =  Mk_constructor_name("W_NAMED_SLICE");
+    s_W_UPDATE_NAMED_SLICE = Mk_constructor_name("W_UPDATE_NAMED_SLICE");
     s_W_CAT =	       Mk_constructor_name("W_CAT");
     s_W_MEM_READ =     Mk_constructor_name("W_MEM_READ");
     s_W_MEM_WRITE =    Mk_constructor_name("W_MEM_WRITE");
@@ -847,17 +850,36 @@ DBG_print_vec_ptr(vec_ptr vp)
     FP(err_fp, "\n");
 }
 
-
-void
-DBG_print_ilist(ilist_ptr il)
+static void
+base_print_ilist(ilist_ptr il)
 {
     g_ptr nds = ilist2nds(il);
     g_ptr res = Merge_Vectors(nds, TRUE);
-    FP(err_fp, " ilist:");
     while( !IS_NIL(res) ) {
 	FP(err_fp, " %s", GET_STRING(GET_CONS_HD(res)));
 	res = GET_CONS_TL(res);
     }
+}
+
+void
+DBG_print_ilist(ilist_ptr il)
+{
+    FP(err_fp, " ilist:");
+    base_print_ilist(il);
+    FP(err_fp, "\n");
+}
+
+void
+DBG_print_vis_io_ptr(vis_io_ptr vp)
+{
+    FP(err_fp, " vis_io_ptr:");
+    while( vp ) {
+	FP(err_fp, " %s [", vp->f_vec);
+	base_print_ilist(vp->acts);
+	FP(err_fp, "]");
+	vp = vp->next;
+    }
+    FP(err_fp, "\n");
 }
 
 void
@@ -4261,6 +4283,19 @@ op2str(ncomp_ptr cp)
 	strappend("]");
 	return ret;
     }
+    else if( op == op_UPDATE_SLICE ) {
+	string ret = strtemp("op_UPDATE_SLICE [");
+	idx_list_ptr ip = cp->arg.idx_list;
+	char sep = ' '; 
+	while( ip != NULL ) {
+	    Sprintf(buf, "%c%d", sep, ip->idx);
+	    sep = ',';
+	    strappend(buf);
+	    ip = ip->next;
+	}
+	strappend("]");
+	return ret;
+    }
     else if( op == op_WIRE ) return( strtemp("op_WIRE") );
     else if( op == op_MEM_READ ) {
 	Sprintf(buf, "op_MEM_READ %d %d %d", cp->arg.mem.addr_size,
@@ -4595,7 +4630,7 @@ get_wexpr_size(g_ptr we)
     int sz;
     arbi_T ai;
     string s;
-    g_ptr  c, l, r;
+    g_ptr  b, c, l, r;
     wl_op  op;
   size_start:
     if( is_W_X(we, &sz) ) { return sz; }
@@ -4625,6 +4660,10 @@ get_wexpr_size(g_ptr we)
 	    l = GET_CONS_TL(l);
 	}
 	return sz;
+    }
+    if( is_W_UPDATE_NAMED_SLICE(we, &b, &s, &l, &r) ) {
+	we = b;
+	goto size_start;
     }
     if( is_W_CAT(we, &l) ) {
 	sz = 0;
@@ -4742,7 +4781,7 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
     int sz;
     string base;
     wl_op op;
-    g_ptr l, r;
+    g_ptr b, l, r;
     g_ptr cond;
     int comp_idx = COUNT_BUF(compositesp);
     int osz = 0;
@@ -4942,6 +4981,57 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	}
 	cp->arg.idx_list = idx_list;
 	return( TRUE );
+    }
+    if( is_W_UPDATE_NAMED_SLICE(we, &b, &name, &l, &r) ) {
+	cr.op = op_UPDATE_SLICE;
+	int osz = compute_ilist_length(outs);
+	int sel_sz = 0;
+	for(g_ptr cur = l; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
+            sel_sz++;
+        }
+	int base_sz = get_wexpr_size(b);
+	if( base_sz != osz ) {
+	    FP(err_fp, "Update-slice with invalid base size (%d!=%d)\n",
+		    base_sz, osz);
+	    report_source_locations();
+	    Rprintf("");
+	}
+	int inp_sz = get_wexpr_size(r);
+	if( inp_sz != sel_sz ) {
+	    FP(err_fp, "Update-slice with invalid input size (%d!=%d)\n",
+		    inp_sz, sel_sz);
+	    report_source_locations();
+	    Rprintf("");
+	}
+	// Must push the incomplete record on its correct place!
+	cr.size = osz;
+	push_buf(compositesp, (pointer) &cr);
+	ilist_ptr linps = make_input_arg(b, osz, vtblp, hier, FALSE);
+	ilist_ptr rinps = make_input_arg(r, inp_sz, vtblp, hier, FALSE);
+        ilist_ptr inps = linps;
+        if( linps == NULL ) {
+            inps = linps = rinps;
+        } else {
+            while( linps->next != NULL ) { linps = linps->next; }
+            linps->next = rinps;
+        }
+        ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, comp_idx);
+        cp->inps = inps;
+        add_fanouts(inps, comp_idx);
+	idx_list_ptr idx_list = NULL;
+	idx_list_ptr *prevp;
+	prevp = &idx_list;
+	while( !IS_NIL(l) ) {
+	    int idx = GET_INT(GET_CONS_HD(l));
+	    idx_list_ptr cur = (idx_list_ptr) new_rec(idx_list_rec_mgrp);
+	    cur->idx = osz-idx-1;
+	    cur->next = NULL;
+	    *prevp = cur;
+	    prevp = &(cur->next);
+	    l = GET_CONS_TL(l);
+	}
+	cp->arg.idx_list = idx_list;
+        return( TRUE );
     }
     if( is_W_CAT(we, &l) ) {
 	cr.op = op_WIRE;
@@ -5828,6 +5918,20 @@ is_W_NAMED_SLICE(g_ptr node, string *namep, g_ptr *idxlistp, g_ptr *ep)
 }
 
 static bool
+is_W_UPDATE_NAMED_SLICE(g_ptr node, g_ptr *bp,
+				    string *namep, g_ptr *idxlistp, g_ptr *ep)
+{
+    g_ptr nm;
+    EXTRACT(*ep);
+    EXTRACT(*idxlistp);
+    EXTRACT(nm);
+    EXTRACT(*bp);
+    if( !IS_CONSTRUCTOR(W_UPDATE_NAMED_SLICE, node) ) { return FALSE; }
+    *namep = GET_STRING(nm);
+    return TRUE;
+}
+
+static bool
 is_W_CAT(g_ptr node, g_ptr *listp)
 {
     EXTRACT(*listp);
@@ -6569,6 +6673,26 @@ op_SLICE(ncomp_ptr op)
 	OUT_H(i) = INP_H(ti);
 	OUT_L(i) = INP_L(ti);
 	il = il->next;
+    }
+}
+
+static void
+op_UPDATE_SLICE(ncomp_ptr op)
+{
+    // First the default values
+    FROM_MSB_TO_LSB(op->size, i) {
+	OUT_H(i) = INP_H(i);
+	OUT_L(i) = INP_L(i);
+    }
+    // Then replace selected bits
+    idx_list_ptr il = op->arg.idx_list;
+    int idx = 0;
+    while( il != NULL ) {
+	int ti = il->idx;
+	OUT_H(ti) = INP_H(idx+op->size);
+	OUT_L(ti) = INP_L(idx+op->size);
+	il = il->next;
+	idx++;
     }
 }
 
@@ -7467,13 +7591,13 @@ limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
 	nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, nd);
 	vis_ptr vp = get_vis_info_at_level(np->draw_info, draw_level);
 	int new_type;
-	if( nd <= 3 ) {
+	if( vp ) {
+	    cur_info = vp;
+	    new_type = cur_info->id;
+	} else if( nd <= 3 ) {
 	    new_type = -2;
 	} else if( np->is_top_input ) {
 	    new_type = -1;
-	} else  if( vp ) {
-	    cur_info = vp;
-	    new_type = cur_info->id;
 	} else {
 	    new_type = -3;
 	}
@@ -7667,10 +7791,10 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	   int draw_level)
 {
     string anon;
-    sch_ptr ires;
+//    sch_ptr ires;
 
     // Top-level inputs are always drawn
-    if( (ires = is_input(vsp, il)) != NULL ) { return ires; }
+//    if( (ires = is_input(vsp, il)) != NULL ) { return ires; }
 
     // Is it aldready drawn
     if( (anon = (string) find_hash(&(vsp->done), il)) != NULL ) {
@@ -7745,27 +7869,6 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	    res->children = NULL;
 	    return(res );
 	}
-	// Some of the nodes are interface nodes, but not all
-	// Must create a draw_concat 2 symbol and
-	// call draw_fanin recursively.
-	string pfn = strtemp("draw_concat 2");
-	pfn = wastrsave(&strings, pfn);
-	sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
-	res->vec = anon;
-	res->pfn = pfn;
-	//
-	sch_ptr s_child = draw_fanin(vsp, ifc_ilist, levels, -1, draw_level);
-	sch_list_ptr s_sl = (sch_list_ptr) new_rec(&(vsp->sch_list_rec_mgr));
-	s_sl->sch = s_child;
-	//
-	sch_ptr r_child = draw_fanin(vsp, rem_ilist, levels, -1, draw_level);
-	sch_list_ptr r_sl = (sch_list_ptr) new_rec(&(vsp->sch_list_rec_mgr));
-	r_sl->sch = r_child;
-	//
-	s_sl->next = r_sl;
-	r_sl->next = NULL;
-	res->children = s_sl;
-	return( res );
     }
 
     if( levels <= 0 && (levels < -10 || ilist_is_user_defined(il)) ) {
@@ -7803,13 +7906,13 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, nd);
 	vis_ptr vp = get_vis_info_at_level(np->draw_info,draw_level);
 	int new_type;
-	if( nd <= 3 ) {
+	if( vp ) {
+	    cur_info = vp;
+	    new_type = cur_info->id;
+	} else if( nd <= 3 ) {
 	    new_type = -2;
 	} else if( np->is_top_input ) {
 	    new_type = -1;
-	} else  if( vp ) {
-	    cur_info = vp;
-	    new_type = cur_info->id;
 	} else {
 	    new_type = -3;
 	}
@@ -8187,18 +8290,6 @@ mk_W_SLICE(g_ptr indices, g_ptr w)
     res = Make_CONS_ND(res, w);
     return res;
 }
-
-
-static g_ptr
-mk_W_NAMED_SLICE(g_ptr name, g_ptr indices, g_ptr w)
-{
-    g_ptr res = Make_STRING_leaf(s_W_NAMED_SLICE);
-    res = Make_CONS_ND(res, name);
-    res = Make_CONS_ND(res, indices);
-    res = Make_CONS_ND(res, w);
-    return res;
-}
-
 
 static g_ptr
 mk_W_CAT(g_ptr parts)
@@ -8643,6 +8734,8 @@ clean_pexlif_ios(g_ptr node)
     return res;
 }
 
+
+
 // Dummy function to make these function appear to be used.
 void
 _DuMMy_fsm()
@@ -8668,7 +8761,6 @@ _DuMMy_fsm()
     mk_W_SX(NULL, NULL);
     mk_W_ZX(NULL, NULL);
     mk_W_ITE(NULL, NULL, NULL);
-    mk_W_NAMED_SLICE(NULL, NULL, NULL);
     mk_W_MEM_READ(NULL, NULL, NULL);
     mk_W_MEM_WRITE(NULL, NULL, NULL, NULL);
     mk_W_PHASE_DELAY(NULL, NULL);

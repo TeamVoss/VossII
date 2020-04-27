@@ -76,6 +76,8 @@ lettype wexpr =
         |   W_ITE \{cond::wexpr\} \{t::wexpr\} \{e::wexpr\}
         |   W_SLICE \{indices::int list\} \{w::wexpr\}
         |   W_NAMED_SLICE \{name::string\} \{indices::int list\} \{w::wexpr\}
+	|   W_UPDATE_NAMED_SLICE \{base::wexpr\}
+                                 \{name::string\} \{indices::int list\} \{new::wexpr\}
         |   W_CAT \{parts::wexpr list\}
         |   W_MEM_READ \{info::mem\} \{mem::wexpr\} \{addr::wexpr\}
         |   W_MEM_WRITE \{info::mem\} \{mem::wexpr\} \{addr::wexpr\} \{data::wexpr\}

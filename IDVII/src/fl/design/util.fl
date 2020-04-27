@@ -182,6 +182,7 @@ let w_depends we =
      /\    dep (W_ITE c t e) = (dep c) fseq(dep t) fseq(dep e)
      /\    dep (W_SLICE indices w) = dep w
      /\    dep (W_NAMED_SLICE name indices w) = dep w
+     /\    dep (W_UPDATE_NAMED_SLICE b name indices w) = (dep b) fseq (dep w)
      /\    dep (W_CAT parts) = foreach dep parts
      /\    dep (W_MEM_READ info mem addr) = (dep mem) fseq (dep addr)
      /\    dep (W_MEM_WRITE info mem addr data) =
@@ -241,6 +242,7 @@ letrec wexpr_size wexpr =
 	get_size2 a b
      /\ wsz (W_SLICE indices w) = length indices
      /\ wsz (W_NAMED_SLICE name indices w) = length indices
+     /\ wsz (W_UPDATE_NAMED_SLICE base name indices w) = wexpr_size base
      /\ wsz (W_CAT wl) = itlist (\w.\r. wexpr_size w + r) wl 0
      /\ wsz (W_MEM_READ info mem addr) =
 	val (MEM a_sz lines d_sz) = info in
@@ -308,6 +310,8 @@ cletrec wexpr_is_binary (W_X sz) = F
 	    wexpr_is_binary c AND wexpr_is_binary t AND wexpr_is_binary e
  /\     wexpr_is_binary (W_SLICE indices w) = wexpr_is_binary w
  /\     wexpr_is_binary (W_NAMED_SLICE name indices w) = wexpr_is_binary w
+ /\     wexpr_is_binary (W_UPDATE_NAMED_SLICE base name indices w) =
+	    wexpr_is_binary base AND wexpr_is_binary w
  /\     wexpr_is_binary (W_CAT wl) =
 	    itlist (\w.\l. (wexpr_is_binary w) AND l) wl T
  /\     wexpr_is_binary (W_MEM_READ info mem addr) =
@@ -431,6 +435,31 @@ cletrec wexpr2bool (W_NAMED_CONST name sz v) =
 	    let bv = wexpr2bool w in
 	    let l = length bv in
 	    map (\idx. el (l-idx) bv) indices
+ /\     wexpr2bool (W_UPDATE_NAMED_SLICE old name indices new) =
+	    let old_bv = wexpr2bool old in
+	    let new_bv = wexpr2bool new in
+	    let sz = length old_bv in
+	    let new_map = zip indices ((length indices-1) downto 0) in
+	    let get_el idx l = el (length l - idx) l in
+	    let mk_part inside f t =
+		inside =>
+		    let sel_indices = map (\i. assoc i new_map) (f downto t) in
+		    map (\i. get_el i new_bv) sel_indices
+		|
+		    map (\i. get_el i old_bv) (f downto t)
+	    in
+	    letrec collect inside f cur (idx:idxs) =
+		let new_inside = mem idx indices then
+		(new_inside = inside) => collect inside f idx idxs |
+		// Switching from inside to outside or vice versa
+		let part = mk_part inside f cur in
+		part@(collect new_inside idx idx idxs)
+	      /\   collect inside f cur [] =
+		let part = mk_part inside f cur in 
+		part
+	    in
+	    let start = sz-1 in
+	    collect (mem start indices) start start ((start-1) downto 0)
  /\     wexpr2bool (W_CAT wl) = itlist (\w.\l. (wexpr2bool w)@l) wl []
  /\     wexpr2bool (W_MEM_READ info mem addr) =
 	    val (MEM a_sz lines d_sz) = info in
@@ -496,6 +525,8 @@ let w_substitute sub we =
      /\     do (W_SLICE indices w) = (W_SLICE indices (do w))
      /\     do (W_NAMED_SLICE name indices w) =
 	    (W_NAMED_SLICE name indices (do w))
+     /\     do (W_UPDATE_NAMED_SLICE base name indices w) =
+	    (W_UPDATE_NAMED_SLICE (do base) name indices (do w))
      /\     do (W_CAT wl) = W_CAT (map do wl)
      /\     do (W_MEM_READ info mem addr) =
 		W_MEM_READ info (do mem) (do addr)

@@ -1,0 +1,20 @@
+load "ste.fl";
+
+TYPE "byte" 8;
+
+STRUCT "foo" [("valid", "bit"), ("data", "byte")];
+
+
+let p = 'a <- '0<--valid ? '1
+	        <--data ? '0xc
+;
+
+p;
+
+update_vossrc "VERBOSE-FSM-PRINT" "YES";
+
+let ckt = pexlif2fsm p;
+
+ckt;
+
+STE_debug ckt;

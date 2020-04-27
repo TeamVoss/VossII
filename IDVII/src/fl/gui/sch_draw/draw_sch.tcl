@@ -4112,6 +4112,8 @@ proc fsm:display_fsm {sch_c aname fsm_name dot_pgm states edges inps} {
     foreach t [$c find all] {
 	if ![catch {$c itemcget $t -text} txt] {
 	    set tag [$c gettags $t]
+	    $c itemconfigure $tag -font $::base_mfont
+	    $c addtag "_IsTeXt_" withtag $tag 
 	    if [regexp "0node.*" $tag] {
 		set rtag "1[string range $tag 1 end]"
 		set ::fsm_node2circle_tag($c,$txt) $rtag
@@ -4132,6 +4134,7 @@ proc fsm:display_fsm {sch_c aname fsm_name dot_pgm states edges inps} {
 	val {i_name r_name} $st
 	set t [$c create text $lx $cy -anchor w -justify left \
 		-font $::mfont($c) -text "$i_name = $r_name"]
+	add_font_tags $c $t _IsTeXt_
 	val {tlx tly tux tuy} [$w.c bbox $t]
 	if { $tux > $rx } { set rx $tux }
 	set cy [expr $cy + 2*[min_sep $c]]
@@ -4158,8 +4161,9 @@ proc fsm:display_fsm {sch_c aname fsm_name dot_pgm states edges inps} {
     set cnt 1
     foreach inp $inps {
 	set txt [format {i%d = %s} $cnt $inp]
-	$c create text $lx $cy -anchor w -justify left \
-		-font $::mfont($c) -text $txt
+	set t [$c create text $lx $cy -anchor w -justify left \
+		-font $::mfont($c) -text $txt]
+	add_font_tags $c $t _IsTeXt_
 	incr cnt
 	set cy [expr $cy + 2*[min_sep $c]]
     }

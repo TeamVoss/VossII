@@ -36,5 +36,11 @@ let p = tst 'a 'b 'res;
 let ckt = pexlif2fsm p;
 ckt;
 
-visualize_fanin ckt [] [] 5 ["vld"] 0;
-//STE_debug ckt;
+let ifc_list = flatmap snd (get_visualization_fanins ckt "vld" 0);
+
+visualize_fanin ckt [] ifc_list 100 ["a[4]", "b[4]", "vld"] 1;
+
+//visualize_fanin ckt [] [] 5 ["vld"] 0;
+let vis = STE_debug ckt;
+
+

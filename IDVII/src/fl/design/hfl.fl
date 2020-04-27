@@ -118,6 +118,7 @@ cletrec dep (W_X sz) = []
  /\     dep (W_ITE c t e) = (dep c) union (dep t) union (dep e)
  /\     dep (W_SLICE indices w) = dep w
  /\     dep (W_NAMED_SLICE name indices w) = dep w
+ /\     dep (W_UPDATE_NAMED_SLICE base name indices w) = dep base union dep w
  /\     dep (W_CAT parts) =itlist (\e.\r. dep e union r) parts []
  /\     dep (W_MEM_READ info mem addr) = (dep mem) union (dep addr)
  /\     dep (W_MEM_WRITE info mem addr data) =
@@ -155,7 +156,12 @@ let base_compact_wprint inps rhs =
      /\    P pri (W_EQ  a b) =
 		pri > 3 => sprintf "(%s=%s)" (P 3 a) (P 3 b)
 			 | sprintf "%s=%s" (P 3 a) (P 3 b)
-     /\    P pri (W_PRED name cond) = sprintf "%s" name
+     /\    P pri (W_PRED name cond) =
+	    let inps = get_wbase_names cond in
+	    let sassoc i al = (assoc i al) catch 999 in
+	    let vinps = map (\i. sprintf "i%d" (sassoc i i_map)) inps in
+	    let args = list2str T "(" "," ")" id (qsort node_name_cmp vinps) in
+	    sprintf "%s%s" name args
      /\    P pri (W_GR  (W_CONST sz v) b) =
 		pri > 3 => sprintf "(%s<%s)" (P 3 b) (P 3 (W_CONST sz v))
 			 | sprintf "%s<%s" (P 3 b) (P 3 (W_CONST sz v))
@@ -200,6 +206,19 @@ let base_compact_wprint inps rhs =
      /\    P pri (W_NAMED_SLICE name indices w) =
 		pri > 9 => sprintf "(%s-->%s)" (P 9 w) name
 			 | sprintf "%s-->%s" (P 9 w) name
+     /\    P pri (W_UPDATE_NAMED_SLICE base name ids w) = 
+		letrec get_exprs (W_UPDATE_NAMED_SLICE base name ids w) =
+		    (sprintf "%s ? %s" name (P 10 w)):(get_exprs base)
+		 /\    get_exprs other = [(P 10 other)]
+		in
+		let lines = get_exprs (W_UPDATE_NAMED_SLICE base name ids w) in
+		val (s_base:rem) = rev lines in
+		let max_rem_len = itlist (\s.\m. max m (strlen s)) rem 0 in
+		let rem' = map (sprintf "%-*s\n" (max_rem_len+1)) rem in
+		let pre = sprintf "%s<--" s_base in
+		let sep = sprintf "%*s<--" (strlen s_base) "" in
+		let post = "" in
+		list2str T pre sep post id rem'
      /\    P pri (W_CAT parts) =
 		let in_one = list2str T "{" "," "}" (P 1) parts then
 		strlen in_one <= 10 => in_one |
@@ -308,6 +327,44 @@ let is_LEQ (W_NOT (W_GR a b)) = T
 
 let dest_LEQ (W_NOT (W_GR a b)) = [a,b];
 
+letrec is_tuple (W_CAT [e1, e2]) =
+    let is_slice (W_SLICE l e) = T
+     /\ is_slice other = F
+    in
+    (is_slice e1 OR is_tuple e1) AND
+    (is_slice e2 OR is_tuple e2)
+ /\    is_tuple other = F
+;
+
+let tuple2tcl inps e =
+    letrec match (W_CAT [e,f]) = match e @ match f
+     /\    match (W_SLICE l e) = match e
+     /\    match other = [other]
+    in
+    let es = setify (match e) in
+    length es != 1 => error "Not a pair operator" |
+    let expr = hd es in
+    letrec cat2tuple top (W_CAT [e1, e2]) =
+        let s1 = cat2tuple T e1 in
+        let s2 = cat2tuple F e2 in
+        top => sprintf "(%s, %s)" s1 s2 | sprintf "%s, %s" s1 s2
+    /\     cat2tuple top other = inp2tcl inps other
+    in
+    let clean (W_ITE c t e) =
+        let sc = sprintf "IF %s THEN" (inp2tcl inps c) in
+        let st = cat2tuple T t in
+        let se = cat2tuple T e in
+	let lc = strlen sc in
+	let lt = strlen st in
+	let le = strlen se in
+	let l = max (max lc lt) le in
+	sprintf "%-*s\n%-*s\n%-*s\n%-*s" (l+3) sc l st (l+3) "ELSE" l se
+     /\ clean other = cat2tuple T other
+    in
+    clean expr
+;
+
+
 let opt_base_compact_wprint inps rhs =
     let special (W_ADD var (W_CONST sz v)) assuming (is_var var AND v < 10) =
 	sprintf "draw_unary_arithm {+%d}" v
@@ -327,9 +384,13 @@ let opt_base_compact_wprint inps rhs =
 	"draw_buffer"
      /\ special (W_NAMED_SLICE name indices var) assuming (is_var var) =
 	sprintf "draw_field %s" name
-     /\  special op assuming (is_XOR op) = "draw_xor2"
-     /\  special op assuming (is_LEQ op) = "draw_binary_arithm {<=}"
-     /\  special op assuming (is_binary_base op) = get_binary_draw_cmd op
+     /\ special op assuming (is_XOR op) = "draw_xor2"
+     /\ special op assuming (is_LEQ op) = "draw_binary_arithm {<=}"
+     /\ special op assuming (is_binary_base op) = get_binary_draw_cmd op
+     /\ special op assuming (is_tuple op) =
+	(sprintf "draw_hfl {%s}" (tuple2tcl inps op)) catch
+	let body = base_compact_wprint inps rhs then
+	sprintf "draw_hfl {%s}" body
      /\ special other =
 	let body = base_compact_wprint inps rhs then
 	sprintf "draw_hfl {%s}" body
@@ -343,6 +404,9 @@ let mk_draw_cmd phase_delay rhs =
     inps = [] =>
 	let special (W_NAMED_CONST name sz v) =
 		sprintf "draw_hfl {%s}" name
+	 /\ special (W_UPDATE_NAMED_SLICE base name indices w) =
+		let s = inp2tcl [] (W_UPDATE_NAMED_SLICE base name indices w) in
+		sprintf "draw_hfl {%s}" s
 	 /\ special rhs =
 		let body = inp2tcl inps rhs then
 		sprintf "draw_input %s" body
@@ -1273,31 +1337,9 @@ infix 9 -->;
 let <-- {old:: *a} ({field_fn:: *a -> *b},{new:: *b}) =
     let old = hw_destr old in
     let new = hw_destr new in
-    let Sz = hw_size {'a:: *a} in
+    let sz = hw_size {'a:: *a} in
     val (W_NAMED_SLICE nm indices _) = hw_destr (field_fn {'a:: *a}) then
-    let new_map = zip indices ((length indices-1) downto 0) in
-    let mk_part inside f t =
-        inside =>
-            let sel_indices = map (\i. assoc i new_map) (f downto t) in
-            (W_SLICE sel_indices new)
-        |
-            let sel_indices = f downto t in
-            (W_SLICE sel_indices old)
-    in
-    letrec collect inside f cur (idx:idxs) =
-        let new_inside = mem idx indices then
-        (new_inside = inside) => collect inside f idx idxs |
-        // Switching from inside to outside or vice versa
-        let part = mk_part inside f cur in
-        part:(collect new_inside idx idx idxs)
-      /\   collect inside f cur [] =
-        let part = mk_part inside f cur in 
-        [part]
-    in
-    let start = Sz-1 in
-    let res = hw_constr
-        (W_CAT (collect (mem start indices) start start ((start-1) downto 0)))
-    in
+    let res = hw_constr (W_UPDATE_NAMED_SLICE old nm indices new) then
     {res :: *a}
 ;
 infix 8 <--;
@@ -1317,6 +1359,93 @@ let i_merge ilist =
     val (res,cdir,cur_start,cur_end) = sitlist i_merge1 ilist ([],-2,0,0) in
     (cur_end,cur_start):res
 ;
+
+let base_STRUCT_explicit name size field_list do_check =
+    letrec check ((field_name, type, bits):rem) =
+        NOT (is_defined (sprintf "BV_%s" type)) =>
+            eprintf "Type %s not defined!" type
+        |
+        let t_size = get_hw_type_size type then
+        length bits != t_size =>
+            eprintf "Field %s has type %s of size %d but is given %d indices\n"
+                    field_name type t_size (length bits)
+        |
+        let M = sitlist max bits 0 in
+        M >= size =>
+            eprintf "Field %s has an index outside the size of %s\n"
+                    field_name name
+        |
+        check rem
+     /\     check [] = ()
+    in
+    (do_check => check field_list | ()) fseq
+    NOT (core_TYPE name size F "") => () |
+    let declare_field (fn, type, bits) =
+	let ranges = i_merge bits then
+	let pr_range (f,t) = sprintf "(%d -- %d)" f t in
+        let indices = list2str T "(" "@" ")" pr_range ranges in
+        let cmd =
+            sprintf
+		"let _%s s = BV_%s (W_NAMED_SLICE \"%s\" %s (hw_%s_destr s));"
+		 fn type fn indices name
+        then
+        (eval1 cmd) fseq
+        (is_defined fn =>
+            eval1 (sprintf "overload %s %s _%s;" fn fn fn)
+        |
+            eval1 (sprintf "let %s = _%s;" fn fn)
+        ) fseq ()
+    in
+    (foreach declare_field field_list) fseq
+    // Make assembly function
+    let comment =
+	let c1 =
+	    sprintf "//Assemble a %s from its individual fields.\n" name
+	in
+	let c2 = 
+	    let pre = sprintf "\n//Usage:\n//\tmk_%s " name in
+	    list2str T pre " " ";\n" fst field_list
+	in
+	c1^c2
+    in
+    let def =
+	letrec mk_anon cnt ((field,type,bits):fs) =
+	    ((sprintf "a%d" cnt), type ):(mk_anon (cnt+1) fs)
+	 /\    mk_anon cnt [] = []
+	in
+	let ft_list = mk_anon 1 field_list in
+	let pre = sprintf "let mk_%s " name in
+	let lhs = list2str T pre " " " = " fst ft_list in
+	let mk (field,type) = sprintf "(hw_%s_destr %s)" type field in
+	let pre = sprintf " hw_%s_constr (W_CAT [\n\t" name in
+	let rhs = list2str T pre ",\n\t" "]);" mk ft_list in
+	lhs^rhs
+    in
+    let cmd = sprintf "%s\n%s\n" comment def in
+    (eval1 cmd) fseq ()
+;
+
+let STRUCT_explicit name size field_list =
+	base_STRUCT_explicit name size field_list T
+;
+
+let STRUCT_implicit name field_list =
+    letrec build ((field_name, type):rem) =
+        NOT (is_defined (sprintf "BV_%s" type)) =>
+            eprintf "Type %s not defined!" type
+        |
+	val (cur_start, field_type_range_list) = build rem then
+        let t_size = get_hw_type_size type then
+	let next_start = cur_start+t_size in
+	let bits = (next_start-1) downto cur_start in
+	next_start, ((field_name, type, bits):field_type_range_list)
+     /\     build [] = (0,[])
+    in
+    val (size, ftb_list) = build field_list then
+    base_STRUCT_explicit name size ftb_list F
+;
+
+overload STRUCT STRUCT_explicit STRUCT_implicit;
 
 let MEMORY name size_list word_type =
     let width = get_hw_type_size word_type in
@@ -1468,93 +1597,6 @@ let MEMORY name size_list word_type =
     }> "functor"
 ;
 
-
-let base_STRUCT_explicit name size field_list do_check =
-    letrec check ((field_name, type, bits):rem) =
-        NOT (is_defined (sprintf "BV_%s" type)) =>
-            eprintf "Type %s not defined!" type
-        |
-        let t_size = get_hw_type_size type then
-        length bits != t_size =>
-            eprintf "Field %s has type %s of size %d but is given %d indices\n"
-                    field_name type t_size (length bits)
-        |
-        let M = sitlist max bits 0 in
-        M >= size =>
-            eprintf "Field %s has an index outside the size of %s\n"
-                    field_name name
-        |
-        check rem
-     /\     check [] = ()
-    in
-    (do_check => check field_list | ()) fseq
-    NOT (core_TYPE name size F "") => () |
-    let declare_field (fn, type, bits) =
-	let ranges = i_merge bits then
-	let pr_range (f,t) = sprintf "(%d -- %d)" f t in
-        let indices = list2str T "(" "@" ")" pr_range ranges in
-        let cmd =
-            sprintf
-		"let _%s s = BV_%s (W_NAMED_SLICE \"%s\" %s (hw_%s_destr s));"
-		 fn type fn indices name
-        then
-        (eval1 cmd) fseq
-        (is_defined fn =>
-            eval1 (sprintf "overload %s %s _%s;" fn fn fn)
-        |
-            eval1 (sprintf "let %s = _%s;" fn fn)
-        ) fseq ()
-    in
-    (foreach declare_field field_list) fseq
-    // Make assembly function
-    let comment =
-	let c1 =
-	    sprintf "//Assemble a %s from its individual fields.\n" name
-	in
-	let c2 = 
-	    let pre = sprintf "\n//Usage:\n//\tmk_%s " name in
-	    list2str T pre " " ";\n" fst field_list
-	in
-	c1^c2
-    in
-    let def =
-	letrec mk_anon cnt ((field,type,bits):fs) =
-	    ((sprintf "a%d" cnt), type ):(mk_anon (cnt+1) fs)
-	 /\    mk_anon cnt [] = []
-	in
-	let ft_list = mk_anon 1 field_list in
-	let pre = sprintf "let mk_%s " name in
-	let lhs = list2str T pre " " " = " fst ft_list in
-	let mk (field,type) = sprintf "(hw_%s_destr %s)" type field in
-	let pre = sprintf " hw_%s_constr (W_CAT [\n\t" name in
-	let rhs = list2str T pre ",\n\t" "]);" mk ft_list in
-	lhs^rhs
-    in
-    let cmd = sprintf "%s\n%s\n" comment def in
-    (eval1 cmd) fseq ()
-;
-
-let STRUCT_explicit name size field_list =
-	base_STRUCT_explicit name size field_list T
-;
-
-let STRUCT_implicit name field_list =
-    letrec build ((field_name, type):rem) =
-        NOT (is_defined (sprintf "BV_%s" type)) =>
-            eprintf "Type %s not defined!" type
-        |
-	val (cur_start, field_type_range_list) = build rem then
-        let t_size = get_hw_type_size type then
-	let next_start = cur_start+t_size in
-	let bits = (next_start-1) downto cur_start in
-	next_start, ((field_name, type, bits):field_type_range_list)
-     /\     build [] = (0,[])
-    in
-    val (size, ftb_list) = build field_list then
-    base_STRUCT_explicit name size ftb_list F
-;
-
-overload STRUCT STRUCT_explicit STRUCT_implicit;
 
 let hw_split v =
     let sz = hw_size v in
@@ -2022,6 +2064,8 @@ letrec simp (W_AND a b) = rewrite (W_AND (simp a) (simp b))
  /\    simp (W_SLICE indices w) = rewrite (W_SLICE indices (simp w))
  /\    simp (W_NAMED_SLICE name indices w) =
 	    rewrite (W_NAMED_SLICE name indices (simp w))
+ /\    simp (W_UPDATE_NAMED_SLICE base name indices w) =
+	    rewrite (W_UPDATE_NAMED_SLICE (simp base) name indices (simp w))
  /\    simp (W_CAT parts) = rewrite (W_CAT (map simp parts))
  /\    simp (W_MEM_READ info mem addr) =
 	    rewrite (W_MEM_READ info (simp mem) (simp addr))
