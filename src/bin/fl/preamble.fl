@@ -517,10 +517,10 @@ let cload filename =
     ((mem full_name1 (deref loaded_files_ref)) OR
      (mem full_name2 (deref loaded_files_ref)))
     =>
-	get_vossrc "VERBOSE_CLOAD_IGNORES" != "" =>
+	get_vossrc "VERBOSE_CLOAD_IGNORES" == "YES" =>
 	    fprintf stderr
-		    "Trying to load a previously loaded file (%s). Ignored!"
-		    filename
+		"Trying to load a previously loaded file %s (%s). Ignored!\n"
+		name1 filename
 	|
 	()
     |
@@ -1395,10 +1395,10 @@ let pr_indices indices =
 letrec Pwexpr (W_X sz) = sprintf "X[%d:0]" (sz-1)
  /\    Pwexpr (W_NAMED_CONST name sz v) = name
  /\    Pwexpr (W_CONST sz v) =
-        sz < 5 OR ((sz % 4) != 0) =>
-            sprintf "0b%0*b" sz v
-        |
-            sprintf "0x%0*x" (sz/4) v
+	sz < 5 OR ((sz % 4) != 0) =>
+	    sprintf "0b%0*b" sz v
+	|
+	    sprintf "0x%0*x" (sz/4) v
  /\    Pwexpr (W_VAR sz base) = mk_name sz base
  /\    Pwexpr (W_EXPLICIT_VAR sz name) = name
  /\    Pwexpr (W_AND a b) = sprintf "(%s & %s)" (Pwexpr a) (Pwexpr b)
@@ -1418,20 +1418,20 @@ letrec Pwexpr (W_X sz) = sprintf "X[%d:0]" (sz-1)
  /\    Pwexpr (W_SX sz w) = sprintf "(SX %d %s)" sz (Pwexpr w)
  /\    Pwexpr (W_ZX sz w) = sprintf "(ZX %d %s)" sz (Pwexpr w)
  /\    Pwexpr (W_ITE c t e) =
-            sprintf "(IF %s THEN %s ELSE %s)" (Pwexpr c) (Pwexpr t) (Pwexpr e)
+	    sprintf "(IF %s THEN %s ELSE %s)" (Pwexpr c) (Pwexpr t) (Pwexpr e)
  /\    Pwexpr (W_SLICE indices w) =
-            let vec = pr_indices indices then
-            sprintf "(%s)%s" (Pwexpr w) vec
+	    let vec = pr_indices indices then
+	    sprintf "(%s)%s" (Pwexpr w) vec
  /\    Pwexpr (W_NAMED_SLICE name indices w) =
-            sprintf "(%s)-->%s" (Pwexpr w) name
+	    sprintf "(%s)-->%s" (Pwexpr w) name
  /\    Pwexpr (W_UPDATE_NAMED_SLICE base name indices w) =
-            sprintf "(%s)<--%s ? %s" (Pwexpr base) name (Pwexpr w)
+	    sprintf "(%s)<--%s ? %s" (Pwexpr base) name (Pwexpr w)
  /\    Pwexpr (W_CAT parts) =
-            list2str T "<" ", " ">" Pwexpr parts
+	    list2str T "<" ", " ">" Pwexpr parts
  /\    Pwexpr (W_MEM_READ info mem addr) =
-        sprintf "%s[%s]" (Pwexpr mem) (Pwexpr addr)
+	sprintf "%s[%s]" (Pwexpr mem) (Pwexpr addr)
  /\    Pwexpr (W_MEM_WRITE info mem addr d) =
-        sprintf "(%s[%s]<-%s)" (Pwexpr mem) (Pwexpr addr) (Pwexpr d)
+	sprintf "(%s[%s]<-%s)" (Pwexpr mem) (Pwexpr addr) (Pwexpr d)
 ;
 install_print_function Pwexpr;
 

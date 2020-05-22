@@ -25,9 +25,8 @@ extern FILE     *odests_fp;
 /**** PRIVATE VARIABLES ****/
 static rec_mgr		io_rec_mgr;
 static io_ptr		open_ios;
-static char		buf[1024];
 static char		bdd_pbuf[4096];
-static char		msg_buf[4096];
+static char		buf[4096];
 static uniq_buffer	bexpr_buf;
 static uniq_buffer	bool_buf;
 static uniq_buffer	fsm_buf;
@@ -41,7 +40,7 @@ static buffer		str_results;
 
 /* ----- Forward definitions local functions ----- */
 static void	neg_too_big(int i, int pfn, g_ptr redex);
-static void     make_redex_failure(g_ptr redex, string txt);
+static void     make_redex_failure(g_ptr redex);
 static bool     check_arg(g_ptr *rootp, g_ptr **spp, int *depthp,
                          int n, g_ptr redex, g_ptr arg);
 static bool     prs(int pfn, int i, g_ptr redex,
@@ -95,10 +94,10 @@ Fopen(g_ptr *rootp, g_ptr **spp, int *depthp)
 
     for(io_ptr ip = open_ios; ip != NULL; ip = ip->next) {
         if( STREQ(name, ip->name) ) {
-	    Sprintf(buf, "File %s already opened", name);
+	    Fail_pr("File %s already opened", name);
 	    g_ptr l = GET_APPLY_LEFT(redex);
 	    g_ptr r = GET_APPLY_RIGHT(redex);
-            make_redex_failure(redex, buf);
+            make_redex_failure(redex);
 	    DEC_REF_CNT(l);
 	    DEC_REF_CNT(r);
 	    *spp = *spp + 2;
@@ -144,10 +143,10 @@ Fopen(g_ptr *rootp, g_ptr **spp, int *depthp)
         is_pipe = FALSE;
     }
     if( fp == NULL ) {
-        Sprintf(buf, "Cannot open %s in mode %s", name, mode);
+        Fail_pr("Cannot open %s in mode %s", name, mode);
 	g_ptr l = GET_APPLY_LEFT(redex);
 	g_ptr r = GET_APPLY_RIGHT(redex);
-        make_redex_failure(redex, buf);
+        make_redex_failure(redex);
 	DEC_REF_CNT(l);
 	DEC_REF_CNT(r);
 	*spp = *spp + 2;
@@ -210,7 +209,8 @@ Fclose(g_ptr *rootp, g_ptr **spp, int *depthp)
     if( strcmp(ip->name, "stdin") == 0 ) {
 	g_ptr l = GET_APPLY_LEFT(redex);
 	g_ptr r = GET_APPLY_RIGHT(redex);
-        make_redex_failure(redex, "Cannot close stdin.");
+	Fail_pr("Cannot close stdin.");
+        make_redex_failure(redex);
 	DEC_REF_CNT(l);
 	DEC_REF_CNT(r);
 	*spp = *spp + 1;
@@ -221,7 +221,8 @@ Fclose(g_ptr *rootp, g_ptr **spp, int *depthp)
     if( strcmp(ip->name, "stdout") == 0 ) {
 	g_ptr l = GET_APPLY_LEFT(redex);
 	g_ptr r = GET_APPLY_RIGHT(redex);
-        make_redex_failure(redex, "Cannot close stdout.");
+	Fail_pr("Cannot close stdout.");
+        make_redex_failure(redex);
 	DEC_REF_CNT(l);
 	DEC_REF_CNT(r);
 	*spp = *spp + 1;
@@ -232,7 +233,8 @@ Fclose(g_ptr *rootp, g_ptr **spp, int *depthp)
     if( strcmp(ip->name, "stderr") == 0 ) {
 	g_ptr l = GET_APPLY_LEFT(redex);
 	g_ptr r = GET_APPLY_RIGHT(redex);
-        make_redex_failure(redex, "Cannot close stderr.");
+	Fail_pr("Cannot close stderr.");
+        make_redex_failure(redex);
 	DEC_REF_CNT(l);
 	DEC_REF_CNT(r);
 	*spp = *spp + 1;
@@ -837,7 +839,8 @@ Printf(g_ptr *rootp, g_ptr **spp, int *depthp)
             break;
         }
         case P_EPRINTF: {
-            make_redex_failure(redex, res);
+	    Fail_pr("%s", res);
+            make_redex_failure(redex);
             break;
         }
         case P_FPRINTF: {
@@ -845,8 +848,8 @@ Printf(g_ptr *rootp, g_ptr **spp, int *depthp)
             if( !ip->writable ) {
 		g_ptr l = GET_APPLY_LEFT(redex);
 		g_ptr r = GET_APPLY_RIGHT(redex);
-                Sprintf(buf, "File %s is not open for writing.", ip->name);
-                make_redex_failure(redex, buf);
+                Fail_pr("File %s is not open for writing.", ip->name);
+                make_redex_failure(redex);
 		DEC_REF_CNT(l);
 		DEC_REF_CNT(r);
 		*spp = *spp + args;
@@ -1593,20 +1596,12 @@ force_arg_and_check(g_ptr redex, g_ptr arg)
 
 
 static void
-make_redex_failure(g_ptr redex, string txt)
+make_redex_failure(g_ptr redex)
 {
-    msg_buf[0] = 0;
-    strncat(msg_buf, txt, 4096-1);
-    if( debug_on ) {
-	int rem = 4096-1-strlen(msg_buf);
-	strncat(msg_buf, "\n", rem);
-	rem--;
-	strncat(msg_buf,  Get_stack_trace(RCmax_stack_trace_entries), rem);
-    }
     SET_TYPE(redex, LEAF);
     SET_LEAF_TYPE(redex, PRIM_FN);
     SET_PRIM_FN(redex, P_FAIL);
-    SET_FAIL_STRING(redex, wastrsave(&strings, msg_buf));
+    SET_FAIL_STRING(redex, wastrsave(&strings, FailBuf));
 }
 
 #define PFN2NAME(pfn) ((pfn == P_PRINTF)? "printf" : \
@@ -1618,9 +1613,9 @@ make_redex_failure(g_ptr redex, string txt)
 static void
 neg_too_big(int i, int pfn, g_ptr redex)
 {
-    Sprintf(buf, "Argument %d to %s is negative and does not fit in width\n",
-		 i, PFN2NAME(pfn));
-    make_redex_failure(redex, buf);
+    Fail_pr("Argument %d to %s is negative and does not fit in width\n",
+	    i, PFN2NAME(pfn));
+    make_redex_failure(redex);
 }
 
 static bool
@@ -1629,9 +1624,9 @@ prs(int pfn, int i, g_ptr redex, char *s, bool ljust, bool zfill, int size)
     int len = strlen(s);
     if( size > 0 ) {
         if( len > size ) {
-            Sprintf(buf, "Argument %d to %s does not fit in width %d (%s)\n",
-			 i, PFN2NAME(pfn), size, s);
-            make_redex_failure(redex, buf);
+            Fail_pr("Argument %d to %s (%s) does not fit in width %d\n",
+		    i, PFN2NAME(pfn), s, size);
+            make_redex_failure(redex);
             return( FALSE );
         }
     } else {

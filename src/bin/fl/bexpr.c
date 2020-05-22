@@ -17,7 +17,7 @@
 
 /********* Global variables referenced ***********/
 extern str_mgr  strings;
-extern char     *FailBuf;
+extern char	FailBuf[4096];
 extern FILE     *odests_fp;
 extern g_ptr	void_nd;
 extern bool	Do_gc_asap;
@@ -95,7 +95,10 @@ static bexpr	    bdd2bexpr(formula f);
 int
 Dbg_stop()
 {
-    fprintf(stderr, "-----------Dbg_stop---------\n%s\n", Fail_pr(""));
+    fprintf(stderr, "-----------Dbg_stop---------\n");
+#if 0
+    fprintf(stderr, "FailBuf: %s\n", FailBuf);
+#endif
     return 0;
 }
 #endif

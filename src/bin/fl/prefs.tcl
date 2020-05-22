@@ -63,6 +63,8 @@ set voss2_preferences {
         "Maximum number of simulation steps" "int" "100"}
 
     {"Verbosity" "" "" "header"  ""}
+    {"VERBOSE_CLOAD_IGNORES" "RCverbose_cload_ignores"
+        "Notify when cload does not need to load" "bool"  "FALSE"}
     {"VERBOSE-GARBAGE-COLLECTION" "RCverbose_GC"
         "Print out information about g.c." "bool"  "FALSE"}
     {"VERBOSE-DYNAMIC-ORDERING" "RCverbose_dynamic_ordering"

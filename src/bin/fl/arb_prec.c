@@ -12,12 +12,6 @@
 /* arb_prec.c: arbitrary precision integer arithmetic */
 #include "arb_prec.h"
 
-#if 0
-#define Sprintf(...)	{ fprintf(stderr, "Line %d in %s ", __LINE__,__FILE__); sprintf(__VA_ARGS__); fprintf(stderr, "ok\n"); }
-#else
-#define Sprintf(...)	sprintf(__VA_ARGS__);
-#endif
-
 /* ------------- Global variables ------------- */
 char	*arbi__errmsg;
 

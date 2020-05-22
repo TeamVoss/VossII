@@ -289,6 +289,7 @@ static unsigned int	gmap2_hash(pointer np, unsigned int n);
 static bool		gmap2_equ(pointer p1, pointer p2);
 static g_ptr		g_b_ite(g_ptr l, g_ptr r);
 static g_ptr		reduce_list(g_ptr redex, int levels);
+static bool		is_pat_fail(g_ptr node);
 
 #ifdef DEBUG
 static void		remove_hash();
@@ -951,6 +952,7 @@ Print_Result(result_ptr res, odests fp, bool print)
     }
     eval_ctx_rec ctx;
     Record_eval_context(&ctx);
+    FailBuf[0] = 0;
     //
     root_node = res->expr;
     PUSH_GLOBAL_GC(root_node);
@@ -1137,6 +1139,14 @@ is_fail(g_ptr node)
     return(    GET_TYPE(node) == LEAF
 	    && GET_LEAF_TYPE(node) == PRIM_FN
 	    && GET_PRIM_FN(node) == P_FAIL);
+}
+
+static bool
+is_pat_fail(g_ptr node)
+{
+    return(    GET_TYPE(node) == LEAF
+	    && GET_LEAF_TYPE(node) == PRIM_FN
+	    && GET_PRIM_FN(node) == P_PFAIL);
 }
 
 void
@@ -2841,13 +2851,13 @@ traverse_left(g_ptr oroot)
 		    arg1 = GET_APPLY_RIGHT(*sp);
 		    arg2 = GET_APPLY_RIGHT(*(sp+1));
                     arg1 = force(arg1, FALSE);
-                    if( !is_fail(arg1) ) {
-                        /* Return E1 */
-                        OVERWRITE(redex, arg1);
-                    } else {
+                    if( is_fail(arg1) ) {
                         /* Must return E2 */
                         arg2 = traverse_left(arg2);
                         OVERWRITE(redex, arg2);
+                    } else {
+                        /* Return E1 */
+                        OVERWRITE(redex, arg1);
                     }
 		    pop_trace_fn();
                     goto finish2;
@@ -2886,15 +2896,13 @@ traverse_left(g_ptr oroot)
 		    redex = *(sp+1);
 		    arg1 = traverse_left(GET_APPLY_RIGHT(*sp));
 		    arg2 = GET_APPLY_RIGHT(*(sp+1));
-		    if(   GET_TYPE(arg1) != LEAF
-		       || GET_LEAF_TYPE(arg1) != PRIM_FN
-		       || GET_PRIM_FN(arg1) != P_PFAIL ) {
-			/* Return E1 */
-			OVERWRITE(redex, arg1);
-		    } else {
+		    if( is_pat_fail(arg1) ) {
 			/* Must return E2 */
 			arg2 = traverse_left(arg2);
 			OVERWRITE(redex, arg2);
+		    } else {
+			/* Return E1 */
+			OVERWRITE(redex, arg1);
 		    }
 		    goto finish2;
 
@@ -5963,8 +5971,13 @@ DPR(g_ptr node)
 		    
 		    }
 		case PRIM_FN:
-		    fprintf(stderr, "    PRIM_FN: %d",(int)GET_PRIM_FN(node));
-		    fprintf(stderr, " (%s)\n", Get_pfn_name(node));
+		    fprintf(stderr, "    PRIM_FN: %d", (int) GET_PRIM_FN(node));
+		    if( GET_PRIM_FN(node) == P_FAIL ) {
+			fprintf(stderr, " (P_FAIL \"%s\")\n",
+					GET_FAIL_STRING(node));
+		    } else {
+			fprintf(stderr, " (%s)\n", Get_pfn_name(node));
+		    }
 		    return;
 		case VAR:
 		    fprintf(stderr, "    VAR: %s (version %ld)\n",

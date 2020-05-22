@@ -21,12 +21,11 @@ int             LG_TBL_SIZE;
 /********* Global variables referenced ***********/
 extern str_mgr  strings;
 extern FILE	*v_order_fp;
-extern char     *FailBuf;
 extern FILE     *odests_fp;
 extern g_ptr    void_nd;
 extern bool	gui_mode;
 extern bool	use_stdout;
-
+extern char	FailBuf[4096];
 
 /***** PRIVATE VARIABLES *****/
 static g_ptr		new_var_order_list = NULL;

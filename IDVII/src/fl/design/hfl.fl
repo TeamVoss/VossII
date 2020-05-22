@@ -11,6 +11,33 @@ open_overload {hw_destr:: *a -> wexpr};
 open_overload {hw_constr:: wexpr -> *a};
 open_overload {hw_values:: *a -> string};
 
+// Make sure there are at least two possibilities for the open overloaded
+// functions. 
+lettype dummy1 = DUMMY1;
+let {dummy1_hw_type_name:: dummy1 -> string} = error "dummy";
+let {dummy1_hw_mk_var:: dummy1 -> string -> wexpr} = error "dummy";
+let {dummy1_hw_is_arithmetic:: dummy1 -> bool} = error "dummy";
+let {dummy1_hw_size:: dummy1 -> int} = error "dummy";
+let {dummy1_hw_destr:: dummy1 -> wexpr} = error "dummy";
+let {dummy1_hw_constr:: wexpr -> dummy1} = error "dummy";
+let {dummy1_hw_values:: dummy1 -> string} = error "dummy";
+lettype dummy2 = DUMMY2;
+let {dummy2_hw_type_name:: dummy2 -> string} = error "dummy";
+let {dummy2_hw_mk_var:: dummy2 -> string -> wexpr} = error "dummy";
+let {dummy2_hw_is_arithmetic:: dummy2 -> bool} = error "dummy";
+let {dummy2_hw_size:: dummy2 -> int} = error "dummy";
+let {dummy2_hw_destr:: dummy2 -> wexpr} = error "dummy";
+let {dummy2_hw_constr:: wexpr -> dummy2} = error "dummy";
+let {dummy2_hw_values:: dummy2 -> string} = error "dummy";
+add_open_overload hw_type_name dummy1_hw_type_name dummy1_hw_type_name;
+add_open_overload hw_mk_var dummy1_hw_mk_var dummy1_hw_mk_var;
+add_open_overload hw_is_arithmetic
+		    dummy1_hw_is_arithmetic dummy1_hw_is_arithmetic;
+add_open_overload hw_size dummy1_hw_size dummy1_hw_size;
+add_open_overload hw_destr dummy1_hw_destr dummy1_hw_destr;
+add_open_overload hw_constr dummy1_hw_constr dummy1_hw_constr;
+add_open_overload hw_values dummy1_hw_values dummy1_hw_values;
+
 
 let CELL {name::string} {body::pexlif list} =
     (PINST name [] F [] [] [] (P_HIER body))
@@ -848,7 +875,7 @@ let input body_fun {fs::string} acc =
 			in
 			let inps'' = inps'@[(fv,av)] in
 			let p_main' =
-			    PINST n' attrs'' leaf' inps'' outs ints' body'
+			    PINST n' attrs'' leaf' inps'' outs' ints' body'
 			in
 			(p_main', (prev_expr_pexlifs@expr_pexlifs))
 		    |
@@ -904,7 +931,7 @@ let list_input body_fun {base_fs::string} acc =
 			let prev_expr_pexlifs = tl pexlifs in
 			let inps'' = inps'@new_inps in
 			let p_main' =
-			    PINST n' attrs' leaf' inps'' outs ints' body'
+			    PINST n' attrs' leaf' inps'' outs' ints' body'
 			in
 			(p_main', (prev_expr_pexlifs@(flat expr_pexlifs)))
 		    |
@@ -1029,6 +1056,61 @@ let list_output body_fun {base_fs::string} acc =
 ;
 binder_with_accumulator list_output CELL;
 
+//
+// Declare inout to a unit.
+// Example: 
+//	inout a b c.
+//	    ...
+let inout body_fun {fs::string} acc =
+        \{aa:: *a}.
+            let a = hw_destr aa in
+            let sz = hw_size aa in
+            let wf = hw_mk_var aa fs in
+            let f = {hw_constr wf:: *a} in
+            let av = get_lhs_vars a in
+            let fv = hd (get_lhs_vars wf) in
+	    let values = hw_values {undefined :: *a} in
+            let acc' name bd =
+		let p0 = acc name bd in
+                val (PINST n attrs leaf inps outs ints body) = p0 in
+		val (p_main, p_exprs) =
+		    n = "_WrApPeR_" =>
+			val (P_HIER pexlifs) = body in
+			// Get the main pexlif
+			val (PINST n' attrs' leaf' inps' outs' ints' body') =
+			    el 1 pexlifs
+			in
+			let prev_expr_pexlifs = tl pexlifs in
+			let outs'' = outs'@[(fv,av)] in
+			let attrs'' =
+			    values = "" => attrs' |
+			    (sprintf "node_values_%s" fv, values):attrs'
+			in
+			let p_main' =
+			    PINST n' attrs'' leaf' inps' outs'' ints' body'
+			in
+			(p_main', prev_expr_pexlifs)
+		    |
+		    let attrs' =
+			values = "" => attrs |
+			(sprintf "node_values_%s" fv, values):attrs
+		    in
+		    let outs_n = outs@[(fv,av)] in
+		    let p_main' = PINST n attrs' leaf inps outs_n ints body in
+		    (p_main', [])
+		in
+		p_exprs = [] => p_main |
+		let c_ints = get_tmp_outs p_exprs in
+		let c_inps = mk_wrap_inps c_ints (p_main:p_exprs) in
+		let c_outs = mk_wrap_outs [p_main] in
+		let res = PINST "_WrApPeR_" attrs F c_inps c_outs c_ints
+			    (P_HIER (p_main:p_exprs)) in
+		res
+            in
+            body_fun f acc'
+;
+binder_with_accumulator inout CELL;
+
 // Declare internal signals to a unit.
 let internal body_fun {fs::string} acc =
     let sz = hw_size {undefined :: *a} in
@@ -1080,7 +1162,6 @@ binder_with_accumulator internal CELL;
 
 // Declare internal array of signals to a unit.
 let list_internal cnt body_fun {base_fs::string} acc =
-//    let fs = map (sprintf "%s<%d>" base_fs) ((cnt-1) downto 0) in
     let fs = map (sprintf "%s[%d]" base_fs) ((cnt-1) downto 0) in
     let sz = hw_size {undefined :: *a} in
     let wfs = map (hw_mk_var {undefined :: *a}) fs in
@@ -1151,9 +1232,6 @@ let eval_fl_code l =
 ;
 non_lazy eval_fl_code;
 
-let eval1 cmd = eval_fl_code [cmd];
-non_lazy eval1;
-
 let core_TYPE name size is_arithmetic value_list =
     let current = deref hw_types_decl_ref in
     mem name (map fst current) =>
@@ -1185,6 +1263,8 @@ let core_TYPE name size is_arithmetic value_list =
 	    (defix input) body_fun fs acc a;
 	let `name`_output body_fun {fs::string} acc {a::`name`} =
 	    (defix output) body_fun fs acc a;
+	let `name`_inout body_fun {fs::string} acc {a::`name`} =
+	    (defix inout) body_fun fs acc a;
 	let `name`_internal {body_fun:: `name`->(string-> *a -> pexlif)-> *b}
 			    {fs::string} acc =
 	    (defix internal) body_fun fs acc;
@@ -1209,6 +1289,7 @@ let core_TYPE name size is_arithmetic value_list =
 	;
 	binder_with_accumulator `name`_input CELL;
 	binder_with_accumulator `name`_output CELL;
+	binder_with_accumulator `name`_inout CELL;
 	binder_with_accumulator `name`_internal CELL;
 	sized_binder_with_accumulator `name`_list_internal CELL;
 	binder_with_accumulator `name`_list_input CELL;
@@ -1251,7 +1332,6 @@ let core_TYPE name size is_arithmetic value_list =
 // Declare a new hw type with name 'name' and size number of bits as width.
 let TYPE name size = (core_TYPE name size T "") fseq ();
 
-TYPE "dummy_0" 0;
 TYPE "bit" 1;
 
 let ENUM_0 name name_list =
@@ -1359,6 +1439,9 @@ let i_merge ilist =
     val (res,cdir,cur_start,cur_end) = sitlist i_merge1 ilist ([],-2,0,0) in
     (cur_end,cur_start):res
 ;
+
+let eval1 cmd = eval_fl_code [cmd];
+non_lazy eval1;
 
 let base_STRUCT_explicit name size field_list do_check =
     letrec check ((field_name, type, bits):rem) =
@@ -1998,50 +2081,60 @@ let frombits bl =
 //begin_abstype;
 
 let R_excluded e =
-    letrec get_prods (W_AND a b) = (get_prods a)@(get_prods b)
-     /\    get_prods other = [other]
+    let res = 
+	letrec get_prods (W_AND a b) = (get_prods a)@(get_prods b)
+	 /\    get_prods other = [other]
+	in
+	let not_t (W_CONST 1 1) = F
+	 /\ not_t other = T
+	in
+	let prods = filter not_t (setify (get_prods e)) then
+	prods = [] => W_CONST 1 1 |
+	length prods = 1 => hd prods |
+	//
+	let is_neg (W_NOT _) = T
+	 /\ is_neg other = F
+	in
+	val (negs, pos) = split is_neg prods then
+	let pos = rev pos then
+	negs = [] => sitlist W_AND (tl pos) (hd pos) |
+	//
+	let is_unsat e =
+	    let bv = wexpr2bool e in
+	    bv == [F]
+	in
+	pos = [] => sitlist W_AND (tl negs) (hd negs) |
+	let P = sitlist W_AND (tl pos) (hd pos) then
+	let keep e = NOT (is_unsat (W_AND P (W_NOT e))) then
+	let negs' = filter keep negs then
+	sitlist W_AND negs' P
     in
-    let not_t (W_CONST 1 1) = F
-     /\ not_t other = T
-    in
-    let prods = filter not_t (setify (get_prods e)) in
-    length prods = 1 => error "Nope" |
-    let is_neg (W_NOT _) = T
-     /\ is_neg other = F
-    in
-    let is_unsat e =
-	let bv = wexpr2bool e in
-	bv == [F]
-    in
-    val (negs, pos) = split is_neg prods in
-    negs = [] => error "Done" |
-    let pos = rev pos in
-    let P = sitlist W_AND (tl pos) (hd pos) in
-    let keep e = NOT (is_unsat (W_AND P (W_NOT e))) in
-    let negs' = filter keep negs then
-    sitlist W_AND negs' P
+    res catch e
 ;
 
-
-let rewrite (W_AND (W_CONST 1 1) e) = e
- /\ rewrite (W_AND (W_CONST 1 0) e) = (W_CONST 1 0)  
- /\ rewrite (W_AND e (W_CONST 1 1)) = e
- /\ rewrite (W_AND e (W_CONST 1 0)) = (W_CONST 1 0)  
- /\ rewrite (W_AND e f) assuming (e == f) = e  
- /\ rewrite (W_AND e f) = (R_excluded (W_AND e f)) catch (W_AND e f)
- /\ rewrite (W_OR (W_CONST 1 0) e) = e
- /\ rewrite (W_OR (W_CONST 1 1) e) = (W_CONST 1 1)  
- /\ rewrite (W_OR e (W_CONST 1 0)) = e
- /\ rewrite (W_OR e (W_CONST 1 1)) = (W_CONST 1 1)  
- /\ rewrite (W_OR e f) assuming (e == f) = e  
- /\ rewrite (W_NOT (W_OR (W_NOT e) f)) = W_AND e (W_NOT f)
- /\ rewrite (W_NOT (W_OR e (W_NOT f))) = W_AND (W_NOT e) f
- /\ rewrite (W_NOT (W_AND (W_NOT e) f)) = W_OR e (W_NOT f)
- /\ rewrite (W_NOT (W_AND e (W_NOT f))) = W_OR (W_NOT e) f
- /\ rewrite (W_NOT (W_CONST 1 0)) = (W_CONST 1 1)  
- /\ rewrite (W_NOT (W_CONST 1 1)) = (W_CONST 1 0)  
- /\ rewrite (W_NOT (W_NOT e)) = e  
- /\ rewrite e = e
+let rewrite e =
+    e fseq
+    let rewrite (W_AND (W_CONST 1 1) e) = e
+     /\ rewrite (W_AND (W_CONST 1 0) e) = (W_CONST 1 0)  
+     /\ rewrite (W_AND e (W_CONST 1 1)) = e
+     /\ rewrite (W_AND e (W_CONST 1 0)) = (W_CONST 1 0)  
+     /\ rewrite (W_AND e f) assuming (e == f) = e  
+     /\ rewrite (W_AND e f) = R_excluded (W_AND e f)
+     /\ rewrite (W_OR (W_CONST 1 0) e) = e
+     /\ rewrite (W_OR (W_CONST 1 1) e) = (W_CONST 1 1)  
+     /\ rewrite (W_OR e (W_CONST 1 0)) = e
+     /\ rewrite (W_OR e (W_CONST 1 1)) = (W_CONST 1 1)  
+     /\ rewrite (W_OR e f) assuming (e == f) = e  
+     /\ rewrite (W_NOT (W_OR (W_NOT e) f)) = W_AND e (W_NOT f)
+     /\ rewrite (W_NOT (W_OR e (W_NOT f))) = W_AND (W_NOT e) f
+     /\ rewrite (W_NOT (W_AND (W_NOT e) f)) = W_OR e (W_NOT f)
+     /\ rewrite (W_NOT (W_AND e (W_NOT f))) = W_OR (W_NOT e) f
+     /\ rewrite (W_NOT (W_CONST 1 0)) = (W_CONST 1 1)  
+     /\ rewrite (W_NOT (W_CONST 1 1)) = (W_CONST 1 0)  
+     /\ rewrite (W_NOT (W_NOT e)) = e  
+     /\ rewrite e = e
+    in
+    rewrite e
 ;
 
 letrec simp (W_AND a b) = rewrite (W_AND (simp a) (simp b))
@@ -2150,36 +2243,36 @@ let draw_fsm reset S0 orig_trans base_inps =
 // finite state machine that can be seen by clicking on the FSM symbol
 // in the circuit browser.
 let Moore_FSM name clk state reset_condition transitions =
-    val (reset,S0) = reset_condition in
+    val (reset,S0) = reset_condition then
     let w_state = hw_destr {state:: *a} in
     let cnv (from_state, cond, to_state) =
 	(hw_destr {from_state:: *a}),
 	(hw_destr {cond::bit}),
 	(hw_destr {to_state:: *a})
     in
-    let wtransitions = map cnv transitions in
-    let wS0 = hw_destr {S0:: *a} in
+    let wtransitions = map cnv transitions then
+    let wS0 = hw_destr {S0:: *a} then
     //
-    val (W_VAR ssz b_state) = w_state in
+    val (W_VAR ssz b_state) = w_state then
     let n_state = mk_name ssz b_state then
-    let b_nstate = "_new_"^b_state in
+    let b_nstate = "_new_"^b_state then
     let w_nstate = W_VAR ssz b_nstate then
     let n_nstate = mk_name ssz b_nstate then
-    let b_istate = "_intermediate_"^b_state in
+    let b_istate = "_intermediate_"^b_state then
     let w_istate = W_VAR ssz b_istate then
     let n_istate = mk_name ssz b_istate then
     let s_clk = hd (w_depends (hw_bit_destr clk)) then
     let w_reset = hw_bit_destr reset then
     let reset_name = hd (w_depends w_reset) then
-    let get_we (from_state, cond, to_state) = w_depends cond in
-    let wes = flatmap get_we wtransitions in
+    let get_we (from_state, cond, to_state) = w_depends cond then
+    let wes = flatmap get_we wtransitions then
     let raw_inps = qsort node_name_cmp (setify wes) then
     let fa_inps = (map (\n.n,[n]) (raw_inps subtract [n_state]))@
 		  [(reset_name, [reset_name]), (s_clk, [s_clk])]
     then
     let fa_outs = [(n_state, [n_state])] then
     let ints = [n_nstate, n_istate] then
-    let ssz = hw_size state in
+    let ssz = hw_size state then
     let part_trans = partition fst wtransitions then
     letrec build_cond (same_src:rest) =
 	let from_state = fst (hd same_src) then
@@ -2194,14 +2287,14 @@ let Moore_FSM name clk state reset_condition transitions =
     in
     let w_new_state = W_ITE w_reset wS0 (build_cond part_trans) then
     let comb = {(hw_constr w_nstate):: *a} <- (hw_constr w_new_state) then
-    let w_final_state = W_ITE w_reset wS0 w_istate in
+    let w_final_state = W_ITE w_reset wS0 w_istate then
     let comb2 = state <- {(hw_constr w_final_state):: *a} then
     let body = P_HIER [
 	re_ff clk {(hw_constr w_nstate):: *a} {(hw_constr w_istate):: *a},
 	comb,
 	comb2
-    ] in
-    let base_inps = map (\(f,a). hd (str_split f "[")) fa_inps in
+    ] then
+    let base_inps = map (\(f,a). hd (str_split f "[")) fa_inps then
     val (fsm_file,states,edges) = draw_fsm reset S0 transitions base_inps then
     let pr (f,a) = sprintf "{%s}" f in
     let s_fa_inps = list2str T "{" " " "}" pr fa_inps then
@@ -2221,39 +2314,39 @@ let Moore_FSM name clk state reset_condition transitions =
 
 
 let CASE {out:: *a} {cond_res_list:: (bit # *a) list} {default_value:: *a} =
-    let sz = hw_size default_value in
+    let sz = hw_size default_value then
     let n = length cond_res_list then
     let w_out = hw_destr out then
     let w_default_value = hw_destr default_value then
     let n_out = hd (w_depends w_out) then
-    let fa_outs = [(n_out,[n_out])] in
-    let cnv (cond,res) = hw_bit_destr cond, hw_destr res in
+    let fa_outs = [(n_out,[n_out])] then
+    let cnv (cond,res) = hw_bit_destr cond, hw_destr res then
     let w_crl = map cnv cond_res_list then
     let var2name (W_VAR s b) = [mk_name s b]
      /\ var2name (W_EXPLICIT_VAR s b) = [b]
      /\ var2name other = []
     in
-    let ld = W_VAR sz (sprintf "%s_d" BASE_TMP) in
-    let nd = mk_name sz (sprintf "%s_d" BASE_TMP) in
-    let d_fas = [(nd,[nd])] in
+    let ld = W_VAR sz (sprintf "%s_d" BASE_TMP) then
+    let nd = mk_name sz (sprintf "%s_d" BASE_TMP) then
+    let d_fas = [(nd,[nd])] then
     let default_p = (hw_constr ld) <- default_value then
     letrec select cnt ((c,r):rem) =
-        let bc = sprintf "%s_c%02d" BASE_TMP cnt in
-        let br = sprintf "%s_r%02d" BASE_TMP cnt in
-        let lc = W_VAR 1 bc in
-        let lr = W_VAR sz br in
+        let bc = sprintf "%s_c%02d" BASE_TMP cnt then
+        let br = sprintf "%s_r%02d" BASE_TMP cnt then
+        let lc = W_VAR 1 bc then
+        let lr = W_VAR sz br then
         val (c_ints, c_act, c_extra) =
-	    let v = var2name c in
+	    let v = var2name c then
 	    v = [] =>
-		let en = mk_name 1 bc in
+		let en = mk_name 1 bc then
 		([en], en, [((hw_bit_constr lc) <- (hw_bit_constr c))])
 	    |
 	    ([], hd v, [])
         in
         val (r_ints, r_act, r_extra) =
-	    let v = var2name r in
+	    let v = var2name r then
 	    v = [] =>
-		let en = mk_name sz br in
+		let en = mk_name sz br then
 		([en], en, [((hw_bit_constr lr) <- (hw_bit_constr r))])
 	    |
 	    ([], hd v, [])
@@ -2261,18 +2354,18 @@ let CASE {out:: *a} {cond_res_list:: (bit # *a) list} {default_value:: *a} =
         val (fas, e, ints, extras) = select (cnt+1) rem then 
         let fas = (mk_name 1 bc, [c_act]):(mk_name sz br, [r_act]):fas then
         let e = W_ITE lc lr e then
-        let ints = c_ints@r_ints@ints in
-        let extras = c_extra@r_extra@extras in
+        let ints = c_ints@r_ints@ints then
+        let extras = c_extra@r_extra@extras then
         (fas, e, ints, extras)
      /\    select cnt [] = [], ld, [], []
     in
     val (fas, rhs, ints, extras) = select 1 w_crl then
-    let ints = nd:ints in
+    let ints = nd:ints then
     let body = out <- (hw_constr rhs) then
     let pfn = sprintf "draw_CASE %d" n then
-    let mux = PINST pfn [] T (fas@d_fas) fa_outs [] (P_HIER [body]) in
-    let children = default_p:mux:extras in
-    let get_acts (PINST _ _ _ ifa _ _ _) = flatmap snd ifa in
+    let mux = PINST pfn [] T (fas@d_fas) fa_outs [] (P_HIER [body]) then
+    let children = default_p:mux:extras then
+    let get_acts (PINST _ _ _ ifa _ _ _) = flatmap snd ifa then
     let inps = (setify (flatmap get_acts children)) subtract ints then
     let fa_inps = map (\v.v,[v]) inps then
     PINST "CASE" [] F fa_inps fa_outs ints (P_HIER children)
@@ -2627,14 +2720,14 @@ letrec delay_rec N =
         delay_rec (N-1) clk reset tmp2 dout
 ]);
 
-let delay boxed N =
+let delay boxed N clk reset din dout = (
     bit_input   clk.
     bit_input   reset.
     input       din.
     output      dout.
     let pfn = boxed => sprintf "draw_hfl {DEL(%d)}" N | "delay" in
     CELL pfn [(delay_rec N clk reset din dout)]
-;
+) clk reset din dout;
 
 
 let hw__pair__type_name {p:: *a # *b} =
@@ -2748,4 +2841,22 @@ let is_draw_leaf p =
     val (PINST name _ _ _ _ _ _) = p in
     (str_is_prefix "draw_" name) AND NOT (str_is_prefix "draw_hier" name)
 ;
+
+
+//
+// A circuit that takes an input (vector) and outputs a 1 only after the
+// input has been the same for duration_in_phases phases.
+//
+let is_stable duration_in_phases inp ok = (
+    input       inp.
+    bit_output  ok.
+    internal        old.
+    bit_internal    same.
+    bit_list_internal (duration_in_phases-1) same_list.
+    CELL (sprintf "draw_hfl {is stable\nfor %d  \nphases }" duration_in_phases)  (
+        (map2 (\o.\i. o <: i) same_list ((tl same_list)@[same]))@[
+        old <: inp,
+        same <- (old '=' inp),
+        ok <- itlist (\s.\r. s '&' r) same_list same
+])) inp ok; 
 

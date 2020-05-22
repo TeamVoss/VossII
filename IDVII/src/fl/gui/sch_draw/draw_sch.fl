@@ -1111,7 +1111,7 @@ let base_get_waveform w vec show_depend =
             let val2s HL =
                 HL == (T,F) => "1" |
                 HL == (F,T) => "0" |
-                HL == (T,T) => "+" |
+                HL == (T,T) => "X" |
                 HL == (F,F) => "*" |
                 val (H,L) = HL in
                 (H == NOT L) => "S" |

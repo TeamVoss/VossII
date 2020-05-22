@@ -2,43 +2,29 @@
 // Copyright 2020 Carl-Johan Seger
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
-let bdd_and {ant1::(bool#string#bool#int#int) list} ant2 =
-    ant1 @ ant2
-;
-
-let bexpr_and {ant1::(bexpr#string#bexpr#int#int) list} ant2 =
-    ant1 @ ant2
-;
 
 // A simple interface for defining 5-tuple lists for (b)STE runs.
 // This function catenates two five-tuple lists of the same type.
-overload and bdd_and; // bexpr_and;
+let and = defix @;
 infix 1 and;
 
 let bdd_when {ant::(bool#string#bool#int#int) list} {cond::bool} =
     map (\(w,n,v,f,t). (cond AND w),n,v,f,t) ant
 ;
 
-let bexpr_when {ant::(bexpr#string#bexpr#int#int) list} {cond::bexpr} =
-    map (\(w,n,v,f,t). (cond bAND w),n,v,f,t) ant
-;
-
-// A simple interface for defining 5-tuple lists for (b)STE runs.
+// A simple interface for defining 5-tuple lists for STE runs.
 // This function conjucts the condition cond into every five-tuple.
 // Usage:  five_tuple_list when cond;
-overload when bdd_when; // bexpr_when;
+let when = bdd_when;
 infix 2 when;
 
-let bdd_is_clock nd cycles = map (\i. T, nd, (i%2=0), i, i+1) (0--(2*cycles-1));
-
-let bexpr_is_clock nd cycles =
-    map (\i. bT, nd, ((i%2=0)=>bT|bF), i, i+1) (0--(2*cycles-1))
-;
+let bdd_is_clock nd cycles =
+    map (\i. T, nd, (i%2=0), i, i+1) (0--(2*cycles-1));
 
 // A simple interface for defining 5-tuple lists for (b)STE runs.
 // Define a node nd to be a clock and generate cycs cycles of values.
 // Usage: nd is_clock cycs;
-overload is_clock bdd_is_clock; // bexpr_is_clock;
+let is_clock = bdd_is_clock;
 infix 2 is_clock;
 
 
@@ -58,9 +44,12 @@ lettype values =  STR_VAL   {v::string}
 		| INT_VAL   {i::int}
 		| BV_VAL    {v::bv}
 		| BL_VAL    {v:: bool list}
-		| WEXPR_VAL     {e::wexpr}
+		| WEXPR_VAL {e::wexpr}
+		| UNC
 ;
 
+// A shorthand for an unconstrained value
+let X = UNC;
 
 let s_in_phase v ph = [(T,STR_VAL v,ph,ph+1)];
 let i_in_phase v ph = [(T,INT_VAL v,ph,ph+1)];
@@ -68,8 +57,9 @@ let bv_in_phase v ph = [(T,BV_VAL v,ph,ph+1)];
 let bool_in_phase v ph = [(T,BL_VAL [v],ph,ph+1)];
 let bl_in_phase v ph = [(T,BL_VAL v,ph,ph+1)];
 let w_in_phase v ph = [(T,WEXPR_VAL (hw_destr v), ph, ph+1)];
+let u_in_phase UNC ph = [(T,UNC,ph,ph+1)];
 overload in_phase s_in_phase i_in_phase bv_in_phase bool_in_phase
-		  bl_in_phase w_in_phase
+		  bl_in_phase w_in_phase u_in_phase
 ;
 infix 6 in_phase;
 
@@ -79,8 +69,9 @@ let bv_in_cycle v cyc   = [(T,BV_VAL v,2*cyc,2*cyc+2)];
 let bool_in_cycle v cyc = [(T,BL_VAL [v],2*cyc,2*cyc+2)];
 let bl_in_cycle v cyc   = [(T,BL_VAL v,2*cyc,2*cyc+2)];
 let w_in_cycle v cyc    = [(T,WEXPR_VAL (hw_destr v), 2*cyc, 2*cyc+2)];
+let u_in_cycle UNC cyc    = [(T,UNC, 2*cyc, 2*cyc+2)];
 overload in_cycle s_in_cycle i_in_cycle bv_in_cycle bool_in_cycle
-			     bl_in_cycle w_in_cycle
+			     bl_in_cycle w_in_cycle u_in_cycle
 ;
 infix 6 in_cycle;
 
@@ -116,6 +107,10 @@ let wfor1 v {cnt::int} = [(F,WEXPR_VAL (hw_destr v),0,cnt)];
 let wfor2 [({fixed::bool},v,{start::int},{end::int})] cnt =
     [(fixed, WEXPR_VAL (hw_destr v), start, start+cnt)]
 ;
+let ufor1 UNC {cnt::int} = [(F,UNC,0,cnt)];
+let ufor2 [({fixed::bool},UNC,{start::int},{end::int})] cnt =
+    [(fixed, UNC, start, start+cnt)]
+;
 
 
 overload for sfor1 sfor2
@@ -124,6 +119,7 @@ overload for sfor1 sfor2
 	     boolfor1 boolfor2
 	     blfor1 blfor2
 	     wfor1 wfor2
+	     ufor1 ufor2
 ;
 infix 5 for;
 
@@ -156,12 +152,14 @@ let bv_otherwise vt (v,end)   = gen_otherwise vt (BV_VAL v, end);
 let bool_otherwise vt (v,end) = gen_otherwise vt (BL_VAL [v], end);
 let bl_otherwise vt (v,end)   = gen_otherwise vt (BL_VAL v, end);
 let w_otherwise vt (v,end)    = gen_otherwise vt (WEXPR_VAL (hw_destr v), end);
+let u_otherwise vt (UNC,end)  = gen_otherwise vt (UNC, end);
 overload otherwise s_otherwise
 		   i_otherwise
 		   bv_otherwise
 		   bool_otherwise
 		   bl_otherwise
 		   w_otherwise
+		   u_otherwise
 ;
 infix 3 otherwise;
 
@@ -229,6 +227,7 @@ let base_is nds vtlist =
 	|
 	let vs  = wexpr2bool e in
 	map2 (\n.\v. (T,n,v,f,t)) nds vs
+     /\ cnv (fixed, UNC, f, t) = []
     in
     flatmap cnv vtlist
 ;
@@ -240,5 +239,8 @@ let hw_is v vtlist = base_is (base_get_lhs_vars (hw_destr v)) vtlist;
 overload is s_is hw_is;
 infix 2 is;
 
+// Casting function
 let bool_ant {l::(bool#string#bool#int#int) list} = l;
+
+// Casting function
 let bexpr_ant {l::(bexpr#string#bexpr#int#int) list} = l;

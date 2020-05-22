@@ -46,6 +46,7 @@ typedef struct vec_info_rec {
     unint	    transient:1;
     ilist_ptr	    map;
     string	    value_list;
+    vec_info_ptr    next;
 } vec_info_rec;
 
 typedef struct vis_io_rec   *vis_io_ptr;

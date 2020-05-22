@@ -213,7 +213,12 @@ TypeCheck(g_ptr *ondp, bool delayed, impl_arg_ptr *impl_argsp)
 	node_replace_ptr nrp;
 	int nbr_solns;
       redo_overload_resolution:
+#if 0
 	nbr_solns = nbr_succ_overload_res(to_be_resolved, &nrp, !delayed);
+#else
+	(void) delayed;
+	nbr_solns = nbr_succ_overload_res(to_be_resolved, &nrp, TRUE);
+#endif
 	if( nbr_solns == 0 ) {
 	    while( nrp != NULL && nrp->alts_found != 0 ) { nrp = nrp->next; }
 	    ASSERT(nrp != NULL);

@@ -1,0 +1,24 @@
+load "ste.fl";
+
+let INT_SZ = 3;
+
+// TYPE -- Int -- Integer
+TYPE "simple_Int" INT_SZ;
+
+STRUCT "Int" INT_SZ [
+    ("simple_Int", "simple_Int", (INT_SZ-1 -- 0)),
+    ("msb",        "bit",        [INT_SZ-1]),
+    ("lsb",        "bit",        [0])
+];
+
+let p =
+    Int_internal n next_n.
+    CELL "p" [
+        CASE next_n [
+            n '=' '8 --- '9
+        ] 'X
+];
+
+p fseq 1;
+
+Emit_pexlif "_qq" p;

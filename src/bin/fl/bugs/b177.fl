@@ -1,0 +1,20 @@
+load "ste.fl";
+
+
+let stable duration =
+    bit_input       inp.
+    bit_output  stable.
+    internal        old.
+    bit_internal    same.
+    bit_list_internal duration same_list.
+    CELL "draw_hier duration" (
+        (map2 (\o.\i. o <: i) same_list ((tl same_list)@[same]))@[
+        old <: inp,
+        same <- (old '=' inp),
+        stable <- itlist (\s.\r. s '&' r) same_list '1
+]);
+
+let q = stable 2 'inp 'stable;
+q;
+
+pexlif2fsm q;

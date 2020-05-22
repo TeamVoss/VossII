@@ -1,0 +1,62 @@
+load "ste.fl";
+
+STRUCT "cr" [ ("ld","bit"), ("si","bit"), ("so","bit")];
+
+let CR name =
+    bit_input   clk.
+    cr_inout    cr.
+    output      state.
+    //
+    internal        shifted.
+    bit_internal    msb.
+    CELL (sprintf "draw_hier CR(%s)" name) [
+        shifted <- (IF cr-->ld THEN ((state '*' '2) '+' ZX (cr-->si))
+                               ELSE state),
+        re_ff clk shifted state,
+        msb <- ((state '&' ''(2**(hw_size state-1))) '!=' '0),
+        cr-->so <- msb
+];
+
+let CR_connect =
+    cr_list_output      crs.
+    cr_inout            cr.
+    CELL "draw_hier CR_connect" (
+        (map (\c. c-->ld <- cr-->ld) crs)
+//      @
+//      (map2 (\s1.\s2. s2 <- s1)
+//            ((cr-->si) : (map (\c. c-->so) crs))
+//            ((map (\c. c-->si) crs)@[cr-->so]))
+);
+
+let QCR_connect crs cr = (
+    cr_inout    cr1.
+    cr_inout    cr2.
+    cr_inout            cr.
+    CELL "draw_hier CR_connect" [
+        cr1-->ld <- cr-->ld,
+        cr2-->ld <- cr-->ld
+]) (el 1 crs) (el 2 crs) cr;
+
+
+
+TYPE "tst" 7;
+
+let tst =
+    bit_input       clk.
+    cr_inout        cr.
+    //
+    tst_internal    cnt1 cnt2.
+    cr_internal     c1 c2.
+    CELL "draw_hier tst" [
+        CR "cnt1" clk c1 cnt1,
+        CR "cnt2" clk c2 cnt2,
+        CR_connect [c1,c2] cr
+];
+
+let p = (tst 'clk 'cr);
+Emit_pexlif "_qq" p;
+
+update_vossrc "VERBOSE-FSM-PRINT" "YES";
+
+pexlif2fsm p;
+

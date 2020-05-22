@@ -3170,21 +3170,23 @@ proc draw_fub {module inst inames onames c tag x y} {
 	    -font $::mfont($c) -text $inst]
     add_font_tags $c $f _IsTeXt_
     # Inputs
-    set nx [expr ($xr-$rwid)]
-    set lowy [expr ($y-$rht/2+$rht/($inps*2))]
-    set sep [expr ($rht/$inps)]
-    set xl [expr ($nx)]
-    for {set i 0} {$i < $inps} {incr i} {
-	set yl [expr ($lowy+$i*$sep)]
-	val {fname anames} [lindex $inames $i]
-	set f [$c create text $nx $yl -anchor w -justify left \
-		-font $::mfont($c) -text $fname]
-	add_font_tags $c $f _IsTeXt_
-	$c create line $xl $yl $nx $yl -fill $gcolor
-	lappend inp_locs [expr round($xl)] [expr round($yl)]
+    if { $inps == 0 } {
+	set inp_locs {}
+    } else {
+	set nx [expr ($xr-$rwid)]
+	set lowy [expr ($y-$rht/2+$rht/($inps*2))]
+	set sep [expr ($rht/$inps)]
+	set xl [expr ($nx)]
+	for {set i 0} {$i < $inps} {incr i} {
+	    set yl [expr ($lowy+$i*$sep)]
+	    val {fname anames} [lindex $inames $i]
+	    set f [$c create text $nx $yl -anchor w -justify left \
+		    -font $::mfont($c) -text $fname]
+	    add_font_tags $c $f _IsTeXt_
+	    $c create line $xl $yl $nx $yl -fill $gcolor
+	    lappend inp_locs [expr round($xl)] [expr round($yl)]
+	}
     }
-
-
     # Outputs
     set nx $xr
     set lowy [expr ($y-$rht/2+$rht/($outs*2))]

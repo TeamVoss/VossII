@@ -1,0 +1,137 @@
+load "ste.fl";
+
+
+// Declare inputs to a unit.
+// Example: 
+//	input a b c.
+//	    ...
+let input body_fun {fs::string} {acc::string->(pexlif list)->pexlif} =
+        \{aa:: bit}.
+            let a = hw_destr aa then
+            let sz = hw_size aa then
+            let wf = hw_mk_var aa fs then
+            let f = {hw_constr wf:: bit} then
+            val (expr_pexlifs,av) = get_act_args fs aa then
+(fprintf stderr "Input (%s) |expr_pexlifs|=%d\n" fs (length expr_pexlifs)) fseq
+            let fv = hd (get_lhs_vars wf) then
+	    let values = hw_values {undefined :: bit} then
+            let acc' name bd =
+		let p0 = acc name bd then
+(fprintf stderr "===========Input %s p0:" fs) fseq (Ppexlif stderr p0) fseq
+                val (PINST n attrs leaf inps outs ints body) = p0 then
+		val (p_main, p_exprs) =
+		    n = "_WrApPeR_" =>
+			val (P_HIER pexlifs) = body then
+			// Get the main pexlif
+			val (PINST n' attrs' leaf' inps' outs' ints' body') =
+			    el 1 pexlifs
+			then
+			let prev_expr_pexlifs = tl pexlifs then
+			let attrs'' =
+			    values = "" => attrs' |
+			    (sprintf "node_values_%s" fv, values):attrs'
+			then
+			let inps'' = inps'@[(fv,av)] then
+			let p_main' =
+			    PINST n' attrs'' leaf' inps'' outs' ints' body'
+			then
+			(p_main', (prev_expr_pexlifs@expr_pexlifs))
+		    |
+		    let attrs' =
+			values = "" => attrs |
+			(sprintf "node_values_%s" fv, values):attrs
+		    then
+		    let inps_n = inps@[(fv,av)] then
+		    let p_main' = PINST n attrs' leaf inps_n outs ints body then
+		    (p_main', expr_pexlifs)
+		then
+		p_exprs = [] => p_main |
+		let c_ints = get_tmp_outs p_exprs then
+		let c_inps = mk_wrap_inps c_ints (p_main:p_exprs) then
+		let c_outs = mk_wrap_outs [p_main] then
+		let res = PINST "_WrApPeR_" attrs F c_inps c_outs c_ints
+			    (P_HIER (p_main:p_exprs)) in
+		res
+            in
+            body_fun f acc'
+;
+binder_with_accumulator input CELL;
+
+// Declare outputs to a unit.
+// Example: 
+//	output a b c.
+//	    ...
+let output body_fun {fs::string} {acc::string->(pexlif list)->pexlif} =
+        \{aa:: bit}.
+            let a = hw_destr aa then
+            let sz = hw_size aa then
+            let wf = hw_mk_var aa fs then
+            let f = {hw_constr wf:: bit} then
+            let av = get_lhs_vars a then
+            let fv = hd (get_lhs_vars wf) then
+	    let values = hw_values {undefined :: bit} then
+            let acc' name bd =
+		let p0 = acc name bd then
+(fprintf stderr "----------Output %s p0:" fs) fseq (Ppexlif stderr p0) fseq
+                val (PINST n attrs leaf inps outs ints body) = p0 then
+		val (p_main, p_exprs) =
+		    n = "_WrApPeR_" =>
+			val (P_HIER pexlifs) = body then
+			// Get the main pexlif
+			val (PINST n' attrs' leaf' inps' outs' ints' body') =
+			    el 1 pexlifs
+			then
+			let prev_expr_pexlifs = tl pexlifs then
+			let outs'' = outs'@[(fv,av)] then
+			let attrs'' =
+			    values = "" => attrs' |
+			    (sprintf "node_values_%s" fv, values):attrs'
+			then
+			let p_main' =
+			    PINST n' attrs'' leaf' inps' outs'' ints' body'
+			then
+			(p_main', prev_expr_pexlifs)
+		    |
+		    let attrs' =
+			values = "" => attrs |
+			(sprintf "node_values_%s" fv, values):attrs
+		    then
+		    let outs_n = outs@[(fv,av)] then
+		    let p_main' = PINST n attrs' leaf inps outs_n ints body then
+		    (p_main', [])
+		then
+		p_exprs = [] => p_main |
+		let c_ints = get_tmp_outs p_exprs then
+		let c_inps = mk_wrap_inps c_ints (p_main:p_exprs) then
+		let c_outs = mk_wrap_outs [p_main] then
+		let res = PINST "_WrApPeR_" attrs F c_inps c_outs c_ints
+			    (P_HIER (p_main:p_exprs)) then
+		res
+            then
+            body_fun f acc'
+;
+binder_with_accumulator output CELL;
+
+
+let p1 =
+    output  oink.
+    input   a.
+    input   b.
+    CELL "p1" [
+	oink <- '0
+];
+
+let p2 =
+    output  u.
+    CELL "p2" [
+	p1 u '1 '0
+];
+
+
+let p = p2 'u;
+
+p fseq 1;
+//Emit_pexlif "_qq" p;
+
+pexlif2fsm p;
+

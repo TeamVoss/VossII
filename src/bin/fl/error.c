@@ -163,7 +163,7 @@ Fail_pr (const string format, ...)
     res = strtemp("---  ");
     res = strappend(fbuf);
     res = charappend('\n');
-    if( debug_on ) {
+    if( debug_on && strstr(res, "Stack trace:\n") == 0 ) {
 	strappend(Get_stack_trace(RCmax_stack_trace_entries));
     }
     strncpy(FailBuf, res, 4096-1);

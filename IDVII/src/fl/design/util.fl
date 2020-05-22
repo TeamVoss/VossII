@@ -335,7 +335,6 @@ infix 4 dXOR;
 let dXNOR = defix XNOR;
 infix 4 dXNOR;
 
-// open_overload dTHEN;
 let dTHEN_1 c (t,e) = (c dAND t) dOR (dNOT c dAND e);
 
 let dTHEN_2 c (lt,le) = map2 (\t.\e. dTHEN_1 c (t,e)) lt le;

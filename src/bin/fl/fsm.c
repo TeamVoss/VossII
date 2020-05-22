@@ -295,7 +295,7 @@ static int          get_stride(vec_ptr vp);
 static bool         inside(int i, int upper, int lower);
 static int          find_index_from_end(int i, range_ptr rp);
 static bool         is_full_range(vec_ptr v1, vec_ptr v2);
-static void         map_node(vec_ptr decl, vec_ptr ivec, int cur);
+static void         map_node(vec_ptr decl, vec_ptr ivec, ilist_ptr map, int i);
 static int          compute_ilist_length(ilist_ptr l);
 static ilist_ptr    ilist_append(ilist_ptr l1, ilist_ptr l2);
 static ilist_ptr    append_range(ilist_ptr l, int i_from, int i_to);
@@ -5156,7 +5156,7 @@ get_lhs_indices(hash_record *vtblp, g_ptr e)
 static void
 report_source_locations()
 {
-    FP(err_fp,"While reading:\n");
+    FP(err_fp,"While processing:\n");
     g_ptr *gpp;
     int indent = 2;
     FUB_ROF(&attr_buf, g_ptr, gpp) {
@@ -5164,9 +5164,11 @@ report_source_locations()
 	for(g_ptr l = attrs; !IS_NIL(l); l = GET_CONS_TL(l)) {
 	    string key = GET_STRING(GET_CONS_HD(GET_CONS_HD(l)));
 	    string val = GET_STRING(GET_CONS_TL(GET_CONS_HD(l)));
-	    if( strcmp(key, "src") == 0 ) {
+	    if( strcmp(key, "module") == 0 && strcmp(val, "_WrApPeR_") != 0) {
 		FP(err_fp, "%*s%s\n", indent, "", val);
 		indent += 4;
+	    } else if( strcmp(key, "src") == 0 ) {
+		FP(err_fp, " in %s\n", val);
 	    }
 	}
     }
@@ -5178,6 +5180,7 @@ declare_vector(hash_record *vtblp, string hier, string name,
 {
     vec_info_ptr ip;
     ip = (vec_info_ptr) new_rec(vec_info_rec_mgrp);
+    ip->next = NULL;
     ip->value_list = value_list;
     ip->transient = transient;
     ip->local_name = name;
@@ -5223,7 +5226,13 @@ declare_vector(hash_record *vtblp, string hier, string name,
 	    push_buf(nodesp, (pointer) &nr);
 	}
     }
-    insert_hash(vtblp, sig, ip);
+    vec_info_ptr oip = (vec_info_ptr) find_hash(vtblp, sig);
+    if( oip == NULL ) {
+	insert_hash(vtblp, sig, ip);
+    } else {
+	while( oip->next ) { oip = oip->next; }
+	oip->next = ip;
+    }
     string full_vname = strtemp(hier);
     strappend(sig);
     full_vname = wastrsave(&strings, full_vname);
@@ -5314,7 +5323,7 @@ vec2indices(string name)
     idx_map_result = NULL;
     im_cur = NULL;
     if( setjmp(node_map_jmp_env) == 0 ) {
-	map_node(dp, vp, ip->map->from);
+	map_node(dp, vp, ip->map, 0);
     } else {
 	FP(err_fp, "Cannot map %s\n%s\n", name, FailBuf);
 	report_source_locations();
@@ -5364,25 +5373,29 @@ map_vector(hash_record *vtblp, string name)
     }
     vec_ptr vp = split_vector_name(vec_rec_mgrp,range_rec_mgrp, name);
     string sig = get_vector_signature(vp);
-    vec_info_ptr ip = (vec_info_ptr) find_hash(vtblp,sig);
-    if( ip == NULL ) {
-	Fail_pr("Cannot find a declaration of %s", name);
-	return NULL;
+    vec_info_ptr oip = (vec_info_ptr) find_hash(vtblp,sig);
+    vec_info_ptr ip = oip;
+    FailBuf[0] = 0;
+    while( 1 ) {
+	if( ip == NULL ) {
+	    FP(err_fp, "Cannot map %s (%s[%p])\n%s\n", name, sig, oip, FailBuf);
+	    report_source_locations();
+	    Rprintf("");
+	}
+	vec_ptr dp = ip->declaration;
+	idx_map_result = NULL;
+	if( is_full_range(dp, vp) ) {
+	    ilist_ptr res = ilist_copy(ip->map);
+	    return( res );
+	}
+	im_cur = NULL;
+	if( setjmp(node_map_jmp_env) == 0 ) {
+	    map_node(dp, vp, ip->map, 0);
+	    return( idx_map_result );
+	} else {
+	    ip = ip->next;
+	}
     }
-    vec_ptr dp = ip->declaration;
-    if( is_full_range(dp, vp) ) {
-	return( ilist_copy(ip->map) );
-    }
-    idx_map_result = NULL;
-    im_cur = NULL;
-    if( setjmp(node_map_jmp_env) == 0 ) {
-	map_node(dp, vp, ip->map->from);
-    } else {
-	FP(err_fp, "Cannot map %s\n%s\n", name, FailBuf);
-	report_source_locations();
-	Rprintf("");
-    }
-    return( idx_map_result );
 }
 
 static int
@@ -5476,8 +5489,22 @@ is_full_range(vec_ptr v1, vec_ptr v2)
     goto full_range_restart;
 }
 
+static int
+ilist_sel(ilist_ptr ip, int idx)
+{
+    while( ip->size <= idx ) {
+	idx -= ip->size;
+	ip = ip->next;
+    }
+    if( ip->from >= ip->to ) {
+	return( ip->from-idx );
+    } else {
+	return( ip->from+idx );
+    }
+}
+
 static void
-map_node(vec_ptr decl, vec_ptr ivec, int cur)
+map_node(vec_ptr decl, vec_ptr ivec, ilist_ptr map, int cur)
 {
     vec_ptr vec = ivec;
     while( vec != NULL && vec->type == TXT ) {
@@ -5488,22 +5515,23 @@ map_node(vec_ptr decl, vec_ptr ivec, int cur)
     }
     if( vec == NULL ) {
 	ASSERT(decl == NULL);
+	int rcur = ilist_sel(map, cur);
 	if( idx_map_result == NULL ) {
 	    idx_map_result = (ilist_ptr) new_rec(ilist_rec_mgrp);
 	    im_cur = idx_map_result;
 	    im_cur->next = NULL;
-	    im_cur->from = cur;
-	    im_cur->to = cur;
+	    im_cur->from = rcur;
+	    im_cur->to = rcur;
 	    im_cur->size = 1;
 	    return;
 	}
-	if( im_cur->from >= im_cur->to && (cur == (im_cur->to-1)) ) {
-	    im_cur->to = cur;
+	if( im_cur->from >= im_cur->to && (rcur == (im_cur->to-1)) ) {
+	    im_cur->to = rcur;
 	    (im_cur->size)++;
 	    return;
 	}
-	if( im_cur->from <= im_cur->to && (cur == (im_cur->to+1)) ) {
-	    im_cur->to = cur;
+	if( im_cur->from <= im_cur->to && (rcur == (im_cur->to+1)) ) {
+	    im_cur->to = rcur;
 	    (im_cur->size)++;
 	    return;
 	}
@@ -5511,8 +5539,8 @@ map_node(vec_ptr decl, vec_ptr ivec, int cur)
 	im_cur->next = tmp;
 	im_cur = im_cur->next;
 	im_cur->next = NULL;
-	im_cur->from = cur;
-	im_cur->to = cur;
+	im_cur->from = rcur;
+	im_cur->to = rcur;
 	im_cur->size = 1;
 	return;
     }
@@ -5523,12 +5551,12 @@ map_node(vec_ptr decl, vec_ptr ivec, int cur)
 	if( rp->upper >= rp->lower ) {
 	    for(int i = rp->upper; i >= rp->lower; i--) {
 		int idx = find_index_from_end(i, decl->u.ranges);
-		map_node(decl->next, vec->next, cur+(stride*idx));
+		map_node(decl->next, vec->next, map, cur+(stride*idx));
 	    }
 	} else {
 	    for(int i = rp->upper; i <= rp->lower; i++) {
 		int idx = find_index_from_end(i, decl->u.ranges);
-		map_node(decl->next, vec->next, cur+(stride*idx));
+		map_node(decl->next, vec->next, map, cur+(stride*idx));
 	    }
 	}
     }
@@ -6848,6 +6876,9 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
 	Fail_pr("Not a PINST where expected");
 	return FALSE;
     }
+    attrs = Make_CONS_ND(
+		Make_CONS_ND(Make_STRING_leaf(wastrsave(&strings,"module")),
+			     Make_STRING_leaf(name)), attrs);
     push_buf(&attr_buf, &attrs);
     // Declare new nodes (internal)
     for(g_ptr l = internals; !IS_NIL(l); l = GET_CONS_TL(l)) {
