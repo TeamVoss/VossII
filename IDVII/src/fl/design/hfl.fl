@@ -118,6 +118,7 @@ let _s2_var s =
     let w = W_EXPLICIT_VAR sz s in
     {hw_constr w:: *r}
 ;
+
 overload '' '' _i2_const _s2_var;
 
 begin_abstype;
@@ -884,6 +885,12 @@ let input body_fun {fs::string} acc =
 			(sprintf "node_values_%s" fv, values):attrs
 		    in
 		    let inps_n = inps@[(fv,av)] in
+		    mem fv ints =>
+			eprintf "Node %s declared both input and internal" fv 
+		    |
+		    mem fv (map fst outs) =>
+			eprintf "Node %s declared both input and output" fv 
+		    |
 		    let p_main' = PINST n attrs' leaf inps_n outs ints body in
 		    (p_main', expr_pexlifs)
 		in
@@ -917,9 +924,9 @@ let list_input body_fun {base_fs::string} acc =
             let acc' name bd =
 		let p0 = acc name bd in
                 val (PINST n attrs leaf inps outs ints body) = p0 in
-                let new_inps = aa = [] => [] |
-				[((hd (md_merge_vectors fv)),
-				 (md_merge_vectors (flat avs)))]
+		let fv1 = hd (md_merge_vectors fv) in
+                let new_inps = aa = [] => [] 
+					| [(fv1, (md_merge_vectors (flat avs)))]
 		in
 		val (p_main, p_exprs) =
 		    n = "_WrApPeR_" =>
@@ -936,6 +943,12 @@ let list_input body_fun {base_fs::string} acc =
 			(p_main', (prev_expr_pexlifs@(flat expr_pexlifs)))
 		    |
 		    let inps_n = inps@new_inps in
+		    (aa != []) AND (mem fv1 ints) =>
+			eprintf "Node %s declared both input and internal" fv1 
+		    |
+		    (aa != []) AND (mem fv1 (map fst outs)) =>
+			eprintf "Node %s declared both input and output" fv1 
+		    |
 		    let p_main' = PINST n attrs leaf inps_n outs ints body in
 		    (p_main', flat expr_pexlifs)
 		in
@@ -991,6 +1004,12 @@ let output body_fun {fs::string} acc =
 			(sprintf "node_values_%s" fv, values):attrs
 		    in
 		    let outs_n = outs@[(fv,av)] in
+		    mem fv ints =>
+			eprintf "Node %s declared both output and internal" fv 
+		    |
+		    mem fv (map fst inps) =>
+			eprintf "Node %s declared both input and output" fv 
+		    |
 		    let p_main' = PINST n attrs' leaf inps outs_n ints body in
 		    (p_main', [])
 		in
@@ -1022,9 +1041,9 @@ let list_output body_fun {base_fs::string} acc =
             let acc' name bd =
 		let p0 = acc name bd in
                 val (PINST n attrs leaf inps outs ints body) = p0 in
-                let new_outs = aa = [] => [] |
-				[((hd (md_merge_vectors fv)),
-				 (md_merge_vectors (flat av)))]
+		let fv1 = hd (md_merge_vectors fv) in
+                let new_outs = aa = [] => []
+					| [(fv1, (md_merge_vectors (flat av)))]
 		in
 		val (p_main, p_exprs) =
 		    n = "_WrApPeR_" =>
@@ -1041,6 +1060,12 @@ let list_output body_fun {base_fs::string} acc =
 			(p_main', prev_expr_pexlifs)
 		    |
 		    let outs_n = outs@new_outs in
+		    (aa != []) AND (mem fv1 ints) =>
+			eprintf "Node %s declared both output and internal" fv1 
+		    |
+		    (aa != []) AND (mem fv1 (map fst inps)) =>
+			eprintf "Node %s declared both input and output" fv1 
+		    |
 		    let p_main' = PINST n attrs leaf inps outs_n ints body in
 		    (p_main', [])
 		in
@@ -1159,6 +1184,33 @@ let internal body_fun {fs::string} acc =
     body_fun {f:: *a} acc'
 ;
 binder_with_accumulator internal CELL;
+
+// Make an internal wire named by an expression
+// Should be used in conjunction with add_internal.
+// For example:
+//	let foo = mk_internal (sprintf "_KeY_%s" name) in
+//	add_internal foo (CELL .... );
+//
+let mk_internal name =
+    let sz = hw_size {undefined:: *r} in
+    val w =
+	let nsz = md_size name in
+	sz = nsz => W_EXPLICIT_VAR sz name |
+	W_EXPLICIT_VAR sz (sprintf "%s[%d:0]" name (sz-1))
+    in
+    {hw_constr w:: *r}
+;
+
+// Add an internal wire created by mk_internal to the internals list in pexlif.
+// See mk_internal for example of use.
+let add_internal new_int cell =
+    let w_int = hw_destr new_int in
+    let new_ints = merge_vectors (base_get_lhs_vars w_int) in
+    val (PINST nm attrs leaf inps outs ints body) = cell in
+    PINST nm attrs leaf inps outs (new_ints@ints) body
+;
+
+
 
 // Declare internal array of signals to a unit.
 let list_internal cnt body_fun {base_fs::string} acc =

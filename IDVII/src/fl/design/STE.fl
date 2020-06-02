@@ -75,6 +75,21 @@ overload in_cycle s_in_cycle i_in_cycle bv_in_cycle bool_in_cycle
 ;
 infix 6 in_cycle;
 
+begin_abstype;
+let mk_in_cycs v cycs = map (\cyc. (T,v,2*cyc, 2*cyc+2)) cycs;
+let s_in_cycles v cycs    = mk_in_cycs (STR_VAL v) cycs;
+let i_in_cycles v cycs    = mk_in_cycs (INT_VAL v) cycs;
+let bv_in_cycles v cycs   = mk_in_cycs (BV_VAL v) cycs;
+let bool_in_cycles v cycs = mk_in_cycs (BL_VAL [v]) cycs;
+let bl_in_cycles v cycs   = mk_in_cycs (BL_VAL v) cycs;
+let w_in_cycles v cycs    = mk_in_cycs (WEXPR_VAL (hw_destr v)) cycs;
+let u_in_cycles UNC cycs  = mk_in_cycs (UNC) cycs;
+overload in_cycles s_in_cycles i_in_cycles bv_in_cycles bool_in_cycles
+			     bl_in_cycles w_in_cycles u_in_cycles
+;
+infix 6 in_cycles;
+end_abstype in_cycles;
+
 // Keep???
 //let at_phase v ph = [(T,v,ph,ph)];
 //infix 6 at_phase;
