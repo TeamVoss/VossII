@@ -25,12 +25,12 @@ extern FILE		*yyin;
 extern old_yyin_ptr	cur_file;
 extern symbol_tbl_ptr	symb_tbl;
 extern bool		gui_mode;
+extern jmp_buf	        *start_envp;
 
 bool			Disable_GC;
 bool			do_gc_asap;
 bool		        file_load = FALSE;
 int		        line_nbr = 1;
-jmp_buf		        *start_envp;
 g_ptr		        root_node;
 g_ptr		        *sp;
 char		        *space_const;

@@ -1946,7 +1946,7 @@ let MUX =
     input a b.
     output out.
     CELL "MUX" [
-	out <- (SX c) '&' a '|' '~'(SX c) '&' b
+	out <- (IF c THEN a ELSE b)
 ];
 
 // Needed to make the drawing function happy....
@@ -2911,4 +2911,26 @@ let is_stable duration_in_phases inp ok = (
         same <- (old '=' inp),
         ok <- itlist (\s.\r. s '&' r) same_list same
 ])) inp ok; 
+
+
+
+// A function that helps in declaring internal signals
+// Use:
+//    find_free_vars [:  expr :];
+
+let find_free_vars expr =
+   letrec findfree bound (APPLY e1 e2) =
+        (findfree bound e1) union (findfree bound e2)
+     /\   findfree bound (VAR s) =
+          mem s bound => [] |
+          is_defined s => [] | [s]
+     /\   findfree bound (LAMBDA v e) =
+            findfree (v:bound) e
+     /\   findfree bound (CONS e1 e2) =
+        (findfree bound e1) union (findfree bound e2)
+     /\   findfree bound other = []
+    in
+    let free = findfree [] expr then
+    print (list2str T "" "\n" "\n" (sprintf "    internal  %s.") (setify free))
+;
 

@@ -21,7 +21,7 @@
 #include "strings.h"
 #include "typecheck.h"
 
-g_ptr void_nd;
+extern g_ptr void_nd;
 #include "graph.h"
 
 /* Functions made available to fl plugins */

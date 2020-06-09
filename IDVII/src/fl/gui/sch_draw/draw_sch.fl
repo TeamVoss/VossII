@@ -1425,7 +1425,7 @@ let add_waveform vfsm vecs =
     let ww = sprintf "%s.nb.waveform" w then
     let cmds = map (\v. sprintf "wv:prim_add_waveform %s {%s}" ww v) vecs in
     (foreach (fl_record_waveform_addition w) vecs) fseq
-    (tcl_eval (cmds@[sprintf "wv:set_time_pointer %s {}" ww])) fseq
+    (tcl_eval (cmds@[sprintf "wv:set_time_pointer %s {}" ww, "update"])) fseq
     ()
 ;
 
@@ -1441,7 +1441,7 @@ let delete_waveform vfsm idx =
     let ww = deref (vfsm2wvr vfsm) then
     let nn = sprintf "%s.panes.name_frame.names" ww in
     let cmd = sprintf "wv:delete_waveform %s %d" nn idx in
-    (tcl_eval [cmd, sprintf "wv:set_time_pointer %s {}" ww]) fseq
+    (tcl_eval [cmd, sprintf "wv:set_time_pointer %s {}" ww, "update"]) fseq
     ()
 ;
 
@@ -1458,7 +1458,7 @@ let move_waveform vfsm idx dir =
     let ww = deref (vfsm2wvr vfsm) then
     let nn = sprintf "%s.panes.name_frame.names" ww in
     let cmd = sprintf "wv:move_waveform %s %d %d" nn idx dir in
-    (tcl_eval [cmd, sprintf "wv:set_time_pointer %s {}" ww]) fseq
+    (tcl_eval [cmd, sprintf "wv:set_time_pointer %s {}" ww, "update"]) fseq
     ()
 ;
 
@@ -1468,7 +1468,7 @@ let move_waveform vfsm idx dir =
 let draw_set_time vfsm t =
     let w = (vfsm2id vfsm) then
     let old = tcl_eval [sprintf "set ::vstatus(time,%s)" w] then
-    (tcl_eval [sprintf "set ::vstatus(time,%s) %d" w t]) fseq
+    (tcl_eval [sprintf "set ::vstatus(time,%s) %d" w t, "update"]) fseq
     sscanf "%d" old
 ;
 
@@ -1492,7 +1492,8 @@ let draw_show_values {vis::vfsm} c show =
     NOT toggle => () |
     ((tcl_eval [
 	sprintf "set ::vstatus(show_value,%s) %s" c (show => "1" | "0"),
-	sprintf "sch:toggle_show_value_buttons %s [winfo parent %s].menu" c c]
+	sprintf "sch:toggle_show_value_buttons %s [winfo parent %s].menu" c c,
+	"update"]
     ) fseq ())
 ;
 
