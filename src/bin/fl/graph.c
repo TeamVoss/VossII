@@ -3056,7 +3056,7 @@ traverse_left(g_ptr oroot)
                     /*                                          */
                     /*         @                  @<-+          */
                     /*        / \                / \ |          */
-                    /*       Y   f              f   -           */
+                    /*       Y   f              f   -+          */
 
 		    if( depth < 1 )
 			goto clean_up;
