@@ -24,7 +24,7 @@
 extern ustr_mgr         strings;
 
 static buffer	    sch_ptr_buf;
-static char	    cmd_buf[4096];
+static char	    cmd_buf[8*4096]; // Temporary bug workaround for large pfns
 static rec_mgr	    pair_list_rec_mgr;
 
 static hash_record  pfn2width;
@@ -99,7 +99,6 @@ add_sch_object(ClientData clientData, Tcl_Interp *interp,
 	}
 	insert_hash(&pfn2width, pfn, INT2PTR(width));
 	insert_hash(&pfn2height, pfn, INT2PTR(height));
-
     } else {
 	width = PTR2INT(find_hash(&pfn2width, pfn));
     }
