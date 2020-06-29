@@ -1026,6 +1026,40 @@ nodes(g_ptr redex)
 }
 
 static void
+edges(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_fsm;
+    EXTRACT_1_ARG(redex, g_fsm);
+    fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
+    push_fsm(fsm);
+    MAKE_REDEX_NIL(redex);
+    g_ptr tail = redex;
+    nnode_ptr np;
+    FOR_BUF(&(fsm->nodes), nnode_rec, np) {
+        int start = np->vec->map->from;
+        string sname = get_real_name(np->vec, np->idx-start+1);
+        if(*sname != '!') {
+	    g_ptr from = Make_STRING_leaf(wastrsave(&strings, sname));
+	    for(idx_list_ptr ilp = np->fanouts; ilp != NULL; ilp = ilp->next) {
+		ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, ilp->idx);
+		FOREACH_NODE(nd, cp->outs) {
+		    g_ptr to = Make_STRING_leaf(wastrsave(&strings, idx2name(nd)));
+		    g_ptr h = GET_CONS_HD(tail);
+		    MAKE_REDEX_PAIR(h, from, to);
+		    SET_CONS_TL(tail, Make_NIL());
+		    tail = GET_CONS_TL(tail);
+		}
+	    }
+        }
+    }
+    pop_fsm();
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);    
+}
+
+static void
 vectors(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
@@ -1338,9 +1372,9 @@ fanin(g_ptr redex)
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
 	return;
     }
-    nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
+    nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
     int composite = np->composite;
     if( composite >= 0 ) {
 	ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, composite);
@@ -2372,6 +2406,15 @@ Fsm_Install_Functions()
 			GLmake_arrow(fsm_handle_tp,
 				     GLmake_list(GLmake_string())),
 			nodes);
+
+    Add_ExtAPI_Function("edges", "1", FALSE,
+			GLmake_arrow(
+			    fsm_handle_tp,
+			    GLmake_list(
+				GLmake_tuple(
+				    GLmake_string(),
+				    GLmake_string()))),
+			edges);    
 
     Add_ExtAPI_Function("vectors", "1", FALSE,
 			GLmake_arrow(fsm_handle_tp,

@@ -34,7 +34,7 @@ typedef union {
     formula	f;
     bexpr	bp;
     arbi_T	ai;
-		    }	gbv;
+} gbv;
 
 typedef struct vec_info_rec *vec_info_ptr;
 typedef struct vec_info_rec {
@@ -274,6 +274,12 @@ typedef struct node_comp_pair_rec {
     nnode_ptr	np;
     int		comp_idx;
 } node_comp_pair_rec;
+
+typedef struct edge_rec *edge_ptr;
+typedef struct edge_rec {
+    string from;
+    string to;
+} edge_rec;
 
 #endif /* FSM_H */
 #endif /* EXPORT_FORWARD_DECL */

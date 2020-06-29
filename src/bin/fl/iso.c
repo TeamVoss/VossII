@@ -108,3 +108,22 @@ Iso_Install_Functions()
 {
   // ...
 }
+
+// g_ptr r = GET_APPLY_RIGHT(redex);
+//   = { #define GET_APPLY_RIGHT(np)     M_GET_APPLY_RIGHT(np) }
+// g_ptr r = M_GET_APPLY_RIGHT(redex);
+//   = { #define M_GET_APPLY_RIGHT(np)   ((g_ptr) GET_RIGHT(np)) }
+// g_ptr r = ((g_ptr) GET_RIGHT(redex));
+//   = { #define GET_RIGHT(np)           (((ui)((np)->R)) & ~0x3) }
+// g_ptr r = (((ui)((redex)->R)) & ~0x3);
+
+// g_ptr g_fsm;
+// EXTRACT_1_ARG(redex, g_fsm);
+//   = { #define EXTRACT_1_ARG(np, a1)   a1 = GET_APPLY_RIGHT(np); }
+// g_fsm = GET_APPLY_RIGHT(redex);
+//   = { ... as before ... }
+// g_fsm = (((ui)((redex)->R)) & ~0x3);
+
+// fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
+//   = { #define GET_EXT_OBJ(np)         ((pointer) GET_RIGHT(np)) }
+// fsm_ptr fsm = ...
