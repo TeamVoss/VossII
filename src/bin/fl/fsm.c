@@ -1043,14 +1043,13 @@ edges(g_ptr redex)
         if(*sname != '!') {
 	    g_ptr from = Make_STRING_leaf(wastrsave(&strings, sname));
 	    for(idx_list_ptr ilp = np->fanouts; ilp != NULL; ilp = ilp->next) {
-		ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, ilp->idx);
-		FOREACH_NODE(nd, cp->outs) {
-		    g_ptr to = Make_STRING_leaf(wastrsave(&strings, idx2name(nd)));
-		    g_ptr h = GET_CONS_HD(tail);
-		    MAKE_REDEX_PAIR(h, from, to);
-		    SET_CONS_TL(tail, Make_NIL());
-		    tail = GET_CONS_TL(tail);
-		}
+                ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, ilp->idx);
+	        FOREACH_NODE(nd, cp->outs) {
+                    string tname = idx2name(nd);
+		    g_ptr to = Make_STRING_leaf(wastrsave(&strings, tname));
+                    g_ptr pair = Make_PAIR_ND(from, to);
+                    APPEND1(tail, pair);
+	        }
 	    }
         }
     }
