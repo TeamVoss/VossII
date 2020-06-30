@@ -2512,6 +2512,23 @@ let SELECT =
             ) ('X)
 ];
 
+
+let SELECT_list =
+    list_input  {inps:: *a list}.
+    input       addr.
+    output      {out:: *a}.
+    CELL "draw_SELECT" [
+        let lines = length inps in
+        let addr_sz = hw_size addr in
+        lines > 2**addr_sz =>
+            eprintf "Too many lines (%d) in SELECT_list for address size (%d)"
+                    lines addr_sz
+        |
+        let sel i = el (lines-i) inps in
+        CASE out
+             (map (\i. ((addr '=' ''i), sel i)) (0--(lines-1))) ('X)
+];
+
 let DECODER =
     input   inp.
     output  out.
@@ -2563,14 +2580,10 @@ let EN_DECODER_list =
     list_output	{outs :: bit list}.
     let isz = hw_size inp in
     let osz = length outs in
-    osz != (2**isz) =>
-	eprintf "Output size (%d) of EN_DECODER not power of input size (%d)"
-		osz isz
-    |
     let pfn = sprintf "draw_DECODER 1 %d %d" isz osz in
     CELL pfn (
 	map2 (\i.\o. o <- (enable '&' (inp '=' (''i))))
-	     ((2**(hw_size inp)-1) downto 0) outs
+	     ((length outs-1) downto 0) outs
 );
 
 
