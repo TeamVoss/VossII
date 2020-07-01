@@ -31,6 +31,7 @@ OBJ = new_bdd.o error.o arb_prec.o file_ops.o initialize.o symbol_tbl.o \
 	draw_graph.o debug.o symbol.o strings.o int_ops.o list_ops.o \
 	system.o signature.o float.o bv.o bev.o fsm.o sha256.o table.o image.o \
 	plugin.o plugin_loader.o plugin_checker.o plugin_errlog.o
+#        iso.o
 
 fl: $(OBJ) $(LIB)
 	$(CX) $(CFLAGS) $(INC) $(LINKFLAG) -o fl $(OBJ) $(LIB) \
@@ -99,6 +100,7 @@ plugin_loader.o:    plugin_loader.h plugin.h strings.h typecheck.h abi_version.h
 plugin_checker.o:   plugin_loader.h plugin.h strings.h typecheck.h abi_version.h plugin_errlog.h
 plugin_errlog.o:    plugin_errlog.h
 table.o:	    table.h graph.h typecheck.h fl.h
+#iso.o:              iso.h graph.h fsm.h fl.h
 
 prefs.h: prefs.tcl
 	tclsh make_prefs.tcl

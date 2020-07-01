@@ -825,6 +825,17 @@ Make_Lambda(string var, g_ptr expr)
     return( root );
 }
 
+g_ptr
+Make_PAIR_ND(g_ptr fst, g_ptr snd)
+{
+    g_ptr root;
+    root = Get_node();
+    SET_TYPE(root, CONS_ND);
+    SET_CONS_HD(root, fst);
+    SET_CONS_TL(root, snd);
+    return( root );
+}
+
 string
 Find_new_free_var(g_ptr expr)
 {
@@ -3056,7 +3067,7 @@ traverse_left(g_ptr oroot)
                     /*                                          */
                     /*         @                  @<-+          */
                     /*        / \                / \ |          */
-                    /*       Y   f              f   -           */
+                    /*       Y   f              f   -+          */
 
 		    if( depth < 1 )
 			goto clean_up;
