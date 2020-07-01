@@ -1,0 +1,63 @@
+load "ste.fl";
+
+// deCASE
+// demultiplexer
+// Usage:
+//  deCASE inp [
+//      condition1  --- out1,
+//      condition2  --- out2,
+//      condition3  --- out3,
+//  ] out_generic,
+
+letrec deCASE_rec =
+    input	inp.
+    list_input	co_list.
+    output	fallback.
+    bit_input	condition.
+    CELL "draw_hier deCASE" (
+	co_list = [] => [
+            fallback <- (IF condition THEN '0 ELSE inp)
+	] |
+        let co_tail = tl co_list in
+        let co_head = hd co_list in
+        let c = fst co_head in
+        let o = snd co_head in [
+            o <- (IF ('~' condition '&' c) THEN inp ELSE '0),
+            deCASE_rec inp co_tail fallback (condition '&' c)
+        ]
+    )
+;
+
+let deCASE inp condition_output_list fallback =
+    deCASE_rec inp condition_output_list fallback '0;
+
+TYPE "byte" 8;
+
+let bla_test =
+    byte_input   foo.
+    bit_input   bar.
+    byte_output  baz1 baz0.
+    CELL "dhfslkdjfh" [
+        deCASE foo [
+            bar --- baz1
+        ] baz0
+    ]
+;
+
+let p_test   = bla_test 'foo 'bar 'baz1 'baz0;
+p_test;
+let ckt_test = pexlif2fsm p_test;
+ckt_test;
+
+let vis = STE_debug ckt_test;
+
+let ant =
+    "foo[7:0]" is "a[7:0]" for 4 cycles
+  and
+    "bar" is 0 for 1 cycle followed_by 
+	     1 for 1 cycle followed_by 
+	     0 for 1 cycle followed_by 
+	     1 for 1 cycle
+;
+
+STE "-e" vis [] ant [] [];
