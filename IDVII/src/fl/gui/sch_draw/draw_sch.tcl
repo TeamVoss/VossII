@@ -379,11 +379,14 @@ proc nb:tab2c {w name} {
     error "No tab named $name in notebook under $w"
 }
 
-proc get_new_sch_canvas {w draw_level} {
+proc get_new_sch_canvas {w draw_level {name ""}} {
     set nb $w.nb
     incr ::sch_window_cnt($w)
     set cc [format {%s.c%d} $nb $::sch_window_cnt($w)]
-    $nb add [frame $cc] -text "Ckt $::sch_window_cnt($w)"
+    if { $name == "" } {
+	set name "Ckt $::sch_window_cnt($w)"
+    }
+    $nb add [frame $cc] -text $name
     set c [create_circuit_canvas $nb $cc]
     set ::cur_zoom_factor($cc) 100.0
     set ::cur_zoom_factor($c) 100.0

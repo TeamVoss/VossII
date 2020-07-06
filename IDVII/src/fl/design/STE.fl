@@ -97,44 +97,26 @@ end_abstype in_cycles;
 //let at_cycle v cyc = [(T,v,2*cyc,2*cyc)];
 //infix 6 at_cycle;
 
-let sfor1 {v::string} {cnt::int} = [(F,STR_VAL v,0,cnt)];
-let sfor2 [({fixed::bool},{v::string},{start::int},{end::int})] cnt =
-    [(fixed, STR_VAL v, start, start+cnt)]
+let gfor [({fixed::bool}, {v::values}, {start::int}, {end::int})] cnt =
+    [(fixed, v, start, start+cnt)]
 ;
-let ifor1 {i::int} {cnt::int} = [(F,INT_VAL i,0,cnt)];
-let ifor2 [({fixed::bool},{i::int},{start::int},{end::int})] cnt =
-    [(fixed, INT_VAL i, start, start+cnt)]
-;
-let bvfor1 {v::bv} {cnt::int} = [(F,BV_VAL v,0,cnt)];
-let bvfor2 [({fixed::bool},{v::bv},{start::int},{end::int})] cnt =
-    [(fixed, BV_VAL v, start, start+cnt)]
-;
-let boolfor1 {v::bool} {cnt::int} = [(F,BL_VAL [v], 0, cnt)];
-let boolfor2 [({fixed::bool},{v::bool},{start::int},{end::int})] cnt =
-    [(fixed, BL_VAL [v], start, start+cnt)]
-;
-let blfor1 {v::bool list} {cnt::int} = [(F,BL_VAL v,0,cnt)];
-let blfor2 [({fixed::bool},{v::bool list},{start::int},{end::int})] cnt =
-    [(fixed, BL_VAL v, start, start+cnt)]
-;
-
-let wfor1 v {cnt::int} = [(F,WEXPR_VAL (hw_destr v),0,cnt)];
-let wfor2 [({fixed::bool},v,{start::int},{end::int})] cnt =
-    [(fixed, WEXPR_VAL (hw_destr v), start, start+cnt)]
-;
-let ufor1 UNC {cnt::int} = [(F,UNC,0,cnt)];
-let ufor2 [({fixed::bool},UNC,{start::int},{end::int})] cnt =
-    [(fixed, UNC, start, start+cnt)]
-;
+let sfor {v::string} {cnt::int} = [(F,STR_VAL v,0,cnt)];
+let ifor {i::int} {cnt::int} = [(F,INT_VAL i,0,cnt)];
+let bvfor {v::bv} {cnt::int} = [(F,BV_VAL v,0,cnt)];
+let boolfor {v::bool} {cnt::int} = [(F,BL_VAL [v], 0, cnt)];
+let blfor {v::bool list} {cnt::int} = [(F,BL_VAL v,0,cnt)];
+let wfor v {cnt::int} = [(F,WEXPR_VAL (hw_destr v),0,cnt)];
+let ufor UNC {cnt::int} = [(F,UNC,0,cnt)];
 
 
-overload for sfor1 sfor2
-	     ifor1 ifor2
-	     bvfor1 bvfor2
-	     boolfor1 boolfor2
-	     blfor1 blfor2
-	     wfor1 wfor2
-	     ufor1 ufor2
+overload for gfor
+	     sfor
+	     ifor
+	     bvfor
+	     boolfor
+	     blfor
+	     wfor
+	     ufor
 ;
 infix 5 for;
 

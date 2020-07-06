@@ -265,8 +265,11 @@ let fl_record_waveform_movement w idx dir =
 ;
 export_to_tcl fl_record_waveform_movement;
 
-let get_new_sch_canvas w draw_level =
-    let tw_c = tcl_eval [sprintf "get_new_sch_canvas %s %d" w draw_level] then
+let get_new_sch_canvas w draw_level name =
+    let rname = name = "" => "" | sprintf " {%s}" name in
+    let tw_c =
+	tcl_eval [sprintf "get_new_sch_canvas %s %d%s" w draw_level rname]
+    then
     val [tab_w, canvas] = str_split tw_c " " then
     (tab_w, canvas)
 ;
@@ -279,7 +282,7 @@ let gen_draw_fanin vfsm draw_level levels vecs =
     let fsm = vfsm2fsm vfsm then 
     let w = vfsm2id vfsm then
     let vis = visualize_fanin fsm stop_list [] levels vecs draw_level then
-    val (tab_window, c) = get_new_sch_canvas w draw_level then
+    val (tab_window, c) = get_new_sch_canvas w draw_level "" then
     let cmd =	
 	let tab = canvas2tab c then
 	let svecs = list2str T "[" "," "]" (sprintf "\"%s\"") vecs in
@@ -319,7 +322,7 @@ let gen_draw_inside vfsm cur_draw_level vecs =
     let w = vfsm2id vfsm then
     let draw_level = cur_draw_level+1 in
     let vis = visualize_fanin fsm stop_list ifc_list 100 vecs draw_level then
-    val (tab_window, c) = get_new_sch_canvas w draw_level then
+    val (tab_window, c) = get_new_sch_canvas w draw_level name then
     let cmd =	
 	let tab = canvas2tab c then
 	let svecs = list2str T "[" "," "]" (sprintf "\"%s\"") vecs in
