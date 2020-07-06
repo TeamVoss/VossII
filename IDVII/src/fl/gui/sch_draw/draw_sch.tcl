@@ -400,6 +400,15 @@ proc set_scrollregion {c} {
     $c configure -scrollregion [$c bbox all]
 }
 
+proc draw_hier_boundingbox {c name} {
+    update idletasks
+    val {lx ly ux uy} [grow_bbox $c]
+    $c create rectangle  $lx $ly $ux $uy -outline blue -fill ""
+    set t [$c create text $lx $uy -text $name -anchor nw -justify left \
+		-font $::sfont($c)]
+    add_font_tags $c $t _IsTeXt_
+}
+
 
 proc sch:toggle_show_value_buttons {c f} {
     set tl $f.tp
@@ -3129,6 +3138,14 @@ proc get_width {c x y cur_max txt} {
 	set cur_max $new_wid
     }
     return $cur_max
+}
+
+proc extract_name_draw_fub {module inst args} {
+    if {$inst == ""} {
+	return $module
+    } else {
+	return [format {%s (%s)} $inst $module]
+    }
 }
 
 proc draw_fub {module inst inames onames c tag x y} {

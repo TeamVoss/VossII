@@ -301,12 +301,20 @@ let gen_draw_fanin vfsm draw_level levels vecs =
     c
 ;
 
+
 let gen_draw_inside vfsm cur_draw_level vecs =
     let fsm = vfsm2fsm vfsm then 
     let nds = md_expand_vectors vecs then
     let stop_list = deref (vfsm2stop_list_r vfsm) then
     let ifc_list =
 	flatmap snd (get_visualization_fanins fsm (hd nds) cur_draw_level)
+    then
+    let name =
+	let pfn = get_visualization_pfn fsm (hd nds) cur_draw_level then
+	NOT (str_is_prefix "draw_fub" pfn) => "-" |
+	let cmd = "extract_name_"^pfn then
+	let res = tcl_eval [cmd] then
+	res
     then
     let w = vfsm2id vfsm then
     let draw_level = cur_draw_level+1 in
@@ -328,6 +336,7 @@ let gen_draw_inside vfsm cur_draw_level vecs =
                 "update",
 		sprintf "bind %s <Map> {fl_update_colors %s}"  c c,
 		sprintf "fl_update_colors %s"  c,
+		sprintf "draw_hier_boundingbox %s %s" c name,
                 sprintf "set_scrollregion %s" c
               ]) fseq
     c
