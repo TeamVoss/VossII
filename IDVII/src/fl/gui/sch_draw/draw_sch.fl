@@ -339,7 +339,7 @@ let gen_draw_inside vfsm cur_draw_level vecs =
                 "update",
 		sprintf "bind %s <Map> {fl_update_colors %s}"  c c,
 		sprintf "fl_update_colors %s"  c,
-		sprintf "draw_hier_boundingbox %s %s" c name,
+		sprintf "draw_hier_boundingbox %s {%s}" c name,
                 sprintf "set_scrollregion %s" c
               ]) fseq
     c
