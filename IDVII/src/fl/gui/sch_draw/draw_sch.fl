@@ -554,6 +554,7 @@ let fl_get_short_value w vecs compute_alternatives =
     let fsm = ste2fsm ste then
     let t = deref (vfsm2cur_time_r vfsm) then
     let nds = md_expand_vectors vecs in
+    length nds > 128 => "..." |
     let opt_states = node2value_list fsm (hd nds) in
     type = "bdd" =>
 	let get_val nd = (T,(get_trace_val ste nd t)) catch (F,(T,T)) in
@@ -651,6 +652,7 @@ let fl_get_long_value canvas tag =
     let t = deref (canvas2current_time_r canvas) then
     let vecs = fl_tag2vec canvas tag then
     let nds = md_expand_vectors vecs in
+    length nds > 128 => "..." |
     type = "bdd" =>
 	let get_val nd = (get_trace_val ste nd t) catch (T,T) in
 	let vals = map get_val nds then
