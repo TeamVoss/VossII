@@ -12,7 +12,7 @@
 #include "fsm.h"
 #include "graph.h"
 
-/* ------------- Global variables ------------- */
+/* ------------- Global variables -------------- */
 
 /********* Global variables referenced ***********/
 extern symbol_tbl_ptr	symb_tbl;
@@ -260,7 +260,7 @@ static pointer      load_fsm_fn(FILE *fp);
 static unint        idx_list_hash(pointer key, unint n);
 static bool         idx_list_equ(pointer k1, pointer k2);
 static string       op2str(ncomp_ptr cp);
-static string       get_real_name(vec_info_ptr ip, int idx);
+//static string       get_real_name(vec_info_ptr ip, int idx);
 static void         print_nodes(odests fp, fsm_ptr fsm);
 static void         print_composites(odests fp);
 static string       anon2real(vstate_ptr vp, string aname);
@@ -462,10 +462,6 @@ static string       create_merge_component(int sz, int *ccnt, g_ptr *intsp,
 static g_ptr        clean_pexlif_ios(g_ptr node);
 static string	    find_instance_name(g_ptr attrs);
 
-#define FOREACH_NODE(i, il) \
-    for(ilist_ptr _l = il; _l != NULL; _l = _l->next) \
-    for(int i = _l->from; abs(i-_l->from) < _l->size; (_l->from>_l->to)?i--:i++)
-
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
 /********************************************************/
@@ -559,6 +555,40 @@ Fsm_Init()
     new_buf(&inps_buf, 1000, sizeof(gbv));
     new_buf(&outs_buf, 1000, sizeof(gbv));
     new_buf(&tmps_buf, 1000, sizeof(gbv));
+}
+
+string
+get_real_name(vec_info_ptr ip, int idx)
+{
+    vec_ptr decl = ip->declaration;
+    string res = strtemp(ip->hierarchy);
+    while( decl != NULL ) {
+	if( decl->type != INDEX ) {
+	    strappend(decl->u.name);
+	    decl = decl->next;
+	} else {
+	    range_ptr r = decl->u.ranges;
+	    int i = r->upper;
+	    int stride = get_stride(decl->next);
+	    if( r->upper <= r->lower ) {
+		// Going up
+		while( idx > stride ) {
+		    i++;
+		    idx = idx-stride;
+		}
+	    } else {
+		// Going downs
+		while( idx > stride ) {
+		    i--;
+		    idx = idx-stride;
+		}
+	    }
+	    Sprintf(buf, "%d", i);
+	    strappend(buf);
+	    decl = decl->next;
+	}
+    }
+    return res;
 }
 
 /********************************************************/
@@ -1055,7 +1085,7 @@ edges(g_ptr redex)
     }
     pop_fsm();
     DEC_REF_CNT(l);
-    DEC_REF_CNT(r);    
+    DEC_REF_CNT(r);
 }
 
 static void
@@ -4353,40 +4383,6 @@ op2str(ncomp_ptr cp)
     } else {
 	return( strtemp("UNKNOWN op????") );
     }
-}
-
-static string
-get_real_name(vec_info_ptr ip, int idx)
-{
-    vec_ptr decl = ip->declaration;
-    string res = strtemp(ip->hierarchy);
-    while( decl != NULL ) {
-	if( decl->type != INDEX ) {
-	    strappend(decl->u.name);
-	    decl = decl->next;
-	} else {
-	    range_ptr r = decl->u.ranges;
-	    int i = r->upper;
-	    int stride = get_stride(decl->next);
-	    if( r->upper <= r->lower ) {
-		// Going up
-		while( idx > stride ) {
-		    i++;
-		    idx = idx-stride;
-		}
-	    } else {
-		// Going downs
-		while( idx > stride ) {
-		    i--;
-		    idx = idx-stride;
-		}
-	    }
-	    Sprintf(buf, "%d", i);
-	    strappend(buf);
-	    decl = decl->next;
-	}
-    }
-    return res;
 }
 
 static void

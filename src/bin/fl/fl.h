@@ -196,6 +196,7 @@ typedef struct impl_arg_rec	*impl_arg_ptr;
 #include        "table.h"
 #include        "image.h"
 #include        "plugin_loader.h"
+#include        "iso.h"
 
 /* Include function prototypes */
 #undef EXPORT_FORWARD_DECL

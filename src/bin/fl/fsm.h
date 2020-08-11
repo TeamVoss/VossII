@@ -12,10 +12,13 @@
 #ifdef EXPORT_FORWARD_DECL
 /* --- Forward declarations that need to be exported to earlier .h files --- */
 typedef struct ilist_rec    *ilist_ptr;
+typedef struct vec_info_rec *vec_info_ptr;
 
 /* ----- Function prototypes for public functions ----- */
 void	    Fsm_Init();
 void	    Fsm_Install_Functions();
+
+string      get_real_name(vec_info_ptr ip, int idx);
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */
@@ -36,7 +39,6 @@ typedef union {
     arbi_T	ai;
 } gbv;
 
-typedef struct vec_info_rec *vec_info_ptr;
 typedef struct vec_info_rec {
     string	    local_name;
     string	    hierarchy;
@@ -280,6 +282,10 @@ typedef struct edge_rec {
     string from;
     string to;
 } edge_rec;
+
+#define FOREACH_NODE(i, il) \
+    for(ilist_ptr _l = il; _l != NULL; _l = _l->next) \
+    for(int i = _l->from; abs(i-_l->from) < _l->size; (_l->from>_l->to)?i--:i++)
 
 #endif /* FSM_H */
 #endif /* EXPORT_FORWARD_DECL */

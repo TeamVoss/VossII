@@ -66,6 +66,7 @@ Init()
     Init_SHA256();
     Table_Init();
     Image_Init();
+    Iso_Init();
 
     // Now install builtin functions
     Symbols_Install_Functions();
@@ -86,5 +87,6 @@ Init()
     Fsm_Install_Functions();
     Table_Install_Functions();
     Image_Install_Functions();
+    Iso_Install_Functions();
 }
 
