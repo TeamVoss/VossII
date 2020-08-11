@@ -16,11 +16,11 @@
  ENABLE_VERIFIC := 0
 @@ -584,6 +584,7 @@
  
- include backends/verilog/Makefile.inc
- include backends/ilang/Makefile.inc
+ include $(YOSYS_SRC)/backends/verilog/Makefile.inc
+ include $(YOSYS_SRC)/backends/ilang/Makefile.inc
 +include backends/pexlif/Makefile.inc
  
- include techlibs/common/Makefile.inc
+ include $(YOSYS_SRC)/techlibs/common/Makefile.inc
  
 @@ -930,3 +931,6 @@
  .PHONY: all top-all abc test install install-abc manual clean mrproper qtcreator coverage vcxsrc mxebin

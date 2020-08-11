@@ -178,7 +178,7 @@ static int	    max_rank = 1;
 /* ----- Forward definitions local functions ----- */
 
 static vis_ptr	    get_vis_info_at_level(vis_list_ptr vp, int draw_level);
-static void	    report_source_locations();
+static void	    report_source_locations(odests dfp);
 static unint        ni_pair_hash(pointer key, unint size);
 static bool         ni_pair_equ(pointer k1, pointer k2);
 static unint        ilist_ptr_hash(pointer key, unint size);
@@ -281,7 +281,7 @@ static void         add_fanouts(ilist_ptr inps, int comp_idx);
 static bool         compile_expr(hash_record *vtblp, string hier,
                                  ilist_ptr outs, g_ptr we, bool pdel);
 static string       mk_vec_name(string base, int sz);
-static ilist_ptr    get_lhs_indices(hash_record *vtblp, g_ptr e);
+static ilist_ptr    get_lhs_indices(hash_record *vtblp, string hier, g_ptr e);
 static ilist_ptr    declare_vector(hash_record *vtblp, string hier, string name,
                                    bool transient, ilist_ptr act_map,
 				   string value_list);
@@ -289,7 +289,7 @@ static int          find_node_index(vec_ptr decl, vec_ptr vp, int start);
 static string       idx2name(int idx);
 static ilist_ptr    vec2indices(string name);
 static int          name2idx(string name);
-static ilist_ptr    map_vector(hash_record *vtblp, string name);
+static ilist_ptr    map_vector(hash_record *vtblp, string hier, string name);
 static int          vec_size(vec_ptr vec);
 static int          get_stride(vec_ptr vp);
 static bool         inside(int i, int upper, int lower);
@@ -4739,9 +4739,9 @@ make_input_arg(g_ptr we, int sz, hash_record *vtblp, string hier, bool pdel)
     ilist_ptr inps;
     if( is_W_VAR(we, &sz, &base) ) {
 	string vname = mk_vec_name(base, sz);
-	inps = map_vector(vtblp, vname);
+	inps = map_vector(vtblp, hier, vname);
     } else if( is_W_EXPLICIT_VAR(we, &sz, &base) ) {
-	inps = map_vector(vtblp, base);
+	inps = map_vector(vtblp, hier, base);
     } else {
 	// Make a temporary vector
 	Sprintf(buf, "__tmp%d", ++temporary_node_cnt);
@@ -4837,7 +4837,7 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	cr.op = op_WIRE;
 	cr.size = sz;
 	string vname = mk_vec_name(base, sz);
-	ilist_ptr inps = map_vector(vtblp, vname);
+	ilist_ptr inps = map_vector(vtblp, hier, vname);
 	cr.inps = inps;
 	add_fanouts(inps, comp_idx);
 	push_buf(compositesp, (pointer) &cr);
@@ -4846,7 +4846,7 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
     if( is_W_EXPLICIT_VAR(we, &sz, &name) ) {
 	cr.op = op_WIRE;
 	cr.size = sz;
-	ilist_ptr inps = map_vector(vtblp, name);
+	ilist_ptr inps = map_vector(vtblp, hier, name);
 	cr.inps = inps;
 	add_fanouts(inps, comp_idx);
 	push_buf(compositesp, (pointer) &cr);
@@ -4988,7 +4988,7 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	    INC_REFCNT(we);
 	    Eval(res);
 	    FP(err_fp, "in expression:\n%s\n", GET_STRING(res));
-	    report_source_locations();
+	    report_source_locations(err_fp);
 	    Rprintf("");
 	}
 	cr.size = sz;
@@ -5001,7 +5001,7 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	if( inp_sz != compute_ilist_length(inps) ) {
 	    FP(err_fp, "Slice operation has inconsistent input size (%d!=%d)\n",
 		    inp_sz, compute_ilist_length(inps));
-	    report_source_locations();
+	    report_source_locations(err_fp);
 	    Rprintf("");
 	}
 	add_fanouts(inps, comp_idx);
@@ -5031,14 +5031,14 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	if( base_sz != osz ) {
 	    FP(err_fp, "Update-slice with invalid base size (%d!=%d)\n",
 		    base_sz, osz);
-	    report_source_locations();
+	    report_source_locations(err_fp);
 	    Rprintf("");
 	}
 	int inp_sz = get_wexpr_size(r);
 	if( inp_sz != sel_sz ) {
 	    FP(err_fp, "Update-slice with invalid input size (%d!=%d)\n",
 		    inp_sz, sel_sz);
-	    report_source_locations();
+	    report_source_locations(err_fp);
 	    Rprintf("");
 	}
 	// Must push the incomplete record on its correct place!
@@ -5151,7 +5151,7 @@ mk_vec_name(string base, int sz)
 
 
 static ilist_ptr
-get_lhs_indices(hash_record *vtblp, g_ptr e)
+get_lhs_indices(hash_record *vtblp, string hier, g_ptr e)
 {
     int sz;
     string base;
@@ -5159,16 +5159,16 @@ get_lhs_indices(hash_record *vtblp, g_ptr e)
     if( is_W_VAR(e, &sz, &base) ) {
 	// Variable
 	string vname = mk_vec_name(base, sz);
-	ilist_ptr res = map_vector(vtblp, vname);
+	ilist_ptr res = map_vector(vtblp, hier, vname);
 	return res;
     } else if( is_W_EXPLICIT_VAR(e, &sz, &base) ) {
 	// Variable
-	ilist_ptr res = map_vector(vtblp, base);
+	ilist_ptr res = map_vector(vtblp, hier, base);
 	return res;
     } else if( is_W_SLICE(e, &idx_list, &sub_expr) ||
 	       is_W_NAMED_SLICE(e, &base, &idx_list, &sub_expr) ) {
 	// Slice
-	ilist_ptr vlist = get_lhs_indices(vtblp, sub_expr);
+	ilist_ptr vlist = get_lhs_indices(vtblp, hier, sub_expr);
 	int len = compute_ilist_length(vlist);
 	ilist_ptr res = NULL;
 	for(g_ptr cur = idx_list; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
@@ -5181,7 +5181,7 @@ get_lhs_indices(hash_record *vtblp, g_ptr e)
     } else if( is_W_CAT(e, &cat_list) ) {
 	ilist_ptr res = NULL;
 	for(g_ptr cur = cat_list; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
-	    ilist_ptr tmp = get_lhs_indices(vtblp, GET_CONS_HD(cur));
+	    ilist_ptr tmp = get_lhs_indices(vtblp, hier, GET_CONS_HD(cur));
 	    res = ilist_append(res, tmp);
 	}
 	return res;
@@ -5192,9 +5192,9 @@ get_lhs_indices(hash_record *vtblp, g_ptr e)
 }
 
 static void
-report_source_locations()
+report_source_locations(odests dfp)
 {
-    FP(err_fp,"While processing:\n");
+    FP(dfp,"While processing:\n");
     g_ptr *gpp;
     int indent = 2;
     FUB_ROF(&attr_buf, g_ptr, gpp) {
@@ -5203,10 +5203,10 @@ report_source_locations()
 	    string key = GET_STRING(GET_CONS_HD(GET_CONS_HD(l)));
 	    string val = GET_STRING(GET_CONS_TL(GET_CONS_HD(l)));
 	    if( strcmp(key, "module") == 0 && strcmp(val, "_WrApPeR_") != 0) {
-		FP(err_fp, "%*s%s\n", indent, "", val);
+		FP(dfp, "%*s%s\n", indent, "", val);
 		indent += 4;
 	    } else if( strcmp(key, "src") == 0 ) {
-		FP(err_fp, " in %s\n", val);
+		FP(dfp, " in %s\n", val);
 	    }
 	}
     }
@@ -5234,7 +5234,7 @@ declare_vector(hash_record *vtblp, string hier, string name,
 	if( sz != asz ) {
 	    FP(err_fp,"\nLength mismatch for %s/%s (%d!=%d)\n",
 		      hier, name, sz, asz);
-	    report_source_locations();
+	    report_source_locations(err_fp);
 	    Rprintf("");
 	}
 	ip->map = act_map;
@@ -5364,7 +5364,7 @@ vec2indices(string name)
 	map_node(dp, vp, ip->map, 0);
     } else {
 	FP(err_fp, "Cannot map %s\n%s\n", name, FailBuf);
-	report_source_locations();
+	report_source_locations(err_fp);
 	Rprintf("");
     }
     return( idx_map_result );
@@ -5389,7 +5389,7 @@ name2idx(string name)
 }
 
 static ilist_ptr
-map_vector(hash_record *vtblp, string name)
+map_vector(hash_record *vtblp, string hier, string name)
 {
     if( strncmp("0b", name, 2) == 0 ) {
 	// A constant
@@ -5412,13 +5412,19 @@ map_vector(hash_record *vtblp, string name)
     vec_ptr vp = split_vector_name(vec_rec_mgrp,range_rec_mgrp, name);
     string sig = get_vector_signature(vp);
     vec_info_ptr oip = (vec_info_ptr) find_hash(vtblp,sig);
+    if( oip == NULL ) {
+	FP(warning_fp, "Undeclared signal %s in %s. Created.\n", name, hier);
+	report_source_locations(warning_fp);
+	declare_vector(vtblp, hier, name, FALSE, NULL, NULL);
+	oip = (vec_info_ptr) find_hash(vtblp,sig);
+    }
     vec_info_ptr ip = oip;
     FailBuf[0] = 0;
     while( 1 ) {
 	if( ip == NULL ) {
-	    FP(err_fp, "Cannot map %s (%s[%p])\n%s\n", name, sig, oip, FailBuf);
-	    report_source_locations();
-	    Rprintf("");
+            FP(err_fp, "Cannot map %s (%s[%p])\n%s\n", name, sig, oip, FailBuf);
+            report_source_locations(err_fp);
+            Rprintf("");
 	}
 	vec_ptr dp = ip->declaration;
 	idx_map_result = NULL;
@@ -6984,7 +6990,7 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
 	    ilist_ptr act_list = NULL;
 	    while( !IS_NIL(acts) ) {
 		string actual = GET_STRING(GET_CONS_HD(acts));
-		ilist_ptr tmp = map_vector(parent_tblp, actual);
+		ilist_ptr tmp = map_vector(parent_tblp, hier, actual);
 		if( tmp == NULL ) {
 		    string phier = strtemp(hier);
 		    string last = rindex(phier, '/');
@@ -7022,7 +7028,7 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
 	    ilist_ptr act_list = NULL;
 	    while( !IS_NIL(acts) ) {
 		string actual = GET_STRING(GET_CONS_HD(acts));
-		ilist_ptr tmp = map_vector(parent_tblp, actual);
+		ilist_ptr tmp = map_vector(parent_tblp, hier, actual);
 		if( tmp == NULL ) {
 		    string phier = strtemp(hier);
 		    string last = rindex(phier, '/');
@@ -7131,10 +7137,10 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
 	    g_ptr fn = GET_CONS_HD(cl);
 	    g_ptr lhs, rhs;
 	    if( is_W_UPDATE_FN(fn, &lhs, &rhs) ) {
-		ilist_ptr lhs_indices = get_lhs_indices(&vinfo_tbl, lhs);
+		ilist_ptr lhs_indices = get_lhs_indices(&vinfo_tbl, hier, lhs);
 		compile_expr(&vinfo_tbl, hier, lhs_indices, rhs, FALSE);
 	    } else if( is_W_PHASE_DELAY(fn, &lhs, &rhs) ) {
-		ilist_ptr lhs_indices = get_lhs_indices(&vinfo_tbl, lhs);
+		ilist_ptr lhs_indices = get_lhs_indices(&vinfo_tbl, hier, lhs);
 		compile_expr(&vinfo_tbl, hier, lhs_indices, rhs, TRUE);
 	    } else {
 		DIE("Should not be possible!");
@@ -8539,7 +8545,7 @@ create_constant(int sz, int *ccnt, g_ptr ints, string cnst, buffer *chbufp)
 		}
 		default:
 		    FP(err_fp, "Unsupported constant %s", cnst);
-		    report_source_locations();
+		    report_source_locations(err_fp);
 		    Rprintf("");
 		    break;
 	    }
@@ -8768,7 +8774,7 @@ clean_pexlif_ios(g_ptr node)
 	    if( IS_NIL(acts) ) {
 		FP(err_fp, "Actuals to argument %s is empty inside %s\n",
 			fname, GET_STRING(cnm));
-		report_source_locations();
+		report_source_locations(err_fp);
 		Rprintf("");
 	    }
 	    int len = list_length(acts);

@@ -19,6 +19,7 @@
 
 #include "kernel/yosys.h"
 #include "kernel/sigtools.h"
+#include "kernel/ffinit.h"
 
 USING_YOSYS_NAMESPACE
 PRIVATE_NAMESPACE_BEGIN
@@ -71,12 +72,12 @@ struct ShregmapTechGreenpak4 : ShregmapTech
 
 	bool fixup(Cell *cell, dict<int, SigBit> &taps)
 	{
-		auto D = cell->getPort(ID(D));
-		auto C = cell->getPort(ID(C));
+		auto D = cell->getPort(ID::D);
+		auto C = cell->getPort(ID::C);
 
 		auto newcell = cell->module->addCell(NEW_ID, ID(GP_SHREG));
 		newcell->setPort(ID(nRST), State::S1);
-		newcell->setPort(ID(CLK), C);
+		newcell->setPort(ID::CLK, C);
 		newcell->setPort(ID(IN), D);
 
 		int i = 0;
@@ -100,9 +101,8 @@ struct ShregmapWorker
 	int dff_count, shreg_count;
 
 	pool<Cell*> remove_cells;
-	pool<SigBit> remove_init;
 
-	dict<SigBit, bool> sigbit_init;
+	FfInitVals initvals;
 	dict<SigBit, Cell*> sigbit_chain_next;
 	dict<SigBit, Cell*> sigbit_chain_prev;
 	pool<SigBit> sigbit_with_non_chain_users;
@@ -116,16 +116,6 @@ struct ShregmapWorker
 				for (auto bit : sigmap(wire))
 					sigbit_with_non_chain_users.insert(bit);
 			}
-
-			if (wire->attributes.count(ID(init))) {
-				SigSpec initsig = sigmap(wire);
-				Const initval = wire->attributes.at(ID(init));
-				for (int i = 0; i < GetSize(initsig) && i < GetSize(initval); i++)
-					if (initval[i] == State::S0 && !opts.zinit)
-						sigbit_init[initsig[i]] = false;
-					else if (initval[i] == State::S1)
-						sigbit_init[initsig[i]] = true;
-			}
 		}
 
 		for (auto cell : module->cells())
@@ -137,8 +127,9 @@ struct ShregmapWorker
 
 				SigBit d_bit = sigmap(cell->getPort(d_port).as_bit());
 				SigBit q_bit = sigmap(cell->getPort(q_port).as_bit());
+				State initval = initvals(q_bit);
 
-				if (opts.init || sigbit_init.count(q_bit) == 0)
+				if (opts.init || initval == State::Sx || (opts.zinit && initval == State::S0))
 				{
 					auto r = sigbit_chain_next.insert(std::make_pair(d_bit, cell));
 					if (!r.second) {
@@ -310,22 +301,17 @@ struct ShregmapWorker
 			if (opts.init) {
 				vector<State> initval;
 				for (int i = depth-1; i >= 0; i--) {
-					SigBit bit = sigmap(chain[cursor+i]->getPort(q_port).as_bit());
-					if (sigbit_init.count(bit) == 0)
-						initval.push_back(State::Sx);
-					else if (sigbit_init.at(bit))
-						initval.push_back(State::S1);
-					else
-						initval.push_back(State::S0);
-					remove_init.insert(bit);
+					SigBit bit = chain[cursor+i]->getPort(q_port).as_bit();
+					initval.push_back(initvals(bit));
+					initvals.remove_init(bit);
 				}
-				first_cell->setParam(ID(INIT), initval);
+				first_cell->setParam(ID::INIT, initval);
 			}
 
 			if (opts.zinit)
 				for (int i = depth-1; i >= 0; i--) {
-					SigBit bit = sigmap(chain[cursor+i]->getPort(q_port).as_bit());
-					remove_init.insert(bit);
+					SigBit bit = chain[cursor+i]->getPort(q_port).as_bit();
+					initvals.remove_init(bit);
 				}
 
 			if (opts.params)
@@ -348,7 +334,7 @@ struct ShregmapWorker
 
 			first_cell->type = shreg_cell_type_str;
 			first_cell->setPort(q_port, last_cell->getPort(q_port));
-			first_cell->setParam(ID(DEPTH), depth);
+			first_cell->setParam(ID::DEPTH, depth);
 
 			if (opts.tech != nullptr && !opts.tech->fixup(first_cell, taps_dict))
 				remove_cells.insert(first_cell);
@@ -364,22 +350,6 @@ struct ShregmapWorker
 		for (auto cell : remove_cells)
 			module->remove(cell);
 
-		for (auto wire : module->wires())
-		{
-			if (wire->attributes.count(ID(init)) == 0)
-				continue;
-
-			SigSpec initsig = sigmap(wire);
-			Const &initval = wire->attributes.at(ID(init));
-
-			for (int i = 0; i < GetSize(initsig) && i < GetSize(initval); i++)
-				if (remove_init.count(initsig[i]))
-					initval[i] = State::Sx;
-
-			if (SigSpec(initval).is_fully_undef())
-				wire->attributes.erase(ID(init));
-		}
-
 		remove_cells.clear();
 		sigbit_chain_next.clear();
 		sigbit_chain_prev.clear();
@@ -389,6 +359,7 @@ struct ShregmapWorker
 	ShregmapWorker(Module *module, const ShregmapOptions &opts) :
 			module(module), sigmap(module), opts(opts), dff_count(0), shreg_count(0)
 	{
+		initvals.set(&sigmap, module);
 		make_sigbit_chain_next_prev();
 		find_chain_start_cells();
 
@@ -403,7 +374,7 @@ struct ShregmapWorker
 
 struct ShregmapPass : public Pass {
 	ShregmapPass() : Pass("shregmap", "map shift registers") { }
-	void help() YS_OVERRIDE
+	void help() override
 	{
 		//   |---v---|---v---|---v---|---v---|---v---|---v---|---v---|---v---|---v---|---v---|
 		log("\n");
@@ -461,7 +432,7 @@ struct ShregmapPass : public Pass {
 		log("        map to greenpak4 shift registers.\n");
 		log("\n");
 	}
-	void execute(std::vector<std::string> args, RTLIL::Design *design) YS_OVERRIDE
+	void execute(std::vector<std::string> args, RTLIL::Design *design) override
 	{
 		ShregmapOptions opts;
 		string clkpol, enpol;
@@ -548,19 +519,19 @@ struct ShregmapPass : public Pass {
 			bool en_neg = enpol == "neg" || enpol == "any" || enpol == "any_or_none";
 
 			if (clk_pos && en_none)
-				opts.ffcells[ID($_DFF_P_)] = make_pair(IdString(ID(D)), IdString(ID(Q)));
+				opts.ffcells[ID($_DFF_P_)] = make_pair(IdString(ID::D), IdString(ID::Q));
 			if (clk_neg && en_none)
-				opts.ffcells[ID($_DFF_N_)] = make_pair(IdString(ID(D)), IdString(ID(Q)));
+				opts.ffcells[ID($_DFF_N_)] = make_pair(IdString(ID::D), IdString(ID::Q));
 
 			if (clk_pos && en_pos)
-				opts.ffcells[ID($_DFFE_PP_)] = make_pair(IdString(ID(D)), IdString(ID(Q)));
+				opts.ffcells[ID($_DFFE_PP_)] = make_pair(IdString(ID::D), IdString(ID::Q));
 			if (clk_pos && en_neg)
-				opts.ffcells[ID($_DFFE_PN_)] = make_pair(IdString(ID(D)), IdString(ID(Q)));
+				opts.ffcells[ID($_DFFE_PN_)] = make_pair(IdString(ID::D), IdString(ID::Q));
 
 			if (clk_neg && en_pos)
-				opts.ffcells[ID($_DFFE_NP_)] = make_pair(IdString(ID(D)), IdString(ID(Q)));
+				opts.ffcells[ID($_DFFE_NP_)] = make_pair(IdString(ID::D), IdString(ID::Q));
 			if (clk_neg && en_neg)
-				opts.ffcells[ID($_DFFE_NN_)] = make_pair(IdString(ID(D)), IdString(ID(Q)));
+				opts.ffcells[ID($_DFFE_NN_)] = make_pair(IdString(ID::D), IdString(ID::Q));
 
 			if (en_pos || en_neg)
 				opts.ffe = true;

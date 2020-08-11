@@ -1,0 +1,87 @@
+
+load "ste.fl";
+
+let tst {attrs::(string#string) list} conns =
+    let inps = [ "clk",
+                 "arst",
+                 "srst",
+                 "en",
+		 "inp[1:0]"
+    ] in
+    let outs = [
+		 "q_sdff_11[1:0]", "q_sdff_10[1:0]", "q_sdff_01[1:0]", "q_sdff_00[1:0]",
+		 //
+		 "q_adffe_000[1:0]", "q_adffe_001[1:0]", "q_adffe_010[1:0]", "q_adffe_011[1:0]", "q_adffe_100[1:0]", "q_adffe_101[1:0]", "q_adffe_110[1:0]", "q_adffe_111[1:0]",
+		//
+		"q_dffe_00[1:0]", "q_dffe_01[1:0]", "q_dffe_10[1:0]", "q_dffe_11[1:0]",
+		//
+		"q_sdffe_000[1:0]", "q_sdffe_001[1:0]", "q_sdffe_010[1:0]", "q_sdffe_011[1:0]", "q_sdffe_100[1:0]", "q_sdffe_101[1:0]", "q_sdffe_110[1:0]", "q_sdffe_111[1:0]",
+		//
+		"q_sdffce_000[1:0]", "q_sdffce_001[1:0]", "q_sdffce_010[1:0]", "q_sdffce_011[1:0]", "q_sdffce_100[1:0]", "q_sdffce_101[1:0]", "q_sdffce_110[1:0]", "q_sdffce_111[1:0]"
+    ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+//
+ _adffe T T T 2 "foo.v:1.1-1.11" ["q_adffe_111[1:0]"] ["arst"] ["en"] ["clk"] ["inp[1:0]"],
+ _adffe T T F 2 "foo.v:1.1-1.11" ["q_adffe_110[1:0]"] ["arst"] ["en"] ["clk"] ["inp[1:0]"],
+ _adffe T F T 2 "foo.v:1.1-1.11" ["q_adffe_101[1:0]"] ["arst"] ["en"] ["clk"] ["inp[1:0]"],
+ _adffe T F F 2 "foo.v:1.1-1.11" ["q_adffe_100[1:0]"] ["arst"] ["en"] ["clk"] ["inp[1:0]"],
+ _adffe F T T 2 "foo.v:1.1-1.11" ["q_adffe_011[1:0]"] ["arst"] ["en"] ["clk"] ["inp[1:0]"],
+ _adffe F T F 2 "foo.v:1.1-1.11" ["q_adffe_010[1:0]"] ["arst"] ["en"] ["clk"] ["inp[1:0]"],
+ _adffe F F T 2 "foo.v:1.1-1.11" ["q_adffe_001[1:0]"] ["arst"] ["en"] ["clk"] ["inp[1:0]"],
+ _adffe F F F 2 "foo.v:1.1-1.11" ["q_adffe_000[1:0]"] ["arst"] ["en"] ["clk"] ["inp[1:0]"],
+//
+ _dffe F F 2 "foo.v:1.1-1.22" ["q_dffe_00[1:0]"] ["en"] ["clk"] ["inp[1:0]"],
+ _dffe F T 2 "foo.v:1.1-1.22" ["q_dffe_01[1:0]"] ["en"] ["clk"] ["inp[1:0]"],
+ _dffe T F 2 "foo.v:1.1-1.22" ["q_dffe_10[1:0]"] ["en"] ["clk"] ["inp[1:0]"],
+ _dffe T T 2 "foo.v:1.1-1.22" ["q_dffe_11[1:0]"] ["en"] ["clk"] ["inp[1:0]"],
+//
+ _sdff T T 2 "foo.v:1.1-2.11" ["q_sdff_11[1:0]"] ["srst"] ["clk"] ["inp[1:0]"],
+ _sdff T F 2 "foo.v:1.1-2.11" ["q_sdff_10[1:0]"] ["srst"] ["clk"] ["inp[1:0]"],
+ _sdff F T 2 "foo.v:1.1-2.11" ["q_sdff_01[1:0]"] ["srst"] ["clk"] ["inp[1:0]"],
+ _sdff F F 2 "foo.v:1.1-2.11" ["q_sdff_00[1:0]"] ["srst"] ["clk"] ["inp[1:0]"],
+//
+ _sdffe F F F 2 "foo.v:1.1-1.21" ["q_sdffe_000[1:0]"] ["srst"] ["en"] ["clk"] ["inp[1:0]"],
+ _sdffe F F T 2 "foo.v:1.1-1.21" ["q_sdffe_001[1:0]"] ["srst"] ["en"] ["clk"] ["inp[1:0]"],
+ _sdffe F T F 2 "foo.v:1.1-1.21" ["q_sdffe_010[1:0]"] ["srst"] ["en"] ["clk"] ["inp[1:0]"],
+ _sdffe F T T 2 "foo.v:1.1-1.21" ["q_sdffe_011[1:0]"] ["srst"] ["en"] ["clk"] ["inp[1:0]"],
+ _sdffe T F F 2 "foo.v:1.1-1.21" ["q_sdffe_100[1:0]"] ["srst"] ["en"] ["clk"] ["inp[1:0]"],
+ _sdffe T F T 2 "foo.v:1.1-1.21" ["q_sdffe_101[1:0]"] ["srst"] ["en"] ["clk"] ["inp[1:0]"],
+ _sdffe T T F 2 "foo.v:1.1-1.21" ["q_sdffe_110[1:0]"] ["srst"] ["en"] ["clk"] ["inp[1:0]"],
+ _sdffe T T T 2 "foo.v:1.1-1.21" ["q_sdffe_111[1:0]"] ["srst"] ["en"] ["clk"] ["inp[1:0]"],
+//
+ _sdffce F F F 2 "foo.v:1.1-1.21" ["q_sdffce_000[1:0]"] ["srst"] ["en"] ["clk"] ["inp[1:0]"],
+ _sdffce F F T 2 "foo.v:1.1-1.21" ["q_sdffce_001[1:0]"] ["srst"] ["en"] ["clk"] ["inp[1:0]"],
+ _sdffce F T F 2 "foo.v:1.1-1.21" ["q_sdffce_010[1:0]"] ["srst"] ["en"] ["clk"] ["inp[1:0]"],
+ _sdffce F T T 2 "foo.v:1.1-1.21" ["q_sdffce_011[1:0]"] ["srst"] ["en"] ["clk"] ["inp[1:0]"],
+ _sdffce T F F 2 "foo.v:1.1-1.21" ["q_sdffce_100[1:0]"] ["srst"] ["en"] ["clk"] ["inp[1:0]"],
+ _sdffce T F T 2 "foo.v:1.1-1.21" ["q_sdffce_101[1:0]"] ["srst"] ["en"] ["clk"] ["inp[1:0]"],
+ _sdffce T T F 2 "foo.v:1.1-1.21" ["q_sdffce_110[1:0]"] ["srst"] ["en"] ["clk"] ["inp[1:0]"],
+ _sdffce T T T 2 "foo.v:1.1-1.21" ["q_sdffce_111[1:0]"] ["srst"] ["en"] ["clk"] ["inp[1:0]"]
+//
+    ] in
+    PINST "draw_hier tst" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+let p = tst [] [];
+
+let ckt = pexlif2fsm p;
+ckt;
+
+STE_debug ckt;
+
+
+
+
+
+
+
+
+
+
+
+
+

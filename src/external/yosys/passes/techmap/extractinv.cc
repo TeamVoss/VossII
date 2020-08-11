@@ -2,7 +2,7 @@
  *  yosys -- Yosys Open SYnthesis Suite
  *
  *  Copyright (C) 2012  Clifford Wolf <clifford@clifford.at>
- *  Copyright (C) 2019  Marcin Kościelnicki <mwk@0x04.net>
+ *  Copyright (C) 2019  Marcelina Kościelnicka <mwk@0x04.net>
  *
  *  Permission to use, copy, modify, and/or distribute this software for any
  *  purpose with or without fee is hereby granted, provided that the above
@@ -35,7 +35,7 @@ void split_portname_pair(std::string &port1, std::string &port2)
 
 struct ExtractinvPass : public Pass {
 	ExtractinvPass() : Pass("extractinv", "extract explicit inverter cells for invertible cell pins") { }
-	void help() YS_OVERRIDE
+	void help() override
 	{
 		//   |---v---|---v---|---v---|---v---|---v---|---v---|---v---|---v---|---v---|---v---|
 		log("\n");
@@ -57,7 +57,7 @@ struct ExtractinvPass : public Pass {
 		log("\n");
 	}
 
-	void execute(std::vector<std::string> args, RTLIL::Design *design) YS_OVERRIDE
+	void execute(std::vector<std::string> args, RTLIL::Design *design) override
 	{
 		log_header(design, "Executing EXTRACTINV pass (extracting pin inverters).\n");
 
@@ -90,7 +90,7 @@ struct ExtractinvPass : public Pass {
 				auto cell_wire = cell_module->wire(port.first);
 				if (!cell_wire)
 					continue;
-				auto it = cell_wire->attributes.find("\\invertible_pin");
+				auto it = cell_wire->attributes.find(ID::invertible_pin);
 				if (it == cell_wire->attributes.end())
 					continue;
 				IdString param_name = RTLIL::escape_id(it->second.decode_string());

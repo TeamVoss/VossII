@@ -28,7 +28,7 @@ let p = verilog2pexlif "" "M32632" [
 				  ] []
 ;
 
-p fseq 111111111;
+wtime (p fseq 111111111);
 
 
 let ckt = pexlif2fsm p;

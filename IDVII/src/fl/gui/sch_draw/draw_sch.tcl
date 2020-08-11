@@ -46,7 +46,7 @@ proc buf_wid	 {c} { return  [expr 30.0*$::sc($c)] }
 proc and_ht	 {c} { return  [expr 40.0*$::sc($c)] }
 proc and_wid	 {c} { return  [expr 40.0*$::sc($c)] }
 proc rect_ht	 {c} { return  [expr 15.0*$::sc($c)] }
-proc rect_wid	 {c} { return  [expr 40.0*$::sc($c)] }
+proc rect_wid	 {c} { return  [expr 50.0*$::sc($c)] }
 proc fsm_wid	 {c} { return  [expr 60.0*$::sc($c)] }
 proc fsm_ht	 {c} { return  [expr 60.0*$::sc($c)] }
 proc fsm_rad	 {c} { return  [expr 10.0*$::sc($c)] }
@@ -379,11 +379,14 @@ proc nb:tab2c {w name} {
     error "No tab named $name in notebook under $w"
 }
 
-proc get_new_sch_canvas {w draw_level} {
+proc get_new_sch_canvas {w draw_level {name ""}} {
     set nb $w.nb
     incr ::sch_window_cnt($w)
     set cc [format {%s.c%d} $nb $::sch_window_cnt($w)]
-    $nb add [frame $cc] -text "Ckt $::sch_window_cnt($w)"
+    if { $name == "" } {
+	set name "Ckt $::sch_window_cnt($w)"
+    }
+    $nb add [frame $cc] -text $name
     set c [create_circuit_canvas $nb $cc]
     set ::cur_zoom_factor($cc) 100.0
     set ::cur_zoom_factor($c) 100.0
@@ -398,6 +401,15 @@ proc get_new_sch_canvas {w draw_level} {
 proc set_scrollregion {c} {
     update idletasks
     $c configure -scrollregion [$c bbox all]
+}
+
+proc draw_hier_boundingbox {c name} {
+    update idletasks
+    val {lx ly ux uy} [grow_bbox $c]
+    $c create rectangle  $lx $ly $ux $uy -outline blue -fill ""
+    set t [$c create text $lx $uy -text $name -anchor nw -justify left \
+		-font $::sfont($c)]
+    add_font_tags $c $t _IsTeXt_
 }
 
 
@@ -2637,13 +2649,7 @@ proc draw_vertical_wire {oht c tag x y} {
 
 proc out_connect {c tag x1 y1 x2 y2 inp_nbr tot_inps mtag} {
     global gcolor mfont
-    if { $y1 < $y2 } {
-	# Connection going upwards
-	set xmid [expr ($x2-($inp_nbr)*[min_sep $c])]
-    } else {
-	# Connection going downwards
-	set xmid [expr ($x2-($tot_inps-$inp_nbr+1)*[min_sep $c])]
-    }
+    set xmid [expr $x2-2*[min_sep $c]]
     set wtag [format {%s____%d} $mtag $inp_nbr]
     if { [fl_is_vector $c $tag] } {
 	$c create line $x1 $y1 $xmid $y1 $xmid $y2 $x2 $y2 \
@@ -3129,6 +3135,14 @@ proc get_width {c x y cur_max txt} {
 	set cur_max $new_wid
     }
     return $cur_max
+}
+
+proc extract_name_draw_fub {module inst args} {
+    if {$inst == ""} {
+	return $module
+    } else {
+	return [format {%s (%s)} $inst $module]
+    }
 }
 
 proc draw_fub {module inst inames onames c tag x y} {
@@ -3799,19 +3813,34 @@ proc draw_nand2 {c tag x y} {return [draw_and_pat 0 {"" ""} "1" $c $tag $x $y]}
 proc draw_nor2 {c tag x y} {return [draw_or_pat 0 {"" ""} "1" "" $c $tag $x $y]}
 
 
-proc wr_lbl {txt c x y tag} {
-    global mfont
+proc wr_lbl {neg txt c x y tag} {
+    global mfont gcolor fc
+    if { $neg == 1 } {
+	set nx $x
+	set x [expr $x+2*[inv_rad $c]]
+	$c create oval [expr $x-2*[inv_rad $c]] [expr $y-[inv_rad $c]] \
+		       $x [expr $y+[inv_rad $c]] \
+		       -outline $gcolor -fill $fc \
+			-tags [list $tag _DoNotChangeColor_]
+    }
     add_font_tags $c [$c create text [expr $x+1] $y -anchor w -text $txt \
 			-font $mfont($c) -tags [list $tag _DoNotChangeColor_]] \
 		    _IsTeXt_
 }
 
-proc Dlabel {c x y tag}	    { wr_lbl D $c $x $y $tag }
-proc Elabel {c x y tag}	    { wr_lbl E $c $x $y $tag }
-proc Rlabel {c x y tag}	    { wr_lbl R $c $x $y $tag }
-proc Slabel {c x y tag}	    { wr_lbl S $c $x $y $tag }
-proc ZeroLabel {c x y tag}  { wr_lbl 0 $c $x $y $tag }
-proc OneLabel {c x y tag}   { wr_lbl 1 $c $x $y $tag }
+proc Dlabel {c x y tag}	    { wr_lbl 0 D $c $x $y $tag }
+proc Elabel {c x y tag}	    { wr_lbl 0 E $c $x $y $tag }
+proc Rlabel {c x y tag}	    { wr_lbl 0 R $c $x $y $tag }
+proc RClabel {c x y tag}    { wr_lbl 0 cR $c $x $y $tag }
+proc SRlabel {c x y tag}    { wr_lbl 0 SR $c $x $y $tag }
+proc Slabel {c x y tag}	    { wr_lbl 0 S $c $x $y $tag }
+proc ZeroLabel {c x y tag}  { wr_lbl 0 0 $c $x $y $tag }
+proc OneLabel {c x y tag}   { wr_lbl 0 1 $c $x $y $tag }
+
+proc negElabel {c x y tag}  { wr_lbl 1 E $c $x $y $tag }
+proc negRlabel {c x y tag}  { wr_lbl 1 R $c $x $y $tag }
+proc negRClabel {c x y tag} { wr_lbl 1 cR $c $x $y $tag }
+proc negSlabel {c x y tag}  { wr_lbl 1 S $c $x $y $tag }
 
 proc MUXLabel {c x y tag} {
     global mfont
@@ -3828,7 +3857,7 @@ proc ITELabel {c x y tag} {
 proc UnLabeled {x y tag} {
 }
 
-proc EdgeLabel {c x y tag} {
+proc ClkInLabel {c x y tag} {
     global gcolor mfont
     set s [expr [rect_wid $c]/20]
     $c create line $x [expr $y-3*$s] [expr $x+4*$s] $y $x [expr $y+3*$s] \
@@ -3917,113 +3946,153 @@ proc draw_mux5 {c tag x y} {
 }
 
 proc draw_ah_latch {c tag x y} {
-    return [draw_box_pat 2 {ActHighWaveForm} {Dlabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 2 {ActHighWaveForm} {Dlabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_al_latch {c tag x y} {
-    return [draw_box_pat 2 {ActLowWaveForm} {Dlabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 2 {ActLowWaveForm} {Dlabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_pos_d_latchen {c tag x y} {
-    return [draw_box_pat 2 {ActHighWaveForm} {Dlabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 2 {ActHighWaveForm} {Dlabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_pos_d_latch {c tag x y} {
-    return [draw_box_pat 2 {ActHighWaveForm} {Dlabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 2 {ActHighWaveForm} {Dlabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_pos_d_latch_reset {c tag x y} {
-    return [draw_box_pat 3 {ActHighWaveForm} {Dlabel Rlabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 3 {ActHighWaveForm} {Dlabel Rlabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_pos_d_latchbig {c tag x y} {
-    return [draw_box_pat 2 {ActHighWaveForm} {Dlabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 2 {ActHighWaveForm} {Dlabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_neg_d_latch {c tag x y} {
-    return [draw_box_pat 2 {ActLowWaveForm} {Dlabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 2 {ActLowWaveForm} {Dlabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_master_slave {c tag x y} {
-    return [draw_box_pat 2 {RisingEdge} {Dlabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 2 {RisingEdge} {Dlabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_ff_re_with_en {c tag x y} {
-    return [draw_box_pat 3 {RisingEdge} {Dlabel Elabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 3 {RisingEdge} {Dlabel Elabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_ff_fe_with_en {c tag x y} {
-    return [draw_box_pat 3 {FallingEdge} {Dlabel Elabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 3 {FallingEdge} {Dlabel Elabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_ff_fe {c tag x y} {
-    return [draw_box_pat 2 {FallingEdge} {Dlabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 2 {FallingEdge} {Dlabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_ff_re {c tag x y} {
-    return [draw_box_pat 2 {RisingEdge} {Dlabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 2 {RisingEdge} {Dlabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_elastic_re_ff {c tag x y} {
-    return [draw_box_pat 2 {ElasticRisingEdge} {Dlabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 2 {ElasticRisingEdge} {Dlabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_dff {c tag x y} {
-    return [draw_box_pat 2 {RisingEdge} {Dlabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 2 {RisingEdge} {Dlabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_adff {c tag x y} {
-    return [draw_box_pat 3 {RisingEdge} {Dlabel EdgeLabel Rlabel} $c $tag $x $y]
+    return [draw_box_pat 3 {RisingEdge} {Dlabel ClkInLabel Rlabel} $c $tag $x $y]
 }
 
+
+proc draw_adffe {pclk pen prst c tag x y} {
+    if { $pclk == 1 } { set edge RisingEdge } else { set edge FallingEdge }
+    if { $pen == 1 } { set elabel Elabel } else { set elabel negElabel }
+    if { $prst == 1 } { set rlabel Rlabel } else { set rlabel negRlabel }
+    return [draw_box_pat 4 $edge \
+			 [list Dlabel $elabel ClkInLabel $rlabel] $c $tag $x $y]
+}
+
+proc draw_dffe {pclk pen c tag x y} {
+    if { $pclk == 1 } { set edge RisingEdge } else { set edge FallingEdge }
+    if { $pen == 1 } { set elabel Elabel } else { set elabel negElabel }
+    return [draw_box_pat 3 $edge \
+			 [list Dlabel $elabel ClkInLabel] $c $tag $x $y]
+}
+
+proc draw_sdff {pclk psrst c tag x y} {
+    if { $pclk == 1 }  { set edge RisingEdge } else { set edge FallingEdge }
+    if { $psrst == 1 } { set rlabel Rlabel } else { set rlabel negRlabel }
+    return [draw_box_pat 3 $edge \
+	    [list Dlabel ClkInLabel $rlabel] $c $tag $x $y]
+}
+
+proc draw_sdffe {pclk pen psrst c tag x y} {
+    if { $pclk == 1 }  { set edge RisingEdge } else { set edge FallingEdge }
+    if { $pen == 1 }   { set elabel Elabel } else { set elabel negElabel }
+    if { $psrst == 1 } { set rlabel Rlabel } else { set rlabel negRlabel }
+    return [draw_box_pat 4 $edge \
+	[list Dlabel $elabel ClkInLabel $rlabel] $c $tag $x $y]
+}
+
+proc draw_sdffce {pclk pen psrst c tag x y} {
+    if { $pclk == 1 }  { set edge RisingEdge } else { set edge FallingEdge }
+    if { $pen == 1 }   { set elabel Elabel } else { set elabel negElabel }
+    if { $psrst == 1 } { set rlabel RClabel } else { set rlabel negRClabel }
+    return [draw_box_pat 4 $edge \
+	    [list Dlabel $elabel ClkInLabel $rlabel] $c $tag $x $y]
+}
+
+
 proc draw_ff_re_with_en_reset {c tag x y} {
-    return [draw_box_pat 4 {RisingEdge} {Dlabel Elabel Rlabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 4 {RisingEdge} {Dlabel Elabel Rlabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_ff_fe_with_en_reset {c tag x y} {
-    return [draw_box_pat 4 {FallingEdge} {Dlabel Elabel Rlabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 4 {FallingEdge} {Dlabel Elabel Rlabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_ff_re_with_en_set {c tag x y} {
-    return [draw_box_pat 4 {RisingEdge} {Dlabel Elabel Slabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 4 {RisingEdge} {Dlabel Elabel Slabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_ff_fe_with_en_set {c tag x y} {
-    return [draw_box_pat 4 {FallingEdge} {Dlabel Elabel Slabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 4 {FallingEdge} {Dlabel Elabel Slabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_ff_re_with_en_reset_set {c tag x y} {
-    return [draw_box_pat 5 {RisingEdge} {Dlabel Elabel Rlabel Slabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 5 {RisingEdge} {Dlabel Elabel Rlabel Slabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_ff_fe_with_en_reset_set {c tag x y} {
-    return [draw_box_pat 5 {FallingEdge} {Dlabel Elabel Rlabel Slabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 5 {FallingEdge} {Dlabel Elabel Rlabel Slabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_ff_re_reset {c tag x y} {
-    return [draw_box_pat 3 {RisingEdge} {Dlabel Rlabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 3 {RisingEdge} {Dlabel Rlabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_ff_re_reset2 {c tag x y} {
-    return [draw_box_pat 3 {RisingEdge} {Dlabel Rlabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 3 {RisingEdge} {Dlabel Rlabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_ff_fe_reset {c tag x y} {
-    return [draw_box_pat 3 {FallingEdge} {Dlabel Rlabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 3 {FallingEdge} {Dlabel Rlabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_ff_re_set {c tag x y} {
-    return [draw_box_pat 3 {RisingEdge} {Dlabel Slabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 3 {RisingEdge} {Dlabel Slabel ClkInLabel} $c $tag $x $y]
 }
 proc draw_ff_fe_set {c tag x y} {
-    return [draw_box_pat 3 {FallingEdge} {Dlabel Slabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 3 {FallingEdge} {Dlabel Slabel ClkInLabel} $c $tag $x $y]
 }
 
 proc draw_ff_re_reset_set {c tag x y} {
-    return [draw_box_pat 4 {RisingEdge} {Dlabel Slabel Rlabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 4 {RisingEdge} {Dlabel Slabel Rlabel ClkInLabel} $c $tag $x $y]
 }
 proc draw_ff_fe_reset_set {c tag x y} {
-    return [draw_box_pat 4 {FallingEdge} {Dlabel Slabel Rlabel EdgeLabel} $c $tag $x $y]
+    return [draw_box_pat 4 {FallingEdge} {Dlabel Slabel Rlabel ClkInLabel} $c $tag $x $y]
 }
 
 ###########################################################################
