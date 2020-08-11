@@ -87,6 +87,13 @@ struct PexlifDumper
 	vector<shared_str> cstr_buf;
 	pool<SigBit> cstr_bits_seen;
 
+	bool is_ff_cell(RTLIL::IdString type)
+	{
+		return type.in(ID($dff), ID($dffe), ID($sdff), ID($sdffe), ID($sdffce), ID($adff), ID($adffe),
+			       ID($dffsr), ID($dffsre), ID($dlatch), ID($adlatch), ID($dlatchsr), ID($sr));
+	}
+
+
 	const char *cstr(RTLIL::IdString id)
 	{
 		std::string str = RTLIL::unescape_id(id);
@@ -518,6 +525,7 @@ struct PexlifDumper
 			}
 			continue;
 		    }
+
 		    if (cell->type == "$dlatch") {
 			RTLIL::SigSpec out = cell->getPort("\\Q");
 			f << "_dlatch ";
@@ -529,6 +537,7 @@ struct PexlifDumper
 			dump_sigspec(f, cell->getPort("\\D"));
 			continue;
 		    }
+
 		    if (cell->type == "$dff") {
 			RTLIL::SigSpec out = cell->getPort("\\Q");
 			f << "_dff ";
@@ -540,6 +549,93 @@ struct PexlifDumper
 			dump_sigspec(f, cell->getPort("\\D"));
 			continue;
 		    }
+
+		    if( cell->type == "$adffe") {
+			RTLIL::SigSpec out = cell->getPort("\\Q");
+			f << "_adffe ";
+			if( cell->hasParam(ID::CLK_POLARITY) && !cell->getParam(ID::CLK_POLARITY).as_bool() )   { f << "F "; } else { f << "T "; }
+			if( cell->hasParam(ID::EN_POLARITY) && !cell->getParam(ID::EN_POLARITY).as_bool() )     { f << "F "; } else { f << "T "; }
+			if( cell->hasParam(ID::ARST_POLARITY) && !cell->getParam(ID::ARST_POLARITY).as_bool() ) { f << "F "; } else { f << "T "; }
+			f << stringf("%d \"%s\" ", out.size(), src.c_str());
+			f << " ";
+			dump_sigspec(f, out);
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\ARST"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\EN"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\CLK"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\D"));
+			continue;
+		    }
+		    if( cell->type == "$dffe") {
+			RTLIL::SigSpec out = cell->getPort("\\Q");
+			f << "_dffe ";
+			if( cell->hasParam(ID::CLK_POLARITY) && !cell->getParam(ID::CLK_POLARITY).as_bool() )   { f << "F "; } else { f << "T "; }
+			if( cell->hasParam(ID::EN_POLARITY) && !cell->getParam(ID::EN_POLARITY).as_bool() )     { f << "F "; } else { f << "T "; }
+			f << stringf("%d \"%s\" ", out.size(), src.c_str());
+			dump_sigspec(f, out);
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\EN"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\CLK"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\D"));
+			continue;
+		    }
+		    if( cell->type == "$sdff") {
+			RTLIL::SigSpec out = cell->getPort("\\Q");
+			f << "_sdff ";
+			if( cell->hasParam(ID::CLK_POLARITY) && !cell->getParam(ID::CLK_POLARITY).as_bool() )   { f << "F "; } else { f << "T "; }
+			if( cell->hasParam(ID::SRST_POLARITY) && !cell->getParam(ID::SRST_POLARITY).as_bool() ) { f << "F "; } else { f << "T "; }
+			f << stringf("%d \"%s\" ", out.size(), src.c_str());
+			dump_sigspec(f, out);
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\SRST"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\CLK"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\D"));
+			continue;
+		    }
+		    if( cell->type == "$sdffe") {
+			RTLIL::SigSpec out = cell->getPort("\\Q");
+			f << "_sdffe ";
+			if( cell->hasParam(ID::CLK_POLARITY) && !cell->getParam(ID::CLK_POLARITY).as_bool() )   { f << "F "; } else { f << "T "; }
+			if( cell->hasParam(ID::EN_POLARITY) && !cell->getParam(ID::EN_POLARITY).as_bool() )   { f << "F "; } else { f << "T "; }
+			if( cell->hasParam(ID::SRST_POLARITY) && !cell->getParam(ID::SRST_POLARITY).as_bool() ) { f << "F "; } else { f << "T "; }
+			f << stringf("%d \"%s\" ", out.size(), src.c_str());
+			dump_sigspec(f, out);
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\SRST"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\EN"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\CLK"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\D"));
+			continue;
+		    }
+		    if( cell->type == "$sdffce") {
+			RTLIL::SigSpec out = cell->getPort("\\Q");
+			f << "_sdffce ";
+			if( cell->hasParam(ID::CLK_POLARITY) && !cell->getParam(ID::CLK_POLARITY).as_bool() )   { f << "F "; } else { f << "T "; }
+			if( cell->hasParam(ID::EN_POLARITY) && !cell->getParam(ID::EN_POLARITY).as_bool() )   { f << "F "; } else { f << "T "; }
+			if( cell->hasParam(ID::SRST_POLARITY) && !cell->getParam(ID::SRST_POLARITY).as_bool() ) { f << "F "; } else { f << "T "; }
+			f << stringf("%d \"%s\" ", out.size(), src.c_str());
+			dump_sigspec(f, out);
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\SRST"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\EN"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\CLK"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\D"));
+			continue;
+		    }
+
 		    if (cell->type == "$adff") {
 			RTLIL::SigSpec out = cell->getPort("\\Q");
 			f << "_adff ";
@@ -753,6 +849,7 @@ struct PexlifDumper
 			continue;
 		    }
 
+		    // Needed??????
 		    if (config->unbuf_types.count(cell->type)) {
 			auto portnames = config->unbuf_types.at(cell->type);
 			f << stringf(".names00 %s %s\n1 1\n",
@@ -760,30 +857,23 @@ struct PexlifDumper
 				     cstr(cell->getPort(portnames.second)));
 			continue;
 		    }
+
 		    f << stringf("Q%s [(\"instance\", \"%s\"), (\"src\", \"%s\")] [\n                ",
 				 cstr(cell->type), (((cell->name).c_str())+1), src.c_str());
 
 		    bool first = true;
 		    for (auto &conn : cell->connections()) {
-			if( !first ) f << ",\n                ";
-			first = false;
 			int ssz = conn.second.size();
-			if( ssz == 0) {
-			    ssz = conn.first.size();
-			    if( ssz == 1 )
-				f << stringf("(\"--%s\",", cstr(conn.first));
-			    else
-				f << stringf("(\"--%s[%d:0]\",",
-				    cstr(conn.first), (int) conn.first.size());
-			} else {
+			if( ssz != 0) {
+			    if( !first ) f << ",\n                ";
+			    first = false;
 			    if (ssz == 1)
 				f << stringf("(\"%s\",", cstr(conn.first));
 			    else
-				f << stringf("(\"%s[%d:0]\",",
-				    cstr(conn.first), ssz-1);
+				f << stringf("(\"%s[%d:0]\",", cstr(conn.first), ssz-1);
+			    dump_sigspec(f, conn.second);
+			    f << ")";
 			}
-			dump_sigspec(f, conn.second);
-			f << ")";
 		    }
 		    f << stringf("]");
 

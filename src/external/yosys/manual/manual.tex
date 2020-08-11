@@ -42,8 +42,8 @@
 \usepackage{rotating}
 \usepackage{natbib}
 \usepackage{epsf}
-%\usepackage{dsfont}
-%\usepackage[algochapter, boxruled, vlined]{algorithm2e}
+\usepackage{dsfont}
+\usepackage[algochapter, boxruled, vlined]{algorithm2e}
 %Activating and setting of character protruding - if you like
 %\usepackage[activate,DVIoutput]{pdfcprot}
 % If you really need special chars...
@@ -58,14 +58,14 @@ pagebackref,%
 bookmarksopen=false%
 ]{hyperref}
 % For the two different reference lists ...
-%\usepackage{multibib}
+\usepackage{multibib}
 \usepackage{multirow}
 \usepackage{booktabs}
 \usepackage{pdfpages}
 
 \usepackage{listings}
 \usepackage{pifont}
-%\usepackage{skull}
+\usepackage{skull}
 % \usepackage{draftwatermark}
 
 \usepackage{tikz}
@@ -81,9 +81,6 @@ bookmarksopen=false%
 \def\C#1{\lstinline[language=C++]{#1}}
 \def\V#1{\lstinline[language=Verilog]{#1}}
 
-% DUMMY
-\newcommand{\citeweblink}[1]{\mbox{$\tt #1$}} 
-
 \newsavebox{\fixmebox}
 \newenvironment{fixme}%
 {\newcommand\colboxcolor{FFBBBB}%
@@ -92,7 +89,7 @@ bookmarksopen=false%
 {\end{minipage}\end{lrbox}\textbf{FIXME: }\\%
 \colorbox[HTML]{\colboxcolor}{\usebox{\fixmebox}}}
 
-%\newcites{weblink}{Internet References}
+\newcites{weblink}{Internet References}
 
 \setcounter{secnumdepth}{3}
 \makeindex
@@ -149,7 +146,7 @@ with the help of HDL synthesis tools.
 
 In special cases such as synthesis for coarse-grain cell libraries or when
 testing new synthesis algorithms it might be necessary to write a custom HDL
-synthesis tool or add new features to an existing one. It this cases the
+synthesis tool or add new features to an existing one. In these cases the
 availability of a Free and Open Source (FOSS) synthesis tool that can be used
 as basis for custom tools would be helpful.
 
@@ -223,7 +220,7 @@ YOSYS       & Yosys Open SYnthesis Suite \\
 \bibliography{literature}
 \bibliographystyle{alphadin}
 
-%\bibliographyweblink{weblinks}
-%\bibliographystyleweblink{abbrv}
+\bibliographyweblink{weblinks}
+\bibliographystyleweblink{abbrv}
 
 \end{document}

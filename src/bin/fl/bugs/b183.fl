@@ -1,0 +1,27 @@
+load "ste.fl";
+
+let bug {attrs::(string#string) list} conns =
+    let inps = [ ] in
+    let outs = [ ] in
+    let ints = md_extract_vectors [
+                 "TmP_1[2:0]",
+                 "TmP_2[1:0]",
+                 "TmP_3[2:0]",
+		 "ram[2:0][1:0]" ] in
+    let ram = "ram[2:0][1:0]" in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _memwr "" 3 2 ram ["TmP_1[2:0]"] ["TmP_2[1:0]"] ["TmP_3[2:0]"]
+    ] in
+    PINST "cpu_registerfile" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+let p = bug [] [];
+
+let ckt = pexlif2fsm p;
+
+ckt;
+
+p;

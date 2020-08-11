@@ -31,15 +31,15 @@ void create_ice40_dsp(ice40_dsp_pm &pm)
 
 	log("Checking %s.%s for iCE40 DSP inference.\n", log_id(pm.module), log_id(st.mul));
 
-	log_debug("ffA:    %s %s %s\n", log_id(st.ffA, "--"), log_id(st.ffAholdmux, "--"), log_id(st.ffArstmux, "--"));
-	log_debug("ffB:    %s %s %s\n", log_id(st.ffB, "--"), log_id(st.ffBholdmux, "--"), log_id(st.ffBrstmux, "--"));
-	log_debug("ffCD:   %s %s\n", log_id(st.ffCD, "--"), log_id(st.ffCDholdmux, "--"));
+	log_debug("ffA:    %s\n", log_id(st.ffA, "--"));
+	log_debug("ffB:    %s\n", log_id(st.ffB, "--"));
+	log_debug("ffCD:   %s\n", log_id(st.ffCD, "--"));
 	log_debug("mul:    %s\n", log_id(st.mul, "--"));
 	log_debug("ffFJKG: %s\n", log_id(st.ffFJKG, "--"));
 	log_debug("ffH:    %s\n", log_id(st.ffH, "--"));
 	log_debug("add:    %s\n", log_id(st.add, "--"));
 	log_debug("mux:    %s\n", log_id(st.mux, "--"));
-	log_debug("ffO:    %s %s %s\n", log_id(st.ffO, "--"), log_id(st.ffOholdmux, "--"), log_id(st.ffOrstmux, "--"));
+	log_debug("ffO:    %s\n", log_id(st.ffO, "--"));
 	log_debug("\n");
 
 	if (GetSize(st.sigA) > 16) {
@@ -73,11 +73,11 @@ void create_ice40_dsp(ice40_dsp_pm &pm)
 
 	// SB_MAC16 Input Interface
 	SigSpec A = st.sigA;
-	A.extend_u0(16, st.mul->getParam(ID(A_SIGNED)).as_bool());
+	A.extend_u0(16, st.mul->getParam(ID::A_SIGNED).as_bool());
 	log_assert(GetSize(A) == 16);
 
 	SigSpec B = st.sigB;
-	B.extend_u0(16, st.mul->getParam(ID(B_SIGNED)).as_bool());
+	B.extend_u0(16, st.mul->getParam(ID::B_SIGNED).as_bool());
 	log_assert(GetSize(B) == 16);
 
 	SigSpec CD = st.sigCD;
@@ -88,8 +88,8 @@ void create_ice40_dsp(ice40_dsp_pm &pm)
 
 	cell->setPort(ID::A, A);
 	cell->setPort(ID::B, B);
-	cell->setPort(ID(C), CD.extract(16, 16));
-	cell->setPort(ID(D), CD.extract(0, 16));
+	cell->setPort(ID::C, CD.extract(16, 16));
+	cell->setPort(ID::D, CD.extract(0, 16));
 
 	cell->setParam(ID(A_REG), st.ffA ? State::S1 : State::S0);
 	cell->setParam(ID(B_REG), st.ffB ? State::S1 : State::S0);
@@ -97,16 +97,16 @@ void create_ice40_dsp(ice40_dsp_pm &pm)
 	cell->setParam(ID(D_REG), st.ffCD ? State::S1 : State::S0);
 
 	SigSpec AHOLD, BHOLD, CDHOLD;
-	if (st.ffAholdmux)
-		AHOLD = st.ffAholdpol ? st.ffAholdmux->getPort(ID(S)) : pm.module->Not(NEW_ID, st.ffAholdmux->getPort(ID(S)));
+	if (st.ffA && st.ffA->hasPort(ID::EN))
+		AHOLD = st.ffA->getParam(ID::EN_POLARITY).as_bool() ? pm.module->Not(NEW_ID, st.ffA->getPort(ID::EN)) : st.ffA->getPort(ID::EN);
 	else
 		AHOLD = State::S0;
-	if (st.ffBholdmux)
-		BHOLD = st.ffBholdpol ? st.ffBholdmux->getPort(ID(S)) : pm.module->Not(NEW_ID, st.ffBholdmux->getPort(ID(S)));
+	if (st.ffB && st.ffB->hasPort(ID::EN))
+		BHOLD = st.ffB->getParam(ID::EN_POLARITY).as_bool() ? pm.module->Not(NEW_ID, st.ffB->getPort(ID::EN)) : st.ffB->getPort(ID::EN);
 	else
 		BHOLD = State::S0;
-	if (st.ffCDholdmux)
-		CDHOLD = st.ffCDholdpol ? st.ffCDholdmux->getPort(ID(S)) : pm.module->Not(NEW_ID, st.ffCDholdmux->getPort(ID(S)));
+	if (st.ffCD && st.ffCD->hasPort(ID::EN))
+		CDHOLD = st.ffCD->getParam(ID::EN_POLARITY).as_bool() ? pm.module->Not(NEW_ID, st.ffCD->getPort(ID::EN)) : st.ffCD->getPort(ID::EN);
 	else
 		CDHOLD = State::S0;
 	cell->setPort(ID(AHOLD), AHOLD);
@@ -115,12 +115,12 @@ void create_ice40_dsp(ice40_dsp_pm &pm)
 	cell->setPort(ID(DHOLD), CDHOLD);
 
 	SigSpec IRSTTOP, IRSTBOT;
-	if (st.ffArstmux)
-		IRSTTOP = st.ffArstpol ? st.ffArstmux->getPort(ID(S)) : pm.module->Not(NEW_ID, st.ffArstmux->getPort(ID(S)));
+	if (st.ffA && st.ffA->hasPort(ID::ARST))
+		IRSTTOP = st.ffA->getParam(ID::ARST_POLARITY).as_bool() ? st.ffA->getPort(ID::ARST) : pm.module->Not(NEW_ID, st.ffA->getPort(ID::ARST));
 	else
 		IRSTTOP = State::S0;
-	if (st.ffBrstmux)
-		IRSTBOT = st.ffBrstpol ? st.ffBrstmux->getPort(ID(S)) : pm.module->Not(NEW_ID, st.ffBrstmux->getPort(ID(S)));
+	if (st.ffB && st.ffB->hasPort(ID::ARST))
+		IRSTBOT = st.ffB->getParam(ID::ARST_POLARITY).as_bool() ? st.ffB->getPort(ID::ARST) : pm.module->Not(NEW_ID, st.ffB->getPort(ID::ARST));
 	else
 		IRSTBOT = State::S0;
 	cell->setPort(ID(IRSTTOP), IRSTTOP);
@@ -128,7 +128,7 @@ void create_ice40_dsp(ice40_dsp_pm &pm)
 
 	if (st.clock != SigBit())
 	{
-		cell->setPort(ID(CLK), st.clock);
+		cell->setPort(ID::CLK, st.clock);
 		cell->setPort(ID(CE), State::S1);
 		cell->setParam(ID(NEG_TRIGGER), st.clock_pol ? State::S0 : State::S1);
 
@@ -156,7 +156,7 @@ void create_ice40_dsp(ice40_dsp_pm &pm)
 	}
 	else
 	{
-		cell->setPort(ID(CLK), State::S0);
+		cell->setPort(ID::CLK, State::S0);
 		cell->setPort(ID(CE), State::S0);
 		cell->setParam(ID(NEG_TRIGGER), State::S0);
 	}
@@ -166,7 +166,7 @@ void create_ice40_dsp(ice40_dsp_pm &pm)
 	cell->setPort(ID(SIGNEXTIN), State::Sx);
 	cell->setPort(ID(SIGNEXTOUT), pm.module->addWire(NEW_ID));
 
-	cell->setPort(ID(CI), State::Sx);
+	cell->setPort(ID::CI, State::Sx);
 
 	cell->setPort(ID(ACCUMCI), State::Sx);
 	cell->setPort(ID(ACCUMCO), pm.module->addWire(NEW_ID));
@@ -178,19 +178,19 @@ void create_ice40_dsp(ice40_dsp_pm &pm)
 	if (O_width == 33) {
 		log_assert(st.add);
 		// If we have a signed multiply-add, then perform sign extension
-		if (st.add->getParam(ID(A_SIGNED)).as_bool() && st.add->getParam(ID(B_SIGNED)).as_bool())
+		if (st.add->getParam(ID::A_SIGNED).as_bool() && st.add->getParam(ID::B_SIGNED).as_bool())
 			pm.module->connect(O[32], O[31]);
 		else
-			cell->setPort(ID(CO), O[32]);
+			cell->setPort(ID::CO, O[32]);
 		O.remove(O_width-1);
 	}
 	else
-		cell->setPort(ID(CO), pm.module->addWire(NEW_ID));
+		cell->setPort(ID::CO, pm.module->addWire(NEW_ID));
 	log_assert(GetSize(O) <= 32);
 	if (GetSize(O) < 32)
 		O.append(pm.module->addWire(NEW_ID, 32-GetSize(O)));
 
-	cell->setPort(ID(O), O);
+	cell->setPort(ID::O, O);
 
 	bool accum = false;
 	if (st.add) {
@@ -207,16 +207,16 @@ void create_ice40_dsp(ice40_dsp_pm &pm)
 	}
 
 	SigSpec OHOLD;
-	if (st.ffOholdmux)
-		OHOLD = st.ffOholdpol ? st.ffOholdmux->getPort(ID(S)) : pm.module->Not(NEW_ID, st.ffOholdmux->getPort(ID(S)));
+	if (st.ffO && st.ffO->hasPort(ID::EN))
+		OHOLD = st.ffO->getParam(ID::EN_POLARITY).as_bool() ? pm.module->Not(NEW_ID, st.ffO->getPort(ID::EN)) : st.ffO->getPort(ID::EN);
 	else
 		OHOLD = State::S0;
 	cell->setPort(ID(OHOLDTOP), OHOLD);
 	cell->setPort(ID(OHOLDBOT), OHOLD);
 
 	SigSpec ORST;
-	if (st.ffOrstmux)
-		ORST = st.ffOrstpol ? st.ffOrstmux->getPort(ID(S)) : pm.module->Not(NEW_ID, st.ffOrstmux->getPort(ID(S)));
+	if (st.ffO && st.ffO->hasPort(ID::ARST))
+		ORST = st.ffO->getParam(ID::ARST_POLARITY).as_bool() ? st.ffO->getPort(ID::ARST) : pm.module->Not(NEW_ID, st.ffO->getPort(ID::ARST));
 	else
 		ORST = State::S0;
 	cell->setPort(ID(ORSTTOP), ORST);
@@ -225,9 +225,11 @@ void create_ice40_dsp(ice40_dsp_pm &pm)
 	SigSpec acc_reset = State::S0;
 	if (st.mux) {
 		if (st.muxAB == ID::A)
-			acc_reset = st.mux->getPort(ID(S));
+			acc_reset = st.mux->getPort(ID::S);
 		else
-			acc_reset = pm.module->Not(NEW_ID, st.mux->getPort(ID(S)));
+			acc_reset = pm.module->Not(NEW_ID, st.mux->getPort(ID::S));
+	} else if (st.ffO && st.ffO->hasPort(ID::SRST)) {
+		acc_reset = st.ffO->getParam(ID::SRST_POLARITY).as_bool() ? st.ffO->getPort(ID::SRST) : pm.module->Not(NEW_ID, st.ffO->getPort(ID::SRST));
 	}
 	cell->setPort(ID(OLOADTOP), acc_reset);
 	cell->setPort(ID(OLOADBOT), acc_reset);
@@ -248,8 +250,8 @@ void create_ice40_dsp(ice40_dsp_pm &pm)
 	cell->setParam(ID(BOTADDSUB_CARRYSELECT), Const(0, 2));
 
 	cell->setParam(ID(MODE_8x8), State::S0);
-	cell->setParam(ID(A_SIGNED), st.mul->getParam(ID(A_SIGNED)).as_bool());
-	cell->setParam(ID(B_SIGNED), st.mul->getParam(ID(B_SIGNED)).as_bool());
+	cell->setParam(ID::A_SIGNED, st.mul->getParam(ID::A_SIGNED).as_bool());
+	cell->setParam(ID::B_SIGNED, st.mul->getParam(ID::B_SIGNED).as_bool());
 
 	if (st.ffO) {
 		if (st.o_lo)
@@ -257,7 +259,7 @@ void create_ice40_dsp(ice40_dsp_pm &pm)
 		else
 			cell->setParam(ID(TOPOUTPUT_SELECT), Const(1, 2));
 
-		st.ffO->connections_.at(ID(Q)).replace(O, pm.module->addWire(NEW_ID, GetSize(O)));
+		st.ffO->connections_.at(ID::Q).replace(O, pm.module->addWire(NEW_ID, GetSize(O)));
 		cell->setParam(ID(BOTOUTPUT_SELECT), Const(1, 2));
 	}
 	else {
@@ -275,7 +277,7 @@ void create_ice40_dsp(ice40_dsp_pm &pm)
 
 struct Ice40DspPass : public Pass {
 	Ice40DspPass() : Pass("ice40_dsp", "iCE40: map multipliers") { }
-	void help() YS_OVERRIDE
+	void help() override
 	{
 		//   |---v---|---v---|---v---|---v---|---v---|---v---|---v---|---v---|---v---|---v---|
 		log("\n");
@@ -294,7 +296,7 @@ struct Ice40DspPass : public Pass {
 		log("the accumulator to an arbitrary value can be inferred to use the {C,D} input.\n");
 		log("\n");
 	}
-	void execute(std::vector<std::string> args, RTLIL::Design *design) YS_OVERRIDE
+	void execute(std::vector<std::string> args, RTLIL::Design *design) override
 	{
 		log_header(design, "Executing ICE40_DSP pass (map multipliers).\n");
 

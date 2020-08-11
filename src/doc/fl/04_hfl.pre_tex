@@ -403,7 +403,7 @@ let module_name =
 \end{hol}
 Note that when a hardware type ``foo'' is created, there are (at least)
 three additional functions created: foo\_input, foo\_output, and foo\_internal,
-that are binder functions that makes it wasy to declare inputs/outputs or
+that are binder functions that makes it easy to declare inputs/outputs or
 internal signals of this type.
 However, there are also an input, output, and internal functions available
 in which the signals declares will not be forced to have a particular type.

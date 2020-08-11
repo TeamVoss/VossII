@@ -1,6 +1,6 @@
 read_verilog -icells <<EOT
 module \$__XILINX_SHREG_ (input C, input D, input [31:0] L, input E, output Q, output SO);
-  parameter DEPTH = 1;
+  parameter DEPTH = 2;
   parameter [DEPTH-1:0] INIT = 0;
   parameter CLKPOL = 1;
   parameter ENPOL = 2;
@@ -35,7 +35,6 @@ design -stash gate
 
 design -copy-from gold -as gold pmtest_xilinx_srl_pm_fixed
 design -copy-from gate -as gate pmtest_xilinx_srl_pm_fixed
-dff2dffe -unmap # sat does not support flops-with-enable yet
 miter -equiv -flatten -make_assert gold gate miter
 sat -set-init-zero -seq 5 -verify -prove-asserts miter
 
@@ -52,6 +51,5 @@ design -stash gate
 
 design -copy-from gold -as gold pmtest_xilinx_srl_pm_variable
 design -copy-from gate -as gate pmtest_xilinx_srl_pm_variable
-dff2dffe -unmap # sat does not support flops-with-enable yet
 miter -equiv -flatten -make_assert gold gate miter
 sat -set-init-zero -seq 5 -verify -prove-asserts miter

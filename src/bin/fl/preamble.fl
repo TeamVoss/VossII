@@ -967,6 +967,30 @@ letrec AND_list l =
     AND_list new_l
 ;
 
+letrec OR_list l =
+    l = [] => F |
+    let l = setify l then
+    let ll = length l in
+    ll = 1 => hd l |
+    ll = 2 => (el 1 l) OR (el 2 l) |
+    letrec find_smallest idx1 sz1 idx2 sz2 idx es =
+	es = [] => (idx1, idx2) |
+	val (e:es) = es in
+	let sz = bdd_size e in
+	sz < sz1 => find_smallest idx sz idx1 sz1 (idx+1) es |
+	sz < sz2 => find_smallest idx1 sz1 idx sz (idx+1) es |
+	find_smallest idx1 sz1 idx2 sz2 (idx+1) es
+    in
+    val (idx1,idx2) = find_smallest 0 (2**63) 0 (2**63) 1 l then
+    let f1 = el idx1 l in
+    let f2 = el idx2 l in
+    let f = f1 OR f2 then
+    let rem_indices = (1 upto ll) subtract [idx1,idx2] in
+    let rem = map (\i. el i l) rem_indices then
+    let new_l = f:rem then
+    OR_list new_l
+;
+
 // Merge
 let merge_funs info indices =
     val (EQ_INFO cnt main_list v2is v2cnts) = info in

@@ -239,8 +239,7 @@ $(YOSYS_PATCHED_MAKEFILE):
 	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f $(YOSYS_PATCHED_MAKEFILE)
 	touch .yosys
 
-.yosys_pexlif: $(YOSYS_DIR)/backends/pexlif/pexlif.cc $(YOSYS_PATCHED_MAKEFILE)
-	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f $(YOSYS_PATCHED_MAKEFILE) config-gcc-static
+.yosys_pexlif: $(YOSYS_DIR)/backends/pexlif/pexlif.cc
 	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f $(YOSYS_PATCHED_MAKEFILE)
 	touch .yosys_pexlif
 
