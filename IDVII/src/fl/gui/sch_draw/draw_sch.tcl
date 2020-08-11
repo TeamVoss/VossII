@@ -2649,13 +2649,7 @@ proc draw_vertical_wire {oht c tag x y} {
 
 proc out_connect {c tag x1 y1 x2 y2 inp_nbr tot_inps mtag} {
     global gcolor mfont
-    if { $y1 < $y2 } {
-	# Connection going upwards
-	set xmid [expr ($x2-($inp_nbr)*[min_sep $c])]
-    } else {
-	# Connection going downwards
-	set xmid [expr ($x2-($tot_inps-$inp_nbr+1)*[min_sep $c])]
-    }
+    set xmid [expr $x2-2*[min_sep $c]]
     set wtag [format {%s____%d} $mtag $inp_nbr]
     if { [fl_is_vector $c $tag] } {
 	$c create line $x1 $y1 $xmid $y1 $xmid $y2 $x2 $y2 \
