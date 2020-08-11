@@ -792,7 +792,7 @@ let _memwr src width abits mem en addr data =
     let f_NEW_DATA = mk_name width "NEW_DATA" in
     let phase_del =
 	let lf = P_LEAF [W_PHASE_DELAY OLD MEM] in
-	PINST "pdel" [] T [(f_MEM, [f_MEM])] [(f_OLD,[f_OLD])] [] lf
+	PINST "draw_delay" [] T [(f_MEM, [f_MEM])] [(f_OLD,[f_OLD])] [] lf
     in
     let read =
 	let lf = P_LEAF [W_UPDATE_FN OLD_DATA (W_MEM_READ mem_info OLD ADDR)] in
@@ -801,20 +801,21 @@ let _memwr src width abits mem en addr data =
     in
     let neg =
 	let lf = P_LEAF [W_UPDATE_FN NEG_EN (W_NOT EN)] in
-	PINST "neg" [] T [(f_EN,[f_EN])] [(f_NEG_EN,[f_NEG_EN])] [] lf
+	PINST "draw_not" [] T [(f_EN,[f_EN])] [(f_NEG_EN,[f_NEG_EN])] [] lf
     in
     let a1 =
 	let lf = P_LEAF [W_UPDATE_FN A1 (W_AND EN DATA)] in
-	PINST "A1" [] T [(f_EN,[f_EN]),(f_DATA,[f_DATA])] [(f_A1,[f_A1])] [] lf
+	PINST "draw_and2" [] T [(f_EN,[f_EN]),(f_DATA,[f_DATA])]
+			       [(f_A1,[f_A1])] [] lf
     in
     let a2 =
 	let lf = P_LEAF [W_UPDATE_FN A2 (W_AND NEG_EN OLD_DATA)] in
-	PINST "A2" [] T [(f_NEG_EN,[f_NEG_EN]),(f_OLD_DATA,[f_OLD_DATA])]
+	PINST "draw_and2" [] T [(f_NEG_EN,[f_NEG_EN]),(f_OLD_DATA,[f_OLD_DATA])]
 			[(f_A2,[f_A2])] [] lf
     in
     let or =
 	let lf = P_LEAF [W_UPDATE_FN NEW_DATA (W_OR A1 A2)] in
-	PINST "or" [] T [(f_A1,[f_A1]),(f_A2,[f_A2])]
+	PINST "draw_or2" [] T [(f_A1,[f_A1]),(f_A2,[f_A2])]
 			[(f_NEW_DATA,[f_NEW_DATA])] [] lf
     in
     let wr =

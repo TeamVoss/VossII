@@ -28,19 +28,19 @@ let p = verilog2pexlif "" "M32632" [
 				  ] []
 ;
 
-wtime (p fseq 111111111);
+wtime (p fseq 1);
 
 
 let ckt = pexlif2fsm p;
 
-wtime ckt;
+wtime (ckt fseq 2);
 
 let vis = STE_debug ckt;
-wtime vis;
+wtime (vis fseq 3);
 
 let ste = random_simulation vis
 	    [("BCLK","01")]
 	    [("BRESET","11110"),("ENWR","000000-")]
 	    50;
-ste;
+//ste;
 

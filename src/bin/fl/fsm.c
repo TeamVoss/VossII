@@ -6940,7 +6940,14 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
 	vp->draw_level = draw_level;
 	draw_level++;
 	vp->id = ++visualization_id;
-	vp->pfn = name;
+	if( strstr(name, "draw_") == NULL ) {
+	    string tmp = strtemp("draw_hfl {");
+	    tmp = strappend(name);
+	    tmp = strappend("}");
+	    vp->pfn = wastrsave(&strings, tmp);
+	} else {
+	    vp->pfn = name;
+	}
 	vp->fa_inps = NULL;
 	vp->fa_outs = NULL;
     }
