@@ -218,12 +218,10 @@ test(g_ptr redex)
     g_ptr g_fsm;
     EXTRACT_1_ARG(redex, g_fsm);
     fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
-    push_fsm(fsm);
     MAKE_REDEX_NIL(redex);
     //
     create_iso_mat(fsm);
     //
-    pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
