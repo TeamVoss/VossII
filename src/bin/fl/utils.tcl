@@ -153,10 +153,68 @@ proc util:report_result_in_file {msg file return_alts} {
     util:report_result $header $txt $return_alts
 }
 
+
+set ::busy_level 0
+
+
 set ::always_alive {}
 
 proc make_window_always_alive {w} {
     lappend ::always_alive $w
+}
+
+proc remove_window_always_alive {w} {
+    set old $::always_alive
+    set ::always_alive {}
+    foreach ww $old {
+	if { $ww != $w } {
+	    lappend ::always_alive $ww
+	}
+    }
+}
+
+proc mk_busy {w mode} {
+    foreach cw [winfo children $w] {
+	set has_active_child 0
+	set len [string length $cw]
+	foreach aw $::always_alive {
+	    if [string equal -length $len $cw $aw] {
+		set has_active_child 1
+	    }
+	}
+	if { $has_active_child == 0 } {
+	    if { $mode == 1 } {
+		catch {tk busy hold $cw -cursor watch}
+	    } else {
+		catch {tk busy forget $cw}
+	    }
+	} else {
+	    mk_busy $cw $mode
+	}
+    }
+}
+
+proc i_am_busy {} {
+    incr ::busy_level
+    if { $::busy_level == 1 } {
+	foreach w [wm stackorder .] {
+	    mk_busy $w 1
+	}
+	update
+    }
+}
+
+proc i_am_free {} {
+    set ::busy_level [expr $::busy_level-1]
+    if [expr $::busy_level < 0] { 
+	set ::busy_level 0
+    }
+    if { $::busy_level == 0 } {
+	foreach w [wm stackorder .] {
+	    mk_busy $w 0
+	}
+	update
+    }
 }
 
 

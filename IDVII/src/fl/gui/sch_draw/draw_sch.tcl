@@ -387,6 +387,7 @@ proc get_new_sch_canvas {w draw_level {name ""}} {
 	set name "Ckt $::sch_window_cnt($w)"
     }
     $nb add [frame $cc] -text $name
+    update
     set c [create_circuit_canvas $nb $cc]
     set ::cur_zoom_factor($cc) 100.0
     set ::cur_zoom_factor($c) 100.0
@@ -395,6 +396,7 @@ proc get_new_sch_canvas {w draw_level {name ""}} {
     set ::sfont($c) $::base_sfont
     $nb select $cc
     set ::sch_info(draw_level,$c) $draw_level
+    update
     return [list $cc $c]
 }
 

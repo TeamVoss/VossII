@@ -176,7 +176,10 @@ let bool_STE opts ckt wl ant cons trl = STE opts ckt wl ant cons trl;
 
 let vfsm_STE opts vfsm wl ant cons trl =
     let fsm = vfsm2fsm vfsm then
+    let w = vfsm2id vfsm then
+    (tcl_eval [sprintf "set ::active_gui %s" w]) fseq
     let ste = STE opts fsm wl ant cons trl then
+    (tcl_eval [sprintf "unset ::active_gui"]) fseq
     ((vfsm2ste_r vfsm) := ste) fseq
     (tcl_eval [sprintf "wv:set_new_max_time %s 1" (deref (vfsm2wvr vfsm))]) fseq
     ste
@@ -369,14 +372,14 @@ export_to_tcl fl_vecs2tags;
 
 let fl_draw_fanin_by_name canvas draw_level levels vecs =
     let vfsm = w2vfsm canvas then
-    gen_draw_fanin vfsm draw_level levels vecs
+    busy (gen_draw_fanin vfsm draw_level levels vecs)
 ;
 export_to_tcl fl_draw_fanin_by_name;
 
 let fl_draw_inside canvas cur_draw_level tag =
     let vfsm = w2vfsm canvas then
     let vecs = fl_tag2vec canvas tag then
-    gen_draw_inside vfsm cur_draw_level vecs
+    busy (gen_draw_inside vfsm cur_draw_level vecs)
 ;
 export_to_tcl fl_draw_inside;
 
@@ -385,7 +388,7 @@ let fl_draw_fanin_by_tag canvas draw_level levels tag =
     let vfsm = w2vfsm canvas then
     let vec = fl_tag2vec canvas tag then
     let c = gen_draw_fanin vfsm draw_level levels vec then
-    c
+    busy c
 ;
 export_to_tcl fl_draw_fanin_by_tag;
 
@@ -1317,7 +1320,7 @@ export_to_tcl fl_get_sch_commands;
 
 // Create random inputs to the circuit and simulate it.
 //
-//  vis	    an active visualization of a circuit.
+//  ckt	    an fsm to simulate
 //
 //  clks    a list of (name,pat) pairs where name refers to the
 //	    clock signal and pat describes the (infinitely) repeating pattern.
@@ -1333,7 +1336,73 @@ export_to_tcl fl_get_sch_commands;
 // Usage:
 // random_simulation vis clks resets cnt;
 //
-let random_simulation {vis::vfsm} clks resets cnt =
+let random_simulation_fsm ckt clks resets cnt =
+    let s2b s = s = "0" => F | s = "1" => T |
+		eprintf "Pattern with non-0/1 value (%s)" s
+    in
+    // Clocks
+    let mk_clk (clk,pat) =
+	pat = "" => eprintf "Clk %s not given a pattern" clk |
+	let vs = map s2b (explode pat) in
+	let len = length vs in
+	let all =
+	    firstn (cnt+1) (flat (replicate ((cnt+2*len)/len) vs))
+	then
+	let mk v t = (T,clk,v,t,t+1) in
+	map2 mk all (0 upto (length all-1))
+    in
+    let clk_ant = flatmap mk_clk clks then
+    let clk_nds = map fst clks then
+    // Resets
+    let mk_reset (reset,pat) =
+	let ps = explode pat in
+	let final = last ps in
+	let initial = butlast ps in
+	let len = length initial in
+	let mk v t = (T,reset,v,t,t+1) in
+	let ant0 = map2 mk (map s2b initial) (0 upto (len-1)) in
+	final = "-"  =>
+	    let mk_random t = (T,reset,(random 0 1)=1,t,t+1) in
+	    ant0@(map mk_random (len upto cnt))
+	|
+	(T,reset,s2b final,len,cnt):ant0
+    in
+    let reset_ant = flatmap mk_reset resets then
+    let reset_nds = map fst resets then
+    //
+    let raw_inps = md_expand_vectors (inputs ckt) in
+    let inps = raw_inps subtract (clk_nds@reset_nds) in
+    letrec mk_at_time t (nd:nds) =
+        t < 0 => [] |
+        let v = (random 0 1) = 1 in
+        (T,nd,v,t,t+1):(mk_at_time t nds)
+     /\    mk_at_time t [] = mk_at_time (t-1) inps
+    in
+    let ant_inps = inps = [] => [] | mk_at_time cnt inps then
+    //
+    let ant = clk_ant@reset_ant@ant_inps in
+    STE "-e" ckt [] ant [] []
+;
+
+// Create random inputs to the circuit and simulate it.
+//
+//  vis	    an active STE_debug canvas
+//
+//  clks    a list of (name,pat) pairs where name refers to the
+//	    clock signal and pat describes the (infinitely) repeating pattern.
+//
+//  resets  a list of (name,pat) pairs where name refers to the
+//	    reset signal and pat describes the first phases to invoke the
+//	    reset of the circuit. If the final value of the reset pattern
+//	    is -, then the signal will be given random inputs. If the final
+//	    value is 0 or 1, this value will be repeated infinitely often.
+//
+//  cnt	    for how many phases the circuit should be simulated.
+//
+// Usage:
+// random_simulation vis clks resets cnt;
+//
+let random_simulation_vis vis clks resets cnt =
     let ckt = vfsm2fsm vis in
     let s2b s = s = "0" => F | s = "1" => T |
 		eprintf "Pattern with non-0/1 value (%s)" s
@@ -1381,6 +1450,8 @@ let random_simulation {vis::vfsm} clks resets cnt =
     let ant = clk_ant@reset_ant@ant_inps in
     STE "-e" vis [] ant [] []
 ;
+
+overload random_simulation random_simulation_fsm random_simulation_vis;
 
 // ======================================================================
 //  fl API to drawing routine(s)

@@ -1636,3 +1636,12 @@ non_lazy set_font;
 //  ["a[2]","b[4]","a[1]","b[3]","a[0]","b[2]","b[1]","b[0]"]
 //
 let vec_interleave vecs = interleave (map md_expand_vector vecs);
+
+// Evaluate expression e inside a context in which all of the GUI, 
+// except Interrupt button(s), is made inactive.
+let busy e =
+    (tcl_eval ["i_am_busy"]) fseq
+    let res = (SOME e) catch NONE then
+    (tcl_eval ["i_am_free"]) fseq
+    e
+;

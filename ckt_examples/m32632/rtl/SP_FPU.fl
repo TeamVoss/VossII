@@ -7,4 +7,4 @@ let vis = STE_debug ckt;
 
 vis;
 
-random_simulation vis [("BCLK","01")] [] 30;
+random_simulation vis [("BCLK","01")] [] 100;

@@ -18,6 +18,8 @@
 extern symbol_tbl_ptr	symb_tbl;
 extern str_mgr		strings;
 extern jmp_buf		*start_envp;
+extern bool		gui_mode;
+extern bool		use_stdout;
 extern char		FailBuf[4096];
 extern bool		RCverbose_fsm_print;
 extern bool		RCnotify_traj_failures;
@@ -34,6 +36,7 @@ extern bool		Do_gc_asap;
 extern FILE		*odests_fp;
 
 /***** PRIVATE VARIABLES *****/
+static bool         quit_simulation_early;
 static int	    nbr_errors_reported;
 static jmp_buf	    node_map_jmp_env;
 static jmp_buf	    event_jmp_env;
@@ -596,10 +599,21 @@ free_ste_buffers()
     next_buf = NULL;
 }
 
+static void
+simulation_break_handler()
+{
+    if( quit_simulation_early ) return;
+    if( !gui_mode || use_stdout ) {
+        FP(err_fp, "\n\n---- Simulation interrupted ----\n");
+    }
+    quit_simulation_early = TRUE;
+}
 
 static void
 gSTE(g_ptr redex, value_type type)
 {
+    void    (*old_handler)();
+
     // STE opts fsm wl ant cons trl
     g_ptr g_opts, g_fsm, wl, ant, cons, trl;
     nbr_errors_reported = 0;
@@ -619,6 +633,10 @@ gSTE(g_ptr redex, value_type type)
 	    FP(warning_fp, "-m should be followed by time). Ignored.\n");
 	}
     }
+
+    old_handler = signal(SIGINT, simulation_break_handler);
+    quit_simulation_early = FALSE;
+
     fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
     push_fsm(fsm);
     ste_ptr ste = create_ste(fsm, type);
@@ -646,9 +664,10 @@ gSTE(g_ptr redex, value_type type)
     // Make sure g.c. can see the object
     //
     MAKE_REDEX_EXT_OBJ(redex, ste_oidx, ste);
-    if( !ok ) {
+    if( !ok || quit_simulation_early ) {
 	ste->max_time = 0;
 	pop_fsm();
+	signal(SIGINT, old_handler);
 	return;
     }
     ste->active = TRUE;
@@ -657,12 +676,17 @@ gSTE(g_ptr redex, value_type type)
     //
     bool old_RCverbose_ste_run = RCverbose_ste_run;
     RCverbose_ste_run = FALSE;
-    if( !initialize() ) {
-	MAKE_REDEX_FAILURE(redex, Fail_pr("Initialization failed"));
+    if( !initialize() || quit_simulation_early ) {
+	if( quit_simulation_early ) {
+	    MAKE_REDEX_FAILURE(redex, Fail_pr("Simulation interrupted"));
+	} else {
+	    MAKE_REDEX_FAILURE(redex, Fail_pr("Initialization failed"));
+	}
 	free_ste_buffers();
 	ste->max_time = 0;
 	ste->active = FALSE;
 	pop_fsm();
+	signal(SIGINT, old_handler);
 	return;
     }
     RCverbose_ste_run = old_RCverbose_ste_run;
@@ -674,6 +698,7 @@ gSTE(g_ptr redex, value_type type)
 	free_ste_buffers();
 	ste->active = FALSE;
 	pop_fsm();
+	signal(SIGINT, old_handler);
 	return;
     }
     //
@@ -683,15 +708,34 @@ gSTE(g_ptr redex, value_type type)
     int min_time = ep->time;
     ep = FAST_LOC_BUF(&event_buf, 0);
     int max_time = ep->time+1;
- 
+
+    if( RCprint_time ) {
+	if( gui_mode ) {
+            Sprintf(buf, "simulation_start %d %d", min_time, max_time);
+            Info_to_tcl(buf);
+	} else {
+	    FP(bdd_gc_fp, "\nStart simulation:\n");
+	}
+    }
     for(int t = min_time; t <= max_time; t++) {
-	if( t > abort_time ) {
-	    FP(warning_fp, "Simulation aborted at time %d\n", abort_time);
+	if( t > abort_time || quit_simulation_early ) {
+	    if( gui_mode ) {
+		Sprintf(buf, "simulation_end");
+		Info_to_tcl(buf);
+	    }
+	    FP(warning_fp, "Simulation interrupted at time %d\n", abort_time);
 	    ste->active = FALSE;
+	    signal(SIGINT, old_handler);
 	    return;
 	}
-	if( RCprint_time )
-	    FP(sim_fp, "Time: %d\n", t);
+	if( RCprint_time ) {
+	    if( gui_mode ) {
+		Sprintf(buf, "simulation_update %d", t);
+		Info_to_tcl(buf);
+	    } else {
+		FP(sim_fp, "Time: %d\n", t);
+	    }
+	}
 	process_event(&event_buf, t);
 	nnode_ptr np;
 	// Do weakenings and antecedents
@@ -732,7 +776,12 @@ gSTE(g_ptr redex, value_type type)
 			    ste->validTrajectory = v;
 			    ste->max_time = t;
 			    ste->active = FALSE;
+			    if( gui_mode ) {
+				Sprintf(buf, "simulation_end");
+				Info_to_tcl(buf);
+			    }
 			    pop_fsm();
+			    signal(SIGINT, old_handler);
 			    return;
 			}
 		    }
@@ -790,8 +839,13 @@ gSTE(g_ptr redex, value_type type)
 			v = c_AND(v, c_OR(c_NOT(curH), chkH));
 			v = c_AND(v, c_OR(c_NOT(curL), chkL));
 			ste->checkTrajectory = v;
+			if( gui_mode ) {
+			    Sprintf(buf, "simulation_end");
+			    Info_to_tcl(buf);
+			}
 			ste->active = FALSE;
 			ste->max_time = t;
+			signal(SIGINT, old_handler);
 			return;
 		    }
 		}
@@ -814,6 +868,10 @@ gSTE(g_ptr redex, value_type type)
     ste->max_time = max_time;
     free_ste_buffers();
     ste->active = FALSE;
+    if( gui_mode ) {
+	Sprintf(buf, "simulation_end");
+	Info_to_tcl(buf);
+    }
     pop_fsm();
 }
 
@@ -6238,6 +6296,7 @@ do_combinational()
 		    ncomp_ptr cp;
 		    pop_buf(bp, &cp);
 		    cp->flag = FALSE;
+		    if( quit_simulation_early ) return -1;
 		    todo += do_wl_op(cp);
 		}
 	    }
@@ -7432,6 +7491,7 @@ initialize()
 	    return FALSE;
 	}
 	todo = do_combinational();
+	if( todo < 0 ) return FALSE;
 	if( todo > 0 ) 
 	    do_phase();
     }

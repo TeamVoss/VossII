@@ -201,6 +201,62 @@ proc voss2_interrupt_action {} {
 }
 
 
+proc simulation_start {start_time end_time} {
+    if [info exists ::active_gui] {
+	set w $::active_gui.sim_time
+    } else {
+	set w $::voss2_top_level.sim_time
+    }
+    set ::simulation_time_top_window $w
+    catch {destroy $w} 
+    if [info exists ::voss2_status(hidden_fl_window)] {
+	toplevel $w
+    } else {
+	frame $w 
+    }
+    label $w.lbl -text "Simulation time: "
+    set ::simulation_current_time $start_time
+    label $w.time -textvariable ::simulation_current_time
+    ttk::progressbar $w.p -orient horizontal -length 150 -mode determinate \
+	-maximum [expr $end_time-$start_time+1].0
+    button $w.quit -text Abort -command voss2_interrupt
+    make_window_always_alive $w.quit
+    pack $w.lbl -side left
+    pack $w.time -side left -padx 2
+    pack $w.p -side left -padx 2
+    pack $w.quit -side left -padx 2 -fill x -expand y
+    if [info exists ::voss2_status(hidden_fl_window)] {
+	wm geometry $w 600x40+10+10
+    } else {
+	if [info exists ::active_gui] {
+	    pack $w -side top -before $::active_gui.nb -fill x
+	} else {
+	    pack $w -side bottom -before $::voss2_info(txtwin) -fill x
+	}
+    }
+    update
+    $::voss2_info(txtwin) see end
+}
+
+proc simulation_update {time} {
+    if { ![info exists ::simulation_time_top_window] } { return }
+    set w $::simulation_time_top_window
+    if { ![winfo exists $w] } { return }
+    $w.p step
+    set ::simulation_current_time $time
+    update
+}
+
+proc simulation_end {} {
+    if { ![info exists ::simulation_time_top_window] } { return }
+    set w $::simulation_time_top_window
+    remove_window_always_alive $w.quit
+    catch {destroy $w}
+    update
+    unset ::simulation_time_top_window
+    $::voss2_info(txtwin) see end
+}
+
 proc reorder_start {nbr_vars start_size} {
     set w $::voss2_top_level.reorder
     catch {destroy $w} 
@@ -209,26 +265,26 @@ proc reorder_start {nbr_vars start_size} {
     } else {
 	frame $w 
     }
-        label $w.l -text "BDD re-ordering"
-        ttk::progressbar $w.p -orient horizontal -length 150 -mode determinate \
-            -maximum $nbr_vars.0
-        label $w.sl -text [format {Start size: %d} $start_size]
-        label $w.cvl -text "Current size: "
-        set ::reorder_current_size $start_size
-        label $w.cv -textvariable ::reorder_current_size
-        button $w.quit -text Abort -command reorder_abort
-	make_window_always_alive $w.quit
-        pack $w.l -side left
-        pack $w.p -side left -padx 2
-        pack $w.sl -side left -padx 2
-        pack $w.cvl -side left -padx 2
-        pack $w.cv -side left -padx 2
-        pack $w.quit -side left -padx 2 -fill x -expand y
+    label $w.l -text "BDD re-ordering"
+    ttk::progressbar $w.p -orient horizontal -length 150 -mode determinate \
+	-maximum $nbr_vars.0
+    label $w.sl -text [format {Start size: %d} $start_size]
+    label $w.cvl -text "Current size: "
+    set ::reorder_current_size $start_size
+    label $w.cv -textvariable ::reorder_current_size
+    button $w.quit -text Abort -command reorder_abort
+    pack $w.l -side left
+    pack $w.p -side left -padx 2
+    pack $w.sl -side left -padx 2
+    pack $w.cvl -side left -padx 2
+    pack $w.cv -side left -padx 2
+    pack $w.quit -side left -padx 2 -fill x -expand y
     if [info exists ::voss2_status(hidden_fl_window)] {
 	wm geometry $w 600x40+10+10
     } else {
 	pack $w -side bottom -before $::voss2_info(txtwin) -fill x
     }
+    make_window_always_alive $w.quit
     update
     $::voss2_info(txtwin) see end
 }
@@ -237,18 +293,20 @@ proc reorder_abort {} {
     voss2_interrupt
 }
 
-proc reorder_end {} {
-    set w $::voss2_top_level.reorder
-    catch {destroy $w}
-    update
-    $::voss2_info(txtwin) see end
-}
-
 proc reorder_update {cur_size} {
     set w $::voss2_top_level.reorder
     $w.p step
     set ::reorder_current_size $cur_size
     update
+}
+
+proc reorder_end {} {
+    set w $::voss2_top_level.reorder
+    catch {destroy $w}
+    update
+    remove_window_always_alive $w.quit
+    update
+    $::voss2_info(txtwin) see end
 }
 
 # Make sure every way of killing voss2 (except kill -9) uses a call to quit.
@@ -1632,49 +1690,6 @@ proc process_stdin {} {
     update idletasks
     invoke
 }
-
-set ::busy_level 0
-
-proc mk_busy {w mode} {
-    foreach cw [winfo children $w] {
-	set active_child 0
-	set len [string length $cw]
-	foreach aw $::always_alive {
-	    if [string equal -length $len $cw $aw] {
-		set active_child 1
-	    }
-	}
-	if { $active_child == 0 } {
-	    if { $mode == 1 } {
-		catch {tk busy hold $cw -cursor watch}
-	    } else {
-		catch {tk busy forget $cw}
-	    }
-	} else {
-	    mk_busy $cw $mode
-	}
-    }
-}
-
-proc i_am_busy {} {
-    incr ::busy_level
-    if { $::busy_level == 1 } {
-	mk_busy . 1
-	update
-    }
-}
-
-proc i_am_free {} {
-    set ::busy_level [expr $::busy_level-1]
-    if [expr $::busy_level < 0] { 
-	set ::busy_level 0
-    }
-    if { $::busy_level == 0 } {
-	mk_busy . 0
-	update
-    }
-}
-
 set ::dbg_levels 0
 
 proc __basic_fl_callback {fun_name args} {
