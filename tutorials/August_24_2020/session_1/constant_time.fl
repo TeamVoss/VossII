@@ -71,6 +71,7 @@ let bv2code file bv =
 	b == T => "1" |
 	let tbl = deref found then
 	tbl_member tbl b => tbl_get tbl b |
+	tbl_member tbl (NOT b) => sprintf "~%s" (tbl_get tbl (NOT b)) |
 	let res_var = sprintf "t[%d]" (deref cnt) then
 	(cnt := (deref cnt + 1)) fseq
 	(found := (tbl_insert tbl b res_var)) fseq
@@ -126,4 +127,50 @@ map tst (0--7);
 
 bv2code "zzz" (fact av);
 
+
+// Final exmaple
+// Decrypting RSA for really small numbers
+let mod_exp base n mod =
+    letrec squaring (b:bs) cur =
+	let sq = (cur * cur) % mod then
+	IF b THEN (cur * (squaring bs sq)) % mod
+	     ELSE (squaring bs sq)
+     /\    squaring [] cur = '1
+    in
+    squaring (rev (bv2list n)) base
+;
+
+let profiled_mod_exp base n mod =
+    let cnt = ref 0 in
+    letrec squaring (b:bs) cur =
+	let sq = (cur * cur) % mod then
+	(cnt := (deref cnt+1)) fseq
+	IF b THEN (
+	    (cnt := (deref cnt+1)) fseq
+	    ((cur * (squaring bs sq)) % mod)
+	) ELSE (squaring bs sq)
+     /\    squaring [] cur = '1
+    in
+    let res = squaring (rev (bv2list n)) base then
+    (fprintf stderr "Performed: %d multiplications and %d mod operations\n"
+		    (deref cnt) (deref cnt)) fseq
+    res
+;
+
+
+let m = int2bv 73;
+let e = bv_ZX (bv_variable "e[15:0]");
+let n = int2bv 129;
+
+profiled_mod_exp m (int2bv 121) n;
+profiled_mod_exp m (int2bv 219) n;
+
+let res = (mod_exp m e n);
+length (depends res);
+bdd_size res;
+
+bdd_reorder 4;
+bdd_size res;
+
+bv2code "www" res;
 
