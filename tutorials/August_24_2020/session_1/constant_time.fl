@@ -1,0 +1,129 @@
+// Example of symbolic version of execution.
+// DES S1 box.
+
+/ Use of symbolic execution to compute a bitslicing verssion of an algorithm.
+
+// S1 definition
+let S1 = [
+    14, 4,  13, 1,  2,  15, 11, 8,  3,  10, 6,  12, 5,  9,  0,  7,
+    0,  15, 7,  4,  14, 2,  13, 1,  10, 6,  12, 11, 9,  5,  3,  8,
+    4,  1,  14, 8,  13, 6,  2,  11, 15, 12, 9,  7,  3,  10, 5,  0,
+    15, 12, 8,  2,  4,  9,  1,  7,  5,  11, 3,  14, 10, 0,  6,  13
+];
+
+// Normal algorithm
+let do_S1 inp =
+    letrec look i (d:ds) = i = inp => d | look (i + 1) ds
+     /\    look i [] = error "Out of bounds"
+    in
+    look 0 S1
+;
+
+// Examples
+do_S1 0;
+do_S1 12;
+
+
+// Symbolic version
+let s_do_S1 inp =
+    letrec look i (d:ds) = i = inp => d | look (i + '1) ds
+     /\    look i [] = error "Out of bounds"
+    in
+    look (int2bv 0) (map int2bv S1)
+;
+
+s_do_S1 '0;
+bv2int it;
+s_do_S1 '12;
+bv2int it;
+
+// Now use symbolic inputs.
+let av = bv_ZX (bv_variable "a[5:0]");
+av;
+
+let s_res = s_do_S1 av;
+
+s_res;
+
+
+let mk_cname v =
+    NOT (str_is_substr "[" v) => v |
+    let is_ok c = c != "[" AND c != "]" in
+    let ev = explode v in
+    let ev' = filter is_ok ev in
+    implode ev'
+;
+
+
+let bv2code file bv =
+    let bl = (rev ((bv2list bv))) then
+    let fp = fopen file "w" then
+    let inps = depends bv in
+    let pr_inp fp v = fprintf fp "unsigned long %s" (mk_cname v) in
+    (list2fp fp T "static void\ns1(\n\t" ",\n\t" ",\n\t" pr_inp (rev inps)) fseq
+    let pr_out fp i = fprintf fp "unsigned long *out%d" i in
+    (list2fp fp T "" ",\n\t" " )\n{\n" pr_out (1--(length bl))) fseq
+    let cnt = ref 0 then
+    let found = ref (tbl_create 100) then
+    let code = ref [] then
+    letrec walk b =
+	b == F => "0" |
+	b == T => "1" |
+	let tbl = deref found then
+	tbl_member tbl b => tbl_get tbl b |
+	let res_var = sprintf "t[%d]" (deref cnt) then
+	(cnt := (deref cnt + 1)) fseq
+	(found := (tbl_insert tbl b res_var)) fseq
+	val (v,H,L) = top_cofactor b then
+	let c = mk_cname v in
+	let t = walk H then
+	let e = walk L then
+	let line = (sprintf "\t%s = " res_var)^ (
+	    (t = "1") AND (e = "0") => sprintf "%s;\n" c |
+	    (t = "0") AND (e = "1") => sprintf "~%s;\n" c |
+	    t = "1" => sprintf "%s | %s;\n" c e |
+	    e = "1" => sprintf "~%s | %s;\n" c t |
+	    sprintf "%s & %s | ~%s & %s;\n" c t c e)
+	then
+	(code := (line : (deref code))) fseq
+	res_var
+    in
+    let lres = map walk bl then
+    (fprintf fp "\tunsigned long t[%d];\n" (deref cnt+1)) fseq 
+    let pr_l fp s = fprintf fp "%s" s then
+    (list2fp fp T "" "" "" pr_l (rev (deref code))) fseq
+    let pr_res fp i = fprintf fp "\t*out%d = %s;\n" i (el i lres) in
+    (list2fp fp T "" "" "}\n" pr_res (1 -- length bl)) fseq
+    (fclose fp)
+;
+
+bv2code "qqq" s_res;
+
+
+
+// Another example.
+letrec fact n = n = '0 => '1 | n * fact (n - '1);
+
+bv2int (fact '3);
+bv2int (fact '5);
+bv2int (fact '7);
+
+let av = bv_ZX (bv_variable "a[2:0]");
+
+let s_res = fact av;
+
+s_res;
+
+let tst i = 
+    let bv = int2bv i in
+    let cond = av = bv then
+    let sub = param cond in
+    bv2int (substitute sub s_res)
+;
+
+map tst (0--7);
+
+
+bv2code "zzz" (fact av);
+
+
