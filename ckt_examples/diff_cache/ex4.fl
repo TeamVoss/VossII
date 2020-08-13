@@ -272,7 +272,7 @@ let mk_CPU_ROM ckt ops =
 	let name = sprintf "%s[%d]" R i in
 	op2rom name op
     in
-    (flat (map2 mk (0 upto (length ops-1)) ops)) from 0 to 1
+    (flat (map2 mk (0 upto (length ops-1)) ops))
 ;
 
 // ===================== RAM model ============================

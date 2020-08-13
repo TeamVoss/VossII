@@ -309,17 +309,16 @@ let list2str print_empty_list pre sep post pr_fun l =
 ;
 
 // Print out a list to a stream
-// Usage: list2fp fp print_empty_list pre sep post pr_fun l, where
+// Usage: list2fp_1 fp print_empty_list pre sep post pr_fun l, where
 //	fp		    stream to write to
 //	print_empty_list    decides whether a pre^post or "" will be the result
 //			    on an empty list
 //	pre		    The string that will be prepended before the list
 //	sep		    The separator string between elements
 //	post		    The string that will be appended after the list
-//	pr_fun		    A function that printf an element of the list
-//			    to a string.
+//      pr_fun              A function that prints an element of the list to fp
 //	l		    List of elements to print
-let list2fp fp print_empty_list pre sep post pr_fun l =
+let list2fp_1 fp print_empty_list pre sep post pr_fun l =
     l = [] => print_empty_list => fprintf fp "%s%s" pre post | () |
     letrec do csep (e:es) =
 	(fprintf fp "%s" csep) fseq
@@ -329,6 +328,28 @@ let list2fp fp print_empty_list pre sep post pr_fun l =
     in
     (do pre l)
 ;
+
+// Print out a list to a stream
+// Usage: list2fp_2 fp print_empty_list pre sep post pr_fun l, where
+//	fp		    stream to write to
+//	print_empty_list    decides whether a pre^post or "" will be the result
+//			    on an empty list
+//	pre		    The string that will be prepended before the list
+//	sep		    The separator string between elements
+//	post		    The string that will be appended after the list
+//	pr_fun		    A function that convert an element of the list 
+//			    to a string.
+//	l		    List of elements to print
+let list2fp_2 fp print_empty_list pre sep post pr_fun l =
+    l = [] => print_empty_list => fprintf fp "%s%s" pre post | () |
+    letrec do csep (e:es) =
+	(fprintf fp "%s%s" csep (pr_fun e)) fseq (do sep es)
+     /\	   do csep [] = fprintf fp "%s" post
+    in
+    (do pre l)
+;
+
+overload list2fp list2fp_1 list2fp_2;
 
 // log2 n -- floor of log_2(n)
 let log2 n =

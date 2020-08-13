@@ -252,8 +252,8 @@ proc simulation_end {} {
     set w $::simulation_time_top_window
     remove_window_always_alive $w.quit
     catch {destroy $w}
-    update
     unset ::simulation_time_top_window
+    update
     $::voss2_info(txtwin) see end
 }
 
