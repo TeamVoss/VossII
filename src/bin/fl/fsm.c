@@ -348,9 +348,9 @@ static void         sshl_fun(int size, gbv *vp, int cnt, gbv *resp);
 static void         sshr_fun(int size, gbv *vp, int cnt, gbv *resp);
 static void         sashr_fun(int size, gbv *vp, int cnt, gbv *resp);
 static void         add_op_todo(ncomp_ptr cp);
-static void         do_phase();
-static int          do_combinational();
-static int          do_wl_op(ncomp_ptr op);
+static void         do_phase(ste_ptr ste);
+static int          do_combinational(ste_ptr ste);
+static int          do_wl_op(ste_ptr ste, ncomp_ptr op);
 static void         op_X(ncomp_ptr op);
 static void         op_CONST(ncomp_ptr op);
 static void         op_VAR(ncomp_ptr op);
@@ -399,9 +399,10 @@ static void         switch_to_ints();
 static void         BDD_cHL_Print(odests fp, gbv H, gbv L);
 static void         bexpr_cHL_Print(odests fp, gbv H, gbv L);
 static void         switch_to_BDDs();
-static int          update_node(int idx, gbv Hnew, gbv Lnew, bool new);
+static int          update_node(ste_ptr ste, int idx, gbv Hnew, gbv Lnew,
+			        bool new);
 static gbv *        allocate_value_buf(int sz, gbv H, gbv L);
-static bool         initialize();
+static bool         initialize(ste_ptr ste);
 static sch_ptr      mk_repeat(vstate_ptr vp, char *anon);
 static bool         has_ifc_nodes(vstate_ptr vp, ilist_ptr il, ilist_ptr *silp,
                                   ilist_ptr *rilp);
@@ -640,6 +641,7 @@ gSTE(g_ptr redex, value_type type)
     fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
     push_fsm(fsm);
     ste_ptr ste = create_ste(fsm, type);
+    ste->abort_ASAP = abort_ASAP;
     //
     // Now translate weakenings, ant, cons and trl into events
     //
@@ -676,7 +678,7 @@ gSTE(g_ptr redex, value_type type)
     //
     bool old_RCverbose_ste_run = RCverbose_ste_run;
     RCverbose_ste_run = FALSE;
-    if( !initialize() || quit_simulation_early ) {
+    if( !initialize(ste) || quit_simulation_early ) {
 	if( quit_simulation_early ) {
 	    MAKE_REDEX_FAILURE(redex, Fail_pr("Simulation interrupted"));
 	} else {
@@ -718,6 +720,7 @@ gSTE(g_ptr redex, value_type type)
 	}
     }
     for(int t = min_time; t <= max_time; t++) {
+	ste->cur_time = t;
 	if( t > abort_time || quit_simulation_early ) {
 	    if( gui_mode ) {
 		Sprintf(buf, "simulation_end");
@@ -738,64 +741,23 @@ gSTE(g_ptr redex, value_type type)
 	}
 	process_event(&event_buf, t);
 	nnode_ptr np;
-	// Do weakenings and antecedents
+	// Put nodes whose weak/ant changed on evaluation list.
 	int idx = 0;
 	FOR_BUF(nodesp, nnode_rec, np) {
-	    if( np->has_weak || np->has_ant ) {
-		gbv curH = *(cur_buf+2*idx);
-		gbv curL = *(cur_buf+2*idx+1);
-		gbv newH = curH;
-		gbv newL = curL;
-		if( np->has_weak ) {
-		    newH = c_OR(newH, *(weak_buf+2*idx)); 
-		    newL = c_OR(newL, *(weak_buf+2*idx+1)); 
+	    if( np->has_ant_or_weak_change ) {
+		if( np->composite >= 0 ) {
+		    ncomp_ptr c;
+		    c = (ncomp_ptr) M_LOCATE_BUF(compositesp,np->composite);
+		    add_op_todo(c);
+		} else if( np->composite == -1 ) {
+		    // Input node
+		    update_node(ste, idx, c_ONE, c_ONE, FALSE);
 		}
-		if( np->has_ant ) {
-		    gbv aH = *(ant_buf+2*idx);
-		    gbv aL = *(ant_buf+2*idx+1);
-		    gbv abort = c_NOT(c_OR(c_AND(aH, newH), c_AND(aL, newL)));
-		    if( RCnotify_traj_failures &&
-			(nbr_errors_reported < RCmax_nbr_errors) &&
-			c_NEQ(abort, c_ZERO) )
-		    {
-			FP(warning_fp,
-			  "Warning: Antecedent failure at time %d on node %s\n",
-			  t, idx2name(np->idx));
-			if( RCprint_failures ) {
-			    FP(err_fp, "\nCurrent value:");
-			    cHL_Print(err_fp, newH, newL);
-			    FP(err_fp, "\nAsserted value:");
-			    cHL_Print(err_fp, aH, aL);
-			}
-			nbr_errors_reported++;
-			if( abort_ASAP ) {
-			    newH = c_AND(newH, aH); 
-			    newL = c_AND(newL, aL); 
-			    gbv v = ste->validTrajectory;
-			    v = c_AND(v, c_OR(newH, newL));
-			    ste->validTrajectory = v;
-			    ste->max_time = t;
-			    ste->active = FALSE;
-			    if( gui_mode ) {
-				Sprintf(buf, "simulation_end");
-				Info_to_tcl(buf);
-			    }
-			    pop_fsm();
-			    signal(SIGINT, old_handler);
-			    return;
-			}
-		    }
-		    newH = c_AND(newH, aH); 
-		    newL = c_AND(newL, aL); 
-		    gbv v = ste->validTrajectory;
-		    v = c_AND(v, c_OR(newH, newL));
-		    ste->validTrajectory = v;
-		}
-		update_node(idx, newH, newL, FALSE);
+		np->has_ant_or_weak_change = FALSE;
 	    }
 	    idx++;
 	}
-	do_combinational();
+	do_combinational(ste);
 	// Do consequents and traces
 	idx = 0;
 	FOR_BUF(nodesp, nnode_rec, np) {
@@ -861,7 +823,7 @@ gSTE(g_ptr redex, value_type type)
 	    }
 	    idx++;
 	}
-	do_phase();
+	do_phase(ste);
 	if( Do_gc_asap )
 	    Garbage_collect();
     }
@@ -3316,6 +3278,7 @@ process_event(buffer *event_bufp, int time)
 	} else {
 	    int idx = ep->nd_idx;
 	    nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
+	    np->has_ant_or_weak_change = FALSE;
 	    if( ep->type == start_trace ) {
 		np->has_trace = TRUE;
 		gbv H = *(cur_buf + 2*idx);
@@ -3329,18 +3292,22 @@ process_event(buffer *event_bufp, int time)
 		switch( ep->type ) {
 		    case start_weak:
 			np->has_weak = TRUE;
+			np->has_ant_or_weak_change = TRUE;
 			buf = weak_buf;
 			break;
 		    case end_weak:
 			np->has_weak = FALSE;
+			np->has_ant_or_weak_change = TRUE;
 			buf = weak_buf;
 			break;
 		    case start_ant:
 			np->has_ant = TRUE;
+			np->has_ant_or_weak_change = TRUE;
 			buf = ant_buf;
 			break;
 		    case end_ant:
 			np->has_ant = FALSE;
+			np->has_ant_or_weak_change = TRUE;
 			buf = ant_buf;
 			break;
 		    case start_cons:
@@ -6258,7 +6225,7 @@ add_op_todo(ncomp_ptr cp)
 }
 
 static void
-do_phase()
+do_phase(ste_ptr ste)
 {
     nnode_ptr np;
     int idx = 0;
@@ -6267,19 +6234,19 @@ do_phase()
 	if( idx >3 && np->composite == -1 ) {
 	    // Input
 	    newH = newL = c_ONE;
-	    update_node(idx, newH, newL, TRUE);
+	    update_node(ste, idx, newH, newL, FALSE);
 	} else if( np->has_phase_event ) {
 	    np->has_phase_event = FALSE;
 	    newH = *(next_buf+2*idx);
 	    newL = *(next_buf+2*idx+1);
-	    update_node(idx, newH, newL, TRUE);
+	    update_node(ste, idx, newH, newL, FALSE);
 	}
 	idx++;
     }
 }
 
 static int
-do_combinational()
+do_combinational(ste_ptr ste)
 {
     bool empty = FALSE;
     int iterations = RCStep_limit;
@@ -6297,7 +6264,7 @@ do_combinational()
 		    pop_buf(bp, &cp);
 		    cp->flag = FALSE;
 		    if( quit_simulation_early ) return -1;
-		    todo += do_wl_op(cp);
+		    todo += do_wl_op(ste, cp);
 		}
 	    }
 	    rank--;
@@ -6334,7 +6301,7 @@ do_combinational()
 
 //
 static int
-do_wl_op(ncomp_ptr op)
+do_wl_op(ste_ptr ste, ncomp_ptr op)
 {
     gbv one = c_ONE;
     resize_buf(&inps_buf, 0);
@@ -6373,7 +6340,7 @@ do_wl_op(ncomp_ptr op)
 	FOREACH_NODE(idx, op->outs) {
 	    gbv newH = *(gbv_outs+i); i++;
 	    gbv newL = *(gbv_outs+i); i++;
-	    additional += update_node(idx, newH, newL, FALSE);
+	    additional += update_node(ste, idx, newH, newL, FALSE);
 	}
     }
     return additional;
@@ -7414,10 +7381,8 @@ switch_to_BDDs()
     c_ONE.f  = B_One();
 }
 
-
-
 static int
-update_node(int idx, gbv Hnew, gbv Lnew, bool force)
+update_node(ste_ptr ste, int idx, gbv Hnew, gbv Lnew, bool force)
 {
     int todo = 0;
     gbv Hcur = *(cur_buf+2*idx);
@@ -7431,10 +7396,45 @@ update_node(int idx, gbv Hnew, gbv Lnew, bool force)
 	    Lnew = c_OR(Lnew, Lw); 
 	}
 	if( np->has_ant ) {
-	    gbv Ha = *(ant_buf+2*idx);
-	    gbv La = *(ant_buf+2*idx+1);
-	    Hnew = c_AND(Hnew, Ha); 
-	    Lnew = c_AND(Lnew, La); 
+	    gbv aH = *(ant_buf+2*idx);
+	    gbv aL = *(ant_buf+2*idx+1);
+	    gbv abort = c_NOT(c_OR(c_AND(aH, Hnew), c_AND(aL, Lnew)));
+	    if( RCnotify_traj_failures &&
+		(nbr_errors_reported < RCmax_nbr_errors) &&
+		c_NEQ(abort, c_ZERO) )
+	    {
+		FP(warning_fp,
+		  "Warning: Antecedent failure at time %d on node %s\n",
+		  ste->cur_time, idx2name(np->idx));
+		if( RCprint_failures ) {
+		    FP(err_fp, "\nCurrent value:");
+		    cHL_Print(err_fp, Hnew, Lnew);
+		    FP(err_fp, "\nAsserted value:");
+		    cHL_Print(err_fp, aH, aL);
+		}
+		nbr_errors_reported++;
+		if( ste->abort_ASAP ) {
+		    Hnew = c_AND(Hnew, aH); 
+		    Lnew = c_AND(Lnew, aL); 
+		    gbv v = ste->validTrajectory;
+		    v = c_AND(v, c_OR(Hnew, Lnew));
+		    ste->validTrajectory = v;
+		    ste->max_time = ste->cur_time;
+		    ste->active = FALSE;
+		    if( gui_mode ) {
+			Sprintf(buf, "simulation_end");
+			Info_to_tcl(buf);
+		    }
+		    pop_fsm();
+		    kill(getpid(), SIGINT);
+		    return 0;
+		}
+	    }
+	    Hnew = c_AND(Hnew, aH); 
+	    Lnew = c_AND(Lnew, aL); 
+	    gbv v = ste->validTrajectory;
+	    v = c_AND(v, c_OR(Hnew, Lnew));
+	    ste->validTrajectory = v;
 	}
     }
     *(cur_buf+2*idx) = Hnew;
@@ -7448,7 +7448,6 @@ update_node(int idx, gbv Hnew, gbv Lnew, bool force)
 		add_op_todo(c);
 	    }
 	}
-    } else {
     }
     return todo;
 }
@@ -7465,7 +7464,7 @@ allocate_value_buf(int sz, gbv H, gbv L)
 }
 
 static bool
-initialize()
+initialize(ste_ptr ste)
 {
     nnode_ptr np;
     FOR_BUF(nodesp, nnode_rec, np) {
@@ -7490,10 +7489,10 @@ initialize()
 	    //FP(sim_fp, "Oscillating nodes set to X\n");
 	    return FALSE;
 	}
-	todo = do_combinational();
+	todo = do_combinational(ste);
 	if( todo < 0 ) return FALSE;
 	if( todo > 0 ) 
-	    do_phase();
+	    do_phase(ste);
     }
     return( TRUE );
 }

@@ -135,8 +135,9 @@ typedef struct ncomp_rec {
 typedef struct nnode_rec    *nnode_ptr;
 typedef struct nnode_rec {
     vec_info_ptr    vec;
-    unint	    idx:27;	    // I think 134 million nodes are enough....
+    unint	    idx:26;	    // I think 134 million nodes are enough....
     unint	    has_phase_event:1;
+    unint	    has_ant_or_weak_change:1;
     unint	    has_weak:1;
     unint	    has_ant:1;
     unint	    has_cons:1;
@@ -212,6 +213,8 @@ typedef struct ste_rec {
     fsm_ptr	fsm;
     value_type	type;
     bool	active;		// Currently being simulated
+    int		cur_time;
+    bool	abort_ASAP;
     int		max_time;	// Time to which it is run
     gbv         validTrajectory;
     gbv         checkTrajectory;

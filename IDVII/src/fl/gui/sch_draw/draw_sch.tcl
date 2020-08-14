@@ -4046,6 +4046,15 @@ proc draw_sdffce {pclk pen psrst c tag x y} {
 	    [list Dlabel $elabel ClkInLabel $rlabel] $c $tag $x $y]
 }
 
+proc draw_dffsre {pclk pset pclr pen c tag x y} {
+    if { $pclk == 1 }  { set edge RisingEdge } else { set edge FallingEdge }
+    if { $pen == 1 }   { set elabel Elabel } else { set elabel negElabel }
+    if { $pclr == 1 }  { set clabel Rlabel } else { set clabel negRlabel }
+    if { $pset == 1 }  { set slabel Slabel } else { set slabel negSlabel }
+    return [draw_box_pat 5 $edge \
+	    [list Dlabel $elabel ClkInLabel $slabel $clabel] $c $tag $x $y]
+}
+
 
 proc draw_ff_re_with_en_reset {c tag x y} {
     return [draw_box_pat 4 {RisingEdge} {Dlabel Elabel Rlabel ClkInLabel} $c $tag $x $y]

@@ -635,6 +635,27 @@ struct PexlifDumper
 			dump_sigspec(f, cell->getPort("\\D"));
 			continue;
 		    }
+		    if( cell->type == "$dffsre") {
+			RTLIL::SigSpec out = cell->getPort("\\Q");
+			f << "_dffsre ";
+			if( cell->hasParam(ID::CLK_POLARITY) && !cell->getParam(ID::CLK_POLARITY).as_bool() )   { f << "F "; } else { f << "T "; }
+			if( cell->hasParam(ID::SET_POLARITY) && !cell->getParam(ID::SET_POLARITY).as_bool() ) { f << "F "; } else { f << "T "; }
+			if( cell->hasParam(ID::CLR_POLARITY) && !cell->getParam(ID::CLR_POLARITY).as_bool() ) { f << "F "; } else { f << "T "; }
+			if( cell->hasParam(ID::EN_POLARITY) && !cell->getParam(ID::EN_POLARITY).as_bool() )   { f << "F "; } else { f << "T "; }
+			f << stringf("%d \"%s\" ", out.size(), src.c_str());
+			dump_sigspec(f, out);
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\CLR"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\SET"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\EN"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\CLK"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\D"));
+			continue;
+		    }
 
 		    if (cell->type == "$adff") {
 			RTLIL::SigSpec out = cell->getPort("\\Q");
