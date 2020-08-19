@@ -120,7 +120,6 @@ static subst_ptr	bdd_subs;
 
 static buffer           bdd_gc_buf;
 
-
 /* ----- Forward definitions local functions ----- */
 static formula		prim_B_Var(string name);
 static formula		find_insert_bdd(var_ptr vp, formula lson, formula rson);
@@ -163,8 +162,8 @@ static int		draw_bdd_rec(FILE *fp, hash_record *hp, formula f);
 static bool		truth_cover_rec(hash_record *done_tblp,
 					buffer *var_bufp, unint idx, formula b,
 					arbi_T *resp, string *emsgp);
-static int		get_bdd_size(formula f);
-
+static int		bdd_get_size_rec(formula f, int *limitp);
+static void		restore_mark(formula f);
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
 /********************************************************/
@@ -318,6 +317,17 @@ Rand_Var(string name)
 }
 
 
+/* Return the size of the BDD */
+int
+Get_bdd_size(formula f, int limit) 
+{
+    if( f == ZERO || f == ONE)
+	return 0;
+    int res = bdd_get_size_rec(f, &limit);
+    restore_mark(f);
+    return res;
+}
+
 /* Reset_Ref_cnts -- Prepare for a garbage collection */
 void
 Reset_Ref_cnts()
@@ -444,6 +454,7 @@ B_Or(formula f1, formula f2)
 {
     BDD_RETURN( bdd_step(OR, f1, f2) );
 }
+
 
 formula
 B_Xor(formula f1, formula f2)
@@ -1023,6 +1034,7 @@ B_Init()
 	new->in_use = 0;
 #endif
 	new->mark = 0;
+	new->sz_mark = 0;
 	new->moving = 0;
 	new->ref_cnt = 0;
 	b_free_list = i;
@@ -1588,6 +1600,7 @@ grow_MainTbl()
 	new->in_use = 0;
 #endif
 	new->mark = 0;
+	new->sz_mark = 0;
 	new->moving = 0;
 	new->ref_cnt = 0;
 	b_free_list = i;
@@ -1703,6 +1716,7 @@ find_insert_bdd(var_ptr vp, formula lson, formula rson)
 #endif
     bp->ref_cnt = 0;
     bp->mark = 0;
+    bp->sz_mark = 0;
     bp->moving = 0;
     BDD_SET_VAR(bp,var);
     bp->lson = lson;
@@ -3089,14 +3103,20 @@ draw_bdd_rec(FILE *fp, hash_record *hp, formula f)
 }
 
 static int
-bsize_rec(formula f)
+bdd_get_size_rec(formula f, int *limitp)
 {
     if( f == ZERO || f == ONE)
         return 0;
+    if( *limitp <= 0 ) return 0;
     bdd_ptr bp = GET_BDDP(f);
-    if( bp->mark ) return 0;
-    bp->mark = 1;
-    return(1 + bsize_rec(POS(GET_LSON(bp))) + bsize_rec(POS(GET_RSON(bp))) );
+    if( bp->sz_mark ) return 0;
+    bp->sz_mark = 1;
+    (*limitp)--;
+    if( *limitp <= 0 ) return 1;
+    int lres = bdd_get_size_rec(POS(GET_LSON(bp)), limitp);
+    if( *limitp <= 0 ) return( lres+1 );
+    int rres = bdd_get_size_rec(POS(GET_RSON(bp)), limitp);
+    return(1 + lres + rres );
 }
 
 static void
@@ -3105,24 +3125,9 @@ restore_mark(formula f)
     if( f == ZERO || f == ONE)
 	return;
     bdd_ptr bp = GET_BDDP(f);
-    if( !bp->mark ) return;
-    bp->mark = 0;
+    if( !bp->sz_mark ) return;
+    bp->sz_mark = 0;
     restore_mark(POS(GET_LSON(bp)));
     restore_mark(POS(GET_RSON(bp)));
 }
 
-static int
-get_bdd_size(formula f) 
-{
-    if( f == ZERO || f == ONE)
-	return 0;
-    int res = bsize_rec(f);
-    restore_mark(f);
-    return res;
-}
-
-void
-DummyBDD()
-{
-    get_bdd_size(ZERO);
-}

@@ -87,6 +87,8 @@ void            Reorder(int times);
 bool		Save_BDDs(string filename, buffer *roots);
 bool		Load_BDDs(string filename, buffer *results);
 g_ptr		End_ordering();
+int		Get_bdd_size(formula f, int limit);
+
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */
@@ -110,9 +112,9 @@ typedef struct var_rec		*var_ptr;
 #define LG_BDD_SIZE		(LG_BDD_SIZE1-1)
 #define VAR_SZ			18
 #ifdef REF_CNT_DEBUG
-#define REF_CNT_SIZE		(32-VAR_SZ-3)
+#define REF_CNT_SIZE		(32-VAR_SZ-4)
 #else
-#define REF_CNT_SIZE		(32-VAR_SZ-2)
+#define REF_CNT_SIZE		(32-VAR_SZ-3)
 #endif
 #define MAX_RECS		((ui) (((ui) 1) << ((ui) LG_BDD_SIZE)))
 #define MAX_VARS		(1 << VAR_SZ)
@@ -129,6 +131,7 @@ typedef struct bdd_rec {
 #endif
 	unint		mark:1;
 	unint		moving:1;		/* For the swap algorithm */
+	unint		sz_mark:1;		/* For the get_bdd_size */
 	unint		ref_cnt:REF_CNT_SIZE;
 	unint		var:VAR_SZ;
 	/* Word 2 */
@@ -190,7 +193,7 @@ typedef enum {sop_format, infix_format, tree_format}	print_types;
 				fprintf(stderr, "\n");		\
 			}
 #define BDD_RETURN(expr)    {						\
-				formula t = expr;			\
+				formula t = (expr);			\
 				fprintf(stderr, "---(%d)", __LINE__);	\
 				D_PR_F("------->",t);			\
 				return(t);				\
@@ -205,7 +208,7 @@ typedef enum {sop_format, infix_format, tree_format}	print_types;
 
 #else /*DEBUGF */
 #define D_PR_F(st,expr)
-#define BDD_RETURN(expr)	{formula t = expr; return(t);}
+#define BDD_RETURN(expr)	{formula t = (expr); return(t);}
 #define ENTERING_FN(st,f,g)
 #endif /* DEBUGF */
 

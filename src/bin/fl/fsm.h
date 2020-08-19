@@ -117,8 +117,9 @@ typedef struct mem_data_rec {
 // Individual composites
 typedef struct ncomp_rec {
         unint				size;
-	unint				rank:30;
+	unint				rank:29;
 	unint				phase_delay:1;
+	unint				no_weakening:1;
 	unint				flag:1;	// General purpose bit
 	wl_op				op;
         union {
@@ -223,6 +224,7 @@ typedef struct ste_rec {
     hash_record	trace_tbl;
     rec_mgr	trace_event_rec_mgr;
     rec_mgr	trace_rec_mgr;
+    buffer	weakening_buf;
 } ste_rec;
 
 // Simulation state

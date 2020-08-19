@@ -111,6 +111,8 @@ static rec_mgr	    *trace_event_rec_mgrp;
 static rec_mgr	    *old_trace_event_rec_mgrp;
 static rec_mgr	    *trace_rec_mgrp;
 static rec_mgr	    *old_trace_rec_mgrp;
+static buffer	    *weakening_bufp;
+static buffer	    *old_weakening_bufp;
 static value_type   current_type;
 static value_type   old_type;
 //
@@ -177,6 +179,9 @@ static char	    tmp_name_buf[4096];
 static char	    buf[4096];
 static int	    temporary_node_cnt = 0;
 static int	    max_rank = 1;
+
+static int	    BDD_size_limit;
+static bool	    information_flow_weakening;
 
 /* ----- Forward definitions local functions ----- */
 
@@ -465,6 +470,8 @@ static string       create_merge_component(int sz, int *ccnt, g_ptr *intsp,
                                            buffer *chbufp);
 static g_ptr        clean_pexlif_ios(g_ptr node);
 static string	    find_instance_name(g_ptr attrs);
+static gbv	    BDD_c_limited_AND(gbv a, gbv b);
+static gbv	    BDD_c_limited_OR(gbv a, gbv b);
 
 #define FOREACH_NODE(i, il) \
     for(ilist_ptr _l = il; _l != NULL; _l = _l->next) \
@@ -627,11 +634,33 @@ gSTE(g_ptr redex, value_type type)
     if( strstr(opts, "-a") != NULL )
 	abort_ASAP = TRUE;
     int abort_time = 99999999;
+    //
     string mt = strstr(opts, "-m");
     if( mt != NULL ) {
-	if( sscanf("-m %d", mt, &abort_time) != 1 ) {
+	if( sscanf(mt, "-m %d", &abort_time) != 1 ) {
 	    FP(warning_fp, "Unrecognized flag in STE call (");
 	    FP(warning_fp, "-m should be followed by time). Ignored.\n");
+	}
+    }
+    //
+    BDD_size_limit = -1;
+    string dw = strstr(opts, "-w");
+    if( dw != NULL ) {
+	if( type != use_bdds ) {
+	    FP(err_fp, "Weakening (-w) currently only avaliable in BDD based ");
+	    FP(err_fp, "STE. Flag ignored\n");
+	} else if( sscanf(dw, "-w %d", &BDD_size_limit) != 1 ) {
+	    FP(warning_fp, "Unrecognized flag in STE call (-w should be ");
+	    FP(warning_fp,"followed by BDD size limit). Ignored.\n");
+	}
+    }
+    information_flow_weakening = FALSE;
+    if( strstr(opts, "-ifw") != NULL ) {
+	if( type != use_bdds ) {
+	    FP(err_fp, "Information flow weakening (-ifw) only avaliable ");
+	    FP(err_fp, "in BDD based STE.  Flag ignored\n");
+	} else {
+	    information_flow_weakening = TRUE;
 	}
     }
 
@@ -774,7 +803,7 @@ gSTE(g_ptr redex, value_type type)
 		    FP(err_fp, "Warning: Consequent failure at time %d", t);
 		    FP(err_fp, " on node %s\n", idx2name(idx));
 		    if( RCprint_failures ) {
-			FP(err_fp, "\nCurrent value:");
+			FP(err_fp, "Current value:");
 			cHL_Print(err_fp, curH, curL);
 			FP(err_fp, "\nExpected value:");
 			cHL_Print(err_fp, chkH, chkL);
@@ -787,12 +816,13 @@ gSTE(g_ptr redex, value_type type)
 			if( c_NEQ(bad,c_ZERO) ) {
 			    FP(err_fp, "\nStrong disagreement when: ");
 			    c_Print(err_fp, bad, -1);
+			} else {
+			    FP(err_fp, "\nWeak disagreement when:");
+			    gbv bad = c_OR(c_AND(c_NOT(chkH), curH),
+					   c_AND(c_NOT(chkL), curL));
+			    c_Print(err_fp, bad, -1);
 			}
-		    } else {
-			FP(err_fp, "\nWeak disagreement when:");
-			gbv bad = c_OR(c_AND(c_NOT(chkH), curH),
-				       c_AND(c_NOT(chkL), curL));
-			c_Print(err_fp, bad, -1);
+			FP(err_fp, "\n");
 		    }
 		    nbr_errors_reported++;
 		    FP(err_fp, "\n");
@@ -1745,6 +1775,37 @@ value_type2string(value_type type)
 }
 
 static void
+get_weak_expressions(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_ste;
+    EXTRACT_1_ARG(redex, g_ste);
+    ste_ptr ste = (ste_ptr) GET_EXT_OBJ(g_ste);
+    if( ste->type != use_bdds ) {
+	string msg = Fail_pr("get_weak_expressions require ste from STE run");
+	MAKE_REDEX_FAILURE(redex, msg);
+	return;
+    }
+    push_ste(ste);
+    MAKE_REDEX_NIL(redex);
+    g_ptr tail = redex;
+    formula *fp;
+    int idx = 0;
+    FOR_BUF(weakening_bufp, formula, fp) {
+	char nm[10];
+	sprintf(nm, "_%d", idx);
+	idx++;
+	string name = wastrsave(&strings, nm);
+	g_ptr pair = Make_PAIR_ND(Make_STRING_leaf(name), Make_BOOL_leaf(*fp));
+	APPEND1(tail, pair);
+    }
+    pop_ste();
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
 gen_get_trace(g_ptr redex, value_type type)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
@@ -2594,6 +2655,12 @@ Fsm_Install_Functions()
 						  GLmake_string())),
 			basename);
 
+    Add_ExtAPI_Function("get_weak_expressions", "1", FALSE,
+			 GLmake_arrow(ste_handle_tp,
+			    GLmake_list(
+				GLmake_tuple(GLmake_string(), GLmake_bool()))),
+			 get_weak_expressions);
+
     Add_ExtAPI_Function("get_trace", "11", FALSE,
 			GLmake_arrow(
 			  ste_handle_tp,
@@ -3148,8 +3215,8 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	er.type = end_weak;
 	er.nd_idx = nd_idx;
 	er.time = to;
-	er.H = c_ZERO;
-	er.L = c_ZERO;
+	er.H = when;
+	er.L = when;
 	push_buf(ebufp, &er);
     }
     for(g_ptr cur = ant; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
@@ -3293,11 +3360,27 @@ process_event(buffer *event_bufp, int time)
 		    case start_weak:
 			np->has_weak = TRUE;
 			np->has_ant_or_weak_change = TRUE;
+			if( c_EQ(ep->H, c_ZERO) && c_EQ(ep->L, c_ZERO) ) {
+			    if( np->composite >= 0 ) {
+				ncomp_ptr c;
+				c = (ncomp_ptr) M_LOCATE_BUF(compositesp,
+							     np->composite);
+				c->no_weakening = TRUE;
+			    }
+			}
 			buf = weak_buf;
 			break;
 		    case end_weak:
 			np->has_weak = FALSE;
 			np->has_ant_or_weak_change = TRUE;
+			if( c_EQ(ep->H, c_ZERO) && c_EQ(ep->L, c_ZERO) ) {
+			    if( np->composite >= 0 ) {
+				ncomp_ptr c;
+				c = (ncomp_ptr) M_LOCATE_BUF(compositesp,
+							     np->composite);
+				c->no_weakening = FALSE;
+			    }
+			}
 			buf = weak_buf;
 			break;
 		    case start_ant:
@@ -3387,6 +3470,8 @@ create_ste(fsm_ptr fsm, value_type type)
     new_mgr(_trace_event_rec_mgrp, sizeof(trace_event_rec));
     rec_mgr     *_trace_rec_mgrp = &(ste->trace_rec_mgr);
     new_mgr(_trace_rec_mgrp, sizeof(trace_rec));
+    buffer     *_weakening_bufp = &(ste->weakening_buf);
+    new_buf(_weakening_bufp, 100, sizeof(formula));
     push_ste(ste);
     ste->validTrajectory = c_ONE;
     ste->checkTrajectory = c_ONE;
@@ -3402,6 +3487,7 @@ push_ste(ste_ptr ste)
     old_trace_tblp = trace_tblp;
     old_trace_event_rec_mgrp = trace_event_rec_mgrp;
     old_trace_rec_mgrp = trace_rec_mgrp;
+    old_weakening_bufp = weakening_bufp;
     current_type = ste->type;
     switch( current_type ) {
 	case use_bdds:
@@ -3419,6 +3505,7 @@ push_ste(ste_ptr ste)
     trace_tblp = &(ste->trace_tbl);
     trace_event_rec_mgrp = &(ste->trace_event_rec_mgr);
     trace_rec_mgrp = &(ste->trace_rec_mgr);
+    weakening_bufp = &(ste->weakening_buf);
 }
 
 static void
@@ -3441,6 +3528,7 @@ pop_ste()
     trace_tblp = old_trace_tblp;
     trace_event_rec_mgrp = old_trace_event_rec_mgrp;
     trace_rec_mgrp = old_trace_rec_mgrp;
+    weakening_bufp = old_weakening_bufp;
 }
 
 static void
@@ -3576,6 +3664,10 @@ mark_ste_fn(pointer p)
 	    gbv_mark(*(next_buf+2*i));
 	    gbv_mark(*(next_buf+2*i));
 	}
+    }
+    formula *fp;
+    FOR_BUF(weakening_bufp, formula, fp) {
+	B_Mark(*fp);
     }
     pop_fsm_env();
     pop_ste();
@@ -6273,7 +6365,6 @@ do_combinational(ste_ptr ste)
     return( todo );
 }
 
-
 //
 // Convention for value buffer
 //
@@ -6321,7 +6412,21 @@ do_wl_op(ste_ptr ste, ncomp_ptr op)
     gbv_outs = START_BUF(&outs_buf);
     //
     // Perform the operation
-    op->op(op);
+    if( BDD_size_limit >= 0 && !op->no_weakening ) {
+	    // Use dynamic weakening
+	    gbv (*old_c_AND)(gbv a, gbv b);
+	    gbv (*old_c_OR)(gbv a, gbv b);
+	    old_c_AND = c_AND;
+	    old_c_OR  = c_OR;
+	    c_AND = BDD_c_limited_AND;
+	    c_OR = BDD_c_limited_OR;
+	    op->op(op);
+	    c_AND     = old_c_AND;
+	    c_OR      = old_c_OR;
+    } else {
+	op->op(op);
+    }
+
     int additional = 0;
     // Now process the outputs (fanouts, phase delays, etc.)
     if( op->phase_delay ) {
@@ -7310,6 +7415,56 @@ BDD_c_OR(gbv a, gbv b)
     formula g = b.f;
     gbv res;
     res.f = B_Or(f,g);
+    return( res );
+}
+
+static gbv
+BDD_c_limited_AND(gbv a, gbv b)
+{
+    formula f = a.f;
+    formula g = b.f;
+    gbv res;
+    formula r = B_And(f,g);
+    if( Get_bdd_size(r, BDD_size_limit) >= BDD_size_limit ) {
+	if( information_flow_weakening ) {
+	    int idx = COUNT_BUF(weakening_bufp);
+	    push_buf(weakening_bufp, &r);
+	    char nm[10];
+	    sprintf(nm, "_%d", idx);
+	    string name = wastrsave(&strings, nm);
+	    res.f = B_Var(name);
+	} else {
+	    // Dynamic weakening
+	    res.f = B_One();
+	}
+    } else {
+	res.f = r;
+    }
+    return( res );
+}
+
+static gbv
+BDD_c_limited_OR(gbv a, gbv b)
+{
+    formula f = a.f;
+    formula g = b.f;
+    gbv res;
+    formula r = B_Or(f,g);
+    if( Get_bdd_size(r, BDD_size_limit) >= BDD_size_limit ) {
+	if( information_flow_weakening ) {
+	    int idx = COUNT_BUF(weakening_bufp);
+	    push_buf(weakening_bufp, &r);
+	    char nm[10];
+	    sprintf(nm, "_%d", idx);
+	    string name = wastrsave(&strings, nm);
+	    res.f = B_Var(name);
+	} else {
+	    // Dynamic weakening
+	    res.f = B_One();
+	}
+    } else {
+	res.f = r;
+    }
     return( res );
 }
 

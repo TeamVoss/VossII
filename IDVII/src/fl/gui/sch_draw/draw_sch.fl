@@ -152,6 +152,14 @@ export_to_tcl fl_destroy_vfsm;
 //
 //    -m t   Abort the STE run after t phases has been simulated.
 //
+//    -w n   Limit the size of any BDD to n. If the value of a node
+//           exceeds this limit, abstract the node (make it more X).
+//
+//    -ifw   Do the weakening by introducing new (fresh) variables.
+//           The translation from the abstracted BDD to the true expression
+//           can be obtained by repeated substitutions from the expression
+//           map obtained from get_weak_expressions.
+//
 // The weak_list (wl) is a list of 4-tuples of the form (w,nd,f,t) to be
 // read as: when w holds, weaken the excitation function of node nd from
 // time f up to, but not including, time t.
