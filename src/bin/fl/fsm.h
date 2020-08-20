@@ -63,6 +63,7 @@ typedef struct vis_rec {
     string	    pfn;	// Draw function
     vis_io_ptr	    fa_inps;
     vis_io_ptr	    fa_outs;
+    g_ptr	    attrs;
 } vis_rec;
 
 typedef struct vis_list_rec *vis_list_ptr;

@@ -756,6 +756,10 @@ proc cb:sch_canvas_menu {c wx wy sx sy} {
 	    [list fl_draw_inside $c $::sch_info(draw_level,$c) $nodes]"
 
     $m add command -label "Add waveform" -command "sc:add_waveforms $c $nodes"
+
+    $m add command -label "Show RTL" \
+	-command "after idle \
+	    [list fl_show_rtl $c $::sch_info(draw_level,$c) $nodes]"
     
     set mm $m.mark
     catch {destroy $mm}
@@ -4380,4 +4384,44 @@ proc draw_fsm {name dotfile states edges inps c tag x y} {
 	set inp_locs {}
     }
     return [list $inp_locs [list $orig_x $orig_y]]
+}
+
+set ::rtl_visualizatin_cnt 0
+
+proc visualize_rtl {file start_line start_col end_line end_col} {
+    if [catch {open $file r} fp] {
+        report_error "Cannot open file $file."
+        return
+    }
+    set data [read $fp]
+    close $fp
+    set lines [split $data {\n}]
+    set wid 50
+    foreach line [split $data {\n}] {
+	set len [string length $line]
+	if { $len > $wid } { set wid $len; }
+    }
+    if { $wid > 150 } { set wid 150; }
+
+    set w [format {.rtl_visualization_%d} $::rtl_visualizatin_cnt]
+    incr ::rtl_visualizatin_cnt
+    catch {destroy $w}
+    toplevel $w
+
+    button $w.b -text Close -command [list destroy $w]
+    pack $w.b -side bottom
+    ttk::scrollbar $w.yscroll -command [list $w.t yview]
+    ttk::scrollbar $w.xscroll -orient horizontal \
+			      -command [list $w.t xview]
+    text $w.t -background white -font $::voss2_help_font -wrap none \
+	-yscrollcommand [list $w.yscroll set] -setgrid 1 -width $wid
+    $w.t insert 1.0 $data
+    $w.t tag add selected_fun "$start_line.$start_col-1c" "$end_line.$end_col"
+    $w.t tag configure selected_fun -foreground red
+    $w.t tag configure selected_fun -background yellow
+    $w.t see "$start_line.0"
+    $w.t configure -state disabled
+    pack $w.yscroll -side right -fill y
+    pack $w.xscroll -side bottom -fill x
+    pack $w.t -side right -expand yes -fill both
 }

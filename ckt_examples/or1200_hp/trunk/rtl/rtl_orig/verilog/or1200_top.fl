@@ -111,10 +111,7 @@ let tab_1 = draw_fanin vis (0) 20 ["iwb_cyc_o","iwb_adr_o[31:0]","iwb_stb_o","iw
 tab_1;
 let tab_2 = draw_inside vis 1 ["ic_en","icpu_adr_cpu[31:0]","icpu_cycstb_cpu","icpu_sel_cpu[3:0]","icpu_tag_cpu[3:0]","immu_en","ex_insn[31:0]","ex_freeze","id_pc[31:0]","branch_op[2:0]","spr_dat_npc[31:0]","rf_dataw[31:0]","du_except[12:0]","du_dat_cpu[31:0]","dc_en","dcpu_adr_cpu[31:0]","dcpu_cycstb_cpu","dcpu_we_cpu","dcpu_sel_cpu[3:0]","dcpu_tag_cpu[3:0]","dcpu_dat_cpu[31:0]","dmmu_en","supv","spr_addr[31:0]","spr_dat_cpu[31:0]","spr_cs[31:0]","spr_we"];
 tab_2;
-let tab_3 = draw_inside vis 2 ["i3/rf_dataa[31:0]","i3/rf_datab[31:0]","i3/spr_dat_rf[31:0]"];
+let tab_3 = draw_fanin vis (-1) 2 ["i3/i11/i42/spo[31:0]"];
 tab_3;
-let tab_4 = draw_inside vis 3 ["i3/i11/i42/spo[31:0]","i3/i11/from_rfb_int[31:0]"];
+let tab_4 = draw_inside vis 2 ["i3/rf_dataa[31:0]","i3/rf_datab[31:0]","i3/spr_dat_rf[31:0]"];
 tab_4;
-let tab_5 = draw_inside vis 4 ["i3/i11/i42/spo[31:0]","i3/i11/from_rfb_int[31:0]"];
-tab_5;
-draw_show_values vis tab_4 T;

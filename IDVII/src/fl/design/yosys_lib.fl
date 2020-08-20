@@ -7,19 +7,31 @@
 let _SignExt sz avs =
     let bits = cexpand_vectors avs then
     let l = length bits in
-    let new = replicate (sz-l+1) (hd bits) in
-    new@(cmerge_vectors (tl bits))
+    let msb = hd bits in
+    let pref =
+	msb = "0" => [sprintf "0b%*b" (sz-l) 0] |
+	msb = "1" => [sprintf "0b%*b" (sz-l) (2**(sz-l)-1)] |
+	replicate (sz-l) msb
+    in
+    let merge l =
+	length l < 2 => l |
+	val (b1:b2:rem) = l in
+	NOT (str_is_prefix "0b" b1) => l |
+	NOT (str_is_prefix "0b" b2) => l |
+	(b1^(string_tl (string_tl b2))):rem
+    in
+    merge (pref@avs)
 ;
 
 let _ZeroExt sz avs =
     let bits = cexpand_vectors avs then
     let l = length bits in
-    let new = replicate (sz-l) "0" in
-    new@avs
+    let new = sprintf "0b%*b" (sz-l) 0 in
+    new:avs
 ;
 
 let mk_attr src file lineno =
-    [("src", sprintf "%s:%d" file lineno), ("src", src)]
+    [("fl_src", sprintf "%s:%d" file lineno), ("src", src)]
 ;
 
 let _not sz src out inp =

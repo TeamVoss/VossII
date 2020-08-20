@@ -400,6 +400,31 @@ let fl_draw_fanin_by_tag canvas draw_level levels tag =
 ;
 export_to_tcl fl_draw_fanin_by_tag;
 
+let fl_show_rtl canvas dlev tag =
+    let vfsm = w2vfsm canvas then
+    let fsm = vfsm2fsm vfsm then 
+    let vecs = fl_tag2vec canvas tag then
+    let get_src v = (
+	let src = assoc "src" (get_visualization_attributes fsm v dlev) then
+	let src = last (str_split src "|") then
+	val [file,range] = str_split src ":" then
+	val [start_loc, end_loc] = str_split range "-" then
+	val [start_line, start_col] = str_split start_loc "." then
+	val [end_line, end_col] = str_split end_loc "." then
+	[(file, start_line, start_col, end_line, end_col)]
+	) catch []
+    in
+    let srcs = setify (flatmap get_src vecs) then
+    srcs = [] => fprintf stderr "No RTL annotation avaiable for %S:\n" vecs |
+    let show (file, start_line, start_col, end_line, end_col) = 
+	tcl_eval [sprintf "visualize_rtl %s %s %s %s %s"
+			   file start_line start_col end_line end_col] fseq
+	()
+    in
+    foreach show srcs
+;
+export_to_tcl fl_show_rtl;
+
 let fl_is_vector_name name = md_size name > 1;
 export_to_tcl fl_is_vector_name;
 

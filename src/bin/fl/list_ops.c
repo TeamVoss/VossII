@@ -1153,7 +1153,7 @@ last(g_ptr redex)
     g_ptr list;
     EXTRACT_1_ARG(redex, list);
     if( IS_NIL(list) ) {
-	MAKE_REDEX_FAILURE(redex, Fail_pr("last on emoty list"));
+	MAKE_REDEX_FAILURE(redex, Fail_pr("last on empty list"));
 	DEC_REF_CNT(l);
 	DEC_REF_CNT(r);
 	return;

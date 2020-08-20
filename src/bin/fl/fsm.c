@@ -36,6 +36,7 @@ extern bool		Do_gc_asap;
 extern FILE		*odests_fp;
 
 /***** PRIVATE VARIABLES *****/
+static int	    undeclared_node_cnt;
 static bool         quit_simulation_early;
 static int	    nbr_errors_reported;
 static jmp_buf	    node_map_jmp_env;
@@ -297,7 +298,8 @@ static int          find_node_index(vec_ptr decl, vec_ptr vp, int start);
 static string       idx2name(int idx);
 static ilist_ptr    vec2indices(string name);
 static int          name2idx(string name);
-static ilist_ptr    map_vector(hash_record *vtblp, string hier, string name);
+static ilist_ptr    map_vector(hash_record *vtblp, string hier, string name,
+			       bool ingnore_dangling);
 static int          vec_size(vec_ptr vec);
 static int          get_stride(vec_ptr vp);
 static bool         inside(int i, int upper, int lower);
@@ -472,6 +474,7 @@ static g_ptr        clean_pexlif_ios(g_ptr node);
 static string	    find_instance_name(g_ptr attrs);
 static gbv	    BDD_c_limited_AND(gbv a, gbv b);
 static gbv	    BDD_c_limited_OR(gbv a, gbv b);
+static void	    base_print_ilist(ilist_ptr il);
 
 #define FOREACH_NODE(i, il) \
     for(ilist_ptr _l = il; _l != NULL; _l = _l->next) \
@@ -977,7 +980,7 @@ DBG_print_sch(string title, sch_ptr sch)
     dbg_print_sch_rec(sch, 0);
 }
 
-#if 0
+#if 1
 static void
 fl_clean_pexlif_ios(g_ptr redex)
 {
@@ -1004,6 +1007,7 @@ pexlif2fsm(g_ptr redex)
     new_buf(&attr_buf, 100, sizeof(g_ptr));
     //
     visualization_id = 0;
+    undeclared_node_cnt = 0;
     new_mgr(&node_comp_pair_rec_mgr, sizeof(node_comp_pair_rec));
     create_hash(&node_comp_pair_tbl, 1000, ni_pair_hash, ni_pair_equ);
     create_hash(&idx_list_uniq_tbl, 100, idx_list_hash, idx_list_equ);
@@ -1324,6 +1328,37 @@ get_visualization_pfn(g_ptr redex)
 	return;
     }
     MAKE_REDEX_STRING(redex, vp->pfn);
+    pop_fsm();
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+get_visualization_attributes(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_fsm, g_node, g_level;
+    EXTRACT_3_ARGS(redex, g_fsm, g_node, g_level);
+    fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
+    string node = GET_STRING(g_node);
+    push_fsm(fsm);
+    int idx = name2idx(node);
+    if( idx < 0 ) {
+	pop_fsm();
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	return;
+    }
+    nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
+    vis_ptr vp = get_vis_info_at_level(np->draw_info, GET_INT(g_level));
+    if( vp == NULL ) {
+	pop_fsm();
+	MAKE_REDEX_FAILURE(redex,
+			   Fail_pr("Node %s has no drawing information", node));
+	return;
+    }
+    INC_REFCNT(vp->attrs);
+    OVERWRITE(redex, vp->attrs);
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -2404,6 +2439,12 @@ Fsm_Install_Functions()
     // Add builtin functions
     typeExp_ptr	pexlif_tp = Get_Type("pexlif", NULL, TP_INSERT_PLACE_HOLDER);
 
+    Add_ExtAPI_Function("dbg_clean_pexlif_ios", "1", FALSE,
+			GLmake_arrow(pexlif_tp, pexlif_tp),
+			fl_clean_pexlif_ios);
+
+    
+
     Add_ExtAPI_Function("pexlif2fsm", "1", FALSE,
 			GLmake_arrow(pexlif_tp, fsm_handle_tp),
 			pexlif2fsm);
@@ -2540,6 +2581,18 @@ Fsm_Install_Functions()
 				GLmake_string(),
 				GLmake_arrow(GLmake_int(), GLmake_string()))),
 			get_visualization_pfn);
+
+    Add_ExtAPI_Function("get_visualization_attributes", "111", FALSE,
+			GLmake_arrow(
+			    fsm_handle_tp,
+			    GLmake_arrow(
+				GLmake_string(),
+				GLmake_arrow(
+				    GLmake_int(),
+				    GLmake_list(
+					GLmake_tuple(GLmake_string(),
+						     GLmake_string()))))),
+			get_visualization_attributes);
 
     Add_ExtAPI_Function("get_visualization_fanins", "111", FALSE,
 			GLmake_arrow(
@@ -3602,6 +3655,10 @@ mark_fsm_fn(pointer p)
 	if( op == op_CONST ) {
 	    Arbi_mark(cp->arg.value);
 	}
+    }
+    vis_ptr vp;
+    FOR_REC(&(fsm->vis_rec_mgr), vis_ptr, vp) {
+	Mark(vp->attrs);
     }
 }
 
@@ -4860,9 +4917,9 @@ make_input_arg(g_ptr we, int sz, hash_record *vtblp, string hier, bool pdel)
     ilist_ptr inps;
     if( is_W_VAR(we, &sz, &base) ) {
 	string vname = mk_vec_name(base, sz);
-	inps = map_vector(vtblp, hier, vname);
+	inps = map_vector(vtblp, hier, vname, FALSE);
     } else if( is_W_EXPLICIT_VAR(we, &sz, &base) ) {
-	inps = map_vector(vtblp, hier, base);
+	inps = map_vector(vtblp, hier, base, FALSE);
     } else {
 	// Make a temporary vector
 	Sprintf(buf, "__tmp%d", ++temporary_node_cnt);
@@ -4958,7 +5015,7 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	cr.op = op_WIRE;
 	cr.size = sz;
 	string vname = mk_vec_name(base, sz);
-	ilist_ptr inps = map_vector(vtblp, hier, vname);
+	ilist_ptr inps = map_vector(vtblp, hier, vname, FALSE);
 	cr.inps = inps;
 	add_fanouts(inps, comp_idx);
 	push_buf(compositesp, (pointer) &cr);
@@ -4967,7 +5024,7 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
     if( is_W_EXPLICIT_VAR(we, &sz, &name) ) {
 	cr.op = op_WIRE;
 	cr.size = sz;
-	ilist_ptr inps = map_vector(vtblp, hier, name);
+	ilist_ptr inps = map_vector(vtblp, hier, name, FALSE);
 	cr.inps = inps;
 	add_fanouts(inps, comp_idx);
 	push_buf(compositesp, (pointer) &cr);
@@ -5280,11 +5337,11 @@ get_lhs_indices(hash_record *vtblp, string hier, g_ptr e)
     if( is_W_VAR(e, &sz, &base) ) {
 	// Variable
 	string vname = mk_vec_name(base, sz);
-	ilist_ptr res = map_vector(vtblp, hier, vname);
+	ilist_ptr res = map_vector(vtblp, hier, vname, FALSE);
 	return res;
     } else if( is_W_EXPLICIT_VAR(e, &sz, &base) ) {
 	// Variable
-	ilist_ptr res = map_vector(vtblp, hier, base);
+	ilist_ptr res = map_vector(vtblp, hier, base, FALSE);
 	return res;
     } else if( is_W_SLICE(e, &idx_list, &sub_expr) ||
 	       is_W_NAMED_SLICE(e, &base, &idx_list, &sub_expr) ) {
@@ -5328,6 +5385,8 @@ report_source_locations(odests dfp)
 		indent += 4;
 	    } else if( strcmp(key, "src") == 0 ) {
 		FP(dfp, " in %s\n", val);
+	    } else if( strcmp(key, "fl_src") == 0 ) {
+		FP(dfp, " in %s\n", val);
 	    }
 	}
     }
@@ -5353,8 +5412,9 @@ declare_vector(hash_record *vtblp, string hier, string name,
     if( transient ) {
 	int asz = compute_ilist_length(act_map);
 	if( sz != asz ) {
-	    FP(err_fp,"\nLength mismatch for %s/%s (%d!=%d)\n",
-		      hier, name, sz, asz);
+	    FP(err_fp,"\nLength mismatch between %s%s and ", hier, name);
+	    base_print_ilist(act_map);
+	    FP(err_fp," (%d!=%d)\n", sz, asz);
 	    report_source_locations(err_fp);
 	    Rprintf("");
 	}
@@ -5510,7 +5570,7 @@ name2idx(string name)
 }
 
 static ilist_ptr
-map_vector(hash_record *vtblp, string hier, string name)
+map_vector(hash_record *vtblp, string hier, string name, bool ignore_missing)
 {
     if( strncmp("0b", name, 2) == 0 ) {
 	// A constant
@@ -5534,9 +5594,20 @@ map_vector(hash_record *vtblp, string hier, string name)
     string sig = get_vector_signature(vp);
     vec_info_ptr oip = (vec_info_ptr) find_hash(vtblp,sig);
     if( oip == NULL ) {
-	FP(warning_fp, "Undeclared signal %s in %s. Created.\n", name, hier);
-	report_source_locations(warning_fp);
+	if( !ignore_missing ) {
+	    FP(warning_fp, "Undeclared signal %s in %s.\n", name, hier);
+	    report_source_locations(warning_fp);
+	}
+	sprintf(tmp_name_buf, "TmP__%d_%s", undeclared_node_cnt, name);
+	undeclared_node_cnt++;
+	string new_name = wastrsave(&strings, tmp_name_buf);
+	if( !ignore_missing ) {
+	    FP(warning_fp, "Replaced %s with %s\n\n", name, new_name);
+	}
+	name = new_name;
 	declare_vector(vtblp, hier, name, FALSE, NULL, NULL);
+	vp = split_vector_name(vec_rec_mgrp,range_rec_mgrp, name);
+	sig = get_vector_signature(vp);
 	oip = (vec_info_ptr) find_hash(vtblp,sig);
     }
     vec_info_ptr ip = oip;
@@ -7069,6 +7140,7 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
     if( !top_level && (leaf || (strstr(name,"draw_") != NULL))){
 	vp = (vis_ptr) new_rec(vis_rec_mgrp);
 	vp->draw_level = draw_level;
+	vp->attrs = attrs;
 	draw_level++;
 	vp->id = ++visualization_id;
 	if( strstr(name, "draw_") == NULL ) {
@@ -7132,7 +7204,7 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
 	    ilist_ptr act_list = NULL;
 	    while( !IS_NIL(acts) ) {
 		string actual = GET_STRING(GET_CONS_HD(acts));
-		ilist_ptr tmp = map_vector(parent_tblp, hier, actual);
+		ilist_ptr tmp = map_vector(parent_tblp, hier, actual, FALSE);
 		if( tmp == NULL ) {
 		    string phier = strtemp(hier);
 		    string last = rindex(phier, '/');
@@ -7170,7 +7242,7 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
 	    ilist_ptr act_list = NULL;
 	    while( !IS_NIL(acts) ) {
 		string actual = GET_STRING(GET_CONS_HD(acts));
-		ilist_ptr tmp = map_vector(parent_tblp, hier, actual);
+		ilist_ptr tmp = map_vector(parent_tblp, hier, actual, TRUE);
 		if( tmp == NULL ) {
 		    string phier = strtemp(hier);
 		    string last = rindex(phier, '/');
@@ -7223,9 +7295,19 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
             // Replace draw_hier txt with draw_fub txt inst inputs outputs
 	    string cmd = gen_strtemp(sm, "draw_fub ");
 	    cmd = gen_strappend(sm, vp->pfn + 10);
-	    cmd = gen_strappend(sm, " ");
-	    cmd = gen_strappend(sm, find_instance_name(attrs));
-	    cmd = gen_strappend(sm, " { ");
+	    string iname = find_instance_name(attrs);
+	    if( iname == s_no_instance ) {
+		cmd = gen_strappend(sm, " ");
+		cmd = gen_strappend(sm, hier);
+		cmd = gen_strappend(sm, " ");
+	    } else {
+		cmd = gen_strappend(sm, " {");
+		cmd = gen_strappend(sm, hier);
+		cmd = gen_strappend(sm, ": ");
+		cmd = gen_strappend(sm, iname);
+		cmd = gen_strappend(sm, "} ");
+	    }
+	    cmd = gen_strappend(sm, "{ ");
             for(g_ptr l = fa_inps; !IS_NIL(l); l = GET_CONS_TL(l)) {
                 g_ptr pair = GET_CONS_HD(l);
                 string fname = GET_STRING(GET_FST(pair));
