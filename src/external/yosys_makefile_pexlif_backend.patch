@@ -18,7 +18,7 @@
  
  include $(YOSYS_SRC)/backends/verilog/Makefile.inc
  include $(YOSYS_SRC)/backends/ilang/Makefile.inc
-+include backends/pexlif/Makefile.inc
++include $(YOSYS_SRC)/backends/pexlif/Makefile.inc
  
  include $(YOSYS_SRC)/techlibs/common/Makefile.inc
  
