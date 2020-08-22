@@ -119,6 +119,7 @@ proc create_ste_debugger {w} {
     set ::vstatus(time,$root) 0
     trace add variable ::vstatus(time,$root) write \
 	    "after idle [list sc:inform_time_change $w]"
+    update
 }
 
 proc nb:expand_selected_list {nlb y} {

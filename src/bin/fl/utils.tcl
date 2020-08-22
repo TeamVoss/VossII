@@ -321,7 +321,6 @@ proc display_dot {dot_pgm} {
     foreach t [$c find all] {
         if ![catch {$c itemcget $t -text} txt] {
             set tag [$c gettags $t]
-#            $c itemconfigure $tag -font $::base_mfont
             $c addtag "_IsTeXt_" withtag $tag
         }
     }
