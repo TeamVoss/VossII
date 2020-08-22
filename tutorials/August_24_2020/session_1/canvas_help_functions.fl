@@ -1,0 +1,80 @@
+
+let get_rows_and_cols canvas  =
+    val (CANVAS rows cols m_r) = canvas then
+    rows,cols
+;
+
+forward_declare {read :: mem->bv->bv};
+
+let canvas2tcl canvas =
+    val (CANVAS rows cols m_r) = canvas then
+    let m = deref m_r then
+    let mk_row r =
+	let mk_col c =
+	    let idx = {r::int}*{cols::int}+{c::int} in
+	    let v = read m (int2bv idx) then
+            v == ('0) => "black" |
+            v == ('1) => "white" |
+            "pink"
+	in
+	list2str T "{" " " "}" mk_col (0 upto (cols-1))
+    in
+    list2str T "{" "\n" "}" mk_row (0 upto (rows-1))
+;
+
+
+// ---- Visualization code ------
+let Init_Tcl = tcl_eval [sprintf "source %s/visualize.tcl" DIR];
+Init_Tcl;
+
+let DRexamples images =
+    let cnt = length images in
+    val (rows, cols) = get_rows_and_cols (hd images) in
+    let max_per_row = min cnt (max 1 (400/(2*cols+3))) in
+    let rows_needed = (cnt+max_per_row-1)/max_per_row in
+    Init_Tcl fseq
+    let wc = tcl_eval [ sprintf "create_example_canvas %d %d %d %d"
+                                rows cols rows_needed max_per_row]
+    then
+    let fp = mktemp "visualize" then
+    letrec draw_ex cs cnt =
+        cs = [] => () |
+        val (c:cs) = cs then
+        (fprintf fp "draw_example %s {} %d " wc cnt) seq
+        (fprintf fp "%s" (canvas2tcl c)) fseq
+        (fprintf fp "\n\n") fseq
+        (draw_ex cs (cnt+1))
+    in
+    (draw_ex images 0) fseq
+    let fname = stream2filename fp then
+    (fprintf fp "update\n%s config -scrollregion [%s bbox all]" wc wc) fseq
+    (fclose fp) fseq
+    (tcl_eval [sprintf "source %s" fname]) fseq
+    ()
+;
+
+
+let bv2fixlist size bv =
+    let l = bv2list bv in
+    let len = length l in
+    len >= size => lastn size l |
+    (replicate (size-len) (hd l))@l
+;
+
+let get_example canvas =
+    let ns = depends canvas then
+    let l = length ns then
+    let i = random 0 (2**l-1) then
+    let vs = bv2fixlist l (int2bv i) then
+    let sub = zip ns vs then
+    val (CANVAS rows cols m_r) = canvas then
+    let m = deref m_r in
+    let m' = substitute sub m then
+    CANVAS rows cols (ref m')
+;
+non_lazy get_example;
+
+let VIS cnt canvas =
+    DRexamples (map (\i. get_example (i seq canvas)) (1 upto cnt))
+;
+

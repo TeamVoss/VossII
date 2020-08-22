@@ -1689,3 +1689,7 @@ let get_abstract_depends ste obj =
 ;
 
 end_abstype get_abstract_depends;
+
+// Boolean implication.
+let ==> a b = NOT a OR b;
+infix 2 ==>;

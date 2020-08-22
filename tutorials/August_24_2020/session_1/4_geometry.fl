@@ -1,98 +1,26 @@
 
+// Create a symbolic version of a list.
+// The same approach can be used for any algebraic data type.
 lettype slist = SLIST {leaf::bool} ({bv#bv} opt) ({slist} opt);
+
+// Define "constructors"
 let sNIL = SLIST T NONE NONE;
 let sCONS e l = SLIST F (SOME e) (SOME l);
 
+// and discriminators and destructors.
 let is_sNIL (SLIST type opt_hd opt_tail) = type;
 let is_sCONS (SLIST type opt_hd opt_tail) = NOT type;
 let destr_sCONS (SLIST type (SOME hd) (SOME tl)) =  hd, tl;
 
-
+// A simple memory data type.
 lettype mem = MEM {initial_value::bv} {value_list::slist};
 let initMem = MEM '0 sNIL;
 
+// An image
 lettype canvas = CANVAS {rows::int} {cols::int} {bitmap::mem ref};
 
-let get_rows_and_cols canvas  =
-    val (CANVAS rows cols m_r) = canvas then
-    rows,cols
-;
-
-forward_declare {read :: mem->bv->bv};
-
-let canvas2tcl canvas =
-    val (CANVAS rows cols m_r) = canvas then
-    let m = deref m_r then
-    let mk_row r =
-	let mk_col c =
-	    let idx = {r::int}*{cols::int}+{c::int} in
-	    let v = read m (int2bv idx) then
-            v == ('0) => "black" |
-            v == ('1) => "white" |
-            "pink"
-	in
-	list2str T "{" " " "}" mk_col (0 upto (cols-1))
-    in
-    list2str T "{" "\n" "}" mk_row (0 upto (rows-1))
-;
-
-
-// ---- Visualization code ------
-let Init_Tcl = tcl_eval [sprintf "source %s/visualize.tcl" DIR];
-Init_Tcl;
-
-let DRexamples images =
-    let cnt = length images in
-    val (rows, cols) = get_rows_and_cols (hd images) in
-    let max_per_row = min cnt (max 1 (400/(2*cols+3))) in
-    let rows_needed = (cnt+max_per_row-1)/max_per_row in
-    Init_Tcl fseq
-    let wc = tcl_eval [ sprintf "create_example_canvas %d %d %d %d"
-                                rows cols rows_needed max_per_row]
-    then
-    let fp = mktemp "visualize" then
-    letrec draw_ex cs cnt =
-        cs = [] => () |
-        val (c:cs) = cs then
-        (fprintf fp "draw_example %s {} %d " wc cnt) seq
-        (fprintf fp "%s" (canvas2tcl c)) fseq
-        (fprintf fp "\n\n") fseq
-        (draw_ex cs (cnt+1))
-    in
-    (draw_ex images 0) fseq
-    let fname = stream2filename fp then
-    (fprintf fp "update\n%s config -scrollregion [%s bbox all]" wc wc) fseq
-    (fclose fp) fseq
-    (tcl_eval [sprintf "source %s" fname]) fseq
-    ()
-;
-
-
-let bv2fixlist size bv =
-    let l = bv2list bv in
-    let len = length l in
-    len >= size => lastn size l |
-    (replicate (size-len) (hd l))@l
-;
-
-let get_example canvas =
-    let ns = depends canvas then
-    let l = length ns then
-    let i = random 0 (2**l-1) then
-    let vs = bv2fixlist l (int2bv i) then
-    let sub = zip ns vs then
-    val (CANVAS rows cols m_r) = canvas then
-    let m = deref m_r in
-    let m' = substitute sub m then
-    CANVAS rows cols (ref m')
-;
-non_lazy get_example;
-
-let VIS cnt canvas =
-    DRexamples (map (\i. get_example (i seq canvas)) (1 upto cnt))
-;
-
-
+// Load misc help and visualization functions
+cload "canvas_help_functions.fl";
 
 // Actual code
 let mk_canvas rows cols =
@@ -100,6 +28,7 @@ let mk_canvas rows cols =
 ;
 non_lazy mk_canvas;
 
+// Function to read an address in memory
 let read mem addr =
     val (MEM init avs) = mem in
     letrec rd l assuming (is_sCONS l) =
@@ -110,11 +39,13 @@ let read mem addr =
     rd avs
 ;
 
+// Function to write an address in memory
 let write mem addr data =
     val (MEM init avs) = mem in
     (MEM init (sCONS (addr,data) avs))
 ;
 
+// Function mapping from row,col to memory location to read value
 let get_pixel canvas row col =
     val (CANVAS rows cols m_r) = canvas then
     let m = deref m_r then
@@ -122,6 +53,7 @@ let get_pixel canvas row col =
     read m idx
 ;
 
+// Function mapping from row,col to memory location to write value
 let set_pixel canvas row col value =
     val (CANVAS rows cols m_r) = canvas then
     let m = deref m_r then
@@ -130,7 +62,31 @@ let set_pixel canvas row col value =
     (m_r := m')
 ;
 
-
+// Bresenham's line algorithm
+// void plotLine(int x0, int y0, int x1, int y1)
+// {
+//     int dx = abs(x1-x0)
+//     int sx = x0<x1 ? 1 : -1;
+//     int dy = -abs(y1-y0);
+//     int sy = y0<y1 ? 1 : -1;
+//     int err = dx+dy;
+//     int e2; /* error value e_xy */
+//
+//     for(;;) {
+//      setPixel(x0,y0);
+//      if ( x0==x1 AND y0==y1 ) break;
+//      e2 = 2*err;
+//      if (e2 >= dy) {
+//          err = err + dy;
+//          x0 = x0 + sx;
+//      }
+//      if (e2 <= dx) {
+//          err = err + dx;
+//          y0 = y0 + sy;
+//      }
+//     }
+// }
+//
 let draw_line (x0,y0) (x1,y1) canvas =
     //
     let dx = abs (x1 - x0) then
@@ -159,6 +115,28 @@ let draw_line (x0,y0) (x1,y1) canvas =
 ;
 
 
+// Bresenham's circle drawing algorithm
+//
+// void plotCircle(int xm, int ym, int r)
+// {
+//    int x = -r, y = 0, err = 2-2*r; /* II. Quadrant */
+//    do {
+//       setPixel(xm-x, ym+y); /*   I. Quadrant */
+//       setPixel(xm-y, ym-x); /*  II. Quadrant */
+//       setPixel(xm+x, ym-y); /* III. Quadrant */
+//       setPixel(xm+y, ym+x); /*  IV. Quadrant */
+//       r = err;
+//       if (r <= y) {
+//      y++;
+//      err = err + y*2 + 1;           /* e_xy+e_y < 0 */
+//       }
+//       if (r > x OR err > y) {
+//      x++;
+//      err = err + x*2 + 1; /* e_xy+e_x > 0 or no 2nd y-step */
+//       }
+//    } while (x < 0);
+// }
+//
 let draw_circle (xc,yc) rad canvas =
     let x = '-1 * rad then
     let y = '0 then
@@ -192,7 +170,6 @@ let draw_circle (xc,yc) rad canvas =
 ;
 
 
-
 let C1 = draw_line ('3,'19) ('20,'5) (mk_canvas 32 32);
 VIS 5 C1;
 
@@ -203,11 +180,14 @@ let y1 = bv_constrained_variable "y1[5:0]" (\v. y0 < v AND v < '31);
 
 let C2 = draw_line (x0,y0) (x1,y1) (mk_canvas 32 32);
 C2;
+VIS 15 C2;
 
 
-let rad = bv_constrained_variable "y1[5:0]" (\v. '5 < v AND v < '15);
+let x0 = bv_constrained_variable "x0[5:0]" (\v. '10 < v AND v < '20);
+let y0 = bv_constrained_variable "y0[5:0]" (\v. '10 < v AND v < '20);
+let rad = bv_constrained_variable "r[5:0]" (\v. '2 < v AND v < '10);
 
 let C3 = draw_circle (x0,y0) rad (mk_canvas 32 32);
 C3;
-VIS 16 C3;
+VIS 15 C3;
 

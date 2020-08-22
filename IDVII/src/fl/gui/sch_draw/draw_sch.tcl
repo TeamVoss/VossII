@@ -110,9 +110,9 @@ proc sc:inform_time_change {w args} {
 proc create_ste_debugger {w} {
     catch {destroy $w}
     toplevel $w
-    wm geometry $w 70x35-20+100
+    wm geometry $w 70x40-20+100
     set nb $w.nb
-    ttk::notebook $nb -width 1200 -height 500
+    ttk::notebook $nb -width 1200 -height 700
     pack $nb -side top -expand y -fill both
     set ::sch_window_cnt($w) 0
     set root [w2root $w]
@@ -158,27 +158,27 @@ proc nb:create_mandatory_tabs {w} {
 
 proc nb:create_node_browser {w p} {
     ttk::labelframe $p.search -text "Search:"
-        labelframe $p.search.lbl -relief flat -text "Limit search to: " \
+        ttk::labelframe $p.search.lbl -relief flat -text "Limit search to: " \
                 -labelanchor w
         ttk::combobox $p.search.lbl.c -textvariable ::nodebrowser(source,$p) \
             -state readonly \
-            -values {Inputs Outputs {User Given} All}
+            -values {Inputs Outputs {User Given} All} -font $::voss2_txtfont
         set ::nodebrowser(source,$p) Outputs
  
-        labelframe $p.search.pat_lbl -relief flat -text "Pattern: " \
+        ttk::labelframe $p.search.pat_lbl -relief flat -text "Pattern: " \
                 -labelanchor w
         ttk::combobox $p.search.pat_lbl.c \
-		-textvariable ::nodebrowser(pattern,$p)
+		-textvariable ::nodebrowser(pattern,$p) -font $::voss2_txtfont
         bind $p.search.pat_lbl.c <KeyPress-Return> \
 		[list $p.search.refresh invoke]
         set ::nodebrowser(pattern,$p) {*}
-        button $p.search.refresh -text Refresh \
+        ttk::button $p.search.refresh -text Refresh \
                 -command [list nb:update_nb_list $p $p.lf.list]
     pack $p.search -side top -pady 10 -fill x
         pack $p.search.lbl -side top -fill x
-            pack $p.search.lbl.c -side top
+            pack $p.search.lbl.c -side left -fill x -expand yes
         pack $p.search.pat_lbl -side top -fill x
-            pack $p.search.pat_lbl.c -side top
+            pack $p.search.pat_lbl.c -side left -fill x -expand yes
         pack $p.search.refresh -side top -fill x
  
     set f $p.lf
@@ -186,7 +186,8 @@ proc nb:create_node_browser {w p} {
     scrollbar $f.yscroll -command "$f.list yview"
     scrollbar $f.xscroll -orient horizontal -command "$f.list xview"
     listbox $f.list -setgrid 1 \
-        -yscroll "$f.yscroll set" -xscroll "$f.xscroll set" -selectmode extended
+        -yscroll "$f.yscroll set" -xscroll "$f.xscroll set" \
+	-selectmode extended -font $::voss2_txtfont
     bind $f.list <Double-1> { nb:expand_selected_list %W %y }
     pack $f.yscroll -side right -fill y
     pack $f.xscroll -side bottom -fill x
@@ -195,16 +196,16 @@ proc nb:create_node_browser {w p} {
     pack $f -side top -fill both -expand yes
  
     ttk::labelframe $p.opts -text "Options:"
-	labelframe $p.opts.hier -text "Hierarchical drawing:" \
+	ttk::labelframe $p.opts.hier -text "Hierarchical drawing:" \
 		-labelanchor w -relief flat
 	    frame $p.opts.hier.space
 	    ttk::checkbutton $p.opts.hier.cb \
 		-variable ::nodebrowser(hierarchy,$p)
 	    set ::nodebrowser(hierarchy,$p) 1
-	labelframe $p.opts.levels -text "Levels of fanin:" \
+	ttk::labelframe $p.opts.levels -text "Levels of fanin:" \
 		-labelanchor w -relief flat
 	    ttk::combobox $p.opts.levels.c \
-		-textvariable ::nodebrowser(levels,$p)
+		-textvariable ::nodebrowser(levels,$p) -font $::voss2_txtfont
 	    set ::nodebrowser(levels,$p) 20
     pack $p.opts -side top -fill x
         pack $p.opts.hier -side top -fill x
@@ -214,11 +215,11 @@ proc nb:create_node_browser {w p} {
             pack $p.opts.levels.c -side top -fill x -expand yes
  
     ttk::labelframe $p.operations -text "Operation:"
-        button $p.operations.fanin -text Fanin \
+        ttk::button $p.operations.fanin -text Fanin \
             -command [list nb:draw_fanin $p $f.list]
-        button $p.operations.waveform -text Waveform \
+        ttk::button $p.operations.waveform -text Waveform \
             -command [list nb:add_waveform $w.nb.waveform $f.list]
-        button $p.operations.stop -text Stop \
+        ttk::button $p.operations.stop -text Stop \
             -command [list sl:add_stop_node $p $f.list]
     pack $p.operations -side top -fill x
         pack $p.operations.fanin -side left -expand yes
@@ -243,7 +244,7 @@ proc nb:update_nb_list {w lb} {
 }
 
 proc sl:create_stop_node_browser {w p} {
-    label $p.lbl -text "Stop nodes"
+    ttk::label $p.lbl -text "Stop nodes"
     pack $p.lbl -side top -fill x
     set f $p.lf
     frame $f -relief flat
@@ -251,7 +252,7 @@ proc sl:create_stop_node_browser {w p} {
 	scrollbar $f.xscroll -orient horizontal -command "$f.list xview"
 	listbox $f.list -setgrid 1 \
 	    -yscroll "$f.yscroll set" -xscroll "$f.xscroll set" \
-	    -selectmode extended
+	    -selectmode extended -font $::voss2_txtfont
 	pack $f.yscroll -side right -fill y
 	pack $f.xscroll -side bottom -fill x
 	pack $f.list -side top -fill both -expand yes
@@ -259,7 +260,7 @@ proc sl:create_stop_node_browser {w p} {
  
     set ::stop_list_info($w) $f.list
     ttk::labelframe $p.operations -text "Operation:"
-        button $p.operations.b -text Delete \
+        ttk::button $p.operations.b -text Delete \
             -command [list sl:delete_stop_nd $p $f.list]
     pack $p.operations -side top -fill x
         pack $p.operations.b -side top
@@ -268,14 +269,15 @@ proc sl:create_stop_node_browser {w p} {
 }
 
 proc cm:create_commands {w p} {
-    label $p.lbl -text "Commands"
+    ttk::label $p.lbl -text "Commands"
     pack $p.lbl -side top -fill x
     set f $p.lf
     frame $f -relief flat
 	scrollbar $f.yscroll -command "$f.txt yview"
 	scrollbar $f.xscroll -orient horizontal -command "$f.txt xview"
 	text $f.txt -setgrid 1 \
-	    -yscroll "$f.yscroll set" -xscroll "$f.xscroll set"
+	    -yscroll "$f.yscroll set" -xscroll "$f.xscroll set" \
+	    -font $::voss2_txtfont
 	pack $f.yscroll -side right -fill y
 	pack $f.xscroll -side bottom -fill x
 	pack $f.txt -side top -fill both -expand yes
@@ -283,7 +285,7 @@ proc cm:create_commands {w p} {
  
     set ::cmd_txt($w) $f.txt
     ttk::labelframe $p.operations -text "Operation:"
-        button $p.operations.b -text Save \
+        ttk::button $p.operations.b -text Save \
             -command [list cmd:save_cmds $f.txt]
         pack $p.operations.b -side top
     pack $p.operations -side top -fill x
@@ -451,23 +453,26 @@ proc sch:create_time_point {c} {
     set mb $tt.minus
     
     frame $tl -relief flat -height 10
+    set ::vstatus(show_bdd_group,$c) 0
+    set ::vstatus(show_value,$c) 0
     pack $tl -side right
-	set ::vstatus(show_value,$c) 0
-        checkbutton $cbc -text "Show dependencies:" \
+        ttk::checkbutton $cbc -text "Show dependencies:" \
 		    -variable ::vstatus(show_bdd_group,$c)  \
 		    -command [list sch:toggle_show_value_buttons $c $f]
-        checkbutton $cb -text "Show values:" \
+        ttk::checkbutton $cb -text "Show values:" \
 		-variable ::vstatus(show_value,$c) \
                 -command [list sch:toggle_show_value_buttons $c $f]
         frame $tt -relief flat -height 10
-            entry $et -width 5 \
+            ttk::entry $et -width 5 \
                 -background black -foreground red -justify center \
 		-textvariable ::vstatus(time,$root) \
 		-validate all \
 		-validatecommand {string is integer %P}
 
-            button $pb -text "+" -command "incr ::vstatus(time,[w2root $c]) +1"
-            button $mb -text "-" -command "incr ::vstatus(time,[w2root $c]) -1"
+            ttk::button $pb -text "+" \
+		-command "incr ::vstatus(time,[w2root $c]) +1" -width 2
+            ttk::button $mb -text "-" \
+		-command "incr ::vstatus(time,[w2root $c]) -1" -width 2
         pack $cbc -side left -pady 0 -padx 0
         pack $cb -side left -pady 0 -padx 0
         pack $tt -side left -pady 0 -padx 0 -expand yes
@@ -3153,6 +3158,9 @@ proc extract_name_draw_fub {module inst args} {
 
 proc draw_fub {module inst inames onames c tag x y} {
     global gcolor fc sfont
+    if { ![info exists ::sch_info(draw_level,$c)] } {
+	set ::sch_info(draw_level,$c) 0
+    }
     #
     set inps [llength $inames]
     set outs [llength $onames]
@@ -3179,8 +3187,10 @@ proc draw_fub {module inst inames onames c tag x y} {
     #
     # Draw box with module name inside and instance name above
     #
-    $c create rectangle [expr ($xr-$rwid)] [expr ($y+$erht/2)] \
-	    $xr [expr ($y-$erht/2)] -outline $gcolor -fill $fc -tags $tag
+    set dr [$c create rectangle [expr ($xr-$rwid)] [expr ($y+$erht/2)] \
+		$xr [expr ($y-$erht/2)] -outline $gcolor -fill $fc -tags $tag]
+    $c bind $dr <Double-1> \
+	    [list fl_draw_inside $c $::sch_info(draw_level,$c) $tag]
     set mid_x [expr ($xr-$rwid/2)]
     set top_y [expr $y-$erht/2]
     set f [$c create text $mid_x $top_y -anchor n -justify center \
@@ -3202,6 +3212,8 @@ proc draw_fub {module inst inames onames c tag x y} {
 	    val {fname anames} [lindex $inames $i]
 	    set f [$c create text $nx $yl -anchor w -justify left \
 		    -font $::mfont($c) -text $fname]
+	    $c bind $f <Double-1> \
+		    [list fl_draw_inside $c $::sch_info(draw_level,$c) $tag]
 	    add_font_tags $c $f _IsTeXt_
 	    $c create line $xl $yl $nx $yl -fill $gcolor
 	    lappend inp_locs [expr round($xl)] [expr round($yl)]
@@ -3222,6 +3234,8 @@ proc draw_fub {module inst inames onames c tag x y} {
 	val {fname anames} [lindex $onames $i]
 	set f [$c create text $xl $yl -anchor e -justify right \
 		-font $::sfont($c) -text $fname]
+	$c bind $f <Double-1> \
+		[list fl_draw_inside $c $::sch_info(draw_level,$c) $tag]
 	add_font_tags $c $f _IsTeXt_
 	set wtag [fl_vecs2tags $c $anames]
 	if [fl_is_vector_name $fname] {
@@ -4408,7 +4422,7 @@ proc visualize_rtl {file start_line start_col end_line end_col} {
     catch {destroy $w}
     toplevel $w
 
-    button $w.b -text Close -command [list destroy $w]
+    ttk::button $w.b -text Close -command [list destroy $w]
     pack $w.b -side bottom
     ttk::scrollbar $w.yscroll -command [list $w.t yview]
     ttk::scrollbar $w.xscroll -orient horizontal \

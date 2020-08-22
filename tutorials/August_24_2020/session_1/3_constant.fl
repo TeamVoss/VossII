@@ -1,7 +1,9 @@
+set_font font_large;
+
 // Example of symbolic version of execution.
 // DES S1 box.
 
-/ Use of symbolic execution to compute a bitslicing verssion of an algorithm.
+// Use of symbolic execution to compute a bitslicing version of an algorithm.
 
 // S1 definition
 let S1 = [
@@ -13,10 +15,10 @@ let S1 = [
 
 // Normal algorithm
 let do_S1 inp =
-    letrec look i (d:ds) = i = inp => d | look (i + 1) ds
-     /\    look i [] = error "Out of bounds"
+    letrec look_for i (d:ds) = i = inp => d | look_for (i + 1) ds
+     /\    look_for i [] = error "Out of bounds"
     in
-    look 0 S1
+    look_for 0 S1
 ;
 
 // Examples
@@ -26,10 +28,10 @@ do_S1 12;
 
 // Symbolic version
 let s_do_S1 inp =
-    letrec look i (d:ds) = i = inp => d | look (i + '1) ds
-     /\    look i [] = error "Out of bounds"
+    letrec look_for i (d:ds) = i = inp => d | look_for (i + '1) ds
+     /\    look_for i [] = error "Out of bounds"
     in
-    look (int2bv 0) (map int2bv S1)
+    look_for (int2bv 0) (map int2bv S1)
 ;
 
 s_do_S1 '0;
@@ -45,7 +47,11 @@ let s_res = s_do_S1 av;
 
 s_res;
 
+draw_bdds T (bv2list s_res);
 
+// Can write a program that outputs a C function
+// that evaluates the BDD in fixed time.
+//
 let mk_cname v =
     NOT (str_is_substr "[" v) => v |
     let is_ok c = c != "[" AND c != "]" in
@@ -53,14 +59,13 @@ let mk_cname v =
     let ev' = filter is_ok ev in
     implode ev'
 ;
-
-
 let bv2code file bv =
     let bl = (rev ((bv2list bv))) then
     let fp = fopen file "w" then
     let inps = depends bv in
-    let pr_inp fp v = fprintf fp "unsigned long %s" (mk_cname v) in
-    (list2fp fp T "static void\ns1(\n\t" ",\n\t" ",\n\t" pr_inp (rev inps)) fseq
+    let pr_inp fp v = fprintf fp "unsigned long %s" v in
+    let Cinps = qsort node_name_cmp (map mk_cname inps) in
+    (list2fp fp T "static void\ns1(\n\t" ",\n\t" ",\n\t" pr_inp Cinps) fseq
     let pr_out fp i = fprintf fp "unsigned long *out%d" i in
     (list2fp fp T "" ",\n\t" " )\n{\n" pr_out (1--(length bl))) fseq
     let cnt = ref 0 then
@@ -101,35 +106,8 @@ let bv2code file bv =
 bv2code "qqq" s_res;
 
 
-
 // Another example.
-letrec fact n = n = '0 => '1 | n * fact (n - '1);
-
-bv2int (fact '3);
-bv2int (fact '5);
-bv2int (fact '7);
-
-let av = bv_ZX (bv_variable "a[2:0]");
-
-let s_res = fact av;
-
-s_res;
-
-let tst i = 
-    let bv = int2bv i in
-    let cond = av = bv then
-    let sub = param cond in
-    bv2int (substitute sub s_res)
-;
-
-map tst (0--7);
-
-
-bv2code "zzz" (fact av);
-
-
-// Final exmaple
-// Decrypting RSA for really small numbers
+// Decrypting RSA (for small numbers)
 let mod_exp base n mod =
     letrec squaring (b:bs) cur =
 	let sq = (cur * cur) % mod then
@@ -162,6 +140,7 @@ let m = int2bv 73;
 let e = bv_ZX (bv_variable "e[15:0]");
 let n = int2bv 129;
 
+// Note that there is a (potential) timing side channel in the code.
 profiled_mod_exp m (int2bv 121) n;
 profiled_mod_exp m (int2bv 219) n;
 
@@ -172,5 +151,6 @@ bdd_size res;
 bdd_reorder 4;
 bdd_size res;
 
+// Now write out a fixed time version of the function!
 bv2code "www" res;
 

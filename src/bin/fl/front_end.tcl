@@ -850,7 +850,8 @@ create_voss2_top_level_txtwin "$voss2_top_level.t" "$voss2_top_level.s"
 
 #-----------------------------------------------------------------------
 
-proc bgerror {msg} {
+proc old_bgerror {msg} {
+
     # Release grabs
     if {[grab current .] != ""} {
 	grab release [grab current .]
@@ -877,9 +878,9 @@ proc bgerror {msg} {
     wm minsize $w 1 1
     wm title $w "Error Stack Trace"
     wm iconname $w "Stack Trace"
-    button $w.ok -text OK -command "destroy $w"
+    ttk::button $w.ok -text OK -command "destroy $w"
     text $w.text -relief sunken -bd 2 -yscrollcommand "$w.scroll set" \
-		-setgrid 1 -width 80 -height 20
+		-setgrid 1 -width 80 -height 20 -font $::voss2_txtfont
     scrollbar $w.scroll -relief sunken -command "$w.text yview"
 
     $w.text insert 0.0 "Error: $msg\nStack trace:\n$info"
@@ -1326,7 +1327,8 @@ namespace eval voss2_help {
 		frame $f -relief flat
 		$tb add $f -text $fun
 		$tb select $f
-		button $f.b -text Close -command [list destroy $f]
+		button $f.b -text Close -command [list destroy $f] \
+			-font $::voss2_txtfont
 		pack $f.b -side bottom
 		ttk::scrollbar $f.yscroll -command [list $f.t yview]
 		ttk::scrollbar $f.xscroll -orient horizontal \
@@ -1553,10 +1555,11 @@ namespace eval voss2_help {
 	pack $w_action_buttons -side top -fill x
 
 	    button $w_action_buttons.quit -text "Quit" \
-		-command ::voss2_help::help_end
+		-command ::voss2_help::help_end -font $::voss2_txtfont
 	    pack $w_action_buttons.quit -side left -expand yes
 
 	    button $w_action_buttons.info -text "Man page" \
+					  -font $::voss2_txtfont \
 	      -command "::voss2_help::help_show_info $w_search_alts.list \
 						     $w_help_tab_notebook"
 	    pack $w_action_buttons.info -side left -expand yes
@@ -1721,3 +1724,9 @@ proc hide_fl_window {} {
     set ::voss2_status(hidden_fl_window) 1
     wm withdraw .
 }
+
+# Increase stack size to allow change_fonts to work even when deep
+# hierarchy of windows are open.
+# This is a workaround. Should fix change_fonts (and other) procs.
+set old_limit [interp recursionlimit {}]
+interp recursionlimit {} [expr {$old_limit + 5000}]
