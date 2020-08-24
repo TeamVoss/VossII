@@ -1,0 +1,4 @@
+A simple processor with an example of a (very simple) verification of
+one of its operations.
+
+The main file is M65C02.fl.

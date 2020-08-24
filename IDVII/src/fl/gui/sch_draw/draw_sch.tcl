@@ -119,7 +119,6 @@ proc create_ste_debugger {w} {
     set ::vstatus(time,$root) 0
     trace add variable ::vstatus(time,$root) write \
 	    "after idle [list sc:inform_time_change $w]"
-    update
 }
 
 proc nb:expand_selected_list {nlb y} {
@@ -3150,10 +3149,14 @@ proc get_width {c x y cur_max txt} {
 }
 
 proc extract_name_draw_fub {module inst args} {
-    if {$inst == ""} {
+    if {$inst == "" || $inst == $module } {
 	return $module
     } else {
-	return [format {%s (%s)} $inst $module]
+	set nm [format {%s (%s)} $inst $module]
+	if { [string length $nm] > 10 } {
+	    set nm $inst
+	}
+	return $nm
     }
 }
 
@@ -3191,7 +3194,7 @@ proc draw_fub {module inst inames onames c tag x y} {
     set dr [$c create rectangle [expr ($xr-$rwid)] [expr ($y+$erht/2)] \
 		$xr [expr ($y-$erht/2)] -outline $gcolor -fill $fc -tags $tag]
     $c bind $dr <Double-1> \
-	    [list fl_draw_inside $c $::sch_info(draw_level,$c) $tag]
+	"after idle [list fl_draw_inside $c $::sch_info(draw_level,$c) $tag]"
     set mid_x [expr ($xr-$rwid/2)]
     set top_y [expr $y-$erht/2]
     set f [$c create text $mid_x $top_y -anchor n -justify center \
@@ -3214,7 +3217,8 @@ proc draw_fub {module inst inames onames c tag x y} {
 	    set f [$c create text $nx $yl -anchor w -justify left \
 		    -font $::mfont($c) -text $fname]
 	    $c bind $f <Double-1> \
-		    [list fl_draw_inside $c $::sch_info(draw_level,$c) $tag]
+		"after idle \
+		    [list fl_draw_inside $c $::sch_info(draw_level,$c) $tag]"
 	    add_font_tags $c $f _IsTeXt_
 	    $c create line $xl $yl $nx $yl -fill $gcolor
 	    lappend inp_locs [expr round($xl)] [expr round($yl)]
@@ -3236,7 +3240,8 @@ proc draw_fub {module inst inames onames c tag x y} {
 	set f [$c create text $xl $yl -anchor e -justify right \
 		-font $::sfont($c) -text $fname]
 	$c bind $f <Double-1> \
-		[list fl_draw_inside $c $::sch_info(draw_level,$c) $tag]
+	    "after idle \
+		[list fl_draw_inside $c $::sch_info(draw_level,$c) $tag]"
 	add_font_tags $c $f _IsTeXt_
 	set wtag [fl_vecs2tags $c $anames]
 	if [fl_is_vector_name $fname] {

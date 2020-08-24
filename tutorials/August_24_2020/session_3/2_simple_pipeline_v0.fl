@@ -1,0 +1,203 @@
+set_font font_large;
+cload "ste.fl";
+
+ENUM "security" ["LOW", "HIGH"];
+
+ENUM "opcode" ["NOP", "LDI", "ADD", "SUB"];
+
+
+TYPE "word" 8;
+
+TYPE "sreg" 2;
+
+STRUCT "reg" [
+	    ("msb", "bit"),
+	    ("addr", "sreg")
+];
+
+let make_range top_range sz =
+        let next = (itlist max top_range (-1))+1 in
+        let next' = next+sz in
+        let range = (next+sz-1) downto next in
+        range
+;
+
+let opc_range     = make_range [] (hw_size {'0::opcode});
+let dst_range     = make_range opc_range (hw_size {'0::reg});
+let src1_range    = make_range dst_range (hw_size {'0::reg});
+let src2_range    = make_range src1_range (hw_size {'0::reg});
+let imm_size      = hd src2_range - hd dst_range;
+let imm_range     = make_range dst_range (hd src2_range - hd dst_range);
+
+TYPE "imm" imm_size;
+
+let tot_bits_needed = hd imm_range+1;
+
+STRUCT "instr" tot_bits_needed [
+	    ("opc", "opcode", opc_range),
+	    ("dst", "reg", dst_range),
+	    ("src1", "reg", src1_range),
+	    ("src2", "reg", src2_range),
+	    ("imm",  "imm", imm_range)
+];
+
+let NOP_instr = '0<--opc ? NOP;
+
+MEMORY "RF" [(4, "sreg")] "word";
+
+let ALU =
+    instr_input	    instr.
+    word_input	    A.
+    word_input	    B.
+    word_output	    out.
+    //
+    internal	    opcode.
+    CELL "draw_hier ALU" [
+	opcode <- instr-->opc,
+	CASE out [
+	    is_LDI opcode --- (ZX (instr-->imm)),
+	    is_ADD opcode --- (A '+' B),
+	    is_SUB opcode --- (A '-' B)
+	] 'X
+];
+
+
+let core_RF lbl =
+    bit_input	    clk.
+    bit_input	    we.
+    sreg_input	    waddr.
+    word_input	    din.
+    RF_output	    RF.
+    RF_internal	    tmp_RF new_RF.
+    CELL (sprintf "draw_hier {RF %s}" lbl) [
+	Write_RF RF waddr din new_RF,
+	tmp_RF <- (IF we THEN new_RF ELSE RF),
+	re_ff clk tmp_RF RF
+];
+
+let RF =
+    bit_input	    clk.
+    security_input  sec_level_rd.
+    security_input  sec_level_wr.
+    reg_input	    src1.
+    reg_input	    src2.
+    reg_input	    dst.
+    bit_input	    dst_valid.
+    word_input	    res.
+    word_output	    A.
+    word_output	    B.
+    //
+    RF_internal	    tmp_RF0 new_RF0 RF0.
+    RF_internal	    tmp_RF1 new_RF1 RF1.
+    word_internal   r_A0 r_B0.
+    word_internal   r_A1 r_B1.
+    bit_internal    ok_to_write0.
+    bit_internal    ok_to_write1.
+    //
+    CELL "draw_hier SecureRF" [
+	Read_RF RF0 (src1-->addr) r_A0,
+	Read_RF RF0 (src2-->addr) r_B0,
+	Read_RF RF1 (src1-->addr) r_A1,
+	Read_RF RF1 (src2-->addr) r_B1,
+	CASE A [
+	    (src1 '=' '0) --- '0,
+	    (sec_level_rd '=' HIGH '&' src1-->msb) --- r_A1,
+	    (sec_level_rd '=' LOW '&' src1-->msb) --- '0
+	] r_A0,
+	CASE B [
+	    (src2 '=' '0) --- '0,
+	    (sec_level_rd '=' HIGH '&' src2-->msb) --- r_B1,
+	    (sec_level_rd '=' LOW '&' src2-->msb) --- '0
+	] r_B0,
+	ok_to_write1 <- dst_valid '&' dst-->msb '&' sec_level_wr '=' HIGH,
+	ok_to_write0 <- dst_valid '&' '~' dst-->msb,
+	core_RF "Low" clk ok_to_write0 (dst-->addr) res RF0,
+	core_RF "High" clk ok_to_write1 (dst-->addr) res RF1
+];
+
+let pipeline =
+    bit_input	    clk.
+    bit_input	    reset.
+    security_input  sec_level.
+    instr_input	    op.
+    bit_output	    dbg_valid.
+    instr_output    dbg_op.
+    word_output	    dbg_data.
+    //
+    instr_internal	opIF opEXE opMEM opWB.
+    bit_internal	validIF validEXE validMEM validWB.
+    security_internal   sec_levelIF sec_levelEXE sec_levelMEM sec_levelWB.
+    word_internal	AdataIF BdataIF AdataEXE BdataEXE.
+    word_internal	dataEXE dataMEM dataWB.
+    CELL "draw_hier pipeline" [
+	validIF <- '~' (is_NOP (opIF-->opc)),
+	re_ff_reset clk reset validIF validEXE,
+	re_ff_reset clk reset validEXE validMEM,
+	re_ff_reset clk reset validMEM validWB,
+	//
+	re_ff clk sec_level sec_levelIF,
+	re_ff clk sec_levelIF sec_levelEXE,
+	re_ff clk sec_levelEXE sec_levelMEM,
+	re_ff clk sec_levelMEM sec_levelWB,
+	//
+	re_ff_reset clk reset op opIF,
+	re_ff clk opIF opEXE,
+	re_ff clk opEXE opMEM,
+	re_ff clk opMEM opWB,
+	//
+	RF clk sec_levelIF sec_levelWB (opIF-->src1) (opIF-->src2) (opWB-->dst)
+			 validWB dataWB AdataIF BdataIF,
+	ALU opEXE AdataEXE BdataEXE dataEXE,
+	re_ff clk AdataIF AdataEXE,
+	re_ff clk BdataIF BdataEXE,
+	re_ff clk dataEXE dataMEM,
+	re_ff clk dataMEM dataWB,
+	dbg_data <- dataWB,
+	dbg_op <- opWB,
+	dbg_valid <- validWB
+];
+
+let p = pipeline 'clk 'reset 'sec_level 'op 'dbg_valid 'dbg_op 'dbg_data;
+
+let vis = STE_debug (pexlif2fsm p);
+vis;
+
+
+let i1 = NOP_instr;
+let i2 = NOP_instr;
+let i3 = 'hi<-- dst ? (('hi-->dst)<--msb ? '1);
+let i4 = {'li::instr};
+let i5 = NOP_instr;
+
+let N = 20;
+let ant =
+    "clk" is_clock N
+  and
+    "reset" is 1 in_cycle 0 otherwise 0 until N cycles
+  and
+    "sec_level" is LOW in_cycle 1 followed_by
+		   LOW in_cycle 2 followed_by
+		   HIGH in_cycle 3 followed_by
+		   LOW in_cycle 4 followed_by
+		   LOW in_cycle 5 otherwise LOW until N cycles
+  and
+    "op[10:0]" is i1 in_cycle 1 followed_by
+		  i2 in_cycle 2 followed_by
+		  i3 in_cycle 3 followed_by
+		  i4 in_cycle 4 followed_by
+		  i5 in_cycle 5 otherwise NOP_instr until N cycles
+  and
+    "i13/RF0[1][7:0]" is "b[1][7:0]" in_cycle 0
+  and
+    "i13/RF0[2][7:0]" is "b[2][7:0]" in_cycle 0
+  and
+    "i13/RF1[2][7:0]" is "r[7][7:0]" in_cycle 0
+;
+
+var_order (
+    (interleave (map md_expand_vector ["hi[10:0]", "li[10:0]"]))@
+    (interleave (map md_expand_vector ["b[1][7:0]", "b[2][7:0]", "r[7][7:0]"]))
+);
+
+let ste = STE "-e" vis [] ant [] [];
+ste;

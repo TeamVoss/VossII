@@ -31,6 +31,7 @@ extern int		RCStep_limit;
 extern bool		RCprint_failures;
 extern bool		RCverbose_ste_run;
 extern bool		RCprint_time;
+extern bool		RCaccurate_ite_comp;
 extern g_ptr		void_nd;
 extern bool		Do_gc_asap;
 extern FILE		*odests_fp;
@@ -798,50 +799,52 @@ gSTE(g_ptr redex, value_type type)
 		gbv curL = *(cur_buf+2*idx+1);
 		gbv chkH = *(cons_buf+2*idx);
 		gbv chkL = *(cons_buf+2*idx+1);
-		gbv ok = c_AND(c_OR(chkH,c_NOT(curH)), c_OR(chkL,c_NOT(curL)));
 		if( RCnotify_check_failures &&
-		    (nbr_errors_reported < RCmax_nbr_errors) && 
-		    c_NEQ(ok, c_ONE) )
+		    (nbr_errors_reported < RCmax_nbr_errors) )
 		{
-		    FP(err_fp, "Warning: Consequent failure at time %d", t);
-		    FP(err_fp, " on node %s\n", idx2name(idx));
-		    if( RCprint_failures ) {
-			FP(err_fp, "Current value:");
-			cHL_Print(err_fp, curH, curL);
-			FP(err_fp, "\nExpected value:");
-			cHL_Print(err_fp, chkH, chkL);
-			/* Print a counter example */
-			gbv bad = c_AND(
-				    c_OR(c_AND(chkH,c_NOT(curH)),
-					 c_AND(c_NOT(chkH),curH)),
-				    c_OR(c_AND(chkL,c_NOT(curL)),
-					 c_AND(c_NOT(chkL),curL)));
-			if( c_NEQ(bad,c_ZERO) ) {
-			    FP(err_fp, "\nStrong disagreement when: ");
-			    c_Print(err_fp, bad, -1);
-			} else {
-			    FP(err_fp, "\nWeak disagreement when:");
-			    gbv bad = c_OR(c_AND(c_NOT(chkH), curH),
-					   c_AND(c_NOT(chkL), curL));
-			    c_Print(err_fp, bad, -1);
+		    gbv ok = c_AND(c_OR(chkH,c_NOT(curH)),
+				   c_OR(chkL,c_NOT(curL)));
+		    if( c_NEQ(ok, c_ONE) ) {
+			FP(err_fp, "Warning: Consequent failure at time %d", t);
+			FP(err_fp, " on node %s\n", idx2name(idx));
+			if( RCprint_failures ) {
+			    FP(err_fp, "Current value:");
+			    cHL_Print(err_fp, curH, curL);
+			    FP(err_fp, "\nExpected value:");
+			    cHL_Print(err_fp, chkH, chkL);
+			    /* Print a counter example */
+			    gbv bad = c_AND(
+					c_OR(c_AND(chkH,c_NOT(curH)),
+					     c_AND(c_NOT(chkH),curH)),
+					c_OR(c_AND(chkL,c_NOT(curL)),
+					     c_AND(c_NOT(chkL),curL)));
+			    if( c_NEQ(bad,c_ZERO) ) {
+				FP(err_fp, "\nStrong disagreement when: ");
+				c_Print(err_fp, bad, -1);
+			    } else {
+				FP(err_fp, "\nWeak disagreement when:");
+				gbv bad = c_OR(c_AND(c_NOT(chkH), curH),
+					       c_AND(c_NOT(chkL), curL));
+				c_Print(err_fp, bad, -1);
+			    }
+			    FP(err_fp, "\n");
 			}
+			nbr_errors_reported++;
 			FP(err_fp, "\n");
-		    }
-		    nbr_errors_reported++;
-		    FP(err_fp, "\n");
-		    if( abort_ASAP ) {
-			gbv v = ste->checkTrajectory;
-			v = c_AND(v, c_OR(c_NOT(curH), chkH));
-			v = c_AND(v, c_OR(c_NOT(curL), chkL));
-			ste->checkTrajectory = v;
-			if( gui_mode ) {
-			    Sprintf(buf, "simulation_end");
-			    Info_to_tcl(buf);
+			if( abort_ASAP ) {
+			    gbv v = ste->checkTrajectory;
+			    v = c_AND(v, c_OR(c_NOT(curH), chkH));
+			    v = c_AND(v, c_OR(c_NOT(curL), chkL));
+			    ste->checkTrajectory = v;
+			    if( gui_mode ) {
+				Sprintf(buf, "simulation_end");
+				Info_to_tcl(buf);
+			    }
+			    ste->active = FALSE;
+			    ste->max_time = t;
+			    signal(SIGINT, old_handler);
+			    return;
 			}
-			ste->active = FALSE;
-			ste->max_time = t;
-			signal(SIGINT, old_handler);
-			return;
 		    }
 		}
 		gbv v = ste->checkTrajectory;
@@ -867,6 +870,7 @@ gSTE(g_ptr redex, value_type type)
 	Sprintf(buf, "simulation_end");
 	Info_to_tcl(buf);
     }
+    signal(SIGINT, old_handler);
     pop_fsm();
 }
 
@@ -6742,10 +6746,15 @@ op_ITE(ncomp_ptr op)
 	gbv aL = INP_L(1+i);
 	gbv bH = INP_H(1+i+op->size);
 	gbv bL = INP_L(1+i+op->size);
-	OUT_H(i) = c_OR(c_OR(c_AND(aH,bH),c_AND(cH,aH)),
-			  c_AND(cL,bH));
-	OUT_L(i) = c_AND(c_AND(c_OR(aL,bL),c_OR(cL,aL)),
-			   c_OR(cH,bL));
+	if( RCaccurate_ite_comp ) {
+	    OUT_H(i) = c_OR(c_OR(c_AND(aH,bH),c_AND(cH,aH)),
+			      c_AND(cL,bH));
+	    OUT_L(i) = c_AND(c_AND(c_OR(aL,bL),c_OR(cL,aL)),
+			       c_OR(cH,bL));
+	} else {
+	    OUT_H(i) = c_OR(c_AND(cH,aH), c_AND(cL,bH));
+	    OUT_L(i) = c_AND(c_OR(cL,aL), c_OR(cH,bL));
+	}
     }
 }
 
@@ -7635,36 +7644,37 @@ update_node(ste_ptr ste, int idx, gbv Hnew, gbv Lnew, bool force)
 	if( np->has_ant ) {
 	    gbv aH = *(ant_buf+2*idx);
 	    gbv aL = *(ant_buf+2*idx+1);
-	    gbv abort = c_NOT(c_OR(c_AND(aH, Hnew), c_AND(aL, Lnew)));
 	    if( RCnotify_traj_failures &&
-		(nbr_errors_reported < RCmax_nbr_errors) &&
-		c_NEQ(abort, c_ZERO) )
+		(nbr_errors_reported < RCmax_nbr_errors) )
 	    {
-		FP(warning_fp,
-		  "Warning: Antecedent failure at time %d on node %s\n",
-		  ste->cur_time, idx2name(np->idx));
-		if( RCprint_failures ) {
-		    FP(err_fp, "\nCurrent value:");
-		    cHL_Print(err_fp, Hnew, Lnew);
-		    FP(err_fp, "\nAsserted value:");
-		    cHL_Print(err_fp, aH, aL);
-		}
-		nbr_errors_reported++;
-		if( ste->abort_ASAP ) {
-		    Hnew = c_AND(Hnew, aH); 
-		    Lnew = c_AND(Lnew, aL); 
-		    gbv v = ste->validTrajectory;
-		    v = c_AND(v, c_OR(Hnew, Lnew));
-		    ste->validTrajectory = v;
-		    ste->max_time = ste->cur_time;
-		    ste->active = FALSE;
-		    if( gui_mode ) {
-			Sprintf(buf, "simulation_end");
-			Info_to_tcl(buf);
+		gbv abort = c_NOT(c_OR(c_AND(aH, Hnew), c_AND(aL, Lnew)));
+		if( c_NEQ(abort, c_ZERO) ) {
+		    FP(warning_fp,
+		      "Warning: Antecedent failure at time %d on node %s\n",
+		      ste->cur_time, idx2name(np->idx));
+		    if( RCprint_failures ) {
+			FP(err_fp, "\nCurrent value:");
+			cHL_Print(err_fp, Hnew, Lnew);
+			FP(err_fp, "\nAsserted value:");
+			cHL_Print(err_fp, aH, aL);
 		    }
-		    pop_fsm();
-		    kill(getpid(), SIGINT);
-		    return 0;
+		    nbr_errors_reported++;
+		    if( ste->abort_ASAP ) {
+			Hnew = c_AND(Hnew, aH); 
+			Lnew = c_AND(Lnew, aL); 
+			gbv v = ste->validTrajectory;
+			v = c_AND(v, c_OR(Hnew, Lnew));
+			ste->validTrajectory = v;
+			ste->max_time = ste->cur_time;
+			ste->active = FALSE;
+			if( gui_mode ) {
+			    Sprintf(buf, "simulation_end");
+			    Info_to_tcl(buf);
+			}
+			pop_fsm();
+			kill(getpid(), SIGINT);
+			return 0;
+		    }
 		}
 	    }
 	    Hnew = c_AND(Hnew, aH); 

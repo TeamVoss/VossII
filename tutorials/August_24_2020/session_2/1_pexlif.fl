@@ -1,0 +1,272 @@
+set_font font_large;
+
+// Need to load the ste.fl library if any hardware functions will be needed.
+load "ste.fl";
+
+// Examples of modeling latches and flip-flops
+STE_debug (pexlif2fsm (re_ff 'clk {'d::bit} 'q));;
+STE_debug (pexlif2fsm (ah_latch 'clk {'d::bit} 'out));;
+
+//
+// VossII provides two data models for hardware:
+//  1) pexlif
+//  2) fsm
+//
+// pexlif:
+//	    An algebraic datatype for synchronous hardware.
+//	    + Zero delay combinational logic at a "word-level" abstraction
+//	    + Phase delays
+//
+//	Flops and latches are modeled with these primitives.
+//
+//
+//
+//
+
+
+// First some examples of declaration of HW types.
+TYPE "byte" 8;
+
+TYPE "raddr" 4;
+TYPE "addr"  28;
+
+ENUM "state" ["IDLE", "ALLOCATING", "SAVING", "RESTORING1", "RESTORING2"];
+
+ENUM "opcode" [
+            "P_PLUS", "P_MINUS", "P_TIMES", "P_DIV", "P_MOD",
+            "P_EQ", "P_NEQ", "P_GT", "P_GEQ",
+            "P_AND", "P_OR", "P_NOT", "P_COND",
+	    "P_GOTO", "P_CALL", "P_RETURN"];
+
+// Simple structure
+STRUCT "line" [
+  ("mode", "state"),
+  ("src",  "raddr"),
+  ("dst1", "raddr"),
+  ("dst2", "raddr")
+];
+
+// Overlapping (union) struct
+STRUCT "instr" 32 [
+	("op",	    "opcode",		(31--28)),
+	// ALU instructions RF->RF->RF
+	("src1",    "raddr",		(27--24)),
+	("src2",    "raddr",		(23--20)),
+	("dst",    "raddr",		(19--16)),
+	// Cond 
+	("cond",    "raddr",		(27--24)),
+	("loc1",    "raddr",		(23--20)),
+	("loc2",    "raddr",		(19--16)),
+	// Goto/call
+	("loc",    "addr",		(27--0))
+];
+
+// Accessing fields
+'a-->src1;
+'a-->dst;
+'a-->loc1;
+'a-->loc;
+
+// Updating fields
+'a<--src1 ? '1
+  <--src2 ? '2
+  <--dst  ? '0xf
+;
+
+
+// Simple HFL example
+let add3 =
+    byte_input	a b c.
+    byte_output	out.
+    CELL "draw_hier add3" [
+	out <- a '+' b '+' c
+];
+
+let p = add3 'a 'b 'c 'out;
+
+p;
+
+// Now use the add3 module
+let simple_circuit =
+    bit_input	clk.
+    bit_input	reset.
+    byte_input  a b.
+    byte_output out.
+    byte_internal   mid new.
+    CELL "draw_hier simple_circuit" [
+	add3 a b out mid,
+	new <- (IF reset THEN '0 ELSE mid),
+	re_ff clk mid out
+];
+
+let p = simple_circuit 'clk 'reset 'a 'b 'out;
+
+//
+// Example of code traversing the pexlif
+//
+letrec get_all_wires (PINST _ _ leaf _ _ ints cont) =
+    let local = md_expand_vectors ints in
+    leaf => local |
+    let get_children (P_HIER chs) = chs
+     /\ get_children (P_LEAF _) = []
+    in
+    let ch_res = flatmap get_all_wires (get_children cont) in
+    local@ch_res
+;
+
+// md_extract_vectors does a multi-dimensional vectorization of a list of nodes
+md_extract_vectors (get_all_wires p);
+
+
+// Most users, will never look at the pexlif, but convert it to an fsm 
+let ckt = pexlif2fsm p;
+ckt;
+
+// To visualize the fsm, use STE_debug
+STE_debug ckt;
+
+
+// Of course we can use pure fl to build circuits
+
+// Version 1
+let add9 =
+    byte_input      i1 i2 i3 i4 i5 i6 i7 i8 i9.
+    byte_output     o.
+    byte_internal   m1 m2 m3.
+    CELL "draw_hier add6" [
+        add3 i1 i2 i3 m1,
+        add3 i4 i5 i6 m2,
+        add3 i7 i8 i9 m3,
+        add3 m1 m2 m3 o
+];
+
+let p = add9 'i1 'i2 'i3 'i4 'i5 'i6 'i7 'i8 'i9 'o;
+STE_debug (pexlif2fsm p);
+
+// But we would like to define a module that add any number of items...
+// Here's one way:
+letrec add_list =
+    byte_list_input il.
+    byte_output	    o.
+    byte_internal   rem.
+    CELL "draw_hier add_tree" (
+	il = [] => [
+	    o <- '0
+	] | [
+	    add_list (tl il) rem,
+	    o <- rem '+' (hd il)
+	]
+);
+
+let p = add_list ['i1,'i2,'i3,'i4,'i5,'i6,'i7,'i8,'i9] 'o;
+let vis = STE_debug (pexlif2fsm p);
+vis;
+
+// Easier to visualize:
+let vis = STE_debug (pexlif2fsm (flatten_pexlif p));
+vis;
+
+
+// However, that's not a good design.
+// Make it a balanced tree instead!
+letrec add_tree =
+    byte_list_input  il.
+    byte_output      o.
+    byte_internal    m1 m2.
+    CELL "draw_hier add_tree" (
+        let l = length il in
+        l = 1 => [
+	    o <- (hd il)
+	] |
+	    let high = firstn (l/2) il in
+	    let low  = butfirstn (l/2) il in 
+	[
+            add_tree high m1,
+            add_tree low m2,
+            o <- m1 '+' m2
+]);
+
+let p = add_tree ['i1,'i2,'i3,'i4,'i5,'i6,'i7,'i8,'i9] 'o;
+STE_debug (pexlif2fsm p);
+
+// Easier to visualize
+STE_debug (pexlif2fsm (flatten_pexlif p));
+
+// That gave us a tree-structured added for bytes. 
+// How about generalizing it to any type?
+letrec gen_add_tree =
+    list_input  il.
+    output      o.
+    internal    m1 m2.
+    CELL "draw_hier gen_add_tree" (
+        let l = length il in
+        l = 1 => [
+	    o <- (hd il)
+	] |
+	    let high = firstn (l/2) il in
+	    let low  = butfirstn (l/2) il in 
+	[
+            gen_add_tree high m1,
+            gen_add_tree low m2,
+            o <- m1 '+' m2
+]);
+
+let p = gen_add_tree ['i1,'i2,'i3,'i4,'i5,'i6,'i7,'i8,'i9] {'o::byte};
+STE_debug (pexlif2fsm (flatten_pexlif p));
+
+// Define a new type.
+TYPE "word" 32;
+
+// And generate an adder tree for 9 items of this type
+let p = gen_add_tree ['i1,'i2,'i3,'i4,'i5,'i6,'i7,'i8,'i9] {'o::word};
+STE_debug (pexlif2fsm (flatten_pexlif p));
+
+
+// BUT, how about using fl more efficiently?
+// In particular, create a higher-order function (a function taking a
+// function as argument).
+// We can define:
+letrec reduce_tree op =
+    list_input  il.
+    output      o.
+    internal    m1 m2.
+    CELL "draw_hier reduce_tree" (
+        let l = length il in
+        l = 1 => [o <- (hd il)] |
+        let high = firstn (l/2) il in
+        let low  = butfirstn (l/2) il in [
+            reduce_tree op high m1,
+            reduce_tree op low m2,
+            o <- op m1 m2
+]);
+
+// With this very general definition, we can define:
+let add_tree = reduce_tree (defix '+');
+let mul_tree = reduce_tree (defix '*');
+let xor_tree = reduce_tree (defix '^');
+let and_tree = reduce_tree (defix '&');
+let or_tree  = reduce_tree (defix '|');
+
+// Trying this out...
+let test = 
+    byte_input	a b c d e f.
+    byte_output	o1 o2 o3 o4 o5.
+    CELL "draw_hier test" [
+	add_tree [a,b,c,d,e,f] o1,
+	mul_tree [a,b,c,d,e,f] o2,
+	xor_tree [a,b,c,d,e,f] o3,
+	and_tree [a,b,c,d,e,f] o4,
+	or_tree [a,b,c,d,e,f] o5
+];
+
+let p = test 'a 'b 'c 'd 'e 'f 'o1 'o2 'o3 'o4 'o5;
+STE_debug (pexlif2fsm p);
+
+// or easier to see:
+STE_debug (pexlif2fsm (flatten_pexlif p));
+
+
+// ====================================
+// Finally a larger example:
+load "diff_cache/diff_cache.fl";
+

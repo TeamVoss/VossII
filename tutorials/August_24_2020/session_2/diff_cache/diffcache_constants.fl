@@ -1,0 +1,34 @@
+cload "ste.fl";
+let BYTE_SIZE           = 8;
+let ADDR_SIZE           = 20;
+let TIMER_SIZE          = 16;
+let LINES               = 8;            // Number of cache lines
+let BYTES_IN_CACHE_LINE = 8;            // Number of bytes in cache line
+
+let TAG_SIZE		= ADDR_SIZE-(log2 LINES)-(log2 BYTES_IN_CACHE_LINE);
+
+TYPE "byte" BYTE_SIZE;
+TYPE "cache_line" (BYTE_SIZE*BYTES_IN_CACHE_LINE);
+
+TYPE "atag_field"  TAG_SIZE;
+TYPE "line_addr"   (log2 LINES);
+TYPE "decoded_line_addr" LINES;
+TYPE "byte_addr"    (log2 BYTES_IN_CACHE_LINE);
+
+ENUM "tag" ["FREE", "L1", "L2", "L3", "L4", "L5", "L6", "L7"];
+let CAM_ADDR_SIZE = 4;
+let CAM_LINES = 2**CAM_ADDR_SIZE;
+TYPE "cam_addr" CAM_ADDR_SIZE;
+
+STRUCT "addr" [ ("aTag", "atag_field"),
+		("line", "line_addr"),
+		("byte", "byte_addr")
+];
+
+
+STRUCT "ext_cache_line" [
+	    ("valid", "bit"),
+            ("sTag", "tag"),
+	    ("aTag", "atag_field"),
+	    ("data", "cache_line")
+];

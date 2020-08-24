@@ -1,0 +1,117 @@
+load "ste.fl";
+
+let p = verilog2pexlif "-I../../rtl_virtex_orig/verilog/" "or1200_top" [
+	    "rf_sub.v",
+	    "or1200_alu.v",
+	    "or1200_cfgr.v",
+	    "or1200_cpu.v",
+	    "or1200_ctrl.v",
+	    "or1200_dc_fsm.v",
+	    "or1200_dc_ram.v",
+	    "or1200_dc_tag.v",
+	    "or1200_dc_top.v",
+	    "or1200_defines.v",
+	    "or1200_dmmu_tlb.v",
+	    "or1200_dmmu_top.v",
+	    "or1200_du.v",
+	    "or1200_except.v",
+	    "or1200_freeze.v",
+	    "or1200_genpc.v",
+	    "or1200_gmultp2_32x32.v",
+	    "or1200_ic_fsm.v",
+	    "or1200_ic_ram.v",
+	    "or1200_ic_tag.v",
+	    "or1200_ic_top.v",
+	    "or1200_if.v",
+	    "or1200_immu_tlb.v",
+	    "or1200_immu_top.v",
+	    "or1200_iwb_biu.v",
+	    "or1200_lsu.v",
+	    "or1200_mem2reg.v",
+	    "or1200_mult_mac.v",
+	    "or1200_operandmuxes.v",
+	    "or1200_pic.v",
+	    "or1200_pm.v",
+	    "or1200_qmem_top.v",
+	    "or1200_reg2mem.v",
+	    "or1200_rf.v",
+	    "or1200_sb.v",
+	    "or1200_sprs.v",
+	    "or1200_top.v",
+	    "or1200_tt.v",
+	    "or1200_wb_biu.v",
+	    "or1200_wbmux.v",
+	    //
+	    "dc_ram_blk.v",
+	    "dc_ram_sub.v",
+	    "dc_tag_blk.v",
+	    "dc_tag_sub.v",
+	    "dtlb_mr_blk.v",
+	    "dtlb_mr_sub.v",
+	    "dtlb_tr_blk.v",
+	    "dtlb_tr_sub.v",
+	    "ic_ram_blk.v",
+	    "ic_ram_sub.v",
+	    "ic_tag_blk.v",
+	    "ic_tag_sub.v",
+	    "itlb_mr_blk.v",
+	    "itlb_mr_sub.v",
+	    "itlb_tr_blk.v",
+	    "itlb_tr_sub.v",
+	    "rf_dist_model.v"
+	    //"rf_dist_xil.v",
+] []
+;
+
+wtime (p fseq 1);
+
+
+let ckt = pexlif2fsm p;
+
+wtime (ckt fseq 2);
+
+let vis = STE_debug ckt;
+wtime (vis fseq 3);
+
+let N = 10;
+
+let ant = 
+    "clk_i" is_clock N
+  and
+    "i3/i11/rf_we" is 1 in_cycle 0 followed_by
+		      1 in_cycle 1 followed_by
+		      1 in_cycle 2 otherwise 0 until N cycles
+  and
+    "i3/i11/rf_addrb_reg[4:0]" is
+			0 in_cycle 0 followed_by
+			1 in_cycle 1 followed_by
+			2 in_cycle 2 followed_by
+			0 in_cycle 3 followed_by
+			1 in_cycle 4 followed_by
+			2 in_cycle 5 followed_by
+			1 in_cycle 6
+  and
+    "i3/i11/rf_addrw[4:0]" is 
+			0 in_cycle 0 followed_by
+			1 in_cycle 1 followed_by
+			2 in_cycle 2 followed_by
+			X for (N-3) cycles
+  and
+    "i3/i11/rf_dataw[31:0]" is 
+			"a[31:0]" in_cycle 0 followed_by
+			"b[31:0]" in_cycle 1 followed_by
+			"c[31:0]" in_cycle 2 followed_by
+			X for (N-3) cycles
+;
+
+let ste = STE "-e" vis [] ant [] [];
+ste;
+
+let tab_1 = draw_fanin vis (0) 20 ["iwb_cyc_o","iwb_adr_o[31:0]","iwb_stb_o","iwb_we_o","iwb_sel_o[3:0]","iwb_dat_o[31:0]","iwb_cab_o","dwb_cyc_o","dwb_adr_o[31:0]","dwb_stb_o","dwb_we_o","dwb_sel_o[3:0]","dwb_dat_o[31:0]","dwb_cab_o","dbg_lss_o[3:0]","dbg_is_o[1:0]","dbg_wp_o[10:0]","dbg_bp_o","dbg_dat_o[31:0]","dbg_ack_o","pm_clksd_o[3:0]","pm_dc_gate_o","pm_ic_gate_o","pm_dmmu_gate_o","pm_immu_gate_o","pm_tt_gate_o","pm_cpu_gate_o","pm_wakeup_o","pm_lvolt_o"];
+tab_1;
+let tab_2 = draw_inside vis 1 ["ic_en","icpu_adr_cpu[31:0]","icpu_cycstb_cpu","icpu_sel_cpu[3:0]","icpu_tag_cpu[3:0]","immu_en","ex_insn[31:0]","ex_freeze","id_pc[31:0]","branch_op[2:0]","spr_dat_npc[31:0]","rf_dataw[31:0]","du_except[12:0]","du_dat_cpu[31:0]","dc_en","dcpu_adr_cpu[31:0]","dcpu_cycstb_cpu","dcpu_we_cpu","dcpu_sel_cpu[3:0]","dcpu_tag_cpu[3:0]","dcpu_dat_cpu[31:0]","dmmu_en","supv","spr_addr[31:0]","spr_dat_cpu[31:0]","spr_cs[31:0]","spr_we"];
+tab_2;
+let tab_3 = draw_fanin vis (-1) 2 ["i3/i11/i42/spo[31:0]"];
+tab_3;
+let tab_4 = draw_inside vis 2 ["i3/rf_dataa[31:0]","i3/rf_datab[31:0]","i3/spr_dat_rf[31:0]"];
+tab_4;

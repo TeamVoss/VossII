@@ -102,6 +102,7 @@ let mk_ste_debug_window {dummy::void} =
 non_lazy mk_ste_debug_window;
 
 let STE_debug fsm =
+    fsm fseq
     let w = mk_ste_debug_window () then
     (tcl_eval [sprintf "create_ste_debugger %s" w]) fseq
     let ste0 = STE "" fsm [] [] [] [] then
@@ -286,7 +287,9 @@ let get_new_sch_canvas w draw_level name =
 ;
 
 let canvas2tab c =
-    sprintf "tab_%s" (string_tl (el 4 (str_split c ".")));
+    (sprintf "tab_%s" (string_tl (el 4 (str_split c "."))))
+    gen_catch (\msg. (fprintf stderr "canvas2tab: %s fails\n" c) seq error msg)
+;
 
 let gen_draw_fanin vfsm draw_level levels vecs =
     let stop_list = deref (vfsm2stop_list_r vfsm) then
@@ -325,7 +328,7 @@ let gen_draw_inside vfsm cur_draw_level vecs =
     then
     let name =
 	let pfn = get_visualization_pfn fsm (hd nds) cur_draw_level then
-	NOT (str_is_prefix "draw_fub" pfn) => "-" |
+	NOT (str_is_prefix "draw_fub" pfn) => "N/A" |
 	let cmd = "extract_name_"^pfn then
 	let res = tcl_eval [cmd] then
 	res
@@ -1102,7 +1105,7 @@ let get_dependency_color ste t nds =
     let deps =
 	type = "bdd" =>
 	    let vs = (map (\n. get_trace_val ste n t) nds) catch [] then
-	    setify (map string_hd (depends vs))
+	    setify (map string_hd (get_abstract_depends ste vs))
 	|
 	type = "bexpr" =>
 	    let vs = (map (\n. bget_trace_val ste n t) nds) catch [] then
@@ -1112,33 +1115,34 @@ let get_dependency_color ste t nds =
 	eprintf "get_dependency_color on non-binary (%s) STE run" type
     then
     deps = [] => "" |
-    length deps > 1 => "pink" |
     deps = ["g"] => "green" |
     deps = ["b"] => "blue" |
-    deps = ["y"] => "yellow" |
     deps = ["r"] => "red" |
-    "brown"
+    mem "r" deps => "pink" |
+    "yellow"
 ;
 
 let fl_set_color_by_bdd_prefix mode c =
-  (
-    (cur_canvas := c) fseq
-    let vis   = canvas2vis c then
-    let dl_r = canvas2dl_r c then
-    let ste   = canvas2ste c then
-    let t = deref (canvas2current_time_r c) then
-    let anon_vis = visualize_get_shown_anons vis then
-    let get_color an =
-	mode = "off" => [] |
-	let vecs = visualization_anon2real vis an in
-	let nds = md_expand_vectors vecs in
-	let col = get_dependency_color ste t nds then
-	col = "" => [] |
-	map (\v. v,col) vecs
-    in
-    let cols = flatmap get_color anon_vis then
-    (dl_r := cols)
-  ) catch ()
+    busy (
+	    (
+		(cur_canvas := c) fseq
+		let vis   = canvas2vis c then
+		let dl_r = canvas2dl_r c then
+		let ste   = canvas2ste c then
+		let t = deref (canvas2current_time_r c) then
+		let anon_vis = visualize_get_shown_anons vis then
+		let get_color an =
+		    mode = "off" => [] |
+		    let vecs = visualization_anon2real vis an in
+		    let nds = md_expand_vectors vecs in
+		    let col = get_dependency_color ste t nds then
+		    col = "" => [] |
+		    map (\v. v,col) vecs
+		in
+		let cols = flatmap get_color anon_vis then
+		(dl_r := cols)
+	    ) catch ()
+    )
 ;
 export_to_tcl fl_set_color_by_bdd_prefix;
 

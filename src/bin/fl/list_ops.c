@@ -1063,7 +1063,7 @@ subtract(g_ptr redex)
     g_ptr set1, set2;
     EXTRACT_2_ARGS(redex, set1, set2);
     if( IS_NIL(set1) ) {
-	OVERWRITE(redex, set2);
+	OVERWRITE(redex, set1);
 	return;
     }
     if( IS_NIL(set2) ) {

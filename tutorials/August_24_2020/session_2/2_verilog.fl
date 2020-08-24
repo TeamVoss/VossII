@@ -1,0 +1,81 @@
+set_font font_large;
+load "ste.fl";
+
+// A pexlif can be obtained from Verilog through the verilog2pexlif function.
+// For details of the arguments, see the help system.
+
+// A small example (~5k lines of Verilog).
+let p = verilog2pexlif "-IM65C02" "M65C02_Core" [
+						"M65C02_Core.v",
+						"M65C02_MPCv4.v",
+						"M65C02_AddrGen.v",
+						"M65C02_ALU.v",
+						"M65C02_BCD.v",
+						"M65C02_BIN.v"] [];
+
+STE_debug (pexlif2fsm p);
+
+// A larger example:
+let p = verilog2pexlif "-Ior1200_hp" "or1200_top" [
+	    "rf_sub.v",
+	    "or1200_alu.v",
+	    "or1200_cfgr.v",
+	    "or1200_cpu.v",
+	    "or1200_ctrl.v",
+	    "or1200_dc_fsm.v",
+	    "or1200_dc_ram.v",
+	    "or1200_dc_tag.v",
+	    "or1200_dc_top.v",
+	    "or1200_defines.v",
+	    "or1200_dmmu_tlb.v",
+	    "or1200_dmmu_top.v",
+	    "or1200_du.v",
+	    "or1200_except.v",
+	    "or1200_freeze.v",
+	    "or1200_genpc.v",
+	    "or1200_gmultp2_32x32.v",
+	    "or1200_ic_fsm.v",
+	    "or1200_ic_ram.v",
+	    "or1200_ic_tag.v",
+	    "or1200_ic_top.v",
+	    "or1200_if.v",
+	    "or1200_immu_tlb.v",
+	    "or1200_immu_top.v",
+	    "or1200_iwb_biu.v",
+	    "or1200_lsu.v",
+	    "or1200_mem2reg.v",
+	    "or1200_mult_mac.v",
+	    "or1200_operandmuxes.v",
+	    "or1200_pic.v",
+	    "or1200_pm.v",
+	    "or1200_qmem_top.v",
+	    "or1200_reg2mem.v",
+	    "or1200_rf.v",
+	    "or1200_sb.v",
+	    "or1200_sprs.v",
+	    "or1200_top.v",
+	    "or1200_tt.v",
+	    "or1200_wb_biu.v",
+	    "or1200_wbmux.v",
+	    //
+	    "dc_ram_blk.v",
+	    "dc_ram_sub.v",
+	    "dc_tag_blk.v",
+	    "dc_tag_sub.v",
+	    "dtlb_mr_blk.v",
+	    "dtlb_mr_sub.v",
+	    "dtlb_tr_blk.v",
+	    "dtlb_tr_sub.v",
+	    "ic_ram_blk.v",
+	    "ic_ram_sub.v",
+	    "ic_tag_blk.v",
+	    "ic_tag_sub.v",
+	    "itlb_mr_blk.v",
+	    "itlb_mr_sub.v",
+	    "itlb_tr_blk.v",
+	    "itlb_tr_sub.v",
+	    "rf_dist_model.v"
+] []
+;
+
+STE_debug (pexlif2fsm p);

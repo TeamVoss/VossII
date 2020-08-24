@@ -61,6 +61,8 @@ set voss2_preferences {
         "Print time points during simulation" "bool" "TRUE"}
     {"STEP-LIMIT" "RCStep_limit"
         "Maximum number of simulation steps" "int" "100"}
+    {"ACCURATE-ITE-COMP" "RCaccurate_ite_comp"
+        "Ignore X on condition if then and else are equal" "bool" "TRUE"}
 
     {"Verbosity" "" "" "header"  ""}
     {"VERBOSE_CLOAD_IGNORES" "RCverbose_cload_ignores"

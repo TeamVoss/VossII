@@ -29,12 +29,21 @@ let find_file search_paths name =
     look search_paths
 ;
 
-// Compile Verilog to VossII's internal Fsm type.
+//
+// Compile Verilog to VossII's internal pexlif type.
 //
 // Usage: read_verilog flags top_level_module file_list
 // where
-//	flags		 = are yosys read_verilog flags (see yosys documentation
-//	top_level_module = 
+//	flags		 = yosys read_verilog flags (see yosys documentation)
+//			   Common one is: -I<path> to add search path
+//
+//	top_level_module = name of top-level Verilog module
+//
+//	file_list	 = list of verilog files to compile	
+//
+//	additional_files = list of files needed but not verilog files
+//			   For example, files only included by .v files.
+//
 let verilog2pexlif flags top_level_module file_list additional_files =
     // Create tmp directory and copy all files to it
     let tmp_dir = mktempd (sprintf "%s_verilog" top_level_module) then
@@ -92,11 +101,4 @@ let verilog2pexlif flags top_level_module file_list additional_files =
     let p = deref last_pexlif_ref then
     (last_pexlif_ref := error "No pexlif read") seq
     p
-;
-
-let verilog2fsm flags top_level_module file_list additional_files =
-    let p =
-	verilog2pexlif flags top_level_module file_list additional_files
-    then
-    pexlif2fsm p
 ;
