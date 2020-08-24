@@ -22,7 +22,7 @@ lettype canvas = CANVAS {rows::int} {cols::int} {bitmap::mem ref};
 // Load misc help and visualization functions
 cload "canvas_help_functions.fl";
 
-// Actual code
+// Create an empty canvas.
 let mk_canvas rows cols =
     CANVAS rows cols (ref (MEM '0 sNIL))
 ;
@@ -182,7 +182,6 @@ let C2 = draw_line (x0,y0) (x1,y1) (mk_canvas 32 32);
 C2;
 VIS 15 C2;
 
-
 let x0 = bv_constrained_variable "x0[5:0]" (\v. '10 < v AND v < '20);
 let y0 = bv_constrained_variable "y0[5:0]" (\v. '10 < v AND v < '20);
 let rad = bv_constrained_variable "r[5:0]" (\v. '2 < v AND v < '10);
@@ -190,4 +189,28 @@ let rad = bv_constrained_variable "r[5:0]" (\v. '2 < v AND v < '10);
 let C3 = draw_circle (x0,y0) rad (mk_canvas 32 32);
 C3;
 VIS 15 C3;
+// 
+// Note: C3 represents:
+2**(length (depends C3));
+// distinct circles.
 
+let hdsz = bv_constrained_variable "h[5:0]" (\v. '3 < v AND v < '5);
+let body = bv_constrained_variable "b[5:0]" (\v. '2*hdsz < v AND v < '12);
+let leg  = bv_constrained_variable "l[5:0]" (\v. '4 < v AND v < '8);
+let arm  = bv_constrained_variable "a[5:0]" (\v. '3 < v AND v < '7);
+let x0   = bv_constrained_variable "x0[5:0]" (\v. '12 < v AND v < '18);
+let y0   = bv_constrained_variable "y0[5:0]" (\v. '5 < v AND v < '10);
+
+let C4 =
+    let C0 = mk_canvas 32 32 then
+    let C1 = draw_circle (x0,y0) hdsz C0 then
+    let C2 = draw_line (x0,y0 + hdsz) (x0,y0+ hdsz+body) C1 then
+    let C3 = draw_line (x0,y0 + hdsz) (x0-arm,y0+ hdsz+arm) C2 then
+    let C4 = draw_line (x0,y0 + hdsz) (x0+arm,y0+ hdsz+arm) C3 then
+    let C5 = draw_line (x0,y0 +hdsz+body) (x0-leg,y0+hdsz+body+leg) C4 then
+    let C6 = draw_line (x0,y0 +hdsz+body) (x0+leg,y0+hdsz+body+leg) C5 then
+C6;
+
+C4;
+
+VIS 5 C4;

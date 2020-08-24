@@ -68,8 +68,3 @@ let ant =
 let ste = STE "-e" vis [] ant [] [];
 ste;
 
-// ====================================================================
-// A more complex example
-// ====================================================================
-// See examples in simple_pipeline directory
-

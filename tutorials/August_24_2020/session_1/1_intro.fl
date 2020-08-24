@@ -89,6 +89,8 @@ letrec list_length [] = 0
  /\    list_length (a:as) = 1+list_length as
 ;
 
+list_length [1,2,3,4,5];
+list_length ["a","b","q","wwq","abba","oink"];
 
 
 // One can define new (algebraic) data types.

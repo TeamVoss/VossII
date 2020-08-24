@@ -1,3 +1,7 @@
+// ----------------------------------------------------------------
+//  A simple 4-stage pipline
+// ----------------------------------------------------------------
+
 set_font font_large;
 cload "ste.fl";
 
@@ -201,3 +205,68 @@ var_order (
 
 let ste = STE "-e" vis [] ant [] [];
 ste;
+
+
+
+// Change i3:
+let i3 = 'hi<-- src1 ? (('hi-->src1)<--msb ? '0)
+	    <-- src2 ? (('hi-->src2)<--msb ? '0);
+
+let ant =
+    "clk" is_clock N
+  and
+    "reset" is 1 in_cycle 0 otherwise 0 until N cycles
+  and
+    "sec_level" is LOW in_cycle 1 followed_by
+		   LOW in_cycle 2 followed_by
+		   HIGH in_cycle 3 followed_by
+		   LOW in_cycle 4 followed_by
+		   LOW in_cycle 5 otherwise LOW until N cycles
+  and
+    "op[10:0]" is i1 in_cycle 1 followed_by
+		  i2 in_cycle 2 followed_by
+		  i3 in_cycle 3 followed_by
+		  i4 in_cycle 4 followed_by
+		  i5 in_cycle 5 otherwise NOP_instr until N cycles
+  and
+    "i13/RF0[1][7:0]" is "b[1][7:0]" in_cycle 0
+  and
+    "i13/RF0[2][7:0]" is "b[2][7:0]" in_cycle 0
+  and
+    "i13/RF1[2][7:0]" is "r[7][7:0]" in_cycle 0
+;
+
+let ste = STE "-e" vis [] ant [] [];
+ste;
+
+// Allow i3 to do anything!
+let i3 = {'hi::instr};
+
+let ant =
+    "clk" is_clock N
+  and
+    "reset" is 1 in_cycle 0 otherwise 0 until N cycles
+  and
+    "sec_level" is LOW in_cycle 1 followed_by
+		   LOW in_cycle 2 followed_by
+		   HIGH in_cycle 3 followed_by
+		   LOW in_cycle 4 followed_by
+		   LOW in_cycle 5 otherwise LOW until N cycles
+  and
+    "op[10:0]" is i1 in_cycle 1 followed_by
+		  i2 in_cycle 2 followed_by
+		  i3 in_cycle 3 followed_by
+		  i4 in_cycle 4 followed_by
+		  i5 in_cycle 5 otherwise NOP_instr until N cycles
+  and
+    "i13/RF0[1][7:0]" is "b[1][7:0]" in_cycle 0
+  and
+    "i13/RF0[2][7:0]" is "b[2][7:0]" in_cycle 0
+  and
+    "i13/RF1[2][7:0]" is "r[7][7:0]" in_cycle 0
+;
+
+let ste = STE "-e" vis [] ant [] [];
+ste;
+
+

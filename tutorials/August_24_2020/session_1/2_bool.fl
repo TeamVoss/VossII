@@ -3,6 +3,7 @@ set_font font_large;
 // Boolean variables
 let a = variable "a";
 let b = variable "b";
+let c = variable "c";
 
 // Or more convenient if you need a few
 VARS "a1 b1 a2 b2 a3 b3 a4 b4";
@@ -11,7 +12,7 @@ VARS "a1 b1 a2 b2 a3 b3 a4 b4";
 // Internally, they are represented as (Ordered) Binary Decision Diagrams (BDDs)
 let ex1 = NOT (a AND b);
 let ex2 = NOT a OR NOT b;
-let ex3 = NOT a OR b;
+let ex3 = NOT a OR NOT (b AND c);
 let ex4 = (a1 XNOR b1) AND (a2 XNOR b2) AND (a3 XNOR b3) AND (a4 XNOR b4);
 
 // There are two types of equality:
@@ -87,6 +88,9 @@ s;
 // For convenience, all arithmetic operations have been overloaded.
 (s + (int2bv 1));
 
+// A shorthand ' can be used instead of int2bv
+(s + '1);
+
 // Small fun
 let t  = bv_variable "t[3:0]";
 let u  = bv_variable "u[3:0]";
@@ -133,7 +137,7 @@ enumerate_examples 20 (depends s) reach;
 // ================================================================
 
 // An early extension to VossII was the introduction of BDDs in conditionals
-variable "c" => [ex1,ex3] | [ex3,ex1];
+variable "d" => [ex1,ex3] | [ex3,ex1];
 
 // Unfortunately, there were severe restirctions
 //  1) Both lhs and rhs had to have "the same shape", i.e, could only

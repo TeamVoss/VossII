@@ -11,7 +11,7 @@ let canvas2tcl canvas =
     let m = deref m_r then
     let mk_row r =
 	let mk_col c =
-	    let idx = {r::int}*{cols::int}+{c::int} in
+	    let idx = {c::int}*{rows::int}+{r::int} in
 	    let v = read m (int2bv idx) then
             v == ('0) => "black" |
             v == ('1) => "white" |

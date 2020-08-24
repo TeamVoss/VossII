@@ -4,8 +4,8 @@ set_font font_large;
 load "ste.fl";
 
 // Examples of modeling latches and flip-flops
-STE_debug (pexlif2fsm (re_ff 'clk {'d::bit} 'q));;
-STE_debug (pexlif2fsm (ah_latch 'clk {'d::bit} 'out));;
+//STE_debug (pexlif2fsm (re_ff 'clk {'d::bit} 'q));;
+//STE_debug (pexlif2fsm (ah_latch 'clk {'d::bit} 'out));;
 
 //
 // VossII provides two data models for hardware:
@@ -25,10 +25,10 @@ STE_debug (pexlif2fsm (ah_latch 'clk {'d::bit} 'out));;
 
 
 // First some examples of declaration of HW types.
-TYPE "byte" 8;
+TYPE "bv_8" 8;
 
 TYPE "raddr" 4;
-TYPE "addr"  28;
+TYPE "pc_addr"  28;
 
 ENUM "state" ["IDLE", "ALLOCATING", "SAVING", "RESTORING1", "RESTORING2"];
 
@@ -58,16 +58,16 @@ STRUCT "instr" 32 [
 	("loc1",    "raddr",		(23--20)),
 	("loc2",    "raddr",		(19--16)),
 	// Goto/call
-	("loc",    "addr",		(27--0))
+	("loc",    "pc_addr",		(27--0))
 ];
 
-// Accessing fields
+// Access fields
 'a-->src1;
 'a-->dst;
 'a-->loc1;
 'a-->loc;
 
-// Updating fields
+// Update fields
 'a<--src1 ? '1
   <--src2 ? '2
   <--dst  ? '0xf
@@ -76,8 +76,8 @@ STRUCT "instr" 32 [
 
 // Simple HFL example
 let add3 =
-    byte_input	a b c.
-    byte_output	out.
+    bv_8_input	a b c.
+    bv_8_output	out.
     CELL "draw_hier add3" [
 	out <- a '+' b '+' c
 ];
@@ -90,9 +90,9 @@ p;
 let simple_circuit =
     bit_input	clk.
     bit_input	reset.
-    byte_input  a b.
-    byte_output out.
-    byte_internal   mid new.
+    bv_8_input  a b.
+    bv_8_output out.
+    bv_8_internal   mid new.
     CELL "draw_hier simple_circuit" [
 	add3 a b out mid,
 	new <- (IF reset THEN '0 ELSE mid),
@@ -130,9 +130,9 @@ STE_debug ckt;
 
 // Version 1
 let add9 =
-    byte_input      i1 i2 i3 i4 i5 i6 i7 i8 i9.
-    byte_output     o.
-    byte_internal   m1 m2 m3.
+    bv_8_input      i1 i2 i3 i4 i5 i6 i7 i8 i9.
+    bv_8_output     o.
+    bv_8_internal   m1 m2 m3.
     CELL "draw_hier add6" [
         add3 i1 i2 i3 m1,
         add3 i4 i5 i6 m2,
@@ -146,9 +146,9 @@ STE_debug (pexlif2fsm p);
 // But we would like to define a module that add any number of items...
 // Here's one way:
 letrec add_list =
-    byte_list_input il.
-    byte_output	    o.
-    byte_internal   rem.
+    bv_8_list_input il.
+    bv_8_output	    o.
+    bv_8_internal   rem.
     CELL "draw_hier add_tree" (
 	il = [] => [
 	    o <- '0
@@ -170,9 +170,9 @@ vis;
 // However, that's not a good design.
 // Make it a balanced tree instead!
 letrec add_tree =
-    byte_list_input  il.
-    byte_output      o.
-    byte_internal    m1 m2.
+    bv_8_list_input  il.
+    bv_8_output      o.
+    bv_8_internal    m1 m2.
     CELL "draw_hier add_tree" (
         let l = length il in
         l = 1 => [
@@ -192,7 +192,7 @@ STE_debug (pexlif2fsm p);
 // Easier to visualize
 STE_debug (pexlif2fsm (flatten_pexlif p));
 
-// That gave us a tree-structured added for bytes. 
+// That gave us a tree-structured added for bv_8s. 
 // How about generalizing it to any type?
 letrec gen_add_tree =
     list_input  il.
@@ -211,7 +211,7 @@ letrec gen_add_tree =
             o <- m1 '+' m2
 ]);
 
-let p = gen_add_tree ['i1,'i2,'i3,'i4,'i5,'i6,'i7,'i8,'i9] {'o::byte};
+let p = gen_add_tree ['i1,'i2,'i3,'i4,'i5,'i6,'i7,'i8,'i9] {'o::bv_8};
 STE_debug (pexlif2fsm (flatten_pexlif p));
 
 // Define a new type.
@@ -249,8 +249,8 @@ let or_tree  = reduce_tree (defix '|');
 
 // Trying this out...
 let test = 
-    byte_input	a b c d e f.
-    byte_output	o1 o2 o3 o4 o5.
+    bv_8_input	a b c d e f.
+    bv_8_output	o1 o2 o3 o4 o5.
     CELL "draw_hier test" [
 	add_tree [a,b,c,d,e,f] o1,
 	mul_tree [a,b,c,d,e,f] o2,
@@ -267,6 +267,6 @@ STE_debug (pexlif2fsm (flatten_pexlif p));
 
 
 // ====================================
-// Finally a larger example:
-load "diff_cache/diff_cache.fl";
+// Finally to see a larger example 
 
+load "diff_cache/diff_cache.fl";

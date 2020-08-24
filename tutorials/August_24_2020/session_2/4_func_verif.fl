@@ -1,0 +1,115 @@
+// =============================================================
+// Verification example
+// =============================================================
+set_font font_large;
+load "ste.fl";
+
+
+// Load design.
+let p = verilog2pexlif "-IM65C02" "M65C02_Core" [
+					    "M65C02_Core.v",
+					    "M65C02_MPCv4.v",
+					    "M65C02_AddrGen.v",
+					    "M65C02_ALU.v",
+					    "M65C02_BCD.v",
+					    "M65C02_BIN.v" ] []
+;
+
+// Start the GUI
+let vis = STE_debug (pexlif2fsm p);
+vis;
+
+// Load ROM.
+let ROM_ant file rom MAX_TIME =
+    let fp = fopen file "r" then
+    letrec rd addr =
+	let line = fgets fp then
+	line == "" => [] |
+	let loc = sprintf "%s[%d][31:0]" rom addr then
+	let vs = map (\c.c="1") (butlast (explode line)) in
+	(map2 (\n.\v. (T,n,v,0,MAX_TIME)) (md_expand_vector loc) vs):
+	(rd (addr+1))
+    in
+    let lines = rd 0 then
+    (fclose fp) fseq
+    flat lines
+;
+
+let N      = 20;                                    // Simulation length.
+let a      = bv_variable "a[7:0]";                  // Accumulator sym. value.
+let b      = bv_variable "b[7:0]";                  // Operand sym. value.
+let res    = tl (fixed_bv2list 9 T (a + b));	    // Expected result.
+                                                    // Expected carry flag.
+let carry  = (bv_AND (bv_add (bv_ZX a) (bv_ZX b)) (int2bv 256)) != (int2bv 0);
+let zero   = res = (replicate 8 F);                 // Expected zero flag.
+let static =
+    // Microprogram setup.
+    "MC[2:0]"      is "0b100"     in_cycle 0 and  // Microcycle controller.
+    "uPL[31:28]"   is "0b0101"    in_cycle 0 and  // Instruction field.
+    "i3/dRst"      is "0x0"       in_cycle 0 and  // Delayed reset.
+    "i1/PSW[5:0]"  is "0b000100"  in_cycle 1 and  // Program status word.
+    "OP1[7:0]"     is "0x0"       in_cycle 0 and  // Operand one.
+    "OP2[7:0]"     is "0x0"       in_cycle 0 and  // Operand two.
+    // Constant.
+    "Clk"  is_clock N          and                  // Clock.
+    "Rst"  is "0" for N cycles and                  // Reset.
+    "Wait" is "0" for N cycles and                  // Memory Wait.
+    "Int"  is "0" for N cycles and                  // Interrupt.
+    "xIRQ" is "0" for N cycles and                  // Interrupt Mask.
+    // ROM.
+    ROM_ant "M65C02/M65C02_uPgm_V3a.coe"    "uP_ROM" N and // Program ROM.
+    ROM_ant "M65C02/M65C02_Decoder_ROM.coe" "ID_ROM" N     // Instruction ROM.
+;
+
+// Shorthands.
+let a_bv = fixed_bv2list 8 T a;
+let b_bv = fixed_bv2list 8 T b;
+
+// 0x196 _ADC_imm, opcode 0x69.
+let ant =
+    "A[7:0]"  is a_bv    in_cycle 1 and
+    "BA[8:0]" is "0x196" in_cycle 0 and
+    "DI[7:0]" is "0x69"  in_cycle 0 and
+    "DI[7:0]" is b_bv    in_cycle 4 and
+    static
+;
+
+let cons =
+    "A[7:0]"     is res     in_cycle 9
+;
+
+let ste  = STE "-e" vis [] ant cons [];
+ste;
+
+get_ste_result ste "strong";
+
+
+// What if it fails?
+let try_res    = tl (fixed_bv2list 9 T (a - b));
+let cons =
+    "A[7:0]"     is try_res     in_cycle 9
+;
+
+let ste  = STE "-e" vis [] ant cons [];
+ste;
+
+let ok = get_ste_result ste "strong";
+ok;
+forcing ok;
+
+let failure_cond = NOT ok;
+
+enumerate_examples 10 (depends (a_bv, b_bv)) failure_cond;
+
+let sub = full_example F (depends ant) failure_cond;
+sub;
+
+let ant' = substitute sub ant;
+let cons' = substitute sub cons;
+
+substitute sub a_bv;
+substitute sub b_bv;
+substitute sub try_res;
+
+STE "-e" vis [] ant' cons' [];
+
