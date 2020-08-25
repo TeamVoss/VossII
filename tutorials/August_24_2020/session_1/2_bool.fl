@@ -24,6 +24,9 @@ ex1 == ex3;
 ex1 = ex2;
 ex1 = ex3;
 
+ex1;
+ex3;
+
 // More interesting
 NOT (ex1 = ex3);
 
@@ -78,6 +81,11 @@ letrec Gfp fn cur =
     IF (new == cur) THEN cur ELSE Gfp fn new
 ;
 
+letrec Lfp fn cur =
+    let new = cur AND (fn cur) in
+    IF (new == cur) THEN cur ELSE Gfp fn new
+;
+
 
 // Since individual Boolean variables are rarely useful by themselves,
 // VossII also provides (infinitely precise) bitvectors.
@@ -90,6 +98,8 @@ s;
 
 // A shorthand ' can be used instead of int2bv
 (s + '1);
+
+//s + '0x8000;
 
 // Small fun
 let t  = bv_variable "t[3:0]";
@@ -136,7 +146,7 @@ enumerate_examples 20 (depends s) reach;
 // Symbolic computations
 // ================================================================
 
-// An early extension to VossII was the introduction of BDDs in conditionals
+// An early extension to Voss was the introduction of BDDs in conditionals
 variable "d" => [ex1,ex3] | [ex3,ex1];
 
 // Unfortunately, there were severe restirctions
@@ -152,7 +162,9 @@ letrec fact n = n = '1 => '1 | n * fact (n - '1);
 fact (int2bv 5);
 
 let test v = v >= '6 ==> (fact v) > (v*v + '100);
-let v = bv_constrained_variable "v[7:0]" (\v. v > '1 AND v < '99);
-test v;
 
+let v = bv_constrained_variable "v[7:0]" (\v. v > '1 AND v < '99);
+bv_examples 30 v;
+
+test v;
 

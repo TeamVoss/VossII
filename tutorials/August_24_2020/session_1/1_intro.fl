@@ -80,6 +80,11 @@ let triple x =
     double x + x
 ;
 
+let triple x =
+    let twice x = x+x in
+    twice x + x
+;
+
 triple 12;
 triple 1.2;
 triple (int2bv 5);

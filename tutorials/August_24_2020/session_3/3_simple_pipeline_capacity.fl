@@ -202,7 +202,6 @@ let ant =
 ;
 
 (var_order (
-    (map (sprintf "_%d") (1--10000)) @
     (interleave (map md_expand_vector ["hi[10:0]", "li[10:0]"]))@
     (interleave (map md_expand_vector ["b[1][7:0]", "b[2][7:0]", "r[7][7:0]"]))
 )) fseq ();
@@ -212,5 +211,5 @@ update_vossrc "NOTIFY-TRAJECTORY-FAILURES" "NO";
 update_vossrc "NOTIFY-CHECK-FAILURES" "NO";
 update_vossrc "ACCURATE-ITE-COMP" "NO";
 
-let ste = STE "-e -w 10000 -ifw" vis [] ant [] [];
+let ste = STE "-e -w 1000 -ifw" vis [] ant [] [];
 ste;

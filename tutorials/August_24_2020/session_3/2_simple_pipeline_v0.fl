@@ -169,7 +169,7 @@ vis;
 
 let i1 = NOP_instr;
 let i2 = NOP_instr;
-let i3 = 'hi<-- dst ? (('hi-->dst)<--msb ? '1);
+let i3 = 'ri<-- dst ? (('ri-->dst)<--msb ? '1);
 let i4 = {'li::instr};
 let i5 = NOP_instr;
 
@@ -192,8 +192,6 @@ let ant =
 		  i5 in_cycle 5 otherwise NOP_instr until N cycles
   and
     "i13/RF0[1][7:0]" is "b[1][7:0]" in_cycle 0
-  and
-    "i13/RF0[2][7:0]" is "b[2][7:0]" in_cycle 0
   and
     "i13/RF1[2][7:0]" is "r[7][7:0]" in_cycle 0
 ;

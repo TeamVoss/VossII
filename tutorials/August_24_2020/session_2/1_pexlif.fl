@@ -62,6 +62,9 @@ STRUCT "instr" 32 [
 ];
 
 // Access fields
+{'a::instr};
+{'b::instr};
+
 'a-->src1;
 'a-->dst;
 'a-->loc1;
