@@ -1,0 +1,166 @@
+cload "ste.fl";
+cload (DIR^"diffcache_constants.fl");
+
+let lookup {t1::tag} {t2::tag} {ll:: (int list) list} =
+    let vals = [FREE, L1, L2, L3, L4, L5, L6, L7] in
+    let conds = flatmap (\r. map (\c. t1 '=' r '&' t2 '=' c) vals) vals in
+    let sel e c = e = 0 => [] | [c] in
+    let res = flat (map2 sel (flat ll) conds) in
+    itlist (defix '|') res {'0::bit}
+;
+
+let info_order =
+    tag_input	t1 t2.
+    bit_output	less.
+    CELL "draw_hier info_order" [
+	less <- lookup t1 t2 (map snd [
+	// Example of lattice
+	//
+	//                           L7
+	//                          / \
+	//                         /   \
+	//                  L3    L5   L6
+	//                  |      \  /
+	//                  |       \/
+	//                  L2      L4
+	//                    \    /
+	//                     \  /
+	//                      \/
+	//                      L1
+	//                       |
+	//                       |
+	//                     FREE
+	//
+	//
+	      // FREE, L1, L2, L3, L4, L5, L6, L7
+        (FREE, [  0,   1,  1,  1,  1,  1,  1,  1 ]),
+        (L1,   [  0,   0,  1,  1,  1,  1,  1,  1 ]),
+        (L2,   [  0,   0,  0,  1,  0,  0,  0,  0 ]),
+        (L3,   [  0,   0,  0,  0,  0,  0,  0,  0 ]),
+        (L4,   [  0,   0,  0,  0,  0,  1,  0,  1 ]),
+        (L5,   [  0,   0,  0,  0,  0,  0,  0,  1 ]),
+        (L6,   [  0,   0,  0,  0,  0,  0,  0,  1 ]),
+        (L7,   [  0,   0,  0,  0,  0,  0,  0,  0 ])])
+];
+
+// let vis = STE_debug (pexlif2fsm (info_order 't1 't2 'less));
+// let ant = "t1[2:0]" is L1 for 1 phases followed_by
+//                   L2 for 1 phases followed_by
+//                   L1 for 1 phases followed_by
+//                   L2 for 1 phases
+//       and "t2[2:0]" is L1 for 2 phases followed_by
+//                   L2 for 2 phases;
+// STE "-e" vis [] ant [] [];
+
+let cam_cell =
+    bit_input	clk.
+    bit_input	reset.
+    tag_input	new_key.
+    bit_input   exact_match.
+    bit_input	write.
+    bit_input	creset.
+    bit_output	match.
+    //
+    tag_internal    cur_key.
+    bit_internal    new_less_cur new_eq_cur new_lte_cur free.
+    CELL "draw_hier cam_cell" [
+	info_order new_key cur_key new_less_cur,
+        new_eq_cur <- (new_key '=' cur_key),
+        new_lte_cur <- (new_less_cur '|' new_eq_cur),
+        match <- (IF exact_match THEN new_eq_cur ELSE new_lte_cur),
+	free <- creset '&' new_lte_cur,
+	STATE clk cur_key [
+	    reset --- FREE,
+	    free  --- FREE,
+	    write --- new_key
+	]
+] ;
+
+//STE_debug (pexlif2fsm (cam_cell 'clk 'reset 'new_key 'write 'creset 'match));
+
+
+// 
+// NOTE: It is assumed that get_free, update, restore, and cleanup
+// are mutually exclusive (at most one is high in any cycle).
+//
+let CAM =
+    bit_input	clk.
+    bit_input	reset.
+    // Alloc interface
+    bit_input	get_free.
+    bit_output	free_valid.
+    cam_addr_output	free_addr.
+    // Update interface
+    bit_input	update.
+    cam_addr_input	update_addr.
+    tag_input	update_tag.
+    // Restore interface
+    bit_input	restore.
+    tag_input	restore_tag.
+    bit_output	restore_valid.
+    cam_addr_output	restore_addr.
+    // Clean up interface
+    bit_input	cleanup.
+    tag_input	clean_level.
+    // ----------------------
+    list_internal CAM_LINES cam_writes cam_valids.
+    bit_internal	valid.
+    cam_addr_internal	match_addr.
+    tag_internal	new_key.
+    bit_internal        exact_match.
+    CELL "draw_hier CAM" (
+	(map2 (\w.\m. cam_cell clk reset new_key exact_match w cleanup m)
+	      cam_writes cam_valids)@
+	[
+	CASE new_key [
+	    get_free	---  FREE,
+	    restore	---  restore_tag,
+	    update	---  update_tag,
+	    cleanup	---  clean_level ] '0,
+        // When restoring we want all addresses st. new_tag <= cur_tag, but
+        // get_free needs an address st. FREE = cur_tag.
+        exact_match <- ('~' restore),
+	free_valid <- get_free '&' valid,
+	free_addr  <- match_addr,
+	EN_DECODER_list update update_addr cam_writes,
+	list_ENCODER cam_valids valid match_addr,
+	restore_valid <- restore '&' valid,
+	restore_addr  <- match_addr
+]);
+
+let p = CAM 'clk 'reset
+	    'get_free 'free_valid 'free_addr
+	    'update 'update_addr 'update_tag
+	    'restore 'restore_tag 'restore_valid 'restore_addr
+	    'cleanup 'clean_level
+;
+
+let ckt = pexlif2fsm p;
+
+let vis = STE_debug ckt;
+
+//vis;
+
+let ant =
+    "addr[3:0]" is 0x0 for 1 phase followed_by
+		   0x1 for 1 phase followed_by
+		   0x2 for 1 phase followed_by
+		   0x3 for 1 phase followed_by
+		   0x0 for 1 phase followed_by
+		   0x1 for 1 phase followed_by
+		   0x2 for 1 phase followed_by
+		   0x3 for 1 phase
+  and
+    "din[15:0]" is "0x123" for 1 phase followed_by
+		   "0x5f2" for 1 phase followed_by
+		   "0x222[15:0]" for 1 phase followed_by
+		   "0xffff" for 1 phase followed_by
+		   "d4[15:0]" for 1 phase followed_by
+		   "d5[15:0]" for 1 phase followed_by
+		   "d6[15:0]" for 1 phase followed_by
+		   "d7[15:0]" for 1 phase
+  and
+    "write" is 1 for 4 phases otherwise 0 until 8 phases
+;
+
+//STE "-e" vis [] ant [] [];

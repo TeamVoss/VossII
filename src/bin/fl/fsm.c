@@ -18,6 +18,8 @@
 extern symbol_tbl_ptr	symb_tbl;
 extern str_mgr		strings;
 extern jmp_buf		*start_envp;
+extern bool		gui_mode;
+extern bool		use_stdout;
 extern char		FailBuf[4096];
 extern bool		RCverbose_fsm_print;
 extern bool		RCnotify_traj_failures;
@@ -29,11 +31,14 @@ extern int		RCStep_limit;
 extern bool		RCprint_failures;
 extern bool		RCverbose_ste_run;
 extern bool		RCprint_time;
+extern bool		RCaccurate_ite_comp;
 extern g_ptr		void_nd;
 extern bool		Do_gc_asap;
 extern FILE		*odests_fp;
 
 /***** PRIVATE VARIABLES *****/
+static int	    undeclared_node_cnt;
+static bool         quit_simulation_early;
 static int	    nbr_errors_reported;
 static jmp_buf	    node_map_jmp_env;
 static jmp_buf	    event_jmp_env;
@@ -108,6 +113,8 @@ static rec_mgr	    *trace_event_rec_mgrp;
 static rec_mgr	    *old_trace_event_rec_mgrp;
 static rec_mgr	    *trace_rec_mgrp;
 static rec_mgr	    *old_trace_rec_mgrp;
+static buffer	    *weakening_bufp;
+static buffer	    *old_weakening_bufp;
 static value_type   current_type;
 static value_type   old_type;
 //
@@ -174,6 +181,9 @@ static char	    tmp_name_buf[4096];
 static char	    buf[4096];
 static int	    temporary_node_cnt = 0;
 static int	    max_rank = 1;
+
+static int	    BDD_size_limit;
+static bool	    information_flow_weakening;
 
 /* ----- Forward definitions local functions ----- */
 
@@ -289,7 +299,8 @@ static int          find_node_index(vec_ptr decl, vec_ptr vp, int start);
 static string       idx2name(int idx);
 static ilist_ptr    vec2indices(string name);
 static int          name2idx(string name);
-static ilist_ptr    map_vector(hash_record *vtblp, string hier, string name);
+static ilist_ptr    map_vector(hash_record *vtblp, string hier, string name,
+			       bool ingnore_dangling);
 static int          vec_size(vec_ptr vec);
 static int          get_stride(vec_ptr vp);
 static bool         inside(int i, int upper, int lower);
@@ -345,9 +356,9 @@ static void         sshl_fun(int size, gbv *vp, int cnt, gbv *resp);
 static void         sshr_fun(int size, gbv *vp, int cnt, gbv *resp);
 static void         sashr_fun(int size, gbv *vp, int cnt, gbv *resp);
 static void         add_op_todo(ncomp_ptr cp);
-static void         do_phase();
-static int          do_combinational();
-static int          do_wl_op(ncomp_ptr op);
+static void         do_phase(ste_ptr ste);
+static int          do_combinational(ste_ptr ste);
+static int          do_wl_op(ste_ptr ste, ncomp_ptr op);
 static void         op_X(ncomp_ptr op);
 static void         op_CONST(ncomp_ptr op);
 static void         op_VAR(ncomp_ptr op);
@@ -396,9 +407,10 @@ static void         switch_to_ints();
 static void         BDD_cHL_Print(odests fp, gbv H, gbv L);
 static void         bexpr_cHL_Print(odests fp, gbv H, gbv L);
 static void         switch_to_BDDs();
-static int          update_node(int idx, gbv Hnew, gbv Lnew, bool new);
+static int          update_node(ste_ptr ste, int idx, gbv Hnew, gbv Lnew,
+			        bool new);
 static gbv *        allocate_value_buf(int sz, gbv H, gbv L);
-static bool         initialize();
+static bool         initialize(ste_ptr ste);
 static sch_ptr      mk_repeat(vstate_ptr vp, char *anon);
 static bool         has_ifc_nodes(vstate_ptr vp, ilist_ptr il, ilist_ptr *silp,
                                   ilist_ptr *rilp);
@@ -461,6 +473,9 @@ static string       create_merge_component(int sz, int *ccnt, g_ptr *intsp,
                                            buffer *chbufp);
 static g_ptr        clean_pexlif_ios(g_ptr node);
 static string	    find_instance_name(g_ptr attrs);
+static gbv	    BDD_c_limited_AND(gbv a, gbv b);
+static gbv	    BDD_c_limited_OR(gbv a, gbv b);
+static void	    base_print_ilist(ilist_ptr il);
 
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
@@ -626,10 +641,21 @@ free_ste_buffers()
     next_buf = NULL;
 }
 
+static void
+simulation_break_handler()
+{
+    if( quit_simulation_early ) return;
+    if( !gui_mode || use_stdout ) {
+        FP(err_fp, "\n\n---- Simulation interrupted ----\n");
+    }
+    quit_simulation_early = TRUE;
+}
 
 static void
 gSTE(g_ptr redex, value_type type)
 {
+    void    (*old_handler)();
+
     // STE opts fsm wl ant cons trl
     g_ptr g_opts, g_fsm, wl, ant, cons, trl;
     nbr_errors_reported = 0;
@@ -642,16 +668,43 @@ gSTE(g_ptr redex, value_type type)
     if( strstr(opts, "-a") != NULL )
 	abort_ASAP = TRUE;
     int abort_time = 99999999;
+    //
     string mt = strstr(opts, "-m");
     if( mt != NULL ) {
-	if( sscanf("-m %d", mt, &abort_time) != 1 ) {
+	if( sscanf(mt, "-m %d", &abort_time) != 1 ) {
 	    FP(warning_fp, "Unrecognized flag in STE call (");
 	    FP(warning_fp, "-m should be followed by time). Ignored.\n");
 	}
     }
+    //
+    BDD_size_limit = -1;
+    string dw = strstr(opts, "-w");
+    if( dw != NULL ) {
+	if( type != use_bdds ) {
+	    FP(err_fp, "Weakening (-w) currently only avaliable in BDD based ");
+	    FP(err_fp, "STE. Flag ignored\n");
+	} else if( sscanf(dw, "-w %d", &BDD_size_limit) != 1 ) {
+	    FP(warning_fp, "Unrecognized flag in STE call (-w should be ");
+	    FP(warning_fp,"followed by BDD size limit). Ignored.\n");
+	}
+    }
+    information_flow_weakening = FALSE;
+    if( strstr(opts, "-ifw") != NULL ) {
+	if( type != use_bdds ) {
+	    FP(err_fp, "Information flow weakening (-ifw) only avaliable ");
+	    FP(err_fp, "in BDD based STE.  Flag ignored\n");
+	} else {
+	    information_flow_weakening = TRUE;
+	}
+    }
+
+    old_handler = signal(SIGINT, simulation_break_handler);
+    quit_simulation_early = FALSE;
+
     fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
     push_fsm(fsm);
     ste_ptr ste = create_ste(fsm, type);
+    ste->abort_ASAP = abort_ASAP;
     //
     // Now translate weakenings, ant, cons and trl into events
     //
@@ -676,9 +729,10 @@ gSTE(g_ptr redex, value_type type)
     // Make sure g.c. can see the object
     //
     MAKE_REDEX_EXT_OBJ(redex, ste_oidx, ste);
-    if( !ok ) {
+    if( !ok || quit_simulation_early ) {
 	ste->max_time = 0;
 	pop_fsm();
+	signal(SIGINT, old_handler);
 	return;
     }
     ste->active = TRUE;
@@ -687,12 +741,17 @@ gSTE(g_ptr redex, value_type type)
     //
     bool old_RCverbose_ste_run = RCverbose_ste_run;
     RCverbose_ste_run = FALSE;
-    if( !initialize() ) {
-	MAKE_REDEX_FAILURE(redex, Fail_pr("Initialization failed"));
+    if( !initialize(ste) || quit_simulation_early ) {
+	if( quit_simulation_early ) {
+	    MAKE_REDEX_FAILURE(redex, Fail_pr("Simulation interrupted"));
+	} else {
+	    MAKE_REDEX_FAILURE(redex, Fail_pr("Initialization failed"));
+	}
 	free_ste_buffers();
 	ste->max_time = 0;
 	ste->active = FALSE;
 	pop_fsm();
+	signal(SIGINT, old_handler);
 	return;
     }
     RCverbose_ste_run = old_RCverbose_ste_run;
@@ -704,6 +763,7 @@ gSTE(g_ptr redex, value_type type)
 	free_ste_buffers();
 	ste->active = FALSE;
 	pop_fsm();
+	signal(SIGINT, old_handler);
 	return;
     }
     //
@@ -713,70 +773,54 @@ gSTE(g_ptr redex, value_type type)
     int min_time = ep->time;
     ep = FAST_LOC_BUF(&event_buf, 0);
     int max_time = ep->time+1;
- 
+
+    if( RCprint_time ) {
+	if( gui_mode ) {
+            Sprintf(buf, "simulation_start %d %d", min_time, max_time);
+            Info_to_tcl(buf);
+	} else {
+	    FP(bdd_gc_fp, "\nStart simulation:\n");
+	}
+    }
     for(int t = min_time; t <= max_time; t++) {
-	if( t > abort_time ) {
-	    FP(warning_fp, "Simulation aborted at time %d\n", abort_time);
+	ste->cur_time = t;
+	if( t > abort_time || quit_simulation_early ) {
+	    if( gui_mode ) {
+		Sprintf(buf, "simulation_end");
+		Info_to_tcl(buf);
+	    }
+	    FP(warning_fp, "Simulation interrupted at time %d\n", abort_time);
 	    ste->active = FALSE;
+	    signal(SIGINT, old_handler);
 	    return;
 	}
-	if( RCprint_time )
-	    FP(sim_fp, "Time: %d\n", t);
+	if( RCprint_time ) {
+	    if( gui_mode ) {
+		Sprintf(buf, "simulation_update %d", t);
+		Info_to_tcl(buf);
+	    } else {
+		FP(sim_fp, "Time: %d\n", t);
+	    }
+	}
 	process_event(&event_buf, t);
 	nnode_ptr np;
-	// Do weakenings and antecedents
+	// Put nodes whose weak/ant changed on evaluation list.
 	int idx = 0;
 	FOR_BUF(nodesp, nnode_rec, np) {
-	    if( np->has_weak || np->has_ant ) {
-		gbv curH = *(cur_buf+2*idx);
-		gbv curL = *(cur_buf+2*idx+1);
-		gbv newH = curH;
-		gbv newL = curL;
-		if( np->has_weak ) {
-		    newH = c_OR(newH, *(weak_buf+2*idx)); 
-		    newL = c_OR(newL, *(weak_buf+2*idx+1)); 
+	    if( np->has_ant_or_weak_change ) {
+		if( np->composite >= 0 ) {
+		    ncomp_ptr c;
+		    c = (ncomp_ptr) M_LOCATE_BUF(compositesp,np->composite);
+		    add_op_todo(c);
+		} else if( np->composite == -1 ) {
+		    // Input node
+		    update_node(ste, idx, c_ONE, c_ONE, FALSE);
 		}
-		if( np->has_ant ) {
-		    gbv aH = *(ant_buf+2*idx);
-		    gbv aL = *(ant_buf+2*idx+1);
-		    gbv abort = c_NOT(c_OR(c_AND(aH, newH), c_AND(aL, newL)));
-		    if( RCnotify_traj_failures &&
-			(nbr_errors_reported < RCmax_nbr_errors) &&
-			c_NEQ(abort, c_ZERO) )
-		    {
-			FP(warning_fp,
-			  "Warning: Antecedent failure at time %d on node %s\n",
-			  t, idx2name(np->idx));
-			if( RCprint_failures ) {
-			    FP(err_fp, "\nCurrent value:");
-			    cHL_Print(err_fp, newH, newL);
-			    FP(err_fp, "\nAsserted value:");
-			    cHL_Print(err_fp, aH, aL);
-			}
-			nbr_errors_reported++;
-			if( abort_ASAP ) {
-			    newH = c_AND(newH, aH); 
-			    newL = c_AND(newL, aL); 
-			    gbv v = ste->validTrajectory;
-			    v = c_AND(v, c_OR(newH, newL));
-			    ste->validTrajectory = v;
-			    ste->max_time = t;
-			    ste->active = FALSE;
-			    pop_fsm();
-			    return;
-			}
-		    }
-		    newH = c_AND(newH, aH); 
-		    newL = c_AND(newL, aL); 
-		    gbv v = ste->validTrajectory;
-		    v = c_AND(v, c_OR(newH, newL));
-		    ste->validTrajectory = v;
-		}
-		update_node(idx, newH, newL, FALSE);
+		np->has_ant_or_weak_change = FALSE;
 	    }
 	    idx++;
 	}
-	do_combinational();
+	do_combinational(ste);
 	// Do consequents and traces
 	idx = 0;
 	FOR_BUF(nodesp, nnode_rec, np) {
@@ -785,44 +829,52 @@ gSTE(g_ptr redex, value_type type)
 		gbv curL = *(cur_buf+2*idx+1);
 		gbv chkH = *(cons_buf+2*idx);
 		gbv chkL = *(cons_buf+2*idx+1);
-		gbv ok = c_AND(c_OR(chkH,c_NOT(curH)), c_OR(chkL,c_NOT(curL)));
 		if( RCnotify_check_failures &&
-		    (nbr_errors_reported < RCmax_nbr_errors) && 
-		    c_NEQ(ok, c_ONE) )
+		    (nbr_errors_reported < RCmax_nbr_errors) )
 		{
-		    FP(err_fp, "Warning: Consequent failure at time %d", t);
-		    FP(err_fp, " on node %s\n", idx2name(idx));
-		    if( RCprint_failures ) {
-			FP(err_fp, "\nCurrent value:");
-			cHL_Print(err_fp, curH, curL);
-			FP(err_fp, "\nExpected value:");
-			cHL_Print(err_fp, chkH, chkL);
-			/* Print a counter example */
-			gbv bad = c_AND(
-				    c_OR(c_AND(chkH,c_NOT(curH)),
-					 c_AND(c_NOT(chkH),curH)),
-				    c_OR(c_AND(chkL,c_NOT(curL)),
-					 c_AND(c_NOT(chkL),curL)));
-			if( c_NEQ(bad,c_ZERO) ) {
-			    FP(err_fp, "\nStrong disagreement when: ");
-			    c_Print(err_fp, bad, -1);
+		    gbv ok = c_AND(c_OR(chkH,c_NOT(curH)),
+				   c_OR(chkL,c_NOT(curL)));
+		    if( c_NEQ(ok, c_ONE) ) {
+			FP(err_fp, "Warning: Consequent failure at time %d", t);
+			FP(err_fp, " on node %s\n", idx2name(idx));
+			if( RCprint_failures ) {
+			    FP(err_fp, "Current value:");
+			    cHL_Print(err_fp, curH, curL);
+			    FP(err_fp, "\nExpected value:");
+			    cHL_Print(err_fp, chkH, chkL);
+			    /* Print a counter example */
+			    gbv bad = c_AND(
+					c_OR(c_AND(chkH,c_NOT(curH)),
+					     c_AND(c_NOT(chkH),curH)),
+					c_OR(c_AND(chkL,c_NOT(curL)),
+					     c_AND(c_NOT(chkL),curL)));
+			    if( c_NEQ(bad,c_ZERO) ) {
+				FP(err_fp, "\nStrong disagreement when: ");
+				c_Print(err_fp, bad, -1);
+			    } else {
+				FP(err_fp, "\nWeak disagreement when:");
+				gbv bad = c_OR(c_AND(c_NOT(chkH), curH),
+					       c_AND(c_NOT(chkL), curL));
+				c_Print(err_fp, bad, -1);
+			    }
+			    FP(err_fp, "\n");
 			}
-		    } else {
-			FP(err_fp, "\nWeak disagreement when:");
-			gbv bad = c_OR(c_AND(c_NOT(chkH), curH),
-				       c_AND(c_NOT(chkL), curL));
-			c_Print(err_fp, bad, -1);
-		    }
-		    nbr_errors_reported++;
-		    FP(err_fp, "\n");
-		    if( abort_ASAP ) {
-			gbv v = ste->checkTrajectory;
-			v = c_AND(v, c_OR(c_NOT(curH), chkH));
-			v = c_AND(v, c_OR(c_NOT(curL), chkL));
-			ste->checkTrajectory = v;
-			ste->active = FALSE;
-			ste->max_time = t;
-			return;
+			nbr_errors_reported++;
+			FP(err_fp, "\n");
+			if( abort_ASAP ) {
+			    gbv v = ste->checkTrajectory;
+			    v = c_AND(v, c_OR(c_NOT(curH), chkH));
+			    v = c_AND(v, c_OR(c_NOT(curL), chkL));
+			    ste->checkTrajectory = v;
+			    if( gui_mode ) {
+				Sprintf(buf, "simulation_end");
+				Info_to_tcl(buf);
+			    }
+			    ste->active = FALSE;
+			    ste->max_time = t;
+			    signal(SIGINT, old_handler);
+			    return;
+			}
 		    }
 		}
 		gbv v = ste->checkTrajectory;
@@ -837,13 +889,18 @@ gSTE(g_ptr redex, value_type type)
 	    }
 	    idx++;
 	}
-	do_phase();
+	do_phase(ste);
 	if( Do_gc_asap )
 	    Garbage_collect();
     }
     ste->max_time = max_time;
     free_ste_buffers();
     ste->active = FALSE;
+    if( gui_mode ) {
+	Sprintf(buf, "simulation_end");
+	Info_to_tcl(buf);
+    }
+    signal(SIGINT, old_handler);
     pop_fsm();
 }
 
@@ -957,7 +1014,7 @@ DBG_print_sch(string title, sch_ptr sch)
     dbg_print_sch_rec(sch, 0);
 }
 
-#if 0
+#if 1
 static void
 fl_clean_pexlif_ios(g_ptr redex)
 {
@@ -984,6 +1041,7 @@ pexlif2fsm(g_ptr redex)
     new_buf(&attr_buf, 100, sizeof(g_ptr));
     //
     visualization_id = 0;
+    undeclared_node_cnt = 0;
     new_mgr(&node_comp_pair_rec_mgr, sizeof(node_comp_pair_rec));
     create_hash(&node_comp_pair_tbl, 1000, ni_pair_hash, ni_pair_equ);
     create_hash(&idx_list_uniq_tbl, 100, idx_list_hash, idx_list_equ);
@@ -1304,6 +1362,37 @@ get_visualization_pfn(g_ptr redex)
 	return;
     }
     MAKE_REDEX_STRING(redex, vp->pfn);
+    pop_fsm();
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+get_visualization_attributes(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_fsm, g_node, g_level;
+    EXTRACT_3_ARGS(redex, g_fsm, g_node, g_level);
+    fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
+    string node = GET_STRING(g_node);
+    push_fsm(fsm);
+    int idx = name2idx(node);
+    if( idx < 0 ) {
+	pop_fsm();
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	return;
+    }
+    nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
+    vis_ptr vp = get_vis_info_at_level(np->draw_info, GET_INT(g_level));
+    if( vp == NULL ) {
+	pop_fsm();
+	MAKE_REDEX_FAILURE(redex,
+			   Fail_pr("Node %s has no drawing information", node));
+	return;
+    }
+    INC_REFCNT(vp->attrs);
+    OVERWRITE(redex, vp->attrs);
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -1752,6 +1841,37 @@ value_type2string(value_type type)
 	    DIE("Impossible");
     }
     DIE("Impossible");
+}
+
+static void
+get_weak_expressions(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_ste;
+    EXTRACT_1_ARG(redex, g_ste);
+    ste_ptr ste = (ste_ptr) GET_EXT_OBJ(g_ste);
+    if( ste->type != use_bdds ) {
+	string msg = Fail_pr("get_weak_expressions require ste from STE run");
+	MAKE_REDEX_FAILURE(redex, msg);
+	return;
+    }
+    push_ste(ste);
+    MAKE_REDEX_NIL(redex);
+    g_ptr tail = redex;
+    formula *fp;
+    int idx = 0;
+    FOR_BUF(weakening_bufp, formula, fp) {
+	char nm[10];
+	sprintf(nm, "_%d", idx);
+	idx++;
+	string name = wastrsave(&strings, nm);
+	g_ptr pair = Make_PAIR_ND(Make_STRING_leaf(name), Make_BOOL_leaf(*fp));
+	APPEND1(tail, pair);
+    }
+    pop_ste();
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
 }
 
 static void
@@ -2353,6 +2473,12 @@ Fsm_Install_Functions()
     // Add builtin functions
     typeExp_ptr	pexlif_tp = Get_Type("pexlif", NULL, TP_INSERT_PLACE_HOLDER);
 
+    Add_ExtAPI_Function("dbg_clean_pexlif_ios", "1", FALSE,
+			GLmake_arrow(pexlif_tp, pexlif_tp),
+			fl_clean_pexlif_ios);
+
+    
+
     Add_ExtAPI_Function("pexlif2fsm", "1", FALSE,
 			GLmake_arrow(pexlif_tp, fsm_handle_tp),
 			pexlif2fsm);
@@ -2490,6 +2616,18 @@ Fsm_Install_Functions()
 				GLmake_arrow(GLmake_int(), GLmake_string()))),
 			get_visualization_pfn);
 
+    Add_ExtAPI_Function("get_visualization_attributes", "111", FALSE,
+			GLmake_arrow(
+			    fsm_handle_tp,
+			    GLmake_arrow(
+				GLmake_string(),
+				GLmake_arrow(
+				    GLmake_int(),
+				    GLmake_list(
+					GLmake_tuple(GLmake_string(),
+						     GLmake_string()))))),
+			get_visualization_attributes);
+
     Add_ExtAPI_Function("get_visualization_fanins", "111", FALSE,
 			GLmake_arrow(
 			    fsm_handle_tp,
@@ -2603,6 +2741,12 @@ Fsm_Install_Functions()
 				     GLmake_arrow(GLmake_string(),
 						  GLmake_string())),
 			basename);
+
+    Add_ExtAPI_Function("get_weak_expressions", "1", FALSE,
+			 GLmake_arrow(ste_handle_tp,
+			    GLmake_list(
+				GLmake_tuple(GLmake_string(), GLmake_bool()))),
+			 get_weak_expressions);
 
     Add_ExtAPI_Function("get_trace", "11", FALSE,
 			GLmake_arrow(
@@ -3158,8 +3302,8 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	er.type = end_weak;
 	er.nd_idx = nd_idx;
 	er.time = to;
-	er.H = c_ZERO;
-	er.L = c_ZERO;
+	er.H = when;
+	er.L = when;
 	push_buf(ebufp, &er);
     }
     for(g_ptr cur = ant; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
@@ -3288,6 +3432,7 @@ process_event(buffer *event_bufp, int time)
 	} else {
 	    int idx = ep->nd_idx;
 	    nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
+	    np->has_ant_or_weak_change = FALSE;
 	    if( ep->type == start_trace ) {
 		np->has_trace = TRUE;
 		gbv H = *(cur_buf + 2*idx);
@@ -3301,18 +3446,38 @@ process_event(buffer *event_bufp, int time)
 		switch( ep->type ) {
 		    case start_weak:
 			np->has_weak = TRUE;
+			np->has_ant_or_weak_change = TRUE;
+			if( c_EQ(ep->H, c_ZERO) && c_EQ(ep->L, c_ZERO) ) {
+			    if( np->composite >= 0 ) {
+				ncomp_ptr c;
+				c = (ncomp_ptr) M_LOCATE_BUF(compositesp,
+							     np->composite);
+				c->no_weakening = TRUE;
+			    }
+			}
 			buf = weak_buf;
 			break;
 		    case end_weak:
 			np->has_weak = FALSE;
+			np->has_ant_or_weak_change = TRUE;
+			if( c_EQ(ep->H, c_ZERO) && c_EQ(ep->L, c_ZERO) ) {
+			    if( np->composite >= 0 ) {
+				ncomp_ptr c;
+				c = (ncomp_ptr) M_LOCATE_BUF(compositesp,
+							     np->composite);
+				c->no_weakening = FALSE;
+			    }
+			}
 			buf = weak_buf;
 			break;
 		    case start_ant:
 			np->has_ant = TRUE;
+			np->has_ant_or_weak_change = TRUE;
 			buf = ant_buf;
 			break;
 		    case end_ant:
 			np->has_ant = FALSE;
+			np->has_ant_or_weak_change = TRUE;
 			buf = ant_buf;
 			break;
 		    case start_cons:
@@ -3392,6 +3557,8 @@ create_ste(fsm_ptr fsm, value_type type)
     new_mgr(_trace_event_rec_mgrp, sizeof(trace_event_rec));
     rec_mgr     *_trace_rec_mgrp = &(ste->trace_rec_mgr);
     new_mgr(_trace_rec_mgrp, sizeof(trace_rec));
+    buffer     *_weakening_bufp = &(ste->weakening_buf);
+    new_buf(_weakening_bufp, 100, sizeof(formula));
     push_ste(ste);
     ste->validTrajectory = c_ONE;
     ste->checkTrajectory = c_ONE;
@@ -3407,6 +3574,7 @@ push_ste(ste_ptr ste)
     old_trace_tblp = trace_tblp;
     old_trace_event_rec_mgrp = trace_event_rec_mgrp;
     old_trace_rec_mgrp = trace_rec_mgrp;
+    old_weakening_bufp = weakening_bufp;
     current_type = ste->type;
     switch( current_type ) {
 	case use_bdds:
@@ -3424,6 +3592,7 @@ push_ste(ste_ptr ste)
     trace_tblp = &(ste->trace_tbl);
     trace_event_rec_mgrp = &(ste->trace_event_rec_mgr);
     trace_rec_mgrp = &(ste->trace_rec_mgr);
+    weakening_bufp = &(ste->weakening_buf);
 }
 
 static void
@@ -3446,6 +3615,7 @@ pop_ste()
     trace_tblp = old_trace_tblp;
     trace_event_rec_mgrp = old_trace_event_rec_mgrp;
     trace_rec_mgrp = old_trace_rec_mgrp;
+    weakening_bufp = old_weakening_bufp;
 }
 
 static void
@@ -3520,6 +3690,10 @@ mark_fsm_fn(pointer p)
 	    Arbi_mark(cp->arg.value);
 	}
     }
+    vis_ptr vp;
+    FOR_REC(&(fsm->vis_rec_mgr), vis_ptr, vp) {
+	Mark(vp->attrs);
+    }
 }
 
 static void
@@ -3581,6 +3755,10 @@ mark_ste_fn(pointer p)
 	    gbv_mark(*(next_buf+2*i));
 	    gbv_mark(*(next_buf+2*i));
 	}
+    }
+    formula *fp;
+    FOR_BUF(weakening_bufp, formula, fp) {
+	B_Mark(*fp);
     }
     pop_fsm_env();
     pop_ste();
@@ -4739,9 +4917,9 @@ make_input_arg(g_ptr we, int sz, hash_record *vtblp, string hier, bool pdel)
     ilist_ptr inps;
     if( is_W_VAR(we, &sz, &base) ) {
 	string vname = mk_vec_name(base, sz);
-	inps = map_vector(vtblp, hier, vname);
+	inps = map_vector(vtblp, hier, vname, FALSE);
     } else if( is_W_EXPLICIT_VAR(we, &sz, &base) ) {
-	inps = map_vector(vtblp, hier, base);
+	inps = map_vector(vtblp, hier, base, FALSE);
     } else {
 	// Make a temporary vector
 	Sprintf(buf, "__tmp%d", ++temporary_node_cnt);
@@ -4837,7 +5015,7 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	cr.op = op_WIRE;
 	cr.size = sz;
 	string vname = mk_vec_name(base, sz);
-	ilist_ptr inps = map_vector(vtblp, hier, vname);
+	ilist_ptr inps = map_vector(vtblp, hier, vname, FALSE);
 	cr.inps = inps;
 	add_fanouts(inps, comp_idx);
 	push_buf(compositesp, (pointer) &cr);
@@ -4846,7 +5024,7 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
     if( is_W_EXPLICIT_VAR(we, &sz, &name) ) {
 	cr.op = op_WIRE;
 	cr.size = sz;
-	ilist_ptr inps = map_vector(vtblp, hier, name);
+	ilist_ptr inps = map_vector(vtblp, hier, name, FALSE);
 	cr.inps = inps;
 	add_fanouts(inps, comp_idx);
 	push_buf(compositesp, (pointer) &cr);
@@ -5159,11 +5337,11 @@ get_lhs_indices(hash_record *vtblp, string hier, g_ptr e)
     if( is_W_VAR(e, &sz, &base) ) {
 	// Variable
 	string vname = mk_vec_name(base, sz);
-	ilist_ptr res = map_vector(vtblp, hier, vname);
+	ilist_ptr res = map_vector(vtblp, hier, vname, FALSE);
 	return res;
     } else if( is_W_EXPLICIT_VAR(e, &sz, &base) ) {
 	// Variable
-	ilist_ptr res = map_vector(vtblp, hier, base);
+	ilist_ptr res = map_vector(vtblp, hier, base, FALSE);
 	return res;
     } else if( is_W_SLICE(e, &idx_list, &sub_expr) ||
 	       is_W_NAMED_SLICE(e, &base, &idx_list, &sub_expr) ) {
@@ -5207,6 +5385,8 @@ report_source_locations(odests dfp)
 		indent += 4;
 	    } else if( strcmp(key, "src") == 0 ) {
 		FP(dfp, " in %s\n", val);
+	    } else if( strcmp(key, "fl_src") == 0 ) {
+		FP(dfp, " in %s\n", val);
 	    }
 	}
     }
@@ -5232,8 +5412,9 @@ declare_vector(hash_record *vtblp, string hier, string name,
     if( transient ) {
 	int asz = compute_ilist_length(act_map);
 	if( sz != asz ) {
-	    FP(err_fp,"\nLength mismatch for %s/%s (%d!=%d)\n",
-		      hier, name, sz, asz);
+	    FP(err_fp,"\nLength mismatch between %s%s and ", hier, name);
+	    base_print_ilist(act_map);
+	    FP(err_fp," (%d!=%d)\n", sz, asz);
 	    report_source_locations(err_fp);
 	    Rprintf("");
 	}
@@ -5389,7 +5570,7 @@ name2idx(string name)
 }
 
 static ilist_ptr
-map_vector(hash_record *vtblp, string hier, string name)
+map_vector(hash_record *vtblp, string hier, string name, bool ignore_missing)
 {
     if( strncmp("0b", name, 2) == 0 ) {
 	// A constant
@@ -5413,9 +5594,20 @@ map_vector(hash_record *vtblp, string hier, string name)
     string sig = get_vector_signature(vp);
     vec_info_ptr oip = (vec_info_ptr) find_hash(vtblp,sig);
     if( oip == NULL ) {
-	FP(warning_fp, "Undeclared signal %s in %s. Created.\n", name, hier);
-	report_source_locations(warning_fp);
+	if( !ignore_missing ) {
+	    FP(warning_fp, "Undeclared signal %s in %s.\n", name, hier);
+	    report_source_locations(warning_fp);
+	}
+	sprintf(tmp_name_buf, "TmP__%d_%s", undeclared_node_cnt, name);
+	undeclared_node_cnt++;
+	string new_name = wastrsave(&strings, tmp_name_buf);
+	if( !ignore_missing ) {
+	    FP(warning_fp, "Replaced %s with %s\n\n", name, new_name);
+	}
+	name = new_name;
 	declare_vector(vtblp, hier, name, FALSE, NULL, NULL);
+	vp = split_vector_name(vec_rec_mgrp,range_rec_mgrp, name);
+	sig = get_vector_signature(vp);
 	oip = (vec_info_ptr) find_hash(vtblp,sig);
     }
     vec_info_ptr ip = oip;
@@ -6196,7 +6388,7 @@ add_op_todo(ncomp_ptr cp)
 }
 
 static void
-do_phase()
+do_phase(ste_ptr ste)
 {
     nnode_ptr np;
     int idx = 0;
@@ -6205,19 +6397,19 @@ do_phase()
 	if( idx >3 && np->composite == -1 ) {
 	    // Input
 	    newH = newL = c_ONE;
-	    update_node(idx, newH, newL, TRUE);
+	    update_node(ste, idx, newH, newL, FALSE);
 	} else if( np->has_phase_event ) {
 	    np->has_phase_event = FALSE;
 	    newH = *(next_buf+2*idx);
 	    newL = *(next_buf+2*idx+1);
-	    update_node(idx, newH, newL, TRUE);
+	    update_node(ste, idx, newH, newL, FALSE);
 	}
 	idx++;
     }
 }
 
 static int
-do_combinational()
+do_combinational(ste_ptr ste)
 {
     bool empty = FALSE;
     int iterations = RCStep_limit;
@@ -6234,7 +6426,8 @@ do_combinational()
 		    ncomp_ptr cp;
 		    pop_buf(bp, &cp);
 		    cp->flag = FALSE;
-		    todo += do_wl_op(cp);
+		    if( quit_simulation_early ) return -1;
+		    todo += do_wl_op(ste, cp);
 		}
 	    }
 	    rank--;
@@ -6242,7 +6435,6 @@ do_combinational()
     }
     return( todo );
 }
-
 
 //
 // Convention for value buffer
@@ -6271,7 +6463,7 @@ do_combinational()
 
 //
 static int
-do_wl_op(ncomp_ptr op)
+do_wl_op(ste_ptr ste, ncomp_ptr op)
 {
     gbv one = c_ONE;
     resize_buf(&inps_buf, 0);
@@ -6291,7 +6483,21 @@ do_wl_op(ncomp_ptr op)
     gbv_outs = START_BUF(&outs_buf);
     //
     // Perform the operation
-    op->op(op);
+    if( BDD_size_limit >= 0 && !op->no_weakening ) {
+	    // Use dynamic weakening
+	    gbv (*old_c_AND)(gbv a, gbv b);
+	    gbv (*old_c_OR)(gbv a, gbv b);
+	    old_c_AND = c_AND;
+	    old_c_OR  = c_OR;
+	    c_AND = BDD_c_limited_AND;
+	    c_OR = BDD_c_limited_OR;
+	    op->op(op);
+	    c_AND     = old_c_AND;
+	    c_OR      = old_c_OR;
+    } else {
+	op->op(op);
+    }
+
     int additional = 0;
     // Now process the outputs (fanouts, phase delays, etc.)
     if( op->phase_delay ) {
@@ -6310,7 +6516,7 @@ do_wl_op(ncomp_ptr op)
 	FOREACH_NODE(idx, op->outs) {
 	    gbv newH = *(gbv_outs+i); i++;
 	    gbv newL = *(gbv_outs+i); i++;
-	    additional += update_node(idx, newH, newL, FALSE);
+	    additional += update_node(ste, idx, newH, newL, FALSE);
 	}
     }
     return additional;
@@ -6536,10 +6742,15 @@ op_ITE(ncomp_ptr op)
 	gbv aL = INP_L(1+i);
 	gbv bH = INP_H(1+i+op->size);
 	gbv bL = INP_L(1+i+op->size);
-	OUT_H(i) = c_OR(c_OR(c_AND(aH,bH),c_AND(cH,aH)),
-			  c_AND(cL,bH));
-	OUT_L(i) = c_AND(c_AND(c_OR(aL,bL),c_OR(cL,aL)),
-			   c_OR(cH,bL));
+	if( RCaccurate_ite_comp ) {
+	    OUT_H(i) = c_OR(c_OR(c_AND(aH,bH),c_AND(cH,aH)),
+			      c_AND(cL,bH));
+	    OUT_L(i) = c_AND(c_AND(c_OR(aL,bL),c_OR(cL,aL)),
+			       c_OR(cH,bL));
+	} else {
+	    OUT_H(i) = c_OR(c_AND(cH,aH), c_AND(cL,bH));
+	    OUT_L(i) = c_AND(c_OR(cL,aL), c_OR(cH,bL));
+	}
     }
 }
 
@@ -6934,9 +7145,17 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
     if( !top_level && (leaf || (strstr(name,"draw_") != NULL))){
 	vp = (vis_ptr) new_rec(vis_rec_mgrp);
 	vp->draw_level = draw_level;
+	vp->attrs = attrs;
 	draw_level++;
 	vp->id = ++visualization_id;
-	vp->pfn = name;
+	if( strstr(name, "draw_") == NULL ) {
+	    string tmp = strtemp("draw_hfl {");
+	    tmp = strappend(name);
+	    tmp = strappend("}");
+	    vp->pfn = wastrsave(&strings, tmp);
+	} else {
+	    vp->pfn = name;
+	}
 	vp->fa_inps = NULL;
 	vp->fa_outs = NULL;
     }
@@ -6990,7 +7209,7 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
 	    ilist_ptr act_list = NULL;
 	    while( !IS_NIL(acts) ) {
 		string actual = GET_STRING(GET_CONS_HD(acts));
-		ilist_ptr tmp = map_vector(parent_tblp, hier, actual);
+		ilist_ptr tmp = map_vector(parent_tblp, hier, actual, FALSE);
 		if( tmp == NULL ) {
 		    string phier = strtemp(hier);
 		    string last = rindex(phier, '/');
@@ -7028,7 +7247,7 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
 	    ilist_ptr act_list = NULL;
 	    while( !IS_NIL(acts) ) {
 		string actual = GET_STRING(GET_CONS_HD(acts));
-		ilist_ptr tmp = map_vector(parent_tblp, hier, actual);
+		ilist_ptr tmp = map_vector(parent_tblp, hier, actual, TRUE);
 		if( tmp == NULL ) {
 		    string phier = strtemp(hier);
 		    string last = rindex(phier, '/');
@@ -7081,9 +7300,19 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
             // Replace draw_hier txt with draw_fub txt inst inputs outputs
 	    string cmd = gen_strtemp(sm, "draw_fub ");
 	    cmd = gen_strappend(sm, vp->pfn + 10);
-	    cmd = gen_strappend(sm, " ");
-	    cmd = gen_strappend(sm, find_instance_name(attrs));
-	    cmd = gen_strappend(sm, " { ");
+	    string iname = find_instance_name(attrs);
+	    if( iname == s_no_instance ) {
+		cmd = gen_strappend(sm, " ");
+		cmd = gen_strappend(sm, hier);
+		cmd = gen_strappend(sm, " ");
+	    } else {
+		cmd = gen_strappend(sm, " {");
+		cmd = gen_strappend(sm, hier);
+		cmd = gen_strappend(sm, ": ");
+		cmd = gen_strappend(sm, iname);
+		cmd = gen_strappend(sm, "} ");
+	    }
+	    cmd = gen_strappend(sm, "{ ");
             for(g_ptr l = fa_inps; !IS_NIL(l); l = GET_CONS_TL(l)) {
                 g_ptr pair = GET_CONS_HD(l);
                 string fname = GET_STRING(GET_FST(pair));
@@ -7276,6 +7505,56 @@ BDD_c_OR(gbv a, gbv b)
     return( res );
 }
 
+static gbv
+BDD_c_limited_AND(gbv a, gbv b)
+{
+    formula f = a.f;
+    formula g = b.f;
+    gbv res;
+    formula r = B_And(f,g);
+    if( Get_bdd_size(r, BDD_size_limit) >= BDD_size_limit ) {
+	if( information_flow_weakening ) {
+	    int idx = COUNT_BUF(weakening_bufp);
+	    push_buf(weakening_bufp, &r);
+	    char nm[10];
+	    sprintf(nm, "_%d", idx);
+	    string name = wastrsave(&strings, nm);
+	    res.f = B_Var(name);
+	} else {
+	    // Dynamic weakening
+	    res.f = B_One();
+	}
+    } else {
+	res.f = r;
+    }
+    return( res );
+}
+
+static gbv
+BDD_c_limited_OR(gbv a, gbv b)
+{
+    formula f = a.f;
+    formula g = b.f;
+    gbv res;
+    formula r = B_Or(f,g);
+    if( Get_bdd_size(r, BDD_size_limit) >= BDD_size_limit ) {
+	if( information_flow_weakening ) {
+	    int idx = COUNT_BUF(weakening_bufp);
+	    push_buf(weakening_bufp, &r);
+	    char nm[10];
+	    sprintf(nm, "_%d", idx);
+	    string name = wastrsave(&strings, nm);
+	    res.f = B_Var(name);
+	} else {
+	    // Dynamic weakening
+	    res.f = B_One();
+	}
+    } else {
+	res.f = r;
+    }
+    return( res );
+}
+
 static bool
 bexpr_c_NEQ(gbv a, gbv b)
 {
@@ -7344,10 +7623,8 @@ switch_to_BDDs()
     c_ONE.f  = B_One();
 }
 
-
-
 static int
-update_node(int idx, gbv Hnew, gbv Lnew, bool force)
+update_node(ste_ptr ste, int idx, gbv Hnew, gbv Lnew, bool force)
 {
     int todo = 0;
     gbv Hcur = *(cur_buf+2*idx);
@@ -7361,10 +7638,46 @@ update_node(int idx, gbv Hnew, gbv Lnew, bool force)
 	    Lnew = c_OR(Lnew, Lw); 
 	}
 	if( np->has_ant ) {
-	    gbv Ha = *(ant_buf+2*idx);
-	    gbv La = *(ant_buf+2*idx+1);
-	    Hnew = c_AND(Hnew, Ha); 
-	    Lnew = c_AND(Lnew, La); 
+	    gbv aH = *(ant_buf+2*idx);
+	    gbv aL = *(ant_buf+2*idx+1);
+	    if( RCnotify_traj_failures &&
+		(nbr_errors_reported < RCmax_nbr_errors) )
+	    {
+		gbv abort = c_NOT(c_OR(c_AND(aH, Hnew), c_AND(aL, Lnew)));
+		if( c_NEQ(abort, c_ZERO) ) {
+		    FP(warning_fp,
+		      "Warning: Antecedent failure at time %d on node %s\n",
+		      ste->cur_time, idx2name(np->idx));
+		    if( RCprint_failures ) {
+			FP(err_fp, "\nCurrent value:");
+			cHL_Print(err_fp, Hnew, Lnew);
+			FP(err_fp, "\nAsserted value:");
+			cHL_Print(err_fp, aH, aL);
+		    }
+		    nbr_errors_reported++;
+		    if( ste->abort_ASAP ) {
+			Hnew = c_AND(Hnew, aH); 
+			Lnew = c_AND(Lnew, aL); 
+			gbv v = ste->validTrajectory;
+			v = c_AND(v, c_OR(Hnew, Lnew));
+			ste->validTrajectory = v;
+			ste->max_time = ste->cur_time;
+			ste->active = FALSE;
+			if( gui_mode ) {
+			    Sprintf(buf, "simulation_end");
+			    Info_to_tcl(buf);
+			}
+			pop_fsm();
+			kill(getpid(), SIGINT);
+			return 0;
+		    }
+		}
+	    }
+	    Hnew = c_AND(Hnew, aH); 
+	    Lnew = c_AND(Lnew, aL); 
+	    gbv v = ste->validTrajectory;
+	    v = c_AND(v, c_OR(Hnew, Lnew));
+	    ste->validTrajectory = v;
 	}
     }
     *(cur_buf+2*idx) = Hnew;
@@ -7378,7 +7691,6 @@ update_node(int idx, gbv Hnew, gbv Lnew, bool force)
 		add_op_todo(c);
 	    }
 	}
-    } else {
     }
     return todo;
 }
@@ -7395,7 +7707,7 @@ allocate_value_buf(int sz, gbv H, gbv L)
 }
 
 static bool
-initialize()
+initialize(ste_ptr ste)
 {
     nnode_ptr np;
     FOR_BUF(nodesp, nnode_rec, np) {
@@ -7420,9 +7732,10 @@ initialize()
 	    //FP(sim_fp, "Oscillating nodes set to X\n");
 	    return FALSE;
 	}
-	todo = do_combinational();
+	todo = do_combinational(ste);
+	if( todo < 0 ) return FALSE;
 	if( todo > 0 ) 
-	    do_phase();
+	    do_phase(ste);
     }
     return( TRUE );
 }

@@ -1,0 +1,53 @@
+load "ste.fl";
+
+TYPE "word" 16;
+
+let comb =
+    bit_input	clk.
+    word_input	a b.
+    word_output  o1 o2.
+    word_internal    m1 m2 m3.
+    CELL "comb" [
+	m1 <- a '+' b,
+	m2 <- '~' m1,
+	o1 <- '~' m2,
+	re_ff clk m1 o2
+];
+
+let p = comb 'clk 'a 'b 'o1 'o2;
+
+let ckt = pexlif2fsm p;
+
+let ant1 =
+    "clk" is_clock 5
+  and
+    "a[15:0]" is "ra[15:0]" in_cycle 0
+  and
+    "b[15:0]" is "rb[15:0]" in_cycle 0
+;
+
+let ste = STE "-e -w 100 -ifw" ckt [] ant1 [] (map (\n. n,0,10) (nodes ckt));
+ste;
+
+get_trace ste "m1[0]";
+get_trace ste "m1[1]";
+get_trace ste "m1[7]";
+depends it;
+
+//let vis = STE_debug ckt;
+//let ste = STE "-e -w 10" vis [] ant1 [] (map (\n. n,0,100) (nodes ckt));
+//
+//get_trace ste "a";
+//
+//let tab_1 = draw_fanin vis (0) 20 ["o1[15:0]","o2[15:0]"];
+//tab_1;
+//draw_show_values vis tab_1 T;
+//add_waveform vis ["a[15:0]"];
+//add_waveform vis ["b[15:0]"];
+//add_waveform vis ["clk"];
+//add_waveform vis ["o1[15:0]"];
+//add_waveform vis ["o2[15:0]"];
+//add_waveform vis ["m1[15:0]"];
+//add_waveform vis ["m2[15:0]"];
+//add_waveform vis ["m3[15:0]"];
+//

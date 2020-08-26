@@ -1,0 +1,36 @@
+load "ste.fl";
+
+let q =
+    bit_input	clk.
+    bit_input	en.
+    bit_input	inp.
+    bit_output	out.
+    CELL "qq" [
+	_dffe T T 1 "abs" ["out"] ["en"] ["clk"] ["inp"]
+];
+
+let p = q 'clk 'en 'inp 'out;
+p;
+
+let ckt = pexlif2fsm p;
+let vis = STE_debug ckt;
+
+vis;
+
+let ant =
+    "clk" is_clock 2
+  and
+    "en" is 1 in_cycle 0
+  and
+    "inp" is "a" in_cycle 0
+;
+
+let ste = STE "-e" vis [] ant [] [];
+ste;
+
+get_trace ste "clk";
+fanout ckt "clk";
+
+get_trace ste "i1/CLK_##_";
+get_trace ste "en";
+get_trace ste "i1/EN_##_";

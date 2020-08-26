@@ -5,6 +5,7 @@
 
 set ::util_window_cnt 0
 
+set base_ttfont [font actual {{bitstream vera sans mono} 6}]
 set base_tfont  [font actual {{bitstream vera sans mono} 8}]
 set base_sfont  [font actual {{bitstream vera sans mono} 10}]
 set base_mfont  [font actual {{bitstream vera sans mono} 11}]
@@ -49,6 +50,18 @@ proc change_font_rec {w new_font} {
 proc change_fonts {new_font} {
     change_font_rec . $new_font
     set ::voss2_txtfont $new_font
+    set ::voss2_help_font $new_font
+    ttk::style configure TNotebook.Tab -font $new_font
+    ttk::style configure TLabelframe.Label -font $new_font
+    ttk::style configure TCombobox.Entry -font $new_font
+    ttk::style configure TButton -font $new_font
+    ttk::style configure TLabel -font $new_font
+    ttk::style configure TEntry -font $new_font
+    ttk::style configure TCheckbutton -font $new_font
+    option add *TCombobox*Listbox.font $new_font
+    option add *TCombobox*Entry.font $new_font
+    option add *TCombobox*TEntry.font $new_font
+    update
 }
 
 
@@ -153,10 +166,68 @@ proc util:report_result_in_file {msg file return_alts} {
     util:report_result $header $txt $return_alts
 }
 
+
+set ::busy_level 0
+
+
 set ::always_alive {}
 
 proc make_window_always_alive {w} {
     lappend ::always_alive $w
+}
+
+proc remove_window_always_alive {w} {
+    set old $::always_alive
+    set ::always_alive {}
+    foreach ww $old {
+	if { $ww != $w } {
+	    lappend ::always_alive $ww
+	}
+    }
+}
+
+proc mk_busy {w mode} {
+    foreach cw [winfo children $w] {
+	set has_active_child 0
+	set len [string length $cw]
+	foreach aw $::always_alive {
+	    if [string equal -length $len $cw $aw] {
+		set has_active_child 1
+	    }
+	}
+	if { $has_active_child == 0 } {
+	    if { $mode == 1 } {
+		catch {tk busy hold $cw -cursor watch}
+	    } else {
+		catch {tk busy forget $cw}
+	    }
+	} else {
+	    mk_busy $cw $mode
+	}
+    }
+}
+
+proc i_am_busy {} {
+    incr ::busy_level
+    if { $::busy_level == 1 } {
+	foreach w [wm stackorder .] {
+	    mk_busy $w 1
+	}
+	update
+    }
+}
+
+proc i_am_free {} {
+    set ::busy_level [expr $::busy_level-1]
+    if [expr $::busy_level < 0] { 
+	set ::busy_level 0
+    }
+    if { $::busy_level == 0 } {
+	foreach w [wm stackorder .] {
+	    mk_busy $w 0
+	}
+	update
+    }
 }
 
 
@@ -245,6 +316,14 @@ proc display_dot {dot_pgm} {
     }
     close $fp
     update idletasks
+
+    ;# Create add _IsTeXt_ tag to enable scaling of text
+    foreach t [$c find all] {
+        if ![catch {$c itemcget $t -text} txt] {
+            set tag [$c gettags $t]
+            $c addtag "_IsTeXt_" withtag $tag
+        }
+    }
     val {lx ly ux uy} [$w.c bbox all]
     set wid [expr $ux-$lx]
     if [expr $wid > 800] { set wid 800 }
@@ -876,3 +955,4 @@ proc bbox2fl {bb} {
                  [expr round($ux)] [expr round($uy)]]
 }
 
+change_fonts $::voss2_txtfont

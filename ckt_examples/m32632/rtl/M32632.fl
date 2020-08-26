@@ -28,19 +28,33 @@ let p = verilog2pexlif "" "M32632" [
 				  ] []
 ;
 
-wtime (p fseq 111111111);
+wtime (p fseq 1);
 
 
 let ckt = pexlif2fsm p;
 
-wtime ckt;
+wtime (ckt fseq 2);
 
 let vis = STE_debug ckt;
-wtime vis;
+wtime (vis fseq 3);
 
 let ste = random_simulation vis
 	    [("BCLK","01")]
 	    [("BRESET","11110"),("ENWR","000000-")]
 	    50;
-ste;
+//ste;
+
+let tab_1 = draw_fanin vis (0) 20 ["STATUS[3:0]","ILO","STATSIGS[7:0]","IO_WR","IO_RD","IO_A[31:0]","IO_BE[3:0]","IO_DI[31:0]","IC_ACC","IDRAM_ADR[28:0]","DC_ACC","DC_WR","DRAM_ADR[28:0]","DRAM_DI[35:0]","HLDA","COP_GO","COP_OP[23:0]","COP_OUT[127:0]"];
+tab_1;
+let tab_2 = draw_inside vis 1 ["IC_READ","DATA_HOLD","LD_DIN","LD_IMME","WREN_REG","WR_REG","GENSTAT[2:0]","ILO_SIG","COP_OP[23:0]","IC_USER","ACC_FELD[14:0]","DISP[31:0]","IC_TEX[2:0]","IMME_Q[31:0]","INFO_AU[6:0]","LD_OUT[1:0]","DETOIP[12:0]","MMU_UPDATE[1:0]","OPER[10:0]","PC_ARCHI[31:0]","PC_ICACHE[31:0]","RDAA[7:0]","RDAB[7:0]","START[1:0]","WMASKE[1:0]","WRADR[5:0]","RWVAL[2:0]","ENA_HK"];
+tab_2;
+let tab_3 = draw_inside vis 2 ["GENSTAT[2:0]","DISP[31:0]","IMME_Q[31:0]","i2/DISP_BR[31:0]","i2/USED[2:0]","i2/NEW","i2/LOAD_PC","i2/NEXT_PCA","RDAA[7:0]","RDAB[7:0]","OPER[10:0]","START[1:0]","LD_OUT[1:0]","LD_DIN","LD_IMME","INFO_AU[6:0]","ACC_FELD[14:0]","WREN_REG","WRADR[5:0]","WMASKE[1:0]","WR_REG","DETOIP[12:0]","MMU_UPDATE[1:0]","i2/RESTART","i2/STOP_IC","RWVAL[2:0]","ENA_HK","ILO_SIG","COP_OP[23:0]","i2/i1/PHOUT[7:0]"];
+tab_3;
+let tab_4 = draw_inside vis 2 ["PC_ARCHI[31:0]","PC_ICACHE[31:0]","i2/PC_SAVE[31:0]","i2/ALSB[1:0]","IC_USER"];
+tab_4;
+let tab_5 = draw_fanin vis (1) 1 ["i2/OPREG[55:0]","i2/ANZ_VAL[2:0]","IC_READ","i2/NEW_PC","i2/NEXT_ADR","DATA_HOLD","i2/IC_ABORT","IC_TEX[2:0]","i2/INIT_DONE"];
+tab_5;
+let tab_6 = draw_inside vis 2 ["i2/OPREG[55:0]","i2/ANZ_VAL[2:0]","IC_READ","i2/NEW_PC","i2/NEXT_ADR","DATA_HOLD","i2/IC_ABORT","IC_TEX[2:0]","i2/INIT_DONE"];
+tab_6;
+
 

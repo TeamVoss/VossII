@@ -72,34 +72,38 @@ proc wv:create_waveform_viewer {w maxtime} {
 	set root [w2root $w]
 	frame $tf -relief flat -height 10
 	pack $tf -side right
-	    button $zi -image ::bitmap::zoom_in -command "wv:zoom_in $w"
+	    ttk::button $zi -image ::bitmap::zoom_in -command "wv:zoom_in $w"
 	    pack $zi -side left
-	    label $zt -text Zoom
+	    ttk::label $zt -text Zoom
 	    pack $zt -side left
-	    button $zo -image ::bitmap::zoom_out -command "wv:zoom_out $w"
+	    ttk::button $zo -image ::bitmap::zoom_out -command "wv:zoom_out $w"
 	    pack $zo -side left
 
-	    checkbutton $cbc -text "  Show dependencies:" \
+	    set ::wv_info($f,show_depend) 0
+	    ttk::checkbutton $cbc -text "  Show dependencies:" \
 			-variable ::wv_info($f,show_depend)  \
 			-command [list wv:toggle_show_depend $w]
-	    pack $cbc -side left
+	    pack $cbc -side left -padx 50
 
-	    button $mb -text "-" -command "incr ::vstatus(time,[w2root $w]) -1"
+	    ttk::button $mb -text "-" \
+		    -command "incr ::vstatus(time,[w2root $w]) -1" -width 2
 	    pack $mb -side left
-	    entry $et -width 5 \
+	    ttk::entry $et -width 5 \
 		-background black -foreground red -justify center \
 		-textvariable ::vstatus(time,$root) \
 		-validate all \
 		-validatecommand {string is integer %P}
 	    pack $et -side left
-	    button $pb -text "+" -command "incr ::vstatus(time,[w2root $w]) +1"
+	    ttk::button $pb -text "+" \
+		-command "incr ::vstatus(time,[w2root $w]) +1" -width 2
 	    pack $pb -side left
 
     # Actual waveform viewer windows
 	ttk::panedwindow $pw -orient horizontal 
 	frame $nf -relief flat
 	    canvas $nl -height 30 -background white
-	    $nl create text 20 15 -text "Vector:" -anchor w -justify left
+	    $nl create text 20 15 -text "Vector:" -anchor w -justify left \
+				-font $::voss2_txtfont
 	    pack $nl -side top -fill x
 	    scrollbar $sb -orient vertical \
 		    -command "wv:view [list [list $nn $ww]] yview"
@@ -344,7 +348,8 @@ proc wv:draw_time_line {f maxtime} {
 	set x [expr $t*$::wv_xscale($f)]
 	if [expr ($t % 10) == 0] {
 	    $wt create line $x 10 $x 30
-	    $wt create text $x 17 -text $t -anchor sw -justify left
+	    $wt create text $x 17 -text $t -anchor sw -justify left \
+		    -font $::voss2_txtfont
 	} elseif [expr ($t % 5) == 0] {
 	    $wt create line $x 15 $x 25
 	} else {
@@ -665,7 +670,7 @@ proc wv:prim_add_waveform {w vec} {
 	    -tags "BaCkGrOuNd$vec $vec"]
     set w2 [$nn create line 0 $ybot 400 $ybot -fill lightblue -dash . ]
     set w3 [$nn create text 15 $ybot -text $vec -anchor sw -justify left \
-	    -tags "TxTxT $vec"]
+	    -tags "TxTxT $vec" -font $::voss2_txtfont]
 
     incr ::wv_info(anon_cnt)
     set vtag [format {VtAg_%06d} $::wv_info(anon_cnt)]
@@ -720,7 +725,8 @@ proc wv:prim_add_waveform {w vec} {
 			    set xmid [expr round(($lx+$rx)/2.0)]
 			    set ymid [expr round(($ytop+$ybot)/2.0)]
 			    set txt [$ww create text $xmid $ymid -text S \
-					-anchor c -tags $vtag]
+					-anchor c -tags $vtag \
+					-font $::voss2_txtfont]
 			    wv:add_value_popup $ww $txt
 			}
 		S0X	    {
@@ -777,7 +783,8 @@ proc wv:prim_add_waveform {w vec} {
 			    set xmid [expr round(($lx+$rx)/2.0)]
 			    set ymid [expr round(($ytop+$ybot)/2.0)]
 			    set txt [$ww create text $xmid $ymid -text $v \
-					-anchor c -tags $vtag]
+					-anchor c -tags $vtag \
+					-font $::voss2_txtfont]
 			    wv:add_value_popup $ww $txt
 			    val {blx bly bux buy} [$ww bbox $txt]
 			    if [expr ($blx < $lx) || ($rx < $bux) ] {

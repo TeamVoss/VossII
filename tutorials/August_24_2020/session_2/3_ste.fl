@@ -1,0 +1,112 @@
+set_font font_large;
+load "ste.fl";
+
+TYPE "bv_8" 8;
+
+// =============================================================
+//  Simple example of mixed scalar and symbolic simulation
+// =============================================================
+
+// Visualizing is useful, but the main focus is the behavior of the circuit.
+// In VossII the main workhorse is a (generalized) symbolic simulator: STE
+
+// Consider the following simple circuit.
+let example =
+    bit_input	clk.
+    bit_input	clear.
+    bit_input	up.
+    bit_input	down.
+    bv_8_input  a b.
+    bv_8_output sum.
+    CELL "draw_hier example" [
+	STATE clk sum [
+	    clear   --- '0,
+	    up	    --- sum '+' a '+' b,
+	    down    --- sum '+' a '-' b
+	]
+];
+
+let p = example 'clk 'clear 'up 'down 'a 'b 'sum;
+
+let vis = STE_debug (pexlif2fsm p);
+vis;
+
+
+// The STE command takes a number of arguments:
+//  flags -- provides setting for simulator (more later)
+//  ckt	  -- circuit or visualization environment
+//  wl    -- weakening list (more later)
+//  ant   -- assumptions about signal values as list of 5-tuples
+//  cons  -- assertions about signal values as list of 5-tuples
+//  trl   -- nodes to be traced.
+//
+// Special case when using STE as a symbolic simulator:
+// flags="-e", wl=cons=trl=[],
+// ant= values to drive inputs
+//
+// A 5-tuple (w,n,v,f,t) shold be read as: 
+//  When condition 'w', node 'n' should take value 'v' from 'f' to 't'.
+//
+
+// Too cumbersome to write lists of 5-tuples, so a small domain specific
+// language has been created.
+// For example:
+
+"clk" is_clock 4;
+
+"clear" is 1 in_cycle 0 followed_by
+	   1 in_cycle 30 followed_by
+	   1 in_cycle 50 otherwise 0 until 100 cycles;
+
+// Together as a larger example:
+let N = 100;
+let ant = 
+    "clk" is_clock N
+  and
+    "clear" is 1 in_cycle 0 followed_by
+	       1 in_cycle 30 followed_by
+	       1 in_cycle 50 otherwise 0 until N cycles
+  and
+    "up" is    1 in_cycle 2 for 10 cycles followed_by
+	       0 for 5 cycles followed_by
+	       1 for 20 cycles followed_by
+	       0 for 10 cycles otherwise 0 until N cycles
+  and
+    "down" is  1 in_cycle 10 for 10 cycles followed_by
+	       0 for 15 cycles followed_by
+	       1 for 20 cycles followed_by
+	       0 for 10 cycles otherwise 0 until N cycles
+  and
+    "a[7:0]" is 1 for 10 cycles followed_by
+		3 for 2 cycles followed_by
+		"c1[7:0]" for 1 cycle followed_by
+		"c2[7:0]" for 1 cycle followed_by
+		"c3[7:0]" for 1 cycle followed_by
+		"c4[7:0]" for 1 cycle otherwise 0 until N cycles
+  and
+    "b[7:0]" is 0 for 3 cycles followed_by
+		1 for 5 cycles followed_by
+		7 for 5 cycles followed_by
+		3 for 2 cycles followed_by
+		"d1[7:0]" for 1 cycle followed_by
+		"d2[7:0]" for 1 cycle followed_by
+		"d3[7:0]" for 1 cycle followed_by
+		"d4[7:0]" for 1 cycle otherwise 0 until N cycles
+;
+
+// Now run STE with this antecedent. Note no consequent!
+let ste = STE "-e" vis [] ant [] [];
+ste;
+
+// Now add inputs and output to Waveforms window to see how the values change.
+
+// Also note that back-annotation of he current values can be done.
+
+
+// =============================================================
+//  Example of simulation of HFL model
+// =============================================================
+
+// Simulation of HFL code with state machines.
+load "diff_cache/diff_cache.fl";
+

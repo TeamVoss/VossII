@@ -1,0 +1,156 @@
+set_font font_large;
+
+// Example of symbolic version of execution.
+// DES S1 box.
+
+// Use of symbolic execution to compute a bitslicing version of an algorithm.
+
+// S1 definition
+let S1 = [
+    14, 4,  13, 1,  2,  15, 11, 8,  3,  10, 6,  12, 5,  9,  0,  7,
+    0,  15, 7,  4,  14, 2,  13, 1,  10, 6,  12, 11, 9,  5,  3,  8,
+    4,  1,  14, 8,  13, 6,  2,  11, 15, 12, 9,  7,  3,  10, 5,  0,
+    15, 12, 8,  2,  4,  9,  1,  7,  5,  11, 3,  14, 10, 0,  6,  13
+];
+
+// Normal algorithm
+let do_S1 inp =
+    letrec look_for i (d:ds) = i = inp => d | look_for (i + 1) ds
+     /\    look_for i [] = error "Out of bounds"
+    in
+    look_for 0 S1
+;
+
+// Examples
+do_S1 0;
+do_S1 12;
+
+
+// Symbolic version
+let s_do_S1 inp =
+    letrec look_for i (d:ds) = i = inp => d | look_for (i + '1) ds
+     /\    look_for i [] = error "Out of bounds"
+    in
+    look_for (int2bv 0) (map int2bv S1)
+;
+
+s_do_S1 '0;
+bv2int it;
+s_do_S1 '12;
+bv2int it;
+
+// Now use symbolic inputs.
+let av = bv_ZX (bv_variable "a[5:0]");
+av;
+
+let s_res = s_do_S1 av;
+
+s_res;
+
+draw_bdds T (bv2list s_res);
+
+// Can write a program that outputs a C function
+// that evaluates the BDD in fixed time.
+//
+let mk_cname v =
+    NOT (str_is_substr "[" v) => v |
+    let is_ok c = c != "[" AND c != "]" in
+    let ev = explode v in
+    let ev' = filter is_ok ev in
+    implode ev'
+;
+let bv2code file bv =
+    let bl = (rev ((bv2list bv))) then
+    let fp = fopen file "w" then
+    let inps = depends bv in
+    let pr_inp fp v = fprintf fp "unsigned long %s" v in
+    let Cinps = qsort node_name_cmp (map mk_cname inps) in
+    (list2fp fp T "static void\ns1(\n\t" ",\n\t" ",\n\t" pr_inp Cinps) fseq
+    let pr_out fp i = fprintf fp "unsigned long *out%d" i in
+    (list2fp fp T "" ",\n\t" " )\n{\n" pr_out (1--(length bl))) fseq
+    let cnt = ref 0 then
+    let found = ref (tbl_create 100) then
+    let code = ref [] then
+    letrec walk b =
+	b == F => "0" |
+	b == T => "1" |
+	let tbl = deref found then
+	tbl_member tbl b => tbl_get tbl b |
+	tbl_member tbl (NOT b) => sprintf "~%s" (tbl_get tbl (NOT b)) |
+	let res_var = sprintf "t[%d]" (deref cnt) then
+	(cnt := (deref cnt + 1)) fseq
+	(found := (tbl_insert tbl b res_var)) fseq
+	val (v,H,L) = top_cofactor b then
+	let c = mk_cname v in
+	let t = walk H then
+	let e = walk L then
+	let line = (sprintf "\t%s = " res_var)^ (
+	    (t = "1") AND (e = "0") => sprintf "%s;\n" c |
+	    (t = "0") AND (e = "1") => sprintf "~%s;\n" c |
+	    t = "1" => sprintf "%s | %s;\n" c e |
+	    e = "1" => sprintf "~%s | %s;\n" c t |
+	    sprintf "%s & %s | ~%s & %s;\n" c t c e)
+	then
+	(code := (line : (deref code))) fseq
+	res_var
+    in
+    let lres = map walk bl then
+    (fprintf fp "\tunsigned long t[%d];\n" (deref cnt+1)) fseq 
+    let pr_l fp s = fprintf fp "%s" s then
+    (list2fp fp T "" "" "" pr_l (rev (deref code))) fseq
+    let pr_res fp i = fprintf fp "\t*out%d = %s;\n" i (el i lres) in
+    (list2fp fp T "" "" "}\n" pr_res (1 -- length bl)) fseq
+    (fclose fp)
+;
+
+bv2code "qqq" s_res;
+
+
+// Another example.
+// Decrypting RSA (for small numbers)
+let mod_exp base n mod =
+    letrec squaring (b:bs) cur =
+	let sq = (cur * cur) % mod then
+	IF b THEN (cur * (squaring bs sq)) % mod
+	     ELSE (squaring bs sq)
+     /\    squaring [] cur = '1
+    in
+    squaring (rev (bv2list n)) base
+;
+
+let profiled_mod_exp base n mod =
+    let cnt = ref 0 in
+    letrec squaring (b:bs) cur =
+	let sq = (cur * cur) % mod then
+	(cnt := (deref cnt+1)) fseq
+	IF b THEN (
+	    (cnt := (deref cnt+1)) fseq
+	    ((cur * (squaring bs sq)) % mod)
+	) ELSE (squaring bs sq)
+     /\    squaring [] cur = '1
+    in
+    let res = squaring (rev (bv2list n)) base then
+    (fprintf stderr "Performed: %d multiplications and %d mod operations\n"
+		    (deref cnt) (deref cnt)) fseq
+    res
+;
+
+
+let m = int2bv 73;
+let e = bv_ZX (bv_variable "e[15:0]");
+let n = int2bv 129;
+
+// Note that there is a (potential) timing side channel in the code.
+profiled_mod_exp m (int2bv 121) n;
+profiled_mod_exp m (int2bv 219) n;
+
+let res = (mod_exp m e n);
+length (depends res);
+bdd_size res;
+
+bdd_reorder 4;
+bdd_size res;
+
+// Now write out a fixed time version of the function!
+bv2code "www" res;
+

@@ -65,6 +65,7 @@ typedef struct vis_rec {
     string	    pfn;	// Draw function
     vis_io_ptr	    fa_inps;
     vis_io_ptr	    fa_outs;
+    g_ptr	    attrs;
 } vis_rec;
 
 typedef struct vis_list_rec *vis_list_ptr;
@@ -119,8 +120,9 @@ typedef struct mem_data_rec {
 // Individual composites
 typedef struct ncomp_rec {
         unint				size;
-	unint				rank:30;
+	unint				rank:29;
 	unint				phase_delay:1;
+	unint				no_weakening:1;
 	unint				flag:1;	// General purpose bit
 	wl_op				op;
         union {
@@ -137,8 +139,9 @@ typedef struct ncomp_rec {
 typedef struct nnode_rec    *nnode_ptr;
 typedef struct nnode_rec {
     vec_info_ptr    vec;
-    unint	    idx:27;	    // I think 134 million nodes are enough....
+    unint	    idx:26;	    // I think 134 million nodes are enough....
     unint	    has_phase_event:1;
+    unint	    has_ant_or_weak_change:1;
     unint	    has_weak:1;
     unint	    has_ant:1;
     unint	    has_cons:1;
@@ -214,6 +217,8 @@ typedef struct ste_rec {
     fsm_ptr	fsm;
     value_type	type;
     bool	active;		// Currently being simulated
+    int		cur_time;
+    bool	abort_ASAP;
     int		max_time;	// Time to which it is run
     gbv         validTrajectory;
     gbv         checkTrajectory;
@@ -222,6 +227,7 @@ typedef struct ste_rec {
     hash_record	trace_tbl;
     rec_mgr	trace_event_rec_mgr;
     rec_mgr	trace_rec_mgr;
+    buffer	weakening_buf;
 } ste_rec;
 
 // Simulation state

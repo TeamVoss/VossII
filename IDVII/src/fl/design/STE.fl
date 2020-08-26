@@ -90,13 +90,6 @@ overload in_cycles s_in_cycles i_in_cycles bv_in_cycles bool_in_cycles
 infix 6 in_cycles;
 end_abstype in_cycles;
 
-// Keep???
-//let at_phase v ph = [(T,v,ph,ph)];
-//infix 6 at_phase;
-//
-//let at_cycle v cyc = [(T,v,2*cyc,2*cyc)];
-//infix 6 at_cycle;
-
 let gfor [({fixed::bool}, {v::values}, {start::int}, {end::int})] cnt =
     [(fixed, v, start, start+cnt)]
 ;

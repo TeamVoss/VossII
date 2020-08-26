@@ -1,0 +1,70 @@
+set_font font_large;
+load "ste.fl";
+
+//
+// Using symbolic simulation for information flow control analysis.
+//
+// The basic idea is very simple:
+//   Track how some Boolean variables (representing the value we are tracking)
+//   progresses through the circuit.
+//
+
+
+// Trivial example
+
+TYPE "word" 8;
+
+let pipeline =
+    bit_input	clk.
+    bit_input	exclusive.
+    word_input	din1 din2.
+    word_output	dout.
+    //
+    internal	t1 t2 t3 t4 res u1 u2 u3 u4 e1 e2 e3 e4.
+    CELL "draw_hier pipeline" [
+	re_ff clk din1 t1,
+	re_ff clk t1 t2,
+	re_ff clk t2 t3,
+	re_ff clk t3 t4,
+	re_ff clk res dout,
+	//
+	re_ff clk din2 u1,
+	re_ff clk u1 u2,
+	re_ff clk u2 u3,
+	re_ff clk u3 u4,
+	//
+	re_ff clk exclusive e1,
+	re_ff clk e1 e2,
+	re_ff clk e2 e3,
+	re_ff clk e3 e4,
+	//
+	res <- (IF e4 THEN (t4 '^' u4) ELSE (t4 '|' u4))
+];
+
+let p = pipeline 'clk 'exclusive 'din1 'din2 'dout;
+
+let vis = STE_debug (pexlif2fsm p);
+vis;
+
+let N = 20;
+let ant = 
+    "clk" is_clock N
+  and
+    "din1[7:0]"	is 0xab	     in_cycle 0 followed_by
+		   "r1[7:0]" in_cycle 1 followed_by
+		   "r2[7:0]" in_cycle 2 followed_by
+		   "r3[7:0]" in_cycle 4 otherwise 0 until N cycles
+  and
+    "din2[7:0]"	is 0xba	     in_cycle 0 followed_by
+		   "b1[7:0]" in_cycle 1 followed_by
+		   0	     in_cycle 2 followed_by
+		   "b3[7:0]" in_cycle 4 otherwise 0 until N cycles
+  and
+    "exclusive" is 1 in_cycle 1 followed_by
+		   1 in_cycle 2 followed_by
+		   "e" in_cycle 4 otherwise 0 until N cycles
+;
+
+let ste = STE "-e" vis [] ant [] [];
+ste;
+

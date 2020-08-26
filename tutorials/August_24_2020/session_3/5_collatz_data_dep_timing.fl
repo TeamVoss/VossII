@@ -1,0 +1,81 @@
+//==========================================================================
+//
+// Data-dependent completion signal design example
+//
+//==========================================================================
+set_font font_large;
+load "ste.fl";
+//update_vossrc "DYNAMIC-ORDERING" "NO";
+
+TYPE "word" 16;
+
+let collatz = 
+    bit_input clk.
+    bit_input start.
+    word_input t0.
+    bit_output done.
+    word_output out.
+    word_internal length.
+    word_internal t newt new_length.
+    bit_internal eq1 new_done.
+    bit_internal is_even is_odd.
+    CELL "draw_hier data_dependent_collatz" [
+	re_ff clk newt t,
+	eq1 <- (t '=' '1), 
+	is_even <- ((t '%' '2) '=' '0), 
+	is_odd <- '~' is_even,
+	CASE newt [
+	    start --- t0,
+	    eq1 --- t,
+	    is_odd --- ('3 '*' t '+' '1),
+	    is_even --- (t '/' '2)
+	] t,
+	CASE new_length [
+	    start --- '0,
+	    eq1   --- length
+	] (length '+' '1),
+	CASE new_done [
+	    start --- '0,
+	    eq1   --- '1
+	] done,
+	re_ff clk new_done done,
+	re_ff clk new_length length,
+	re_ff_en clk eq1 length out
+];
+
+let test_harness =
+    bit_input clk.
+    bit_input start.
+    word_input	t0.
+    word_output	out.
+    word_output	timer.
+    bit_internal done.
+    CELL "test_harness" [
+	collatz clk start t0 done out,
+	STATE clk timer [
+	    start --- '0,
+	    done  --- timer,
+	    '1    --- (timer '+' '1)
+	]
+];
+
+let ckt = pexlif2fsm (test_harness 'clk 'start 't0 'out 'timer);
+let vis = STE_debug ckt;
+vis;
+
+
+let N = 200;
+
+let A = bv_constrained_variable "r[16:0]" (\v. v > '0 AND v < '1024);
+
+let ant = 
+    "clk" is_clock N
+  and
+    "start" is 1 in_cycle 0 otherwise 0 until N cycles
+  and
+    "t0[15:0]" is A in_cycle 0
+;
+
+let ste = STE "-e" vis [] ant [] [];
+
+ste;

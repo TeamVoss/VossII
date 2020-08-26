@@ -1,0 +1,170 @@
+set_font font_large;
+
+// Boolean variables
+let a = variable "a";
+let b = variable "b";
+let c = variable "c";
+
+// Or more convenient if you need a few
+VARS "a1 b1 a2 b2 a3 b3 a4 b4";
+
+// Boolean expressions are trivial to create
+// Internally, they are represented as (Ordered) Binary Decision Diagrams (BDDs)
+let ex1 = NOT (a AND b);
+let ex2 = NOT a OR NOT b;
+let ex3 = NOT a OR NOT (b AND c);
+let ex4 = (a1 XNOR b1) AND (a2 XNOR b2) AND (a3 XNOR b3) AND (a4 XNOR b4);
+
+// There are two types of equality:
+// 1) Same Boolean function (identity)
+ex1 == ex2;
+ex1 == ex3;
+
+// 2) Under which condition is lhs the same as rhs.
+ex1 = ex2;
+ex1 = ex3;
+
+ex1;
+ex3;
+
+// More interesting
+NOT (ex1 = ex3);
+
+
+// Note that the size (and shape) of BDD depends on the variable order.
+// One can impose an order
+var_order ["a1", "b1", "a2", "b2", "a3", "b3", "a4", "b4"];
+draw_bdds T [ex4];
+
+var_order [ "a1", "a2", "a3", "a4", "b1", "b2", "b3", "b4" ];
+draw_bdds T [ex4];
+
+
+// By default, VossII will perform a dynamic re-ordering when needed
+// One can also force a reordering:
+bdd_reorder 2;
+
+var_order [];
+draw_bdds T [ex4];
+
+// More advanced operations:
+// Quantification
+Quant_forall ["a1","a2","a3","a4"]
+	     (Quant_thereis ["b1", "b2", "b3", "b4"]
+			    ex4);
+
+Quant_thereis ["a1","a2","a3","a4"]
+	     (Quant_forall ["b1", "b2", "b3", "b4"]
+			    ex4);
+
+
+Quant_thereis ["a1","a2","a3","a4"]
+	     (Quant_forall ["b1", "b2", "b3", "b4"]
+			    (b1 OR b2 OR b3 OR b4 OR ex4));
+
+Quant_thereis ["a1","a2"]
+	     (Quant_forall ["b1", "b2", "b3", "b4"]
+			    (b1 OR b2 OR b3 OR b4 OR ex4));
+
+// Move between "current" and "next" variable
+bdd_current2next a;
+bdd_current2next ex4;
+
+
+// Combining Boolean expressions with higher order functions is powerful
+// Let's define a greatest fix point function.
+// Gfp takes any bool->bool function and a starting set (as a BDD)
+// and computes the largest set (as a BDD) cur can reach by some iterations
+// of the function fn.
+letrec Gfp fn cur =
+    let new = cur OR (fn cur) in
+    IF (new == cur) THEN cur ELSE Gfp fn new
+;
+
+letrec Lfp fn cur =
+    let new = cur AND (fn cur) in
+    IF (new == cur) THEN cur ELSE Gfp fn new
+;
+
+
+// Since individual Boolean variables are rarely useful by themselves,
+// VossII also provides (infinitely precise) bitvectors.
+let s  = bv_variable "s[3:0]";
+// Should be read as an infinite repetition of the s[3] followed by the rest.
+s;
+
+// For convenience, all arithmetic operations have been overloaded.
+(s + (int2bv 1));
+
+// A shorthand ' can be used instead of int2bv
+(s + '1);
+
+//s + '0x8000;
+
+// Small fun
+let t  = bv_variable "t[3:0]";
+let u  = bv_variable "u[3:0]";
+let t1 = s*(t + u);
+let t2 = s*t + s*u;
+t1 == t2;
+
+
+// Example: A simple state machine
+let s  = bv_variable "s[3:0]";
+let s' = bdd_current2next s;
+// VossII allow operators to given various fixities to make it more convenient.
+let --> from to = (s = from) AND (s' = to);
+infix 3 -->;
+
+// A simple state machine
+let TR = OR_list [
+    '1 --> '2, '1 --> '4,
+    '2 --> '3, '2 --> '4,
+    '3 --> '4,
+    '4 --> '3,
+    '5 --> '1, '5 --> '3
+];
+
+// Using the Gfp function we can now define a reachable functions
+let reachable transition_relation initial_set =
+    let vs = depends s in
+    let next cur =
+        let rel_transition_relation = cur AND transition_relation in
+        bdd_next2current (Quant_thereis vs rel_transition_relation)
+    in
+    Gfp next initial_set
+;
+
+// For example:
+let reach = reachable TR (s = '1);
+reach;
+
+enumerate_examples 20 (depends s) reach;
+
+
+// ================================================================
+// Symbolic computations
+// ================================================================
+
+// An early extension to Voss was the introduction of BDDs in conditionals
+variable "d" => [ex1,ex3] | [ex3,ex1];
+
+// Unfortunately, there were severe restirctions
+//  1) Both lhs and rhs had to have "the same shape", i.e, could only
+//     differ in Boolean expressions
+//  2) The conditional could (usually) not be used for recursion termination.
+
+// VossII has relaxed (almost removed) these conditions.
+
+// For example bitvectors adjust automatically and thus:
+letrec fact n = n = '1 => '1 | n * fact (n - '1);
+// works fine
+fact (int2bv 5);
+
+let test v = v >= '6 ==> (fact v) > (v*v + '100);
+
+let v = bv_constrained_variable "v[7:0]" (\v. v > '1 AND v < '99);
+bv_examples 30 v;
+
+test v;
+

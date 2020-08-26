@@ -1,0 +1,110 @@
+set_font font_large;
+
+// Simple expressions
+// Comments starts with two slashes
+// Commands end with semicolon
+
+123*333;
+
+// You define functions with 'let ...'
+// Functions may be of arity 0.
+let v1 = 123*3;
+
+let v2 = 2*v1-1;
+
+// Note that expressions don't get evaluated until they are forced.
+v2;
+
+// Simple function definition.
+// Notice the type inferred automatically.
+let inc x = x+1;
+
+// Stongly typed: ok
+inc 12;
+
+// Stongly typed: fails
+inc "a";
+
+// Notice that many operators can be overloaded.
+// Then functions become (implicitly) overloaded
+let double x = x+x;
+
+// The overloading gets resolved
+double 12;
+
+double 1.2;
+
+(int2bv 5);
+
+double (int2bv 5);
+
+
+// There can be more than one version of the overloaded operator.
+// Here there are two '+' functions that have not been resolved.
+let triple x = double x + x;
+
+triple 12;
+triple 1.2;
+triple (int2bv 5);
+
+
+// Recursive functions are defined with letrec
+// cond => then_expr | else_expr  is how conditionals are used
+letrec factorial n = n = 1 => 1 | n*factorial (n-1);
+
+// Note fl uses infinite precision integers.
+factorial 5;
+factorial 1200;
+
+
+
+// Footnote: One can also use IF cond THEN then_expr ELSE else_expr.
+letrec factorial n = IF (n = 1) THEN 1 ELSE n*factorial (n-1);
+
+
+// Another recursive example (that processes lists)
+// hd == head of list
+// tl == tail of list
+letrec list_length l = l = [] => 0 | 1+list_length (tl l);
+
+// NOTE: This was an example of a polymorphic function (works
+// for lists of any type).
+
+list_length [1,2,3,4,5];
+list_length ["a","b","q","wwq","abba","oink"];
+
+
+// Local functions are useful. Simply add an 'in' after.
+let triple x =
+    let double x = x+x in
+    double x + x
+;
+
+let triple x =
+    let twice x = x+x in
+    twice x + x
+;
+
+triple 12;
+triple 1.2;
+triple (int2bv 5);
+
+// A convenient way to define functions is by pattern matching.
+letrec list_length [] = 0
+ /\    list_length (a:as) = 1+list_length as
+;
+
+list_length [1,2,3,4,5];
+list_length ["a","b","q","wwq","abba","oink"];
+
+
+// One can define new (algebraic) data types.
+lettype tree = BR tree tree | LEAF bool;
+
+// Using pattern matching to define function
+letrec tree_height (BR t1 t2) = (max (tree_height t1) (tree_height t2))+1
+ /\    tree_height (LEAF v) = 1
+;
+
+tree_height (BR (BR (LEAF T) (LEAF F)) (LEAF F));
+

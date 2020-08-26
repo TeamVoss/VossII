@@ -1063,7 +1063,7 @@ subtract(g_ptr redex)
     g_ptr set1, set2;
     EXTRACT_2_ARGS(redex, set1, set2);
     if( IS_NIL(set1) ) {
-	OVERWRITE(redex, set2);
+	OVERWRITE(redex, set1);
 	return;
     }
     if( IS_NIL(set2) ) {
@@ -1153,7 +1153,7 @@ last(g_ptr redex)
     g_ptr list;
     EXTRACT_1_ARG(redex, list);
     if( IS_NIL(list) ) {
-	MAKE_REDEX_FAILURE(redex, Fail_pr("last on emoty list"));
+	MAKE_REDEX_FAILURE(redex, Fail_pr("last on empty list"));
 	DEC_REF_CNT(l);
 	DEC_REF_CNT(r);
 	return;

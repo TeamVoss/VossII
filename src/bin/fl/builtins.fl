@@ -155,6 +155,14 @@ non_lazy fflush;
 //	     cone of nodes in the consequent or trace list.
 //
 //    -m t   Abort the STE run after t phases has been simulated.
+//
+//    -w n   Limit the size of any BDD to n. If the value of a node
+//	     exceeds this limit, abstract the node (make it more X).
+//
+//    -ifw   Do the weakening by introducing new (fresh) variables.
+//	     The translation from the abstracted BDD to the true expression
+//	     can be obtained by repeated substitutions from the expression
+//	     map obtained from get_weak_expressions.
 // 
 // The weak_list (wl) is a list of 4-tuples of the form (w,nd,f,t) to be
 // read as: when w holds, weaken the excitation function of node nd from
@@ -1453,3 +1461,12 @@ let relprod_forall qvars e1 e2 = (defix relprod_forall) qvars e1 e2;
 //
 let var_order l = md_merge_vectors (var_order (md_expand_vectors l));
 non_lazy var_order;
+
+
+// If ste is obtained from a (BDD based) STE run that was invoked with the
+// -ifw flag and a weakening occured (due to -w size flag), the translation
+// between the newly intruduced variables and the corresponding expressions is
+// returned as an association list (variable, expression). Note that
+// an expression associated with a fresh variable might depend on other
+// fesh variables. However, it is guaranteed that there are no cycles.
+let get_weak_expressions ste = (defix get_weak_expressions) ste;

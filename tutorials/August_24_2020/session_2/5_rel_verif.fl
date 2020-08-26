@@ -1,0 +1,133 @@
+// =============================================================
+// What about non-functional (relational) specifications?
+// =============================================================
+set_font font_large;
+cload "ste.fl";
+
+// The basic idea is to add an "observer" circuit.
+// Example:
+
+TYPE "word" 32;
+
+let CSA =
+    word_input  x y z.
+    word_output c s.
+    //
+    internal m.
+    CELL "draw_hier CSA" [
+        s <- x '^' y '^' z,
+        m <- x '&' y '|' x '&' z '|' y '&' z,
+        c <- m '<<' '1
+];
+
+
+letrec CSA_tree =
+    word_list_input	inps.
+    word_output		C S.
+    word_internal	t uC uS lC lS mC mS.
+    CELL "draw_hier CSA_tree" (
+	let sz = length inps in
+	sz = 1 => [
+	    S <- (el 1 inps),
+	    C <- '0
+	] |
+	sz = 2 => [
+	    S <- (el 1 inps),
+	    C <- (el 2 inps)
+	] |
+	let upper = firstn (sz/2) inps in
+	let lower = butfirstn (sz/2) inps in
+	[
+	    CSA_tree upper uC uS,
+	    CSA_tree lower lC lS,
+	    CSA uS lC lS mC mS,
+	    CSA uC mC mS C S
+	]
+);
+
+let fast_adder_tree =
+    word_list_input	inps.
+    word_output		sum.
+    word_internal	C S.
+    CELL "draw_hier fast_adder_tree" [
+	CSA_tree inps C S,
+	sum <- C '+' S
+];
+
+let p = fast_adder_tree ['i1,'i2,'i3,'i4,'i5,'i6,'i7,'i8] 'sum;
+
+let vis = STE_debug (pexlif2fsm p);
+vis;
+
+
+let CSA_property i1 i2 i3 c s =
+    let sum1 = i1 at_cycle 0 '+'
+	       i2 at_cycle 0 '+'
+	       i3 at_cycle 0
+    in
+    let sum2 = c at_cycle 0 '+' s at_cycle 0 in
+    ASSERT "csa_sum" (sum1 '=' sum2)
+;
+
+var_order (interleave (map md_expand_vector ["a[31:0]","b[31:0]","c[31:0]"]));
+
+let verify_CSA model i1 i2 i3 c s =
+    let ant =
+	i1 is "a[31:0]" in_cycle 0
+      and
+	i2 is "b[31:0]" in_cycle 0
+      and
+	i3 is "c[31:0]" in_cycle 0
+    in
+    let assumes = [] in
+    let cons = [] in
+    let asserts = [CSA_property i1 i2 i3 c s] in
+    // Compile property and merge with main circuit
+    val (ckt, assume_ant, assert_cons) = rels2STE model assumes asserts then
+    let final_ant = ant@assume_ant in
+    let final_cons = cons@assert_cons in
+    // NOTE: We need to strictly weaken the inputs (since the C[0]==0)
+    // We also need to limit propagation since the BDDs would blow up otherwise
+    let wl = map (\n.T,n,0,2) (md_expand_vectors [i1,i2,i3]) in
+    // -w 1000 limits the size of any BDD during simulation to 1000 nodes.
+    // If the BDD needs to be bigger, it is abstracted so that the values
+    // on the circuit nodes will be "more" X. 
+    // Thus, if verification succeeds, then property is true.
+    // However, one can get weak disagreements (false negatives).
+    let ste = STE "-e -w 1000" ckt wl final_ant final_cons [] in
+    let res = get_ste_result ste "strong" then
+    res == T => fprintf stdout "Successfully verified\n" |
+    // Failed verification
+    let failure_cond = NOT res in
+    let sub = full_example F (depends final_ant) failure_cond then
+    let final_ant' = substitute sub final_ant then
+    let final_cons' = substitute sub final_cons then
+    let vis = STE_debug ckt in
+    (STE "-e -w 1000" vis wl final_ant' final_cons' []) fseq
+    fprintf stderr "Failed. Counterexample simulated.\n"
+;
+
+verify_CSA p "i1/uC[31:0]" "i1/mC[31:0]" "i1/mS[31:0]" "C[31:0]" "S[31:0]";
+
+verify_CSA p "i1/uS[31:0]" "i1/lC[31:0]" "i1/lS[31:0]"
+	      "i1/mC[31:0]" "i1/mS[31:0]";
+
+verify_CSA p "i1/i1/uC[31:0]" "i1/i1/mC[31:0]" "i1/i1/mS[31:0]"
+	     "i1/uC[31:0]" "i1/uS[31:0]";
+
+verify_CSA p "i1/i1/uS[31:0]" "i1/i1/lC[31:0]" "i1/i1/lS[31:0]"
+	      "i1/i1/mC[31:0]" "i1/i1/mS[31:0]";
+
+verify_CSA p "i1/i2/uC[31:0]" "i1/i2/mC[31:0]" "i1/i2/mS[31:0]"
+	     "i1/lC[31:0]" "i1/lS[31:0]";
+
+verify_CSA p "i1/i2/uS[31:0]" "i1/i2/lC[31:0]" "i1/i2/lS[31:0]"
+	      "i1/i2/mC[31:0]" "i1/i2/mS[31:0]";
+
+
+
+
+// Example of a failure (wrong signals connected).
+verify_CSA p "i1/i2/uS[31:0]" "i1/i2/uC[31:0]" "i1/i2/lS[31:0]"
+	      "i1/i2/mC[31:0]" "i1/i2/mS[31:0]";
+

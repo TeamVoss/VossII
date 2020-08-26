@@ -2863,7 +2863,7 @@ infix 1 <==;
 // i<number>/i<number>/.../<name> where the i<number>s refere to
 // the cardinality of a subfub.
 // 
-let flatten_pexlif stop_pred p =
+let gen_flatten_pexlif stop_pred p =
     letrec do_flat sub pref p =
         let tr n = (assoc n sub) catch n in
         val (PINST name attrs leaf fa_inps fa_outs ints content) = p in
@@ -2874,6 +2874,7 @@ let flatten_pexlif stop_pred p =
             in
             let fa_inps' = map tr_io fa_inps in
             let fa_outs' = map tr_io fa_outs in
+            let attrs = ("instance", pref):attrs in
             [(PINST name attrs leaf fa_inps' fa_outs' ints content)]
         |
             val (P_HIER children) = content in
@@ -2889,15 +2890,21 @@ let flatten_pexlif stop_pred p =
             let prefs = map (sprintf "%si%d/" pref) (1 upto length children) in
             flat (map2 (do_flat sub') prefs children)
     in
-    let children = do_flat [] "" p in
+    val (PINST name attrs leaf fa_inps fa_outs ints content) = p in
+    leaf => p |
+    val (P_HIER chs) = content in
+    let prefs = map (sprintf "i%d/") (1 upto length chs) in
+    let children = flat (map2 (do_flat []) prefs chs) in
     let wires_used (PINST _ _ _ fa_inps fa_outs _ _) =
         md_expand_vectors (flatmap snd (fa_inps @ fa_outs))
     in
     let all = setify (flatmap wires_used children) in
-    val (PINST name attrs _ fa_inps fa_outs _ _) = p in
-    let ios = md_expand_vectors (flatmap snd (fa_inps @ fa_outs)) in
-    let new_ints = md_extract_vectors (all subtract ios) in
-    (PINST name attrs F fa_inps fa_outs new_ints (P_HIER children))
+    let declared =
+            (md_expand_vectors (map fst (fa_inps @ fa_outs))) @
+            (md_expand_vectors ints)
+    in
+    let ints' = ints@(md_extract_vectors (all subtract declared)) in
+    (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER children))
 ;
 
 // A simple stop-predicate for flatten_pexlif that can be used to
@@ -2906,6 +2913,9 @@ let is_draw_leaf p =
     val (PINST name _ _ _ _ _ _) = p in
     (str_is_prefix "draw_" name) AND NOT (str_is_prefix "draw_hier" name)
 ;
+
+// A function to flatten a pexlif to basic drawing components.
+let flatten_pexlif p = gen_flatten_pexlif is_draw_leaf p;
 
 
 //

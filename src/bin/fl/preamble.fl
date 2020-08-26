@@ -309,17 +309,16 @@ let list2str print_empty_list pre sep post pr_fun l =
 ;
 
 // Print out a list to a stream
-// Usage: list2fp fp print_empty_list pre sep post pr_fun l, where
+// Usage: list2fp_1 fp print_empty_list pre sep post pr_fun l, where
 //	fp		    stream to write to
 //	print_empty_list    decides whether a pre^post or "" will be the result
 //			    on an empty list
 //	pre		    The string that will be prepended before the list
 //	sep		    The separator string between elements
 //	post		    The string that will be appended after the list
-//	pr_fun		    A function that printf an element of the list
-//			    to a string.
+//      pr_fun              A function that prints an element of the list to fp
 //	l		    List of elements to print
-let list2fp fp print_empty_list pre sep post pr_fun l =
+let list2fp_1 fp print_empty_list pre sep post pr_fun l =
     l = [] => print_empty_list => fprintf fp "%s%s" pre post | () |
     letrec do csep (e:es) =
 	(fprintf fp "%s" csep) fseq
@@ -329,6 +328,28 @@ let list2fp fp print_empty_list pre sep post pr_fun l =
     in
     (do pre l)
 ;
+
+// Print out a list to a stream
+// Usage: list2fp_2 fp print_empty_list pre sep post pr_fun l, where
+//	fp		    stream to write to
+//	print_empty_list    decides whether a pre^post or "" will be the result
+//			    on an empty list
+//	pre		    The string that will be prepended before the list
+//	sep		    The separator string between elements
+//	post		    The string that will be appended after the list
+//	pr_fun		    A function that convert an element of the list 
+//			    to a string.
+//	l		    List of elements to print
+let list2fp_2 fp print_empty_list pre sep post pr_fun l =
+    l = [] => print_empty_list => fprintf fp "%s%s" pre post | () |
+    letrec do csep (e:es) =
+	(fprintf fp "%s%s" csep (pr_fun e)) fseq (do sep es)
+     /\	   do csep [] = fprintf fp "%s" post
+    in
+    (do pre l)
+;
+
+overload list2fp list2fp_1 list2fp_2;
 
 // log2 n -- floor of log_2(n)
 let log2 n =
@@ -414,6 +435,27 @@ let example preference cond =
      /\    select f [] = []
     in
     select cond (depends [cond])
+;
+
+// Compute an assignment to all the variables in vars so that
+// cond is satisfied. If there is a choice for some variable, preference
+// determined whether T or F should be selected.
+// Usage: full_example preference cond
+let full_example preference vars cond =
+    let cvars = depends cond then
+    cvars subtract vars != [] =>
+	    eprintf "full_example: cond depends on variables not in vars (%S)"
+		    (md_extract_vectors (cvars subtract vars))
+    |
+    letrec select f (v:vs) =
+        let H = substitute [(v,T)] f in
+        let L = substitute [(v,F)] f in
+        H == F => (v,F):(select L vs) |
+        L == F => (v,T):(select H vs) |
+        preference => (v,T):(select H vs) | (v,F):(select L vs)
+     /\    select f [] = []
+    in
+    select cond vars
 ;
 
 
@@ -1636,3 +1678,58 @@ non_lazy set_font;
 //  ["a[2]","b[4]","a[1]","b[3]","a[0]","b[2]","b[1]","b[0]"]
 //
 let vec_interleave vecs = interleave (map md_expand_vector vecs);
+
+// Evaluate expression e inside a context in which all of the GUI, 
+// except Interrupt button(s), is made inactive.
+let busy e =
+    (tcl_eval ["i_am_busy"]) fseq
+    let res = (SOME e) catch NONE then
+    (tcl_eval ["i_am_free"]) fseq
+    e
+;
+
+
+begin_abstype;
+
+//cletrec get_abstract_depends_rec wk_exprs {anm::string} =
+//    let expr = assoc anm wk_exprs then
+//    let vs = depends expr then
+//    val (todo,done) = split (str_is_prefix "_") vs then
+//    let get nm r = (get_abstract_depends_rec wk_exprs nm) union r in 
+//    itlist get todo done
+//;
+//
+//// Get an (over-)estimation of the variables some object depends on
+//// given an STE run that used dynamic weakening using the -ifw flag.
+//let get_abstract_depends ste obj =
+//    let wk_exprs = get_weak_expressions ste then
+//    let vs = depends obj then
+//    val (todo,done) = split (str_is_prefix "_") vs then
+//    let get nm r = (get_abstract_depends_rec wk_exprs nm) union r in 
+//    itlist get todo done
+//;
+
+clet get_abstract_depends_helper wk_exprs obj =
+    letrec search vars =
+	val (vars_todo,vars_done) = split (str_is_prefix "_") vars then
+	vars_todo = [] => vars_done |
+	let exprs_todo = map (\v. assoc v wk_exprs) vars_todo then
+	let new_vars = depends exprs_todo then
+	(search new_vars)@vars_done
+    in
+    let raw_res = search (depends obj) then
+    setify raw_res
+;
+
+// Get an (over-)estimation of the variables some object depends on
+// given an STE run that used dynamic weakening using the -ifw flag.
+let get_abstract_depends ste obj =
+    let wk_exprs = get_weak_expressions ste then
+    get_abstract_depends_helper wk_exprs obj
+;
+
+end_abstype get_abstract_depends;
+
+// Boolean implication.
+let ==> a b = NOT a OR b;
+infix 2 ==>;

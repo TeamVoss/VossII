@@ -1,0 +1,130 @@
+// TODO:
+// * Success bit for store; currently we just fail silently if we're asked to
+//   store something we don't have memory left for.
+// * Optimize restore process. Currently takes one restore cycle (i.e. two
+//   clock cycles) longer than necessary.
+cload (DIR^"cam_example.fl");
+cload (DIR^"diffcache_constants.fl");
+
+ENUM "ds_state" ["IDLE", "ALLOCATING", "SAVING", "RESTORING1", "RESTORING2"];
+
+STRUCT "ds_line" [
+  ("tag",   "tag"),
+  ("line",  "cache_line"),
+  ("aTag",  "atag_field"),
+  ("lAddr", "line_addr")
+];
+
+// On store signal, stores the given ds_line in two cycles.
+// On start_restore signal, restores all cache lines stored at or above the
+// restore_target security level in exactly (max_lines+1)*2 cycles.
+// Restored lines are output on restore_line, and the respective security level
+// on restore_tag. A new line is restored every two cycles.
+// NOTE: assumes that store and start_restore are mutually exclusive.
+let diffstate =
+    bit_input clk.
+    bit_input reset.
+
+    // Store interface
+    bit_input store.
+    ds_line_input store_line.
+    // TODO: valid bit for store
+
+    // Start restore process
+    bit_input   start_restore.
+    tag_input   restore_target.
+    cam_addr_input  max_lines.
+    // Restore outputs; one every two cycles
+    ds_line_output restore_line.
+    bit_output  restore_valid_out.
+    bit_output  restore_done.
+
+    // Internal stuff
+    ds_state_internal state.
+    bit_internal free_valid.
+    cam_addr_internal free_addr.
+    cam_addr_internal restore_addr.
+    tag_internal saved_tag.
+    tag_internal saved_restore_target.
+    ds_line_internal saved_line.
+    cam_addr_internal lines_to_restore.
+    cam_addr_internal saved_addr.
+    bit_internal write_ram.
+    bit_internal restore_valid.
+    bit_internal reset_done_flag.
+    bit_internal update_tag.
+
+    CELL "draw_hier diffstate" [
+         Moore_FSM "ds_state_fsm" clk state (reset, IDLE) [
+             IDLE       --- start_restore                   --- RESTORING1,
+             IDLE       --- store                           --- ALLOCATING,
+             ALLOCATING --- '1				    --- SAVING,
+             SAVING     --- store                           --- ALLOCATING,
+             SAVING     --- start_restore                   --- RESTORING1,
+             SAVING     --- ('~' (store '|' start_restore)) --- IDLE,
+             RESTORING1 --- '1			            --- RESTORING2,
+             RESTORING2 --- ('~' restore_done)              --- RESTORING1,
+             RESTORING2 --- restore_done                    --- IDLE
+         ],
+
+
+         // Save some data for the next cycle when storing or restoring...
+         re_ff_en clk (start_restore '|' store)
+                      (IF store THEN store_line-->tag ELSE FREE)
+                      saved_tag,
+         re_ff_en clk store store_line saved_line,
+         re_ff_en clk start_restore restore_target saved_restore_target,
+
+         // Count down the number of lines left to restore
+         // TODO: we're currently spending one restore cycle too much on each
+         // restore to avoid timing issues; this can probably be optimized.
+         re_ff_en clk (start_restore '|' is_RESTORING1 state '|' reset)
+                      (IF reset
+                          THEN '0
+                          ELSE (IF (is_RESTORING1 state)
+                                   THEN (lines_to_restore '-' '1)
+                                   ELSE (max_lines '+' '1)
+                          )
+                      )
+                      lines_to_restore,
+
+         // We're done restoring when the line count hits 0, whether we're really
+         // done or not.
+         reset_done_flag <- reset '|' is_IDLE state,
+         restore_done <- ((is_RESTORING2 state) '&' lines_to_restore '=' '0),
+
+         // On successful allocation, save allocated address.
+         // On successful restore, save restored address.
+         re_ff_en clk (restore_valid '|' free_valid)
+                      (IF (is_RESTORING1 state) THEN restore_addr ELSE free_addr)
+                      saved_addr,
+
+         // Store saved_line in memory when is_SAVING state
+         write_ram <- is_SAVING state '&' clk, // avoid fl crash
+         RAM "mem" LINES saved_addr
+                         saved_addr
+                         saved_line
+                         write_ram
+                         restore_line,
+
+         // Restore valid bit for diffstate is simply restore valid bit for CAM
+         // shifted one cycle into the future
+         re_ff clk restore_valid restore_valid_out,
+
+         // Update address with new tag if we're either restoring
+         // (where we mark the address as free) or we're storing a cache line
+         // at the address.
+         update_tag <- (IF (is_RESTORING2 state)
+                           THEN ('~' restore_done)
+                           ELSE (is_SAVING state)
+                       ),
+         CAM clk reset
+             (is_ALLOCATING state) free_valid free_addr
+             // Update tag when we're in saving state
+             update_tag saved_addr saved_tag
+             // Keep restoring while we're still in restoring state,
+             // one line per cycle
+             (is_RESTORING1 state) saved_restore_target restore_valid restore_addr
+             // Wipe saved tag when restore is done
+             ('~' reset '&' restore_done) saved_restore_target
+    ];
