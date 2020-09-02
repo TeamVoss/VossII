@@ -1127,11 +1127,11 @@ vectors(g_ptr redex)
     push_fsm(fsm);
     buffer res_buf;
     new_buf(&res_buf, 1000, sizeof(string));
-    vec_info_ptr vp;
-    FOR_REC(vec_info_rec_mgrp, vec_info_ptr, vp) {
-	if( !vp->transient ) {
-	    string vec = strtemp(vp->hierarchy);
-	    vec = strappend(vp->local_name);
+    vec_info_ptr vip;
+    FOR_REC(vec_info_rec_mgrp, vec_info_ptr, vip) {
+	if( !vip->transient ) {
+	    string vec = strtemp(vip->hierarchy);
+	    vec = strappend(vip->local_name);
 	    if( *vec != '!' ) {
 		vec = wastrsave(&strings, vec);
 		push_buf(&res_buf, &vec);

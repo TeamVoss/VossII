@@ -944,8 +944,6 @@ End_ADT(symbol_tbl_ptr stbl, var_list_ptr vlp)
             flp->visible = TRUE;
             flp->ADT_level = ADT_level;
             insert_hash(stbl->tbl_ptr, (pointer) flp->name, (pointer) flp);
-        } else {
-//          flp->visible = FALSE;
         }
         /* Type constructor status is bounded inside ADT */
         if( find_hash( &Constructor_Table, (pointer) flp->name ) != NULL )
@@ -954,11 +952,9 @@ End_ADT(symbol_tbl_ptr stbl, var_list_ptr vlp)
     }
     while( flp != NULL ) {
         string name = flp->name;
-        if( find_hash(&keep_tbl, (pointer) name) != NULL &&
-            flp->ADT_level == ADT_level )
+        if( find_hash(&keep_tbl, (pointer) name) == NULL ||
+            flp->ADT_level != ADT_level )
         {
-//          flp->visible = FALSE;
-        } else {
             if( flp->visible &&
                 find_hash(stbl->tbl_ptr, (pointer) name) == NULL)
             {
@@ -1041,6 +1037,8 @@ Get_Matching_Functions(string name_pat,
     g_ptr res = Make_NIL();
     while( list != NULL ) {
         if( !list->visible )
+            goto do_next;
+	if( find_hash(symb_tbl->tbl_ptr, (pointer) list->name) == NULL )
             goto do_next;
         if( STREQ(s_dummy, list->name) )
             goto do_next;
@@ -1877,9 +1875,6 @@ update_stbl(symbol_tbl_ptr stbl, fn_ptr fp)
     string name = fp->name;
     fn_ptr last = (fn_ptr) find_hash(stbl->tbl_ptr,(pointer) name);
     if(last != NULL && last != fp ) {
-        if( last->ADT_level == ADT_level ) {
-//          last->visible = FALSE;
-        }
         delete_hash(stbl->tbl_ptr, (pointer) name);
     }
     insert_hash(stbl->tbl_ptr, (pointer) name, (pointer) fp);

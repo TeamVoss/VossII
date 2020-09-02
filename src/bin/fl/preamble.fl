@@ -153,7 +153,7 @@ infix 6 downto;
 
 // Generate the list of integers from f to t inclusive
 // If f < t it generates an increasing list.
-// If f > t it genetates a decreasing list.
+// If f > t it generates a decreasing list.
 let -- f t =
     f < t => f upto t | f downto t
 ;
@@ -225,11 +225,11 @@ letrec map3 fn l1 l2 l3 =
 // Usage: itlist f l x;
 letrec itlist f l x = empty l => x | f (hd l) (itlist f (tl l) x);
 
-// Merge the elements in the list l by repeadedly applying the function fn
+// Merge the elements in the list l by repeatedly applying the function fn
 // Usage: accumulate fn l;
 letrec accumulate fn l = itlist fn (tl l) (hd l);
 
-// Reverese iteration list
+// Reverse iteration list
 letrec rev_itlist f l x = empty l => x | rev_itlist f (tl l) (f (hd l) x);
 
 // Apply the list creating function fn to every element in l and append
@@ -271,12 +271,12 @@ letrec interleave ll = (empty ll) => [] |
                 rm @ (rem (tl ll)) in
         (hdlist ll) @ (interleave (rem ll));
 
-// Take twp lists of the same length and return a list of pairs 
+// Take two lists of the same length and return a list of pairs 
 letrec zip l1 l2 =
         empty l1 =>
-            empty l2 => [] | error "Lenght mismatch in zip"
+            empty l2 => [] | error "Length mismatch in zip"
         |
-            empty l2 => error "Lenght mismatch in zip"
+            empty l2 => error "Length mismatch in zip"
         |
             (hd l1, hd l2):(zip (tl l1) (tl l2))
 ;
@@ -582,7 +582,7 @@ let cload filename =
 non_lazy cload;
 end_abstype cload;
 
-// Replace all curent state variables (not ending in _n) with their
+// Replace all current state variables (not ending in _n) with their
 // corresponding next-state variables in all the BDDs in fs.
 // All other variables remain as they were.
 // NOTE: If fs already depends on one of the new next-state variables, 
@@ -837,7 +837,7 @@ let draw_bdd_profile e =
 // A convenient shorthand for bottom.
 let undefined = error "Undefined";
 
-// A convenient funtion to quickly create a collection of identifiers for
+// A convenient function to quickly create a collection of identifiers for
 // Boolean variables or vectors of Boolean variables.
 // For example:
 //   VARS "a[2:0] b[1:0] c d";
@@ -876,7 +876,7 @@ let VARS s =
     foreach decl id_nds
 ;
 
-// A convenient funtion to quickly create a collection of identifiers for
+// A convenient function to quickly create a collection of identifiers for
 // constrained Boolean variables and/or bvs (vectors of Boolean variables).
 // For example:
 //   cVARS "a[2:0] b[2:0] c d" "(c OR d) AND (a > '0) AND (b > a)";
@@ -1207,7 +1207,7 @@ overload {abs :: *a -> *a} iabs fabs bvabs bevabs;
 
 // Transpose a list with n elements that each are an m-element list to
 // an m-element list that each consists of an n-element list
-// For exammpe:
+// For example:
 //	transpose [[1,2,3],[4,5,6]];
 //  yields:
 //	[[1,4],[2,5],[3,6]]
@@ -1586,7 +1586,7 @@ andlettype content =
         |   P_LEAF {fns::update_fn list}
 ;
 
-// Convert any bexpr occuring in "e" to a BDD.
+// Convert any bexpr occurring in "e" to a BDD.
 // Currently only defined to bexprs, lists, pairs and list of pairs of bexprs.
 // Usage: bexpr2bdd e;
 open_overload {bexpr2bdd :: *a -> *b};
@@ -1630,7 +1630,7 @@ export_to_tcl fl_set_gui_return;
 // Example of use
 // prompt_for_inputs "Test" [("Give name", ""), ("Give size", "3")];
 // Returns a list of the text field from the user or an empty list
-// if the user prush the Cancel button.
+// if the user pushes the Cancel button.
 //
 // Usage: prompt_for_inputs title label_default_list;
 let prompt_for_inputs title text_fields =

@@ -1318,54 +1318,80 @@ namespace eval voss2_help {
 	}
     }
 
+    proc help_show_function_info {tb fun} {
+	set wname [name2wname $fun]
+	if { ![winfo exists $tb.$wname] } {
+	    set f $tb.$wname
+	    frame $f -relief flat
+	    $tb add $f -text $fun
+	    $tb select $f
+	    button $f.b -text Close -command [list destroy $f] \
+		    -font $::voss2_txtfont
+	    pack $f.b -side bottom
+	    ttk::scrollbar $f.yscroll -command [list $f.t yview]
+	    ttk::scrollbar $f.xscroll -orient horizontal \
+				      -command [list $f.t xview]
+	    text $f.t -background white -font $::voss2_help_font \
+		-wrap none \
+		-xscrollcommand [list $f.xscroll set] \
+		-yscrollcommand [list $f.yscroll set] \
+		-setgrid 1 -width 50
+	    $f.t insert 1.0 [help_clean [help $fun]]
+	    $f.t tag configure source_loc   -foreground blue
+	    set file_loc [$f.t search {File:  } 1.0]
+	    if { $file_loc != "" } {
+		$f.t tag add source_loc "$file_loc+7chars" \
+					"$file_loc lineend"
+		set start_loc [$f.t search {Start: } $file_loc]
+		set end_loc   [$f.t search {End:   } $start_loc]
+		set file [$f.t get "$file_loc+7chars" "$file_loc lineend"]
+		set s_line [$f.t get "$start_loc+7chars" \
+				     "$start_loc lineend"]
+		set e_line [$f.t get "$end_loc+7chars" "$end_loc lineend"]
+		$f.t tag bind source_loc <Button-1> \
+			    "::voss2_help::help_open_file $tb $fun \
+				    $file $s_line $e_line"
+	    }
+	    set overload_loc [$f.t search {is the overloading of:} 1.0]
+	    if { $overload_loc != "" } {
+		set o_cnt 0
+		set cur_loc [$f.t index "$overload_loc lineend + 1 chars"]
+		set keep_going 1
+		while { $keep_going == 1 } {
+		    set line [$f.t get $cur_loc "$cur_loc lineend"]
+		    if { [regexp {([A-Za-z0-9_]*) ::} $line --> ofun] == 1 } {
+			set o_tag [format {o_tag%04d} $o_cnt]
+			incr o_cnt
+			$f.t tag configure $o_tag -foreground blue
+			$f.t tag add $o_tag $cur_loc \
+				    "$cur_loc + [string length $ofun] chars"
+			$f.t tag bind $o_tag <Button-1> \
+			    "::voss2_help::help_show_function_info $tb $ofun"
+			set keep_going 1
+			set cur_loc [$f.t index "$cur_loc lineend + 1 chars"]
+		    } else {
+			set keep_going 0
+		    }
+		}
+	    }
+
+	    $f.t configure -state disabled
+	    pack $f.yscroll -side right -fill y
+	    pack $f.xscroll -side bottom -fill x
+	    pack $f.t -side right -expand yes -fill both
+	} else {
+	    set f $tb.$wname
+	    $tb select $f
+	}
+    }
+
     proc help_show_info {lb tb} {
 	foreach index [$lb curselection] {
 	    set fun [$lb get $index]
-	    set wname [name2wname $fun]
-	    if { ![winfo exists $tb.$wname] } {
-		set f $tb.$wname
-		frame $f -relief flat
-		$tb add $f -text $fun
-		$tb select $f
-		button $f.b -text Close -command [list destroy $f] \
-			-font $::voss2_txtfont
-		pack $f.b -side bottom
-		ttk::scrollbar $f.yscroll -command [list $f.t yview]
-		ttk::scrollbar $f.xscroll -orient horizontal \
-					  -command [list $f.t xview]
-		text $f.t -background white -font $::voss2_help_font \
-		    -wrap none \
-		    -xscrollcommand [list $f.xscroll set] \
-		    -yscrollcommand [list $f.yscroll set] \
-		    -setgrid 1 -width 50
-		$f.t insert 1.0 [help_clean [help $fun]]
-		$f.t tag configure source_loc   -foreground blue
-		set file_loc [$f.t search {File:  } 1.0]
-		if { $file_loc != "" } {
-		    $f.t tag add source_loc "$file_loc+7chars" \
-					    "$file_loc lineend"
-		    set start_loc [$f.t search {Start: } $file_loc]
-		    set end_loc   [$f.t search {End:   } $start_loc]
-		    set file [$f.t get "$file_loc+7chars" "$file_loc lineend"]
-		    set s_line [$f.t get "$start_loc+7chars" \
-					 "$start_loc lineend"]
-		    set e_line [$f.t get "$end_loc+7chars" "$end_loc lineend"]
-		    $f.t tag bind source_loc <Button-1> \
-				"::voss2_help::help_open_file $tb $fun \
-					$file $s_line $e_line"
-		}
-		$f.t configure -state disabled
-		pack $f.yscroll -side right -fill y
-		pack $f.xscroll -side bottom -fill x
-		pack $f.t -side right -expand yes -fill both
-	    } else {
-		set f $tb.$wname
-                $tb select $f
-	    }
+	    help_show_function_info $tb $fun
 	}
 	$lb selection clear 0 end
     }
-
 
     proc help_do_match {lb} {
 	$lb delete 0 end 
