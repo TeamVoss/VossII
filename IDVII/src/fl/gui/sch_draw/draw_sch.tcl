@@ -87,7 +87,8 @@ proc max {a b} {
 }
 
 proc sch:show_values_on_canvas {c} {
-    set show [expr $::vstatus(show_value,$c) || $::vstatus(show_bdd_group,$c)]
+    set show [expr $::vstatus(show_value,$c) || \
+		   $::vstatus(show_bdd_group,$c)]
     sch:sch_display_values $c $show
 }
 
@@ -736,7 +737,8 @@ proc create_circuit_canvas {nb mw} {
 }
 
 proc cb:update_time_and_colors {c} {
-    set show [expr $::vstatus(show_value,$c) || $::vstatus(show_bdd_group,$c)]
+    set show [expr $::vstatus(show_value,$c) || \
+		   $::vstatus(show_bdd_group,$c)]
     sch:sch_display_values $c $show
 }
 
@@ -857,6 +859,10 @@ proc add_value_field {c aname x y {special_tag ""}} {
 		-font $sfont($c) -fill $::value_col]
     add_font_tags $c $t _IsVaLuE_
     $c bind $t <ButtonPress-3> "cb:add_value_menu $c $aname %X %Y; break"
+    $c create rectangle [expr $x+3]	       [expr $y+3] \
+		        [expr $x+4*[min_sep $c]] [expr $y+4*[min_sep $c]] \
+			-tags "$ttag _IsDePeNdEnCy_" -fill white -outline white
+    $c lower _IsDePeNdEnCy_
 }
 
 proc draw_three_dots {c lx ly ux uy tag} {
@@ -1130,9 +1136,9 @@ proc record_orig_color {c item} {
 proc cb:prim_set_wire_color {c name color} {
     global gcolor fc
     if ![winfo exists $c] { return }
-    set items [$c find withtag "$name&&!_IsTeXt_"]
+    set items [$c find withtag "$name&&!_IsTeXt_&&!_IsDePeNdEnCy_"]
     set cname [clean_name $name]
-    eval lappend items [$c find withtag "$cname&&!_IsTeXt_"]
+    eval lappend items [$c find withtag "$cname&&!_IsTeXt_&&!_IsDePeNdEnCy_"]
     foreach item $items {
 	if [do_not_change_color $c $item] { continue; }
 	if { [$c type $item] == "line" && ![is_WiRe $c $item] } { continue; }
@@ -1307,15 +1313,35 @@ proc Remove_Labels_on_Gates {c} {
     }
 }
 
+proc flash_dependency {c tag cnt} {
+    if [winfo exists $c] {
+	if [winfo ismapped $c] {
+	    if { [expr $cnt % 2] == 0 } {
+		$c itemconfigure $tag -fill pink
+	    } else {
+		$c itemconfigure $tag -fill white
+	    }
+	}
+	if { $cnt != 0 } { 
+	    after 300 "flash_dependency $c $tag [expr $cnt-1]"
+	}
+    }
+}
+
 proc sch:sch_display_values {c show} {
     if ![winfo exists $c] { return; }
+    i_am_busy
     if { $show } {
 	if { $::vstatus(show_bdd_group,$c) } {
-	    fl_set_color_by_bdd_prefix on $c
-	    fl_update_colors $c
+	    foreach tag [$c find withtag _IsDePeNdEnCy_] {
+		set aname [get_anon_name [$c gettags $tag]]
+		    set col [fl_get_bdd_color $c $aname]
+		    $c itemconfigure $tag -fill $col
+	    }
 	} else {
-	    fl_set_color_by_bdd_prefix off $c
-	    fl_update_colors $c
+	    foreach tag [$c find withtag _IsDePeNdEnCy_] {
+		$c itemconfigure $tag -fill white
+	    }
 	}
 	if { $::vstatus(show_value,$c) } {
 	    foreach tag [$c find withtag _IsVaLuE_] {
@@ -1329,12 +1355,14 @@ proc sch:sch_display_values {c show} {
 	    }
 	}
     } else {
+	foreach tag [$c find withtag _IsDePeNdEnCy_] {
+	    $c itemconfigure $tag -fill white
+	}
         foreach tag [$c find withtag _IsVaLuE_] {
             $c itemconfigure $tag -text ""
         }
-	fl_set_color_by_bdd_prefix off $c
-	fl_update_colors $c
     }
+    i_am_free
 }
 
 proc clear_value_tags { cur_canvas } {

@@ -184,7 +184,8 @@ proc voss2_interrupt_action {} {
     button $w.x -text "Exit VossII" -command {set ::interrupt_choice x}
     pack $w.x -side top -pady 2 -fill x -expand yes
 
-    button $w.r -text "Return to top" -command {set ::interrupt_choice r}
+    button $w.r -text "Return to top" \
+	    -command {make_all_active; set ::interrupt_choice r}
     pack $w.r -side top -pady 2 -fill x -expand yes
 
     $::voss2_info(intr) configure -state disable

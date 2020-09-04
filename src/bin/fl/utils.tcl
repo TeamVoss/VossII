@@ -167,9 +167,6 @@ proc util:report_result_in_file {msg file return_alts} {
 }
 
 
-set ::busy_level 0
-
-
 set ::always_alive {}
 
 proc make_window_always_alive {w} {
@@ -208,16 +205,40 @@ proc mk_busy {w mode} {
 }
 
 proc i_am_busy {} {
-    incr ::busy_level
-    if { $::busy_level == 1 } {
-	foreach w [wm stackorder .] {
+    foreach w [wm stackorder .] {
+	incr ::busy_level($w)
+	if { $::busy_level($w) == 1 } {
 	    mk_busy $w 1
 	}
-	update
     }
+    update
 }
 
 proc i_am_free {} {
+    foreach w [wm stackorder .] {
+	if [info exists ::busy_level($w)] {
+	    incr ::busy_level($w) -1
+	    if { [expr $::busy_level($w) <= 0] } {
+		mk_busy $w 0
+		set ::busy_level($w) 0
+	    }
+	} else {
+	    mk_busy $w 0
+	    set ::busy_level($w) 0
+	}
+    }
+    update
+}
+
+proc make_all_active {} {
+    foreach w [wm stackorder .] {
+	mk_busy $w 0
+	set ::busy_level($w) 0
+    }
+}
+
+
+proc old_i_am_free {} {
     set ::busy_level [expr $::busy_level-1]
     if [expr $::busy_level < 0] { 
 	set ::busy_level 0

@@ -14,7 +14,6 @@ lettype vfsm =
 		{stop_list::(string list) ref}
 		{selection_list::(string list) ref}
 		{highlight_list::((string#string) list) ref}
-		{depend_list::((string#string) list) ref}
 		{canvas_list :: (((string#vis)list) ref)}
 		{fsm_list :: (((string#string)list) ref)}
 		{cmds::(string list) ref}
@@ -22,62 +21,58 @@ lettype vfsm =
 
 
 let vfsm2id vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr cmd) = vfsm in
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
     id
 ;
 
 let vfsm2fsm vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr cmd) = vfsm in
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
     fsm
 ;
 
 let vfsm2ste_r vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr cmd) = vfsm in
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
     ster
 ;
 
 let vfsm2wvr vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr cmd) = vfsm in
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
     wvr
 ;
 
 let vfsm2cur_time_r vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr cmd) = vfsm in
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
     tr
 ;
 
 let vfsm2stop_list_r vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr cmd) = vfsm in
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
     stopr
 ;
 
 let vfsm2selection_r vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr cmd) = vfsm in
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
     selr
 ;
 
 let vfsm2canvases_r vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr cmd) = vfsm in
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
     cvsr
 ;
 
 let vfsm2fsms_r vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr cmd) = vfsm in
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
     fsmr
 ;
 
 let vfsm2hll_r vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr cmd) = vfsm in
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
     hlr
 ;
 
-let vfsm2dl_r vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr cmd) = vfsm in
-    dlr
-;
 
 let vfsm2cmds_r vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr dlr cvsr fsmr cmd) = vfsm in
+    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
     cmd
 ;
 
