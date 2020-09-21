@@ -449,6 +449,9 @@ proc create_voss2_top_level_menu {{tm ".voss2.menu"}} {
 	    -command {voss2_load_file} -underline 0
     $tm.file.m add command -label "Save" \
 	    -command {voss2_save_file} -underline 0
+    $tm.file.m add command -label "Take Screenshot" \
+	    -command {sg:screen_grab} -underline 0
+
     $tm.file.m add command -label "Quit VossII" \
 	    -command {send_top_voss2_cmd "quit;"} -underline 0
     pack $tm.file -side left
@@ -1751,6 +1754,90 @@ proc hide_fl_window {} {
     set ::voss2_status(hidden_fl_window) 1
     wm withdraw .
 }
+
+
+proc sg:screen_grab {} {
+    set w .screen_grab
+    catch {destroy $w}
+    set topwins [wm stackorder .]
+
+    toplevel $w
+
+    label $w.l -text "Screen capture"
+    pack $w.l -side top -fill x
+
+    frame $w.window -relief flat
+    pack $w.window -side top -fill x
+	label $w.window.l -text "Window name:"
+	ttk::combobox $w.window.cb -textvariable ::screen_grab_window_name \
+				   -values $topwins
+	pack $w.window.l -side left
+	pack $w.window.cb -side left -fill x -expand yes
+
+    frame $w.sz -relief flat
+    set ::sg_desired_width 1000
+    pack $w.sz -side top -fill x
+	label $w.sz.l -text "Width: "
+	entry $w.sz.e -textvariable ::sg_desired_width
+	pack $w.sz.l -side left
+	pack $w.sz.e -side left -fill x -expand yes
+
+    frame $w.dir -relief flat
+    pack $w.dir -side top -fill x
+	label $w.dir.l -text "Directory:"
+	entry $w.dir.e -textvariable ::screen_shot_dir
+	set ::screen_shot_dir .
+	button $w.dir.b -text Browse -command "sg:choose_dir $w"
+	pack $w.dir.l -side left
+	pack $w.dir.e -side left -fill x -expand yes
+	pack $w.dir.b -side left
+
+    frame $w.bname -relief flat
+    set ::screen_shot_basename screen_shot
+    pack $w.bname -side top -fill x
+	label $w.bname.l -text "Base name: "
+	entry $w.bname.e -textvariable ::screen_shot_basename
+	pack $w.bname.l -side left
+	pack $w.bname.e -side left -fill x -expand yes
+
+    button $w.capture -text Capture -command "sg:capture $w"
+    pack $w.capture -fill x
+
+
+}
+
+proc sg:choose_dir {w} {
+    set ::screen_shot_dir [tk_chooseDirectory \
+	    -initialdir ~ -title "Choose a directory"]
+}
+
+proc sg:capture {w} {
+    set ::screen_grab_id [winfo id $::screen_grab_window_name]
+    wm iconify $::screen_grab_window_name
+    update
+    wm deiconify $::screen_grab_window_name
+    update
+    set geom [winfo geometry $::screen_grab_window_name]
+    regexp {([0-9]*)x([0-9]*)\+[0-9]*\+[0-9]*} $geom --> wid ht
+    set ::screen_grab_width $wid
+    set ::screen_grab_height $ht
+
+    if { ![info exists ::screen_grab_file_cnt($::screen_shot_basename)] } {
+	set ::screen_grab_file_cnt($::screen_shot_basename) 0
+    }
+    incr ::screen_grab_file_cnt($::screen_shot_basename)
+    set file [format {%s/%s_%03d.png} \
+		     $::screen_shot_dir \
+		     $::screen_shot_basename \
+		     $::screen_grab_file_cnt($::screen_shot_basename)]
+    
+    set ratio [expr $::sg_desired_width.0/$::screen_grab_width.0]
+    set wid [expr round($ratio * $::::screen_grab_width.0)]
+    set ht [expr round($ratio * $::::screen_grab_height.0)]
+    eval exec import -window $::screen_grab_id png:- | \
+	 convert -resize [format {%dx%d} $wid $ht] png:- $file
+}
+
 
 # Increase stack size to allow change_fonts to work even when deep
 # hierarchy of windows are open.

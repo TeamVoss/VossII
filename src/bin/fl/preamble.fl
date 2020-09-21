@@ -403,6 +403,40 @@ let fixed_bv2list bits sign_ext bv =
 // Compute the condition for two bitvectors to be equal.
 let bv_eq {a::bv} {b::bv} = a = b;
 
+begin_abstype;
+// For small values -100 <= x <= 100 (-1.0 -- 1.0)
+// Result 100*exp(x/100)
+let bv_small_exp {p::bv} =
+    p = '0 => '100 |
+    ('6000000+p*('60000+p*('300+p)))/ '60000
+;
+
+let bvabs bv = bv < (int2bv 0) => ('0 - bv) | bv;
+
+// Return an approximation to: 100*exp(n/d)
+// Is accurate within 3% at least for -6.0 <= n/d <= 12.0
+let bv_exp {n::bv} {d::bv} =
+    n = '0 => int2bv 100 |
+    n = d  => int2bv (round (100.0*exp(1.0))) |
+    n = ('0 - '1*d)  => int2bv (round (100.0*exp(-1.0))) |
+    let n' = bvabs n in
+    let d' = bvabs d in
+    let sign = n/n' * d/d' in
+    let m = n' / d' in
+    let r = n' % d' in
+    let small = bv_small_exp (('100*r)/d') in
+    let scale = 1000000 in
+    let e = int2bv (round ((int2float scale)*exp(1.0))) in
+    letrec big_exp i = i = '0 => ('1,'1) |
+                       val (er,sr) = big_exp (i - '1) in
+                       (e*er, sr*(int2bv scale))
+    in
+    val (big,big_scale) = big_exp m in
+    let ares = (big*small)/ big_scale then
+    sign == '1 => ares | '10000/ares
+;
+end_abstype bv_exp bv_abs;
+
 // Compute the condition for two bitvectors not to be equal.
 let bv_neq {a::bv} {b::bv} = a != b;
 
@@ -458,6 +492,18 @@ let full_example preference vars cond =
     select cond vars
 ;
 
+// Split a vector into a basename and a list of (idx,idx) pairs extracted
+// from the name v.
+let split_vector v =
+    let parts = str_split v "[" then
+    let base = hd parts in
+    let range s =
+        str_is_substr ":" s => sscanf "%d:%d]" s |
+        let idx = sscanf "%d]" s in
+        (idx,idx)
+    in
+    base, map range (tl parts)
+;
 
 // Given a list of node vectors, return a list of "atoms" (vectors) that
 // have the property that every node in an atom is member of exactly the
@@ -1196,7 +1242,6 @@ end_abstype param fparam;
 
 let iabs i = i < 0 => -1*i | i;
 let fabs f = f < 0.0 => -1.0*f | f;
-let bvabs bv = bv < (int2bv 0) => ('0 - bv) | bv;
 let bevabs {bev::bev} = 
     let is_neg = list2bev [(bev < (int2bev 0))] in
     let neg = (int2bev 0) - bev in
@@ -1371,6 +1416,58 @@ let mutex v =
 ;
 
 
+// Given a bv, return the minimum and maximum value that bv can represent.
+let bv_range bv =
+    letrec find_max (b:bs) =
+	b == F => find_max bs |
+	let i = 2**(length bs) in
+	let sub = param b in
+	let bs' = substitute sub bs in
+	i+find_max bs'
+     /\   find_max [] = 0
+    in
+    letrec find_min (b:bs) =
+	let i = 2**(length bs) in
+	b == T => i+find_min bs |
+	let sub = param (NOT b) in
+	let bs' = substitute sub bs in
+	find_min bs'
+     /\   find_min [] = 0
+    in
+    let can_be_neg = NOT ((bv < (int2bv 0)) == F) in
+    let can_be_pos = NOT ((bv >= (int2bv 0)) == F) in
+    let neg = bv < (int2bv 0) in
+    let min =
+	can_be_neg =>
+	    let sub = param neg in
+	    let bv = substitute sub bv in
+	    let bv = (int2bv (-1)) * bv in
+	    let bl = bv2list bv in
+	    let max = find_max bl in
+	    -1*max
+	|
+	    let sub = param (NOT neg) in
+	    let bv = substitute sub bv in
+	    let bl = bv2list bv in
+	    find_min bl
+    in
+    let max =
+	can_be_pos =>
+	    let sub = param (NOT neg) in
+	    let bv = substitute sub bv in
+	    let bl = bv2list bv in
+	    find_max bl
+	|
+	    let sub = param neg in
+	    let bv = substitute sub bv in
+	    let bv = (int2bv (-1)) * bv in
+	    let bl = bv2list bv in
+	    let max = find_min bl in
+	    -1*max
+    in
+    min,max
+;
+
 // Function for printing some (cnt) examples that the bv can denote.
 // Usage: bv_examples cnt bv;
 //
@@ -1470,7 +1567,7 @@ letrec Pwexpr (W_X sz) = sprintf "X[%d:0]" (sz-1)
  /\    Pwexpr (W_AND a b) = sprintf "(%s & %s)" (Pwexpr a) (Pwexpr b)
  /\    Pwexpr (W_OR  a b) = sprintf "(%s | %s)" (Pwexpr a) (Pwexpr b)
  /\    Pwexpr (W_NOT a) = sprintf "~(%s)" (Pwexpr a)
- /\    Pwexpr (W_PRED name cond) = sprintf "(%s::%s)" name (Pwexpr cond)
+ /\    Pwexpr (W_PRED name cond) = sprintf "(%s)" (Pwexpr cond)
  /\    Pwexpr (W_EQ  a b) = sprintf "(%s = %s)" (Pwexpr a) (Pwexpr b)
  /\    Pwexpr (W_GR  a b) = sprintf "(%s > %s)" (Pwexpr a) (Pwexpr b)
  /\    Pwexpr (W_ADD a b) = sprintf "(%s + %s)" (Pwexpr a) (Pwexpr b)

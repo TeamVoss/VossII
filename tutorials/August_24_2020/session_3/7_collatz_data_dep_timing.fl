@@ -19,7 +19,7 @@ let collatz =
     word_internal t newt new_length.
     bit_internal eq1 new_done.
     bit_internal is_even is_odd.
-    CELL "draw_hier data_dependent_collatz" [
+    CELL "draw_hier collatz_dd" [
 	re_ff clk newt t,
 	eq1 <- (t '=' '1), 
 	is_even <- ((t '%' '2) '=' '0), 

@@ -232,6 +232,8 @@ let vfsm_STE opts vfsm wl ant cons trl =
     (tcl_eval [sprintf "unset ::active_gui"]) fseq
     ((vfsm2ste_r vfsm) := ste) fseq
     (tcl_eval [sprintf "wv:set_new_max_time %s 1" (deref (vfsm2wvr vfsm))]) fseq
+    let cur_time = deref (vfsm2cur_time_r vfsm) then 
+    (tcl_eval [sprintf "set ::vstatus(time,%s) %d" w cur_time]) fseq
     ste
 ;
 overload STE bool_STE vfsm_STE;
@@ -1156,10 +1158,9 @@ clet get_dependency_color ste t vecs =
 	eprintf "get_dependency_color on non-binary (%s) STE run" type
     then
     deps = [] => "" |
-    deps = ["g"] => "green" |
     deps = ["b"] => "blue" |
     deps = ["r"] => "red" |
-    mem "r" deps => "pink" |
+    (mem "r" deps) AND (mem "b" deps) => "pink" |
     "yellow"
 ;
 

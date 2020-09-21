@@ -1594,14 +1594,14 @@ let MEMORY name size_list word_type =
     (hw_types_decl_ref := new) fseq
     let ssz = sprintf "%d" tot_size in
     let swidth = sprintf "%d" width in
-    let s_addr_sz =
-	let asz = itlist (\(lns,atp).\r. get_hw_type_size atp+r) size_list 0 in
-	sprintf "%d" asz
+    let addr_sz =
+	itlist (\(lns,atp).\r. get_hw_type_size atp+r) size_list 0
     in
+    let s_addr_sz = sprintf "%d" addr_sz in
     let stot_lines = sprintf "%d" (itlist (\(lns,_).\r. lns*r) size_list 1) in
     let sVAR =
 	let gen (lines,atype) = sprintf "[%d:0]" (lines-1) in
-	let post = sprintf "[%d:0]\")" (width-1) in
+	let post = width == 1 => "\")" | sprintf "[%d:0]\")" (width-1) in
 	let base_and_dims = list2str T "(base^\"" "" post gen size_list in
 	sprintf "W_EXPLICIT_VAR %d %s" tot_size base_and_dims
     in
@@ -1636,7 +1636,10 @@ let MEMORY name size_list word_type =
     in
     let saddr_w_adr_comp =
         letrec mk_expr cnt [(lns,atp)] =
-            (sprintf "(W_ZX %s (hw_%s_destr addr%d))" s_addr_sz atp cnt)
+	    get_hw_type_size atp = addr_sz =>
+		(sprintf "hw_%s_destr addr%d" atp cnt)
+	    |
+		(sprintf "(W_ZX %s (hw_%s_destr addr%d))" s_addr_sz atp cnt)
          /\    mk_expr cnt ((lns,atp):rem) =
             let rest = mk_expr (cnt-1) rem in
             (sprintf "(W_ADD (W_ZX %s (hw_%s_destr addr%d))" s_addr_sz atp cnt)^
@@ -1941,6 +1944,26 @@ let SX {inp:: *a} =
     {out :: *b}
 ;
 
+
+//
+// A circuit that takes an input (vector) and outputs a 1 only after the
+// input has been the same for duration_in_phases phases.
+//
+let is_stable duration_in_phases inp ok = (
+    input       inp.
+    bit_output  ok.
+    internal        old.
+    bit_internal    same.
+    bit_list_internal (duration_in_phases-1) same_list.
+    CELL (sprintf "draw_hfl {is stable\nfor %d  \nphases }" duration_in_phases)  (
+        (map2 (\o.\i. o <: i) same_list ((tl same_list)@[same]))@[
+        old <: inp,
+        same <- (old '=' inp),
+        ok <- itlist (\s.\r. s '&' r) same_list same
+])) inp ok; 
+
+
+// MUX between two signals.
 let MUX =
     bit_input c.
     input a b.
@@ -1994,8 +2017,25 @@ let base_re_ff_en =
 	MUX TmP_len TmP_d_o TmP_q_o q
 ];
 
+let base_re_ff_en_reset =
+    input	d.
+    bit_input	en.
+    bit_input	reset.
+    bit_input	clk.
+    output	q.
+    internal TmP_d_o TmP_clk_o TmP_q_o TmP_len TmP_tmp TmP_zero TmP_en_o.
+    CELL "draw_ff_re_with_en_reset" [
+	TmP_d_o <: d,
+	TmP_q_o <: q,
+	TmP_clk_o <: clk,
+	TmP_en_o <: en,
+	TmP_zero <- '0,
+	TmP_len <- reset '|' TmP_en_o '&' '~'TmP_clk_o '&' clk,
+	MUX reset TmP_zero TmP_d_o TmP_tmp,
+	MUX TmP_len TmP_tmp TmP_q_o q
+];
+
 // A rising edge D flip-flop.
-// Usage: re_ff clk d q;
 let re_ff = 
     bit_input	clk.
     input	d.
@@ -2022,6 +2062,17 @@ let re_ff_en =
     output	q.
     CELL "" [
 	base_re_ff_en d en clk q
+];
+
+// A rising edge D flip-flop with enable and asynchronous reset (acive high).
+let re_ff_en_reset =
+    bit_input	clk.
+    bit_input	en.
+    bit_input	reset.
+    input	d.
+    output	q.
+    CELL "" [
+	base_re_ff_en_reset d en reset clk q
 ];
 
 // A falling edge D flip-flop.
@@ -2485,7 +2536,74 @@ let STATE {clk::bit} {state:: *a} {cond_res_list:: (bit # *a) list} =
     let get_acts (PINST _ _ _ ifa _ _ _) = flatmap snd ifa in
     let inps = (setify (flatmap get_acts children)) subtract ints then
     let fa_inps = (map (\v.v,[v]) inps) then
-    PINST "CASE" [] F fa_inps fa_states ints (P_HIER children)
+    PINST "STATE" [] F fa_inps fa_states ints (P_HIER children)
+;
+
+let EN_STATE {clk::bit} {enable::bit} {state:: *a}
+	     {cond_res_list:: (bit # *a) list}
+    =
+    let sz = hw_size state in
+    let n = length cond_res_list then
+    let w_clk = hw_destr clk then
+    let n_clk = hd (w_depends w_clk) then
+    let w_state = hw_mk_var {undefined :: *a} BASE_TMP then
+    let new_state = {hw_constr w_state :: *a} then
+    let w_new_state = hw_destr new_state then
+    let n_new_state = hd (w_depends w_new_state) then
+    let w_state = hw_destr state then
+    let n_state = hd (w_depends w_state) then
+    let fa_states = [(n_state,[n_state])] in
+    let fa_outs = [(n_new_state,[n_new_state])] in
+    let cnv (cond,res) = hw_bit_destr cond, hw_destr res in
+    let w_crl = map cnv cond_res_list then
+    let var2name (W_VAR s b) = [mk_name s b]
+     /\ var2name (W_EXPLICIT_VAR s b) = [b]
+     /\ var2name other = []
+    in
+    let ld = W_VAR sz (sprintf "%s_d" BASE_TMP) in
+    let nd = mk_name sz (sprintf "%s_d" BASE_TMP) in
+    let d_fas = [(nd,[nd])] in
+    let default_p = (hw_constr ld) <- state then
+    letrec select cnt ((c,r):rem) =
+        let bc = sprintf "%s_c%02d" BASE_TMP cnt in
+        let br = sprintf "%s_r%02d" BASE_TMP cnt in
+        let lc = W_VAR 1 bc in
+        let lr = W_VAR sz br in
+        val (c_ints, c_act, c_extra) =
+	    let v = var2name c in
+	    v = [] =>
+		let en = mk_name 1 bc in
+		([en], en, [((hw_bit_constr lc) <- (hw_bit_constr c))])
+	    |
+	    ([], hd v, [])
+        in
+        val (r_ints, r_act, r_extra) =
+	    let v = var2name r in
+	    v = [] =>
+		let en = mk_name sz br in
+		([en], en, [((hw_bit_constr lr) <- (hw_bit_constr r))])
+	    |
+	    ([], hd v, [])
+        in
+        val (fas, e, ints, extras) = select (cnt+1) rem then 
+        let fas = (mk_name 1 bc, [c_act]):(mk_name sz br, [r_act]):fas then
+        let e = W_ITE lc lr e then
+        let ints = c_ints@r_ints@ints in
+        let extras = c_extra@r_extra@extras in
+        (fas, e, ints, extras)
+     /\    select cnt [] = [], ld, [], []
+    in
+    val (fas, rhs, ints, extras) = select 1 w_crl then
+    let ints = n_new_state:nd:ints in
+    let body = new_state <- (hw_constr rhs) then
+    let pfn = sprintf "draw_CASE %d" n then
+    let mux = PINST pfn [] T (fas@d_fas) fa_outs [] (P_HIER [body]) in
+    let ff = re_ff_en clk enable new_state state then
+    let children = ff:default_p:mux:extras in
+    let get_acts (PINST _ _ _ ifa _ _ _) = flatmap snd ifa in
+    let inps = (setify (flatmap get_acts children)) subtract ints then
+    let fa_inps = (map (\v.v,[v]) inps) then
+    PINST "STATE" [] F fa_inps fa_states ints (P_HIER children)
 ;
 
 let SELECT =
@@ -2730,48 +2848,6 @@ let RAM name lines {raddr:: *a} {waddr:: *a} {din:: *d} {we::bit} {out:: *d} =
     PINST pfn [] T fa_inps fa_outs [s_mem] (P_HIER [rd,wr])
 ;
 
-let MEM_WRITE name {din:: *d} {we::bit} {waddr:: *a} {mem:: *m} =
-    let a_sz = hw_size waddr in
-    let d_sz = hw_size din in
-    let m_sz = hw_size mem in
-    let lines = m_sz/d_sz in
-    ((m_sz % d_sz) != 0) => eprintf "Memory size not a multiple of word size" |
-    lines > 2**a_sz => eprintf "Too many lines in RAM for address size" |
-    let s_mem = sprintf "%s[%d:0][%d:0]" name (lines-1) (d_sz-1) then
-    let s_waddr = sprintf "wa[%d:0]" (a_sz-1) in
-    let s_din = sprintf "din[%d:0]" (d_sz-1) in
-    let s_we = "we" in
-    let W_waddr = W_VAR a_sz "wa" in
-    let W_din = W_VAR d_sz "din" in
-    let W_we = W_VAR 1 "we" in
-    let W_mem = W_VAR d_sz (sprintf "%s[%d:0]" name (lines-1)) in
-    let old = 
-      W_CAT (map (\i. W_VAR d_sz (sprintf "%s[%d]" name i)) ((lines-1)--0))
-    then
-    letrec write i =
-          i < 0 => [] |
-          let old = W_VAR d_sz (sprintf "%s[%d]" name i) in
-          let cond = W_EQ W_waddr (W_CONST a_sz i) then
-          let res = W_ITE cond W_din old then
-          res:(write (i-1))
-    in
-    let new = W_CAT (write (lines-1)) then
-    let wlf = P_LEAF [W_PHASE_DELAY old (W_ITE W_we new old)] then
-    let wr =
-      let inps = [(s_we,[s_we]), (s_din, [s_din]), (s_waddr,[s_waddr])] in
-      PINST "" [] F inps [(s_mem,[s_mem])] [] wlf
-    then
-    let pfn = sprintf "draw_mem_write %d" lines then
-    let fa_inps = [
-                  (s_din, (get_lhs_vars (hw_destr din))),
-                  (s_we, (get_lhs_vars (hw_destr we))),
-                  (s_waddr, (get_lhs_vars (hw_destr waddr)))
-                ]
-    in
-    let fa_outs = [(s_mem, (get_lhs_vars (hw_destr mem)))] in
-    PINST pfn [] T fa_inps fa_outs [] (P_HIER [wr])
-;
-
 letrec delay_rec N =
     bit_input   clk.
     bit_input   reset.
@@ -2917,23 +2993,6 @@ let is_draw_leaf p =
 // A function to flatten a pexlif to basic drawing components.
 let flatten_pexlif p = gen_flatten_pexlif is_draw_leaf p;
 
-
-//
-// A circuit that takes an input (vector) and outputs a 1 only after the
-// input has been the same for duration_in_phases phases.
-//
-let is_stable duration_in_phases inp ok = (
-    input       inp.
-    bit_output  ok.
-    internal        old.
-    bit_internal    same.
-    bit_list_internal (duration_in_phases-1) same_list.
-    CELL (sprintf "draw_hfl {is stable\nfor %d  \nphases }" duration_in_phases)  (
-        (map2 (\o.\i. o <: i) same_list ((tl same_list)@[same]))@[
-        old <: inp,
-        same <- (old '=' inp),
-        ok <- itlist (\s.\r. s '&' r) same_list same
-])) inp ok; 
 
 
 
