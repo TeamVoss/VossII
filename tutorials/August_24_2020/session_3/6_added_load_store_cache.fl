@@ -1,0 +1,515 @@
+//set_font font_large;
+cload "ste.fl";
+
+ENUM "security" ["LOW", "HIGH"];
+
+ENUM "opcode" ["NOP", "LDI",
+	       "LD", "ST",
+	       "GET_TIMER", "PRIVATE", "PUBLIC",
+	       "ADD", "SUB"];
+
+let op_has_dst opc =
+	is_LDI opc '|'
+	is_LD opc '|'
+	is_GET_TIMER opc '|'
+	is_ADD opc '|'
+	is_SUB opc
+;
+
+
+TYPE "word" 8;
+
+TYPE "sreg" 2;
+
+STRUCT "reg" [
+	    ("msb", "bit"),
+	    ("addr", "sreg")
+];
+
+let make_range top_range sz =
+        let next = (itlist max top_range (-1))+1 in
+        let next' = next+sz in
+        let range = (next+sz-1) downto next in
+        range
+;
+
+let opc_range     = make_range [] (hw_size {'0::opcode});
+let dst_range     = make_range opc_range (hw_size {'0::reg});
+let src1_range    = make_range dst_range (hw_size {'0::reg});
+let src2_range    = make_range src1_range (hw_size {'0::reg});
+let imm_size      = hd src2_range - hd dst_range;
+let imm_range     = make_range dst_range (hd src2_range - hd dst_range);
+
+let RAM_LATENCY = 4;
+let addr_size   = hw_size {'a::word};
+
+TYPE "ram_delay" ((log2 RAM_LATENCY)+1);
+
+let CACHE_LINES = 4;	// Must be power of 2
+
+let cache_size = log2 CACHE_LINES;
+let cache_tag_size = addr_size - cache_size;
+
+TYPE "tag" cache_tag_size;
+TYPE "cache_addr" cache_size;
+
+STRUCT "addr" [("tag", "tag"), ("line_addr", "cache_addr")];
+
+let word2addr w = hw_addr_constr (hw_word_destr w);
+let addr2word w = hw_word_constr (hw_addr_destr w);
+
+TYPE "imm" imm_size;
+
+let tot_bits_needed = hd imm_range+1;
+
+STRUCT "instr" tot_bits_needed [
+	    ("opc", "opcode", opc_range),
+	    ("dst", "reg", dst_range),
+	    ("src1", "reg", src1_range),
+	    ("src2", "reg", src2_range),
+	    ("imm",  "imm", imm_range)
+];
+
+let MEM_SIZE = 2**addr_size;
+
+MEMORY "ram" [(MEM_SIZE, "addr")] "word";
+
+MEMORY "valid_array" [(CACHE_LINES, "cache_addr")] "bit";
+MEMORY "tag_array" [(CACHE_LINES, "cache_addr")] "tag";
+MEMORY "cache_array" [(CACHE_LINES, "cache_addr")] "word";
+
+let NOP_instr = '0<--opc ? NOP;
+
+MEMORY "RF" [(4, "sreg")] "word";
+
+ENUM "cache_states" ["C_INIT", "C_WRITE", "C_MISS"];
+
+let ALU =
+    bit_input	    clk.
+    bit_input	    reset.
+    instr_input	    instr.
+    word_input	    A.
+    word_input	    B.
+    word_output	    out.
+    //
+    internal	    opcode.
+    word_internal   timer.
+    CELL "draw_hier ALU" [
+	opcode <- instr-->opc,
+	CASE out [
+	    is_LDI opcode --- (ZX (instr-->imm)),
+	    is_ADD opcode --- (A '+' B),
+	    is_SUB opcode --- (A '-' B),
+	    is_ST opcode --- A,
+	    is_GET_TIMER opcode --- timer
+	] 'X,
+	STATE clk timer [
+	    reset --- '0,
+	    '1    --- (timer '+' '1)
+	]
+];
+
+
+let core_RF lbl =
+    bit_input	    clk.
+    bit_input	    we.
+    sreg_input	    waddr.
+    word_input	    din.
+    RF_output	    RF.
+    RF_internal	    tmp_RF new_RF.
+    CELL (sprintf "draw_hier {RF %s}" lbl) [
+	Write_RF RF waddr din new_RF,
+	tmp_RF <- (IF we THEN new_RF ELSE RF),
+	re_ff clk tmp_RF RF
+];
+
+let RF =
+    bit_input	    clk.
+    security_input  sec_level_rd.
+    security_input  sec_level_wr.
+    reg_input	    src1.
+    reg_input	    src2.
+    reg_input	    dst.
+    bit_input	    dst_valid.
+    word_input	    res.
+    word_output	    A.
+    word_output	    B.
+    //
+    RF_internal	    tmp_RF0 new_RF0 RF0.
+    RF_internal	    tmp_RF1 new_RF1 RF1.
+    word_internal   r_A0 r_B0.
+    word_internal   r_A1 r_B1.
+    bit_internal    ok_to_write0.
+    bit_internal    ok_to_write1.
+    //
+    CELL "draw_hier SecureRF" [
+	Read_RF RF0 (src1-->addr) r_A0,
+	Read_RF RF0 (src2-->addr) r_B0,
+	Read_RF RF1 (src1-->addr) r_A1,
+	Read_RF RF1 (src2-->addr) r_B1,
+	CASE A [
+	    (src1 '=' '0) --- '0,
+	    (sec_level_rd '=' HIGH '&' src1-->msb) --- r_A1,
+	    (sec_level_rd '=' LOW '&' src1-->msb) --- '0
+	] r_A0,
+	CASE B [
+	    (src2 '=' '0) --- '0,
+	    (sec_level_rd '=' HIGH '&' src2-->msb) --- r_B1,
+	    (sec_level_rd '=' LOW '&' src2-->msb) --- '0
+	] r_B0,
+	ok_to_write1 <- dst_valid '&' dst-->msb '&' sec_level_wr '=' HIGH,
+	ok_to_write0 <- dst_valid '&' '~' dst-->msb,
+	core_RF "Low" clk ok_to_write0 (dst-->addr) res RF0,
+	core_RF "High" clk ok_to_write1 (dst-->addr) res RF1
+];
+
+
+let ROM name latency lines addr out = (
+    input   addr.
+    output  out.
+    latency < 0 => eprintf "ROM with latency < 0 (%d)" latency |
+    let a_sz     = hw_size addr in
+    lines > 2**a_sz => eprintf "Too many lines in ROM for address size" |
+    let d_sz     = hw_size out in
+    let mem_info = MEM a_sz lines d_sz in
+    let s_mem    = sprintf "_RoM_%s[%d:0][%d:0]" name (lines-1) (d_sz-1) in
+    let w_mem    = W_EXPLICIT_VAR (lines*d_sz) s_mem in
+    let w_addr   = hw_destr addr in
+    let s_addr   = hd (get_lhs_vars w_addr) in
+    let d_s_addr = mk_name a_sz "Addr_##_" in
+    let d_w_addr = W_EXPLICIT_VAR a_sz d_s_addr in
+    let w_out    = hw_destr out in
+    let s_out    = hd (get_lhs_vars w_out) in
+    let s_dels   = map (sprintf "__Addr[%d]") (0 upto latency) in
+    let w_dels   = map (W_EXPLICIT_VAR 1) s_dels in
+    let s_stable = "_StAbLe_" in
+    let w_stable = W_EXPLICIT_VAR 1 s_stable in
+    let read     = W_UPDATE_FN w_out
+                        (W_ITE (W_GR w_addr (W_CONST a_sz (lines-1)))
+                               (W_X d_sz)
+                               (
+                                  W_ITE w_stable
+                                  (W_MEM_READ mem_info w_mem w_addr)
+                                  (W_X d_sz)
+                               )
+                        )
+    then
+    let keep     = W_PHASE_DELAY w_mem w_mem then
+    let stable_cond =
+        itlist (\d.\r. W_AND d r) (butlast w_dels) (W_CONST 1 1)
+    in
+    let lf = P_LEAF (
+                read:
+                keep:
+                (W_PHASE_DELAY d_w_addr w_addr):
+                (W_UPDATE_FN (hd w_dels) (W_EQ w_addr d_w_addr)):
+                (W_UPDATE_FN w_stable stable_cond):
+                (map2 (\o.\i. W_PHASE_DELAY o i) (tl w_dels) (butlast w_dels)))
+    in
+    let ints = s_mem:d_s_addr:s_stable:s_dels in
+    let bd = PINST "" [] F [(s_addr,[s_addr])] [(s_out,[s_out])] ints lf then
+    CELL (sprintf "draw_rom %s %d" name lines) [bd]
+) addr out;
+
+
+let mk_ROM_ant_1 name ckt content =
+    let p = sprintf "_RoM_%s[" name in
+    let rom_vecs = md_extract_vectors (filter (str_is_substr p) (nodes ckt)) in
+    rom_vecs = [] => eprintf "No ROM cells found with name %s" name |
+    length rom_vecs != 1 => eprintf "Multiple ROM cells matching name %s" name |
+    val (base,[(u_line,l_line), (u_w,l_w)]) = split_vector (hd rom_vecs) then
+    letrec do i (c:cs) =
+        let vec = sprintf "%s[%d][%d:%d]" base i u_w l_w then
+        vec is c in_phase 0 and (do (i+1) cs)
+     /\    do i [] = []
+    in
+    {do 0 content:: (bool#string#bool#int#int) list}
+;
+
+let mk_ROM_ant_2 name vis content =
+    let ckt = vfsm2fsm vis in
+    mk_ROM_ant_1 name ckt content
+;
+
+overload mk_ROM_ant mk_ROM_ant_1 mk_ROM_ant_2;
+
+
+//let ROM name =
+//    word_input  addr.
+//    instr_output out.
+//    //
+//    bit_internal    rdy.
+//    internal        local_out.
+//    let  rom =  mk_internal (sprintf "__ROM__%s__" name) in
+//    add_internal rom (
+//    CELL "draw_hier ROM" [
+//        is_stable ROM_LATENCY addr rdy,
+//        Read_ROM rom addr local_out,
+//        out <- (IF rdy THEN local_out ELSE 'X),
+//        rom <: rom
+//]);
+
+
+let RAM =
+    bit_input   rw.
+    addr_input addr.
+    word_input  inp.
+    word_output out.
+    //
+    bit_internal    addr_rdy rw_rdy inp_rdy rd_rdy wr_rdy.
+    ram_internal    ram tmp_new_ram new_ram.
+    internal        local_rd_data.
+    CELL "draw_hier RAM" [
+        is_stable RAM_LATENCY addr addr_rdy,
+        is_stable RAM_LATENCY rw rw_rdy,
+        is_stable RAM_LATENCY inp inp_rdy,
+        rd_rdy <- addr_rdy '&' rw_rdy,
+        Read_ram ram addr local_rd_data,
+        out <- (IF (rd_rdy '&' rw) THEN local_rd_data ELSE 'X),
+        Write_ram ram addr inp tmp_new_ram,
+        wr_rdy <- rd_rdy '&' inp_rdy,
+        new_ram <- (IF (wr_rdy '&' '~' rw) THEN tmp_new_ram ELSE ram),
+        ram <: new_ram
+];
+
+let cache =
+    bit_input	clk.
+    bit_input	reset.
+    // CPU interface
+    bit_input	req.
+    bit_input	rw.
+    addr_input	addr.
+    word_input	inp.
+    word_output	out.
+    bit_output	nstall.
+    // RAM interface
+    bit_output	ram_rw.
+    addr_output ram_addr.
+    word_output ram_inp.
+    word_input  ram_out.
+    //
+    bit_internal	    c_valid match update_cache mem_access.
+    cache_addr_internal	    mc_addr.
+    tag_internal	    mc_tag c_tag.
+    valid_array_internal    valid.
+    tag_array_internal	    tags.
+    cache_array_internal    cache_data.
+    cache_states_internal   cache_fsm.
+    ram_delay_internal	    mem_cnt.
+    CELL "draw_hier Cache" [
+	mc_addr <- addr-->line_addr,
+	mc_tag  <- addr-->tag,
+	c_valid <- read_valid_array valid mc_addr,
+	c_tag   <- read_tag_array tags mc_addr,
+	match   <- c_valid '&' (c_tag '=' mc_tag),
+	Moore_FSM "cache_FSM" clk cache_fsm
+	    (reset, C_INIT) [
+	    C_INIT  --- (req '&' '~' match '&' rw) --- C_MISS,
+	    C_INIT  --- (req '&' '~' rw)           --- C_WRITE,
+	    C_MISS  --- update_cache       --- C_INIT,
+	    C_WRITE --- ((mem_cnt '=' '0)) --- C_INIT
+	],
+	nstall   <- (is_C_INIT cache_fsm),
+	update_cache <- is_C_MISS cache_fsm '&' (mem_cnt '=' '0),
+	mem_access <- (is_C_INIT cache_fsm) '&' ('~' rw '|' '~' match),
+	STATE clk mem_cnt [
+	    mem_access             --- ''(RAM_LATENCY/2),
+	    (is_C_MISS cache_fsm)  --- mem_cnt '-' '1,
+	    (is_C_WRITE cache_fsm) --- mem_cnt '-' '1
+	],
+	STATE clk valid [
+	    reset	 --- '0,
+	    '~' rw	 --- (write_valid_array valid mc_addr '0),
+	    update_cache --- (write_valid_array valid mc_addr '1)
+	],
+	STATE clk tags [
+	    update_cache --- (write_tag_array tags mc_addr mc_tag)
+	],
+	STATE clk cache_data [
+	    update_cache --- (write_cache_array cache_data mc_addr ram_out)
+	],
+	ram_rw <- rw,
+	ram_addr <- addr,
+	ram_inp <- inp,
+	out <- read_cache_array cache_data mc_addr
+];
+
+
+let bypass =
+    security_input  sec_levelEXE sec_levelMEM sec_levelWB.
+    bit_input	    validMEM validWB.
+    instr_input	    opMEM opWB.
+    word_input	    dataEXE dataMEM dataWB.
+    reg_input	    src.
+    word_output	    data.
+    bit_internal    pre_dst_src pre_pre_dst_src.
+    CELL "draw_hier bypass" [
+	CASE data [
+	    pre_dst_src	--- dataMEM,
+	    pre_pre_dst_src	--- dataWB
+	] dataEXE,
+	pre_dst_src <- sec_levelMEM '=' sec_levelEXE '&'
+			validMEM '&' opMEM-->dst '=' src,
+	pre_pre_dst_src <- sec_levelWB '=' sec_levelEXE '&'
+			    validWB '&' opWB-->dst '=' src
+];
+
+
+
+let cpu =
+    bit_input	    clk.
+    bit_input	    reset.
+    opcode_output   dbg_opc.
+    bit_output	    dbg_valid.
+    instr_output    dbg_op.
+    word_output	    dbg_data.
+    //
+    instr_internal	op.
+    word_internal	pc.
+    instr_internal	opIF opEXE opMEM opWB.
+    bit_internal	validIF validEXE validMEM validWB valid_dest.
+    bit_internal	rw ram_rw nstall.
+    addr_internal	ram_addr.
+    word_internal	ram_inp ram_out new_dataMEM.
+    security_internal   sec_levelIF sec_levelEXE sec_levelMEM sec_levelWB.
+    word_internal	AdataIF BdataIF AdataEXE BdataEXE.
+    word_internal	bpAdataEXE bpBdataEXE bpBdataMEM.
+    word_internal	dataEXE dataMEM dataWB.
+    word_internal	cache_out.
+    bit_internal	pre_dst_src1 pre_pre_dst_src1.
+    bit_internal	pre_dst_src2 pre_pre_dst_src2.
+    CELL "draw_hier cpu" [
+	STATE clk sec_levelIF [
+	    reset --- LOW,
+	    is_PRIVATE (opIF-->opc) --- HIGH,
+	    is_PUBLIC (opIF-->opc) --- LOW
+	],
+	STATE clk pc [
+	    reset --- '0,
+	    nstall --- (pc '+' '1)
+	],
+	ROM "ROM" 0 16 pc op,
+	validIF <- '~' (is_NOP (opIF-->opc)),
+	re_ff_en_reset clk nstall reset validIF validEXE,
+	re_ff_en_reset clk nstall reset validEXE validMEM,
+	re_ff_en_reset clk nstall reset validMEM validWB,
+	//
+	re_ff_en clk nstall sec_levelIF sec_levelEXE,
+	re_ff_en clk nstall sec_levelEXE sec_levelMEM,
+	re_ff_en clk nstall sec_levelMEM sec_levelWB,
+	//
+	re_ff_en_reset clk nstall reset op opIF,
+	re_ff_en clk nstall opIF opEXE,
+	re_ff_en clk nstall opEXE opMEM,
+	re_ff_en clk nstall opMEM opWB,
+	//
+	valid_dest <- validWB '&' op_has_dst (opWB-->opc),
+	RF clk sec_levelIF sec_levelWB (opIF-->src1) (opIF-->src2) (opWB-->dst)
+			 valid_dest dataWB AdataIF BdataIF,
+	ALU clk reset opEXE bpAdataEXE bpBdataEXE dataEXE,
+	re_ff_en clk nstall bpBdataEXE bpBdataMEM,
+	bypass sec_levelEXE sec_levelMEM sec_levelWB
+	       validMEM validWB
+	       opMEM opWB
+	       AdataEXE dataMEM dataWB
+	       (opEXE-->src1) bpAdataEXE,
+	bypass sec_levelEXE sec_levelMEM sec_levelWB
+	       validMEM validWB
+	       opMEM opWB
+	       BdataEXE dataMEM dataWB
+	       (opEXE-->src2) bpBdataEXE,
+	rw <- '~' (opMEM-->opc '=' ST),
+	cache clk reset validMEM rw
+			(word2addr bpBdataMEM) dataMEM cache_out nstall
+			ram_rw ram_addr ram_inp ram_out,
+	RAM ram_rw ram_addr ram_inp ram_out,
+	re_ff_en clk nstall AdataIF AdataEXE,
+	re_ff_en clk nstall BdataIF BdataEXE,
+	re_ff_en clk nstall dataEXE dataMEM,
+	new_dataMEM <- (IF (opMEM-->opc '=' LD) THEN cache_out ELSE dataMEM),
+	re_ff_en clk nstall new_dataMEM dataWB,
+	dbg_opc <- op-->opc,
+	dbg_data <- dataWB,
+	dbg_op <- opWB,
+	dbg_valid <- validWB
+];
+
+let p = cpu 'clk 'reset 'dbg_opc 'dbg_valid 'dbg_op 'dbg_data;
+
+let vis = STE_debug (pexlif2fsm p);
+vis;
+
+var_order (
+    (interleave (map md_expand_vector ["hi[11:0]", "li0[11:0]", "li1[11:0]" ]))@
+    (interleave (map md_expand_vector ["b[1][7:0]", "b[2][7:0]", "r[7][7:0]"]))
+);
+//var_order ["li[4:0]","hi[4]","li[10]","li[7]","hi[3]","li[9]","li[6:5]","li[8]","hi[2:0]","hi[8:10]","hi[7:5]","r[7][7:6]","b[1:2][6]","b[2:1][7]","r[7][5]","b[1:2][5]","r[7][4]","b[1:2][4]","r[7][3]","b[1:2][3]","r[7][2]","b[1:2][2]","b[1][0:1]","r[7][1:0]","b[2][0:1]"];
+
+//update_vossrc "DYNAMIC-ORDERING" "NO";
+
+
+let i1 = NOP_instr;
+let i2 = 'li0<-- opc ? LD <-- dst ? '1 <--src2 ? '1;
+let i4 = '0<--opc ? GET_TIMER <-- dst ? '2;
+let i5 = 'li1<-- opc ? LD <-- dst ? '1 <--src2 ? '1;
+let i6 = '0<--opc ? GET_TIMER <-- dst ? '3;
+
+let ROM_ant = mk_ROM_ant "ROM" vis [
+	i1,
+	i2
+];
+ROM_ant;
+
+
+let test i3 =
+    let N = 20 in
+    let ant =
+	"clk" is_clock N
+      and
+	"reset" is 1 in_cycle 0 otherwise 0 until N cycles
+      and
+	"op[11:0]" is i1 in_cycle 1 followed_by
+		      i2 in_cycle 2 followed_by
+		      i3 in_cycle 3 followed_by
+		      i4 in_cycle 4 followed_by
+		      i5 in_cycle 5 followed_by
+		      i6 in_cycle 6 otherwise NOP_instr until N cycles
+      and
+	"i13/RF0[1][7:0]" is "b[1][7:0]" in_cycle 0
+      and
+	"i13/RF0[2][7:0]" is "b[2][7:0]" in_cycle 0
+      and
+	"i13/RF1[2][7:0]" is "r[7][7:0]" in_cycle 0
+    in
+    STE "-e -w 1000 -ifw" vis [] ant [] []
+;
+
+
+update_vossrc "DYNAMIC-ORDERING" "NO";
+update_vossrc "NOTIFY-TRAJECTORY-FAILURES" "NO";
+update_vossrc "NOTIFY-CHECK-FAILURES" "NO";
+update_vossrc "ACCURATE-ITE-COMP" "NO";
+
+// Assume secure instruction only writes to secure register file.
+let i3 = 'hi<-- dst ? (('hi-->dst)<--msb ? '1);
+test i3;
+
+// Assume secure instruction does not read secure register file.
+let i3 = 'hi<-- src1 ? (('hi-->src1)<--msb ? '0)
+	    <-- src2 ? (('hi-->src2)<--msb ? '0);
+test i3;
+
+// Assume secure instruction only reads and writes secure register file
+let i3 = 'hi<-- src1 ? (('hi-->src1)<--msb ? '1)
+	    <-- src2 ? (('hi-->src2)<--msb ? '1)
+	    <-- dst  ? (('hi-->dst)<--msb ? '1)
+;
+test i3;
+
+// Assume secure instruction only reads and writes public register file
+let i3 = 'hi<-- src1 ? (('hi-->src1)<--msb ? '0)
+	    <-- src2 ? (('hi-->src2)<--msb ? '0)
+	    <-- dst  ? (('hi-->dst)<--msb ? '0)
+;
+test i3;
+

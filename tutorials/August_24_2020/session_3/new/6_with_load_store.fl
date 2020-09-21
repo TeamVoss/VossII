@@ -1,0 +1,441 @@
+//set_font font_large;
+cload "ste.fl";
+
+ENUM "security" ["LOW", "HIGH"];
+
+ENUM "opcode" ["NOP", "LDI", "ADD", "SUB", "SAVE", "LOAD"];
+
+ENUM "mem_op" ["IDLE", "READ", "WRITE", "DONE"];
+
+TYPE "word" 8;
+
+TYPE "sreg" 2;
+
+STRUCT "reg" [
+	    ("msb", "bit"),
+	    ("addr", "sreg")
+];
+
+let make_range top_range sz =
+        let next = (itlist max top_range (-1))+1 in
+        let next' = next+sz in
+        let range = (next+sz-1) downto next in
+        range
+;
+
+let opc_range     = make_range [] (hw_size {'0::opcode});
+let dst_range     = make_range opc_range (hw_size {'0::reg});
+let src1_range    = make_range dst_range (hw_size {'0::reg});
+let src2_range    = make_range src1_range (hw_size {'0::reg});
+let imm_size      = hd src2_range - hd dst_range;
+let imm_range     = make_range dst_range (hd src2_range - hd dst_range);
+
+TYPE "imm" imm_size;
+
+let tot_bits_needed = hd imm_range+1;
+
+STRUCT "instr" tot_bits_needed [
+	    ("opc", "opcode", opc_range),
+	    ("dst", "reg", dst_range),
+	    ("src1", "reg", src1_range),
+	    ("src2", "reg", src2_range),
+	    ("imm",  "imm", imm_range)
+];
+
+let NOP_instr = '0<--opc ? NOP;
+
+MEMORY "RF" [(4, "sreg")] "word";
+
+let ALU =
+    instr_input	    instr.
+    word_input	    A.
+    word_input	    B.
+    word_output	    out.
+    //
+    internal	    opcode.
+    CELL "draw_hier ALU" [
+	opcode <- instr-->opc,
+	CASE out [
+	    is_LDI opcode --- (ZX (instr-->imm)),
+	    is_SAVE opcode --- A,
+	    is_ADD opcode --- (A '+' B),
+	    is_SUB opcode --- (A '-' B)
+	] 'X
+];
+
+
+let core_RF lbl =
+    bit_input	    clk.
+    bit_input	    we.
+    sreg_input	    waddr.
+    word_input	    din.
+    RF_output	    RF.
+    RF_internal	    tmp_RF new_RF.
+    CELL (sprintf "draw_hier {RF %s}" lbl) [
+	Write_RF RF waddr din new_RF,
+	tmp_RF <- (IF we THEN new_RF ELSE RF),
+	re_ff clk tmp_RF RF
+];
+
+let RF =
+    bit_input	    clk.
+    security_input  sec_level_rd.
+    security_input  sec_level_wr.
+    reg_input	    src1.
+    reg_input	    src2.
+    reg_input	    dst.
+    bit_input	    dst_valid.
+    word_input	    res.
+    word_output	    A.
+    word_output	    B.
+    //
+    RF_internal	    tmp_RF0 new_RF0 RF0.
+    RF_internal	    tmp_RF1 new_RF1 RF1.
+    word_internal   r_A0 r_B0.
+    word_internal   r_A1 r_B1.
+    bit_internal    ok_to_write0.
+    bit_internal    ok_to_write1.
+    //
+    CELL "draw_hier SecureRF" [
+	Read_RF RF0 (src1-->addr) r_A0,
+	Read_RF RF0 (src2-->addr) r_B0,
+	Read_RF RF1 (src1-->addr) r_A1,
+	Read_RF RF1 (src2-->addr) r_B1,
+	CASE A [
+	    (src1 '=' '0) --- '0,
+	    (sec_level_rd '=' HIGH '&' src1-->msb) --- r_A1,
+	    (sec_level_rd '=' LOW '&' src1-->msb) --- '0
+	] r_A0,
+	CASE B [
+	    (src2 '=' '0) --- '0,
+	    (sec_level_rd '=' HIGH '&' src2-->msb) --- r_B1,
+	    (sec_level_rd '=' LOW '&' src2-->msb) --- '0
+	] r_B0,
+	ok_to_write1 <- dst_valid '&' dst-->msb '&' sec_level_wr '=' HIGH,
+	ok_to_write0 <- dst_valid '&' '~' (dst-->msb),
+	core_RF "Low" clk ok_to_write0 (dst-->addr) res RF0,
+	core_RF "High" clk ok_to_write1 (dst-->addr) res RF1
+];
+
+let bypass =
+    security_input  sec_levelEXE sec_levelMEM sec_levelWB.
+    bit_input	    validMEM validWB.
+    instr_input	    opMEM opWB.
+    word_input	    dataEXE dataMEM dataWB.
+    reg_input	    src.
+    word_output	    data.
+    bit_internal    pre_dst_src pre_pre_dst_src.
+    CELL "draw_hier bypass" [
+	CASE data [
+	    pre_dst_src	--- dataMEM,
+	    pre_pre_dst_src	--- dataWB
+	] dataEXE,
+	pre_dst_src <- sec_levelMEM '=' sec_levelEXE '&'
+			validMEM '&' opMEM-->dst '=' src,
+	pre_pre_dst_src <- sec_levelWB '=' sec_levelEXE '&'
+			    validWB '&' opWB-->dst '=' src
+];
+
+
+let pipeline =
+    bit_input	    clk.
+    bit_input	    reset.
+    security_input  sec_level.
+    instr_input	    op.
+    //
+    word_output	    mem_addr.
+    bit_output	    mem_req.
+    bit_input	    mem_ack.
+    bit_output	    mem_write.
+    word_output	    mem_data_to_write.
+    word_input	    mem_data_read.
+    //
+    instr_internal	opIF opEXE opMEM opWB.
+    bit_internal	validIF validEXE new_validMEM validMEM validWB.
+    security_internal   sec_levelIF sec_levelEXE sec_levelMEM sec_levelWB.
+    word_internal	AdataIF BdataIF AdataEXE BdataEXE AdataMEM.
+    word_internal	bpAdataEXE bpBdataEXE.
+    word_internal	dataEXE dataMEM res_dataMEM dataWB.
+    bit_internal	pre_dst_src1 pre_pre_dst_src1.
+    bit_internal	pre_dst_src2 pre_pre_dst_src2.
+    bit_internal	rdy.
+    mem_op_internal	mem_fsm.
+    CELL "draw_hier pipeline" [
+	validIF <- '~' (is_NOP (opIF-->opc)),
+	re_ff_en_reset clk rdy reset validIF validEXE,
+	re_ff_en_reset clk rdy reset validEXE validMEM,
+	re_ff_en_reset clk rdy reset new_validMEM validWB,
+	new_validMEM <- validMEM '&' '~' (is_SAVE (opMEM-->opc)),
+	//
+	re_ff_en clk rdy sec_level sec_levelIF,
+	re_ff_en clk rdy sec_levelIF sec_levelEXE,
+	re_ff_en clk rdy sec_levelEXE sec_levelMEM,
+	re_ff_en clk rdy sec_levelMEM sec_levelWB,
+	//
+	re_ff_en_reset clk rdy reset op opIF,
+	re_ff_en clk rdy opIF opEXE,
+	re_ff_en clk rdy opEXE opMEM,
+	re_ff_en clk rdy opMEM opWB,
+	//
+	RF clk sec_levelIF sec_levelWB (opIF-->src1) (opIF-->src2) (opWB-->dst)
+			 validWB dataWB AdataIF BdataIF,
+	ALU opEXE bpAdataEXE bpBdataEXE dataEXE,
+	//
+	bypass sec_levelEXE sec_levelMEM sec_levelWB
+	       validMEM validWB
+	       opMEM opWB
+	       AdataEXE dataMEM dataWB
+	       (opEXE-->src1) bpAdataEXE,
+	bypass sec_levelEXE sec_levelMEM sec_levelWB
+	       validMEM validWB
+	       opMEM opWB
+	       BdataEXE dataMEM dataWB
+	       (opEXE-->src2) bpBdataEXE,
+	//
+	re_ff_en clk rdy AdataIF AdataEXE,
+	re_ff_en clk rdy AdataEXE AdataMEM,
+	re_ff_en clk rdy BdataIF BdataEXE,
+	re_ff_en clk rdy dataEXE dataMEM,
+	re_ff_en clk rdy res_dataMEM dataWB,
+	//
+	mem_addr <- AdataMEM,
+	mem_write <- validMEM '&' is_SAVE (opMEM-->opc),
+	mem_data_to_write <- dataMEM,
+	CASE res_dataMEM [
+	    validMEM '&' is_LOAD (opMEM-->opc) --- mem_data_read
+	] dataMEM,
+	Moore_FSM "mem_fsm" clk mem_fsm 
+	    (reset --- IDLE) [
+		IDLE  --- validEXE '&' is_LOAD (opEXE-->opc) --- READ,
+		IDLE  --- validEXE '&' is_SAVE (opEXE-->opc) --- WRITE,
+		READ  --- mem_ack			     --- DONE,
+		WRITE --- mem_ack			     --- DONE,
+		DONE  --- '~' mem_ack			     --- IDLE
+	],
+	rdy <- (is_IDLE mem_fsm)
+];
+
+let p =
+    pipeline 'clk 'reset 'sec_level 'op
+	     'mem_addr 'mem_req 'mem_ack 'mem_write
+	     'mem_data_to_write 'mem_data_read;
+
+let vis = STE_debug (pexlif2fsm p);
+
+//vis;
+
+
+
+let ROM name latency lines addr out = (
+    input   addr.
+    output  out.
+    latency < 0 => eprintf "ROM with latency < 0 (%d)" latency |
+    let a_sz     = hw_size addr in
+    lines > 2**a_sz => eprintf "Too many lines in ROM for address size" |
+    let d_sz     = hw_size out in
+    let mem_info = MEM a_sz lines d_sz in
+    let s_mem    = sprintf "_RoM_%s[%d:0][%d:0]" name (lines-1) (d_sz-1) in
+    let w_mem    = W_EXPLICIT_VAR (lines*d_sz) s_mem in
+    let w_addr   = hw_destr addr in
+    let s_addr   = hd (get_lhs_vars w_addr) in
+    let d_s_addr = mk_name a_sz "Addr_##_" in 
+    let d_w_addr = W_EXPLICIT_VAR a_sz d_s_addr in
+    let w_out    = hw_destr out in
+    let s_out    = hd (get_lhs_vars w_out) in
+    let s_dels   = map (sprintf "__Addr[%d]") (0 upto latency) in
+    let w_dels   = map (W_EXPLICIT_VAR 1) s_dels in
+    let s_stable = "_StAbLe_" in
+    let w_stable = W_EXPLICIT_VAR 1 s_stable in
+    let read     = W_UPDATE_FN w_out
+			(W_ITE (W_GR w_addr (W_CONST a_sz (lines-1)))
+			       (W_X d_sz)
+			       (
+				  W_ITE w_stable
+				  (W_MEM_READ mem_info w_mem w_addr)
+				  (W_X d_sz)
+			       )
+			)
+    then
+    let keep     = W_PHASE_DELAY w_mem w_mem then
+    let stable_cond =
+	itlist (\d.\r. W_AND d r) (butlast w_dels) (W_CONST 1 1)
+    in
+    let lf = P_LEAF (
+		read:
+		keep:
+		(W_PHASE_DELAY d_w_addr w_addr):
+		(W_UPDATE_FN (hd w_dels) (W_EQ w_addr d_w_addr)):
+		(W_UPDATE_FN w_stable stable_cond):
+		(map2 (\o.\i. W_PHASE_DELAY o i) (tl w_dels) (butlast w_dels)))
+    in
+    let ints = s_mem:d_s_addr:s_stable:s_dels in
+    let bd = PINST "" [] F [(s_addr,[s_addr])] [(s_out,[s_out])] ints lf then
+    CELL (sprintf "draw_rom %s %d" name lines) [bd]
+) addr out;
+
+
+let mk_ROM_ant_1 name ckt content =
+    let p = sprintf "_RoM_%s[" name in
+    let rom_vecs = md_extract_vectors (filter (str_is_substr p) (nodes ckt)) in
+    rom_vecs = [] => eprintf "No ROM cells found with name %s" name |
+    length rom_vecs != 1 => eprintf "Multiple ROM cells matching name %s" name |
+    val (base,[(u_line,l_line), (u_w,l_w)]) = split_vector (hd rom_vecs) then
+    letrec do i (c:cs) =
+	let vec = sprintf "%s[%d][%d:%d]" base i u_w l_w then
+	vec is c in_phase 0 and (do (i+1) cs)
+     /\    do i [] = []
+    in
+    {do 0 content:: (bool#string#bool#int#int) list}
+;
+
+let mk_ROM_ant_2 name vis content =
+    let ckt = vfsm2fsm vis in
+    mk_ROM_ant_1 name ckt content
+;
+
+overload mk_ROM_ant mk_ROM_ant_1 mk_ROM_ant_2;
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+let RAM name latency lines addr rw din dout = (
+    input	addr.
+    bit_input	rw.
+    input	{din:: *d}.
+    output	{dout:: *d}.
+    latency < 0 => eprintf "RAM with latency < 0 (%d)" latency |
+    let a_sz     = hw_size addr in
+    lines > 2**a_sz => eprintf "Too many lines in RAM for address size" |
+    let d_sz     = hw_size out in
+    let mem_info = MEM a_sz lines d_sz in
+    let s_mem    = sprintf "_RaM_%s[%d:0][%d:0]" name (lines-1) (d_sz-1) in
+    let w_mem    = W_EXPLICIT_VAR (lines*d_sz) s_mem in
+    let w_addr   = hw_destr addr in
+    let s_addr   = hd (get_lhs_vars w_addr) in
+
+    let w_rw     = hw_destr rw
+    let s_rw     = hd (get_lhs_vars w_rw) in
+    let w_din     = hw_destr din
+    let s_din     = hd (get_lhs_vars w_din) in
+
+
+    let w_out    = hw_destr out in
+    let s_out    = hd (get_lhs_vars w_out) in
+
+    let d_s_addr = mk_name a_sz "Addr_##_" in 
+    let d_w_addr = W_EXPLICIT_VAR a_sz d_s_addr in
+    let s_dels   = map (sprintf "__Addr[%d]") (0 upto latency) in
+    let w_dels   = map (W_EXPLICIT_VAR 1) s_dels in
+    let s_stable = "_StAbLe_" in
+    let w_stable = W_EXPLICIT_VAR 1 s_stable in
+    let read     = W_UPDATE_FN w_out
+			(W_ITE (W_GR w_addr (W_CONST a_sz (lines-1)))
+			       (W_X d_sz)
+			       (
+				  W_ITE w_stable
+				  (W_MEM_READ mem_info w_mem w_addr)
+				  (W_X d_sz)
+			       )
+			)
+    then
+    let keep     = W_PHASE_DELAY w_mem w_mem then
+    let stable_cond =
+	itlist (\d.\r. W_AND d r) (butlast w_dels) (W_CONST 1 1)
+    in
+    let lf = P_LEAF (
+		read:
+		keep:
+		(W_PHASE_DELAY d_w_addr w_addr):
+		(W_UPDATE_FN (hd w_dels) (W_EQ w_addr d_w_addr)):
+		(W_UPDATE_FN w_stable stable_cond):
+		(map2 (\o.\i. W_PHASE_DELAY o i) (tl w_dels) (butlast w_dels)))
+    in
+    let ints = s_mem:d_s_addr:s_stable:s_dels in
+    let bd = PINST "" [] F [(s_addr,[s_addr])] [(s_out,[s_out])] ints lf then
+    CELL (sprintf "draw_rom %s %d" name lines) [bd]
+) addr out;
+
+    
+
+
+    
+
+
+
+TYPE "maddr" 8;
+TYPE "mdata" 7;
+
+let tst =
+    maddr_input	    adr.
+    mdata_output    out.
+    CELL "draw_hier test" [
+	ROM "my_rom" 0 200 adr out
+];
+
+let p = tst 'adr 'out;
+let ckt = pexlif2fsm p;
+ckt;
+let vis = STE_debug ckt;
+
+
+let ant = 
+    mk_ROM_ant "my_rom" ckt [{'a::mdata},'b,'d]
+  and
+    "adr[7:0]" is 0 in_cycle 0 followed_by
+		  0 in_cycle 1 followed_by
+		  1 in_cycle 2 followed_by
+		  2 in_cycle 3 followed_by
+		  201 in_cycle 4 followed_by
+		  "a[7:0]" in_cycle 5
+;
+
+
+let ste = STE "-e" vis [] ant [] [];
+ste;
+
+get_trace ste "i1/i1/Addr_##_[0]";
+get_trace ste "i1/i1/_StAbLe_";
+
+
+
+
+
+let i1 = NOP_instr;
+let i2 = NOP_instr;
+let i3 = 'hi<-- dst ? ('his1<--msb ? '1);
+let i4 = {'li::instr};
+let i5 = NOP_instr;
+
+let N = 20;
+let ant =
+    "clk" is_clock N
+  and
+    "reset" is 1 in_cycle 0 otherwise 0 until N cycles
+  and
+    "sec_level" is LOW in_cycle 1 followed_by
+		   LOW in_cycle 2 followed_by
+		   HIGH in_cycle 3 followed_by
+		   LOW in_cycle 4 followed_by
+		   LOW in_cycle 5 otherwise LOW until N cycles
+  and
+    "op[11:0]" is i1 in_cycle 1 followed_by
+		  i2 in_cycle 2 followed_by
+		  i3 in_cycle 3 followed_by
+		  i4 in_cycle 4 followed_by
+		  i5 in_cycle 5 otherwise NOP_instr until N cycles
+  and
+    "i14/RF0[1][7:0]" is "b[1][7:0]" in_cycle 0
+  and
+    "i14/RF0[2][7:0]" is "b[2][7:0]" in_cycle 0
+  and
+    "i14/RF1[2][7:0]" is "r[7][7:0]" in_cycle 0
+;
+
+update_vossrc "DYNAMIC-ORDERING" "NO";
+update_vossrc "NOTIFY-TRAJECTORY-FAILURES" "NO";
+update_vossrc "NOTIFY-CHECK-FAILURES" "NO";
+update_vossrc "ACCURATE-ITE-COMP" "NO";
+
+let ste = STE "-e -w 1000 -ifw" vis [] ant [] [];
+ste;
