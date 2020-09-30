@@ -1,0 +1,295 @@
+//------------------------------------------------------------------------------
+//
+//------------------------------------------------------------------------------
+
+let all p as = AND_list (map p as);
+let any p as = OR_list  (map p as);
+let const a b = a;
+let flip f a b = f b a;
+let itlist_index f xs b =
+        snd (itlist (\x.\(ix,s).(ix-1,f x ix s)) xs (length xs,b));
+
+letrec
+    update 0 (x:xs) f = f x : xs
+/\  update n (x:xs) f = x : update (n-1) xs f
+;
+
+let set i j mat v = update i mat (\row. update j row (\x. v));
+
+// cij = ai1 * bj1 + ... + ain * bjn
+let mult m n =
+  letrec
+      dot []     []     = F
+  /\  dot (x:xs) (y:ys) = (x AND y) OR (dot xs ys)
+  in
+  letrec
+      go xs []     = []
+  /\  go xs (y:ys) = dot xs y : go xs ys
+  in
+  // not sure about this one :)
+  val n' = transpose n then sitlist (\x. \xs. go x n' : xs) m []
+;
+
+//------------------------------------------------------------------------------
+
+let list_of_primes = [
+      2,      3,      5,      7,     11,     13,     17,     19,     23,     29,
+     31,     37,     41,     43,     47,     53,     59,     61,     67,     71,
+     73,     79,     83,     89,     97,    101,    103,    107,    109,    113,
+    127,    131,    137,    139,    149,    151,    157,    163,    167,    173,
+    179,    181,    191,    193,    197,    199,    211,    223,    227,    229,
+    233,    239,    241,    251,    257,    263,    269,    271,    277,    281,
+    283,    293,    307,    311,    313,    317,    331,    337,    347,    349,
+    353,    359,    367,    373,    379,    383,    389,    397,    401,    409,
+    419,    421,    431,    433,    439,    443,    449,    457,    461,    463,
+    467,    479,    487,    491,    499,    503,    509,    521,    523,    541
+  ];
+
+let prime        = flip el list_of_primes;
+let prime_list f = flip (itlist_index (\a.\i.\s. prime i * f a + s));
+
+// Gen. a fingerprint for 'MEM'.
+let
+    fp_mem (MEM as l ds) = prime 1 * as + prime 2 * l + prime 3 * ds
+;
+
+// Gen. a fingerprint for 'WEXPR'.
+letrec
+    fp_w (W_X s)		= prime 0 * s
+/\  fp_w (W_CONST s i)		= prime 1 * s + prime 2 * i
+/\  fp_w (W_NAMED_CONST _ s i)	= prime 3 * s + prime 4 * i
+/\  fp_w (W_VAR s _)		= prime 5 * s
+/\  fp_w (W_EXPLICIT_VAR s _)	= prime 6 * s
+/\  fp_w (W_AND a b)		= prime 7 + fp_w a + fp_w b
+/\  fp_w (W_OR a b)		= prime 8 + fp_w a + fp_w b
+/\  fp_w (W_NOT a)		= prime 9 + fp_w a
+/\  fp_w (W_EQ a b)		= prime 10 + fp_w a + fp_w b
+/\  fp_w (W_PRED _ a)		= prime 11 + fp_w a
+/\  fp_w (W_GR a b)		= prime 12 + fp_w a + fp_w b
+/\  fp_w (W_ADD a b)		= prime 13 + fp_w a + fp_w b
+/\  fp_w (W_SUB a b)		= prime 14 + fp_w a + fp_w b
+/\  fp_w (W_MUL a b)		= prime 15 + fp_w a + fp_w b
+/\  fp_w (W_DIV a b)		= prime 16 + fp_w a + fp_w b
+/\  fp_w (W_MOD a b)		= prime 17 + fp_w a + fp_w b
+/\  fp_w (W_SHL a b)		= prime 18 + fp_w a + fp_w b
+/\  fp_w (W_SHR a b)		= prime 19 + fp_w a + fp_w b
+/\  fp_w (W_ASHR a b)		= prime 20 + fp_w a + fp_w b
+/\  fp_w (W_SX s a)		= prime 21 * s + fp_w a
+/\  fp_w (W_ZX s a)		= prime 22 * s + fp_w a
+/\  fp_w (W_ITE a b c)          = prime 23 + fp_w a + fp_w b + fp_w c
+/\  fp_w (W_SLICE is a)	        = prime_list id 0 is + fp_w a
+/\  fp_w (W_NAMED_SLICE _ is a) = prime_list id 0 is + fp_w a
+/\  fp_w (W_UPDATE_NAMED_SLICE a _ is b)
+                                = prime_list id 0 is + fp_w a + fp_w b
+/\  fp_w (W_CAT as)             = prime_list fp_w 0 as
+/\  fp_w (W_MEM_READ m a b)     = fp_mem m + fp_w a + fp_w b
+/\  fp_w (W_MEM_WRITE m a b d)  = fp_mem m + fp_w a + fp_w b + fp_w d
+;
+
+// Gen. a fingerprint for 'UPDATE_FN'.
+let
+    fp_fn (W_UPDATE_FN l r)   = prime_list fp_w 24 (l : r : [])
+/\  fp_fn (W_PHASE_DELAY l r) = prime_list fp_w 26 (l : r : [])
+;
+
+// Fetch a 'PEXLIF's fingerprint. If none exists, returns 0.
+let
+    fingerprint_of (PINST _ as _ _ _ _ _) =
+        find_first0 (\(n,_). n == "fingerprint") as;
+
+// Gen. a fingerprint for 'CONTENT'.
+let
+    fp_c (P_HIER cs) = prime_list fingerprint_of 28 cs
+/\  fp_c (P_LEAF fs) = prime_list fp_fn 28 fs
+;
+
+// Gen. a fingerprint for a input/output declaration.
+let
+    fp_wl []          = 0
+    fp_wl ((n,as):ws) = 0
+;
+
+// Gen. a fingerprint for each 'PEXLIF' on creation.
+let
+    PINST n as l i o is c =
+        let finger = fp_c c in
+        PINST n (("fingerprint", int2str finger) : as) l i o is c;
+
+//------------------------------------------------------------------------------
+
+// "entity" decl. of a 'PEXLIF'.
+lettype scheme =
+        SCHEME
+            {name::string}
+            {inps::(string#(string list)) list}
+            {outs::(string#(string list)) list}
+;
+
+let scheme_name    (SCHEME n _ _) = n;
+let scheme_inputs  (SCHEME _ i _) = i;
+let scheme_outputs (SCHEME _ _ o) = o;
+
+// "flatten" a 'PEXLIF' into a list of schemes.
+letrec
+    flatten (PINST n _ _ is os _ (P_LEAF _)) = [SCHEME n is os]
+/\  flatten (PINST n _ _ is os _ (P_HIER c)) = (SCHEME n is os) : flatmap flatten c
+;
+
+// check if two 'SCHEME's share a wire.
+let
+    connected (SCHEME _ is os) (SCHEME _ is' os') =
+        val (is_names, os_names) = (map fst is, map fst os) then
+        let wired as bs = any (\a. find_first0 (\b. a == b) bs > 0) as in
+        any (\(_,o). wired is_names o) os' OR any (\(_,i). wired os_names i) is'
+;
+
+let
+    adjacent pex =
+        val sc = setify (flatten pex) then
+        let adj o ss = filter (connected o) ss in
+        map (\s. (scheme_name s, map scheme_name (adj s sc))) sc
+;
+
+//------------------------------------------------------------------------------
+// Ullman’s Subgraph Isomorphism Algorithm:
+//   G - graph, or puzzle.
+//   P - potential subgraphs of G, or piece.
+//   M - |V(P)| x |V(G)| matrix that encodes possible subgraph isomorphisms.
+//------------------------------------------------------------------------------
+
+letrec
+    find_cols _ _ []     = []
+/\  find_cols r d (T:cs) = (r,d) : find_cols r (d+1) cs
+/\  find_cols r d (F:cs) = find_cols r (d+1) cs
+;
+
+letrec
+    find_rows _ []     = []
+/\  find_rows d (r:rs) = find_cols d 0 r @ find_rows (d+1) rs
+;
+
+// iterate over every mat. index that holds a '1'.
+//
+// forall_ones::mat->((i#j)->*->*)->*->*
+let
+    forall_ones mat f =
+        val ixs = find_rows 0 mat then sitlist f ixs
+;
+
+// iterate over every index in a col. that holds a '1'.
+//
+// forall_neighbors::i->mat->(j->*->*)->*->*
+let
+    forall_neighbors i mat f =
+        val ixs = find_cols i 0 (el i mat) then sitlist f (map snd ixs)
+;
+
+// thin the possible set of isomorphisms.
+//
+// prune(...)
+// do
+//   for all (i,j) where M is 1
+//     for all neighbors x of vi in P
+//       if there is no neighbor y of vj s.t. M(x,y)=1
+//         M(i,j)=0
+// while M was changed
+//
+// prune::(M:mat->G:mat->P:mat->M':mat)
+letrec
+    prune mat g p =
+      val mat' =
+          forall_ones mat (\(i,j). \mat.
+            forall_neighbors i p (\vi. \mat.
+              forall_neighbors j g (\vj. const T) F
+                => mat | set i j mat F
+            ) mat
+          ) mat
+      then mat == mat' => mat' | prune mat' g p
+;
+
+//------------------------------------------------------------------------------
+
+let
+    isomorphism mat g =
+      val c = mult mat (transpose (mult mat g)) then T
+;
+
+// find ...
+//
+// recurse(used_columns, cur_row, G, P, M)
+//   if cur_row = num_rows(M)
+//     if M is an isomorphism:
+//        output yes and end the algorithm
+//   M' = M
+//   prune(M')
+//   for all unused columns c
+//     set column c in M' to 1 and other columns to 0
+//     mark c as used
+//     recurse(used_column, cur_row+1, G, P, M')
+//     mark c as unused
+//   output no
+//
+// recurse::(M:mat->G:mat->P:mat->...->M':mat)
+letrec
+    recurse mat g p rows row =
+      row == length mat AND isomorphism mat => 0 |
+        0
+
+//------------------------------------------------------------------------------
+// Fin.
+
+// letrec
+//     EQ_W (W_X i) (W_X j) = i == j
+// /\  EQ_W (W_CONST a i) (W_CONST b j) = a == b AND i == j
+// /\  EQ_W (W_NAMED_CONST n a i) (W_NAMED_CONST m b j) = n == m AND a == b AND i == j
+// /\  EQ_W (W_VAR i _) (W_VAR j _) = i == j
+// /\  EQ_W (W_EXPLICIT_VAR _ i) (W_EXPLICIT_VAR _ j) = i == j
+// /\  EQ_W (W_AND a b) (W_AND c d) = EQ_W a c AND EQ_W b d
+// /\  EQ_W (W_OR a b) (W_OR c d) = EQ_W a c AND EQ_W b d
+// /\  EQ_W (W_NOT a) (W_NOT b) = EQ_W a b
+// /\  EQ_W (W_EQ a b) (W_EQ c d) = EQ_W a c AND EQ_W b d
+// /\  EQ_W (W_PRED p a) (W_PRED q b) = p == q AND EQ_W a b
+// /\  EQ_W (W_GR a b) (W_GR c d) = EQ_W a c AND EQ_W b d
+// /\  EQ_W (W_ADD a b) (W_ADD c d) = EQ_W a c AND EQ_W b d
+// /\  EQ_W (W_SUB a b) (W_SUB c d) = EQ_W a c AND EQ_W b d
+// /\  EQ_W (W_MUL a b) (W_MUL c d) = EQ_W a c AND EQ_W b d
+// /\  EQ_W (W_DIV a b) (W_DIV c d) = EQ_W a c AND EQ_W b d
+// /\  EQ_W (W_MOD a b) (W_MOD c d) = EQ_W a c AND EQ_W b d
+// /\  EQ_W (W_SHL a b) (W_SHL c d) = EQ_W a c AND EQ_W b d
+// /\  EQ_W (W_SHR a b) (W_SHR c d) = EQ_W a c AND EQ_W b d
+// /\  EQ_W (W_ASHR a b) (W_ASHR c d) = EQ_W a c AND EQ_W b d
+// /\  EQ_W (W_SX i a) (W_SX j b) = i == j AND EQ_W a b
+// /\  EQ_W (W_ZX i a) (W_ZX j b) = i == j AND EQ_W a b
+// /\  EQ_W (W_ITE p u a) (W_ITE q v b) = EQ_W p q AND EQ_W u v AND EQ_W a b
+// /\  EQ_W (W_SLICE ix a) (W_SLICE jx b) = ix == jx AND EQ_W a b
+// /\  EQ_W (W_NAMED_SLICE _ ix a) (W_NAMED_SLICE _ jx b) = ix == jx AND EQ_W a b
+// /\  EQ_W (W_UPDATE_NAMED_SLICE x _ ix a) (W_UPDATE_NAMED_SLICE y _ jx b) =
+//         EQ_W x y AND ix == jx AND EQ_W a b
+// /\  EQ_W (W_CAT ps) (W_CAT qs) = AND_list (map2 (\p.\q. EQ_W p q) ps qs)
+// /\  EQ_W (W_MEM_READ _ _ _) (W_MEM_READ _ _ _) = F
+// /\  EQ_W (W_MEM_WRITE _ _ _ _) (W_MEM_WRITE _ _ _ _) = F
+// /\  EQ_W _ _ = F
+// ;
+
+// let
+//     EQ_FN (W_UPDATE_FN a b) (W_UPDATE_FN c d) = EQ_W a c AND EQ_W b d
+// /\  EQ_FN (W_PHASE_DELAY a b) (W_PHASE_DELAY c d) = EQ_W a c AND EQ_W b d
+// /\  EQ_FN _ _ = F
+// ;
+
+// forward_declare {EQ_P::pexlif->pexlif->bool};
+// let
+//     EQ_C (P_HIER cs1) (P_HIER cs2) = AND_list (map2 (\a.\b. EQ_P  a b) cs1 cs2)
+// /\  EQ_C (P_LEAF fs1) (P_LEAF fs2) = AND_list (map2 (\a.\b. EQ_FN a b) fs1 fs2)
+// /\  EQ_C _ _ = F
+// ;
+// let
+//     EQ_P (PINST _ _ l1 in1 out1 _ c1) (PINST _ _ l2 in2 out2 _ c2) =
+//         let nr_wires w = length (md_expand_vectors (map fst w))
+//         in    l1 == l2
+//           AND nr_wires in1  == nr_wires in2
+//           AND nr_wires out1 == nr_wires out2
+//           AND EQ_C c1 c2
+// ;
+
+//------------------------------------------------------------------------------
