@@ -866,6 +866,24 @@ let split_multi_dim v =
     flatmap md_extract_vectors svs
 ;
 
+let is_var (H,L) =
+    NOT (H == NOT L) => F |
+    val (v,(h,l)) = top_cofactor H in
+    h == T AND l == F
+;
+
+let trim s =
+    let es = explode s in
+    letrec trim (" ":" ":r) = trim (" ":r)
+     /\    trim (c:cs) = c:trim cs
+     /\    trim [] = []
+    in
+    let es' = trim es in
+    let es' = hd es' = " " => tl es' | es' in
+    let es' = last es' = " " => butlast es' | es' in
+    (implode es')
+;
+
 let base_get_complete_value ste vectors t =
     let type = get_ste_type ste then
     let process v =
@@ -894,21 +912,28 @@ let base_get_complete_value ste vectors t =
 		    HL == (T,F) => "1" |
 		    HL == (F,T) => "0" |
 		    HL == (T,T) => "X" |
-		    "T"
+		    HL == (F,F) => "T" |
+		    val (v,(h,l)) = top_cofactor (fst HL) in
+		    " "^v^" "
 		in
-		(v, [implode (map val2s vals)])
+		let res = implode (md_merge_vectors (map val2s vals)) in
+		(v, [trim res])
 	    in
 	    letrec group cur (nd:nds) (HL:HLs) =
 		is_const HL => group ((nd,HL):cur) nds HLs |
+		is_var HL   => group ((nd,HL):cur) nds HLs |
 		cur != [] => (mk_range cur):(group []  (nd:nds) (HL:HLs)) |
 		let ovc = (HL = (F,F)) in
 		NOT (ovc == F) => (nd,["OVERCONSTRAINED"]):(group [] nds HLs) |
 		let one   = (HL = (T,F)) in
 		let X     = (HL = (T,T)) in
-		X == F => (nd,[bool2str 3 one]):(group [] nds HLs) |
+		let deps = list2str T "Depends on: " " " "" id 
+				   (md_extract_vectors (depends HL))
+		in
+		X == F => (nd,[bool2str 3 one,deps]):(group [] nds HLs) |
 		let one_s = bool2str 3 one then
 		let X_s   = bool2str 3 X then
-		(nd, [one_s, (sprintf "  + X(%s)" X_s)]):(group [] nds HLs)
+		(nd, [one_s, (sprintf "  + X(%s)" X_s),deps]):(group [] nds HLs)
 	     /\   group cur [] [] =
 		cur = [] => [] |
 		[mk_range cur]
@@ -995,9 +1020,9 @@ let base_get_complete_value ste vectors t =
     let do1 v =
 	let res = process v then
 	str_is_substr "\n" res =>
-	    sprintf "%*s:\n%s" len v res
+	    sprintf "%-*s:\n%s" len v res
 	|
-	    sprintf "%*s: %s" len v res
+	    sprintf "%-*s: %s" len v res
     in
     map do1 vecs
 ;

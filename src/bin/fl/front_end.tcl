@@ -491,7 +491,7 @@ proc create_voss2_top_level_txtwin {{t ".voss2.t"} {s ".voss2.s"}} {
     # create text window
     if { ! [winfo exists $t] } {
 	text $t -relief sunken -bd 2 -yscrollcommand "$s set" \
-		-background $::voss2_bcolor -foreground green \
+		-background $::voss2_bcolor -foreground DarkGreen \
 		-font $::voss2_txtfont
 	pack $t -side left -fill both -expand 1
 

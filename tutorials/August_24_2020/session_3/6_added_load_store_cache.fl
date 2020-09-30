@@ -3,7 +3,7 @@ cload "ste.fl";
 
 ENUM "security" ["LOW", "HIGH"];
 
-ENUM "opcode" ["NOP", "LDI",
+ENUM "opcode" ["NOP", "HALT", "LDI",
 	       "LD", "ST",
 	       "GET_TIMER", "PRIVATE", "PUBLIC",
 	       "ADD", "SUB"];
@@ -272,6 +272,27 @@ let RAM =
         ram <: new_ram
 ];
 
+let mk_RAM_ant_1 name ckt content =
+    let p = sprintf "_RoM_%s[" name in
+    let rom_vecs = md_extract_vectors (filter (str_is_substr p) (nodes ckt)) in
+    rom_vecs = [] => eprintf "No RAM cells found with name %s" name |
+    length rom_vecs != 1 => eprintf "Multiple RAM cells matching name %s" name |
+    val (base,[(u_line,l_line), (u_w,l_w)]) = split_vector (hd rom_vecs) then
+    letrec do i (c:cs) =
+        let vec = sprintf "%s[%d][%d:%d]" base i u_w l_w then
+        vec is c in_phase 0 and (do (i+1) cs)
+     /\    do i [] = []
+    in
+    {do 0 content:: (bool#string#bool#int#int) list}
+;
+
+let mk_RAM_ant_2 name vis content =
+    let ckt = vfsm2fsm vis in
+    mk_RAM_ant_1 name ckt content
+;
+
+overload mk_RAM_ant mk_RAM_ant_1 mk_RAM_ant_2;
+
 let cache =
     bit_input	clk.
     bit_input	reset.
@@ -367,7 +388,8 @@ let cpu =
     instr_internal	op.
     word_internal	pc.
     instr_internal	opIF opEXE opMEM opWB.
-    bit_internal	validIF validEXE validMEM validWB valid_dest.
+    bit_internal	validIF validEXE validMEM validWB.
+    bit_internal	valid_destIF valid_destEXE valid_destMEM valid_destWB.
     bit_internal	rw ram_rw nstall.
     addr_internal	ram_addr.
     word_internal	ram_inp ram_out new_dataMEM.
@@ -386,6 +408,7 @@ let cpu =
 	],
 	STATE clk pc [
 	    reset --- '0,
+	    is_HALT (opIF-->opc) --- pc,
 	    nstall --- (pc '+' '1)
 	],
 	ROM "ROM" 0 16 pc op,
@@ -403,18 +426,22 @@ let cpu =
 	re_ff_en clk nstall opEXE opMEM,
 	re_ff_en clk nstall opMEM opWB,
 	//
-	valid_dest <- validWB '&' op_has_dst (opWB-->opc),
+	valid_destIF <- op_has_dst (opIF-->opc),
+	re_ff_en_reset clk nstall reset valid_destIF valid_destEXE,
+	re_ff_en_reset clk nstall reset valid_destEXE valid_destMEM,
+	re_ff_en_reset clk nstall reset valid_destMEM valid_destWB,
+	//
 	RF clk sec_levelIF sec_levelWB (opIF-->src1) (opIF-->src2) (opWB-->dst)
-			 valid_dest dataWB AdataIF BdataIF,
+			 valid_destWB dataWB AdataIF BdataIF,
 	ALU clk reset opEXE bpAdataEXE bpBdataEXE dataEXE,
 	re_ff_en clk nstall bpBdataEXE bpBdataMEM,
 	bypass sec_levelEXE sec_levelMEM sec_levelWB
-	       validMEM validWB
+	       valid_destMEM valid_destWB
 	       opMEM opWB
 	       AdataEXE dataMEM dataWB
 	       (opEXE-->src1) bpAdataEXE,
 	bypass sec_levelEXE sec_levelMEM sec_levelWB
-	       validMEM validWB
+	       valid_destMEM valid_destWB
 	       opMEM opWB
 	       BdataEXE dataMEM dataWB
 	       (opEXE-->src2) bpBdataEXE,
@@ -448,40 +475,39 @@ var_order (
 //update_vossrc "DYNAMIC-ORDERING" "NO";
 
 
-let i1 = NOP_instr;
-let i2 = 'li0<-- opc ? LD <-- dst ? '1 <--src2 ? '1;
-let i4 = '0<--opc ? GET_TIMER <-- dst ? '2;
-let i5 = 'li1<-- opc ? LD <-- dst ? '1 <--src2 ? '1;
-let i6 = '0<--opc ? GET_TIMER <-- dst ? '3;
 
-let ROM_ant = mk_ROM_ant "ROM" vis [
-	i1,
-	i2
-];
-ROM_ant;
-
+let change_to_public  = '0<-- opc ? PUBLIC;
+let change_to_private = '0<-- opc ? PRIVATE;
 
 let test i3 =
-    let N = 20 in
+    let N = 50 in
+    let ROM_ant = mk_ROM_ant "ROM" vis [
+	    change_to_public,
+	    NOP_instr,
+	    'li0<-- opc ? LD <-- dst ? '1 <--src2 ? '1,
+	    change_to_private,
+	    i3,
+	    change_to_public,
+	    '0<--opc ? GET_TIMER <-- dst ? '2,
+	    'li1<-- opc ? LD <-- dst ? '1 <--src2 ? '1,
+	    '0<--opc ? GET_TIMER <-- dst ? '3
+    ] in
     let ant =
 	"clk" is_clock N
       and
-	"reset" is 1 in_cycle 0 otherwise 0 until N cycles
+	"reset" is 1 in_cycle 0 followed_by
+		   1 in_cycle 1 otherwise 0 until N cycles
       and
-	"op[11:0]" is i1 in_cycle 1 followed_by
-		      i2 in_cycle 2 followed_by
-		      i3 in_cycle 3 followed_by
-		      i4 in_cycle 4 followed_by
-		      i5 in_cycle 5 followed_by
-		      i6 in_cycle 6 otherwise NOP_instr until N cycles
+	ROM_ant
       and
-	"i13/RF0[1][7:0]" is "b[1][7:0]" in_cycle 0
+	"i19/RF0[1][7:0]" is "b[1][7:0]" in_cycle 0
       and
-	"i13/RF0[2][7:0]" is "b[2][7:0]" in_cycle 0
+	"i19/RF0[2][7:0]" is "b[2][7:0]" in_cycle 0
       and
-	"i13/RF1[2][7:0]" is "r[7][7:0]" in_cycle 0
+	"i19/RF1[2][7:0]" is "r[7][7:0]" in_cycle 0
     in
-    STE "-e -w 1000 -ifw" vis [] ant [] []
+    STE "-e" vis [] ant [] []
+//    STE "-e -w 1000 -ifw" vis [] ant [] []
 ;
 
 
@@ -489,6 +515,13 @@ update_vossrc "DYNAMIC-ORDERING" "NO";
 update_vossrc "NOTIFY-TRAJECTORY-FAILURES" "NO";
 update_vossrc "NOTIFY-CHECK-FAILURES" "NO";
 update_vossrc "ACCURATE-ITE-COMP" "NO";
+
+// Simple scalar test
+let i3 = 'hi<-- opc ? ADD
+	    <-- dst ? (('hi-->dst)<--msb ? '1);
+test i3;
+
+
 
 // Assume secure instruction only writes to secure register file.
 let i3 = 'hi<-- dst ? (('hi-->dst)<--msb ? '1);

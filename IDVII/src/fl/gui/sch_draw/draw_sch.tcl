@@ -917,7 +917,7 @@ proc cb:post_extended_value {c aname x y sep_window} {
         set time [fl_get_global_time $c]
 	post_big_popup_window [fl_c2w $c] [fl_get_complete_value $c $aname] \
                           [format {Value for %s at time %d} \
-				  [fl_tag2vec $c $aname] $time]
+				  [clean_name [fl_tag2vec $c $aname]] $time]
     } else {
 	post_popup $c [fl_get_long_value $c $aname] $x $y 1
     }
@@ -3025,7 +3025,7 @@ proc draw_repeat_nd_out {c tag x y} {
 
 
 proc get_suffix_basename {name} {
-    set bn [file tail $name]
+    set bn [file tail [clean_name $name]]
     if { $bn == $name } {
 	return $name
     }
@@ -3044,7 +3044,7 @@ proc draw_incomplete {name c tag x y} {
     set right_x [expr $xl - [expr 0.5*[min_sep $c]]]
     add_three_horizontal_dots $c $left_x $right_x $y $tag
     set f2 [$c create text $left_x $y -anchor e -font $mfont($c) \
-		-text [clean_name $sname 1] -tags $tag]
+		-text $sname -tags $tag]
     add_font_tags $c $f2 _IsTeXt_
     add_value_field $c $tag $x $y
     if { [llength [split $tag "\n"]] > 1 } {
@@ -3068,7 +3068,7 @@ proc draw_incomplete_grey {name c tag x y} {
 	set sname ""
     }
     set f2 [$c create text $xl $y -anchor se -font $mfont($c) \
-		-text [format "%s ... " [clean_name $sname 1]] \
+		-text [format "%s ... " $sname] \
 		-tags $tag]
     add_font_tags $c $f2 _IsTeXt_
     add_value_field $c $tag $x $y
