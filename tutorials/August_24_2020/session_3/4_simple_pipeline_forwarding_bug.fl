@@ -181,41 +181,74 @@ let p = pipeline 'clk 'reset 'sec_level 'op 'dbg_valid 'dbg_op 'dbg_data;
 let vis = STE_debug (pexlif2fsm p);
 vis;
 
+//var_order (
+//    (interleave (map md_expand_vector ["hi[10:0]", "li[10:0]"]))@
+//    (interleave (map md_expand_vector ["b[1][7:0]", "b[2][7:0]", "r[7][7:0]"]))
+//);
+var_order ["li[4:0]","hi[4]","li[10]","li[7]","hi[3]","li[9]","li[6:5]","li[8]","hi[2:0]","hi[8:10]","hi[7:5]","r[7][7:6]","b[1:2][6]","b[2:1][7]","r[7][5]","b[1:2][5]","r[7][4]","b[1:2][4]","r[7][3]","b[1:2][3]","r[7][2]","b[1:2][2]","b[1][0:1]","r[7][1:0]","b[2][0:1]"];
+
+update_vossrc "DYNAMIC-ORDERING" "NO";
+
+
 let i1 = NOP_instr;
 let i2 = NOP_instr;
-let i3 = 'hi<-- dst ? ('his1<--msb ? '1);
 let i4 = {'li::instr};
 let i5 = NOP_instr;
 
-let N = 20;
-let ant =
-    "clk" is_clock N
-  and
-    "reset" is 1 in_cycle 0 otherwise 0 until N cycles
-  and
-    "sec_level" is LOW in_cycle 1 followed_by
-		   LOW in_cycle 2 followed_by
-		   HIGH in_cycle 3 followed_by
-		   LOW in_cycle 4 followed_by
-		   LOW in_cycle 5 otherwise LOW until N cycles
-  and
-    "op[10:0]" is i1 in_cycle 1 followed_by
-		  i2 in_cycle 2 followed_by
-		  i3 in_cycle 3 followed_by
-		  i4 in_cycle 4 followed_by
-		  i5 in_cycle 5 otherwise NOP_instr until N cycles
-  and
-    "i13/RF0[1][7:0]" is "b[1][7:0]" in_cycle 0
-  and
-    "i13/RF0[2][7:0]" is "b[2][7:0]" in_cycle 0
-  and
-    "i13/RF1[2][7:0]" is "r[7][7:0]" in_cycle 0
+
+// A simple test harness for different secure instructions i3
+let test i3 =
+    let N = 20 in
+    let ant =
+	"clk" is_clock N
+      and
+	"reset" is 1 in_cycle 0 otherwise 0 until N cycles
+      and
+	"sec_level" is LOW in_cycle 1 followed_by
+		       LOW in_cycle 2 followed_by
+		       HIGH in_cycle 3 followed_by
+		       LOW in_cycle 4 followed_by
+		       LOW in_cycle 5 otherwise LOW until N cycles
+      and
+	"op[10:0]" is i1 in_cycle 1 followed_by
+		      i2 in_cycle 2 followed_by
+		      i3 in_cycle 3 followed_by
+		      i4 in_cycle 4 followed_by
+		      i5 in_cycle 5 otherwise NOP_instr until N cycles
+      and
+	"i13/RF0[1][7:0]" is "b[1][7:0]" in_cycle 0
+      and
+	"i13/RF0[2][7:0]" is "b[2][7:0]" in_cycle 0
+      and
+	"i13/RF1[2][7:0]" is "r[7][7:0]" in_cycle 0
+    in
+    STE "-e" vis [] ant [] []
+//    STE "-e -w 1000 -ifw" vis [] ant [] []
 ;
 
-update_vossrc "DYNAMIC-ORDERING" "NO";
-update_vossrc "NOTIFY-TRAJECTORY-FAILURES" "NO";
-update_vossrc "NOTIFY-CHECK-FAILURES" "NO";
-update_vossrc "ACCURATE-ITE-COMP" "NO";
 
-let ste = STE "-e -w 1000 -ifw" vis [] ant [] [];
-ste;
+// Assume secure instruction only writes to secure register file.
+let i3 = 'hi<-- dst ? (('hi-->dst)<--msb ? '1);
+test i3;
+
+// Assume secure instruction does not read secure register file.
+let i3 = 'hi<-- src1 ? (('hi-->src1)<--msb ? '0)
+	    <-- src2 ? (('hi-->src2)<--msb ? '0);
+test i3;
+
+// Assume secure instruction only reads and writes secure register file
+let i3 = 'hi<-- src1 ? (('hi-->src1)<--msb ? '1)
+	    <-- src2 ? (('hi-->src2)<--msb ? '1)
+	    <-- dst  ? (('hi-->dst)<--msb ? '1)
+;
+test i3;
+
+// Assume secure instruction only reads and writes public register file
+let i3 = 'hi<-- src1 ? (('hi-->src1)<--msb ? '0)
+	    <-- src2 ? (('hi-->src2)<--msb ? '0)
+	    <-- dst  ? (('hi-->dst)<--msb ? '0)
+;
+test i3;
+
+
+

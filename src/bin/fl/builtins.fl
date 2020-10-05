@@ -11,7 +11,7 @@ let ___z = 0;
 // Convert the BDD f to a string.
 // The format of the expression is decided by the vossrc option PRINT-FORMAT
 // (the default is sum-of-product (SOP).
-// The maximum nymber of products to print is decided by the sz argument.
+// The maximum number of products to print is decided by the sz argument.
 let bool2str sz f = (defix bool2str) sz f;
 
 // Return the total number of BDD nodes needed to represent all the
@@ -21,12 +21,12 @@ let bdd_size e = defix bdd_size e;
 
 // Load a previously saved list of BDDs into memory from the file filename.
 // NOTE: The variable ordering does not have to be the same as when
-// the BDD was saved. However, using a different ordering may csause
+// the BDD was saved. However, using a different ordering may cause
 // the BDDs to grow exponentially.
 let bdd_load filename = defix bdd_load filename;
 
-// Perform cnt dynamic reorderings of the BDDs in memory.
-// See the Preference manu for options controlling the re-ordering process.
+// Perform cnt dynamic reordering of the BDDs in memory.
+// See the Preference manual for options controlling the re-ordering process.
 let bdd_reorder cnt = defix bdd_reorder cnt;
 non_lazy bdd_reorder;
 
@@ -70,7 +70,7 @@ let fanin ckt nd = (defix fanin) ckt nd;
 // Note that this is determined purely structurally.
 let fanout ckt nd = defix fanout ckt nd;
 
-// Return the greatest common divisr of the integers i and j.
+// Return the greatest common divisor of the integers i and j.
 let gcd i j = defix gcd i j;
 
 // fopen filename mode opens a file or pipeline for reading and/or writing.
@@ -81,7 +81,7 @@ let gcd i j = defix gcd i j;
 //          positioned at the beginning of the file.
 // 
 //      r+  Open the file for reading and writing.  The
-//          stream is positioned at the begiing of the
+//          stream is positioned at the beginning of the
 //          file.
 // 
 //       w   Open the file for writing.  The file will have
@@ -284,7 +284,7 @@ non_lazy print;
 // Return the width of the tree of BDDs represented in e.
 // In other words, return the number of BDD nodes with variable v1,
 // followed by the number of BDD nodes with variable v2, etc., where
-// v1 preceeds v2 etc. in the BDD variable ordering.
+// v1 precedes v2 etc. in the BDD variable ordering.
 let profile e = defix profile e;
 
 // Return a random T or F value determined by the Unix random function.
@@ -321,10 +321,10 @@ let bev2num bl = defix bev2num bl;
 // Determine whether the file filename exists.
 let file_exists filename = defix file_exists filename;
 
-// If b is not scalar, returns the tripple (var_name, true-branch, false-branch)
+// If b is not scalar, returns the triple (var_name, true-branch, false-branch)
 let top_cofactor b = defix top_cofactor b;
 
-// Draw (using dot) the forrest of BDDs given in bool_list.
+// Draw (using dot) the forest of BDDs given in bool_list.
 // If draw_neg is T, draw the (true) internal BDD using negated edges (red).
 // If draw_neg is F, draw the BDD without negated pointer.
 // The true-edge is drawn solid and the false-edge is drawn dotted.
@@ -351,7 +351,7 @@ let time e = defix time e;
 
 // Update the value of the vossrc (option) key and set its
 // new value to v. The function returns the old value.
-// If the variable did not exist before, an emtpy string is returned.
+// If the variable did not exist before, an empty string is returned.
 let update_vossrc key v = defix update_vossrc key v;
 
 // Return a signature for the BDD b.
@@ -416,7 +416,7 @@ let + a b = defix + a b;
 // Subtract 'b' from 'a'.
 let - a b = defix - a b;
 
-// Cons element e ono the list l, i.e., create a new list that has e
+// Cons element e onto the list l, i.e., create a new list that has e
 // as first element and the remaining elements the same as in l.
 // Usage:  e:l;
 let : = defix :;
@@ -449,7 +449,7 @@ let != a b = defix != a b;
 let > a b = defix > a b;
 
 
-// Return whether 'a' is greater thn or equal to 'b'.
+// Return whether 'a' is greater then or equal to 'b'.
 let >= a b = defix >= a b;
 
 
@@ -484,7 +484,7 @@ let bvariable name = defix bvariable name;
 // Negate bexpr a;
 let bNOT a = defix bNOT a;
 
-// Form conjuction of bexprs a1 and a2;
+// Form conjunction of bexprs a1 and a2;
 // A simulator + SAT solver with a small timeout is used to keep
 // the bexpr result canonical. However, no guarantee for functional identity.
 let bAND a1 a2 = defix bAND a1 a2;
@@ -573,14 +573,14 @@ let bITE cond e1 e2 = defix bITE cond e1 e2;
 // Usage: gen_bNOT e;
 let gen_bNOT e = defix gen_bNOT e;
 
-// If e1 and e2 are structurally ideantical, then gen_bOR returns the same
+// If e1 and e2 are structurally identical, then gen_bOR returns the same
 // structure but in which every bexpr will be the bOR of e1's and
 // e2's expressions.
 //
 // Usage: gen_bOR e1 e2;
 let gen_bOR e1 e2 = defix gen_bOR e1 e2;
 
-// If e1 and e2 are structurally ideantical, then gen_bAND returns the same
+// If e1 and e2 are structurally identical, then gen_bAND returns the same
 // structure but in which every bexpr will be the bAND of e1's and
 // e2's expressions.
 //
@@ -639,7 +639,7 @@ non_lazy random2;
 // Usage: assoc x l;
 let assoc x assoc_list = defix assoc x assoc_list;
 
-// Keep only the elements of l that satisfy the predice pred
+// Keep only the elements of l that satisfy the predicate pred
 // Usage: filter pred l;
 let filter pred l = defix filter pred l;
 
@@ -735,7 +735,7 @@ let rev_assoc y assoc_list = defix rev_assoc y assoc_list;
 // Expands a list of vectors into the corresponding list of node names.
 // Uses "SystemVerilog compatible" naming conventions.
 // Thus: a substring starting with \ and continuing until first space
-// is treated as a monolitic string.
+// is treated as a monolithic string.
 // Ranges can be given as:
 //	1) single indices, e.g.,  a[3]
 //	2) ranges, e.g., a[31:4]
@@ -747,7 +747,7 @@ let md_expand_vectors vec_list = defix md_expand_vectors vec_list;
 // Expands a vector vec into the corresponding list of node names.
 // Uses "SystemVerilog compatible" naming conventions.
 // Thus: a substring starting with \ and continuing until first space
-// is treated as a monolitic string.
+// is treated as a monolithic string.
 // Ranges can be given as:
 //	1) single indices, e.g.,  a[3]
 //	2) ranges, e.g., a[31:4]
@@ -782,10 +782,10 @@ let merge_vectors name_list = (defix merge_vectors) name_list;
 // Usage:  is_defined name;
 let is_defined name = defix is_defined name;
 
-// Test if the open file desriptor fp is at EOF.
+// Test if the open file descriptor fp is at EOF.
 let feof fp = defix feof fp;
 
-// Read a line from the open filedescriptor fp.
+// Read a line from the open file descriptor fp.
 // Function fails if fp is not open for reading.
 // Usage: fgets fp;
 let fgets fp = defix fgets fp;
@@ -895,7 +895,7 @@ let acos f = defix acos f;
 let atan f = defix atan f;
 
 // Look for the string needle in the string haystack.
-// If it is found, return the location for the first occurence.
+// If it is found, return the location for the first occurrence.
 // If it is not found, return 0.
 // Usage: strstr haystack needle;
 let strstr haystack needle = defix strstr haystack needle;
@@ -1017,7 +1017,7 @@ let bv2str sz bv = defix bv2str sz bv;
 // Usage: bv_add av bv;
 let bv_add av bv = defix bv_add av bv;
 
-// Return the bitwise AND of botvectors av and bv.
+// Return the bitwise AND of bitvectors av and bv.
 // The shorter bv is sign-extended to match the length of the bigger one.
 // Usage: bv_AND av bv;
 let bv_AND av bv = defix bv_AND av bv;
@@ -1083,12 +1083,12 @@ let bv_sub av bv = defix bv_sub av bv;
 // Usage: bv_variable v;
 let bv_variable vec = defix bv_variable vec;
 
-// Return the bitwise XNOR of botvectors av and bv.
+// Return the bitwise XNOR of bitvectors av and bv.
 // The shorter bv is sign-extended to match the length of the bigger one.
 // Usage: bv_XNOR av bv;
 let bv_XNOR av bv = defix bv_XNOR av bv;
 
-// Return the bitwise XOR of botvectors av and bv.
+// Return the bitwise XOR of bitvectors av and bv.
 // The shorter bv is sign-extended to match the length of the bigger one.
 // Usage: bv_XOR av bv;
 let bv_XOR av bv = defix bv_XOR av bv;
@@ -1129,7 +1129,7 @@ let get_fixity op = defix get_fixity op;
 let draw_graph levels e = defix draw_graph levels e;
 
 // Given a list of variables (vars) and a boolean function (f), return
-// the number of assignemnts to the variables in vars that makes f true.
+// the number of assignments to the variables in vars that makes f true.
 // If f depends on a variable not in vars, the function fails.
 // Usage: truth_cover vars f;
 let truth_cover vars f = defix truth_cover vars f;
@@ -1163,7 +1163,7 @@ let wtime e = defix wtime e;
 
 // Evaluate the function fun::*a->void on every element in the list l.
 // Meant to be used for functions with side-effect only since all results
-// are trown away.
+// are thrown away.
 let foreach fun l = defix foreach fun l;
 
 // A strict version of itlist (often significantly faster!).
@@ -1187,7 +1187,7 @@ let bev2str sz bev = defix bev2str sz bev;
 // Usage: bev_add av bev;
 let bev_add aev bev = defix bev_add aev bev;
 
-// Return the bitwise AND of botvectors av and bev.
+// Return the bitwise AND of bitvectors av and bev.
 // The shorter bev is sign-extended to match the length of the bigger one.
 // Usage: bev_AND av bev;
 let bev_AND aev bev = defix bev_AND aev bev;
@@ -1240,7 +1240,7 @@ let bev_mul aev bev = defix bev_mul aev bev;
 // Usage: bev_NOT bev;
 let bev_NOT bev = defix bev_NOT bev;
 
-// Return the bitwise OR of botvectors av and bev.
+// Return the bitwise OR of bitvectors av and bev.
 // The shorter bev is sign-extended to match the length of the bigger one.
 // Usage: bev_OR av bev;
 let bev_OR aev bev = defix bev_OR aev bev;
@@ -1259,12 +1259,12 @@ let bev_sub aev bev = defix bev_sub aev bev;
 // Usage: bev_variable v;
 let bev_variable vec = defix bev_variable vec;
 
-// Return the bitwise XNOR of botvectors av and bev.
+// Return the bitwise XNOR of bitvectors av and bev.
 // The shorter bev is sign-extended to match the length of the bigger one.
 // Usage: bev_XNOR av bev;
 let bev_XNOR aev bev = defix bev_XNOR aev bev;
 
-// Return the bitwise XOR of botvectors av and bev.
+// Return the bitwise XOR of bitvectors av and bev.
 // The shorter bev is sign-extended to match the length of the bigger one.
 // Usage: bev_XOR av bev;
 let bev_XOR aev bev = defix bev_XOR aev bev;
@@ -1383,7 +1383,7 @@ let node2vector ckt nd = defix node2vector ckt nd;
 // the encoding of the name nm.
 // This function allows enumerated types to be give their original
 // names rather than their encoded names for waveform diagrams and
-// backannotation.
+// back annotation.
 //
 // Currently only HFL programs using enumerated types
 // support this functionality.
@@ -1400,7 +1400,7 @@ let get_ste_maxtime ste = defix get_ste_maxtime ste;
 
 // Given an node name nd in circuit ckt, return nd's declared name.
 // For example, a node "i42/i22/i39/d" might have been declared as "foo"
-// three levels of hierachy above and passed down as arguments in module
+// three levels of hierarchy above and passed down as arguments in module
 // instantiations.
 // Usage: basename ckt nd;
 let basename ckt nd = defix basename ckt nd;
@@ -1409,7 +1409,7 @@ let basename ckt nd = defix basename ckt nd;
 // A trace list is a list of (time,H,L) values in reverse order for when
 // the node changed during simulation.
 // NOTE: Unless the STE run was ran with the -e flag, only nodes in the
-// trace list to the STE command will have trace lists avaiable.
+// trace list to the STE command will have trace lists available.
 // Usage: get_trace ste nd;
 let get_trace ste nd = defix get_trace ste nd;
 
@@ -1418,7 +1418,7 @@ let get_trace ste nd = defix get_trace ste nd;
 // A trace list is a list of (time,H,L) values in reverse order for when
 // the node changed during simulation.
 // NOTE: Unless the bSTE run was ran with the -e flag, only nodes in the
-// trace list to the bSTE command will have trace lists avaiable.
+// trace list to the bSTE command will have trace lists available.
 // Usage: bget_trace ste nd;
 let bget_trace ste nd = defix bget_trace ste nd;
 
@@ -1463,10 +1463,16 @@ let var_order l = md_merge_vectors (var_order (md_expand_vectors l));
 non_lazy var_order;
 
 
-// If ste is obtained from a (BDD based) STE run that was invoked with the
-// -ifw flag and a weakening occured (due to -w size flag), the translation
-// between the newly intruduced variables and the corresponding expressions is
+// If ste is obtained from a BDD based STE run that was invoked with the
+// -ifw flag and a weakening occurred (due to -w size flag), the translation
+// between the newly introduced variables and the corresponding expressions is
 // returned as an association list (variable, expression). Note that
 // an expression associated with a fresh variable might depend on other
-// fesh variables. However, it is guaranteed that there are no cycles.
+// fresh variables. However, it is guaranteed that there are no cycles.
 let get_weak_expressions ste = (defix get_weak_expressions) ste;
+
+
+// Get an (over-)estimation of the variables some object depends on
+// given an STE run that used dynamic weakening using the -ifw flag.
+let get_abstract_depends ste obj = (defix get_abstract_depends) ste obj;
+

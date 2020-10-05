@@ -1088,6 +1088,42 @@ POP_BDD_GC(unint cnt)
     }
 }
 
+void
+Get_abstract_depends(g_ptr redex, hash_record *abs_tblp, g_ptr obj)
+{
+    Reset_BDD_Size();
+    Gen_map(top_bdd_depends, obj, TRUE);
+    bool changed = FALSE;
+    unint vars = Get_VarCnt();
+    do {
+	changed = FALSE;
+	for(unint i = 0; i < vars; i++) {
+	    if( B_Width(i) > 0 ) {
+		string var = Get_Var_Name(i);
+		formula	expr;
+		if( (expr = PTR2FORMULA(find_hash(abs_tblp, var))) != 0 ) {
+		    changed = TRUE;
+		    B_Size(expr);
+		    delete_hash(abs_tblp, var);
+		}
+	    }
+	}
+    } while( changed );
+    MAKE_REDEX_NIL(redex);
+    g_ptr cur = redex;
+    for(unint i = 0; i < vars; i++) {
+	if( B_Width(i) > 0 ) {
+	    string var = Get_Var_Name(i);
+	    int dummy;
+	    if( sscanf(var, "_%d", &dummy) != 1 ) {
+		SET_CONS_HD(cur, Make_STRING_leaf(Get_Var_Name(i)));
+		SET_CONS_TL(cur, Make_NIL());
+		cur = GET_CONS_TL(cur);
+	    }
+	}
+    }
+}
+
 /********************************************************/
 /*	    EXPORTED EXTAPI FUNCTIONS    		*/
 /********************************************************/

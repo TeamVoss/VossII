@@ -184,7 +184,8 @@ proc voss2_interrupt_action {} {
     button $w.x -text "Exit VossII" -command {set ::interrupt_choice x}
     pack $w.x -side top -pady 2 -fill x -expand yes
 
-    button $w.r -text "Return to top" -command {set ::interrupt_choice r}
+    button $w.r -text "Return to top" \
+	    -command {make_all_active; set ::interrupt_choice r}
     pack $w.r -side top -pady 2 -fill x -expand yes
 
     $::voss2_info(intr) configure -state disable
@@ -448,6 +449,9 @@ proc create_voss2_top_level_menu {{tm ".voss2.menu"}} {
 	    -command {voss2_load_file} -underline 0
     $tm.file.m add command -label "Save" \
 	    -command {voss2_save_file} -underline 0
+    $tm.file.m add command -label "Take Screenshot" \
+	    -command {sg:screen_grab} -underline 0
+
     $tm.file.m add command -label "Quit VossII" \
 	    -command {send_top_voss2_cmd "quit;"} -underline 0
     pack $tm.file -side left
@@ -487,7 +491,7 @@ proc create_voss2_top_level_txtwin {{t ".voss2.t"} {s ".voss2.s"}} {
     # create text window
     if { ! [winfo exists $t] } {
 	text $t -relief sunken -bd 2 -yscrollcommand "$s set" \
-		-background $::voss2_bcolor -foreground green \
+		-background $::voss2_bcolor -foreground DarkGreen \
 		-font $::voss2_txtfont
 	pack $t -side left -fill both -expand 1
 
@@ -1318,54 +1322,80 @@ namespace eval voss2_help {
 	}
     }
 
+    proc help_show_function_info {tb fun} {
+	set wname [name2wname $fun]
+	if { ![winfo exists $tb.$wname] } {
+	    set f $tb.$wname
+	    frame $f -relief flat
+	    $tb add $f -text $fun
+	    $tb select $f
+	    button $f.b -text Close -command [list destroy $f] \
+		    -font $::voss2_txtfont
+	    pack $f.b -side bottom
+	    ttk::scrollbar $f.yscroll -command [list $f.t yview]
+	    ttk::scrollbar $f.xscroll -orient horizontal \
+				      -command [list $f.t xview]
+	    text $f.t -background white -font $::voss2_help_font \
+		-wrap none \
+		-xscrollcommand [list $f.xscroll set] \
+		-yscrollcommand [list $f.yscroll set] \
+		-setgrid 1 -width 50
+	    $f.t insert 1.0 [help_clean [help $fun]]
+	    $f.t tag configure source_loc   -foreground blue
+	    set file_loc [$f.t search {File:  } 1.0]
+	    if { $file_loc != "" } {
+		$f.t tag add source_loc "$file_loc+7chars" \
+					"$file_loc lineend"
+		set start_loc [$f.t search {Start: } $file_loc]
+		set end_loc   [$f.t search {End:   } $start_loc]
+		set file [$f.t get "$file_loc+7chars" "$file_loc lineend"]
+		set s_line [$f.t get "$start_loc+7chars" \
+				     "$start_loc lineend"]
+		set e_line [$f.t get "$end_loc+7chars" "$end_loc lineend"]
+		$f.t tag bind source_loc <Button-1> \
+			    "::voss2_help::help_open_file $tb $fun \
+				    $file $s_line $e_line"
+	    }
+	    set overload_loc [$f.t search {is the overloading of:} 1.0]
+	    if { $overload_loc != "" } {
+		set o_cnt 0
+		set cur_loc [$f.t index "$overload_loc lineend + 1 chars"]
+		set keep_going 1
+		while { $keep_going == 1 } {
+		    set line [$f.t get $cur_loc "$cur_loc lineend"]
+		    if { [regexp {([A-Za-z0-9_]*) ::} $line --> ofun] == 1 } {
+			set o_tag [format {o_tag%04d} $o_cnt]
+			incr o_cnt
+			$f.t tag configure $o_tag -foreground blue
+			$f.t tag add $o_tag $cur_loc \
+				    "$cur_loc + [string length $ofun] chars"
+			$f.t tag bind $o_tag <Button-1> \
+			    "::voss2_help::help_show_function_info $tb $ofun"
+			set keep_going 1
+			set cur_loc [$f.t index "$cur_loc lineend + 1 chars"]
+		    } else {
+			set keep_going 0
+		    }
+		}
+	    }
+
+	    $f.t configure -state disabled
+	    pack $f.yscroll -side right -fill y
+	    pack $f.xscroll -side bottom -fill x
+	    pack $f.t -side right -expand yes -fill both
+	} else {
+	    set f $tb.$wname
+	    $tb select $f
+	}
+    }
+
     proc help_show_info {lb tb} {
 	foreach index [$lb curselection] {
 	    set fun [$lb get $index]
-	    set wname [name2wname $fun]
-	    if { ![winfo exists $tb.$wname] } {
-		set f $tb.$wname
-		frame $f -relief flat
-		$tb add $f -text $fun
-		$tb select $f
-		button $f.b -text Close -command [list destroy $f] \
-			-font $::voss2_txtfont
-		pack $f.b -side bottom
-		ttk::scrollbar $f.yscroll -command [list $f.t yview]
-		ttk::scrollbar $f.xscroll -orient horizontal \
-					  -command [list $f.t xview]
-		text $f.t -background white -font $::voss2_help_font \
-		    -wrap none \
-		    -xscrollcommand [list $f.xscroll set] \
-		    -yscrollcommand [list $f.yscroll set] \
-		    -setgrid 1 -width 50
-		$f.t insert 1.0 [help_clean [help $fun]]
-		$f.t tag configure source_loc   -foreground blue
-		set file_loc [$f.t search {File:  } 1.0]
-		if { $file_loc != "" } {
-		    $f.t tag add source_loc "$file_loc+7chars" \
-					    "$file_loc lineend"
-		    set start_loc [$f.t search {Start: } $file_loc]
-		    set end_loc   [$f.t search {End:   } $start_loc]
-		    set file [$f.t get "$file_loc+7chars" "$file_loc lineend"]
-		    set s_line [$f.t get "$start_loc+7chars" \
-					 "$start_loc lineend"]
-		    set e_line [$f.t get "$end_loc+7chars" "$end_loc lineend"]
-		    $f.t tag bind source_loc <Button-1> \
-				"::voss2_help::help_open_file $tb $fun \
-					$file $s_line $e_line"
-		}
-		$f.t configure -state disabled
-		pack $f.yscroll -side right -fill y
-		pack $f.xscroll -side bottom -fill x
-		pack $f.t -side right -expand yes -fill both
-	    } else {
-		set f $tb.$wname
-                $tb select $f
-	    }
+	    help_show_function_info $tb $fun
 	}
 	$lb selection clear 0 end
     }
-
 
     proc help_do_match {lb} {
 	$lb delete 0 end 
@@ -1724,6 +1754,90 @@ proc hide_fl_window {} {
     set ::voss2_status(hidden_fl_window) 1
     wm withdraw .
 }
+
+
+proc sg:screen_grab {} {
+    set w .screen_grab
+    catch {destroy $w}
+    set topwins [wm stackorder .]
+
+    toplevel $w
+
+    label $w.l -text "Screen capture"
+    pack $w.l -side top -fill x
+
+    frame $w.window -relief flat
+    pack $w.window -side top -fill x
+	label $w.window.l -text "Window name:"
+	ttk::combobox $w.window.cb -textvariable ::screen_grab_window_name \
+				   -values $topwins
+	pack $w.window.l -side left
+	pack $w.window.cb -side left -fill x -expand yes
+
+    frame $w.sz -relief flat
+    set ::sg_desired_width 1000
+    pack $w.sz -side top -fill x
+	label $w.sz.l -text "Width: "
+	entry $w.sz.e -textvariable ::sg_desired_width
+	pack $w.sz.l -side left
+	pack $w.sz.e -side left -fill x -expand yes
+
+    frame $w.dir -relief flat
+    pack $w.dir -side top -fill x
+	label $w.dir.l -text "Directory:"
+	entry $w.dir.e -textvariable ::screen_shot_dir
+	set ::screen_shot_dir .
+	button $w.dir.b -text Browse -command "sg:choose_dir $w"
+	pack $w.dir.l -side left
+	pack $w.dir.e -side left -fill x -expand yes
+	pack $w.dir.b -side left
+
+    frame $w.bname -relief flat
+    set ::screen_shot_basename screen_shot
+    pack $w.bname -side top -fill x
+	label $w.bname.l -text "Base name: "
+	entry $w.bname.e -textvariable ::screen_shot_basename
+	pack $w.bname.l -side left
+	pack $w.bname.e -side left -fill x -expand yes
+
+    button $w.capture -text Capture -command "sg:capture $w"
+    pack $w.capture -fill x
+
+
+}
+
+proc sg:choose_dir {w} {
+    set ::screen_shot_dir [tk_chooseDirectory \
+	    -initialdir ~ -title "Choose a directory"]
+}
+
+proc sg:capture {w} {
+    set ::screen_grab_id [winfo id $::screen_grab_window_name]
+    wm iconify $::screen_grab_window_name
+    update
+    wm deiconify $::screen_grab_window_name
+    update
+    set geom [winfo geometry $::screen_grab_window_name]
+    regexp {([0-9]*)x([0-9]*)\+[0-9]*\+[0-9]*} $geom --> wid ht
+    set ::screen_grab_width $wid
+    set ::screen_grab_height $ht
+
+    if { ![info exists ::screen_grab_file_cnt($::screen_shot_basename)] } {
+	set ::screen_grab_file_cnt($::screen_shot_basename) 0
+    }
+    incr ::screen_grab_file_cnt($::screen_shot_basename)
+    set file [format {%s/%s_%03d.png} \
+		     $::screen_shot_dir \
+		     $::screen_shot_basename \
+		     $::screen_grab_file_cnt($::screen_shot_basename)]
+    
+    set ratio [expr $::sg_desired_width.0/$::screen_grab_width.0]
+    set wid [expr round($ratio * $::::screen_grab_width.0)]
+    set ht [expr round($ratio * $::::screen_grab_height.0)]
+    eval exec import -window $::screen_grab_id png:- | \
+	 convert -resize [format {%dx%d} $wid $ht] png:- $file
+}
+
 
 # Increase stack size to allow change_fonts to work even when deep
 # hierarchy of windows are open.

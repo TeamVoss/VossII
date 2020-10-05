@@ -153,7 +153,7 @@ infix 6 downto;
 
 // Generate the list of integers from f to t inclusive
 // If f < t it generates an increasing list.
-// If f > t it genetates a decreasing list.
+// If f > t it generates a decreasing list.
 let -- f t =
     f < t => f upto t | f downto t
 ;
@@ -225,11 +225,11 @@ letrec map3 fn l1 l2 l3 =
 // Usage: itlist f l x;
 letrec itlist f l x = empty l => x | f (hd l) (itlist f (tl l) x);
 
-// Merge the elements in the list l by repeadedly applying the function fn
+// Merge the elements in the list l by repeatedly applying the function fn
 // Usage: accumulate fn l;
 letrec accumulate fn l = itlist fn (tl l) (hd l);
 
-// Reverese iteration list
+// Reverse iteration list
 letrec rev_itlist f l x = empty l => x | rev_itlist f (tl l) (f (hd l) x);
 
 // Apply the list creating function fn to every element in l and append
@@ -271,12 +271,12 @@ letrec interleave ll = (empty ll) => [] |
                 rm @ (rem (tl ll)) in
         (hdlist ll) @ (interleave (rem ll));
 
-// Take twp lists of the same length and return a list of pairs 
+// Take two lists of the same length and return a list of pairs 
 letrec zip l1 l2 =
         empty l1 =>
-            empty l2 => [] | error "Lenght mismatch in zip"
+            empty l2 => [] | error "Length mismatch in zip"
         |
-            empty l2 => error "Lenght mismatch in zip"
+            empty l2 => error "Length mismatch in zip"
         |
             (hd l1, hd l2):(zip (tl l1) (tl l2))
 ;
@@ -403,6 +403,40 @@ let fixed_bv2list bits sign_ext bv =
 // Compute the condition for two bitvectors to be equal.
 let bv_eq {a::bv} {b::bv} = a = b;
 
+begin_abstype;
+// For small values -100 <= x <= 100 (-1.0 -- 1.0)
+// Result 100*exp(x/100)
+let bv_small_exp {p::bv} =
+    p = '0 => '100 |
+    ('6000000+p*('60000+p*('300+p)))/ '60000
+;
+
+let bvabs bv = bv < (int2bv 0) => ('0 - bv) | bv;
+
+// Return an approximation to: 100*exp(n/d)
+// Is accurate within 3% at least for -6.0 <= n/d <= 12.0
+let bv_exp {n::bv} {d::bv} =
+    n = '0 => int2bv 100 |
+    n = d  => int2bv (round (100.0*exp(1.0))) |
+    n = ('0 - '1*d)  => int2bv (round (100.0*exp(-1.0))) |
+    let n' = bvabs n in
+    let d' = bvabs d in
+    let sign = n/n' * d/d' in
+    let m = n' / d' in
+    let r = n' % d' in
+    let small = bv_small_exp (('100*r)/d') in
+    let scale = 1000000 in
+    let e = int2bv (round ((int2float scale)*exp(1.0))) in
+    letrec big_exp i = i = '0 => ('1,'1) |
+                       val (er,sr) = big_exp (i - '1) in
+                       (e*er, sr*(int2bv scale))
+    in
+    val (big,big_scale) = big_exp m in
+    let ares = (big*small)/ big_scale then
+    sign == '1 => ares | '10000/ares
+;
+end_abstype bv_exp bv_abs;
+
 // Compute the condition for two bitvectors not to be equal.
 let bv_neq {a::bv} {b::bv} = a != b;
 
@@ -458,6 +492,18 @@ let full_example preference vars cond =
     select cond vars
 ;
 
+// Split a vector into a basename and a list of (idx,idx) pairs extracted
+// from the name v.
+let split_vector v =
+    let parts = str_split v "[" then
+    let base = hd parts in
+    let range s =
+        str_is_substr ":" s => sscanf "%d:%d]" s |
+        let idx = sscanf "%d]" s in
+        (idx,idx)
+    in
+    base, map range (tl parts)
+;
 
 // Given a list of node vectors, return a list of "atoms" (vectors) that
 // have the property that every node in an atom is member of exactly the
@@ -582,7 +628,7 @@ let cload filename =
 non_lazy cload;
 end_abstype cload;
 
-// Replace all curent state variables (not ending in _n) with their
+// Replace all current state variables (not ending in _n) with their
 // corresponding next-state variables in all the BDDs in fs.
 // All other variables remain as they were.
 // NOTE: If fs already depends on one of the new next-state variables, 
@@ -837,7 +883,7 @@ let draw_bdd_profile e =
 // A convenient shorthand for bottom.
 let undefined = error "Undefined";
 
-// A convenient funtion to quickly create a collection of identifiers for
+// A convenient function to quickly create a collection of identifiers for
 // Boolean variables or vectors of Boolean variables.
 // For example:
 //   VARS "a[2:0] b[1:0] c d";
@@ -876,7 +922,7 @@ let VARS s =
     foreach decl id_nds
 ;
 
-// A convenient funtion to quickly create a collection of identifiers for
+// A convenient function to quickly create a collection of identifiers for
 // constrained Boolean variables and/or bvs (vectors of Boolean variables).
 // For example:
 //   cVARS "a[2:0] b[2:0] c d" "(c OR d) AND (a > '0) AND (b > a)";
@@ -1196,7 +1242,6 @@ end_abstype param fparam;
 
 let iabs i = i < 0 => -1*i | i;
 let fabs f = f < 0.0 => -1.0*f | f;
-let bvabs bv = bv < (int2bv 0) => ('0 - bv) | bv;
 let bevabs {bev::bev} = 
     let is_neg = list2bev [(bev < (int2bev 0))] in
     let neg = (int2bev 0) - bev in
@@ -1207,7 +1252,7 @@ overload {abs :: *a -> *a} iabs fabs bvabs bevabs;
 
 // Transpose a list with n elements that each are an m-element list to
 // an m-element list that each consists of an n-element list
-// For exammpe:
+// For example:
 //	transpose [[1,2,3],[4,5,6]];
 //  yields:
 //	[[1,4],[2,5],[3,6]]
@@ -1371,6 +1416,58 @@ let mutex v =
 ;
 
 
+// Given a bv, return the minimum and maximum value that bv can represent.
+let bv_range bv =
+    letrec find_max (b:bs) =
+	b == F => find_max bs |
+	let i = 2**(length bs) in
+	let sub = param b in
+	let bs' = substitute sub bs in
+	i+find_max bs'
+     /\   find_max [] = 0
+    in
+    letrec find_min (b:bs) =
+	let i = 2**(length bs) in
+	b == T => i+find_min bs |
+	let sub = param (NOT b) in
+	let bs' = substitute sub bs in
+	find_min bs'
+     /\   find_min [] = 0
+    in
+    let can_be_neg = NOT ((bv < (int2bv 0)) == F) in
+    let can_be_pos = NOT ((bv >= (int2bv 0)) == F) in
+    let neg = bv < (int2bv 0) in
+    let min =
+	can_be_neg =>
+	    let sub = param neg in
+	    let bv = substitute sub bv in
+	    let bv = (int2bv (-1)) * bv in
+	    let bl = bv2list bv in
+	    let max = find_max bl in
+	    -1*max
+	|
+	    let sub = param (NOT neg) in
+	    let bv = substitute sub bv in
+	    let bl = bv2list bv in
+	    find_min bl
+    in
+    let max =
+	can_be_pos =>
+	    let sub = param (NOT neg) in
+	    let bv = substitute sub bv in
+	    let bl = bv2list bv in
+	    find_max bl
+	|
+	    let sub = param neg in
+	    let bv = substitute sub bv in
+	    let bv = (int2bv (-1)) * bv in
+	    let bl = bv2list bv in
+	    let max = find_min bl in
+	    -1*max
+    in
+    min,max
+;
+
 // Function for printing some (cnt) examples that the bv can denote.
 // Usage: bv_examples cnt bv;
 //
@@ -1470,7 +1567,7 @@ letrec Pwexpr (W_X sz) = sprintf "X[%d:0]" (sz-1)
  /\    Pwexpr (W_AND a b) = sprintf "(%s & %s)" (Pwexpr a) (Pwexpr b)
  /\    Pwexpr (W_OR  a b) = sprintf "(%s | %s)" (Pwexpr a) (Pwexpr b)
  /\    Pwexpr (W_NOT a) = sprintf "~(%s)" (Pwexpr a)
- /\    Pwexpr (W_PRED name cond) = sprintf "(%s::%s)" name (Pwexpr cond)
+ /\    Pwexpr (W_PRED name cond) = sprintf "(%s)" (Pwexpr cond)
  /\    Pwexpr (W_EQ  a b) = sprintf "(%s = %s)" (Pwexpr a) (Pwexpr b)
  /\    Pwexpr (W_GR  a b) = sprintf "(%s > %s)" (Pwexpr a) (Pwexpr b)
  /\    Pwexpr (W_ADD a b) = sprintf "(%s + %s)" (Pwexpr a) (Pwexpr b)
@@ -1586,7 +1683,7 @@ andlettype content =
         |   P_LEAF {fns::update_fn list}
 ;
 
-// Convert any bexpr occuring in "e" to a BDD.
+// Convert any bexpr occurring in "e" to a BDD.
 // Currently only defined to bexprs, lists, pairs and list of pairs of bexprs.
 // Usage: bexpr2bdd e;
 open_overload {bexpr2bdd :: *a -> *b};
@@ -1630,7 +1727,7 @@ export_to_tcl fl_set_gui_return;
 // Example of use
 // prompt_for_inputs "Test" [("Give name", ""), ("Give size", "3")];
 // Returns a list of the text field from the user or an empty list
-// if the user prush the Cancel button.
+// if the user pushes the Cancel button.
 //
 // Usage: prompt_for_inputs title label_default_list;
 let prompt_for_inputs title text_fields =
@@ -1688,48 +1785,7 @@ let busy e =
     e
 ;
 
-
-begin_abstype;
-
-//cletrec get_abstract_depends_rec wk_exprs {anm::string} =
-//    let expr = assoc anm wk_exprs then
-//    let vs = depends expr then
-//    val (todo,done) = split (str_is_prefix "_") vs then
-//    let get nm r = (get_abstract_depends_rec wk_exprs nm) union r in 
-//    itlist get todo done
-//;
-//
-//// Get an (over-)estimation of the variables some object depends on
-//// given an STE run that used dynamic weakening using the -ifw flag.
-//let get_abstract_depends ste obj =
-//    let wk_exprs = get_weak_expressions ste then
-//    let vs = depends obj then
-//    val (todo,done) = split (str_is_prefix "_") vs then
-//    let get nm r = (get_abstract_depends_rec wk_exprs nm) union r in 
-//    itlist get todo done
-//;
-
-clet get_abstract_depends_helper wk_exprs obj =
-    letrec search vars =
-	val (vars_todo,vars_done) = split (str_is_prefix "_") vars then
-	vars_todo = [] => vars_done |
-	let exprs_todo = map (\v. assoc v wk_exprs) vars_todo then
-	let new_vars = depends exprs_todo then
-	(search new_vars)@vars_done
-    in
-    let raw_res = search (depends obj) then
-    setify raw_res
-;
-
-// Get an (over-)estimation of the variables some object depends on
-// given an STE run that used dynamic weakening using the -ifw flag.
-let get_abstract_depends ste obj =
-    let wk_exprs = get_weak_expressions ste then
-    get_abstract_depends_helper wk_exprs obj
-;
-
-end_abstype get_abstract_depends;
-
 // Boolean implication.
 let ==> a b = NOT a OR b;
 infix 2 ==>;
+

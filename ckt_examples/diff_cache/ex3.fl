@@ -635,51 +635,5 @@ let run2 = run	[
 //bdd_reorder 2;
 //var_order [];
 
-let color_by_top_level_type ckt p =
-    val (PINST _ _ _ _ _ _ (P_HIER l)) = p in
-    let cols = ref ["blue", "green", "red", "yellow", "pink", "brown"] in
-    let vnds = visualization_nodes ckt 0 in
-    let result = ref [] in
-    let do (PINST name _ _ fa_inps fa_outs _ _) =
-	(deref cols) = [] => [] |
-	let col = hd (deref cols) then
-	(cols := (tl (deref cols))) fseq
-	(result := ((name,col):(deref result))) fseq
-	let outs = setify (md_expand_vectors (flatmap snd fa_outs)) then
-	let inps = setify (md_expand_vectors (flatmap snd fa_inps)) then
-	let act_outs = outs intersect vnds then
-	let mine = ref inps in
-	letrec traverse nd =
-	    mem nd (deref mine) => () |
-	    (mine := (nd:(deref mine))) fseq
-	    let fi =
-		setify (flatmap snd (get_visualization_fanins ckt nd 0))
-	    then
-	    foreach traverse fi
-	in
-	(foreach traverse act_outs) fseq
-	let my_nds = (deref mine) subtract inps then
-	map (\n. n,col) my_nds
-    in
-    let cols = (flatmap do l) then
-    let c = get_current_canvas () then
-    let hll_r = canvas2hll_r c then
-    (hll_r := cols) fseq
-    (fl_update_colors c) fseq
-    let pr (name,col) = sprintf "%s: %s" name col in
-    printf "\n%s\n" (list2str T "\n" "\n" "\n" pr (deref result))
-;
-
-let show_type = color_by_top_level_type ckt p;
-
-
-let vs vec t =
-    let ste = canvas2ste (get_current_canvas()) then
-    let gt nd = get_trace_val ste nd t in
-    md_extract_vectors (depends (map gt (md_expand_vector vec)))
-;
-
-//filter user (fanin_dfs ckt user ["i3/store_addr"]);
-
 print "Now evaluate run0, run1, or run2\n";
 

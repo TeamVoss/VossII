@@ -1157,11 +1157,11 @@ vectors(g_ptr redex)
     push_fsm(fsm);
     buffer res_buf;
     new_buf(&res_buf, 1000, sizeof(string));
-    vec_info_ptr vp;
-    FOR_REC(vec_info_rec_mgrp, vec_info_ptr, vp) {
-	if( !vp->transient ) {
-	    string vec = strtemp(vp->hierarchy);
-	    vec = strappend(vp->local_name);
+    vec_info_ptr vip;
+    FOR_REC(vec_info_rec_mgrp, vec_info_ptr, vip) {
+	if( !vip->transient ) {
+	    string vec = strtemp(vip->hierarchy);
+	    vec = strappend(vip->local_name);
 	    if( *vec != '!' ) {
 		vec = wastrsave(&strings, vec);
 		push_buf(&res_buf, &vec);
@@ -1869,6 +1869,38 @@ get_weak_expressions(g_ptr redex)
 	g_ptr pair = Make_PAIR_ND(Make_STRING_leaf(name), Make_BOOL_leaf(*fp));
 	APPEND1(tail, pair);
     }
+    pop_ste();
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+get_abstract_depends(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_ste, obj;
+    EXTRACT_2_ARGS(redex, g_ste, obj);
+    ste_ptr ste = (ste_ptr) GET_EXT_OBJ(g_ste);
+    if( ste->type != use_bdds ) {
+	string msg = Fail_pr("get_weak_expressions require ste from STE run");
+	MAKE_REDEX_FAILURE(redex, msg);
+	return;
+    }
+    push_ste(ste);
+    hash_record abs_tbl;
+    create_hash(&abs_tbl, COUNT_BUF(weakening_bufp), str_hash, str_equ);
+    formula *fp;
+    int idx = 0;
+    FOR_BUF(weakening_bufp, formula, fp) {
+	char nm[10];
+	sprintf(nm, "_%d", idx);
+	idx++;
+	string name = wastrsave(&strings, nm);
+	insert_hash(&abs_tbl, name, FORMULA2PTR(*fp));
+    }
+    Get_abstract_depends(redex, &abs_tbl, obj);
+    dispose_hash(&abs_tbl, NULLFCN);
     pop_ste();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -2747,6 +2779,14 @@ Fsm_Install_Functions()
 			    GLmake_list(
 				GLmake_tuple(GLmake_string(), GLmake_bool()))),
 			 get_weak_expressions);
+
+
+    Add_ExtAPI_Function("get_abstract_depends", "11", FALSE,
+			 GLmake_arrow(
+			    ste_handle_tp,
+			    GLmake_arrow(GLnew_tVar(),
+					 GLmake_list(GLmake_string()))),
+			 get_abstract_depends);
 
     Add_ExtAPI_Function("get_trace", "11", FALSE,
 			GLmake_arrow(

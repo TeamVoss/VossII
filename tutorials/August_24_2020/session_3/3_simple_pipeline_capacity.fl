@@ -3,19 +3,21 @@ cload "ste.fl";
 
 ENUM "security" ["LOW", "HIGH"];
 
-ENUM "opcode" ["NOP", "LDI", "ADD", "SUB", "MUL"];
+ENUM "opcode" ["NOP", "LDI", "ADD", "SUB", "MUL", "DIV", "MOD"];
 
 let active_opcode opc =
 	opc '=' LDI '|'
 	opc '=' ADD '|'
 	opc '=' SUB '|'
-	opc '=' MUL
+	opc '=' MUL '|'
+	opc '=' DIV '|'
+	opc '=' MOD
 ;
 
 
-TYPE "word" 8;
+TYPE "word" 32;
 
-TYPE "sreg" 2;
+TYPE "sreg" 4;
 
 STRUCT "reg" [
 	    ("msb", "bit"),
@@ -65,7 +67,9 @@ let ALU =
 	    is_LDI opcode --- (ZX (instr-->imm)),
 	    is_ADD opcode --- (A '+' B),
 	    is_SUB opcode --- (A '-' B),
-	    is_MUL opcode --- (A '*' B)
+	    is_MUL opcode --- (A '*' B),
+	    is_DIV opcode --- (A '/' B),
+	    is_MOD opcode --- (A '%' B)
 	] 'X
 ];
 
@@ -188,7 +192,7 @@ let ant =
 		   LOW in_cycle 4 followed_by
 		   LOW in_cycle 5 otherwise LOW until N cycles
   and
-    "op[11:0]" is i1 in_cycle 1 followed_by
+    "op[17:0]" is i1 in_cycle 1 followed_by
 		  i2 in_cycle 2 followed_by
 		  i3 in_cycle 3 followed_by
 		  i4 in_cycle 4 followed_by
@@ -212,4 +216,4 @@ update_vossrc "NOTIFY-CHECK-FAILURES" "NO";
 update_vossrc "ACCURATE-ITE-COMP" "NO";
 
 let ste = STE "-e -w 1000 -ifw" vis [] ant [] [];
-ste;
+wtime ste;

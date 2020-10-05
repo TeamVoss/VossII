@@ -1,7 +1,3 @@
-// ----------------------------------------------------------------
-//  A simple 4-stage pipline
-// ----------------------------------------------------------------
-
 set_font font_large;
 cload "ste.fl";
 
@@ -132,7 +128,10 @@ let pipeline =
     bit_internal	validIF validEXE validMEM validWB.
     security_internal   sec_levelIF sec_levelEXE sec_levelMEM sec_levelWB.
     word_internal	AdataIF BdataIF AdataEXE BdataEXE.
+    word_internal	bpAdataEXE bpBdataEXE.
     word_internal	dataEXE dataMEM dataWB.
+    bit_internal	pre_dst_src1 pre_pre_dst_src1.
+    bit_internal	pre_dst_src2 pre_pre_dst_src2.
     CELL "draw_hier pipeline" [
 	validIF <- '~' (is_NOP (opIF-->opc)),
 	re_ff_reset clk reset validIF validEXE,
@@ -151,7 +150,23 @@ let pipeline =
 	//
 	RF clk sec_levelIF sec_levelWB (opIF-->src1) (opIF-->src2) (opWB-->dst)
 			 validWB dataWB AdataIF BdataIF,
-	ALU opEXE AdataEXE BdataEXE dataEXE,
+	ALU opEXE bpAdataEXE bpBdataEXE dataEXE,
+	CASE bpAdataEXE [
+	    pre_dst_src1	--- dataMEM,
+	    pre_pre_dst_src1	--- dataWB
+	] AdataEXE,
+	pre_dst_src1 <- sec_levelMEM '=' sec_levelEXE '&'
+			validMEM '&' opMEM-->dst '=' opEXE-->src1,
+	pre_pre_dst_src1 <- sec_levelWB '=' sec_levelEXE '&'
+			    validWB '&' opWB-->dst '=' opEXE-->src1,
+	pre_dst_src2 <-  sec_levelMEM '=' sec_levelEXE '&'
+			 validMEM '&' opMEM-->dst '=' opEXE-->src2,
+	pre_pre_dst_src2 <- sec_levelWB '=' sec_levelEXE '&'
+			    validWB '&' opWB-->dst '=' opEXE-->src2,
+	CASE bpBdataEXE [
+	    pre_dst_src2	--- dataMEM,
+	    pre_pre_dst_src2	--- dataWB
+	] BdataEXE,
 	re_ff clk AdataIF AdataEXE,
 	re_ff clk BdataIF BdataEXE,
 	re_ff clk dataEXE dataMEM,
@@ -166,10 +181,13 @@ let p = pipeline 'clk 'reset 'sec_level 'op 'dbg_valid 'dbg_op 'dbg_data;
 let vis = STE_debug (pexlif2fsm p);
 vis;
 
-var_order (
-    (interleave (map md_expand_vector ["hi[10:0]", "li[10:0]"]))@
-    (interleave (map md_expand_vector ["b[1][7:0]", "b[2][7:0]", "r[7][7:0]"]))
-);
+//var_order (
+//    (interleave (map md_expand_vector ["hi[10:0]", "li[10:0]"]))@
+//    (interleave (map md_expand_vector ["b[1][7:0]", "b[2][7:0]", "r[7][7:0]"]))
+//);
+var_order ["li[4:0]","hi[4]","li[10]","li[7]","hi[3]","li[9]","li[6:5]","li[8]","hi[2:0]","hi[8:10]","hi[7:5]","r[7][7:6]","b[1:2][6]","b[2:1][7]","r[7][5]","b[1:2][5]","r[7][4]","b[1:2][4]","r[7][3]","b[1:2][3]","r[7][2]","b[1:2][2]","b[1][0:1]","r[7][1:0]","b[2][0:1]"];
+
+update_vossrc "DYNAMIC-ORDERING" "NO";
 
 
 let i1 = NOP_instr;
@@ -177,7 +195,6 @@ let i2 = NOP_instr;
 let i4 = {'li::instr};
 let i5 = NOP_instr;
 
-// A simple test harness for different secure instructions i3
 let test i3 =
     let N = 20 in
     let ant =
@@ -199,14 +216,12 @@ let test i3 =
       and
 	"i13/RF0[1][7:0]" is "b[1][7:0]" in_cycle 0
       and
+	"i13/RF0[2][7:0]" is "b[2][7:0]" in_cycle 0
+      and
 	"i13/RF1[2][7:0]" is "r[7][7:0]" in_cycle 0
     in
     STE "-e" vis [] ant [] []
 ;
-
-// Allow i3 to do anything!
-let i3 = {'hi::instr};
-test i3;
 
 // Assume secure instruction only writes to secure register file.
 let i3 = 'hi<-- dst ? (('hi-->dst)<--msb ? '1);
@@ -230,5 +245,4 @@ let i3 = 'hi<-- src1 ? (('hi-->src1)<--msb ? '0)
 	    <-- dst  ? (('hi-->dst)<--msb ? '0)
 ;
 test i3;
-
 

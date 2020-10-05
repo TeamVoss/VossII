@@ -82,7 +82,6 @@ let canvas2waveform canvas = deref (vfsm2wvr (w2vfsm canvas));
 let canvas2stop_list_r canvas = vfsm2stop_list_r (w2vfsm canvas);
 let canvas2selection_r canvas = vfsm2selection_r (w2vfsm canvas);
 let canvas2hll_r canvas = vfsm2hll_r (w2vfsm canvas);
-let canvas2dl_r canvas = vfsm2dl_r (w2vfsm canvas);
 let canvas2canvases_r canvas = vfsm2canvases_r (w2vfsm canvas);
 
 let canvas2vis canvas =
@@ -113,7 +112,6 @@ let STE_debug fsm =
 		      (ref ste0)
 		      (ref "")
 		      (ref 0)
-		      (ref [])
 		      (ref [])
 		      (ref [])
 		      (ref [])
@@ -181,16 +179,61 @@ export_to_tcl fl_destroy_vfsm;
 //       more difficult (but not impossible) but makes it safer since
 //       possibly erroneous trace values are eliminated.
 //
-let bool_STE opts ckt wl ant cons trl = STE opts ckt wl ant cons trl;
+let bool_STE opts ckt wl ant cons trl = busy (STE opts ckt wl ant cons trl);
 
+
+// Perform symbolic trajectory evaluation on the circuit displayed in vfsm.
+// Returns an ste object that can be queried for traces, results, etc.
+//
+// The options argument is a string that can contain a combination of the
+// following flags:
+//
+//    -a     Abort the STE at the first error.
+//
+//    -e     Compute and trace the value for every node in the circuit.
+//           The default is to only compute nodes in the transitive fanin
+//           cone of nodes in the consequent or trace list.
+//
+//    -m t   Abort the STE run after t phases has been simulated.
+//
+//    -w n   Limit the size of any BDD to n. If the value of a node
+//           exceeds this limit, abstract the node (make it more X).
+//
+//    -ifw   Do the weakening by introducing new (fresh) variables.
+//           The translation from the abstracted BDD to the true expression
+//           can be obtained by repeated substitutions from the expression
+//           map obtained from get_weak_expressions.
+//
+// The weak_list (wl) is a list of 4-tuples of the form (w,nd,f,t) to be
+// read as: when w holds, weaken the excitation function of node nd from
+// time f up to, but not including, time t.
+//
+// Both the antecedent (ant) and consequent (cons) lists are lists of
+// 5-tuples of the form (w,nd,v,f,t) to be read as:
+// when w holds, impose the constraint that the node nd should take on
+// at least the value v from time f up to, but not including, time t.
+//
+// The trace_list (trl) is a list of triples of the form (n,f,t) and should
+// be read as: trace node nd from time f up to, but not including, time t.
+//
+// NOTE: If the STE run aborts for some reason (interrupt, timeout,
+//       "-a" flag, etc.), all traces are terminated with an X value at
+//       the time it aborted.  This means that if STE aborts due to an
+//       antecedent failure, for example, the trace will no longer have
+//       the values (at that time).  This will make debugging a bit
+//       more difficult (but not impossible) but makes it safer since
+//       possibly erroneous trace values are eliminated.
+//
 let vfsm_STE opts vfsm wl ant cons trl =
     let fsm = vfsm2fsm vfsm then
     let w = vfsm2id vfsm then
     (tcl_eval [sprintf "set ::active_gui %s" w]) fseq
-    let ste = STE opts fsm wl ant cons trl then
+    let ste = busy (STE opts fsm wl ant cons trl) then
     (tcl_eval [sprintf "unset ::active_gui"]) fseq
     ((vfsm2ste_r vfsm) := ste) fseq
     (tcl_eval [sprintf "wv:set_new_max_time %s 1" (deref (vfsm2wvr vfsm))]) fseq
+    let cur_time = deref (vfsm2cur_time_r vfsm) then 
+    (tcl_eval [sprintf "set ::vstatus(time,%s) %d" w cur_time]) fseq
     ste
 ;
 overload STE bool_STE vfsm_STE;
@@ -823,6 +866,24 @@ let split_multi_dim v =
     flatmap md_extract_vectors svs
 ;
 
+let is_var (H,L) =
+    NOT (H == NOT L) => F |
+    val (v,(h,l)) = top_cofactor H in
+    h == T AND l == F
+;
+
+let trim s =
+    let es = explode s in
+    letrec trim (" ":" ":r) = trim (" ":r)
+     /\    trim (c:cs) = c:trim cs
+     /\    trim [] = []
+    in
+    let es' = trim es in
+    let es' = hd es' = " " => tl es' | es' in
+    let es' = last es' = " " => butlast es' | es' in
+    (implode es')
+;
+
 let base_get_complete_value ste vectors t =
     let type = get_ste_type ste then
     let process v =
@@ -851,21 +912,28 @@ let base_get_complete_value ste vectors t =
 		    HL == (T,F) => "1" |
 		    HL == (F,T) => "0" |
 		    HL == (T,T) => "X" |
-		    "T"
+		    HL == (F,F) => "T" |
+		    val (v,(h,l)) = top_cofactor (fst HL) in
+		    " "^v^" "
 		in
-		(v, [implode (map val2s vals)])
+		let res = implode (md_merge_vectors (map val2s vals)) in
+		(v, [trim res])
 	    in
 	    letrec group cur (nd:nds) (HL:HLs) =
 		is_const HL => group ((nd,HL):cur) nds HLs |
+		is_var HL   => group ((nd,HL):cur) nds HLs |
 		cur != [] => (mk_range cur):(group []  (nd:nds) (HL:HLs)) |
 		let ovc = (HL = (F,F)) in
 		NOT (ovc == F) => (nd,["OVERCONSTRAINED"]):(group [] nds HLs) |
 		let one   = (HL = (T,F)) in
 		let X     = (HL = (T,T)) in
-		X == F => (nd,[bool2str 3 one]):(group [] nds HLs) |
+		let deps = list2str T "Depends on: " " " "" id 
+				   (md_extract_vectors (depends HL))
+		in
+		X == F => (nd,[bool2str 3 one,deps]):(group [] nds HLs) |
 		let one_s = bool2str 3 one then
 		let X_s   = bool2str 3 X then
-		(nd, [one_s, (sprintf "  + X(%s)" X_s)]):(group [] nds HLs)
+		(nd, [one_s, (sprintf "  + X(%s)" X_s),deps]):(group [] nds HLs)
 	     /\   group cur [] [] =
 		cur = [] => [] |
 		[mk_range cur]
@@ -952,9 +1020,9 @@ let base_get_complete_value ste vectors t =
     let do1 v =
 	let res = process v then
 	str_is_substr "\n" res =>
-	    sprintf "%*s:\n%s" len v res
+	    sprintf "%-*s:\n%s" len v res
 	|
-	    sprintf "%*s: %s" len v res
+	    sprintf "%-*s: %s" len v res
     in
     map do1 vecs
 ;
@@ -1008,8 +1076,7 @@ let update_colors vfsm =
   (
     let selection = deref (vfsm2selection_r vfsm) then
     let base_highlights = deref (vfsm2hll_r vfsm) then
-    let dep_highlights  = deref (vfsm2dl_r vfsm) then
-    let highlights = map hd (partition fst (base_highlights@dep_highlights)) in
+    let highlights = map hd (partition fst base_highlights) in
     let active_canvases = deref (vfsm2canvases_r vfsm) then
     let do_one_canvas (c,vis) =
 	let send color anon =
@@ -1072,8 +1139,8 @@ let fl_set_sch_highlight_color c color tag =
 ;
 export_to_tcl fl_set_sch_highlight_color;
 
-let get_current_canvas {dummy::void} = (deref cur_canvas);
-non_lazy get_current_canvas;
+let dbg_get_current_canvas {dummy::void} = (deref cur_canvas);
+non_lazy dbg_get_current_canvas;
 
 let get_current_vis {dummy::void} = 
     let cur = deref cur_vfsm then
@@ -1100,7 +1167,8 @@ let bdepends_on exprs cprefix =
     ((bget_model [diff] 100) != []) catch T
 ;
 
-let get_dependency_color ste t nds =
+clet get_dependency_color ste t vecs =
+    let nds = md_expand_vectors vecs then
     let type = get_ste_type ste then
     let deps =
 	type = "bdd" =>
@@ -1115,36 +1183,21 @@ let get_dependency_color ste t nds =
 	eprintf "get_dependency_color on non-binary (%s) STE run" type
     then
     deps = [] => "" |
-    deps = ["g"] => "green" |
     deps = ["b"] => "blue" |
     deps = ["r"] => "red" |
-    mem "r" deps => "pink" |
+    (mem "r" deps) AND (mem "b" deps) => "pink" |
     "yellow"
 ;
 
-let fl_set_color_by_bdd_prefix mode c =
-    busy (
-	    (
-		(cur_canvas := c) fseq
-		let vis   = canvas2vis c then
-		let dl_r = canvas2dl_r c then
-		let ste   = canvas2ste c then
-		let t = deref (canvas2current_time_r c) then
-		let anon_vis = visualize_get_shown_anons vis then
-		let get_color an =
-		    mode = "off" => [] |
-		    let vecs = visualization_anon2real vis an in
-		    let nds = md_expand_vectors vecs in
-		    let col = get_dependency_color ste t nds then
-		    col = "" => [] |
-		    map (\v. v,col) vecs
-		in
-		let cols = flatmap get_color anon_vis then
-		(dl_r := cols)
-	    ) catch ()
-    )
+let fl_get_bdd_color c an =
+    let vis   = canvas2vis c then
+    let ste   = canvas2ste c then
+    let t     = deref (canvas2current_time_r c) then
+    let vecs  = visualization_anon2real vis an in
+    let col   = get_dependency_color ste t vecs then
+    col = "" => "white" | col
 ;
-export_to_tcl fl_set_color_by_bdd_prefix;
+export_to_tcl fl_get_bdd_color;
 
 let base_get_waveform w vec show_depend =
     let ste = canvas2ste w then
@@ -1159,7 +1212,7 @@ let base_get_waveform w vec show_depend =
         let mk_tr (time,vals) =
 	    let color = 
 		NOT show_depend => "white" |
-		let col = get_dependency_color ste time nds then
+		let col = get_dependency_color ste time [vec] then
 		col == "" => "white" | col
 	    in
             let val2s HL =

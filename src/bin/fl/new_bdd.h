@@ -88,7 +88,8 @@ bool		Save_BDDs(string filename, buffer *roots);
 bool		Load_BDDs(string filename, buffer *results);
 g_ptr		End_ordering();
 int		Get_bdd_size(formula f, int limit);
-
+void		Get_abstract_depends(g_ptr redex, hash_record *abs_tblp,
+				     g_ptr obj);
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */
