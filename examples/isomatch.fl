@@ -6,65 +6,77 @@
 // Misc.
 
 // Check if 'p' is satisfied with all elements of 'as'.
+//  all::(a->bool)->(a list)->bool
 let all p as = AND_list (map p as);
 
 // Check if 'p' is satisfied with any element of 'as'.
+//  any::(a->bool)->(a list)->bool
 let any p as = OR_list (map p as);
 
 // Constant function.
+//  const::a->b->a
 let const a b = a;
 
 // Flip the arguments of a function.
+//  flip::(a->b->c)->b->a->c
 let flip f a b = f b a;
 
 //------------------------------------------------------------------------------
 // List
 
 // Drops the first element of a list.
+//  butfirst::(a list)->(a list)
 let butfirst = butfirstn 1;
 
-// 'itlist' but the function also takes the elements index in the input list.
-let itlist_index f xs b =
-        snd (itlist (\x. \(ix,s). (ix-1,f x ix s)) xs (length xs,b));
+// Make a pair of lists into a list of pairs.
+//  zip::(a list)#(b list)->(a#b list)
+let zip (xs,ys) = map2 (\x. \y. (x,y)) xs ys;
 
-// Set the 'n'th element of a list (assumes there is one).
-letrec
-    set_list 0 (x:xs) f = f x : xs
-/\  set_list n (x:xs) f = x   : set_list (n-1) xs f
-;
+// Makes a list of pairs into a pair of lists.
+//  unzip::(a#b list)->(a list)#(b list)
+let unzip xs = itlist (\(x,y). \(as,bs). (x:as,y:bs)) xs ([],[]);
 
-// Dot-product of two lists.
-letrec
-    dot []     []     = F
-/\  dot (x:xs) (y:ys) = (x AND y) OR (dot xs ys)
-;
+// Fold (rigth-to-left) a list 'xs' with 'f' into 'b'.
+//  ixlist::(a->int->b->b)->(a list)->b->b
+let ixlist f xs b = snd (itlist (\x. \(ix,s). (ix-1,f x ix s)) xs (length xs,b));
+
+// Modify the 'n'th element of a list 'xs' with 'f'.
+//  modify::(a->a)->int->(a list)->(a list)
+let modify f n xs = ixlist (\x. \ix. \ys. n == ix => f x : ys | x : ys) xs [];
+
+// "Dot-product" of two lists of booleans.
+//  dot::(bool list)->(bool list)->bool
+let dot xs ys = itlist (\z. \b. z OR b) (map2 (\x. \y. x AND y) xs ys) F;
 
 //------------------------------------------------------------------------------
 // Matrix
 
 // Set the 'i,j'th element of a matrix (assumes there is one).
-let set_mat i j mat v = set_list i mat (flip (set_list j) (const v));
+//  update::int->int->((a list) list)->a->((a list) list)
+let update i j mat v = modify (modify (const v) j) i mat;
 
-// Matrix multiplication (cij = a_i1 * b_j1 + ... + a_in * b_jn).
-let mult m n = val n' = transpose n then map (\r. map (dot r) n') m
-;
+// "Matrix multiplication" of two boolean matrices (c_ij = a_i1 * b_j1 + ... + a_in * b_jn).
+//  mult::((bool list) list)->((bool list) list)->((bool list) list)
+let mult m n = val n' = transpose n then map (\r. map (dot r) n') m;
 
 //------------------------------------------------------------------------------
 // String.
 
 // Checks if string 's' is empty.
+//  empty_string::string->bool
 let empty_string s = empty (explode s);
 
 // Removes the first character of a string.
+//  butfirst_string::string->string
 let butfirst_string s = implode (butfirst (explode s));
 
 // Removes the first and last characters of a string.
+//  trim::string->string
 let trim s = implode (butlast (butfirst (explode s)));
 
 // Split a string 's' on a character 'c' ('let (_,_) = X'?).
-let split_on c s =
-    val (h,t) = split (\x. x != c) (explode s) then (implode h, implode t)
-;
+//  split_on::string->string->string#string
+let split_on c s = val (h,t) = split (\x. x != c) (explode s) then (implode h, implode t);
 
 //------------------------------------------------------------------------------
 // Ports/Wires.
@@ -82,6 +94,7 @@ lettype port =
 ;
 
 // Check if two port references are equal.
+//  port_eq::port->port->bool
 let
     port_eq (OPEN a)       (OPEN b)       = a == b
 /\  port_eq (CONSTANT a i) (CONSTANT b j) = a == b AND i == j
@@ -89,21 +102,26 @@ let
 ;
 
 // Parse a <port_reference> into its parts, i.e. a name and possibly some range.
+//  parse_port::string->port
 let parse_port p =
     val (n,r) = split_on "[" p        then empty_string r => OPEN n       |
     val (l,h) = split_on ":" (trim r) then empty_string h => CONSTANT n l |
     RANGE n l (butfirst_string h)
 ;
 
-// Short-hand for parsing multiple ports.
+// Short-hand for parsing multiple named ports.
+//  parse_ports::(string#(string list) list)->(string#(port list) list)
 let parse_ports ws = map (\(n,ps). (n,map parse_port ps)) ws;
 
 //------------------------------------------------------------------------------
 // Pexlif.
 
-let attributes (PINST _ as _ _ _ _ _) = as;
+// Feth a 'PEXLIF's attribute list.
+//  attributes_of::pexlif->(string#string list)
+let attributes_of (PINST _ as _ _ _ _ _) = as;
 
-// Fetch a 'PEXLIF's fingerprint attribute. If none exists, returns 0.
+// Fetch the "fingerprint" attribute. If none exists, returns 0.
+//  find_fingerprint::(string#string list)->int
 let find_fingerprint as = find_first0 (\(n,_). n == "fingerprint") as;
 
 //------------------------------------------------------------------------------
@@ -123,8 +141,13 @@ let list_of_primes = [
     467,    479,    487,    491,    499,    503,    509,    521,    523,    541
   ];
 
-let prime        = flip el list_of_primes;
-let prime_list f = flip (itlist_index (\a.\i.\s. prime i * f a + s));
+// Fetch the 'n'th prime.
+//  prime::int->int
+let prime = flip el list_of_primes;
+
+// Sum a list of numbers given by 'f' into some primes starting at 'n'.
+//  prime_list::(a->int)->int->(a list)->int
+let prime_list f = flip (ixlist (\a.\i.\s. prime i * f a + s));
 
 // Gen. a fingerprint for 'MEM'.
 let
@@ -172,15 +195,15 @@ let
 
 // Gen. a fingerprint for 'CONTENT'.
 let
-    fp_c (P_HIER cs) = prime_list (\c. find_fingerprint (attributes c)) 31 cs
+    fp_c (P_HIER cs) = prime_list (\c. find_fingerprint (attributes_of c)) 31 cs
 /\  fp_c (P_LEAF fs) = prime_list fp_fn 32 fs
 ;
 
 // Gen. a fingerprint for a 'PORT'.
 let
     fp_p (OPEN _)        = prime 33
-/\  fp_p (CONSTANT _ ix) = prime 34 * (s2int ix)
-/\  fp_p (RANGE _ f t)   = prime 35 * (s2int f) + prime 36 * (s2int t)
+/\  fp_p (CONSTANT _ ix) = prime 34 * s2int ix
+/\  fp_p (RANGE _ f t)   = prime 35 * s2int f + prime 36 * s2int t
 ;
 
 // Gen. a fingerprint for a input/output declaration. ('str2int'?)
@@ -189,10 +212,10 @@ let
         prime_list (\w. prime_list (\p. fp_p (parse_port p)) 37 (snd w)) 38 ws
 ;
 
-// Gen. a fingerprint for each 'PEXLIF' on creation.
+// Gen. a fingerprint for each 'PEXLIF' on creation (fingerprint 'c'?).
 let
     PINST n as l i o is c =
-        let finger = fp_c c + fp_wl i + fp_wl o in
+        let finger = fp_wl i + fp_wl o in
         PINST n (("fingerprint", int2str finger) : as) l i o is c;
 
 //------------------------------------------------------------------------------
@@ -206,22 +229,22 @@ lettype scheme =
             {outs::(string#(port list)) list}
 ;
 
-// ...
-let read_fp (SCHEME _ fp _ _) = fp;
+// "Smart" constructor for a 'SCHEME'.
+let scheme n as is os = SCHEME n (find_fingerprint as) (parse_ports is) (parse_ports os);
 
-// ...
-let
-    mk_scheme n as is os =
-        SCHEME n (find_fingerprint as) (parse_ports is) (parse_ports os)
-;
+// Fetch the fingerprint of a 'SCHEME'.
+//  fingerprint_of::scheme->int
+let fingerprint_of (SCHEME _ fp _ _) = fp;
 
-// "flatten" a 'PEXLIF' into a list of schemes.
+// Flatten a 'PEXLIF' into its 'SCHEME's.
+//  flatten::pexlif->(scheme list)
 letrec
-    flatten (PINST n as _ is os _ (P_LEAF _)) = [mk_scheme n as is os]
-/\  flatten (PINST n as _ is os _ (P_HIER c)) = (mk_scheme n as is os) : flatmap flatten c
+    flatten (PINST n as _ is os _ (P_LEAF _)) = [scheme n as is os]
+/\  flatten (PINST n as _ is os _ (P_HIER c)) = (scheme n as is os) : flatmap flatten c
 ;
 
 // Check if two 'SCHEME's share a wire.
+//  connected::scheme->scheme->bool
 let
     connected (SCHEME n _ is os) (SCHEME n' _ is' os') = n == n' => T |
         let shares_wire xs ys = any (\x. any (port_eq x) ys) xs in
@@ -230,12 +253,13 @@ let
         shares_wire (wires os) (wires is')
 ;
 
-// Construct an adjacency matrix for a 'PEXLIF'.
-// todo: order nodes by connectivity to speed up pruning.
+// Construct an adjacency matrix for a 'PEXLIF' (order nodes by connectivity).
+//  adjacency_matrix::pexlif->((int list) list)
 let
-   adjacency_matrix pex =
-       let adjacent x scs = map (\sc. connected x sc => read_fp sc | 0) scs in
-       val scs = flatten pex then map (flip adjacent scs) scs
+    adjacency_matrix pex =
+        let adjacent x scs =
+          map (\sc. connected x sc => fingerprint_of sc | 0) scs in
+        val scs = flatten pex then map (flip adjacent scs) scs
 ;
 
 // ...
@@ -243,7 +267,7 @@ let
     isomatch_matrix piece puzzle =
         let build pi pu = map (\p. map (\q. p == q) pu) pi in
         let strip mat   = map (\c. map (\v. v != 0) c) mat in
-        val pi = adjacency_matrix piece then
+        val pi = adjacency_matrix piece  then
         val pu = adjacency_matrix puzzle then
         val m  = build pi pu then
         (strip pi, strip pu, m)
@@ -257,31 +281,21 @@ let
 //------------------------------------------------------------------------------
 
 letrec
-    find_cols _ _ []     = []
-/\  find_cols r d (T:cs) = (r,d) : find_cols r (d+1) cs
-/\  find_cols r d (F:cs) = find_cols r (d+1) cs
+    ix_cols _ _ p []     = []
+/\  ix_cols r d p (c:cs) = p c =>
+        (r,d) : ix_cols r (d+1) p cs | ix_cols r (d+1) p cs
 ;
 
 letrec
-    find_rows _ []     = []
-/\  find_rows d (r:rs) = find_cols d 0 r @ find_rows (d+1) rs
+    ix_rows _ p []     = []
+/\  ix_rows d p (r:rs) = ix_cols d 0 p r @ ix_rows (d+1) p rs
 ;
 
-// iterate over every mat. index that holds a '1'.
-//
-// forall_ones::mat->((i#j)->*->*)->*->*
-let
-    forall_ones mat f =
-        val ixs = find_rows 0 mat then sitlist f ixs
-;
+// Iterate over every mat. index that is a possible match.
+let forall_ones mat f = val ixs = ix_rows 0 id mat then sitlist f ixs;
 
-// iterate over every index in a col. that holds a '1'.
-//
-// forall_neighbors::i->mat->(j->*->*)->*->*
-let
-    forall_neighbors i mat f =
-        val ixs = find_cols i 0 (el i mat) then sitlist f (map snd ixs)
-;
+// Iterate over every index in a col. that is a possible match.
+let forall_neighbors i mat f = val ixs = ix_cols i 0 id (el i mat) then sitlist f (map snd ixs);
 
 // thin the possible set of isomorphisms.
 //
@@ -293,14 +307,14 @@ let
 //         M(i,j)=0
 // while M was changed
 //
-// prune::(M:mat->G:mat->P:mat->M':mat)
+// prune::(mat->mat->mat->mat)
 letrec
     prune mat g p =
       val mat' =
           forall_ones mat (\(i,j). \mat.
             forall_neighbors i p (\vi. \mat.
               forall_neighbors j g (\vj. const T) F
-                => mat | set_mat i j mat F
+                => mat | update i j mat F
             ) mat
           ) mat
       then mat == mat' => mat' | prune mat' g p
@@ -308,9 +322,34 @@ letrec
 
 //------------------------------------------------------------------------------
 
+// Iterate over all unused row-indices.
+//  forall_unused::(bool list)->(int->a->a)->a->a
 let
-    isomorphism mat g =
-      val c = mult mat (transpose (mult mat g)) then T
+    forall_unused row f =
+        val ixs = ix_cols 0 0 NOT row then sitlist f (map snd ixs)
+;
+
+// Mark every el. as 'F', except the 'n'th el. that is marked as 'T'.
+//  mark_one::int->(* list)->(bool list)
+let
+    mark_one n xs =
+        modify (const T) n (map (const F) xs)
+;
+
+// Check that only a single solution (only one 'T' in each row and column).
+//  only_one_solution::((bool list) list)->bool
+let
+    only_one_solution mat =
+        val (rs,cs) = unzip (ix_rows 0 id mat) then
+        let unique xs = setify xs == xs in
+        unique rs AND unique cs
+;
+
+// Check that wether 'm' is a valid morphism for puzzle 'g' and piece 'p'.
+//  isomorphism::((bool list) list)->((bool list) list)->((bool list) list)->bool
+let
+    isomorphism mat g p =
+        only_one_solution mat AND p == mult mat (transpose (mult mat g))
 ;
 
 // find ...
@@ -323,72 +362,23 @@ let
 //   prune(M')
 //   for all unused columns c
 //     set column c in M' to 1 and other columns to 0
-//     mark c as used
-//     recurse(used_column, cur_row+1, G, P, M')
-//     mark c as unused
+//       -- 'c' at 'cur_row'? I might have missed that part during translation.
+//     used_columns' = used_columns
+//     mark c as used in used_columns'
+//     recurse(used_column', cur_row+1, G, P, M')
 //   output no
 //
-// recurse::(M:mat->G:mat->P:mat->...->M':mat)
+// recurse::(mat->mat->mat->int list->int->(bool,mat))
 letrec
-    recurse mat g p rows row =
-      row == length mat AND isomorphism mat => 0 |
-        0
+    recurse mat g p cols row =
+        row == length mat AND isomorphism mat g p => (T,mat)
+          | val mat' = prune mat g p then
+            forall_unused cols (\col. \(r,m). r => (r,m) |
+                let m'    = modify (mark_one col) row m in
+                let cols' = modify (const T) col cols in
+                recurse m' g p cols' (row+1)
+            ) (F,mat')
+;
 
 //------------------------------------------------------------------------------
 // Fin.
-
-// letrec
-//     EQ_W (W_X i) (W_X j) = i == j
-// /\  EQ_W (W_CONST a i) (W_CONST b j) = a == b AND i == j
-// /\  EQ_W (W_NAMED_CONST n a i) (W_NAMED_CONST m b j) = n == m AND a == b AND i == j
-// /\  EQ_W (W_VAR i _) (W_VAR j _) = i == j
-// /\  EQ_W (W_EXPLICIT_VAR _ i) (W_EXPLICIT_VAR _ j) = i == j
-// /\  EQ_W (W_AND a b) (W_AND c d) = EQ_W a c AND EQ_W b d
-// /\  EQ_W (W_OR a b) (W_OR c d) = EQ_W a c AND EQ_W b d
-// /\  EQ_W (W_NOT a) (W_NOT b) = EQ_W a b
-// /\  EQ_W (W_EQ a b) (W_EQ c d) = EQ_W a c AND EQ_W b d
-// /\  EQ_W (W_PRED p a) (W_PRED q b) = p == q AND EQ_W a b
-// /\  EQ_W (W_GR a b) (W_GR c d) = EQ_W a c AND EQ_W b d
-// /\  EQ_W (W_ADD a b) (W_ADD c d) = EQ_W a c AND EQ_W b d
-// /\  EQ_W (W_SUB a b) (W_SUB c d) = EQ_W a c AND EQ_W b d
-// /\  EQ_W (W_MUL a b) (W_MUL c d) = EQ_W a c AND EQ_W b d
-// /\  EQ_W (W_DIV a b) (W_DIV c d) = EQ_W a c AND EQ_W b d
-// /\  EQ_W (W_MOD a b) (W_MOD c d) = EQ_W a c AND EQ_W b d
-// /\  EQ_W (W_SHL a b) (W_SHL c d) = EQ_W a c AND EQ_W b d
-// /\  EQ_W (W_SHR a b) (W_SHR c d) = EQ_W a c AND EQ_W b d
-// /\  EQ_W (W_ASHR a b) (W_ASHR c d) = EQ_W a c AND EQ_W b d
-// /\  EQ_W (W_SX i a) (W_SX j b) = i == j AND EQ_W a b
-// /\  EQ_W (W_ZX i a) (W_ZX j b) = i == j AND EQ_W a b
-// /\  EQ_W (W_ITE p u a) (W_ITE q v b) = EQ_W p q AND EQ_W u v AND EQ_W a b
-// /\  EQ_W (W_SLICE ix a) (W_SLICE jx b) = ix == jx AND EQ_W a b
-// /\  EQ_W (W_NAMED_SLICE _ ix a) (W_NAMED_SLICE _ jx b) = ix == jx AND EQ_W a b
-// /\  EQ_W (W_UPDATE_NAMED_SLICE x _ ix a) (W_UPDATE_NAMED_SLICE y _ jx b) =
-//         EQ_W x y AND ix == jx AND EQ_W a b
-// /\  EQ_W (W_CAT ps) (W_CAT qs) = AND_list (map2 (\p.\q. EQ_W p q) ps qs)
-// /\  EQ_W (W_MEM_READ _ _ _) (W_MEM_READ _ _ _) = F
-// /\  EQ_W (W_MEM_WRITE _ _ _ _) (W_MEM_WRITE _ _ _ _) = F
-// /\  EQ_W _ _ = F
-// ;
-
-// let
-//     EQ_FN (W_UPDATE_FN a b) (W_UPDATE_FN c d) = EQ_W a c AND EQ_W b d
-// /\  EQ_FN (W_PHASE_DELAY a b) (W_PHASE_DELAY c d) = EQ_W a c AND EQ_W b d
-// /\  EQ_FN _ _ = F
-// ;
-
-// forward_declare {EQ_P::pexlif->pexlif->bool};
-// let
-//     EQ_C (P_HIER cs1) (P_HIER cs2) = AND_list (map2 (\a.\b. EQ_P  a b) cs1 cs2)
-// /\  EQ_C (P_LEAF fs1) (P_LEAF fs2) = AND_list (map2 (\a.\b. EQ_FN a b) fs1 fs2)
-// /\  EQ_C _ _ = F
-// ;
-// let
-//     EQ_P (PINST _ _ l1 in1 out1 _ c1) (PINST _ _ l2 in2 out2 _ c2) =
-//         let nr_wires w = length (md_expand_vectors (map fst w))
-//         in    l1 == l2
-//           AND nr_wires in1  == nr_wires in2
-//           AND nr_wires out1 == nr_wires out2
-//           AND EQ_C c1 c2
-// ;
-
-//------------------------------------------------------------------------------
