@@ -1,4 +1,5 @@
 load "ste.fl";
+load "-Iexamples/isomatch.fl";
 
 let p = verilog2pexlif "-Iexamples/verilog"
                        "mux4"

@@ -44,20 +44,12 @@ let ixlist f xs b = snd (itlist (\x. \(ix,s). (ix-1,f x ix s)) xs (length xs,b))
 //  modify::(a->a)->int->(a list)->(a list)
 let modify f n xs = ixlist (\x. \ix. \ys. n == ix => f x : ys | x : ys) xs [];
 
-// "Dot-product" of two lists of booleans.
-//  dot::(bool list)->(bool list)->bool
-let dot xs ys = itlist (\z. \b. z OR b) (map2 (\x. \y. x AND y) xs ys) F;
-
 //------------------------------------------------------------------------------
 // Matrix
 
 // Set the 'i,j'th element of a matrix (assumes there is one).
 //  update::int->int->((a list) list)->a->((a list) list)
 let update i j mat v = modify (modify (const v) j) i mat;
-
-// "Matrix multiplication" of two boolean matrices (c_ij = a_i1 * b_j1 + ... + a_in * b_jn).
-//  mult::((bool list) list)->((bool list) list)->((bool list) list)
-let mult m n = val n' = transpose n then map (\r. map (dot r) n') m;
 
 //------------------------------------------------------------------------------
 // String.
@@ -150,8 +142,7 @@ let prime = flip el list_of_primes;
 let prime_list f = flip (ixlist (\a.\i.\s. prime i * f a + s));
 
 // Gen. a fingerprint for 'MEM'.
-let
-    fp_mem (MEM as l ds) = prime 1 * as + prime 2 * l + prime 3 * ds
+let fp_mem (MEM as l ds) = prime 1 * as + prime 2 * l + prime 3 * ds
 ;
 
 // Gen. a fingerprint for 'WEXPR'.
@@ -207,14 +198,12 @@ let
 ;
 
 // Gen. a fingerprint for a input/output declaration. ('str2int'?)
-let
-    fp_wl ws =
+let fp_wl ws =
         prime_list (\w. prime_list (\p. fp_p (parse_port p)) 37 (snd w)) 38 ws
 ;
 
 // Gen. a fingerprint for each 'PEXLIF' on creation (fingerprint 'c'?).
-let
-    PINST n as l i o is c =
+let PINST n as l i o is c =
         let finger = fp_wl i + fp_wl o in
         PINST n (("fingerprint", int2str finger) : as) l i o is c;
 
@@ -245,8 +234,7 @@ letrec
 
 // Check if two 'SCHEME's share a wire.
 //  connected::scheme->scheme->bool
-let
-    connected (SCHEME n _ is os) (SCHEME n' _ is' os') = n == n' => T |
+let connected (SCHEME n _ is os) (SCHEME n' _ is' os') = n == n' => T |
         let shares_wire xs ys = any (\x. any (port_eq x) ys) xs in
         let wires xs = flatmap snd xs in
         shares_wire (wires is) (wires os') OR
@@ -255,16 +243,13 @@ let
 
 // Construct an adjacency matrix for a 'PEXLIF' (order nodes by connectivity).
 //  adjacency_matrix::pexlif->((int list) list)
-let
-    adjacency_matrix pex =
-        let adjacent x scs =
-          map (\sc. connected x sc => fingerprint_of sc | 0) scs in
+let adjacency_matrix pex =
+        let adjacent x scs = map (\sc. connected x sc => fingerprint_of sc | 0) scs in
         val scs = flatten pex then map (flip adjacent scs) scs
 ;
 
 // ...
-let
-    isomatch_matrix piece puzzle =
+let isomatch_matrix piece puzzle =
         let build pi pu = map (\p. map (\q. p == q) pu) pi in
         let strip mat   = map (\c. map (\v. v != 0) c) mat in
         val pi = adjacency_matrix piece  then
@@ -322,33 +307,30 @@ letrec
 
 //------------------------------------------------------------------------------
 
+// "Dot-product" of two lists of booleans.
+//  dot::(bool list)->(bool list)->bool
+let dot xs ys = itlist (\z. \b. z OR b) (map2 (\x. \y. x AND y) xs ys) F;
+
+// "Matrix multiplication" of two boolean matrices (c_ij = a_i1 * b_j1 + ... + a_in * b_jn).
+//  mult::((bool list) list)->((bool list) list)->((bool list) list)
+let mult m n = val n' = transpose n then map (\r. map (dot r) n') m;
+
 // Iterate over all unused row-indices.
 //  forall_unused::(bool list)->(int->a->a)->a->a
-let
-    forall_unused row f =
-        val ixs = ix_cols 0 0 NOT row then sitlist f (map snd ixs)
-;
+let forall_unused row f = val ixs = ix_cols 0 0 NOT row then sitlist f (map snd ixs);
 
 // Mark every el. as 'F', except the 'n'th el. that is marked as 'T'.
 //  mark_one::int->(* list)->(bool list)
-let
-    mark_one n xs =
-        modify (const T) n (map (const F) xs)
-;
-
-// Check that only a single solution (only one 'T' in each row and column).
-//  only_one_solution::((bool list) list)->bool
-let
-    only_one_solution mat =
-        val (rs,cs) = unzip (ix_rows 0 id mat) then
-        let unique xs = setify xs == xs in
-        unique rs AND unique cs
-;
+let mark_one n xs = modify (const T) n (map (const F) xs);
 
 // Check that wether 'm' is a valid morphism for puzzle 'g' and piece 'p'.
 //  isomorphism::((bool list) list)->((bool list) list)->((bool list) list)->bool
-let
-    isomorphism mat g p =
+let isomorphism mat g p =
+        let only_one_solution mat =
+            val (rs,cs) = unzip (ix_rows 0 id mat) then
+            let unique xs = setify xs == xs in
+            unique rs AND unique cs
+        in
         only_one_solution mat AND p == mult mat (transpose (mult mat g))
 ;
 
