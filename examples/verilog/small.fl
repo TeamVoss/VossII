@@ -1,5 +1,8 @@
 load "ste.fl";
-load "-Iexamples/isomatch.fl";
+load "examples/isomatch.fl";
+
+//------------------------------------------------------------------------------
+// Load example files.
 
 let p = verilog2pexlif "-Iexamples/verilog"
                        "mux4"
@@ -7,3 +10,14 @@ let p = verilog2pexlif "-Iexamples/verilog"
                        [];
 
 let s = pexlif2fsm p;
+
+//------------------------------------------------------------------------------
+// ...
+
+let zeros = flip replicate 0;
+
+modify (const 1) 1 (zeroes 2);
+//update 1 1 [[0,0],[0,0]] 1;
+
+//------------------------------------------------------------------------------
+// Fin.
