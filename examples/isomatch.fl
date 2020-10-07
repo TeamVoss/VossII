@@ -49,7 +49,7 @@ let second f (a,b) = (a,f b);
 
 // Drops the first element of a list.
 //  butfirst::(a list)->(a list)
-let butfirst (_,xs) = xs;
+let butfirst (x:xs) = xs;
 
 // Infinite list of repeated applications of 'f' to 'x'.
 //     iterate::(a->a)->a->(a list)

@@ -12,12 +12,20 @@ let p = verilog2pexlif "-Iexamples/verilog"
 let s = pexlif2fsm p;
 
 //------------------------------------------------------------------------------
-// ...
+// Testing.
 
 let zeros = flip replicate 0;
 
-modify (const 1) 1 (zeroes 2);
-//update 1 1 [[0,0],[0,0]] 1;
-
+//------------------------------------------------------------------------------
+all NOT [T,T] = T;
+any NOT [F,T] = T;
+equal T T;
+const T F = T;
+flip const T F = F;
+curry const (T,F) = T;
+uncurry id T F = (T,F);
+first NOT (T,T) = (F,T);
+second NOT (T,T) = (T,F);
+butfirst [F,T] = [T];
 //------------------------------------------------------------------------------
 // Fin.
