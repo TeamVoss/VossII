@@ -68,7 +68,7 @@ let modify f n xs = ixlist (\x. \ix. \ys. n == ix => f x : ys | x : ys) xs [];
 
 // Drops the first 'n' characters from the string 's'.
 //  string_butfirstn::string->int->string
-let string_butfirstn s n = el n (iterate (string_tl) s);
+let string_butfirstn s n = el (n+1) (iterate (string_tl) s);
 
 // Short-hand for 'string_tl'.
 //  string_butfirst::string->string
@@ -100,7 +100,7 @@ lettype vector =
 // Check if two port references are equal.
 //  port_eq::vector->vector->bool
 let vec_eq (CONSTANT a)  (CONSTANT b)  = a == b
-/\  vec_eq (VECTOR a is) (VECTOR b js) = a == b AND all (curry equal) (zip is js)
+/\  vec_eq (VECTOR a ix) (VECTOR b jx) = a == b AND all (curry equal) (zip ix jx)
 /\  vec_eq _ _ = F
 ;
 
@@ -130,7 +130,7 @@ let attributes_of (PINST _ as _ _ _ _ _) = as;
 //  find_fingerprint::(string#string list)->int
 let find_fingerprint as = find_first0 (\(n,_). n == "fingerprint") as;
 
-// ...
+// Ill named Short-hand for "find_fingerprint . attributes_of".
 //  fp_of::pexlif->int
 let fp_of p = find_fingerprint (attributes_of p);
 
@@ -199,11 +199,11 @@ letrec
 /\  fp_w (W_ZX s a)		= prime 31 s + prime 32 (fp_w a)
 /\  fp_w (W_ITE a b c)          = prime 33 (fp_w a) + prime 34 (fp_w b)
                                                     + prime 35 (fp_w c)
-/\  fp_w (W_SLICE is a)	        = prime 36 (fp_w a) + prime_list id 0 is
-/\  fp_w (W_NAMED_SLICE _ is a) = prime 37 (fp_w a) + prime_list id 0 is
-/\  fp_w (W_UPDATE_NAMED_SLICE a _ is b)
+/\  fp_w (W_SLICE ix a)	        = prime 36 (fp_w a) + prime_list id 0 ix
+/\  fp_w (W_NAMED_SLICE _ ix a) = prime 37 (fp_w a) + prime_list id 0 ix
+/\  fp_w (W_UPDATE_NAMED_SLICE a _ ix b)
                                 = prime 38 (fp_w a) + prime 39 (fp_w b)
-                                                    + prime_list id 0 is
+                                                    + prime_list id 0 ix
 /\  fp_w (W_CAT as)             = prime_list fp_w 40 as
 /\  fp_w (W_MEM_READ m a b)     = prime 41 (fp_mem m) + prime 42 (fp_w a)
                                                       + prime 43 (fp_w b)
@@ -227,7 +227,7 @@ let
 // Gen. a fingerprint for a 'VECTOR'.
 let
     fp_v (CONSTANT ix) = prime 54 ix
-/\  fp_v (VECTOR _ is) = prime_list id 55 is
+/\  fp_v (VECTOR _ ix) = prime_list id 55 ix
 ;
 
 // Gen. a fingerprint for a input/output declaration. ('str2int'?)
@@ -414,3 +414,30 @@ letrec
 
 //------------------------------------------------------------------------------
 // Fin.
+
+// all NOT [T,T] = F;
+// any NOT [F,T] = T;
+// equal T T;
+// const T F = T;
+// flip const T F = F;
+// curry const (T,F) = T;
+// uncurry id T F = (T,F);
+// first NOT (T,T) = (F,T);
+// second NOT (T,T) = (T,F);
+// butfirst [F,T] = [T];
+// firstn 3 (iterate NOT T) = [T,F,T];
+// ixlist (\a.\i.\b.(i>a):b) [2,2,2,2] [] = [F,F,T,T];
+// modify NOT 2 [T,T,T] = [T,F,T];
+// string_butfirstn "abc" 2 = "c";
+// string_butfirst "abc" = "bc";
+// string_butlast "abc" = "ab";
+// list_update T 2 [F,F,F] = [F,T,F];
+// mat_update T (2,2) [[F,F,F],[F,F,F],[F,F,F]] = [[F,F,F],[F,T,F],[F,F,F]];
+// let test_vec = VECTOR "a" [1,2,4];
+// vec_eq test_vec test_vec;
+// parse_actual "a[1:2,4]" = test_vec;
+// dot [T,F] [F,F] = F;
+// mult [[T,T],[F,F]] [[F,F],[T,T]] = [[T,T],[F,F]];
+// mark_one 2 [T,T,T] = [F,T,F];
+
+//------------------------------------------------------------------------------
