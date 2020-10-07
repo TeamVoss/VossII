@@ -1,0 +1,232 @@
+//------------------------------------------------------------------------------
+// Random util. things.
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Misc.
+
+// Check if 'p' is satisfied with all elements of 'as'.
+//  all::(a->bool)->(a list)->bool
+let all p as = AND_list (map p as);
+
+// Check if 'p' is satisfied with any element of 'as'.
+//  any::(a->bool)->(a list)->bool
+let any p as = OR_list (map p as);
+
+// Non-infix version of (==) because I can't figure out how to write that.
+//  equal::a->a->bool
+let equal a b = a == b;
+
+// Constant function.
+//  const::a->b->a
+let const a b = a;
+
+// Flip the arguments of a function.
+//  flip::(a->b->c)->b->a->c
+let flip f a b = f b a;
+
+// "Curry" a function.
+//  curry::((a->b->c)->(a#b)->c
+let curry f (a,b) = f a b;
+
+// Un"curry" a function.
+//  uncurry::((a#b)->c)->a->b->c
+let uncurry f a b = f (a,b);
+
+//------------------------------------------------------------------------------
+// Pairs
+
+// Apply 'f' to the first element of pair '(a,b)'.
+//  first::(a->c)->(a#b)->(c#b)
+let first f (a,b) = (f a,b);
+
+// Apply 'f' to the second element of a pair '(a,b)'.
+//  second::(b->c)->(a#b)->(a#c)
+let second f (a,b) = (a,f b);
+
+//------------------------------------------------------------------------------
+// List
+
+// Drops the first element of a list.
+//  butfirst::(a list)->(a list)
+let butfirst (_,xs) = xs;
+
+// Infinite list of repeated applications of 'f' to 'x'.
+//     iterate::(a->a)->a->(a list)
+letrec iterate f x = x : iterate f (f x);
+
+// Fold (rigth-to-left) a list 'xs' with 'f' into 'b'.
+//  ixlist::(a->int->b->b)->(a list)->b->b
+let ixlist f xs b = snd (itlist (\x. \(ix,s). (ix-1,f x ix s)) xs (length xs,b));
+
+// Modify the 'n'th element of a list 'xs' with 'f'.
+//  modify::(a->a)->int->(a list)->(a list)
+let modify f n xs = ixlist (\x. \ix. \ys. n == ix => f x : ys | x : ys) xs [];
+
+//------------------------------------------------------------------------------
+// String
+
+// Drops the first 'n' characters from the string 's'.
+//  string_butfirstn::string->int->string
+let string_butfirstn s n = el n (iterate (string_tl) s);
+
+// Short-hand for 'string_tl'.
+//  string_butfirst::string->string
+let string_butfirst = string_tl;
+
+// Short-hand for 'string_butlastn 1'.
+//  string_butlast::string->string
+let string_butlast s = string_butlastn s 1;
+
+//------------------------------------------------------------------------------
+// Vector/Matrix (lists/list of lists).
+
+// Set the 'n'th element of a list 'x' to 'v'.
+//  vec_update::a->int->(a vec)->(a vec)
+let vec_update v i = modify (const v) i;
+
+// Set the '(i,j)'th element of matrix 'mat' to 'v'.
+//  mat_update::a->(int#int)->(a mat)->(a mat)
+let mat_update v (i,j) = modify (vec_update v j) i;
+
+//------------------------------------------------------------------------------
+// Ports/Wires.
+
+lettype vector =
+          CONSTANT {value::int}
+        | VECTOR   {name::string} {indices::int list}
+;
+
+// Check if two port references are equal.
+//  port_eq::vector->vector->bool
+let vec_eq (CONSTANT a)  (CONSTANT b)  = a == b
+/\  vec_eq (VECTOR a is) (VECTOR b js) = a == b AND all (curry equal) (zip is js)
+/\  vec_eq _ _ = F
+;
+
+// ...
+//  parse_actual::string->vector
+let parse_actual p =
+        let name_of s = hd (str_split s "[") in
+        let index_of s = s2int (string_butlast (el 2 (str_split s "["))) in
+        str_is_prefix "0b" p =>
+            CONSTANT (s2int (string_butfirstn p 2))
+          | let ps = md_expand_vector p in
+            VECTOR (name_of (hd ps)) (map index_of ps)
+;
+
+// ...
+//  parse_actuals::(string#(string list) list)->(string#(vector list) list)
+let parse_actuals = map (second parse_actual);
+
+//------------------------------------------------------------------------------
+// Pexlif.
+
+// Feth a 'PEXLIF's attribute list.
+//  attributes_of::pexlif->(string#string list)
+let attributes_of (PINST _ as _ _ _ _ _) = as;
+
+// Fetch the "fingerprint" attribute. If none exists, returns 0.
+//  find_fingerprint::(string#string list)->int
+let find_fingerprint as = find_first0 (\(n,_). n == "fingerprint") as;
+
+// ...
+//  fp_of::pexlif->int
+let fp_of p = find_fingerprint (attributes_of p);
+
+//------------------------------------------------------------------------------
+// Fingerprinting.
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Prime numbers.
+
+// todo: replace with built in generator.
+let list_of_primes = [
+      2,      3,      5,      7,     11,     13,     17,     19,     23,     29,
+     31,     37,     41,     43,     47,     53,     59,     61,     67,     71,
+     73,     79,     83,     89,     97,    101,    103,    107,    109,    113,
+    127,    131,    137,    139,    149,    151,    157,    163,    167,    173,
+    179,    181,    191,    193,    197,    199,    211,    223,    227,    229,
+    233,    239,    241,    251,    257,    263,    269,    271,    277,    281,
+    283,    293,    307,    311,    313,    317,    331,    337,    347,    349,
+    353,    359,    367,    373,    379,    383,    389,    397,    401,    409,
+    419,    421,    431,    433,    439,    443,    449,    457,    461,    463,
+    467,    479,    487,    491,    499,    503,    509,    521,    523,    541
+  ];
+
+// note: we cap the integers so that they fit in a 64-bit word.
+let roof = ipow 2 63 - 1;
+
+// ...
+//  prime::int->int->int
+let prime n v = (v * el n list_of_primes) % roof;
+
+// ...
+//  prime_list::(a->int)->int->(a list)->int
+let prime_list f = flip (ixlist (\a.\i.\s. prime i (f a) + s));
+
+//------------------------------------------------------------------------------
+// Gen. of a fingerprint.
+
+// Gen. a fingerprint for 'MEM'.
+let
+    fp_mem (MEM as l ds) = prime 0 as + prime 1 l + prime 2 ds
+;
+
+// Gen. a fingerprint for 'WEXPR'.
+letrec
+    fp_w (W_X s)		= prime 0 s
+/\  fp_w (W_CONST s i)		= prime 1 s + prime 2 i
+/\  fp_w (W_NAMED_CONST _ s i)	= prime 3 s + prime 4 i
+/\  fp_w (W_VAR s _)		= prime 5 s
+/\  fp_w (W_EXPLICIT_VAR s _)	= prime 6 s
+/\  fp_w (W_AND a b)		= prime 7 (fp_w a + fp_w b)
+/\  fp_w (W_OR a b)		= prime 8 (fp_w a + fp_w b)
+/\  fp_w (W_NOT a)		= prime 9 (fp_w a)
+/\  fp_w (W_EQ a b)		= prime 10 (fp_w a + fp_w b)
+/\  fp_w (W_PRED _ a)		= prime 11 (fp_w a)
+/\  fp_w (W_GR a b)		= prime 12 (fp_w a) + prime 13 (fp_w b)
+/\  fp_w (W_ADD a b)		= prime 14 (fp_w a + fp_w b)
+/\  fp_w (W_SUB a b)		= prime 15 (fp_w a) + prime 16 (fp_w b)
+/\  fp_w (W_MUL a b)		= prime 17 (fp_w a) + prime 18 (fp_w b)
+/\  fp_w (W_DIV a b)		= prime 19 (fp_w a) + prime 20 (fp_w b)
+/\  fp_w (W_MOD a b)		= prime 21 (fp_w a) + prime 22 (fp_w b)
+/\  fp_w (W_SHL a b)		= prime 23 (fp_w a) + prime 24 (fp_w b)
+/\  fp_w (W_SHR a b)		= prime 25 (fp_w a) + prime 26 (fp_w b)
+/\  fp_w (W_ASHR a b)		= prime 27 (fp_w a) + prime 28 (fp_w b)
+/\  fp_w (W_SX s a)		= prime 29 s + prime 30 (fp_w a)
+/\  fp_w (W_ZX s a)		= prime 31 s + prime 32 (fp_w a)
+/\  fp_w (W_ITE a b c)          = prime 33 (fp_w a) + prime 34 (fp_w b)
+                                                    + prime 35 (fp_w c)
+/\  fp_w (W_SLICE is a)	        = prime 36 (fp_w a) + prime_list id 0 is
+/\  fp_w (W_NAMED_SLICE _ is a) = prime 37 (fp_w a) + prime_list id 0 is
+/\  fp_w (W_UPDATE_NAMED_SLICE a _ is b)
+                                = prime 38 (fp_w a) + prime 39 (fp_w b)
+                                                    + prime_list id 0 is
+/\  fp_w (W_CAT as)             = prime_list fp_w 40 as
+/\  fp_w (W_MEM_READ m a b)     = prime 41 (fp_mem m) + prime 42 (fp_w a)
+                                                      + prime 43 (fp_w b)
+/\  fp_w (W_MEM_WRITE m a b d)  = prime 44 (fp_mem m) + prime 45 (fp_w a)
+                                                      + prime 46 (fp_w b)
+                                                      + prime 47 (fp_w d)
+;
+
+// Gen. a fingerprint for 'UPDATE_FN'.
+let
+    fp_fn (W_UPDATE_FN l r)   = prime 48 (fp_w l) + prime 49 (fp_w r)
+/\  fp_fn (W_PHASE_DELAY l r) = prime 50 (fp_w l) + prime 51 (fp_w r)
+;
+
+// Gen. a fingerprint for 'CONTENT'.
+let
+    fp_c (P_HIER cs) = prime 51 (length cs) + prime_list fp_of 0 cs
+/\  fp_c (P_LEAF fs) = prime 52 (length fs) + prime_list fp_fn 0 fs
+;
+
+// Gen. a fingerprint for a 'VECTOR'.
+let
+    fp_v (CONSTANT ix) = prime 54 ix
+/\  fp_v (RANGE _ is)  = prime_list id 55 is
+;
+

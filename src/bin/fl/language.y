@@ -975,11 +975,12 @@ lhs_expr_list	: arg_expr lhs_expr_list
 			    $$.expr = Make_APPL_ND(res,
 					   Make_VAR_leaf(
 						wastrsave(&strings, buf)));
+			    $$.cnt = $2.cnt+1;
+			    $$.ok = TRUE;
 			} else {
 			    $$.expr = NULL;
+			    $$.ok = FALSE;
 			}
-			$$.cnt = $2.cnt+1;
-			$$.ok = TRUE;
 		    } else {
 			$$.ok = FALSE;
 		    }
