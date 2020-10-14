@@ -43,6 +43,7 @@ static hash_record	type_var_tbl;
 static FILE		*tmp_fp;
 static char             tmp_buf[1024];
 static string		s_str2float;
+static string		s_crossprod;
 static string		s_prefix_0;
 static string		s_prefix_1;
 static string		s_infix_0;
@@ -679,6 +680,7 @@ opt_typed_var	: var_or_infix
 		;
 
 var_or_infix	: VART { $$ = $1; }
+		| CROSSPROD { $$ = s_crossprod; }
 		| INFIX_VAR_0 { $$ = $1; }
 		| INFIX_VAR_1 { $$ = $1; }
 		| INFIX_VAR_2 { $$ = $1; }
@@ -1484,6 +1486,12 @@ expr		: LCURL expr TYPE_SEP simple_type RCURL
 		}
 		| expr POSTFIX_VAR
 		{ $$ = Make_APPL_ND(Make_VAR_leaf($2), $1); }
+		| expr CROSSPROD expr
+		{ 
+		    $$ = Make_APPL_ND(
+			    Make_APPL_ND(Make_VAR_leaf(s_crossprod), $1),
+			    $3);
+		}
 		| expr INFIX_VAR_0 expr
 		{ $$ = Make_APPL_ND(Make_APPL_ND(Make_VAR_leaf($2), $1), $3); }
 		| expr INFIX_VAR_1 expr
@@ -1789,6 +1797,7 @@ Parse_Init()
     new_mgr(&tvarl_rec_mgr, sizeof(tvar_list_rec));
     it	              = wastrsave(&strings, "it");
     eq_string         = wastrsave(&strings, "=");
+    s_crossprod       = wastrsave(&strings, "#");
     s_str2float       = wastrsave(&strings, "str2float");
     s_prefix_0        = wastrsave(&strings, "prefix 0");
     s_prefix_1        = wastrsave(&strings, "prefix 1");
@@ -2124,6 +2133,7 @@ string
 Get_Fixity(string name) 
 {
     int fix = Get_Infix(name);
+    if( strcmp(name,"#") == 0 ) { return s_infixr_0; }
     switch( fix ) {
 	case PREFIX_VAR_0:	    return s_prefix_0;
 	case PREFIX_VAR_1:	    return s_prefix_1;
