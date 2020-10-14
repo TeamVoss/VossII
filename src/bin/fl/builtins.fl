@@ -234,6 +234,7 @@ let get_matching_functions name_pat file_pat arg_pat res_pat =
 // Get the current value of the vossrc (option) variable key.
 // If key does not exists, an empty string is returned.
 let get_vossrc key = defix get_vossrc key;
+non_lazy get_vossrc;
 
 // Return the head of the list l.
 let hd l = defix hd l;
@@ -353,6 +354,7 @@ let time e = defix time e;
 // new value to v. The function returns the old value.
 // If the variable did not exist before, an empty string is returned.
 let update_vossrc key v = defix update_vossrc key v;
+non_lazy update_vossrc;
 
 // Return a signature for the BDD b.
 // NOTE: the signature is only guaranteed to stay the same during a
