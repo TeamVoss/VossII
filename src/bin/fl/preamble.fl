@@ -1781,3 +1781,15 @@ let busy e =
 let ==> a b = NOT a OR b;
 infix 2 ==>;
 
+lettype vec_info = TXT {text::string} | RANGES {ranges:: (int#int) list};
+
+let Pvec_info (TXT s) = s
+ /\ Pvec_info (RANGES rs) =
+	let pr (u,l) = u = l => sprintf "%d" u | sprintf "%d:%d" u l in
+	list2str T "" "," "" pr rs
+;
+install_print_function Pvec_info;
+
+// Convert a vec_info list to a single string.
+// It is the reverse of md_split_vector.
+let vec_info2str vinfo_list =  list2str T "" "" "" Pvec_info vinfo_list;

@@ -757,6 +757,11 @@ let md_expand_vectors vec_list = defix md_expand_vectors vec_list;
 //
 let md_expand_vector vec = defix md_expand_vector vec;
 
+// Split a vector name into a list of vec_info types.
+// A vec_info is either a (TXT s) object or a (RANGES range_list),
+// where a range is a pair of integers.
+let md_split_vector vec = defix md_split_vector vec;
+
 // Returns T if fl is run in -noX mode. Otherwise returns F.
 let noX = defix noX;
 
