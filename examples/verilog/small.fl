@@ -4,16 +4,16 @@ load "examples/isomatch.fl";
 //------------------------------------------------------------------------------
 // Load example files.
 
-let p = verilog2pexlif "-Iexamples/verilog"
-                       "mux4"
-                       ["small.v","small_lib.v"]
-                       [];
+//let g = verilog2pexlif "-Iexamples/verilog" "mux4" ["small.v","small_lib.v"] [];
+//Emit_pexlif "puzzle.txt" g;
 
-let s = pexlif2fsm p;
+let p = verilog2pexlif "-Iexamples/verilog" "mux2" ["small_lib.v"] [];
+Emit_pexlif "piece.txt"  p;
 
 //------------------------------------------------------------------------------
 
-// ...
+val (a,b,m) = isomatch_matrix p p;
+val (x,y) = recurse m a b (replicate (length b) 0) 0;
 
 //------------------------------------------------------------------------------
 // Fin.

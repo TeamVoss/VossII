@@ -94,6 +94,7 @@ let mat_update v (i,j) = modify (list_update v j) i;
 
 lettype vector =
           CONSTANT {value::int}
+        | VARIABLE {name::string}
         | VECTOR   {name::string} {indices::int list}
 ;
 
@@ -107,12 +108,16 @@ let vec_eq (CONSTANT a)  (CONSTANT b)  = a == b
 // ...
 //  parse_actual::string->vector
 let parse_actual p =
-        let name_of s = hd (str_split s "[") in
-        let index_of s = s2int (string_butlast (el 2 (str_split s "["))) in
-        str_is_prefix "0b" p =>
-            CONSTANT (s2int (string_butfirstn p 2))
-          | let ps = md_expand_vector p in
-            VECTOR (name_of (hd ps)) (map index_of ps)
+        let parse_constant s = CONSTANT (s2int (string_butfirstn p 2)) in
+        let parse_variable s = VARIABLE s in
+        let parse_vector ss  =
+                let name_of  s = hd (str_split s "[") in
+                let index_of s = s2int (string_butlast (el 2 (str_split s "["))) in
+                VECTOR (name_of (hd ss)) (map index_of ss)
+        in
+        str_is_prefix "0b" p => parse_constant p |
+        str_is_substr "["  p => parse_vector (md_expand_vector p) |
+        parse_variable p
 ;
 
 // ...
@@ -227,25 +232,21 @@ let
 // Gen. a fingerprint for a 'VECTOR'.
 let
     fp_v (CONSTANT ix) = prime 54 ix
-/\  fp_v (VECTOR _ ix) = prime_list id 55 ix
+/\  fp_v (VARIABLE _)  = prime 55 1
+/\  fp_v (VECTOR _ ix) = prime_list id 56 ix
 ;
 
 // Gen. a fingerprint for a input/output declaration. ('str2int'?)
 let
-    fp_wl acs = prime_list (prime_list fp_v 0) 56 (map snd (parse_actuals acs))
+    fp_wl acs = prime_list (prime_list fp_v 0) 57 (map snd (parse_actuals acs))
 ;
 
 // Gen. a fingerprint for each 'PEXLIF' on creation (fingerprint 'c'?).
 let PINST name attrs leaf fa_inps fa_outs internals content =
-        let finger = fp_wl fa_inps + fp_wl fa_outs in
-        PINST
-            name
-            (("fingerprint", int2str finger) : attrs)
-            leaf
-            fa_inps
-            fa_outs
-            internals
-            content
+        let new = fp_wl fa_inps + fp_wl fa_outs in
+        let old = find_fingerprint attrs != 0 in
+        let as' = old => (("fingerprint", int2str new) : attrs) | attrs in
+        PINST name as' leaf fa_inps fa_outs internals content
 ;
 
 //------------------------------------------------------------------------------
