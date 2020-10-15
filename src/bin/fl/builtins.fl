@@ -234,6 +234,7 @@ let get_matching_functions name_pat file_pat arg_pat res_pat =
 // Get the current value of the vossrc (option) variable key.
 // If key does not exists, an empty string is returned.
 let get_vossrc key = defix get_vossrc key;
+non_lazy get_vossrc;
 
 // Return the head of the list l.
 let hd l = defix hd l;
@@ -353,6 +354,7 @@ let time e = defix time e;
 // new value to v. The function returns the old value.
 // If the variable did not exist before, an empty string is returned.
 let update_vossrc key v = defix update_vossrc key v;
+non_lazy update_vossrc;
 
 // Return a signature for the BDD b.
 // NOTE: the signature is only guaranteed to stay the same during a
@@ -754,6 +756,11 @@ let md_expand_vectors vec_list = defix md_expand_vectors vec_list;
 //	3) comma-separated ranges, e.g., a[31:24, 15:8,4,1:0]
 //
 let md_expand_vector vec = defix md_expand_vector vec;
+
+// Split a vector name into a list of vec_info types.
+// A vec_info is either a (TXT s) object or a (RANGES range_list),
+// where a range is a pair of integers.
+let md_split_vector vec = defix md_split_vector vec;
 
 // Returns T if fl is run in -noX mode. Otherwise returns F.
 let noX = defix noX;

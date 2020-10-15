@@ -5,6 +5,10 @@
 
 (_load (DIR^"builtins.fl") F) fseq ();
 
+// Function composition
+let # f g = \x. f (g x);
+infixr 0 #;
+
 // Convert a natural number to a bitvector.
 let nat2bv n =
     n < 0 => eprintf "nat2bv of negative number %d" n |
@@ -1181,14 +1185,12 @@ cletrec parametric rem_vars f =
 // Return the parametric representation for a condition cond.
 clet param cond =
     cond == F => error "Param called with F condition." |
-    let vars = depends [cond] then
     let old = update_vossrc "DYNAMIC-ORDERING" "NO" then
+    let vars = depends [cond] then
     let res = zip vars (parametric vars cond) then
     (update_vossrc "DYNAMIC-ORDERING" old) fseq
     res
 ;
-
-
 
 cletrec fparam_rec vars f = vars = [] => [] |
     let Quant_thereis vs f =
@@ -1228,7 +1230,7 @@ cletrec fparam_rec vars f = vars = [] => [] |
 // Usage: fparam vars_to_solve_for function.
 //
 let fparam vars f =
-    f fseq
+    f fseq vars fseq
     ((depends f) subtract vars) != [] => fparam_rec vars f |
     let sub = param f then
     let cnv v = (v,(bdd_current2next (assoc v sub)))
@@ -1468,36 +1470,26 @@ let bv_range bv =
     min,max
 ;
 
-// Function for printing some (cnt) examples that the bv can denote.
-// Usage: bv_examples cnt bv;
+// Function for printing at most cnt examples that bv can denote.
 //
 let bv_examples cnt bv =
-    let add_example cur ex =
-        mem ex cur => (T,cur) |
-        let cur' = ex:cur in
-        ((length cur') < cnt), cur'
-    in
     let vs = depends bv then
-    let lvs = length vs in
-    let ints = 0 -- (2**(length vs)-1) then
-    letrec mk cur (i:ii) =
-        let sub =
-            vs = [] => [] |
-            let iv = tl (bv2list (int2bv i)) in
-            let iv = (replicate (lvs-length iv) F)@iv in
-            zip vs iv then
-        let bv0 = substitute sub bv then
-        val (keep_going, cur') = add_example cur (bv2int bv0) in
-        keep_going => mk cur' ii | cur'
-     /\    mk cur [] = cur
+    letrec get_example n cond =
+        cond == F => [] |
+        n == 0 => [] |
+        let sub = full_example F vs cond then
+        let bvi = substitute sub bv then
+        let cond' = cond AND (bv != bvi) then
+        (bv2int bvi):(get_example (n-1) cond')
     in
-    let il = mk [] ints in
-    let exs = qsort (defix -) il then
+    let res = get_example (cnt+1) T then
+    let exs = qsort (defix -) res then
     let sz = bv_size bv in
-    let p1 fp i = fprintf fp "%0*b" sz i in
+    let p1 fp i = fprintf fp "%0*b (%d)" sz i i in
     let end = length exs > cnt => "\n...\n" | "\n" in
     list2fp stdout T "" "\n" end p1 exs
 ;
+
 
 lettype mem = MEM
                 {addr_size::int}
@@ -1789,3 +1781,15 @@ let busy e =
 let ==> a b = NOT a OR b;
 infix 2 ==>;
 
+lettype vec_info = TXT {text::string} | RANGES {ranges:: (int#int) list};
+
+let Pvec_info (TXT s) = s
+ /\ Pvec_info (RANGES rs) =
+	let pr (u,l) = u = l => sprintf "%d" u | sprintf "%d:%d" u l in
+	list2str T "" "," "" pr rs
+;
+install_print_function Pvec_info;
+
+// Convert a vec_info list to a single string.
+// It is the reverse of md_split_vector.
+let vec_info2str vinfo_list =  list2str T "" "" "" Pvec_info vinfo_list;

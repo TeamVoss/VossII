@@ -22,7 +22,9 @@ extern str_mgr     strings;
 extern jmp_buf     *start_envp;
 
 /***** PRIVATE VARIABLES *****/
-static char             path_buf[PATH_MAX+1];
+static string	    s_TXT;
+static string	    s_RANGES;
+static char         path_buf[PATH_MAX+1];
 static ustr_mgr	    lstrings;
 static ustr_mgr	    *lstringsp;
 static rec_mgr	    vec_rec_mgr;
@@ -63,7 +65,9 @@ static string		mk_name_signature(vec_ptr vp);
 void
 Strings_Init()
 {
-    // Any needed initialization code
+    // Initialization code
+    s_TXT = Mk_constructor_name("TXT");
+    s_RANGES = Mk_constructor_name("RANGES");
 }
 
 vec_ptr
@@ -290,6 +294,44 @@ str_split(g_ptr redex)
 	    tail = GET_CONS_TL(tail);
 	}
     }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+md_split_vector(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    begin_vector_ops();
+    MAKE_REDEX_NIL(redex);
+    g_ptr tail = redex;
+    vec_ptr vp = split_name(GET_STRING(r));
+    while( vp != NULL ) {
+	g_ptr cur;
+	if( vp->type == TXT ) {
+	    // Text
+	    cur = Make_STRING_leaf(s_TXT);
+	    cur = Make_CONS_ND(cur,
+			      Make_STRING_leaf(wastrsave(&strings,vp->u.name)));
+	} else {
+	    // Range
+	    cur = Make_STRING_leaf(s_RANGES);
+	    g_ptr rlist = Make_NIL();
+	    g_ptr rtail = rlist;
+	    cur = Make_CONS_ND(cur, rlist);
+	    range_ptr rp = vp->u.ranges;
+	    while(rp != NULL ) {
+		g_ptr pair = Make_PAIR_ND(Make_INT_leaf(rp->upper),
+					  Make_INT_leaf(rp->lower));
+		APPEND1(rtail, pair);
+		rp = rp->next;
+	    }
+	}
+	APPEND1(tail, cur);
+	vp = vp->next;
+    }
+    end_vector_ops();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
@@ -588,6 +630,9 @@ string_str_cluster(g_ptr redex)
 void
 Strings_Install_Functions()
 {
+    // Get handle to vec_info type (defined in preamble.fl)
+    typeExp_ptr vec_info_tp = Get_Type("vec_info",NULL,TP_INSERT_PLACE_HOLDER);
+
     // Add builtin functions
     Add_ExtAPI_Function("file_fullname", "1", FALSE,
 			GLmake_arrow(GLmake_string(),GLmake_string()),
@@ -635,10 +680,16 @@ Strings_Install_Functions()
 					 GLmake_bool())),
 			str_match);
 
+    Add_ExtAPI_Function("md_split_vector", "1", FALSE,
+			GLmake_arrow(GLmake_string(),
+				     GLmake_list(vec_info_tp)),
+			md_split_vector);
+
     Add_ExtAPI_Function("md_expand_vector", "1", FALSE,
 			GLmake_arrow(GLmake_string(),
 				     GLmake_list(GLmake_string())),
 			md_expand_vector);
+
 
     Add_ExtAPI_Function("md_expand_vectors", "1", FALSE,
 			GLmake_arrow(GLmake_list(GLmake_string()),
