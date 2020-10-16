@@ -180,7 +180,7 @@ letrec replicate n x =
     n=0 => [] | x:(replicate (n-1) x)
 ;
 
-// (map fn list) -- Apply function fn to every element of list l.
+// (map fn l) -- Apply function fn to every element of list l.
 letrec map fn l = empty l => [] | (fn (hd l)):(map fn (tl l));
 
 // (map2 fn l1 l2) - Apply the binary function fn to every elements in
