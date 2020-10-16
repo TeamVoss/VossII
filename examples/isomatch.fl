@@ -33,6 +33,9 @@ let curry f (a,b) = f a b;
 //  uncurry::((a#b)->c)->a->b->c
 let uncurry f a b = f (a,b);
 
+// Non-infix version of (,) because "(,) a b" doesn't seem to work.
+let pair a b = (a,b);
+
 // ...
 //  sum_with::(a->int)->(a list)->int
 let sum_with f as = itlist (\a. \s. f a + s) as 0;
@@ -226,11 +229,15 @@ let
 ;
 
 // Gen. a fingerprint for each 'PEXLIF' on creation (fingerprint 'c'?).
-let PINST name attrs leaf fa_inps fa_outs internals content =
-        let new = fp_wl fa_inps + fp_wl fa_outs in
-        let old = find_fingerprint attrs != 0 in
-        let as' = old => (("fingerprint", int2str new) : attrs) | attrs in
-        PINST name as' leaf fa_inps fa_outs internals content
+let
+    PINST name attrs leaf fa_inps fa_outs internals content =
+        // let has_fingerprint = find_fingerprint attrs != 0 in
+        // let new_fingerprint = int2str (fp_wl fa_inps + fp_wl fa_outs) in
+        // let new_attrs = has_fingerprint => attrs |
+        //         ("fingerprint", new_fingerprint) : attrs
+        // in
+        // PINST name new_attrs leaf fa_inps fa_outs internals content
+        PINST name (("fingerprint", "99") : attrs) leaf fa_inps fa_outs internals content
 ;
 
 //------------------------------------------------------------------------------
@@ -244,15 +251,27 @@ lettype scheme =
             {outs::(string#((vec_info list) list)) list}
 ;
 
-// "Smart" constructor for a 'SCHEME'.
-let scheme name attrs fa_inps fa_outs =
-        let parse as = map (second (map md_split_vector)) as in
-        SCHEME name (find_fingerprint attrs) (parse fa_inps) (parse fa_outs)
-;
-
 // Fetch the fingerprint of a 'SCHEME'.
-//  fingerprint_of::scheme->int
 let fingerprint_of (SCHEME _ fp _ _) = fp;
+
+let
+    Pscheme scheme =
+        val (SCHEME name fp inps outs) = scheme in
+        let pr (f,a) = sprintf "(%s,%s)" f (list2str T "{" "," "}" vec_info2str a) in
+        let i = list2str T "\n    [" "," "]" pr inps in
+        let o = list2str T "\n    [" "," "]" pr outs in
+        sprintf "\n(SCHEME name:\"%s\" fingerprint:%d %s %s)" name fp i o
+;
+install_print_function Pscheme;
+
+// "Smart" constructor for a 'SCHEME'.
+let
+    scheme name attrs fa_inps fa_outs =
+        let parse as = map (second (map md_split_vector)) as in
+        let fp_ix = find_fingerprint attrs in
+        let fp    = fp_ix == 0 => 0 | s2int (snd (el fp_ix attrs)) in
+        SCHEME name fp (parse fa_inps) (parse fa_outs)
+;
 
 // Flatten a 'PEXLIF' into its 'SCHEME's.
 //  flatten::pexlif->(scheme list)
@@ -265,7 +284,8 @@ letrec
 
 // Check if two 'SCHEME's share a wire.
 //  connected::scheme->scheme->bool
-let connected (SCHEME name _ fa_inps fa_outs) (SCHEME name' _ fa_inps' fa_outs') =
+let
+    connected (SCHEME name _ fa_inps fa_outs) (SCHEME name' _ fa_inps' fa_outs') =
         let shares_wire xs ys = any (\x. any (vec_info_eq x) ys) xs in
         let wires xs = flatmap snd xs in
         name == name' OR
@@ -299,22 +319,17 @@ let isomatch_matrix piece puzzle =
 //   M - |V(P)| x |V(G)| matrix that encodes possible subgraph isomorphisms.
 //------------------------------------------------------------------------------
 
-letrec
-    ix_cols _ _ p []     = []
-/\  ix_cols r d p (c:cs) = p c =>
-        (r,d) : ix_cols r (d+1) p cs | ix_cols r (d+1) p cs
-;
-
-letrec
-    ix_rows _ p []     = []
-/\  ix_rows d p (r:rs) = ix_cols d 0 p r @ ix_rows (d+1) p rs
+// Filter every index/pair of indices in a vector/matrix 'xs' using 'p'.
+let filter_cols p xs = ixlist (\x. \ix. \ys. p x => ix : ys | ys) xs [];
+let filter_rows p xs =
+        ixlist (\x. \ix. \ys. map (pair ix) (filter_cols p x) @ ys) xs []
 ;
 
 // Iterate over every mat. index that is a possible match.
-let forall_ones mat f = val ixs = ix_rows 0 id mat then sitlist f ixs;
+let forall_ones mat f = sitlist f (filter_rows id mat);
 
 // Iterate over every index in a col. that is a possible match.
-let forall_neighbors i mat f = val ixs = ix_cols i 0 id (el i mat) then sitlist f (map snd ixs);
+let forall_neighbors i mat f = sitlist f (filter_cols id (el i mat));
 
 // Thin the possible set of isomorphisms.
 //
@@ -351,7 +366,7 @@ let mult m n = val n' = transpose n then map (\r. map (dot r) n') m;
 
 // Iterate over all unused row-indices.
 //  forall_unused::(bool list)->(int->a->a)->a->a
-let forall_unused row f = val ixs = ix_cols 0 0 NOT row then sitlist f (map snd ixs);
+let forall_unused row f = sitlist f (filter_cols NOT row);
 
 // Mark every el. as 'F', except the 'n'th el. that is marked as 'T'.
 //  mark_one::int->(bool list)->(bool list)
@@ -361,7 +376,7 @@ let mark_one n xs = modify (const T) n (map (const F) xs);
 //  isomorphism::(bool mat)->(bool mat)->(bool mat)->bool
 let isomorphism mat g p =
         let only_one_solution mat =
-            val (rs,cs) = unzip (ix_rows 0 id mat) then
+            val (rs,cs) = unzip (filter_rows id mat) then
             let unique xs = setify xs == xs in
             unique rs AND unique cs
         in
@@ -417,6 +432,9 @@ letrec
 // string_butlast "abc" = "ab";
 // list_update T 2 [F,F,F] = [F,T,F];
 // mat_update T (2,2) [[F,F,F],[F,F,F],[F,F,F]] = [[F,F,F],[F,T,F],[F,F,F]];
+// filter_cols id [T,F,T] = [1,3];
+// filter_rows id [[T,F],[F,T]] = [(1,1),(2,2)];
+//filter_rows 
 // dot [T,F] [F,F] = F;
 // mult [[T,T],[F,F]] [[F,F],[T,T]] = [[T,T],[F,F]];
 // mark_one 2 [T,T,T] = [F,T,F];
