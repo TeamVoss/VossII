@@ -174,7 +174,7 @@ infix 9 @;
 // Usage: atmost cnt l trunc_list;
 let atmost cnt l trunc_list = length l <= cnt => l | (firstn cnt l)@trunc_list;
 
-// Create list by duplicating first argument arg2 times
+// (replicate n x) -- Create a list of length n with x the value of every element.
 letrec replicate n x =
     n < 0 => eprintf "replicate with count < 0 (%d)" n |
     n=0 => [] | x:(replicate (n-1) x)
