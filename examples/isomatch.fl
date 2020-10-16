@@ -33,6 +33,10 @@ let curry f (a,b) = f a b;
 //  uncurry::((a#b)->c)->a->b->c
 let uncurry f a b = f (a,b);
 
+// ...
+//  sum_with::(a->int)->(a list)->int
+let sum_with f as = itlist (\a. \s. f a + s) as 0;
+
 //------------------------------------------------------------------------------
 // Pairs
 
@@ -90,42 +94,19 @@ let list_update v i = modify (const v) i;
 let mat_update v (i,j) = modify (list_update v j) i;
 
 //------------------------------------------------------------------------------
-// Ports/Wires.
-
-lettype vector =
-          CONSTANT {value::int}
-        | VARIABLE {name::string}
-        | VECTOR   {name::string} {indices::int list}
-;
-
-// Check if two port references are equal.
-//  port_eq::vector->vector->bool
-let vec_eq (CONSTANT a)  (CONSTANT b)  = a == b
-/\  vec_eq (VECTOR a ix) (VECTOR b jx) = a == b AND all (curry equal) (zip ix jx)
-/\  vec_eq _ _ = F
-;
-
-// ...
-//  parse_actual::string->vector
-let parse_actual p =
-        let parse_constant s = CONSTANT (s2int (string_butfirstn p 2)) in
-        let parse_variable s = VARIABLE s in
-        let parse_vector ss  =
-                let name_of  s = hd (str_split s "[") in
-                let index_of s = s2int (string_butlast (el 2 (str_split s "["))) in
-                VECTOR (name_of (hd ss)) (map index_of ss)
-        in
-        str_is_prefix "0b" p => parse_constant p |
-        str_is_substr "["  p => parse_vector (md_expand_vector p) |
-        parse_variable p
-;
-
-// ...
-//  parse_actuals::(string#(string list) list)->(string#(vector list) list)
-let parse_actuals = map (second (map parse_actual));
-
-//------------------------------------------------------------------------------
 // Pexlif.
+
+// Compare two 'VEC_INFO' to see if they're equal.
+//  vec_info_eq::(vec_info list)->(vec_info list)->bool
+let
+    vec_info_eq vs ys =
+        let
+            check (TXT _)     (TXT _)     = T
+        /\  check (RANGES ix) (RANGES jx) = ix == jx
+        /\  check _           _           = F
+        in
+        all (curry check) (zip vs ys)
+;
 
 // Feth a 'PEXLIF's attribute list.
 //  attributes_of::pexlif->(string#string list)
@@ -229,16 +210,19 @@ let
 /\  fp_c (P_LEAF fs) = prime 52 (length fs) + prime_list fp_fn 0 fs
 ;
 
-// Gen. a fingerprint for a 'VECTOR'.
+// Gen. a fingerprint for a 'VEC_INFO'.
 let
-    fp_v (CONSTANT ix) = prime 54 ix
-/\  fp_v (VARIABLE _)  = prime 55 1
-/\  fp_v (VECTOR _ ix) = prime_list id 56 ix
+    fp_v (TXT _)     = prime 54 1
+/\  fp_v (RANGES ix) =
+        let go (x,y) = x = y => prime 55 x | prime 56 x + prime 57 y in
+        prime_list go 0 ix
 ;
 
 // Gen. a fingerprint for a input/output declaration. ('str2int'?)
 let
-    fp_wl acs = prime_list (prime_list fp_v 0) 57 (map snd (parse_actuals acs))
+    fp_wl acs =
+        let vss = map (map md_split_vector # snd) acs in
+        prime_list (\vs. prime_list (\v. sum_with fp_v v) 0 vs) 58 vss
 ;
 
 // Gen. a fingerprint for each 'PEXLIF' on creation (fingerprint 'c'?).
@@ -256,15 +240,14 @@ lettype scheme =
         SCHEME
             {name::string}
             {fp::int}
-            {inps::(string#(vector list)) list}
-            {outs::(string#(vector list)) list}
+            {inps::(string#((vec_info list) list)) list}
+            {outs::(string#((vec_info list) list)) list}
 ;
 
 // "Smart" constructor for a 'SCHEME'.
 let scheme name attrs fa_inps fa_outs =
-        SCHEME name (find_fingerprint attrs)
-                    (parse_actuals fa_inps)
-                    (parse_actuals fa_outs)
+        let parse as = map (second (map md_split_vector)) as in
+        SCHEME name (find_fingerprint attrs) (parse fa_inps) (parse fa_outs)
 ;
 
 // Fetch the fingerprint of a 'SCHEME'.
@@ -283,7 +266,7 @@ letrec
 // Check if two 'SCHEME's share a wire.
 //  connected::scheme->scheme->bool
 let connected (SCHEME name _ fa_inps fa_outs) (SCHEME name' _ fa_inps' fa_outs') =
-        let shares_wire xs ys = any (\x. any (vec_eq x) ys) xs in
+        let shares_wire xs ys = any (\x. any (vec_info_eq x) ys) xs in
         let wires xs = flatmap snd xs in
         name == name' OR
         shares_wire (wires fa_inps) (wires fa_outs') OR
@@ -434,9 +417,6 @@ letrec
 // string_butlast "abc" = "ab";
 // list_update T 2 [F,F,F] = [F,T,F];
 // mat_update T (2,2) [[F,F,F],[F,F,F],[F,F,F]] = [[F,F,F],[F,T,F],[F,F,F]];
-// let test_vec = VECTOR "a" [1,2,4];
-// vec_eq test_vec test_vec;
-// parse_actual "a[1:2,4]" = test_vec;
 // dot [T,F] [F,F] = F;
 // mult [[T,T],[F,F]] [[F,F],[T,T]] = [[T,T],[F,F]];
 // mark_one 2 [T,T,T] = [F,T,F];

@@ -8,12 +8,17 @@ load "examples/isomatch.fl";
 //Emit_pexlif "puzzle.txt" g;
 
 let p = verilog2pexlif "-Iexamples/verilog" "mux2" ["small_lib.v"] [];
-Emit_pexlif "piece.txt"  p;
+//Emit_pexlif "piece.txt"  p;
 
 //------------------------------------------------------------------------------
 
-val (a,b,m) = isomatch_matrix p p;
-val (x,y) = recurse m a b (replicate (length b) 0) 0;
+// Init.
+val (a,b,c) = isomatch_matrix p p;
+let cols = replicate (length b) F;
+let row = 0;
+
+// Run.
+//val (x,y) = recurse c b a cols row;
 
 //------------------------------------------------------------------------------
 // Fin.
