@@ -1,5 +1,5 @@
-load "ste.fl";
 load "examples/isomatch.fl";
+load "ste.fl";
 
 //------------------------------------------------------------------------------
 // Load example files.
@@ -13,7 +13,9 @@ let p = verilog2pexlif "-Iexamples/verilog" "mux2" ["small_lib.v"] [];
 //------------------------------------------------------------------------------
 
 // Test.
-flatten p;
+let a = flatten p;
+let b = adjacency_matrix a;
+let c = isomatch_matrix a a;
 
 //------------------------------------------------------------------------------
 // Fin.

@@ -17,6 +17,10 @@ let any p as = OR_list (map p as);
 //  equal::a->a->bool
 let equal a b = a == b;
 
+// Non-infix version of (!=) for a similar reason.
+//  not_equal::a->a->bool
+let not_equal a b = NOT (equal a b);
+
 // Constant function.
 //  const::a->b->a
 let const a b = a;
@@ -32,6 +36,14 @@ let curry f (a,b) = f a b;
 // Un"curry" a function.
 //  uncurry::((a#b)->c)->a->b->c
 let uncurry f a b = f (a,b);
+
+// on b u x y --- runs the binary function b on the results of applying unary function u to two arguments x and y.
+//  on::(b->b->c)->(a->b)->a->a->c
+let on g f x y = g (f x) (f y);
+infix 3 on;
+
+// "Map" with its arguments flipped.
+let for_each = flip map;
 
 // Non-infix version of (,) because "(,) a b" doesn't seem to work.
 let pair a b = (a,b);
@@ -120,8 +132,8 @@ let attributes_of (PINST _ as _ _ _ _ _) = as;
 let find_fingerprint as = find_first0 (\(n,_). n == "fingerprint") as;
 
 // Ill named Short-hand for "find_fingerprint . attributes_of".
-//  fp_of::pexlif->int
-let fp_of p = find_fingerprint (attributes_of p);
+//  find_fp::pexlif->int
+let find_fp p = find_fingerprint (attributes_of p);
 
 //------------------------------------------------------------------------------
 // Fingerprinting.
@@ -209,8 +221,8 @@ let
 
 // Gen. a fingerprint for 'CONTENT'.
 let
-    fp_c (P_HIER cs) = prime 51 (length cs) + prime_list fp_of 0 cs
-/\  fp_c (P_LEAF fs) = prime 52 (length fs) + prime_list fp_fn 0 fs
+    fp_c (P_HIER cs) = prime 51 (length cs) + prime_list find_fp 0 cs
+/\  fp_c (P_LEAF fs) = prime 52 (length fs) + prime_list fp_fn   0 fs
 ;
 
 // Gen. a fingerprint for a 'VEC_INFO'.
@@ -231,13 +243,14 @@ let
 // Gen. a fingerprint for each 'PEXLIF' on creation (fingerprint 'c'?).
 let
     PINST name attrs leaf fa_inps fa_outs internals content =
-        // let has_fingerprint = find_fingerprint attrs != 0 in
-        // let new_fingerprint = int2str (fp_wl fa_inps + fp_wl fa_outs) in
-        // let new_attrs = has_fingerprint => attrs |
-        //         ("fingerprint", new_fingerprint) : attrs
-        // in
-        // PINST name new_attrs leaf fa_inps fa_outs internals content
-        PINST name (("fingerprint", "99") : attrs) leaf fa_inps fa_outs internals content
+        let has_fingerprint = find_fingerprint attrs != 0 in
+        let new_fingerprint = int2str
+                (fp_wl fa_inps + fp_wl fa_outs + fp_c content)
+        in
+        let new_attrs = has_fingerprint => attrs |
+                ("fingerprint", new_fingerprint) : attrs
+        in
+        PINST name new_attrs leaf fa_inps fa_outs internals content
 ;
 
 //------------------------------------------------------------------------------
@@ -252,7 +265,7 @@ lettype scheme =
 ;
 
 // Fetch the fingerprint of a 'SCHEME'.
-let fingerprint_of (SCHEME _ fp _ _) = fp;
+let fp_of (SCHEME _ fp _ _) = fp;
 
 let
     Pscheme scheme =
@@ -267,7 +280,7 @@ install_print_function Pscheme;
 // "Smart" constructor for a 'SCHEME'.
 let
     scheme name attrs fa_inps fa_outs =
-        let parse as = map (second (map md_split_vector)) as in
+        let parse = map (second (map md_split_vector)) in
         let fp_ix = find_fingerprint attrs in
         let fp    = fp_ix == 0 => 0 | s2int (snd (el fp_ix attrs)) in
         SCHEME name fp (parse fa_inps) (parse fa_outs)
@@ -287,30 +300,20 @@ letrec
 let
     connected (SCHEME name _ fa_inps fa_outs) (SCHEME name' _ fa_inps' fa_outs') =
         let shares_wire xs ys = any (\x. any (vec_info_eq x) ys) xs in
-        let wires xs = flatmap snd xs in
-        name == name' OR
-        shares_wire (wires fa_inps) (wires fa_outs') OR
-        shares_wire (wires fa_outs) (wires fa_inps')
+        let wires xs = flatmap snd xs in name == name' OR
+        shares_wire
+          (wires fa_inps  @ wires fa_outs)
+          (wires fa_inps' @ wires fa_outs')
 ;
 
-// Construct an adjacency matrix for a 'PEXLIF' (order nodes by connectivity).
-//  adjacency_matrix::pexlif->(int mat)
-let adjacency_matrix pex =
-        let adj x ys = map (\y. connected x y => fingerprint_of y | 0) ys in
-        val scs = flatten pex then
-        map (flip adj scs) scs
-;
+// Construct an adjacency matrix (shared wires) for a 'PEXLIF'.
+//  adjacency_matrix::(scheme list)->(int mat)
+let adjacency_matrix sc = map (for_each sc # connected) sc;
+// todo: order nodes by connectivity
 
-// ...
-//  isomatch_matrix::pexlif->pexlif->((bool mat)#(bool mat)#(bool mat))
-let isomatch_matrix piece puzzle =
-        let build pi pu = map (\p. map (\q. p == q) pu) pi in
-        let strip mat   = map (\c. map (\v. v != 0) c) mat in
-        val pi = adjacency_matrix piece  then
-        val pu = adjacency_matrix puzzle then
-        val m  = build pi pu then
-        (strip pi, strip pu, m)
-;
+// Construct an isomatch matrix (possible matches) from two adjacency matrices.
+//  isomatch_matrix::(scheme list)->(scheme list)->(bool mat)
+let isomatch_matrix piece puzzle = map (for_each puzzle # equal on fp_of) piece;
 
 //------------------------------------------------------------------------------
 // Ullman’s Subgraph Isomorphism Algorithm:
@@ -321,9 +324,7 @@ let isomatch_matrix piece puzzle =
 
 // Filter every index/pair of indices in a vector/matrix 'xs' using 'p'.
 let filter_cols p xs = ixlist (\x. \ix. \ys. p x => ix : ys | ys) xs [];
-let filter_rows p xs =
-        ixlist (\x. \ix. \ys. map (pair ix) (filter_cols p x) @ ys) xs []
-;
+let filter_rows p xs = ixlist (\x. \ix. \ys. map (pair ix) (filter_cols p x) @ ys) xs [];
 
 // Iterate over every mat. index that is a possible match.
 let forall_ones mat f = sitlist f (filter_rows id mat);
@@ -362,7 +363,7 @@ let dot xs ys = itlist (\z. \b. z OR b) (map2 (\x. \y. x AND y) xs ys) F;
 
 // "Matrix multiplication" of two boolean matrices.
 //  mult::(bool mat)->(bool mat)->(bool mat)
-let mult m n = val n' = transpose n then map (\r. map (dot r) n') m;
+let mult m n = val n' = transpose n then map (for_each n' # dot) m;
 
 // Iterate over all unused row-indices.
 //  forall_unused::(bool list)->(int->a->a)->a->a
@@ -374,7 +375,8 @@ let mark_one n xs = modify (const T) n (map (const F) xs);
 
 // Check that wether 'm' is a valid morphism for puzzle 'g' and piece 'p'.
 //  isomorphism::(bool mat)->(bool mat)->(bool mat)->bool
-let isomorphism mat g p =
+let
+    isomorphism mat g p =
         let only_one_solution mat =
             val (rs,cs) = unzip (filter_rows id mat) then
             let unique xs = setify xs == xs in
