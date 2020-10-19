@@ -16,6 +16,7 @@ let p = verilog2pexlif "-Iexamples/verilog" "mux2" ["small_lib.v"] [];
 let a = flatten p;
 let b = adjacency_matrix a;
 let c = isomatch_matrix a a;
+recurse c b b (replicate (length b) F) 0;
 
 //------------------------------------------------------------------------------
 // Fin.

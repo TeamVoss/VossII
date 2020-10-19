@@ -401,7 +401,7 @@ let
 //     recurse(used_column', cur_row+1, G, P, M')
 //   output no
 //
-// recurse::(bool mat)->(bool mat)->(bool mat)->(int list)->int->(bool#(bool mat))
+// recurse::(bool mat)->(bool mat)->(bool mat)->(bool list)->int->(bool#(bool mat))
 letrec
     recurse mat g p cols row =
         row == length mat AND isomorphism mat g p => (T,mat)
