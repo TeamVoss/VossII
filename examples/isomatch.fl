@@ -120,7 +120,7 @@ let
         /\  check (RANGES ix) (RANGES jx) = ix == jx
         /\  check _           _           = F
         in
-        all (curry check) (zip vs ys)
+        (length vs) == (length ys) AND all (curry check) (zip vs ys)
 ;
 
 // Feth a 'PEXLIF's attribute list.

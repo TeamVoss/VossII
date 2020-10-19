@@ -4,7 +4,7 @@ load "ste.fl";
 //------------------------------------------------------------------------------
 // Load example files.
 
-//let g = verilog2pexlif "-Iexamples/verilog" "mux4" ["small.v","small_lib.v"] [];
+let g = verilog2pexlif "-Iexamples/verilog" "mux4" ["small.v","small_lib.v"] [];
 //Emit_pexlif "puzzle.txt" g;
 
 let p = verilog2pexlif "-Iexamples/verilog" "mux2" ["small_lib.v"] [];
@@ -12,11 +12,19 @@ let p = verilog2pexlif "-Iexamples/verilog" "mux2" ["small_lib.v"] [];
 
 //------------------------------------------------------------------------------
 
-// Test.
-let a = flatten p;
-let b = adjacency_matrix a;
-let c = isomatch_matrix a a;
-recurse c b b (replicate (length b) F) 0;
+// let a = flatten p;
+// let b = adjacency_matrix a;
+// let c = isomatch_matrix a a;
+// recurse c b b (replicate (length b) F) 0;
+
+let a = flatten g;
+let b = flatten p;
+//
+let a' = adjacency_matrix a;
+let b' = adjacency_matrix b;
+let c' = isomatch_matrix b a;
+//
+
 
 //------------------------------------------------------------------------------
 // Fin.
