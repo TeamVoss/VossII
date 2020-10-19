@@ -37,7 +37,7 @@ let curry f (a,b) = f a b;
 //  uncurry::((a#b)->c)->a->b->c
 let uncurry f a b = f (a,b);
 
-// on b u x y --- runs the binary function b on the results of applying unary function u to two arguments x and y.
+// Runs the binary function g on the results of applying unary function f to two arguments x and y.
 //  on::(b->b->c)->(a->b)->a->a->c
 let on g f x y = g (f x) (f y);
 infix 3 on;
