@@ -2287,14 +2287,14 @@ let draw_fsm reset S0 orig_trans base_inps =
 	val (W_NAMED_CONST n _ v) = hw_destr S0 in
 	(n,v)
     in
-    let cnv (f,on,t) =
+    let cnv (f,on',t) =
         val (W_NAMED_CONST fn _ fv) = hw_destr f in
         val (W_NAMED_CONST tn _ tv) = hw_destr t in
-	let w_on = hw_destr on in
+	let w_on = hw_destr on' in
         (fn,fv), w_on, (tn,tv)
     in
     let trans = map cnv orig_trans in
-    let get_state (f,on,t) =  [f,t] in
+    let get_state (f,_,t) =  [f,t] in
     let r_states = setify (S0n:(flatmap get_state trans)) then
     let cmp (s1,v1) (s2,v2) = v1-v2 in
     let states = qsort cmp r_states then
@@ -2310,16 +2310,16 @@ let draw_fsm reset S0 orig_trans base_inps =
     in 
     (foreach mk_state states) fseq
     let ptrans = partition fst trans in
-    let emit_edge ((f,fv),on,(t,tv)) =
-        fprintf fp "%s -> %s [ label = \"%s\" ];\n" f t on
+    let emit_edge ((f,fv),on',(t,tv)) =
+        fprintf fp "%s -> %s [ label = \"%s\" ];\n" f t on'
     in
-    letrec mk_edges done ((f,on,t):rem) =
-	let cond = W_AND on (W_NOT done) in
+    letrec mk_edges done ((f,on',t):rem) =
+	let cond = W_AND on' (W_NOT done) in
 	let scond = cond_simplify cond in
 	let s_cond = base_compact_wprint base_inps scond in
 	let f_cond = Pwexpr scond in
 	(emit_edge (f,s_cond,t)) fseq
-	(s_cond,f_cond):(mk_edges (W_OR done on) rem) 
+	(s_cond,f_cond):(mk_edges (W_OR done on') rem) 
      /\    mk_edges done [] = []
     in
     let edges = flatmap (mk_edges (W_CONST 1 0)) ptrans then
