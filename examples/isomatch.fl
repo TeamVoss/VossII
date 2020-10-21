@@ -43,7 +43,7 @@ let on g f x y = g (f x) (f y);
 infix 3 on;
 
 // "Map" with its arguments flipped.
-let for_each = flip map;
+let pam = flip map;
 
 // Non-infix version of (,) because "(,) a b" doesn't seem to work.
 let pair a b = (a,b);
@@ -131,10 +131,6 @@ let attributes_of (PINST _ as _ _ _ _ _) = as;
 //  find_fingerprint::(string#string list)->int
 let find_fingerprint as = find_first0 (\(n,_). n == "fingerprint") as;
 
-// Ill named Short-hand for "find_fingerprint . attributes_of".
-//  find_fp::pexlif->int
-let find_fp p = find_fingerprint (attributes_of p);
-
 //------------------------------------------------------------------------------
 // Fingerprinting.
 //------------------------------------------------------------------------------
@@ -221,23 +217,33 @@ let
 
 // Gen. a fingerprint for 'CONTENT'.
 let
-    fp_c (P_HIER cs) = prime 51 (length cs) + prime_list find_fp 0 cs
-/\  fp_c (P_LEAF fs) = prime 52 (length fs) + prime_list fp_fn   0 fs
+    fp_c (P_LEAF fs) = prime 52 (length fs) + prime_list fp_fn   0 fs
+/\  fp_c (P_HIER cs) =
+        let go (PINST _ attrs _ fa_inps fa_outs _ _) =
+            ( find_fingerprint attrs
+            + fp_actual fa_inps
+            + fp_actual fa_outs
+            )
+        in
+        prime 51 (length cs) + prime_list go 0 cs
 ;
 
-// Gen. a fingerprint for a 'VEC_INFO'.
+// Gen. a fingerprint for the "formals" of an input/output declaration.
+// todo: consider the sizes of each formal argument (how to fetch them?).
 let
-    fp_v (TXT _)     = prime 54 1
-/\  fp_v (RANGES ix) =
-        let go (x,y) = x = y => prime 55 x | prime 56 x + prime 57 y in
-        prime_list go 0 ix
+    fp_formal ps = prime 58 (length ps)
 ;
 
-// Gen. a fingerprint for a input/output declaration. ('str2int'?)
+// Gen. a fingerprint for the "actuals" of an input/output declaration.
 let
-    fp_wl acs =
-        let vss = map (map md_split_vector # snd) acs in
-        prime_list (\vs. prime_list (\v. sum_with fp_v v) 0 vs) 58 vss
+    fp_actual ps =
+        let fp_vi (TXT _)     = prime 54 1
+        /\  fp_vi (RANGES ix) =
+                let go (x,y) = x = y => prime 55 x | prime 56 x + prime 57 y in
+                prime_list go 0 ix
+        in
+        let vss = map (map md_split_vector # snd) ps in
+        prime_list (\vs. prime_list (\v. sum_with fp_vi v) 0 vs) 59 vss
 ;
 
 // Gen. a fingerprint for each 'PEXLIF' on creation (fingerprint 'c'?).
@@ -245,7 +251,10 @@ let
     PINST name attrs leaf fa_inps fa_outs internals content =
         let has_fingerprint = find_fingerprint attrs != 0 in
         let new_fingerprint = int2str
-                (fp_wl fa_inps + fp_wl fa_outs + fp_c content)
+                ( fp_formal fa_inps
+                + fp_formal fa_outs
+                + fp_c content
+                )
         in
         let new_attrs = has_fingerprint => attrs |
                 ("fingerprint", new_fingerprint) : attrs
@@ -308,12 +317,12 @@ let
 
 // Construct an adjacency matrix (shared wires) for a 'PEXLIF'.
 //  adjacency_matrix::(scheme list)->(int mat)
-let adjacency_matrix sc = map (for_each sc # connected) sc;
+let adjacency_matrix sc = map (pam sc # connected) sc;
 // todo: order nodes by connectivity
 
 // Construct an isomatch matrix (possible matches) from two adjacency matrices.
 //  isomatch_matrix::(scheme list)->(scheme list)->(bool mat)
-let isomatch_matrix piece puzzle = map (for_each puzzle # equal on fp_of) piece;
+let isomatch_matrix piece puzzle = map (pam puzzle # equal on fp_of) piece;
 
 //------------------------------------------------------------------------------
 // Ullman’s Subgraph Isomorphism Algorithm:
@@ -363,7 +372,7 @@ let dot xs ys = itlist (\z. \b. z OR b) (map2 (\x. \y. x AND y) xs ys) F;
 
 // "Matrix multiplication" of two boolean matrices.
 //  mult::(bool mat)->(bool mat)->(bool mat)
-let mult m n = val n' = transpose n then map (for_each n' # dot) m;
+let mult m n = val n' = transpose n then map (pam n' # dot) m;
 
 // Iterate over all unused row-indices.
 //  forall_unused::(bool list)->(int->a->a)->a->a

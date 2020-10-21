@@ -5,10 +5,10 @@ load "ste.fl";
 // Load example files.
 
 let g = verilog2pexlif "-Iexamples/verilog" "mux4" ["small.v","small_lib.v"] [];
-//Emit_pexlif "puzzle.txt" g;
+Emit_pexlif "puzzle.txt" g;
 
 let p = verilog2pexlif "-Iexamples/verilog" "mux2" ["small_lib.v"] [];
-//Emit_pexlif "piece.txt" p;
+Emit_pexlif "piece.txt" p;
 
 //------------------------------------------------------------------------------
 
