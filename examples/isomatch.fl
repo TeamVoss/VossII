@@ -215,19 +215,6 @@ let
 /\  fp_fn (W_PHASE_DELAY l r) = prime 50 (fp_w l) + prime 51 (fp_w r)
 ;
 
-// Gen. a fingerprint for 'CONTENT'.
-let
-    fp_c (P_LEAF fs) = prime 52 (length fs) + prime_list fp_fn   0 fs
-/\  fp_c (P_HIER cs) =
-        let go (PINST _ attrs _ fa_inps fa_outs _ _) =
-            ( find_fingerprint attrs
-            + fp_actual fa_inps
-            + fp_actual fa_outs
-            )
-        in
-        prime 51 (length cs) + prime_list go 0 cs
-;
-
 // Gen. a fingerprint for the "formals" of an input/output declaration.
 // todo: consider the sizes of each formal argument (how to fetch them?).
 let
@@ -244,6 +231,19 @@ let
         in
         let vss = map (map md_split_vector # snd) ps in
         prime_list (\vs. prime_list (\v. sum_with fp_vi v) 0 vs) 59 vss
+;
+
+// Gen. a fingerprint for 'CONTENT'.
+let
+    fp_c (P_LEAF fs) = prime 52 (length fs) + prime_list fp_fn   0 fs
+/\  fp_c (P_HIER cs) =
+        let go (PINST _ attrs _ fa_inps fa_outs _ _) =
+            ( find_fingerprint attrs
+            + fp_actual fa_inps
+            + fp_actual fa_outs
+            )
+        in
+        prime 51 (length cs) + prime_list go 0 cs
 ;
 
 // Gen. a fingerprint for each 'PEXLIF' on creation (fingerprint 'c'?).
@@ -322,7 +322,7 @@ let adjacency_matrix sc = map (pam sc # connected) sc;
 
 // Construct an isomatch matrix (possible matches) from two adjacency matrices.
 //  isomatch_matrix::(scheme list)->(scheme list)->(bool mat)
-let isomatch_matrix piece puzzle = map (pam puzzle # equal on fp_of) piece;
+let isomatch_matrix p_sc g_sc = map (pam g_sc # equal on fp_of) p_sc;
 
 //------------------------------------------------------------------------------
 // Ullman’s Subgraph Isomorphism Algorithm:
@@ -336,32 +336,34 @@ let filter_cols p xs = ixlist (\x. \ix. \ys. p x => ix : ys | ys) xs [];
 let filter_rows p xs = ixlist (\x. \ix. \ys. map (pair ix) (filter_cols p x) @ ys) xs [];
 
 // Iterate over every mat. index that is a possible match.
-let forall_ones mat f = sitlist f (filter_rows id mat);
+let forall_ones mat f = sitlist f (filter_rows id mat) mat;
 
 // Iterate over every index in a col. that is a possible match.
 let forall_neighbors i mat f = sitlist f (filter_cols id (el i mat));
 
-// Thin the possible set of isomorphisms.
+// Thin the possible set of isomorphisms. The general idea is that, if we have
+// M(x,y) then any neighbor v of x in P should have a neighbor u in G s.t.
+// M(v,u) holds. Otherwise M(x,y) cannot be a solution.
 //
 // prune(...)
 // do
 //   for all (i,j) where M is 1
 //     for all neighbors x of vi in P
-//       if there is no neighbor y of vj s.t. M(x,y)=1
-//         M(i,j)=0
+//       if there is no neighbor y of vj in G s.t. M(x,y)
+//         M(i,j) := F
 // while M was changed
 //
 // prune::(bool mat)->(bool mat)->(bool mat)->(bool mat)
 letrec
-    prune mat g p =
-      val mat' =
-          forall_ones mat (\(i,j). \mat.
-            forall_neighbors i p (\vi. \mat.
-              forall_neighbors j g (\vj. const T) F
-                => mat | mat_update F (i,j) mat
-            ) mat
-          ) mat
-      then mat == mat' => mat' | prune mat' g p
+    prune m g p =
+        val m' =
+            forall_ones m (\(i,j).
+                forall_neighbors i p (\vi. \n.
+                    forall_neighbors j g (\vj. const T) F
+                        => n | mat_update F (i,j) n
+                )
+            )
+        then m != m' => prune m' g p | m'
 ;
 
 //------------------------------------------------------------------------------
@@ -445,7 +447,6 @@ letrec
 // mat_update T (2,2) [[F,F,F],[F,F,F],[F,F,F]] = [[F,F,F],[F,T,F],[F,F,F]];
 // filter_cols id [T,F,T] = [1,3];
 // filter_rows id [[T,F],[F,T]] = [(1,1),(2,2)];
-//filter_rows 
 // dot [T,F] [F,F] = F;
 // mult [[T,T],[F,F]] [[F,F],[T,T]] = [[T,T],[F,F]];
 // mark_one 2 [T,T,T] = [F,T,F];
