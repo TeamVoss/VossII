@@ -439,6 +439,13 @@ let <= a b = defix <= a b;
 // and '=' returns the condition under which 'a' is the same as 'b'.
 let == a b = defix == a b;
 
+// Determine if 'a' is not identical to 'b'.
+// For all data types except bool, '!=' and '!==' are the same.
+// However, for bools (BDDS) '!==' returns T iff 'a' and 'b' are not identical,
+// and '!=' returns the condition under which 'a' is the different from 'b'.
+let !== a b = NOT (a == b);
+infix 0 !==;
+
 // Assign the the reference variable 'rv' the value 'v'.
 let := rv v = defix := rv v;
 non_lazy :=;

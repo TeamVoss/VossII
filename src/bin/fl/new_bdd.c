@@ -26,6 +26,7 @@ extern g_ptr    void_nd;
 extern bool	gui_mode;
 extern bool	use_stdout;
 extern char	FailBuf[4096];
+extern bool	Interrupt_asap;
 
 /***** PRIVATE VARIABLES *****/
 static g_ptr		new_var_order_list = NULL;
@@ -1719,6 +1720,7 @@ find_insert_bdd(var_ptr vp, formula lson, formula rson)
     unint		neg, var;
     bdd_ptr		bp;
 
+    CHECK_FOR_INTERRUPT;
     if( lson == rson ) {
 	return(lson);
     }
@@ -2089,6 +2091,7 @@ garbage_collect()
 	else
 	    re_order();
 	erase = TRUE;	/* Must wipe out cache since nodes may have moved */
+	RCdynamic_ordering_threshold = nodes_used + nodes_used/2;
     } else {
 	erase = FALSE;
     }

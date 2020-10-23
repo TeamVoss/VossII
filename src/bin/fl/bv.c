@@ -314,17 +314,38 @@ add_rec(bool neg, g_ptr l1, g_ptr l2, formula *coutp)
     }
     formula cin;
     g_ptr rem = add_rec(neg, GET_CONS_TL(l1), GET_CONS_TL(l2), &cin);
+    PUSH_BDD_GC(cin);
+    PUSH_GLOBAL_GC(rem);
     formula a = GET_BOOL(GET_CONS_HD(l1));
     formula b = GET_BOOL(GET_CONS_HD(l2));
     b = neg? B_Not(b) : b;
-    formula sum = B_Xor(a, B_Xor(b, cin));
-    rem = Make_CONS_ND(Make_BOOL_leaf(sum), rem);
-    *coutp = B_Or( B_And(a, b), B_Or( B_And(a, cin), B_And(b, cin)));
-    PUSH_GLOBAL_GC(rem);
-    PUSH_BDD_GC(*coutp);
+    formula sum = B_Xor(b, cin);
+    PUSH_BDD_GC(sum);
     if( Do_gc_asap ) Garbage_collect();
     POP_BDD_GC(1);
-    POP_GLOBAL_GC(1);
+    sum = B_Xor(a, sum);
+    PUSH_BDD_GC(sum);
+    if( Do_gc_asap ) Garbage_collect();
+    POP_BDD_GC(1);
+    rem = Make_CONS_ND(Make_BOOL_leaf(sum), rem);
+    PUSH_GLOBAL_GC(rem);
+    formula ab = B_And(a,b);
+    PUSH_BDD_GC(ab);
+    if( Do_gc_asap ) Garbage_collect();
+    formula ac = B_And(a,cin);
+    PUSH_BDD_GC(ac);
+    if( Do_gc_asap ) Garbage_collect();
+    formula bc = B_And(b,cin);
+    PUSH_BDD_GC(bc);
+    if( Do_gc_asap ) Garbage_collect();
+    formula s1 = B_Or(ac,bc);
+    PUSH_BDD_GC(s1);
+    if( Do_gc_asap ) Garbage_collect();
+    *coutp = B_Or( ab, s1);
+    PUSH_BDD_GC(*coutp);
+    if( Do_gc_asap ) Garbage_collect();
+    POP_BDD_GC(6);
+    POP_GLOBAL_GC(2);
     return( rem );
 }
 
@@ -454,10 +475,17 @@ less_rec(g_ptr l1, g_ptr l2)
     formula a = GET_BOOL(GET_CONS_HD(l1));
     formula b = GET_BOOL(GET_CONS_HD(l2));
     formula rem = less_rec(GET_CONS_TL(l1),GET_CONS_TL(l2));
-    PUSH_BDD_GC(rem);
-    if( Do_gc_asap ) Garbage_collect();
-    POP_BDD_GC(1);
-    return( B_Or(B_And(B_Not(a), b), B_And(B_Xnor(a,b), rem)));
+    PUSH_BDD_GC(rem); if( Do_gc_asap ) Garbage_collect();
+    formula ab = B_Xnor(a,b);
+    PUSH_BDD_GC(ab); if( Do_gc_asap ) Garbage_collect();
+    formula abrem = B_And(ab,rem);
+    PUSH_BDD_GC(abrem); if( Do_gc_asap ) Garbage_collect();
+    formula nab = B_And(B_Not(a), b);
+    PUSH_BDD_GC(nab); if( Do_gc_asap ) Garbage_collect();
+    formula res = B_Or(nab, abrem);
+    PUSH_BDD_GC(nab); if( Do_gc_asap ) Garbage_collect();
+    POP_BDD_GC(5);
+    return( res );
 }
 
 static formula
