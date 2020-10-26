@@ -22,13 +22,22 @@ let p = verilog2pexlif "-Iexamples/verilog" "mux2" ["small_lib.v"] [];
 let g_f = flatten g;
 let p_f = flatten p;
 //
-let g_m = adjacency_matrix g_f;
-let p_m = adjacency_matrix p_f;
-let m   = isomatch_matrix  g_f p_f;
-let cs  = replicate (length b) F;
-let row = 0;
+let g_m  = adjacency_matrix g_f;
+let p_m  = adjacency_matrix p_f;
+let m    = isomatch_matrix  p_f g_f; // V(P)xV(G)
+let m_cs = replicate (length g_m) F; // Cols(M) of F
+let row  = 0;
 //
-recurse c' a' b' cs row;
+recurse m g_m p_m m_cs row;
+
+//------------------------------------------------------------------------------
+
+//(g_m) fseq ((p_m) fseq ());
+
+//let xs = forall_ones m cons [];
+//let ys = map (\i. forall_neighbors i p_m (cons) []) (map fst xs);
+//let zs = map (\j. forall_neighbors j g_m (cons) []) (map snd xs);
+//prune m g_m p_m;
 
 //------------------------------------------------------------------------------
 // Fin.
