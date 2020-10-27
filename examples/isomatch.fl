@@ -13,14 +13,6 @@ let all p as = AND_list (map p as);
 //  any::(a->bool)->(a list)->bool
 let any p as = OR_list (map p as);
 
-// Non-infix version of (==) because I can't figure out how to write that.
-//  equal::a->a->bool
-let equal a b = a == b;
-
-// Non-infix version of (!=) for a similar reason.
-//  not_equal::a->a->bool
-let not_equal a b = NOT (equal a b);
-
 // Constant function.
 //  const::a->b->a
 let const a b = a;
@@ -43,21 +35,40 @@ let on g f x y = g (f x) (f y);
 infix 3 on;
 
 // "Map" with its arguments flipped.
+//  pam::(a list)->(a->b)->(b list)
 let pam = flip map;
 
 // Non-infix version of (,) because "(,) a b" doesn't seem to work.
+//  pair::a->b->(a#b)
 let pair a b = (a,b);
 
 // Non-infix version of (:) because ...
+//  const::a->(a list)->(a list)
 let cons a b = a : b;
+
+// Non-infix version of (==) because I can't figure out how to write that.
+//  equal::a->a->bool
+let equal a b = a == b;
+
+// Non-infix version of (!=) for a similar reason.
+//  not_equal::a->a->bool
+let not_equal a b = NOT (equal a b);
+
+// Checks if an element is a memeber of the given list.
+//  elem::a->(a list)->bool
+let elem a as = find_first0 (equal a) as == 0 => F | T ;
 
 // ...
 //  sum_with::(a->int)->(a list)->int
 let sum_with f as = itlist (\a. \s. f a + s) as 0;
 
 // ...
-//  columns::(a mat)->int
-let columns xs = empty xs => 0 | length (hd xs);
+//  num_rows::(a mat)->int
+let num_rows = length;
+
+// ...
+//  num_columns::(a mat)->int
+let num_columns xs = empty xs => 0 | length (hd xs);
 
 //------------------------------------------------------------------------------
 // Pairs
@@ -280,8 +291,8 @@ lettype scheme =
             {outs::(string#((vec_info list) list)) list}
 ;
 
-// Fetch the fingerprint of a 'SCHEME'.
-let fp_of (SCHEME _ fp _ _) = fp;
+let name_of (SCHEME n _ _ _)  = n;
+let fp_of   (SCHEME _ fp _ _) = fp;
 
 let
     Pscheme scheme =
@@ -329,7 +340,11 @@ let adjacency_matrix sc = map (pam sc # connected) sc;
 
 // Construct an isomatch matrix (possible matches) from two adjacency matrices.
 //  isomatch_matrix::(scheme list)->(scheme list)->(bool mat)
-let isomatch_matrix p_sc g_sc = map (pam g_sc # equal on fp_of) p_sc;
+let isomatch_matrix g_sc p_sc = map (pam g_sc # equal on fp_of) p_sc;
+
+// Construct a vector of every used column in an isomatch matrix.
+//  possible_rows::(bool mat)->(bool list)
+let possible_rows m = map OR_list (transpose m);
 
 //------------------------------------------------------------------------------
 // Ullman’s Subgraph Isomorphism Algorithm:
@@ -362,7 +377,7 @@ let forall_neighbors i mat f = sitlist f (filter_cols id (el i mat));
 //         M(i,j) := F
 // while M was changed
 //
-// prune::(bool mat)->(bool mat)->(bool mat)->(bool mat)
+//  prune::(bool mat)->(bool mat)->(bool mat)->(bool mat)
 letrec
     prune m g p =
         val m' =
@@ -385,13 +400,16 @@ let dot xs ys = itlist (\z. \b. z OR b) (map2 (\x. \y. x AND y) xs ys) F;
 //  mult::(bool mat)->(bool mat)->(bool mat)
 let mult m n = val n' = transpose n then map (pam n' # dot) m;
 
-// Iterate over all unused row-indices.
-//  forall_unused::(bool list)->(int->a->a)->a->a
-let forall_unused row f = sitlist f (filter_cols NOT row);
-
 // Mark every el. as 'F', except the 'n'th el. that is marked as 'T'.
 //  mark_one::int->(bool list)->(bool list)
 let mark_one n xs = modify (const T) n (map (const F) xs);
+
+// Iterate over all unused row-indices.
+//  forall_unused::(bool mat)->int->(bool list)->(int->(bool mat)->(bool#(bool mat))
+let forall_unused m row used f =
+        let unused = filter (NOT # flip el used) (filter_cols id (el row m)) in
+        sitlist (\c. \(b,n). b => (b,n) | f c n) unused (F,m)
+;
 
 // Check that wether 'm' is a valid morphism for puzzle 'g' and piece 'p'.
 //  isomorphism::(bool mat)->(bool mat)->(bool mat)->bool
@@ -405,32 +423,50 @@ let
         only_one_solution mat AND p == mult mat (transpose (mult mat g))
 ;
 
+let Pcs cs = list2str T "[" "," "]" (sprintf "%B") cs;
+let Pm m = list2str T "[" "," "]\n" (list2str T "[" "," "]" (sprintf "%B")) m;
+
 // Find ...
 //
-// recurse(used_columns, cur_row, G, P, M)
-//   if cur_row = num_rows(M)
-//     if M is an isomorphism:
+// recurse(used, row, G, P, M)
+//   if row = num_rows(M) + 1
+//     if M is an isomorphism
 //        output yes and end the algorithm
-//   M' = M
-//   prune(M')
-//   for all unused columns c
-//     set column c in M' to 1 and other columns to 0
-//       -- 'c' at 'cur_row'? I might have missed that part during translation.
-//     used_columns' = used_columns
-//     mark c as used in used_columns'
-//     recurse(used_column', cur_row+1, G, P, M')
+//     if not
+//        output no
+//   N = prune(M)
+//   for all unused columns c in N[row]
+//     N' = set all columns in N[row] to zero but column c
+//     used' = mark c as used
+//     recurse(used', row+1, G, P, N')
 //   output no
 //
-// recurse::(bool mat)->(bool mat)->(bool mat)->(bool list)->int->(bool#(bool mat))
+//  recurse::(bool mat)->(bool mat)->(bool mat)->(bool mat)
 letrec
-    recurse mat g p cols row =
-        row == length mat AND isomorphism mat g p => (T,mat)
-          | val mat' = prune mat g p then
-            forall_unused cols (\col. \(r,m). r => (r,m) |
-                let m'    = modify (mark_one col) row m in
-                let cols' = modify (const T) col cols in
-                recurse m' g p cols' (row+1)
-            ) (F,mat')
+    recurse mat g p =
+        let solution m = isomorphism m g p => (T, m) | (F, m) in
+        letrec
+            go m cs r = r == num_rows mat + 1 => solution m |
+                val m' = prune m g p then
+                forall_unused m' r cs (\c. \n.
+                    let n'  = modify (mark_one c) r n  in
+                    let cs' = modify (const T)    c cs in
+                    go n' cs' (r+1)
+                )
+        in
+        val (valid,mat') = go mat (replicate (num_columns mat) F) 1 then
+        valid => mat' | eprintf "No isomatch found"
+;
+
+//------------------------------------------------------------------------------
+
+// Recover the PINST names (the "answer") of a solution given by 'recurse'.
+//  recover::(bool mat)->(scheme list)->(scheme list)->string
+let
+    recover mat g_sc p_sc =
+        let pairs = forall_ones mat (\(i,j). cons (el i p_sc, el j g_sc)) [] in
+        let pr (a,b) = sprintf "%s :-> %s" (name_of a) (name_of b) in
+        list2str T "{" "," "}" pr pairs
 ;
 
 //------------------------------------------------------------------------------
@@ -454,11 +490,17 @@ letrec
 // string_butlast "abc" = "ab";
 // list_update T 2 [F,F,F] = [F,T,F];
 // mat_update T (2,2) [[F,F,F],[F,F,F],[F,F,F]] = [[F,F,F],[F,T,F],[F,F,F]];
+// unused_rows [[F,T,F,T,F,T,F],[F,F,T,F,T,F,T]] = [F,T,T,T,T,T,T];
 // filter_cols id [T,F,T] = [1,3];
 // filter_rows id [[T,F],[F,T]] = [(1,1),(2,2)];
 // forall_ones [[T,F],[F,T]] (\p. \l. p : l) [] = [(1,1),(2,2)];
 // dot [T,F] [F,F] = F;
 // mult [[T,T],[F,F]] [[F,F],[T,T]] = [[T,T],[F,F]];
 // mark_one 2 [T,T,T] = [F,T,F];
+// forall_unused
+//     [[T,F,T,F,T,F,T]]
+//     1
+//     [F,F,F,F,T,T,T]
+//     (\c. \m. (print (sprintf "%d " c)) fseq (F,m));
 
 //------------------------------------------------------------------------------

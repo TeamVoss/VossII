@@ -4,11 +4,11 @@ load "ste.fl";
 //------------------------------------------------------------------------------
 // Load example files.
 
-let g = verilog2pexlif "-Iexamples/verilog" "mux4" ["small.v","small_lib.v"] [];
-//Emit_pexlif "puzzle.txt" g;
+let g_pex = verilog2pexlif "-Iexamples/verilog" "mux4" ["small.v","small_lib.v"] [];
+//Emit_pexlif "puzzle.txt" g_pex;
 
-let p = verilog2pexlif "-Iexamples/verilog" "mux2" ["small_lib.v"] [];
-//Emit_pexlif "piece.txt" p;
+let p_pex = verilog2pexlif "-Iexamples/verilog" "mux2" ["small_lib.v"] [];
+//Emit_pexlif "piece.txt" p_pex;
 
 //------------------------------------------------------------------------------
 
@@ -19,16 +19,16 @@ let p = verilog2pexlif "-Iexamples/verilog" "mux2" ["small_lib.v"] [];
 
 //------------------------------------------------------------------------------
 
-let g_f = flatten g;
-let p_f = flatten p;
+let g_scheme = flatten g_pex;
+let p_scheme = flatten p_pex;
 //
-let g_m  = adjacency_matrix g_f;
-let p_m  = adjacency_matrix p_f;
-let m    = isomatch_matrix  p_f g_f; // V(P)xV(G)
-let m_cs = replicate (length g_m) F; // Cols(M) of F
-let row  = 0;
+let g = adjacency_matrix g_scheme;
+let p = adjacency_matrix p_scheme;
+let m = isomatch_matrix  g_scheme p_scheme;
 //
-recurse m g_m p_m m_cs row;
+val iso = recurse m g p;
+//
+let answer = recover iso g_scheme p_scheme;
 
 //------------------------------------------------------------------------------
 
