@@ -281,6 +281,8 @@ let
 ;
 
 //------------------------------------------------------------------------------
+// todo: don't flatten more than we need to (1 level).
+// todo: order adj. matrix nodes by connectivity
 
 // "entity" decl. of a 'PEXLIF'.
 lettype scheme =
@@ -313,15 +315,13 @@ let
         SCHEME name fp (parse fa_inps) (parse fa_outs)
 ;
 
-// todo: don't flatten more than we need to (1 level).
-//
-// Flatten a 'PEXLIF' into its 'SCHEME's.
-//  flatten::pexlif->(scheme list)
+// Collect the 'SCHEME's of a 'PEXLIF'.
+//  collect_schemes::pexlif->(scheme list)
 letrec
-    flatten (PINST name attrs _ fa_inps fa_outs _ (P_LEAF _)) =
+    collect_schemes (PINST name attrs _ fa_inps fa_outs _ (P_LEAF _)) =
         [scheme name attrs fa_inps fa_outs]
-/\  flatten (PINST name attrs _ fa_inps fa_outs _ (P_HIER c)) =
-        (scheme name attrs fa_inps fa_outs) : flatmap flatten c
+/\  collect_schemes (PINST name attrs _ fa_inps fa_outs _ (P_HIER c)) =
+        (scheme name attrs fa_inps fa_outs) : flatmap collect_schemes c
 ;
 
 // Check if two 'SCHEME's share a wire.
@@ -338,15 +338,10 @@ let
 // Construct an adjacency matrix (shared wires) for a 'PEXLIF'.
 //  adjacency_matrix::(scheme list)->(int mat)
 let adjacency_matrix sc = map (pam sc # connected) sc;
-// todo: order nodes by connectivity
 
 // Construct an isomatch matrix (possible matches) from two adjacency matrices.
 //  isomatch_matrix::(scheme list)->(scheme list)->(bool mat)
 let isomatch_matrix g_sc p_sc = map (pam g_sc # equal on fp_of) p_sc;
-
-// Construct a vector of every used column in an isomatch matrix.
-//  possible_rows::(bool mat)->(bool list)
-let possible_rows m = map OR_list (transpose m);
 
 //------------------------------------------------------------------------------
 // Ullman’s Subgraph Isomorphism Algorithm:
@@ -406,13 +401,13 @@ let mult m n = val n' = transpose n then map (pam n' # dot) m;
 //  mark_one::int->(bool list)->(bool list)
 let mark_one n xs = modify (const T) n (map (const F) xs);
 
-// todo: Keep list of solutions.
-//
 // Iterate over all unused row-indices.
-//  forall_unused::(bool mat)->int->(bool list)->(int->(bool mat)->(bool#(bool mat))
+//  forall_unused::(bool mat)->int->(bool list)
+//               ->(int->(bool mat)->((bool mat) list))
+//               ->((bool mat) list)
 let forall_unused m row used f =
         let unused = filter (NOT # flip el used) (filter_cols id (el row m)) in
-        sitlist (\c. \(b,n). b => (b,n) | f c n) unused (F,m)
+        sitlist (\c. \ms. f c m @ ms) unused []
 ;
 
 // Check that wether 'm' is a valid morphism for puzzle 'g' and piece 'p'.
@@ -442,10 +437,10 @@ let
 //     recurse(used', row+1, G, P, N')
 //   output no
 //
-//  recurse::(bool mat)->(bool mat)->(bool mat)->(bool mat)
+//  recurse::(bool mat)->(bool mat)->(bool mat)->((bool mat) list)
 letrec
     recurse mat g p =
-        let solution m = isomorphism m g p => (T, m) | (F, m) in
+        let solution m = isomorphism m g p => [m] | [] in
         letrec
             go m cs r = r == num_rows mat + 1 => solution m |
                 val m' = prune m g p then
@@ -455,8 +450,7 @@ letrec
                     go n' cs' (r+1)
                 )
         in
-        val (valid,mat') = go mat (replicate (num_columns mat) F) 1 then
-        valid => mat' | eprintf "No isomatch found"
+        go mat (replicate (num_columns mat) F) 1
 ;
 
 //------------------------------------------------------------------------------
@@ -471,8 +465,8 @@ let
                 (flatmap (map vec_info2str # snd) fa_i)
                 (flatmap (map vec_info2str # snd) fa_o)
         in
-        let pr (a,b) = sprintf "%s :-> %s" (pr2 a) (pr2 b) in
-        list2str T "{" "," "}" pr pairs
+        let pr (a,b) = sprintf "%s\n :-> %s" (pr2 a) (pr2 b) in
+        list2str T "{" "\n," "}" pr pairs
 ;
 
 //------------------------------------------------------------------------------
