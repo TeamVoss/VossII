@@ -1,0 +1,431 @@
+//==========================================================================
+//
+// Flattened CPU + (traditional) CACHE + RAM exammple
+//
+//==========================================================================
+
+load "ste.fl";
+
+//let BYTE_SIZE		= 8;
+//let ADDR_SIZE		= 32;
+//let TIMER_SIZE		= 16;
+////let LINES		= 256;		// Number of cache lines
+//let LINES		= 16;		// Number of cache lines
+//let BYTES_IN_CACHE_LINE = 8;		// Number of bytes in cache line
+
+//let BYTE_SIZE		= 4;
+//let ADDR_SIZE		= 8;
+//let TIMER_SIZE		= 16;
+//let LINES		= 8;		// Number of cache lines
+//let BYTES_IN_CACHE_LINE = 4;		// Number of bytes in cache line
+
+let BYTE_SIZE           = 8;
+let ADDR_SIZE           = 20;
+let TIMER_SIZE          = 16;
+let LINES               = 8;            // Number of cache lines
+let BYTES_IN_CACHE_LINE = 8;            // Number of bytes in cache line
+
+let TAG_SIZE		= ADDR_SIZE-(log2 LINES)-(log2 BYTES_IN_CACHE_LINE);
+
+TYPE "byte" BYTE_SIZE;
+TYPE "cache_line" (BYTE_SIZE*BYTES_IN_CACHE_LINE);;
+
+TYPE "atag_field"  TAG_SIZE;
+TYPE "line_addr"   (log2 LINES);
+TYPE "decoded_line_addr" LINES;
+TYPE "byte_addr"    (log2 BYTES_IN_CACHE_LINE);
+
+
+STRUCT "addr" [ ("aTag", "atag_field"),
+		("line", "line_addr"),
+		("byte", "byte_addr")
+];
+
+
+STRUCT "ext_cache_line" [
+	    ("valid", "bit"),
+	    ("aTag", "atag_field"),
+	    ("data", "cache_line")
+];
+
+lettype memory = MEM {lines::(addr#cache_line) list};
+
+let Pmemory (MEM ls) =
+    let P1 (a,d) = sprintf "M[%s] = %s" (P_addr a) (P_cache_line d) in
+    list2str T "\n" "\n" "\n" P1 ls
+;
+install_print_function Pmemory;
+
+// ===================== CPU model ============================
+
+let CPU_INSTRUCTIONS = 16;
+let CPU_REGISTERS = 4;
+
+TYPE "regs" (BYTE_SIZE*CPU_REGISTERS);
+
+ENUM "trust_level" ["High", "Low"];
+
+ENUM "cpu_instr" ["NOP", "STOP", "READ_MEM", "CONTEXT_SWITCH",
+		  "START_TIMER", "STOP_TIMER", "CLEAR_REG"
+		 ];
+
+ENUM "p_states" ["P_Idle", "P_ContextSwitch",
+		 "P_RequestData", "P_WaitForData",
+		 "P_Incr_PC"];
+
+ENUM "timer_mode" ["Timer_Idle", "Timer_Reset", "Timer_Running"];
+
+TYPE "cpu_cnt" (bits_needed CPU_INSTRUCTIONS);
+
+TYPE "cpu_reg_addr" (bits_needed (CPU_REGISTERS-1));
+TYPE "cpu_reg_decoded" CPU_REGISTERS;
+
+TYPE "timer" TIMER_SIZE;
+
+STRUCT "cpu_rom_data" [
+			("instr", "cpu_instr"),
+			("addr", "addr"),
+			("dest","cpu_reg_addr")
+];
+
+
+let CPU_model =
+    bit_input		    clk.
+    bit_input		    reset.
+    bit_input		    C2P_valid.
+    cache_line_input	    C2P_data.
+    bit_output		    P2C_req.
+    addr_output		    P2C_addr.
+    byte_output		    R0 R1 R2 R3.
+    timer_output	    timer.
+    bit_output		    execution.
+    //
+    cpu_cnt_internal	    cnt n_cnt.
+    cpu_rom_data_internal   c_instr.
+    cpu_instr_internal	    op.
+    bit_internal	    do_read do_cs do_nop do_stop do_clr.
+    p_states_internal	    state.
+    cpu_reg_addr_internal   raddr.
+    trust_level_internal    trust.
+    addr_internal	    ok_addr raw_addr mask.
+    bit_internal	    do_start_timer do_stop_timer unary_op.
+    bit_internal	    write_reg.
+    timer_internal	    n_timer.
+    timer_mode_internal	    timer_mode.
+    cpu_reg_addr_internal   result_reg.
+    byte_internal	    raw_byte_to_write zero.
+    byte_internal	    byte_to_write zero.
+    cpu_reg_decoded_internal select_reg.
+    CELL "draw_hier CPU_model" [
+	execution <- is_P_Idle state,
+	ROM "CPU_ROM" CPU_INSTRUCTIONS cnt c_instr,
+	op <- (c_instr-->instr),
+	do_nop <- is_NOP op,
+	do_clr <- is_CLEAR_REG op,
+	do_read <- is_READ_MEM op,
+	do_cs <- is_CONTEXT_SWITCH op,
+	do_stop <- is_STOP op,
+	do_start_timer <- is_START_TIMER op,
+	do_stop_timer <- is_STOP_TIMER op,
+	unary_op <- do_nop '|'
+		    do_start_timer '|'
+		    do_stop_timer '|'
+		    do_clr,
+	(Moore_FSM "CPU_FSM" clk state
+	    (reset, P_Idle)
+	    [
+		P_Idle          --- do_stop ---   P_Idle,
+		P_Idle          --- unary_op ---  P_Incr_PC,
+		P_Idle          --- do_cs ---     P_ContextSwitch,
+		P_Idle          --- do_read ---   P_RequestData,
+		P_ContextSwitch --- default ---   P_Incr_PC,
+		P_RequestData   --- default ---   P_WaitForData,
+		P_WaitForData   --- C2P_valid --- P_Incr_PC,
+		P_Incr_PC	--- default ---   P_Idle
+	    ]
+	),
+	result_reg <- c_instr-->dest,
+	SELECT C2P_data (P2C_addr-->byte) raw_byte_to_write,
+	byte_to_write <- (IF do_clr THEN '0 ELSE raw_byte_to_write),
+	write_reg <- C2P_valid '|' do_clr,
+	EN_DECODER write_reg (c_instr-->dest) select_reg,
+	re_ff_en clk (select_reg~~0) byte_to_write R0,
+	re_ff_en clk (select_reg~~1) byte_to_write R1,
+	re_ff_en clk (select_reg~~2) byte_to_write R2,
+	re_ff_en clk (select_reg~~3) byte_to_write R3,
+	P2C_req <- is_P_RequestData state,
+	CASE n_cnt [
+		reset --- '0,
+		(cnt '=' (''(CPU_INSTRUCTIONS-1))) --- cnt, 
+		(is_P_Incr_PC state '&' '~' do_stop) --- (cnt '+' '1)] cnt,
+	re_ff clk n_cnt cnt,
+	(Moore_FSM "TRUST_FSM" clk trust
+		(reset, Low)
+		[
+		    Low  --- (is_P_ContextSwitch state) --- High,
+		    High --- (is_P_ContextSwitch state) --- Low
+		]
+	),
+	mask <- ('' (2**(hw_size P2C_addr-1)-1)),
+	raw_addr <- (c_instr-->addr),
+	ok_addr <- (IF (is_High trust) THEN raw_addr ELSE (raw_addr '&' mask)),
+	(Moore_FSM "TIMER_FSM" clk timer_mode
+	    (reset, Timer_Idle)
+	    [
+		Timer_Idle --- do_start_timer --- Timer_Reset,
+		Timer_Reset --- do_stop_timer --- Timer_Idle,
+		Timer_Reset --- default --- Timer_Running,
+		Timer_Running --- do_stop_timer --- Timer_Idle,
+		Timer_Running --- do_stop_timer --- Timer_Idle
+	    ]
+	),
+	re_ff clk n_timer timer,
+	CASE n_timer [
+	    (reset '|' is_Timer_Reset timer_mode) --- '0,
+	    is_Timer_Running timer_mode --- (timer '+' '1)
+	    ] timer,
+	re_ff_en clk do_read ok_addr P2C_addr
+];
+
+let p_CPU = CPU_model 'clk 'reset 'C2P_valid 'C2P_data 'P2C_req
+		      'P2C_addr 'R0 'R1 'R2 'R3 'timer 'execution;
+let ckt_CPU = pexlif2fsm p_CPU;
+//let vis_CPU = STE_debug ckt_CPU;
+
+lettype op =
+	      OP_NOP
+	    | OP_HALT
+	    | OP_READ {address::addr} {dest::cpu_reg_addr}
+	    | OP_CLR {dest::cpu_reg_addr}
+	    | OP_SWITCH
+	    | OP_START_TIMER
+	    | OP_STOP_TIMER
+;
+
+let op2rom name op =
+    let sz = hw_size {'0::cpu_rom_data} in
+    let v = {hw_constr (W_VAR sz name)::cpu_rom_data} in
+    let select (OP_NOP) = v-->instr is NOP in_phase 0
+     /\ select (OP_HALT) = v-->instr is STOP in_phase 0
+     /\ select (OP_READ a d) =
+		(v-->instr is READ_MEM in_phase 0) and
+		(v-->addr is a in_phase 0) and
+		(v-->dest is d in_phase 0)
+    /\  select (OP_CLR d) = (v-->instr is CLEAR_REG in_phase 0) and
+			    (v-->dest is d in_phase 0)
+    /\  select (OP_SWITCH) = v-->instr is CONTEXT_SWITCH in_phase 0
+    /\  select (OP_START_TIMER) = v-->instr is START_TIMER in_phase 0
+    /\  select (OP_STOP_TIMER) = v-->instr is STOP_TIMER in_phase 0
+    in
+    select op
+;
+
+let op2str op =
+    let sz = hw_size {'0::cpu_rom_data} in
+    let b2s b = b == T => "1" | b == F => "0" | "S" in
+    let vl = map (\(w,n,v,f,t). (n,b2s v)) (op2rom "o" op) in
+    let get n = (assoc n vl) catch "X" in
+    let res = map get (md_expand_vector (sprintf "o[%d:0]" (sz-1))) then
+    ((setify res) subtract ["0","1"]) = [] =>
+	sprintf "0x%x" (sscanf "%b" (implode res))
+    |
+    list2str T "" "," "" id (compress res)
+;
+
+let P1op (OP_NOP) = "NOP"
+ /\ P1op (OP_HALT) = "HALT"
+ /\ P1op (OP_READ address dest) =
+        sprintf "READ %s -> R%s" (P_addr address) (P_cpu_reg_addr dest)
+ /\ P1op (OP_CLR dest) = sprintf "CLEAR %s" (P_cpu_reg_addr dest)
+ /\ P1op (OP_SWITCH) = "SWITCH_TRUST_LEVEL"
+ /\ P1op (OP_START_TIMER) = "START_TIMER"
+ /\ P1op (OP_STOP_TIMER) = "STOP_TIMER"
+;
+install_print_function P1op;
+
+let Pops ops = list2str T "\n" "\n" "\n" P1op ops;
+install_print_function Pops;
+
+let mk_CPU_ROM ckt ops =
+    let r = filter (str_is_substr "CPU_ROM") (vectors ckt) then
+    length r != 1 => eprintf "More than one CPU_ROM set of nodes" |
+    let R = hd (str_split (hd r) "[") in
+    let mk i op = 
+	let name = sprintf "%s[%d]" R i in
+	op2rom name op
+    in
+    (flat (map2 mk (0 upto (length ops-1)) ops))
+;
+
+// ===================== RAM model ============================
+
+let RAM_DELAY = 5;
+
+let DISTINCT_LOCATIONS = 3;
+
+ENUM "ram_state" ["R_IDLE", "R_WAITING", "R_READY"];
+
+let mk_var name =
+    let r_sz = hw_size {'a:: *r} in
+    let nds = md_expand_vector name in
+    length nds != r_sz => eprintf "Length mismatch for %s" name |
+    {(hw_constr (W_CAT (map (W_VAR 1) nds))):: *r}
+;
+
+letrec EMM_rec =
+    list_input		data_l.
+    list_input		addr_l.
+    addr_input		addr.
+    cache_line_output	out.
+    cache_line_internal rem.
+    CELL "draw_hier EMM" (
+	data_l = [] => [out <- 'X] |
+	let my_data = hd data_l in
+	let my_addr = hd addr_l in
+	(my_addr <: my_addr):
+	(my_data <: my_data):
+	(out <- (IF (my_addr '=' addr) THEN my_data ELSE rem)):
+	(EMM_rec (tl data_l) (tl addr_l) addr rem):[]
+);
+
+let EMM name =
+    addr_input          addr.
+    cache_line_output   out.
+    list_internal DISTINCT_LOCATIONS EMM_dta EMM_adr.
+    let pfn = sprintf "draw_hier {EMM %s (%d)}" name DISTINCT_LOCATIONS in
+    CELL pfn [
+	EMM_rec EMM_dta EMM_adr addr out
+];
+
+let RAM_model =
+    bit_input		clk.
+    bit_input		reset.
+    addr_input		addr.
+    bit_input		req.
+    cache_line_output	data.
+    bit_output		valid.
+    //
+    ram_state_internal	state.
+    bit_internal	timeout.
+    byte_internal	n_cnt cnt.
+    CELL "draw_hier RAM_model" [
+	EMM "MEM_EMM" addr data,
+	(Moore_FSM "RAM_STATE" clk state
+	(reset, R_IDLE) [
+		R_IDLE --- req --- R_WAITING,
+		R_WAITING --- timeout --- R_READY,
+		R_READY --- default --- R_IDLE
+	    ]
+	),
+	CASE n_cnt [
+	    is_R_IDLE state --- ''RAM_DELAY,
+	    is_R_WAITING state --- cnt '-' '1
+	] cnt,
+	re_ff clk n_cnt cnt,
+	timeout <- cnt '=' '0,
+	valid <- is_R_READY state
+];
+
+let p_RAM = RAM_model 'clk 'reset 'addr 'req 'data 'valid;
+let ckt_RAM = pexlif2fsm p_RAM;
+//let vis_RAM = STE_debug ckt_RAM;
+//vis_RAM;
+
+
+let mk_EMM_ant ckt (MEM addr_data_list) =
+    length addr_data_list > DISTINCT_LOCATIONS =>
+	eprintf "Too many address/data pairs in mk_EMM_ant!" 
+    |
+    let l1 = filter (str_is_substr "EMM_") (vectors ckt) then
+    length l1 != 2 => eprintf "More than one %s set of nodes" "EMM_" |
+    let pref = hd (str_split (hd l1) "EMM_") in
+    let asz = hw_size {'0::addr} in
+    let dsz = hw_size {'0::cache_line} in
+    let mk_a_vec i = 
+	{mk_var (sprintf "%sEMM_adr[%d][%d:0]" pref i (asz-1))::addr}
+    in
+    let mk_d_vec i =
+	{mk_var (sprintf "%sEMM_dta[%d][%d:0]" pref i (dsz-1))::cache_line}
+    in
+    letrec mk i ((a,d):rem) =
+	((mk_a_vec i) is a in_cycle 0) and
+	((mk_d_vec i) is d in_cycle 0) and
+	(mk (i+1) rem)
+     /\    mk i [] = []
+    in
+    mk 0 addr_data_list
+;
+
+// ===================== Cache ============================
+
+let cache_line =
+    bit_input		    clk.
+    bit_input		    reset.
+    bit_input		    we.
+    line_addr_input	    line.
+    cache_line_input	    din.
+    atag_field_input	    atag.
+    bit_output		    match.
+    cache_line_output	    dout.
+    bit_input               sel.
+    cache_line_input	    r_dout.
+    bit_input               r_match.
+    //
+    bit_internal	    my_we l_match.
+    ext_cache_line_internal n_cl cl.
+    //
+    CELL ("cache_line") [
+	my_we <- sel '&' we,
+	n_cl-->valid <- (IF reset THEN '0 ELSE (my_we '|' cl-->valid)),
+	n_cl-->aTag  <- (IF my_we THEN atag ELSE cl-->aTag),
+	n_cl-->data  <- (IF my_we THEN din ELSE cl-->data),
+	re_ff clk n_cl cl,
+	l_match <- sel '&' cl-->valid '&' (atag '=' cl-->aTag),
+	match <- (IF sel THEN l_match ELSE r_match),
+	dout <- (IF sel THEN cl-->data ELSE r_dout)
+    ]
+;
+
+letrec cache_rec n =
+    bit_input		    clk.
+    bit_input		    reset.
+    bit_input		    we.
+    line_addr_input	    line.
+    cache_line_input	    din.
+    atag_field_input	    atag.
+    bit_output		    match.
+    cache_line_output	    dout.
+    //
+    bit_internal	    my_we sel r_match l_match.
+    ext_cache_line_internal n_cl cl.
+    cache_line_internal	    r_dout.
+    CELL (sprintf "cache_rec %d" n) (
+    n < 0 => [
+	    dout  <- 'X,
+	    match <- '0
+    ] | [
+	sel <- line '=' ''n,
+	cache_rec (n-1) clk reset we line din atag r_match r_dout,
+        cache_line clk reset we line din atag match dout sel r_dout r_match
+]);
+
+let cache_mem =
+    bit_input			clk.
+    bit_input			reset.
+    bit_input			we.
+    line_addr_input		line.
+    cache_line_input		din.
+    atag_field_input		atag.
+    bit_output			hit.
+    cache_line_output		dout.
+    //
+    CELL "draw_hier CacheMem" [
+	cache_rec (LINES-1) clk reset we line din atag hit dout
+];
+
+let p_CacheMem = cache_mem 'clk 'reset 'we 'line 'din 'atag 'hit 'dout;
+let ckt_Cache_Mem = pexlif2fsm p_CacheMem;
+let vis_CacheMem = STE_debug ckt_Cache_Mem;
+vis_CacheMem;
+
+// =============================================================================

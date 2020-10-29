@@ -313,6 +313,8 @@ let
         SCHEME name fp (parse fa_inps) (parse fa_outs)
 ;
 
+// todo: don't flatten more than we need to (1 level).
+//
 // Flatten a 'PEXLIF' into its 'SCHEME's.
 //  flatten::pexlif->(scheme list)
 letrec
@@ -404,6 +406,8 @@ let mult m n = val n' = transpose n then map (pam n' # dot) m;
 //  mark_one::int->(bool list)->(bool list)
 let mark_one n xs = modify (const T) n (map (const F) xs);
 
+// todo: Keep list of solutions.
+//
 // Iterate over all unused row-indices.
 //  forall_unused::(bool mat)->int->(bool list)->(int->(bool mat)->(bool#(bool mat))
 let forall_unused m row used f =
@@ -422,9 +426,6 @@ let
         in
         only_one_solution mat AND p == mult mat (transpose (mult mat g))
 ;
-
-let Pcs cs = list2str T "[" "," "]" (sprintf "%B") cs;
-let Pm m = list2str T "[" "," "]\n" (list2str T "[" "," "]" (sprintf "%B")) m;
 
 // Find ...
 //
@@ -465,7 +466,12 @@ letrec
 let
     recover mat g_sc p_sc =
         let pairs = forall_ones mat (\(i,j). cons (el i p_sc, el j g_sc)) [] in
-        let pr (a,b) = sprintf "%s :-> %s" (name_of a) (name_of b) in
+        let pr2 (SCHEME n _ fa_i fa_o) =
+            sprintf "%s %S %S" n
+                (flatmap (map vec_info2str # snd) fa_i)
+                (flatmap (map vec_info2str # snd) fa_o)
+        in
+        let pr (a,b) = sprintf "%s :-> %s" (pr2 a) (pr2 b) in
         list2str T "{" "," "}" pr pairs
 ;
 
