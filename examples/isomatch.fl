@@ -163,33 +163,18 @@ let find_fingerprint as =
 // Fingerprinting.
 //------------------------------------------------------------------------------
 
-//------------------------------------------------------------------------------
-// Prime numbers.
-
-// todo: replace with built in generator.
-let list_of_primes = [
-      2,      3,      5,      7,     11,     13,     17,     19,     23,     29,
-     31,     37,     41,     43,     47,     53,     59,     61,     67,     71,
-     73,     79,     83,     89,     97,    101,    103,    107,    109,    113,
-    127,    131,    137,    139,    149,    151,    157,    163,    167,    173,
-    179,    181,    191,    193,    197,    199,    211,    223,    227,    229,
-    233,    239,    241,    251,    257,    263,    269,    271,    277,    281,
-    283,    293,    307,    311,    313,    317,    331,    337,    347,    349,
-    353,    359,    367,    373,    379,    383,    389,    397,    401,    409,
-    419,    421,    431,    433,    439,    443,    449,    457,    461,    463,
-    467,    479,    487,    491,    499,    503,    509,    521,    523,    541
-  ];
+load "examples/primes.fl";
 
 // note: we cap the integers so that they fit in a 64-bit word.
 let roof = ipow 2 63 - 1;
 
 // ...
 //  prime::int->int->int
-let prime n v = (v * el n list_of_primes) % roof;
+let prime n v = (v * el (n % num_of_primes) list_of_primes) % roof;
 
 // ...
 //  prime_list::(a->int)->int->(a list)->int
-let prime_list f = flip (ixlist (\a.\i.\s. prime i (f a) + s));
+let prime_list f = flip (ixlist (\a. \i. \s. prime i (f a) + s));
 
 //------------------------------------------------------------------------------
 // Gen. of a fingerprint.
@@ -201,52 +186,52 @@ let
 
 // Gen. a fingerprint for 'WEXPR'.
 letrec
-    fp_w (W_X s)		= prime 0 s
-/\  fp_w (W_CONST s i)		= prime 1 s + prime 2 i
-/\  fp_w (W_NAMED_CONST _ s i)	= prime 3 s + prime 4 i
-/\  fp_w (W_VAR s _)		= prime 5 s
-/\  fp_w (W_EXPLICIT_VAR s _)	= prime 6 s
-/\  fp_w (W_AND a b)		= prime 7 (fp_w a + fp_w b)
-/\  fp_w (W_OR a b)		= prime 8 (fp_w a + fp_w b)
-/\  fp_w (W_NOT a)		= prime 9 (fp_w a)
-/\  fp_w (W_EQ a b)		= prime 10 (fp_w a + fp_w b)
-/\  fp_w (W_PRED _ a)		= prime 11 (fp_w a)
-/\  fp_w (W_GR a b)		= prime 12 (fp_w a) + prime 13 (fp_w b)
-/\  fp_w (W_ADD a b)		= prime 14 (fp_w a + fp_w b)
-/\  fp_w (W_SUB a b)		= prime 15 (fp_w a) + prime 16 (fp_w b)
-/\  fp_w (W_MUL a b)		= prime 17 (fp_w a) + prime 18 (fp_w b)
-/\  fp_w (W_DIV a b)		= prime 19 (fp_w a) + prime 20 (fp_w b)
-/\  fp_w (W_MOD a b)		= prime 21 (fp_w a) + prime 22 (fp_w b)
-/\  fp_w (W_SHL a b)		= prime 23 (fp_w a) + prime 24 (fp_w b)
-/\  fp_w (W_SHR a b)		= prime 25 (fp_w a) + prime 26 (fp_w b)
-/\  fp_w (W_ASHR a b)		= prime 27 (fp_w a) + prime 28 (fp_w b)
-/\  fp_w (W_SX s a)		= prime 29 s + prime 30 (fp_w a)
-/\  fp_w (W_ZX s a)		= prime 31 s + prime 32 (fp_w a)
-/\  fp_w (W_ITE a b c)          = prime 33 (fp_w a) + prime 34 (fp_w b)
-                                                    + prime 35 (fp_w c)
-/\  fp_w (W_SLICE ix a)	        = prime 36 (fp_w a) + prime_list id 0 ix
-/\  fp_w (W_NAMED_SLICE _ ix a) = prime 37 (fp_w a) + prime_list id 0 ix
+    fp_w (W_X s)		= prime 1 s
+/\  fp_w (W_CONST s i)		= prime 2 s + prime 3 i
+/\  fp_w (W_NAMED_CONST _ s i)	= prime 4 s + prime 5 i
+/\  fp_w (W_VAR s _)		= prime 6 s
+/\  fp_w (W_EXPLICIT_VAR s _)	= prime 7 s
+/\  fp_w (W_AND a b)		= prime 8 (fp_w a + fp_w b)
+/\  fp_w (W_OR a b)		= prime 9 (fp_w a + fp_w b)
+/\  fp_w (W_NOT a)		= prime 10 (fp_w a)
+/\  fp_w (W_EQ a b)		= prime 11 (fp_w a + fp_w b)
+/\  fp_w (W_PRED _ a)		= prime 12 (fp_w a)
+/\  fp_w (W_GR a b)		= prime 13 (fp_w a) + prime 14 (fp_w b)
+/\  fp_w (W_ADD a b)		= prime 15 (fp_w a + fp_w b)
+/\  fp_w (W_SUB a b)		= prime 16 (fp_w a) + prime 17 (fp_w b)
+/\  fp_w (W_MUL a b)		= prime 18 (fp_w a) + prime 19 (fp_w b)
+/\  fp_w (W_DIV a b)		= prime 20 (fp_w a) + prime 21 (fp_w b)
+/\  fp_w (W_MOD a b)		= prime 22 (fp_w a) + prime 23 (fp_w b)
+/\  fp_w (W_SHL a b)		= prime 24 (fp_w a) + prime 25 (fp_w b)
+/\  fp_w (W_SHR a b)		= prime 26 (fp_w a) + prime 27 (fp_w b)
+/\  fp_w (W_ASHR a b)		= prime 28 (fp_w a) + prime 29 (fp_w b)
+/\  fp_w (W_SX s a)		= prime 30 s + prime 31 (fp_w a)
+/\  fp_w (W_ZX s a)		= prime 32 s + prime 33 (fp_w a)
+/\  fp_w (W_ITE a b c)          = prime 34 (fp_w a) + prime 35 (fp_w b)
+                                                    + prime 36 (fp_w c)
+/\  fp_w (W_SLICE ix a)	        = prime 37 (fp_w a) + prime_list id 1 ix
+/\  fp_w (W_NAMED_SLICE _ ix a) = prime 38 (fp_w a) + prime_list id 1 ix
 /\  fp_w (W_UPDATE_NAMED_SLICE a _ ix b)
-                                = prime 38 (fp_w a) + prime 39 (fp_w b)
-                                                    + prime_list id 0 ix
-/\  fp_w (W_CAT as)             = prime_list fp_w 40 as
-/\  fp_w (W_MEM_READ m a b)     = prime 41 (fp_mem m) + prime 42 (fp_w a)
-                                                      + prime 43 (fp_w b)
-/\  fp_w (W_MEM_WRITE m a b d)  = prime 44 (fp_mem m) + prime 45 (fp_w a)
-                                                      + prime 46 (fp_w b)
-                                                      + prime 47 (fp_w d)
+                                = prime 39 (fp_w a) + prime 40 (fp_w b)
+                                                    + prime_list id 1 ix
+/\  fp_w (W_CAT as)             = prime_list fp_w 41 as
+/\  fp_w (W_MEM_READ m a b)     = prime 42 (fp_mem m) + prime 43 (fp_w a)
+                                                      + prime 44 (fp_w b)
+/\  fp_w (W_MEM_WRITE m a b d)  = prime 45 (fp_mem m) + prime 46 (fp_w a)
+                                                      + prime 47 (fp_w b)
+                                                      + prime 48 (fp_w d)
 ;
 
 // Gen. a fingerprint for 'UPDATE_FN'.
 let
-    fp_fn (W_UPDATE_FN l r)   = prime 48 (fp_w l) + prime 49 (fp_w r)
-/\  fp_fn (W_PHASE_DELAY l r) = prime 50 (fp_w l) + prime 51 (fp_w r)
+    fp_fn (W_UPDATE_FN l r)   = prime 49 (fp_w l) + prime 50 (fp_w r)
+/\  fp_fn (W_PHASE_DELAY l r) = prime 51 (fp_w l) + prime 52 (fp_w r)
 ;
 
 // Gen. a fingerprint for the "formals" of an input/output declaration.
 // todo: consider the sizes of each formal argument (how to fetch them?).
 let
-    fp_formal ps = prime 58 (length ps)
+    fp_formal ps = prime 53 (length ps)
 ;
 
 // Gen. a fingerprint for the "actuals" of an input/output declaration.
@@ -255,15 +240,15 @@ let
         let fp_vi (TXT _)     = prime 54 1
         /\  fp_vi (RANGES ix) =
                 let go (x,y) = x = y => prime 55 x | prime 56 x + prime 57 y in
-                prime_list go 0 ix
+                prime_list go 1 ix
         in
         let vss = map (map md_split_vector # snd) ps in
-        prime_list (\vs. prime_list (\v. sum_with fp_vi v) 0 vs) 59 vss
+        prime_list (\vs. prime_list (\v. sum_with fp_vi v) 1 vs) 58 vss
 ;
 
 // Gen. a fingerprint for 'CONTENT'.
 let
-    fp_c (P_LEAF fs) = prime 52 (length fs) + prime_list fp_fn   0 fs
+    fp_c (P_LEAF fs) = prime 59 (length fs) + prime_list fp_fn 1 fs
 /\  fp_c (P_HIER cs) =
         let go (PINST _ attrs _ fa_inps fa_outs _ _) =
             ( find_fingerprint attrs
@@ -271,7 +256,7 @@ let
             + fp_actual fa_outs
             )
         in
-        prime 51 (length cs) + prime_list go 0 cs
+        prime 60 (length cs) + prime_list go 1 cs
 ;
 
 // Gen. a fingerprint for each 'PEXLIF' on creation (fingerprint 'c'?).
