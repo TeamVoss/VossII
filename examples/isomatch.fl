@@ -21,6 +21,10 @@ let const a b = a;
 //  flip::(a->b->c)->b->a->c
 let flip f a b = f b a;
 
+// Infinite list of repeated applications of 'f' to 'x'.
+//     iterate::(a->a)->a->(a list)
+letrec iterate f x = x : iterate f (f x);
+
 // "Curry" a function.
 //  curry::((a->b->c)->(a#b)->c
 let curry f (a,b) = f a b;
@@ -29,12 +33,30 @@ let curry f (a,b) = f a b;
 //  uncurry::((a#b)->c)->a->b->c
 let uncurry f a b = f (a,b);
 
-// Runs the binary function g on the results of applying unary function f to two arguments x and y.
+// Runs the binary function g on the results of applying unary function f to two
+// arguments x and y.
 //  on::(b->b->c)->(a->b)->a->a->c
 let on g f x y = g (f x) (f y);
 infix 3 on;
 
-// "Map" with its arguments flipped.
+// Takes two lists and returns a list of corresponding pairs. If one input list
+// is short, excess elements of the longer list are discarded.
+//  zip_uneven::(a list)->(b list)->((a#b) list)
+letrec
+    zip_uneven (x:xs) (y:ys) = (x,y) : zip_uneven xs ys
+/\  zip_uneven _ [] = []
+/\  zip_uneven [] _ = []
+;
+
+// Apply 'f' to the first element of pair '(a,b)'.
+//  first::(a->c)->(a#b)->(c#b)
+let first f (a,b) = (f a,b);
+
+// Apply 'f' to the second element of a pair '(a,b)'.
+//  second::(b->c)->(a#b)->(a#c)
+let second f (a,b) = (a,f b);
+
+// 'map' with its arguments flipped.
 //  pam::(a list)->(a->b)->(b list)
 let pam = flip map;
 
@@ -71,26 +93,11 @@ let num_rows = length;
 let num_columns xs = empty xs => 0 | length (hd xs);
 
 //------------------------------------------------------------------------------
-// Pairs
-
-// Apply 'f' to the first element of pair '(a,b)'.
-//  first::(a->c)->(a#b)->(c#b)
-let first f (a,b) = (f a,b);
-
-// Apply 'f' to the second element of a pair '(a,b)'.
-//  second::(b->c)->(a#b)->(a#c)
-let second f (a,b) = (a,f b);
-
-//------------------------------------------------------------------------------
 // List
 
 // Drops the first element of a list.
 //  butfirst::(a list)->(a list)
-let butfirst (x:xs) = xs;
-
-// Infinite list of repeated applications of 'f' to 'x'.
-//     iterate::(a->a)->a->(a list)
-letrec iterate f x = x : iterate f (f x);
+let butfirst = tl;
 
 // Fold (rigth-to-left) a list 'xs' with 'f' into 'b'.
 //  ixlist::(a->int->b->b)->(a list)->b->b
@@ -281,67 +288,135 @@ let
 ;
 
 //------------------------------------------------------------------------------
-// todo: don't flatten more than we need to (1 level).
-// todo: order adj. matrix nodes by connectivity
+// ....
+//------------------------------------------------------------------------------
 
-// "entity" decl. of a 'PEXLIF'.
+//------------------------------------------------------------------------------
+// Schemes: entity decl. of a 'PEXLIF'.
+
 lettype scheme =
         SCHEME
             {name::string}
             {fp::int}
             {inps::(string#((vec_info list) list)) list}
             {outs::(string#((vec_info list) list)) list}
+            {regs::(vec_info list) list}
 ;
 
-let name_of (SCHEME n _ _ _)  = n;
-let fp_of   (SCHEME _ fp _ _) = fp;
-
-let
-    Pscheme scheme =
-        val (SCHEME name fp inps outs) = scheme in
-        let pr (f,a) = sprintf "(%s,%s)" f (list2str T "{" "," "}" vec_info2str a) in
-        let i = list2str T "\n    [" "," "]" pr inps in
-        let o = list2str T "\n    [" "," "]" pr outs in
-        sprintf "\n(SCHEME name:\"%s\" fingerprint:%d %s %s)" name fp i o
-;
-install_print_function Pscheme;
+// ...
+let name_of_scheme (SCHEME n _ _ _ _) = n;
 
 // "Smart" constructor for a 'SCHEME'.
+//  mk_scheme::PEXLIF->SCHEME
 let
-    scheme name attrs fa_inps fa_outs =
+    mk_scheme name attrs fa_inps fa_outs internals =
         let parse = map (second (map md_split_vector)) in
         let fp_ix = find_fingerprint attrs in
         let fp    = fp_ix == 0 => 0 | s2int (snd (el fp_ix attrs)) in
-        SCHEME name fp (parse fa_inps) (parse fa_outs)
+        SCHEME name fp
+            (parse fa_inps)
+            (parse fa_outs)
+            (map md_split_vector internals)
 ;
 
-// Collect the 'SCHEME's of a 'PEXLIF'.
-//  collect_schemes::pexlif->(scheme list)
-letrec
-    collect_schemes (PINST name attrs _ fa_inps fa_outs _ (P_LEAF _)) =
-        [scheme name attrs fa_inps fa_outs]
-/\  collect_schemes (PINST name attrs _ fa_inps fa_outs _ (P_HIER c)) =
-        (scheme name attrs fa_inps fa_outs) : flatmap collect_schemes c
-;
-
-// Check if two 'SCHEME's share a wire.
-//  connected::scheme->scheme->bool
+// Checks if two 'SCHEME's are connected via a wire.
+//  test_scheme::SCHEME->SCHEME->bool
 let
-    connected (SCHEME name _ fa_inps fa_outs) (SCHEME name' _ fa_inps' fa_outs') =
-        let shares_wire xs ys = any (\x. any (vec_info_eq x) ys) xs in
-        let wires xs = flatmap snd xs in name == name' OR
-        shares_wire
-          (wires fa_inps  @ wires fa_outs)
-          (wires fa_inps' @ wires fa_outs')
+    test_scheme (SCHEME _ _ i1 o1 _) (SCHEME _ _ i2 o2 _) =
+        let check xs ys = any (\x. any (\y. vec_info_eq x y) ys) xs in
+        let wires xs = flatmap snd xs in
+        check (wires i1 @ wires o1)
+              (wires i2 @ wires o2)
+
 ;
+
+//------------------------------------------------------------------------------
+// Adj.node: record of adjacencies for a node. todo: not just adjacencies...
+
+lettype anode =
+        ANODE
+            {inst::string}
+            {adjacent::string list}
+;
+
+let Panode (ANODE i as) = sprintf "%s <-> %S" i as;
+install_print_function Panode;
+
+// ...
+let inst_of_anode (ANODE i _) = i;
+let adj_of_anode (ANODE _ as) = as;
+
+// Cons a node to an 'ADJ.NODE's adjacencies.
+//  cons_anode::anode->string->anode
+let cons_anode a (ANODE i as) = ANODE i (a:as);
+
+// ...
+//  flatten_anode::(anode list)->(bool mat)
+let
+    flatten_anode as =
+        let order = zip_uneven (map inst_of_anode as) (iterate (\i.i+1) 1) in
+        let go xs =
+                itlist (\x. list_update T (assoc x order)) xs
+                    (replicate (length as) F)
+        in
+        map (go # adj_of_anode) as
+;
+
+//------------------------------------------------------------------------------
+// Adj. matrix construction.
+//------------------------------------------------------------------------------
+
+// Connect two nodes if their SCHEME's share a wire.
+//  adj_connect::SCHEME->(ANODE,SCHEME,[ANODE])->(ANODE,SCHEME,[ANODE])
+let adj_connect r (a,s,c) = test_scheme s r => (cons_anode (name_of_scheme r) a,s,c) | (a,s,c);
+
+// Merge a "parent" node with its "children".
+//  adj_merge::(ANODE,SCHEME,[ANODE])->[(ANODE,SCHEME,[ANODE])]->(ANODE,SCHEME,[ANODE])
+let adj_merge (a,s,c) as = (a,s,itlist (\(b,_,d). append (b:d)) as c);
+
+// Traverse a 'PINST' and record every node's adjacencies to other nodes.
+//  adj_reduce::str->PINST->(ANODE,SCHEME,[ANODE])
+forward_declare {adj_map::string->content->((anode#(scheme#(anode list))) list)};
+letrec
+    adj_reduce inst (PINST _ as _ fa_is fa_os int cont) =
+        // Construct/Fetch 'adj.node' for this 'PINST' and its 'cont' children.
+        let p   = (ANODE inst [], mk_scheme inst as fa_is fa_os int, []) in
+        let ps  = adj_map inst cont in
+        // Compute adjacencies for 'p' and 'ps'.
+        let sc (_,s,_) = s in
+        let p'  = itlist (adj_connect) (map sc ps) p in
+        let ps' = map (adj_connect (sc p)) ps in
+        // Finally add new 'ps' as children to new 'p', droppin their 'SCHEME's.
+        adj_merge p' ps'
+;
+letrec
+    adj_map inst (P_LEAF _)  = []
+/\  adj_map inst (P_HIER ps) =
+        letrec
+            go _ []     = []
+        /\  go c (p:ps) =
+                let n = sprintf "%s/%d" inst c in
+                adj_reduce n p : go (c+1) ps
+        in
+        go 1 ps
+;
+
+//------------------------------------------------------------------------------
 
 // Construct an adjacency matrix (shared wires) for a 'PEXLIF'.
-//  adjacency_matrix::(scheme list)->(int mat)
-let adjacency_matrix sc = map (pam sc # connected) sc;
+//  adjacency_matrix::PEXLIF->(bool mat)
+let adjacency_matrix pexlif =
+        val (p,_,cs) = adj_reduce "1" pexlif in
+        flatten_anode (p:cs)
+;
+
+//------------------------------------------------------------------------------
+// Iso. match matrix.
+//------------------------------------------------------------------------------
 
 // Construct an isomatch matrix (possible matches) from two adjacency matrices.
-//  isomatch_matrix::(scheme list)->(scheme list)->(bool mat)
-let isomatch_matrix g_sc p_sc = map (pam g_sc # equal on fp_of) p_sc;
+//  isomatch_matrix::PEXLIF->PEXLIF->(bool mat)
+let isomatch_matrix = 0;
 
 //------------------------------------------------------------------------------
 // Ullman’s Subgraph Isomorphism Algorithm:
@@ -460,7 +535,7 @@ letrec
 let
     recover mat g_sc p_sc =
         let pairs = forall_ones mat (\(i,j). cons (el i p_sc, el j g_sc)) [] in
-        let pr2 (SCHEME n _ fa_i fa_o) =
+        let pr2 (SCHEME n _ fa_i fa_o _) =
             sprintf "%s %S %S" n
                 (flatmap (map vec_info2str # snd) fa_i)
                 (flatmap (map vec_info2str # snd) fa_o)

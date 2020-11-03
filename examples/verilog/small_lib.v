@@ -1,5 +1,6 @@
-// File: small_lib.v
-module mux2(
+// =============================================================================
+
+module mymux2(
   din_0,  // Mux first input
   din_1,  // Mux Second input
   sel,    // Select input
@@ -12,3 +13,5 @@ reg mux_out;
 assign mux_out = (sel) ? din_1 : din_0;
 
 endmodule
+
+// =============================================================================

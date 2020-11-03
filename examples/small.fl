@@ -4,41 +4,24 @@ load "ste.fl";
 //------------------------------------------------------------------------------
 // Load example files.
 
-let g_pex = verilog2pexlif "-Iexamples/verilog" "mux4" ["small.v","small_lib.v"] [];
+let g_pex = verilog2pexlif "-Iexamples/verilog" "mux4" ["small.v"] [];
 //Emit_pexlif "puzzle.txt" g_pex;
 
-let p_pex = verilog2pexlif "-Iexamples/verilog" "mux2" ["small_lib.v"] [];
+let p_pex = verilog2pexlif "-Iexamples/verilog" "mymux2" ["small_lib.v"] [];
 //Emit_pexlif "piece.txt" p_pex;
 
 //------------------------------------------------------------------------------
 
-// let a = flatten p;
-// let b = adjacency_matrix a;
-// let c = isomatch_matrix a a;
-// recurse c b b (replicate (length b) F) 0;
+let g = adjacency_matrix g_pex;
+let p = adjacency_matrix p_pex;
+//let m = isomatch_matrix  g_pex p_pex;
+//let ms = recurse m g p;
+//let ans = list2str T "\n" "\n==========\n" "\n" id (map (\n. recover n g_scheme p_scheme) ms);
 
 //------------------------------------------------------------------------------
 
-let g_scheme = collect_schemes g_pex;
-let p_scheme = collect_schemes p_pex;
-//
-let g = adjacency_matrix g_scheme;
-let p = adjacency_matrix p_scheme;
-let m = isomatch_matrix  g_scheme p_scheme;
-//
-val ms = recurse m g p;
-//
-let ans = list2str T "\n" "\n==========\n" "\n" id
-              (map (\n. recover n g_scheme p_scheme) ms);
-
-//------------------------------------------------------------------------------
-
-//(g_m) fseq ((p_m) fseq ());
-
-//let xs = forall_ones m cons [];
-//let ys = map (\i. forall_neighbors i p_m (cons) []) (map fst xs);
-//let zs = map (\j. forall_neighbors j g_m (cons) []) (map snd xs);
-//prune m g_m p_m;
+let g' = val (g,_,cs) = adj_reduce "1" g_pex in (g:cs);
+let p' = val (p,_,cs) = adj_reduce "1" p_pex in (p:cs);
 
 //------------------------------------------------------------------------------
 // Fin.
