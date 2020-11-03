@@ -15,7 +15,7 @@ Emit_pexlif "piece.txt" p_pex;
 let g = adjacency_matrix g_pex;
 let p = adjacency_matrix p_pex;
 let m = isomatch_matrix  g_pex p_pex;
-//let ms = recurse m g p;
+let ms = recurse m g p;
 //let ans = list2str T "\n" "\n==========\n" "\n" id (map (\n. recover n g_scheme p_scheme) ms);
 
 //------------------------------------------------------------------------------
