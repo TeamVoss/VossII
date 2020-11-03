@@ -1,0 +1,25 @@
+load "examples/isomatch.fl";
+load "ste.fl";
+
+//------------------------------------------------------------------------------
+// ...
+//------------------------------------------------------------------------------
+
+// Load verilog examples.
+let g_pex = verilog2pexlif "-Iexamples/verilog" "mux4" ["small.v"] [];
+let p_pex = verilog2pexlif "-Iexamples/verilog" "mymux2" ["small_lib.v"] [];
+
+// Print 'PINST' files for debugging.
+//Emit_pexlif "puzzle.txt" g_pex;
+//Emit_pexlif "piece.txt" p_pex;
+
+// Create adj./iso. matrices.
+let g = adjacency_matrix g_pex;
+let p = adjacency_matrix p_pex;
+let m = isomatch_matrix  g_pex p_pex;
+
+// Perform iso. matching.
+let res = recurse m g p;
+
+//------------------------------------------------------------------------------
+// Fin.
