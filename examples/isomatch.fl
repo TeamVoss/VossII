@@ -154,7 +154,10 @@ let attributes_of (PINST _ as _ _ _ _ _) = as;
 
 // Fetch the "fingerprint" attribute. If none exists, returns 0.
 //  find_fingerprint::(string#string list)->int
-let find_fingerprint as = find_first0 (\(n,_). n == "fingerprint") as;
+let find_fingerprint as =
+        let ix = find_first0 (\(n,_). n == "fingerprint") as in
+        ix == 0 => 0 | s2int (snd (el ix as))
+;
 
 //------------------------------------------------------------------------------
 // Fingerprinting.
@@ -297,37 +300,29 @@ let
 lettype scheme =
         SCHEME
             {name::string}
-            {fp::int}
             {inps::(string#((vec_info list) list)) list}
             {outs::(string#((vec_info list) list)) list}
-            {regs::(vec_info list) list}
+         // {regs::(vec_info list) list}
 ;
 
 // ...
-let name_of_scheme (SCHEME n _ _ _ _) = n;
+let name_of_scheme (SCHEME n _ _) = n;
 
 // "Smart" constructor for a 'SCHEME'.
 //  mk_scheme::PEXLIF->SCHEME
 let
-    mk_scheme name attrs fa_inps fa_outs internals =
+    mk_scheme name fa_inps fa_outs internals =
         let parse = map (second (map md_split_vector)) in
-        let fp_ix = find_fingerprint attrs in
-        let fp    = fp_ix == 0 => 0 | s2int (snd (el fp_ix attrs)) in
-        SCHEME name fp
-            (parse fa_inps)
-            (parse fa_outs)
-            (map md_split_vector internals)
+        SCHEME name (parse fa_inps) (parse fa_outs)
 ;
 
 // Checks if two 'SCHEME's are connected via a wire.
 //  test_scheme::SCHEME->SCHEME->bool
 let
-    test_scheme (SCHEME _ _ i1 o1 _) (SCHEME _ _ i2 o2 _) =
+    test_scheme (SCHEME _ i1 o1) (SCHEME _ i2 o2) =
         let check xs ys = any (\x. any (\y. vec_info_eq x y) ys) xs in
         let wires xs = flatmap snd xs in
-        check (wires i1 @ wires o1)
-              (wires i2 @ wires o2)
-
+        check (wires i1 @ wires o1) (wires i2 @ wires o2)
 ;
 
 //------------------------------------------------------------------------------
@@ -339,9 +334,6 @@ lettype anode =
             {adjacent::string list}
 ;
 
-let Panode (ANODE i as) = sprintf "%s <-> %S" i as;
-install_print_function Panode;
-
 // ...
 let inst_of_anode (ANODE i _) = i;
 let adj_of_anode (ANODE _ as) = as;
@@ -350,7 +342,7 @@ let adj_of_anode (ANODE _ as) = as;
 //  cons_anode::anode->string->anode
 let cons_anode a (ANODE i as) = ANODE i (a:as);
 
-// ...
+// ... bad name ...
 //  flatten_anode::(anode list)->(bool mat)
 let
     flatten_anode as =
@@ -380,7 +372,7 @@ forward_declare {adj_map::string->content->((anode#(scheme#(anode list))) list)}
 letrec
     adj_reduce inst (PINST _ as _ fa_is fa_os int cont) =
         // Construct/Fetch 'adj.node' for this 'PINST' and its 'cont' children.
-        let p   = (ANODE inst [], mk_scheme inst as fa_is fa_os int, []) in
+        let p   = (ANODE inst [], mk_scheme inst fa_is fa_os int, []) in
         let ps  = adj_map inst cont in
         // Compute adjacencies for 'p' and 'ps'.
         let sc (_,s,_) = s in
@@ -405,7 +397,8 @@ letrec
 
 // Construct an adjacency matrix (shared wires) for a 'PEXLIF'.
 //  adjacency_matrix::PEXLIF->(bool mat)
-let adjacency_matrix pexlif =
+let
+    adjacency_matrix pexlif =
         val (p,_,cs) = adj_reduce "1" pexlif in
         flatten_anode (p:cs)
 ;
@@ -413,10 +406,28 @@ let adjacency_matrix pexlif =
 //------------------------------------------------------------------------------
 // Iso. match matrix.
 //------------------------------------------------------------------------------
+// todo: I don't know how to speed this up yet.
+// todo: Should produce an 'ordering' for nodes, this relies on a lot of internals.
+
+// ...
+//  iso_collect::PEXLIF->(int list)
+letrec
+    iso_collect (PINST _ attrs _ _ _ _ (P_LEAF _))  =
+        [find_fingerprint attrs]
+/\  iso_collect (PINST _ attrs _ _ _ _ (P_HIER cs)) =
+        find_fingerprint attrs : flatmap iso_collect cs
+;
+
+//------------------------------------------------------------------------------
 
 // Construct an isomatch matrix (possible matches) from two adjacency matrices.
 //  isomatch_matrix::PEXLIF->PEXLIF->(bool mat)
-let isomatch_matrix = 0;
+let
+    isomatch_matrix pexlif_g pexlif_p =
+        let fs_g = iso_collect pexlif_g in
+        let fs_p = iso_collect pexlif_p in
+        map (pam fs_g # equal) fs_p
+;
 
 //------------------------------------------------------------------------------
 // Ullman’s Subgraph Isomorphism Algorithm:
@@ -532,17 +543,17 @@ letrec
 
 // Recover the PINST names (the "answer") of a solution given by 'recurse'.
 //  recover::(bool mat)->(scheme list)->(scheme list)->string
-let
-    recover mat g_sc p_sc =
-        let pairs = forall_ones mat (\(i,j). cons (el i p_sc, el j g_sc)) [] in
-        let pr2 (SCHEME n _ fa_i fa_o _) =
-            sprintf "%s %S %S" n
-                (flatmap (map vec_info2str # snd) fa_i)
-                (flatmap (map vec_info2str # snd) fa_o)
-        in
-        let pr (a,b) = sprintf "%s\n :-> %s" (pr2 a) (pr2 b) in
-        list2str T "{" "\n," "}" pr pairs
-;
+// let
+//     recover mat g_sc p_sc =
+//         let pairs = forall_ones mat (\(i,j). cons (el i p_sc, el j g_sc)) [] in
+//         let pr2 (SCHEME n _ fa_i fa_o _) =
+//             sprintf "%s %S %S" n
+//                 (flatmap (map vec_info2str # snd) fa_i)
+//                 (flatmap (map vec_info2str # snd) fa_o)
+//         in
+//         let pr (a,b) = sprintf "%s\n :-> %s" (pr2 a) (pr2 b) in
+//         list2str T "{" "\n," "}" pr pairs
+// ;
 
 //------------------------------------------------------------------------------
 // Fin.
