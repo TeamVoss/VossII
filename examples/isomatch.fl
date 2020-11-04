@@ -390,7 +390,7 @@ letrec
 
 // ...
 /// xxx::PINST->[ANODE]
-let xxx pexlif depth = val (p,_,cs) = adj_reduce "1" depth pexlif in (p:cs);
+let xxx pexlif depth = val (p,_,cs) = xxx_reduce "1" depth pexlif in (p:cs);
 
 //==============================================================================
 //
