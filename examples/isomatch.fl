@@ -405,7 +405,8 @@ let xxx pexlif depth = val (p,_,cs) = xxx_reduce "1" depth pexlif in (p:cs);
 
 // Construct an adjacency matrix (shared wires) for a 'PEXLIF'.
 //  adjacency_matrix::[ANODE]->(bool mat)
-let adjacency_matrix as =
+let
+    adjacency_matrix as =
         let order = zip_uneven (map inst_of_anode as) (iterate (\i.i+1) 1) in
         let go xs = itlist (\x. list_update T (assoc x order)) xs (replicate (length as) F) in
         map (go # adj_of_anode) as
