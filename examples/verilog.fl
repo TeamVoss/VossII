@@ -14,9 +14,12 @@ let p_pex = verilog2pexlif "-Iexamples/verilog" "mymux2" ["small_lib.v"] [];
 //Emit_pexlif "piece.txt" p_pex;
 
 // Create adj./iso. matrices.
-let g = adjacency_matrix g_pex;
-let p = adjacency_matrix p_pex;
-let m = isomatch_matrix  g_pex p_pex;
+let as_g = xxx g_pex 1;
+let as_p = xxx p_pex 0;
+//
+let g = adjacency_matrix as_g;
+let p = adjacency_matrix as_p;
+let m = isomatch_matrix  as_g as_p;
 
 // Perform iso. matching.
 let res = recurse m g p;

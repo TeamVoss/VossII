@@ -1,9 +1,11 @@
-//------------------------------------------------------------------------------
-// Random util. things.
-//------------------------------------------------------------------------------
+//==============================================================================
+//
+// Random util. things that I think are just neat.
+//
+//==============================================================================
 
 //------------------------------------------------------------------------------
-// Misc.
+// Misc. combinators.
 
 // Check if 'p' is satisfied with all elements of 'as'.
 //  all::(a->bool)->(a list)->bool
@@ -60,40 +62,27 @@ let second f (a,b) = (a,f b);
 //  pam::(a list)->(a->b)->(b list)
 let pam = flip map;
 
-// Non-infix version of (,) because "(,) a b" doesn't seem to work.
+//------------------------------------------------------------------------------
+// Non-infix versions of combinators/constructors.
+
+// Non-infix version of (,).
 //  pair::a->b->(a#b)
 let pair a b = (a,b);
 
-// Non-infix version of (:) because ...
+// Non-infix version of (:).
 //  const::a->(a list)->(a list)
 let cons a b = a : b;
 
-// Non-infix version of (==) because I can't figure out how to write that.
+// Non-infix version of (==).
 //  equal::a->a->bool
 let equal a b = a == b;
 
-// Non-infix version of (!=) for a similar reason.
+// Non-infix version of (!=).
 //  not_equal::a->a->bool
 let not_equal a b = NOT (equal a b);
 
-// Checks if an element is a memeber of the given list.
-//  elem::a->(a list)->bool
-let elem a as = find_first0 (equal a) as == 0 => F | T ;
-
-// ...
-//  sum_with::(a->int)->(a list)->int
-let sum_with f as = itlist (\a. \s. f a + s) as 0;
-
-// ...
-//  num_rows::(a mat)->int
-let num_rows = length;
-
-// ...
-//  num_columns::(a mat)->int
-let num_columns xs = empty xs => 0 | length (hd xs);
-
 //------------------------------------------------------------------------------
-// List
+// List.
 
 // Drops the first element of a list.
 //  butfirst::(a list)->(a list)
@@ -106,6 +95,33 @@ let ixlist f xs b = snd (itlist (\x. \(ix,s). (ix-1,f x ix s)) xs (length xs,b))
 // Modify the 'n'th element of a list 'xs' with 'f'.
 //  modify::(a->a)->int->(a list)->(a list)
 let modify f n xs = ixlist (\x. \ix. \ys. n == ix => f x : ys | x : ys) xs [];
+
+// Set the 'n'th element of a list 'x' to 'v'.
+//  list_update::a->int->(a vec)->(a vec)
+let list_update v i = modify (const v) i;
+
+// Checks if an element is a memeber of the given list.
+//  elem::a->(a list)->bool
+let elem a as = find_first0 (equal a) as == 0 => F | T ;
+
+// ...
+//  sum_with::(a->int)->(a list)->int
+let sum_with f as = itlist (\a. \s. f a + s) as 0;
+
+//------------------------------------------------------------------------------
+// Matrix.
+
+// Count the number of rows in a matrix.
+//  num_rows::(a mat)->int
+let num_rows = length;
+
+// Count the number of columns in a square matrix.
+//  num_columns::(a mat)->int
+let num_columns xs = empty xs => 0 | length (hd xs);
+
+// Set the '(i,j)'th element of matrix 'mat' to 'v'.
+//  mat_update::a->(int#int)->(a mat)->(a mat)
+let mat_update v (i,j) = modify (list_update v j) i;
 
 //------------------------------------------------------------------------------
 // String
@@ -123,18 +139,7 @@ let string_butfirst = string_tl;
 let string_butlast s = string_butlastn s 1;
 
 //------------------------------------------------------------------------------
-// Vector/Matrix (lists/list of lists).
-
-// Set the 'n'th element of a list 'x' to 'v'.
-//  list_update::a->int->(a vec)->(a vec)
-let list_update v i = modify (const v) i;
-
-// Set the '(i,j)'th element of matrix 'mat' to 'v'.
-//  mat_update::a->(int#int)->(a mat)->(a mat)
-let mat_update v (i,j) = modify (list_update v j) i;
-
-//------------------------------------------------------------------------------
-// Pexlif.
+// Vec_info.
 
 // Compare two 'VEC_INFO' to see if they're equal.
 //  vec_info_eq::(vec_info list)->(vec_info list)->bool
@@ -147,6 +152,9 @@ let
         in
         (length vs) == (length ys) AND all (curry check) (zip vs ys)
 ;
+
+//------------------------------------------------------------------------------
+// Pexlif.
 
 // Feth a 'PEXLIF's attribute list.
 //  attributes_of::pexlif->(string#string list)
@@ -168,11 +176,11 @@ load "examples/primes.fl";
 // note: we cap the integers so that they fit in a 64-bit word.
 let roof = ipow 2 63 - 1;
 
-// ...
+// Multiply a value 'v' by the 'n'th prime (modulo 10,000), fitted to 64bits.
 //  prime::int->int->int
 let prime n v = (v * el (n % num_of_primes) list_of_primes) % roof;
 
-// ...
+// Multiply each value by a prime, starting at some 'n', and sum the results.
 //  prime_list::(a->int)->int->(a list)->int
 let prime_list f = flip (ixlist (\a. \i. \s. prime i (f a) + s));
 
@@ -180,11 +188,13 @@ let prime_list f = flip (ixlist (\a. \i. \s. prime i (f a) + s));
 // Gen. of a fingerprint.
 
 // Gen. a fingerprint for 'MEM'.
+//  fp_mem::MEM->int
 let
     fp_mem (MEM as l ds) = prime 0 as + prime 1 l + prime 2 ds
 ;
 
 // Gen. a fingerprint for 'WEXPR'.
+//  fp_w::WEXPR->int
 letrec
     fp_w (W_X s)		= prime 1 s
 /\  fp_w (W_CONST s i)		= prime 2 s + prime 3 i
@@ -223,18 +233,21 @@ letrec
 ;
 
 // Gen. a fingerprint for 'UPDATE_FN'.
+//  fp_fn::UPDATE_FN->int
 let
     fp_fn (W_UPDATE_FN l r)   = prime 49 (fp_w l) + prime 50 (fp_w r)
 /\  fp_fn (W_PHASE_DELAY l r) = prime 51 (fp_w l) + prime 52 (fp_w r)
 ;
 
 // Gen. a fingerprint for the "formals" of an input/output declaration.
-// todo: consider the sizes of each formal argument (how to fetch them?).
+//  fp_formal::[str]->int
 let
     fp_formal ps = prime 53 (length ps)
 ;
+// todo: consider the sizes of each formal argument (how to fetch them?).
 
 // Gen. a fingerprint for the "actuals" of an input/output declaration.
+//  fp_actual::[(str,[str])]->int
 let
     fp_actual ps =
         let fp_vi (TXT _)     = prime 54 1
@@ -247,6 +260,7 @@ let
 ;
 
 // Gen. a fingerprint for 'CONTENT'.
+//  fp_c::CONTENT->int
 let
     fp_c (P_LEAF fs) = prime 59 (length fs) + prime_list fp_fn 1 fs
 /\  fp_c (P_HIER cs) =
@@ -258,6 +272,9 @@ let
         in
         prime 60 (length cs) + prime_list go 1 cs
 ;
+
+//------------------------------------------------------------------------------
+// Modify the 'PINST' creation.
 
 // Gen. a fingerprint for each 'PEXLIF' on creation (fingerprint 'c'?).
 let
@@ -275,9 +292,11 @@ let
         PINST name new_attrs leaf fa_inps fa_outs internals content
 ;
 
-//------------------------------------------------------------------------------
-// ....
-//------------------------------------------------------------------------------
+//==============================================================================
+//
+// ...
+//
+//==============================================================================
 
 //------------------------------------------------------------------------------
 // Schemes: entity decl. of a 'PEXLIF'.
@@ -290,8 +309,9 @@ lettype scheme =
          // {regs::(vec_info list) list}
 ;
 
-// ...
 let name_of_scheme (SCHEME n _ _) = n;
+let inps_of_scheme (SCHEME _ i _) = i;
+let outs_of_scheme (SCHEME _ _ o) = o;
 
 // "Smart" constructor for a 'SCHEME'.
 //  mk_scheme::PEXLIF->SCHEME
@@ -316,110 +336,96 @@ let
 lettype anode =
         ANODE
             {inst::string}
+            {fp::int}
             {adjacent::string list}
 ;
 
-// ...
-let inst_of_anode (ANODE i _) = i;
-let adj_of_anode (ANODE _ as) = as;
+let inst_of_anode (ANODE i _ _) = i;
+let fp_of_anode   (ANODE _ f _) = f;
+let adj_of_anode  (ANODE _ _ a) = a;
 
 // Cons a node to an 'ADJ.NODE's adjacencies.
 //  cons_anode::anode->string->anode
-let cons_anode a (ANODE i as) = ANODE i (a:as);
-
-// ... bad name ...
-//  flatten_anode::(anode list)->(bool mat)
-let
-    flatten_anode as =
-        let order = zip_uneven (map inst_of_anode as) (iterate (\i.i+1) 1) in
-        let go xs =
-                itlist (\x. list_update T (assoc x order)) xs
-                    (replicate (length as) F)
-        in
-        map (go # adj_of_anode) as
-;
+let cons_anode a (ANODE i fp as) = ANODE i fp (cons a as);
 
 //------------------------------------------------------------------------------
-// Adj. matrix construction.
-//------------------------------------------------------------------------------
+// Construction of adj. nodes from a pexlif.
 
 // Connect two nodes if their SCHEME's share a wire.
-//  adj_connect::SCHEME->(ANODE,SCHEME,[ANODE])->(ANODE,SCHEME,[ANODE])
-let adj_connect r (a,s,c) = test_scheme s r => (cons_anode (name_of_scheme r) a,s,c) | (a,s,c);
+//  xxx_connect::SCHEME->(ANODE,SCHEME,[ANODE])->(ANODE,SCHEME,[ANODE])
+let xxx_connect r (a,s,c) = test_scheme s r => (cons_anode (name_of_scheme r) a,s,c) | (a,s,c);
 
 // Merge a "parent" node with its "children".
-//  adj_merge::(ANODE,SCHEME,[ANODE])->[(ANODE,SCHEME,[ANODE])]->(ANODE,SCHEME,[ANODE])
-let adj_merge (a,s,c) as = (a,s,itlist (\(b,_,d). append (b:d)) as c);
+//  xxx_merge::(ANODE,SCHEME,[ANODE])->[(ANODE,SCHEME,[ANODE])]->(ANODE,SCHEME,[ANODE])
+let xxx_merge (a,s,c) as = (a,s,itlist (\(b,_,d). append (b:d)) as c);
 
 // Traverse a 'PINST' and record every node's adjacencies to other nodes.
-//  adj_reduce::str->PINST->(ANODE,SCHEME,[ANODE])
-forward_declare {adj_map::string->content->((anode#(scheme#(anode list))) list)};
+//  xxx_reduce::str->int->PINST->(ANODE,SCHEME,[ANODE])
+forward_declare {xxx_map::string->int->content->((anode#(scheme#(anode list))) list)};
 letrec
-    adj_reduce inst (PINST _ as _ fa_is fa_os int cont) =
+    xxx_reduce inst 0 (PINST _ as _ fa_is fa_os int cont) =
+        (ANODE inst (find_fingerprint as) [], mk_scheme inst fa_is fa_os int, [])
+/\  xxx_reduce inst d (PINST _ as _ fa_is fa_os int cont) =
         // Construct/Fetch 'adj.node' for this 'PINST' and its 'cont' children.
-        let p   = (ANODE inst [], mk_scheme inst fa_is fa_os int, []) in
-        let ps  = adj_map inst cont in
+        let p   = (ANODE inst (find_fingerprint as) [], mk_scheme inst fa_is fa_os int, []) in
+        let ps  = xxx_map inst (d-1) cont in
         // Compute adjacencies for 'p' and 'ps'.
         let sc (_,s,_) = s in
-        let p'  = itlist (adj_connect) (map sc ps) p in
-        let ps' = map (adj_connect (sc p)) ps in
+        let p'  = itlist (xxx_connect) (map sc ps) p in
+        let ps' = map (xxx_connect (sc p)) ps in
         // Finally add new 'ps' as children to new 'p', droppin their 'SCHEME's.
-        adj_merge p' ps'
+        xxx_merge p' ps'
 ;
 letrec
-    adj_map inst (P_LEAF _)  = []
-/\  adj_map inst (P_HIER ps) =
+    xxx_map inst _ (P_LEAF _)  = []
+/\  xxx_map inst d (P_HIER ps) =
         letrec
             go _ []     = []
         /\  go c (p:ps) =
                 let n = sprintf "%s/%d" inst c in
-                adj_reduce n p : go (c+1) ps
+                xxx_reduce n d p : go (c+1) ps
         in
         go 1 ps
 ;
 
+// ...
+/// xxx::PINST->[ANODE]
+let xxx pexlif depth = val (p,_,cs) = adj_reduce "1" depth pexlif in (p:cs);
+
+//==============================================================================
+//
+// ...
+//
+//==============================================================================
+// todo: Should produce an 'ordering' for nodes, the current algo. relies on a
+// lot of internals that could change.
+
 //------------------------------------------------------------------------------
+// Adj. matrix.
 
 // Construct an adjacency matrix (shared wires) for a 'PEXLIF'.
-//  adjacency_matrix::PEXLIF->(bool mat)
-let
-    adjacency_matrix pexlif =
-        val (p,_,cs) = adj_reduce "1" pexlif in
-        flatten_anode (p:cs)
+//  adjacency_matrix::[ANODE]->(bool mat)
+let adjacency_matrix as =
+        let order = zip_uneven (map inst_of_anode as) (iterate (\i.i+1) 1) in
+        let go xs = itlist (\x. list_update T (assoc x order)) xs (replicate (length as) F) in
+        map (go # adj_of_anode) as
 ;
 
 //------------------------------------------------------------------------------
 // Iso. match matrix.
-//------------------------------------------------------------------------------
-// todo: I don't know how to speed this up yet.
-// todo: Should produce an 'ordering' for nodes, this relies on a lot of internals.
 
-// ...
-//  iso_collect::PEXLIF->(int list)
-letrec
-    iso_collect (PINST _ attrs _ _ _ _ (P_LEAF _))  =
-        [find_fingerprint attrs]
-/\  iso_collect (PINST _ attrs _ _ _ _ (P_HIER cs)) =
-        find_fingerprint attrs : flatmap iso_collect cs
-;
+// Construct an isomatch matrix (possible matches) from two ...
+//  isomatch_matrix::[ANODE]->[ANODE]->(bool mat)
+let isomatch_matrix as_g as_p = map (pam as_g # equal on fp_of_anode) as_p;
 
-//------------------------------------------------------------------------------
-
-// Construct an isomatch matrix (possible matches) from two adjacency matrices.
-//  isomatch_matrix::PEXLIF->PEXLIF->(bool mat)
-let
-    isomatch_matrix pexlif_g pexlif_p =
-        let fs_g = iso_collect pexlif_g in
-        let fs_p = iso_collect pexlif_p in
-        map (pam fs_g # equal) fs_p
-;
-
-//------------------------------------------------------------------------------
-// Ullman’s Subgraph Isomorphism Algorithm:
-//   G - graph, or puzzle.
-//   P - potential subgraphs of G, or piece.
+//==============================================================================
+//
+// Ullman’s Subgraph Isomorphism Algorithm.
+//   G - Graph, or puzzle/haystack.
+//   P - Potential subgraphs of G, or piece/needle.
 //   M - |V(P)| x |V(G)| matrix that encodes possible subgraph isomorphisms.
-//------------------------------------------------------------------------------
+//
+//==============================================================================
 
 // Filter every index/pair of indices in a vector/matrix 'xs' using 'p'.
 let filter_cols p xs = ixlist (\x. \ix. \ys. p x => ix : ys | ys) xs [];

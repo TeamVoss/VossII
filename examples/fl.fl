@@ -11,8 +11,8 @@ let g_pex = p_CacheMem;
 let p_pex = p_CacheLine;
 
 // Print 'PINST' files for debugging.
-Emit_pexlif "puzzle.txt" g_pex;
-Emit_pexlif "piece.txt" p_pex;
+//Emit_pexlif "puzzle.txt" g_pex;
+//Emit_pexlif "piece.txt" p_pex;
 
 // Create adj./iso. matrices.
 let g = adjacency_matrix g_pex;
