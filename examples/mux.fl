@@ -5,22 +5,21 @@ load "ste.fl";
 // ...
 //------------------------------------------------------------------------------
 
-// Load FL examples.
-load "examples/fl/cache.fl";
-let g_pex = p_CacheMem;
-let p_pex = p_CacheLine;
+// Load verilog examples.
+let g_pex = verilog2pexlif "-Iexamples/mux" "mux4" ["small.v"] [];
+let p_pex = verilog2pexlif "-Iexamples/mux" "mymux2" ["small_lib.v"] [];
 
 // Print 'PINST' files for debugging.
 //Emit_pexlif "puzzle.txt" g_pex;
 //Emit_pexlif "piece.txt" p_pex;
 
 // Create adj./iso. matrices.
-let as_g = xxx g_pex 2;
+let as_g = xxx g_pex 1;
 let as_p = xxx p_pex 0;
 //
 let g = adjacency_matrix as_g;
 let p = adjacency_matrix as_p;
-let m = isomatch_matrix  as_g as_p;
+let m = isomatch_matrix as_g as_p;
 
 // Perform iso. matching.
 let res = recurse m g p;
