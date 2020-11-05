@@ -423,7 +423,9 @@ let xxx pexlif depth = val (p,_,cs) = xxx_reduce 1 depth pexlif in (p:cs);
 //------------------------------------------------------------------------------
 // Adj. matrix.
 
-// ...
+// Creates a list of 'max' elements with an 'T' at index 'i' if 'i' is present
+// in the list 'xs' and 'F' if not.
+//  fill::int->int->(bool list)
 let fill max xs =
         letrec
             go n []     = replicate (max-n) F
@@ -434,11 +436,7 @@ let fill max xs =
 
 // Construct an adjacency matrix (shared wires) for a 'PEXLIF'.
 //  adjacency_matrix::[ANODE]->(bool mat)
-let
-    adjacency_matrix as =
-        let len = length as in
-        map (fill len # adj_of_anode) as
-;
+let adjacency_matrix as = map (fill (length as) # adj_of_anode) as;
 
 //------------------------------------------------------------------------------
 // Iso. match matrix.
