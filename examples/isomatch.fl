@@ -428,10 +428,14 @@ let xxx pexlif depth = val (p,_,cs) = xxx_reduce 1 depth pexlif in (p:cs);
 //  fill::int->int->(bool list)
 let fill max xs =
         letrec
-            go n []     = replicate (max-n) F
-        /\  go n (a:as) = replicate (a-n-1) F @ [T] @ go a as
+            fill 0 rs = rs
+        /\  fill n rs = F : fill (n-1) rs
         in
-        go 0 xs
+        letrec
+            build n rs []     = fill (max-n) rs
+        /\  build n rs (a:as) = build a (T : fill (a-n-1) rs) as
+        in
+        rev (build 0 [] xs)
 ;
 
 // Construct an adjacency matrix (shared wires) for a 'PEXLIF'.

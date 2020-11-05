@@ -5,7 +5,7 @@ load "ste.fl";
 // ...
 //------------------------------------------------------------------------------
 
-// Load FL examples.
+// Load cache source.
 load "examples/cache/cache.fl";
 let g_pex = p_CacheMem;
 let p_pex = p_CacheLine;

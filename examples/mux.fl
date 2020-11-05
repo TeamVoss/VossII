@@ -5,7 +5,7 @@ load "ste.fl";
 // ...
 //------------------------------------------------------------------------------
 
-// Load verilog examples.
+// Load mux source.
 let g_pex = verilog2pexlif "-Iexamples/mux" "mux4" ["small.v"] [];
 let p_pex = verilog2pexlif "-Iexamples/mux" "mymux2" ["small_lib.v"] [];
 
