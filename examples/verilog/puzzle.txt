@@ -1,0 +1,51 @@
+:
+(PINST "draw_hier mux4" [fingerprint->52658930,instance->mux4] F
+  [(din_0,[din_0]),(din_1,[din_1]),(din_2,[din_2]),(din_3,[din_3]),(sel[1:0],[sel[1:0]])]
+  [(mux_out,[mux_out])]
+  [mid23,mid01]
+i1/:
+    (PINST "draw_hier mux2" [fingerprint->5255450,instance->mux1,src->/tmp/voss2_mararon_JxPxA8/mux4_verilog_CpgfY8/small.v:33.6-33.72] F
+      [(din_0,[din_0]),(din_1,[din_1]),(sel,[sel[0]])]
+      [(mux_out,[mid01])]
+      []
+i1/i1/:
+        (PINST "draw_ite" [fingerprint->2620950,fl_src->/home/mararon/chalmers/repos/VossII/IDVII/src/fl/design/yosys_lib.fl:587,src->/tmp/voss2_mararon_JxPxA8/mux4_verilog_CpgfY8/small.v:13.18-13.39] T
+          [(S,[sel]),(B,[din_1]),(A,[din_0])]
+          [(Y,[mux_out])]
+          []
+          LEAF [
+            Y <- (IF S THEN B ELSE A)
+          ]
+        )
+    )
+i2/:
+    (PINST "draw_hier mux2" [fingerprint->5255450,instance->mux12,src->/tmp/voss2_mararon_JxPxA8/mux4_verilog_CpgfY8/small.v:35.6-35.75] F
+      [(din_0,[mid01]),(din_1,[mid23]),(sel,[sel[1]])]
+      [(mux_out,[mux_out])]
+      []
+i2/i1/:
+        (PINST "draw_ite" [fingerprint->2620950,fl_src->/home/mararon/chalmers/repos/VossII/IDVII/src/fl/design/yosys_lib.fl:587,src->/tmp/voss2_mararon_JxPxA8/mux4_verilog_CpgfY8/small.v:13.18-13.39] T
+          [(S,[sel]),(B,[din_1]),(A,[din_0])]
+          [(Y,[mux_out])]
+          []
+          LEAF [
+            Y <- (IF S THEN B ELSE A)
+          ]
+        )
+    )
+i3/:
+    (PINST "draw_hier mux2" [fingerprint->5255450,instance->mux2,src->/tmp/voss2_mararon_JxPxA8/mux4_verilog_CpgfY8/small.v:34.6-34.72] F
+      [(din_0,[din_3]),(din_1,[din_2]),(sel,[sel[0]])]
+      [(mux_out,[mid23])]
+      []
+i3/i1/:
+        (PINST "draw_ite" [fingerprint->2620950,fl_src->/home/mararon/chalmers/repos/VossII/IDVII/src/fl/design/yosys_lib.fl:587,src->/tmp/voss2_mararon_JxPxA8/mux4_verilog_CpgfY8/small.v:13.18-13.39] T
+          [(S,[sel]),(B,[din_1]),(A,[din_0])]
+          [(Y,[mux_out])]
+          []
+          LEAF [
+            Y <- (IF S THEN B ELSE A)
+          ]
+        )
+    )
+)

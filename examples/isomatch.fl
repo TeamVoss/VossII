@@ -88,6 +88,10 @@ let not_equal a b = NOT (equal a b);
 //  butfirst::(a list)->(a list)
 let butfirst = tl;
 
+// ...
+//  itlist1::(a->a->a)->(a list)->a
+let itlist1 f (x:xs) = itlist f xs x;
+
 // Fold (rigth-to-left) a list 'xs' with 'f' into 'b'.
 //  ixlist::(a->int->b->b)->(a list)->b->b
 let ixlist f xs b = snd (itlist (\x. \(ix,s). (ix-1,f x ix s)) xs (length xs,b));
@@ -102,11 +106,19 @@ let list_update v i = modify (const v) i;
 
 // Checks if an element is a memeber of the given list.
 //  elem::a->(a list)->bool
-let elem a as = find_first0 (equal a) as == 0 => F | T ;
+let elem a as = find_first0 (equal a) as == 0 => F | T;
 
 // ...
-//  sum_with::(a->int)->(a list)->int
-let sum_with f as = itlist (\a. \s. f a + s) as 0;
+//  extend_with::int->a->(a list)->(a list)
+letrec
+    extend_with 0 _ as     = as
+/\  extend_with n a []     = replicate n a
+/\  extend_with n a (a:as) = a : extend_with (n-1) a as
+;
+
+// ...
+//  sum::(int list)->int
+let sum as = itlist (\a. \s. a + s) as 0;
 
 //------------------------------------------------------------------------------
 // Matrix.
@@ -256,7 +268,7 @@ let
                 prime_list go 1 ix
         in
         let vss = map (map md_split_vector # snd) ps in
-        prime_list (\vs. prime_list (\v. sum_with fp_vi v) 1 vs) 58 vss
+        prime_list (\vs. prime_list (sum # map fp_vi) 1 vs) 58 vss
 ;
 
 // Gen. a fingerprint for 'CONTENT'.
@@ -303,7 +315,7 @@ let
 
 lettype scheme =
         SCHEME
-            {name::string}
+            {name::int}
             {inps::(string#((vec_info list) list)) list}
             {outs::(string#((vec_info list) list)) list}
          // {regs::(vec_info list) list}
@@ -335,21 +347,25 @@ let
 
 lettype anode =
         ANODE
-            {inst::string}
+            {id::int}
             {fp::int}
-            {adjacent::string list}
+            {adj::int list}
 ;
 
-let inst_of_anode (ANODE i _ _) = i;
-let fp_of_anode   (ANODE _ f _) = f;
-let adj_of_anode  (ANODE _ _ a) = a;
+let id_of_anode  (ANODE i _ _) = i;
+let fp_of_anode  (ANODE _ f _) = f;
+let adj_of_anode (ANODE _ _ a) = a;
 
 // Cons a node to an 'ADJ.NODE's adjacencies.
-//  cons_anode::anode->string->anode
+//  cons_anode::anode->int->anode
 let cons_anode a (ANODE i fp as) = ANODE i fp (cons a as);
 
 //------------------------------------------------------------------------------
 // Construction of adj. nodes from a pexlif.
+
+// ...
+//  xxx_length::(ANODE,SCHEME,[ANODE])->int
+let xxx_length (_,_,c) = length c + 1;
 
 // Connect two nodes if their SCHEME's share a wire.
 //  xxx_connect::SCHEME->(ANODE,SCHEME,[ANODE])->(ANODE,SCHEME,[ANODE])
@@ -360,15 +376,17 @@ let xxx_connect r (a,s,c) = test_scheme s r => (cons_anode (name_of_scheme r) a,
 let xxx_merge (a,s,c) as = (a,s,itlist (\(b,_,d). append (b:d)) as c);
 
 // Traverse a 'PINST' and record every node's adjacencies to other nodes.
-//  xxx_reduce::str->int->PINST->(ANODE,SCHEME,[ANODE])
-forward_declare {xxx_map::string->int->content->((anode#(scheme#(anode list))) list)};
+//  xxx_reduce::int->int->PINST->(ANODE,SCHEME,[ANODE])
+forward_declare {xxx_map::int->int->content->((anode#(scheme#(anode list))) list)};
 letrec
-    xxx_reduce inst 0 (PINST _ as _ fa_is fa_os int cont) =
-        (ANODE inst (find_fingerprint as) [], mk_scheme inst fa_is fa_os int, [])
-/\  xxx_reduce inst d (PINST _ as _ fa_is fa_os int cont) =
-        // Construct/Fetch 'adj.node' for this 'PINST' and its 'cont' children.
-        let p   = (ANODE inst (find_fingerprint as) [], mk_scheme inst fa_is fa_os int, []) in
-        let ps  = xxx_map inst (d-1) cont in
+    xxx_reduce id d (PINST n as _ fa_is fa_os int cont) =
+        // Construct an 'adj.node' for this 'PINST'.
+        let p = (ANODE id (find_fingerprint as) [], mk_scheme id fa_is fa_os int, []) in
+        // Check if we're at the 'bottom'.
+        d == 0 => p |
+        // Fetch 'adj.node' for 'cont' children (only decrease 'depth' for non-"draw-nodes").
+        let d' = str_is_prefix "draw_" n => d-1 | d in
+        let ps = xxx_map (id+1) d' cont in
         // Compute adjacencies for 'p' and 'ps'.
         let sc (_,s,_) = s in
         let p'  = itlist (xxx_connect) (map sc ps) p in
@@ -377,20 +395,22 @@ letrec
         xxx_merge p' ps'
 ;
 letrec
-    xxx_map inst _ (P_LEAF _)  = []
-/\  xxx_map inst d (P_HIER ps) =
+    xxx_map id _ (P_LEAF _)  = []
+/\  xxx_map id d (P_HIER ps) =
         letrec
             go _ []     = []
         /\  go c (p:ps) =
-                let n = sprintf "%s/%d" inst c in
-                xxx_reduce n d p : go (c+1) ps
+                let an = xxx_reduce c d p in
+                let l  = xxx_length an in
+                an : go (c+l) ps
         in
-        go 1 ps
+        go id ps
 ;
 
-// ...
-/// xxx::PINST->[ANODE]
-let xxx pexlif depth = val (p,_,cs) = xxx_reduce "1" depth pexlif in (p:cs);
+// Interface for 'xxx_reduce', simply calls the reduction with its initial
+// values and flattens its result.
+//  xxx::PINST->[ANODE]
+let xxx pexlif depth = val (p,_,cs) = xxx_reduce 1 depth pexlif in (p:cs);
 
 //==============================================================================
 //
@@ -403,13 +423,21 @@ let xxx pexlif depth = val (p,_,cs) = xxx_reduce "1" depth pexlif in (p:cs);
 //------------------------------------------------------------------------------
 // Adj. matrix.
 
+// ...
+let fill max xs =
+        letrec
+            go n []     = replicate (max-n) F
+        /\  go n (a:as) = replicate (a-n-1) F @ [T] @ go a as
+        in
+        go 0 xs
+;
+
 // Construct an adjacency matrix (shared wires) for a 'PEXLIF'.
 //  adjacency_matrix::[ANODE]->(bool mat)
 let
     adjacency_matrix as =
-        let order = zip_uneven (map inst_of_anode as) (iterate (\i.i+1) 1) in
-        let go xs = itlist (\x. list_update T (assoc x order)) xs (replicate (length as) F) in
-        map (go # adj_of_anode) as
+        let len = length as in
+        map (fill len # adj_of_anode) as
 ;
 
 //------------------------------------------------------------------------------
