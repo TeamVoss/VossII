@@ -352,6 +352,14 @@ lettype anode =
             {adj::int list}
 ;
 
+let Panode (ANODE i f as) =
+        sprintf "%s:%s:%s"
+            (int2str i)
+            (int2str f)
+            (list2str T "[" "," "]" int2str as)
+;
+install_print_function Panode;
+
 let id_of_anode  (ANODE i _ _) = i;
 let fp_of_anode  (ANODE _ f _) = f;
 let adj_of_anode (ANODE _ _ a) = a;
