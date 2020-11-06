@@ -20,10 +20,6 @@ static buffer		ref_var_tbl;
 static int		ref_var_cnt;
 
 static unint    primes[] = {
-                            13,
-                            23,
-                            59,
-                            113,
                             241,
                             503,
                             1019,
@@ -91,8 +87,9 @@ Find_in_g_cache(int cache_tbl, g_ptr argl)
     g_ptr	*recp;
 
     gp = (g_cache_ptr) locate_buf(&g_cache_tbl, cache_tbl);
-    if( gp->load == 0 )
+    if( gp->load == 0 ) {
 	return( NULL );
+    }
     hash  = main_cache_hash(argl, gp->size);
     recp  = gp->tbl + 2*hash;
     if( cache_eq(*recp, argl) ) {
@@ -106,7 +103,7 @@ void
 Insert_in_g_cache(int cache_tbl, g_ptr argl, g_ptr res)
 {
     g_cache_ptr gp;
-    unint	hash, i;
+    ui	hash, i;
     g_ptr	*recp;
 
     if( res == NULL )
@@ -143,8 +140,10 @@ Insert_in_g_cache(int cache_tbl, g_ptr argl, g_ptr res)
 
     hash  = main_cache_hash(argl, gp->size);
     recp  = gp->tbl + 2*hash;
-    if( *recp == NULL )
+    if( *recp == NULL ) {
 	gp->load++;
+    } else {
+    }
     *recp     = argl;
     *(recp+1) = res;
 }
@@ -521,8 +520,8 @@ cache_hash(g_ptr nd, unint n)
 
     switch( GET_TYPE(nd) ) {
 	case CONS_ND:
-	    return( (931*(PTR2UINT(GET_CONS_HD(nd))) +
-		         (PTR2UINT(GET_CONS_TL(nd)))) % n );
+	    return( (931*(cache_hash(GET_CONS_HD(nd), n)) +
+		         (cache_hash(GET_CONS_TL(nd), n))) % n );
 	case APPLY_ND:
 	    return( (931*(PTR2UINT(GET_APPLY_LEFT(nd))) +
 		         (PTR2UINT(GET_APPLY_RIGHT(nd)))) % n );
@@ -531,7 +530,7 @@ cache_hash(g_ptr nd, unint n)
                 case INT:
 		    return( Arbi_hash(GET_AINT(nd), n) );
                 case STRING:
-		    return( (PTR2UINT(GET_STRING(nd)))%n );
+		    return( str_hash(GET_STRING(nd), n) );
                 case BOOL:
 		    return( ((unsigned int) GET_BOOL(nd)) % n );
                 case BEXPR:

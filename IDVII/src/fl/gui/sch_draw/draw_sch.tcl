@@ -197,23 +197,23 @@ proc nb:create_node_browser {w p} {
     pack $f -side top -fill both -expand yes
  
     ttk::labelframe $p.opts -text "Options:"
-	ttk::labelframe $p.opts.hier -text "Hierarchical drawing:" \
-		-labelanchor w -relief flat
-	    frame $p.opts.hier.space
-	    ttk::checkbutton $p.opts.hier.cb \
-		-variable ::nodebrowser(hierarchy,$p)
-	    set ::nodebrowser(hierarchy,$p) 1
+
+	tk_optionMenu $p.opts.choice ::nodebrowser(type_of_drawing,$p) \
+		Hierarchical Flat
+
+
 	ttk::labelframe $p.opts.levels -text "Levels of fanin:" \
 		-labelanchor w -relief flat
 	    ttk::combobox $p.opts.levels.c \
 		-textvariable ::nodebrowser(levels,$p) -font $::voss2_txtfont
-	    set ::nodebrowser(levels,$p) 20
+	    set ::nodebrowser(levels,$p) 2
     pack $p.opts -side top -fill x
-        pack $p.opts.hier -side top -fill x
-            pack $p.opts.hier.space -side left -fill x -expand yes
-            pack $p.opts.hier.cb -side right -fill x
-        pack $p.opts.levels -side top -fill x
-            pack $p.opts.levels.c -side top -fill x -expand yes
+        pack $p.opts.choice -side top -fill x
+
+    trace add variable ::nodebrowser(type_of_drawing,$p) write \
+	    "nb:drawing_type_tracer $p"
+
+
  
     ttk::labelframe $p.operations -text "Operation:"
         ttk::button $p.operations.fanin -text Fanin \
@@ -342,15 +342,27 @@ proc sl:update_stop_node_list {w lb} {
     }
 }
 
+proc nb:drawing_type_tracer {w args} {
+    if { $::nodebrowser(type_of_drawing,$w) == "Hierarchical" } {
+	pack forget $w.opts.levels.c
+        pack forget $w.opts.levels
+    } else {
+        pack $w.opts.levels -side top -fill x
+	pack $w.opts.levels.c -side top -fill x -expand yes
+    }
+}
+
 proc nb:draw_fanin {w lb} {
     foreach idx [$lb curselection] { lappend sel [$lb get $idx] }
     if [info exists sel] {
-	if $::nodebrowser(hierarchy,$w) {
+	if { $::nodebrowser(type_of_drawing,$w) == "Hierarchical" } {
 	    set draw_level 0
+	    set levels 100
 	} else {
 	    set draw_level -1
+	    set levels $::nodebrowser(levels,$w)
 	}
-	fl_draw_fanin_by_name $w $draw_level $::nodebrowser(levels,$w) $sel
+	fl_draw_fanin_by_name $w $draw_level $levels $sel
     }
 }
 
@@ -743,9 +755,6 @@ proc cb:update_time_and_colors {c} {
 }
 
 proc cb:sch_canvas_menu {c wx wy sx sy} {
-    set selected [fl_get_anon_selected $c]
-    selection_lock $c $wx $wy 0
-    selection_execute $c $wx $wy $sx $sy 0
     set tags [$c gettags current]
     set nodes [get_anon_name $tags]
     set m $c.sel_op
@@ -1012,6 +1021,7 @@ proc selection_execute {c wx wy sx sy shift} {
 	    }
 	}
     }
+    set ::previous_selection [fl_get_anon_selected $c]
     if $shift {
 	fl_set_selection $c "MODIFY_SELECTION" $nodes
     } else {
@@ -3188,6 +3198,18 @@ proc extract_name_draw_fub {module inst args} {
     }
 }
 
+proc sc:double_draw_inside {c levels tag} {
+    if ![info exists ::previous_selection] {
+	set old "_"
+    } elseif { $::previous_selection == {} } {
+	set old "_"
+    } else {
+	set old $::previous_selection
+    }
+    fl_set_selection $c "SET_SELECTION" $old
+    fl_draw_inside $c $levels $tag
+}
+
 proc draw_fub {module inst inames onames c tag x y} {
     global gcolor fc sfont
     if { ![info exists ::sch_info(draw_level,$c)] } {
@@ -3222,7 +3244,8 @@ proc draw_fub {module inst inames onames c tag x y} {
     set dr [$c create rectangle [expr ($xr-$rwid)] [expr ($y+$erht/2)] \
 		$xr [expr ($y-$erht/2)] -outline $gcolor -fill $fc -tags $tag]
     $c bind $dr <Double-1> \
-	"after idle [list fl_draw_inside $c $::sch_info(draw_level,$c) $tag]"
+    "after idle [list sc:double_draw_inside $c $::sch_info(draw_level,$c) $tag]"
+
     set mid_x [expr ($xr-$rwid/2)]
     set top_y [expr $y-$erht/2]
     set f [$c create text $mid_x $top_y -anchor n -justify center \
@@ -3246,7 +3269,8 @@ proc draw_fub {module inst inames onames c tag x y} {
 		    -font $::mfont($c) -text $fname]
 	    $c bind $f <Double-1> \
 		"after idle \
-		    [list fl_draw_inside $c $::sch_info(draw_level,$c) $tag]"
+		    [list sc:double_draw_inside $c \
+				$::sch_info(draw_level,$c) $tag]"
 	    add_font_tags $c $f _IsTeXt_
 	    $c create line $xl $yl $nx $yl -fill $gcolor
 	    lappend inp_locs [expr round($xl)] [expr round($yl)]
@@ -3269,7 +3293,7 @@ proc draw_fub {module inst inames onames c tag x y} {
 		-font $::sfont($c) -text $fname]
 	$c bind $f <Double-1> \
 	    "after idle \
-		[list fl_draw_inside $c $::sch_info(draw_level,$c) $tag]"
+		[list sc:double_draw_inside $c $::sch_info(draw_level,$c) $tag]"
 	add_font_tags $c $f _IsTeXt_
 	set wtag [fl_vecs2tags $c $anames]
 	if [fl_is_vector_name $fname] {

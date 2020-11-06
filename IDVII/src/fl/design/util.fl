@@ -157,7 +157,7 @@ clet cmerge_vectors nl =
     merge_vectors (merge_consts "" nl)
 ;
 
-let w_depends we =
+clet w_depends we =
     let raw_res = ref [] then
     letrec dep (W_X sz) = ()
      /\    dep (W_NAMED_CONST name sz v) = ()
@@ -195,7 +195,7 @@ let w_depends we =
     length res1 = length res2 => res1 | qsort node_name_cmp res2
 ;
 
-letrec wexpr_size wexpr =
+cletrec wexpr_size wexpr =
     let get_size2 a b =
 	let a_sz = wexpr_size a in
 	let b_sz = wexpr_size b in
