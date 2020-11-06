@@ -1,0 +1,15 @@
+:
+(PINST "draw_hier mymux2" [fingerprint->5255450,instance->mymux2] F
+  [(din_0,[din_0]),(din_1,[din_1]),(sel,[sel])]
+  [(mux_out,[mux_out])]
+  []
+i1/:
+    (PINST "draw_ite" [fingerprint->2620950,fl_src->/home/mararon/chalmers/repos/VossII/IDVII/src/fl/design/yosys_lib.fl:587,src->/tmp/voss2_mararon_JxPxA8/mymux2_verilog_fy1Lpa/small_lib.v:13.18-13.39] T
+      [(S,[sel]),(B,[din_1]),(A,[din_0])]
+      [(Y,[mux_out])]
+      []
+      LEAF [
+        Y <- (IF S THEN B ELSE A)
+      ]
+    )
+)

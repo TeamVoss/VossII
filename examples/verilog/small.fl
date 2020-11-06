@@ -1,8 +1,0 @@
-load "ste.fl";
-
-let p = verilog2pexlif "-Iexamples/verilog"
-                       "mux4"
-                       ["small.v","small_lib.v"]
-                       [];
-
-let s = pexlif2fsm p;

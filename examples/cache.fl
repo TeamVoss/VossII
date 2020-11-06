@@ -1,0 +1,29 @@
+load "examples/isomatch.fl";
+load "ste.fl";
+
+//------------------------------------------------------------------------------
+// ...
+//------------------------------------------------------------------------------
+
+// Load cache source.
+load "examples/cache/cache.fl";
+let g_pex = p_CacheMem;
+let p_pex = p_CacheLine;
+
+// Print 'PINST' files for debugging.
+//Emit_pexlif "puzzle.txt" g_pex;
+//Emit_pexlif "piece.txt" p_pex;
+
+// Create adj./iso. matrices.
+let as_g = xxx g_pex 2;
+let as_p = xxx p_pex 0;
+//
+let g = adjacency_matrix as_g;
+let p = adjacency_matrix as_p;
+let m = isomatch_matrix  as_g as_p;
+
+// Perform iso. matching.
+let res = recurse m g p;
+
+//------------------------------------------------------------------------------
+// Fin.
