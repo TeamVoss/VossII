@@ -168,14 +168,21 @@ let
 //------------------------------------------------------------------------------
 // Pexlif.
 
-// Feth a 'PEXLIF's attribute list.
-//  attributes_of::pexlif->(string#string list)
-let attributes_of (PINST _ as _ _ _ _ _) = as;
+let attributes_of_pexlif (PINST _ as _ _ _ _ _) = as;
 
 // Fetch the "fingerprint" attribute. If none exists, returns 0.
 //  find_fingerprint::(string#string list)->int
-let find_fingerprint as =
+let
+    find_fingerprint as =
         let ix = find_first0 (\(n,_). n == "fingerprint") as in
+        ix == 0 => 0 | s2int (snd (el ix as))
+;
+
+// Fetch the "signature" attribute. If none exists, returns 0.
+//  find_sig::(string#string list)->int
+let
+    find_signature as =
+        let ix = find_first0 (\(n,_). n == "signature") as in
         ix == 0 => 0 | s2int (snd (el ix as))
 ;
 
@@ -183,7 +190,7 @@ let find_fingerprint as =
 // Fingerprinting.
 //------------------------------------------------------------------------------
 
-load "examples/primes.fl";
+load "examples/primes.fl"; // Needed for 'list_of_primes'.
 
 // note: we cap the integers so that they fit in a 64-bit word.
 let roof = ipow 2 63 - 1;
@@ -430,14 +437,15 @@ let xxx pexlif depth = val (p,_,cs) = xxx_reduce 1 depth pexlif in (p:cs);
 
 //==============================================================================
 //
-// ...
+// Ullman’s Subgraph Isomorphism Algorithm.
+//   G - Graph, or puzzle/haystack.
+//   P - Potential subgraphs of G, or piece/needle.
+//   M - |V(P)| x |V(G)| matrix that encodes possible subgraph isomorphisms.
 //
 //==============================================================================
-// todo: Should produce an 'ordering' for nodes, the current algo. relies on a
-// lot of internals that could change.
 
 //------------------------------------------------------------------------------
-// Adj. matrix.
+// Creationg of adj. matrix.
 
 // Creates a list of 'max' elements with an 'T' at index 'i' if 'i' is present
 // in the list 'xs' and 'F' if not.
@@ -459,20 +467,14 @@ let fill max xs =
 let adjacency_matrix as = as fseq map (fill (length as) # adj_of_anode) as;
 
 //------------------------------------------------------------------------------
-// Iso. match matrix.
+// Creationg of iso. match matrix.
 
 // Construct an isomatch matrix (possible matches) from two ...
 //  isomatch_matrix::[ANODE]->[ANODE]->(bool mat)
 let isomatch_matrix as_g as_p = map (pam as_g # equal on fp_of_anode) as_p;
 
-//==============================================================================
-//
-// Ullman’s Subgraph Isomorphism Algorithm.
-//   G - Graph, or puzzle/haystack.
-//   P - Potential subgraphs of G, or piece/needle.
-//   M - |V(P)| x |V(G)| matrix that encodes possible subgraph isomorphisms.
-//
-//==============================================================================
+//------------------------------------------------------------------------------
+// Pruning of match matrix.
 
 // Filter every index/pair of indices in a vector/matrix 'xs' using 'p'.
 let filter_cols p xs = ixlist (\x. \ix. \ys. p x => ix : ys | ys) xs [];
@@ -512,6 +514,7 @@ letrec
 ;
 
 //------------------------------------------------------------------------------
+// Main "matching" algo.
 
 // "Dot-product" of two lists of booleans.
 //  dot::(bool list)->(bool list)->bool
@@ -577,11 +580,25 @@ letrec
         go mat (replicate (num_columns mat) F) 1
 ;
 
-//------------------------------------------------------------------------------
+//==============================================================================
 //
-// Human-readable answer.
+// Equality testing via SHA256 signatures to verify iso. matches.
 //
-//------------------------------------------------------------------------------
+//==============================================================================
+
+//
+//  verify::((bool mat) list)->pexlif->pexlif->(bool list)
+let
+    verify res g p =
+        let p' = annotate_pexlif p then
+        0
+;
+
+//==============================================================================
+//
+// Print-function for getting a human-readable answer out of the iso. matching.
+//
+//==============================================================================
 
 // ...
 //  recover_schemes::int->pexlif->(scheme list)
@@ -628,7 +645,7 @@ let
            (\r. recover_one r g_sc p_sc) res
 ;
 
-//------------------------------------------------------------------------------
+//==============================================================================
 // Fin.
 
 // all NOT [T,T] = F;
