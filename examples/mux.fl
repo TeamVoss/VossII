@@ -8,6 +8,7 @@ load "ste.fl";
 // Load mux source.
 let g_pex = verilog2pexlif "-Iexamples/mux" "mux4" ["small.v"] [];
 let p_pex = verilog2pexlif "-Iexamples/mux" "mymux2" ["small_lib.v"] [];
+(g_pex fseq p_pex fseq print "Finished loading.\n");
 
 // Print 'PINST' files for debugging.
 //Emit_pexlif "puzzle.txt" g_pex;
