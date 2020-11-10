@@ -1131,6 +1131,28 @@ Get_abstract_depends(g_ptr redex, hash_record *abs_tblp, g_ptr obj)
     }
 }
 
+int
+SHA256_bdd(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha, formula f)
+{
+    int res;
+    if( f == ZERO ) return -1;
+    if( f == ONE ) return 1;
+    bool neg = ISNOT(f);
+    bdd_ptr bp = GET_BDDP(f);
+    if( (res = PTR2INT(find_hash(g_tblp, bp))) != 0 ) {
+        return (neg? -1*res : res);
+    }
+    res = *g_cntp;
+    *g_cntp = res+1;
+    res = neg? -1*res : res;
+    insert_hash(g_tblp, bp, INT2PTR(res));
+    int lres = SHA256_bdd(g_cntp, g_tblp, sha, GET_LSON(bp));
+    int rres = SHA256_bdd(g_cntp, g_tblp, sha, GET_RSON(bp));
+    SHA_printf(sha, "%d=ITE %s %d %d\n", res, get_var_name(f), lres, rres);
+    return res;
+}
+
+
 /********************************************************/
 /*	    EXPORTED EXTAPI FUNCTIONS    		*/
 /********************************************************/

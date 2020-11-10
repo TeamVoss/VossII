@@ -8129,7 +8129,7 @@ limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
 	    for(vis_io_ptr vi = cur_info->fa_inps; vi != NULL; vi = vi->next) {
 		sch_ptr child =
 		    limited_draw_fanin(vsp, vi->acts, limit_tblp, draw_level);
-		sch_list_ptr sl =(sch_list_ptr)new_rec(&(vsp->sch_list_rec_mgr));
+		sch_list_ptr sl=(sch_list_ptr)new_rec(&(vsp->sch_list_rec_mgr));
 		sl->sch = child;
 		sl->next = NULL;
 		if( res->children == NULL ) {

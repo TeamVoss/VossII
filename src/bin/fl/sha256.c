@@ -255,6 +255,141 @@ SHA256_final (unsigned char *digest, SHA256_ptr ctx)
     }
 }
 
+static hash_record  g_tbl;
+static int	    g_cnt;
+
+static int
+sha256_traverse_graph(SHA256_ptr sha, g_ptr node)
+{
+    int res, lres, rres;
+    string s;
+    if( node == NULL ) return 1;
+    if( (res = PTR2INT(find_hash(&g_tbl, node))) != 0 ) {
+	return res;
+    }
+    res = g_cnt++;
+    insert_hash(&g_tbl, node, INT2PTR(res));
+    if( IS_NIL(node) ) {
+	SHA_printf(sha, "%d=[]\n", res);
+	return res;
+    }
+    switch( GET_TYPE(node) ) {
+	case LAMBDA_ND: 
+	    rres = sha256_traverse_graph(sha, GET_LAMBDA_BODY(node));
+	    SHA_printf(sha, "%d=\\%s.%d\n", res, GET_LAMBDA_VAR(node), rres);
+	    return res;
+	case APPLY_ND:
+	    lres = sha256_traverse_graph(sha, GET_APPLY_LEFT(node));
+	    rres = sha256_traverse_graph(sha, GET_APPLY_RIGHT(node));
+	    SHA_printf(sha, "%d=%d@%d\n", res, lres, rres);
+	    return res;
+	case CONS_ND: 
+	    lres = sha256_traverse_graph(sha, GET_CONS_HD(node));
+	    rres = sha256_traverse_graph(sha, GET_CONS_TL(node));
+	    SHA_printf(sha, "%d=%d:%d\n", res, lres, rres);
+	    return res;
+	case LEAF:
+	    switch( GET_LEAF_TYPE(node) ) {
+		case INT:
+		    s = Arbi_ToString(GET_AINT(node),10);
+		    SHA_printf(sha, "%d=I%s\n", res, s);
+		    return res;
+		case STRING:
+		    s = GET_STRING(node);
+		    SHA_printf(sha, "%d=\"%s\"\n", res, s);
+		    return res;
+		case BOOL:
+		    lres = SHA256_bdd(&g_cnt, &g_tbl, sha, GET_BOOL(node));
+		    SHA_printf(sha, "%d=B %d\n", res, lres);
+		    return res;
+		case BEXPR:
+		    lres = SHA256_bexpr(&g_cnt, &g_tbl, sha, GET_BEXPR(node));
+		    SHA_printf(sha, "%d=BE %d\n", res, lres);
+		    return res;
+		case PRIM_FN:
+		    {
+			switch ( GET_PRIM_FN(node) ) {
+			    case P_EXTAPI_FN:
+				SHA_printf(sha, "%d=EFN(%s)",
+						res,
+						Get_ExtAPI_Function_Name(
+							GET_EXTAPI_FN(node)));
+				return res;
+			    case P_SSCANF:
+				SHA_printf(sha, "%d=sscanf \\\"%s\\\"\n)", res,
+					     GET_PRINTF_STRING(node));
+				return res;
+			    case P_PRINTF:
+				SHA_printf(sha, "%d=printf \\\"%s\\\"\n)", res,
+					     GET_PRINTF_STRING(node));
+				return res;
+			    case P_SPRINTF:
+				SHA_printf(sha, "%d=sprintf \\\"%s\\\"\n)", res,
+					     GET_PRINTF_STRING(node));
+				return res;
+			    case P_EPRINTF:
+				SHA_printf(sha, "%d=eprintf \\\"%s\\\"\n)", res,
+					     GET_PRINTF_STRING(node));
+				return res;
+			    case P_FPRINTF:
+				SHA_printf(sha, "%d=fprintf \\\"%s\\\"\n)", res,
+					     GET_PRINTF_STRING(node));
+				return res;
+			    case P_REF_VAR: {
+				int r = GET_REF_VAR(node);
+				lres = sha256_traverse_graph(sha,Get_RefVar(r));
+				SHA_printf(sha, "%d=REF %d\n", res, r);
+				return res;
+			    }
+			    default:
+				SHA_printf(sha, "%d=PFN %s", res, 
+						Get_pfn_name(node));
+				return res;
+			}
+		    }
+		case EXT_OBJ:
+		    {
+			// This is really too conservative!!!
+			SHA_printf(sha, "%d=EO %p", res, node);
+			return res;
+		    }
+		case VAR:
+		    s = GET_VAR(node);
+		    SHA_printf(sha, "%d=VAR %s", res, s);
+		    return res;
+		case USERDEF:
+		{
+		    s = Get_userdef_name(node);
+		    int version = GET_VERSION(node);
+		    SHA_printf(sha, "%d=UD %s %d", res, s, version);
+		    return res;
+		}
+
+		default:
+		    DIE("Unknown LEAF type");
+	    }
+
+	default:
+	    DIE("Should never happen");
+    }
+}
+
+static void
+sha256_signature(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    SHA256_ptr sha = Begin_SHA256();
+    create_hash(&g_tbl, 1000, ptr_hash, ptr_equ);
+    g_cnt = 1;
+    sha256_traverse_graph(sha, r);
+    string sig = Get_SHA256_hash(sha);
+    MAKE_REDEX_STRING(redex, sig);
+    dispose_hash(&g_tbl, NULLFCN);
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
 /********************************************************/
 /*                    PUBLIC FUNCTIONS                  */
 /********************************************************/
@@ -264,6 +399,16 @@ Init_SHA256()
 {
     new_mgr(&sha256_rec_mgr, sizeof(SHA256_rec));
     initialized = 1;
+}
+
+void
+SHA256_Install_Functions()
+{
+    typeExp_ptr tv = GLnew_tVar();
+
+    Add_ExtAPI_Function("sha256_signature", "1", FALSE,
+			GLmake_arrow(tv, GLmake_string()),
+                        sha256_signature);
 }
 
 SHA256_ptr

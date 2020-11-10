@@ -1023,6 +1023,13 @@ Replace_name(g_ptr node, symbol_tbl_ptr stbl)
     DIE("Should never occur!"); return NULL; // Dummy
 }
 
+string
+Get_userdef_name(g_ptr node)
+{
+    fn_ptr fn = GET_USERDEF(node);
+    return( fn->name );
+}
+
 
 
 g_ptr

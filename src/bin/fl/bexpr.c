@@ -425,6 +425,31 @@ Load_bexprs(string filename, buffer *results)
 }
 
 
+int
+SHA256_bexpr(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha, bexpr f)
+{
+    int res;
+    if( BE_IS_FALSE(f) ) return -1;
+    if( BE_IS_TRUE(f) ) return 1;
+    bool neg = BE_IS_NEG(f);
+    bexpr bp = BE_POS(f);
+    if( (res = PTR2INT(find_hash(g_tblp, bp))) != 0 ) {
+        return (neg? -1*res : res);
+    }
+    res = *g_cntp;
+    *g_cntp = res+1;
+    res = neg? -1*res : res;
+    insert_hash(g_tblp, bp, INT2PTR(res));
+    if( BE_IS_VAR(bp) ) {
+	SHA_printf(sha, "%d=V %s\n", res, BE_GET_VAR(bp));
+	return res;
+    }
+    int lres = SHA256_bexpr(g_cntp, g_tblp, sha, BE_GET_LEFT(bp));
+    int rres = SHA256_bexpr(g_cntp, g_tblp, sha, BE_GET_RIGHT(bp));
+    SHA_printf(sha, "%d=& %s %d %d\n", res, lres, rres);
+    return res;
+}
+
 
 /********************************************************/
 /*	    EXPORTED EXTAPI FUNCTIONS    		*/
