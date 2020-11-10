@@ -315,7 +315,7 @@ let
 
 lettype scheme =
         SCHEME
-            {name::int}
+            {name::string}
             {inps::(string#((vec_info list) list)) list}
             {outs::(string#((vec_info list) list)) list}
          // {regs::(vec_info list) list}
@@ -377,7 +377,11 @@ let xxx_length (_,_,c) = length c + 1;
 
 // Connect two nodes if their SCHEME's share a wire.
 //  xxx_connect::SCHEME->(ANODE,SCHEME,[ANODE])->(ANODE,SCHEME,[ANODE])
-let xxx_connect r (a,s,c) = test_scheme s r => (cons_anode (name_of_scheme r) a,s,c) | (a,s,c);
+let
+    xxx_connect r (a,s,c) = test_scheme s r =>
+        (cons_anode (s2int (name_of_scheme r)) a,s,c) |
+        (a,s,c)
+;
 
 // Merge a "parent" node with its "children".
 //  xxx_merge::(ANODE,SCHEME,[ANODE])->[(ANODE,SCHEME,[ANODE])]->(ANODE,SCHEME,[ANODE])
@@ -385,11 +389,27 @@ let xxx_merge (a,s,c) as = (a,s,itlist (\(b,_,d). append (b:d)) as c);
 
 // Traverse a 'PINST' and record every node's adjacencies to other nodes.
 //  xxx_reduce::int->int->PINST->(ANODE,SCHEME,[ANODE])
-forward_declare {xxx_map::int->int->content->((anode#(scheme#(anode list))) list)};
 letrec
     xxx_reduce id d (PINST n as _ fa_is fa_os int cont) =
+        // Traverse each child in order.
+        //  xxx_map::int->int->content->((anode#(scheme#(anode list))) list);
+        letrec
+            xxx_map id _ (P_LEAF _)  = []
+        /\  xxx_map id d (P_HIER ps) =
+                letrec
+                    go _ []     = []
+                /\  go c (p:ps) =
+                        let an = xxx_reduce c d p in
+                        let l  = xxx_length an in
+                        an : go (c+l) ps
+                in
+                go id ps
+        in
         // Construct an 'adj.node' for this 'PINST'.
-        let p = (ANODE id (find_fingerprint as) [], mk_scheme id fa_is fa_os int, []) in
+        let p = ( ANODE id (find_fingerprint as) []
+                , mk_scheme (int2str id) fa_is fa_os int
+                , [])
+        in
         // Check if we're at the 'bottom'.
         d == 0 => p |
         // Fetch 'adj.node' for 'cont' children (only decrease 'depth' for non-"draw-nodes").
@@ -401,18 +421,6 @@ letrec
         let ps' = map (xxx_connect (sc p)) ps in
         // Finally add new 'ps' as children to new 'p', droppin their 'SCHEME's.
         xxx_merge p' ps'
-;
-letrec
-    xxx_map id _ (P_LEAF _)  = []
-/\  xxx_map id d (P_HIER ps) =
-        letrec
-            go _ []     = []
-        /\  go c (p:ps) =
-                let an = xxx_reduce c d p in
-                let l  = xxx_length an in
-                an : go (c+l) ps
-        in
-        go id ps
 ;
 
 // Interface for 'xxx_reduce', simply calls the reduction with its initial
@@ -448,7 +456,7 @@ let fill max xs =
 
 // Construct an adjacency matrix (shared wires) for a 'PEXLIF'.
 //  adjacency_matrix::[ANODE]->(bool mat)
-let adjacency_matrix as = map (fill (length as) # adj_of_anode) as;
+let adjacency_matrix as = as fseq map (fill (length as) # adj_of_anode) as;
 
 //------------------------------------------------------------------------------
 // Iso. match matrix.
@@ -570,20 +578,55 @@ letrec
 ;
 
 //------------------------------------------------------------------------------
+//
+// Human-readable answer.
+//
+//------------------------------------------------------------------------------
 
-// Recover the PINST names (the "answer") of a solution given by 'recurse'.
-//  recover::(bool mat)->(scheme list)->(scheme list)->string
-// let
-//     recover mat g_sc p_sc =
-//         let pairs = forall_ones mat (\(i,j). cons (el i p_sc, el j g_sc)) [] in
-//         let pr2 (SCHEME n _ fa_i fa_o _) =
-//             sprintf "%s %S %S" n
-//                 (flatmap (map vec_info2str # snd) fa_i)
-//                 (flatmap (map vec_info2str # snd) fa_o)
-//         in
-//         let pr (a,b) = sprintf "%s\n :-> %s" (pr2 a) (pr2 b) in
-//         list2str T "{" "\n," "}" pr pairs
-// ;
+// ...
+//  recover_schemes::int->pexlif->(scheme list)
+let
+    recover_schemes d pexlif =
+        letrec
+            go_pex d (PINST n _ _ fa_is fa_os int cont) =
+                letrec
+                        go_cont _ (P_LEAF _)  = []
+                    /\  go_cont d (P_HIER ps) = flatmap (go_pex d) ps
+                in
+                let sc = mk_scheme n fa_is fa_os int in
+                let d' = str_is_prefix "draw_" n => d-1 | d in
+                d == 0 => [sc] |
+                sc : go_cont d' cont
+        in
+        go_pex d pexlif
+;
+
+// ...
+//  recover_one::(bool mat)->(scheme list)->(scheme list)->string
+let
+    recover_one res g_sc p_sc =
+       let pairs_ix = forall_ones res (cons) [] in
+       let pairs_sc = map (\(i, j). (el i p_sc, el j g_sc)) pairs_ix in
+       //
+       let pr_wires a b = sprintf "%s->%s" (fst a) (fst b) in
+       let pr_schemes (SCHEME n1 i1 o1) (SCHEME n2 i2 o2) =
+           sprintf "%s->%s where %s and %s" n1 n2
+               (list2str T "[" "," "]" (curry pr_wires) (zip i1 i2))
+               (list2str T "[" "," "]" (curry pr_wires) (zip o1 o2))
+       in
+       //
+       list2str T "{" "\n," "}" (curry pr_schemes) pairs_sc
+;
+
+// ...
+//  recover_all::((bool mat) list)->pexlif->pexlif->string
+let
+    recover_all res g p = 
+       val g_sc = recover_schemes 1 g then
+       val p_sc = recover_schemes 1 p then
+       list2str T "Solutions:\n" "\n" "\n"
+           (\r. recover_one r g_sc p_sc) res
+;
 
 //------------------------------------------------------------------------------
 // Fin.

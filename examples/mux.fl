@@ -24,5 +24,8 @@ let m = isomatch_matrix as_g as_p;
 // Perform iso. matching.
 let res = recurse m g p;
 
+// Recover solutions.
+res fseq recover_all res g_pex p_pex;
+
 //------------------------------------------------------------------------------
 // Fin.
