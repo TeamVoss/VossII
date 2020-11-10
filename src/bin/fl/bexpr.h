@@ -37,6 +37,8 @@ subst_ptr   Add_to_BE_Subs(subst_ptr start, bexpr v, bexpr e);
 bexpr	    BE_Substitute(bexpr f, subst_ptr subs);
 bool	    Save_bexprs(string filename, buffer *roots);
 bool	    Load_bexprs(string filename, buffer *results);
+int	    SHA256_bexpr(int *g_cntp, hash_record *g_tblp,
+			 SHA256_ptr sha, bexpr f);
 #ifdef DEBUG
 int	    Dbg_stop();
 #endif /* DEBUG */

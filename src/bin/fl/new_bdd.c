@@ -26,8 +26,10 @@ extern g_ptr    void_nd;
 extern bool	gui_mode;
 extern bool	use_stdout;
 extern char	FailBuf[4096];
+extern bool	Interrupt_asap;
 
 /***** PRIVATE VARIABLES *****/
+static cache_ptr	cache_free_list;
 static g_ptr		new_var_order_list = NULL;
 static bdd_ptr		MainTbl;		/* Global BDD node table      */
 static lunint		sz_MainTbl = 0;		/* Nbr of bins in ClustBuf    */
@@ -41,10 +43,6 @@ static lunint		gc_limit;		/* When do garbage collection */
 static var_ptr		VarTbl;			/* Variable table	      */
 static unint		sz_VarTbl;		/* Nbr of bins in VarTbl      */
 static unint		nbr_VarTbl;		/* Nbr of element in VarTbl   */
-
-static cache_ptr	Cache;			/* Operation cache 	      */
-static lunint		sz_Cache;		/* Size of cache	      */
-static bool		rand_cache;
 
 static hash_record	save_var_tbl;
 static hash_record	var_htbl;		/* Variable lookup table      */
@@ -99,6 +97,8 @@ static print_types      print_format;
 
 
 static rec_mgr		subst_rec_mgr;
+static rec_mgr		cache_rec_mgr;
+static hash_record	cache_tbl;
 static rec_mgr		subst_cache_rec_mgr;
 static hash_record	subs_tbl;
 static hash_record	bdd_size_tbl;
@@ -138,7 +138,6 @@ static bool		subst_eq(pointer p1, pointer p2);
 static unsigned int	bdd_hash(pointer np, unsigned int n);
 static bool		bdd_eq(pointer p1, pointer p2);
 static void		clean_cache(bool erase);
-static int		new_prime(unsigned long int cur_size);
 static lunint		uniq_hash_fn(formula l, formula r, lunint n);
 static void		Bdec_ref_cnt(bdd_ptr bp);
 static void		re_order();
@@ -164,6 +163,9 @@ static bool		truth_cover_rec(hash_record *done_tblp,
 					arbi_T *resp, string *emsgp);
 static int		bdd_get_size_rec(formula f, int *limitp);
 static void		restore_mark(formula f);
+static cache_ptr	get_new_cache_rec();
+static unint		cache_hash(pointer p, unint n);
+static bool		cache_equ(pointer p1, pointer p2);
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
 /********************************************************/
@@ -539,9 +541,13 @@ B_Depends(formula f)
 	BDD_RETURN( ONE );
 
     /* Check cache */
-    cp = Cache + (f % sz_Cache);
-    if( cp->lson == f && cp->rson == f && cp->fn == DEPENDS )
+    cache_rec cr;
+    cr.fn = DEPENDS;
+    cr.u.args.lson = f;
+    cr.u.args.rson = f;
+    if( (cp = (cache_ptr) find_hash(&cache_tbl, &cr)) != NULL ) {
 	BDD_RETURN(cp->res);
+    }
 
     bp = GET_BDDP(f);
     vp = VarTbl + BDD_GET_VAR(bp);
@@ -551,11 +557,12 @@ B_Depends(formula f)
 		find_insert_bdd(vp, ONE, ZERO));
 
     /* Insert into cache */
-    cp = Cache + (f % sz_Cache);
-    cp->fn   = DEPENDS;
-    cp->lson = f;
-    cp->rson = f;
-    cp->res  = ret;
+    cp = get_new_cache_rec();
+    cp->fn = DEPENDS;
+    cp->u.args.lson = f;
+    cp->u.args.rson = f;
+    cp->res = ret;
+    insert_hash(&cache_tbl, cp, cp);
     BDD_RETURN( ret );
 }
 
@@ -819,7 +826,7 @@ Load_BDDs(string filename, buffer *results)
 void
 Begin_RelProd()
 {
-    relprod_cache_sz = sz_Cache;
+    relprod_cache_sz = sz_MainTbl/10;
     relprod_cache = (relprod_cache_ptr)
 			Calloc((relprod_cache_sz)*sizeof(relprod_cache_rec));
 }
@@ -1045,9 +1052,9 @@ B_Init()
     sz_VarTbl = 64;
     VarTbl = (var_ptr) Calloc(sz_VarTbl*sizeof(var_rec));
     nbr_VarTbl = 0;
-    sz_Cache = new_prime(sz_MainTbl/10);
-    Cache = (cache_ptr) Calloc((sz_Cache+1)*sizeof(cache_rec));
-    rand_cache = 0;
+    new_mgr(&cache_rec_mgr, sizeof(cache_rec));
+    cache_free_list = NULL;
+    create_hash(&cache_tbl, sz_MainTbl/10, cache_hash, cache_equ);
     ZERO = 0;
     ONE  = NOT(ZERO);
     create_hash(&var_htbl, sz_VarTbl, Ustr_hash, Ustr_equ);
@@ -1123,6 +1130,28 @@ Get_abstract_depends(g_ptr redex, hash_record *abs_tblp, g_ptr obj)
 	}
     }
 }
+
+int
+SHA256_bdd(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha, formula f)
+{
+    int res;
+    if( f == ZERO ) return -1;
+    if( f == ONE ) return 1;
+    bool neg = ISNOT(f);
+    bdd_ptr bp = GET_BDDP(f);
+    if( (res = PTR2INT(find_hash(g_tblp, bp))) != 0 ) {
+        return (neg? -1*res : res);
+    }
+    res = *g_cntp;
+    *g_cntp = res+1;
+    res = neg? -1*res : res;
+    insert_hash(g_tblp, bp, INT2PTR(res));
+    int lres = SHA256_bdd(g_cntp, g_tblp, sha, GET_LSON(bp));
+    int rres = SHA256_bdd(g_cntp, g_tblp, sha, GET_RSON(bp));
+    SHA_printf(sha, "%d=ITE %s %d %d\n", res, get_var_name(f), lres, rres);
+    return res;
+}
+
 
 /********************************************************/
 /*	    EXPORTED EXTAPI FUNCTIONS    		*/
@@ -1719,6 +1748,7 @@ find_insert_bdd(var_ptr vp, formula lson, formula rson)
     unint		neg, var;
     bdd_ptr		bp;
 
+    CHECK_FOR_INTERRUPT;
     if( lson == rson ) {
 	return(lson);
     }
@@ -1774,7 +1804,7 @@ find_insert_bdd(var_ptr vp, formula lson, formula rson)
 static formula
 bdd_step(int fn, formula f1, formula f2)
 {
-    cache_ptr	cp, cp_old;
+    cache_ptr	cp;
     formula	lson1, rson1, lson2, rson2, ret, pf1, pf2;
     unint	f1_var, f2_var;
     var_ptr	vp;
@@ -1830,16 +1860,12 @@ bdd_step(int fn, formula f1, formula f2)
     }
 
     /* Check cache */
-    cp = Cache + CACHE_FN(f1,f2,fn);
-    if( cp->lson == f1 && cp->rson == f2 && cp->fn == fn ) {
+    cache_rec cr;
+    cr.fn = fn;
+    cr.u.args.lson = f1;
+    cr.u.args.rson = f2;
+    if( (cp = (cache_ptr) find_hash(&cache_tbl, &cr)) != NULL ) {
 	BDD_RETURN(cp->res);
-    }
-    cp_old = cp;
-    if( cp->fn ) {
-	cp++;
-	if( cp->lson == f1 && cp->rson == f2 && cp->fn == fn ) {
-	    BDD_RETURN(cp->res);
-	}
     }
 
     f1p = FGET_BDDP(pf1);
@@ -1887,20 +1913,19 @@ bdd_step(int fn, formula f1, formula f2)
 	ret = find_insert_bdd(vp, lson1, rson1);
 
     /* Insert into cache */
-    if( rand_cache )
-	cp = cp_old;
-    rand_cache = !rand_cache;
-    cp->fn   = fn;
-    cp->lson = f1;
-    cp->rson = f2;
-    cp->res  = ret;
+    cp = get_new_cache_rec();
+    cp->fn = fn;
+    cp->u.args.lson = f1;
+    cp->u.args.rson = f2;
+    cp->res = ret;
+    insert_hash(&cache_tbl, cp, cp);
     BDD_RETURN( ret );
 }
 
 static formula
 quantify(formula f, formula vf, int type)
 {
-    cache_ptr   cp, cp_old;
+    cache_ptr   cp;
     formula     ret;
     unint       index, cur;
     var_ptr     vp;
@@ -1911,18 +1936,13 @@ quantify(formula f, formula vf, int type)
         BDD_RETURN( f );
 
     /* Check cache */
-    cp = Cache + CACHE_FN(f,vf,type);
-    if( cp->lson == f && cp->rson == vf && cp->fn == type ) {
-        BDD_RETURN(cp->res);
+    cache_rec cr;
+    cr.fn = type;
+    cr.u.args.lson = f;
+    cr.u.args.rson = vf;
+    if( (cp = (cache_ptr) find_hash(&cache_tbl, &cr)) != NULL ) {
+	BDD_RETURN(cp->res);
     }
-    cp_old = cp;
-    if( cp->fn ) {
-        cp++;
-        if( cp->lson == f && cp->rson == vf && cp->fn == type ) {
-            BDD_RETURN(cp->res);
-        }
-    }
-
     index = f2var(vf);
     cur = f2var(f);
 
@@ -1957,13 +1977,12 @@ quantify(formula f, formula vf, int type)
 	}
     }
     /* Insert into cache */
-    if( rand_cache )
-	cp = cp_old;
-    rand_cache = !rand_cache;
-    cp->fn   = type;
-    cp->lson = f;
-    cp->rson = vf;
-    cp->res  = ret;
+    cp = get_new_cache_rec();
+    cp->fn = type;
+    cp->u.args.lson = f;
+    cp->u.args.rson = vf;
+    cp->res = ret;
+    insert_hash(&cache_tbl, cp, cp);
     BDD_RETURN( ret );
 }
 
@@ -2089,18 +2108,13 @@ garbage_collect()
 	else
 	    re_order();
 	erase = TRUE;	/* Must wipe out cache since nodes may have moved */
+	RCdynamic_ordering_threshold = nodes_used + nodes_used/2;
     } else {
 	erase = FALSE;
     }
 
-    /* Clean and possibly expand the cache */
-    if( nodes_used > CACHE_LOAD_FACTOR * sz_Cache ) {
-	Free((pointer) Cache);
-	sz_Cache = new_prime((5*nodes_used)/(4*CACHE_LOAD_FACTOR));
-	Cache = (cache_ptr) Calloc((sz_Cache+1)*sizeof(cache_rec));
-    } else {
-	clean_cache(erase);
-    }
+    /* Clean the cache */
+    clean_cache(erase);
 
 #if 0
     /* Reset external references */
@@ -2127,38 +2141,36 @@ garbage_collect()
     signal(SIGINT, old_handler);
 }
 
+static void
+clean_cache_rec_fn(pointer key, pointer data)
+{
+    cache_ptr	cp = (cache_ptr) key;
+    (void) data;
+    bool	remove = FALSE;
+    bdd_ptr	bp = GET_BDDP(cp->u.args.lson);
+    if( bp->ref_cnt < 1 )
+	remove = TRUE;
+    bp = GET_BDDP(cp->u.args.rson);
+    if( bp->ref_cnt < 1 )
+	remove = TRUE;
+    bp = GET_BDDP(cp->res);
+    if( bp->ref_cnt < 1 )
+	remove = TRUE;
+    if( remove ) {
+	delete_hash(&cache_tbl, cp);
+	cp->u.next = cache_free_list;
+	cache_free_list = cp;
+    }
+}
 
 static void
 clean_cache(bool erase)
 {
-    lunint i;
-    if( !erase ) {
-	for(i = 0; i <= sz_Cache; i++) {
-	    cache_ptr	cp;
-	    cp = Cache+i;
-	    if( cp-> fn != 0 ) {
-		bdd_ptr	bp;
-		bool	remove = FALSE;
-
-		bp = GET_BDDP(cp->lson);
-		if( bp->ref_cnt < 1 )
-		    remove = TRUE;
-		bp = GET_BDDP(cp->rson);
-		if( bp->ref_cnt < 1 )
-		    remove = TRUE;
-		bp = GET_BDDP(cp->res);
-		if( bp->ref_cnt < 1 )
-		    remove = TRUE;
-		if( remove ) {
-		    cp->fn = 0;
-		    cp->lson = 0;
-		    cp->rson = 0;
-		    cp->res = 0;
-		}
-	    }
-	}
+    if( erase ) {
+	dispose_hash(&cache_tbl, NULLFCN);
+	create_hash(&cache_tbl, sz_MainTbl/10, cache_hash, cache_equ);
     } else {
-	bzero((char *) Cache, (sz_Cache+1)*sizeof(cache_rec));
+	scan_hash(&cache_tbl, clean_cache_rec_fn);
     }
 }
 
@@ -2815,15 +2827,36 @@ bdd_eq(pointer p1, pointer p2)
     return( p1 == p2 );
 }
 
-static int
-new_prime(unsigned long int cur_size)
+
+static cache_ptr
+get_new_cache_rec()
 {
-    unsigned long int i;
-    i = 0;
-    while( primes[i] <= cur_size )
-	i++;
-    return( primes[i] );
+    if( cache_free_list != NULL ) {
+	cache_ptr res = cache_free_list;
+	cache_free_list = cache_free_list->u.next;
+	return res;
+    }
+    cache_ptr res = (cache_ptr) new_rec(&cache_rec_mgr);
+    return res;
 }
+
+static unint
+cache_hash(pointer p, unint n)
+{
+    cache_ptr	cp = (cache_ptr) p;
+    return (((cp->fn << 4)*(cp->u.args.lson)*(cp->u.args.rson)) % n);
+}
+
+static bool
+cache_equ(pointer p1, pointer p2)
+{
+    cache_ptr	cp1 = (cache_ptr) p1;
+    cache_ptr	cp2 = (cache_ptr) p2;
+    return( (cp1->fn == cp2->fn) &&
+	    (cp1->u.args.lson == cp2->u.args.lson) &&
+	    (cp1->u.args.rson == cp2->u.args.rson) );
+}
+
 
 static lunint
 uniq_hash_fn(formula l, formula r, lunint n)

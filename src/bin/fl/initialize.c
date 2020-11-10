@@ -88,5 +88,6 @@ Init()
     Table_Install_Functions();
     Image_Install_Functions();
     Iso_Install_Functions();
+    SHA256_Install_Functions();
 }
 

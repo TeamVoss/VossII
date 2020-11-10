@@ -1,0 +1,571 @@
+//set_font font_large;
+
+update_vossrc "DYNAMIC-ORDERING" "NO";
+
+//tcl_eval [sprintf "source %s/lattice_display.tcl" DIR];
+
+
+let display_sequence name sequence =
+    let sequence =
+	length sequence % 2 != 0 => (hd sequence):sequence | sequence in
+    let id_seq = zip (8 upto (length sequence-1+8)) sequence in
+    let mk (i,v) = sprintf "%d %d" i (256-v) in
+    let pre = sprintf "draw_sequence %s {" name in
+    let cmd = list2str T pre " " "}" mk id_seq then
+    (tcl_eval [cmd]) fseq ()
+;
+
+let add_comparison_sequence (color,sequence) =
+    let sequence =
+	length sequence % 2 != 0 => (hd sequence):sequence | sequence in
+    let id_seq = zip (8 upto (length sequence-1+8)) sequence in
+    let mk (i,v) = sprintf "%d %d" i (256-v) in
+    let pre = sprintf "add_comparison_sequence %s {" color in
+    let cmd = list2str T pre " " "}" mk id_seq then
+    (tcl_eval [cmd]) fseq ()
+;
+
+let display_range_sequence first name range_sequence =
+    let sequence =
+	length range_sequence % 2 != 0 => (hd range_sequence):range_sequence
+					| range_sequence
+    in
+    let id_seq = zip (8 upto (length sequence-1+8)) sequence in
+    let mk (i,(m,M)) = sprintf "{%d %d %d}" i (256-M) (256-m) in
+    let pre = sprintf "draw_range_sequence %s %s {" (first=>"1" | "0") name in
+    let cmd = list2str T pre " " "}" mk id_seq then
+    (tcl_eval [cmd]) fseq ()
+;
+
+// Symbolic version
+lettype satom =
+    S_ATOM {type::bv}
+	  {o_bv1:: {bv#bv} opt}
+	  {o_bv2:: {bv} opt}
+	  {o_bv3:: {bv} opt}
+	  {o_atom1 :: {satom} opt}
+	  {o_atom2 :: {satom} opt}
+;
+
+let t_STEADY  = int2bv 0;
+let t_SLOPE   = int2bv 1;
+let t_FOLLOWS = int2bv 2;
+
+let S_STEADY v dur = S_ATOM t_STEADY (SOME v) NONE (SOME dur) NONE NONE;
+let S_SLOPE fv wid d = S_ATOM t_SLOPE (SOME fv) (SOME wid) (SOME d) NONE NONE;
+let S_FOLLOWS f s = S_ATOM t_FOLLOWS NONE NONE NONE (SOME f) (SOME s);
+
+let is_STEADY (S_ATOM tp obv1 obv2 obv3 oa1 oa2)  = tp = t_STEADY;
+let is_SLOPE (S_ATOM tp obv1 obv2 obv3 oa1 oa2)   = tp = t_SLOPE;
+let is_FOLLOWS (S_ATOM tp obv1 obv2 obv3 oa1 oa2) = tp = t_FOLLOWS;
+
+let destr_STEADY (S_ATOM _ (SOME v) _ (SOME dur) _ _)         = (v, dur);
+let destr_SLOPE (S_ATOM _ (SOME fv) (SOME tv) (SOME dur) _ _) = (fv, tv, dur);
+let destr_FOLLOWS (S_ATOM _ _ _ _ (SOME f) (SOME s))          = (f, s);
+
+
+
+letrec Psatom sa =
+    let p2s (v,V) = sprintf "(%d,%d)" (bv2int v) (bv2int V) in
+    is_STEADY sa =>
+	val (v,dur) = destr_STEADY sa in
+	sprintf "(STEADY %s %d)" (p2s v) (bv2int dur)
+    |
+    is_SLOPE sa =>
+	val (fv,tv,dur) = destr_SLOPE sa in
+	sprintf "(SLOPE %s %d %d)" (p2s fv) (bv2int tv) (bv2int dur)
+    |
+    is_FOLLOWS sa =>
+	val (f,t) = destr_FOLLOWS sa in
+	sprintf "%s >> %s" (Psatom f) (Psatom t)
+    |
+    error "Illegal satom"
+;
+install_print_function Psatom;
+
+
+lettype svlist = SV {type::bool} {oval:: {satom} opt} {olist:: {svlist} opt};
+
+let tNIL  = F;
+let tCONS = T;
+
+let SCONS v l = SV T (SOME v) (SOME l);
+let SNIL      = SV F NONE NONE;
+
+let is_SNIL  (SV tp _ _) = NOT tp;
+let is_SCONS (SV tp _ _) = tp;
+
+let destr_SCONS (SV tp (SOME v) (SOME sl)) = (v,sl);
+
+letrec sl_split cnt sl =
+    cnt = (int2bv 0) => (SNIL,sl) |
+    is_SNIL sl => SNIL, SNIL |
+    val (shd,stl) = destr_SCONS sl in
+    val (l1,l2) = sl_split (cnt - (int2bv 1)) stl in
+    SCONS shd l1, l2
+; 
+
+letrec sl_length sl =
+    is_SNIL sl => int2bv 0 |
+    val (shd,stl) = destr_SCONS sl in
+    (int2bv 1) + (sl_length stl)
+;
+
+letrec sl_append sl1 sl2 =
+    is_SNIL sl1 => sl2 |
+    val (shd,stl) = destr_SCONS sl1 in
+    SCONS shd (sl_append stl sl2)
+;
+    
+
+
+letrec split_ts sa =
+    is_STEADY sa => SCONS sa SNIL |
+    is_SLOPE sa => SCONS sa SNIL |
+    is_FOLLOWS sa =>
+	val (f,t) = destr_FOLLOWS sa in
+	sl_append (split_ts f) (split_ts t)
+    |
+    error "Illegal satom"
+;
+
+cletrec get_duration sa =
+    is_STEADY sa =>
+	val (value,duration) = destr_STEADY sa in
+	duration
+    |
+    is_SLOPE sa =>
+	val (fromv,to_v,duration) = destr_SLOPE sa in
+	duration
+    |
+    is_FOLLOWS sa =>
+	val (f,t) = destr_FOLLOWS sa in
+	get_duration f + get_duration t
+    |
+    error "Illegal satom"
+;
+
+let INF = 255;
+let S_UNKNOWN = (int2bv 0), (int2bv INF);
+let UNC = (0,256);
+
+clet fuzz v wid = (v-wid), (v+wid);
+
+clet slope fv tv dur =
+    let tw = dur - int2bv 1 in
+    ((int2bv 16)*(tv-fv))/tw
+;
+
+clet dec v = v - (int2bv 1);
+
+clet eq0 v = v = int2bv 0;
+
+clet less av bv = bv_less av bv;
+
+cletrec getvalue t sa =
+    is_STEADY sa =>
+	val (v,dur) = destr_STEADY sa in
+	eq0 dur => S_UNKNOWN |
+	less t dur => v | S_UNKNOWN
+    |
+    is_SLOPE sa =>
+	val ((fv,tv),wid,dur) = destr_SLOPE sa in
+	NOT (less t dur) => S_UNKNOWN |
+	let tw = dec dur in
+	eq0 t => fuzz fv wid |
+	(t = tw) => fuzz tv wid |
+	let v = fv+(t*(slope fv tv dur))/(int2bv 16) in
+	fuzz v wid
+    |
+    is_FOLLOWS sa =>
+	val (s1,s2) = destr_FOLLOWS sa in
+	let d1 = get_duration s1 in
+	less t d1 => getvalue t s1 | getvalue (t-d1) s2
+    |
+    error "Illegal satom"
+;
+
+
+clet satom2sequence max_time sequence =
+	map (\i. getvalue (int2bv i) sequence) (0 upto (max_time-1))
+;
+
+let iv2p v = (int2bv v, int2bv v);
+let bv2p v = ({v::bv}, v);
+let piv2p (f,t) = (int2bv f, int2bv t);
+
+let to_ii from_v to_v = (int2bv from_v, int2bv to_v);
+let to_ib from_v to_v = (int2bv from_v, {to_v::bv});
+let to_bi from_v to_v = ({from_v::bv}, iv2p to_v);
+let to_bb from_v to_v = ({from_v::bv}, {to_v::bv});
+overload --> to_ii to_ib to_bi to_bb;
+infix 5 -->;
+
+let >> l1 l2 = S_FOLLOWS l1 l2;
+infix 2 >>;
+
+let pm_0ii {iv::int} {wid::int} = (int2bv (max 0 (iv-wid)),
+				   int2bv (min 256 (iv+wid)))
+;
+let pm_0ib {iv::int} {wid::bv}  = (max (int2bv 0) (int2bv iv-wid),
+				   min (int2bv 256) (int2bv iv+wid))
+;
+let pm_0bi {iv::bv} {wid::int}  = 
+		let bwid = int2bv wid in
+		(max (int2bv 0) (iv-bwid), min (int2bv 256) (iv+bwid))
+;
+let pm_0bb {iv::bv} {wid::bv}  = 
+		(max (int2bv 0) (iv-wid), min (int2bv 256) (iv+wid))
+;
+let pm_i (fv,tv) wid = (fv,tv),int2bv wid;
+let pm_b (fv,tv) wid = (fv,tv,{wid::bv});
+overload +/- pm_i pm_b pm_0ii pm_0ib pm_0bi pm_0bb;
+infix 4 +/-;
+
+
+let steady_ii value time = S_STEADY (iv2p value) (int2bv time);
+let steady_bi value time = S_STEADY (bv2p value) (int2bv time);
+let steady_ib value time = S_STEADY (iv2p value) time;
+let steady_bb value time = S_STEADY value time;
+let psteady_ii value time = S_STEADY (piv2p value) (int2bv time);
+let psteady_bi value time = S_STEADY value (int2bv time);
+let psteady_ib value time = S_STEADY (piv2p value) time;
+
+let slope_b ((fv,tv),wid) {dur::bv} =
+    let illegal = dur < (int2bv 2) in
+    (illegal !== F) => eprintf "A slope must have duration >= 2" |
+    dur = '2 =>
+	(S_STEADY (fuzz fv wid) '1) >> (S_STEADY (fuzz tv wid) '1)
+    |
+    val (v_f,v_F) = fuzz fv wid in
+    val (v_t,v_T) = fuzz tv wid in
+    let m = depends (v_f,v_t) != [] => min v_f v_t
+				     | int2bv (min (bv2int v_f) (bv2int v_t))
+    in
+    let M = depends (v_F,v_T) != [] => max v_F v_T
+				     | int2bv (max (bv2int v_F) (bv2int v_T))
+    in
+    (S_STEADY (v_f, v_F) '1) >>
+    (S_STEADY (m, M) (dur - '2)) >>
+    (S_STEADY (v_t, v_T) '1)
+;
+
+let slope_i ((fv,tv),wid) dur =
+    dur < 2 => eprintf "A slope must have duration >= 2 (%d)" dur |
+    slope_b ((fv,tv),wid) (int2bv dur)
+;
+overload for steady_ii steady_bi steady_ib steady_bb
+	     psteady_ii psteady_bi psteady_ib
+	     slope_i slope_b
+;
+infix 3 for;
+
+
+
+letrec repeat_i al cnt = cnt = 0 => UNC for 0 | al >> (repeat_i al (cnt-1));
+letrec repeat_b al cnt =
+    cnt = (int2bv 0) => UNC for 0 | al >> (repeat_b al (cnt-(int2bv 1)))
+;
+overload ^^ repeat_i repeat_b;
+infix 6 ^^;
+
+let second t = t;
+postfix second;
+
+let seconds t = t;
+postfix seconds;
+
+let If c = c;
+let Else t e = (t,e);
+let Then c (t,e) = c => t | e;
+if_then_else_binder Then Else;
+
+let nothing = 0 for 0 seconds;
+
+let unconstrained = S_UNKNOWN for 0 seconds;
+
+// Visualize a collection of examples of waveforms covered by sa.
+let show_sequence_examples examples max_time sa comparisons =
+    let vs = depends sa then
+    letrec make_examples n cond =
+        cond == F => [] |
+        n == 0 => [] |
+        let sub = full_example ((random 0 1) = 1) vs cond then
+	let sa' = substitute sub sa then
+	let range = satom2sequence max_time sa' then
+        let cond' = cond AND (sa' != sa) then
+	let irange = map (\(m,M). bv2int m, bv2int M) range then
+        irange:(make_examples (n-1) cond')
+    in
+    let exs = make_examples examples T then
+    let pre1 = "draw_range_sequence {} 1 {" in
+    let pren = "draw_range_sequence {} 0 {" in
+    let pr (m,M) = sprintf "{%d %d}" (256-M) (256-m) in
+    let cmd1 = list2str T pre1 " " "}" pr (hd exs) then
+    let cmdn = map (\ex. list2str T pren " " "}" pr ex) (tl exs) then
+    let cmd = cmd1:cmdn in
+    let res = tcl_eval cmd then
+    (foreach add_comparison_sequence comparisons) fseq
+    res
+;
+
+
+
+
+let get_durations ranges =
+    let cnt = length ranges in
+    let var_names = map (sprintf "d%d[9:0]") (1 upto cnt) then
+//    (var_order (interleave (map md_expand_vector ("T[9:0]":var_names)))) fseq
+    let mk n = bv_ZX (bv_variable n) in
+    let durs = map mk var_names in
+    let mk_dur dv (m,M) =
+	let cond = (int2bv m) <= dv AND dv <= (int2bv M) in
+	let vs = depends cond in
+	let sub = fparam vs cond then
+	substitute sub dv
+    in
+    map2 mk_dur durs ranges
+;
+
+
+
+
+val [d_before,d_down,d_stop,d_up] =
+    get_durations [(0,500), (2,9), (0,20), (2,9)]
+;
+
+
+let spec =
+    UNC for d_before >>
+    40 --> 0 +/- 10 for d_down >>
+    2 +/- 2 for d_stop >>
+    0 --> 40 +/- 10 for d_up
+;
+
+val [d_before,
+     d_dwn1,d_stp1,d_up1,
+     d_sep1,
+     d_dwn2,d_stp2,d_up2,
+     d_sep2,
+     d_dwn3,d_stp3,d_up3] =
+    get_durations [
+	(0,500),
+	(8,12), (8,12),(10,15),
+	(10,100),
+	(8,12), (8,12),(10,15),
+	(10,100),
+	(8,12), (8,12),(10,15)
+];
+
+let spec =
+    UNC for d_before
+    >>
+    90-->0 +/- 10 for d_dwn1 >> 0 for d_stp1 >> 0-->80 +/- 10 for d_up1
+    >>
+    UNC for d_sep1
+    >>
+    90-->0 +/- 10 for d_dwn2 >> 0 for d_stp2 >> 0-->80 +/- 10 for d_up2
+    >>
+    UNC for d_sep2
+    >>
+    90-->0 +/- 10 for d_dwn3 >> 0 for d_stp3 >> 0-->80 +/- 10 for d_up3
+;
+
+//var_order [
+//    "T[9]", "d1[9]", "d4[9]", "d5[9]", "T[8]", "d1[8]", "d4[8]", "d5[8]",
+//    "T[7]", "d1[7]", "d4[7]", "d5[7]", "T[6]", "d1[6]", "d5[6]", "T[5]",
+//    "d1[5]", "d5[5]", "T[4:0]", "d9[9:8]", "b[9:7]", "d2[9]", "d3[9]",
+//    "d2[8]", "d3[8]", "d2[7]", "d3[7]", "d2[6]", "d3[6]", "d2[5]", "d3[5]",
+//    "d2[4:3]", "d6[9]", "d7[9]", "d8[9]", "d10[9]", "d11[9]", "d7[8]",
+//    "d8[8]", "d10[8]", "d11[8]", "d7[7]", "d8[7]", "d9[7]", "d7[6]", "a[9]",
+//    "d13[9]", "d12[9]", "d3[3]", "d6[8]", "d10[7:5]", "d11[7:6]", "d9[6:5]",
+//    "d7[5]", "a[8]", "a[0:1]", "d13[8:2]", "d12[8]", "d6[7:5]", "d10[4:3]",
+//    "d11[5]", "a[2:3]", "d12[7]", "d6[4:3]", "a[5]", "a[7]", "a[4]", "a[6]",
+//    "d13[1:0]", "d9[4:2]", "d9[0:1]", "d12[6:4]", "d12[2:3]", "d12[1:0]",
+//    "d10[2]", "d10[0:1]", "d11[4:0]", "d4[6:4]", "d4[2:3]", "d4[1:0]",
+//    "d1[4:0]", "d2[2:0]", "d3[4]", "d3[2:0]", "d5[4:0]", "d7[4:0]", "d6[2:0]",
+//    "d8[6:0]", "b[1:0]", "b[3:4]", "b[2]", "b[5:6]"
+//];
+
+
+
+val [d_dwn1,d_stp1,d_up1, d_sep1,
+     d_dwn2,d_stp2,d_up2, d_sep2,
+     d_dwn3,d_stp3,d_up3, d_sep3, cnt
+    ,d_before, d_final
+    ] =
+    get_durations [
+	(4,20), (8,25),(10,20),
+	(10,100),
+	(4,20), (8,25),(10,20),
+	(10,100),
+	(4,20), (8,25),(10,20),
+	(10,100),
+	(1,3)
+	,(1,127), (1,511)
+];
+
+let t = bv_ZX (bv_variable "T[8:0]");
+
+//let d_before = bv_constrained_variable "b[9:0]" (\v. v > '0 AND v < '100);
+
+//let d_final = bv_constrained_variable "a[9:0]" (\v.
+//	v + (d_before + d_dwn1 + d_stp1 + d_up1 + d_sep1 +
+//	     (cnt >= '2 =>  d_dwn2 + d_stp2 + d_up2 + d_sep2 | '0) +
+//	     (cnt >= '3 =>  d_dwn3 + d_stp3 + d_up3 + d_sep3 | '0)) = '512);
+
+//let d_final = bv_constrained_variable "a[9:0]" (\v. '0 < v AND v < '500);
+
+update_vossrc "DYNAMIC-ORDERING" "YES";
+bdd_size d_final;
+
+let spec =
+    UNC for d_before
+    >>
+    (
+	5-->90 +/- 5 for d_up1
+	>>
+	120 +/- 40 for d_stp1
+	>>
+	90-->5 +/- 5 for d_dwn1
+	>>
+	UNC for d_sep1
+    )
+    >>
+    (
+	(cnt >= '2) => (
+	    (
+		5-->60 +/- 5 for d_up2
+		>>
+		60 +/- 10 for d_stp2
+		>>
+		60-->5 +/- 5 for d_dwn2
+		>>
+		UNC for d_sep2
+	    )
+	    >>
+	    (
+		(cnt >= '3) => (
+		    10-->150 +/- 10 for d_up3
+		    >>
+		    150 +/- 10 for d_stp3
+		    >>
+		    150-->10 +/- 10 for d_dwn3
+		    >>
+		    UNC for d_sep3
+		) |
+		UNC for 0
+	    )
+	) | UNC for 0
+    )
+    >>
+    UNC for d_final
+;
+
+//wtime (bdd_size spec);
+
+//let split_spec = split_ts spec;
+
+//wtime (split_spec fseq 1);
+//sl_length split_spec;
+//bv_range it;
+
+
+//let extract_ts len sa =
+//    let slist = split_ts sa in
+//    let cond = sl_length slist = (int2bv len) in
+//    cond == F => [] |
+//    let sub = param cond in
+//    let slist' = substitute sub slist in
+//    letrec slist2list sl =
+//	is_SCONS sl =>
+//	    val (shd,stl) = destr_SCONS sl in
+//	    let rhd =
+//		is_STEADY shd =>
+//		    val ((m,M),dur) = destr_STEADY shd in
+//		    (T,m,M,int2bv 0,dur)
+//		|
+//		is_SLOPE shd =>
+//		    val ((fv,tv),wid,dur) = destr_SLOPE shd in
+//		    (F,fv,tv,wid,dur)
+//		|
+//		error "Should not happen"
+//	    in
+//	    rhd:(slist2list stl)
+//	|
+//	    []
+//    in
+//    slist2list slist'
+//;
+//
+//let q1 = extract_ts 7 spec;
+//q1;
+//let q2 = extract_ts 11 spec;
+//q2;
+//let q3 = extract_ts 14 spec;
+//q3;
+//
+//
+//let tot_len1 = itlist (\(type,f,t,wid,dur).\res. res + dur) q1 '0;
+//let c1 = tot_len1 = (int2bv 511);
+//bdd_size c1;
+//
+//let tot_len2 = itlist (\(type,f,t,wid,dur).\res. res + dur) q2 '0;
+//let c2 = tot_len2 = (int2bv 511);
+//bdd_size c2;
+//
+//let tot_len3 = itlist (\(type,f,t,wid,dur).\res. res + dur) q3 '0;
+//let c3 = tot_len3 = (int2bv 511);
+//bdd_size c3;
+//
+//let sub3 = param c3;
+//wtime (bdd_size sub3);
+//
+//let q3' = substitute sub3 q3;
+//bdd_size q3';
+
+
+
+//val [d_before, d_dwn1,d_stp1,d_up1] =
+//    get_durations [
+//	(0,500),
+//	(5,15), (5,20),(5,15)
+//];
+//
+//let spec =
+//    UNC for d_before
+//    >>
+//    90-->0 +/- 10 for d_dwn1 >> 0 for d_stp1 >> 0-->80 +/- 10 for d_up1
+//;
+
+
+length (depends spec);
+
+//update_vossrc "DYNAMIC-ORDERING" "NO";
+var_order [
+    "T[9]", "d1[9]", "d4[9]", "d5[9]", "T[8]", "d1[8]", "d4[8]", "d5[8]",
+    "T[7]", "d1[7]", "d4[7]", "d5[7]", "T[6]", "d1[6]", "d5[6]", "T[5]",
+    "d1[5]", "d5[5]", "T[4:0]", "d9[9:8]", "b[9:7]", "d2[9]", "d3[9]",
+    "d2[8]", "d3[8]", "d2[7]", "d3[7]", "d2[6]", "d3[6]", "d2[5]", "d3[5]",
+    "d2[4:3]", "d6[9]", "d7[9]", "d8[9]", "d10[9]", "d11[9]", "d7[8]",
+    "d8[8]", "d10[8]", "d11[8]", "d7[7]", "d8[7]", "d9[7]", "d7[6]",
+    "a[9]", "d13[9]", "d12[9]", "d3[3]", "d6[8]", "d10[7:5]", "d11[7:6]",
+    "d9[6:5]", "d7[5]", "a[8]", "a[0:1]", "d13[8:2]", "d12[8]", "d6[7:5]",
+    "d10[4:3]", "d11[5]", "a[2:3]", "d12[7]", "d6[4:3]", "a[5]", "a[7]",
+    "a[4]", "a[6]", "d11[3]", "d7[3]", "b[1:0]", "b[3:4]", "b[2]", "b[5:6]",
+    "d14[9]", "d15[9]", "d16[9]", "d14[8:5]", "d16[5:8]", "d14[4]", "d16[4]",
+    "d4[6:4]", "d14[3]", "d16[3]", "d4[3:2]", "d14[2]", "d16[2]", "d4[1]",
+    "d14[1:0]", "d4[0]", "d16[1]", "d3[4]", "d3[2:0]", "d1[4:0]", "d16[0]",
+    "d13[1:0]", "d15[8:6]", "d8[6:0]", "d15[5]", "d5[4]", "d9[4:2]",
+    "d9[0:1]", "d15[4]", "d12[6:3]", "d15[3:2]", "d12[2:1]", "d15[1:0]",
+    "d5[3:0]", "d11[4]", "d11[2:0]", "d7[4]", "d12[0]", "d2[2:0]", "d7[2:0]",
+    "d6[2:0]", "d10[0:2]"
+];
+
+//show_sequence_examples 4 512 spec [];
+
+update_vossrc "DYNAMIC-ORDERING" "YES";
+let spec_rel = getvalue t spec;
+
+wtime (bdd_size spec_rel);
+

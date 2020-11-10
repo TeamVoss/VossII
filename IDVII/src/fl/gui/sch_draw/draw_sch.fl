@@ -1387,7 +1387,7 @@ export_to_tcl fl_undo_expansion;
 let fl_hide_fanin c tag make_it_stop_node =
     (make_it_stop_node => (fl_add_stop_nd c tag) | ()) fseq
     let vis = canvas2vis c then
-    let vis = visualize_hide_fanin vis tag 0 then
+    let vis = visualize_hide_fanin vis tag (-1) then
     val (final_res, cmds) = visualisation2tcl vis then
     (big_tcl_eval ("create_sch":cmds)) fseq
     (tcl_eval [

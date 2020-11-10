@@ -15,6 +15,7 @@ void	    Init_SHA256();
 SHA256_ptr  Begin_SHA256();
 void	    SHA_printf(SHA256_ptr ctx, const string format, ...);
 string	    Get_SHA256_hash(SHA256_ptr ctx);
+void	    SHA256_Install_Functions();
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */

@@ -90,6 +90,8 @@ g_ptr		End_ordering();
 int		Get_bdd_size(formula f, int limit);
 void		Get_abstract_depends(g_ptr redex, hash_record *abs_tblp,
 				     g_ptr obj);
+int		SHA256_bdd(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha,
+			    formula f); 
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */
@@ -122,7 +124,7 @@ typedef struct var_rec		*var_ptr;
 #define BDD_MAX_REF_CNT		((1 << REF_CNT_SIZE)-1)
 #define LOAD_FACTOR		4			/* Avg chain = 4     */
 #define MIN_PERCENT_GC_INCR	50
-#define CACHE_LOAD_FACTOR	8
+#define CACHE_LOAD_FACTOR	2
 #define DYN_VAR_RED		2
 
 typedef struct bdd_rec {
@@ -153,12 +155,20 @@ typedef struct var_rec {
 } var_rec;
 
 
-typedef struct {
-	formula	lson;
-	formula	rson;
-	unint	fn:CACHE_OP_SZ;		/* NOR/XOR/UNIV/EXIST/DEPENDS */
-	formula	res:LG_BDD_SIZE1;
-} cache_rec, *cache_ptr;
+typedef struct cache_rec    *cache_ptr;
+
+typedef struct cache_rec {
+	union {
+	    struct {
+	      formula	lson;
+	      formula	rson;
+	      }		    args;
+	    cache_ptr	    next;
+	}			    u;
+				    /* AND/OR/XOR/UNIV/EXIST/DEPENDS */
+	unint			    fn:CACHE_OP_SZ;
+	formula			    res:LG_BDD_SIZE1;
+} cache_rec;
 
 typedef enum {sop_format, infix_format, tree_format}	print_types;
 #define MAX_PROD_SIZE	4000	/* Max # characters to print in SOP */

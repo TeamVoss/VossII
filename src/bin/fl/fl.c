@@ -275,7 +275,7 @@ fl_main(int argc, char *argv[])
         }
     }
 
-    LG_TBL_SIZE = 20;
+    LG_TBL_SIZE = 18;
     if( size_str != NULL && !str2int(size_str, &LG_TBL_SIZE) )
     {
 	Eprintf("Size flag takes a number between 12 and 24.\n");
