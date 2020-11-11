@@ -57,7 +57,6 @@ Init()
     System_Init();
     Int_ops_Init();
     List_ops_Init();
-    Signature_Init();
     Float_Init();
     Bv_Init();
     Bev_Init();
@@ -78,7 +77,6 @@ Init()
     System_Install_Functions();
     Int_ops_Install_Functions();
     List_ops_Install_Functions();
-    Signature_Install_Functions();
     Cache_ops_Install_Functions();
     Float_Install_Functions();
     Bv_Install_Functions();

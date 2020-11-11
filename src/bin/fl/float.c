@@ -26,6 +26,9 @@ static typeExp_ptr  float_handle_tp;
 static rec_mgr	    float_rec_mgr;
 static float_ptr    free_list;
 
+static int	    float_sha256_fn(int *g_cntp, hash_record *g_tblp,
+				    SHA256_ptr sha, pointer a);
+
 /********************************************************/
 /*                    LOCAL FUNCTIONS    		*/
 /********************************************************/
@@ -323,6 +326,18 @@ static void f_floor(g_ptr redex) { gen_convert_to_int(floor, redex); }
 static void f_ceil(g_ptr redex) { gen_convert_to_int(ceil, redex); }
 static void f_round(g_ptr redex) { gen_convert_to_int(round, redex); }
 
+static int
+float_sha256_fn(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha, pointer a)
+{
+    (void) g_tblp;
+    float_ptr fp = (float_ptr) a;
+    int res = *g_cntp;
+    *g_cntp = res+1;
+    SHA256_printf(sha, "%d=FL %a\n", res, fp->u.f);
+    return res;     
+}
+
+
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
 /********************************************************/
@@ -340,7 +355,8 @@ Float_Init()
 				    float2str_fn,
 				    float_eq_fn,
 				    NULL,
-				    NULL);
+				    NULL,
+				    float_sha256_fn);
     float_handle_tp  = Get_Type("float", NULL, TP_INSERT_FULL_TYPE);
 }
 

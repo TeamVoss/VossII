@@ -1234,7 +1234,9 @@ Add_ExtAPI_Object(
             string  (*obj2string)(pointer p),
             formula (*eq_fn)(pointer a, pointer b, bool identical),
             pointer (*gmap_fn)(gmap_info_ptr ip, pointer a),
-            pointer (*gmap2_fn)(gmap_info_ptr ip, pointer a, pointer b))
+            pointer (*gmap2_fn)(gmap_info_ptr ip, pointer a, pointer b),
+	    int	    (*sha256_fn)(int *g_cntp, hash_record *g_tblp,
+				 SHA256_ptr sha, pointer obj) )
 {
     name = wastrsave(&strings, name);
     ext_obj_rec obj;
@@ -1253,6 +1255,7 @@ Add_ExtAPI_Object(
     }
     obj.gmap_fn = gmap_fn;
     obj.gmap2_fn = gmap2_fn;
+    obj.sha256_fn = sha256_fn;
     push_buf(&ext_obj_buf, (pointer) &obj);
     return(obj.class);
 }

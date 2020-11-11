@@ -724,6 +724,8 @@ typedef struct ext_obj_rec {
 	formula	    (*eq_fn)(pointer a, pointer b, bool identical);
 	pointer	    (*gmap_fn)(gmap_info_ptr ip, pointer a);
 	pointer	    (*gmap2_fn)(gmap_info_ptr ip, pointer a, pointer b);
+	int	    (*sha256_fn)(int *g_cntp, hash_record *g_tblp,
+				 SHA256_ptr sha, pointer obj);
 } ext_obj_rec;
 
 

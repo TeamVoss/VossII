@@ -476,6 +476,8 @@ static string	    find_instance_name(g_ptr attrs);
 static gbv	    BDD_c_limited_AND(gbv a, gbv b);
 static gbv	    BDD_c_limited_OR(gbv a, gbv b);
 static void	    base_print_ilist(ilist_ptr il);
+static int	    fsm_sha256_fn(int *g_cntp, hash_record *g_tblp,
+				  SHA256_ptr sha, pointer a);
 
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
@@ -541,7 +543,8 @@ Fsm_Init()
                                   fsm2str_fn,
                                   fsm_eq_fn,
                                   NULL,
-                                  NULL);
+                                  NULL,
+				  fsm_sha256_fn);
     fsm_handle_tp  = Get_Type("fsm", NULL, TP_INSERT_FULL_TYPE);
 
     ste_oidx = Add_ExtAPI_Object("ste",
@@ -552,7 +555,8 @@ Fsm_Init()
                                   ste2str_fn,
                                   ste_eq_fn,
                                   ste_gmap_fn,
-                                  ste_gmap2_fn);
+                                  ste_gmap2_fn,
+				  NULL);
     ste_handle_tp  = Get_Type("ste", NULL, TP_INSERT_FULL_TYPE);
 
     vstate_oidx = Add_ExtAPI_Object("vstate",
@@ -563,8 +567,8 @@ Fsm_Init()
                                   vstate2str_fn,
                                   NULL, //vstate_eq_fn,
                                   NULL, //vstate_gmap_fn,
-                                  NULL //vstate_gmap2_fn
-				    );
+                                  NULL, //vstate_gmap2_fn
+				  NULL);
     vstate_handle_tp  = Get_Type("vis", NULL, TP_INSERT_FULL_TYPE);
 
     new_buf(&inps_buf, 1000, sizeof(gbv));
@@ -4809,51 +4813,51 @@ static string
 compute_sha256_signature(fsm_ptr fsm)
 {
     SHA256_ptr sha = Begin_SHA256();
-    SHA_printf(sha, "%s %d\n", fsm->top_name, fsm->ranks);
+    SHA256_printf(sha, "%s %d\n", fsm->top_name, fsm->ranks);
     // Include all information about the nodes
     nnode_ptr np;
     FOR_BUF(&(fsm->nodes), nnode_rec, np) {
 	int start = np->vec->map->from;
 	vec_info_ptr vp = np->vec;
-	SHA_printf(sha, "  %d %s %s %d composite:%d fanouts: [",
+	SHA256_printf(sha, "  %d %s %s %d composite:%d fanouts: [",
 			np->idx, vp->hierarchy, vp->local_name,
 			np->idx-start+1, np->composite);
 	char sep = ' ';
 	for(idx_list_ptr ip = np->fanouts; ip != NULL; ip = ip->next) {
-	    SHA_printf(sha, "%c %d", sep, ip->idx);
+	    SHA256_printf(sha, "%c %d", sep, ip->idx);
 	    sep = ',';
 	}
-	SHA_printf(sha, "]\n");
+	SHA256_printf(sha, "]\n");
     }
     // and the same for all composites
     ncomp_ptr   cp;
     int cnt = 0;
     FOR_BUF(compositesp, ncomp_rec, cp) {
-        SHA_printf(sha, " %3d %s sz:%d rank:%d pdel:%d ",
+        SHA256_printf(sha, " %3d %s sz:%d rank:%d pdel:%d ",
                 cnt++, op2str(cp),cp->size,cp->rank,cp->phase_delay);
-        SHA_printf(sha, "inps: ");
+        SHA256_printf(sha, "inps: ");
         char *sep = strtemp("[");
         for(ilist_ptr ip = cp->inps; ip != NULL; ip = ip->next) {
             if( ip->size == 1 ) {
-                SHA_printf(sha, "%s%d", sep, ip->from);
+                SHA256_printf(sha, "%s%d", sep, ip->from);
             } else {
-                SHA_printf(sha, "%s[%d:%d]", sep, ip->from, ip->to);
+                SHA256_printf(sha, "%s[%d:%d]", sep, ip->from, ip->to);
             }
             strtemp(",");
         }
-        if( cp->inps != NULL ) SHA_printf(sha, "] ");
-        SHA_printf(sha, "outs: ");
+        if( cp->inps != NULL ) SHA256_printf(sha, "] ");
+        SHA256_printf(sha, "outs: ");
         strtemp("["); 
         for(ilist_ptr ip = cp->outs; ip != NULL; ip = ip->next) {
             if( ip->size == 1 ) {
-                SHA_printf(sha, "%s%d", sep, ip->from);
+                SHA256_printf(sha, "%s%d", sep, ip->from);
             } else {
-                SHA_printf(sha, "%s[%d:%d]", sep, ip->from, ip->to);
+                SHA256_printf(sha, "%s[%d:%d]", sep, ip->from, ip->to);
             }
             strtemp(",");
         }
-        if( cp->outs != NULL ) SHA_printf(sha, "]");
-        SHA_printf(sha, "\n");
+        if( cp->outs != NULL ) SHA256_printf(sha, "]");
+        SHA256_printf(sha, "\n");
     }
     return( Get_SHA256_hash(sha) );
 }
@@ -9162,6 +9166,16 @@ clean_pexlif_ios(g_ptr node)
     return res;
 }
 
+static int
+fsm_sha256_fn(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha, pointer a)
+{
+    (void) g_tblp;
+    fsm_ptr fsm = (fsm_ptr) a;
+    int res = *g_cntp;
+    *g_cntp = res+1;
+    SHA256_printf(sha, "%d=FSM %s\n", res, fsm->sha256_sig);
+    return res;     
+}
 
 
 // Dummy function to make these function appear to be used.

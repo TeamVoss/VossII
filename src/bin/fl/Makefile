@@ -29,7 +29,7 @@ OBJ = new_bdd.o error.o arb_prec.o file_ops.o initialize.o symbol_tbl.o \
 	graph.o fl.o typecheck.o emit.o lp.o cache.o compile.o \
 	expand_cursor.o io.o remote_tcl.o bexpr.o minisat_ifc.o main.o \
 	draw_graph.o debug.o symbol.o strings.o int_ops.o list_ops.o \
-	system.o signature.o float.o bv.o bev.o fsm.o sha256.o table.o image.o \
+	system.o float.o bv.o bev.o fsm.o sha256.o table.o image.o \
 	plugin.o plugin_loader.o plugin_checker.o plugin_errlog.o \
         iso.o
 
@@ -88,7 +88,6 @@ strings.o:	    strings.h graph.h typecheck.h fl.h
 int_ops.o:	    int_ops.h graph.h typecheck.h fl.h
 list_ops.o:	    list_ops.h graph.h typecheck.h fl.h
 system.o:	    system.h graph.h typecheck.h fl.h
-signature.o:	    signature.h graph.h typecheck.h fl.h
 float.o:	    float.h graph.h typecheck.h fl.h
 bv.o:		    bv.h graph.h typecheck.h fl.h
 bev.o:		    bev.h graph.h typecheck.h fl.h

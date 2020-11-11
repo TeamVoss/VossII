@@ -124,6 +124,7 @@ register_types(int num_types, fl_plugin_types types)
                              , types[i].equals
                              , types[i].gmap
                              , types[i].gmap2
+			     , NULL		// No SHA256 computation
                              );
         types[i].type = Get_Type(types[i].name, NULL, TP_INSERT_FULL_TYPE);
     }

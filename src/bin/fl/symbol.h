@@ -72,7 +72,9 @@ int		Add_ExtAPI_Object(
 		    string  (*obj2string)(pointer p),
 		    formula (*eq_fn)(pointer a, pointer b, bool identical),
 		    pointer (*gmap_fn)(gmap_info_ptr ip, pointer a),
-		    pointer (*gmap2_fn)(gmap_info_ptr ip,pointer a,pointer b));
+		    pointer (*gmap2_fn)(gmap_info_ptr ip,pointer a,pointer b),
+		    int     (*sha256_fn)(int *g_cntp, hash_record *g_tblp,
+					 SHA256_ptr sha, pointer obj));
 g_ptr		Make_ext_obj(int class, pointer p);
 void		Mark_ext_obj(g_ptr np);
 void		Save_ext_obj(FILE *fp, g_ptr np);

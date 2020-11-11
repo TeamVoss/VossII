@@ -13,9 +13,11 @@ typedef struct SHA256_rec	*SHA256_ptr;
 /* ----- Function prototypes for public functions ----- */
 void	    Init_SHA256();
 SHA256_ptr  Begin_SHA256();
-void	    SHA_printf(SHA256_ptr ctx, const string format, ...);
+void	    SHA256_printf(SHA256_ptr ctx, const string format, ...);
 string	    Get_SHA256_hash(SHA256_ptr ctx);
 void	    SHA256_Install_Functions();
+int	    SHA256_traverse_graph(int *g_cntp, hash_record *g_tblp,
+				  SHA256_ptr sha, g_ptr node);
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */

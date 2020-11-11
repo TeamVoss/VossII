@@ -49,7 +49,8 @@ static int       read_int(FILE *fp, bool nl);
 static void      write_string(FILE *fp, string s, bool nl);
 static string    read_string(FILE *fp, bool nl);
 static void	 rgb2hsv(int r, int g, int b, int *hp, int *sp, int *vp);
-
+static int       image_sha256_fn(int *g_cntp, hash_record *g_tblp,
+				 SHA256_ptr sha, pointer a);
 
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
@@ -69,7 +70,8 @@ Image_Init()
                                    image2str_fn,
                                    image_eq_fn,
                                    NULL,
-                                   NULL);
+                                   NULL,
+				   image_sha256_fn);
     image_handle_tp = Get_Type("image", NULL, TP_INSERT_FULL_TYPE);
 }
 
@@ -2132,5 +2134,23 @@ rgb2hsv(int r, int g, int b, int *hp, int *sp, int *vp)
 		  (Cmax == G)? 2.0+(B-R)/delta :
 		  4.0 + (R-G)/delta;
     *hp = ((int) (round(60.0*tmp))) % 360;
+}
+
+static int
+image_sha256_fn(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha, pointer a)
+{
+    (void) g_tblp;
+    image_ptr ip = (image_ptr) a;
+    int res = *g_cntp;
+    *g_cntp = res+1;
+    SHA256_printf(sha,"%d=image %s %d %d\n", res, ip->name, ip->rows, ip->cols);
+    for(int r = 0; r < ip->rows; r++) {
+	for(int c = 0; c < ip->cols; c++) {
+	    color_ptr	cp;
+	    cp = GET_PIXEL(ip, c, r);
+	    SHA256_printf(sha,"%c %c %c %c\n", cp->valid, cp->r, cp->g, cp->b);
+	}
+    }
+    return res;
 }
 
