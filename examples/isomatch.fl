@@ -261,35 +261,38 @@ let
 // Gen. a fingerprint for the "formals" of an input/output declaration.
 //  fp_formal::[str]->int
 let
-    fp_formal ps = prime 53 (length ps)
+    fp_formal ps = prime 53 (sum (map md_size ps))
 ;
-// todo: consider the sizes of each formal argument (how to fetch them?).
 
-// Gen. a fingerprint for the "actuals" of an input/output declaration.
-//  fp_actual::[(str,[str])]->int
+// Gen. a fingerprint for the internals of a 'PINST'.
+//  fp_internal::[str]->int
 let
-    fp_actual ps =
-        let fp_vi (TXT _)     = prime 54 1
-        /\  fp_vi (RANGES ix) =
-                let go (x,y) = x = y => prime 55 x | prime 56 x + prime 57 y in
-                prime_list go 1 ix
-        in
-        let vss = map (map md_split_vector # snd) ps in
-        prime_list (\vs. prime_list (sum # map fp_vi) 1 vs) 58 vss
+    fp_internal ps = prime 54 (sum (map md_size ps))
 ;
 
 // Gen. a fingerprint for 'CONTENT'.
-//  fp_c::CONTENT->int
+//  fp_content::CONTENT->int
 let
-    fp_c (P_LEAF fs) = prime 59 (length fs) + prime_list fp_fn 1 fs
-/\  fp_c (P_HIER cs) =
-        let go (PINST _ attrs _ fa_inps fa_outs _ _) =
+    fp_content (P_LEAF fs) = prime 59 (sum (map fp_fn fs))
+/\  fp_content (P_HIER cs) =
+        let go (PINST _ attrs _ fa_inps fa_outs int _) =
             ( find_fingerprint attrs
-            + fp_actual fa_inps
-            + fp_actual fa_outs
+            + fp_internal int
+            + fp_formal (map fst fa_inps)
+            + fp_formal (map fst fa_outs)
             )
         in
-        prime 60 (length cs) + prime_list go 1 cs
+        prime 65 (sum (map go cs))
+;
+
+// Gen. a fingerprint for the components of a 'PINST'.
+//  fp_pinst::((str#(str list)) list)->((str#(str list)) list)->(str list)->content->int
+let
+    fp_pinst fa_inps fa_outs internals content =
+        fp_formal (map fst fa_inps) +
+        fp_formal (map fst fa_inps) +
+        fp_internal internals +
+        fp_content content
 ;
 
 //------------------------------------------------------------------------------
@@ -298,17 +301,9 @@ let
 // Gen. a fingerprint for each 'PEXLIF' on creation (fingerprint 'c'?).
 let
     PINST name attrs leaf fa_inps fa_outs internals content =
-        let has_fingerprint = find_fingerprint attrs != 0 in
-        let new_fingerprint = int2str
-                ( fp_formal fa_inps
-                + fp_formal fa_outs
-                + fp_c content
-                )
-        in
-        let new_attrs = has_fingerprint => attrs |
-                ("fingerprint", new_fingerprint) : attrs
-        in
-        PINST name new_attrs leaf fa_inps fa_outs internals content
+        let fp  = ("fingerprint", int2str (fp_pinst fa_inps fa_outs internals content)) in
+        let sig = ("signature", sha256_signature (name, leaf, map fst fa_inps, map fst fa_outs, internals, content)) in
+        PINST name (fp : sig : attrs) leaf fa_inps fa_outs internals content
 ;
 
 //==============================================================================
@@ -325,7 +320,6 @@ lettype scheme =
             {name::string}
             {inps::(string#((vec_info list) list)) list}
             {outs::(string#((vec_info list) list)) list}
-         // {regs::(vec_info list) list}
 ;
 
 let name_of_scheme (SCHEME n _ _) = n;
@@ -582,21 +576,8 @@ letrec
 
 //==============================================================================
 //
-// Equality testing via SHA256 signatures to verify iso. matches.
-//
-//==============================================================================
-
-//
-//  verify::((bool mat) list)->pexlif->pexlif->(bool list)
-let
-    verify res g p =
-        let p' = annotate_pexlif p then
-        0
-;
-
-//==============================================================================
-//
-// Print-function for getting a human-readable answer out of the iso. matching.
+// Verification of answers and a print-function for getting a human-readable
+// output from the iso. matching.
 //
 //==============================================================================
 
