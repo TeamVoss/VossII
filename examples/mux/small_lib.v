@@ -1,10 +1,10 @@
 // =============================================================================
 
-module mymux2(
-  din_0,  // Mux first input
-  din_1,  // Mux Second input
-  sel,    // Select input
-  mux_out // Mux output
+module mux2(
+  din_0,
+  din_1,
+  sel,
+  mux_out
 );
 input din_0, din_1, sel;
 output mux_out;
