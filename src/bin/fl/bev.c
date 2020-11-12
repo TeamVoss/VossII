@@ -205,6 +205,18 @@ bev_eq_fn(pointer p1, pointer p2, bool identical)
     return( B_One() );
 }
 
+static int
+bev_sha256_fn(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha, pointer a)
+{
+    bev_ptr bp = (bev_ptr) a;
+    int res = *g_cntp;
+    *g_cntp = res+1;
+    SHA256_printf(sha, "%d=BEV\n", res);
+    g_ptr  l = bp->u.l;
+    SHA256_traverse_graph(g_cntp, g_tblp, sha, l);
+    return res;
+}
+
 static pointer
 bev_gmap_fn(gmap_info_ptr ip, pointer a)
 {
@@ -1173,7 +1185,8 @@ Bev_Init()
 				 bev2str_fn,
 				 bev_eq_fn,
 				 bev_gmap_fn,
-				 bev_gmap2_fn);
+				 bev_gmap2_fn,
+				 bev_sha256_fn);
     bev_handle_tp  = Get_Type("bev", NULL, TP_INSERT_FULL_TYPE);
 }
 
@@ -1183,11 +1196,11 @@ Bev_Install_Functions()
     // Add builtin functions
 
     Add_ExtAPI_Function("list2bev", "1", FALSE,
-			GLmake_arrow(GLmake_list(GLmake_bexpr()), bev_handle_tp),
+			GLmake_arrow(GLmake_list(GLmake_bexpr()),bev_handle_tp),
 			bev_construct);
 
     Add_ExtAPI_Function("bev2list", "1", FALSE,
-			GLmake_arrow(bev_handle_tp, GLmake_list(GLmake_bexpr())),
+			GLmake_arrow(bev_handle_tp,GLmake_list(GLmake_bexpr())),
 			bev_destruct);
 
     Add_ExtAPI_Function("bev_size", "1", FALSE,

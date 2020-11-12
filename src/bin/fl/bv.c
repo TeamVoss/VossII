@@ -222,6 +222,18 @@ bv_eq_fn(pointer p1, pointer p2, bool identical)
     return result;
 }
 
+static int
+bv_sha256_fn(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha, pointer a)
+{
+    bv_ptr bp = (bv_ptr) a;
+    int res = *g_cntp;
+    *g_cntp = res+1;
+    SHA256_printf(sha, "%d=BV\n", res);
+    g_ptr  l = bp->u.l;
+    SHA256_traverse_graph(g_cntp, g_tblp, sha, l);
+    return res;
+}
+
 static pointer
 bv_gmap_fn(gmap_info_ptr ip, pointer a)
 {
@@ -1218,7 +1230,8 @@ Bv_Init()
 				 bv2str_fn,
 				 bv_eq_fn,
 				 bv_gmap_fn,
-				 bv_gmap2_fn);
+				 bv_gmap2_fn,
+				 bv_sha256_fn);
     bv_handle_tp  = Get_Type("bv", NULL, TP_INSERT_FULL_TYPE);
 }
 

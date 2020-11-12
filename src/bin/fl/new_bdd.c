@@ -1148,7 +1148,7 @@ SHA256_bdd(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha, formula f)
     insert_hash(g_tblp, bp, INT2PTR(res));
     int lres = SHA256_bdd(g_cntp, g_tblp, sha, GET_LSON(bp));
     int rres = SHA256_bdd(g_cntp, g_tblp, sha, GET_RSON(bp));
-    SHA_printf(sha, "%d=ITE %s %d %d\n", res, get_var_name(f), lres, rres);
+    SHA256_printf(sha, "%d=ITE %s %d %d\n", res, get_var_name(f), lres, rres);
     return res;
 }
 

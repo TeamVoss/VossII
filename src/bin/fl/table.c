@@ -240,6 +240,33 @@ table_eq_fn(pointer p1, pointer p2, bool identical)
     return( tp1 == tp2 );
 }
 
+static int	    *tbl_g_cntp;
+static hash_record  *tbl_g_tblp;
+static SHA256_ptr   tbl_sha;
+
+static void
+do_sha256_comp(pointer pkey, pointer pdata)
+{
+    g_ptr key = (g_ptr) pkey;
+    g_ptr data = (g_ptr) pdata;
+    SHA256_traverse_graph(tbl_g_cntp, tbl_g_tblp, tbl_sha, key);
+    SHA256_traverse_graph(tbl_g_cntp, tbl_g_tblp, tbl_sha, data);
+}
+
+static int
+table_sha256_fn(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha, pointer a)
+{
+    table_ptr tp = (table_ptr) a;
+    int res = *g_cntp;
+    *g_cntp = res+1;
+    SHA256_printf(sha, "%d=TBL\n", res);
+    tbl_g_cntp = g_cntp;
+    tbl_g_tblp = g_tblp;
+    tbl_sha = sha;
+    scan_hash(&(tp->tbl), do_sha256_comp);
+    return res;
+}
+
 
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
@@ -258,7 +285,8 @@ Table_Init()
                                    NULL,
                                    table_eq_fn,
                                    NULL,
-                                   NULL);
+                                   NULL,
+				   table_sha256_fn);
     table_free_list = NULL;
 }
 

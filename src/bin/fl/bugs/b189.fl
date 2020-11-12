@@ -1,0 +1,33 @@
+load "ste.fl";
+
+let p = verilog2pexlif (sprintf "-I%sm6502" DIR) "M65C02_Core" [
+                                    "M65C02_Core.v",
+                                    "M65C02_ALU.v",
+                                    "M65C02_AddrGen.v",
+                                    "M65C02_MPCv4.v",
+                                    "M65C02_BCD.v",
+                                    "M65C02_BIN.v"
+                                  ] []
+;
+
+wtime (p fseq 1);
+
+sha256_signature p;
+
+let inc x = x+1;
+
+sha256_signature inc;
+
+
+sha256_signature (\x.x+1);
+sha256_signature (\x.x+1) = sha256_signature (\y.y+1);
+
+let ckt = pexlif2fsm p;
+wtime ckt;
+
+sha256_signature ckt;
+
+let vis = STE_debug ckt;
+
+// Should fail:
+sha256_signature vis;

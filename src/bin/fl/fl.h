@@ -188,7 +188,6 @@ typedef struct impl_arg_rec	*impl_arg_ptr;
 #include        "system.h"
 #include        "int_ops.h"
 #include        "list_ops.h"
-#include        "signature.h"
 #include        "float.h"
 #include        "bv.h"
 #include        "bev.h"
