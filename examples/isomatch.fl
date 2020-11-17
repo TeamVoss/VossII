@@ -186,13 +186,19 @@ let
         ix == 0 => "" | snd (el ix as)
 ;
 
+//==============================================================================
+//
+// Signatures.
+//
+//==============================================================================
+
 //------------------------------------------------------------------------------
-// Fingerprinting.
-//------------------------------------------------------------------------------
+// Gen. of a fingerprint.
 
 load "examples/primes.fl"; // Needed for 'list_of_primes'.
 
-// note: we cap the integers so that they fit in a 64-bit word.
+// Max. value for fingerprints (should fit a 64-bit word).
+//  roof::int
 let roof = ipow 2 63 - 1;
 
 // Multiply a value 'v' by the 'n'th prime (modulo 10,000), fitted to 64bits.
@@ -202,9 +208,6 @@ let prime n v = (v * el (n % num_of_primes) list_of_primes) % roof;
 // Multiply each value by a prime, starting at some 'n', and sum the results.
 //  prime_list::(a->int)->int->(a list)->int
 let prime_list f = flip (ixlist (\a. \i. \s. prime i (f a) + s));
-
-//------------------------------------------------------------------------------
-// Gen. of a fingerprint.
 
 // Gen. a fingerprint for 'MEM'.
 //  fp_mem::MEM->int
@@ -286,13 +289,37 @@ let
 ;
 
 // Gen. a fingerprint for the components of a 'PINST'.
-//  fp_pinst::((str#(str list)) list)->((str#(str list)) list)->(str list)->content->int
+//  fp_pinst::((str#(str list)) list)->((str#(str list)) list)->(str list)->content->str
 let
-    fp_pinst fa_inps fa_outs internals content =
-        fp_formal (map fst fa_inps) +
-        fp_formal (map fst fa_inps) +
-        fp_internal internals +
-        fp_content content
+    fp_pinst fa_inps fa_outs internals content = int2str
+        ( fp_formal (map fst fa_inps)
+        + fp_formal (map fst fa_inps)
+        + fp_internal internals
+        + fp_content content
+        )
+;
+
+//------------------------------------------------------------------------------
+// Gen. of a SHA256 signature.
+
+// Compute the SHA256 signature of a 'set' of components.
+let sha_list = sha256_signature # qsort strcmp # map sha256_signature;
+
+// Compute the SHA256 signature of a 'CONTENT'.
+let
+    sha_content (P_LEAF fs) = sha_list fs
+/\  sha_content (P_HIER cs) = sha_list cs
+;
+
+// Compute the SHA256 signature of a 'PINST'.
+let
+    sha_pinst name fa_inps fa_outs internals content = sha256_signature
+        ( name
+        , sha_list (map fst fa_inps)
+        , sha_list (map fst fa_outs)
+        , sha_list internals
+        , sha_content content
+        )
 ;
 
 //------------------------------------------------------------------------------
@@ -301,8 +328,8 @@ let
 // Gen. a fingerprint for each 'PEXLIF' on creation (fingerprint 'c'?).
 let
     PINST name attrs leaf fa_inps fa_outs internals content =
-        let fp  = ("fingerprint", int2str (fp_pinst fa_inps fa_outs internals content)) in
-        let sig = ("signature", sha256_signature (name, leaf, map fst fa_inps, map fst fa_outs, internals, content)) in
+        let fp  = ("fingerprint", fp_pinst fa_inps fa_outs internals content) in
+        let sig = ("signature", sha_pinst name fa_inps fa_outs internals content) in
         find_fingerprint attrs != 0
           => PINST name attrs leaf fa_inps fa_outs internals content
           |  PINST name (fp : sig : attrs) leaf fa_inps fa_outs internals content
@@ -313,9 +340,6 @@ let
 // ...
 //
 //==============================================================================
-
-//------------------------------------------------------------------------------
-// Schemes: entity decl. of a 'PEXLIF'.
 
 lettype scheme =
         SCHEME
@@ -331,7 +355,10 @@ let inps_of_scheme (SCHEME _ _ i _) = i;
 let outs_of_scheme (SCHEME _ _ _ o) = o;
 let
     Pscheme (SCHEME n s i o) =
-        let pr (f,as) = sprintf "%s<-%S" f (map (\a. list2str T "" "," "" Pvec_info a) as) in
+        let
+            pr (f,as) = sprintf "%s<-%S" f
+                (map (\a. list2str T "" "," "" Pvec_info a) as)
+        in
         sprintf "%s(%s):%S:%S" n s (map pr i) (map pr o)
 ;
 install_print_function Pscheme;
@@ -354,7 +381,7 @@ let
 ;
 
 //------------------------------------------------------------------------------
-// Adj.node: record of adjacencies for a node. todo: not just adjacencies...
+// ...
 
 lettype anode =
         ANODE
@@ -640,8 +667,8 @@ letrec
 let
     print_one match =
        let pr_wires a b = sprintf "%s->%s" (fst a) (fst b) in
-       let pr_schemes (SCHEME n1 _ i1 o1) (SCHEME n2 _ i2 o2) =
-           sprintf "%s->%s where %s and %s" n1 n2
+       let pr_schemes (SCHEME n1 s1 i1 o1) (SCHEME n2 s2 i2 o2) =
+           sprintf "%s(%s) ->\n %s(%s) where\n %s and\n %s" n1 s1 n2 s2
                (list2str T "[" "," "]" (curry pr_wires) (zip i1 i2))
                (list2str T "[" "," "]" (curry pr_wires) (zip o1 o2))
        in
@@ -656,6 +683,7 @@ let print_all = list2str T "Solutions:\n" "\n" "\n" print_one;
 // ...
 
 // ...
+//  solutions::((bool mat) list)->pexlif->pexlif->((scheme#scheme) list)
 let solutions res g p = recover_all res g p find_fingerprint;
 
 // ...
