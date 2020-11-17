@@ -150,6 +150,10 @@ let string_butfirst = string_tl;
 //  string_butlast::string->string
 let string_butlast s = string_butlastn s 1;
 
+// Checks if a string is empty.
+//  string_empty::string->bool
+let string_empty s = strlen s == 0;
+
 //------------------------------------------------------------------------------
 // Vec_info.
 
@@ -308,7 +312,14 @@ let sha_list = sha256_signature # qsort strcmp # map sha256_signature;
 // Compute the SHA256 signature of a 'CONTENT'.
 let
     sha_content (P_LEAF fs) = sha_list fs
-/\  sha_content (P_HIER cs) = sha_list cs
+/\  sha_content (P_HIER cs) =
+        let
+            sha_child (PINST name as _ fa_inps fa_outs internals content) =
+                let new = sha_pinst name fa_inps fa_outs internals content in
+                let old = find_signature as in
+                string_empty old => new | old
+        in
+        sha256_signature (qsort strcmp (map sha_child cs))
 ;
 
 // Compute the SHA256 signature of a 'PINST'.
