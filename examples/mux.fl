@@ -9,8 +9,8 @@ load "ste.fl";
 let g_pex = verilog2pexlif "-Iexamples/mux" "mux4" ["small.v"] [];
 let p_pex = verilog2pexlif "-Iexamples/mux" "mux2" ["small_lib.v"] [];
 //
-//Emit_pexlif "puzzle.txt" g_pex;
-//Emit_pexlif "piece.txt" p_pex;
+Emit_pexlif "puzzle.txt" g_pex;
+Emit_pexlif "piece.txt" p_pex;
 //
 (g_pex fseq p_pex fseq print "Finished loading.\n");
 
