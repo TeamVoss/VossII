@@ -199,7 +199,7 @@ let
 //------------------------------------------------------------------------------
 // Gen. of a fingerprint.
 
-load "examples/primes.fl"; // Needed for 'list_of_primes'.
+load (DIR^"primes.fl"); // Needed for 'list_of_primes'.
 
 // Max. value for fingerprints (should fit a 64-bit word).
 //  roof::int
@@ -207,7 +207,7 @@ let roof = ipow 2 63 - 1;
 
 // Multiply a value 'v' by the 'n'th prime (modulo 10,000), fitted to 64bits.
 //  prime::int->int->int
-let prime n v = (v * el (n % num_of_primes) list_of_primes) % roof;
+let prime n v = (v * el (n % num_of_primes + 1) list_of_primes) % roof;
 
 // Multiply each value by a prime, starting at some 'n', and sum the results.
 //  prime_list::(a->int)->int->(a list)->int
@@ -309,6 +309,18 @@ let
 // Compute the SHA256 signature of a 'set' of components.
 let sha_list = sha256_signature # qsort strcmp # map sha256_signature;
 
+forward_declare{sha_content::content->string};
+// Compute the SHA256 signature of a 'PINST'.
+let
+    sha_pinst name fa_inps fa_outs internals content = sha256_signature
+        ( name
+        , sha_list (map fst fa_inps)
+        , sha_list (map fst fa_outs)
+        , sha_list internals
+        , sha_content content
+        )
+;
+
 // Compute the SHA256 signature of a 'CONTENT'.
 let
     sha_content (P_LEAF fs) = sha_list fs
@@ -320,17 +332,6 @@ let
                 string_empty old => new | old
         in
         sha256_signature (qsort strcmp (map sha_child cs))
-;
-
-// Compute the SHA256 signature of a 'PINST'.
-let
-    sha_pinst name fa_inps fa_outs internals content = sha256_signature
-        ( name
-        , sha_list (map fst fa_inps)
-        , sha_list (map fst fa_outs)
-        , sha_list internals
-        , sha_content content
-        )
 ;
 
 //------------------------------------------------------------------------------
