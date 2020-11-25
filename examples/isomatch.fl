@@ -343,15 +343,6 @@ let
 ;
 
 //------------------------------------------------------------------------------
-// ...
-
-// Compute the size (number of 'PINST' nodes) of a composite 'PINST'.
-let
-    size_of_content (P_LEAF _)  = 1
-/\  size_of_content (P_HIER cs) = sum (map (find_size # attributes_of_pexlif) cs)
-;
-
-//------------------------------------------------------------------------------
 // Modify the 'PINST' creation.
 
 // Gen. a fingerprint for each 'PEXLIF' on creation (fingerprint 'c'?).
@@ -359,7 +350,6 @@ let
     PINST name attrs leaf fa_inps fa_outs internals content =
         let fp  = ("fingerprint", fp_pinst fa_inps fa_outs internals content) in
         let sig = ("signature", sha_pinst name fa_inps fa_outs internals content) in
-//      let sz  = ("size", int2str (size_of_content content)) in
         find_fingerprint attrs != 0
           => PINST name attrs leaf fa_inps fa_outs internals content
           |  PINST name (fp : sig : attrs) leaf fa_inps fa_outs internals content
@@ -493,11 +483,11 @@ letrec
 //  xxx::(attrs->string)->pexlif->int->[anode]
 let xxx f pexlif depth = val (p,_,cs) = xxx_reduce 1 depth f pexlif in (p:cs);
 
-//  xxx_fp::pexlif->int->[anode]
-let xxx_fp = xxx (int2str # find_fingerprint);
+//  xxx_fp::attrs->string
+let xxx_fp = int2str # find_fingerprint;
 
-//  xxx_sha::pexlif->int->[anode]
-let xxx_sha = xxx (find_signature);
+//  xxx_sha::attrs->string
+let xxx_sha = find_signature;
 
 //==============================================================================
 //
@@ -676,7 +666,7 @@ let
 ;
 
 // ...
-//  recover_all::((bool mat) list)->pexlif->pexlif->(attrs->string)->((scheme#scheme) mat)
+//  recover_all::((bool mat) list)->pexlif->int->pexlif->int->((scheme#scheme) mat)
 let
     recover_all res g g_d p p_d =
         let g_sc = recover_schemes g_d g then
@@ -689,10 +679,10 @@ let
 	map recover_one res
 ;
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------
 // ...
 
-// ...
+// Fetch a 'PINST' specified by 'inst' within a hierarchical 'PINST'.
 //  cherry_pick_pinst::string->pexlif->pexlif
 let
     cherry_pick_pinst inst pexlif =
@@ -706,23 +696,23 @@ let
 ;
 
 // ...
-//  yyy::(pexlif->[anode])->(scheme#scheme)->pexlif->pexlif->((scheme#scheme) mat)
+//  isomatch::(attrs->string)->input->input->((scheme#scheme) mat)
 let
-    yyy f (ps,gs) g p =
-        let gc = cherry_pick_pinst (sig_of_scheme gs) g then
-        let pc = cherry_pick_pinst (sig_of_scheme ps) p then
-        //
-        let ga  = f gc then
-        let pa  = f pc then
-        let res = recurse (adjacency_matrix ga) (adjacency_matrix pa) (isomatch_matrix ga pa) then
-        //
-        recover_all res gc (-1) pc (-1)
+    isomatch cmp (g_pex, g_sig, g_dep) (p_pex, p_sig, p_dep) =
+        // Get the "haystack" matrix.
+        let gc_pex = cherry_pick_pinst g_sig g_pex in
+        let gc_as  = xxx cmp gc_pex g_dep in
+        let gc     = adjacency_matrix gc_as then
+        // Get the "needle" matrix.
+        let pc_pex = cherry_pick_pinst p_sig p_pex in
+        let pc_as  = xxx cmp pc_pex p_dep in
+        let pc     = adjacency_matrix pc_as then
+        // Get the "isomatch" matrix and perform Ullman's algorithm.
+        let iso = isomatch_matrix gc_as pc_as then
+        let res = recurse iso gc pc then
+        // Recover the 'PINST' schemes' for each solution.
+        recover_all res gc_pex g_dep pc_pex p_dep
 ;
-
-// ...
-// should be:
-//  yyy_all::(pexlif->[anode])->((scheme#scheme) mat)->pexlif->pexlif->(((scheme#scheme) mat) mat)
-let yyy_all f ss g p = map (map (\pair. yyy f pair g p)) ss;
 
 //------------------------------------------------------------------------------
 // Printing res.
@@ -733,7 +723,8 @@ let
     print_one matches =
        let pr_wires a b = sprintf "%s->%s" (fst a) (fst b) in
        let pr_schemes (SCHEME n1 s1 i1 o1) (SCHEME n2 s2 i2 o2) =
-           sprintf "%s(%s) ->\n %s(%s) where\n %s and\n %s" n1 s1 n2 s2
+           sprintf "%s(%s) :-> %s(%s) where\n     %s and\n     %s"
+               n1 s1 n2 s2
                (list2str T "[" "," "]" (curry pr_wires) (zip i1 i2))
                (list2str T "[" "," "]" (curry pr_wires) (zip o1 o2))
        in
@@ -744,25 +735,45 @@ let
 //  print_all::((scheme#scheme) mat)->string
 let print_all = list2str T "=== Solutions:\n" "\n" "\n" print_one;
 
+//==============================================================================
+//
+// ...
+//
+//==============================================================================
+
+// ...
+//  extend_matches::(attrs->string)->pexlif->pexlif->((scheme#scheme) mat)->(((scheme#scheme) mat) mat)
+let
+    extend_matches cmp g_pex p_pex matches =
+        let //::((scheme#scheme) list)->(((scheme#scheme) mat) list)
+            extend_match match =
+                let //::scheme->scheme->((scheme#scheme) mat)
+                    extend (SCHEME _ p_sig _ _) (SCHEME _ g_sig _ _) =
+                        isomatch cmp (g_pex, g_sig, -1) (p_pex, p_sig, -1)
+                in
+                map (curry extend) match
+        in
+        map (extend_match) matches
+;
+
 //------------------------------------------------------------------------------
 
 // ...
-//  print_all_ex::((scheme#scheme) list)->(((scheme#scheme) mat) mat)->string
-let print_all_ex ss es =
-        let
-        //  print_one_expanded::scheme->scheme->((scheme#scheme) mat)->string
-            print_one_expanded ps gs ss =
-                val (SCHEME _ s1 _ _) = ps in
-		val (SCHEME _ s2 _ _) = gs in
-                let header = sprintf "--- Solution for: (%s)->(%s)\n" s1 s2 in
-                list2str T (header) "\n" "\n" print_one ss
+//  print_all_ex::((scheme#scheme) mat)->(((scheme#scheme) mat) mat)->string
+let print_all_ex ms es =
+        let // ::(scheme#scheme)->((scheme#scheme) mat)->string
+            print_pair (SCHEME _ sig1 _ _) (SCHEME _ sig2 _ _) ss =
+                list2str T (sprintf "(%s)->(%s):\n" sig1 sig2) "\n" "\n" print_one ss
         in
-        let
-        //  print_all_expanded::((scheme#scheme) list)->(((scheme#scheme) mat) list)->string
-            print_all_expanded pairs sols =
-                list2str T "\n" "\n" "\n" (curry print_one_expanded) (zip pairs sols)
+        let //::((scheme#scheme) list)->(((scheme#scheme) mat) list)->string
+            print_list match ssl =
+                list2str T "--- Group solutions for " "" "" (curry (curry print_pair)) (zip match ssl)
         in
-        list2str T "=== Expanded solutions:\n" "\n" "\n" (curry print_all_expanded) (zip ss es)
+        let //::((scheme#scheme) mat)->(((scheme#scheme) mat) mat)->string
+            print_mat matches ssm =
+                list2str T "=== Expanded solutions:\n" "\n" "\n" (curry print_list) (zip matches ssm)
+        in
+        print_mat ms es
 ;
 
 //==============================================================================
