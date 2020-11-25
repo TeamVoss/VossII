@@ -9,31 +9,21 @@ load "ste.fl";
 let g_pex = verilog2pexlif "-Iexamples/mux" "mux4" ["small.v"] [];
 let p_pex = verilog2pexlif "-Iexamples/mux" "mux2" ["small_lib.v"] [];
 //
-Emit_pexlif "puzzle.txt" g_pex;
-Emit_pexlif "piece.txt" p_pex;
+//Emit_pexlif "puzzle.txt" g_pex;
+//Emit_pexlif "piece.txt" p_pex;
 //
 (g_pex fseq p_pex fseq print "Finished loading.\n");
 
+//--------------------------------------------------------------------------------
 // Create adj./iso. matrices.
-let as_g = xxx_fp g_pex 1;
-let as_p = xxx_fp p_pex 0;
-//
-let g   = adjacency_matrix as_g;
-let p   = adjacency_matrix as_p;
-let m   = isomatch_matrix as_g as_p;
-let res = recurse m g p;
-//
-(res fseq print "Finished matching.\n");
-//
-let ss = recover_all res g_pex 1 p_pex 0;
+let ss = isomatch xxx_fp (g_pex, "", 1) (p_pex, "", 0);
 print_all ss;
 
+//--------------------------------------------------------------------------------
 // ...
-let ess = yyy_all (flip xxx_fp (-1)) ss g_pex p_pex;
-//
-(ess fseq print "Finished expanded matching.\n");
-//
-print_all_expanded ss ess;
+
+let es = extend_matches xxx_fp g_pex p_pex ss;
+print_all_ex ss es;
 
 //------------------------------------------------------------------------------
 // Fin.
