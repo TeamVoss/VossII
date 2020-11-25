@@ -1,0 +1,171 @@
+open_overload {bTHEN :: bexpr -> (*a # *a ) -> *a};
+
+let bexpr_bTHEN c (t,e) =
+    c == bT => t |
+    c == bF => e |
+    c bAND t bOR bNOT c bAND e
+;
+add_open_overload bTHEN bexpr_bTHEN;
+
+let void_bTHEN c (t,e) =
+    c == bT => {t::void} |
+    c == bF => e |
+    t == e => t |
+    error "bTHEN over different voids ????"
+;
+add_open_overload bTHEN void_bTHEN;
+
+let int_bTHEN c (t,e) =
+    c == bT => t |
+    c == bF => e |
+    t == e => t |
+    eprintf "bTHEN over different integers (%d != %d)" t e
+;
+add_open_overload bTHEN int_bTHEN;
+
+let string_bTHEN c (t,e) =
+    c == bT => t |
+    c == bF => e |
+    t == e => t |
+    eprintf "bTHEN over different strings (%s != %s)" t e
+;
+add_open_overload bTHEN string_bTHEN;
+
+let bool_bTHEN c (t,e) =
+    c == bT => t |
+    c == bF => e |
+    t == e => t |
+    eprintf "bTHEN over different bools (%s != %s)"
+	    (bool2str 5 t) (bool2str 5 e)
+;
+add_open_overload bTHEN bool_bTHEN;
+
+
+let list_bTHEN c (t,e) =
+    c == bT => t |
+    c == bF => e |
+    length t != length e =>
+	eprintf "Length mismatch in list_bTHEN |t|=%d |e|=%d\n"
+		(length t) (length e)
+    |
+    letrec ite (t:ts) (e:es) = (bTHEN c (t,e)):(ite ts es)
+     /\    ite [] [] = []
+    in
+    ite t e
+;
+add_open_overload bTHEN list_bTHEN;
+
+let pair_bTHEN c (t,e) =
+    c == bT => t |
+    c == bF => e |
+    val (t1,t2) = t in
+    val (e1,e2) = e in
+    (bTHEN c (t1,e1)), (bTHEN c (t2,e2))
+;
+add_open_overload bTHEN pair_bTHEN;
+
+let opt_bTHEN c (t,e) =
+    c == bT => t |
+    c == bF => e |
+    has_value t =>
+	has_value e =>
+	    SOME (bTHEN c ((get_value t),(get_value e)))
+	|
+	    t
+    |
+	has_value e => e | NONE
+;
+add_open_overload bTHEN opt_bTHEN;
+
+let bv_bTHEN c (t,e) =
+    c == bT => t |
+    c == bF => e |
+    t == e => t |
+    eprintf "bTHEN over mismatching bvs (%s != %s)" (bv2str 5 t) (bv2str 5 e)
+;
+add_open_overload bTHEN bv_bTHEN;
+
+let bev_bTHEN c (t,e) =
+    c == bT => t |
+    c == bF => e |
+    t == e => t |
+    let lt = bev2list t in
+    let len_lt = length lt in
+    let le = bev2list e in
+    let len_le = length le in
+    let L = max len_lt len_le in
+    let lt' = (replicate (L-len_lt) (hd lt))@lt in
+    let le' = (replicate (L-len_le) (hd le))@le in
+    let res = map (bexpr_bTHEN c) (zip lt' le') in
+    list2bev res
+;
+add_open_overload bTHEN bev_bTHEN;
+
+
+// Symbolic atom
+lettype satom =
+    S_ATOM {type::bev}
+	   {o_bev1:: {bev#bev} opt}
+	   {o_bev2:: {bev} opt}
+	   {o_bev3:: {bev} opt}
+	   {o_atom1 :: {satom} opt}
+	   {o_atom2 :: {satom} opt}
+;
+
+letrec satom_bTHEN c (t,e) =
+    c == bT => t |
+    c == bF => e |
+    val (S_ATOM t_tp t_obev1 t_obev2 t_obev3 t_oa1 t_oa2) = t in
+    val (S_ATOM e_tp e_obev1 e_obev2 e_obev3 e_oa1 e_oa2) = e in
+    let tp = bev_bTHEN c (t_tp, e_tp) in
+    let obev1 = bTHEN c (t_obev1, e_obev1) in
+    let obev2 = bTHEN c (t_obev2, e_obev2) in
+    let obev3 = bTHEN c (t_obev3, e_obev3) in
+    let do_opt_isatom_ite (SOME ta) (SOME ea) = SOME (satom_bTHEN c (ta,ea))
+     /\ do_opt_isatom_ite (SOME ta) NONE      = SOME ta
+     /\ do_opt_isatom_ite NONE      (SOME ea) = SOME ea
+     /\ do_opt_isatom_ite NONE      NONE      = NONE
+    in
+    let oa1 = do_opt_isatom_ite t_oa1 e_oa1 in
+    let oa2 = do_opt_isatom_ite t_oa2 e_oa2 in
+    S_ATOM tp obev1 obev2 obev3 oa1 oa2
+;
+add_open_overload bTHEN satom_bTHEN;
+
+if_then_else_binder bTHEN ELSE;
+
+
+
+
+
+let global_conds = ref [bT];
+
+let get_durations ranges =
+    (global_conds := []) fseq
+    let var_names = map (\(n,r). (sprintf "%s[9:0]" n)) ranges then
+    let mk n = bev_ZX (bev_variable n) in
+    let durs = map mk var_names in
+    let mk_dur dv (nm,(m,M)) =
+        let cond = (int2bev m) <= dv bAND dv <= (int2bev M) then
+(fprintf stderr "cond: %s\n" (bool2str 8 (bexpr2bdd cond))) fseq
+        (global_conds := (cond:(deref global_conds))) fseq
+(fprintf stderr "gc=%S\n" (map (\be.bool2str 20 (bexpr2bdd be)) (deref global_conds))) fseq
+        dv
+    in
+(fprintf stderr "|durs|=%d |ranges|=%d\n" (length durs) (length ranges)) fseq
+    map2 mk_dur durs ranges
+;
+
+
+
+val [d_before, d_zero, d_after] =
+    get_durations [
+        ("before",1,400),
+        ("low", 20,30),
+        ("after",1,511)]
+;
+
+d_before;
+d_zero;
+d_after;
+deref global_conds;

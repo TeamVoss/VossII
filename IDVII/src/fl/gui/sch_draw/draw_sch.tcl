@@ -798,14 +798,10 @@ proc cb:sch_canvas_menu {c wx wy sx sy} {
     set te [winfo parent $c].menu.tp.time.time
 
     $m add command -label "Stop here" \
-	    -command "unpost_popup $c; \
-		      cb:hide_fanin $c $nodes 1; \
-		      cb:restore_attributes $c"
+	    -command "cb:hide_fanin $c $nodes 1;"
 
     $m add command -label "Hide fanin" \
-	    -command "unpost_popup $c; \
-		      cb:hide_fanin $c $nodes 0; \
-		      cb:restore_attributes $c"
+	    -command "cb:hide_fanin $c $nodes 0;"
 
     set mm $m.expand_fanin
     catch {destroy $mm}
