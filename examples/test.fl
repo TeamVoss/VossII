@@ -1,0 +1,26 @@
+load "examples/isomatch.fl";
+load "ste.fl";
+
+let g_pex = verilog2pexlif "-Iexamples/mux" "mux4" ["small.v"] [];
+let p_pex = verilog2pexlif "-Iexamples/mux" "mux2" ["small_lib.v"] [];
+(g_pex fseq p_pex fseq print "Finished loading.\n");
+
+//--------------------------------------------------------------------------------
+
+// let res = isomatch on_fp (g_pex, 1) (p_pex, 0);
+//
+let sc_g  = adj_build g_pex 1;
+let adj_g = adjacency_matrix sc_g;
+//
+let sc_p  = adj_build p_pex 0;
+let adj_p = adjacency_matrix sc_p;
+//
+let iso_m = isomatch_matrix sc_g sc_p pex_fp;
+let res   = recurse iso_m adj_g adj_p;
+//
+let sol   = recover sc_g sc_p res;
+//
+print_all sol;
+
+//--------------------------------------------------------------------------------
+
