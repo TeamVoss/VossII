@@ -404,18 +404,16 @@ let
 // ...
 //  cons_adjacent_scheme::scheme->scheme->scheme
 let
-    cons_adjacent_scheme sc (SCHEME n l as i o) = (SCHEME n l (sc:as) i o)
+    cons_adjacent_scheme sc (SCHEME n l a i o) = (SCHEME n l (sc:a) i o)
 ;
 
 // Checks if two 'SCHEME's are connected via a wire.
 //  test_scheme::scheme->scheme->bool
 let
-    test_conn_scheme s1 s2 =
-        let check_once  x  ys = any (any (vec_info_shared x)) ys in
-        let check_twice xs ys = any (any (flip check_once ys)) xs in
-        check_twice
-            (inps_of_scheme s1 @ outs_of_scheme s1)
-            (inps_of_scheme s2 @ outs_of_scheme s2)
+    scheme_shared (SCHEME _ _ _ i1 o1) (SCHEME _ _ _ i2 o2) = T
+        // let check_once  x  ys = any (any (vec_info_shared x)) ys in
+        // let check_twice xs ys = any (any (flip check_once ys)) xs in
+        // check_twice (i1 @ o1) (i2 @ o2)
 ;
 
 //------------------------------------------------------------------------------
@@ -430,8 +428,8 @@ let
 // ...
 //  adj_cons::(scheme,[scheme])->(scheme,[scheme])->(scheme,[scheme])
 let
-    adj_cons (s1,a1) (s2,a2) = NOT (test_conn_scheme s1 s2) => (s2,a2) |
-        (cons_adjacent_scheme s1 s2,a2)
+    adj_cons (s1,a1) (s2,a2) =
+        scheme_shared s1 s2 => (cons_adjacent_scheme s1 s2,a2) | (s2,a2)
 ;
 
 // Merge a "parent" node with its "children".
@@ -477,9 +475,9 @@ letrec
 ;
 
 // Calls 'adj_reduce' and flattens its result.
-//  adj_build::pexlif->int->[anode]
+//  adj_build::pexlif->int->[scheme]
 let
-    adj_build pexlif depth = val (sc,adj) = adj_reduce 1 depth pexlif in (sc:adj)
+    adj_build pex d = val (sc,adj) = adj_reduce 1 d pex in (sc:adj)
 ;
 
 //==============================================================================
@@ -675,12 +673,99 @@ let isomatch_all cmp g_pex p_pex = isomatch cmp (g_pex,-1) (p_pex,-1);
 //
 //==============================================================================
 
-//  extend::((scheme#scheme) mat)->...
+// todo: Assumes a top-level solution as input, i.e. a list of singleton lists.
+//  expand::(pexlif->string)->((scheme#scheme) mat)->(((scheme#scheme) mat) mat)
 let
-    extend =
-        0
+    expand cmp sols =
+        let
+            extend_sol [(p_sc,g_sc)] =
+                [isomatch_all cmp (pexlif_of_scheme g_sc) (pexlif_of_scheme p_sc)]
+        in
+        map extend_sol sols
 ;
 
+//==============================================================================
+//
+// ...
+//
+//==============================================================================
+
+// ...
+//  subst::((string#string) list)->string->string
+let
+    subst sub name =
+        let ix = find_first0 (equal name # fst) sub then
+        ix == 0 => name | (snd (el ix sub))
+;
+
+// ...
+//  subst_wexpr::((string#string) list)->wexpr->wexpr
+letrec
+    subst_wexpr _ (W_X sz)       = W_X sz
+/\  subst_wexpr _ (W_CONST sz v) = W_CONST sz v
+/\  subst_wexpr s (W_NAMED_CONST n sz v) = W_NAMED_CONST (subst s n) sz v
+/\  subst_wexpr s (W_VAR sz n)   = W_VAR sz (subst s n)
+/\  subst_wexpr s (W_EXPLICIT_VAR sz n) = W_EXPLICIT_VAR sz (subst s n)
+/\  subst_wexpr s (W_AND a b)    = W_AND (subst_wexpr s a) (subst_wexpr s b)
+/\  subst_wexpr s (W_OR a b)     = W_OR (subst_wexpr s a) (subst_wexpr s b)
+/\  subst_wexpr s (W_NOT a)      = W_NOT (subst_wexpr s a)
+/\  subst_wexpr s (W_EQ a b)     = W_EQ (subst_wexpr s a) (subst_wexpr s b)
+/\  subst_wexpr s (W_PRED n c)   = W_PRED (subst s n) (subst_wexpr s c)
+/\  subst_wexpr s (W_GR a b)     = W_GR (subst_wexpr s a) (subst_wexpr s b)
+/\  subst_wexpr s (W_ADD a b)    = W_ADD (subst_wexpr s a) (subst_wexpr s b)
+/\  subst_wexpr s (W_SUB a b)    = W_SUB (subst_wexpr s a) (subst_wexpr s b)
+/\  subst_wexpr s (W_MUL a b)    = W_MUL (subst_wexpr s a) (subst_wexpr s b)
+/\  subst_wexpr s (W_DIV a b)    = W_DIV (subst_wexpr s a) (subst_wexpr s b)
+/\  subst_wexpr s (W_MOD a b)    = W_MOD (subst_wexpr s a) (subst_wexpr s b)
+/\  subst_wexpr s (W_SHL a b)    = W_SHL (subst_wexpr s a) (subst_wexpr s b)
+/\  subst_wexpr s (W_SHR a b)    = W_SHR (subst_wexpr s a) (subst_wexpr s b)
+/\  subst_wexpr s (W_ASHR a b)   = W_ASHR (subst_wexpr s a) (subst_wexpr s b)
+/\  subst_wexpr s (W_SX sz w)    = W_SX sz (subst_wexpr s w)
+/\  subst_wexpr s (W_ZX sz w)    = W_ZX sz (subst_wexpr s w)
+/\  subst_wexpr s (W_ITE c t e)  = W_ITE (subst_wexpr s c) (subst_wexpr s t) (subst_wexpr s e)
+/\  subst_wexpr s (W_SLICE i w)  = W_SLICE i (subst_wexpr s w)
+/\  subst_wexpr s (W_NAMED_SLICE n i w) = W_NAMED_SLICE (subst s n) i (subst_wexpr s w)
+/\  subst_wexpr s (W_UPDATE_NAMED_SLICE b n i w) = W_UPDATE_NAMED_SLICE (subst_wexpr s b) (subst s n) i (subst_wexpr s w)
+/\  subst_wexpr s (W_CAT ps)     = W_CAT (map (subst_wexpr s) ps)
+/\  subst_wexpr s (W_MEM_READ i m a) = W_MEM_READ i (subst_wexpr s m) (subst_wexpr s a)
+/\  subst_wexpr s (W_MEM_WRITE i m a d) = W_MEM_WRITE i (subst_wexpr s m) (subst_wexpr s a) (subst_wexpr s d)
+;
+
+// ...
+//  subst_fn::((string#string) list)->update_fn->update_fn
+let
+    subst_fn s (W_UPDATE_FN l r)   = W_UPDATE_FN (subst_wexpr s l) (subst_wexpr s r)
+/\  subst_fn s (W_PHASE_DELAY l r) = W_PHASE_DELAY (subst_wexpr s l) (subst_wexpr s r)
+;
+
+//------------------------------------------------------------------------------
+
+// ...
+//  alpha_equality::pexlif->pexlif->bool
+let
+    alpha_equality
+        (PINST _ _ _ fa_inps1 fa_outs1 int1 (P_LEAF fs1))
+        (PINST _ _ _ fa_inps2 fa_outs2 int2 (P_LEAF fs2)) =
+        let
+            sub = (zip (map fst fa_inps2) (map fst fa_inps1)) @
+                  (zip (map fst fa_outs2) (map fst fa_outs1)) @
+                  (zip int2 int1)
+        in
+        fs1 == map (subst_fn sub) fs2
+/\  alpha_equality _ _ = T
+;
+
+// ...
+//  alpha_equality_scheme::scheme->scheme->bool
+let alpha_equality_scheme p g = alpha_equality (pexlif_of_scheme p) (pexlif_of_scheme g);
+
+// ...
+//  alpha_equality_solution::((scheme#scheme) mat)->bool
+let alpha_equality_solution = AND_list # flatmap (map (curry alpha_equality_scheme));
+
+// ...
+//  fliter_alpha_equal::(((scheme#scheme) mat) mat)->(((scheme#scheme) mat) mat)
+let filter_alpha_equal = map (filter alpha_equality_solution);
 
 //==============================================================================
 //
