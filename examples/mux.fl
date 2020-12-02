@@ -15,15 +15,15 @@ let p_pex = verilog2pexlif "-Iexamples/mux" "mux2" ["small_lib.v"] [];
 (g_pex fseq p_pex fseq print "Finished loading.\n");
 
 //--------------------------------------------------------------------------------
-// Create adj./iso. matrices.
-let ss = isomatch xxx_fp (g_pex, "", 1) (p_pex, "", 0);
-print_all ss;
 
-//--------------------------------------------------------------------------------
-// ...
-
-let es = extend_matches xxx_fp g_pex p_pex ss;
-print_all_ex ss es;
+let sol = isomatch pex_fp (g_pex,1) (p_pex,0);
+print_all sol;
+//
+let ex = expand pex_fp sol;
+print_all_ex sol ex;
+//
+let fex = filter_alpha_equal ex;
+print_all_ex sol fex;
 
 //------------------------------------------------------------------------------
 // Fin.
