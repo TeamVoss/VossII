@@ -7,20 +7,29 @@ let p_pex = verilog2pexlif "-Iexamples/mux" "mux2" ["small_lib.v"] [];
 
 //--------------------------------------------------------------------------------
 
-// let res = isomatch on_fp (g_pex, 1) (p_pex, 0);
-//
-let sc_g  = adj_build g_pex 1;
-let adj_g = adjacency_matrix sc_g;
-//
-let sc_p  = adj_build p_pex 0;
-let adj_p = adjacency_matrix sc_p;
-//
-let iso_m = isomatch_matrix sc_g sc_p pex_fp;
-let res   = recurse iso_m adj_g adj_p;
-//
-let sol   = recover sc_g sc_p res;
-//
+let sol = isomatch pex_fp (g_pex, 1) (p_pex, 0);
 print_all sol;
 
 //--------------------------------------------------------------------------------
 
+val [_,_,[(sp3,sg3)]] = sol;
+let p3 = pexlif_of_scheme sp3;
+let g3 = pexlif_of_scheme sg3;
+//
+let sc_g3 = adj_build g3 (-1);
+let adj_g3 = adjacency_matrix sc_g3;
+//
+let sc_p3 = adj_build p3 (-1);
+let adj_p3 = adjacency_matrix sc_p3;
+//
+let iso_m3 = isomatch_matrix sc_g3 sc_p3 pex_fp;
+let res3 = recurse iso_m3 adj_g3 adj_p3;
+//
+let sol3 = recover sc_g3 sc_p3 res3;
+
+//--------------------------------------------------------------------------------
+
+let ex = expand pex_fp sol;
+print_all_ex sol ex;
+
+//--------------------------------------------------------------------------------
