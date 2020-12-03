@@ -350,6 +350,11 @@ let
 //------------------------------------------------------------------------------
 // Modify the 'PINST' creation.
 
+// let
+//     toplevel_pexlif (PINST name attrs leaf fa_inps fa_outs int cont) =
+//       PINST name attrs leaf fa_inps fa_outs int []
+// ;
+
 // Gen. a fingerprint for each 'PEXLIF' on creation (fingerprint 'c'?).
 let
     PINST name attrs leaf fa_inps fa_outs internals content =
@@ -439,15 +444,15 @@ let
 ;
 
 // Traverse each child in order.
-//  adj_map::int->int->content->[(scheme,[scheme])];
-forward_declare{adj_reduce::int->int->pexlif->(scheme#(scheme list))};
+//  adj_map::int->content->[(scheme,[scheme])];
+forward_declare{adj_reduce::int->pexlif->(scheme#(scheme list))};
 letrec
-    adj_map id _ (P_LEAF _)  = []
-/\  adj_map id d (P_HIER ps) =
+    adj_map id (P_LEAF _)  = []
+/\  adj_map id (P_HIER ps) =
         letrec
             go _ []     = []
         /\  go c (p:ps) =
-                let an = adj_reduce c d p in
+                let an = adj_reduce c p in
                 let l  = adj_length an in
                 an : go (c+l) ps
         in
@@ -455,18 +460,16 @@ letrec
 ;
 
 // Traverse a 'PINST' and record every node's adjacencies to other nodes.
-//  adj_reduce::int->int->pexlif->(scheme,[scheme])
+//  adj_reduce::int->pexlif->(scheme,[scheme])
 letrec
-    adj_reduce id d pex =
+    adj_reduce id pex =
         // Pattern-match against the 'PINST'.
         val (PINST n as _ fa_is fa_os int cont) = pex in
         // Construct an ... for the 'PINST'.
         let anode = (mk_scheme pex (int2str id), []) in
         // Check if we're at the 'bottom'.
-        d == 0 => anode |
         // Fetch "anodes" for children.
-        let d' = str_is_prefix "draw_" n => d-1 | d in
-        let cs = adj_map (id+1) d' cont in
+        let cs = adj_map (id+1) cont in
         // Find new adjacencies between children and this node.
         let anode' = itlist (adj_cons) cs anode in
         let cs'    = map (adj_cons anode) cs in
@@ -477,7 +480,7 @@ letrec
 // Calls 'adj_reduce' and flattens its result.
 //  adj_build::pexlif->int->[scheme]
 let
-    adj_build pex d = val (sc,adj) = adj_reduce 1 d pex in (sc:adj)
+    adj_build pex = val (sc,adj) = adj_reduce 1 pex in (sc:adj)
 ;
 
 //==============================================================================
@@ -525,6 +528,7 @@ let pex_sha = find_signature # attributes_of_pexlif # pexlif_of_scheme;
 // Construct an isomatch matrix (possible matches) from two ...
 //  isomatch_matrix::[scheme]->[scheme]->(pexlif->string)->(bool mat)
 let isomatch_matrix as_g as_p cmp = map (pam as_g # equal on cmp) as_p;
+// todo: could we use sha sig to limit search?
 
 //------------------------------------------------------------------------------
 // Pruning of match matrix.
@@ -645,12 +649,12 @@ let
 // ...
 //  isomatch::(pexlif->string)->(pexlif,int)->(pexlif,int)->((scheme#scheme) mat)
 let
-    isomatch cmp (g_pex, g_dep) (p_pex, p_dep) =
+    isomatch cmp g_pex p_pex =
         // Create haystack.
-        let sc_g  = adj_build g_pex g_dep then
+        let sc_g  = adj_build g_pex then
         let adj_g = adjacency_matrix sc_g then
         // Create needle.
-        let sc_p  = adj_build p_pex p_dep then
+        let sc_p  = adj_build p_pex then
         let adj_p = adjacency_matrix sc_p then
         // Perform isomatch.
         let iso_m = isomatch_matrix sc_g sc_p cmp then
@@ -658,14 +662,6 @@ let
         // Recover solution.
         recover sc_g sc_p res
 ;
-
-// ...
-//  isomatch_top::(pexlif->string)->pexlif->pexlif->((scheme#scheme) mat)
-let isomatch_top cmp g_pex p_pex = isomatch cmp (g_pex,1) (p_pex,0);
-
-// ...
-//  isomatch_all::(pexlif->string)->pexlif->pexlif->((scheme#scheme) mat)
-let isomatch_all cmp g_pex p_pex = isomatch cmp (g_pex,-1) (p_pex,-1);
 
 //==============================================================================
 //
@@ -679,7 +675,7 @@ let
     expand cmp sols =
         let
             extend_sol [(p_sc,g_sc)] =
-                [isomatch_all cmp (pexlif_of_scheme g_sc) (pexlif_of_scheme p_sc)]
+                [isomatch cmp (pexlif_of_scheme g_sc) (pexlif_of_scheme p_sc)]
         in
         map extend_sol sols
 ;
@@ -751,7 +747,9 @@ let
                   (zip (map fst fa_outs2) (map fst fa_outs1)) @
                   (zip int2 int1)
         in
-        fs1 == map (subst_fn sub) fs2
+        let sha1 = sha_set fs1 in
+        let sha2 = sha_set (map (subst_fn sub) fs2) in
+        sha1 == sha2
 /\  alpha_equality _ _ = T
 ;
 
