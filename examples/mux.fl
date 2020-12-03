@@ -8,22 +8,26 @@ load "ste.fl";
 // Load mux source.
 let g_pex = verilog2pexlif "-Iexamples/mux" "mux4" ["small.v"] [];
 let p_pex = verilog2pexlif "-Iexamples/mux" "mux2" ["small_lib.v"] [];
-//
+(g_pex fseq p_pex fseq print "Finished loading.\n");
+
+//------------------------------------------------------------------------------
+
 //Emit_pexlif "puzzle.txt" g_pex;
 //Emit_pexlif "piece.txt" p_pex;
-//
-(g_pex fseq p_pex fseq print "Finished loading.\n");
 
 //--------------------------------------------------------------------------------
 
-let sol = isomatch pex_fp (g_pex,1) (p_pex,0);
+let sol = isomatch pex_fp g_pex p_pex;
+wtime (sol fseq 1);
 print_all sol;
 //
-let ex = expand pex_fp sol;
-print_all_ex sol ex;
+// let ex = expand pex_fp sol;
+// wtime (ex fseq 1);
+// print_all_ex sol ex;
 //
-let fex = filter_alpha_equal ex;
-print_all_ex sol fex;
+// let fex = filter_alpha_equal ex;
+// wtime (fex fseq 1);
+// print_all_ex sol fex;
 
 //------------------------------------------------------------------------------
 // Fin.
