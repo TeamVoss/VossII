@@ -172,7 +172,6 @@ static struct prim_fun_name_rec {
 		    {P_CPRIME, "P_CPRIME", ""},
 		    {P_BSTAR, "P_BSTAR", ""},
 		    {P_HELP, "P_HELP", "help"},
-		    {P_GET_MATCHING_FNS, "P_GET_MATCHING_FNS", ""},
 		    {P_FORALL, "P_FORALL", ""},
 		    {P_THEREIS, "P_THEREIS", ""},
 		    {P_PRINT, "P_PRINT", ""},
@@ -3946,25 +3945,6 @@ traverse_left(g_ptr oroot)
 			goto finish1;
 		    }
 
-		case P_GET_MATCHING_FNS:
-		    if( depth < 4 )
-			goto clean_up;
-		    redex = *(sp+3);
-		    arg4  = traverse_left(GET_APPLY_RIGHT(*(sp+3)));
-                    if( is_fail(arg4) ) goto arg4_fail4;
-		    arg3  = traverse_left(GET_APPLY_RIGHT(*(sp+2)));
-                    if( is_fail(arg3) ) goto arg3_fail4;
-		    arg2  = traverse_left(GET_APPLY_RIGHT(*(sp+1)));
-                    if( is_fail(arg2) ) goto arg2_fail4;
-		    arg1  = traverse_left(GET_APPLY_RIGHT(*sp));
-                    if( is_fail(arg1) ) goto arg1_fail4;
-		    ntmp = Get_Matching_Functions(GET_STRING(arg1),
-						  GET_STRING(arg2),
-						  GET_STRING(arg3),
-						  GET_STRING(arg4));
-		    OVERWRITE(redex, ntmp);
-		    goto finish4;
-
 		case P_STRING_HD:
 		case P_STRING_TL:
 		    if( depth < 1 )
@@ -4334,22 +4314,6 @@ traverse_left(g_ptr oroot)
         goto start;
   arg3_fail3:
 	OVERWRITE(redex, arg3); sp = sp + 3; depth = depth - 3; root = redex;
-	DO_TRACE_DBG();
-        goto start;
-  arg1_fail4:
-	OVERWRITE(redex, arg1); sp = sp + 4; depth = depth - 4; root = redex;
-	DO_TRACE_DBG();
-        goto start;
-  arg2_fail4:
-	OVERWRITE(redex, arg2); sp = sp + 4; depth = depth - 4; root = redex;
-	DO_TRACE_DBG();
-        goto start;
-  arg3_fail4:
-	OVERWRITE(redex, arg3); sp = sp + 4; depth = depth - 4; root = redex;
-	DO_TRACE_DBG();
-        goto start;
-  arg4_fail4:
-	OVERWRITE(redex, arg4); sp = sp + 4; depth = depth - 4; root = redex;
 	DO_TRACE_DBG();
         goto start;
   fail1:

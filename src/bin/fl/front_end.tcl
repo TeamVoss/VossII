@@ -1279,6 +1279,8 @@ namespace eval voss2_history {
 
 namespace eval voss2_help {
 
+    variable max_results_to_list 40
+
     proc help_clean {txt} {
 	regsub -all {\\} $txt {} res
 	regsub {^\{(.*)\}$} $res {\1} nres
@@ -1390,20 +1392,33 @@ namespace eval voss2_help {
     }
 
     proc help_show_info {lb tb} {
+	variable max_results_to_list
 	foreach index [$lb curselection] {
 	    set fun [$lb get $index]
-	    help_show_function_info $tb $fun
+	    if { $fun == "..." } {
+		incr max_results_to_list 40
+		help_do_match $lb 0
+		$lb see $index
+		return
+	    } else {
+		help_show_function_info $tb $fun
+	    }
 	}
 	$lb selection clear 0 end
     }
 
-    proc help_do_match {lb} {
+    proc help_do_match {lb first} {
+	variable max_results_to_list
+	if { $first == 1 } {
+	    set max_results_to_list 40
+	}
 	$lb delete 0 end 
 	set alts [get_matching_functions $::help_search_name_pat \
 					 $::help_search_file_pat \
 					 $::help_search_arg_pat \
-					 $::help_search_res_pat]
-	foreach fun [lsort $alts] {
+					 $::help_search_res_pat \
+					 $max_results_to_list]
+	foreach fun $alts {
 	    $lb insert end $fun
 	}
     }
@@ -1541,7 +1556,7 @@ namespace eval voss2_help {
 		-font $::voss2_txtfont
 	pack $w_search_name_pat.entry -side top -fill both -expand yes
 	bind $w_search_name_pat.entry <Return> \
-		[list ::voss2_help::help_do_match $w_search_alts.list]
+		[list ::voss2_help::help_do_match $w_search_alts.list 1]
 
 	ttk::labelframe $w_search_file_pat -text "File name matching"
 	pack $w_search_file_pat -side top -fill x -pady 4
@@ -1549,7 +1564,7 @@ namespace eval voss2_help {
 		-font $::voss2_txtfont
 	pack $w_search_file_pat.entry -side top -fill both -expand yes
 	bind $w_search_file_pat.entry <Return> \
-		[list ::voss2_help::help_do_match $w_search_alts.list]
+		[list ::voss2_help::help_do_match $w_search_alts.list 1]
 
 	ttk::labelframe $w_search_arg_pat -text "Argument type matching"
 	pack $w_search_arg_pat -side top -fill x -pady 4
@@ -1557,7 +1572,7 @@ namespace eval voss2_help {
 		-font $::voss2_txtfont
 	pack $w_search_arg_pat.entry -side top -fill both -expand yes
 	bind $w_search_arg_pat.entry <Return> \
-		[list ::voss2_help::help_do_match $w_search_alts.list]
+		[list ::voss2_help::help_do_match $w_search_alts.list 1]
 
 	ttk::labelframe $w_search_res_pat -text "Result type matching"
 	pack $w_search_res_pat -side top -fill x -pady 4
@@ -1565,10 +1580,10 @@ namespace eval voss2_help {
 		-font $::voss2_txtfont
 	pack $w_search_res_pat.entry -side top -fill both -expand yes
 	bind $w_search_res_pat.entry <Return> \
-		[list ::voss2_help::help_do_match $w_search_alts.list]
+		[list ::voss2_help::help_do_match $w_search_alts.list 1]
 
 	button $w_search_button -text Search \
-	    -command "::voss2_help::help_do_match $w_search_alts.list"
+	    -command "::voss2_help::help_do_match $w_search_alts.list 1"
 	pack $w_search_button -side top -fill x 
 
 	frame $w_search_alts -relief flat

@@ -227,8 +227,9 @@ let fst p = defix fst p;
 //	that was defined in a file whose name matches file_pat AND
 //	that has at least one argument matching arg_pat AND
 //	whose return type matches res_pat
-let get_matching_functions name_pat file_pat arg_pat res_pat =
-    defix get_matching_functions name_pat file_pat arg_pat res_pat
+// Return at most max_cnt results (add a ... if more available).
+let get_matching_functions name_pat file_pat arg_pat res_pat max_cnt =
+    defix get_matching_functions name_pat file_pat arg_pat res_pat max_cnt
 ;
 
 // Get the current value of the vossrc (option) variable key.

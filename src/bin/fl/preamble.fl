@@ -1307,7 +1307,7 @@ let prim_fns = [
 		(24, "P_NOT_EQUAL"), (25, "P_VAR"), (26, "P_CAT"),
 		(27, "P_EMPTY"), (28, "P_LOAD"), (29, "P_ERROR"), (30, "P_SEQ"),
 		(31, "P_SPRIME"), (32, "P_CPRIME"), (33, "P_BSTAR"),
-		(34, "P_HELP"), (35, "P_GET_MATCHING_FNS"), (36, "P_FORALL"),
+		(34, "P_HELP"), (36, "P_FORALL"),
 		(37, "P_THEREIS"), (38, "P_PRINT"), (39, "P_DEBUG"),
 		(40, "P_IDENTICAL"), (41, "P_STRING_HD"), (42, "P_STRING_TL"),
 		(43, "P_FAIL"), (44, "P_IS_CONS"), (45, "P_CATCH"),

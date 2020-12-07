@@ -109,8 +109,6 @@ static struct function_rec {
             {"fclose", P_FCLOSE,                -1, -1, FALSE,FALSE,TRUE},
             {"fflush", P_FFLUSH,                -1, -1, FALSE,FALSE,TRUE},
             {"fst", P_FST,			-1, -1, FALSE,FALSE,FALSE},
-	    {"get_matching_functions", P_GET_MATCHING_FNS,
-						-1, -1 ,FALSE,FALSE,FALSE},
             {"get_vossrc", P_GET_VOSSRC,	-1, -1, FALSE,FALSE,FALSE},
             {"hd", P_HEAD,			-1, -1, FALSE,FALSE,FALSE},
             {"help", P_HELP,			-1, -1, FALSE,FALSE,FALSE},
