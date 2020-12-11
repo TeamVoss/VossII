@@ -1,0 +1,252 @@
+//==============================================================================
+//
+// Random functions that I think are just neat.
+//
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// Misc. combinators.
+
+// Check if 'p' is satisfied with all elements of 'as'.
+//  all::(a->bool)->(a list)->bool
+let all p as = AND_list (map p as);
+
+// Check if 'p' is satisfied with any element of 'as'.
+//  any::(a->bool)->(a list)->bool
+let any p as = OR_list (map p as);
+
+// Constant function.
+//  const::a->b->a
+let const a b = a;
+
+// Flip the arguments of a function.
+//  flip::(a->b->c)->b->a->c
+let flip f a b = f b a;
+
+// Infinite list of repeated applications of 'f' to 'x'.
+//     iterate::(a->a)->a->(a list)
+letrec iterate f x = x : iterate f (f x);
+
+// "Curry" a function.
+//  curry::((a->b->c)->(a#b)->c
+let curry f (a,b) = f a b;
+
+// Un"curry" a function.
+//  uncurry::((a#b)->c)->a->b->c
+let uncurry f a b = f (a,b);
+
+// Runs the binary function g on the results of applying unary function f to two
+// arguments x and y.
+//  on::(b->b->c)->(a->b)->a->a->c
+let on g f x y = g (f x) (f y);
+infix 3 on;
+
+// Takes two lists and returns a list of corresponding pairs. If one input list
+// is short, excess elements of the longer list are discarded.
+//  zip_uneven::(a list)->(b list)->((a#b) list)
+letrec
+    zip_uneven (x:xs) (y:ys) = (x,y) : zip_uneven xs ys
+/\  zip_uneven _ [] = []
+/\  zip_uneven [] _ = []
+;
+
+// Apply 'f' to the first element of pair '(a,b)'.
+//  first::(a->c)->(a#b)->(c#b)
+let first f (a,b) = (f a,b);
+
+// Apply 'f' to the second element of a pair '(a,b)'.
+//  second::(b->c)->(a#b)->(a#c)
+let second f (a,b) = (a,f b);
+
+// 'map' with its arguments flipped.
+//  pam::(a list)->(a->b)->(b list)
+let pam = flip map;
+
+// Perform action 'a' if 'b' is true, otherwise do nothing.
+//  when::bool->void->void
+let when b a = b => a | ();
+
+// Swaps the element's of a pair.
+//  swap::(a#b)->(b#a)
+let swap (a,b) = (b,a);
+
+//------------------------------------------------------------------------------
+// Non-infix versions of combinators/constructors.
+
+// Non-infix version of (,).
+//  pair::a->b->(a#b)
+let pair a b = (a,b);
+
+// Non-infix version of (:).
+//  const::a->(a list)->(a list)
+let cons a b = a : b;
+
+// Non-infix version of (==).
+//  equal::a->a->bool
+let equal a b = a == b;
+
+// Non-infix version of (!=).
+//  not_equal::a->a->bool
+let not_equal a b = NOT (equal a b);
+
+// Non-infix version of (+).
+//  add::int->int->int
+let add a b = a + b;
+
+//------------------------------------------------------------------------------
+// List.
+
+// Drops the first element of a list.
+//  butfirst::(a list)->(a list)
+let butfirst = tl;
+
+// Sum a list of integers.
+//  sum::(int list)->int
+let sum as = itlist (\a. \s. a + s) as 0;
+
+// Fold (rigth-to-left) 'xs' into itself with 'f'.
+//  itlist1::(a->a->a)->(a list)->a
+let itlist1 f (x:xs) = itlist f xs x;
+
+// Fold (rigth-to-left) 'xs' into 'b' with 'f'.
+//  ixlist::(a->int->b->b)->(a list)->b->b
+let ixlist f xs b = snd (itlist (\x. \(ix,s). (ix-1,f x ix s)) xs (length xs,b));
+
+// Modify the 'n'th element of a list 'xs' with 'f'.
+//  modify::(a->a)->int->(a list)->(a list)
+let modify f n xs = ixlist (\x. \ix. \ys. n == ix => f x : ys | x : ys) xs [];
+
+// Set the 'n'th element of a list 'x' to 'v'.
+//  list_update::a->int->(a vec)->(a vec)
+let list_update v i = modify (const v) i;
+
+// Checks if an element is a memeber of the given list.
+//  elem::a->(a list)->bool
+let elem a as = find_first0 (equal a) as == 0 => F | T;
+
+// Label each element with its index in the list.
+//  ixlabel::(a list)->((a#int) list)
+let ixlabel = flip zip_uneven (iterate (add 1) 1) ;
+
+// Left-shift a list one element.
+//  rotate::(a list)->(a list)
+let rotate (x:xs) = xs @ [x];
+
+// Left-shift a list 'l'-elements.
+//  rotations::int->(a list)->((a list) list)
+let rotations l xs = firstn l (iterate rotate xs);
+
+// Generate every permutation of a list.
+//  permutations::(a list)->((a list) list)
+letrec
+    permutations xs =
+        letrec
+            perms []     _  = []
+        /\  perms (t:ts) js =
+                let
+                    interleave xs r =
+                        letrec
+                            interleave' _ []     r = (ts, r)
+                        /\  interleave' f (y:ys) r =
+                                val (us,zs) = interleave' (f # (cons y)) ys r in
+                                (y:us, f (t:y:us) : zs)
+                        in                         
+                        snd (interleave' id xs r)
+                in
+                itlist interleave (perms ts (t:js)) (permutations js)
+        in
+        xs : perms xs []
+;
+
+// ...
+//  extend_with::int->a->(a list)->(a list)
+letrec
+    extend_with 0 _ as     = as
+/\  extend_with n a []     = replicate n a
+/\  extend_with n a (a:as) = a : extend_with (n-1) a as
+;
+
+//------------------------------------------------------------------------------
+// Matrix.
+
+// Count the number of rows in a matrix.
+//  num_rows::(a mat)->int
+let num_rows = length;
+
+// Count the number of columns in a square matrix.
+//  num_columns::(a mat)->int
+let num_columns xs = empty xs => 0 | length (hd xs);
+
+// Set the '(i,j)'th element of matrix 'mat' to 'v'.
+//  mat_update::a->(int#int)->(a mat)->(a mat)
+let mat_update v (i,j) = modify (list_update v j) i;
+
+//------------------------------------------------------------------------------
+// String
+
+// Drops the first 'n' characters from the string 's'.
+//  string_butfirstn::string->int->string
+let string_butfirstn s n = el (n+1) (iterate (string_tl) s);
+
+// Short-hand for 'string_tl'.
+//  string_butfirst::string->string
+let string_butfirst = string_tl;
+
+// Short-hand for 'string_butlastn 1'.
+//  string_butlast::string->string
+let string_butlast s = string_butlastn s 1;
+
+// Checks if a string is empty.
+//  string_empty::string->bool
+let string_empty s = strlen s == 0;
+
+// Short-hand for printing of matrices.
+//  matrix2str::bool->string->string->string->string->(*->string)->((* list) list)->string
+let
+    matrix2str print_empty pre sep_row sep_col post pr_fun =
+        list2str print_empty pre sep_row post
+            (list2str print_empty pre sep_col post pr_fun)
+;
+
+//------------------------------------------------------------------------------
+// SHA256.
+
+// Compute the SHA256 signature of a 'set' of components.
+//  sha_set::(a list)->string
+let sha_set = sha256_signature # qsort strcmp # map sha256_signature;
+
+//------------------------------------------------------------------------------
+// Pexlif.
+
+let _pexlif_name      (PINST n _ _ _ _ _ _) = n;
+let _pexlif_attrs     (PINST _ a _ _ _ _ _) = a;
+let _pexlif_leaf      (PINST _ _ l _ _ _ _) = l;
+let _pexlif_fa_inps   (PINST _ _ _ i _ _ _) = i;
+let _pexlif_fa_outs   (PINST _ _ _ _ o _ _) = o;
+let _pexlif_internals (PINST _ _ _ _ _ t _) = t;
+let _pexlif_content   (PINST _ _ _ _ _ _ c) = c;
+
+// Fetch the specified attribute. If none exists, returns the empty string.
+//  find_signature::string->(string#string list)->string
+let
+    find_attr s as =
+        let ix = find_first0 (equal s # fst) as in
+        ix == 0 => "" | snd (el ix as)
+;
+
+
+// Fetch the "fingerprint" attribute. If none exists, returns zero.
+//  find_fingerprint::(string#string list)->int
+let
+    find_fingerprint as =
+        let fp = find_attr "fingerprint" as in
+        string_empty fp => 0 | s2int fp
+;
+
+// Fetch the "signature" attribute. If none exists, returns the empty string.
+//  find_signature::(string#string list)->string
+let
+    find_signature as = find_attr "signature" as
+;
+
+//------------------------------------------------------------------------------
