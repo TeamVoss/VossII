@@ -112,6 +112,10 @@ let itlist1 f (x:xs) = itlist f xs x;
 //  ixlist::(a->int->b->b)->(a list)->b->b
 let ixlist f xs b = snd (itlist (\x. \(ix,s). (ix-1,f x ix s)) xs (length xs,b));
 
+// ...
+//  ixmap::(a->int->b)->(a list)->(b list)
+let ixmap f xs = ixlist (\x. \ix. cons (f x ix)) xs [];
+
 // Modify the 'n'th element of a list 'xs' with 'f'.
 //  modify::(a->a)->int->(a list)->(a list)
 let modify f n xs = ixlist (\x. \ix. \ys. n == ix => f x : ys | x : ys) xs [];
@@ -250,3 +254,23 @@ let
 ;
 
 //------------------------------------------------------------------------------
+// Fin.
+
+// all NOT [T,T] = F;
+// any NOT [F,T] = T;
+// equal T T;
+// const T F = T;
+// flip const T F = F;
+// curry const (T,F) = T;
+// uncurry id T F = (T,F);
+// first NOT (T,T) = (F,T);
+// second NOT (T,T) = (T,F);
+// butfirst [F,T] = [T];
+// firstn 3 (iterate NOT T) = [T,F,T];
+// ixlist (\a.\i.\b.(i>a):b) [2,2,2,2] [] = [F,F,T,T];
+// modify NOT 2 [T,T,T] = [T,F,T];
+// string_butfirstn "abc" 2 = "c";
+// string_butfirst "abc" = "bc";
+// string_butlast "abc" = "ab";
+// list_update T 2 [F,F,F] = [F,T,F];
+// mat_update T (2,2) [[F,F,F],[F,F,F],[F,F,F]] = [[F,F,F],[F,T,F],[F,F,F]];

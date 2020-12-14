@@ -24,6 +24,9 @@ andlettype
       | SUBE  {sube::entity}
 ;
 
+let _entity_name    (ENTITY n _) = n;
+let _entity_indices (ENTITY _ i) = i;
+
 letrec
     Pentity (ENTITY n rs) =
         let
@@ -36,7 +39,6 @@ letrec
 install_print_function Pentity;
 
 // ...
-// todo: fails if a name is used in the indices.
 //  parse_vec::string->entity
 let
     parse_vec s =
@@ -49,6 +51,7 @@ let
         //
         ENTITY e' (flatmap unpack rs')
 ;
+// todo: fails if a name is used in the indices.
 
 // ...
 //  test_vec::entity->entity->bool
@@ -63,12 +66,64 @@ let
 ;
 
 // ...
-//  shared_vec::entity->entity->bool
-let shared_vec (ENTITY n1 rs1) (ENTITY n2 rs2) = n1 == n2;
+//  size_vec::entity->int
+let
+    size_vec (ENTITY _ rs) =
+        let diff (x,y) = iabs (y - x) in
+        letrec
+            size [] = 0
+        /\  size (INDEX x:xs) = 1 + size xs
+        /\  size (RANGE x:xs) = diff x + size xs
+        in
+        size rs
+;
+
+//------------------------------------------------------------------------------
+
+// "Align" the first entity with the second, that is, ensure the first entity is
+// indexed in chunks of indices that matches the second entity.
+//  align_vec::entity->entity->entity
+let
+    align_vec e1 e2 =
+        val (ENTITY n1 rs1) = e1 in
+        val (ENTITY n2 rs2) = e2 in
+        //
+        let diff (x,y) = iabs (y - x) in
+        let tail (x,y) = (x+1) == y => INDEX y | RANGE (x+1,y) in
+        //
+        letrec
+            expand i []           = []
+        /\  expand i (INDEX y:ys) = INDEX i : expand (i+1) ys
+        /\  expand i (RANGE y:ys) = let s = diff y in
+                RANGE (i,i+s) : expand (i+s+1) ys
+        in
+        letrec
+            align (INDEX x:xs) (INDEX y:ys) = INDEX x : align xs ys
+        /\  align (RANGE x:xs) (INDEX y:ys) = INDEX (fst x) : align (tail x:xs) ys
+        /\  align (RANGE x:xs) (RANGE y:ys) = let s = diff x - diff y in
+                s == 0 => RANGE x : align xs ys |
+                s >  0 => val (l,h) = x in RANGE (l,l+s) : align (RANGE (l+s+1,h):xs) ys |
+                undefined
+        in
+        //
+        size_vec e1 == 0           => ENTITY n1 (expand 0 rs2)  |
+        size_vec e1 == size_vec e2 => ENTITY n1 (align rs1 rs2) | 
+        undefined
+;
+// todo: what about diff. between MSB and LSB orderings.
+
+// "Align" the first list of actuals with the second, that is, ensure the first
+// list is in chunks of entities that match the second list's.
+//  align_actuals::(entity list)->(entity list)->(entity list)
+let
+    align_actuals es1 es2 =
+        undefined
+;
 
 //------------------------------------------------------------------------------
 // ...
 
+// ...
 lettype scheme =
         SCHEME
             {pex::pexlif}
@@ -88,12 +143,11 @@ let _scheme_int (SCHEME _ _ _ _ _ t) = t;
 
 let
     Pscheme (SCHEME p l a i o t) =
-        let name_of (PINST n _ _ _ _ _ _) = n in
         let pr = list2str T "{" "," "}" Pentity in
         sprintf "%s(%s):%S:%S:%S:%s"
-            (name_of p)
+            (_pexlif_name p)
             l
-            (map (name_of # _scheme_pex) a)
+            (map (_pexlif_name # _scheme_pex) a)
             (map pr i)
             (map pr o)
             (pr t)
@@ -127,8 +181,17 @@ let
         check_all o1 i2 OR check_all i1 o2
 ;
 
+//==============================================================================
+//
+// Ullman’s Subgraph Isomorphism Algorithm.
+//   G - Graph, or puzzle/haystack.
+//   P - Potential subgraphs of G, or piece/needle.
+//   M - |V(P)| x |V(G)| matrix that encodes possible subgraph isomorphisms.
+//
+//==============================================================================
+
 //------------------------------------------------------------------------------
-// Construction of adj. nodes from a pexlif.
+// Creationg of adj. matrix.
 
 // ...
 //  adj_length::(scheme,[scheme])->int
@@ -139,8 +202,8 @@ let
 // ...
 //  adj_cons::(scheme,[scheme])->(scheme,[scheme])->(scheme,[scheme])
 let
-    adj_cons (s1,a1) (s2,a2) =
-        scheme_shared s1 s2 => (scheme_cons_adj s1 s2,a2) | (s2,a2)
+    adj_cons (s1,a1) (s2,a2) = (scheme_cons_adj s1 s2,a2)
+//      scheme_shared s1 s2 => (scheme_cons_adj s1 s2,a2) | (s2,a2)
 ;
 
 // Merge a "parent" node with its "children".
@@ -189,18 +252,6 @@ let
     adj_build pex = val (sc,adj) = adj_reduce 1 pex in (sc:adj)
 ;
 
-//==============================================================================
-//
-// Ullman’s Subgraph Isomorphism Algorithm.
-//   G - Graph, or puzzle/haystack.
-//   P - Potential subgraphs of G, or piece/needle.
-//   M - |V(P)| x |V(G)| matrix that encodes possible subgraph isomorphisms.
-//
-//==============================================================================
-
-//------------------------------------------------------------------------------
-// Creationg of adj. matrix.
-
 // Creates a list of 'max' elements with an 'T' at index 'i' if 'i' is present
 // in the list 'xs' and 'F' if not.
 //  fill::int->(int list)->(bool list)
@@ -216,7 +267,7 @@ let fill max xs =
         rev (build 0 [] xs)
 ;
 
-// ...
+// Fetch the ID's of each node adjacent to the given one.
 //  adj_to_id::scheme->(int list)
 let adj_to_id = map (s2int # _scheme_lbl) # _scheme_adj;
 
@@ -227,24 +278,52 @@ let adjacency_matrix as = map (fill (length as) # adj_to_id) as;
 //------------------------------------------------------------------------------
 // Creation of iso. match matrix.
 
-// ...
-//  fp::pexlif->string
-let pex_fp = int2str # find_fingerprint # _pexlif_attrs # _scheme_pex;
+// Filter every index in a vector 'xs' using 'p'.
+//  filter_cols::(a->bool)->(a list)->(int list)
+let filter_cols p xs = ixlist (\x. \ix. \ys. p x => ix : ys | ys) xs [];
 
-// ...
-//  sha::pexlif->string
-let pex_sha = find_signature # _pexlif_attrs # _scheme_pex;
+// Filter every pair of indices in matrix 'xs' using 'p'.
+//  filter_rows::(a->bool)->(a mat)->((int#int) list)
+let filter_rows p xs = ixlist (\x. \ix. \ys. map (pair ix) (filter_cols p x) @ ys) xs [];
+
+// Remove every 'sc' and their adjacent nodes from the possible iso. solutions.
+//  trim::(scheme list)->(bool mat)->(bool mat)
+let
+    trim sc iso =
+        letrec
+            adj s = adj_to_id s @ flatmap adj (_scheme_adj s)
+        in
+        let none = replicate (length iso) F in
+        let aset = flatmap (\s. s2int (_scheme_lbl s) : adj s) sc in
+        transpose (ixmap (\r. \ix. elem ix aset => none | r) (transpose iso))
+;
 
 // Construct an isomatch matrix (possible matches) from two ...
 //  isomatch_matrix::[scheme]->[scheme]->(pexlif->string)->(bool mat)
-let isomatch_matrix as_g as_p cmp = map (pam as_g # equal on cmp) as_p;
+let
+    isomatch_matrix as_g as_p cmp =
+        // Find every possible equality match.
+        let iso = map (pam as_g # equal on cmp) as_p then
+        // Filter out non-top level sub-graphs.
+        let poss_top = filter_cols id (hd iso) in
+        let act_top  = adj_to_id (hd as_g) in
+        let not_top  = filter (NOT # flip elem act_top) poss_top in
+        let rem  = map (flip el as_g) not_top in
+        let iso' = trim rem iso then
+        // ...
+        iso'
+;
+
+// Fetch the fingerprint...
+//  fp::pexlif->string
+let pex_fp = int2str # find_fingerprint # _pexlif_attrs # _scheme_pex;
+
+// Fetch the SHA256 signature...
+//  sha::pexlif->string
+let pex_sha = find_signature # _pexlif_attrs # _scheme_pex;
 
 //------------------------------------------------------------------------------
 // Pruning of match matrix.
-
-// Filter every index/pair of indices in a vector/matrix 'xs' using 'p'.
-let filter_cols p xs = ixlist (\x. \ix. \ys. p x => ix : ys | ys) xs [];
-let filter_rows p xs = ixlist (\x. \ix. \ys. map (pair ix) (filter_cols p x) @ ys) xs [];
 
 // Iterate over every mat. index that is a possible match.
 //  forall_ones::(bool mat)->((int#int)->a->a)->a->a
@@ -347,6 +426,8 @@ letrec
 ;
 
 //------------------------------------------------------------------------------
+// ...
+
 let mat2str = matrix2str T "[" "\n," "," "]";
 let b2str b = b => "T" | "F";
 
@@ -368,9 +449,9 @@ let
         let sc_p  = adj_build p_pex in
         let adj_p = adjacency_matrix sc_p in
         // Create iso. matrix.
-        let iso_m = isomatch_matrix sc_g sc_p cmp in
+        let iso   = isomatch_matrix sc_g sc_p cmp in
         // Perform isomatch.
-        let res   = recurse iso_m adj_g adj_p in
+        let res   = recurse iso adj_g adj_p in
         // Recover solution.
         let sol   = recover sc_g sc_p res in
 // Debug: ------------------------------
@@ -378,23 +459,23 @@ let
         val (_,t2) = wtime adj_g in
         let p1 = mat2str b2str adj_g in
         (fprintf stdout "-- Adj.G in (%s+%s):\n" t1 t2) fseq
-        //(fprintf stdout "%s\n" p1) fseq
+        (fprintf stdout "%s\n" p1) fseq
         //
         val (_,t3) = wtime sc_p in
         val (_,t4) = wtime adj_p in
-        let p2 = mat2str b2str adj_g in
+        let p2 = mat2str b2str adj_p in
         (fprintf stdout "-- Adj.P in (%s+%s):\n" t3 t4) fseq
-        //(fprintf stdout "%s\n" p2) fseq
+        (fprintf stdout "%s\n" p2) fseq
         //
-        val (_,t5) = wtime iso_m in
-        let p3 = mat2str b2str iso_m in
+        val (_,t5) = wtime iso in
+        let p3 = mat2str b2str iso in
         (fprintf stdout "-- Iso.M in %s:\n" t5) fseq
-        //(fprintf stdout "%s\n" p3) fseq
+        (fprintf stdout "%s\n" p3) fseq
         //
         val (_,t6) = wtime res in
         let p4 = map (mat2str b2str) res in
         (fprintf stdout "-- Result in %s:\n" t6) fseq
-        //(foreach (fprintf stdout "%s\n") p4) fseq
+        (foreach (fprintf stdout "%s\n") p4) fseq
         //
         val (_,t7) = wtime sol in
         (fprintf stdout "-- Recover in %s.\n" t7) fseq
@@ -576,24 +657,6 @@ let print_all = list2str T "===\n" "\n===\n" "\n" print_one;
 //==============================================================================
 // Fin.
 
-// all NOT [T,T] = F;
-// any NOT [F,T] = T;
-// equal T T;
-// const T F = T;
-// flip const T F = F;
-// curry const (T,F) = T;
-// uncurry id T F = (T,F);
-// first NOT (T,T) = (F,T);
-// second NOT (T,T) = (T,F);
-// butfirst [F,T] = [T];
-// firstn 3 (iterate NOT T) = [T,F,T];
-// ixlist (\a.\i.\b.(i>a):b) [2,2,2,2] [] = [F,F,T,T];
-// modify NOT 2 [T,T,T] = [T,F,T];
-// string_butfirstn "abc" 2 = "c";
-// string_butfirst "abc" = "bc";
-// string_butlast "abc" = "ab";
-// list_update T 2 [F,F,F] = [F,T,F];
-// mat_update T (2,2) [[F,F,F],[F,F,F],[F,F,F]] = [[F,F,F],[F,T,F],[F,F,F]];
 // unused_rows [[F,T,F,T,F,T,F],[F,F,T,F,T,F,T]] = [F,T,T,T,T,T,T];
 // filter_cols id [T,F,T] = [1,3];
 // filter_rows id [[T,F],[F,T]] = [(1,1),(2,2)];
@@ -601,36 +664,4 @@ let print_all = list2str T "===\n" "\n===\n" "\n" print_one;
 // dot [T,F] [F,F] = F;
 // mult [[T,T],[F,F]] [[F,F],[T,T]] = [[T,T],[F,F]];
 // mark_one 2 [T,T,T] = [F,T,F];
-// forall_unused
-//     [[T,F,T,F,T,F,T]]
-//     1
-//     [F,F,F,F,T,T,T]
-//     (\c. \m. (print (sprintf "%d " c)) fseq (F,m));
-
-//------------------------------------------------------------------------------
-// Old
-
-// parse_vec_info
-        // letrec
-        //     build_entity x y [] =
-        //         (ENTITY undefined,[])
-        // /\  build_entity x y ((TXT s):vs) = 
-        //         str_is_suffix "]" s =>
-        //             let e = ENTITY x y in
-        //             (e,vs) |
-        //         str_is_suffix "[" s =>
-        //             let n = butlast s in
-        //             build_entity  |
-        //         undefined
-        // /\  build_entity x y ((RANGES rs):vs) =
-        //         undefined
-        // in
-        // letrec
-        //     build_index [] = []
-        // /\  build_index ((TXT s):vs) =
-        //         val (e,vs') = build_entity "" [] ((TXT s):vs) in
-        //         e : build_index vs'
-        // /\  build_index ((RANGES rs):vs) =
-        //         let go (u,l) = u == l => INDEX u | RANGE (u,l) in
-        //         map go rs @ build_index vs
-        // in
+// forall_unused [[T,F,T,F,T,F,T]] 1 [F,F,F,F,T,T,T] (\c. \m. (print (sprintf "%d " c)) fseq (F,m));
