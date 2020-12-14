@@ -241,9 +241,9 @@ letrec
         let cs = adj_map (id+1) cont in
         // Find new adjacencies between children and this node.
         let anode' = itlist (adj_cons) cs anode in
-//      let cs'    = map (adj_cons anode) cs in
+        let cs'    = map (adj_cons anode) cs in
         // Merge this "anode" and its children.
-        adj_merge anode' cs
+        adj_merge anode' cs'
 ;
 
 // Calls 'adj_reduce' and flattens its result.
