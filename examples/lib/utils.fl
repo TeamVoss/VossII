@@ -96,6 +96,10 @@ let add a b = a + b;
 //------------------------------------------------------------------------------
 // List.
 
+// Checks if a list has at least one element.
+//  nonempty::(a list)->bool
+let nonempty = NOT # empty;
+
 // Drops the first element of a list.
 //  butfirst::(a list)->(a list)
 let butfirst = tl;
@@ -116,9 +120,27 @@ let ixlist f xs b = snd (itlist (\x. \(ix,s). (ix-1,f x ix s)) xs (length xs,b))
 //  ixmap::(a->int->b)->(a list)->(b list)
 let ixmap f xs = ixlist (\x. \ix. cons (f x ix)) xs [];
 
+// ...
+//  span::(a->bool)->(a list)->((a list)#(a list))
+letrec
+    span _ []     = ([], [])
+/\  span p (x:xs) = p x => val (ys,zs) = span p xs in (x:ys,zs) | ([],x:xs)
+;
+
+// ...
+//  group::(a->a->bool)->(a list)->((a list) list)
+letrec
+    group _ []     = []
+/\  group p (x:xs) = val (ys,zs) = span (p x) xs in (x:ys) : group p zs
+;
+
 // Modify the 'n'th element of a list 'xs' with 'f'.
 //  modify::(a->a)->int->(a list)->(a list)
-let modify f n xs = ixlist (\x. \ix. \ys. n == ix => f x : ys | x : ys) xs [];
+let
+    modify _ _ []     = []
+/\  modify f 0 (x:xs) = f x : xs
+/\  modify f n (x:xs) = x : modify f (n-1) xs
+;
 
 // Set the 'n'th element of a list 'x' to 'v'.
 //  list_update::a->int->(a vec)->(a vec)
@@ -130,7 +152,7 @@ let elem a as = find_first0 (equal a) as == 0 => F | T;
 
 // Label each element with its index in the list.
 //  ixlabel::(a list)->((a#int) list)
-let ixlabel = flip zip_uneven (iterate (add 1) 1) ;
+let ixlabel = flip zip_uneven (iterate (add 1) 1);
 
 // Left-shift a list one element.
 //  rotate::(a list)->(a list)
