@@ -19,15 +19,11 @@ let p_pex = verilog2pexlif "-Iexamples/mux" "mux2" ["small_lib.v"] [];
 
 let sol = isomatch pex_fp g_pex p_pex;
 (sol fseq print "Finished matching.\n");
-// print_all sol;
 //
-// let ex = expand pex_fp sol;
-// wtime (ex fseq 1);
-// print_all_ex sol ex;
+let subs = recover_solutions sol;
+(subs fseq print "Finished recovering.\n");
 //
-// let fex = filter_alpha_equal ex;
-// wtime (fex fseq 1);
-// print_all_ex sol fex;
+ print_all sol;
 
 //------------------------------------------------------------------------------
 // Fin.
