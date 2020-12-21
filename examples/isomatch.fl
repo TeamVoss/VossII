@@ -201,13 +201,13 @@ letrec
 letrec
     adj_reduce id pex =
         val (PINST n as _ fa_is fa_os int cont) = pex in
-        //
+        // Construct adjencies for node and children.
         let anode = (mk_scheme pex (int2str id), []) in
-        let cs = adj_map (id+1) cont in
-        //
+        let cs    = adj_map (id+1) cont in
+        // Connect node and children.
         let anode' = itlist (adj_cons) cs anode in
-        let cs' = map (adj_cons anode) cs in
-        //
+        let cs'    = map (adj_cons anode) cs in
+        // Merge adjacencies.
         adj_merge anode' cs'
 ;
 
@@ -619,10 +619,17 @@ letrec
         reduce (traverse cs)
 ;
 
+// ...
 //  recover_solution::((scheme#scheme) list)->((string#string) list)
 let
-    recover_solution scs =
-        undefined
+    recover_solution []     = []
+/\  recover_solution (s:ss) = (recover_pair s ss) catch []
+;
+
+// ...
+//  recover_solutions::((scheme#scheme) mat)->((string#string) mat)
+let
+    recover_solutions sols = filter (NOT # empty) (map recover_solution sols)
 ;
 
 //==============================================================================
