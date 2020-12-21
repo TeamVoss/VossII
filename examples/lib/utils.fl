@@ -134,9 +134,16 @@ letrec
 /\  group p (x:xs) = val (ys,zs) = span (p x) xs in (x:ys) : group p zs
 ;
 
+// ...
+//  reorder::(int list)->(a list)->(a list)
+letrec
+    reorder []     _  = []
+/\  reorder (o:os) xs = el o xs : reorder os xs
+;
+
 // Modify the 'n'th element of a list 'xs' with 'f'.
 //  modify::(a->a)->int->(a list)->(a list)
-let
+letrec
     modify _ _ []     = []
 /\  modify f 0 (x:xs) = f x : xs
 /\  modify f n (x:xs) = x : modify f (n-1) xs
