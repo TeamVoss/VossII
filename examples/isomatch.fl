@@ -65,7 +65,7 @@ let
         /\  test (RANGE r1) (RANGE r2) = r1 == r2
         /\  test _ _ = F
         in
-        n1 == n2 AND all (curry test) (zip rs1 rs2)
+        n1 == n2 AND length rs1 == length rs2 AND all (curry test) (zip rs1 rs2)
 ;
 
 // ...
@@ -628,7 +628,8 @@ let
 // ...
 //  recover_solutions::((scheme#scheme) mat)->((string#string) mat)
 let
-    recover_solutions sols = filter (NOT # empty) (map recover_solution sols)
+    recover_solutions sols = map recover_solution sols
+        //filter (NOT # empty) (map recover_solution sols)
 ;
 
 //==============================================================================
@@ -638,20 +639,29 @@ let
 //==============================================================================
 
 // Print-function for a single sol. list.
-//  print_one::((scheme#scheme) list)->string
+//  print_one::((scheme#scheme) list)->((string#string) list)->string
 let
-    print_one matches =
-       let pr_schemes (SCHEME p1 l1 _) (SCHEME p2 l2 _) =
+    print_one sol sub =
+       let
+           pr_match (SCHEME p1 l1 _) (SCHEME p2 l2 _) =
                val (PINST n1 _ _ _ _ _ _) = p1 in
                val (PINST n2 _ _ _ _ _ _) = p2 in
                sprintf "%s(%s) :-> %s(%s)" n1 l1 n2 l2
        in
-       list2str T "{" "\n," "}" (curry pr_schemes) matches
+       let
+           pr_subst s1 s2 =
+               sprintf "%s := %s" s1 s2
+       in
+       let connections   = list2str T "{  " "\n,  " "}" (curry pr_match) sol in
+       let substitutions = list2str T "{  " "\n,  " "}" (curry pr_subst) sub in
+       //
+       sprintf "Matches\n%s\nwhere\n%s" connections substitutions
+       
 ;
 
 // Print all solutions of a given sol. list.
-//  print_all::((scheme#scheme) mat)->string
-let print_all = list2str T "===\n" "\n===\n" "\n" print_one;
+//  print_all::((scheme#scheme) mat)->((string#string) mat)->string
+let print_all sols subs = list2str T "\n" "\n\n" "\n" (curry print_one) (zip sols subs);
 
 //==============================================================================
 // Fin.

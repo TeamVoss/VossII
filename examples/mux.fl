@@ -23,7 +23,7 @@ let sol = isomatch pex_fp g_pex p_pex;
 let subs = recover_solutions sol;
 (subs fseq print "Finished recovering.\n");
 //
- print_all sol;
+print_all sol subs;
 
 //------------------------------------------------------------------------------
 // Fin.
