@@ -149,7 +149,7 @@ letrec
 //  modify::(a->a)->int->(a list)->(a list)
 letrec
     modify _ _ []     = []
-/\  modify f 0 (x:xs) = f x : xs
+/\  modify f 1 (x:xs) = f x : xs
 /\  modify f n (x:xs) = x : modify f (n-1) xs
 ;
 

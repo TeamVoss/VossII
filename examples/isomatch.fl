@@ -7,6 +7,9 @@ load (DIR^"lib/utils.fl");
 //
 //==============================================================================
 
+let mat2str = matrix2str T "[" "\n," "," "]";
+let b2str b = b => "T" | "F";
+
 //==============================================================================
 // ...
 
@@ -261,8 +264,6 @@ let
         transpose (ixmap (\r. \ix. elem ix aset => none | r) (transpose iso))
 ;
 
-//------------------------------------------------------------------------------
-
 // ...
 //  trim_non_top_matches::(scheme list)->(scheme list)->(bool mat)->(bool mat)
 let
@@ -270,7 +271,8 @@ let
         let poss_top = filter_cols id (hd iso) in
         let act_top  = adj_to_id (hd as_g) in
         let not_top  = filter (NOT # flip elem act_top) poss_top in
-        let rem  = map (flip el as_g) not_top in
+        let rem      = map (flip el as_g) not_top in
+        //
         trim rem iso
 ;
 
@@ -401,9 +403,6 @@ letrec
 
 //==============================================================================
 // ...
-
-let mat2str = matrix2str T "[" "\n," "," "]";
-let b2str b = b => "T" | "F";
 
 // ...
 //  recover::(scheme list)->(scheme list)->((bool mat) list)->((scheme#scheme) mat)
