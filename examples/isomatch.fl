@@ -149,6 +149,13 @@ let
         // check_all o1 i2 OR check_all i1 o2
 ;
 
+// Check if a scheme wraps a "leaf" 'pexlif'.
+//  is_leaf_node::scheme->bool
+let
+    is_leaf_node (SCHEME ((PINST _ _ _ _ _ _ (P_LEAF _))) _ _) = T
+/\  is_leaf_node _ = F
+;
+
 //==============================================================================
 //
 // Ullman’s Subgraph Isomorphism Algorithm.
@@ -273,9 +280,9 @@ let
 //  isomatch_matrix::[scheme]->[scheme]->(pexlif->string)->(bool mat)
 let
     isomatch_matrix as_g as_p cmp =
-        // 
+        // Initial equalities.
         let iso = map (pam as_g # equal on cmp) as_p then
-        // 
+        // Filter by depth.
         let iso' = trim_non_top_matches as_g as_p iso then
         //
         iso'
@@ -590,46 +597,31 @@ let
 
 //------------------------------------------------------------------------------
 
-// ...
-//  align_actuals::scheme->scheme->(..#..#..)
-// let
-//     align_actuals (SCHEME _ _ _ i1 o1 t1) (SCHEME _ _ _ i2 o2 t2) =
-//         let go x y = zip (flatmap explode_entity x) (flatmap explode_entity y) in
-//         (map2 go i1 i2, map2 go o1 o2, go t1 t2)
-// ;
-
-// ...
-//  reorder_actuals::...
-// let
-//     reorder_actuals ord (PINST _ _ _ fa_i2 fa_o2 f_t2 _) i o t =
-//         let i' = reorder (map (ord # fst) fa_i2) i in
-//         let o' = reorder (map (ord # fst) fa_o2) o in
-//         let t' = reorder (map ord f_t2) t in
-//         (i', o', t')
-// ;
-
-// ...
-//  sub2ord::...
-// let
-//     sub2ord sub (PINST _ _ _ fa_i fa_o f_t _) =
-//         let ord_i = ixlabel (map fst fa_i) in
-//         let ord_o = ixlabel (map fst fa_o) in
-//         let ord_t = ixlabel f_t in
-//         (\f. subst (ord_i @ ord_o @ ord_t) (subst sub f))
-// ;
-
-//------------------------------------------------------------------------------
-
-let
-    unify_leaves (SCHEME p1 _ _) (SCHEME p2 _ _) =
-        undefined
-        // reorder_actuals (sub2ord (alpha_equal p1 p2) p1) p2 i2 o2 t2
+letrec
+    recover_pair (s1,s2) ss =
+        // If the pair consists of leaf nodes we attempt to find a renaming.
+        is_leaf_node s2 => alpha_equal_actual (_scheme_pex s1) (_scheme_pex s2) |
+        // If not, we must recover every child pairing.
+        let
+            pairing_of pex =
+                (find (equal pex # _scheme_pex # snd) ss) catch
+                (error "not-matched-node")
+        in
+        let
+            traverse children =
+                map (flip recover_pair ss # pairing_of) children
+        in
+        let
+            reduce subs =
+                composite_equal (_scheme_pex s1) (_scheme_pex s2) subs
+        in
+        val (SCHEME ((PINST _ _ _ _ _ _ (P_HIER cs))) _ _) = s2 in
+        reduce (traverse cs)
 ;
 
-// ...
-//  unify_composite::
+//  recover_solution::((scheme#scheme) list)->((string#string) list)
 let
-    unify_composite (SCHEME _ _ _) (SCHEME _ _ _) =
+    recover_solution scs =
         undefined
 ;
 
