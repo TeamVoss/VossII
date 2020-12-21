@@ -55,8 +55,12 @@ letrec
 let first f (a,b) = (f a,b);
 
 // Apply 'f' to the second element of a pair '(a,b)'.
-//  second::(b->c)->(a#b)->(a#c)
+//  second::(b->d)->(a#b)->(a#d)
 let second f (a,b) = (a,f b);
+
+// Apply 'f' and 'g' to the first and second element of a pair '(a,b)', respectively.
+//  both::(a->c)->(b->d)->(a#b)->(c#d)
+let both f g (a,b) = (f a,g b);
 
 // 'map' with its arguments flipped.
 //  pam::(a list)->(a->b)->(b list)

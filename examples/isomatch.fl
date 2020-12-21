@@ -7,7 +7,6 @@ load (DIR^"lib/utils.fl");
 //
 //==============================================================================
 
-
 //==============================================================================
 // ...
 
@@ -53,7 +52,6 @@ let
         //
         ENTITY e' (flatmap unpack rs')
 ;
-// todo: fails if a name is used in the indices.
 
 // ...
 //  test_vec::entity->entity->bool
@@ -80,6 +78,37 @@ let
         size rs
 ;
 
+//------------------------------------------------------------------------------
+
+// Splits off each index constraint in an entity to seperate entities.
+//  explode_entity::entity->(entity list)
+let
+    explode_entity (ENTITY n rs) =
+        let
+            explode (INDEX i)     = [INDEX i]
+        /\  explode (RANGE (i,j)) = map INDEX (i <= j => i upto j | i downto j)
+        in
+        map (\i. ENTITY n [i]) (flatmap explode rs)
+;
+
+// Groups index constraints for entities that share a common name.
+//  implode_entities::(entity list)->entity
+let
+    implode_entity es =
+        letrec
+            implode []     = []
+        /\  implode (x:[]) = [x]
+        /\  implode ((INDEX i):(INDEX x):xs) =
+                i == (x+1) OR i == (x-1) => implode (RANGE (i,x):xs) |
+                INDEX i : implode (INDEX x:xs)
+        /\  implode ((RANGE (i,j)):(INDEX x):xs) =
+                i < j AND j == (x-1) => implode (RANGE (i,x):xs) |
+                i > j AND j == (x+1) => implode (RANGE (i,x):xs) |
+                RANGE (i,j) : implode (INDEX x:xs)
+        in
+        ENTITY (_entity_name (hd es)) (implode (flatmap _entity_indices es))
+;
+
 //==============================================================================
 // ...
 
@@ -89,28 +118,15 @@ lettype scheme =
             {pex::pexlif}
             {lbl::string}
             {adj::scheme list}
-            {inp::(entity list) list}
-            {out::(entity list) list}
-            {int::entity list}
 ;
 
-let _scheme_pex (SCHEME p _ _ _ _ _) = p;
-let _scheme_lbl (SCHEME _ l _ _ _ _) = l;
-let _scheme_adj (SCHEME _ _ a _ _ _) = a;
-let _scheme_inp (SCHEME _ _ _ i _ _) = i;
-let _scheme_out (SCHEME _ _ _ _ o _) = o;
-let _scheme_int (SCHEME _ _ _ _ _ t) = t;
+let _scheme_pex (SCHEME p _ _) = p;
+let _scheme_lbl (SCHEME _ l _) = l;
+let _scheme_adj (SCHEME _ _ a) = a;
 
 let
-    Pscheme (SCHEME p l a i o t) =
-        let pr = list2str T "{" "," "}" Pentity in
-        sprintf "%s(%s):%S:%S:%S:%s"
-            (_pexlif_name p)
-            l
-            (map (_pexlif_name # _scheme_pex) a)
-            (map pr i)
-            (map pr o)
-            (pr t)
+    Pscheme (SCHEME p l a) =
+        sprintf "%s(%s):%S" (_pexlif_name p) l (map (_pexlif_name # _scheme_pex) a)
 ;
 install_print_function Pscheme;
 
@@ -118,27 +134,19 @@ install_print_function Pscheme;
 
 // "Smart" constructor for a 'SCHEME'.
 //  mk_scheme::*parts of PEXLIF*->scheme
-let
-    mk_scheme pex label =
-        val (PINST _ _ _ i o t _) = pex in
-        let parse = map parse_vec # snd in 
-        SCHEME pex label []
-            (map parse i)
-            (map parse o)
-            (map parse_vec t)
-;
+let mk_scheme pex label = SCHEME pex label [];
 
 // ...
 //  scheme_cons_adj::scheme->scheme->scheme
-let scheme_cons_adj sc (SCHEME n l a i o t) = (SCHEME n l (sc:a) i o t);
+let scheme_cons_adj sc (SCHEME n l a) = (SCHEME n l (sc:a));
 
 // Checks if two 'SCHEME's are connected via a wire.
 //  test_scheme::scheme->scheme->bool
 let
-    scheme_shared (SCHEME _ _ _ i1 o1 _) (SCHEME _ _ _ i2 o2 _) =
-        let check_one x  ys = any (any (test_vec x)) ys in
-        let check_all xs ys = any (any (flip check_one ys)) xs in
-        check_all o1 i2 OR check_all i1 o2
+    scheme_shared (SCHEME p1 _ _) (SCHEME p2 _ _) = T
+        // let check_one x  ys = any (any (test_vec x)) ys in
+        // let check_all xs ys = any (any (flip check_one ys)) xs in
+        // check_all o1 i2 OR check_all i1 o2
 ;
 
 //==============================================================================
@@ -150,7 +158,7 @@ let
 //
 //==============================================================================
 
-//------------------------------------------------------------------------------
+//==============================================================================
 // Creationg of adj. matrix.
 
 // ...
@@ -223,7 +231,7 @@ let fill max xs =
 //  adjacency_matrix::(scheme list)->(bool mat)
 let adjacency_matrix as = map (fill (length as) # adj_to_id) as;
 
-//------------------------------------------------------------------------------
+//==============================================================================
 // Creation of iso. match matrix.
 
 // Filter every index in a vector 'xs' using 'p'.
@@ -246,19 +254,30 @@ let
         transpose (ixmap (\r. \ix. elem ix aset => none | r) (transpose iso))
 ;
 
-// Construct an isomatch matrix (possible matches) from two ...
-//  isomatch_matrix::[scheme]->[scheme]->(pexlif->string)->(bool mat)
+//------------------------------------------------------------------------------
+
+// ...
+//  trim_non_top_matches::(scheme list)->(scheme list)->(bool mat)->(bool mat)
 let
-    isomatch_matrix as_g as_p cmp =
-        // Find every possible equality match.
-        let iso = map (pam as_g # equal on cmp) as_p then
-        // Filter out non-top level sub-graphs.
+    trim_non_top_matches as_g as_p iso = 
         let poss_top = filter_cols id (hd iso) in
         let act_top  = adj_to_id (hd as_g) in
         let not_top  = filter (NOT # flip elem act_top) poss_top in
         let rem  = map (flip el as_g) not_top in
-        let iso' = trim rem iso then
-        // ...
+        trim rem iso
+;
+
+//------------------------------------------------------------------------------
+
+// Construct an isomatch matrix (possible matches) from two ...
+//  isomatch_matrix::[scheme]->[scheme]->(pexlif->string)->(bool mat)
+let
+    isomatch_matrix as_g as_p cmp =
+        // 
+        let iso = map (pam as_g # equal on cmp) as_p then
+        // 
+        let iso' = trim_non_top_matches as_g as_p iso then
+        //
         iso'
 ;
 
@@ -270,7 +289,7 @@ let pex_fp = int2str # find_fingerprint # _pexlif_attrs # _scheme_pex;
 //  sha::pexlif->string
 let pex_sha = find_signature # _pexlif_attrs # _scheme_pex;
 
-//------------------------------------------------------------------------------
+//==============================================================================
 // Pruning of match matrix.
 
 // Iterate over every mat. index that is a possible match.
@@ -306,7 +325,7 @@ letrec
         then m != m' => prune m' g p | m'
 ;
 
-//------------------------------------------------------------------------------
+//==============================================================================
 // Main "matching" algo.
 
 // "Dot-product" of two lists of booleans.
@@ -373,7 +392,7 @@ letrec
         go mat (replicate (num_columns mat) F) 1
 ;
 
-//------------------------------------------------------------------------------
+//==============================================================================
 // ...
 
 let mat2str = matrix2str T "[" "\n," "," "]";
@@ -437,9 +456,12 @@ let
 //
 //==============================================================================
 
+//==============================================================================
+// Substitution.
+
 // ...
 //  subst::((string#string) list)->string->string
-let subst s n = let ix = find_first (equal n # fst) s then snd (el ix s);
+let subst s n = (assoc n s) catch n;
 
 // ...
 //  subst_wexpr::((string#string) list)->wexpr->wexpr
@@ -468,8 +490,7 @@ letrec
 /\  subst_wexpr s (W_ITE c t e)          = W_ITE (subst_wexpr s c) (subst_wexpr s t) (subst_wexpr s e)
 /\  subst_wexpr s (W_SLICE i w)          = W_SLICE i (subst_wexpr s w)
 /\  subst_wexpr s (W_NAMED_SLICE n i w)  = W_NAMED_SLICE (subst s n) i (subst_wexpr s w)
-/\  subst_wexpr s (W_UPDATE_NAMED_SLICE b n i w)
-                                         = W_UPDATE_NAMED_SLICE (subst_wexpr s b) (subst s n) i (subst_wexpr s w)
+/\  subst_wexpr s (W_UPDATE_NAMED_SLICE b n i w) = W_UPDATE_NAMED_SLICE (subst_wexpr s b) (subst s n) i (subst_wexpr s w)
 /\  subst_wexpr s (W_CAT ps)             = W_CAT (map (subst_wexpr s) ps)
 /\  subst_wexpr s (W_MEM_READ i m a)     = W_MEM_READ i (subst_wexpr s m) (subst_wexpr s a)
 /\  subst_wexpr s (W_MEM_WRITE i m a d)  = W_MEM_WRITE i (subst_wexpr s m) (subst_wexpr s a) (subst_wexpr s d)
@@ -482,16 +503,38 @@ let
 /\  subst_fn s (W_PHASE_DELAY l r) = W_PHASE_DELAY (subst_wexpr s l) (subst_wexpr s r)
 ;
 
+//==============================================================================
+// ...
+
+// Given a list of formal names, finds each name's actuals.
+//  find_actuals::pexlif->(string list)->((string list) list)
+let
+    find_actuals (PINST _ _ _ fa_inps fa_outs _ _) names =
+        let expand = map (second (md_expand_vectors)) in
+        let inps = expand fa_inps in
+        let outs = expand fa_outs in
+        //
+        map (flip assoc (inps @ outs)) names
+;
+
+// ...
+//  formal_to_actuals::pexlif->pexlif->((string#string) list)->((string#string) list)
+let
+    formal_to_actuals p1 p2 sub = 
+        (curry zip) (both (flat # find_actuals p1) (flat # find_actuals p2) (unzip sub))
+;
+
 //------------------------------------------------------------------------------
 
-// Given two "leaf" pexlifs, 'alpha_equality' attemps to find a substitution
-// s.t. the second pexlif's wexprs are syntactically equal to the first pexlif's
-// wexprs. If no such substitution is found
+// Given two "leaf" 'pexlif's, 'alpha_equality' attemps to find a substitution of
+// their "formal" wire names s.t. the second pexlif's wexprs are syntactically
+// equal to the first pexlif's wexprs. If no such substitution is found, returns
+// an empty list.
 //  alpha_equal::pexlif->pexlif->((string#string) list)
 let
     alpha_equal
-        (PINST _ _ _ fa_inps1 fa_outs1 fa_int1 (P_LEAF fs1))
-        (PINST _ _ _ fa_inps2 fa_outs2 fa_int2 (P_LEAF fs2))
+        (PINST _ _ _ fa_inps1 fa_outs1 _ (P_LEAF fs1))
+        (PINST _ _ _ fa_inps2 fa_outs2 _ (P_LEAF fs2))
         =
         let perms  xs ys = map (zip xs) (permutations ys) in
         let test s xs ys = sha_set xs == sha_set (map (subst_fn s) ys) in
@@ -502,106 +545,91 @@ let
         //
         let sub_inps = perms (map fst fa_inps2) (map fst fa_inps1) in
         let sub_outs = perms (map fst fa_outs2) (map fst fa_outs1) in
-        let sub_int  = perms fa_int2 fa_int1 in
         search sub_inps (\sinp.
             search sub_outs (\sout.
-                search sub_int (\sint.
-                    let sub = sinp @ sout @ sint in test sub fs1 fs2 => sub | []
-        )))
+                let sub = sinp @ sout in test sub fs1 fs2 => sub | []
+        ))
+;
+
+// ...
+//  alpha_equal_actual::pexlif->pexlif->((string#string) list)->((string#string) list)
+let
+    alpha_equal_actual p1 p2 =
+        let
+            alpha_equal_err p1 p2 = 
+                let sub = alpha_equal p1 p2 in
+                empty sub => error "not-alpha-equal" | sub
+        in
+        formal_to_actuals p1 p2 (alpha_equal_err p1 p2)
 ;
 
 //------------------------------------------------------------------------------
 
-// Splits off each index constraint in an entity to seperate entities.
-//  explode_entity::entity->(entity list)
+// ...
+//  merge_substitutions::(((string#string) list) list)->((string#string) list)
 let
-    explode_entity (ENTITY n rs) =
+    merge_substitutions subs =
         let
-            explode (INDEX i)     = [INDEX i]
-        /\  explode (RANGE (i,j)) = map INDEX (i <= j => i upto j | i downto j)
+            subst_err s n =
+                let m = subst s n in
+                m != n => error "not-subst-equal" | n
         in
-        map (\i. ENTITY n [i]) (flatmap explode rs)
+        letrec
+            merge sub []         = sub
+        /\  merge sub ((a,b):ss) = (a,subst_err sub b) : merge sub ss
+        in
+        setify (itlist1 merge subs)
 ;
 
-// Groups index constraints for entities that share a common name.
-//  implode_entities::(entity list)->entity
+// ...
+//  composite_equal::pexlif->pexlif->(((string#string) list) list)->((string#string) list)
 let
-    implode_entity es =
-        letrec
-            implode []     = []
-        /\  implode (x:[]) = [x]
-        /\  implode ((INDEX i):(INDEX x):xs) =
-                i == (x+1) OR i == (x-1) => implode (RANGE (i,x):xs) |
-                INDEX i : implode (INDEX x:xs)
-        /\  implode ((RANGE (i,j)):(INDEX x):xs) =
-                i < j AND j == (x-1) => implode (RANGE (i,x):xs) |
-                i > j AND j == (x+1) => implode (RANGE (i,x):xs) |
-                RANGE (i,j) : implode (INDEX x:xs)
-        in
-        ENTITY (_entity_name (hd es)) (implode (flatmap _entity_indices es))
+    composite_equal p1 p2 subs =
+        merge_substitutions (map (formal_to_actuals p1 p2) subs)
 ;
 
 //------------------------------------------------------------------------------
 
 // ...
 //  align_actuals::scheme->scheme->(..#..#..)
-let
-    align_actuals (SCHEME _ _ _ i1 o1 t1) (SCHEME _ _ _ i2 o2 t2) =
-        let go x y = zip (flatmap explode_entity x) (flatmap explode_entity y) in
-        (map2 go i1 i2, map2 go o1 o2, go t1 t2)
-;
+// let
+//     align_actuals (SCHEME _ _ _ i1 o1 t1) (SCHEME _ _ _ i2 o2 t2) =
+//         let go x y = zip (flatmap explode_entity x) (flatmap explode_entity y) in
+//         (map2 go i1 i2, map2 go o1 o2, go t1 t2)
+// ;
 
 // ...
 //  reorder_actuals::...
-let
-    reorder_actuals ord (PINST _ _ _ fa_i2 fa_o2 f_t2 _) i o t =
-        let i' = reorder (map (ord # fst) fa_i2) i in
-        let o' = reorder (map (ord # fst) fa_o2) o in
-        let t' = reorder (map ord f_t2) t in
-        (i', o', t')
-;
+// let
+//     reorder_actuals ord (PINST _ _ _ fa_i2 fa_o2 f_t2 _) i o t =
+//         let i' = reorder (map (ord # fst) fa_i2) i in
+//         let o' = reorder (map (ord # fst) fa_o2) o in
+//         let t' = reorder (map ord f_t2) t in
+//         (i', o', t')
+// ;
 
 // ...
 //  sub2ord::...
-let
-    sub2ord sub (PINST _ _ _ fa_i fa_o f_t _) =
-        let ord_i = ixlabel (map fst fa_i) in
-        let ord_o = ixlabel (map fst fa_o) in
-        let ord_t = ixlabel f_t in
-        (\f. subst (ord_i @ ord_o @ ord_t) (subst sub f))
-;
-
-let
-    formal2ord sol (PINST _ _ _ fa_i fa_o f_t _) =
-        undefined
-;
+// let
+//     sub2ord sub (PINST _ _ _ fa_i fa_o f_t _) =
+//         let ord_i = ixlabel (map fst fa_i) in
+//         let ord_o = ixlabel (map fst fa_o) in
+//         let ord_t = ixlabel f_t in
+//         (\f. subst (ord_i @ ord_o @ ord_t) (subst sub f))
+// ;
 
 //------------------------------------------------------------------------------
 
-// let M = (((entity list)#(entity list)) list)
-
-// ...
-//  unify_leaves::scheme->scheme->(M,M,M)
 let
-    unify_leaves (SCHEME p1 _ _ i1 o1 t1) (SCHEME p2 _ _ i2 o2 t2) =
-        val (i2', o2', t2') =
-            reorder_actuals (sub2ord (alpha_equal p1 p2) p1) p2 i2 o2 t2
-        in
-        (zip i1 i2', zip o1 o2', zip t1 t2')
+    unify_leaves (SCHEME p1 _ _) (SCHEME p2 _ _) =
+        undefined
+        // reorder_actuals (sub2ord (alpha_equal p1 p2) p1) p2 i2 o2 t2
 ;
 
 // ...
 //  unify_composite::
 let
-    unify_composite (SCHEME _ _ _ _ _ _) (SCHEME _ _ _ _ _ _) =
-        undefined
-;
-
-// ...
-//  unify_solution
-letrec
-    unify_solution []     = []
-/\  unify_solution (s:ss) =
+    unify_composite (SCHEME _ _ _) (SCHEME _ _ _) =
         undefined
 ;
 
@@ -615,12 +643,10 @@ letrec
 //  print_one::((scheme#scheme) list)->string
 let
     print_one matches =
-       let pr_schemes (SCHEME p1 l1 _ _ _ _) (SCHEME p2 l2 _ _ _ _) =
+       let pr_schemes (SCHEME p1 l1 _) (SCHEME p2 l2 _) =
                val (PINST n1 _ _ _ _ _ _) = p1 in
                val (PINST n2 _ _ _ _ _ _) = p2 in
                sprintf "%s(%s) :-> %s(%s)" n1 l1 n2 l2
-//                   (list2str T "[" "," "]" (curry pr_wires) (zip i1 i2))
-//                   (list2str T "[" "," "]" (curry pr_wires) (zip o1 o2))
        in
        list2str T "{" "\n," "}" (curry pr_schemes) matches
 ;
