@@ -188,9 +188,9 @@ letrec
                                 val (us,zs) = interleave' (f # (cons y)) ys r in
                                 (y:us, f (t:y:us) : zs)
                         in                         
-                        snd (interleave' id xs r)
+                        val (_,zs) = interleave' id xs r in zs
                 in
-                itlist interleave (perms ts (t:js)) (permutations js)
+                itlist interleave (permutations js) (perms ts (t:js))
         in
         xs : perms xs []
 ;
