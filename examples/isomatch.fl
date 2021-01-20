@@ -355,6 +355,15 @@ letrec
 /\  alpha (W_MEM_WRITE i n a b) (W_MEM_WRITE j m x y) = error "todo"
 ;
 
+//------------------------------------------------------------------------------
+
+let
+    DBG_update_fn (W_UPDATE_FN lhs rhs) =
+        sprintf "(UPDATE %s := %s)" (DBGwexpr lhs) (DBGwexpr rhs)
+/\  DBG_update_fn (W_PHASE_DELAY lhs rhs) =
+        sprintf "(PHASE %s := %s)" (DBGwexpr lhs) (DBGwexpr rhs)
+;
+
 // ...
 //  alpha_leaf::(update_fn list)->(update_fn list)->(((string#string) list) opt)
 let
@@ -380,6 +389,20 @@ let
                 collect [] fs1 fs
         in
         try_all (alpha_fns) (permutations fs2)
+        //
+        // let x = try_all (alpha_fns) (permutations fs2) in
+        // has_value x => x |
+        // let prt = map (\(x,y). sprintf "%s=%s" x y) in
+        // let
+        //     dbg (W_UPDATE_FN u1 u2) (W_UPDATE_FN v1 v2) =
+        //         let a1 = alpha u1 v1 in
+        //         let a2 = alpha u2 v2 in
+        //         sprintf "%S;%S" (prt a1) (prt a2)
+        // in
+        // eprintf "\n%S\n%S\n%S"
+        //   (map DBG_update_fn fs1)
+        //   (map DBG_update_fn fs2)
+        //   (map2 dbg fs1 fs2)
 ;
 
 //------------------------------------------------------------------------------
@@ -473,42 +496,43 @@ let recover_all sols adj needle haystack = map (\res. recover_one res adj needle
 
 //==============================================================================
 //
-// Printing res.
+// ... Pretty-Printing.
 //
 //==============================================================================
 
-// ...
-//  collect_ones::((int#int)->*)->((bool list) list)->(* list)
-let collect_ones f x = forall_ones x (cons # f) [];
-
-// ...
-//  recover_schemes::(scheme list)->(scheme list)->((bool mat) list)->((scheme#scheme) mat)
-let recover_schemes gsc psc = map (collect_ones (both (flip el psc) (flip el gsc)));
-
-// Print-function for a single sol. list.
-//  print_one::((scheme#scheme) list)->((string#string) list)->string
+// Pretty-print a matching.
+//  print_match::((scheme#scheme) list)->{((string#string) list) opt}->string
 let
-    print_one sol sub =
-       let
-           pr_match (SCHEME p1 l1 _) (SCHEME p2 l2 _) =
-               val (PINST n1 _ _ _ _ _ _) = p1 in
-               val (PINST n2 _ _ _ _ _ _) = p2 in
-               sprintf "%s(%s) :-> %s(%s)" n1 l1 n2 l2
-       in
-       let
-           pr_subst s1 s2 =
-               sprintf "%s := %s" s1 s2
-       in
-       let connections   = list2str T "{  " "\n,  " "}" (curry pr_match) sol in
-       let substitutions = list2str T "{  " "\n,  " "}" (curry pr_subst) sub in
-       //
-       sprintf "Matches\n%s\nwhere\n%s" connections substitutions
-       
+    print_match ms (NONE) =
+       let name_of = _pexlif_name # _scheme_pex in
+       let pr_match n h = sprintf "%s=%s"  (name_of n) (name_of h) in
+       sprintf "%s\n%s"
+         (list2str T "{ " "\n, " "\n}" (curry pr_match) ms)
+         "No alpha-eq. match found."
+/\  print_match ms (SOME ss) =
+       let name_of = _pexlif_name # _scheme_pex in
+       let pr_subst n h = sprintf "%s->%s" n h in
+       let pr_match n h = sprintf "%s=%s"  (name_of n) (name_of h) in
+       sprintf "%s\n%s"
+         (list2str T "{ " "\n, " "\n}" (curry pr_match) ms)
+         (list2str T "{ " "\n, " "\n}" (curry pr_subst) ss)
 ;
 
-// Print all solutions of a given sol. list.
-//  print_all::((scheme#scheme) mat)->((string#string) mat)->string
-let print_all sols subs = list2str T "\n" "\n\n" "\n" (curry print_one) (zip sols subs);
+// Pretty-print matches.
+//  print_matches::((bool mat) list)->({((string#string) list) opt} list)->(scheme list)->(scheme list)->string
+let
+    print_matches res ss ns hs =
+        let
+            matches_of m =
+                letrec
+                    go c (F:xs) = go (c+1) xs
+                /\  go c (T:xs) = el c hs
+                in
+                ixmap (\r. \i. (el i ns, go 1 r)) m
+        in
+        let pr_solution = print_match # matches_of in
+        list2str T "\n===\n" "\n===\n" "\n" (curry pr_solution) (zip res ss)
+;
 
 //==============================================================================
 //
