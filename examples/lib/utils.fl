@@ -4,8 +4,12 @@
 //
 //==============================================================================
 
-//------------------------------------------------------------------------------
+//==============================================================================
 // Misc. combinators.
+
+// Boolean implication.
+let <==> a b = a ==> b AND b ==> a;
+infix 2 <==>;
 
 // Check if 'p' is satisfied with all elements of 'as'.
 //  all::(a->bool)->(a list)->bool
@@ -41,14 +45,13 @@ let uncurry f a b = f (a,b);
 let on g f x y = g (f x) (f y);
 infix 3 on;
 
-// Takes two lists and returns a list of corresponding pairs. If one input list
-// is short, excess elements of the longer list are discarded.
-//  zip_uneven::(a list)->(b list)->((a#b) list)
-letrec
-    zip_uneven (x:xs) (y:ys) = (x,y) : zip_uneven xs ys
-/\  zip_uneven _ [] = []
-/\  zip_uneven [] _ = []
-;
+// Substitution of a value 'n' given its presence in 's'.
+//  subst::((a#a) list)->a->a
+let subst s n = (assoc n s) catch n;
+
+// Substitution of a value 'n' given its presence in a flipped 's'.
+//  rev_subst::((a#a) list)->a->a
+let rev_subst s n = (rev_assoc n s) catch n;
 
 // Apply 'f' to the first element of pair '(a,b)'.
 //  first::(a->c)->(a#b)->(c#b)
@@ -74,7 +77,7 @@ let when b a = b => a | ();
 //  swap::(a#b)->(b#a)
 let swap (a,b) = (b,a);
 
-//------------------------------------------------------------------------------
+//==============================================================================
 // Non-infix versions of combinators/constructors.
 
 // Non-infix version of (,).
@@ -97,7 +100,14 @@ let not_equal a b = NOT (equal a b);
 //  add::int->int->int
 let add a b = a + b;
 
-//------------------------------------------------------------------------------
+//==============================================================================
+// Opt.
+
+// ...
+//  maybe::(a opt)->(a->(b opt))->(b opt)
+let maybe m f = has_value m => f (get_value m) | NONE;
+
+//==============================================================================
 // List.
 
 // Checks if a list has at least one element.
@@ -107,6 +117,15 @@ let nonempty = NOT # empty;
 // Drops the first element of a list.
 //  butfirst::(a list)->(a list)
 let butfirst = tl;
+
+// Takes two lists and returns a list of corresponding pairs. If one input list
+// is short, excess elements of the longer list are discarded.
+//  zip_uneven::(a list)->(b list)->((a#b) list)
+letrec
+    zip_uneven (x:xs) (y:ys) = (x,y) : zip_uneven xs ys
+/\  zip_uneven _      []     = []
+/\  zip_uneven []     _      = []
+;
 
 // Sum a list of integers.
 //  sum::(int list)->int
@@ -123,6 +142,10 @@ let ixlist f xs b = snd (itlist (\x. \(ix,s). (ix-1,f x ix s)) xs (length xs,b))
 // ...
 //  ixmap::(a->int->b)->(a list)->(b list)
 let ixmap f xs = ixlist (\x. \ix. cons (f x ix)) xs [];
+
+// Label each element with its index in the list.
+//  ixlabel::(a list)->((a#int) list)
+let ixlabel = flip zip_uneven (iterate (add 1) 1);
 
 // ...
 //  span::(a->bool)->(a list)->((a list)#(a list))
@@ -161,10 +184,6 @@ let list_update v i = modify (const v) i;
 //  elem::a->(a list)->bool
 let elem a as = find_first0 (equal a) as == 0 => F | T;
 
-// Label each element with its index in the list.
-//  ixlabel::(a list)->((a#int) list)
-let ixlabel = flip zip_uneven (iterate (add 1) 1);
-
 // Left-shift a list one element.
 //  rotate::(a list)->(a list)
 let rotate (x:xs) = xs @ [x];
@@ -195,15 +214,14 @@ letrec
         xs : perms xs []
 ;
 
-// ...
-//  extend_with::int->a->(a list)->(a list)
+// Applies 'f' to 'a' in the given list, stopping as soon as 'f' succeds.
+//  try_all::(a->(b opt))->(a list)->(b opt)
 letrec
-    extend_with 0 _ as     = as
-/\  extend_with n a []     = replicate n a
-/\  extend_with n a (a:as) = a : extend_with (n-1) a as
+    try_all _ []     = NONE
+/\  try_all f (x:xs) = let y = f x in has_value y => y | try_all f xs
 ;
 
-//------------------------------------------------------------------------------
+//==============================================================================
 // Matrix.
 
 // Count the number of rows in a matrix.
@@ -218,7 +236,7 @@ let num_columns xs = empty xs => 0 | length (hd xs);
 //  mat_update::a->(int#int)->(a mat)->(a mat)
 let mat_update v (i,j) = modify (list_update v j) i;
 
-//------------------------------------------------------------------------------
+//==============================================================================
 // String
 
 // Drops the first 'n' characters from the string 's'.
@@ -245,14 +263,20 @@ let
             (list2str print_empty pre sep_col post pr_fun)
 ;
 
-//------------------------------------------------------------------------------
+// ...
+let mat2str = matrix2str T "[" "\n," "," "]";
+
+// ...
+let b2str b = b => "T" | "F";
+
+//==============================================================================
 // SHA256.
 
 // Compute the SHA256 signature of a 'set' of components.
 //  sha_set::(a list)->string
 let sha_set = sha256_signature # qsort strcmp # map sha256_signature;
 
-//------------------------------------------------------------------------------
+//==============================================================================
 // Pexlif.
 
 let _pexlif_name      (PINST n _ _ _ _ _ _) = n;
@@ -286,7 +310,7 @@ let
     find_signature as = find_attr "signature" as
 ;
 
-//------------------------------------------------------------------------------
+//==============================================================================
 // Fin.
 
 // all NOT [T,T] = F;

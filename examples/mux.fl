@@ -10,20 +10,28 @@ let g_pex = verilog2pexlif "-Iexamples/mux" "mux4" ["small.v"] [];
 let p_pex = verilog2pexlif "-Iexamples/mux" "mux2" ["small_lib.v"] [];
 (g_pex fseq p_pex fseq print "Finished loading.\n");
 
-//------------------------------------------------------------------------------
-
 //Emit_pexlif "puzzle.txt" g_pex;
 //Emit_pexlif "piece.txt" p_pex;
 
 //--------------------------------------------------------------------------------
 
-let sol = isomatch pex_fp g_pex p_pex;
-(sol fseq print "Finished matching.\n");
-//
-let subs = recover_solutions sol;
-(subs fseq print "Finished recovering.\n");
-//
-print_all sol subs;
+// Pick comparison method.
+let cmp = pex_fp;
+
+// Debug run.
+// let res = DBG_isomatch cmp g_pex p_pex;
+
+// Normal run.
+let sc_g  = adj_build g_pex;                 // Create haystack schemes
+let adj_g = adjacency_matrix sc_g;           // and adj. matrix.
+let sc_p  = adj_build p_pex;                 // Create needle schemes
+let adj_p = adjacency_matrix sc_p;           // and adj. matrix.
+let iso   = isomatch_matrix sc_g sc_p cmp;   // Create iso. matrix.
+let res   = recurse iso adj_g adj_p;         // Perform isomatch.
+(res fseq print "Finished matching.\n");
+
+let ss = recover_all res adj_p sc_p sc_g;
+(ss fseq print "Finished recovering substitutions.\n");
 
 //------------------------------------------------------------------------------
 // Fin.
