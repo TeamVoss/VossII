@@ -29,9 +29,11 @@ let adj_p = adjacency_matrix sc_p;           // and adj. matrix.
 let iso   = isomatch_matrix sc_g sc_p cmp;   // Create iso. matrix.
 let res   = recurse iso adj_g adj_p;         // Perform isomatch.
 (res fseq print "Finished matching.\n");
-
+//
 let ss = recover_all res adj_p sc_p sc_g;
 (ss fseq print "Finished recovering substitutions.\n");
+//
+print_matches res ss sc_p sc_g;
 
 //------------------------------------------------------------------------------
 // Fin.
