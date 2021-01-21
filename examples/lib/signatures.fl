@@ -123,8 +123,8 @@ let
             go (PINST n a _ i o t _) =
                 ( n
                 , find_signature a
-                , sha_set (map fst i)
-                , sha_set (map fst o)
+                , sha256_signature (map fst i)
+                , sha256_signature (map fst o)
                 , sha_set t
                 )
         in
@@ -136,8 +136,8 @@ let
 let
     sha_pinst n i o t c = sha256_signature
         ( n
-        , sha_set (map fst i)
-        , sha_set (map fst o)
+        , sha256_signature (map fst i)
+        , sha256_signature (map fst o)
         , sha_set t
         , sha_content c
         )
