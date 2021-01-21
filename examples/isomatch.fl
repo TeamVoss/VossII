@@ -500,22 +500,20 @@ let recover_all sols adj needle haystack = map (\res. recover_one res adj needle
 //
 //==============================================================================
 
+let print_list = list2str T "{ " "\n, " "}";
+let print_subst s1 s2 = sprintf "%s->%s" s1 s2;
+let print_pair (SCHEME p1 l1 _) (SCHEME p2 l2 _) = sprintf "%s(%s)=%s(%s)" (_pexlif_name p1) l1 (_pexlif_name p2) l2;
+
 // Pretty-print a matching.
 //  print_match::((scheme#scheme) list)->{((string#string) list) opt}->string
 let
     print_match ms (NONE) =
-       let name_of = _pexlif_name # _scheme_pex in
-       let pr_match n h = sprintf "%s=%s"  (name_of n) (name_of h) in
-       sprintf "%s\n%s"
-         (list2str T "{ " "\n, " "\n}" (curry pr_match) ms)
-         "No alpha-eq. match found."
+        sprintf "%s\n where no alpha-eq. connection could be found."
+            (print_list (curry print_pair) ms)
 /\  print_match ms (SOME ss) =
-       let name_of = _pexlif_name # _scheme_pex in
-       let pr_subst n h = sprintf "%s->%s" n h in
-       let pr_match n h = sprintf "%s=%s"  (name_of n) (name_of h) in
-       sprintf "%s\n%s"
-         (list2str T "{ " "\n, " "\n}" (curry pr_match) ms)
-         (list2str T "{ " "\n, " "\n}" (curry pr_subst) ss)
+        sprintf "%s\nwhere\n%s"
+            (print_list (curry print_pair)  ms)
+            (print_list (curry print_subst) ss)
 ;
 
 // Pretty-print matches.
