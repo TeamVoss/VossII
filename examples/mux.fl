@@ -19,7 +19,7 @@ let p_pex = verilog2pexlif "-Iexamples/mux" "mux2" ["small_lib.v"] [];
 let cmp = pex_fp;
 
 // Debug run.
-// let res = DBG_isomatch cmp g_pex p_pex;
+// DBG_isomatch cmp g_pex p_pex;
 
 // Normal run.
 let sc_g  = adj_build g_pex;                 // Create haystack schemes
