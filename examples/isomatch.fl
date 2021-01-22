@@ -32,19 +32,8 @@ install_print_function Pscheme;
 let mk_scheme pex label = SCHEME pex label [];
 
 // ...
-//  scheme_cons_adj::scheme->scheme->scheme
-let scheme_cons_adj sc (SCHEME n l a) = (SCHEME n l (sc:a));
-
-// Checks if two 'SCHEME's are connected via a wire.
-//  test_scheme::scheme->scheme->bool
-let scheme_shared (SCHEME p1 _ _) (SCHEME p2 _ _) = T;
-
-// Check if a scheme wraps a "leaf" 'pexlif'.
-//  is_leaf_node::scheme->bool
-let
-    is_leaf_node (SCHEME ((PINST _ _ _ _ _ _ (P_LEAF _))) _ _) = T
-/\  is_leaf_node _ = F
-;
+//  scheme_cons::scheme->scheme->scheme
+let scheme_cons sc (SCHEME n l a) = (SCHEME n l (sc:a));
 
 //==============================================================================
 //
@@ -52,56 +41,78 @@ let
 //
 //==============================================================================
 
-// ...
-//  adj_length::(scheme,[scheme])->int
-let adj_length (_,adj) = length adj + 1;
-
-// ...
-//  adj_cons::(scheme,[scheme])->(scheme,[scheme])->(scheme,[scheme])
-let adj_cons (s1,a1) (s2,a2) = (scheme_cons_adj s1 s2,a2);
-
-// ...
-//  adj_merge::(scheme,[scheme])->[(scheme,[scheme])]->(scheme,[scheme])
-let adj_merge (sc,adj) cs = (sc,itlist (\(s,a). append (s:a)) cs adj);
-
-// Traverse each child in order.
-//  adj_map::int->content->[(scheme,[scheme])];
-forward_declare{adj_reduce::int->pexlif->(scheme#(scheme list))};
-letrec
-    adj_map id (P_LEAF _)  = []
-/\  adj_map id (P_HIER ps) =
-        letrec
-            go _ []     = []
-        /\  go c (p:ps) =
-                let an = adj_reduce c p in
-                let l  = adj_length an in
-                an : go (c+l) ps
-        in
-        go id ps
-;
-
 // Traverse a 'PINST' and record every node's adjacencies to other nodes.
-//  adj_reduce::int->pexlif->(scheme,[scheme])
-letrec
-    adj_reduce id pex =
-        val (PINST n as _ fa_is fa_os int cont) = pex in
-        // Construct adjencies for node and children.
-        let anode = (mk_scheme pex (int2str id), []) in
-        let cs    = adj_map (id+1) cont in
-        // Connect node and children.
-        let anode' = itlist (adj_cons) cs anode in
-        let cs'    = map (adj_cons anode) cs in
-        // Merge adjacencies.
-        adj_merge anode' cs'
+//  reduce_pexlif::(int->pexlif->bool)->pexlif->[scheme]
+let
+    reduce_pexlif stop pex =
+        let size (_,adj) = length adj + 1 in
+        let extend (s1,_) (s2,a2) = (scheme_cons s1 s2,a2) in
+        let merge (sc,adj) cs = (sc,itlist (append # curry cons) cs adj) in
+        letrec
+            reduce lvl id p =
+                let
+                    traverse _ i (P_LEAF _)  = []
+                /\  traverse l i (P_HIER ps) =
+                        letrec
+                            go _ []     = []
+                        /\  go c (p:ps) = let an = reduce l c p in an : go (c+size an) ps
+                        in
+                        go i ps
+                in
+                let anode  = (mk_scheme p (int2str id), []) in
+		//
+                stop lvl p => anode |
+                // 
+                let cs     = traverse (lvl+1) (id+1) (_pexlif_content p) in
+                let anode' = itlist extend cs anode in
+                let cs'    = map (extend anode) cs in
+                merge anode' cs'
+        in
+        val (sc,adj) = reduce 1 1 pex in (sc:adj)
 ;
 
-// Calls 'adj_reduce' and flattens its result.
-//  adj_build::pexlif->int->[scheme]
-let adj_build pex = val (sc,adj) = adj_reduce 1 pex in (sc:adj);
+// ...
+//  adj_needle::pexlif->[scheme]
+let adj_build_needle pex = reduce_pexlif (const (const F)) pex;
 
-// Fetch the ID's of each node adjacent to the given one.
-//  adj_to_id::scheme->(int list)
-let adj_to_id = map (s2int # _scheme_lbl) # _scheme_adj;
+//------------------------------------------------------------------------------
+
+// Labels for each possible match at every "level" of a 'pinst'.
+//  possible_matches::(pexlif->string)->scheme->(((string#int) list) list)
+let
+    possible_matches attr sc =
+        let
+            filter_visited vs =
+                filter (NOT # flip elem vs # attr # _scheme_pex)
+        in
+        letrec
+            go vs (SCHEME p _ as) =
+                let l = attr p in l : flatmap (go (l:vs)) (filter_visited vs as)
+        in
+        ixlabel (go [] sc)
+;
+
+// Options for 'attr' above.
+let pex_fp  = int2str # find_fingerprint # _pexlif_attrs;
+let pex_sha = find_signature # _pexlif_attrs;
+
+// ...
+//  adj_haystack::(pexlif->string)->scheme->pexlif->[scheme]
+let
+    adj_build_haystack attr needle pex =
+        let
+            matches =
+                possible_matches attr needle in
+        let
+            stop 1 _ = F
+        /\  stop i p =
+                let pred j q = (i == j + 1) AND attr p == q in
+                NOT (any (curry (flip pred)) matches)
+        in
+        reduce_pexlif stop pex
+;
+
+//------------------------------------------------------------------------------
 
 // Creates a list of 'max' elements with an 'T' at index 'i' if 'i' is present
 // in the list 'xs' and 'F' if not.
@@ -117,6 +128,10 @@ let fill max xs =
         in
         rev (build 0 [] xs)
 ;
+
+// Fetch the ID's of each node adjacent to the given one.
+//  adj_to_id::scheme->(int list)
+let adj_to_id = map (s2int # _scheme_lbl) # _scheme_adj;
 
 // Construct an adjacency matrix (shared wires) for a 'PEXLIF'.
 //  adjacency_matrix::(scheme list)->(bool mat)
@@ -171,24 +186,18 @@ let
 //------------------------------------------------------------------------------
 
 // Construct an isomatch matrix (possible matches) from two ...
-//  isomatch_matrix::[scheme]->[scheme]->(pexlif->string)->(bool mat)
+//  isomatch_matrix::(pexlif->string)->[scheme]->[scheme]->(bool mat)
 let
-    isomatch_matrix as_g as_p cmp =
+    isomatch_matrix cmp as_g as_p =
         // Initial equalities.
-        let iso = map (pam as_g # equal on cmp) as_p then
+        let ps_g = map _scheme_pex as_g in
+        let ps_p = map _scheme_pex as_p in
+        let iso  = map (pam ps_g # equal on cmp) ps_p then
         // Filter by depth.
         let iso' = trim_non_top_matches as_g as_p iso then
         //
         iso'
 ;
-
-// Fetch the fingerprint...
-//  fp::pexlif->string
-let pex_fp = int2str # find_fingerprint # _pexlif_attrs # _scheme_pex;
-
-// Fetch the SHA256 signature...
-//  sha::pexlif->string
-let pex_sha = find_signature # _pexlif_attrs # _scheme_pex;
 
 //==============================================================================
 //
@@ -389,20 +398,6 @@ let
                 collect [] fs1 fs
         in
         try_all (alpha_fns) (permutations fs2)
-        //
-        // let x = try_all (alpha_fns) (permutations fs2) in
-        // has_value x => x |
-        // let prt = map (\(x,y). sprintf "%s=%s" x y) in
-        // let
-        //     dbg (W_UPDATE_FN u1 u2) (W_UPDATE_FN v1 v2) =
-        //         let a1 = alpha u1 v1 in
-        //         let a2 = alpha u2 v2 in
-        //         sprintf "%S;%S" (prt a1) (prt a2)
-        // in
-        // eprintf "\n%S\n%S\n%S"
-        //   (map DBG_update_fn fs1)
-        //   (map DBG_update_fn fs2)
-        //   (map2 dbg fs1 fs2)
 ;
 
 //------------------------------------------------------------------------------
@@ -540,27 +535,27 @@ let
 
 let
     DBG_isomatch cmp g_pex p_pex =
-        // Create haystack.
-        let sc_g  = adj_build g_pex in
-        let adj_g = adjacency_matrix sc_g in
         // Create needle.
-        let sc_p  = adj_build p_pex in
+        let sc_p  = adj_build_needle p_pex in
         let adj_p = adjacency_matrix sc_p in
+        // Create haystack.
+        let sc_g  = adj_build_haystack cmp (hd sc_p) g_pex in
+        let adj_g = adjacency_matrix sc_g in
         // Create iso. matrix.
-        let iso   = isomatch_matrix sc_g sc_p cmp in
+        let iso   = isomatch_matrix cmp sc_g sc_p in
         // Perform isomatch.
         let res   = recurse iso adj_g adj_p in
 // Debug printing ----------------------
-        val (_,t1) = wtime sc_g in
-        val (_,t2) = wtime adj_g in
-        let p1 = mat2str b2str adj_g in
-        (fprintf stdout "-- Adj.G in (%s+%s):\n" t1 t2) fseq
+        val (_,t1) = wtime sc_p in
+        val (_,t2) = wtime adj_p in
+        let p1 = mat2str b2str adj_p in
+        (fprintf stdout "-- Adj.P in (%s+%s):\n" t1 t2) fseq
         (fprintf stdout "%s\n" p1) fseq
         //
-        val (_,t3) = wtime sc_p in
-        val (_,t4) = wtime adj_p in
-        let p2 = mat2str b2str adj_p in
-        (fprintf stdout "-- Adj.P in (%s+%s):\n" t3 t4) fseq
+        val (_,t3) = wtime sc_g in
+        val (_,t4) = wtime adj_g in
+        let p2 = mat2str b2str adj_g in
+        (fprintf stdout "-- Adj.G in (%s+%s):\n" t3 t4) fseq
         (fprintf stdout "%s\n" p2) fseq
         //
         val (_,t5) = wtime iso in
