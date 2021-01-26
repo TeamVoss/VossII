@@ -255,6 +255,9 @@ let string_butlast s = string_butlastn s 1;
 //  string_empty::string->bool
 let string_empty s = strlen s == 0;
 
+//==============================================================================
+// ...
+
 // Short-hand for printing of matrices.
 //  matrix2str::bool->string->string->string->string->(*->string)->((* list) list)->string
 let
@@ -268,6 +271,10 @@ let mat2str = matrix2str T "[" "\n," "," "]";
 
 // ...
 let b2str b = b => "T" | "F";
+
+// ...
+//  fa2str::(string#(string list)) list->string
+let fa2str = list2str T "[" "," "]" (\(f,as). sprintf "(%s,%S)" f as);
 
 //==============================================================================
 // SHA256.
