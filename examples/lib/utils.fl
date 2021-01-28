@@ -298,21 +298,23 @@ let _pexlif_fa_outs   (PINST _ _ _ _ o _ _) = o;
 let _pexlif_internals (PINST _ _ _ _ _ t _) = t;
 let _pexlif_content   (PINST _ _ _ _ _ _ c) = c;
 
-// Fetch the specified attribute. If none exists, returns the empty string.
-//  find_signature::string->string->(string#string list)->string
-let find_attr s a    = snd # find_maybe (equal s # fst) ("",a);
+// Fetch attribute 's'. If none exists, returns 'a'.
+//  find_attr::string->string->(string#string list)->string
+let find_attr s a = snd # find_maybe (equal s # fst) ("",a);
+//  find_fingerprint::(string#string list)->int
 let find_fingerprint = s2int # find_attr "fingerprint" "0";
-let find_signature   = find_attr "signature" "";
+//  find_signature::(string#string list)->string
+let find_signature = find_attr "signature" "";
 
 //------------------------------------------------------------------------------
 
-//  ::(formal#(actual list) list)->(formal#actual list)
+//  lineup::(formal#(actual list) list)->(formal#actual list)
 let lineup = flatmap (curry zip # both md_expand_vector md_expand_vectors);
-//  ::(formal#actual list)->(formal list)->(actual list)
+//  raise::(formal#actual list)->(formal list)->(actual list)
 let raise = map # subst;
-//  ::(formal#actual list)->(actual list)->(formal list)
+//  lower::(formal#actual list)->(actual list)->(formal list)
 let lower = map # rev_subst;
-//  ::(a->b)->(formal#actual list)->(formal#actual list)->(a#a list)->(b#b list)
+//  promote::(a->b)->(formal#actual list)->(formal#actual list)->(a#a list)->(b#b list)
 let promote f ns hs = curry zip # both (f ns) (f hs) # unzip;
 
 // Turns a subst. of formals into one over actuals.
@@ -320,6 +322,22 @@ let formalize fa_n fa_h = promote raise (lineup fa_n) (lineup fa_h);
 
 // Turns a subst. of actuals into one over formals.
 let actualize fa_n fa_h = promote lower (lineup fa_n) (lineup fa_h);
+
+//------------------------------------------------------------------------------
+
+// Checks if two 'PEXLIF's are connected via a shared wire.
+//  test_adjacent::pexlif->pexlif->bool
+let 
+    test_adjacent
+        (PINST _ _ _ fa_inps1 fa_outs1 _ _)
+        (PINST _ _ _ fa_inps2 fa_outs2 _ _)
+        =
+        let flatten  = flatmap (md_expand_vectors # snd) in
+        let shared i = any (flip elem i) in
+        //
+        shared (flatten fa_inps1) (flatten fa_outs2) OR
+        shared (flatten fa_outs1) (flatten fa_inps2)
+;
 
 //==============================================================================
 // Fin.

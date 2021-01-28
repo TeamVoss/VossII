@@ -34,7 +34,10 @@ install_print_function Pann;
 let mk_ann pex label = ANN pex label [];
 
 //  ann_cons::ann->ann->ann
-let ann_cons sc (ANN n l a) = (ANN n l (sc:a));
+let ann_cons sc (ANN p l a) = (ANN p l (sc:a));
+
+//  ann_test::ann->ann->bool
+let ann_test (ANN p1 l1 _) (ANN p2 l2 _) = l1 != l2 AND test_adjacent p1 p2;
 
 //  ann_adj_id::ann->(int list)
 let ann_adj_id = map (s2int # _ann_lbl) # _ann_adj;
@@ -48,7 +51,10 @@ let
         //  ::anode->int
         let size (_,a) = length a + 1 in
         //  ::anode->anode->anode
-        let extend (s1,_) (s2,a2) = (ann_cons s1 s2,a2) in
+        let extend (x,_) (y,a) = (ann_cons x y,a) in
+        //  ::anode->(anode list)->anode
+        let test cs (y,a) = (itlist (\x. \y. ann_test x y => ann_cons x y | y) (map fst cs) y, a) in
+        //  test = first # sitlist (\x. \y. ann_test x y => ann_cons x y | y) # map fst
         //  ::(anode list)->anode->anode
         let merge cs = second (itlist (append # curry cons) cs) in
         //  ::int->string->pexlif->anode
@@ -68,18 +74,24 @@ let
                 //
                 let anode  = (mk_ann p (int2str id), []) in
                 let cs     = traverse (id+1) (_pexlif_content p) in
-                // stop lvl p => anode |
+                //
                 let anode' = itlist extend cs anode in
                 let cs'    = map (extend anode) cs in
-                merge cs' anode'
+                let cs''   = map (test cs') cs' in
+                //
+                merge cs'' anode'
         in
         val (sc,adj) = annotate 1 1 pex in (sc:adj)
 ;
 
 //------------------------------------------------------------------------------
 
+// Builds the 'anode's used to construct an adj. mat. for the needle.
 //  adj_needle::pexlif->[ann]
-let adj_build_needle pex = annotate_pexlif (const (const F)) pex;
+let
+    adj_build_needle pex =
+        annotate_pexlif (const (const F)) pex
+;
 
 // Labels for each possible match at every "level" of a 'pinst'.
 //  possible_matches::(pexlif->string)->ann->(((string#int) list) list)
@@ -95,7 +107,8 @@ let
         ixlabel (go [] sc)
 ;
 
-//  ::(pexlif->string)->ann->pexlif->[ann]
+// Builds the 'anode's used to construct an adj. mat. for the haystack.
+//  adj_build_haystack::(pexlif->string)->ann->pexlif->[ann]
 let
     adj_build_haystack attr needle pex =
         let matches = possible_matches attr needle in
@@ -139,7 +152,6 @@ let adjacency_matrix as = map (fill (length as) # ann_adj_id) as;
 //
 //==============================================================================
 
-// ...
 //  replace_columns::((int#(* list)) list)->(* mat)->(* mat)
 let
     replace_columns cset mat =
@@ -207,6 +219,7 @@ let subst_merge ss = let s = flat ss in subst_verify s => SOME s | NONE;
 
 //------------------------------------------------------------------------------
 
+// Find a subst. s.t. both 'wexpr's are alpha-eq.
 //  ::wexpr->wexpr->subst
 letrec
     alpha (W_X _)       (W_X _)       = []
@@ -266,7 +279,6 @@ let
 ;
 
 //------------------------------------------------------------------------------
-
 
 //  ::pexlif->pexlif->(subst opt)
 let

@@ -1,4 +1,4 @@
-load "examples/isomatch.fl";
+load (DIR^"isomatch.fl");
 load "ste.fl";
 
 //------------------------------------------------------------------------------
@@ -13,9 +13,8 @@ let p_pex = verilog2pexlif "-Iexamples/mux" "mux2" ["small_lib.v"] [];
 //Emit_pexlif "puzzle.txt" g_pex;
 //Emit_pexlif "piece.txt" p_pex;
 
-let cmp = pex_fp;
 //isomatch cmp p_pex g_pex;
-DBG_isomatch cmp p_pex g_pex;
+DBG_isomatch cmp_fp p_pex g_pex;
 
 //------------------------------------------------------------------------------
 // Fin.
