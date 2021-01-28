@@ -12,6 +12,14 @@ load (DIR^"utils.fl");
 //==============================================================================
 // Pruning of match matrix.
 
+// Filter every index in a vector 'xs' using 'p'.
+//  filter_cols::(a->bool)->(a list)->(int list)
+let filter_cols p xs = ixlist (\x. \ix. \ys. p x => ix : ys | ys) xs [];
+
+// Filter every pair of indices in matrix 'xs' using 'p'.
+//  filter_rows::(a->bool)->(a mat)->((int#int) list)
+let filter_rows p xs = ixlist (\x. \ix. \ys. map (pair ix) (filter_cols p x) @ ys) xs [];
+
 // Iterate over every mat. index that is a possible match.
 //  forall_ones::(bool mat)->((int#int)->a->a)->a->a
 let forall_ones mat f = sitlist f (filter_rows id mat);

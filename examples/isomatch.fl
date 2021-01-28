@@ -139,14 +139,6 @@ let adjacency_matrix as = map (fill (length as) # ann_adj_id) as;
 //
 //==============================================================================
 
-// Filter every index in a vector 'xs' using 'p'.
-//  filter_cols::(a->bool)->(a list)->(int list)
-let filter_cols p xs = ixlist (\x. \ix. \ys. p x => ix : ys | ys) xs [];
-
-// Filter every pair of indices in matrix 'xs' using 'p'.
-//  filter_rows::(a->bool)->(a mat)->((int#int) list)
-let filter_rows p xs = ixlist (\x. \ix. \ys. map (pair ix) (filter_cols p x) @ ys) xs [];
-
 // ...
 //  replace_columns::((int#(* list)) list)->(* mat)->(* mat)
 let
