@@ -13,27 +13,9 @@ let p_pex = verilog2pexlif "-Iexamples/mux" "mux2" ["small_lib.v"] [];
 //Emit_pexlif "puzzle.txt" g_pex;
 //Emit_pexlif "piece.txt" p_pex;
 
-//--------------------------------------------------------------------------------
-
-// Comparison by fingerprint.
 let cmp = pex_fp;
-
-// Debug run.
-DBG_isomatch cmp g_pex p_pex;
-
-// Normal run.
-let sc_p  = adj_build_needle p_pex;
-let adj_p = adjacency_matrix sc_p;
-let sc_g  = adj_build_haystack cmp (hd sc_p) g_pex;
-let adj_g = adjacency_matrix sc_g;
-let iso   = isomatch_matrix cmp sc_g sc_p;
-let res   = recurse iso adj_g adj_p;
-(res fseq print "Finished matching.\n");
-//
-let ss = recover_all res adj_p sc_p sc_g;
-(ss fseq print "Finished recovering substitutions.\n");
-//
-print_matches res ss sc_p sc_g;
+//isomatch cmp p_pex g_pex;
+DBG_isomatch cmp p_pex g_pex;
 
 //------------------------------------------------------------------------------
 // Fin.

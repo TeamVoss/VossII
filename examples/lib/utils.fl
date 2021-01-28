@@ -148,6 +148,10 @@ let ixmap f xs = ixlist (\x. \ix. cons (f x ix)) xs [];
 let ixlabel = flip zip_uneven (iterate (add 1) 1);
 
 // ...
+//  find_maybe::(a->bool)->a->(a list)->a
+let find_maybe f x xs = let i = find_first0 f xs in i == 0 => x | (el i xs);
+
+// ...
 //  span::(a->bool)->(a list)->((a list)#(a list))
 letrec
     span _ []     = ([], [])
@@ -295,27 +299,27 @@ let _pexlif_internals (PINST _ _ _ _ _ t _) = t;
 let _pexlif_content   (PINST _ _ _ _ _ _ c) = c;
 
 // Fetch the specified attribute. If none exists, returns the empty string.
-//  find_signature::string->(string#string list)->string
-let
-    find_attr s as =
-        let ix = find_first0 (equal s # fst) as in
-        ix == 0 => "" | snd (el ix as)
-;
+//  find_signature::string->string->(string#string list)->string
+let find_attr s a    = snd # find_maybe (equal s # fst) ("",a);
+let find_fingerprint = s2int # find_attr "fingerprint" "0";
+let find_signature   = find_attr "signature" "";
 
+//------------------------------------------------------------------------------
 
-// Fetch the "fingerprint" attribute. If none exists, returns zero.
-//  find_fingerprint::(string#string list)->int
-let
-    find_fingerprint as =
-        let fp = find_attr "fingerprint" as in
-        string_empty fp => 0 | s2int fp
-;
+//  ::(formal#(actual list) list)->(formal#actual list)
+let lineup = flatmap (curry zip # both md_expand_vector md_expand_vectors);
+//  ::(formal#actual list)->(formal list)->(actual list)
+let raise = map # subst;
+//  ::(formal#actual list)->(actual list)->(formal list)
+let lower = map # rev_subst;
+//  ::(a->b)->(formal#actual list)->(formal#actual list)->(a#a list)->(b#b list)
+let promote f ns hs = curry zip # both (f ns) (f hs) # unzip;
 
-// Fetch the "signature" attribute. If none exists, returns the empty string.
-//  find_signature::(string#string list)->string
-let
-    find_signature as = find_attr "signature" as
-;
+// Turns a subst. of formals into one over actuals.
+let formalize fa_n fa_h = promote raise (lineup fa_n) (lineup fa_h);
+
+// Turns a subst. of actuals into one over formals.
+let actualize fa_n fa_h = promote lower (lineup fa_n) (lineup fa_h);
 
 //==============================================================================
 // Fin.

@@ -1,122 +1,118 @@
 load (DIR^"lib/signatures.fl");
 load (DIR^"lib/utils.fl");
-
-//==============================================================================
-//
-// ... Schemes ...
-//
-//==============================================================================
-
-// ...
-lettype scheme =
-        SCHEME
-            {pex::pexlif}
-            {lbl::string}
-            {adj::scheme list}
-;
-
-let _scheme_pex (SCHEME p _ _) = p;
-let _scheme_lbl (SCHEME _ l _) = l;
-let _scheme_adj (SCHEME _ _ a) = a;
-
-let
-    Pscheme (SCHEME p l a) =
-        sprintf "%s(%s):%S" (_pexlif_name p) l (map (_pexlif_name # _scheme_pex) a)
-;
-install_print_function Pscheme;
+load (DIR^"lib/ullman.fl");
 
 //------------------------------------------------------------------------------
 
-// "Smart" constructor for a 'SCHEME'.
-//  mk_scheme::*parts of PEXLIF*->scheme
-let mk_scheme pex label = SCHEME pex label [];
-
-// ...
-//  scheme_cons::scheme->scheme->scheme
-let scheme_cons sc (SCHEME n l a) = (SCHEME n l (sc:a));
+let cmp_fp  = int2str # find_fingerprint # _pexlif_attrs;
+let cmp_sha = find_signature # _pexlif_attrs;
 
 //==============================================================================
 //
-// Creationg of adj. matrix.
+// ... Ann
 //
 //==============================================================================
+
+lettype ann =
+        ANN
+            {pex::pexlif}
+            {lbl::string}
+            {adj::ann list}
+;
+
+let _ann_pex (ANN p _ _) = p;
+let _ann_lbl (ANN _ l _) = l;
+let _ann_adj (ANN _ _ a) = a;
+
+let
+    Pann (ANN p l a) =
+        sprintf "%s(%s):%S" (_pexlif_name p) l (map (_pexlif_name # _ann_pex) a)
+;
+install_print_function Pann;
+
+//  mk_ann::pexlif->string->ann
+let mk_ann pex label = ANN pex label [];
+
+//  ann_cons::ann->ann->ann
+let ann_cons sc (ANN n l a) = (ANN n l (sc:a));
+
+//  ann_adj_id::ann->(int list)
+let ann_adj_id = map (s2int # _ann_lbl) # _ann_adj;
+
+//------------------------------------------------------------------------------
 
 // Traverse a 'PINST' and record every node's adjacencies to other nodes.
-//  reduce_pexlif::(int->pexlif->bool)->pexlif->[scheme]
+//  annotate_pexlif::(int->pexlif->bool)->pexlif->[ann]
 let
-    reduce_pexlif stop pex =
-        let
-            size (_,adj) = length adj + 1
-        in
-        let
-            extend (s1,_) (s2,a2) = (scheme_cons s1 s2,a2)
-        in
-        let
-            merge (sc,adj) cs = (sc,itlist (append # curry cons) cs adj)
-        in
+    annotate_pexlif stop pex =
+        //  ::anode->int
+        let size (_,a) = length a + 1 in
+        //  ::anode->anode->anode
+        let extend (s1,_) (s2,a2) = (ann_cons s1 s2,a2) in
+        //  ::(anode list)->anode->anode
+        let merge cs = second (itlist (append # curry cons) cs) in
+        //  ::int->string->pexlif->anode
         letrec
-            reduce lvl id p =
+            annotate lvl id p =
                 let
-                    traverse _ i (P_LEAF _)  = []
-                /\  traverse l i (P_HIER ps) =
+                    traverse _ (P_LEAF _)  = []
+                /\  traverse i (P_HIER ps) =
                         letrec
                             go _ []     = []
-                        /\  go c (p:ps) = let an = reduce l c p in an : go (c+size an) ps
+                        /\  go c (p:ps) =
+                                let an = annotate (lvl+1) c p in
+                                an : go (c+size an) ps
                         in
                         go i ps
                 in
-                let anode  = (mk_scheme p (int2str id), []) in
-                stop lvl p => anode |
-                let cs     = traverse (lvl+1) (id+1) (_pexlif_content p) in
+                //
+                let anode  = (mk_ann p (int2str id), []) in
+                let cs     = traverse (id+1) (_pexlif_content p) in
+                // stop lvl p => anode |
                 let anode' = itlist extend cs anode in
                 let cs'    = map (extend anode) cs in
-                merge anode' cs'
+                merge cs' anode'
         in
-        val (sc,adj) = reduce 1 1 pex in (sc:adj)
+        val (sc,adj) = annotate 1 1 pex in (sc:adj)
 ;
-
-// ...
-//  adj_needle::pexlif->[scheme]
-let adj_build_needle pex = reduce_pexlif (const (const F)) pex;
 
 //------------------------------------------------------------------------------
 
+//  adj_needle::pexlif->[ann]
+let adj_build_needle pex = annotate_pexlif (const (const F)) pex;
+
 // Labels for each possible match at every "level" of a 'pinst'.
-//  possible_matches::(pexlif->string)->scheme->(((string#int) list) list)
+//  possible_matches::(pexlif->string)->ann->(((string#int) list) list)
 let
     possible_matches attr sc =
-        let
-            filter_visited vs =
-                filter (NOT # flip elem vs # attr # _scheme_pex)
-        in
+        //  ::( list)->( list)->( list)
+        let skip vs = filter (NOT # flip elem vs # attr # _ann_pex) in
         letrec
-            go vs (SCHEME p _ as) =
-                let l = attr p in l : flatmap (go (l:vs)) (filter_visited vs as)
+            go vs (ANN p _ as) =
+                let l = attr p in
+                l : flatmap (go (l:vs)) (skip vs as)
         in
         ixlabel (go [] sc)
 ;
 
-// Options for 'attr' above.
-let pex_fp  = int2str # find_fingerprint # _pexlif_attrs;
-let pex_sha = find_signature # _pexlif_attrs;
-
-// ...
-//  adj_haystack::(pexlif->string)->scheme->pexlif->[scheme]
+//  ::(pexlif->string)->ann->pexlif->[ann]
 let
     adj_build_haystack attr needle pex =
-        let
-            matches =
-                possible_matches attr needle in
+        let matches = possible_matches attr needle in
         let
             stop 1 _ = F
         /\  stop i p =
                 let pred j q = (i == j + 1) AND attr p == q in
                 NOT (any (curry (flip pred)) matches)
         in
-        reduce_pexlif stop pex
+        annotate_pexlif stop pex
 ;
 
-//------------------------------------------------------------------------------
+//==============================================================================
+//
+// Creation of adj. matrix.
+//
+//==============================================================================
 
 // Creates a list of 'max' elements with an 'T' at index 'i' if 'i' is present
 // in the list 'xs' and 'F' if not.
@@ -133,13 +129,9 @@ let fill max xs =
         rev (build 0 [] xs)
 ;
 
-// Fetch the ID's of each node adjacent to the given one.
-//  adj_to_id::scheme->(int list)
-let adj_to_id = map (s2int # _scheme_lbl) # _scheme_adj;
-
 // Construct an adjacency matrix (shared wires) for a 'PEXLIF'.
-//  adjacency_matrix::(scheme list)->(bool mat)
-let adjacency_matrix as = map (fill (length as) # adj_to_id) as;
+//  adjacency_matrix::(ann list)->(bool mat)
+let adjacency_matrix as = map (fill (length as) # ann_adj_id) as;
 
 //==============================================================================
 //
@@ -164,38 +156,38 @@ let
 ;
 
 // Remove every 'sc' and their adjacent nodes from the possible iso. solutions.
-//  trim::(scheme list)->(bool mat)->(bool mat)
+//  trim::(ann list)->(bool mat)->(bool mat)
 let
-    trim_scheme sc iso =
+    trim_ann sc iso =
         letrec
-            adj s = adj_to_id s @ flatmap adj (_scheme_adj s)
+            adj s = ann_adj_id s @ flatmap adj (_ann_adj s)
         in
         let none = replicate (length iso) F in
-        let aset = flatmap (\s. s2int (_scheme_lbl s) : adj s) sc in
+        let aset = flatmap (\s. s2int (_ann_lbl s) : adj s) sc in
         transpose (ixmap (\r. \ix. elem ix aset => none | r) (transpose iso))
 ;
 
 //------------------------------------------------------------------------------
 
 // ...
-//  trim_non_top_matches::(scheme list)->(scheme list)->(bool mat)->(bool mat)
+//  trim_non_top_matches::(ann list)->(ann list)->(bool mat)->(bool mat)
 let
     trim_non_top_matches as_g as_p iso = 
         let poss_top = filter_cols id (hd iso) in
-        let act_top  = adj_to_id (hd as_g) in
+        let act_top  = ann_adj_id (hd as_g) in
         let not_top  = filter (NOT # flip elem act_top) poss_top in
         let rem      = map (flip el as_g) not_top in
         //
-        trim_scheme rem iso
+        trim_ann rem iso
 ;
 
 // Construct an isomatch matrix (possible matches) from two ...
-//  isomatch_matrix::(pexlif->string)->[scheme]->[scheme]->(bool mat)
+//  isomatch_matrix::(pexlif->string)->[ann]->[ann]->(bool mat)
 let
     isomatch_matrix cmp as_p as_g =
         // Initial equalities.
-        let ps_p = map _scheme_pex as_p in
-        let ps_g = map _scheme_pex as_g in
+        let ps_p = map _ann_pex as_p in
+        let ps_g = map _ann_pex as_g in
         let iso  = map (pam ps_g # equal on cmp) ps_p then
         // Filter by depth.
         let iso' = trim_non_top_matches as_g as_p iso then
@@ -203,161 +195,27 @@ let
         iso'
 ;
 
-//------------------------------------------------------------------------------
-
-// ...
-//  equality_matrix
-let
-    equality_matrix as_p as_g =
-        let sha_p = map (pex_sha # _scheme_pex) as_p in
-        let sha_g = map (pex_sha # _scheme_pex) as_g in
-        let eq    = map (pam sha_g # equal) sha_p in
-        //
-        eq
-;
-
 //==============================================================================
 //
-// Ullman’s Subgraph Isomorphism Algorithm.
-//   G - Graph, or puzzle/haystack.
-//   P - Potential subgraphs of G, or piece/needle.
-//   M - |V(P)| x |V(G)| matrix that encodes possible subgraph isomorphisms.
+// ... Alpha equality.
 //
 //==============================================================================
-
-//==============================================================================
-// Pruning of match matrix.
-
-// Iterate over every mat. index that is a possible match.
-//  forall_ones::(bool mat)->((int#int)->a->a)->a->a
-let forall_ones mat f = sitlist f (filter_rows id mat);
-
-// Iterate over every index in a col. that is a possible match.
-//  forall_neighbors::int->(bool mat)->(int->a->a)->a->a
-let forall_neighbors i mat f = sitlist f (filter_cols id (el i mat));
-
-// Thin the possible set of isomorphisms. The general idea is that, if we have
-// M(x,y) then any neighbor v of x in P should have a neighbor u in G s.t.
-// M(v,u) holds. Otherwise M(x,y) cannot be a solution.
-//
-// prune(...)
-// do
-//   for all (i,j) where M is 1
-//     for all neighbors x of vi in P
-//       if there is no neighbor y of vj in G s.t. M(x,y)
-//         M(i,j) := F
-// while M was changed
-//
-//  prune::(bool mat)->(bool mat)->(bool mat)->(bool mat)
-letrec
-    prune m g p =
-        val m' =
-            forall_ones m (\(i,j).
-                forall_neighbors i p (\vi. \n.
-                    forall_neighbors j g (\vj. const T) F
-                        => n | mat_update F (i,j) n
-                )
-            ) m
-        then m != m' => prune m' g p | m'
-;
-
-//==============================================================================
-// Main "matching" algo.
-
-// "Dot-product" of two lists of booleans.
-//  dot::(bool list)->(bool list)->bool
-let dot xs ys = itlist (\z. \b. z OR b) (map2 (\x. \y. x AND y) xs ys) F;
-
-// "Matrix multiplication" of two boolean matrices.
-//  mult::(bool mat)->(bool mat)->(bool mat)
-let mult m n = val n' = transpose n then map (pam n' # dot) m;
-
-// Mark every el. as 'F', except the 'n'th el. that is marked as 'T'.
-//  mark_one::int->(bool list)->(bool list)
-let mark_one n xs = modify (const T) n (map (const F) xs);
-
-// Iterate over all unused row-indices.
-//  forall_unused::(bool mat)->int->(bool list)
-//               ->(int->(bool mat)->((bool mat) list))
-//               ->((bool mat) list)
-let forall_unused m row used f =
-        let unused = filter (NOT # flip el used) (filter_cols id (el row m)) in
-        sitlist (\c. \ms. f c m @ ms) unused []
-;
-
-// Check that wether 'm' is a valid morphism for 'p' and 'g'.
-//  isomorphism::(bool mat)->(bool mat)->(bool mat)->bool
-let
-    isomorphism mat p g =
-        let only_one_solution mat =
-            val (rs,cs) = unzip (filter_rows id mat) then
-            let unique xs = setify xs == xs in
-            unique rs AND unique cs
-        in
-        only_one_solution mat AND p == mult mat (transpose (mult mat g))
-;
-
-// Find ...
-//
-// recurse(used, row, P, G, M)
-//   if row = num_rows(M) + 1
-//     if M is an isomorphism
-//        output yes and end the algorithm
-//     if not
-//        output no
-//   N = prune(M)
-//   for all unused columns c in N[row]
-//     N' = set all columns in N[row] to zero but column c
-//     used' = mark c as used
-//     recurse(used', row+1, P, G, N')
-//   output no
-//
-//  recurse::(bool mat)->(bool mat)->(bool mat)->((bool mat) list)
-letrec
-    recurse mat p g =
-        let solution m = isomorphism m p g => [m] | [] in
-        letrec
-            go m cs r = r == num_rows mat + 1 => solution m |
-                val m' = prune m g p then
-                forall_unused m' r cs (\c. \n.
-                    let n'  = modify (mark_one c) r n  in
-                    let cs' = modify (const T)    c cs in
-                    go n' cs' (r+1)
-                )
-        in
-        go mat (replicate (num_columns mat) F) 1
-;
-
-//==============================================================================
-//
-// ...
-//
-//==============================================================================
-
-let DBG_print_subst s = list2str T "[" "," "]" (\(a,b). a ^ ":" ^ b) s;
-let DBG_print_opt_subst (NONE)   = "No match."
-/\  DBG_print_opt_subst (SOME s) = DBG_print_subst s
-;
 
 // For every pair '(x,y)' in 's', 'assoc x s == y' and 'rev_assoc y s == x'.
-//  subst_verify::((string#string) list)->bool
+//  subst_verify::subst->bool
 let subst_verify s = all (\(u,t). all (\(x,y). (u == x) <==> (t == y)) s) s;
 
 // Extends a substitution with another.
-//  subst_extend::((string#string) list)->((string#string) list)->((string#string) list)
+//  ::subst->subst->subst
 let subst_extend s u = map (second (subst s)) u @ s;
 
 // Attempts to merge a list of substitutions, fails on conflicting mappings.
-//  subst_merge::(((string#string) list) list)->(((string#string) list) opt)
+//  subst_merge::(subst list)->(subst opt)
 let subst_merge ss = let s = flat ss in subst_verify s => SOME s | NONE;
-
-// (foreach (\x. fprintf stdout "to-merge:%s\n" (DBG_print_subst x)) ss) fseq
-// (fprintf stdout "merged:%s\n" (DBG_print_subst s)) fseq
 
 //------------------------------------------------------------------------------
 
-// Attemps to find a substitution such that both 'wexpr's match.
-//  alpha::wexpr->wexpr->((string#string) list)
+//  ::wexpr->wexpr->subst
 letrec
     alpha (W_X _)       (W_X _)       = []
 /\  alpha (W_CONST _ _) (W_CONST _ _) = []
@@ -389,19 +247,9 @@ letrec
 /\  alpha (W_MEM_WRITE i n a b) (W_MEM_WRITE j m x y) = error "todo"
 ;
 
-//------------------------------------------------------------------------------
-
+//  ::(update_fn list)->(update_fn list)->(subst opt)
 let
-    DBG_update_fn (W_UPDATE_FN lhs rhs) =
-        sprintf "(UPDATE %s := %s)" (DBGwexpr lhs) (DBGwexpr rhs)
-/\  DBG_update_fn (W_PHASE_DELAY lhs rhs) =
-        sprintf "(PHASE %s := %s)" (DBGwexpr lhs) (DBGwexpr rhs)
-;
-
-// ...
-//  alpha_leaf::(update_fn list)->(update_fn list)->(((string#string) list) opt)
-let
-    alpha_leaf fs1 fs2 =
+    alpha_fn fs1 fs2 =
         let
             alpha_pairs u1 u2 v1 v2 = subst_merge [alpha u1 v1, alpha u2 v2]
         in
@@ -427,32 +275,8 @@ let
 
 //------------------------------------------------------------------------------
 
-//  lineup::(formal#(actual list) list)->(formal#actual list)
-let lineup = flatmap (curry zip # both md_expand_vector md_expand_vectors);
 
-//  lift::(formal#actual list)->(formal list)->(actual list)
-let lift = map # subst;
-
-//  promote::(formal#actual list)->(formal#actual list)->(formal#formal list)->(actual#actual list)
-let promote ns hs = curry zip # both (lift ns) (lift hs) # unzip;
-
-//  formalize::(formal#(actual list) list)->(formal#(actual list) list)->(formal#formal list)->(actual#actual list)
-let formalize fa_n fa_h = promote (lineup fa_n) (lineup fa_h);
-
-// ...
-//  unpack::({(string#string list)} opt list)->{((string#string list) list)} opt
-let
-    unpack ms =
-        letrec
-            go s []            = SOME s
-        /\  go s ((NONE):xs)   = NONE
-        /\  go s ((SOME x):xs) = go (x:s) xs
-        in
-        go [] ms
-;
-
-// ...
-//  alpha_pinst::pexlif->pexlif->((string#string) list) opt
+//  ::pexlif->pexlif->(subst opt)
 let
     alpha_pinst_leaf
         (PINST _ _ _ fa_inps1 fa_outs1 _ (P_LEAF fs1))
@@ -461,24 +285,30 @@ let
         let fa_n = (fa_inps1 @ fa_outs1) in
         let fa_h = (fa_inps2 @ fa_outs2) in
         let f    = formalize fa_n fa_h in
-        maybe (alpha_leaf fs1 fs2) (SOME # f)
+        maybe (alpha_fn fs1 fs2) (SOME # f)
 ;
 
-// ...
+//  ::pexlif->pexlif->((subst opt) list)->((subst list) opt)
 let
     alpha_pinst_hier
         (PINST _ _ _ fa_inps1 fa_outs1 _ (P_HIER _))
         (PINST _ _ _ fa_inps2 fa_outs2 _ (P_HIER _))
         substs
         =
+        let
+            unpack ms =
+                letrec
+                    go s []            = SOME s
+                /\  go s ((NONE):xs)   = NONE
+                /\  go s ((SOME x):xs) = go (x:s) xs
+                in
+                go [] ms
+        in
         let fa_n = (fa_inps1 @ fa_outs1) in
         let fa_h = (fa_inps2 @ fa_outs2) in
         let f    = formalize fa_n fa_h in
         maybe (unpack substs) (flip maybe (SOME # f) # subst_merge)
 ;
-
-// (fprintf stdout "leaf-n:%s\nleaf-h:%s\nsubst:%s\n\n" (fa2str fa_n) (fa2str fa_h) (DBG_print_opt_subst s)) fseq
-// (fprintf stdout "hier-n:%s\nhier-h:%s\nsubst:%s\n\n" (fa2str fa_n) (fa2str fa_h) (DBG_print_opt_subst s)) fseq
 
 //------------------------------------------------------------------------------
 
@@ -488,7 +318,7 @@ let fill_column j v = transpose # modify (\c. replicate (length c) v) j # transp
 
 // Traverse the nodes of an adjacency matrix in depth-first order, calling
 // 'leaf' for leaf nodes and 'hier' to merge composite nodes.
-//  traverse::(bool mat)->(int->*)->(int->(* list)->*)->*
+//  ::(bool mat)->(int->*)->(int->(* list)->*)->*
 let
     traverse adj leaf hier =
         letrec
@@ -500,8 +330,9 @@ let
         go adj 1
 ;
 
-// ...
-//  recover_one::(bool mat)->(bool mat)->(scheme list)->(scheme list)->((string#string) list)
+// TODO: 'recover_one' keeps substitutions for formals used in each child node,
+// those should really be discarded for the parent.
+//  ::(bool mat)->(bool mat)->(ann list)->(ann list)->subst
 let
     recover_one res adj needle haystack =
         let
@@ -512,17 +343,17 @@ let
                 in
                 go (el i res) haystack
         in
-        let pair_of i = (_scheme_pex (el i needle), _scheme_pex (match_of i)) in
+        let pair_of i = (_ann_pex (el i needle), _ann_pex (match_of i)) in
         traverse adj
           (curry alpha_pinst_leaf # pair_of)
           (curry alpha_pinst_hier # pair_of)
 ;
-// TODO: 'recover_one' keeps substitutions for formals used in each child node,
-// those should really be discarded for the parent.
 
-// ...
-//  recover_all::((bool mat) list)->(bool mat)->(scheme list)->(scheme list)->(((string#string) list) list)
-let recover_all sols adj needle haystack = map (\res. recover_one res adj needle haystack) sols;
+//  ::((bool mat) list)->(bool mat)->(ann list)->(ann list)->(subst list)
+let
+    recover_all sols adj needle haystack =
+        map (\res. recover_one res adj needle haystack) sols
+;
 
 //==============================================================================
 //
@@ -530,12 +361,19 @@ let recover_all sols adj needle haystack = map (\res. recover_one res adj needle
 //
 //==============================================================================
 
+//  ::(a list)->string
 let print_list = list2str T "{ " "\n, " "}";
-let print_subst s1 s2 = sprintf "%s->%s" s1 s2;
-let print_pair (SCHEME p1 l1 _) (SCHEME p2 l2 _) = sprintf "%s(%s)=%s(%s)" (_pexlif_name p1) l1 (_pexlif_name p2) l2;
 
-// Pretty-print a matching.
-//  print_match::((scheme#scheme) list)->{((string#string) list) opt}->string
+//  ::subst->subst->string
+let print_subst s1 s2 = sprintf "%s->%s" s1 s2;
+
+//  ::ann->ann->string
+let
+    print_pair (ANN p1 l1 _) (ANN p2 l2 _) =
+        sprintf "%s(%s)=%s(%s)" (_pexlif_name p1) l1 (_pexlif_name p2) l2
+;
+
+//  ::((ann#ann) list)->(subst opt)->string
 let
     print_match ms (NONE) =
         sprintf "%s\n where no alpha-eq. connection could be found."
@@ -546,8 +384,7 @@ let
             (print_list (curry print_subst) ss)
 ;
 
-// Pretty-print matches.
-//  print_matches::((bool mat) list)->({((string#string) list) opt} list)->(scheme list)->(scheme list)->string
+//  ::((bool mat) list)->((subst opt) list)->(ann list)->(ann list)->string
 let
     print_matches res ss ns hs =
         let
@@ -583,7 +420,6 @@ let
         // Done.
         print_matches res ss sc_p sc_g;
 ;
-
 
 //==============================================================================
 //
