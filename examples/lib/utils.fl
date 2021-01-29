@@ -325,18 +325,16 @@ let actualize fa_n fa_h = promote lower (lineup fa_n) (lineup fa_h);
 
 //------------------------------------------------------------------------------
 
-// Checks if two 'PEXLIF's are connected via a shared wire.
-//  test_adjacent::pexlif->pexlif->bool
-let 
-    test_adjacent
-        (PINST _ _ _ fa_inps1 fa_outs1 _ _)
-        (PINST _ _ _ fa_inps2 fa_outs2 _ _)
-        =
-        let flatten  = flatmap (md_expand_vectors # snd) in
-        let shared i = any (flip elem i) in
-        //
-        shared (flatten fa_inps1) (flatten fa_outs2) OR
-        shared (flatten fa_outs1) (flatten fa_inps2)
+//  actuals::pexlif->[string]
+let
+    actuals (PINST _ _ _ fa_inps fa_outs _ _) =
+        flatmap (md_expand_vectors # snd) (fa_inps @ fa_outs)
+;
+
+//  formals::pexlif->[string]
+let
+    formals (PINST _ _ _ fa_inps fa_outs _ _) =
+        flatmap (md_expand_vector # fst) (fa_inps @ fa_outs)
 ;
 
 //==============================================================================

@@ -26,7 +26,8 @@ let _ann_adj (ANN _ _ a) = a;
 
 let
     Pann (ANN p l a) =
-        sprintf "%s(%s):%S" (_pexlif_name p) l (map (_pexlif_name # _ann_pex) a)
+        let pr (ANN x y _) = sprintf "%s(%s)" (_pexlif_name x) y in
+        sprintf "%s(%s):%S" (_pexlif_name p) l (map pr a)
 ;
 install_print_function Pann;
 
@@ -34,10 +35,7 @@ install_print_function Pann;
 let mk_ann pex label = ANN pex label [];
 
 //  ann_cons::ann->ann->ann
-let ann_cons sc (ANN p l a) = (ANN p l (sc:a));
-
-//  ann_test::ann->ann->bool
-let ann_test (ANN p1 l1 _) (ANN p2 l2 _) = l1 != l2 AND test_adjacent p1 p2;
+let ann_cons x (ANN p l a) = (ANN p l (x:a));
 
 //  ann_adj_id::ann->(int list)
 let ann_adj_id = map (s2int # _ann_lbl) # _ann_adj;
@@ -45,43 +43,49 @@ let ann_adj_id = map (s2int # _ann_lbl) # _ann_adj;
 //------------------------------------------------------------------------------
 
 // Traverse a 'PINST' and record every node's adjacencies to other nodes.
-//  annotate_pexlif::(int->pexlif->bool)->pexlif->[ann]
+//  annotate_pexlif::pexlif->[ann]
 let
-    annotate_pexlif stop pex =
+    annotate_pexlif pex =
         //  ::anode->int
-        let size (_,a) = length a + 1 in
-        //  ::anode->anode->anode
-        let extend (x,_) (y,a) = (ann_cons x y,a) in
-        //  ::anode->(anode list)->anode
-        let test cs (y,a) = (itlist (\x. \y. ann_test x y => ann_cons x y | y) (map fst cs) y, a) in
-        //  test = first # sitlist (\x. \y. ann_test x y => ann_cons x y | y) # map fst
+        let size (_,a) = 1 + length a in
         //  ::(anode list)->anode->anode
         let merge cs = second (itlist (append # curry cons) cs) in
+        //  ::(anode list)->anode->anode
+        let connect f g (a,_) (x,y) =
+                //  ::(string list)->(string list)->bool
+                let shared x y = NOT (empty (x intersect y)) in
+                //  ::ann->ann->bool
+                let check_shared (ANN p u _) (ANN q v _) = u != v AND shared (f p) (g q) in
+                //  ::ann->ann->ann
+                let cons_maybe a b = check_shared a b => ann_cons a b | b in
+                //
+                (cons_maybe a x,y)
+        in
         //  ::int->string->pexlif->anode
         letrec
-            annotate lvl id p =
+            annotate id p =
                 let
                     traverse _ (P_LEAF _)  = []
                 /\  traverse i (P_HIER ps) =
                         letrec
                             go _ []     = []
                         /\  go c (p:ps) =
-                                let an = annotate (lvl+1) c p in
+                                let an = annotate c p in
                                 an : go (c+size an) ps
                         in
                         go i ps
                 in
-                //
-                let anode  = (mk_ann p (int2str id), []) in
+                // Make/Fetch 'anodes' for this parent 'PINST' and its children.
+                let anode  = (ANN p (int2str id) [], []) in
                 let cs     = traverse (id+1) (_pexlif_content p) in
-                //
-                let anode' = itlist extend cs anode in
-                let cs'    = map (extend anode) cs in
-                let cs''   = map (test cs') cs' in
-                //
+                // Connect "parent<->child" and "child<->child".
+                let anode' = itlist (connect actuals formals) cs anode in
+                let cs'    = map (connect formals actuals anode) cs in
+                let cs''   = map (itlist (connect actuals actuals) cs') cs' in
+                // "Merge" to include parent in resulting 'anode' list.
                 merge cs'' anode'
         in
-        val (sc,adj) = annotate 1 1 pex in (sc:adj)
+        val (sc,adj) = annotate 1 pex in (sc:adj)
 ;
 
 //------------------------------------------------------------------------------
@@ -90,7 +94,7 @@ let
 //  adj_needle::pexlif->[ann]
 let
     adj_build_needle pex =
-        annotate_pexlif (const (const F)) pex
+        annotate_pexlif pex
 ;
 
 // Labels for each possible match at every "level" of a 'pinst'.
@@ -115,10 +119,10 @@ let
         let
             stop 1 _ = F
         /\  stop i p =
-                let pred j q = (i == j + 1) AND attr p == q in
+                let pred j q = (i == j) AND (attr p == q) in
                 NOT (any (curry (flip pred)) matches)
         in
-        annotate_pexlif stop pex
+        annotate_pexlif pex
 ;
 
 //==============================================================================
@@ -127,24 +131,14 @@ let
 //
 //==============================================================================
 
-// Creates a list of 'max' elements with an 'T' at index 'i' if 'i' is present
-// in the list 'xs' and 'F' if not.
-//  fill::int->(int list)->(bool list)
-let fill max xs =
-        letrec
-            fill 0 rs = rs
-        /\  fill n rs = F : fill (n-1) rs
-        in
-        letrec
-            build n rs []     = fill (max-n) rs
-        /\  build n rs (a:as) = build a (T : fill (a-n-1) rs) as
-        in
-        rev (build 0 [] xs)
-;
-
 // Construct an adjacency matrix (shared wires) for a 'PEXLIF'.
 //  adjacency_matrix::(ann list)->(bool mat)
-let adjacency_matrix as = map (fill (length as) # ann_adj_id) as;
+let adjacency_matrix as =
+    let len    = length as in
+    let matrix = replicate len (replicate len F) in
+    let mark a = ixmap (\x. \i. elem i a) in
+    (map2 (mark # ann_adj_id) as matrix)
+;
 
 //==============================================================================
 //
@@ -409,6 +403,8 @@ let
 //
 //==============================================================================
 
+// TODO: Ignore first PINST "wrapper" in needle by discarding first row in its
+//       adj. matrix and iso. match matrix.
 let
     isomatch cmp p_pex g_pex =
         // Needle.
