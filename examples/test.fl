@@ -1,35 +1,170 @@
-load "examples/isomatch.fl";
+load (DIR^"isomatch.fl");
 load "ste.fl";
 
-let g_pex = verilog2pexlif "-Iexamples/mux" "mux4" ["small.v"] [];
-let p_pex = verilog2pexlif "-Iexamples/mux" "mux2" ["small_lib.v"] [];
-(g_pex fseq p_pex fseq print "Finished loading.\n");
+let cmp = cmp_fp;
 
-//--------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
-let sol = isomatch pex_fp (g_pex, 1) (p_pex, 0);
-print_all sol;
+let not =
+    bit_input a.
+    bit_output b.
+    CELL "draw_hier not" [
+        b <- '~' a
+    ];
+let not_pex = not 'a 'b;
+not_pex;
 
-//--------------------------------------------------------------------------------
+let xor =
+    bit_input a b.
+    bit_output c.
+    CELL "draw_hier xor" [
+        c <- a '^' b
+    ];
+let xor_pex = xor 'a 'b 'c;
+xor_pex;
 
-val [_,_,[(sp3,sg3)]] = sol;
-let p3 = pexlif_of_scheme sp3;
-let g3 = pexlif_of_scheme sg3;
-//
-let sc_g3 = adj_build g3 (-1);
-let adj_g3 = adjacency_matrix sc_g3;
-//
-let sc_p3 = adj_build p3 (-1);
-let adj_p3 = adjacency_matrix sc_p3;
-//
-let iso_m3 = isomatch_matrix sc_g3 sc_p3 pex_fp;
-let res3 = recurse iso_m3 adj_g3 adj_p3;
-//
-let sol3 = recover sc_g3 sc_p3 res3;
+let rox =
+    bit_input a b.
+    bit_output c.
+    CELL "draw_hier rox" [
+        c <- b '^' a
+    ];
+let rox_pex = rox 'a 'b 'c;
+rox_pex;
 
-//--------------------------------------------------------------------------------
+let buf1 =
+    bit_input a.
+    bit_output out.
+    bit_internal mid.
+    CELL "draw_hier buf1" [
+      mid <- '~' a,
+      out <- '~' mid
+    ];
+let buf1_pex = buf1 'a 'out;
+buf1_pex;
 
-let ex = expand pex_fp sol;
-print_all_ex sol ex;
+let buf2 =
+    bit_input x.
+    bit_output y.
+    bit_internal mid.
+    CELL "draw_hier buf2" [
+      mid <- '~' x,
+      y <- '~' mid
+];
+let buf2_pex = buf2 'x 'y;
+buf2_pex;
 
-//--------------------------------------------------------------------------------
+let buf3 =
+    bit_input a.
+    bit_output out.
+    bit_internal oink.
+    CELL "draw_hier buf3" [
+      oink <- '~' a,
+      out <- '~' oink
+    ];
+let buf3_pex = buf3 'a 'out;
+buf3_pex;
+
+letrec inv_rec n =
+    bit_input    a.
+    bit_output  out.
+    bit_internal mid.
+    CELL "draw_hier inv_rec" (
+      n = 1 => [ out <- '~' a ] |
+      [
+          mid <- '~' a,
+          inv_rec (n-1) mid out
+      ]);
+let buf4 =
+    bit_input    a.
+    bit_output  out.
+    CELL "buf4" [
+        inv_rec 2 a out
+    ];
+let buf4_pex = buf4 'a 'out;
+buf4_pex;
+
+let needle_pex = not_pex;
+let needle_pex = buf1_pex;
+
+//------------------------------------------------------------------------------
+
+let haystack =
+    bit_input a.
+    bit_output b.
+    bit_internal t1 t2 t3.
+    CELL "draw_hier h1" [
+        not a  t1,
+        not t1 t2,
+        not t2 t3,
+        not t3 b
+    ];
+let haystack_pex = haystack 'a 'b;
+
+letrec haystack n =
+    bit_input a.
+    bit_output b.
+    bit_internal t.
+    CELL (sprintf "h2 %d" n) (
+    n == 0 =>
+      [
+          not a b
+      ] | [
+          not a t,
+          h2 (n-1) t b
+      ] );
+let haystack_pex = haystack 3 'a 'b;
+
+let haystack =
+    bit_input a b.
+    bit_output c.
+    bit_internal t.
+    CELL "draw_hier h3" [
+        not a t,
+        xor a b c,
+        xor t a c,
+        not c c
+    ];
+let haystack_pex = haystack 'a 'b 'c;
+
+let haystack =
+    bit_input a.
+    bit_output o.
+    CELL "draw_hier haystack" [
+        inv_rec 2 a o
+    ];
+let haystack_pex = haystack 'a 'o;
+
+let haystack =
+    bit_input a.
+    bit_output o1 o2.
+    bit_internal mid.
+    CELL "draw_hier haystack" [
+        mid <- '~' a,
+        o1 <- '~' mid,
+        o2 <- '~' mid
+    ];
+let haystack_pex = haystack 'a 'o1 'o2;
+
+let haystack =
+    bit_input a b c d e f.
+    bit_output o1 o2 o3 o4 o5 o6 o7.
+    bit_internal mid.
+    CELL "draw_hier haystack" [
+      buf1 a o1,
+      buf2 b o2,
+      buf3 c o3,
+      inv_rec 2 d o4,
+      buf4 e o5,
+      mid <- '~' f,
+      o6 <- '~' mid,
+      o7 <- '~' mid
+    ];
+let haystack_pex = haystack 'a 'b 'c 'd 'e 'f 'o1 'o2 'o3 'o4 'o5 'o6 'o7;
+
+needle_pex;
+haystack_pex;
+isomatch cmp needle_pex haystack_pex;
+DBG_isomatch cmp needle_pex haystack_pex;
+
+//------------------------------------------------------------------------------
