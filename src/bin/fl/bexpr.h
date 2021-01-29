@@ -56,7 +56,7 @@ typedef enum {
     BE_ONE = 3
 } be_type;
 
-#define NBR_SIGNATURES	4
+#define NBR_SIGNATURES	1
 
 typedef struct bexpr_rec {
     be_type	    type:2;

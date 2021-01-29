@@ -8,7 +8,7 @@
 // Misc. combinators.
 
 // Boolean implication.
-let <==> a b = (a ==> b) AND (b ==> a);
+let <==> a b = a = b;
 infix 2 <==>;
 
 // Check if 'p' is satisfied with all elements of 'as'.
@@ -148,6 +148,10 @@ let ixmap f xs = ixlist (\x. \ix. cons (f x ix)) xs [];
 let ixlabel = flip zip_uneven (iterate (add 1) 1);
 
 // ...
+//  find_maybe::(a->bool)->a->(a list)->a
+let find_maybe f x xs = let i = find_first0 f xs in i == 0 => x | (el i xs);
+
+// ...
 //  span::(a->bool)->(a list)->((a list)#(a list))
 letrec
     span _ []     = ([], [])
@@ -182,7 +186,7 @@ let list_update v i = modify (const v) i;
 
 // Checks if an element is a memeber of the given list.
 //  elem::a->(a list)->bool
-let elem a as = find_first0 (equal a) as == 0 => F | T;
+let elem a as = find_first0 (equal a) as != 0;
 
 // Left-shift a list one element.
 //  rotate::(a list)->(a list)
@@ -255,6 +259,9 @@ let string_butlast s = string_butlastn s 1;
 //  string_empty::string->bool
 let string_empty s = strlen s == 0;
 
+//==============================================================================
+// ...
+
 // Short-hand for printing of matrices.
 //  matrix2str::bool->string->string->string->string->(*->string)->((* list) list)->string
 let
@@ -268,6 +275,10 @@ let mat2str = matrix2str T "[" "\n," "," "]";
 
 // ...
 let b2str b = b => "T" | "F";
+
+// ...
+//  fa2str::(string#(string list)) list->string
+let fa2str = list2str T "[" "," "]" (\(f,as). sprintf "(%s,%S)" f as);
 
 //==============================================================================
 // SHA256.
@@ -287,27 +298,43 @@ let _pexlif_fa_outs   (PINST _ _ _ _ o _ _) = o;
 let _pexlif_internals (PINST _ _ _ _ _ t _) = t;
 let _pexlif_content   (PINST _ _ _ _ _ _ c) = c;
 
-// Fetch the specified attribute. If none exists, returns the empty string.
-//  find_signature::string->(string#string list)->string
-let
-    find_attr s as =
-        let ix = find_first0 (equal s # fst) as in
-        ix == 0 => "" | snd (el ix as)
-;
-
-
-// Fetch the "fingerprint" attribute. If none exists, returns zero.
+// Fetch attribute 's'. If none exists, returns 'a'.
+//  find_attr::string->string->(string#string list)->string
+let find_attr s a = snd # find_maybe (equal s # fst) ("",a);
 //  find_fingerprint::(string#string list)->int
+let find_fingerprint = s2int # find_attr "fingerprint" "0";
+//  find_signature::(string#string list)->string
+let find_signature = find_attr "signature" "";
+
+//------------------------------------------------------------------------------
+
+//  lineup::(formal#(actual list) list)->(formal#actual list)
+let lineup = flatmap (curry zip # both md_expand_vector md_expand_vectors);
+//  raise::(formal#actual list)->(formal list)->(actual list)
+let raise = map # subst;
+//  lower::(formal#actual list)->(actual list)->(formal list)
+let lower = map # rev_subst;
+//  promote::(a->b)->(formal#actual list)->(formal#actual list)->(a#a list)->(b#b list)
+let promote f ns hs = curry zip # both (f ns) (f hs) # unzip;
+
+// Turns a subst. of formals into one over actuals.
+let formalize fa_n fa_h = promote raise (lineup fa_n) (lineup fa_h);
+
+// Turns a subst. of actuals into one over formals.
+let actualize fa_n fa_h = promote lower (lineup fa_n) (lineup fa_h);
+
+//------------------------------------------------------------------------------
+
+//  actuals::pexlif->[string]
 let
-    find_fingerprint as =
-        let fp = find_attr "fingerprint" as in
-        string_empty fp => 0 | s2int fp
+    actuals (PINST _ _ _ fa_inps fa_outs _ _) =
+        flatmap (md_expand_vectors # snd) (fa_inps @ fa_outs)
 ;
 
-// Fetch the "signature" attribute. If none exists, returns the empty string.
-//  find_signature::(string#string list)->string
+//  formals::pexlif->[string]
 let
-    find_signature as = find_attr "signature" as
+    formals (PINST _ _ _ fa_inps fa_outs _ _) =
+        flatmap (md_expand_vector # fst) (fa_inps @ fa_outs)
 ;
 
 //==============================================================================

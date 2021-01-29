@@ -1557,7 +1557,7 @@ be_subst(bexpr be)
 	bexpr old_r = BE_GET_RIGHT(b);
 	bexpr new_r = be_subst(old_r);
 	if( old_l == new_l && old_r == new_r ) {
-	    res = be;
+	    res = b;
 	} else {
 	    res = be_and(new_l, new_r);
 	}

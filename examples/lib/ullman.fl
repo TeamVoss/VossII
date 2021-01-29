@@ -1,0 +1,124 @@
+load (DIR^"utils.fl");
+
+//==============================================================================
+//
+// Ullman’s Subgraph Isomorphism Algorithm.
+//   G - Graph, or puzzle/haystack.
+//   P - Potential subgraphs of G, or piece/needle.
+//   M - |V(P)| x |V(G)| matrix that encodes possible subgraph isomorphisms.
+//
+//==============================================================================
+
+//==============================================================================
+// Pruning of match matrix.
+
+// Filter every index in a vector 'xs' using 'p'.
+//  filter_cols::(a->bool)->(a list)->(int list)
+let filter_cols p xs = ixlist (\x. \ix. \ys. p x => ix : ys | ys) xs [];
+
+// Filter every pair of indices in matrix 'xs' using 'p'.
+//  filter_rows::(a->bool)->(a mat)->((int#int) list)
+let filter_rows p xs = ixlist (\x. \ix. \ys. map (pair ix) (filter_cols p x) @ ys) xs [];
+
+// Iterate over every mat. index that is a possible match.
+//  forall_ones::(bool mat)->((int#int)->a->a)->a->a
+let forall_ones mat f = sitlist f (filter_rows id mat);
+
+// Iterate over every index in a col. that is a possible match.
+//  forall_neighbors::int->(bool mat)->(int->a->a)->a->a
+let forall_neighbors i mat f = sitlist f (filter_cols id (el i mat));
+
+// Thin the possible set of isomorphisms. The general idea is that, if we have
+// M(x,y) then any neighbor v of x in P should have a neighbor u in G s.t.
+// M(v,u) holds. Otherwise M(x,y) cannot be a solution.
+//
+// prune(...)
+// do
+//   for all (i,j) where M is 1
+//     for all neighbors x of vi in P
+//       if there is no neighbor y of vj in G s.t. M(x,y)
+//         M(i,j) := F
+// while M was changed
+//
+//  prune::(bool mat)->(bool mat)->(bool mat)->(bool mat)
+letrec
+    prune m g p =
+        val m' =
+            forall_ones m (\(i,j).
+                forall_neighbors i p (\vi. \n.
+                    forall_neighbors j g (\vj. const T) F
+                        => n | mat_update F (i,j) n
+                )
+            ) m
+        then m != m' => prune m' g p | m'
+;
+
+//==============================================================================
+// Main "matching" algo.
+
+// "Dot-product" of two lists of booleans.
+//  dot::(bool list)->(bool list)->bool
+let dot xs ys = itlist (\z. \b. z OR b) (map2 (\x. \y. x AND y) xs ys) F;
+
+// "Matrix multiplication" of two boolean matrices.
+//  mult::(bool mat)->(bool mat)->(bool mat)
+let mult m n = val n' = transpose n then map (pam n' # dot) m;
+
+// Mark every el. as 'F', except the 'n'th el. that is marked as 'T'.
+//  mark_one::int->(bool list)->(bool list)
+let mark_one n xs = modify (const T) n (map (const F) xs);
+
+// Iterate over all unused row-indices.
+//  forall_unused::(bool mat)->int->(bool list)
+//               ->(int->(bool mat)->((bool mat) list))
+//               ->((bool mat) list)
+let forall_unused m row used f =
+        let unused = filter (NOT # flip el used) (filter_cols id (el row m)) in
+        sitlist (\c. \ms. f c m @ ms) unused []
+;
+
+// Check that wether 'm' is a valid morphism for 'p' and 'g'.
+//  isomorphism::(bool mat)->(bool mat)->(bool mat)->bool
+let
+    isomorphism mat p g =
+        let only_one_solution mat =
+            val (rs,cs) = unzip (filter_rows id mat) then
+            let unique xs = setify xs == xs in
+            unique rs AND unique cs
+        in
+        only_one_solution mat AND p == mult mat (transpose (mult mat g))
+;
+
+// Find ...
+//
+// recurse(used, row, P, G, M)
+//   if row = num_rows(M) + 1
+//     if M is an isomorphism
+//        output yes and end the algorithm
+//     if not
+//        output no
+//   N = prune(M)
+//   for all unused columns c in N[row]
+//     N' = set all columns in N[row] to zero but column c
+//     used' = mark c as used
+//     recurse(used', row+1, P, G, N')
+//   output no
+//
+//  recurse::(bool mat)->(bool mat)->(bool mat)->((bool mat) list)
+letrec
+    recurse mat p g =
+        let solution m = isomorphism m p g => [m] | [] in
+        letrec
+            go m cs r = r == num_rows mat + 1 => solution m |
+                val m' = prune m g p then
+                forall_unused m' r cs (\c. \n.
+                    let n'  = modify (mark_one c) r n  in
+                    let cs' = modify (const T)    c cs in
+                    go n' cs' (r+1)
+                )
+        in
+        go mat (replicate (num_columns mat) F) 1
+;
+
+//==============================================================================
+// Fin.

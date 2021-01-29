@@ -64,6 +64,32 @@ map @A :silent 'a,'z call Send_fl_lines()<CR><CR>'z
 map @Z 'z:silent '',. call Send_fl_lines()<CR><CR>'z
 " All of buffer
 map <silent> @B :w! ./.fl_tmp<CR>:! echo 'load "./.fl_tmp";' >> $fl_inp<CR><CR><CR><CR>
+" --------- Comment out regions -------------
+" Single line
+map )) :silent s@^@//@<CR>
+" To end of paragraph
+map )} }:silent '',.  s@^@//@<CR>
+" From beginning of paragraph
+map <silent> ){ {)}
+" To end of file
+map )G G:silent '',. s@^@//@<CR>G
+" To end of page
+map )L L:silent '',. s@^@//@<CR>L
+" From current to 'z mark
+map )Z 'z:silent '',. s@^@//@<CR><CR>'z
+" --------- Uncomment regions -------------
+" Single line
+map (( :silent s@^//@@<CR>
+" To end of paragraph
+map (} }:silent '',.  s@^//@@<CR>
+" From beginning of paragraph
+map <silent> ({ {(}
+" To end of file
+map (G G:silent '',. s@^//@@<CR>G
+" To end of page
+map (L L:silent '',. s@^//@@<CR>L
+" From current to 'z mark
+map (Z 'z:silent '',. s@^//@@<CR><CR>'z
 
 :endif
 

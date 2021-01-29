@@ -1031,60 +1031,6 @@ Get_userdef_name(g_ptr node)
 }
 
 
-
-g_ptr
-Get_Matching_Functions(string name_pat,
-                       string file_pat,
-                       string arg_type_pat,
-                       string res_type_pat)
-{
-    hash_record done;
-    create_hash(&done, 100, str_hash, str_equ);
-    fn_ptr list = symb_tbl->def_list;
-    g_ptr res = Make_NIL();
-    while( list != NULL ) {
-        if( !list->visible )
-            goto do_next;
-	if( find_hash(symb_tbl->tbl_ptr, (pointer) list->name) == NULL )
-            goto do_next;
-        if( STREQ(s_dummy, list->name) )
-            goto do_next;
-        if( strncmp(list->name, "__DeStRuCtOr", 12) == 0 )
-            goto do_next;
-        if( !check_match(name_pat, list->name) )
-            goto do_next;
-        if( !check_match(file_pat, list->file_name) )
-            goto do_next;
-        if( check_type_match(arg_type_pat, res_type_pat, list->type) ) {
-            if( find_hash(&done, list->name) == NULL ) {
-                res = Make_CONS_ND(Make_STRING_leaf(list->name), res);
-                insert_hash(&done, list->name, list->name);
-            }
-            goto do_next;
-        }
-        if( list->overload_list != NULL ) {
-            oll_ptr cur = list->overload_list;
-            bool found = FALSE;
-            while( !found && cur != NULL ) {
-                if( cur->fn->visible &&
-                    check_type_match(arg_type_pat, res_type_pat, cur->fn->type)
-                  )
-                {
-                    found = TRUE;
-                    if( find_hash(&done, list->name) == NULL ) {
-                        res = Make_CONS_ND(Make_STRING_leaf(list->name), res);
-                        insert_hash(&done, list->name, list->name);
-                    }
-                }
-                cur = cur->next;
-            }
-        }
-      do_next:
-        list = list->next;
-    }
-    return res;
-}
-
 static string
 do_special_help(string name)
 {
@@ -1472,6 +1418,90 @@ get_fixity(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
+static int
+fn_cmp(const void *pi, const void *pj)
+{
+    string *i = (string *) pi;
+    string *j = (string *) pj;
+    return( strcmp(*i, *j) );
+}
+
+static void
+get_matching_functions(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_name_pat, g_file_pat, g_arg_type_pat, g_res_type_pat, g_max_cnt;
+    EXTRACT_5_ARGS(redex, g_name_pat, g_file_pat, g_arg_type_pat,
+			  g_res_type_pat, g_max_cnt);
+    string name_pat = GET_STRING(g_name_pat);
+    string file_pat = GET_STRING(g_file_pat);
+    string arg_type_pat = GET_STRING(g_arg_type_pat);
+    string res_type_pat = GET_STRING(g_res_type_pat);
+    int	   max_cnt = GET_INT(g_max_cnt);
+
+    hash_record done;
+    create_hash(&done, 100, str_hash, str_equ);
+    fn_ptr list = symb_tbl->def_list;
+    buffer  rbuf;
+    new_buf(&rbuf, 100, sizeof(string));
+    while( list != NULL ) {
+        if( !list->visible )
+            goto do_next;
+	if( find_hash(symb_tbl->tbl_ptr, (pointer) list->name) == NULL )
+            goto do_next;
+        if( STREQ(s_dummy, list->name) )
+            goto do_next;
+        if( strncmp(list->name, "__DeStRuCtOr", 12) == 0 )
+            goto do_next;
+        if( !check_match(name_pat, list->name) )
+            goto do_next;
+        if( !check_match(file_pat, list->file_name) )
+            goto do_next;
+        if( check_type_match(arg_type_pat, res_type_pat, list->type) ) {
+            if( find_hash(&done, list->name) == NULL ) {
+		push_buf(&rbuf, (pointer) &(list->name));
+                insert_hash(&done, list->name, list->name);
+            }
+            goto do_next;
+        }
+        if( list->overload_list != NULL ) {
+            oll_ptr cur = list->overload_list;
+            bool found = FALSE;
+            while( !found && cur != NULL ) {
+                if( cur->fn->visible &&
+                    check_type_match(arg_type_pat, res_type_pat, cur->fn->type)
+                  )
+                {
+                    found = TRUE;
+                    if( find_hash(&done, list->name) == NULL ) {
+			push_buf(&rbuf, (pointer) &(list->name));
+                        insert_hash(&done, list->name, list->name);
+                    }
+                }
+                cur = cur->next;
+            }
+        }
+      do_next:
+        list = list->next;
+    }
+    qsort(START_BUF(&rbuf), COUNT_BUF(&rbuf), sizeof(string), fn_cmp);
+    MAKE_REDEX_NIL(redex);
+    g_ptr tail = redex;
+    string  *namep;
+    FOR_BUF(&rbuf, string, namep) {
+	if( max_cnt > 0 ) {
+	    APPEND1(tail, Make_STRING_leaf(*namep));
+	}
+	max_cnt--;
+    }
+    if( max_cnt <= 0 ) {
+	APPEND1(tail, Make_STRING_leaf(wastrsave(&strings, "...")));
+    }
+    free_buf (&rbuf); 
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
 
 
 void
@@ -1483,6 +1513,19 @@ Symbols_Install_Functions()
     Add_ExtAPI_Function("get_fixity", "1", TRUE,
                         GLmake_arrow(GLmake_string(),GLmake_string()),
                         get_fixity);
+    Add_ExtAPI_Function("get_matching_functions", "11111", TRUE,
+                        GLmake_arrow(
+			  GLmake_string(),
+			  GLmake_arrow(
+			    GLmake_string(),
+			    GLmake_arrow(
+			      GLmake_string(),
+			      GLmake_arrow(
+				GLmake_string(),
+				GLmake_arrow(
+				  GLmake_int(),
+				  GLmake_list(GLmake_string())))))),
+                        get_matching_functions);
 
 }
 

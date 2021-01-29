@@ -308,6 +308,7 @@ clet is_var (W_VAR _ _) = T
 clet is_vars l = itlist (\v.\r. is_var v AND r) l T;
 
 let is_binary_base (W_EQ  a b)  = (is_var a) AND (is_var b)
+ /\ is_binary_base (W_NOT (W_EQ a b))  = (is_var a) AND (is_var b)
  /\ is_binary_base (W_GR  a b)  = (is_var a) AND (is_var b)
  /\ is_binary_base (W_AND a b)  = (is_var a) AND (is_var b)
  /\ is_binary_base (W_NOT (W_AND a b))  = (is_var a) AND (is_var b)
@@ -325,6 +326,7 @@ let is_binary_base (W_EQ  a b)  = (is_var a) AND (is_var b)
 ;
 
 let get_binary_draw_cmd (W_EQ  a b)  = "draw_binary_arithm {=}"
+ /\ get_binary_draw_cmd (W_NOT (W_EQ a b))  = "draw_binary_arithm {!=}"
  /\ get_binary_draw_cmd (W_GR  a b)  = "draw_binary_arithm {>}"
  /\ get_binary_draw_cmd (W_AND  a b) = "draw_and2"
  /\ get_binary_draw_cmd (W_NOT (W_AND  a b)) = "draw_nand2"
@@ -400,6 +402,9 @@ clet opt_base_compact_wprint inps rhs =
 	sprintf "draw_unary_arithm {-%d}" v
      /\ special (W_EQ var (W_CONST sz v)) assuming (is_var var AND v < 10) =
 	sprintf "draw_unary_arithm {=%d}" v
+     /\ special (W_NOT (W_EQ var (W_CONST sz v)))
+		assuming (is_var var AND v < 10) =
+	sprintf "draw_unary_arithm {!=%d}" v
      /\ special (W_EQ var (W_CONST sz v)) assuming (is_var var) =
 	sprintf "draw_hfl {=0x%x}" v
      /\ special (W_PRED name cond) =
@@ -463,33 +468,33 @@ let is_wide_AND e  =
 ;
 
 clet is_binary (W_EQ  a b)  = T
- /\ is_binary (W_GR  a b)  = T
- /\ is_binary (W_AND a b) = T
- /\ is_binary (W_OR  a b)  = T
- /\ is_binary (W_ADD a b)  = T
- /\ is_binary (W_SUB a b)  = T
- /\ is_binary (W_MUL a b)  = T
- /\ is_binary (W_DIV a b)  = T
- /\ is_binary (W_MOD a b)  = T
- /\ is_binary (W_SHL a b)  = T
- /\ is_binary (W_SHR a b)  = T
- /\ is_binary (W_ASHR a b) = T
- /\ is_binary other = F
+  /\ is_binary (W_GR  a b)  = T
+  /\ is_binary (W_AND a b) = T
+  /\ is_binary (W_OR  a b)  = T
+  /\ is_binary (W_ADD a b)  = T
+  /\ is_binary (W_SUB a b)  = T
+  /\ is_binary (W_MUL a b)  = T
+  /\ is_binary (W_DIV a b)  = T
+  /\ is_binary (W_MOD a b)  = T
+  /\ is_binary (W_SHL a b)  = T
+  /\ is_binary (W_SHR a b)  = T
+  /\ is_binary (W_ASHR a b) = T
+  /\ is_binary other = F
 ;
 
 clet split_binary (W_EQ  a b)  = W_EQ, a, b
- /\ split_binary (W_GR  a b)  = W_GR, a, b
- /\ split_binary (W_AND  a b) = W_AND, a, b
- /\ split_binary (W_OR  a b)  = W_OR, a, b
- /\ split_binary (W_ADD a b)  = W_ADD, a, b
- /\ split_binary (W_SUB a b)  = W_SUB, a, b
- /\ split_binary (W_MUL a b)  = W_MUL, a, b
- /\ split_binary (W_DIV a b)  = W_DIV, a, b
- /\ split_binary (W_MOD a b)  = W_MOD, a, b
- /\ split_binary (W_SHL a b)  = W_SHL, a, b
- /\ split_binary (W_SHR a b)  = W_SHR, a, b
- /\ split_binary (W_ASHR a b) = W_ASHR, a, b
- /\ split_binary other = error "Should not happen"
+  /\ split_binary (W_GR  a b)  = W_GR, a, b
+  /\ split_binary (W_AND  a b) = W_AND, a, b
+  /\ split_binary (W_OR  a b)  = W_OR, a, b
+  /\ split_binary (W_ADD a b)  = W_ADD, a, b
+  /\ split_binary (W_SUB a b)  = W_SUB, a, b
+  /\ split_binary (W_MUL a b)  = W_MUL, a, b
+  /\ split_binary (W_DIV a b)  = W_DIV, a, b
+  /\ split_binary (W_MOD a b)  = W_MOD, a, b
+  /\ split_binary (W_SHL a b)  = W_SHL, a, b
+  /\ split_binary (W_SHR a b)  = W_SHR, a, b
+  /\ split_binary (W_ASHR a b) = W_ASHR, a, b
+  /\ split_binary other = error "Should not happen"
 ;
 
 clet base_assignment make_draw_command lhs rhs =
@@ -3023,5 +3028,23 @@ let find_free_vars expr =
     in
     let free = findfree [] expr then
     print (list2str T "" "\n" "\n" (sprintf "    internal  %s.") (setify free))
+;
+
+// Expression for bitwise OR-ing together a list of signals.
+let OR_n l =
+    l = [] => error "OR_n for empty list" |
+    accumulate (defix '|') l
+;
+
+// Expression for bitwise AND-ing together a list of signals.
+let AND_n l =
+    l = [] => error "AND_n for empty list" |
+    accumulate (defix '&') l
+;
+
+// Expression for bitwise XOR-ing together a list of signals.
+let XOR_n l =
+    l = [] => error "XOR_n for empty list" |
+    accumulate (defix '^') l
 ;
 

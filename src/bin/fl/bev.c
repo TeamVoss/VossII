@@ -28,6 +28,9 @@ static char	    bev_str_buf[4096];
 static g_ptr	    Zero;
 static g_ptr	    One;
 
+
+static int	    sx2(g_ptr *lp1, g_ptr *lp2);
+
 /********************************************************/
 /*                    LOCAL FUNCTIONS    		*/
 /********************************************************/
@@ -176,29 +179,12 @@ bev_eq_fn(pointer p1, pointer p2, bool identical)
     bev_ptr bp2 = (bev_ptr) p2;
     g_ptr   l1 = bp1->u.l;
     g_ptr   l2 = bp2->u.l;
-    int	    len1 = get_bev_length(l1);
-    int	    len2 = get_bev_length(l2);
-    // Make the first list shorter or equal to the second list
-    if( len1 > len2 ) {
-	int len = len2;
-	len2 = len1;
-	len1 = len;
-	g_ptr l = l2;
-	l2 = l1;
-	l1 = l;
-    }
-    bexpr b1 = GET_BEXPR(GET_CONS_HD(l1));
-    while( len2 > len1 ) {
-	bexpr b2 = GET_BEXPR(GET_CONS_HD(l2));
-	if( !BE_Equal(b1, b2) ) { return( B_Zero() ); }
-	len2--;
-	l2 = GET_CONS_TL(l2);
-    }
-    while( len2 > 0 ) {
+    int len = sx2(&l1, &l2);
+    while( len > 0 ) {
 	bexpr b1 = GET_BEXPR(GET_CONS_HD(l1));
 	bexpr b2 = GET_BEXPR(GET_CONS_HD(l2));
 	if( !BE_Equal(b1, b2) ) { return( B_Zero() ); }
-	len2--;
+	len--;
 	l1 = GET_CONS_TL(l1);
 	l2 = GET_CONS_TL(l2);
     }

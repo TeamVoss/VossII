@@ -1872,13 +1872,6 @@ get_prim_fun_type(g_ptr node)
 	case P_HELP:
 	    type = (make_arrow(string_op, string_op));
 	    break;
-	case P_GET_MATCHING_FNS:
-	    type = (make_arrow(string_op,
-		      make_arrow(string_op,
-			make_arrow(string_op,
-			  make_arrow(string_op,
-			    make_list(string_op))))));
-	    break;
 	case P_EXTAPI_FN:
 	    type = Get_ExtAPI_Type( GET_EXTAPI_FN(node) );
 	    type = fresh_inst_rec(type);
