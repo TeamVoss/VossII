@@ -37,92 +37,50 @@ let mk_ann pex label = ANN pex label [];
 //  ann_cons::ann->ann->ann
 let ann_cons x (ANN p l a) = (ANN p l (x:a));
 
-//  ann_adj_id::ann->(int list)
-let ann_adj_id = map (s2int # _ann_lbl) # _ann_adj;
-
 //------------------------------------------------------------------------------
 
 // Traverse a 'PINST' and record every node's adjacencies to other nodes.
 //  annotate_pexlif::pexlif->[ann]
 let
-    annotate_pexlif pex =
-        //  ::anode->int
-        let size (_,a) = 1 + length a in
-        //  ::(anode list)->anode->anode
-        let merge cs = second (itlist (append # curry cons) cs) in
-        //  ::(anode list)->anode->anode
-        let connect f g (a,_) (x,y) =
+    annotate_pexlif inst pex =
+        let
+            connect f g x y =
                 //  ::(string list)->(string list)->bool
-                let shared x y = NOT (empty (x intersect y)) in
+                let
+                    shared x y =
+                        (NOT (empty (x intersect y))) AND
+                        (NOT (empty x)) AND
+                        (NOT (empty y))
+                in
                 //  ::ann->ann->bool
                 let check_shared (ANN p u _) (ANN q v _) = u != v AND shared (f p) (g q) in
-                //  ::ann->ann->ann
-                let cons_maybe a b = check_shared a b => ann_cons a b | b in
                 //
-                (cons_maybe a x,y)
+                //val (ANN px lx _) = x in
+                //val (ANN py ly _) = y in
+                //(fprintf stderr "connect-x(%s):%S\n" lx (f px)) fseq
+                //(fprintf stderr "connect-y(%s):%S\n" ly (g py)) fseq
+                //(fprintf stderr "connect:%s\n" (b2str (check_shared x y))) fseq
+                //
+                check_shared x y => ann_cons x y | y
         in
-        //  ::int->string->pexlif->anode
-        letrec
-            annotate id p =
-                let
-                    traverse _ (P_LEAF _)  = []
-                /\  traverse i (P_HIER ps) =
-                        letrec
-                            go _ []     = []
-                        /\  go c (p:ps) =
-                                let an = annotate c p in
-                                an : go (c+size an) ps
-                        in
-                        go i ps
-                in
-                // Make/Fetch 'anodes' for this parent 'PINST' and its children.
-                let anode  = (ANN p (int2str id) [], []) in
-                let cs     = traverse (id+1) (_pexlif_content p) in
-                // Connect "parent<->child" and "child<->child".
-                let anode' = itlist (connect actuals formals) cs anode in
-                let cs'    = map (connect formals actuals anode) cs in
-                let cs''   = map (itlist (connect actuals actuals) cs') cs' in
-                // "Merge" to include parent in resulting 'anode' list.
-                merge cs'' anode'
-        in
-        val (sc,adj) = annotate 1 pex in (sc:adj)
-;
-
-//------------------------------------------------------------------------------
-
-// Builds the 'anode's used to construct an adj. mat. for the needle.
-//  adj_needle::pexlif->[ann]
-let
-    adj_build_needle pex =
-        annotate_pexlif pex
-;
-
-// Labels for each possible match at every "level" of a 'pinst'.
-//  possible_matches::(pexlif->string)->ann->(((string#int) list) list)
-let
-    possible_matches attr sc =
-        //  ::( list)->( list)->( list)
-        let skip vs = filter (NOT # flip elem vs # attr # _ann_pex) in
-        letrec
-            go vs (ANN p _ as) =
-                let l = attr p in
-                l : flatmap (go (l:vs)) (skip vs as)
-        in
-        ixlabel (go [] sc)
-;
-
-// Builds the 'anode's used to construct an adj. mat. for the haystack.
-//  adj_build_haystack::(pexlif->string)->ann->pexlif->[ann]
-let
-    adj_build_haystack attr needle pex =
-        let matches = possible_matches attr needle in
         let
-            stop 1 _ = F
-        /\  stop i p =
-                let pred j q = (i == j) AND (attr p == q) in
-                NOT (any (curry (flip pred)) matches)
+            annotate (P_LEAF  _) = []
+        /\  annotate (P_HIER ps) =
+                letrec
+                    go _ []     = []
+                /\  go i (p:ps) = ANN p (sprintf "%s/%d" inst i) [] : go (i+1) ps
+                in
+                go 1 ps
         in
-        annotate_pexlif pex
+        // Annotate parent/child.
+        let p  = ANN pex inst [] in
+        let cs = annotate (_pexlif_content pex) in
+        // Connect "parent<->child" and "child<->child".
+        let p'   = itlist (connect actuals formals) cs p in
+        let cs'  = map (connect formals actuals p) cs in
+        let cs'' = map (itlist (connect actuals actuals) cs') cs' in
+        // Return list of marked nodes.
+        p':cs''
 ;
 
 //==============================================================================
@@ -131,13 +89,33 @@ let
 //
 //==============================================================================
 
+// Builds the 'anode's used to construct an adj. mat. for the needle.
+//  adj_needle::string->pexlif->(ann list)
+let adj_needle inst pex = annotate_pexlif inst pex;
+
+// Builds the 'anode's used to construct an adj. mat. for the haystack.
+//  adj_build_haystack::string->pexlif->(ann list)
+let adj_haystack inst pex = annotate_pexlif inst pex;
+
 // Construct an adjacency matrix (shared wires) for a 'PEXLIF'.
 //  adjacency_matrix::(ann list)->(bool mat)
-let adjacency_matrix as =
-    let len    = length as in
-    let matrix = replicate len (replicate len F) in
-    let mark a = ixmap (\x. \i. elem i a) in
-    (map2 (mark # ann_adj_id) as matrix)
+let
+    adjacency_matrix [] = []
+/\  adjacency_matrix (a:as) =
+        // 
+        let len     = length (a:as) in
+        let matrix  = replicate len (replicate len F) in
+        let mark a  = ixmap (const (\i. elem i a)) in
+        //
+        let size    = strlen (_ann_lbl a) in
+        let parse s = string_empty s => 1 | 1 + s2int (string_butfirst s) in
+        let index   = parse # flip string_butfirstn size # _ann_lbl in
+        let order   = map index # _ann_adj in
+        //
+        //(foreach (\x.  fprintf stderr "%s\n" (Pann x)) (a:as)) fseq
+        //(foreach (\xs. fprintf stderr "%S\n" (map (\x. sprintf "%d" x) xs)) (map order (a:as))) fseq
+        //
+        (map2 mark (map order (a:as)) matrix)
 ;
 
 //==============================================================================
@@ -146,51 +124,13 @@ let adjacency_matrix as =
 //
 //==============================================================================
 
-//  replace_columns::((int#(* list)) list)->(* mat)->(* mat)
-let
-    replace_columns cset mat =
-        let replace i x = (assoc i cset) catch x in
-        transpose (ixmap (flip replace) (transpose mat))
-;
-
-// Remove every 'sc' and their adjacent nodes from the possible iso. solutions.
-//  trim::(ann list)->(bool mat)->(bool mat)
-let
-    trim_ann sc iso =
-        letrec
-            adj s = ann_adj_id s @ flatmap adj (_ann_adj s)
-        in
-        let none = replicate (length iso) F in
-        let aset = flatmap (\s. s2int (_ann_lbl s) : adj s) sc in
-        transpose (ixmap (\r. \ix. elem ix aset => none | r) (transpose iso))
-;
-
-//------------------------------------------------------------------------------
-
-// ...
-//  trim_non_top_matches::(ann list)->(ann list)->(bool mat)->(bool mat)
-let
-    trim_non_top_matches as_g as_p iso = 
-        let poss_top = filter_cols id (hd iso) in
-        let act_top  = ann_adj_id (hd as_g) in
-        let not_top  = filter (NOT # flip elem act_top) poss_top in
-        let rem      = map (flip el as_g) not_top in
-        //
-        trim_ann rem iso
-;
-
 // Construct an isomatch matrix (possible matches) from two ...
 //  isomatch_matrix::(pexlif->string)->[ann]->[ann]->(bool mat)
 let
     isomatch_matrix cmp as_p as_g =
-        // Initial equalities.
         let ps_p = map _ann_pex as_p in
         let ps_g = map _ann_pex as_g in
-        let iso  = map (pam ps_g # equal on cmp) ps_p then
-        // Filter by depth.
-        let iso' = trim_non_top_matches as_g as_p iso then
-        //
-        iso'
+        map (pam ps_g # equal on cmp) ps_p
 ;
 
 //==============================================================================
@@ -403,18 +343,24 @@ let
 //
 //==============================================================================
 
-// TODO: Ignore first PINST "wrapper" in needle by discarding first row in its
-//       adj. matrix and iso. match matrix.
+//  drop_parent::(* mat)->(* mat)
+let drop_parent = transpose # tl # transpose # tl;
+
 let
-    isomatch cmp p_pex g_pex =
+    isomatch cmp p_inst g_inst p_box g_pex =
         // Needle.
-        let sc_p  = adj_build_needle p_pex then
-        let adj_p = adjacency_matrix sc_p then
+        let sc_p   = adj_needle p_inst p_pex then
+        let adj_p  = adjacency_matrix sc_p then
         // Haystack.
-        let sc_g  = adj_build_haystack cmp (hd sc_p) g_pex then
+        let sc_g  = adj_haystack g_inst g_pex then
         let adj_g = adjacency_matrix sc_g then
         // Isomatch.
         let iso = isomatch_matrix cmp sc_p sc_g then
+        // Trim top level 'PINST' in 'p_pex'
+        let sc_p  = tl sc_p in
+        let adj_p = drop_parent adj_p in
+        let iso   = tl iso in
+        // Algo.
         let res = recurse iso adj_p adj_g then
         let ss  = recover_all res adj_p sc_p sc_g then
         // Done.
@@ -422,21 +368,22 @@ let
 ;
 
 //==============================================================================
-//
-// ... Debug.
-//
-//==============================================================================
 
 let
-    DBG_isomatch cmp p_pex g_pex =
+    DBG_isomatch cmp p_inst g_inst p_pex g_pex =
         // Needle.
-        let sc_p  = adj_build_needle p_pex in
+        let sc_p  = adj_needle p_inst p_pex in
         let adj_p = adjacency_matrix sc_p in
         // Haystack.
-        let sc_g  = adj_build_haystack cmp (hd sc_p) g_pex in
+        let sc_g  = adj_haystack g_inst g_pex in
         let adj_g = adjacency_matrix sc_g in
         // Isomatch.
         let iso   = isomatch_matrix cmp sc_p sc_g in
+        // Trim top level 'PINST' in 'p_pex'
+        let sc_p  = tl sc_p in
+        let adj_p = drop_parent adj_p in
+        let iso   = tl iso in
+        // Algo.
         let res   = recurse iso adj_p adj_g in
         let ss    = recover_all res adj_p sc_p sc_g in
 // Debug printing ----------------------

@@ -13,8 +13,12 @@ let p_pex = verilog2pexlif "-Iexamples/mux" "mux2" ["small_lib.v"] [];
 //Emit_pexlif "puzzle.txt" g_pex;
 //Emit_pexlif "piece.txt" p_pex;
 
+// ...
+let piece  = PINST "box" [] F [] [] [] (P_HIER [p_pex]);
+let puzzle = g_pex;
+
 //isomatch cmp p_pex g_pex;
-DBG_isomatch cmp_fp p_pex g_pex;
+DBG_isomatch cmp_fp "1" "1" piece puzzle;
 
 //------------------------------------------------------------------------------
 // Fin.
