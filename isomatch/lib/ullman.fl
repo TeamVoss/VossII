@@ -9,8 +9,9 @@ load (DIR^"utils.fl");
 //
 //==============================================================================
 
-//==============================================================================
-// Pruning of match matrix.
+// Mark every el. as 'F', except the 'n'th el. that is marked as 'T'.
+//  mark_one::int->(bool list)->(bool list)
+let mark_one n xs = modify (const T) n (map (const F) xs);
 
 // Filter every index in a vector 'xs' using 'p'.
 //  filter_cols::(a->bool)->(a list)->(int list)
@@ -21,18 +22,35 @@ let filter_cols p xs = ixlist (\x. \ix. \ys. p x => ix : ys | ys) xs [];
 let filter_rows p xs = ixlist (\x. \ix. \ys. map (pair ix) (filter_cols p x) @ ys) xs [];
 
 // Iterate over every mat. index that is a possible match.
-//  forall_ones::(bool mat)->((int#int)->a->a)->a->a
-let forall_ones mat f = sitlist f (filter_rows id mat);
+//  forall_ones::(bool mat)->a->((int#int)->a->a)->a
+let forall_ones mat x f = sitlist f (filter_rows id mat) x;
 
 // Iterate over every index in a col. that is a possible match.
 //  forall_neighbors::int->(bool mat)->(int->a->a)->a->a
 let forall_neighbors i mat f = sitlist f (filter_cols id (el i mat));
 
+//------------------------------------------------------------------------------
+
+// "Dot-product" of two lists of booleans.
+//  dot::(bool list)->(bool list)->bool
+let dot xs ys = itlist (\z. \b. z OR b) (map2 (\x. \y. x AND y) xs ys) F;
+
+// "Matrix multiplication" of two boolean matrices.
+//  mult::(bool mat)->(bool mat)->(bool mat)
+let mult m n = val n' = transpose n then map (pam n' # dot) m;
+
+// Checks that list 'xs' does not contain any duplicates.
+//  unique::(* list)->bool
+let unique xs = setify xs == xs;
+
+//==============================================================================
+// Pruning of match matrix.
+
 // Thin the possible set of isomorphisms. The general idea is that, if we have
 // M(x,y) then any neighbor v of x in P should have a neighbor u in G s.t.
 // M(v,u) holds. Otherwise M(x,y) cannot be a solution.
 //
-// prune(...)
+// prune(P, G, M)
 // do
 //   for all (i,j) where M is 1
 //     for all neighbors x of vi in P
@@ -44,49 +62,49 @@ let forall_neighbors i mat f = sitlist f (filter_cols id (el i mat));
 letrec
     prune m g p =
         val m' =
-            forall_ones m (\(i,j).
+            forall_ones m m (\(i,j).
                 forall_neighbors i p (\vi. \n.
                     forall_neighbors j g (\vj. const T) F
                         => n | mat_update F (i,j) n
                 )
-            ) m
+            )
         then m != m' => prune m' g p | m'
 ;
 
 //==============================================================================
-// Main "matching" algo.
+// Solution checking.
 
-// "Dot-product" of two lists of booleans.
-//  dot::(bool list)->(bool list)->bool
-let dot xs ys = itlist (\z. \b. z OR b) (map2 (\x. \y. x AND y) xs ys) F;
-
-// "Matrix multiplication" of two boolean matrices.
-//  mult::(bool mat)->(bool mat)->(bool mat)
-let mult m n = val n' = transpose n then map (pam n' # dot) m;
-
-// Mark every el. as 'F', except the 'n'th el. that is marked as 'T'.
-//  mark_one::int->(bool list)->(bool list)
-let mark_one n xs = modify (const T) n (map (const F) xs);
-
-// Iterate over all unused row-indices.
-//  forall_unused::(bool mat)->int->(bool list)
-//               ->(int->(bool mat)->((bool mat) list))
-//               ->((bool mat) list)
-let forall_unused m row used f =
-        let unused = filter (NOT # flip el used) (filter_cols id (el row m)) in
-        sitlist (\c. \ms. f c m @ ms) unused []
+// Check if 'mat' is well formatted.
+//  single_morphism::(bool mat)->bool
+let
+    single_morphism mat =
+        val (rs,cs) = unzip (filter_rows id mat) then
+        unique rs AND unique cs
 ;
 
-// Check that wether 'm' is a valid morphism for 'p' and 'g'.
+// Check if 'mat' is a valid morphism from 'g' to 'p'.
+//  valid_morphism::(bool mat)->(bool mat)->(bool mat)->bool
+let
+    valid_morphism mat p g =
+        p == mult mat (transpose (mult mat g))
+;
+
+// Checks if 'mat' is a valid isomorphism.
 //  isomorphism::(bool mat)->(bool mat)->(bool mat)->bool
 let
     isomorphism mat p g =
-        let only_one_solution mat =
-            val (rs,cs) = unzip (filter_rows id mat) then
-            let unique xs = setify xs == xs in
-            unique rs AND unique cs
-        in
-        only_one_solution mat AND p == mult mat (transpose (mult mat g))
+         single_morphism mat AND valid_morphism mat p g
+;
+
+//==============================================================================
+// Matching algo.
+
+// Iterate over all unused row-indices.
+//  forall_unused::(bool mat)->int->(bool list)->(int->(bool mat)->((bool mat) list))->((bool mat) list)
+let
+    forall_unused m row used f =
+        let unused = filter (NOT # flip el used) (filter_cols id (el row m)) in
+        sitlist (\c. \ms. f c m @ ms) unused []
 ;
 
 // Find ...
@@ -126,7 +144,7 @@ letrec
 // unused_rows [[F,T,F,T,F,T,F],[F,F,T,F,T,F,T]] = [F,T,T,T,T,T,T];
 // filter_cols id [T,F,T] = [1,3];
 // filter_rows id [[T,F],[F,T]] = [(1,1),(2,2)];
-// forall_ones [[T,F],[F,T]] (\p. \l. p : l) [] = [(1,1),(2,2)];
+// forall_ones [[T,F],[F,T]] [] (\p. \l. p : l) = [(1,1),(2,2)];
 // dot [T,F] [F,F] = F;
 // mult [[T,T],[F,F]] [[F,F],[T,T]] = [[T,T],[F,F]];
 // mark_one 2 [T,T,T] = [F,T,F];

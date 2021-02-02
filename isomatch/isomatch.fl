@@ -374,7 +374,7 @@ let
                     matches m =
                         val (PINST _ _ _ _ _ _ (P_HIER p_cs)) = p_pex in
                         val (PINST _ _ _ _ _ _ (P_HIER g_cs)) = g_pex in
-                        let g_ms = forall_ones m (cons # flip el g_cs # snd) [] in 
+                        let g_ms = forall_ones m [] (cons # flip el g_cs # snd) in 
                         zip p_cs g_ms
                 in
                 let
