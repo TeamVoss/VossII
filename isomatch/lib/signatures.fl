@@ -1,0 +1,161 @@
+load (DIR^"utils.fl");
+load (DIR^"primes.fl");
+
+//==============================================================================
+//
+// Fingerprinting of a PEXLIF.
+//
+//==============================================================================
+
+// Max. value for fingerprints (should fit a 64-bit word).
+//  roof::int
+let roof = ipow 2 63 - 1;
+
+// Multiply a value 'v' by the 'n'th prime (modulo 10,000), fitted to 64bits.
+//  prime::int->int->int
+let prime n v = (v * el (n % num_of_primes + 1) list_of_primes) % roof;
+
+// Multiply each value by a prime, starting at some 'n', and sum the results.
+//  prime_list::(a->int)->int->(a list)->int
+let prime_list f n vs = ixlist (\a. \i. \s. prime i (f a) + s) vs n;
+
+//------------------------------------------------------------------------------
+// Gen. of "fingerprint".
+
+// Gen. a fingerprint for 'MEM'.
+//  fp_mem::MEM->int
+let
+    fp_mem (MEM as l ds) = prime 0 as + prime 1 l + prime 2 ds
+;
+
+// Gen. a fingerprint for 'WEXPR'.
+//  fp_w::WEXPR->int
+letrec
+    fp_w (W_X s)		= prime 1 s
+/\  fp_w (W_CONST s i)		= prime 2 s + prime 3 i
+/\  fp_w (W_NAMED_CONST _ s i)	= prime 4 s + prime 5 i
+/\  fp_w (W_VAR s _)		= prime 6 s
+/\  fp_w (W_EXPLICIT_VAR s _)	= prime 7 s
+/\  fp_w (W_AND a b)		= prime 8 (fp_w a + fp_w b)
+/\  fp_w (W_OR a b)		= prime 9 (fp_w a + fp_w b)
+/\  fp_w (W_NOT a)		= prime 10 (fp_w a)
+/\  fp_w (W_EQ a b)		= prime 11 (fp_w a + fp_w b)
+/\  fp_w (W_PRED _ a)		= prime 12 (fp_w a)
+/\  fp_w (W_GR a b)		= prime 13 (fp_w a) + prime 14 (fp_w b)
+/\  fp_w (W_ADD a b)		= prime 15 (fp_w a + fp_w b)
+/\  fp_w (W_SUB a b)		= prime 16 (fp_w a) + prime 17 (fp_w b)
+/\  fp_w (W_MUL a b)		= prime 18 (fp_w a) + prime 19 (fp_w b)
+/\  fp_w (W_DIV a b)		= prime 20 (fp_w a) + prime 21 (fp_w b)
+/\  fp_w (W_MOD a b)		= prime 22 (fp_w a) + prime 23 (fp_w b)
+/\  fp_w (W_SHL a b)		= prime 24 (fp_w a) + prime 25 (fp_w b)
+/\  fp_w (W_SHR a b)		= prime 26 (fp_w a) + prime 27 (fp_w b)
+/\  fp_w (W_ASHR a b)		= prime 28 (fp_w a) + prime 29 (fp_w b)
+/\  fp_w (W_SX s a)		= prime 30 s + prime 31 (fp_w a)
+/\  fp_w (W_ZX s a)		= prime 32 s + prime 33 (fp_w a)
+/\  fp_w (W_ITE a b c)          = prime 34 (fp_w a) + prime 35 (fp_w b) + prime 36 (fp_w c)
+/\  fp_w (W_SLICE ix a)	        = prime 37 (fp_w a) + prime_list id 1 ix
+/\  fp_w (W_NAMED_SLICE _ ix a) = prime 38 (fp_w a) + prime_list id 1 ix
+/\  fp_w (W_UPDATE_NAMED_SLICE a _ ix b)
+                                = prime 39 (fp_w a) + prime 40 (fp_w b) + prime_list id 1 ix
+/\  fp_w (W_CAT as)             = prime_list fp_w 41 as
+/\  fp_w (W_MEM_READ m a b)     = prime 42 (fp_mem m) + prime 43 (fp_w a) + prime 44 (fp_w b)
+/\  fp_w (W_MEM_WRITE m a b d)  = prime 45 (fp_mem m) + prime 46 (fp_w a) + prime 47 (fp_w b) + prime 48 (fp_w d)
+;
+
+// Gen. a fingerprint for 'UPDATE_FN'.
+//  fp_fn::UPDATE_FN->int
+let
+    fp_fn (W_UPDATE_FN l r)   = prime 49 (fp_w l) + prime 50 (fp_w r)
+/\  fp_fn (W_PHASE_DELAY l r) = prime 51 (fp_w l) + prime 52 (fp_w r)
+;
+
+// Gen. a fingerprint for the "formals" of an input/output declaration.
+//  fp_formal::[str]->int
+let
+    fp_formal ps = prime 53 (sum (map md_size ps))
+;
+
+// Gen. a fingerprint for the internals of a 'PINST'.
+//  fp_internal::[str]->int
+let
+    fp_internal ps = prime 54 (sum (map md_size ps))
+;
+
+// Gen. a fingerprint for 'CONTENT'.
+//  fp_content::CONTENT->int
+let
+    fp_content (P_LEAF fs) = prime 59 (sum (map fp_fn fs))
+/\  fp_content (P_HIER cs) =
+        let
+            go (PINST _ a _ i o t _) =
+                ( find_fingerprint a
+                + fp_formal (map fst i)
+                + fp_formal (map fst o)
+                + fp_internal t
+                )
+        in
+        prime 65 (sum (map go cs))
+;
+
+// Gen. a fingerprint for the components of a 'PINST'.
+//  fp_pinst::'pinst contents'->string
+let
+    fp_pinst i o t c = int2str
+        ( fp_formal (map fst i)
+        + fp_formal (map fst o)
+        + fp_internal t
+        + fp_content c
+        )
+;
+
+//==============================================================================
+//
+// SHA256 signatures of a PEXLIF.
+//
+//==============================================================================
+
+// Compute the SHA256 signature of a 'CONTENT'.
+//  sha_content::content->string
+let
+    sha_content (P_LEAF fs) = sha_set fs
+/\  sha_content (P_HIER cs) =
+        let
+            go (PINST n a _ i o t _) =
+                ( n
+                , find_signature a
+                , sha256_signature (map fst i)
+                , sha256_signature (map fst o)
+                , sha_set t
+                )
+        in
+        sha_set (map go cs)
+;
+
+// Compute the SHA256 signature of a 'PINST'.
+//  sha_pinst::'pinst contents'->string
+let
+    sha_pinst n i o t c = sha256_signature
+        ( n
+        , sha256_signature (map fst i)
+        , sha256_signature (map fst o)
+        , sha_set t
+        , sha_content c
+        )
+;
+
+//==============================================================================
+//
+// Modify the 'PINST' creation.
+//
+//==============================================================================
+
+let
+    PINST n a l i o t c =
+        find_fingerprint a != 0 => PINST n a l i o t c | 
+        let f = ("fingerprint", fp_pinst    i o t c) then
+        let s = ("signature",   sha_pinst n i o t c) then
+        PINST n (f : s : a) l i o t c
+;
+
+//------------------------------------------------------------------------------
+// Fin.
