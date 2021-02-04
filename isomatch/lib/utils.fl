@@ -71,7 +71,7 @@ let pam = flip map;
 
 // Perform action 'a' if 'b' is true, otherwise do nothing.
 //  when::bool->void->void
-let when b a = b => a | ();
+//  when b a = b => a | ();
 
 // Swaps the element's of a pair.
 //  swap::(a#b)->(b#a)
@@ -103,9 +103,20 @@ let add a b = a + b;
 //==============================================================================
 // Opt.
 
+// If the 'm' is 'NONE', returns 'b'. Otherwise, applies 'f' to value of 'm'.
+//  maybe::b->(a opt)->(a->b)->b
+let maybe b m f = has_value m => f (get_value m) | b;
+
 // ...
-//  maybe::(a opt)->(a->(b opt))->(b opt)
-let maybe m f = has_value m => f (get_value m) | NONE;
+//  when::(a opt)->(a->b)->(b opt)
+let when m f = maybe NONE m (SOME # f);
+
+// Finds first value 
+//  exhaust::((a opt) list)->(a opt)
+letrec
+    exhaust []     = NONE
+/\  exhaust (x:xs) = maybe (exhaust xs) x SOME
+;
 
 //==============================================================================
 // List.
@@ -218,13 +229,6 @@ letrec
         xs : perms xs []
 ;
 
-// Applies 'f' to 'a' in the given list, stopping as soon as 'f' succeds.
-//  try_all::(a->(b opt))->(a list)->(b opt)
-letrec
-    try_all _ []     = NONE
-/\  try_all f (x:xs) = let y = f x in has_value y => y | try_all f xs
-;
-
 //==============================================================================
 // Matrix.
 
@@ -318,10 +322,10 @@ let lower = map # rev_subst;
 let promote f ns hs = curry zip # both (f ns) (f hs) # unzip;
 
 // Turns a subst. of formals into one over actuals.
-let formalize fa_n fa_h = promote raise (lineup fa_n) (lineup fa_h);
+let actualize fa_n fa_h = promote raise (lineup fa_n) (lineup fa_h);
 
 // Turns a subst. of actuals into one over formals.
-let actualize fa_n fa_h = promote lower (lineup fa_n) (lineup fa_h);
+let formalize fa_n fa_h = promote lower (lineup fa_n) (lineup fa_h);
 
 //------------------------------------------------------------------------------
 
