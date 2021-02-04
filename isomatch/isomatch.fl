@@ -1,5 +1,6 @@
 load (DIR^"lib/signatures.fl");
 load (DIR^"lib/utils.fl");
+//load (DIR^"lib/ullman.fl");
 
 let ?! = undefined;
 
@@ -91,6 +92,14 @@ let
 
 //==============================================================================
 // ...
+
+let
+    actualize_sha p g =
+        val p_act = actuals (_pex p) in
+        val g_act = actuals (_pex g) in
+        //
+        SOME (zip p_act g_act)
+;
 
 // ...
 let
@@ -262,7 +271,7 @@ letrec
 // ...
 
 // ...
-//forward_declare{recurse::ann_pex->ann_pex->(int list)};
+forward_declare{search::ann_pex->ann_pex->((({(string#string) list} opt) list) list)};
 let
     explore p g =
         let sig  = _sig # _pex in
@@ -270,16 +279,14 @@ let
         let leaf = _pexlif_leaf # _pex in
         //
         IF sig p == sig g THEN
-            ?!
+            [actualize_sha p g]
         ELSE IF fp p == fp g THEN
             IF leaf p AND leaf g THEN
-                //let sub = actualize_leaf p g in
-                ?!
+                [actualize_leaf p g]
             ELSE
-                //let rec = search p g in
-                ?!
+                map (\ss. actualize_hier ss p g) (search p g)
         ELSE
-            ?!
+            []
 ;
 
 //==============================================================================
@@ -325,6 +332,23 @@ let
         search iso (replicate rows F) 1
 ;
 
+//------------------------------------------------------------------------------
+
+// ...
+//  find_mask::(bool list)->(* list)->*
+letrec
+    find_mask (F:xs) (y:ys) = find_mask xs ys
+/\  find_mask (T:xs) (y:ys) = y
+;
+
+// "expand_choices [[1,2],[3,4]] = [[1,3],[1,4],[2,3],[2,4]]"
+//  expand_choices::((* list) list)->((* list) list)
+letrec
+    expand_choices []       = []
+/\  expand_choices (xs:[])  = map (\x. [x]) xs
+/\  expand_choices (xs:xss) = flatmap (\x. map (\ys. x:ys) (expand_choices xss)) xs
+;
+
 // Finds each possible matching of children for P and G and explores it.
 //
 // search(P, G)
@@ -334,10 +358,6 @@ let
 //             explore(X)
 let
     search p g =
-        letrec
-            find_match (F:xs) (y:ys) = find_match xs ys
-        /\  find_match (T:xs) (y:ys) = y
-        in
         // Find possible solutions for a 'p' and 'g' mapping.
         let adj_p   = adjacencies p in
         let adj_g   = adjacencies g in
@@ -348,8 +368,13 @@ let
         let p_flat  = map ANN (flat1 p) in
         let g_flat  = map ANN (flat1 g) in
         pam sols (\sol.
-            let g_matches = map (flip find_match g_flat) sol in
-            map2 explore p_flat g_matches
+            let g_matches = map (flip find_mask g_flat) sol in
+            // Explore each matched pair.
+            let options = map2 explore p_flat g_matches in
+            // Construct list of all possible solutions.
+            let choices = expand_choices options in
+            // Merge substitutions for each choice.
+            map collect choices
         )
 ;
 
