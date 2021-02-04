@@ -9,6 +9,16 @@ load (DIR^"utils.fl");
 //
 //==============================================================================
 
+// "Dot-product" of two lists of booleans.
+//  dot::(bool list)->(bool list)->bool
+let dot xs ys = itlist (\z. \b. z OR b) (map2 (\x. \y. x AND y) xs ys) F;
+
+// "Matrix multiplication" of two boolean matrices.
+//  mult::(bool mat)->(bool mat)->(bool mat)
+let mult m n = val n' = transpose n then map (pam n' # dot) m;
+
+//------------------------------------------------------------------------------
+
 // Mark every el. as 'F', except the 'n'th el. that is marked as 'T'.
 //  mark_one::int->(bool list)->(bool list)
 let mark_one n xs = modify (const T) n (map (const F) xs);
@@ -28,16 +38,6 @@ let forall_ones mat x f = sitlist f (filter_rows id mat) x;
 // Iterate over every index in a col. that is a possible match.
 //  forall_neighbors::int->(bool mat)->(int->a->a)->a->a
 let forall_neighbors i mat f = sitlist f (filter_cols id (el i mat));
-
-//------------------------------------------------------------------------------
-
-// "Dot-product" of two lists of booleans.
-//  dot::(bool list)->(bool list)->bool
-let dot xs ys = itlist (\z. \b. z OR b) (map2 (\x. \y. x AND y) xs ys) F;
-
-// "Matrix multiplication" of two boolean matrices.
-//  mult::(bool mat)->(bool mat)->(bool mat)
-let mult m n = val n' = transpose n then map (pam n' # dot) m;
 
 // Checks that list 'xs' does not contain any duplicates.
 //  unique::(* list)->bool
@@ -99,43 +99,44 @@ let
 //==============================================================================
 // Matching algo.
 
-// Iterate over all unused row-indices.
-//  forall_unused::(bool mat)->int->(bool list)->(int->(bool mat)->((bool mat) list))->((bool mat) list)
-let
-    forall_unused m row used f =
-        let unused = filter (NOT # flip el used) (filter_cols id (el row m)) in
-        sitlist (\c. \ms. f c m @ ms) unused []
-;
-
-// Find ...
+// Recursively search for an isomorphism in 'P', 'G' and 'M'.
 //
 // recurse(used, row, P, G, M)
 //   if row = num_rows(M) + 1
-//     if M is an isomorphism
-//        output yes and end the algorithm
-//     if not
-//        output no
-//   N = prune(M)
-//   for all unused columns c in N[row]
-//     N' = set all columns in N[row] to zero but column c
-//     used' = mark c as used
-//     recurse(used', row+1, P, G, N')
-//   output no
-//
-//  recurse::(bool mat)->(bool mat)->(bool mat)->((bool mat) list)
-letrec
-    recurse mat p g =
-        let solution m = isomorphism m p g => [m] | [] in
-        letrec
-            go m cs r = r == num_rows mat + 1 => solution m |
-                val m' = prune m g p then
-                forall_unused m' r cs (\c. \n.
-                    let n'  = modify (mark_one c) r n  in
-                    let cs' = modify (const T)    c cs in
-                    go n' cs' (r+1)
-                )
+//       if isomorphism(P, G, M)
+//           report M as a solution
+//   else
+//       N = prune(M)
+//       for all unused columns c in N[row]
+//           N'    = zero all columns but c in N[row]
+//           used' = mark c in used
+//           recurse(used', row+1, P, G, N')
+let
+    recurse iso adj_p adj_g =
+        let
+            forall_unused iso row used f =
+                let columns = filter_cols id (el row iso) in
+                let unused  = filter_mask used columns in
+                flatmap f unused
         in
-        go mat (replicate (num_columns mat) F) 1
+        //
+        let solution m = isomorphism m adj_p adj_g in
+        let rows = num_rows iso in
+        letrec
+            search m used row =
+                IF row == rows + 1 THEN
+                    IF solution m THEN
+                        [m]
+                    ELSE
+                        []
+                ELSE
+                    let n = prune m adj_p adj_g then
+		    forall_unused n row used (\col.
+                        let n'    = modify (mark_one col) row n in
+                        let used' = modify (const T) col used in
+                        search n' used' (row+1))
+        in
+        search iso (replicate rows F) 1
 ;
 
 //==============================================================================

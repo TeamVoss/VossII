@@ -1,12 +1,24 @@
 load (DIR^"lib/signatures.fl");
 load (DIR^"lib/utils.fl");
-//load (DIR^"lib/ullman.fl");
+load (DIR^"lib/ullman.fl");
 
+//------------------------------------------------------------------------------
+
+// ...
 let ?! = undefined;
+
+// ...
+//  filter_mask::(bool list)->(* list)->(* list)
+let filter_mask mask = snd # unzip # filter fst # zip mask;
+
+// ...
+let _fp  = find_fingerprint # _pexlif_attrs;
+let _sig = find_signature # _pexlif_attrs;
+let _hier (PINST _ _ _ _ _ _ (P_HIER cs)) = cs;
 
 //==============================================================================
 //
-//
+// Annotated 'pexlif', might be unnecessary.
 //
 //==============================================================================
 
@@ -16,10 +28,6 @@ lettype ann_pex =
 ;
 
 let _pex (ANN p) = p;
-
-let _hier (PINST _ _ _ _ _ _ (P_HIER cs)) = cs;
-let _fp  = find_fingerprint # _pexlif_attrs;
-let _sig = find_signature # _pexlif_attrs;
 
 //==============================================================================
 //
@@ -128,10 +136,12 @@ let
 //==============================================================================
 
 // Check if the lists 'x' and 'y' share any elements.
+//  intersects::(* list)->(* list)->bool
 let intersects x y = NOT (empty (x intersect y) OR empty x OR empty y);
 infix 7 intersects;
 
-//  Matrix over each node's relation ('cmp') to every other node.
+// Matrix over each node's relation ('cmp') to every other node.
+//  reflexive_compare_all::(*->*->bool)->(* list)->((* list) list)
 let
     reflexive_compare_all cmp xs =
         letrec
@@ -145,7 +155,8 @@ let
         fill (build xs)
 ;
 
-//------------------------------------------------------------------------------
+//==============================================================================
+// Construction of adj. and iso. matrices.
 
 // ...
 let
@@ -173,175 +184,16 @@ let
 ;
 
 //==============================================================================
-//
-// ...
-//
-//==============================================================================
-
-// Mark every el. as 'F', except the 'n'th el. that is marked as 'T'.
-//  mark_one::int->(bool list)->(bool list)
-let mark_one n xs = modify (const T) n (map (const F) xs);
-
-// Filter every index in a vector 'xs' using 'p'.
-//  filter_cols::(a->bool)->(a list)->(int list)
-let filter_cols p xs = ixlist (\x. \ix. \ys. p x => ix : ys | ys) xs [];
-
-// Filter every pair of indices in matrix 'xs' using 'p'.
-//  filter_rows::(a->bool)->(a mat)->((int#int) list)
-let filter_rows p xs = ixlist (\x. \ix. \ys. map (pair ix) (filter_cols p x) @ ys) xs [];
-
-// Iterate over every mat. index that is a possible match.
-//  forall_ones::(bool mat)->a->((int#int)->a->a)->a
-let forall_ones mat x f = itlist f (filter_rows id mat) x;
-
-// Iterate over every index in a col. that is a possible match.
-//  forall_neighbors::int->(bool mat)->(int->a->a)->a->a
-let forall_neighbors i mat f = itlist f (filter_cols id (el i mat));
-
-// "Dot-product" of two lists of booleans.
-//  dot::(bool list)->(bool list)->bool
-let dot xs ys = itlist (\z. \b. z OR b) (map2 (\x. \y. x AND y) xs ys) F;
-
-// "Matrix multiplication" of two boolean matrices.
-//  mult::(bool mat)->(bool mat)->(bool mat)
-let mult m n = val n' = transpose n then map (pam n' # dot) m;
-
-// Checks that list 'xs' does not contain any duplicates.
-//  unique::(* list)->bool
-let unique xs = setify xs == xs;
-
-// ...
-//  filter_mask::(bool list)->(* list)->(* list)
-let filter_mask mask = snd # unzip # filter fst # zip mask;
-
-//==============================================================================
-// Solution checking.
-
-// Check if 'mat' is well formatted.
-//  single_morphism::(bool mat)->bool
-let
-    single_morphism mat =
-        val (rs,cs) = unzip (filter_rows id mat) then
-        unique rs AND unique cs
-;
-
-// Check if 'mat' is a valid morphism from 'g' to 'p'.
-//  valid_morphism::(bool mat)->(bool mat)->(bool mat)->bool
-let
-    valid_morphism mat p g =
-        p == mult mat (transpose (mult mat g))
-;
-
-// Checks if 'mat' is a valid isomorphism.
-//  isomorphism::(bool mat)->(bool mat)->(bool mat)->bool
-let
-    isomorphism mat p g =
-         single_morphism mat AND valid_morphism mat p g
-;
-
-//==============================================================================
-// Pruning of match matrix.
-
-// Thin the possible set of isomorphisms. The general idea is that, if we have
-// M(x,y) then any neighbor v of x in P should have a neighbor u in G s.t.
-// M(v,u) holds. Otherwise M(x,y) cannot be a solution.
-//
-// prune(M, P, G)
-// do
-//   for all (i,j) where M is 1
-//     for all neighbors x of vi in P
-//       if there is no neighbor y of vj in G s.t. M(x,y)
-//         M(i,j) := F
-// while M was changed
-//
-//  prune::(bool mat)->(bool mat)->(bool mat)->(bool mat)
-letrec
-    prune m p g =
-        val m' =
-            forall_ones m m (\(i,j).
-                forall_neighbors i p (\vi. \n.
-                    forall_neighbors j g (\vj. const T) F
-                        => n | mat_update F (i,j) n
-                )
-            )
-        then m != m' => prune m' g p | m'
-;
-
-//==============================================================================
 // ...
 
-// ...
-forward_declare{search::ann_pex->ann_pex->((({(string#string) list} opt) list) list)};
-let
-    explore p g =
-        let sig  = _sig # _pex in
-        let fp   = _fp  # _pex in
-        let leaf = _pexlif_leaf # _pex in
-        //
-        IF sig p == sig g THEN
-            [actualize_sha p g]
-        ELSE IF fp p == fp g THEN
-            IF leaf p AND leaf g THEN
-                [actualize_leaf p g]
-            ELSE
-                map (\ss. actualize_hier ss p g) (search p g)
-        ELSE
-            []
-;
-
-//==============================================================================
-// ...
-
-// Ullman-esque isomorphism search.
-//
-// recurse(used, row, P, G, M)
-//   if row = num_rows(M) + 1
-//       if isomorphism(P, G, M)
-//           report M as a solution
-//   else
-//       N = prune(M)
-//       for all unused columns c in N[row]
-//           N'    = zero all columns but c in N[row]
-//           used' = mark c in used
-//           recurse(used', row+1, P, G, N')
-let
-    recurse iso adj_p adj_g =
-        let
-            forall_unused iso row used f =
-                let columns = filter_cols id (el row iso) in
-                let unused  = filter_mask used columns in
-                flatmap f unused
-        in
-        //
-        let solution m = isomorphism m adj_p adj_g in
-        let rows = num_rows iso in
-        letrec
-            search m used row =
-                IF row == rows + 1 THEN
-                    IF solution m THEN
-                        [m]
-                    ELSE
-                        [ ]
-                ELSE
-                    let n = prune m adj_p adj_g then
-		    forall_unused n row used (\col.
-                        let n'    = modify (mark_one col) row n in
-                        let used' = modify (const T) col used in
-                        search n' used' (row+1))
-        in
-        search iso (replicate rows F) 1
-;
-
-//------------------------------------------------------------------------------
-
-// ...
+// Find el. given by mask 'xs' (one and only one el. of 'xs' must be 'T').
 //  find_mask::(bool list)->(* list)->*
 letrec
     find_mask (F:xs) (y:ys) = find_mask xs ys
 /\  find_mask (T:xs) (y:ys) = y
 ;
 
-// "expand_choices [[1,2],[3,4]] = [[1,3],[1,4],[2,3],[2,4]]"
+// Expand list of choices, i.e, '[[1,2],[3,4]] = [[1,3],[1,4],[2,3],[2,4]]'.
 //  expand_choices::((* list) list)->((* list) list)
 letrec
     expand_choices []       = []
@@ -349,13 +201,14 @@ letrec
 /\  expand_choices (xs:xss) = flatmap (\x. map (\ys. x:ys) (expand_choices xss)) xs
 ;
 
-// Finds each possible matching of children for P and G and explores it.
+// ...
 //
 // search(P, G)
 //     S = recurse(none, 1, adj(P), adj(G), iso(P, G))
 //     for all solutions R in S
-//         for all pairings X of P and G according to R
-//             explore(X)
+//         explore all pairings X of P and G according to R
+//
+forward_declare{explore::ann_pex->ann_pex->({((string#string) list)} opt list)};
 let
     search p g =
         // Find possible solutions for a 'p' and 'g' mapping.
@@ -377,6 +230,43 @@ let
             map collect choices
         )
 ;
+
+// ...
+//
+// explore(P, G)
+//     if P == G
+//         report direct mapping
+//     else if P ~ G
+//         if P and G are leafs
+//             report subst. s.t. P == G, if any.
+//         else if P and G are hierarchies
+//             CS = sets of possible subst. s.t. P == G
+//             report each coherent choice C in CS
+//     else
+//         report no solution
+//
+let
+    explore p g =
+        let sig  = _sig # _pex in
+        let fp   = _fp  # _pex in
+        let leaf = _pexlif_leaf # _pex in
+        //
+        IF sig p == sig g THEN
+            [actualize_sha p g]
+        ELSE IF fp p == fp g THEN
+            IF leaf p AND leaf g THEN
+                [actualize_leaf p g]
+            ELSE
+                map (\ss. actualize_hier ss p g) (search p g)
+        ELSE
+            []
+;
+
+//==============================================================================
+// ...
+
+
+
 
 //==============================================================================
 // Fin.
