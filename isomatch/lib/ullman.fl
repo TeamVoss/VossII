@@ -23,6 +23,10 @@ let mult m n = val n' = transpose n then map (pam n' # dot) m;
 //  mark_one::int->(bool list)->(bool list)
 let mark_one n xs = modify (const T) n (map (const F) xs);
 
+// ...
+//  filter_mask::(bool list)->(* list)->(* list)
+let filter_mask mask = snd # unzip # filter fst # zip mask;
+
 // Filter every index in a vector 'xs' using 'p'.
 //  filter_cols::(a->bool)->(a list)->(int list)
 let filter_cols p xs = ixlist (\x. \ix. \ys. p x => ix : ys | ys) xs [];

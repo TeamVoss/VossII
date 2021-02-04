@@ -8,10 +8,6 @@ load (DIR^"lib/ullman.fl");
 let ?! = undefined;
 
 // ...
-//  filter_mask::(bool list)->(* list)->(* list)
-let filter_mask mask = snd # unzip # filter fst # zip mask;
-
-// ...
 let _fp  = find_fingerprint # _pexlif_attrs;
 let _sig = find_signature # _pexlif_attrs;
 let _hier (PINST _ _ _ _ _ _ (P_HIER cs)) = cs;
@@ -159,7 +155,7 @@ let
 // Construction of adj. and iso. matrices.
 
 // ...
-let
+clet
     adjacencies ann =
         let child   x y = (formals x) intersects (actuals y) in
         let sibling x y = (actuals x) intersects (actuals y) in
@@ -263,10 +259,44 @@ let
 ;
 
 //==============================================================================
+//
+// Pretty-Printing.
+//
+//==============================================================================
+
+//  filter_some::((* opt) list)->(* list)
+letrec
+    filter_some []            = []
+/\  filter_some (NONE:xs)     = filter_some xs
+/\  filter_some ((SOME x):xs) = x : filter_some xs
+;
+
+//------------------------------------------------------------------------------
+
+//  print_list::(*->string)->(* list)->string
+let print_list = list2str T "[" "," "]";
+
+//  print_pair::string->string->string
+let print_pair = sprintf "%s:%s";
+
+//  print_subst::((string#string) list)->string
+let print_subst = print_list (curry print_pair);
+
+//  pretty::((subst opt) list)->string
+let pretty = list2str T "{ " "\n, " "}\n" print_subst # filter_some;
+
+//==============================================================================
 // ...
 
-
-
+let
+    moo p (PINST _ _ _ _ _ _ (P_HIER gs)) =
+        let candidates = filter (\g. _fp p == _fp g) gs in
+        flip foreach candidates (\g.
+            let x = explore (ANN p) (ANN g) in
+            fprintf stdout "%s->%s:\n%s"
+                (_pexlif_name p) (_pexlif_name g) (pretty x)
+        )
+;
 
 //==============================================================================
 // Fin.

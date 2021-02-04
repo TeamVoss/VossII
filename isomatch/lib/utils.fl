@@ -111,7 +111,7 @@ let maybe b m f = has_value m => f (get_value m) | b;
 //  when::(a opt)->(a->b)->(b opt)
 let when m f = maybe NONE m (SOME # f);
 
-// Finds first value 
+// ...
 //  exhaust::((a opt) list)->(a opt)
 letrec
     exhaust []     = NONE

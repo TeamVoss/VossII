@@ -1,9 +1,8 @@
 load (DIR^"isomatch.fl");
 load "ste.fl";
 
-let cmp = cmp_fp;
-
 //------------------------------------------------------------------------------
+// Needles.
 
 let not =
     bit_input a.
@@ -11,8 +10,7 @@ let not =
     CELL "draw_hier not" [
         b <- '~' a
     ];
-let not_pex = not 'a 'b;
-not_pex;
+let needle_pex = not 'a 'b;
 
 let xor =
     bit_input a b.
@@ -20,8 +18,7 @@ let xor =
     CELL "draw_hier xor" [
         c <- a '^' b
     ];
-let xor_pex = xor 'a 'b 'c;
-xor_pex;
+let needle_pex = xor 'a 'b 'c;
 
 let rox =
     bit_input a b.
@@ -29,8 +26,7 @@ let rox =
     CELL "draw_hier rox" [
         c <- b '^' a
     ];
-let rox_pex = rox 'a 'b 'c;
-rox_pex;
+let needle_pex = rox 'a 'b 'c;
 
 let buf1 =
     bit_input a.
@@ -40,8 +36,7 @@ let buf1 =
       mid <- '~' a,
       out <- '~' mid
     ];
-let buf1_pex = buf1 'a 'out;
-buf1_pex;
+let needle_pex = buf1 'a 'out;
 
 let buf2 =
     bit_input x.
@@ -51,8 +46,7 @@ let buf2 =
       mid <- '~' x,
       y <- '~' mid
 ];
-let buf2_pex = buf2 'x 'y;
-buf2_pex;
+let needle_pex = buf2 'x 'y;
 
 let buf3 =
     bit_input a.
@@ -62,8 +56,7 @@ let buf3 =
       oink <- '~' a,
       out <- '~' oink
     ];
-let buf3_pex = buf3 'a 'out;
-buf3_pex;
+let needle_pex = buf3 'a 'out;
 
 letrec inv_rec n =
     bit_input    a.
@@ -81,13 +74,10 @@ let buf4 =
     CELL "buf4" [
         inv_rec 2 a out
     ];
-let buf4_pex = buf4 'a 'out;
-buf4_pex;
-
-let needle_pex = not_pex;
-let needle_pex = buf1_pex;
+let needle_pex = buf4 'a 'out;
 
 //------------------------------------------------------------------------------
+// Haystacks.
 
 let haystack =
     bit_input a.
@@ -162,9 +152,12 @@ let haystack =
     ];
 let haystack_pex = haystack 'a 'b 'c 'd 'e 'f 'o1 'o2 'o3 'o4 'o5 'o6 'o7;
 
+//------------------------------------------------------------------------------
+// Iso. matching.
+
 needle_pex;
 haystack_pex;
-isomatch cmp needle_pex haystack_pex;
-DBG_isomatch cmp needle_pex haystack_pex;
+moo needle_pex haystack_pex;
 
 //------------------------------------------------------------------------------
+// Fin.
