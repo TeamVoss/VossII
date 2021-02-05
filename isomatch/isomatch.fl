@@ -2,18 +2,7 @@ load (DIR^"lib/signatures.fl");
 load (DIR^"lib/utils.fl");
 load (DIR^"lib/ullman.fl");
 
-//------------------------------------------------------------------------------
-
-// ...
 let ?! = undefined;
-
-// ...
-clet fp   = find_fingerprint # _pexlif_attrs;
-clet sig  = find_signature # _pexlif_attrs;
-
-// ...
-let leaf = _pexlif_leaf;
-let hier (PINST _ _ _ _ _ _ (P_HIER cs)) = cs;
 
 //==============================================================================
 //
@@ -111,6 +100,15 @@ let
 // ...
 //
 //==============================================================================
+
+// Memoized fetch of a pexlif's fingerprint and SHA signature.
+//   fp&sig::pexlif->string
+clet fp   = find_fingerprint # _pexlif_attrs;
+clet sig  = find_signature   # _pexlif_attrs;
+
+// Fetch a pexlif's children.
+//  hier::pexlif->(pexlif list)
+let hier (PINST _ _ _ _ _ _ (P_HIER cs)) = cs;
 
 // Check if the lists 'x' and 'y' share any elements.
 //  intersects::(* list)->(* list)->bool
@@ -242,6 +240,7 @@ let
 //
 let
     explore p g =
+        let leaf = _pexlif_leaf in
         //
         //(fprintf stderr "exploring '%s' and '%s'\n" (_pexlif_name p) (_pexlif_name g)) fseq
         //
@@ -281,13 +280,22 @@ let pretty p g s = sprintf "Found match for '%s' and '%s', where %s\n" (_pexlif_
 
 //------------------------------------------------------------------------------
 
+//  clean_subst::(string list)->subst->subst
+let clean_subst f = filter (flip elem f # fst);
+
+//  clean_solution::pexlif->((subst opt) list)->((subst opt) list)
+let clean_solution p = let f = formals p in map (flip when (clean_subst f));
+
+//------------------------------------------------------------------------------
+
 // ...
 let
     moo p (PINST _ _ _ _ _ _ (P_HIER gs)) =
         let candidates = filter (\g. fp p == fp g) gs in
         flip foreach candidates (\g.
-            let sol = explore p g then
-            print (pretty p g sol)
+            let sol  = explore p g then
+            let sol' = clean_solution p sol then
+            print (pretty p g sol')
         )
 ;
 
