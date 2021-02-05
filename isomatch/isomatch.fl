@@ -8,22 +8,12 @@ load (DIR^"lib/ullman.fl");
 let ?! = undefined;
 
 // ...
-let _fp  = find_fingerprint # _pexlif_attrs;
-let _sig = find_signature # _pexlif_attrs;
-let _hier (PINST _ _ _ _ _ _ (P_HIER cs)) = cs;
+clet fp   = find_fingerprint # _pexlif_attrs;
+clet sig  = find_signature # _pexlif_attrs;
 
-//==============================================================================
 //
-// Annotated 'pexlif', might be unnecessary.
-//
-//==============================================================================
-
-lettype ann_pex =
-        ANN
-            {pex::pexlif}
-;
-
-let _pex (ANN p) = p;
+let leaf = _pexlif_leaf;
+let hier (PINST _ _ _ _ _ _ (P_HIER cs)) = cs;
 
 //==============================================================================
 //
@@ -99,28 +89,19 @@ let
 
 let
     actualize_sha p g =
-        val p_act = actuals (_pex p) in
-        val g_act = actuals (_pex g) in
-        //
-        SOME (zip p_act g_act)
+        SOME (zip (actuals p) (actuals g))
 ;
 
 // ...
 let
-    actualize_leaf p g =
-        val (PINST _ _ _ i1 o1 _ l1) = _pex p in
-        val (PINST _ _ _ i2 o2 _ l2) = _pex g in
-        //
+    actualize_leaf (PINST _ _ _ i1 o1 _ l1) (PINST _ _ _ i2 o2 _ l2) =
         let lift = actualize (i1 @ o1) (i2 @ o2) in
         maybe NONE (alpha_leaf l1 l2) (SOME # lift)
 ;
 
 // ...
 let
-    actualize_hier ss p g =
-        val (PINST _ _ _ i1 o1 _ _) = _pex p in
-        val (PINST _ _ _ i2 o2 _ _) = _pex g in
-        //
+    actualize_hier ss (PINST _ _ _ i1 o1 _ _) (PINST _ _ _ i2 o2 _ _) =
         let lift = actualize (i1 @ o1) (i2 @ o2) in
         maybe NONE (collect ss) (\s. coherent s => SOME (lift s) | NONE)
 ;
@@ -137,50 +118,65 @@ let intersects x y = NOT (empty (x intersect y) OR empty x OR empty y);
 infix 7 intersects;
 
 // Matrix over each node's relation ('cmp') to every other node.
-//  reflexive_compare_all::(*->*->bool)->(* list)->((* list) list)
+//  compare_all::(*->*->bool)->(* list)->((* list) list)
 let
-    reflexive_compare_all cmp xs =
+    compare_all cmp xs =
         letrec
             build [] = []
-        /\  build (x:xs) = map (cmp x) xs : build xs
+        /\  build (x:xs) = (F : map (cmp x) xs) : build xs
         in
         letrec
             fill [] = []
-        /\  fill (x:xs) = x : map2 cons x (fill xs)
+        /\  fill (x:xs) = x : map2 cons (tl x) (fill xs)
         in
         fill (build xs)
 ;
 
-//==============================================================================
-// Construction of adj. and iso. matrices.
+//------------------------------------------------------------------------------
 
 // ...
 clet
-    adjacencies ann =
+    adjacencies pex =
         let child   x y = (formals x) intersects (actuals y) in
         let sibling x y = (actuals x) intersects (actuals y) in
         // Fetch parent/children.
-        let parent   = _pex ann in
-        let children = _hier parent in
+        let parent   = pex in
+        let children = hier pex in
         // Compute adj. for "parent<->child" and "child<->child".
         let adj_parent   = F : map (child parent) children in
-        let adj_children = reflexive_compare_all sibling children in
+        let adj_children = compare_all sibling children in
         // Complete adj. mat. combines above two.
-        adj_parent : map2 cons adj_parent adj_children
+        let adj = adj_parent : map2 cons (tl adj_parent) adj_children in
+        //
+        (fprintf stderr "adjacencies for '%s' " (_pexlif_name pex)) fseq
+        (fprintf stderr "with children %S\n" (map _pexlif_name children)) fseq
+        //(fprintf stderr "> adj_parent:%s\n" (print_list print_bool adj_parent)) fseq
+        //(fprintf stderr "> adj_children:%s\n" (print_matrix print_bool adj_children)) fseq
+        (fprintf stderr "> adj:%s\n" (print_matrix print_bool adj)) fseq
+        //
+        adj
 ;
 
 // ...
 let
-    isomorphisms ann bnn =
+    isomorphisms pex bex =
         // Fetch parent&children.
-        let xs = _pex ann : _hier (_pex ann) in
-        let ys = _pex bnn : _hier (_pex bnn) in
+        let xs = pex : hier pex in
+        let ys = bex : hier bex in
         // Compare every pos. pairing.
-        map (flip map ys # equal on _fp) xs
+        let iso = map (flip map ys # equal on fp) xs then
+        //
+        (fprintf stderr "isomorphisms for '%s' and '%s'\n" (_pexlif_name pex) (_pexlif_name bex)) fseq
+        (fprintf stderr "> iso:%s\n" (print_matrix print_bool iso)) fseq
+        //
+        iso
 ;
 
 //==============================================================================
+//
 // ...
+//
+//==============================================================================
 
 // Find el. given by mask 'xs' (one and only one el. of 'xs' must be 'T').
 //  find_mask::(bool list)->(* list)->*
@@ -197,33 +193,36 @@ letrec
 /\  expand_choices (xs:xss) = flatmap (\x. map (\ys. x:ys) (expand_choices xss)) xs
 ;
 
-// ...
+//------------------------------------------------------------------------------
+
+// Exand a matching of 'p' and 'g' to test whether it's valid pairing or not.
 //
-// search(P, G)
+// expand(P, G)
 //     S = recurse(none, 1, adj(P), adj(G), iso(P, G))
 //     for all solutions R in S
-//         explore all pairings X of P and G according to R
+//         explore all pairings X of children in P and G according to R
 //
-forward_declare{explore::ann_pex->ann_pex->({((string#string) list)} opt list)};
+forward_declare{explore::pexlif->pexlif->({((string#string) list)} opt list)};
 let
-    search p g =
+    expand p g =
+        //
+        (fprintf stderr "expanding '%s' and '%s'\n" (_pexlif_name p) (_pexlif_name g)) fseq
+        //
         // Find possible solutions for a 'p' and 'g' mapping.
-        let adj_p   = adjacencies p in
-        let adj_g   = adjacencies g in
-        let iso     = isomorphisms p g in
-        let sols    = recurse iso adj_p adj_g in
+        let adj_p = adjacencies p then
+        let adj_g = adjacencies g then
+        let iso   = isomorphisms p g then
+        let solutions = recurse iso adj_p adj_g then
         // Explore each pairing in a solution to validate it.
-        let flat1 a = _pex a : _hier (_pex a) in
-        let p_flat  = map ANN (flat1 p) in
-        let g_flat  = map ANN (flat1 g) in
-        pam sols (\sol.
-            let g_matches = map (flip find_mask g_flat) sol in
-            // Explore each matched pair.
-            let options = map2 explore p_flat g_matches in
-            // Construct list of all possible solutions.
+        let p_flat = p : hier p in
+        let g_flat = g : hier g in
+        pam (filter (hd # hd) solutions) (\solution.
+            let matches = map (\col. find_mask col (g : hier g)) (tl solution) in
+            let options = map2 explore (hier p) matches in
             let choices = expand_choices options in
-            // Merge substitutions for each choice.
-            map collect choices
+            let res     = map collect choices in
+            //
+            res
         )
 ;
 
@@ -243,41 +242,33 @@ let
 //
 let
     explore p g =
-        let sig  = _sig # _pex in
-        let fp   = _fp  # _pex in
-        let leaf = _pexlif_leaf # _pex in
+        //
+        (fprintf stderr "exploring '%s' and '%s'\n" (_pexlif_name p) (_pexlif_name g)) fseq
         //
         IF sig p == sig g THEN
+            (fprintf stderr "> signatures matched!\n") fseq
+            //
             [actualize_sha p g]
         ELSE IF fp p == fp g THEN
             IF leaf p AND leaf g THEN
+                (fprintf stderr "> both leaves\n") fseq
+                //
                 [actualize_leaf p g]
             ELSE
-                map (\ss. actualize_hier ss p g) (search p g)
+                (fprintf stderr "> both hier.\n") fseq
+                //
+                map (\ss. actualize_hier ss p g) (expand p g)
         ELSE
+            (fprintf stderr "> no match!") fseq
+            //
             []
 ;
 
 //==============================================================================
 //
-// Pretty-Printing.
+// ...
 //
 //==============================================================================
-
-//  filter_some::((* opt) list)->(* list)
-letrec
-    filter_some []            = []
-/\  filter_some (NONE:xs)     = filter_some xs
-/\  filter_some ((SOME x):xs) = x : filter_some xs
-;
-
-//------------------------------------------------------------------------------
-
-//  print_list::(*->string)->(* list)->string
-let print_list = list2str T "[" "," "]";
-
-//  print_pair::string->string->string
-let print_pair = sprintf "%s:%s";
 
 //  print_subst::((string#string) list)->string
 let print_subst = print_list (curry print_pair);
@@ -285,14 +276,14 @@ let print_subst = print_list (curry print_pair);
 //  pretty::((subst opt) list)->string
 let pretty = list2str T "{ " "\n, " "}\n" print_subst # filter_some;
 
-//==============================================================================
-// ...
+//------------------------------------------------------------------------------
 
+// ...
 let
     moo p (PINST _ _ _ _ _ _ (P_HIER gs)) =
-        let candidates = filter (\g. _fp p == _fp g) gs in
+        let candidates = filter (\g. fp p == fp g) gs in
         flip foreach candidates (\g.
-            let x = explore (ANN p) (ANN g) in
+            let x = explore p g in
             fprintf stdout "%s->%s:\n%s"
                 (_pexlif_name p) (_pexlif_name g) (pretty x)
         )

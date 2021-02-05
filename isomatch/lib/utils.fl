@@ -112,6 +112,14 @@ let maybe b m f = has_value m => f (get_value m) | b;
 let when m f = maybe NONE m (SOME # f);
 
 // ...
+//  filter_some::((* opt) list)->(* list)
+letrec
+    filter_some []            = []
+/\  filter_some (NONE:xs)     = filter_some xs
+/\  filter_some ((SOME x):xs) = x : filter_some xs
+;
+
+// ...
 //  exhaust::((a opt) list)->(a opt)
 letrec
     exhaust []     = NONE
@@ -266,23 +274,23 @@ let string_empty s = strlen s == 0;
 //==============================================================================
 // ...
 
-// Short-hand for printing of matrices.
-//  matrix2str::bool->string->string->string->string->(*->string)->((* list) list)->string
-let
-    matrix2str print_empty pre sep_row sep_col post pr_fun =
-        list2str print_empty pre sep_row post
-            (list2str print_empty pre sep_col post pr_fun)
-;
+//  print_pair::string->string->string
+let print_pair = sprintf "%s:%s";
 
-// ...
-let mat2str = matrix2str T "[" "\n," "," "]";
+//  print_list::(*->string)->(* list)->string
+let print_list = list2str T "[" "," "]";
 
-// ...
-let b2str b = b => "T" | "F";
+//  print_matrix::(*->string)->((* list) list)->string
+let print_matrix = print_list # print_list;
 
-// ...
-//  fa2str::(string#(string list)) list->string
-let fa2str = list2str T "[" "," "]" (\(f,as). sprintf "(%s,%S)" f as);
+//  print_large_matrix::(*->string)->((* list) list)->string
+let print_large_matrix = list2str T "[ " "\n, " "\n]" # print_list;
+
+//  print_bool::bool->string
+let print_bool b = b => "T" | "F";
+
+//  print_fa::(string#(string list))->string
+let print_fa = print_list (curry print_pair # second (print_list id));
 
 //==============================================================================
 // SHA256.

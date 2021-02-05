@@ -64,15 +64,21 @@ let unique xs = setify xs == xs;
 //
 //  prune::(bool mat)->(bool mat)->(bool mat)->(bool mat)
 letrec
-    prune m g p =
+    prune m p g =
+        // Check if there are neighbors of 'i' in 'm'.
+        let any_neighbors i m = forall_neighbors i m (\vj. const T) F in
+        // Prune 'm' once.
         val m' =
             forall_ones m m (\(i,j).
                 forall_neighbors i p (\vi. \n.
-                    forall_neighbors j g (\vj. const T) F
-                        => n | mat_update F (i,j) n
-                )
-            )
-        then m != m' => prune m' g p | m'
+                    any_neighbors j g => n | mat_update F (i,j) n))
+        then
+        // Continue pruning until options are exhausted.
+        (fprintf stderr "pruning matrix %s " (print_matrix print_bool m)) fseq
+        (fprintf stderr "into %s " (print_matrix print_bool m')) fseq
+        (fprintf stderr "done? %s\n" (print_bool (m == m'))) fseq
+        //
+        m == m' => m | prune m' g p
 ;
 
 //==============================================================================
@@ -117,11 +123,14 @@ let
 //           recurse(used', row+1, P, G, N')
 let
     recurse iso adj_p adj_g =
+        //
+        (fprintf stderr "recurse on matrix %s\n" (print_matrix print_bool iso)) fseq
+        //
         let
             forall_unused iso row used f =
-                let columns = filter_cols id (el row iso) in
-                let unused  = filter_mask used columns in
-                flatmap f unused
+                let unused  = map NOT used in
+                let matches = map2 (defix AND) (el row iso) unused in
+                flatmap f (filter_cols id matches)
         in
         //
         let solution m = isomorphism m adj_p adj_g in
@@ -134,13 +143,17 @@ let
                     ELSE
                         []
                 ELSE
-                    let n = prune m adj_p adj_g then
+                    let n = m in // prune m adj_p adj_g then
 		    forall_unused n row used (\col.
                         let n'    = modify (mark_one col) row n in
                         let used' = modify (const T) col used in
                         search n' used' (row+1))
         in
-        search iso (replicate rows F) 1
+        let res = search iso (replicate rows F) 1 then
+        //
+        (fprintf stderr "finished recursion with\n> res:%s\n" (print_list (print_matrix print_bool) res)) fseq
+        //
+        res
 ;
 
 //==============================================================================
