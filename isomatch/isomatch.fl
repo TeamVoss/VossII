@@ -11,7 +11,7 @@ let ?! = undefined;
 clet fp   = find_fingerprint # _pexlif_attrs;
 clet sig  = find_signature # _pexlif_attrs;
 
-//
+// ...
 let leaf = _pexlif_leaf;
 let hier (PINST _ _ _ _ _ _ (P_HIER cs)) = cs;
 
