@@ -74,9 +74,9 @@ letrec
                     any_neighbors j g => n | mat_update F (i,j) n))
         then
         // Continue pruning until options are exhausted.
-        (fprintf stderr "pruning matrix %s " (print_matrix print_bool m)) fseq
-        (fprintf stderr "into %s " (print_matrix print_bool m')) fseq
-        (fprintf stderr "done? %s\n" (print_bool (m == m'))) fseq
+        //(fprintf stderr "pruning matrix %s " (print_matrix print_bool m)) fseq
+        //(fprintf stderr "into %s " (print_matrix print_bool m')) fseq
+        //(fprintf stderr "done? %s\n" (print_bool (m == m'))) fseq
         //
         m == m' => m | prune m' g p
 ;
@@ -124,7 +124,7 @@ let
 let
     recurse iso adj_p adj_g =
         //
-        (fprintf stderr "recurse on matrix %s\n" (print_matrix print_bool iso)) fseq
+        //(fprintf stderr "recurse on matrix %s\n" (print_matrix print_bool iso)) fseq
         //
         let
             forall_unused iso row used f =
@@ -151,7 +151,7 @@ let
         in
         let res = search iso (replicate rows F) 1 then
         //
-        (fprintf stderr "finished recursion with\n> res:%s\n" (print_list (print_matrix print_bool) res)) fseq
+        //(fprintf stderr "finished recursion with\n> res:%s\n" (print_list (print_matrix print_bool) res)) fseq
         //
         res
 ;

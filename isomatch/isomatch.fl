@@ -148,11 +148,11 @@ clet
         // Complete adj. mat. combines above two.
         let adj = adj_parent : map2 cons (tl adj_parent) adj_children in
         //
-        (fprintf stderr "adjacencies for '%s' " (_pexlif_name pex)) fseq
-        (fprintf stderr "with children %S\n" (map _pexlif_name children)) fseq
+        //(fprintf stderr "adjacencies for '%s' " (_pexlif_name pex)) fseq
+        //(fprintf stderr "with children %S\n" (map _pexlif_name children)) fseq
         //(fprintf stderr "> adj_parent:%s\n" (print_list print_bool adj_parent)) fseq
         //(fprintf stderr "> adj_children:%s\n" (print_matrix print_bool adj_children)) fseq
-        (fprintf stderr "> adj:%s\n" (print_matrix print_bool adj)) fseq
+        //(fprintf stderr "> adj:%s\n" (print_matrix print_bool adj)) fseq
         //
         adj
 ;
@@ -166,8 +166,8 @@ let
         // Compare every pos. pairing.
         let iso = map (flip map ys # equal on fp) xs then
         //
-        (fprintf stderr "isomorphisms for '%s' and '%s'\n" (_pexlif_name pex) (_pexlif_name bex)) fseq
-        (fprintf stderr "> iso:%s\n" (print_matrix print_bool iso)) fseq
+        //(fprintf stderr "isomorphisms for '%s' and '%s'\n" (_pexlif_name pex) (_pexlif_name bex)) fseq
+        //(fprintf stderr "> iso:%s\n" (print_matrix print_bool iso)) fseq
         //
         iso
 ;
@@ -206,7 +206,7 @@ forward_declare{explore::pexlif->pexlif->({((string#string) list)} opt list)};
 let
     expand p g =
         //
-        (fprintf stderr "expanding '%s' and '%s'\n" (_pexlif_name p) (_pexlif_name g)) fseq
+        //(fprintf stderr "expanding '%s' and '%s'\n" (_pexlif_name p) (_pexlif_name g)) fseq
         //
         // Find possible solutions for a 'p' and 'g' mapping.
         let adj_p = adjacencies p then
@@ -243,23 +243,23 @@ let
 let
     explore p g =
         //
-        (fprintf stderr "exploring '%s' and '%s'\n" (_pexlif_name p) (_pexlif_name g)) fseq
+        //(fprintf stderr "exploring '%s' and '%s'\n" (_pexlif_name p) (_pexlif_name g)) fseq
         //
         IF sig p == sig g THEN
-            (fprintf stderr "> signatures matched!\n") fseq
+            //(fprintf stderr "> signatures matched!\n") fseq
             //
             [actualize_sha p g]
         ELSE IF fp p == fp g THEN
             IF leaf p AND leaf g THEN
-                (fprintf stderr "> both leaves\n") fseq
+                //(fprintf stderr "> both leaves\n") fseq
                 //
                 [actualize_leaf p g]
             ELSE
-                (fprintf stderr "> both hier.\n") fseq
+                //(fprintf stderr "> both hier.\n") fseq
                 //
                 map (\ss. actualize_hier ss p g) (expand p g)
         ELSE
-            (fprintf stderr "> no match!") fseq
+            //(fprintf stderr "> no match!") fseq
             //
             []
 ;
@@ -273,8 +273,11 @@ let
 //  print_subst::((string#string) list)->string
 let print_subst = print_list (curry print_pair);
 
-//  pretty::((subst opt) list)->string
-let pretty = list2str T "{ " "\n, " "}\n" print_subst # filter_some;
+//  print_solution::((subst opt) list)->string
+let print_solution = print_list print_subst # filter_some;
+
+//  pretty::pexlif->pexlif->((subst opt) list)->string
+let pretty p g s = sprintf "Found match for '%s' and '%s', where %s\n" (_pexlif_name p) (_pexlif_name g) (print_solution s);
 
 //------------------------------------------------------------------------------
 
@@ -283,9 +286,8 @@ let
     moo p (PINST _ _ _ _ _ _ (P_HIER gs)) =
         let candidates = filter (\g. fp p == fp g) gs in
         flip foreach candidates (\g.
-            let x = explore p g in
-            fprintf stdout "%s->%s:\n%s"
-                (_pexlif_name p) (_pexlif_name g) (pretty x)
+            let sol = explore p g then
+            print (pretty p g sol)
         )
 ;
 

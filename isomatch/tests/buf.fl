@@ -63,6 +63,6 @@ let haystack =
 let needle_pex = buf1 'a 'out;
 let haystack_pex = haystack 'a 'b 'c 'd 'e 'f 'o1 'o2 'o3 'o4 'o5 'o6 'o7;
 
-needle_pex;
-haystack_pex;
+//needle_pex;
+//haystack_pex;
 moo needle_pex haystack_pex;
