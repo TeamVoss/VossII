@@ -6,11 +6,11 @@ let ?! = undefined;
 
 //==============================================================================
 //
-// ...
+// Construction of a subst. eq. between two pexlifs.
 //
 //==============================================================================
 
-// ...
+// Merge two subst., fails if any is empty.
 //  @@::(subst opt)->(subst opt)->(subst opt)
 let
     @@ (SOME x) (SOME y) = SOME (x @ y)
@@ -18,7 +18,7 @@ let
 ;
 infix 9 @@;
 
-// ...
+// Merge a list of opt. subst., fails if any is empty.
 //  collect::((subst opt) list)->(subst opt)
 let collect ss = itlist (defix @@) ss (SOME []);
 
@@ -29,7 +29,8 @@ let coherent s = all (\(u,t). all (\(x,y). (u == x) <==> (t == y)) s) s;
 //------------------------------------------------------------------------------
 
 // Find a subst., if any, s.t. both expressions are equal.
-//   TODO: Some missing cases.
+// TODO: Some missing cases.
+//  alpha::wexpr->wexpr->subst
 letrec
     alpha (W_X _)       (W_X _)       = SOME []
 /\  alpha (W_CONST _ _) (W_CONST _ _) = SOME []
@@ -56,6 +57,7 @@ letrec
 ;
 
 // Find a subst., if any, s.t. both update functions are equal.
+//  alpha_fn::update_fn->update_fn->subst
 let
     alpha_fn (W_UPDATE_FN a b)   (W_UPDATE_FN x y)   = alpha a x @@ alpha b y
 /\  alpha_fn (W_PHASE_DELAY a b) (W_PHASE_DELAY x y) = alpha a x @@ alpha b y
@@ -63,6 +65,7 @@ let
 ;
 
 // Find subst., if any, s.t. both sets of functions are equal.
+//  alpha_leaf::content->content->subst
 let
     alpha_leaf (P_LEAF fs) (P_LEAF gs) =
         let
@@ -73,22 +76,25 @@ let
         exhaust (map test (permutations gs))
 ;
 
-//==============================================================================
-// ...
+//------------------------------------------------------------------------------
 
+// Given an SHA eq. between 'p' and 'g', construct a formal subst.
+//  actualize_sha::pexlif->pexlif->(subst opt)
 let
     actualize_sha p g =
         SOME (zip (actuals p) (actuals g))
 ;
 
-// ...
+// Find formal subst. for two leaf pexlif's.
+//  actualize_leaf::pexlif->pexlif->(subst opt)
 let
     actualize_leaf (PINST _ _ _ i1 o1 _ l1) (PINST _ _ _ i2 o2 _ l2) =
         let lift = actualize (i1 @ o1) (i2 @ o2) in
         maybe NONE (alpha_leaf l1 l2) (SOME # lift)
 ;
 
-// ...
+// Given a list of subst. of actuals for their children, find formal subst.
+//  actualize_hier::((subst opt) list)->pexlif->pexlif->(subst opt)
 let
     actualize_hier ss (PINST _ _ _ i1 o1 _ _) (PINST _ _ _ i2 o2 _ _) =
         let lift = actualize (i1 @ o1) (i2 @ o2) in
@@ -97,7 +103,7 @@ let
 
 //==============================================================================
 //
-// ...
+// Construction of adj. & iso. matrices.
 //
 //==============================================================================
 
@@ -132,7 +138,8 @@ let
 
 //------------------------------------------------------------------------------
 
-// ...
+// Construct adj. matrix for 'pex' when "flattened" one level.
+//  adjacencies::pexlif->(bool mat)
 clet
     adjacencies pex =
         let child   x y = (formals x) intersects (actuals y) in
@@ -155,16 +162,17 @@ clet
         adj
 ;
 
-// ...
+// Construct iso. matrix between 'pex' and 'qex' when "flattened" one level.
+//  isomorphisms::pexlif->pexlif->(bool mat)
 let
-    isomorphisms pex bex =
+    isomorphisms pex qex =
         // Fetch parent&children.
         let xs = pex : hier pex in
-        let ys = bex : hier bex in
+        let ys = qex : hier qex in
         // Compare every pos. pairing.
         let iso = map (flip map ys # equal on fp) xs then
         //
-        //(fprintf stderr "isomorphisms for '%s' and '%s'\n" (_pexlif_name pex) (_pexlif_name bex)) fseq
+        //(fprintf stderr "isomorphisms for '%s' and '%s'\n" (_pexlif_name pex) (_pexlif_name qex)) fseq
         //(fprintf stderr "> iso:%s\n" (print_matrix print_bool iso)) fseq
         //
         iso
@@ -172,7 +180,7 @@ let
 
 //==============================================================================
 //
-// ...
+// Isomatch. searching.
 //
 //==============================================================================
 
@@ -210,12 +218,12 @@ let
         let adj_p = adjacencies p then
         let adj_g = adjacencies g then
         let iso   = isomorphisms p g then
-        let solutions = recurse iso adj_p adj_g then
+        let ss    = recurse iso adj_p adj_g then
         // Explore each pairing in a solution to validate it.
         let p_flat = p : hier p in
         let g_flat = g : hier g in
-        pam (filter (hd # hd) solutions) (\solution.
-            let matches = map (\col. find_mask col (g : hier g)) (tl solution) in
+        pam (filter (hd # hd) ss) (\sol.
+            let matches = map (\col. find_mask col (g : hier g)) (tl sol) in
             let options = map2 explore (hier p) matches in
             let choices = expand_choices options in
             let res     = map collect choices in
@@ -224,7 +232,7 @@ let
         )
 ;
 
-// ...
+// Explore two pexlifs to find if they are a potential match.
 //
 // explore(P, G)
 //     if P == G
@@ -265,7 +273,7 @@ let
 
 //==============================================================================
 //
-// ...
+// Main.
 //
 //==============================================================================
 
@@ -288,7 +296,8 @@ let clean_solution p = let f = formals p in map (flip when (clean_subst f));
 
 //------------------------------------------------------------------------------
 
-// ...
+// Performs isomatching on two pexlifs and prints the results, if any.
+//  moo::pexlif->pexlif->void
 let
     moo p (PINST _ _ _ _ _ _ (P_HIER gs)) =
         let candidates = filter (\g. fp p == fp g) gs in
