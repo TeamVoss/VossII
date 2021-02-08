@@ -3,6 +3,7 @@ load (DIR^"lib/utils.fl");
 load (DIR^"lib/ullman.fl");
 
 let ?! = undefined;
+let count_some = length # filter_some;
 
 //==============================================================================
 //
@@ -209,6 +210,7 @@ letrec
 //         explore all pairings X of children in P and G according to R
 //
 forward_declare{explore::pexlif->pexlif->({((string#string) list)} opt list)};
+//  expand::pexlif->pexlif->(({(string#string list)} opt list) list)
 let
     expand p g =
         //
@@ -220,13 +222,12 @@ let
         let iso   = isomorphisms p g then
         let ss    = recurse iso adj_p adj_g then
         // Explore each pairing in a solution to validate it.
-        let p_flat = p : hier p in
         let g_flat = g : hier g in
         pam (filter (hd # hd) ss) (\sol.
-            let matches = map (\col. find_mask col (g : hier g)) (tl sol) in
-            let options = map2 explore (hier p) matches in
-            let choices = expand_choices options in
-            let res     = map collect choices in
+            let matches = map (\col. find_mask col (g : hier g)) (tl sol) then
+            let options = map2 explore (hier p) matches then
+            let choices = expand_choices options then
+            let res     = map collect choices then
             //
             res
         )
@@ -248,23 +249,27 @@ let
 //
 let
     explore p g =
-        let leaf = _pexlif_leaf in
+        let leaf = _pexlif_leaf then
         //
         //(fprintf stderr "exploring '%s' and '%s'\n" (_pexlif_name p) (_pexlif_name g)) fseq
         //
         IF sig p == sig g THEN
-            //(fprintf stderr "> signatures matched!\n") fseq
+            let x = [actualize_sha p g] then x
             //
-            [actualize_sha p g]
+            //(fprintf stderr "> signatures matched!\n") fseq x
         ELSE IF fp p == fp g THEN
             IF leaf p AND leaf g THEN
-                //(fprintf stderr "> both leaves\n") fseq
+                //(fprintf stderr ">both leaf.\n") fseq
                 //
-                [actualize_leaf p g]
+                let x = [actualize_leaf p g] then x
+                //
+                //(fprintf stderr "found %d sols. while exploring leafs '%s' and '%s'.\n" (count_some x) (_pexlif_name p) (_pexlif_name g)) fseq x
             ELSE
-                //(fprintf stderr "> both hier.\n") fseq
+                //(fprintf stderr ">both hier.\n") fseq
                 //
-                map (\ss. actualize_hier ss p g) (expand p g)
+                let x = map (\ss. actualize_hier ss p g) (expand p g) then x
+                //
+                //(fprintf stderr "found %d sols. while exploring hiers. '%s' and '%s'.\n" (count_some x) (_pexlif_name p) (_pexlif_name g)) fseq x
         ELSE
             //(fprintf stderr "> no match!") fseq
             //
@@ -277,34 +282,67 @@ let
 //
 //==============================================================================
 
+//  clean_subst::(string list)->subst->subst
+let clean_subst f = filter (flip elem f # fst);
+
+//  clean_solution::pexlif->(subst list)->(subst list)
+let clean_solution p = map (clean_subst (formals p));
+
+//  recover_matches::pexlif->pexlif->((bool mat) list)->(((pexlif#pexlif) list) list)
+let recover_matches p g iso = map (map2 (\n. \r. (n, find_mask r (hier g))) (hier p)) iso;
+
+//------------------------------------------------------------------------------
+
 //  print_subst::((string#string) list)->string
 let print_subst = print_list (curry print_pair);
 
 //  print_solution::((subst opt) list)->string
 let print_solution = print_list print_subst # filter_some;
 
-//  pretty::pexlif->pexlif->((subst opt) list)->string
-let pretty p g s = sprintf "Found match for '%s' and '%s', where %s\n" (_pexlif_name p) (_pexlif_name g) (print_solution s);
+//  pretty::((pexlif#pexlif) list)->((subst list) list)->void
+let pretty ms ss =
+        let
+            pretty_one (p,g) s =
+                (fprintf stdout "matching '%s' and '%s' %s"
+                    (_pexlif_name p)
+                    (_pexlif_name g)
+                    (list2str T "where " " or " "\n" (print_subst) s))
+        in
+        foreach (curry pretty_one) (zip ms ss)
+;
 
 //------------------------------------------------------------------------------
 
-//  clean_subst::(string list)->subst->subst
-let clean_subst f = filter (flip elem f # fst);
+// Removes the first column and row of a matrix.
+//  mat_tl::(* mat)->(* mat)
+let mat_tl = map tl # tl;
 
-//  clean_solution::pexlif->((subst opt) list)->((subst opt) list)
-let clean_solution p = let f = formals p in map (flip when (clean_subst f));
-
-//------------------------------------------------------------------------------
-
-// Performs isomatching on two pexlifs and prints the results, if any.
+// Isomatch and pretty-print.
 //  moo::pexlif->pexlif->void
 let
-    moo p (PINST _ _ _ _ _ _ (P_HIER gs)) =
-        let candidates = filter (\g. fp p == fp g) gs in
-        flip foreach candidates (\g.
-            let sol  = explore p g then
-            let sol' = clean_solution p sol then
-            print (pretty p g sol')
+    moo p g =
+        let adj_p = mat_tl (adjacencies p) then
+        let adj_g = mat_tl (adjacencies g) then
+        let iso   = mat_tl (isomorphisms p g) then
+        let ss    = recurse iso adj_p adj_g then
+        //
+        (fprintf stdout "Found match for '%s' and '%s'\n"
+            (_pexlif_name p) (_pexlif_name g))
+        fseq
+        //
+        flip foreach ss (\sol.
+            //  matches::(pexlif list)
+            let matches = map (flip find_mask (hier g)) sol then
+            //  pairs::(pexlif#pexlif list)
+            let pairs   = zip (hier p) matches then
+            //  options::(((subst opt) list) list)
+            let options = map (curry explore) pairs then
+            //  choices::(((subst opt) list) list)
+            let choices = expand_choices options then
+            //  res::((subst list) list)
+            let res = map filter_some options then
+            //
+            pretty pairs res
         )
 ;
 

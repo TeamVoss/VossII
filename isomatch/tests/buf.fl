@@ -45,6 +45,13 @@ let buf4 =
         inv_rec 2 a out
     ];
 
+let needle =
+    bit_input a.
+    bit_output b.
+    CELL "draw_hier needle" [
+        buf1 a b
+    ];
+
 let haystack =
     bit_input a b c d e f.
     bit_output o1 o2 o3 o4 o5 o6 o7.
@@ -61,8 +68,9 @@ let haystack =
     ];
 
 let needle_pex = buf1 'a 'out;
+let needle_pex = needle 'a 'b;
 let haystack_pex = haystack 'a 'b 'c 'd 'e 'f 'o1 'o2 'o3 'o4 'o5 'o6 'o7;
 
-//needle_pex;
-//haystack_pex;
+needle_pex;
+haystack_pex;
 moo needle_pex haystack_pex;

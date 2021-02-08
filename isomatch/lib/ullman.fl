@@ -127,14 +127,18 @@ let
         //(fprintf stderr "recurse on matrix %s\n" (print_matrix print_bool iso)) fseq
         //
         let
-            forall_unused iso row used f =
-                let unused  = map NOT used in
-                let matches = map2 (defix AND) (el row iso) unused in
+            forall_unused m row used f =
+                //
+                //(fprintf stderr "forall_unused %s %d %s\n" (print_matrix print_bool m) row (print_list print_bool used)) fseq
+                //
+                let unused  = map NOT used then
+                let matches = map2 (defix AND) (el row m) unused then
                 flatmap f (filter_cols id matches)
         in
         //
         let solution m = isomorphism m adj_p adj_g in
-        let rows = num_rows iso in
+        let cols = length (hd iso) in
+        let rows = length iso in
         letrec
             search m used row =
                 IF row == rows + 1 THEN
@@ -149,7 +153,7 @@ let
                         let used' = modify (const T) col used in
                         search n' used' (row+1))
         in
-        let res = search iso (replicate rows F) 1 then
+        let res = search iso (replicate cols F) 1 then
         //
         //(fprintf stderr "finished recursion with\n> res:%s\n" (print_list (print_matrix print_bool) res)) fseq
         //

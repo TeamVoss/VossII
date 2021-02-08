@@ -274,6 +274,12 @@ let string_empty s = strlen s == 0;
 //==============================================================================
 // ...
 
+//  print_bool::bool->string
+let print_bool b = b => "T" | "F";
+
+//  print_some::(* opt)->(*->string)->string;
+let print_some = flip (maybe "none");
+
 //  print_pair::string->string->string
 let print_pair = sprintf "%s:%s";
 
@@ -283,11 +289,11 @@ let print_list = list2str T "[" "," "]";
 //  print_matrix::(*->string)->((* list) list)->string
 let print_matrix = print_list # print_list;
 
+//  print_large_list::(*->string)->(* list)->string
+let print_large_list = list2str T "[ " "\n, " "\n]";
+
 //  print_large_matrix::(*->string)->((* list) list)->string
 let print_large_matrix = list2str T "[ " "\n, " "\n]" # print_list;
-
-//  print_bool::bool->string
-let print_bool b = b => "T" | "F";
 
 //  print_fa::(string#(string list))->string
 let print_fa = print_list (curry print_pair # second (print_list id));
