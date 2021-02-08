@@ -25,6 +25,16 @@ map <silent> @Q :! echo 'quit;' >> $fl_inp <CR><CR>
 :endfunction
 map <silent> @? mK/[^a-z0-9A-Z_']<CR>mL`K"ky`L`K/[a-zA-Z0-9()   "]<CR>mL`K"ly`L`K:call Select_help()<CR><CR>
 
+" --------- Evaluate identifier ---------
+" Evaluate word or symbol under cursor (search back and forward to get id)
+:function Select_eval()
+:  if ( match(strpart(getline(line(".")), col(".") -1, 1), "[a-zA-Z_]") == 0 )
+:     exe ":! echo '" . @k . ';' . "'" . " >>" . $fl_inp
+:  else
+:     exe ":! echo '" . @l . ';' . "'" . " >>" . $fl_inp
+:  endif
+:endfunction
+map <silent> @> mK/[^a-z0-9A-Z_']<CR>mL`K"ky`L`K/[a-zA-Z0-9()   "]<CR>mL`K"ly`L`K:call Select_eval()<CR><CR>
 
 " --------- Open a window in vim to see stdout from fl ---------
 function! See_stdout()

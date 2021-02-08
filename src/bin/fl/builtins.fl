@@ -820,7 +820,10 @@ let clean_clets = defix clean_clets;
 non_lazy clean_clets;
 
 // Convert a float to a string
-let float2str f = defix float2str f;
+let float2str f = 
+    let r = defix float2str f in
+    str_is_substr "." r => r | r^".0"
+;
 
 // Convert a string to a floating point number.
 // The string should be of the form: [-]{digit}*.{digit}+{e[-]{digit}+}?

@@ -1,0 +1,14 @@
+
+lettype *a tr1 = BR1 (({*a} tr1) list) | LF1 *a;
+
+lettype {*a} tr1 = BR2 (({*a} tr1) list) | LF2 *a;
+
+lettype {*a,*b} tr2 = BR3 {subtrees :: (({*a,*b} tr2) list)}
+		    | LFA3 {data1:: *a}
+		    | LFB3 {data2:: *b}
+		    | LF3 {data1:: *a} {data2:: *b}
+;
+
+let q = BR3 [(BR3 [LFA3 1, LFB3 "a"]), BR3 [LF3 2 "b"]];
+q;
+
