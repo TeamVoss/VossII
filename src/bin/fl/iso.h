@@ -23,18 +23,12 @@ void	    Iso_Install_Functions();
 
 #include "fl.h"
 
-typedef struct adj_mat_rec *adj_mat_ptr;
-typedef struct adj_mat_rec {
-    unint **mat;
+typedef struct mat_rec *mat_ptr;
+typedef struct mat_rec {
+    bool  **mat;
     unint rows;
     unint cols;
-} adj_mat_rec;
-
-typedef struct iso_mat_rec *iso_mat_ptr;
-typedef struct iso_mat_rec {
-    adj_mat_ptr adj_mat;    // Adjacency matrix.
-    hash_record node_names; // Name table.
-} iso_mat_rec;
+} mat_rec;
 
 #endif /* ISO_H */
 #endif /* EXPORT_FORWARD_DECL */

@@ -123,19 +123,12 @@ let
 //           recurse(used', row+1, P, G, N')
 let
     recurse iso adj_p adj_g =
-        //
-        //(fprintf stderr "recurse on matrix %s\n" (print_matrix print_bool iso)) fseq
-        //
         let
             forall_unused m row used f =
-                //
-                //(fprintf stderr "forall_unused %s %d %s\n" (print_matrix print_bool m) row (print_list print_bool used)) fseq
-                //
                 let unused  = map NOT used then
                 let matches = map2 (defix AND) (el row m) unused then
                 flatmap f (filter_cols id matches)
         in
-        //
         let solution m = isomorphism m adj_p adj_g in
         let cols = length (hd iso) in
         let rows = length iso in
@@ -147,17 +140,13 @@ let
                     ELSE
                         []
                 ELSE
-                    let n = m in // prune m adj_p adj_g then
+                    let n = prune m adj_p adj_g then
 		    forall_unused n row used (\col.
                         let n'    = modify (mark_one col) row n in
                         let used' = modify (const T) col used in
                         search n' used' (row+1))
         in
-        let res = search iso (replicate cols F) 1 then
-        //
-        //(fprintf stderr "finished recursion with\n> res:%s\n" (print_list (print_matrix print_bool) res)) fseq
-        //
-        res
+        search iso (replicate cols F) 1
 ;
 
 //==============================================================================

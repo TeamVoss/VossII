@@ -13,10 +13,10 @@ let p_pex = p_CacheLine;
 let g_flat = flatten_pexlif g_pex;
 let p_flat = flatten_pexlif p_pex;
 
-Emit_pexlif "p.txt" p_pex;
-Emit_pexlif "g.txt" g_pex;
+//Emit_pexlif "p.txt" p_pex;
+//Emit_pexlif "g.txt" g_pex;
 
-//moo p_flat g_flat;
+moo p_flat g_flat;
 
 //------------------------------------------------------------------------------
 // Fin.
