@@ -147,7 +147,7 @@ test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g)
             for(unint k=0; k<iso->cols; k++) {
 				t2 = FALSE;
                 for(unint l=0; l<iso->cols; l++) {
-					if(iso->mat[l][j] && g->mat[k][l]) {
+					if(iso->mat[j][l] && g->mat[l][k]) {
 						t2 = TRUE;
                         break;
                     }
@@ -157,7 +157,7 @@ test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g)
                     break;
                 }
             }
-            if(p->mat[i][j] != t1) {
+            if(p->mat[j][i] != t1) {
 				return FALSE;
             }
         }
