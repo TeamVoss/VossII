@@ -9,7 +9,7 @@ load "ste.fl";
 let BYTE_SIZE           = 8;
 let ADDR_SIZE           = 20;
 let TIMER_SIZE          = 16;
-let LINES               = 8;            // Number of cache lines
+let LINES               = 1;            // Number of cache lines
 let BYTES_IN_CACHE_LINE = 8;            // Number of bytes in cache line
 let TAG_SIZE		= ADDR_SIZE-(log2 LINES)-(log2 BYTES_IN_CACHE_LINE);
 

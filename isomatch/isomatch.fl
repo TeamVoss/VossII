@@ -3,7 +3,6 @@ load (DIR^"lib/utils.fl");
 load (DIR^"lib/ullman.fl");
 
 let ?! = undefined;
-let count_some = length # filter_some;
 
 //==============================================================================
 //
@@ -154,11 +153,12 @@ clet
         // Complete adj. mat. combines above two.
         let adj = adj_parent : map2 cons (tl adj_parent) adj_children in
         //
-        //(fprintf stderr "adjacencies for '%s' " (_pexlif_name pex)) fseq
-        //(fprintf stderr "with children %S\n" (map _pexlif_name children)) fseq
-        //(fprintf stderr "> adj_parent:%s\n" (print_list print_bool adj_parent)) fseq
-        //(fprintf stderr "> adj_children:%s\n" (print_matrix print_bool adj_children)) fseq
-        //(fprintf stderr "> adj:%s\n" (print_matrix print_bool adj)) fseq
+(fprintf stderr "### adjacencies for '%s' with %d children %S:\n%s\n"
+    (_pexlif_name pex)
+    (length children)
+    (map _pexlif_name children)
+    (print_large_matrix print_bool (mat_tl adj))
+) fseq
         //
         adj
 ;
@@ -173,8 +173,11 @@ let
         // Compare every pos. pairing.
         let iso = map (flip map ys # equal on fp) xs then
         //
-        //(fprintf stderr "isomorphisms for '%s' and '%s'\n" (_pexlif_name pex) (_pexlif_name qex)) fseq
-        //(fprintf stderr "> iso:%s\n" (print_matrix print_bool iso)) fseq
+(fprintf stderr "### isomorphisms for '%s' and '%s':\n%s\n"
+    (_pexlif_name pex)
+    (_pexlif_name qex)
+    (print_large_matrix print_bool (mat_tl iso))
+) fseq
         //
         iso
 ;
@@ -263,13 +266,13 @@ let
                 //
                 let x = [actualize_leaf p g] then x
                 //
-                //(fprintf stderr "found %d sols. while exploring leafs '%s' and '%s'.\n" (count_some x) (_pexlif_name p) (_pexlif_name g)) fseq x
+                //(fprintf stderr "found %d sols. while exploring leafs '%s' and '%s'.\n" (num_some x) (_pexlif_name p) (_pexlif_name g)) fseq x
             ELSE
                 //(fprintf stderr ">both hier.\n") fseq
                 //
                 let x = map (\ss. actualize_hier ss p g) (expand p g) then x
                 //
-                //(fprintf stderr "found %d sols. while exploring hiers. '%s' and '%s'.\n" (count_some x) (_pexlif_name p) (_pexlif_name g)) fseq x
+                //(fprintf stderr "found %d sols. while exploring hiers. '%s' and '%s'.\n" (num_some x) (_pexlif_name p) (_pexlif_name g)) fseq x
         ELSE
             //(fprintf stderr "> no match!") fseq
             //
@@ -313,10 +316,6 @@ let pretty ms ss =
 
 //------------------------------------------------------------------------------
 
-// Removes the first column and row of a matrix.
-//  mat_tl::(* mat)->(* mat)
-let mat_tl = map tl # tl;
-
 // Isomatch and pretty-print.
 //  moo::pexlif->pexlif->void
 let
@@ -326,11 +325,9 @@ let
         let iso   = mat_tl (isomorphisms p g) then
         let ss    = recurse iso adj_p adj_g then
         //
-        (fprintf stdout "Found match for '%s' and '%s'\n"
-            (_pexlif_name p) (_pexlif_name g))
-        fseq
-        //
         flip foreach ss (\sol.
+            //
+            (fprintf stdout "Found match for '%s' and '%s'\n" (_pexlif_name p) (_pexlif_name g)) fseq
             //  matches::(pexlif list)
             let matches = map (flip find_mask (hier g)) sol then
             //  pairs::(pexlif#pexlif list)

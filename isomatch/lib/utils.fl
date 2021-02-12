@@ -126,6 +126,10 @@ letrec
 /\  exhaust (x:xs) = maybe (exhaust xs) x SOME
 ;
 
+// ...
+//  num_some::((a opt) list)->int
+let num_some = length # filter_some;
+
 //==============================================================================
 // List.
 
@@ -240,6 +244,14 @@ letrec
 //==============================================================================
 // Matrix.
 
+// Removes the first column and row of a matrix.
+//  mat_tl::(* mat)->(* mat)
+let mat_tl = map tl # tl;
+
+// Set the '(i,j)'th element of matrix 'mat' to 'v'.
+//  mat_update::a->(int#int)->(a mat)->(a mat)
+let mat_update v (i,j) = modify (list_update v j) i;
+
 // Count the number of rows in a matrix.
 //  num_rows::(a mat)->int
 let num_rows = length;
@@ -247,10 +259,6 @@ let num_rows = length;
 // Count the number of columns in a square matrix.
 //  num_columns::(a mat)->int
 let num_columns xs = empty xs => 0 | length (hd xs);
-
-// Set the '(i,j)'th element of matrix 'mat' to 'v'.
-//  mat_update::a->(int#int)->(a mat)->(a mat)
-let mat_update v (i,j) = modify (list_update v j) i;
 
 //==============================================================================
 // String
@@ -275,7 +283,7 @@ let string_empty s = strlen s == 0;
 // ...
 
 //  print_bool::bool->string
-let print_bool b = b => "T" | "F";
+let print_bool b = b => "T" | "_";
 
 //  print_some::(* opt)->(*->string)->string;
 let print_some = flip (maybe "none");
@@ -343,17 +351,13 @@ let formalize fa_n fa_h = promote lower (lineup fa_n) (lineup fa_h);
 
 //------------------------------------------------------------------------------
 
-//  actuals::pexlif->[string]
-let
-    actuals (PINST _ _ _ fa_inps fa_outs _ _) =
-        flatmap (md_expand_vectors # snd) (fa_inps @ fa_outs)
-;
+//  actuals/formals::pexlif->[string]
+let actuals (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd (fa_inps @ fa_outs);
+let formals (PINST _ _ _ fa_inps fa_outs _ _) = map fst (fa_inps @ fa_outs);
 
-//  formals::pexlif->[string]
-let
-    formals (PINST _ _ _ fa_inps fa_outs _ _) =
-        flatmap (md_expand_vector # fst) (fa_inps @ fa_outs)
-;
+//  flat_actuals/flat_formals::pexlif->[string]
+let flat_actuals = flatmap md_expand_vector # actuals;
+let flat_formals = flatmap md_expand_vector # formals;
 
 //==============================================================================
 // Fin.

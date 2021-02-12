@@ -74,11 +74,11 @@ letrec
                     any_neighbors j g => n | mat_update F (i,j) n))
         then
         // Continue pruning until options are exhausted.
-        //(fprintf stderr "pruning matrix %s " (print_matrix print_bool m)) fseq
-        //(fprintf stderr "into %s " (print_matrix print_bool m')) fseq
-        //(fprintf stderr "done? %s\n" (print_bool (m == m'))) fseq
-        //
-        m == m' => m | prune m' g p
+        IF m == m' THEN
+            m
+        ELSE
+(fprintf stderr ">>> pruning.\n") fseq
+            prune m' g p
 ;
 
 //==============================================================================
@@ -124,13 +124,10 @@ let
 let
     recurse iso adj_p adj_g =
         //
-        //(fprintf stderr "recurse on matrix %s\n" (print_matrix print_bool iso)) fseq
+(fprintf stderr "### recursing...\n") fseq
         //
         let
             forall_unused m row used f =
-                //
-                //(fprintf stderr "forall_unused %s %d %s\n" (print_matrix print_bool m) row (print_list print_bool used)) fseq
-                //
                 let unused  = map NOT used then
                 let matches = map2 (defix AND) (el row m) unused then
                 flatmap f (filter_cols id matches)
@@ -142,12 +139,23 @@ let
         letrec
             search m used row =
                 IF row == rows + 1 THEN
+(fprintf stderr ">> reached bottom...") fseq
                     IF solution m THEN
+(fprintf stderr "found solution!\n") fseq
                         [m]
                     ELSE
+(fprintf stderr "no solution.\n") fseq
                         []
                 ELSE
-                    let n = m in // prune m adj_p adj_g then
+                    let n = prune m adj_p adj_g then
+                    //
+(fprintf stderr ">> exploring row %d\nused:%s\niso: %s\nadj: %s\n"
+    row
+    (print_list print_bool used)
+    (print_list print_bool (el row n))
+    (print_list print_bool (el row adj_p))
+) fseq
+                    //
 		    forall_unused n row used (\col.
                         let n'    = modify (mark_one col) row n in
                         let used' = modify (const T) col used in
@@ -155,7 +163,10 @@ let
         in
         let res = search iso (replicate cols F) 1 then
         //
-        //(fprintf stderr "finished recursion with\n> res:%s\n" (print_list (print_matrix print_bool) res)) fseq
+(fprintf stderr "### finished recursion with %d solution(s):\n%s\n"
+    (length res)
+    (print_large_list (print_large_matrix print_bool) res)
+) fseq
         //
         res
 ;
