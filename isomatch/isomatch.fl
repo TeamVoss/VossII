@@ -138,23 +138,42 @@ let
 
 //------------------------------------------------------------------------------
 
+// ...
+//  expand::pexlif->[string]
+let expand = flatmap md_expand_vector;
+
+// ...
+//  child_of::pexlif->pexlif->bool
+clet
+    child_of x y =
+        let child_slow x y = (expand (formals x)) intersects (expand (actuals y)) in
+        let child_fast x y = (formals x) intersects (actuals y) in
+        IF child_fast x y THEN T ELSE child_slow x y
+;
+
+// ...
+//  sibling_of::pexlif->pexlif->bool
+clet
+    sibling_of x y =
+        let sibling_slow x y = (expand (actuals x)) intersects (expand (actuals y)) in
+        let sibling_fast x y = (actuals x) intersects (actuals y) in
+        IF sibling_fast x y THEN T ELSE sibling_slow x y
+;
+
 // Construct adj. matrix for 'pex' when "flattened" one level.
 //  adjacencies::pexlif->(bool mat)
 clet
-    adjacencies pex =
-        let child   x y = (formals x) intersects (actuals y) in
-        let sibling x y = (actuals x) intersects (actuals y) in
-        // Fetch parent/children.
-        let parent   = pex in
-        let children = hier pex in
-        // Compute adj. for "parent<->child" and "child<->child".
-        let adj_parent   = F : map (child parent) children in
-        let adj_children = compare_all sibling children in
-        // Complete adj. mat. combines above two.
+    adjacencies parent =
+        let children = hier parent in
+        // Compute adj. for "parent<->child".
+        let adj_parent   = F : map (child_of parent) children in
+        // Compute adj. for "child<->child".
+        let adj_children = compare_all sibling_of children in
+        // Merge above two adj. matrices.
         let adj = adj_parent : map2 cons (tl adj_parent) adj_children in
         //
 (fprintf stderr "### adjacencies for '%s' with %d children %S:\n%s\n"
-    (_pexlif_name pex)
+    (_pexlif_name parent)
     (length children)
     (map _pexlif_name children)
     (print_large_matrix print_bool (mat_tl adj))

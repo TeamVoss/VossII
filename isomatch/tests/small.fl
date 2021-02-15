@@ -1,0 +1,48 @@
+load (DIR^"../isomatch.fl");
+load "ste.fl";
+
+let not =
+    bit_input a.
+    bit_output b.
+    CELL "draw_hier not" [
+        b <- '~' a
+];
+
+let mix =
+    bit_input a.
+    bit_output b.
+    bit_internal m.
+    CELL "draw_hier mix" [
+        not a m,
+        b <- a '&' m
+];
+
+let one =
+    bit_input a.
+    bit_output b.
+    CELL "draw_hier one" [
+        mix a b
+];
+
+let two =
+    bit_input a.
+    bit_output b.
+    bit_internal m.
+    CELL "draw_hier two" [
+        mix a m,
+        mix m b
+];
+
+let p = one 'a 'b;
+let g = two 'a 'b;
+
+let p_flat = flatten_pexlif p;
+let g_flat = flatten_pexlif g;
+
+p_flat fseq g_flat fseq ();
+
+p_flat;
+g_flat;
+
+moo p_flat g_flat;
+

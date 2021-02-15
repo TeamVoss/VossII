@@ -17,8 +17,8 @@ let p_pex = verilog2pexlif "-Iisomatch/tests/mux" "mux2" ["small_lib.v"] [];
 let piece  = PINST "box" [] F [] [] [] (P_HIER [p_pex]);
 let puzzle = g_pex;
 
-//isomatch cmp p_pex g_pex;
-DBG_isomatch cmp_fp "1" "1" piece puzzle;
+// ...
+moo piece puzzle;
 
 //------------------------------------------------------------------------------
 // Fin.

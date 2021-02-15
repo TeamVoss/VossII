@@ -355,10 +355,6 @@ let formalize fa_n fa_h = promote lower (lineup fa_n) (lineup fa_h);
 let actuals (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd (fa_inps @ fa_outs);
 let formals (PINST _ _ _ fa_inps fa_outs _ _) = map fst (fa_inps @ fa_outs);
 
-//  flat_actuals/flat_formals::pexlif->[string]
-let flat_actuals = flatmap md_expand_vector # actuals;
-let flat_formals = flatmap md_expand_vector # formals;
-
 //==============================================================================
 // Fin.
 

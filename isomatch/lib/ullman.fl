@@ -81,6 +81,19 @@ letrec
             prune m' g p
 ;
 
+// Trim impossible matches given a match of 'P(r)' to 'G(c)'.
+//
+//  thin::int->int->(bool mat)->(bool mat)->(bool mat)->(bool mat)
+letrec
+    thin r c m p g =
+        // Trim col. if 'G(y)' is not adj. to 'G(c)'.
+        let f col j = IF NOT (el c (el j g)) THEN F ELSE col in
+        // Trim row if 'P(x)' is adj. to 'P(r)'.
+        let g row i = IF (el r (el i p)) THEN ixmap f row ELSE row in
+        //
+        ixmap g m
+;
+
 //==============================================================================
 // Solution checking.
 
@@ -157,9 +170,14 @@ let
 ) fseq
                     //
 		    forall_unused n row used (\col.
+(fprintf stderr "> picked col %d\nadj: %s\n"
+    col
+    (print_list print_bool (el col adj_g))
+) fseq
                         let n'    = modify (mark_one col) row n in
+                        let n''   = thin row col n' adj_p adj_g in
                         let used' = modify (const T) col used in
-                        search n' used' (row+1))
+                        search n'' used' (row+1))
         in
         let res = search iso (replicate cols F) 1 then
         //
