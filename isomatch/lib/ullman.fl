@@ -68,20 +68,19 @@ letrec
         // Check if there are neighbors of 'i' in 'm'.
         let any_neighbors i m = forall_neighbors i m (\vj. const T) F in
         // Prune 'm' once.
-        val m' =
-            forall_ones m m (\(i,j).
-                forall_neighbors i p (\vi. \n.
-                    any_neighbors j g => n | mat_update F (i,j) n))
+        val
+            m' =
+                forall_ones m m (\(i,j).
+                    forall_neighbors i p (\vi. \n.
+                        any_neighbors j g => n | mat_update F (i,j) n))
         then
         // Continue pruning until options are exhausted.
-        IF m == m' THEN
-            m
-        ELSE
-(fprintf stderr ">>> pruning.\n") fseq
-            prune m' g p
+        IF m == m' THEN m ELSE prune m' g p
 ;
 
-// Trim impossible matches given a match of 'P(r)' to 'G(c)'.
+// Trim impossible matches given a match of 'P(r)' to 'G(c)': If 'P(r)' is
+// matched against 'G(c)', then no 'P(x)' adj. to 'P(r)' can be isomorphic to
+// some 'G(y)' that is not adj. to 'G(c)'.
 //
 //  thin::int->int->(bool mat)->(bool mat)->(bool mat)->(bool mat)
 letrec
@@ -170,7 +169,8 @@ let
 ) fseq
                     //
 		    forall_unused n row used (\col.
-(fprintf stderr "> picked col %d\nadj: %s\n"
+(fprintf stderr "> (%d) picked col %d\nadj: %s\n"
+    row
     col
     (print_list print_bool (el col adj_g))
 ) fseq
