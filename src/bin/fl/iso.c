@@ -169,3 +169,60 @@ _DuMMy_iso()
     test_isomorphism_match(NULL,NULL,NULL);
     recurse(NULL,NULL,NULL);
 }
+
+/******************************************************************************/
+/*                                OLD FUNCTIONS                               */
+/******************************************************************************/
+
+/* static iso_mat_ptr */
+/* create_iso_mat(fsm_ptr fsm) */
+/* { */
+/*     unint        _node_count = COUNT_BUF(&(fsm->nodes)); */
+/*     adj_mat_rec *_adj_mat; */
+/*     hash_record *_node_names; */
+/*     // Allocate. ------------------------------------------- */
+/*     iso_mat_ptr iso_mat; */
+/*     iso_mat = (iso_mat_ptr) new_rec(&iso_mat_mgr); */
+/*     // */
+/*     _adj_mat = (iso_mat->adj_mat); */
+/*     allocate_adjacency_matrix(_adj_mat, _node_count, _node_count); */
+/*     // */
+/*     _node_names = &(iso_mat->node_names); */
+/*     create_hash(_node_names, _node_count, int_hash, int_equ); */
+/*     // Initialize. ----------------------------------------- */
+/*     unint ix = 0; */
+/*     nnode_ptr np; */
+/*     FOR_BUF(&(fsm->nodes), nnode_rec, np) { */
+/*         unint n_idx = np->idx; */
+/* 	if (*get_real_name(np->vec, n_idx-(np->vec->map->from)+1) == '!') { */
+/* 	    continue; */
+/* 	} */
+/*         // Associate nodes with their index in the adj. matrix. */
+/*         unint  n_ix; */
+/*         unint *n_ix_ptr = (unint*) find_hash(_node_names, INT2PTR(n_idx)); */
+/*         if (n_ix_ptr == NULL) { */
+/* 	    n_ix = ix++; */
+/*             insert_hash(_node_names, INT2PTR(n_idx), INT2PTR(n_ix)); */
+/*         } else { */
+/* 	    n_ix = *n_ix_ptr; */
+/*         } */
+/*         // Build adj. matrix. */
+/* 	for(idx_list_ptr ilp = np->fanouts; ilp != NULL; ilp = ilp->next) { */
+/* 	    ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(&(fsm->composites), ilp->idx); */
+/* 	    FOREACH_NODE(t_idx, cp->outs) { */
+/*                 unint  t_ix; */
+/*                 unint *t_ix_ptr = find_hash(_node_names, INT2PTR(t_idx)); */
+/*                 if (t_ix_ptr == NULL) { */
+/* 		    t_ix = ix++; */
+/*                     insert_hash(_node_names, INT2PTR(t_idx), INT2PTR(t_ix)); */
+/*                 } else { */
+/* 		    t_ix = *t_ix_ptr; */
+/*                 } */
+/*                 _adj_mat->mat[n_ix][t_ix] = 1; */
+/*             } */
+/* 	} */
+/*     } */
+/*     // */
+/*     return iso_mat; */
+/* } */
+
