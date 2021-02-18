@@ -14,7 +14,41 @@
 /******************************************************************************/
 /*                               GLOBAL VARIABLES                             */
 /******************************************************************************/
-// ...
+
+string s_PINST;
+string s_P_HIER;
+string s_P_LEAF;
+string s_W_UPDATE_FN;
+string s_W_PHASE_DELAY;
+string s_W_X;
+string s_W_CONST;
+string s_W_NAMED_CONST;
+string s_W_VAR;
+string s_W_EXPLICIT_VAR;
+string s_W_AND;
+string s_W_OR;
+string s_W_NOT;
+string s_W_PRED;
+string s_W_EQ;
+string s_W_GR;
+string s_W_ADD;
+string s_W_SUB;
+string s_W_MUL;
+string s_W_DIV;
+string s_W_MOD;
+string s_W_SHL;
+string s_W_SHR;
+string s_W_ASHR;
+string s_W_SX;
+string s_W_ZX;
+string s_W_ITE;
+string s_W_SLICE;
+string s_W_NAMED_SLICE;
+string s_W_UPDATE_NAMED_SLICE;
+string s_W_CAT;
+string s_W_MEM_READ;
+string s_W_MEM_WRITE;
+string s_MEM;
 
 // Global variables referenced -------------------------------------------------
 // ...
