@@ -144,7 +144,6 @@ let
                 let matches = map2 (defix AND) (el row m) unused then
                 flatmap f (filter_cols id matches)
         in
-        //
         let solution m = isomorphism m adj_p adj_g in
         let cols = length (hd iso) in
         let rows = length iso in
@@ -170,8 +169,7 @@ let
                     //
 		    forall_unused n row used (\col.
 (fprintf stderr "> (%d) picked col %d\nadj: %s\n"
-    row
-    col
+    row col
     (print_list print_bool (el col adj_g))
 ) fseq
                         let n'    = modify (mark_one col) row n in

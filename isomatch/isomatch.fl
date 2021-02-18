@@ -236,7 +236,7 @@ forward_declare{explore::pexlif->pexlif->({((string#string) list)} opt list)};
 let
     expand p g =
         //
-        //(fprintf stderr "expanding '%s' and '%s'\n" (_pexlif_name p) (_pexlif_name g)) fseq
+(fprintf stderr "expanding '%s' and '%s'\n" (_pexlif_name p) (_pexlif_name g)) fseq
         //
         // Find possible solutions for a 'p' and 'g' mapping.
         let adj_p = adjacencies p then
@@ -273,27 +273,33 @@ let
     explore p g =
         let leaf = _pexlif_leaf then
         //
-        //(fprintf stderr "exploring '%s' and '%s'\n" (_pexlif_name p) (_pexlif_name g)) fseq
+(fprintf stderr "exploring '%s' and '%s'\n" (_pexlif_name p) (_pexlif_name g)) fseq
         //
         IF sig p == sig g THEN
-            let x = [actualize_sha p g] then x
+            let x = [actualize_sha p g] then
             //
-            //(fprintf stderr "> signatures matched!\n") fseq x
+(fprintf stderr "> signatures matched!\n") fseq
+            //
+            x
         ELSE IF fp p == fp g THEN
             IF leaf p AND leaf g THEN
-                //(fprintf stderr ">both leaf.\n") fseq
+(fprintf stderr ">both leaf.\n") fseq
                 //
-                let x = [actualize_leaf p g] then x
+                let x = [actualize_leaf p g] then
                 //
-                //(fprintf stderr "found %d sols. while exploring leafs '%s' and '%s'.\n" (num_some x) (_pexlif_name p) (_pexlif_name g)) fseq x
+(fprintf stderr "found %d sols. while exploring leafs '%s' and '%s'.\n" (num_some x) (_pexlif_name p) (_pexlif_name g)) fseq
+                //
+                x
             ELSE
-                //(fprintf stderr ">both hier.\n") fseq
+(fprintf stderr ">both hier.\n") fseq
                 //
-                let x = map (\ss. actualize_hier ss p g) (expand p g) then x
+                let x = map (\ss. actualize_hier ss p g) (expand p g) then
                 //
-                //(fprintf stderr "found %d sols. while exploring hiers. '%s' and '%s'.\n" (num_some x) (_pexlif_name p) (_pexlif_name g)) fseq x
+(fprintf stderr "found %d sols. while exploring hiers. '%s' and '%s'.\n" (num_some x) (_pexlif_name p) (_pexlif_name g)) fseq
+                //
+                x
         ELSE
-            //(fprintf stderr "> no match!") fseq
+(fprintf stderr "> no match!") fseq
             //
             []
 ;
