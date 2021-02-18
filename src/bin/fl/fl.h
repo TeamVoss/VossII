@@ -166,12 +166,12 @@ typedef struct impl_arg_rec	*impl_arg_ptr;
 #include	"symbol_tbl.h"
 #include	"file_ops.h"
 #include	"arb_prec.h"
-#include        "sha256.h"
+#include    "sha256.h"
 #include	"new_bdd.h"
 #include	"initialize.h"
-#include        "graph.h"
-#include        "symbol.h"
-#include        "typecheck.h"
+#include    "graph.h"
+#include    "symbol.h"
+#include    "typecheck.h"
 #include	"language.h"
 #include	"emit.h"
 #include	"lp.h"
@@ -184,34 +184,35 @@ typedef struct impl_arg_rec	*impl_arg_ptr;
 #include	"minisat_ifc.h"
 #include	"draw_graph.h"
 #include	"debug.h"
-#include        "strings.h"
-#include        "system.h"
-#include        "int_ops.h"
-#include        "list_ops.h"
-#include        "float.h"
-#include        "bv.h"
-#include        "bev.h"
-#include        "fsm.h"
-#include        "table.h"
-#include        "image.h"
-#include        "plugin_loader.h"
-#include        "iso.h"
+#include    "strings.h"
+#include    "system.h"
+#include    "int_ops.h"
+#include    "list_ops.h"
+#include    "float.h"
+#include    "bv.h"
+#include    "bev.h"
+#include    "fsm.h"
+#include    "table.h"
+#include    "image.h"
+#include    "plugin_loader.h"
+#include    "iso.h"
+#include    "pexlif.h"
 
 /* Include function prototypes */
 #undef EXPORT_FORWARD_DECL
 
-typedef struct name_list_rec {		/* List of valid node names	      */
-	bool		used;
-        string          name;   	/* Valid name for this node           */
-        name_list_ptr   next;
+typedef struct name_list_rec {		/* List of valid node names	*/
+	bool		    used;
+    string          name;           /* Valid name for this node */
+    name_list_ptr   next;
 } name_list_rec;
 
 typedef struct impl_arg_rec {
 	bool		    used;
-        string		    name;   	/* Valid name for this node           */
+    string		    name;   	    /* Valid name for this node */
 	fn_ptr		    def;
-	typeExp_ptr	    type;	/* General type for this node	      */
-        impl_arg_ptr	    next;
+	typeExp_ptr	    type;	        /* General type for this node */
+    impl_arg_ptr	next;
 } impl_arg_rec;
 
 /*  ========= Generally useful macros ============ */

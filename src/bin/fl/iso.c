@@ -73,13 +73,13 @@ preload()
 static void
 preload_needle(g_ptr pexlif)
 {
-
+	pexlif = pexlif;
 }
 
 static void
 preload_haystack(g_ptr pexlif)
 {
-
+	pexlif = pexlif;
 }
 
 // Solution check --------------------------------------------------------------
@@ -164,10 +164,11 @@ _DuMMy_iso()
     M = NULL;
     matrix_free(NULL);
     matrix_allocate(0,0);
-    prune(NULL,NULL,NULL);
+    preload();
+    preload_needle(NULL);
+    preload_haystack(NULL);
     test_isomorphism_formatting(NULL);
     test_isomorphism_match(NULL,NULL,NULL);
-    recurse(NULL,NULL,NULL);
 }
 
 /******************************************************************************/

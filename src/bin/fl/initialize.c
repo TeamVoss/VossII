@@ -66,6 +66,7 @@ Init()
     Table_Init();
     Image_Init();
     Iso_Init();
+    Pexlif_Init();
 
     // Now install builtin functions
     Symbols_Install_Functions();
@@ -84,8 +85,9 @@ Init()
     LP_Install_Functions();
     Fsm_Install_Functions();
     Table_Install_Functions();
+    SHA256_Install_Functions();
     Image_Install_Functions();
     Iso_Install_Functions();
-    SHA256_Install_Functions();
+    Pexlif_Install_Functions();
 }
 

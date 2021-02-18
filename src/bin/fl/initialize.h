@@ -21,7 +21,6 @@ void	Init(void);
 #define INITIALIZE_H
 #include "fl.h"	/* Global data types and include files 		     */
 
-
 #endif /* INITIALIZE_H */
 #endif /* EXPORT_FORWARD_DECL */
 

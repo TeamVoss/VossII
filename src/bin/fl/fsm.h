@@ -99,7 +99,6 @@ typedef struct fsm_rec {
     rec_mgr	vis_list_rec_mgr;
 } fsm_rec;
 
-
 typedef struct ncomp_rec *ncomp_ptr;
 
 typedef void (*wl_op)(ncomp_ptr);
@@ -152,7 +151,6 @@ typedef struct nnode_rec {
     idx_list_ptr    fanouts;
     vis_list_ptr    draw_info;
 } nnode_rec;
-
 
 typedef enum {use_bdds, use_bexprs, use_ints}  value_type;
 
