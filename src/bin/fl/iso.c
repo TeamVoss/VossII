@@ -73,7 +73,11 @@ preload()
 static void
 preload_needle(g_ptr pexlif)
 {
-	pexlif = pexlif;
+    g_ptr attrs, fa_inps, fa_outs, internals, content;
+    string name;
+    bool leaf;
+    is_PINST(pexlif,&name,&attrs,&leaf,&fa_inps,&fa_outs,&internals,&content);
+    //
 }
 
 static void

@@ -15,10 +15,10 @@ typedef struct ilist_rec    *ilist_ptr;
 typedef struct vec_info_rec *vec_info_ptr;
 
 /* ----- Function prototypes for public functions ----- */
-void	    Fsm_Init();
-void	    Fsm_Install_Functions();
-
-string      get_real_name(vec_info_ptr ip, int idx);
+string get_real_name(vec_info_ptr ip, int idx);
+//
+void Fsm_Init();
+void Fsm_Install_Functions();
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */

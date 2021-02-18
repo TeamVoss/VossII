@@ -71,6 +71,8 @@ extern string s_W_CAT;
 extern string s_W_MEM_READ;
 extern string s_W_MEM_WRITE;
 extern string s_MEM;
+//
+extern string s_no_instance;
 
 /***** PRIVATE VARIABLES *****/
 static int	    undeclared_node_cnt;
@@ -86,7 +88,6 @@ static string	    s_use_bexprs;
 static string	    s_use_ints;
 static string	    s_DummyOut;
 static string	    s_draw_repeat;
-static string	    s_no_instance;
 
 static string	    s_SCH_INT;
 static string	    s_SCH_LEAF;
@@ -346,11 +347,10 @@ static void         op_ASHR(ncomp_ptr op);
 static void         op_SX(ncomp_ptr op);
 static void         op_ZX(ncomp_ptr op);
 static void         op_SLICE(ncomp_ptr op);
-static void	    op_UPDATE_SLICE(ncomp_ptr op);
+static void	        op_UPDATE_SLICE(ncomp_ptr op);
 static void         op_WIRE(ncomp_ptr op);
 static void         op_MEM_READ(ncomp_ptr op);
 static void         op_MEM_WRITE(ncomp_ptr op);
-static string       get_top_name(g_ptr p);
 static bool         traverse_pexlif(hash_record *parent_tblp, g_ptr p,
                                     string hier, bool top_level,
                                     int draw_level);
@@ -404,7 +404,6 @@ static string       create_merge_component(int sz, int *ccnt, g_ptr *intsp,
                                            g_ptr acts, int len,
                                            buffer *chbufp);
 static g_ptr        clean_pexlif_ios(g_ptr node);
-static string	    find_instance_name(g_ptr attrs);
 static gbv	    BDD_c_limited_AND(gbv a, gbv b);
 static gbv	    BDD_c_limited_OR(gbv a, gbv b);
 static void	    base_print_ilist(ilist_ptr il);
@@ -425,7 +424,6 @@ Fsm_Init()
     new_mgr(&ste_rec_mgr, sizeof(ste_rec));
     new_mgr(&vstate_rec_mgr, sizeof(vstate_rec));
     s_draw_repeat =   wastrsave(&strings, "draw_repeat_nd");
-    s_no_instance =   wastrsave(&strings, "{}");
 
     s_use_bdds =       wastrsave(&strings, "bdd");
     s_use_bexprs =     wastrsave(&strings, "bexpr");
@@ -6663,46 +6661,6 @@ op_MEM_WRITE(ncomp_ptr op)
 	}
     }
 }
-
-static string
-get_top_name(g_ptr p)
-{
-    g_ptr attrs, fa_inps, fa_outs, internals, content;
-    string name;
-    bool leaf;
-    is_PINST(p,&name,&attrs,&leaf,&fa_inps,&fa_outs,&internals,&content);
-    return name;
-}
-
-static char value_list_buf[1024];
-
-static string
-find_value_list(g_ptr attrs, string name)
-{
-    sprintf(value_list_buf, "node_values_%s", name);
-    while( !IS_NIL(attrs) ) {
-	g_ptr key = GET_CONS_HD(GET_CONS_HD(attrs));
-	if( strcmp(value_list_buf, GET_STRING(key)) == 0 ) {
-	    return( GET_STRING(GET_CONS_TL(GET_CONS_HD(attrs))) );
-	}
-	attrs = GET_CONS_TL(attrs);
-    }
-    return NULL;
-}
-
-static string
-find_instance_name(g_ptr attrs)
-{
-    while( !IS_NIL(attrs) ) {
-        g_ptr key = GET_CONS_HD(GET_CONS_HD(attrs));
-        if( strcmp(GET_STRING(key), "instance") == 0 ) {
-            return( GET_STRING(GET_CONS_TL(GET_CONS_HD(attrs))) );
-        }
-        attrs = GET_CONS_TL(attrs);
-    }
-    return s_no_instance;        
-}
-
 
 static bool
 traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,

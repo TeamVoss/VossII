@@ -1,7 +1,7 @@
-//-------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // Copyright 2020 Carl-Johan Seger
 // SPDX-License-Identifier: Apache-2.0
-//-------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
 /******************************************************************************/
 /*                                                                            */
@@ -11,43 +11,11 @@
 /* pexlif.h -- header for pexlif.c */
 #ifdef EXPORT_FORWARD_DECL
 
-// Forward declarations that need to be exported to earlier .h files -----------
-extern string s_PINST;
-extern string s_P_HIER;
-extern string s_P_LEAF;
-extern string s_W_UPDATE_FN;
-extern string s_W_PHASE_DELAY;
-extern string s_W_X;
-extern string s_W_CONST;
-extern string s_W_NAMED_CONST;
-extern string s_W_VAR;
-extern string s_W_EXPLICIT_VAR;
-extern string s_W_AND;
-extern string s_W_OR;
-extern string s_W_NOT;
-extern string s_W_PRED;
-extern string s_W_EQ;
-extern string s_W_GR;
-extern string s_W_ADD;
-extern string s_W_SUB;
-extern string s_W_MUL;
-extern string s_W_DIV;
-extern string s_W_MOD;
-extern string s_W_SHL;
-extern string s_W_SHR;
-extern string s_W_ASHR;
-extern string s_W_SX;
-extern string s_W_ZX;
-extern string s_W_ITE;
-extern string s_W_SLICE;
-extern string s_W_NAMED_SLICE;
-extern string s_W_UPDATE_NAMED_SLICE;
-extern string s_W_CAT;
-extern string s_W_MEM_READ;
-extern string s_W_MEM_WRITE;
-extern string s_MEM;
-
 // Function prototypes for public functions ------------------------------------
+string get_top_name(g_ptr p);
+string find_value_list(g_ptr attrs, string name);
+string find_instance_name(g_ptr attrs);
+//
 void destr_PINST(g_ptr node,g_ptr *namep, g_ptr *attrsp, g_ptr *leafp, g_ptr *fa_inpsp, g_ptr *fa_outsp, g_ptr *internalsp, g_ptr *contentp);
 bool destr_MEM(g_ptr node, int *a_szp, int *linesp, int *d_szp);
 //

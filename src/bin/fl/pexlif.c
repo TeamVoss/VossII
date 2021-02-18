@@ -8,6 +8,7 @@
 /* Original author: Carl-Johan Seger, 2019                                    */
 /*									                                          */
 /******************************************************************************/
+#include "strings.h"
 #include "graph.h"
 #include "pexlif.h"
 
@@ -49,14 +50,16 @@ string s_W_CAT;
 string s_W_MEM_READ;
 string s_W_MEM_WRITE;
 string s_MEM;
+//
+string s_no_instance;
 
 // Global variables referenced -------------------------------------------------
-// ...
+extern str_mgr strings;
 
 /******************************************************************************/
 /*                              PRIVATE VARIABLES                             */
 /******************************************************************************/
-// ...
+static char value_list_buf[1024];
 
 // Forward definitions local functions -----------------------------------------
 // ...
@@ -69,6 +72,43 @@ string s_MEM;
 /******************************************************************************/
 /*                               PUBLIC FUNCTIONS                             */
 /******************************************************************************/
+
+string
+get_top_name(g_ptr p)
+{
+    g_ptr attrs, fa_inps, fa_outs, internals, content;
+    string name;
+    bool leaf;
+    is_PINST(p,&name,&attrs,&leaf,&fa_inps,&fa_outs,&internals,&content);
+    return name;
+}
+
+string
+find_value_list(g_ptr attrs, string name)
+{
+    sprintf(value_list_buf, "node_values_%s", name);
+    while( !IS_NIL(attrs) ) {
+	g_ptr key = GET_CONS_HD(GET_CONS_HD(attrs));
+	if( strcmp(value_list_buf, GET_STRING(key)) == 0 ) {
+	    return( GET_STRING(GET_CONS_TL(GET_CONS_HD(attrs))) );
+	}
+	attrs = GET_CONS_TL(attrs);
+    }
+    return NULL;
+}
+
+string
+find_instance_name(g_ptr attrs)
+{
+    while( !IS_NIL(attrs) ) {
+        g_ptr key = GET_CONS_HD(GET_CONS_HD(attrs));
+        if( strcmp(GET_STRING(key), "instance") == 0 ) {
+            return( GET_STRING(GET_CONS_TL(GET_CONS_HD(attrs))) );
+        }
+        attrs = GET_CONS_TL(attrs);
+    }
+    return s_no_instance;        
+}
 
 // Destr. Functions ------------------------------------------------------------
 
@@ -684,7 +724,8 @@ Pexlif_Init()
     s_W_MEM_READ           = Mk_constructor_name("W_MEM_READ");
     s_W_MEM_WRITE          = Mk_constructor_name("W_MEM_WRITE");
     s_MEM                  = Mk_constructor_name("MEM");
-
+    //
+    s_no_instance = wastrsave(&strings, "{}");
 }
 
 void
