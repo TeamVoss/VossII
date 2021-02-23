@@ -1303,6 +1303,17 @@ List_reverse(g_ptr cur)
     return(prev);
 }
 
+int
+List_length(g_ptr l)
+{
+    int res = 0;
+    while( !IS_NIL(l) ) {
+        res++;
+        l = GET_CONS_TL(l);
+    }
+    return res;
+}
+
 var_list_ptr
 Add_Var_to_Var_List(string var, typeExp_ptr type_hint, var_list_ptr vlp)
 {

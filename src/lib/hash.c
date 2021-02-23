@@ -198,34 +198,34 @@ insert_hash(hash_record_ptr hp, pointer key, pointer data)
 
     ASSERT(hp->initialized == HASH_MAGIC_NBR);
     if( hp->autosize && hp->elements > 2*hp->tbl_size ) {
-	/* Resize the table */
-	buffer	new_tbl;
-	unint	new_size;
-	unint	i = 0;
+        /* Resize the table */
+        buffer	new_tbl;
+        unint	new_size;
+        unint	i = 0;
 	
-	while( primes[i] < hp->elements )
-	    i++;
-	new_size = primes[i];
-	new_buf(&new_tbl, new_size, sizeof(bucket_ptr));
-	for(i = 0; i < new_size; i++) {
-	    pointer dummy = 0;
-	    push_buf(&new_tbl, (pointer) &dummy);
-	}
-	FOR_BUF(&(hp->table), bucket_ptr, bpp) {
-	    bucket_ptr chp, tmp;
-	    chp = *bpp;
-	    while( chp != NULL ) {
-		unint	new_pos;
-		tmp = chp;
-		chp = chp->next;
-		new_pos = (*(hp->hash_fn))(tmp->key, new_size);
-		tmp->next = *((bucket_ptr *) M_LOCATE_BUF(&new_tbl, new_pos));
-		store_buf(&new_tbl, new_pos, (pointer) &tmp);
-	    }
-	}
-	free_buf(&(hp->table));
-	hp->table = new_tbl;
-	hp->tbl_size = new_size;
+        while( primes[i] < hp->elements )
+            i++;
+        new_size = primes[i];
+        new_buf(&new_tbl, new_size, sizeof(bucket_ptr));
+        for(i = 0; i < new_size; i++) {
+            pointer dummy = 0;
+            push_buf(&new_tbl, (pointer) &dummy);
+        }
+        FOR_BUF(&(hp->table), bucket_ptr, bpp) {
+            bucket_ptr chp, tmp;
+            chp = *bpp;
+            while( chp != NULL ) {
+                unint new_pos;
+                tmp = chp;
+                chp = chp->next;
+                new_pos = (*(hp->hash_fn))(tmp->key, new_size);
+                tmp->next = *((bucket_ptr *) M_LOCATE_BUF(&new_tbl, new_pos));
+                store_buf(&new_tbl, new_pos, (pointer) &tmp);
+            }
+        }
+        free_buf(&(hp->table));
+        hp->table = new_tbl;
+        hp->tbl_size = new_size;
     }
 
     pos = (*(hp->hash_fn))(key, hp->tbl_size);
@@ -263,12 +263,12 @@ scan_hash(hash_record_ptr hp, void (*scan_fn)(pointer key, pointer data))
 
     ASSERT(hp->initialized == HASH_MAGIC_NBR);
     FOR_BUF(&(hp->table), bucket_ptr, bpp) {
-	bucket_ptr chp;
-	chp = *bpp;
-	while( chp != NULL ) {
-	    (*scan_fn)(chp->key, chp->data);
-	    chp = chp->next;
-	}
+        bucket_ptr chp;
+        chp = *bpp;
+        while( chp != NULL ) {
+            (*scan_fn)(chp->key, chp->data);
+            chp = chp->next;
+        }
     }
 }
 

@@ -87,6 +87,7 @@ string       Find_new_free_var(g_ptr expr);
 cl_ptr       Get_CL_node();
 g_ptr        Convert_CL(cl_ptr nd, bool list);
 g_ptr        List_reverse(g_ptr cur);
+int          List_length(g_ptr l);
 VOID         Print_Expr(g_ptr node, odests fp);
 VOID         Install_PrinterFn(result_ptr res);
 VOID         Print_Result(result_ptr res, odests fp, bool print);

@@ -395,7 +395,6 @@ static sch_ptr      draw_fanin(vstate_ptr vp, ilist_ptr il, int levels,
                                int anon_cnt, int draw_level);
 static string       mk_fresh_anon_name(g_ptr internals, int *cur_cntp);
 static string       mk_vector_name(string base, int size);
-static int          list_length(g_ptr l);
 static string       create_constant(int sz, int *ccnt, g_ptr ints, string cnst,
                                     buffer *chbufp);
 static g_ptr        mk_list1(g_ptr el);
@@ -5516,64 +5515,64 @@ static ilist_ptr
 map_vector(hash_record *vtblp, string hier, string name, bool ignore_missing)
 {
     if( strncmp("0b", name, 2) == 0 ) {
-	// A constant
-	ilist_ptr res = NULL;
-	for(string s = name+strlen(name)-1; s >= name+2; s--) {
-	    ilist_ptr ip = (ilist_ptr) new_rec(ilist_rec_mgrp);
-	    ip->next = res;
-	    ip->size = 1;
-	    if( *s == '0' ) { ip->from = ip->to = 0; }
-	    else if( *s == '1' ) { ip->from = ip->to = 1; }
-	    else if( *s == 'x' ) { ip->from = ip->to = 2; }
-	    else {
-		Fail_pr("Illegal constant (%s)", name);
-		return NULL;
-	    }
-	    res = ip;
-	}
-	return res;
+        // A constant
+        ilist_ptr res = NULL;
+        for(string s = name+strlen(name)-1; s >= name+2; s--) {
+            ilist_ptr ip = (ilist_ptr) new_rec(ilist_rec_mgrp);
+            ip->next = res;
+            ip->size = 1;
+            if( *s == '0' ) { ip->from = ip->to = 0; }
+            else if( *s == '1' ) { ip->from = ip->to = 1; }
+            else if( *s == 'x' ) { ip->from = ip->to = 2; }
+            else {
+                Fail_pr("Illegal constant (%s)", name);
+                return NULL;
+            }
+            res = ip;
+        }
+        return res;
     }
     vec_ptr vp = split_vector_name(vec_rec_mgrp,range_rec_mgrp, name);
     string sig = get_vector_signature(vp);
     vec_info_ptr oip = (vec_info_ptr) find_hash(vtblp,sig);
     if( oip == NULL ) {
-	if( !ignore_missing ) {
-	    FP(warning_fp, "Undeclared signal %s in %s.\n", name, hier);
-	    report_source_locations(warning_fp);
-	}
-	sprintf(tmp_name_buf, "TmP__%d_%s", undeclared_node_cnt, name);
-	undeclared_node_cnt++;
-	string new_name = wastrsave(&strings, tmp_name_buf);
-	if( !ignore_missing ) {
-	    FP(warning_fp, "Replaced %s with %s\n\n", name, new_name);
-	}
-	name = new_name;
-	declare_vector(vtblp, hier, name, FALSE, NULL, NULL);
-	vp = split_vector_name(vec_rec_mgrp,range_rec_mgrp, name);
-	sig = get_vector_signature(vp);
-	oip = (vec_info_ptr) find_hash(vtblp,sig);
+        if( !ignore_missing ) {
+            FP(warning_fp, "Undeclared signal %s in %s.\n", name, hier);
+            report_source_locations(warning_fp);
+        }
+        sprintf(tmp_name_buf, "TmP__%d_%s", undeclared_node_cnt, name);
+        undeclared_node_cnt++;
+        string new_name = wastrsave(&strings, tmp_name_buf);
+        if( !ignore_missing ) {
+            FP(warning_fp, "Replaced %s with %s\n\n", name, new_name);
+        }
+        name = new_name;
+        declare_vector(vtblp, hier, name, FALSE, NULL, NULL);
+        vp = split_vector_name(vec_rec_mgrp,range_rec_mgrp, name);
+        sig = get_vector_signature(vp);
+        oip = (vec_info_ptr) find_hash(vtblp,sig);
     }
     vec_info_ptr ip = oip;
     FailBuf[0] = 0;
     while( 1 ) {
-	if( ip == NULL ) {
+        if( ip == NULL ) {
             FP(err_fp, "Cannot map %s (%s[%p])\n%s\n", name, sig, oip, FailBuf);
             report_source_locations(err_fp);
             Rprintf("");
-	}
-	vec_ptr dp = ip->declaration;
-	idx_map_result = NULL;
-	if( is_full_range(dp, vp) ) {
-	    ilist_ptr res = ilist_copy(ip->map);
-	    return( res );
-	}
-	im_cur = NULL;
-	if( setjmp(node_map_jmp_env) == 0 ) {
-	    map_node(dp, vp, ip->map, 0);
-	    return( idx_map_result );
-	} else {
-	    ip = ip->next;
-	}
+        }
+        vec_ptr dp = ip->declaration;
+        idx_map_result = NULL;
+        if( is_full_range(dp, vp) ) {
+            ilist_ptr res = ilist_copy(ip->map);
+            return( res );
+        }
+        im_cur = NULL;
+        if( setjmp(node_map_jmp_env) == 0 ) {
+            map_node(dp, vp, ip->map, 0);
+            return( idx_map_result );
+        } else {
+            ip = ip->next;
+        }
     }
 }
 
@@ -6664,7 +6663,7 @@ op_MEM_WRITE(ncomp_ptr op)
 
 static bool
 traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
-		bool top_level, int draw_level)
+                bool top_level, int draw_level)
 {
     hash_record vinfo_tbl;
     create_hash(&vinfo_tbl, 100, str_hash, str_equ);
@@ -6672,255 +6671,255 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
     string name;
     bool leaf;
     if( !is_PINST(p,&name,&attrs,&leaf,&fa_inps,&fa_outs,&internals,&content)) {
-	Fail_pr("Not a PINST where expected");
-	return FALSE;
+        Fail_pr("Not a PINST where expected");
+        return FALSE;
     }
     attrs = Make_CONS_ND(
-		Make_CONS_ND(Make_STRING_leaf(wastrsave(&strings,"module")),
-			     Make_STRING_leaf(name)), attrs);
+                         Make_CONS_ND(Make_STRING_leaf(wastrsave(&strings,"module")),
+                                      Make_STRING_leaf(name)), attrs);
     push_buf(&attr_buf, &attrs);
     // Declare new nodes (internal)
     for(g_ptr l = internals; !IS_NIL(l); l = GET_CONS_TL(l)) {
-	string name = GET_STRING(GET_CONS_HD(l));
-	string value_list = find_value_list(attrs, name);
-	declare_vector(&vinfo_tbl, hier, name, FALSE, NULL, value_list);
+        string name = GET_STRING(GET_CONS_HD(l));
+        string value_list = find_value_list(attrs, name);
+        declare_vector(&vinfo_tbl, hier, name, FALSE, NULL, value_list);
     }
     vis_ptr vp = NULL;
     if( !top_level && (leaf || (strstr(name,"draw_") != NULL))){
-	vp = (vis_ptr) new_rec(vis_rec_mgrp);
-	vp->draw_level = draw_level;
-	vp->attrs = attrs;
-	draw_level++;
-	vp->id = ++visualization_id;
-	if( strstr(name, "draw_") == NULL ) {
-	    string tmp = strtemp("draw_hfl {");
-	    tmp = strappend(name);
-	    tmp = strappend("}");
-	    vp->pfn = wastrsave(&strings, tmp);
-	} else {
-	    vp->pfn = name;
-	}
-	vp->fa_inps = NULL;
-	vp->fa_outs = NULL;
+        vp = (vis_ptr) new_rec(vis_rec_mgrp);
+        vp->draw_level = draw_level;
+        vp->attrs = attrs;
+        draw_level++;
+        vp->id = ++visualization_id;
+        if( strstr(name, "draw_") == NULL ) {
+            string tmp = strtemp("draw_hfl {");
+            tmp = strappend(name);
+            tmp = strappend("}");
+            vp->pfn = wastrsave(&strings, tmp);
+        } else {
+            vp->pfn = name;
+        }
+        vp->fa_inps = NULL;
+        vp->fa_outs = NULL;
     }
     int nbr_inputs = 0;
     if( top_level ) {
-	// Declare new nodes top-level inputs and outputs
-	for(g_ptr l = fa_inps; !IS_NIL(l); l = GET_CONS_TL(l)) {
-	    nbr_inputs++;
-	    g_ptr pair = GET_CONS_HD(l);
-	    string fname = GET_STRING(GET_FST(pair));
-	    if( list_length(GET_SND(pair)) != 1 ||
-		!STREQ(fname, GET_STRING(GET_CONS_HD(GET_SND(pair)))) ) {
-		FP(warning_fp,
-		  "Actual != formal (%s) for top-level pexlif input. ", fname);
-		FP(warning_fp, "Actual ignored\n");
-	    }
-	    push_buf(top_inpsp, &fname);
-	    string value_list = find_value_list(attrs, fname);
-	    ilist_ptr il = declare_vector(&vinfo_tbl, hier, fname,
-					  FALSE, NULL, value_list);
-	    FOREACH_NODE(nd, il) {
-		nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, nd);
-		np->is_top_input = TRUE;
-	    }
-	}
-	for(g_ptr l = fa_outs; !IS_NIL(l); l = GET_CONS_TL(l)) {
-	    g_ptr pair = GET_CONS_HD(l);
-	    string fname = GET_STRING(GET_FST(pair));
-	    if( list_length(GET_SND(pair)) != 1 ||
-		!STREQ(fname, GET_STRING(GET_CONS_HD(GET_SND(pair)))) ) {
-		FP(warning_fp,
-		  "Actual != formal (%s) for top-level pexlif output. ", fname);
-		FP(warning_fp, "Actual ignored\n");
-	    }
-	    push_buf(top_outsp, &fname);
-	    string value_list = find_value_list(attrs, fname);
-	    ilist_ptr il = declare_vector(&vinfo_tbl, hier, fname,
-					  FALSE, NULL, value_list);
-	    FOREACH_NODE(nd, il) {
-		nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, nd);
-		np->is_top_output = TRUE;
-	    }
-	}
+        // Declare new nodes top-level inputs and outputs
+        for(g_ptr l = fa_inps; !IS_NIL(l); l = GET_CONS_TL(l)) {
+            nbr_inputs++;
+            g_ptr pair = GET_CONS_HD(l);
+            string fname = GET_STRING(GET_FST(pair));
+            if( List_length(GET_SND(pair)) != 1 ||
+                !STREQ(fname, GET_STRING(GET_CONS_HD(GET_SND(pair)))) ) {
+                FP(warning_fp,
+                   "Actual != formal (%s) for top-level pexlif input. ", fname);
+                FP(warning_fp, "Actual ignored\n");
+            }
+            push_buf(top_inpsp, &fname);
+            string value_list = find_value_list(attrs, fname);
+            ilist_ptr il = declare_vector(&vinfo_tbl, hier, fname,
+                                          FALSE, NULL, value_list);
+            FOREACH_NODE(nd, il) {
+                nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, nd);
+                np->is_top_input = TRUE;
+            }
+        }
+        for(g_ptr l = fa_outs; !IS_NIL(l); l = GET_CONS_TL(l)) {
+            g_ptr pair = GET_CONS_HD(l);
+            string fname = GET_STRING(GET_FST(pair));
+            if( List_length(GET_SND(pair)) != 1 ||
+                !STREQ(fname, GET_STRING(GET_CONS_HD(GET_SND(pair)))) ) {
+                FP(warning_fp,
+                   "Actual != formal (%s) for top-level pexlif output. ", fname);
+                FP(warning_fp, "Actual ignored\n");
+            }
+            push_buf(top_outsp, &fname);
+            string value_list = find_value_list(attrs, fname);
+            ilist_ptr il = declare_vector(&vinfo_tbl, hier, fname,
+                                          FALSE, NULL, value_list);
+            FOREACH_NODE(nd, il) {
+                nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, nd);
+                np->is_top_output = TRUE;
+            }
+        }
     } else {
-	// Declare inputs using the parent table to get the actuals mapping
-	for(g_ptr l = fa_inps; !IS_NIL(l); l = GET_CONS_TL(l)) {
-	    nbr_inputs++;
-	    g_ptr pair = GET_CONS_HD(l);
-	    string fname = GET_STRING(GET_FST(pair));
-	    g_ptr acts = GET_SND(pair);
-	    ilist_ptr act_list = NULL;
-	    while( !IS_NIL(acts) ) {
-		string actual = GET_STRING(GET_CONS_HD(acts));
-		ilist_ptr tmp = map_vector(parent_tblp, hier, actual, FALSE);
-		if( tmp == NULL ) {
-		    string phier = strtemp(hier);
-		    string last = rindex(phier, '/');
-		    if( last != NULL ) { *last = 0; }
-		    phier = wastrsave(&strings, phier);
-		    Wprintf("Signal %s not declared in %s.", actual, phier);
-		    tmp = declare_vector(&vinfo_tbl, hier, actual,
-					 FALSE, NULL, NULL);
-		}
-		act_list = ilist_append(act_list, tmp);
-		acts = GET_CONS_TL(acts);
-	    }
-	    declare_vector(&vinfo_tbl, hier, fname, TRUE, act_list, NULL);
-	    if( vp != NULL ) {
-		vis_io_ptr vio = (vis_io_ptr) new_rec(vis_io_rec_mgrp);
-		vio->f_vec = fname;
-		vio->acts = act_list;
-		vio->next = NULL;
-		if( vp->fa_inps == NULL ) {
-		    vp->fa_inps = vio;
-		} else {
-		    // Quadratic code, but number of inputs is quite small for
-		    // draw_ objects
-		    vis_io_ptr rp = vp->fa_inps;
-		    while( rp->next != NULL ) rp = rp->next;	
-		    rp->next = vio;
-		}
-	    }
-	}
-	// Declare outputs using the parent table to get the actuals mapping
-	for(g_ptr l = fa_outs; !IS_NIL(l); l = GET_CONS_TL(l)) {
-	    g_ptr pair = GET_CONS_HD(l);
-	    string fname = GET_STRING(GET_FST(pair));
-	    g_ptr acts = GET_SND(pair);
-	    ilist_ptr act_list = NULL;
-	    while( !IS_NIL(acts) ) {
-		string actual = GET_STRING(GET_CONS_HD(acts));
-		ilist_ptr tmp = map_vector(parent_tblp, hier, actual, TRUE);
-		if( tmp == NULL ) {
-		    string phier = strtemp(hier);
-		    string last = rindex(phier, '/');
-		    if( last != NULL ) { *last = '0'; }
-		    phier = wastrsave(&strings, phier);
-		    Wprintf("Signal %s not declared in %s", actual, phier);
-		    tmp = declare_vector(&vinfo_tbl, hier, actual,
-					 FALSE, NULL, NULL);
-		}
-		act_list = ilist_append(act_list, tmp);
-		acts = GET_CONS_TL(acts);
-	    }
-	    declare_vector(&vinfo_tbl, hier, fname, TRUE, act_list, NULL);
-	    if( vp != NULL ) {
-		vis_io_ptr vio = (vis_io_ptr) new_rec(vis_io_rec_mgrp);
-		vio->f_vec = fname;
-		vio->acts = act_list;
-		vio->next = NULL;
-		if( vp->fa_outs == NULL ) {
-		    vp->fa_outs = vio;
-		} else {
-		    // Quadratic code, but number of inputs is quite small for
-		    // draw_ objects
-		    vis_io_ptr rp = vp->fa_outs;
-		    while( rp->next != NULL ) rp = rp->next;	
-		    rp->next = vio;
-		}
-		FOREACH_NODE(nd, act_list) {
-		    nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, nd);
-		    vis_list_ptr vlp = new_rec(vis_list_rec_mgrp);
-		    vlp->vp = vp;
-		    vlp->next = np->draw_info;
-		    np->draw_info = vlp;
-		}
-	    }
-	}
+        // Declare inputs using the parent table to get the actuals mapping
+        for(g_ptr l = fa_inps; !IS_NIL(l); l = GET_CONS_TL(l)) {
+            nbr_inputs++;
+            g_ptr pair = GET_CONS_HD(l);
+            string fname = GET_STRING(GET_FST(pair));
+            g_ptr acts = GET_SND(pair);
+            ilist_ptr act_list = NULL;
+            while( !IS_NIL(acts) ) {
+                string actual = GET_STRING(GET_CONS_HD(acts));
+                ilist_ptr tmp = map_vector(parent_tblp, hier, actual, FALSE);
+                if( tmp == NULL ) {
+                    string phier = strtemp(hier);
+                    string last = rindex(phier, '/');
+                    if( last != NULL ) { *last = 0; }
+                    phier = wastrsave(&strings, phier);
+                    Wprintf("Signal %s not declared in %s.", actual, phier);
+                    tmp = declare_vector(&vinfo_tbl, hier, actual,
+                                         FALSE, NULL, NULL);
+                }
+                act_list = ilist_append(act_list, tmp);
+                acts = GET_CONS_TL(acts);
+            }
+            declare_vector(&vinfo_tbl, hier, fname, TRUE, act_list, NULL);
+            if( vp != NULL ) {
+                vis_io_ptr vio = (vis_io_ptr) new_rec(vis_io_rec_mgrp);
+                vio->f_vec = fname;
+                vio->acts = act_list;
+                vio->next = NULL;
+                if( vp->fa_inps == NULL ) {
+                    vp->fa_inps = vio;
+                } else {
+                    // Quadratic code, but number of inputs is quite small for
+                    // draw_ objects
+                    vis_io_ptr rp = vp->fa_inps;
+                    while( rp->next != NULL ) rp = rp->next;	
+                    rp->next = vio;
+                }
+            }
+        }
+        // Declare outputs using the parent table to get the actuals mapping
+        for(g_ptr l = fa_outs; !IS_NIL(l); l = GET_CONS_TL(l)) {
+            g_ptr pair = GET_CONS_HD(l);
+            string fname = GET_STRING(GET_FST(pair));
+            g_ptr acts = GET_SND(pair);
+            ilist_ptr act_list = NULL;
+            while( !IS_NIL(acts) ) {
+                string actual = GET_STRING(GET_CONS_HD(acts));
+                ilist_ptr tmp = map_vector(parent_tblp, hier, actual, TRUE);
+                if( tmp == NULL ) {
+                    string phier = strtemp(hier);
+                    string last = rindex(phier, '/');
+                    if( last != NULL ) { *last = '0'; }
+                    phier = wastrsave(&strings, phier);
+                    Wprintf("Signal %s not declared in %s", actual, phier);
+                    tmp = declare_vector(&vinfo_tbl, hier, actual,
+                                         FALSE, NULL, NULL);
+                }
+                act_list = ilist_append(act_list, tmp);
+                acts = GET_CONS_TL(acts);
+            }
+            declare_vector(&vinfo_tbl, hier, fname, TRUE, act_list, NULL);
+            if( vp != NULL ) {
+                vis_io_ptr vio = (vis_io_ptr) new_rec(vis_io_rec_mgrp);
+                vio->f_vec = fname;
+                vio->acts = act_list;
+                vio->next = NULL;
+                if( vp->fa_outs == NULL ) {
+                    vp->fa_outs = vio;
+                } else {
+                    // Quadratic code, but number of inputs is quite small for
+                    // draw_ objects
+                    vis_io_ptr rp = vp->fa_outs;
+                    while( rp->next != NULL ) rp = rp->next;	
+                    rp->next = vio;
+                }
+                FOREACH_NODE(nd, act_list) {
+                    nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, nd);
+                    vis_list_ptr vlp = new_rec(vis_list_rec_mgrp);
+                    vlp->vp = vp;
+                    vlp->next = np->draw_info;
+                    np->draw_info = vlp;
+                }
+            }
+        }
     }
 
     if( vp != NULL ) {
-	string match;
-	if( (match = strstr(vp->pfn, "draw_hfl ")) != NULL ) {
+        string match;
+        if( (match = strstr(vp->pfn, "draw_hfl ")) != NULL ) {
             // Replace draw_hfl txt with draw_hfl_code txt nbr_inps
-	    int len = match-vp->pfn+8;
-	    string res = strtemp(vp->pfn);
-	    *(res+len) = 0;
+            int len = match-vp->pfn+8;
+            string res = strtemp(vp->pfn);
+            *(res+len) = 0;
             sprintf(buf, "%s_code %d %s", res, nbr_inputs, res+len+1);
             vp->pfn = wastrsave(&strings, buf);
         } else if( strncmp(vp->pfn, "draw_hier ", 10) == 0 ) {
-	    tstr_ptr sm = new_temp_str_mgr();
+            tstr_ptr sm = new_temp_str_mgr();
             // Replace draw_hier txt with draw_fub txt inst inputs outputs
-	    string cmd = gen_strtemp(sm, "draw_fub ");
-	    cmd = gen_strappend(sm, vp->pfn + 10);
-	    string iname = find_instance_name(attrs);
-	    if( iname == s_no_instance ) {
-		cmd = gen_strappend(sm, " ");
-		cmd = gen_strappend(sm, hier);
-		cmd = gen_strappend(sm, " ");
-	    } else {
-		cmd = gen_strappend(sm, " {");
-		cmd = gen_strappend(sm, hier);
-		cmd = gen_strappend(sm, ": ");
-		cmd = gen_strappend(sm, iname);
-		cmd = gen_strappend(sm, "} ");
-	    }
-	    cmd = gen_strappend(sm, "{ ");
+            string cmd = gen_strtemp(sm, "draw_fub ");
+            cmd = gen_strappend(sm, vp->pfn + 10);
+            string iname = find_instance_name(attrs);
+            if( iname == s_no_instance ) {
+                cmd = gen_strappend(sm, " ");
+                cmd = gen_strappend(sm, hier);
+                cmd = gen_strappend(sm, " ");
+            } else {
+                cmd = gen_strappend(sm, " {");
+                cmd = gen_strappend(sm, hier);
+                cmd = gen_strappend(sm, ": ");
+                cmd = gen_strappend(sm, iname);
+                cmd = gen_strappend(sm, "} ");
+            }
+            cmd = gen_strappend(sm, "{ ");
             for(g_ptr l = fa_inps; !IS_NIL(l); l = GET_CONS_TL(l)) {
                 g_ptr pair = GET_CONS_HD(l);
                 string fname = GET_STRING(GET_FST(pair));
                 cmd = gen_strappend(sm, "{{");
                 cmd = gen_strappend(sm, fname);
-		// Don't need the actuals for inputs
+                // Don't need the actuals for inputs
                 cmd = gen_strappend(sm, "} {");
                 cmd = gen_strappend(sm, "}} ");
             }
             cmd = gen_strappend(sm, "} { ");
-	    for(vis_io_ptr vlp = vp->fa_outs; vlp != NULL; vlp = vlp->next) {
-		cmd = gen_strappend(sm, "{{");
-		cmd = gen_strappend(sm, vlp->f_vec);
-		cmd = gen_strappend(sm, "} {");
-		g_ptr nds = ilist2nds(vlp->acts);
-		g_ptr avecs = Merge_Vectors(nds, TRUE);
-		for(g_ptr ap = avecs; !IS_NIL(ap); ap = GET_CONS_TL(ap)) {
-		    string actual = GET_STRING(GET_CONS_HD(ap));
-		    cmd = gen_strappend(sm, "{");
-		    cmd = gen_strappend(sm, actual);
-		    cmd = gen_strappend(sm, "} ");
-		}
-		DEC_REF_CNT(nds);
-		DEC_REF_CNT(avecs);
-		cmd = gen_strappend(sm, "}} ");
-	    }
-	    cmd = gen_strappend(sm, "}");
-	    // Replace draw_hier txt with draw_hfl_code txt nbr_inps
-	    vp->pfn = wastrsave(&strings, cmd);
-	    free_temp_str_mgr(sm);
-	}
+            for(vis_io_ptr vlp = vp->fa_outs; vlp != NULL; vlp = vlp->next) {
+                cmd = gen_strappend(sm, "{{");
+                cmd = gen_strappend(sm, vlp->f_vec);
+                cmd = gen_strappend(sm, "} {");
+                g_ptr nds = ilist2nds(vlp->acts);
+                g_ptr avecs = Merge_Vectors(nds, TRUE);
+                for(g_ptr ap = avecs; !IS_NIL(ap); ap = GET_CONS_TL(ap)) {
+                    string actual = GET_STRING(GET_CONS_HD(ap));
+                    cmd = gen_strappend(sm, "{");
+                    cmd = gen_strappend(sm, actual);
+                    cmd = gen_strappend(sm, "} ");
+                }
+                DEC_REF_CNT(nds);
+                DEC_REF_CNT(avecs);
+                cmd = gen_strappend(sm, "}} ");
+            }
+            cmd = gen_strappend(sm, "}");
+            // Replace draw_hier txt with draw_hfl_code txt nbr_inps
+            vp->pfn = wastrsave(&strings, cmd);
+            free_temp_str_mgr(sm);
+        }
     }
 
     g_ptr children, fns;
     if( is_P_HIER(content, &children) ) {
-	// Hierarchy
-	int inst = 1;
-	int len = strlen(ihier_buf);
-	char *ep = &(ihier_buf[len]);
-	for(g_ptr cl = children; !IS_NIL(cl); cl = GET_CONS_TL(cl)) {
-	    Sprintf(ep, "i%d/", inst++);
-	    if( !traverse_pexlif(&vinfo_tbl, GET_CONS_HD(cl), ihier_buf,
-				 FALSE, draw_level)) {
-		return FALSE;
-	    }
-	}
+        // Hierarchy
+        int inst = 1;
+        int len = strlen(ihier_buf);
+        char *ep = &(ihier_buf[len]);
+        for(g_ptr cl = children; !IS_NIL(cl); cl = GET_CONS_TL(cl)) {
+            Sprintf(ep, "i%d/", inst++);
+            if( !traverse_pexlif(&vinfo_tbl, GET_CONS_HD(cl), ihier_buf,
+                                 FALSE, draw_level)) {
+                return FALSE;
+            }
+        }
     } else if( is_P_LEAF(content, &fns) ) {
-	// Leaf update function
-	temporary_node_cnt = 0;
-	for(g_ptr cl = fns; !IS_NIL(cl); cl = GET_CONS_TL(cl)) {
-	    g_ptr fn = GET_CONS_HD(cl);
-	    g_ptr lhs, rhs;
-	    if( is_W_UPDATE_FN(fn, &lhs, &rhs) ) {
-		ilist_ptr lhs_indices = get_lhs_indices(&vinfo_tbl, hier, lhs);
-		compile_expr(&vinfo_tbl, hier, lhs_indices, rhs, FALSE);
-	    } else if( is_W_PHASE_DELAY(fn, &lhs, &rhs) ) {
-		ilist_ptr lhs_indices = get_lhs_indices(&vinfo_tbl, hier, lhs);
-		compile_expr(&vinfo_tbl, hier, lhs_indices, rhs, TRUE);
-	    } else {
-		DIE("Should not be possible!");
-	    }
-	}
+        // Leaf update function
+        temporary_node_cnt = 0;
+        for(g_ptr cl = fns; !IS_NIL(cl); cl = GET_CONS_TL(cl)) {
+            g_ptr fn = GET_CONS_HD(cl);
+            g_ptr lhs, rhs;
+            if( is_W_UPDATE_FN(fn, &lhs, &rhs) ) {
+                ilist_ptr lhs_indices = get_lhs_indices(&vinfo_tbl, hier, lhs);
+                compile_expr(&vinfo_tbl, hier, lhs_indices, rhs, FALSE);
+            } else if( is_W_PHASE_DELAY(fn, &lhs, &rhs) ) {
+                ilist_ptr lhs_indices = get_lhs_indices(&vinfo_tbl, hier, lhs);
+                compile_expr(&vinfo_tbl, hier, lhs_indices, rhs, TRUE);
+            } else {
+                DIE("Should not be possible!");
+            }
+        }
     } else {
-	DIE("Should not be possible!");
+        DIE("Should not be possible!");
     }
     dispose_hash(&vinfo_tbl, NULLFCN);
     pop_buf(&attr_buf, NULL);
@@ -8022,18 +8021,6 @@ mk_vector_name(string base, int size)
     }
 }
 
-static int
-list_length(g_ptr l)
-{
-    int res = 0;
-    while( !IS_NIL(l) ) {
-	res++;
-	l = GET_CONS_TL(l);
-    }
-    return res;
-}
-
-
 static string
 create_constant(int sz, int *ccnt, g_ptr ints, string cnst, buffer *chbufp)
 {
@@ -8382,7 +8369,7 @@ clean_pexlif_ios(g_ptr node)
 		report_source_locations(err_fp);
 		Rprintf("");
 	    }
-	    int len = list_length(acts);
+	    int len = List_length(acts);
 	    if( len > 1 ) {
 		int sz = Get_Vector_Size(fname);
 		string t = create_merge_component(sz, &cur_cnt, &ints,

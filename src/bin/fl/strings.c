@@ -1,13 +1,13 @@
-//-------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 // Copyright 2020 Carl-Johan Seger
 // SPDX-License-Identifier: Apache-2.0
-//-------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
-/************************************************************************/
-/*									*/
-/*		Original author: Carl-Johan Seger, 2017			*/
-/*									*/
-/************************************************************************/
+/******************************************************************************/
+/*                                                                            */
+/*		Original author: Carl-Johan Seger, 2017                               */
+/*                                                                            */
+/******************************************************************************/
 #include "strings.h"
 #include "graph.h"
 #include <limits.h>
@@ -37,23 +37,20 @@ static rec_mgr	    merge_list_rec_mgr;
 static rec_mgr	    *merge_list_rec_mgrp;
 
 /* ----- Forward definitions local functions ----- */
-static void		begin_vector_ops();
-static void		end_vector_ops();
-static range_ptr	make_range_canonical(range_ptr rp);
-static void		emit_vector(vec_ptr vp, bool non_contig_vecs,
-				    g_ptr *tailp);
-static bool		same_range(range_ptr r1, range_ptr r2);
-static range_ptr	compress_ranges(range_ptr r1, range_ptr r2);
-static vec_ptr		split_name(string name);
-static sname_list_ptr   *prepend_index(int idx, sname_list_ptr rem,
-				       sname_list_ptr *resp);
-static sname_list_ptr	expand_vec(vec_ptr vec);
-static int		vec_name_cmp(vec_ptr v1, vec_ptr v2);
-static int		nn_cmp(const void *pi, const void *pj);
-static void		gen_extract_vectors(g_ptr redex, bool non_contig_vecs);
-static void		gen_merge_vectors(g_ptr redex, g_ptr l,
-					  bool non_contig_vecs);
-static int		vec_size(vec_ptr vec);
+static void      begin_vector_ops();
+static void      end_vector_ops();
+static vec_ptr   split_name(string name);
+static range_ptr make_range_canonical(range_ptr rp);
+static void      emit_vector(vec_ptr vp, bool non_contig_vecs,g_ptr *tailp);
+static bool		 same_range(range_ptr r1, range_ptr r2);
+static range_ptr compress_ranges(range_ptr r1, range_ptr r2);
+static sname_list_ptr *prepend_index(int idx, sname_list_ptr rem, sname_list_ptr *resp);
+static sname_list_ptr expand_vec(vec_ptr vec);
+static int       vec_name_cmp(vec_ptr v1, vec_ptr v2);
+static int       nn_cmp(const void *pi, const void *pj);
+static void	     gen_extract_vectors(g_ptr redex, bool non_contig_vecs);
+static void	     gen_merge_vectors(g_ptr redex, g_ptr l, bool non_contig_vecs);
+static int	     vec_size(vec_ptr vec);
 
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
@@ -254,7 +251,6 @@ str_match(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
-
 static void
 str_split(g_ptr redex)
 {
@@ -423,7 +419,6 @@ merge_vectors(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
-
 static void
 string_lastn(g_ptr redex)
 {
@@ -590,7 +585,6 @@ string_trim(g_ptr redex)
     return;
 }
 
-
 static void
 string_str_cluster(g_ptr redex)
 {
@@ -624,8 +618,6 @@ string_str_cluster(g_ptr redex)
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
-
-
 
 void
 Strings_Install_Functions()
@@ -769,9 +761,6 @@ Strings_Install_Functions()
 					    GLmake_string(),
 					    GLmake_int())),
 			lift_node_name_cmp);
-
-
-
 }
 
 /********************************************************/
@@ -809,6 +798,96 @@ end_vector_ops()
     merge_list_rec_mgrp = NULL;
 }
 
+static vec_ptr
+split_name(string name)
+{
+    vec_ptr res = NULL;
+    vec_ptr *res_tl_ptr = &res;
+    string p = name;
+    while( *p ) {
+        if( isdigit(*p) ) {
+            // Index
+            string e = p;
+            while( *e && *e != ']' ) e++;
+            if( *e == 0 ) { goto illegal_format; }
+            char tmp = *e;
+            *e = 0;
+            range_ptr indices = NULL;
+            range_ptr *indices_tl_ptr = &indices;
+            while( *p ) {
+                int upper, lower;
+                if( sscanf(p, "%d:%d", &upper, &lower) == 2 ) {
+                    range_ptr range = (range_ptr) new_rec(range_rec_mgrp);
+                    range->upper = upper;
+                    range->lower = lower;
+                    range->next = NULL;
+                    *indices_tl_ptr = range;
+                    indices_tl_ptr = &(range->next);
+                } else if( sscanf(p, "%d", &upper) == 1 ) {
+                    range_ptr range = (range_ptr) new_rec(range_rec_mgrp);
+                    range->upper = upper;
+                    range->lower = upper;
+                    range->next = NULL;
+                    *indices_tl_ptr = range;
+                    indices_tl_ptr = &(range->next);
+                } else {
+                    goto illegal_format;
+                }
+                while( *p && *p != ',' ) p++;
+                if( *p ) p++;
+            }
+            vec_ptr n = (vec_ptr) new_rec(vec_rec_mgrp);
+            n->type = INDEX;
+            n->u.ranges = indices;
+            n->next = NULL;
+            *res_tl_ptr = n;
+            res_tl_ptr = &(n->next);
+            *e = tmp;
+            p = e;
+        } else {
+            // String
+            if( *p == '\\' ) {
+                // An escaped identifier
+                string e = p+1;
+                while( *e && *e != ' ' ) e++;
+                if( *e == 0 ) { goto illegal_format; }
+                e++;
+                char tmp = *e;
+                *e = 0;
+                vec_ptr n = (vec_ptr) new_rec(vec_rec_mgrp);
+                n->type = TXT;
+                n->u.name = uStrsave(lstringsp, p);
+                n->next = NULL;
+                *res_tl_ptr = n;
+                res_tl_ptr = &(n->next);
+                *e = tmp;
+                p = e;
+            } else {
+                string e = p;
+                while( *e && *e != '[' ) e++;
+                if( *e == '[' ) e++;
+                char tmp = *e;
+                *e = 0;
+                vec_ptr n = (vec_ptr) new_rec(vec_rec_mgrp);
+                n->type = TXT;
+                n->u.name = uStrsave(lstringsp, p);
+                n->next = NULL;
+                *res_tl_ptr = n;
+                res_tl_ptr = &(n->next);
+                *e = tmp;
+                p = e;
+            }
+        }
+    }
+    return res;
+
+  illegal_format:
+    res  = (vec_ptr) new_rec(vec_rec_mgrp);
+    res->type = TXT;
+    res->u.name = uStrsave(lstringsp, name);
+    res->next = NULL;
+    return res;
+}
 
 static range_ptr
 make_range_canonical(range_ptr rp)
@@ -938,97 +1017,6 @@ compress_ranges(range_ptr r1, range_ptr r2)
 	}
     }
     return( compress_ranges(r1, r2->next) );
-}
-
-static vec_ptr
-split_name(string name)
-{
-    vec_ptr res = NULL;
-    vec_ptr *res_tl_ptr = &res;
-    string p = name;
-    while( *p ) {
-	if( isdigit(*p) ) {
-	    // Index
-	    string e = p;
-	    while( *e && *e != ']' ) e++;
-	    if( *e == 0 ) { goto illegal_format; }
-	    char tmp = *e;
-	    *e = 0;
-	    range_ptr indices = NULL;
-	    range_ptr *indices_tl_ptr = &indices;
-	    while( *p ) {
-		int upper, lower;
-		if( sscanf(p, "%d:%d", &upper, &lower) == 2 ) {
-		    range_ptr range = (range_ptr) new_rec(range_rec_mgrp);
-		    range->upper = upper;
-		    range->lower = lower;
-		    range->next = NULL;
-		    *indices_tl_ptr = range;
-		    indices_tl_ptr = &(range->next);
-		} else if( sscanf(p, "%d", &upper) == 1 ) {
-		    range_ptr range = (range_ptr) new_rec(range_rec_mgrp);
-		    range->upper = upper;
-		    range->lower = upper;
-		    range->next = NULL;
-		    *indices_tl_ptr = range;
-		    indices_tl_ptr = &(range->next);
-		} else {
-		    goto illegal_format;
-		}
-		while( *p && *p != ',' ) p++;
-		if( *p ) p++;
-	    }
-	    vec_ptr n = (vec_ptr) new_rec(vec_rec_mgrp);
-	    n->type = INDEX;
-	    n->u.ranges = indices;
-	    n->next = NULL;
-	    *res_tl_ptr = n;
-	    res_tl_ptr = &(n->next);
-	    *e = tmp;
-	    p = e;
-	} else {
-	    // String
-	    if( *p == '\\' ) {
-		// An escaped identifier
-		string e = p+1;
-		while( *e && *e != ' ' ) e++;
-		if( *e == 0 ) { goto illegal_format; }
-		e++;
-		char tmp = *e;
-		*e = 0;
-		vec_ptr n = (vec_ptr) new_rec(vec_rec_mgrp);
-		n->type = TXT;
-		n->u.name = uStrsave(lstringsp, p);
-		n->next = NULL;
-		*res_tl_ptr = n;
-		res_tl_ptr = &(n->next);
-		*e = tmp;
-		p = e;
-	    } else {
-		string e = p;
-		while( *e && *e != '[' ) e++;
-		if( *e == '[' ) e++;
-		char tmp = *e;
-		*e = 0;
-		vec_ptr n = (vec_ptr) new_rec(vec_rec_mgrp);
-		n->type = TXT;
-		n->u.name = uStrsave(lstringsp, p);
-		n->next = NULL;
-		*res_tl_ptr = n;
-		res_tl_ptr = &(n->next);
-		*e = tmp;
-		p = e;
-	    }
-	}
-    }
-    return res;
-
-  illegal_format:
-    res  = (vec_ptr) new_rec(vec_rec_mgrp);
-    res->type = TXT;
-    res->u.name = uStrsave(lstringsp, name);
-    res->next = NULL;
-    return res;
 }
 
 static sname_list_ptr *

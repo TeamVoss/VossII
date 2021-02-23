@@ -23,6 +23,13 @@ void	    Iso_Install_Functions();
 
 #include "fl.h"
 
+typedef struct tbl_rec *tbl_ptr;
+typedef struct tbl_rec {
+    hash_record_ptr inps;
+    hash_record_ptr outs;
+    tbl_ptr         next;
+} tbl_rec;
+
 typedef struct mat_rec *mat_ptr;
 typedef struct mat_rec {
     bool  **mat;
