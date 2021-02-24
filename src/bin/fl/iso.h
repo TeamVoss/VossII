@@ -23,12 +23,19 @@ void	    Iso_Install_Functions();
 
 #include "fl.h"
 
-typedef struct tbl_rec *tbl_ptr;
-typedef struct tbl_rec {
-    hash_record_ptr inps;
-    hash_record_ptr outs;
-    tbl_ptr         next;
-} tbl_rec;
+typedef struct key_rec *key_ptr;
+typedef struct key_rec {
+    unint   label;
+    vec_ptr outs;
+    key_ptr next;
+} key_rec;
+
+typedef struct bkt_rec *bkt_ptr;
+typedef struct bkt_rec {
+    unint     label;
+    range_ptr range;
+    bkt_ptr   next;
+} bkt_rec;
 
 typedef struct mat_rec *mat_ptr;
 typedef struct mat_rec {
@@ -36,6 +43,25 @@ typedef struct mat_rec {
     unint rows;
     unint cols;
 } mat_rec;
+
+#define FORMAL_OF_CONS(fa)                                                     \
+    split_vector(GET_STRING(GET_FST(GET_CONS_HD(fa))))
+
+#define ACTUAL_OF_CONS(fa)                                                     \
+    split_vector(GET_STRING(GET_CONS_HD(fa)))
+
+#define FOREACH_FORMAL(vec, fa)                                                \
+    for( g_ptr li = fa                                                         \
+       ; !IS_NIL(li) && (vec = FORMAL_OF_CONS(li), TRUE)                       \
+       ; li = GET_CONS_TL(li))
+
+#define FOREACH_ACTUAL(vec, fa)                                                \
+    for( g_ptr li = fa                                                         \
+        ; !IS_NIL(li)                                                          \
+        ; li = GET_CONS_TL(li))                                                \
+        for( g_ptr as = GET_SND(GET_CONS_HD(li))                               \
+           ; !IS_NIL(as) && (vec = ACTUAL_OF_CONS(as), TRUE)                   \
+           ; as = GET_CONS_TL(as))                                             \
 
 #endif /* ISO_H */
 #endif /* EXPORT_FORWARD_DECL */

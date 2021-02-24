@@ -55,14 +55,14 @@ create_hash(hash_record_ptr hp, unint size,
     hp->autosize = TRUE;
     i = 0;
     while( primes[i] < size )
-	i++;
+        i++;
     size = primes[i];
     hp->tbl_size = size;
     hp->elements = 0;
     new_buf(&(hp->table), size, sizeof(bucket_ptr));
     for(i = 0; i < size; i++) {
-	pointer dummy = 0;
-	push_buf(&(hp->table), (pointer) &dummy);
+        pointer dummy = 0;
+        push_buf(&(hp->table), (pointer) &dummy);
     }
     new_mgr(&(hp->bucket_mgr), sizeof(bucket_rec));
     hp->hash_fn = hash_fn;
