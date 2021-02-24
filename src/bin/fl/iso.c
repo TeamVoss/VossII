@@ -35,17 +35,20 @@ static mat_ptr G; // Puzzle/Haystack adj. matrix.
 static mat_ptr M; // Isomatch.            matrix.
 
 // Forward definitions local functions -----------------------------------------
+// Matrix mgm.
+static void matrix_allocate(mat_ptr m, unint R, unint C);
+static void matrix_free(mat_ptr m);
+static void table_free(tbl_ptr t);
+// ?
 static vec_ptr   split_vector(string name);
 static void      record_vector(hash_record_ptr vec, vec_ptr vs);
 static range_ptr append_range(range_ptr r1, range_ptr r2);
-// Matrix mgm.
-static bool** matrix_allocate(unint R, unint C);
-static void   matrix_free(bool **m);
+static unint     table_length(tbl_ptr t);
 // Adj.
-static tbl_ptr mk_adj_tabel(g_ptr pex);
-static bool    mk_adj_matrix();
-static bool mk_adj_needle(g_ptr p, int size);
-static bool mk_adj_haystack(g_ptr p, int size);
+static tbl_ptr mk_adj_tabel(g_ptr p);
+static bool    mk_adj_matrix(mat_ptr m, g_ptr p);
+static bool    mk_adj_needle(g_ptr p, int size);
+static bool    mk_adj_haystack(g_ptr p, int size);
 // Isomatch.
 static bool test_isomorphism_formatting(mat_ptr iso);
 static bool test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g);
@@ -53,6 +56,44 @@ static bool test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g);
 /******************************************************************************/
 /*                                LOCAL FUNCTIONS                             */
 /******************************************************************************/
+
+// Mem. mgm. -------------------------------------------------------------------
+
+static void
+matrix_allocate(mat_ptr m, unint R, unint C)
+{
+    m = (mat_ptr) new_rec(&mat_mgr);
+    m->rows   = R;
+    m->cols   = C;
+    m->mat    = Malloc(R*sizeof(bool*));
+    m->mat[0] = Calloc(R*C*sizeof(bool));
+    for(unint i=1; i<R; i++) {
+		m->mat[i] = m->mat[0]+i*C;
+    }
+}
+
+static void
+matrix_free(mat_ptr m)
+{
+    Free((void *)m->mat[0]);
+    Free((void *)m->mat);
+    free_rec(&mat_mgr, m);
+}
+
+static void
+table_free(tbl_ptr t)
+{
+    tbl_ptr c;
+    while(t != NULL) {
+        dispose_hash(t->inps, NULLFCN);
+        dispose_hash(t->outs, NULLFCN);
+        c = t;
+        t = t->next;
+        free_rec(&tbl_mgr, c);
+    }
+}
+
+// ? ---------------------------------------------------------------------------
 
 static vec_ptr
 split_vector(string name)
@@ -93,37 +134,24 @@ append_range(range_ptr r1, range_ptr r2)
     return r1;
 }
 
-// Matrix mgm. -----------------------------------------------------------------
-
-static bool**
-matrix_allocate(unint R, unint C)
+static unint
+table_length(tbl_ptr t)
 {
-    bool **m;
-    m = Malloc(R*sizeof(bool*));
-    m[0] = Calloc(R*C*sizeof(bool));
-    for(unint i=1; i<R; i++) {
-		m[i] = m[0]+i*C;
-    }
-    return m;
-}
-
-static void
-matrix_free(bool **m)
-{
-    Free((void *)m[0]);
-    Free((void *)m);
+    unint size = 0;
+    for(tbl_ptr tmp = t; tmp != NULL; tmp = tmp->next) { size += 1; }
+    return size;
 }
 
 // Adj. matrix -----------------------------------------------------------------
 
 static tbl_ptr
-mk_adj_tabel(g_ptr pex)
+mk_adj_tabel(g_ptr p)
 {
     tbl_ptr node_tbl;
     g_ptr attrs, fa_inps, fa_outs, inter, cont, children, fns;
     string name;
     bool leaf;
-    if(!is_PINST(pex, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
+    if(!is_PINST(p, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
 	    Fail_pr("'mk_adj_matrix' expects a pexlif.");
         return NULL;
     }    
@@ -159,7 +187,7 @@ mk_adj_tabel(g_ptr pex)
             g_ptr child = GET_CONS_HD(cs);
             if(!is_PINST(child, &cname, &cattrs, &cleaf, &cfa_inps, &cfa_outs, &cinter, &ccont)) {
                 Fail_pr("'mk_adj_matrix' expects all children to be pexlifs.");
-                free_rec(&tbl_mgr, node_tbl);
+                table_free(node_tbl);
                 return NULL;
             }
             hash_record child_tbl_inp, child_tbl_out;
@@ -191,34 +219,45 @@ mk_adj_tabel(g_ptr pex)
 }
 
 static bool
-mk_adj_matrix(mat_ptr adj, g_ptr pex)
+mk_adj_matrix(mat_ptr m, g_ptr p)
 {
-    tbl_ptr tbl = mk_adj_tabel(pex);
-    return FALSE;
+    tbl_ptr tbl = mk_adj_tabel(p);
+    if(tbl == NULL) { return FALSE; }
+    //
+    ASSERT(m->cols == table_length(tbl)); // All nodes accounted for.
+    ASSERT(m->cols == m->rows);           // Square matrix.
+    tbl_ptr tr, tc;
+    hash_record_ptr inps;
+    hash_record_ptr outs;
+    tr=tbl;
+    for(unint i=0; i<m->rows; i++) {
+        outs = tr->outs;
+        tc   = tbl;
+        for(unint j=0; j<m->cols; j++) {
+            if(i==j) { continue; }
+            inps = tc->inps;
+            //
+            tc = tc->next;
+        }
+        tr = tr->next;
+    }
+    //
+    table_free(tbl);
+    return TRUE;
 }
 
 static bool
-mk_adj_needle(g_ptr pex, int size)
+mk_adj_needle(g_ptr p, int size)
 {
-    P = (mat_ptr) new_rec(&mat_mgr);
-    P->mat  = matrix_allocate(size, size);
-    P->rows = size;
-    P->cols = size;
-    //
-    if (mk_adj_matrix(P, pex)) { return TRUE; }
-    return FALSE;
+    matrix_allocate(P, size, size);
+    return mk_adj_matrix(P, p);
 }
 
 static bool
-mk_adj_haystack(g_ptr pex, int size)
+mk_adj_haystack(g_ptr p, int size)
 {
-    G = (mat_ptr) new_rec(&mat_mgr);
-	G->mat  = matrix_allocate(size, size);
-    G->rows = size;
-    G->cols = size;
-    //
-    if (mk_adj_matrix(G, pex)) { return TRUE; }
-    return FALSE;
+    matrix_allocate(G, size, size);
+    return mk_adj_matrix(G, p);
 }
 
 // Solution check --------------------------------------------------------------
@@ -306,7 +345,7 @@ _DuMMy_iso()
     append_range(NULL,NULL);
     record_vector(NULL,NULL);
     matrix_free(NULL);
-    matrix_allocate(0,0);
+    matrix_allocate(NULL,0,0);
     mk_adj_needle(NULL,0);
     mk_adj_haystack(NULL,0);
     test_isomorphism_formatting(NULL);
