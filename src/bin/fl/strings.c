@@ -1105,15 +1105,15 @@ vec_name_cmp(vec_ptr v1, vec_ptr v2)
 		return( vec_name_cmp(v1->next, v2->next) );
 	    }
 	    return( strcmp(v1->u.name, v2->u.name) );
+	} else {
+	    // v2->type == INDEX
+	    return( 1 );
 	}
-	return( 1 );
     }
-    // v1->type == INDEX
     if( v2->type == TXT ) {
-	if( v1->u.name == v2->u.name ) {
-	    return( vec_name_cmp(v1->next, v2->next) );
-	}
-	return( strcmp(v1->u.name, v2->u.name) );
+	// v1->type == INDEX
+	// v2->type == TXT
+	return( -1 );
     }
     // v1->type == INDEX
     // v2->type == INDEX
