@@ -25,13 +25,13 @@ extern str_mgr strings;
 /*                              PRIVATE VARIABLES                             */
 /******************************************************************************/
 static ustr_mgr	lstrings;
-static rec_mgr key_mgr;
-static rec_mgr bkt_mgr;
-static rec_mgr vec_mgr;
-static rec_mgr rng_mgr;
-static rec_mgr mat_mgr;
+static rec_mgr  key_lst_mgr;
+static rec_mgr  key_mgr;
+static rec_mgr  bkt_mgr;
+static rec_mgr  vec_mgr;
+static rec_mgr  rng_mgr;
+static rec_mgr  mat_mgr;
 // ?
-static key_ptr key_lst;
 static hash_record_ptr tbl;
 // Isomatch.
 static mat_ptr P; // Piece/Needle    adj. matrix.
@@ -43,15 +43,12 @@ static mat_ptr M; // Isomatch.            matrix.
 static void allocate_matrix(mat_ptr m, unint R, unint C);
 static void free_matrix(mat_ptr m);
 // ?
-static void      record_vector(unint i, vec_ptr vs);
+static void      record_vector(unint i, const vec_ptr v);
 static vec_ptr   split_vector(string name);
-static vec_ptr   append_vector(vec_ptr v1, vec_ptr v2);
-static range_ptr append_range(range_ptr r1, range_ptr r2);
-static unint     keys_length();
 // Adj.
 static void new_adj_mem();
 static void rem_adj_mem();
-static bool mk_adj_tabel(g_ptr p);
+static bool mk_adj_tabel(key_lst_ptr k, unint *c, g_ptr p);
 static bool mk_adj_matrix(mat_ptr m, g_ptr p);
 static bool mk_adj_needle(g_ptr p, int size);
 static bool mk_adj_haystack(g_ptr p, int size);
@@ -89,39 +86,27 @@ free_matrix(mat_ptr m)
 // ? ---------------------------------------------------------------------------
 
 static void
-record_vector(unint i, vec_ptr vs)
+record_vector(unint i, const vec_ptr v)
 {
-    string name;
-    while(vs != NULL) {
-        if(vs->type == TXT) {
-            name = vs->u.name;
-            range_ptr r = NULL;
-            while(vs != NULL && vs->type == INDEX) {
-                r  = append_range(r, vs->u.ranges); // <--
-                vs = vs->next;
-            }
-            bkt_ptr new = new_rec(&bkt_mgr);
-            new->label  = i;
-            new->range  = r;
-            new->next   = NULL;
-            bkt_ptr bkt = (bkt_ptr) find_hash(tbl, name);
-            if(bkt != NULL) {
-                while(bkt->next != NULL) { bkt = bkt->next; }
-                bkt->next = new;
-            } else {
-                insert_hash(tbl, name, new);
-            }
-        } else {
-            Fail_pr("What?!");
-        }
-        vs = vs->next;
+    string key = Get_vector_signature(&lstrings, v);
+    bkt_ptr bkt = find_hash(tbl, key);
+    if(bkt == NULL) {
+        bkt = new_rec(&bkt_mgr);
+        insert_hash(tbl, key, bkt);
+    } else {
+        while(bkt->next != NULL) { bkt = bkt->next; }
+        bkt->next = new_rec(&bkt_mgr);
+        bkt = bkt->next;
     }
+    bkt->lbl  = i;
+    bkt->vec  = v;
+    bkt->next = NULL;
 }
 
 static vec_ptr
 split_vector(string name)
 {
-    vec_ptr vp = Split_vector_name(&lstrings,&vec_mgr,&rng_mgr,name);
+    vec_ptr vp = Split_vector_name(&lstrings, &vec_mgr, &rng_mgr, name);
     for(vec_ptr p = vp; p != NULL; p = p->next) {
         if(p->type == TXT) {
             p->u.name = wastrsave(&strings, p->u.name);
@@ -130,39 +115,12 @@ split_vector(string name)
     return vp;
 }
 
-static vec_ptr
-append_vector(vec_ptr v1, vec_ptr v2)
-{
-    if(v1 == NULL) { return v2; }
-    vec_ptr tmp = v1;
-    while(tmp->next != NULL) { tmp = tmp->next; }
-    tmp->next = v2;
-    return v1;
-}
-
-static range_ptr
-append_range(range_ptr r1, range_ptr r2)
-{
-    if(r1 == NULL) { return r2; }
-    range_ptr tmp = r1;
-    while(tmp->next != NULL) { tmp = tmp->next; }
-    tmp->next = r2;
-    return r1;
-}
-
-static unint
-keys_length()
-{
-    unint len = 0;
-    for(key_ptr tmp=key_lst; tmp != NULL; tmp=tmp->next) { len++; }
-    return len;
-}
-
 // Adj. matrix -----------------------------------------------------------------
 
 static void
 new_adj_mem()
 {
+    new_mgr(&key_lst_mgr, sizeof(key_lst));
     new_mgr(&key_mgr, sizeof(key_rec));
     new_mgr(&bkt_mgr, sizeof(bkt_rec));
     new_mgr(&vec_mgr, sizeof(vec_rec));
@@ -173,6 +131,7 @@ new_adj_mem()
 static void
 rem_adj_mem()
 {
+    free_mgr(&key_lst_mgr);
     free_mgr(&key_mgr);
     free_mgr(&bkt_mgr);
     free_mgr(&vec_mgr);
@@ -181,7 +140,7 @@ rem_adj_mem()
 }
 
 static bool
-mk_adj_tabel(g_ptr p)
+mk_adj_tabel(key_lst_ptr keys, unint *count, g_ptr p)
 {
     g_ptr attrs, fa_inps, fa_outs, inter, cont, children, fns;
     string name;
@@ -194,52 +153,89 @@ mk_adj_tabel(g_ptr p)
         Fail_pr("Adj. mat. expects a hierarchical pexlif.");
         return FALSE;
     }
-    else if(is_P_HIER(cont, &children)) {
+    if(is_P_HIER(cont, &children)) {
+        key_lst_ptr keys_tail = keys;
+        vec_ptr vec;
         // Record vector names for parent's formals.
-        vec_ptr vec, vs = NULL;
-        FOREACH_FORMAL(vec, fa_inps) { record_vector(0, vec); }
-        FOREACH_FORMAL(vec, fa_outs) { append_vector(vs, vec); }
-        key_lst = (key_ptr) new_rec(&key_mgr);
-        key_lst->label = 0;
-        key_lst->outs = vs;
-        key_lst->next = NULL;
+        FOREACH_FORMAL(vec, fa_inps) {
+            record_vector(0, vec);
+        }
+        key_ptr key = NULL, key_tail;
+        FOREACH_FORMAL(vec, fa_outs) {
+            if(key == NULL) {
+                key      = new_rec(&key_mgr);
+                key_tail = key;
+            } else {
+                key_tail->next = new_rec(&key_mgr);
+                key_tail = key_tail->next;
+            }
+            key_tail->vec  = vec;
+            key_tail->next = NULL;
+        }
+        keys_tail->key  = key;
+        keys_tail->next = NULL;
         // Record vector names for each child's actuals.
         g_ptr child, tmp;
-        key_ptr end = key_lst;
-        unint count = 1;
+        *count = 1;
         FOR_CONS(children, tmp, child) {
             if(!is_PINST(child, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
                 Fail_pr("Adj. mat. expects all children to be pexlifs.");
                 return FALSE;
             }
-            vs = NULL;
-            FOREACH_ACTUAL(vec, fa_inps) { record_vector(count, vec); }
-            FOREACH_ACTUAL(vec, fa_outs) { append_vector(vs, vec); }
-            key_ptr new = (key_ptr) new_rec(&key_mgr);
-            new->label = count;
-            new->outs = vs;
-            new->next = NULL;
-            end->next = new;
-            end = new;
-            count++;
+            FOREACH_ACTUAL(vec, fa_inps) {
+                record_vector(*count, vec);
+            }
+            key_ptr key = NULL, key_tail;
+            FOREACH_ACTUAL(vec, fa_outs) {
+                if(key == NULL) {
+                    key      = new_rec(&key_mgr);
+                    key_tail = key;
+                } else {
+                    key_tail->next = new_rec(&key_mgr);
+                    key_tail = key_tail->next;
+                }
+                key_tail->vec  = vec;
+                key_tail->next = NULL;
+            }
+            keys_tail->next = new_rec(&key_lst_mgr);
+            keys_tail       = keys_tail->next;
+            keys_tail->key  = key;
+            keys_tail->next = NULL;
+            (*count)++;
         }
     }
-    return TRUE;
+    Fail_pr("What are you then?!");
+    return FALSE;
 }
 
 static bool
 mk_adj_matrix(mat_ptr m, g_ptr p)
 {
     new_adj_mem();
-    if(!mk_adj_tabel(p)) {
-        rem_adj_mem();
-        return FALSE;
+    // Mark adjacencies, if any.
+    key_lst_ptr keys = (key_lst_ptr) new_rec(&key_lst_mgr);
+    unint length;
+    if(mk_adj_tabel(keys, &length, p)) {
+        // All nodes accounted for.
+        ASSERT(m->cols == length);
+        // Square matrix.
+        ASSERT(m->cols == m->rows);
+        //
+        for(int i = 0; keys != NULL; keys = keys->next) {
+            for(key_ptr key = keys->key; key != NULL; key = key->next) {
+                vec_ptr vec = key->vec;
+                string name = Get_vector_signature(&lstrings, vec);
+                bkt_ptr bkt = (bkt_ptr) find_hash(tbl, name);
+                while(bkt != NULL) {
+                    if(Check_vector_overlap(vec, bkt->vec)) {
+                        m->mat[i][bkt->lbl] = TRUE;
+                    }
+                    bkt = bkt->next;
+                }
+            }
+        }
     }
-    ASSERT(m->cols == keys_length()); // All nodes accounted for.
-    ASSERT(m->cols == m->rows);       // Square matrix.
-    for(unint i=0; i<m->rows; i++) {
-        
-    }
+    // Done.
     rem_adj_mem();
     return TRUE;
 }
@@ -341,6 +337,7 @@ _DuMMy_iso()
     mk_adj_haystack(NULL,0);
     test_isomorphism_formatting(NULL);
     test_isomorphism_match(NULL,NULL,NULL);
+    M = M;
 }
 
 /******************************************************************************/

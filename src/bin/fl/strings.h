@@ -11,19 +11,23 @@
 /* strings.h -- header for strings.c */
 #ifdef EXPORT_FORWARD_DECL
 /* --- Forward declarations that need to be exported to earlier .h files --- */
-typedef struct vec_rec	*vec_ptr;
+typedef struct range_rec *range_ptr;
+typedef struct vec_rec   *vec_ptr;
 
 /* ----- Function prototypes for public functions ----- */
 void	    Strings_Init();
 void	    Strings_Install_Functions();
 g_ptr	    Vec2nodes(string name);
 vec_ptr	    Split_vector_name(ustr_mgr *str_mgr_ptr,
-			      rec_mgr  *vector_mgrp,
-			      rec_mgr  *range_mgrp,
-			      string vec);
+                              rec_mgr  *vector_mgrp,
+                              rec_mgr  *range_mgrp,
+                              string vec);
 string	    Get_vector_signature(ustr_mgr *str_mgr_ptr, vec_ptr vp);
-int	    Get_Vector_Size(string vec);
+int	        Get_Vector_Size(string vec);
 g_ptr	    Merge_Vectors(g_ptr nds, bool non_contig_vecs);
+//
+bool        Check_vector_overlap(vec_ptr v1, vec_ptr v2);
+bool        Check_range_overlap(range_ptr r1, range_ptr r2);
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */
@@ -33,7 +37,6 @@ g_ptr	    Merge_Vectors(g_ptr nds, bool non_contig_vecs);
 
 typedef enum {TXT, INDEX} vec_type;
 
-typedef struct range_rec *range_ptr;
 typedef struct range_rec {
 	int	           upper;
 	int	           lower;

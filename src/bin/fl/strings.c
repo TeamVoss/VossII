@@ -105,10 +105,10 @@ Vec2nodes(string name)
     vec_ptr vp = split_name(name);
     sname_list_ptr nlp = expand_vec(vp);
     while( nlp != NULL ) {
-	SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, nlp->name)));
-	SET_CONS_TL(tail, Make_NIL());
-	tail = GET_CONS_TL(tail);
-	nlp = nlp->next;
+        SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, nlp->name)));
+        SET_CONS_TL(tail, Make_NIL());
+        tail = GET_CONS_TL(tail);
+        nlp = nlp->next;
     }
     end_vector_ops();
     return res;
@@ -132,6 +132,41 @@ Merge_Vectors(g_ptr nds, bool non_contig_vecs)
     return res;
 }
 
+bool
+Check_range_overlap(range_ptr r1, range_ptr r2)
+{
+    if(r1 == r2) { return TRUE; }
+    while(r1 != NULL && r2 != NULL) {
+        // Check if range intervals are overlapping.
+        if(!(r1->lower <= r2->upper && r2->lower <= r1->upper)) {
+            return FALSE;
+        }
+        r1 = r1->next;
+        r2 = r2->next;
+    }
+    return TRUE;
+}
+
+bool
+Check_vector_overlap(vec_ptr v1, vec_ptr v2)
+{
+    if(v1 == v2) { return TRUE; }
+    while(v1 != NULL && v2 != NULL) {
+        if(v1->type != v2->type) {
+            return FALSE;
+        }
+        if(v1->type == TXT && v1->u.name != v2->u.name) {
+            return FALSE;
+        }
+        if(v1->type == INDEX && !Check_range_overlap(v1->u.ranges, v2->u.ranges)) {
+            return FALSE;
+        }
+        v1 = v1->next;
+        v2 = v2->next;
+    }
+    return TRUE;
+}
+
 /********************************************************/
 /*	    EXPORTED EXTAPI FUNCTIONS    		*/
 /********************************************************/
@@ -143,9 +178,9 @@ file_fullname(g_ptr redex)
     g_ptr r = GET_APPLY_RIGHT(redex);
     string tmp = realpath(GET_STRING(r), path_buf);
     if( tmp == NULL ) {
-	MAKE_REDEX_FAILURE(redex,
-			   Fail_pr("Cannot find file %s\n", GET_STRING(r)));
-	return;
+        MAKE_REDEX_FAILURE(redex,
+                           Fail_pr("Cannot find file %s\n", GET_STRING(r)));
+        return;
     }
     MAKE_REDEX_STRING(redex, wastrsave(&strings, tmp));
     DEC_REF_CNT(l);
@@ -187,9 +222,9 @@ str_is_prefix(g_ptr redex)
     string pre = GET_STRING(arg1);
     string s   = GET_STRING(arg2);
     if( strncmp(pre, s, strlen(pre)) == 0 ) {
-	MAKE_REDEX_BOOL(redex, B_One());
+        MAKE_REDEX_BOOL(redex, B_One());
     } else {
-	MAKE_REDEX_BOOL(redex, B_Zero());
+        MAKE_REDEX_BOOL(redex, B_Zero());
     }
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -207,9 +242,9 @@ str_is_suffix(g_ptr redex)
     int lsuf = strlen(suf);
     int ls   = strlen(s);
     if( lsuf <= ls && strcmp(s+(ls-lsuf), suf) == 0 ) {
-	MAKE_REDEX_BOOL(redex, B_One());
+        MAKE_REDEX_BOOL(redex, B_One());
     } else {
-	MAKE_REDEX_BOOL(redex, B_Zero());
+        MAKE_REDEX_BOOL(redex, B_Zero());
     }
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -225,9 +260,9 @@ str_is_substr(g_ptr redex)
     string needle = GET_STRING(arg1);
     string haystack   = GET_STRING(arg2);
     if( strstr(haystack, needle) != NULL ) {
-	MAKE_REDEX_BOOL(redex, B_One());
+        MAKE_REDEX_BOOL(redex, B_One());
     } else {
-	MAKE_REDEX_BOOL(redex, B_Zero());
+        MAKE_REDEX_BOOL(redex, B_Zero());
     }
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -243,9 +278,9 @@ str_match(g_ptr redex)
     string pat = GET_STRING(arg1);
     string s   = GET_STRING(arg2);
     if( fnmatch(pat, s, 0) == 0 ) {
-	MAKE_REDEX_BOOL(redex, B_One());
+        MAKE_REDEX_BOOL(redex, B_One());
     } else {
-	MAKE_REDEX_BOOL(redex, B_Zero());
+        MAKE_REDEX_BOOL(redex, B_Zero());
     }
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -267,28 +302,28 @@ str_split(g_ptr redex)
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
     if( lsplit == 0 ) {
-	char buf[2];
-	buf[1] = 0;
-	while( *s != 0) {
-	    buf[0] = *s;
-	    SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, buf)));
-	    SET_CONS_TL(tail, Make_NIL());
-	    tail = GET_CONS_TL(tail);
-	    s++;
-	}
+        char buf[2];
+        buf[1] = 0;
+        while( *s != 0) {
+            buf[0] = *s;
+            SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, buf)));
+            SET_CONS_TL(tail, Make_NIL());
+            tail = GET_CONS_TL(tail);
+            s++;
+        }
     } else {
-	while( (next = strstr(cur, split_str)) != NULL ) {
-	    *next = 0;
-	    SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, cur)));
-	    SET_CONS_TL(tail, Make_NIL());
-	    tail = GET_CONS_TL(tail);
-	    cur = next+lsplit;
-	}
-	if( *cur != 0 ) {
-	    SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, cur)));
-	    SET_CONS_TL(tail, Make_NIL());
-	    tail = GET_CONS_TL(tail);
-	}
+        while( (next = strstr(cur, split_str)) != NULL ) {
+            *next = 0;
+            SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, cur)));
+            SET_CONS_TL(tail, Make_NIL());
+            tail = GET_CONS_TL(tail);
+            cur = next+lsplit;
+        }
+        if( *cur != 0 ) {
+            SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, cur)));
+            SET_CONS_TL(tail, Make_NIL());
+            tail = GET_CONS_TL(tail);
+        }
     }
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -341,14 +376,14 @@ md_expand_vectors(g_ptr redex)
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
     for(g_ptr np = r; !IS_NIL(np); np = GET_CONS_TL(np)) {
-	vec_ptr vp = split_name(GET_STRING(GET_CONS_HD(np)));
-	sname_list_ptr nlp = expand_vec(vp);
-	while( nlp != NULL ) {
-	    SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, nlp->name)));
-	    SET_CONS_TL(tail, Make_NIL());
-	    tail = GET_CONS_TL(tail);
-	    nlp = nlp->next;
-	}
+        vec_ptr vp = split_name(GET_STRING(GET_CONS_HD(np)));
+        sname_list_ptr nlp = expand_vec(vp);
+        while( nlp != NULL ) {
+            SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, nlp->name)));
+            SET_CONS_TL(tail, Make_NIL());
+            tail = GET_CONS_TL(tail);
+            nlp = nlp->next;
+        }
     }
     end_vector_ops();
     DEC_REF_CNT(l);
@@ -366,10 +401,10 @@ md_expand_vector(g_ptr redex)
     vec_ptr vp = split_name(GET_STRING(r));
     sname_list_ptr nlp = expand_vec(vp);
     while( nlp != NULL ) {
-	SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, nlp->name)));
-	SET_CONS_TL(tail, Make_NIL());
-	tail = GET_CONS_TL(tail);
-	nlp = nlp->next;
+        SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, nlp->name)));
+        SET_CONS_TL(tail, Make_NIL());
+        tail = GET_CONS_TL(tail);
+        nlp = nlp->next;
     }
     end_vector_ops();
     DEC_REF_CNT(l);
@@ -429,10 +464,10 @@ string_lastn(g_ptr redex)
     string tmp = strtemp(s);
     int len = strlen(s);
     if( len <= cnt ) {
-	MAKE_REDEX_STRING(redex, wastrsave(&strings, tmp));
+        MAKE_REDEX_STRING(redex, wastrsave(&strings, tmp));
     } else {
-	tmp = tmp+len-cnt;
-	MAKE_REDEX_STRING(redex, wastrsave(&strings, tmp));
+        tmp = tmp+len-cnt;
+        MAKE_REDEX_STRING(redex, wastrsave(&strings, tmp));
     }
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -894,30 +929,30 @@ make_range_canonical(range_ptr rp)
 {
     if( rp == NULL ) { return NULL; }
     if( rp->upper < rp->lower ) { 
-	int tmp = rp->upper;
-	rp->upper = rp->lower;
-	rp->lower = tmp;
+        int tmp = rp->upper;
+        rp->upper = rp->lower;
+        rp->lower = tmp;
     }
     range_ptr rem = make_range_canonical(rp->next);
     if( rem == NULL ) {
-	return rp;
+        return rp;
     }
     if( rp->lower > rem->upper ) {
-	rp->next = rem;
-	return rp;
+        rp->next = rem;
+        return rp;
     }
     // Overlap
     if( rp->upper <= rem->upper ) {
-	if( rp->lower >= rem->lower ) {
-	    return rem;
-	}
-	rem->lower = rp->lower;
-	return( make_range_canonical(rem) );
+        if( rp->lower >= rem->lower ) {
+            return rem;
+        }
+        rem->lower = rp->lower;
+        return( make_range_canonical(rem) );
     }
     rem->upper = rp->upper;
     if( rem->lower > rp->lower ) {
-	rem->lower = rp->lower;
-	return( make_range_canonical(rem) );
+        rem->lower = rp->lower;
+        return( make_range_canonical(rem) );
     }
     return rem;
 }
@@ -978,13 +1013,13 @@ static bool
 same_range(range_ptr r1, range_ptr r2)
 {
     while (1) {
-	if( r1 == r2 ) { return TRUE; }
-	if( r1 == NULL ) { return FALSE; }
-	if( r2 == NULL ) { return FALSE; }
-	if( r1->upper != r2->upper ) { return FALSE; }
-	if( r1->lower != r2->lower ) { return FALSE; }
-	r1 = r1->next;
-	r2 = r2->next;
+        if( r1 == r2 ) { return TRUE; }
+        if( r1 == NULL ) { return FALSE; }
+        if( r2 == NULL ) { return FALSE; }
+        if( r1->upper != r2->upper ) { return FALSE; }
+        if( r1->lower != r2->lower ) { return FALSE; }
+        r1 = r1->next;
+        r2 = r2->next;
     }
 }
 
@@ -995,26 +1030,26 @@ compress_ranges(range_ptr r1, range_ptr r2)
     if( r2 == NULL ) return r1; 
     // Make sure r1 is the larger range
     if( r1->upper < r2->upper ) {
-	range_ptr tmp = r2;
-	r2 = r1;
-	r1 = tmp;
+        range_ptr tmp = r2;
+        r2 = r1;
+        r1 = tmp;
     }
     if( r1->lower > (r2->upper+1) ) {
-	// Non-overlapping
-	r1->next = compress_ranges(r1->next, r2);
-	return r1;
+        // Non-overlapping
+        r1->next = compress_ranges(r1->next, r2);
+        return r1;
     }
     if( r1->lower <= r2->lower ) {
-	// r1 covers r2. Just ignore r2
-	return( compress_ranges(r1, r2->next) );
+        // r1 covers r2. Just ignore r2
+        return( compress_ranges(r1, r2->next) );
     }
     r1->lower = r2->lower;
     // Can we merge newly formed range with next range?
     if( r1->next != NULL ) {
-	if( r1->lower == (r1->next->upper+1) ) {
-	    r1->lower = r1->next->lower;
-	    r1->next = r1->next->next;
-	}
+        if( r1->lower == (r1->next->upper+1) ) {
+            r1->lower = r1->next->lower;
+            r1->next = r1->next->next;
+        }
     }
     return( compress_ranges(r1, r2->next) );
 }
@@ -1025,13 +1060,13 @@ prepend_index(int idx, sname_list_ptr rem, sname_list_ptr *resp)
     char buf[10];
     Sprintf(buf, "%d", idx);
     for(sname_list_ptr np = rem; np != NULL; np = np->next) {
-	sname_list_ptr nnp = new_rec(sname_list_rec_mgrp);
-	string nname = strtemp(buf);
-	nname = strappend(np->name);
-	nnp->name = uStrsave(lstringsp, nname);
-	nnp->next = NULL;
-	*resp = nnp;
-	resp = &(nnp->next);
+        sname_list_ptr nnp = new_rec(sname_list_rec_mgrp);
+        string nname = strtemp(buf);
+        nname = strappend(np->name);
+        nnp->name = uStrsave(lstringsp, nname);
+        nnp->next = NULL;
+        *resp = nnp;
+        resp = &(nnp->next);
     }
     return resp;
 }
@@ -1040,36 +1075,36 @@ static sname_list_ptr
 expand_vec(vec_ptr vec)
 {
     if( vec == NULL ) {
-	sname_list_ptr np = new_rec(sname_list_rec_mgrp);
-	np->next = NULL;
-	np->name = uStrsave(lstringsp, "");
-	return np;
+        sname_list_ptr np = new_rec(sname_list_rec_mgrp);
+        np->next = NULL;
+        np->name = uStrsave(lstringsp, "");
+        return np;
     }
     sname_list_ptr rem = expand_vec(vec->next);
     if( vec->type == TXT ) {
-	// A text item
-	for(sname_list_ptr np = rem; np != NULL; np = np->next) {
-	    string nname = strtemp(vec->u.name);
-	    nname = strappend(np->name);
-	    np->name = uStrsave(lstringsp, nname);
-	}
-	return rem;
+        // A text item
+        for(sname_list_ptr np = rem; np != NULL; np = np->next) {
+            string nname = strtemp(vec->u.name);
+            nname = strappend(np->name);
+            np->name = uStrsave(lstringsp, nname);
+        }
+        return rem;
     } else {
-	// Indices
-	sname_list_ptr res = NULL;
-	sname_list_ptr *tailp = &res;
-	for(range_ptr rp = vec->u.ranges; rp != NULL; rp = rp->next) {
-	    if( rp->upper >= rp->lower ) {
-		for(int i = rp->upper; i >= rp->lower; i--) {
-		    tailp = prepend_index(i, rem, tailp);
-		}
-	    } else {
-		for(int i = rp->upper; i <= rp->lower; i++) {
-		    tailp = prepend_index(i, rem, tailp);
-		}
-	    }
-	}
-	return res;
+        // Indices
+        sname_list_ptr res = NULL;
+        sname_list_ptr *tailp = &res;
+        for(range_ptr rp = vec->u.ranges; rp != NULL; rp = rp->next) {
+            if( rp->upper >= rp->lower ) {
+                for(int i = rp->upper; i >= rp->lower; i--) {
+                    tailp = prepend_index(i, rem, tailp);
+                }
+            } else {
+                for(int i = rp->upper; i <= rp->lower; i++) {
+                    tailp = prepend_index(i, rem, tailp);
+                }
+            }
+        }
+        return res;
     }
 }
 
@@ -1077,41 +1112,41 @@ static int
 vec_name_cmp(vec_ptr v1, vec_ptr v2)
 {
     if( v1 == NULL ) {
-	if( v2 == NULL ) {
-	    return 0;
-	} else {
-	    return( -1 );
-	}
+        if( v2 == NULL ) {
+            return 0;
+        } else {
+            return( -1 );
+        }
     } else {
-	if( v2 == NULL ) {
-	    return( 1 );
-	}
+        if( v2 == NULL ) {
+            return( 1 );
+        }
     }
     if( v1->type == TXT ) {
-	if( v2->type == TXT ) {
-	    if( v1->u.name == v2->u.name ) {
-		return( vec_name_cmp(v1->next, v2->next) );
-	    }
-	    return( strcmp(v1->u.name, v2->u.name) );
-	}
-	return( 1 );
+        if( v2->type == TXT ) {
+            if( v1->u.name == v2->u.name ) {
+                return( vec_name_cmp(v1->next, v2->next) );
+            }
+            return( strcmp(v1->u.name, v2->u.name) );
+        }
+        return( 1 );
     }
     // v1->type == INDEX
     if( v2->type == TXT ) {
-	if( v1->u.name == v2->u.name ) {
-	    return( vec_name_cmp(v1->next, v2->next) );
-	}
-	return( strcmp(v1->u.name, v2->u.name) );
+        if( v1->u.name == v2->u.name ) {
+            return( vec_name_cmp(v1->next, v2->next) );
+        }
+        return( strcmp(v1->u.name, v2->u.name) );
     }
     // v1->type == INDEX
     // v2->type == INDEX
     if( v1->u.ranges->upper == v2->u.ranges->upper ) {
-	return( vec_name_cmp(v1->next, v2->next) );
+        return( vec_name_cmp(v1->next, v2->next) );
     }
     if( v1->u.ranges->upper > v2->u.ranges->upper ) {
-	return(1);
+        return(1);
     } else {
-	return(-1);
+        return(-1);
     }
 }
 
@@ -1129,23 +1164,23 @@ gen_extract_vectors(g_ptr redex, bool non_contig_vecs)
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     if( IS_NIL(r) ) {
-	MAKE_REDEX_NIL(redex);
-	DEC_REF_CNT(l);
-	DEC_REF_CNT(r);
-	return;
+        MAKE_REDEX_NIL(redex);
+        DEC_REF_CNT(l);
+        DEC_REF_CNT(r);
+        return;
     }
     // At least one vector in the list
     begin_vector_ops();
     buffer name_buf;
     new_buf(&name_buf, 100, sizeof(vec_ptr));
     for(g_ptr np = r; !IS_NIL(np); np = GET_CONS_TL(np)) {
-	vec_ptr vp = split_name(GET_STRING(GET_CONS_HD(np)));
-	for(vec_ptr cp = vp; cp != NULL; cp = cp->next) {
-	    if( cp->type == INDEX ) {
-		cp->u.ranges = make_range_canonical(cp->u.ranges); 
-	    }
-	}
-	push_buf(&name_buf, &vp);
+        vec_ptr vp = split_name(GET_STRING(GET_CONS_HD(np)));
+        for(vec_ptr cp = vp; cp != NULL; cp = cp->next) {
+            if( cp->type == INDEX ) {
+                cp->u.ranges = make_range_canonical(cp->u.ranges); 
+            }
+        }
+        push_buf(&name_buf, &vp);
     }
     // Sort according to merge order
     qsort(START_BUF(&name_buf), COUNT_BUF(&name_buf), sizeof(vec_ptr), nn_cmp);
@@ -1153,80 +1188,80 @@ gen_extract_vectors(g_ptr redex, bool non_contig_vecs)
     merge_list_ptr  mp = NULL;
     int alts = 0;
     FOR_BUF(&name_buf, vec_ptr, vpp) {
-	merge_list_ptr m = new_rec (merge_list_rec_mgrp);
-	m->vec = *vpp;
-	m->name_signature = mk_name_signature(*vpp);
-	if( mp == NULL ) {
-	    m->next = m;
-	    m->prev = m;
-	    mp = m;
-	} else {
-	    m->next = mp;
-	    m->prev = mp->prev;
-	    mp->prev->next = m;
-	    mp->prev = m;
-	}
-	alts++;
+        merge_list_ptr m = new_rec (merge_list_rec_mgrp);
+        m->vec = *vpp;
+        m->name_signature = mk_name_signature(*vpp);
+        if( mp == NULL ) {
+            m->next = m;
+            m->prev = m;
+            mp = m;
+        } else {
+            m->next = mp;
+            m->prev = mp->prev;
+            mp->prev->next = m;
+            mp->prev = m;
+        }
+        alts++;
     }
     // Now try to merge adjacent vectors into bigger vectors
     int not_changed = 0;
     do {
-	if( alts != 1 ) {
-	    if( mp->name_signature != mp->next->name_signature ) {
-		// Definitely cannot be merged
-		not_changed++;
-		mp = mp->next;
-	    } else {
-		// Potentially can be merged
-		vec_ptr v1 = mp->vec;
-		vec_ptr v2 = mp->next->vec;
-		while( v1 &&
-		      (v1->type == TXT ||
-		       same_range(v1->u.ranges,v2->u.ranges)) )
-		{
-		    v1 = v1->next;
-		    v2 = v2->next;
-		}
-		if( v1 == NULL ) {
-		    // Two identical vectors
-		    mp->next->next->prev = mp;
-		    mp->next = mp->next->next;
-		    not_changed = 0;
-		    alts--;
-		} else {
-		    // Make sure the rest matches
-		    range_ptr r1 = v1->u.ranges;
-		    range_ptr r2 = v2->u.ranges;
-		    vec_ptr mvp = v1;
-		    v1 = v1->next;
-		    v2 = v2->next;
-		    while( v1 && 
-			   (v1->type == TXT ||
-			    same_range(v1->u.ranges,v2->u.ranges)) )
-		    {
-			v1 = v1->next;
-			v2 = v2->next;
-		    }
-		    if( v1 != NULL ) {
-			not_changed++;
-			mp = mp->next;
-		    } else {
-			mvp->u.ranges = compress_ranges(r1, r2);
-			mp->next->next->prev = mp;
-			mp->next = mp->next->next;
-			not_changed = 0;
-			alts--;
-		    }
-		}
-	    }
-	}
+        if( alts != 1 ) {
+            if( mp->name_signature != mp->next->name_signature ) {
+                // Definitely cannot be merged
+                not_changed++;
+                mp = mp->next;
+            } else {
+                // Potentially can be merged
+                vec_ptr v1 = mp->vec;
+                vec_ptr v2 = mp->next->vec;
+                while( v1 &&
+                       (v1->type == TXT ||
+                        same_range(v1->u.ranges,v2->u.ranges)) )
+                {
+                    v1 = v1->next;
+                    v2 = v2->next;
+                }
+                if( v1 == NULL ) {
+                    // Two identical vectors
+                    mp->next->next->prev = mp;
+                    mp->next = mp->next->next;
+                    not_changed = 0;
+                    alts--;
+                } else {
+                    // Make sure the rest matches
+                    range_ptr r1 = v1->u.ranges;
+                    range_ptr r2 = v2->u.ranges;
+                    vec_ptr mvp = v1;
+                    v1 = v1->next;
+                    v2 = v2->next;
+                    while( v1 && 
+                           (v1->type == TXT ||
+                            same_range(v1->u.ranges,v2->u.ranges)) )
+                    {
+                        v1 = v1->next;
+                        v2 = v2->next;
+                    }
+                    if( v1 != NULL ) {
+                        not_changed++;
+                        mp = mp->next;
+                    } else {
+                        mvp->u.ranges = compress_ranges(r1, r2);
+                        mp->next->next->prev = mp;
+                        mp->next = mp->next->next;
+                        not_changed = 0;
+                        alts--;
+                    }
+                }
+            }
+        }
     } while( alts > 1 && (not_changed <= alts) );
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
     for(int i = 0; i < alts; i++ ) {
-	strtemp("");
-	emit_vector(mp->vec, non_contig_vecs, &tail);
-	mp = mp->next;
+        strtemp("");
+        emit_vector(mp->vec, non_contig_vecs, &tail);
+        mp = mp->next;
     }
     end_vector_ops();
     DEC_REF_CNT(l);
@@ -1237,113 +1272,113 @@ static void
 gen_merge_vectors(g_ptr redex, g_ptr r, bool non_contig_vecs)
 {
     if( IS_NIL(r) ) {
-	MAKE_REDEX_NIL(redex);
-	return;
+        MAKE_REDEX_NIL(redex);
+        return;
     }
     // At least one vector in the list
     begin_vector_ops();
     buffer name_buf;
     new_buf(&name_buf, 100, sizeof(vec_ptr));
     for(g_ptr np = r; !IS_NIL(np); np = GET_CONS_TL(np)) {
-	vec_ptr vp = split_name(GET_STRING(GET_CONS_HD(np)));
-	push_buf(&name_buf, &vp);
+        vec_ptr vp = split_name(GET_STRING(GET_CONS_HD(np)));
+        push_buf(&name_buf, &vp);
     }
     vec_ptr *vpp;
     merge_list_ptr  mp = NULL;
     int alts = 0;
     FOR_BUF(&name_buf, vec_ptr, vpp) {
-	merge_list_ptr m = new_rec (merge_list_rec_mgrp);
-	m->vec = *vpp;
-	m->name_signature = mk_name_signature(*vpp);
-	if( mp == NULL ) {
-	    m->next = m;
-	    m->prev = m;
-	    mp = m;
-	} else {
-	    m->next = mp;
-	    m->prev = mp->prev;
-	    mp->prev->next = m;
-	    mp->prev = m;
-	}
-	alts++;
+        merge_list_ptr m = new_rec (merge_list_rec_mgrp);
+        m->vec = *vpp;
+        m->name_signature = mk_name_signature(*vpp);
+        if( mp == NULL ) {
+            m->next = m;
+            m->prev = m;
+            mp = m;
+        } else {
+            m->next = mp;
+            m->prev = mp->prev;
+            mp->prev->next = m;
+            mp->prev = m;
+        }
+        alts++;
     }
     // Now try to merge adjacent vectors into bigger vectors
     merge_list_ptr mp0 = mp;
     int not_changed = 0;
     while( alts > 1 && not_changed < alts ) {
-	if( mp->next == mp0 ) {
-	    // Never merge the last with the first
-	    mp = mp0;
-	}
-	if( mp->name_signature != mp->next->name_signature ) {
-	    // Definitely cannot be merged
-	    not_changed++;
-	    mp = mp->next;
-	} else {
-	    // Potentially can be merged
-	    vec_ptr v1 = mp->vec;
-	    vec_ptr v2 = mp->next->vec;
-	    while( v1 &&
-		  (v1->type == TXT ||
-		   same_range(v1->u.ranges,v2->u.ranges)) )
-	    {
-		v1 = v1->next;
-		v2 = v2->next;
-	    }
-	    if( v1 == NULL ) {
-		// Two identical vectors; don't remove duplicates
-		not_changed++;
-		mp = mp->next;
-	    } else {
-		// Make sure the rest matches
-		range_ptr r1 = v1->u.ranges;
-		range_ptr r2 = v2->u.ranges;
-		v1 = v1->next;
-		v2 = v2->next;
-		while( v1 && 
-		       (v1->type == TXT ||
-			same_range(v1->u.ranges,v2->u.ranges)) )
-		{
-		    v1 = v1->next;
-		    v2 = v2->next;
-		}
-		if( v1 != NULL ) {
-		    not_changed++;
-		    mp = mp->next;
-		} else {
-		    if( (r1->upper >= r1->lower) && (r1->next == NULL) &&
-			(r2->upper >= r2->lower) && (r2->next == NULL) &&
-			(r2->upper == (r1->lower - 1)) )
-		    {
-			r1->lower = r2->lower;
-			mp->next->next->prev = mp;
-			mp->next = mp->next->next;
-			not_changed = 0;
-			alts--;
-		    } else if( (r1->upper <= r1->lower) && (r1->next == NULL) &&
-			       (r2->upper <= r2->lower) && (r2->next == NULL) &&
-			       (r2->upper == (r1->lower + 1)) )
-		    {
-			r1->lower = r2->lower;
-			mp->next->next->prev = mp;
-			mp->next = mp->next->next;
-			not_changed = 0;
-			alts--;
-		    } else {
-			not_changed++;
-			mp = mp->next;
-		    }
-		}
-	    }
-	}
+        if( mp->next == mp0 ) {
+            // Never merge the last with the first
+            mp = mp0;
+        }
+        if( mp->name_signature != mp->next->name_signature ) {
+            // Definitely cannot be merged
+            not_changed++;
+            mp = mp->next;
+        } else {
+            // Potentially can be merged
+            vec_ptr v1 = mp->vec;
+            vec_ptr v2 = mp->next->vec;
+            while( v1 &&
+                   (v1->type == TXT ||
+                    same_range(v1->u.ranges,v2->u.ranges)) )
+            {
+                v1 = v1->next;
+                v2 = v2->next;
+            }
+            if( v1 == NULL ) {
+                // Two identical vectors; don't remove duplicates
+                not_changed++;
+                mp = mp->next;
+            } else {
+                // Make sure the rest matches
+                range_ptr r1 = v1->u.ranges;
+                range_ptr r2 = v2->u.ranges;
+                v1 = v1->next;
+                v2 = v2->next;
+                while( v1 && 
+                       (v1->type == TXT ||
+                        same_range(v1->u.ranges,v2->u.ranges)) )
+                {
+                    v1 = v1->next;
+                    v2 = v2->next;
+                }
+                if( v1 != NULL ) {
+                    not_changed++;
+                    mp = mp->next;
+                } else {
+                    if( (r1->upper >= r1->lower) && (r1->next == NULL) &&
+                        (r2->upper >= r2->lower) && (r2->next == NULL) &&
+                        (r2->upper == (r1->lower - 1)) )
+                    {
+                        r1->lower = r2->lower;
+                        mp->next->next->prev = mp;
+                        mp->next = mp->next->next;
+                        not_changed = 0;
+                        alts--;
+                    } else if( (r1->upper <= r1->lower) && (r1->next == NULL) &&
+                               (r2->upper <= r2->lower) && (r2->next == NULL) &&
+                               (r2->upper == (r1->lower + 1)) )
+                    {
+                        r1->lower = r2->lower;
+                        mp->next->next->prev = mp;
+                        mp->next = mp->next->next;
+                        not_changed = 0;
+                        alts--;
+                    } else {
+                        not_changed++;
+                        mp = mp->next;
+                    }
+                }
+            }
+        }
     };
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
     mp = mp0;
     for(int i = 0; i < alts; i++ ) {
-	strtemp("");
-	emit_vector(mp->vec, non_contig_vecs, &tail);
-	mp = mp->next;
+        strtemp("");
+        emit_vector(mp->vec, non_contig_vecs, &tail);
+        mp = mp->next;
     }
     end_vector_ops();
 }

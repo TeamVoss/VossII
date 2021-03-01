@@ -25,16 +25,21 @@ void	    Iso_Install_Functions();
 
 typedef struct key_rec *key_ptr;
 typedef struct key_rec {
-    unint   label;
-    vec_ptr outs;
+    vec_ptr vec;
     key_ptr next;
 } key_rec;
 
+typedef struct key_lst *key_lst_ptr;
+typedef struct key_lst {
+    key_ptr     key;
+    key_lst_ptr next;
+} key_lst;
+
 typedef struct bkt_rec *bkt_ptr;
 typedef struct bkt_rec {
-    unint     label;
-    range_ptr range;
-    bkt_ptr   next;
+    unint   lbl;
+    vec_ptr vec;
+    bkt_ptr next;
 } bkt_rec;
 
 typedef struct mat_rec *mat_ptr;
