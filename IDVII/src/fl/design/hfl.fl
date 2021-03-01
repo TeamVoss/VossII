@@ -1359,7 +1359,7 @@ let core_TYPE name size is_arithmetic value_list =
 		in
 		pX we
 	    |
-	    let bits = wexpr2bool we then
+	    let bits = wexpr2bool [] we then
 	    let raw_res0 = map (sprintf "%B") bits in
 	    let tr s = s = "F" => "0" | s = "T" => "1" | s in
 	    let raw_res = map tr raw_res0 in
@@ -1713,7 +1713,7 @@ let MEMORY name size_list word_type =
 						      (hw_destr din)))
 	];
 	let P_`name` t = 
-	    let bits = wexpr2bool (hw_`name`_destr t) then
+	    let bits = wexpr2bool [] (hw_`name`_destr t) then
 	    let raw_res0 = map (sprintf "%B") bits in
 	    let tr s = s = "F" => "0" | s = "T" => "1" | s in
 	    let raw_res = map tr raw_res0 in
@@ -2208,7 +2208,7 @@ let R_excluded e =
 	negs = [] => sitlist W_AND (tl pos) (hd pos) |
 	//
 	let is_unsat e =
-	    let bv = wexpr2bool e in
+	    let bv = wexpr2bool [] e in
 	    bv == [F]
 	in
 	pos = [] => sitlist W_AND (tl negs) (hd negs) |

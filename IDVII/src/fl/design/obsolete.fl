@@ -1,14 +1,14 @@
 let string_bdd_isv {lhs:: string} {rhs:: *a} =
     let W_rhs = hw_destr rhs in
     let nds = md_expand_vector lhs in
-    let vs  = wexpr2bool W_rhs in
+    let vs  = wexpr2bool [] W_rhs in
     map2 (\n.\v. T,n,v,0,0) nds vs
 ;
 
 let string_bexpr_isv {lhs:: string} {rhs:: *a} =
     let W_rhs = hw_destr rhs in
     let nds = md_expand_vector lhs in
-    let vs  = wexpr2bool W_rhs in
+    let vs  = wexpr2bool [] W_rhs in
     map2 (\n.\v. bT,n,bdd2bexpr v,0,0) nds vs
 ;
 
@@ -16,7 +16,7 @@ let bdd_isv {lhs:: *a} {rhs:: *a} =
     let W_lhs = hw_destr lhs in
     let W_rhs = hw_destr rhs in
     let nds = base_get_lhs_vars W_lhs in
-    let vs  = wexpr2bool W_rhs in
+    let vs  = wexpr2bool [] W_rhs in
     map2 (\n.\v. T,n,v,0,0) nds vs
 ;
 
@@ -24,7 +24,7 @@ let bexpr_isv {lhs:: *a} {rhs:: *a} =
     let W_lhs = hw_destr lhs in
     let W_rhs = hw_destr rhs in
     let nds = base_get_lhs_vars W_lhs in
-    let vs  = wexpr2bool W_rhs in
+    let vs  = wexpr2bool [] W_rhs in
     map2 (\n.\v. bT,n,bdd2bexpr v,0,0) nds vs
 ;
 

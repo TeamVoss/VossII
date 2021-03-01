@@ -329,3 +329,35 @@ Print_dists(hash_record_ptr dists)
     scan_hash(dists, print_dists_fn);
 }
 
+
+/* Copy a network */
+sch_draw_ptr
+copy_draw_tree(sch_draw_ptr tree)
+{
+    if(tree == NULL) {
+	return NULL;
+    }
+    sch_draw_ptr ans = (sch_draw_ptr) new_rec(&sch_draw_rec_mgr);
+    ans->type = tree->type;
+    ans->bin_num = tree->bin_num;
+    ans->name = uStrsave(&strings, tree->name);
+    ans->width = tree->width;
+    ans->height = tree->height;
+    ans->x = tree->x;
+    ans->y = tree->y;
+    ans->pfn = uStrsave(&strings, tree->pfn);
+    ans->pfn_type = Pfn2pfn_type(ans->pfn);
+    ans->fanins = NULL;
+    sch_draw_list_ptr *destp = &(ans->fanins);
+    sch_draw_list_ptr cur = tree->fanins;
+    while( cur != NULL ) {
+	sch_draw_list_ptr new;
+	new = (sch_draw_list_ptr) new_rec(&sch_draw_list_rec_mgr);
+	new->tree = copy_draw_tree(cur->tree);
+	new->next = NULL;
+	destp = &(new->next);
+	cur = cur->next;
+    }
+    ans->loop_src = copy_draw_tree(tree->loop_src);
+    return ans;
+}

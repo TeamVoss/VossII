@@ -113,7 +113,7 @@ clet prop2pexlif nwe =
 	map (\nd. T, nd, mkvar nd, t, t+1) (md_expand_vector v)
     in
     let ant = flatmap mk_ant timed_inps in
-    let cond = hd (wexpr2bool we) in
+    let cond = hd (wexpr2bool [] we) in
     let cons = [(T, ok, T, max_time, max_time+1)] in
     cond, ant, cons, (monitor,connections)
 ;

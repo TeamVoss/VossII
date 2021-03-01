@@ -336,6 +336,8 @@ infix 4 dXOR;
 let dXNOR = defix XNOR;
 infix 4 dXNOR;
 
+let dsubstitute sub f = substitute sub f;
+
 let dTHEN_1 c (t,e) = (c dAND t) dOR (dNOT c dAND e);
 
 let dTHEN_2 c (lt,le) = map2 (\t.\e. dTHEN_1 c (t,e)) lt le;
@@ -382,62 +384,62 @@ let mk_xvars sz =
     map dvariable (md_expand_vector (mk_name sz base))
 ;
 
-cletrec wexpr2bool (W_NAMED_CONST name sz v) =
+cletrec wexpr2bool sub (W_NAMED_CONST name sz v) =
 	    v >= 0 => int2fbv sz v | int2fbv sz (2**sz+v)
- /\     wexpr2bool (W_X sz) =
+ /\     wexpr2bool sub (W_X sz) =
 	    // Generate new unique BDD variables for X's
 	    // A bit of a hack, but there is no clean solution to this
 	    // that I can think of. The rigth answer would probably have
 	    // a wexpr2dualrail but that's pretty cumbersome too
 	    mk_xvars sz
- /\     wexpr2bool (W_CONST sz v) =
+ /\     wexpr2bool sub (W_CONST sz v) =
 	    v >= 0 => int2fbv sz v | int2fbv sz (2**sz+v)
- /\     wexpr2bool (W_VAR sz b) =
-	map dvariable (md_expand_vector (mk_name sz b))
- /\     wexpr2bool (W_EXPLICIT_VAR sz n) =
-	map dvariable (md_expand_vector n)
- /\     wexpr2bool (W_AND a b) =
-	    map2 (defix dAND) (wexpr2bool a) (wexpr2bool b)
- /\     wexpr2bool (W_OR a b) =
-	    map2 (defix dOR) (wexpr2bool a) (wexpr2bool b)
- /\     wexpr2bool (W_NOT a) = map dNOT (wexpr2bool a)
- /\     wexpr2bool (W_PRED name cond) = wexpr2bool cond
- /\     wexpr2bool (W_EQ a b) =
-	[(wexpr2bool a) '=' (wexpr2bool b)]
- /\     wexpr2bool (W_GR a b) =
-	[(wexpr2bool a) '>' (wexpr2bool b)]
- /\     wexpr2bool (W_ADD a b) = (wexpr2bool a) '+' (wexpr2bool b)
- /\     wexpr2bool (W_SUB a b) = (wexpr2bool a) '-' (wexpr2bool b)
- /\     wexpr2bool (W_MUL a b) = (wexpr2bool a) '*' (wexpr2bool b)
- /\     wexpr2bool (W_DIV a b) = (wexpr2bool a) '/' (wexpr2bool b)
- /\     wexpr2bool (W_MOD a b) = (wexpr2bool a) '%' (wexpr2bool b)
- /\     wexpr2bool (W_SHL a b) = (wexpr2bool a) '<<' (wexpr2bool b)
- /\     wexpr2bool (W_SHR a b) = (wexpr2bool a) '>>' (wexpr2bool b)
- /\     wexpr2bool (W_ASHR a b) = (wexpr2bool a) '|>>' (wexpr2bool b)
- /\     wexpr2bool (W_SX sz w) =
-	    let short = wexpr2bool w in
+ /\     wexpr2bool sub (W_VAR sz b) =
+	dsubstitute sub (map dvariable (md_expand_vector (mk_name sz b)))
+ /\     wexpr2bool sub (W_EXPLICIT_VAR sz n) =
+	dsubstitute sub (map dvariable (md_expand_vector n))
+ /\     wexpr2bool sub (W_AND a b) =
+	    map2 (defix dAND) (wexpr2bool sub a) (wexpr2bool sub b)
+ /\     wexpr2bool sub (W_OR a b) =
+	    map2 (defix dOR) (wexpr2bool sub a) (wexpr2bool sub b)
+ /\     wexpr2bool sub (W_NOT a) = map dNOT (wexpr2bool sub a)
+ /\     wexpr2bool sub (W_PRED name cond) = wexpr2bool sub cond
+ /\     wexpr2bool sub (W_EQ a b) =
+	[(wexpr2bool sub a) '=' (wexpr2bool sub b)]
+ /\     wexpr2bool sub (W_GR a b) =
+	[(wexpr2bool sub a) '>' (wexpr2bool sub b)]
+ /\     wexpr2bool sub (W_ADD a b) = (wexpr2bool sub a) '+' (wexpr2bool sub b)
+ /\     wexpr2bool sub (W_SUB a b) = (wexpr2bool sub a) '-' (wexpr2bool sub b)
+ /\     wexpr2bool sub (W_MUL a b) = (wexpr2bool sub a) '*' (wexpr2bool sub b)
+ /\     wexpr2bool sub (W_DIV a b) = (wexpr2bool sub a) '/' (wexpr2bool sub b)
+ /\     wexpr2bool sub (W_MOD a b) = (wexpr2bool sub a) '%' (wexpr2bool sub b)
+ /\     wexpr2bool sub (W_SHL a b) = (wexpr2bool sub a) '<<' (wexpr2bool sub b)
+ /\     wexpr2bool sub (W_SHR a b) = (wexpr2bool sub a) '>>' (wexpr2bool sub b)
+ /\     wexpr2bool sub (W_ASHR a b) = (wexpr2bool sub a) '|>>' (wexpr2bool sub b)
+ /\     wexpr2bool sub (W_SX sz w) =
+	    let short = wexpr2bool sub w in
 	    let l = length short in
 	    (replicate (sz-l) (hd short))@short
- /\     wexpr2bool (W_ZX sz w) =
-	    let short = wexpr2bool w in
+ /\     wexpr2bool sub (W_ZX sz w) =
+	    let short = wexpr2bool sub w in
 	    let l = length short in
 	    (replicate (sz-l) dF)@short
- /\     wexpr2bool (W_ITE c t e) =
-	val [cond] = wexpr2bool c in
-	let tv = wexpr2bool t in
-	let ev = wexpr2bool e in
+ /\     wexpr2bool sub (W_ITE c t e) =
+	val [cond] = wexpr2bool sub c in
+	let tv = wexpr2bool sub t in
+	let ev = wexpr2bool sub e in
 	IF cond THEN tv ELSE ev
- /\     wexpr2bool (W_SLICE indices w) =
-	    let bv = wexpr2bool w in
+ /\     wexpr2bool sub (W_SLICE indices w) =
+	    let bv = wexpr2bool sub w in
 	    let l = length bv in
 	    map (\idx. el (l-idx) bv) indices
- /\     wexpr2bool (W_NAMED_SLICE name indices w) =
-	    let bv = wexpr2bool w in
+ /\     wexpr2bool sub (W_NAMED_SLICE name indices w) =
+	    let bv = wexpr2bool sub w in
 	    let l = length bv in
 	    map (\idx. el (l-idx) bv) indices
- /\     wexpr2bool (W_UPDATE_NAMED_SLICE old name indices new) =
-	    let old_bv = wexpr2bool old in
-	    let new_bv = wexpr2bool new in
+ /\     wexpr2bool sub (W_UPDATE_NAMED_SLICE old name indices new) =
+	    let old_bv = wexpr2bool sub old in
+	    let new_bv = wexpr2bool sub new in
 	    let sz = length old_bv in
 	    let new_map = zip indices ((length indices-1) downto 0) in
 	    let get_el idx l = el (length l - idx) l in
@@ -460,8 +462,8 @@ cletrec wexpr2bool (W_NAMED_CONST name sz v) =
 	    in
 	    let start = sz-1 in
 	    collect (mem start indices) start start ((start-1) downto 0)
- /\     wexpr2bool (W_CAT wl) = itlist (\w.\l. (wexpr2bool w)@l) wl []
- /\     wexpr2bool (W_MEM_READ info mem addr) =
+ /\     wexpr2bool sub (W_CAT wl) = itlist (\w.\l. (wexpr2bool sub w)@l) wl []
+ /\     wexpr2bool sub (W_MEM_READ info mem addr) =
 	    val (MEM a_sz lines d_sz) = info in
 	    (check_memory a_sz lines d_sz addr mem) fseq
 	    letrec read i =
@@ -470,8 +472,8 @@ cletrec wexpr2bool (W_NAMED_CONST name sz v) =
 		let cond = W_EQ (W_CONST a_sz i) addr in
 		W_ITE cond (W_SLICE range mem) (read (i+1))
 	    in
-	    wexpr2bool (read 0)
- /\     wexpr2bool (W_MEM_WRITE info mem addr d) =
+	    wexpr2bool sub (read 0)
+ /\     wexpr2bool sub (W_MEM_WRITE info mem addr d) =
 	    val (MEM a_sz lines d_sz) = info in
 	    (check_memory a_sz lines d_sz addr mem) fseq
 	    letrec write i =
@@ -479,11 +481,11 @@ cletrec wexpr2bool (W_NAMED_CONST name sz v) =
 		let range = (d_sz*(i+1)-1) downto (d_sz*i) in
 		let cond = W_EQ (W_CONST a_sz i) addr in
 		let dr = W_ITE cond d (W_SLICE range mem) in
-		(wexpr2bool dr):(write (i+1))
+		(wexpr2bool sub dr):(write (i+1))
 	    in
 	    flat (rev (write 0))
- /\     wexpr2bool other =
-	(draw_graph 10 other) fseq error "No pattern matched in wexpr2bool"
+ /\     wexpr2bool sub other =
+	(draw_graph 10 other) fseq error "No pattern matched in wexpr2bool sub"
 ;
 
 end_abstype wexpr_is_binary wexpr2bool;

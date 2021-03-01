@@ -87,3 +87,11 @@ make -C src docker_package
 
 If you're not a member of the `docker` group on your system, you will need to
 run the above command as root.
+
+To verify the installation, run:
+
+
+```shell
+fl
+```
+
