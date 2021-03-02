@@ -75,7 +75,7 @@ would yield:
 While it is perfectly possible to run the stand-alone fl interpreter in this
 manner, VossII meant to be used as an interactive tool.
 As interactive tools are often best used in tight integration with a text editor,
-we provide VossII integration with Emacs and vim.
+we provide VossII integration with Emacs, vim and visual studio code.
 These integrations provide syntax highlighting and fl command execution directly
 from the respective text editor.
 
