@@ -1,0 +1,140 @@
+{
+	"name": "vossii-fl",
+	"displayName": "Voss II fl",
+	"description": "Language support for Voss II functional language fl",
+	"version": "1.0.0",
+  "license": "Apache-2.0",
+	"publisher": "teamvoss",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TeamVoss/VossII"
+  },
+	"author": {"name": "Dorian Lesbre"},
+	"engines": {
+		"vscode": "^1.53.0"
+	},
+	"categories": [
+		"Programming Languages"
+	],
+	"main": "extension.js",
+	"activationEvents": [
+		"onLanguage:fl",
+		"onCommand:fl.start",
+		"onCommand:fl.restart_and_eval_file"
+	],
+	"contributes": {
+		"languages": [{
+			"id": "fl",
+			"aliases": ["fl", "fl"],
+			"extensions": [".fl"],
+			"configuration": "./language-configuration.json"
+		}],
+		"grammars": [{
+			"language": "fl",
+			"scopeName": "source.fl",
+			"path": "./syntaxes/fl.tmLanguage.json"
+		}],
+		"commands": [
+			{
+				"command": "fl.start",
+				"title": "fl: start fl"
+			},
+			{
+				"command": "fl.stop",
+				"title": "fl: stop fl"
+			},
+			{
+				"command": "fl.help",
+				"title": "fl: help on word under cursor"
+			},
+			{
+				"command": "fl.eval_selection",
+				"title": "fl: run selection"
+			},
+			{
+				"command": "fl.eval_file",
+				"title": "fl: run current file"
+			},
+			{
+				"command": "fl.eval_line",
+				"title": "fl: run current line"
+			},
+			{
+				"command": "fl.restart_and_eval_file",
+				"title": "fl: restart and run file"
+			}
+		],
+		"configuration":[
+			{
+				"title": "vossii-fl",
+				"properties": {
+					"vossii-fl.path" : {
+						"type": "string",
+						"default": "fl",
+						"description": "Path to the fl executable"
+					},
+					"vossii-fl.temporary_files_root" : {
+						"type": "string",
+						"default": "/tmp/fl_",
+						"description": "Root path and prefix of where to store temproary files to talk to fl"
+					},
+					"vossii-fl.run_on_startup" : {
+						"type" : "boolean",
+						"default" : true,
+						"description": "Run fl automaticaly when opening an fl file"
+					},
+					"vossii-fl.fl_setup" : {
+						"type" : "string",
+						"default" : "set_font font_larger;",
+						"description": "Command to run upon starting fl"
+					}
+				}
+			}
+		],
+		"capabilities" : {
+			"hoverProvider": true,
+			"definitionProvider": true
+		},
+		"keybindings" :[
+			{
+				"command": "fl.restart_and_eval_file",
+				"key": "f5",
+				"when": "editorTextFocus && editorLangId == fl"
+			},
+			{
+				"command": "fl.eval_file",
+				"key": "f6",
+				"when": "editorTextFocus && editorLangId == fl"
+			},
+			{
+				"command": "fl.eval_line",
+				"key": "f7",
+				"when": "editorTextFocus && editorLangId == fl"
+			},
+			{
+				"command": "fl.eval_selection",
+				"key": "f8",
+				"when": "editorTextFocus && editorLangId == fl"
+			}
+		],
+		"menus": {
+			"editor/context": [
+				{
+					"command": "fl.eval_selection",
+					"group": "vossii-fl",
+					"when": "editorTextFocus && editorLangId == fl"
+				},
+				{
+					"command": "fl.eval_line",
+					"group": "vossii-fl",
+					"when": "editorTextFocus && editorLangId == fl"
+				},
+				{
+					"command": "fl.help",
+					"group": "vossii-fl",
+					"when": "editorTextFocus && editorLangId == fl"
+				}
+			]
+		}
+	}
+}
