@@ -20,6 +20,7 @@
 
 // Global variables referenced -------------------------------------------------
 extern str_mgr strings;
+extern g_ptr void_nd;
 
 /******************************************************************************/
 /*                              PRIVATE VARIABLES                             */
@@ -40,6 +41,7 @@ static hash_record_ptr tbl_in_ptr;
 static hash_record tbl_out;
 static hash_record_ptr tbl_out_ptr;
 // ?
+static int adj_oidx;
 static typeExp_ptr adj_tp;
 
 // Forward definitions local functions -----------------------------------------
@@ -57,11 +59,8 @@ static void rem_adj_mem();
 static void record_vector(hash_record_ptr tbl_ptr, key_ptr *tail, unint i, const vec_ptr v);
 static bool mk_adj_table(key_lst_ptr *k, unint *c, g_ptr p);
 static bool mk_adj_matrix(mat_ptr m, g_ptr p);
-static bool mk_adj_needle(g_ptr p, unint size);
-static bool mk_adj_haystack(g_ptr p, unint size);
 // Isomatch.
-static inline bool test_adjacent_needle(int i, int j);
-static inline bool test_adjacent_haystack(int i, int j);
+static bool test_adjacent(mat_ptr m, int i, int j);
 static bool test_isomorphism_formatting(mat_ptr iso);
 static bool test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g);
 
@@ -305,38 +304,14 @@ mk_adj_matrix(mat_ptr m, g_ptr p)
     return TRUE;
 }
 
-static bool
-mk_adj_needle(g_ptr p, unint size)
-{
-    P = (mat_ptr) new_rec(&mat_mgr);
-    allocate_matrix(P, size, size);
-    return mk_adj_matrix(P, p);
-}
-
-static bool
-mk_adj_haystack(g_ptr p, unint size)
-{
-    G = (mat_ptr) new_rec(&mat_mgr);
-    allocate_matrix(G, size, size);
-    return mk_adj_matrix(G, p);
-}
-
 // Solution check --------------------------------------------------------------
 
-static inline bool
-test_adjacent_needle(int i, int j)
+static bool
+test_adjacent(mat_ptr m, int i, int j)
 {
-    ASSERT((unint) i < P->rows);
-    ASSERT((unint) j < P->cols);
-    return P->mat[i][j];
-}
-
-static inline bool
-test_adjacent_haystack(int i, int j)
-{
-    ASSERT((unint) i < G->rows);
-    ASSERT((unint) j < G->cols);
-    return G->mat[i][j];
+    ASSERT((unint) i < m->rows);
+    ASSERT((unint) j < m->cols);
+    return m->mat[i][j];
 }
 
 static bool
@@ -405,14 +380,55 @@ test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g)
 /******************************************************************************/
 
 static void
-Make_needle(g_ptr redex)
+pex2adj_fn(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
-    //
     g_ptr g_pex, g_size;
     EXTRACT_2_ARGS(redex, g_pex, g_size);
-    if(mk_adj_needle(g_pex, (unint) GET_INT(g_size))) {
+    int size = GET_INT(g_size);
+    //
+    mat_ptr adj = (mat_ptr) new_rec(&mat_mgr);
+    allocate_matrix(adj, (unint) size, (unint) size);
+    if(mk_adj_matrix(adj, g_pex)) {
+        MAKE_REDEX_EXT_OBJ(redex, adj_oidx, adj);
+    } else {
+        MAKE_REDEX_FAILURE(redex, Fail_pr("pex2adj failed."));
+    }
+    //
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+trim_adj_fn(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_adj;
+    EXTRACT_1_ARG(redex, g_adj);
+    mat_ptr adj = (mat_ptr) GET_EXT_OBJ(g_adj);
+    //
+    drop_matrix_row(adj);
+    drop_matrix_col(adj);
+    MAKE_REDEX_EXT_OBJ(redex, adj_oidx, adj);
+    //
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+is_adjacent_fn(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_adj, g_row, g_col;
+    EXTRACT_3_ARGS(redex, g_adj, g_row, g_col);
+    mat_ptr adj = (mat_ptr) GET_EXT_OBJ(g_adj);
+    int row = GET_INT(g_row);
+    int col = GET_INT(g_col);
+    //
+    if(test_adjacent(adj, row, col)) {
         MAKE_REDEX_BOOL(redex, B_One());
     } else {
         MAKE_REDEX_BOOL(redex, B_Zero());
@@ -423,72 +439,22 @@ Make_needle(g_ptr redex)
 }
 
 static void
-Make_haystack(g_ptr redex)
+is_isomorphism_fn(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_p, g_g, g_iso, g_rows, g_cols;
+    EXTRACT_5_ARGS(redex, g_p, g_g, g_iso, g_rows, g_cols);
+    mat_ptr p = (mat_ptr) GET_EXT_OBJ(g_p);
+    mat_ptr g = (mat_ptr) GET_EXT_OBJ(g_g);
+    int rows  = GET_INT(g_rows);
+    int cols  = GET_INT(g_cols);
     //
-    g_ptr g_pex, g_size;
-    EXTRACT_2_ARGS(redex, g_pex, g_size);
-    if(mk_adj_haystack(g_pex, (unint) GET_INT(g_size))) {
-        MAKE_REDEX_BOOL(redex, B_One());
-    } else {
-        MAKE_REDEX_BOOL(redex, B_Zero());
-    }
-    //
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);
-}
-
-static void
-Is_adjacent_needle(g_ptr redex)
-{
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    //
-    g_ptr g_i, g_j;
-    EXTRACT_2_ARGS(redex, g_i, g_j);
-    if(test_adjacent_needle(GET_INT(g_i), GET_INT(g_j))) {
-        MAKE_REDEX_BOOL(redex, B_One());
-    } else {
-        MAKE_REDEX_BOOL(redex, B_Zero());
-    }
-    //
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);
-}
-
-static void
-Is_adjacent_haystack(g_ptr redex)
-{
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    //
-    g_ptr g_i, g_j;
-    EXTRACT_2_ARGS(redex, g_i, g_j);
-    if(test_adjacent_haystack(GET_INT(g_i), GET_INT(g_j))) {
-        MAKE_REDEX_BOOL(redex, B_One());
-    } else {
-        MAKE_REDEX_BOOL(redex, B_Zero());
-    }
-    //
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);    
-}
-
-static void
-Is_valid_isomorphism(g_ptr redex)
-{
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    //
-    g_ptr g_iso, g_rows, g_cols;
-    EXTRACT_3_ARGS(redex, g_iso, g_rows, g_cols);
     mat_ptr iso = (mat_ptr) new_rec(&mat_mgr);
-    allocate_matrix(iso, GET_INT(g_rows), GET_INT(g_cols));
+    allocate_matrix(iso, rows, cols);
     read_matrix(iso, g_iso);
     if( test_isomorphism_formatting(iso) &&
-        test_isomorphism_match(iso, P, G))
+        test_isomorphism_match(iso, p, g))
     {
         MAKE_REDEX_BOOL(redex, B_One());
     } else {
@@ -501,26 +467,12 @@ Is_valid_isomorphism(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
-static void
-Trim_needle()
-{
-    drop_matrix_row(P);
-    drop_matrix_col(P);
-}
-
-static void
-Trim_haystack()
-{
-    drop_matrix_row(G);
-    drop_matrix_col(G);
-}
-
 //------------------------------------------------------------------------------
 
 void
 Iso_Init()
 {
-    Add_ExtAPI_Object(
+    adj_oidx = Add_ExtAPI_Object(
         "adj"
       , NULL //mark_adj_fn
       , NULL //sweep_adj_fn
@@ -554,61 +506,50 @@ Iso_Install_Functions()
             , GLmake_arrow(
                 GLmake_int()
               , adj_tp))
-        , Make_needle
+        , pex2adj_fn
     );
 
     Add_ExtAPI_Function(
-          "trim_needle"
-        , ""
+          "trim_adj"
+        , "1"
         , TRUE
-        , GLmake_void()
-        , Trim_needle
-    );
-
-    Add_ExtAPI_Function(
-          "trim_haystack"
-        , ""
-        , TRUE
-        , GLmake_void()
-        , Trim_haystack
-    );
-
-    Add_ExtAPI_Function(
-          "adj_needle"
-        , "11"
-        , FALSE
         , GLmake_arrow(
-              GLmake_int()
-            , GLmake_arrow(
-                GLmake_int()
-              , GLmake_bool()))
-        , Is_adjacent_needle
-    );
-    
-    Add_ExtAPI_Function(
-          "adj_haystack"
-        , "11"
-        , FALSE
-        , GLmake_arrow(
-              GLmake_int()
-            , GLmake_arrow(
-                GLmake_int()
-              , GLmake_bool()))
-        , Is_adjacent_haystack
+              adj_tp
+            , adj_tp)
+        , trim_adj_fn
     );
 
     Add_ExtAPI_Function(
-          "is_valid_iso"
+          "is_adjacent"
         , "111"
         , FALSE
         , GLmake_arrow(
-              GLmake_list(GLmake_list(GLmake_bool()))
+              adj_tp
             , GLmake_arrow(
                 GLmake_int()
               , GLmake_arrow(
                   GLmake_int()
                 , GLmake_bool())))
-        , Is_valid_isomorphism
+        , is_adjacent_fn
+    );
+
+    Add_ExtAPI_Function(
+          "is_isomorphism"
+        , "111"
+        , FALSE
+          // adj->adj->((bool list) list)->int->int->bool
+        , GLmake_arrow(
+            adj_tp
+          , GLmake_arrow(
+              adj_tp
+            , GLmake_arrow(
+                GLmake_list(GLmake_list(GLmake_bool()))
+              , GLmake_arrow(
+                  GLmake_int()
+                , GLmake_arrow(
+                    GLmake_int()
+                  , GLmake_bool())))))
+        , is_isomorphism_fn
     );
 }
 
@@ -620,11 +561,8 @@ void
 _DuMMy_iso()
 {
     free_matrix(NULL);
-    mk_adj_needle(NULL,0);
-    mk_adj_haystack(NULL,0);
     test_isomorphism_formatting(NULL);
     test_isomorphism_match(NULL,NULL,NULL);
-    M = M;
 }
 
 /******************************************************************************/

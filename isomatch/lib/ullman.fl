@@ -82,15 +82,15 @@ letrec
 // matched against 'G(c)', then no 'P(x)' adj. to 'P(r)' can be isomorphic to
 // some 'G(y)' that is not adj. to 'G(c)'.
 //
-//  thin_isomorphisms::int->int->(bool mat)->(bool mat)
+//  thin_isomorphisms::(bool mat)->(bool mat)->int->int->(bool mat)->(bool mat)
 let
-    thin_isomorphisms r c m =
+    thin_isomorphisms p g r c m =
         // Trim col. if 'G(y)' is not adj. to 'G(c)'.
-        //          =    NOT (el c (el j g)   )
-        let f col j = IF NOT (adj_haystack c j) THEN F ELSE col in
+        //          =    NOT (el c (el j g)    )
+        let f col j = IF NOT (is_adjacent g j c) THEN F ELSE col in
         // Trim row if 'P(x)' is adj. to 'P(r)'.
-        //          =    (el r (el i p) )
-        let g row i = IF (adj_needle r i) THEN ixmap f row ELSE row in
+        //          =    (el r (el i p)    )
+        let g row i = IF (is_adjacent p i r) THEN ixmap f row ELSE row in
         // Check every matching.
         ixmap g m
 ;
@@ -116,9 +116,9 @@ let
 // Checks if 'mat' is a valid isomorphism.
 //  isomorphism::(bool mat)->(bool mat)->(bool mat)->bool
 let
-    isomorphism mat =
+    isomorphism mat p g =
          // single_morphism mat AND valid_morphism mat p g
-         is_valid_iso mat (length mat) (length (hd mat));
+         is_isomorphism p g mat (length mat) (length (hd mat));
 ;
 
 //==============================================================================
@@ -137,14 +137,14 @@ let
 //           used' = mark c in used
 //           recurse(used', row+1, P, G, N')
 let
-    recurse iso =
+    recurse iso adj_p adj_g =
         let
             forall_unused m row used f =
                 let unused  = map NOT used then
                 let matches = map2 (defix AND) (el row m) unused then
                 flatmap f (filter_cols id matches)
         in
-        let solution m = isomorphism m in
+        let solution m = isomorphism m adj_p adj_g in
         let cols = length (hd iso) in
         let rows = length iso in
         letrec
@@ -157,7 +157,7 @@ let
                 ELSE
 		    forall_unused m row used (\col.
                         let m'    = modify (mark_one col) row m then
-                        let m''   = thin_isomorphisms row col m' then
+                        let m''   = thin_isomorphisms adj_p adj_g row col m' then
                         let used' = modify (const T) col used then
                         search m'' used' (row+1)
                     )

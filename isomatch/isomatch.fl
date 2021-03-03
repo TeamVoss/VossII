@@ -4,6 +4,10 @@ load (DIR^"lib/ullman.fl");
 
 let ?! = undefined;
 
+let pex_length (PINST _ _ _ _ _ _ (P_HIER cs)) = 1 + length cs
+/\  pex_length _ = 1
+;
+
 //==============================================================================
 //
 // Construction of a subst. eq. between two pexlifs.
@@ -233,14 +237,11 @@ forward_declare{explore::pexlif->pexlif->({((string#string) list)} opt list)};
 //  expand::pexlif->pexlif->(({(string#string list)} opt list) list)
 let
     expand p g =
-        //
-(fprintf stderr "expanding '%s' and '%s'\n" (_pexlif_name p) (_pexlif_name g)) fseq
-        //
         // Find possible solutions for a 'p' and 'g' mapping.
-        //let adj_p = adjacencies p then
-        //let adj_g = adjacencies g then
+        let adj_p = pex2adj p (pex_length p) then
+        let adj_g = pex2adj g (pex_length g) then
         let iso   = isomorphisms p g then
-        let ss    = recurse iso then //adj_p adj_g then
+        let ss    = recurse iso adj_p adj_g then
         // Explore each pairing in a solution to validate it.
         let g_flat = g : hier g in
         pam (filter (hd # hd) ss) (\sol.
@@ -335,20 +336,14 @@ let pretty p g ms ss =
 
 //------------------------------------------------------------------------------
 
-let
-    pex_length (PINST _ _ _ _ _ _ (P_HIER cs)) = 1 + length cs
-/\  pex_length _ = 1
-;
-
 // Isomatch and pretty-print.
 //  moo::pexlif->pexlif->void
 let
     moo p g =
-        let err = fprintf stderr "Not OK!" in
-        NOT (mk_needle   p (pex_length p)) => err | trim_needle   fseq
-        NOT (mk_haystack g (pex_length g)) => err | trim_haystack fseq
-        let iso = mat_tl (isomorphisms p g) then
-        let ss  = recurse iso then
+        let adj_p = trim_adj (pex2adj p (pex_length p)) in
+        let adj_g = trim_adj (pex2adj g (pex_length g)) in
+        let iso   = mat_tl (isomorphisms p g) then
+        let ss    = recurse iso adj_p adj_g then
         // Explore each solution.
         flip foreach ss (\sol.
             //  matches::(pexlif list)
