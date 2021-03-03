@@ -25,14 +25,20 @@ extern str_mgr strings;
 /*                              PRIVATE VARIABLES                             */
 /******************************************************************************/
 static ustr_mgr	lstrings;
-static rec_mgr  key_lst_mgr;
-static rec_mgr  key_mgr;
-static rec_mgr  bkt_mgr;
-static rec_mgr  vec_mgr;
-static rec_mgr  rng_mgr;
-static rec_mgr  mat_mgr;
+static rec_mgr key_lst_mgr;
+static rec_mgr_ptr key_lst_mgr_ptr;
+static rec_mgr key_mgr;
+static rec_mgr_ptr key_mgr_ptr;
+static rec_mgr bkt_mgr;
+static rec_mgr_ptr bkt_mgr_ptr;
+static rec_mgr vec_mgr;
+static rec_mgr rng_mgr;
+static rec_mgr mat_mgr;
 // ?
-static hash_record_ptr tbl;
+static hash_record tbl_in;
+static hash_record_ptr tbl_in_ptr;
+static hash_record tbl_out;
+static hash_record_ptr tbl_out_ptr;
 // Isomatch.
 static mat_ptr P; // Piece/Needle    adj. matrix.
 static mat_ptr G; // Puzzle/Haystack adj. matrix.
@@ -43,15 +49,15 @@ static mat_ptr M; // Isomatch.            matrix.
 static void allocate_matrix(mat_ptr m, unint R, unint C);
 static void free_matrix(mat_ptr m);
 // ?
-static void      record_vector(unint i, const vec_ptr v);
-static vec_ptr   split_vector(string name);
+static vec_ptr split_vector(string name);
 // Adj.
 static void new_adj_mem();
 static void rem_adj_mem();
-static bool mk_adj_tabel(key_lst_ptr k, unint *c, g_ptr p);
+static inline void record_vector(hash_record_ptr tbl_ptr, key_ptr *tail, unint i, const vec_ptr v);
+static bool mk_adj_table(key_lst_ptr *k, unint *c, g_ptr p);
 static bool mk_adj_matrix(mat_ptr m, g_ptr p);
-static bool mk_adj_needle(g_ptr p, int size);
-static bool mk_adj_haystack(g_ptr p, int size);
+static bool mk_adj_needle(g_ptr p, unint size);
+static bool mk_adj_haystack(g_ptr p, unint size);
 // Isomatch.
 static bool test_isomorphism_formatting(mat_ptr iso);
 static bool test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g);
@@ -65,7 +71,6 @@ static bool test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g);
 static void
 allocate_matrix(mat_ptr m, unint R, unint C)
 {
-    m = (mat_ptr) new_rec(&mat_mgr);
     m->rows   = R;
     m->cols   = C;
     m->mat    = Malloc(R*sizeof(bool*));
@@ -85,24 +90,6 @@ free_matrix(mat_ptr m)
 
 // ? ---------------------------------------------------------------------------
 
-static void
-record_vector(unint i, const vec_ptr v)
-{
-    string key = Get_vector_signature(&lstrings, v);
-    bkt_ptr bkt = find_hash(tbl, key);
-    if(bkt == NULL) {
-        bkt = new_rec(&bkt_mgr);
-        insert_hash(tbl, key, bkt);
-    } else {
-        while(bkt->next != NULL) { bkt = bkt->next; }
-        bkt->next = new_rec(&bkt_mgr);
-        bkt = bkt->next;
-    }
-    bkt->lbl  = i;
-    bkt->vec  = v;
-    bkt->next = NULL;
-}
-
 static vec_ptr
 split_vector(string name)
 {
@@ -120,27 +107,63 @@ split_vector(string name)
 static void
 new_adj_mem()
 {
-    new_mgr(&key_lst_mgr, sizeof(key_lst));
-    new_mgr(&key_mgr, sizeof(key_rec));
-    new_mgr(&bkt_mgr, sizeof(bkt_rec));
-    new_mgr(&vec_mgr, sizeof(vec_rec));
-    new_mgr(&rng_mgr, sizeof(range_rec));
-    create_hash(tbl, 100, str_hash, str_equ);
+    key_lst_mgr_ptr = &key_lst_mgr;
+    key_mgr_ptr = &key_mgr;
+    bkt_mgr_ptr = &bkt_mgr;
+    tbl_in_ptr = &tbl_in;
+    tbl_out_ptr = &tbl_out;
+    new_mgr(key_lst_mgr_ptr, sizeof(key_lst));
+    new_mgr(key_mgr_ptr, sizeof(key_rec));
+    new_mgr(bkt_mgr_ptr, sizeof(bkt_rec));
+    create_hash(tbl_in_ptr, 100, str_hash, str_equ);
+    create_hash(tbl_out_ptr, 100, str_hash, str_equ);
 }
 
 static void
 rem_adj_mem()
 {
-    free_mgr(&key_lst_mgr);
-    free_mgr(&key_mgr);
-    free_mgr(&bkt_mgr);
-    free_mgr(&vec_mgr);
-    free_mgr(&rng_mgr);
-    dispose_hash(tbl, NULLFCN);
+    free_mgr(key_lst_mgr_ptr);
+    free_mgr(key_mgr_ptr);
+    free_mgr(bkt_mgr_ptr);
+    dispose_hash(tbl_in_ptr, NULLFCN);
+    dispose_hash(tbl_out_ptr, NULLFCN);
+    key_lst_mgr_ptr = NULL;
+    key_mgr_ptr = NULL;
+    bkt_mgr_ptr = NULL;
+    tbl_in_ptr = NULL;
+    tbl_out_ptr = NULL;
+}
+
+static inline void
+record_vector(hash_record_ptr tbl_ptr, key_ptr *tail, unint i, const vec_ptr v)
+{
+    string key = Get_vector_signature(&lstrings, v);
+    // Record in tail.
+    key_ptr n = (key_ptr) new_rec(&key_mgr);
+    n->lbl  = key;
+    n->vec  = v;
+    n->next = NULL;
+    (*tail) = n;
+    // Record in table.
+    bkt_ptr bkt = find_hash(tbl_ptr, key);
+    if(bkt == NULL) {
+        bkt_ptr b = (bkt_ptr) new_rec(&bkt_mgr);
+        b->lbl  = i;
+        b->vec  = v;
+        b->next = NULL;
+        insert_hash(tbl_ptr, key, b);
+    } else {
+        while(bkt->next != NULL) { bkt = bkt->next; }
+        bkt_ptr b = (bkt_ptr) new_rec(&bkt_mgr);
+        b->lbl  = i;
+        b->vec  = v;
+        b->next = NULL;
+        bkt->next = b;
+    }
 }
 
 static bool
-mk_adj_tabel(key_lst_ptr keys, unint *count, g_ptr p)
+mk_adj_table(key_lst_ptr *keys, unint *count, g_ptr p)
 {
     g_ptr attrs, fa_inps, fa_outs, inter, cont, children, fns;
     string name;
@@ -154,55 +177,47 @@ mk_adj_tabel(key_lst_ptr keys, unint *count, g_ptr p)
         return FALSE;
     }
     if(is_P_HIER(cont, &children)) {
-        key_lst_ptr keys_tail = keys;
         vec_ptr vec;
+        key_ptr key = NULL, *key_tail = &key;
         // Record vector names for parent's formals.
         FOREACH_FORMAL(vec, fa_inps) {
-            record_vector(0, vec);
+            record_vector(tbl_in_ptr, key_tail, 0, vec);
+            key_tail = &(*key_tail)->next;
         }
-        key_ptr key = NULL, key_tail;
         FOREACH_FORMAL(vec, fa_outs) {
-            if(key == NULL) {
-                key      = new_rec(&key_mgr);
-                key_tail = key;
-            } else {
-                key_tail->next = new_rec(&key_mgr);
-                key_tail = key_tail->next;
-            }
-            key_tail->vec  = vec;
-            key_tail->next = NULL;
+            record_vector(tbl_out_ptr, key_tail, 0, vec);
+            key_tail = &(*key_tail)->next;
         }
-        keys_tail->key  = key;
-        keys_tail->next = NULL;
+        key_lst_ptr key_lst = (key_lst_ptr) new_rec(&key_lst_mgr), *key_lst_tail = &key_lst;
+        key_lst->key  = key;
+        key_lst->next = NULL;
+        *keys         = key_lst;
+        *count        = 1;
+        key_lst_tail  = &key_lst->next;
         // Record vector names for each child's actuals.
         g_ptr child, tmp;
-        *count = 1;
         FOR_CONS(children, tmp, child) {
             if(!is_PINST(child, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
                 Fail_pr("Adj. mat. expects all children to be pexlifs.");
                 return FALSE;
             }
+            key_ptr key = NULL, *key_tail = &key;
             FOREACH_ACTUAL(vec, fa_inps) {
-                record_vector(*count, vec);
+                record_vector(tbl_in_ptr, key_tail, *count, vec);
+                key_tail = &(*key_tail)->next;
             }
-            key_ptr key = NULL, key_tail;
             FOREACH_ACTUAL(vec, fa_outs) {
-                if(key == NULL) {
-                    key      = new_rec(&key_mgr);
-                    key_tail = key;
-                } else {
-                    key_tail->next = new_rec(&key_mgr);
-                    key_tail = key_tail->next;
-                }
-                key_tail->vec  = vec;
-                key_tail->next = NULL;
+                record_vector(tbl_out_ptr, key_tail, *count, vec);
+                key_tail = &(*key_tail)->next;
             }
-            keys_tail->next = new_rec(&key_lst_mgr);
-            keys_tail       = keys_tail->next;
-            keys_tail->key  = key;
-            keys_tail->next = NULL;
-            (*count)++;
+            key_lst_ptr key_lst = (key_lst_ptr) new_rec(&key_lst_mgr);
+            key_lst->key  = key;
+            key_lst->next = NULL;
+            *key_lst_tail = key_lst;
+            key_lst_tail  = &key_lst->next;
+            *count        = *count + 1;
         }
+        return TRUE;
     }
     Fail_pr("What are you then?!");
     return FALSE;
@@ -213,21 +228,30 @@ mk_adj_matrix(mat_ptr m, g_ptr p)
 {
     new_adj_mem();
     // Mark adjacencies, if any.
-    key_lst_ptr keys = (key_lst_ptr) new_rec(&key_lst_mgr);
+    key_lst_ptr keys = NULL;
     unint length;
-    if(mk_adj_tabel(keys, &length, p)) {
+    if(mk_adj_table(&keys, &length, p)) {
         // All nodes accounted for.
         ASSERT(m->cols == length);
         // Square matrix.
         ASSERT(m->cols == m->rows);
         //
-        for(int i = 0; keys != NULL; keys = keys->next) {
+        for(unint i = 0; keys != NULL; i++, keys = keys->next) {
             for(key_ptr key = keys->key; key != NULL; key = key->next) {
+                string name = key->lbl;
                 vec_ptr vec = key->vec;
-                string name = Get_vector_signature(&lstrings, vec);
-                bkt_ptr bkt = (bkt_ptr) find_hash(tbl, name);
+                // Search inputs.
+                bkt_ptr bkt = (bkt_ptr) find_hash(tbl_in_ptr, name);
                 while(bkt != NULL) {
-                    if(Check_vector_overlap(vec, bkt->vec)) {
+                    if(bkt->lbl != i && Check_vector_overlap(vec, bkt->vec)) {
+                        m->mat[i][bkt->lbl] = TRUE;
+                    }
+                    bkt = bkt->next;
+                }
+                // Search outputs.
+                bkt = (bkt_ptr) find_hash(tbl_out_ptr, name);
+                while(bkt != NULL) {
+                    if(bkt->lbl != i && Check_vector_overlap(vec, bkt->vec)) {
                         m->mat[i][bkt->lbl] = TRUE;
                     }
                     bkt = bkt->next;
@@ -241,15 +265,17 @@ mk_adj_matrix(mat_ptr m, g_ptr p)
 }
 
 static bool
-mk_adj_needle(g_ptr p, int size)
+mk_adj_needle(g_ptr p, unint size)
 {
+    P = (mat_ptr) new_rec(&mat_mgr);
     allocate_matrix(P, size, size);
     return mk_adj_matrix(P, p);
 }
 
 static bool
-mk_adj_haystack(g_ptr p, int size)
+mk_adj_haystack(g_ptr p, unint size)
 {
+    G = (mat_ptr) new_rec(&mat_mgr);
     allocate_matrix(G, size, size);
     return mk_adj_matrix(G, p);
 }
@@ -312,16 +338,77 @@ test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g)
 /*                               PUBLIC FUNCTIONS                             */
 /******************************************************************************/
 
+static void
+Make_needle(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    //
+    g_ptr g_pex, g_size;
+    EXTRACT_2_ARGS(redex, g_pex, g_size);
+    mk_adj_needle(g_pex, (unint) GET_INT(g_size));
+    //
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+Make_haystack(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    //
+    g_ptr g_pex, g_size;
+    EXTRACT_2_ARGS(redex, g_pex, g_size);
+    if(mk_adj_haystack(g_pex, (unint) GET_INT(g_size))) {
+        MAKE_REDEX_BOOL(redex, B_One());
+    } else {
+        MAKE_REDEX_BOOL(redex, B_Zero());
+    }
+    //
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+//------------------------------------------------------------------------------
+
 void
 Iso_Init()
 {
     new_ustrmgr(&lstrings);
+    new_mgr(&vec_mgr, sizeof(vec_rec));
+    new_mgr(&rng_mgr, sizeof(range_rec));
     new_mgr(&mat_mgr, sizeof(mat_rec));
 }
 
 void
 Iso_Install_Functions()
 {
+    typeExp_ptr	pexlif_tp = Get_Type("pexlif", NULL, TP_INSERT_PLACE_HOLDER);
+
+    Add_ExtAPI_Function(
+          "mk_needle"
+        , "11"
+        , FALSE
+        , GLmake_arrow(
+              pexlif_tp
+            , GLmake_arrow(
+                GLmake_int()
+              , GLmake_bool()))
+        , Make_needle
+    );
+
+    Add_ExtAPI_Function(
+          "mk_haystack"
+        , "11"
+        , FALSE
+        , GLmake_arrow(
+              pexlif_tp
+            , GLmake_arrow(
+                GLmake_int()
+              , GLmake_bool()))
+        , Make_haystack
+    );
 
 }
 

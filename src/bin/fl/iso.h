@@ -25,6 +25,7 @@ void	    Iso_Install_Functions();
 
 typedef struct key_rec *key_ptr;
 typedef struct key_rec {
+    string  lbl;
     vec_ptr vec;
     key_ptr next;
 } key_rec;

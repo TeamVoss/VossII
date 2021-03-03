@@ -1188,21 +1188,21 @@ is_phase_delay(g_ptr redex)
     push_fsm(fsm);
     int idx = name2idx(node);
     if( idx < 0 ) {
-	pop_fsm();
-	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
-	return;
+        pop_fsm();
+        MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+        return;
     }
     nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
     int composite = np->composite;
     if( composite >= 0 ) {
-	ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, composite);
-	if( cp->phase_delay ) {
-	    MAKE_REDEX_BOOL(redex, B_One());
-	} else {
-	    MAKE_REDEX_BOOL(redex, B_Zero());
-	}
+        ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, composite);
+        if( cp->phase_delay ) {
+            MAKE_REDEX_BOOL(redex, B_One());
+        } else {
+            MAKE_REDEX_BOOL(redex, B_Zero());
+        }
     } else {
-	MAKE_REDEX_BOOL(redex, B_Zero());
+        MAKE_REDEX_BOOL(redex, B_Zero());
     }
     pop_fsm();
     DEC_REF_CNT(l);

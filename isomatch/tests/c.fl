@@ -1,0 +1,16 @@
+load (DIR^"../isomatch.fl");
+load "ste.fl";
+
+let not =
+    bit_input a.
+    bit_output b.
+    CELL "draw_hier not" [
+        b <- '~' a
+];
+
+let pex = not 'a 'b;
+
+pex;
+adjacencies pex;
+
+mk_needle pex 2;
