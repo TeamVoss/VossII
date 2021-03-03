@@ -59,6 +59,8 @@ static bool mk_adj_matrix(mat_ptr m, g_ptr p);
 static bool mk_adj_needle(g_ptr p, unint size);
 static bool mk_adj_haystack(g_ptr p, unint size);
 // Isomatch.
+static inline bool test_adjacent_needle(int i, int j);
+static inline bool test_adjacent_haystack(int i, int j);
 static bool test_isomorphism_formatting(mat_ptr iso);
 static bool test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g);
 
@@ -282,6 +284,22 @@ mk_adj_haystack(g_ptr p, unint size)
 
 // Solution check --------------------------------------------------------------
 
+static inline bool
+test_adjacent_needle(int i, int j)
+{
+    ASSERT((unint) i < P->rows);
+    ASSERT((unint) j < P->cols);
+    return P->mat[i][j];
+}
+
+static inline bool
+test_adjacent_haystack(int i, int j)
+{
+    ASSERT((unint) i < G->rows);
+    ASSERT((unint) j < G->cols);
+    return G->mat[i][j];
+}
+
 static bool
 test_isomorphism_formatting(mat_ptr iso)
 {
@@ -346,7 +364,11 @@ Make_needle(g_ptr redex)
     //
     g_ptr g_pex, g_size;
     EXTRACT_2_ARGS(redex, g_pex, g_size);
-    mk_adj_needle(g_pex, (unint) GET_INT(g_size));
+    if(mk_adj_needle(g_pex, (unint) GET_INT(g_size))) {
+        MAKE_REDEX_BOOL(redex, B_One());
+    } else {
+        MAKE_REDEX_BOOL(redex, B_Zero());
+    }
     //
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -370,6 +392,44 @@ Make_haystack(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
+static void
+Is_adjacent_needle(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    //
+    g_ptr g_i, g_j;
+    EXTRACT_2_ARGS(redex, g_i, g_j);
+    if(test_adjacent_needle(GET_INT(g_i), GET_INT(g_j))) {
+        MAKE_REDEX_BOOL(redex, B_One());
+    } else {
+        MAKE_REDEX_BOOL(redex, B_Zero());
+    }
+    //
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+    
+}
+
+static void
+Is_adjacent_haystack(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    //
+    g_ptr g_i, g_j;
+    EXTRACT_2_ARGS(redex, g_i, g_j);
+    if(test_adjacent_haystack(GET_INT(g_i), GET_INT(g_j))) {
+        MAKE_REDEX_BOOL(redex, B_One());
+    } else {
+        MAKE_REDEX_BOOL(redex, B_Zero());
+    }
+    //
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+    
+}
+
 //------------------------------------------------------------------------------
 
 void
@@ -389,7 +449,7 @@ Iso_Install_Functions()
     Add_ExtAPI_Function(
           "mk_needle"
         , "11"
-        , FALSE
+        , TRUE
         , GLmake_arrow(
               pexlif_tp
             , GLmake_arrow(
@@ -401,7 +461,7 @@ Iso_Install_Functions()
     Add_ExtAPI_Function(
           "mk_haystack"
         , "11"
-        , FALSE
+        , TRUE
         , GLmake_arrow(
               pexlif_tp
             , GLmake_arrow(
@@ -410,6 +470,29 @@ Iso_Install_Functions()
         , Make_haystack
     );
 
+    Add_ExtAPI_Function(
+          "adj_needle"
+        , "11"
+        , FALSE
+        , GLmake_arrow(
+              GLmake_int()
+            , GLmake_arrow(
+                GLmake_int()
+              , GLmake_bool()))
+        , Is_adjacent_needle
+    );
+    
+    Add_ExtAPI_Function(
+          "adj_haystack"
+        , "11"
+        , FALSE
+        , GLmake_arrow(
+              GLmake_int()
+            , GLmake_arrow(
+                GLmake_int()
+              , GLmake_bool()))
+        , Is_adjacent_haystack
+    );
 }
 
 /******************************************************************************/
