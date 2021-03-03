@@ -12,5 +12,4 @@ let pex = not 'a 'b;
 
 pex;
 adjacencies pex;
-
 mk_needle pex 2;

@@ -62,9 +62,9 @@ let unique xs = setify xs == xs;
 //         M(i,j) := F
 // while M was changed
 //
-//  prune::(bool mat)->(bool mat)->(bool mat)->(bool mat)
+//  prune_isomorphisms::(bool mat)->(bool mat)->(bool mat)->(bool mat)
 letrec
-    prune m p g =
+    prune_isomorphisms m p g =
         // Check if there are neighbors of 'i' in 'm'.
         let any_neighbors i m = forall_neighbors i m (\vj. const T) F in
         // Prune 'm' once.
@@ -75,21 +75,22 @@ letrec
                         any_neighbors j g => n | mat_update F (i,j) n))
         then
         // Continue pruning until options are exhausted.
-        IF m == m' THEN m ELSE prune m' g p
+        IF m == m' THEN m ELSE prune_isomorphisms m' g p
 ;
 
 // Trim impossible matches given a match of 'P(r)' to 'G(c)': If 'P(r)' is
 // matched against 'G(c)', then no 'P(x)' adj. to 'P(r)' can be isomorphic to
 // some 'G(y)' that is not adj. to 'G(c)'.
 //
-//  thin::int->int->(bool mat)->(bool mat)->(bool mat)->(bool mat)
-letrec
-    thin r c m p g =
+//  thin_isomorphisms::int->int->(bool mat)->(bool mat)
+let
+    thin_isomorphisms r c m =
         // Trim col. if 'G(y)' is not adj. to 'G(c)'.
-        let f col j = IF NOT (el c (el j g)) THEN F ELSE col in
+        let f col j = IF NOT (adj_haystack c j) THEN F ELSE col in
+        //          = IF NOT (el c (el j g)) THEN F ELSE col in
         // Trim row if 'P(x)' is adj. to 'P(r)'.
-        let g row i = IF (el r (el i p)) THEN ixmap f row ELSE row in
-        //
+        let g row i = IF (adj_needle r i) THEN ixmap f row ELSE row in
+        //          = IF (el r (el i p))  THEN ixmap f row ELSE row in
         ixmap g m
 ;
 
@@ -114,8 +115,8 @@ let
 // Checks if 'mat' is a valid isomorphism.
 //  isomorphism::(bool mat)->(bool mat)->(bool mat)->bool
 let
-    isomorphism mat p g =
-         single_morphism mat AND valid_morphism mat p g
+    isomorphism mat = //p g =
+         single_morphism mat //AND valid_morphism mat p g
 ;
 
 //==============================================================================
@@ -134,57 +135,33 @@ let
 //           used' = mark c in used
 //           recurse(used', row+1, P, G, N')
 let
-    recurse iso adj_p adj_g =
-        //
-(fprintf stderr "### recursing...\n") fseq
-        //
+    recurse iso =
         let
             forall_unused m row used f =
                 let unused  = map NOT used then
                 let matches = map2 (defix AND) (el row m) unused then
                 flatmap f (filter_cols id matches)
         in
-        let solution m = isomorphism m adj_p adj_g in
+        let solution m = isomorphism m in
         let cols = length (hd iso) in
         let rows = length iso in
         letrec
             search m used row =
                 IF row == rows + 1 THEN
-(fprintf stderr ">> reached bottom...") fseq
                     IF solution m THEN
-(fprintf stderr "found solution!\n") fseq
                         [m]
                     ELSE
-(fprintf stderr "no solution.\n") fseq
-                        []
+                        [ ]
                 ELSE
-                    let n = prune m adj_p adj_g then
-                    //
-(fprintf stderr ">> exploring row %d\nused:%s\niso: %s\nadj: %s\n"
-    row
-    (print_list print_bool used)
-    (print_list print_bool (el row n))
-    (print_list print_bool (el row adj_p))
-) fseq
-                    //
-		    forall_unused n row used (\col.
-(fprintf stderr "> (%d) picked col %d\nadj: %s\n"
-    row col
-    (print_list print_bool (el col adj_g))
-) fseq
-                        let n'    = modify (mark_one col) row n in
-                        let n''   = thin row col n' adj_p adj_g in
-                        let used' = modify (const T) col used in
-                        search n'' used' (row+1))
+		    forall_unused m row used (\col.
+                        let m'    = modify (mark_one col) row m then
+                        let m''   = thin_isomorphisms row col m' then
+                        let used' = modify (const T) col used then
+                        search m'' used' (row+1)
+                    )
         in
-        let res = search iso (replicate cols F) 1 then
-        //
-(fprintf stderr "### finished recursion with %d solution(s):\n%s\n"
-    (length res)
-    (print_large_list (print_large_matrix print_bool) res)
-) fseq
-        //
-        res
+        // ...
+        let res = search iso (replicate cols F) 1 then res
 ;
 
 //==============================================================================
