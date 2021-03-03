@@ -344,17 +344,12 @@ let
 //  moo::pexlif->pexlif->void
 let
     moo p g =
-        let ok_p = mk_needle p (pex_length p) then
-        let ok_g = mk_haystack g (pex_length g) then
-        let iso  = isomorphisms p g then
-        // ...
-        IF NOT (ok_p AND ok_g) THEN (fprintf stderr "Not OK!") ELSE
-        // ...
-        // todo: mat_tl (adjacencies p)
-        // todo: mat_tl (adjacencies g)
-        let iso' = mat_tl iso then
-        let ss   = recurse iso' then
-        // ...
+        let err = fprintf stderr "Not OK!" in
+        NOT (mk_needle   p (pex_length p)) => err | trim_needle   fseq
+        NOT (mk_haystack g (pex_length g)) => err | trim_haystack fseq
+        let iso = mat_tl (isomorphisms p g) then
+        let ss  = recurse iso then
+        // Explore each solution.
         flip foreach ss (\sol.
             //  matches::(pexlif list)
             let matches = map (flip find_mask (hier g)) sol then
@@ -366,7 +361,7 @@ let
             let choices = expand_choices options then
             //  res::((subst list) list)
             let res = map filter_some options then
-            //
+            // Pretty-print sol.
             pretty p g pairs res
         )
 ;

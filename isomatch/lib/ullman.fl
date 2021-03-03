@@ -117,7 +117,8 @@ let
 //  isomorphism::(bool mat)->(bool mat)->(bool mat)->bool
 let
     isomorphism mat =
-         single_morphism mat //AND valid_morphism mat p g
+         // single_morphism mat AND valid_morphism mat p g
+         is_valid_iso mat (length mat) (length (hd mat));
 ;
 
 //==============================================================================

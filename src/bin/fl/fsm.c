@@ -960,12 +960,12 @@ pexlif2fsm(g_ptr redex)
     declare_vector(&parent_tbl, "", wastrsave(&strings, "!T"),FALSE,NULL,NULL);
     ihier_buf[0] = 0;
     if( traverse_pexlif(&parent_tbl, p, "", TRUE, 0) ) {
-	MAKE_REDEX_EXT_OBJ(redex, fsm_oidx, fsm);
-	fsm->top_name = get_top_name(p);
-	fsm->ranks = rank_order();
-	fsm->sha256_sig = compute_sha256_signature(fsm);
+        MAKE_REDEX_EXT_OBJ(redex, fsm_oidx, fsm);
+        fsm->top_name = get_top_name(p);
+        fsm->ranks = rank_order();
+        fsm->sha256_sig = compute_sha256_signature(fsm);
     } else {
-	MAKE_REDEX_FAILURE(redex, FailBuf);
+        MAKE_REDEX_FAILURE(redex, FailBuf);
     }
     free_mgr(&node_comp_pair_rec_mgr);
     dispose_hash(&node_comp_pair_tbl, NULLFCN);
@@ -2410,8 +2410,6 @@ Fsm_Install_Functions()
     Add_ExtAPI_Function("dbg_clean_pexlif_ios", "1", FALSE,
 			GLmake_arrow(pexlif_tp, pexlif_tp),
 			fl_clean_pexlif_ios);
-
-    
 
     Add_ExtAPI_Function("pexlif2fsm", "1", FALSE,
 			GLmake_arrow(pexlif_tp, fsm_handle_tp),
