@@ -86,11 +86,12 @@ letrec
 let
     thin_isomorphisms r c m =
         // Trim col. if 'G(y)' is not adj. to 'G(c)'.
+        //          =    NOT (el c (el j g)   )
         let f col j = IF NOT (adj_haystack c j) THEN F ELSE col in
-        //          = IF NOT (el c (el j g)) THEN F ELSE col in
         // Trim row if 'P(x)' is adj. to 'P(r)'.
+        //          =    (el r (el i p) )
         let g row i = IF (adj_needle r i) THEN ixmap f row ELSE row in
-        //          = IF (el r (el i p))  THEN ixmap f row ELSE row in
+        // Check every matching.
         ixmap g m
 ;
 
@@ -115,7 +116,7 @@ let
 // Checks if 'mat' is a valid isomorphism.
 //  isomorphism::(bool mat)->(bool mat)->(bool mat)->bool
 let
-    isomorphism mat = //p g =
+    isomorphism mat =
          single_morphism mat //AND valid_morphism mat p g
 ;
 

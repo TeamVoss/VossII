@@ -326,25 +326,33 @@ test_isomorphism_formatting(mat_ptr iso)
 static bool
 test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g)
 {
-	bool t1,t2;
+    // P : AxA, G : BxB, ISO : AxB
+    ASSERT(p->rows   == p->cols);
+    ASSERT(g->rows   == g->cols);
+    ASSERT(iso->rows == p->rows);
+    ASSERT(iso->cols == g->cols);
+    // Short-hands.
+    unint GC = g->cols, IR = iso->rows, IC = iso->cols;
+    bool **P = p->mat, **G = g->mat, **I = iso->mat;
     // P == ISO x (ISO x G)^T
-	for(unint i=0; i<iso->rows; i++) {
-		for(unint j=0; j<iso->rows; j++) {
+	bool t1,t2;
+	for(unint i=0; i<IR; i++) {
+		for(unint j=0; j<IR; j++) {
 			t1 = FALSE;
-            for(unint k=0; k<iso->cols; k++) {
+            for(unint k=0; k<IC; k++) {
 				t2 = FALSE;
-                for(unint l=0; l<iso->cols; l++) {
-					if(iso->mat[j][l] && g->mat[l][k]) {
+                for(unint l=0; l<IC; l++) {
+					if(I[0][l + (IC * j)] && G[0][k + (GC * l)]) {
 						t2 = TRUE;
                         break;
                     }
                 }
-                if(iso->mat[i][k] && t2) {
+                if(I[0][k + (IC * i)] && t2) {
 					t1 = TRUE;
                     break;
                 }
             }
-            if(p->mat[j][i] != t1) {
+            if(P[0][i * IR + j] != t1) {
 				return FALSE;
             }
         }
