@@ -75,7 +75,7 @@ letrec
                         any_neighbors j g => n | mat_update F (i,j) n))
         then
         // Continue pruning until options are exhausted.
-        IF m == m' THEN m ELSE prune m' g p
+        m == m' => m | prune m' g p
 ;
 
 // Trim impossible matches given a match of 'P(r)' to 'G(c)': If 'P(r)' is
@@ -86,9 +86,9 @@ letrec
 letrec
     thin r c m p g =
         // Trim col. if 'G(y)' is not adj. to 'G(c)'.
-        let f col j = IF NOT (el c (el j g)) THEN F ELSE col in
+        let f col j = NOT (el c (el j g)) => F | col in
         // Trim row if 'P(x)' is adj. to 'P(r)'.
-        let g row i = IF (el r (el i p)) THEN ixmap f row ELSE row in
+        let g row i = (el r (el i p)) => ixmap f row | row in
         //
         ixmap g m
 ;
@@ -108,7 +108,28 @@ let
 //  valid_morphism::(bool mat)->(bool mat)->(bool mat)->bool
 let
     valid_morphism mat p g =
-        p == mult mat (transpose (mult mat g))
+        let match_tup pc mc = pc ==> mc in
+        let match_row pr mr = all (curry match_tup) (zip pr mr) in
+        let match_all m     = all (curry match_row) (zip p m) in
+        //
+        let a = mult mat g then
+        let b = transpose a then
+        let c = mult mat b then
+        //
+(fprintf stderr "@ iso:\n%s\n@ p:\n%s\n@ g:\n%s\n@ mult iso g:\n%s\n@ transpose (mult iso g):\n%s\n@ mult iso (transpose (mult iso g)):\n%s\n@ match? %s\n@ solution? %s\n"
+    (print_large_matrix print_bool mat)
+    (print_large_matrix print_bool p)
+    (print_large_matrix print_bool g)
+    (print_large_matrix print_bool a)
+    (print_large_matrix print_bool b)
+    (print_large_matrix print_bool c)
+    (print_bool (p == c))
+    (print_bool (match_all c))
+) fseq
+        //
+        // p == mult mat (transpose (mult mat g))
+        match_all c
+        
 ;
 
 // Checks if 'mat' is a valid isomorphism.
@@ -150,16 +171,10 @@ let
         let rows = length iso in
         letrec
             search m used row =
-                IF row == rows + 1 THEN
-(fprintf stderr ">> reached bottom...") fseq
-                    IF solution m THEN
-(fprintf stderr "found solution!\n") fseq
-                        [m]
-                    ELSE
-(fprintf stderr "no solution.\n") fseq
-                        []
-                ELSE
-                    let n = prune m adj_p adj_g then
+                row == rows + 1 =>
+(fprintf stderr ">> reached bottom...\n") fseq
+                    solution m => [m] | [ ]
+                |   let n = prune m adj_p adj_g then
                     //
 (fprintf stderr ">> exploring row %d\nused:%s\niso: %s\nadj: %s\n"
     row
@@ -169,11 +184,13 @@ let
 ) fseq
                     //
 		    forall_unused n row used (\col.
+                        //
 (fprintf stderr "> (%d) picked col %d\nadj: %s\n"
     row
     col
     (print_list print_bool (el col adj_g))
 ) fseq
+                        //
                         let n'    = modify (mark_one col) row n in
                         let n''   = thin row col n' adj_p adj_g in
                         let used' = modify (const T) col used in
