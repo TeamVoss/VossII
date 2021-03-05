@@ -59,6 +59,7 @@ static void rem_adj_mem();
 static void record_vector(hash_record_ptr tbl_ptr, key_ptr *tail, unint i, const vec_ptr v);
 static bool mk_adj_table(key_lst_ptr *k, unint *c, g_ptr p);
 static bool mk_adj_matrix(mat_ptr m, g_ptr p);
+//static bool mk_adj(mat_ptr m, g_ptr p);
 // Isomatch.
 static bool test_adjacent(mat_ptr m, int i, int j);
 static bool test_isomorphism_formatting(mat_ptr iso);
@@ -265,31 +266,28 @@ mk_adj_matrix(mat_ptr m, g_ptr p)
     key_lst_ptr keys = NULL;
     unint length;
     if(mk_adj_table(&keys, &length, p)) {
-        // All nodes accounted for.
-        ASSERT(m->cols == length);
-        // Square matrix.
-        ASSERT(m->cols == m->rows);
-        //
-        for(unint i = 0; keys != NULL; i++, keys = keys->next) {
-            for(key_ptr key = keys->key; key != NULL; key = key->next) {
-                string name = key->lbl;
-                vec_ptr vec = key->vec;
-                // Search inputs.
-                bkt_ptr bkt = (bkt_ptr) find_hash(tbl_in_ptr, name);
-                while(bkt != NULL) {
-                    if(bkt->lbl != i && Check_vector_overlap(vec, bkt->vec)) {
-                        m->mat[i][bkt->lbl] = TRUE;
-                    }
-                    bkt = bkt->next;
+        ASSERT(m->cols == length);  // All nodes accounted for.
+        ASSERT(m->cols == m->rows); // Square matrix.
+        key_ptr key;
+        bkt_ptr bkt;
+        FOREACH_KEY(key, keys) {
+            string name = key->lbl;
+            vec_ptr vec = key->vec;
+            // Search inputs.
+            bkt = (bkt_ptr) find_hash(tbl_in_ptr, name);
+            while(bkt != NULL) {
+                if(bkt->lbl != i && Check_vector_overlap(vec, bkt->vec)) {
+                    m->mat[i][bkt->lbl] = TRUE;
                 }
-                // Search outputs.
-                bkt = (bkt_ptr) find_hash(tbl_out_ptr, name);
-                while(bkt != NULL) {
-                    if(bkt->lbl != i && Check_vector_overlap(vec, bkt->vec)) {
-                        m->mat[i][bkt->lbl] = TRUE;
-                    }
-                    bkt = bkt->next;
+                bkt = bkt->next;
+            }
+            // Search outputs.
+            bkt = (bkt_ptr) find_hash(tbl_out_ptr, name);
+            while(bkt != NULL) {
+                if(bkt->lbl != i && Check_vector_overlap(vec, bkt->vec)) {
+                    m->mat[i][bkt->lbl] = TRUE;
                 }
+                bkt = bkt->next;
             }
         }
     }

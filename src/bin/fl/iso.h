@@ -71,5 +71,9 @@ typedef struct mat_rec {
            ; !IS_NIL(as) && (vec = ACTUAL_OF_CONS(as), TRUE)                   \
            ; as = GET_CONS_TL(as))                                             \
 
+#define FOREACH_KEY(key, keys)                                                 \
+    for(unint i = 0; keys != NULL; i++, keys = keys->next)                     \
+        for(key = keys->key; key != NULL; key = key->next)
+
 #endif /* ISO_H */
 #endif /* EXPORT_FORWARD_DECL */
