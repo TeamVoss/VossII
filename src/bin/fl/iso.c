@@ -4,9 +4,9 @@
 //------------------------------------------------------------------------------
 
 /******************************************************************************/
-/*      	                                      							  */
+/*                                                                            */
 /*     Original author: Markus Aronsson, 2020                                 */
-/*                                  									      */
+/*                                                                            */
 /******************************************************************************/
 #include "strings.h"
 #include "buf.h"
@@ -25,23 +25,24 @@ extern g_ptr void_nd;
 /******************************************************************************/
 /*                              PRIVATE VARIABLES                             */
 /******************************************************************************/
-static ustr_mgr	lstrings;
-static rec_mgr key_lst_mgr;
+static ustr_mgr lstrings;
+static rec_mgr  vec_mgr;
+static rec_mgr  rng_mgr;
+static rec_mgr  mat_mgr;
+// ?
+static rec_mgr     key_lst_mgr;
 static rec_mgr_ptr key_lst_mgr_ptr;
-static rec_mgr key_mgr;
+static rec_mgr     key_mgr;
 static rec_mgr_ptr key_mgr_ptr;
-static rec_mgr bkt_mgr;
+static rec_mgr     bkt_mgr;
 static rec_mgr_ptr bkt_mgr_ptr;
-static rec_mgr vec_mgr;
-static rec_mgr rng_mgr;
-static rec_mgr mat_mgr;
-// ?
-static hash_record tbl_in;
+// Temp. tables for vec. nodes.
+static hash_record     tbl_in;
 static hash_record_ptr tbl_in_ptr;
-static hash_record tbl_out;
+static hash_record     tbl_out;
 static hash_record_ptr tbl_out_ptr;
-// ?
-static int adj_oidx;
+// Adj. mat. type.
+static int         adj_oidx;
 static typeExp_ptr adj_tp;
 
 // Forward definitions local functions -----------------------------------------
@@ -49,10 +50,9 @@ static typeExp_ptr adj_tp;
 static void allocate_matrix(mat_ptr m, unint R, unint C);
 static void free_matrix(mat_ptr m);
 static void read_matrix(mat_ptr m, g_ptr redex);
-static void drop_matrix_row(mat_ptr m);
-static void drop_matrix_col(mat_ptr m);
 // ?
 static vec_ptr split_vector(string name);
+static void trim_matrix_head(mat_ptr m);
 // Adj.
 static void new_adj_mem();
 static void rem_adj_mem();
@@ -73,12 +73,13 @@ static bool test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g);
 static void
 allocate_matrix(mat_ptr m, unint R, unint C)
 {
+    m->mark   = 1;
     m->rows   = R;
     m->cols   = C;
     m->mat    = Malloc(R*sizeof(bool*));
     m->mat[0] = Calloc(R*C*sizeof(bool));
     for(unint i=1; i<R; i++) {
-		m->mat[i] = m->mat[0]+i*C;
+        m->mat[i] = m->mat[0]+i*C;
     }
 }
 
@@ -87,7 +88,6 @@ free_matrix(mat_ptr m)
 {
     Free((void *)m->mat[0]);
     Free((void *)m->mat);
-    free_rec(&mat_mgr, m);
 }
 
 static void
@@ -105,29 +105,6 @@ read_matrix(mat_ptr m, g_ptr redex)
     }
 }
 
-static void
-drop_matrix_row(mat_ptr m)
-{
-    // Ruins memory, but it's a stupid hack anyway (can't move mat[0]).
-    unint R = m->rows;
-    m->rows = R-1;
-    for(unint i=0; i<R; i++) {
-        m->mat[i] = m->mat[i+1];
-    }
-
-}
-
-static void
-drop_matrix_col(mat_ptr m)
-{
-    // Ruins memory, but it's a stupid hack anyway (can't move mat[0]).
-    unint R = m->rows;
-    m->cols = m->cols-1;
-    for(unint i=0; i<R; i++) {
-        m->mat[i] = m->mat[i]+1;
-    }
-}
-
 // ? ---------------------------------------------------------------------------
 
 static vec_ptr
@@ -140,6 +117,22 @@ split_vector(string name)
         }
     }
     return vp;
+}
+
+static void
+trim_matrix_head(mat_ptr m)
+{
+    ASSERT(m->rows > 0);
+    ASSERT(m->cols > 0);
+    //
+    unint R = m->rows;
+    for(unint i=0; i<R; i++) {
+        m->mat[i][0] = FALSE;
+    }
+    unint C = m->cols;
+    for(unint i=1; i<C; i++) {
+        m->mat[0][i] = FALSE;
+    }    
 }
 
 // Adj. matrix -----------------------------------------------------------------
@@ -209,7 +202,7 @@ mk_adj_table(key_lst_ptr *keys, unint *count, g_ptr p)
     string name;
     bool leaf;
     if(!is_PINST(p, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
-	    Fail_pr("Adj. mat. expects a pexlif.");
+        Fail_pr("Adj. mat. expects a pexlif.");
         return FALSE;
     }    
     if(is_P_LEAF(cont, &fns)) {
@@ -220,6 +213,7 @@ mk_adj_table(key_lst_ptr *keys, unint *count, g_ptr p)
         vec_ptr vec;
         key_ptr key = NULL, *key_tail = &key;
         // Record vector names for parent's formals.
+        // TODO: count outputs as inputs for the environment and vice versa.
         FOREACH_FORMAL(vec, fa_inps) {
             record_vector(tbl_in_ptr, key_tail, 0, vec);
             key_tail = &(*key_tail)->next;
@@ -309,8 +303,8 @@ mk_adj_matrix(mat_ptr m, g_ptr p)
 static bool
 test_adjacent(mat_ptr m, int i, int j)
 {
-    ASSERT((unint) i < m->rows);
-    ASSERT((unint) j < m->cols);
+    ASSERT(i >= 0 && i < (int) m->rows);
+    ASSERT(j >= 0 && j < (int) m->cols);
     return m->mat[i][j];
 }
 
@@ -318,16 +312,15 @@ static bool
 test_isomorphism_formatting(mat_ptr iso)
 {
     bool row;
-    // ToDo: maybe 'used' is small enough for the stack?
     bool *used = Calloc(iso->cols*sizeof(bool));
     // Only one 'TRUE' allowed per row and column.
     for(unint i=0; i<iso->rows; i++) {
-		row = FALSE;
-		for(unint j=0; j<iso->cols; j++) {
+        row = FALSE;
+        for(unint j=0; j<iso->cols; j++) {
             if(iso->mat[i][j]) {
-				if(row || used[j]) {
-					Free((void *)used);
-					return FALSE;
+                if(row || used[j]) {
+                    Free((void *)used);
+                    return FALSE;
                 }
                 row = TRUE;
                 used[j] = TRUE;
@@ -350,25 +343,28 @@ test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g)
     unint GC = g->cols, IR = iso->rows, IC = iso->cols;
     bool *P = p->mat[0], *G = g->mat[0], *I = iso->mat[0];
     // P == ISO x (ISO x G)^T
-	bool t1,t2;
-	for(unint i=0; i<IR; i++) {
-		for(unint j=0; j<IR; j++) {
-			t1 = FALSE;
+    bool t1,t2;
+    for(unint i=0; i<IR; i++) {
+        for(unint j=0; j<IR; j++) {
+            t1 = FALSE;
             for(unint k=0; k<IC; k++) {
-				t2 = FALSE;
+                t2 = FALSE;
                 for(unint l=0; l<IC; l++) {
-					if(I[l + (IC * j)] && G[k + (GC * l)]) {
-						t2 = TRUE;
+                    if(I[l + (IC * j)] && G[k + (GC * l)]) {
+                        t2 = TRUE;
                         break;
                     }
                 }
                 if(I[k + (IC * i)] && t2) {
-					t1 = TRUE;
+                    t1 = TRUE;
                     break;
                 }
             }
-            if(P[i * IR + j] != t1) {
-				return FALSE;
+            // If P is connected at this index, G should be as well.
+            // That is, G is at least as connected as P. For a stricter
+            // connectivity we could use equality of t1 and P instead.
+            if(P[i * IR + j] && !t1) {
+                return FALSE;
             }
         }
     }
@@ -380,8 +376,39 @@ test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g)
 /******************************************************************************/
 
 static void
+mark_adj_fn(pointer p)
+{
+    mat_ptr m = (mat_ptr) p;
+    m->mark = 2;
+}
+
+static void
+sweep_adj_fn()
+{
+    mat_ptr m;
+    FOR_REC(&mat_mgr, mat_ptr, m) {
+        switch(m->mark) {
+        case 0:
+            break;
+        case 1:
+            free_matrix(m);
+            m->mark = 0;
+            break;
+        case 2:
+            m->mark = 1;
+            break;
+        default:
+            DIE("Should not happen");
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+
+static void
 pex2adj_fn(g_ptr redex)
 {
+    //fprintf(stderr, "pex2adj_fn @ %s:%i...", __FILE__, __LINE__);
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_pex, g_size;
@@ -393,78 +420,106 @@ pex2adj_fn(g_ptr redex)
     if(mk_adj_matrix(adj, g_pex)) {
         MAKE_REDEX_EXT_OBJ(redex, adj_oidx, adj);
     } else {
-        MAKE_REDEX_FAILURE(redex, Fail_pr("pex2adj failed."));
+        //fprintf(stderr, "... falied but ...");
+        MAKE_REDEX_FAILURE(redex, Fail_pr("pexlif couldn't be converted."));
     }
     //
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    //fprintf(stderr, "... is ok!\n");
 }
 
 static void
 trim_adj_fn(g_ptr redex)
 {
+    //fprintf(stderr, "trim_adj_fn @ %s:%i...", __FILE__, __LINE__);
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_adj;
     EXTRACT_1_ARG(redex, g_adj);
     mat_ptr adj = (mat_ptr) GET_EXT_OBJ(g_adj);
     //
-    drop_matrix_row(adj);
-    drop_matrix_col(adj);
-    MAKE_REDEX_EXT_OBJ(redex, adj_oidx, adj);
+    if( adj->rows > 0 &&
+        adj->cols > 0)
+    {
+        trim_matrix_head(adj);
+        MAKE_REDEX_EXT_OBJ(redex, adj_oidx, adj);
+    } else {
+        //fprintf(stderr, "... falied but ...");
+        MAKE_REDEX_FAILURE(redex, Fail_pr("trim called on empty adj."));
+    }
     //
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    //fprintf(stderr, "... is ok!\n");
 }
 
 static void
 is_adjacent_fn(g_ptr redex)
 {
+    //fprintf(stderr, "is_adjacent_fn @ %s:%i...", __FILE__, __LINE__);
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_adj, g_row, g_col;
     EXTRACT_3_ARGS(redex, g_adj, g_row, g_col);
     mat_ptr adj = (mat_ptr) GET_EXT_OBJ(g_adj);
-    int row = GET_INT(g_row);
-    int col = GET_INT(g_col);
+    unint row = (unint) GET_INT(g_row);
+    unint col = (unint) GET_INT(g_col);
     //
-    if(test_adjacent(adj, row, col)) {
-        MAKE_REDEX_BOOL(redex, B_One());
+    if( row > 0 && row-1 < adj->rows &&
+        col > 0 && col-1 < adj->cols )
+    {
+        if(test_adjacent(adj, row-1, col-1)) {
+            MAKE_REDEX_BOOL(redex, B_One());
+        } else {
+            MAKE_REDEX_BOOL(redex, B_Zero());
+        }
     } else {
-        MAKE_REDEX_BOOL(redex, B_Zero());
+        //fprintf(stderr, "... falied but ...");
+        MAKE_REDEX_FAILURE(redex, Fail_pr("adjacent index out of bounds."));
     }
     //
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    //fprintf(stderr, "... is ok!\n");
 }
 
 static void
 is_isomorphism_fn(g_ptr redex)
 {
+    //fprintf(stderr, "is_isomorphism_fn @ %s:%i ...", __FILE__, __LINE__);
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr g_p, g_g, g_iso, g_rows, g_cols;
-    EXTRACT_5_ARGS(redex, g_p, g_g, g_iso, g_rows, g_cols);
+    g_ptr g_p, g_g, g_iso;
+    EXTRACT_3_ARGS(redex, g_p, g_g, g_iso);
     mat_ptr p = (mat_ptr) GET_EXT_OBJ(g_p);
     mat_ptr g = (mat_ptr) GET_EXT_OBJ(g_g);
-    int rows  = GET_INT(g_rows);
-    int cols  = GET_INT(g_cols);
     //
-    mat_ptr iso = (mat_ptr) new_rec(&mat_mgr);
-    allocate_matrix(iso, rows, cols);
-    read_matrix(iso, g_iso);
-    if( test_isomorphism_formatting(iso) &&
-        test_isomorphism_match(iso, p, g))
+    int rows = List_length(g_iso);
+    int cols = List_length(GET_CONS_HD(g_iso));
+    if( rows >= 0 && (unint) rows == p->rows &&
+        cols >= 0 && (unint) cols == g->cols )
     {
-        MAKE_REDEX_BOOL(redex, B_One());
+        mat_ptr iso = (mat_ptr) new_rec(&mat_mgr);
+        allocate_matrix(iso, p->rows, g->cols);
+        read_matrix(iso, g_iso);
+        if( test_isomorphism_formatting(iso) &&
+            test_isomorphism_match(iso, p, g))
+        {
+            MAKE_REDEX_BOOL(redex, B_One());
+        } else {
+            MAKE_REDEX_BOOL(redex, B_Zero());
+        }
+        free_matrix(iso);
+        free_rec(&mat_mgr, (pointer) iso);
     } else {
-        MAKE_REDEX_BOOL(redex, B_Zero());
+        //fprintf(stderr, "... falied but ...");
+        MAKE_REDEX_FAILURE(redex, Fail_pr("mismatch in isomatrix size."));
     }
-    free_matrix(iso);
-    free_rec(&mat_mgr, (pointer) iso);
     //
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    //fprintf(stderr, "... is ok!\n");
 }
 
 //------------------------------------------------------------------------------
@@ -474,8 +529,8 @@ Iso_Init()
 {
     adj_oidx = Add_ExtAPI_Object(
         "adj"
-      , NULL //mark_adj_fn
-      , NULL //sweep_adj_fn
+      , mark_adj_fn
+      , sweep_adj_fn
       , NULL //save_adj_fn
       , NULL //load_adj_fn
       , NULL //adj2string_fn
@@ -485,7 +540,7 @@ Iso_Init()
       , NULL //adj2sha256_fn
     );
     adj_tp = Get_Type("adj", NULL, TP_INSERT_FULL_TYPE);
-
+    //
     new_ustrmgr(&lstrings);
     new_mgr(&vec_mgr, sizeof(vec_rec));
     new_mgr(&rng_mgr, sizeof(range_rec));
@@ -495,8 +550,7 @@ Iso_Init()
 void
 Iso_Install_Functions()
 {
-    typeExp_ptr	pexlif_tp = Get_Type("pexlif", NULL, TP_INSERT_PLACE_HOLDER);
-
+    typeExp_ptr pexlif_tp = Get_Type("pexlif", NULL, TP_INSERT_PLACE_HOLDER);
     Add_ExtAPI_Function(
           "pex2adj"
         , "11"
@@ -508,7 +562,6 @@ Iso_Install_Functions()
               , adj_tp))
         , pex2adj_fn
     );
-
     Add_ExtAPI_Function(
           "trim_adj"
         , "1"
@@ -518,7 +571,6 @@ Iso_Install_Functions()
             , adj_tp)
         , trim_adj_fn
     );
-
     Add_ExtAPI_Function(
           "is_adjacent"
         , "111"
@@ -532,7 +584,6 @@ Iso_Install_Functions()
                 , GLmake_bool())))
         , is_adjacent_fn
     );
-
     Add_ExtAPI_Function(
           "is_isomorphism"
         , "111"
@@ -544,11 +595,7 @@ Iso_Install_Functions()
               adj_tp
             , GLmake_arrow(
                 GLmake_list(GLmake_list(GLmake_bool()))
-              , GLmake_arrow(
-                  GLmake_int()
-                , GLmake_arrow(
-                    GLmake_int()
-                  , GLmake_bool())))))
+              , GLmake_bool())))
         , is_isomorphism_fn
     );
 }

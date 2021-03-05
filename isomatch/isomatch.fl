@@ -350,13 +350,15 @@ let
 //  moo::pexlif->pexlif->void
 let
     moo p g =
-        let adj_g = adjacencies g then
-        let adj_p = mark_adj (adjacencies p) then
+        let adj_g = pex2adj g (pex_length g) then
+        let adj_p = pex2adj p (pex_length p) then
         let iso   = mark_iso (isomorphisms p g) then
+        // 
+        trim_adj adj_p fseq
         //
-(fprintf stderr "### adjacencies for P:\n%s\n" (print_large_matrix print_bool adj_p)) fseq
-(fprintf stderr "### adjacencies for G:\n%s\n" (print_large_matrix print_bool adj_g)) fseq
-(fprintf stderr "### isomorphisms:\n%s\n"      (print_large_matrix print_bool iso))   fseq
+//(fprintf stderr "### adjacencies for P:\n%s\n" (print_large_matrix print_bool adj_p)) fseq
+//(fprintf stderr "### adjacencies for G:\n%s\n" (print_large_matrix print_bool adj_g)) fseq
+//(fprintf stderr "### isomorphisms:\n%s\n"      (print_large_matrix print_bool iso))   fseq
         //
         let ss = recurse iso adj_p adj_g then
         flip foreach ss (\sol.

@@ -11,7 +11,7 @@ load (DIR^"utils.fl");
 
 // "Dot-product" of two lists of booleans.
 //  dot::(bool list)->(bool list)->bool
-let dot xs ys = itlist (\z. \b. z OR b) (map2 (\x. \y. x AND y) xs ys) F;
+let dot xs ys = sitlist (\z. \b. z OR b) (map2 (\x. \y. x AND y) xs ys) F;
 
 // "Matrix multiplication" of two boolean matrices.
 //  mult::(bool mat)->(bool mat)->(bool mat)
@@ -75,7 +75,7 @@ letrec
                         any_neighbors j g => n | mat_update F (i,j) n))
         then
         // Continue pruning until options are exhausted.
-        m == m' => m | prune m' g p
+        m == m' => m | prune_isomorphisms m' g p
 ;
 
 // Trim impossible matches given a match of 'P(r)' to 'G(c)': If 'P(r)' is
@@ -86,12 +86,21 @@ letrec
 let
     thin_isomorphisms p g r c m =
         // Trim col. if 'G(y)' is not adj. to 'G(c)'.
-        //          =    NOT (el c (el j g)    )
-        let f col j = IF NOT (is_adjacent g j c) THEN F ELSE col in
+        let
+            f col j =
+// (fprintf stderr "f col %d \t(is_adjacent G %d %d)\n" j j c) fseq
+                NOT (is_adjacent g j c) => F | col
+        //      NOT (el c (el j g))
+        in
         // Trim row if 'P(x)' is adj. to 'P(r)'.
-        //          =    (el r (el i p)    )
-        let g row i = IF (is_adjacent p i r) THEN ixmap f row ELSE row in
+        let
+            g row i =
+// (fprintf stderr "g row %d \t(is_adjacent P %d %d)\n" i i r) fseq 
+                (is_adjacent p i r) => ixmap f row | row
+        //      (el r (el i p))
+        in
         // Check every matching.
+// (fprintf stderr "thining row %d and col %d...\n" r c) fseq
         ixmap g m
 ;
 
@@ -139,7 +148,7 @@ let
 let
     isomorphism mat p g =
          // single_morphism mat AND valid_morphism mat p g
-         is_isomorphism p g mat (length mat) (length (hd mat));
+         is_isomorphism p g mat;
 ;
 
 //==============================================================================
@@ -166,36 +175,30 @@ let
                 flatmap f (filter_cols id matches)
         in
         let solution m = isomorphism m adj_p adj_g in
-        let cols = length (hd iso) in
-        let rows = length iso in
+        let cols = length (hd iso) then
+        let rows = length iso then
         letrec
             search m used row =
                 row == rows + 1 =>
-(fprintf stderr ">> reached bottom...\n") fseq
-                    solution m => [m] | [ ]
-                |   let n = prune m adj_p adj_g then
-                    //
-(fprintf stderr ">> exploring row %d\nused:%s\niso: %s\nadj: %s\n"
-    row
-    (print_list print_bool used)
-    (print_list print_bool (el row n))
-    (print_list print_bool (el row adj_p))
-) fseq
-                    //
-		    forall_unused n row used (\col.
-                        //
-(fprintf stderr "> (%d) picked col %d\nadj: %s\n"
-    row
-    col
-    (print_list print_bool (el col adj_g))
-) fseq
-                        //
-                        let n'    = modify (mark_one col) row n in
-                        let n''   = thin row col n' adj_p adj_g in
-                        let used' = modify (const T) col used in
-                        search n'' used' (row+1))
+// (fprintf stderr ">> reached bottom at row %d\n" row) fseq
+                    solution m =>
+// (fprintf stderr "> found a solution!\n") fseq
+                        [m]
+                    |
+// (fprintf stderr "> no solution...\n") fseq
+                        [ ]
+                |
+// (fprintf stderr ">> exploring row %d\n" row) fseq
+		    forall_unused m row used (\col.
+// (fprintf stderr "> row %d picked col %d\n" row col) fseq
+                        let m'    = modify (mark_one col) row m then
+// (fprintf stderr "> modified row %d in 'iso' to use col %d\n" row col) fseq
+                        let m''   = thin_isomorphisms adj_p adj_g row col m' then
+// (fprintf stderr "> thinned the set of isomorphisms\n") fseq
+                        let used' = modify (const T) col used then
+// (fprintf stderr "> marked col %d as used\n" col) fseq
+                        search m'' used' (row+1))
         in
-        // ...
         let res = search iso (replicate cols F) 1 then res
 ;
 
