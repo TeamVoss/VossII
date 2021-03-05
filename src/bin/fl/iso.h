@@ -45,6 +45,8 @@ typedef struct bkt_rec {
 
 typedef struct mat_rec *mat_ptr;
 typedef struct mat_rec {
+    int   mark;
+    //
     bool  **mat;
     unint rows;
     unint cols;
