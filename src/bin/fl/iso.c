@@ -58,8 +58,8 @@ static void new_adj_mem();
 static void rem_adj_mem();
 static void record_vector(hash_record_ptr tbl_ptr, key_ptr *tail, unint i, const vec_ptr v);
 static bool mk_adj_table(key_lst_ptr *k, unint *c, g_ptr p);
-static bool mk_adj_matrix(mat_ptr m, g_ptr p);
-//static bool mk_adj(mat_ptr m, g_ptr p);
+static bool mk_adj_matrix(mat_ptr m, unint s, key_lst_ptr k);
+static bool mk_adj(mat_ptr m, unint size, g_ptr p);
 // Isomatch.
 static bool test_adjacent(mat_ptr m, int i, int j);
 static bool test_isomorphism_formatting(mat_ptr iso);
@@ -259,40 +259,53 @@ mk_adj_table(key_lst_ptr *keys, unint *count, g_ptr p)
 }
 
 static bool
-mk_adj_matrix(mat_ptr m, g_ptr p)
+mk_adj_matrix(mat_ptr m, unint size, key_lst_ptr keys)
 {
-    new_adj_mem();
-    // Mark adjacencies, if any.
-    key_lst_ptr keys = NULL;
-    unint length;
-    if(mk_adj_table(&keys, &length, p)) {
-        ASSERT(m->cols == length);  // All nodes accounted for.
-        ASSERT(m->cols == m->rows); // Square matrix.
-        key_ptr key;
-        bkt_ptr bkt;
-        FOREACH_KEY(key, keys) {
-            string name = key->lbl;
-            vec_ptr vec = key->vec;
-            // Search inputs.
-            bkt = (bkt_ptr) find_hash(tbl_in_ptr, name);
-            while(bkt != NULL) {
-                if(bkt->lbl != i && Check_vector_overlap(vec, bkt->vec)) {
-                    m->mat[i][bkt->lbl] = TRUE;
-                }
-                bkt = bkt->next;
+    if(m->cols != size && m->cols != m->rows) {
+        return FALSE;
+    }
+    key_ptr key;
+    bkt_ptr bkt;
+    FOREACH_KEY(key, keys) {
+        string name = key->lbl;
+        vec_ptr vec = key->vec;
+        // Search inputs.
+        bkt = (bkt_ptr) find_hash(tbl_in_ptr, name);
+        while(bkt != NULL) {
+            if(bkt->lbl != i && Check_vector_overlap(vec, bkt->vec)) {
+                m->mat[i][bkt->lbl] = TRUE;
             }
-            // Search outputs.
-            bkt = (bkt_ptr) find_hash(tbl_out_ptr, name);
-            while(bkt != NULL) {
-                if(bkt->lbl != i && Check_vector_overlap(vec, bkt->vec)) {
-                    m->mat[i][bkt->lbl] = TRUE;
-                }
-                bkt = bkt->next;
+            bkt = bkt->next;
+        }
+        // Search outputs.
+        bkt = (bkt_ptr) find_hash(tbl_out_ptr, name);
+        while(bkt != NULL) {
+            if(bkt->lbl != i && Check_vector_overlap(vec, bkt->vec)) {
+                m->mat[i][bkt->lbl] = TRUE;
             }
+            bkt = bkt->next;
         }
     }
-    // Done.
+    return TRUE;
+}
+
+static bool
+mk_adj(mat_ptr m, unint size, g_ptr p)
+{
+    new_adj_mem();
+    // /
+    key_lst_ptr keys;
+    unint length;
+    bool fail = FALSE;
+    allocate_matrix(m, size, size);
+    if(!fail && !mk_adj_table(&keys, &length, p)) { fail = TRUE; }
+    if(!fail && !mk_adj_matrix(m, length, keys))  { fail = TRUE; }
+    // /
     rem_adj_mem();
+    if(fail) {
+        free_matrix(m);
+        return FALSE;
+    }
     return TRUE;
 }
 
@@ -414,8 +427,7 @@ pex2adj_fn(g_ptr redex)
     int size = GET_INT(g_size);
     //
     mat_ptr adj = (mat_ptr) new_rec(&mat_mgr);
-    allocate_matrix(adj, (unint) size, (unint) size);
-    if(mk_adj_matrix(adj, g_pex)) {
+    if(mk_adj(adj, size, g_pex)) {
         MAKE_REDEX_EXT_OBJ(redex, adj_oidx, adj);
     } else {
         //fprintf(stderr, "... falied but ...");
