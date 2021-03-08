@@ -43,6 +43,9 @@ static hash_record_ptr tbl_out_ptr;
 // Iso. mat. construction.
 static rec_mgr         sig_mgr;
 static rec_mgr_ptr     sig_mgr_ptr;
+// Iso. matching.
+static buffer_ptr      mat_buf_ptr;
+static buffer_ptr      res_buf_ptr;
 // Types.
 static int             mat_oidx;
 static typeExp_ptr     mat_tp;
@@ -78,7 +81,8 @@ static bool test_adjacent(mat_ptr m, int i, int j);
 static bool test_isomorphism_formatting(mat_ptr iso);
 static bool test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g);
 // Isomatching algo.
-
+static void isomatch(mat_ptr iso, mat_ptr p, mat_ptr g);
+static void recurse(mat_ptr iso, mat_ptr p, mat_ptr g, bool *used, unint row);
 
 /******************************************************************************/
 /*                                LOCAL FUNCTIONS                             */
@@ -529,7 +533,39 @@ test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g)
 
 // Iso. search -----------------------------------------------------------------
 
+static void
+isomatch(mat_ptr iso, mat_ptr p, mat_ptr g)
+{
+    new_buf(mat_buf_ptr, 100, sizeof(mat_rec));
+    new_buf(res_buf_ptr, 10,  sizeof(mat_rec));
+    //
+    unint row = 0;
+    bool *used = Calloc(iso->cols*sizeof(bool));
+    recurse(iso, p, g, used, row);
+    //
+    free_buf(mat_buf_ptr);
+    free_buf(res_buf_ptr);
+}
 
+static void
+recurse(mat_ptr iso, mat_ptr p, mat_ptr g, bool *used, unint row)
+{
+    if(iso->rows == row) {
+        if(test_isomorphism_match(iso, p, g)) {
+            push_buf(res_buf_ptr, (pointer) iso);
+        } else {
+            return;
+        }
+    }
+    for(unint col = 0; col < iso->cols; col++) {
+        if(!used[col] || !iso->mat[row][col]) {
+            continue;
+        }
+        used[col] = TRUE;
+        
+        used[col] = FALSE;
+    }
+}
 
 /******************************************************************************/
 /*                               PUBLIC FUNCTIONS                             */
@@ -814,6 +850,7 @@ _DuMMy_iso()
     free_matrix(NULL);
     test_isomorphism_formatting(NULL);
     test_isomorphism_match(NULL,NULL,NULL);
+    isomatch(NULL,NULL,NULL);
 }
 
 /******************************************************************************/
