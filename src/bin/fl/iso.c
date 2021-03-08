@@ -25,10 +25,10 @@ extern g_ptr void_nd;
 /******************************************************************************/
 /*                              PRIVATE VARIABLES                             */
 /******************************************************************************/
-static ustr_mgr lstrings;
-static rec_mgr  vec_mgr;
-static rec_mgr  rng_mgr;
-static rec_mgr  mat_mgr;
+static ustr_mgr        lstrings;
+static rec_mgr         vec_mgr;
+static rec_mgr         rng_mgr;
+static rec_mgr         mat_mgr;
 // Adj. mat. construction.
 static rec_mgr         bkt_mgr;
 static rec_mgr_ptr     bkt_mgr_ptr;
@@ -41,14 +41,12 @@ static hash_record_ptr tbl_in_ptr;
 static hash_record     tbl_out;
 static hash_record_ptr tbl_out_ptr;
 // Iso. mat. construction.
-static rec_mgr     sig_mgr;
-static rec_mgr_ptr sig_mgr_ptr;
+static rec_mgr         sig_mgr;
+static rec_mgr_ptr     sig_mgr_ptr;
 // Types.
-static int         adj_oidx;
-static typeExp_ptr adj_tp;
-static int         iso_oidx;
-static typeExp_ptr iso_tp;
-//
+static int             mat_oidx;
+static typeExp_ptr     mat_tp;
+// Debugging.
 #define DEBUG_ISO 0
 #define debug_print(fmt, ...)                                                  \
         do { if (DEBUG_ISO) fprintf(stderr, "%s:%d:%s(): " fmt, __FILE__,      \
@@ -80,6 +78,7 @@ static bool test_adjacent(mat_ptr m, int i, int j);
 static bool test_isomorphism_formatting(mat_ptr iso);
 static bool test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g);
 // Isomatching algo.
+
 
 /******************************************************************************/
 /*                                LOCAL FUNCTIONS                             */
@@ -552,9 +551,8 @@ sweep_mat_fn()
         case 0:
             break;
         case 1:
-            //DIE("This is called early");
-            //free_matrix(m);
-            //m->mark = 0;
+            free_matrix(m);
+            m->mark = 0;
             break;
         case 2:
             m->mark = 1;
@@ -583,7 +581,7 @@ pex2adj_fn(g_ptr redex)
         MAKE_REDEX_FAILURE(redex, Fail_pr(
             "pexlif couldn't be converted."));
     } else {
-        MAKE_REDEX_EXT_OBJ(redex, adj_oidx, adj);
+        MAKE_REDEX_EXT_OBJ(redex, mat_oidx, adj);
     }
     //
     DEC_REF_CNT(l);
@@ -607,7 +605,7 @@ pex2iso_fn(g_ptr redex)
         MAKE_REDEX_FAILURE(redex, Fail_pr(
             "pexlif couldn't be converted."));
     } else {
-        MAKE_REDEX_EXT_OBJ(redex, iso_oidx, iso);
+        MAKE_REDEX_EXT_OBJ(redex, mat_oidx, iso);
     }
     //
     DEC_REF_CNT(l);
@@ -629,7 +627,7 @@ trim_adj_fn(g_ptr redex)
             "trim_adj: empty adj."));
     } else {
         trim_matrix_head(adj);
-        MAKE_REDEX_EXT_OBJ(redex, adj_oidx, adj);
+        MAKE_REDEX_EXT_OBJ(redex, mat_oidx, adj);
     }
     //
     DEC_REF_CNT(l);
@@ -714,8 +712,8 @@ void
 Iso_Init()
 {
     // Adj. mat.
-    adj_oidx = Add_ExtAPI_Object(
-        "adj"
+    mat_oidx = Add_ExtAPI_Object(
+        "bmat"
       , mark_mat_fn
       , sweep_mat_fn
       , NULL //save_?_fn
@@ -726,21 +724,7 @@ Iso_Init()
       , NULL
       , NULL //?2sha256_fn
     );
-    adj_tp = Get_Type("adj", NULL, TP_INSERT_FULL_TYPE);
-    // Iso. mat.
-    iso_oidx = Add_ExtAPI_Object(
-        "iso"
-      , mark_mat_fn
-      , sweep_mat_fn
-      , NULL //save_?_fn
-      , NULL //load_?_fn
-      , NULL //?2string_fn
-      , NULL //?_eq_fn
-      , NULL
-      , NULL
-      , NULL //?2sha256_fn
-    );
-    iso_tp = Get_Type("iso", NULL, TP_INSERT_FULL_TYPE);
+    mat_tp = Get_Type("bmat", NULL, TP_INSERT_FULL_TYPE);
     // Init. generics.
     new_ustrmgr(&lstrings);
     new_mgr(&vec_mgr, sizeof(vec_rec));
@@ -761,7 +745,7 @@ Iso_Install_Functions()
               pexlif_tp
             , GLmake_arrow(
                 GLmake_int()
-              , adj_tp))
+              , mat_tp))
         , pex2adj_fn
     );
     Add_ExtAPI_Function(
@@ -777,7 +761,7 @@ Iso_Install_Functions()
                   GLmake_int()
                 , GLmake_arrow(
                     GLmake_int()
-                  , iso_tp))))
+                  , mat_tp))))
         , pex2iso_fn
     );
     Add_ExtAPI_Function(
@@ -786,8 +770,8 @@ Iso_Install_Functions()
         , TRUE
           // adj->adj
         , GLmake_arrow(
-              adj_tp
-            , adj_tp)
+              mat_tp
+            , mat_tp)
         , trim_adj_fn
     );
     Add_ExtAPI_Function(
@@ -796,7 +780,7 @@ Iso_Install_Functions()
         , FALSE
           // adj->int->int->bool
         , GLmake_arrow(
-              adj_tp
+              mat_tp
             , GLmake_arrow(
                 GLmake_int()
               , GLmake_arrow(
@@ -810,9 +794,9 @@ Iso_Install_Functions()
         , FALSE
           // adj->adj->((bool list) list)->int->int->bool
         , GLmake_arrow(
-            adj_tp
+            mat_tp
           , GLmake_arrow(
-              adj_tp
+              mat_tp
             , GLmake_arrow(
                 GLmake_list(GLmake_list(GLmake_bool()))
               , GLmake_bool())))
