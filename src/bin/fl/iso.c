@@ -29,21 +29,30 @@ static ustr_mgr lstrings;
 static rec_mgr  vec_mgr;
 static rec_mgr  rng_mgr;
 static rec_mgr  mat_mgr;
-// ?
-static rec_mgr     key_lst_mgr;
-static rec_mgr_ptr key_lst_mgr_ptr;
-static rec_mgr     key_mgr;
-static rec_mgr_ptr key_mgr_ptr;
-static rec_mgr     bkt_mgr;
-static rec_mgr_ptr bkt_mgr_ptr;
-// Temp. tables for vec. nodes.
+// Adj. mat. construction.
+static rec_mgr         bkt_mgr;
+static rec_mgr_ptr     bkt_mgr_ptr;
+static rec_mgr         key_mgr;
+static rec_mgr_ptr     key_mgr_ptr;
+static rec_mgr         key_lst_mgr;
+static rec_mgr_ptr     key_lst_mgr_ptr;
 static hash_record     tbl_in;
 static hash_record_ptr tbl_in_ptr;
 static hash_record     tbl_out;
 static hash_record_ptr tbl_out_ptr;
-// Adj. mat. type.
+// Iso. mat. construction.
+static rec_mgr     sig_mgr;
+static rec_mgr_ptr sig_mgr_ptr;
+// Types.
 static int         adj_oidx;
 static typeExp_ptr adj_tp;
+static int         iso_oidx;
+static typeExp_ptr iso_tp;
+//
+#define DEBUG_ISO 0
+#define debug_print(fmt, ...)                                                  \
+        do { if (DEBUG_ISO) fprintf(stderr, "%s:%d:%s(): " fmt, __FILE__,      \
+                                __LINE__, __func__, __VA_ARGS__); } while (0)
 
 // Forward definitions local functions -----------------------------------------
 // Matrix mgm.
@@ -53,17 +62,24 @@ static void read_matrix(mat_ptr m, g_ptr redex);
 // ?
 static vec_ptr split_vector(string name);
 static void trim_matrix_head(mat_ptr m);
-// Adj.
+// Adj. mat. construciton.
 static void new_adj_mem();
 static void rem_adj_mem();
 static void record_vector(hash_record_ptr tbl_ptr, key_ptr *tail, unint i, const vec_ptr v);
 static bool mk_adj_table(key_lst_ptr *k, unint *c, g_ptr p);
 static bool mk_adj_matrix(mat_ptr m, unint s, key_lst_ptr k);
 static bool mk_adj(mat_ptr m, unint size, g_ptr p);
-// Isomatch.
+// Iso. mat. construction.
+static void new_iso_mem();
+static void rem_adj_mem();
+static bool mk_iso_list(sig_ptr *s, g_ptr p);
+static bool mk_iso_matrix(mat_ptr m, sig_ptr p, sig_ptr g);
+static bool mk_iso(mat_ptr m, unint rows, unint cols, g_ptr p, g_ptr g);
+// Solution checking.
 static bool test_adjacent(mat_ptr m, int i, int j);
 static bool test_isomorphism_formatting(mat_ptr iso);
 static bool test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g);
+// Isomatching algo.
 
 /******************************************************************************/
 /*                                LOCAL FUNCTIONS                             */
@@ -141,14 +157,14 @@ trim_matrix_head(mat_ptr m)
 static void
 new_adj_mem()
 {
-    key_lst_mgr_ptr = &key_lst_mgr;
-    key_mgr_ptr = &key_mgr;
     bkt_mgr_ptr = &bkt_mgr;
+    key_mgr_ptr = &key_mgr;
+    key_lst_mgr_ptr = &key_lst_mgr;
     tbl_in_ptr = &tbl_in;
     tbl_out_ptr = &tbl_out;
-    new_mgr(key_lst_mgr_ptr, sizeof(key_lst));
-    new_mgr(key_mgr_ptr, sizeof(key_rec));
     new_mgr(bkt_mgr_ptr, sizeof(bkt_rec));
+    new_mgr(key_mgr_ptr, sizeof(key_rec));
+    new_mgr(key_lst_mgr_ptr, sizeof(key_lst_rec));
     create_hash(tbl_in_ptr, 100, str_hash, str_equ);
     create_hash(tbl_out_ptr, 100, str_hash, str_equ);
 }
@@ -156,14 +172,14 @@ new_adj_mem()
 static void
 rem_adj_mem()
 {
-    free_mgr(key_lst_mgr_ptr);
-    free_mgr(key_mgr_ptr);
     free_mgr(bkt_mgr_ptr);
+    free_mgr(key_mgr_ptr);
+    free_mgr(key_lst_mgr_ptr);
     dispose_hash(tbl_in_ptr, NULLFCN);
     dispose_hash(tbl_out_ptr, NULLFCN);
-    key_lst_mgr_ptr = NULL;
-    key_mgr_ptr = NULL;
     bkt_mgr_ptr = NULL;
+    key_mgr_ptr = NULL;
+    key_lst_mgr_ptr = NULL;
     tbl_in_ptr = NULL;
     tbl_out_ptr = NULL;
 }
@@ -173,7 +189,7 @@ record_vector(hash_record_ptr tbl_ptr, key_ptr *tail, unint i, const vec_ptr v)
 {
     string key = Get_vector_signature(&lstrings, v);
     // Record in tail.
-    key_ptr n = (key_ptr) new_rec(&key_mgr);
+    key_ptr n = (key_ptr) new_rec(key_mgr_ptr);
     n->lbl  = key;
     n->vec  = v;
     n->next = NULL;
@@ -181,14 +197,14 @@ record_vector(hash_record_ptr tbl_ptr, key_ptr *tail, unint i, const vec_ptr v)
     // Record in table.
     bkt_ptr bkt = find_hash(tbl_ptr, key);
     if(bkt == NULL) {
-        bkt_ptr b = (bkt_ptr) new_rec(&bkt_mgr);
+        bkt_ptr b = (bkt_ptr) new_rec(bkt_mgr_ptr);
         b->lbl  = i;
         b->vec  = v;
         b->next = NULL;
         insert_hash(tbl_ptr, key, b);
     } else {
         while(bkt->next != NULL) { bkt = bkt->next; }
-        bkt_ptr b = (bkt_ptr) new_rec(&bkt_mgr);
+        bkt_ptr b = (bkt_ptr) new_rec(bkt_mgr_ptr);
         b->lbl  = i;
         b->vec  = v;
         b->next = NULL;
@@ -203,11 +219,11 @@ mk_adj_table(key_lst_ptr *keys, unint *count, g_ptr p)
     string name;
     bool leaf;
     if(!is_PINST(p, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
-        Fail_pr("Adj. mat. expects a pexlif.");
+        Fail_pr("mk_adj: expected a pexlif.");
         return FALSE;
     }    
     if(is_P_LEAF(cont, &fns)) {
-        Fail_pr("Adj. mat. expects a hierarchical pexlif.");
+        Fail_pr("mk_adj: expected a hierarchical pexlif.");
         return FALSE;
     }
     if(is_P_HIER(cont, &children)) {
@@ -223,17 +239,17 @@ mk_adj_table(key_lst_ptr *keys, unint *count, g_ptr p)
             record_vector(tbl_out_ptr, key_tail, 0, vec);
             key_tail = &(*key_tail)->next;
         }
-        key_lst_ptr key_lst = (key_lst_ptr) new_rec(&key_lst_mgr), *key_lst_tail = &key_lst;
-        key_lst->key  = key;
+        key_lst_ptr key_lst = (key_lst_ptr) new_rec(key_lst_mgr_ptr);
+        key_lst->key = key;
         key_lst->next = NULL;
-        *keys         = key_lst;
-        *count        = 1;
-        key_lst_tail  = &key_lst->next;
+        *keys = key_lst;
+        *count = 1;
+        key_lst_ptr *key_lst_tail = &key_lst->next;
         // Record vector names for each child's actuals.
         g_ptr child, tmp;
         FOR_CONS(children, tmp, child) {
             if(!is_PINST(child, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
-                Fail_pr("Adj. mat. expects all children to be pexlifs.");
+                Fail_pr("mk_adj: expected all children to be pexlifs.");
                 return FALSE;
             }
             key_ptr key = NULL, *key_tail = &key;
@@ -245,16 +261,16 @@ mk_adj_table(key_lst_ptr *keys, unint *count, g_ptr p)
                 record_vector(tbl_out_ptr, key_tail, *count, vec);
                 key_tail = &(*key_tail)->next;
             }
-            key_lst_ptr key_lst = (key_lst_ptr) new_rec(&key_lst_mgr);
-            key_lst->key  = key;
+            key_lst_ptr key_lst = (key_lst_ptr) new_rec(key_lst_mgr_ptr);
+            key_lst->key = key;
             key_lst->next = NULL;
             *key_lst_tail = key_lst;
-            key_lst_tail  = &key_lst->next;
-            *count        = *count + 1;
+            key_lst_tail = &key_lst->next;
+            *count = *count + 1;
         }
         return TRUE;
     }
-    Fail_pr("What are you then?!");
+    Fail_pr("What?!");
     return FALSE;
 }
 
@@ -262,8 +278,10 @@ static bool
 mk_adj_matrix(mat_ptr m, unint size, key_lst_ptr keys)
 {
     if(m->cols != size && m->cols != m->rows) {
+        Fail_pr("mk_adj: size mismatch.");
         return FALSE;
     }
+    // /
     key_ptr key;
     bkt_ptr bkt;
     FOREACH_KEY(key, keys) {
@@ -302,6 +320,134 @@ mk_adj(mat_ptr m, unint size, g_ptr p)
     if(!fail && !mk_adj_matrix(m, length, keys))  { fail = TRUE; }
     // /
     rem_adj_mem();
+    if(fail) {
+        free_matrix(m);
+        return FALSE;
+    }
+    return TRUE;
+}
+
+// Iso. matrix -----------------------------------------------------------------
+
+static void
+new_iso_mem()
+{
+    sig_mgr_ptr = &sig_mgr;
+    new_mgr(sig_mgr_ptr, sizeof(sig_rec));
+}
+
+static void
+rem_iso_mem()
+{
+    free_mgr(sig_mgr_ptr);
+    sig_mgr_ptr = NULL;
+}
+
+static bool
+mk_iso_list(sig_ptr *sigs, g_ptr p)
+{
+    g_ptr attrs, fa_inps, fa_outs, inter, cont, children, fns;
+    string name;
+    bool leaf;
+    if(!is_PINST(p, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
+        Fail_pr("mk_iso: expected a pexlif.");
+        return FALSE;
+    }    
+    if(is_P_LEAF(cont, &fns)) {
+        Fail_pr("mk_iso: expected a hierarchical pexlif.");
+        return FALSE;
+    }
+    if(is_P_HIER(cont, &children)) {
+        string sha = NULL;
+        int fp = -1;
+        // Record fp/sha attributes for parent.
+        // TODO: These are probably in a fixed order, could test for that first.
+        for(g_ptr l = attrs; !IS_NIL(l); l = GET_CONS_TL(l)) {
+            string key = GET_STRING(GET_CONS_HD(GET_CONS_HD(l)));
+            g_ptr val = GET_CONS_TL(GET_CONS_HD(l));
+            if(strcmp(key, "signature")) {
+                sha = GET_STRING(val);
+            } else if(strcmp(key, "fingerprint")) {
+                fp = GET_INT(val);
+            }
+        }
+        if(fp == -1 || sha == NULL) {
+            Fail_pr("mk_iso: pexlif lacks fp/sha attributes.");
+            return FALSE;
+        }
+        sig_ptr sig = (sig_ptr) new_rec(&sig_mgr);
+        sig->sha = sha;
+        sig->fp = fp;
+        sig->next = NULL;
+        *sigs = sig;
+        sig_ptr *sig_tail = &sig->next;
+        // Record fp/sha attributes for children.
+        g_ptr child, tmp;
+        FOR_CONS(children, tmp, child) {
+            if(!is_PINST(child, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
+                Fail_pr("mk_adj: expected all children to be pexlifs.");
+                return FALSE;
+            }
+            string sha = NULL;
+            int fp = -1;
+            for(g_ptr l = attrs; !IS_NIL(l); l = GET_CONS_TL(l)) {
+                string key = GET_STRING(GET_CONS_HD(GET_CONS_HD(l)));
+                g_ptr val = GET_CONS_TL(GET_CONS_HD(l));
+                if(strcmp(key, "signature")) {
+                    sha = GET_STRING(val);
+                } else if(strcmp(key, "fingerprint")) {
+                    fp = GET_INT(val);
+                }
+            }
+            if(fp == -1 || sha == NULL) {
+                Fail_pr("mk_iso: pexlif lacks fp/sha attributes.");
+                return FALSE;
+            }
+            sig_ptr sig = (sig_ptr) new_rec(&sig_mgr);
+            sig->sha = sha;
+            sig->fp = fp;
+            sig->next = NULL;
+            *sig_tail = sig;
+            sig_tail = &sig->next;
+        }
+        return TRUE;
+    }
+    Fail_pr("What?!");
+    return FALSE;
+}
+
+static bool
+mk_iso_matrix(mat_ptr m, sig_ptr p, sig_ptr g)
+{
+    // assert: length(p) = rows(m)
+    // assert: length(p) = cols(m)
+    int i = 0;
+    for(sig_ptr r = p; r != NULL; r = r->next) {
+        int j = 0;
+        for(sig_ptr c = g; c != NULL; c = c->next) {
+            if(r->fp == c->fp || strcmp(r->sha, c->sha)) {
+                m->mat[i][j] = TRUE;
+            }
+            j++;
+        }
+        i++;
+    }
+    return TRUE;
+}
+
+static bool
+mk_iso(mat_ptr m, unint rows, unint cols, g_ptr p, g_ptr g)
+{
+    new_iso_mem();
+    // /
+    sig_ptr p_sigs, g_sigs;
+    bool fail = FALSE;
+    allocate_matrix(m, rows, cols);
+    if(!fail && !mk_iso_list(&p_sigs, p)) { fail = TRUE; }
+    if(!fail && !mk_iso_list(&g_sigs, g)) { fail = TRUE; }
+    if(!fail && !mk_iso_matrix(m, p_sigs, g_sigs)) { fail = TRUE; }
+    // /
+    rem_iso_mem();
     if(fail) {
         free_matrix(m);
         return FALSE;
@@ -382,19 +528,23 @@ test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g)
     return TRUE;
 }
 
+// Iso. search -----------------------------------------------------------------
+
+
+
 /******************************************************************************/
 /*                               PUBLIC FUNCTIONS                             */
 /******************************************************************************/
 
 static void
-mark_adj_fn(pointer p)
+mark_mat_fn(pointer p)
 {
     mat_ptr m = (mat_ptr) p;
     m->mark = 2;
 }
 
 static void
-sweep_adj_fn()
+sweep_mat_fn()
 {
     mat_ptr m;
     FOR_REC(&mat_mgr, mat_ptr, m) {
@@ -402,8 +552,9 @@ sweep_adj_fn()
         case 0:
             break;
         case 1:
-            free_matrix(m);
-            m->mark = 0;
+            //DIE("This is called early");
+            //free_matrix(m);
+            //m->mark = 0;
             break;
         case 2:
             m->mark = 1;
@@ -419,7 +570,7 @@ sweep_adj_fn()
 static void
 pex2adj_fn(g_ptr redex)
 {
-    //fprintf(stderr, "pex2adj_fn @ %s:%i...", __FILE__, __LINE__);
+    debug_print("%p\n", (void *) redex);
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_pex, g_size;
@@ -427,77 +578,96 @@ pex2adj_fn(g_ptr redex)
     int size = GET_INT(g_size);
     //
     mat_ptr adj = (mat_ptr) new_rec(&mat_mgr);
-    if(mk_adj(adj, size, g_pex)) {
-        MAKE_REDEX_EXT_OBJ(redex, adj_oidx, adj);
+    if(!mk_adj(adj, size, g_pex)) {
+        free_rec(&mat_mgr, (pointer) adj);
+        MAKE_REDEX_FAILURE(redex, Fail_pr(
+            "pexlif couldn't be converted."));
     } else {
-        //fprintf(stderr, "... falied but ...");
-        MAKE_REDEX_FAILURE(redex, Fail_pr("pexlif couldn't be converted."));
+        MAKE_REDEX_EXT_OBJ(redex, adj_oidx, adj);
     }
     //
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
-    //fprintf(stderr, "... is ok!\n");
+}
+
+static void
+pex2iso_fn(g_ptr redex)
+{
+    debug_print("%p\n", (void *) redex);
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_p, g_g, g_rows, g_cols;
+    EXTRACT_4_ARGS(redex, g_p, g_g, g_rows, g_cols);
+    int rows = GET_INT(g_rows);
+    int cols = GET_INT(g_cols);
+    //
+    mat_ptr iso = (mat_ptr) new_rec(&mat_mgr);
+    if(!mk_iso(iso, (unint) rows, (unint) cols, g_p, g_g)) {
+        free_rec(&mat_mgr, (pointer) iso);
+        MAKE_REDEX_FAILURE(redex, Fail_pr(
+            "pexlif couldn't be converted."));
+    } else {
+        MAKE_REDEX_EXT_OBJ(redex, iso_oidx, iso);
+    }
+    //
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
 }
 
 static void
 trim_adj_fn(g_ptr redex)
 {
-    //fprintf(stderr, "trim_adj_fn @ %s:%i...", __FILE__, __LINE__);
+    debug_print("%p\n", (void *) redex);
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_adj;
     EXTRACT_1_ARG(redex, g_adj);
     mat_ptr adj = (mat_ptr) GET_EXT_OBJ(g_adj);
     //
-    if( adj->rows > 0 &&
-        adj->cols > 0)
-    {
+    if(adj->rows <= 0 || adj->cols <= 0) {
+        MAKE_REDEX_FAILURE(redex, Fail_pr(
+            "trim_adj: empty adj."));
+    } else {
         trim_matrix_head(adj);
         MAKE_REDEX_EXT_OBJ(redex, adj_oidx, adj);
-    } else {
-        //fprintf(stderr, "... falied but ...");
-        MAKE_REDEX_FAILURE(redex, Fail_pr("trim called on empty adj."));
     }
     //
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
-    //fprintf(stderr, "... is ok!\n");
 }
 
 static void
 is_adjacent_fn(g_ptr redex)
 {
-    //fprintf(stderr, "is_adjacent_fn @ %s:%i...", __FILE__, __LINE__);
+    debug_print("%p\n", (void *) redex);
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_adj, g_row, g_col;
     EXTRACT_3_ARGS(redex, g_adj, g_row, g_col);
     mat_ptr adj = (mat_ptr) GET_EXT_OBJ(g_adj);
-    unint row = (unint) GET_INT(g_row);
-    unint col = (unint) GET_INT(g_col);
+    int row = (unint) GET_INT(g_row);
+    int col = (unint) GET_INT(g_col);
     //
-    if( row > 0 && row-1 < adj->rows &&
-        col > 0 && col-1 < adj->cols )
-    {
-        if(test_adjacent(adj, row-1, col-1)) {
+    if(row <= 0 || col <= 0) {
+        MAKE_REDEX_FAILURE(redex, Fail_pr("is_adjacent: index negative."));
+    } else if ((unint) row-1 > adj->rows || (unint) col-1 > adj->cols) {
+        MAKE_REDEX_FAILURE(redex, Fail_pr("is_adjacent: index out of range."));
+    } else {
+        if(test_adjacent(adj, (unint) row-1, (unint) col-1)) {
             MAKE_REDEX_BOOL(redex, B_One());
         } else {
             MAKE_REDEX_BOOL(redex, B_Zero());
         }
-    } else {
-        //fprintf(stderr, "... falied but ...");
-        MAKE_REDEX_FAILURE(redex, Fail_pr("adjacent index out of bounds."));
     }
     //
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
-    //fprintf(stderr, "... is ok!\n");
 }
 
 static void
 is_isomorphism_fn(g_ptr redex)
 {
-    //fprintf(stderr, "is_isomorphism_fn @ %s:%i ...", __FILE__, __LINE__);
+    debug_print("%p\n", (void *) redex);
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_p, g_g, g_iso;
@@ -507,12 +677,22 @@ is_isomorphism_fn(g_ptr redex)
     //
     int rows = List_length(g_iso);
     int cols = List_length(GET_CONS_HD(g_iso));
-    if( rows >= 0 && (unint) rows == p->rows &&
-        cols >= 0 && (unint) cols == g->cols )
-    {
-        mat_ptr iso = (mat_ptr) new_rec(&mat_mgr);
-        allocate_matrix(iso, p->rows, g->cols);
-        read_matrix(iso, g_iso);
+    mat_ptr iso = (mat_ptr) new_rec(&mat_mgr);
+    allocate_matrix(iso, p->rows, g->cols);
+    read_matrix(iso, g_iso);
+    if(rows <= 0 || cols <= 0) {
+        MAKE_REDEX_FAILURE(redex, Fail_pr(
+            "is_isomorphism: negative index."));
+    } else if((unint) rows != p->rows || (unint) cols != g->cols) {
+        MAKE_REDEX_FAILURE(redex, Fail_pr(
+            "is_isomorphism: mismatch in iso. size."));
+    } else if(p->rows != p->cols || g->rows != g->cols) {
+        MAKE_REDEX_FAILURE(redex, Fail_pr(
+            "is_isomorphism: mismatch in adj. sizes."));
+    } else if(iso->rows != p->rows || iso->cols != g->cols) {
+        MAKE_REDEX_FAILURE(redex, Fail_pr(
+            "is_isomorphism: iso. size doesn't match adj. sizes."));
+    } else {
         if( test_isomorphism_formatting(iso) &&
             test_isomorphism_match(iso, p, g))
         {
@@ -520,16 +700,12 @@ is_isomorphism_fn(g_ptr redex)
         } else {
             MAKE_REDEX_BOOL(redex, B_Zero());
         }
-        free_matrix(iso);
-        free_rec(&mat_mgr, (pointer) iso);
-    } else {
-        //fprintf(stderr, "... falied but ...");
-        MAKE_REDEX_FAILURE(redex, Fail_pr("mismatch in isomatrix size."));
     }
+    free_matrix(iso);
+    free_rec(&mat_mgr, (pointer) iso);
     //
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
-    //fprintf(stderr, "... is ok!\n");
 }
 
 //------------------------------------------------------------------------------
@@ -537,20 +713,35 @@ is_isomorphism_fn(g_ptr redex)
 void
 Iso_Init()
 {
+    // Adj. mat.
     adj_oidx = Add_ExtAPI_Object(
         "adj"
-      , mark_adj_fn
-      , sweep_adj_fn
-      , NULL //save_adj_fn
-      , NULL //load_adj_fn
-      , NULL //adj2string_fn
-      , NULL //adj_eq_fn
+      , mark_mat_fn
+      , sweep_mat_fn
+      , NULL //save_?_fn
+      , NULL //load_?_fn
+      , NULL //?2string_fn
+      , NULL //?_eq_fn
       , NULL
       , NULL
-      , NULL //adj2sha256_fn
+      , NULL //?2sha256_fn
     );
     adj_tp = Get_Type("adj", NULL, TP_INSERT_FULL_TYPE);
-    //
+    // Iso. mat.
+    iso_oidx = Add_ExtAPI_Object(
+        "iso"
+      , mark_mat_fn
+      , sweep_mat_fn
+      , NULL //save_?_fn
+      , NULL //load_?_fn
+      , NULL //?2string_fn
+      , NULL //?_eq_fn
+      , NULL
+      , NULL
+      , NULL //?2sha256_fn
+    );
+    iso_tp = Get_Type("iso", NULL, TP_INSERT_FULL_TYPE);
+    // Init. generics.
     new_ustrmgr(&lstrings);
     new_mgr(&vec_mgr, sizeof(vec_rec));
     new_mgr(&rng_mgr, sizeof(range_rec));
@@ -565,6 +756,7 @@ Iso_Install_Functions()
           "pex2adj"
         , "11"
         , TRUE
+          // pex->int->adj
         , GLmake_arrow(
               pexlif_tp
             , GLmake_arrow(
@@ -573,9 +765,26 @@ Iso_Install_Functions()
         , pex2adj_fn
     );
     Add_ExtAPI_Function(
+          "pex2iso"
+        , "1111"
+        , TRUE
+          // pex->pex->int->int->iso
+        , GLmake_arrow(
+              pexlif_tp
+            , GLmake_arrow(
+                pexlif_tp
+              , GLmake_arrow(
+                  GLmake_int()
+                , GLmake_arrow(
+                    GLmake_int()
+                  , iso_tp))))
+        , pex2iso_fn
+    );
+    Add_ExtAPI_Function(
           "trim_adj"
         , "1"
         , TRUE
+          // adj->adj
         , GLmake_arrow(
               adj_tp
             , adj_tp)
@@ -585,6 +794,7 @@ Iso_Install_Functions()
           "is_adjacent"
         , "111"
         , FALSE
+          // adj->int->int->bool
         , GLmake_arrow(
               adj_tp
             , GLmake_arrow(

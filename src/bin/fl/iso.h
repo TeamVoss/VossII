@@ -23,19 +23,7 @@ void	    Iso_Install_Functions();
 
 #include "fl.h"
 
-typedef struct key_rec *key_ptr;
-typedef struct key_rec {
-    string  lbl;
-    vec_ptr vec;
-    key_ptr next;
-} key_rec;
-
-typedef struct key_lst *key_lst_ptr;
-typedef struct key_lst {
-    key_ptr     key;
-    key_lst_ptr next;
-} key_lst;
-
+// Adj. matrix construction ------------
 typedef struct bkt_rec *bkt_ptr;
 typedef struct bkt_rec {
     unint   lbl;
@@ -43,6 +31,28 @@ typedef struct bkt_rec {
     bkt_ptr next;
 } bkt_rec;
 
+typedef struct key_rec *key_ptr;
+typedef struct key_rec {
+    string  lbl;
+    vec_ptr vec;
+    key_ptr next;
+} key_rec;
+
+typedef struct key_lst_rec *key_lst_ptr;
+typedef struct key_lst_rec {
+    key_ptr     key;
+    key_lst_ptr next;
+} key_lst_rec;
+
+// Iso. matrix construction ------------
+typedef struct sig_rec *sig_ptr;
+typedef struct sig_rec {
+    string  sha;
+    int     fp;
+    sig_ptr next;
+} sig_rec;
+
+// Matrix. -----------------------------
 typedef struct mat_rec *mat_ptr;
 typedef struct mat_rec {
     int   mark;
@@ -73,7 +83,7 @@ typedef struct mat_rec {
 
 #define FOREACH_KEY(key, keys)                                                 \
     for(unint i = 0; keys != NULL; i++, keys = keys->next)                     \
-        for(key = keys->key; key != NULL; key = key->next)
+        for(key = keys->key; key != NULL; key = key->next)    
 
 #endif /* ISO_H */
 #endif /* EXPORT_FORWARD_DECL */

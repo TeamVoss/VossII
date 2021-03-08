@@ -164,6 +164,7 @@ let
 //       N = prune(M)
 //       for all unused columns c in N[row]
 //           N'    = zero all columns but c in N[row]
+//           N''   = thin(N,r,c)
 //           used' = mark c in used
 //           recurse(used', row+1, P, G, N')
 let
