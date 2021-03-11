@@ -44,8 +44,12 @@ static hash_record_ptr tbl_out_ptr;
 static rec_mgr         sig_mgr;
 static rec_mgr_ptr     sig_mgr_ptr;
 // Iso. matching.
-static buffer_ptr      mat_buf_ptr;
+static rec_mgr         point_mgr;
+static rec_mgr_ptr     point_mgr_ptr;
 static buffer_ptr      res_buf_ptr;
+static bool            *USED;
+static mat_ptr         P;
+static mat_ptr         G;
 // Types.
 static int             mat_oidx;
 static typeExp_ptr     mat_tp;
@@ -64,15 +68,11 @@ static void read_matrix(mat_ptr m, g_ptr redex);
 static vec_ptr split_vector(string name);
 static void trim_matrix_head(mat_ptr m);
 // Adj. mat. construciton.
-static void new_adj_mem();
-static void rem_adj_mem();
 static void record_vector(hash_record_ptr tbl_ptr, key_ptr *tail, unint i, const vec_ptr v);
 static bool mk_adj_table(key_lst_ptr *k, unint *c, g_ptr p);
 static bool mk_adj_matrix(mat_ptr m, unint s, key_lst_ptr k);
 static bool mk_adj(mat_ptr m, unint size, g_ptr p);
 // Iso. mat. construction.
-static void new_iso_mem();
-static void rem_adj_mem();
 static bool mk_iso_list(sig_ptr *s, g_ptr p);
 static bool mk_iso_matrix(mat_ptr m, sig_ptr p, sig_ptr g);
 static bool mk_iso(mat_ptr m, unint rows, unint cols, g_ptr p, g_ptr g);
@@ -82,7 +82,8 @@ static bool test_isomorphism_formatting(mat_ptr iso);
 static bool test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g);
 // Isomatching algo.
 static void isomatch(mat_ptr iso, mat_ptr p, mat_ptr g);
-static void recurse(mat_ptr iso, mat_ptr p, mat_ptr g, bool *used, unint row);
+static void trim(mat_ptr iso, unint r, unint c, point_ptr *points);
+static void recurse(mat_ptr iso, unint row);
 
 /******************************************************************************/
 /*                                LOCAL FUNCTIONS                             */
@@ -106,8 +107,8 @@ allocate_matrix(mat_ptr m, unint R, unint C)
 static void
 free_matrix(mat_ptr m)
 {
-    Free((void *)m->mat[0]);
-    Free((void *)m->mat);
+    Free((pointer) m->mat[0]);
+    Free((pointer) m->mat);
 }
 
 static void
@@ -534,36 +535,88 @@ test_isomorphism_match(mat_ptr iso, mat_ptr p, mat_ptr g)
 // Iso. search -----------------------------------------------------------------
 
 static void
-isomatch(mat_ptr iso, mat_ptr p, mat_ptr g)
+new_rec_mem(mat_ptr p, mat_ptr g)
 {
-    new_buf(mat_buf_ptr, 100, sizeof(mat_rec));
-    new_buf(res_buf_ptr, 10,  sizeof(mat_rec));
-    //
-    unint row = 0;
-    bool *used = Calloc(iso->cols*sizeof(bool));
-    recurse(iso, p, g, used, row);
-    //
-    free_buf(mat_buf_ptr);
-    free_buf(res_buf_ptr);
+    P = p;
+    G = g;
+    USED = Calloc(g->rows*sizeof(bool));
+    point_mgr_ptr = &point_mgr;
+    new_mgr(point_mgr_ptr, sizeof(point_rec));
+    new_buf(res_buf_ptr, 1, sizeof(mat_rec));
 }
 
 static void
-recurse(mat_ptr iso, mat_ptr p, mat_ptr g, bool *used, unint row)
+rem_rec_mem()
+{
+    free_buf(res_buf_ptr);
+    free_mgr(point_mgr_ptr);
+    Free((pointer) USED);
+    point_mgr_ptr = NULL;
+    USED = NULL;
+    P = NULL;
+    G = NULL;
+}
+
+static void
+isomatch(mat_ptr iso, mat_ptr p, mat_ptr g)
+{
+    new_rec_mem(p, g);
+    recurse(iso, 0);
+    rem_rec_mem();
+}
+
+/* Trim impossible matches given a match of 'P(r)' to 'G(c)': If 'P(r)' is
+ * matched against 'G(c)', then no 'P(x)' adj. to 'P(r)' can be isomorphic to
+ * some 'G(y)' that is not adj. to 'G(c)'.
+ */
+static void
+trim(mat_ptr iso, unint r, unint c, point_ptr *points)
+{
+    //    ASSERT(r < iso->rows);
+    //    ASSERT(c < iso->cols);
+    //    ASSERT(iso->rows == P->rows);
+    //    ASSERT(iso->cols == G->rows);
+    //
+    point_ptr head = NULL, *tail = &head;
+    // Note: swapped i->r for r->i (same for j->c), equal but better caching.
+    for(unint i = 0; i<iso->rows; i++) {
+        if(P->mat[r][i]) {
+            for(unint j = 0; j<iso->cols; j++) {
+                if(!G->mat[c][j] && iso->mat[i][j]) {
+                    iso->mat[i][j] = FALSE;
+                    // Record update as a record in rec.
+                    point_ptr new = (point_ptr) new_rec(point_mgr_ptr);
+                    new->row  = i;
+                    new->col  = j;
+                    new->next = NULL;
+                    *tail = new;
+                    tail  = &new->next;
+                }
+            }
+        }
+    }
+    *points = head;
+}
+
+static void
+recurse(mat_ptr iso, unint row)
 {
     if(iso->rows == row) {
-        if(test_isomorphism_match(iso, p, g)) {
+        if(test_isomorphism_match(iso, P, G)) {
             push_buf(res_buf_ptr, (pointer) iso);
         } else {
             return;
         }
     }
+    point_ptr points;
     for(unint col = 0; col < iso->cols; col++) {
-        if(!used[col] || !iso->mat[row][col]) {
+        if(USED[col] || !iso->mat[row][col]) {
             continue;
         }
-        used[col] = TRUE;
+        trim(iso, row, col, &points);
+        USED[col] = TRUE;
         
-        used[col] = FALSE;
+        USED[col] = FALSE;
     }
 }
 

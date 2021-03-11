@@ -86,21 +86,12 @@ letrec
 let
     thin_isomorphisms p g r c m =
         // Trim col. if 'G(y)' is not adj. to 'G(c)'.
-        let
-            f col j =
-// (fprintf stderr "f col %d \t(is_adjacent G %d %d)\n" j j c) fseq
-                NOT (is_adjacent g j c) => F | col
-        //      NOT (el c (el j g))
-        in
+        let f col j = NOT (is_adjacent g j c) => F | col in
+        //            NOT (el c (el j g))
         // Trim row if 'P(x)' is adj. to 'P(r)'.
-        let
-            g row i =
-// (fprintf stderr "g row %d \t(is_adjacent P %d %d)\n" i i r) fseq 
-                (is_adjacent p i r) => ixmap f row | row
-        //      (el r (el i p))
-        in
+        let g row i = (is_adjacent p i r) => ixmap f row | row in
+        //            (el r (el i p))
         // Check every matching.
-// (fprintf stderr "thining row %d and col %d...\n" r c) fseq
         ixmap g m
 ;
 
