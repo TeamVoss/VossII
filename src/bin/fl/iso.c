@@ -55,7 +55,7 @@ static mat_ptr         haystack;
 static int             mat_oidx;
 static typeExp_ptr     mat_tp;
 // Debugging.
-#define DEBUG_ISO 0
+#define DEBUG_ISO 1
 #define debug_print(fmt, ...)                                                  \
         do { if (DEBUG_ISO) fprintf(stderr, "%s:%d:%s(): " fmt, __FILE__,      \
                                 __LINE__, __func__, __VA_ARGS__); } while (0)
@@ -67,7 +67,8 @@ static void free_matrix(mat_ptr m);
 static void read_matrix(mat_ptr m, g_ptr redex);
 // ?
 static vec_ptr split_vector(string name);
-static void trim_matrix_head(mat_ptr m);
+static void    trim_matrix_head(mat_ptr m);
+static int     pexlif_size(g_ptr p);
 // Adj. mat. construciton.
 static void record_vector(hash_record_ptr tbl_ptr, key_ptr *tail, unint i, const vec_ptr v);
 static bool mk_adj_table(key_lst_ptr *k, unint *c, g_ptr p);
@@ -99,7 +100,7 @@ static void
 allocate_matrix(mat_ptr *m, unint R, unint C)
 {
     ASSERT(*m != NULL);
-    //
+    // /
     mat_ptr n = (mat_ptr) new_rec(&mat_mgr);
     n->mark   = 1;
     n->rows   = R;
@@ -116,7 +117,7 @@ static void
 free_matrix(mat_ptr m)
 {
     ASSERT(m != NULL);
-    //
+    // /
     Free((pointer) m->mat[0]);
     Free((pointer) m->mat);
     free_rec(&mat_mgr, (pointer) m);
@@ -126,9 +127,11 @@ static void
 read_matrix(mat_ptr m, g_ptr redex)
 {
     g_ptr lr, lc, row, col;
-    int i = 0;
+    int i, j;
+    // /
+    i = 0;
     FOR_CONS(redex, lr, row) {
-        int j = 0;
+        j = 0;
         FOR_CONS(row, lc, col) {
             m->mat[i][j] = GET_BOOL(col);
             j++;
@@ -154,17 +157,30 @@ split_vector(string name)
 static void
 trim_matrix_head(mat_ptr m)
 {
-    ASSERT(m->rows > 0);
-    ASSERT(m->cols > 0);
-    //
-    unint R = m->rows;
-    for(unint i=0; i<R; i++) {
+    for(unint i=0; i<m->rows; i++) {
         m->mat[i][0] = FALSE;
     }
-    unint C = m->cols;
-    for(unint i=1; i<C; i++) {
+    for(unint i=1; i<m->cols; i++) {
         m->mat[0][i] = FALSE;
     }    
+}
+
+static int
+pexlif_size(g_ptr p)
+{
+    g_ptr attrs, fa_inps, fa_outs, inter, cont, children, fns;
+    string name;
+    bool leaf;
+    if(!is_PINST(p, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
+        return -1;
+    }
+    if(is_P_LEAF(cont, &fns)) {
+        return 1;
+    }
+    if(is_P_HIER(cont, &children)) {
+        return 1 + List_length(children);
+    }
+    return -1;
 }
 
 // Adj. matrix -----------------------------------------------------------------
@@ -203,7 +219,7 @@ static void
 record_vector(hash_record_ptr tbl_ptr, key_ptr *tail, unint i, const vec_ptr v)
 {
     string key = Get_vector_signature(&lstrings, v);
-    // Record in tail.
+    // Record in keys.
     key_ptr n = (key_ptr) new_rec(key_mgr_ptr);
     n->lbl  = key;
     n->vec  = v;
@@ -218,7 +234,9 @@ record_vector(hash_record_ptr tbl_ptr, key_ptr *tail, unint i, const vec_ptr v)
         b->next = NULL;
         insert_hash(tbl_ptr, key, b);
     } else {
-        while(bkt->next != NULL) { bkt = bkt->next; }
+        while(bkt->next != NULL) {
+            bkt = bkt->next;
+        }
         bkt_ptr b = (bkt_ptr) new_rec(bkt_mgr_ptr);
         b->lbl  = i;
         b->vec  = v;
@@ -292,10 +310,8 @@ mk_adj_table(key_lst_ptr *keys, unint *count, g_ptr p)
 static bool
 mk_adj_matrix(mat_ptr m, unint size, key_lst_ptr keys)
 {
-    if(m->cols != size && m->cols != m->rows) {
-        Fail_pr("mk_adj: size mismatch.");
-        return FALSE;
-    }
+    ASSERT(m->cols == size);
+    ASSERT(m->cols == m->rows);
     // /
     key_ptr key;
     bkt_ptr bkt;
@@ -371,14 +387,16 @@ mk_iso_list(sig_ptr *sigs, g_ptr p)
         string sha = NULL;
         int fp = -1;
         // Record fp/sha attributes for parent.
-        // TODO: These are probably in a fixed order, could test for that first.
+        // Note: The fp/sha attributes are likely in a fixed order that we could
+        //   test for, and only then falling back on the search below.
+        debug_print("(%d) search parents\n", 1);        
         for(g_ptr l = attrs; !IS_NIL(l); l = GET_CONS_TL(l)) {
             string key = GET_STRING(GET_CONS_HD(GET_CONS_HD(l)));
-            g_ptr val = GET_CONS_TL(GET_CONS_HD(l));
-            if(strcmp(key, "signature")) {
-                sha = GET_STRING(val);
-            } else if(strcmp(key, "fingerprint")) {
-                fp = GET_INT(val);
+            string val = GET_STRING(GET_CONS_TL(GET_CONS_HD(l)));
+            if(strcmp(key, "signature") == 0) {
+                sha = val;
+            } else if(strcmp(key, "fingerprint") == 0) {
+                fp = atoi(val);
             }
         }
         if(fp == -1 || sha == NULL) {
@@ -392,6 +410,7 @@ mk_iso_list(sig_ptr *sigs, g_ptr p)
         *sigs = sig;
         sig_ptr *sig_tail = &sig->next;
         // Record fp/sha attributes for children.
+        debug_print("(%d) search children\n", 2);        
         g_ptr child, tmp;
         FOR_CONS(children, tmp, child) {
             if(!is_PINST(child, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
@@ -402,11 +421,11 @@ mk_iso_list(sig_ptr *sigs, g_ptr p)
             int fp = -1;
             for(g_ptr l = attrs; !IS_NIL(l); l = GET_CONS_TL(l)) {
                 string key = GET_STRING(GET_CONS_HD(GET_CONS_HD(l)));
-                g_ptr val = GET_CONS_TL(GET_CONS_HD(l));
-                if(strcmp(key, "signature")) {
-                    sha = GET_STRING(val);
-                } else if(strcmp(key, "fingerprint")) {
-                    fp = GET_INT(val);
+                string val = GET_STRING(GET_CONS_TL(GET_CONS_HD(l)));
+                if(strcmp(key, "signature") == 0) {
+                    sha = val;
+                } else if(strcmp(key, "fingerprint") == 0) {
+                    fp = atoi(val);
                 }
             }
             if(fp == -1 || sha == NULL) {
@@ -431,6 +450,7 @@ mk_iso_matrix(mat_ptr m, sig_ptr p, sig_ptr g)
 {
     // assert: length(p) = rows(m)
     // assert: length(p) = cols(m)
+    // /
     int i = 0;
     for(sig_ptr r = p; r != NULL; r = r->next) {
         int j = 0;
@@ -452,9 +472,19 @@ mk_iso(mat_ptr m, g_ptr p, g_ptr g)
     // /
     sig_ptr p_sigs, g_sigs;
     bool fail = FALSE;
-    if(!fail && !mk_iso_list(&p_sigs, p))          { fail = TRUE; }
-    if(!fail && !mk_iso_list(&g_sigs, g))          { fail = TRUE; }
-    if(!fail && !mk_iso_matrix(m, p_sigs, g_sigs)) { fail = TRUE; }
+    debug_print("(%d) mk_iso_list(p)\n", 1);
+    if(!fail && !mk_iso_list(&p_sigs, p)) {
+        fail = TRUE;
+    }
+    debug_print("(%d) mk_iso_list(g)\n", 2);
+    if(!fail && !mk_iso_list(&g_sigs, g)) {
+        fail = TRUE;
+    }
+    debug_print("(%d) mk_iso_matrix\n", 3);
+    if(!fail && !mk_iso_matrix(m, p_sigs, g_sigs)) {
+        fail = TRUE;
+    }
+    debug_print("(%d) done\n", 4);
     // /
     rem_iso_mem();
     return !fail;
@@ -566,14 +596,17 @@ rem_rec_mem()
 static void
 trim(mat_ptr iso, unint r, unint c, point_ptr *ps)
 {
-    //    ASSERT(r < iso->rows);
-    //    ASSERT(c < iso->cols);
-    //    ASSERT(iso->rows == P->rows);
-    //    ASSERT(iso->cols == G->rows);
-    //
+    ASSERT(r < iso->rows);
+    ASSERT(c < iso->cols);
+    ASSERT(iso->rows == needle->rows);
+    ASSERT(iso->cols == haystack->rows);
+    // /
     point_ptr head = NULL, *tail = &head;
-    // Note: swapped i->r for r->i (same for j->c), equal but better caching.
-    for(unint i = 0; i<iso->rows; i++) {
+    // Note: swapped i->r for r->i (same for j->c), equal but better caching,
+    //   might change if adj. def. is updated.
+    // Note: starts at r+1 since every row above r should have been picked and
+    //   r is not adjacent to itself.
+    for(unint i = r+1; i<iso->rows; i++) {
         if(needle->mat[r][i]) {
             for(unint j = 0; j<iso->cols; j++) {
                 if(!haystack->mat[c][j] && iso->mat[i][j]) {
@@ -595,6 +628,9 @@ trim(mat_ptr iso, unint r, unint c, point_ptr *ps)
 static void
 pick(mat_ptr iso, unint r, unint c)
 {
+    ASSERT(iso->rows == shadow->rows);
+    ASSERT(iso->cols == shadow->cols);
+    // /
     for(unint j = 0; j < iso->cols; j++) {
         shadow->mat[r][j] = iso->mat[r][j];
         iso->mat[r][j] = 0;
@@ -655,6 +691,9 @@ isomatch(mat_ptr iso, mat_ptr p, mat_ptr g)
 {
     new_rec_mem(p, g);
     recurse(iso, 0);
+    // /
+    fprintf(stderr, "==> %u\n", res_buf_ptr->buf_size);
+    // /
     rem_rec_mem();
 }
 
@@ -759,7 +798,7 @@ trim_adj_fn(g_ptr redex)
         MAKE_REDEX_FAILURE(redex, Fail_pr("trim_adj: empty adj."));
     } else {
         trim_matrix_head(adj);
-        MAKE_REDEX_EXT_OBJ(redex, mat_oidx, adj);
+        MAKE_REDEX_VOID(redex);
     }
     // /
     DEC_REF_CNT(l);
@@ -831,6 +870,63 @@ is_isomorphism_fn(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
+static void
+isomatch_fn(g_ptr redex)
+{
+    debug_print("%p\n", (void *) redex);
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_p, g_g, g_box;
+    EXTRACT_3_ARGS(redex, g_p, g_g, g_box);
+    bool box = GET_BOOL(g_box);
+    // /
+    int p_size = pexlif_size(g_p);
+    int g_size = pexlif_size(g_g);
+    if(p_size < 2) {
+        MAKE_REDEX_FAILURE(redex, Fail_pr("isomatch: malformed needle."));
+    } else if(g_size < 2) {
+        MAKE_REDEX_FAILURE(redex, Fail_pr("isomatch: malformed haystack."));
+    } else {
+        debug_print("(%d) allocate\n", 1);
+        mat_ptr adj_p, adj_g, iso;
+        allocate_matrix(&adj_p, p_size, p_size);
+        allocate_matrix(&adj_g, g_size, g_size);
+        allocate_matrix(&iso,   p_size, g_size);
+        debug_print("(%d) mk_adj(p)\n", 2);
+        bool fail = FALSE;
+        if(!fail && !mk_adj(adj_p, g_p)) {
+            MAKE_REDEX_FAILURE(redex, Fail_pr("isomatch: invalid needle."));
+            fail = TRUE;
+        }
+        debug_print("(%d) mk_adj(g)\n", 3);
+        if(!fail && !mk_adj(adj_g, g_g)) {
+            MAKE_REDEX_FAILURE(redex, Fail_pr("isomatch: invalid haystack."));
+            fail = TRUE;
+        }
+        debug_print("(%d) mk_iso\n", 4);
+        if(!fail && !mk_iso(iso, g_p, g_g)) {
+            MAKE_REDEX_FAILURE(redex, Fail_pr("isomatch: invalid isomorphisms."));
+            fail = TRUE;
+        }
+        debug_print("(%d) isomatch\n", 5);
+        if(!fail) {
+            if(box) {
+                trim_matrix_head(adj_p);
+            }
+            isomatch(iso, adj_p, adj_g);
+            MAKE_REDEX_VOID(redex);
+        }
+        debug_print("(%d) done\n", 6);
+        // /
+        free_matrix(adj_p);
+        free_matrix(adj_g);
+        free_matrix(iso);
+    }
+    // /
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
 //------------------------------------------------------------------------------
 
 void
@@ -893,10 +989,10 @@ Iso_Install_Functions()
           "trim_adj"
         , "1"
         , TRUE
-          // adj->adj
+          // adj->void
         , GLmake_arrow(
               mat_tp
-            , mat_tp)
+            , GLmake_void())
         , trim_adj_fn
     );
     Add_ExtAPI_Function(
@@ -927,6 +1023,22 @@ Iso_Install_Functions()
               , GLmake_bool())))
         , is_isomorphism_fn
     );
+    // /
+    Add_ExtAPI_Function(
+          "isomatch"
+        , "111"
+        , TRUE
+          // pex->pex->bool->void
+        , GLmake_arrow(
+              pexlif_tp
+            , GLmake_arrow(
+                pexlif_tp
+              , GLmake_arrow(
+                  GLmake_bool()
+                , GLmake_void())))
+        , isomatch_fn
+    );
+
 }
 
 /******************************************************************************/
