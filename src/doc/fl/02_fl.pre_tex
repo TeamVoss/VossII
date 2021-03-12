@@ -28,7 +28,7 @@ objects and can be created, evaluated, compared and printed out.
 For efficiency reasons these Boolean functions are represented as
 ordered binary decision diagrams%
 \index{ordered binary decision diagrams}%
-{}. 
+{}.
 
 Fl is an interactive language.
 At the top-level one can for example: define functions (possibly of arity 0),
@@ -50,7 +50,7 @@ Note that the VOSS-LIBRARY-DIRECTORY%
 
 The fl program can take a number of arguments.
 \index{command-line arguments}
-In particular, 
+In particular,
 \begin{description}
 %
 \item[-f n]
@@ -100,7 +100,7 @@ a list of strings.
 For example:
 \begin{hol}
 % fl We must do 123 situps
-\end{hol} 
+\end{hol}
 would yield:
 
 \FULLSCREEN{forte_with_args_start.jpg}
@@ -130,12 +130,12 @@ the Functions tab to detach the help system.
 \subsection{Embedding in Editors}
 
 A very convenient way of using {\voss} is to run it within an editor.
-There are currently two supported editors: vim and emacs.
+There are currently three supported editors: vim, emacs and visual studio codes.
 Both of these provide similar capabilities, but using different key-bindings
 to better follow the traditions of each editor.
-For details on how to enable vim or emacs integration, see the
-README files in \verb@<VossII installation directory>/modes/vim@ or
-\verb@<VossII installation directory>/modes/emacs@.
+For details on how to enable vim, emacs or vscode integration, see the
+README files in \verb@<VossII installation directory>/modes/vim@,
+\verb@<VossII installation directory>/modes/emacs@ or \verb@<VossII installation directory>/modes/visual studio code@.
 
 
 \subsection{Expressions}
@@ -388,9 +388,9 @@ The are:
 \begin{hol}
 depends
 forcing
-truth_cover 
-example 
-enumerate_examples 
+truth_cover
+example
+enumerate_examples
 \end{hol}
 Depends%
 \index{depends}%
@@ -480,7 +480,7 @@ let BR l r = STREE branch_type NONE (SOME l) (SOME r);
 // Define a function that adds up the leaves. Note: bvs are used instead of ints
 letrec sum_leaves (STREE type o_val o_left o_right) =
         type = leaf_type => get_value o_val |
-        (sum_leaves (get_value o_left)) + (sum_leaves (get_value o_right)) 
+        (sum_leaves (get_value o_left)) + (sum_leaves (get_value o_right))
 ;
 
 let t1 = BR (BR (LF 1) (LF 2)) (LF 3);
@@ -680,7 +680,7 @@ Thus, bdd\_save%
 {} and
 bdd\_load%
 \index{bdd\_load}%
-{} come in handy. 
+{} come in handy.
 
 \subsection{Bexpr and SAT}
 
@@ -752,7 +752,7 @@ The standard functions on strings are \verb@^@ (catenation%
 implode%
 \index{implode}%
 {} (make list of strings into single string).
-There a numerous other string functions. 
+There a numerous other string functions.
 For example:
 %%%START_CODE%%%%
 
@@ -789,7 +789,7 @@ In between there may be (in this order) zero or more flags, and an
 optional length modifier.
 
 The arguments must correspond properly (after type promotion) with the
-conversion specifier. The arguments are used in the order given, 
+conversion specifier. The arguments are used in the order given,
 where each '*' and each conversion specifier asks for the next argument.
 
 The character \% should be followed by zero or more of the following flags:
@@ -1037,7 +1037,7 @@ fact 5;
 
 \subsection{Mutually Recursive Functions}
 
-There is currently no direct support for mutually recursive functions, i.e., 
+There is currently no direct support for mutually recursive functions, i.e.,
 declaring a function f that needs to evaluate g, but g needs to evaluate f etc.
 The work-around for this problem is to forward declare one of the functions.
 The command: forward\_declare%
@@ -1186,7 +1186,7 @@ let l2 = 13 downto 1;
 let l3 = 1--100;
 l1 @ l2;
 lastn 5 l1;
-butlast l2; 
+butlast l2;
 firstn 7 l3;
 butfirstn 96 l3;
 cluster 4 (1--20);
@@ -1276,7 +1276,7 @@ Research Software Ltd.}~\cite{Miranda}.
 Sometimes it is useful to inform the type inference mechanism
 of fl what type is expected.
 This is particularly useful when there is an obscure type error in the
-expression you are trying to define. 
+expression you are trying to define.
 Annotating expressions with the type one expects them to have is often a
 very efficient method for finding the problem.
 This is particularly common when using overloaded functions.
@@ -1387,7 +1387,7 @@ For example:
 let half x = (x % 2) = 1 => eprintf "HALF_ERR: f2 is given an odd number (%d)" x
                         | x/2
 ;
-letrec  robust_half x = 
+letrec  robust_half x =
     (half x) gen_catch
     (\msg. str_is_prefix "HALF_ERR" msg => robust_half (x+1) | error msg)
 ;
@@ -1479,7 +1479,7 @@ pr_card queen;
 pr_card jack;
 pr_card (other 5);
 %%%END_CODE%%%%
-If we now issue the top-level command 
+If we now issue the top-level command
 %%%START_CODE%%%%
 install_print_function pr_card;
 %%%END_CODE%%%%
@@ -1489,7 +1489,7 @@ be called and the string printed out on standard out.
 
 Although pattern matching is often sufficient, sometimes one needs
 to match on some predicate, rather than just the type constructor.
-For this case, fl provides an {\tt assuming} keyword. 
+For this case, fl provides an {\tt assuming} keyword.
 For example:
 %%%START_CODE%%%%
 letrec collatz 1 = [1]
@@ -1661,7 +1661,7 @@ let expr2bool e =
             let state0 = add_to_state state s T in
             let state1 = add_to_state state s F in
             (eval e state0) AND (eval e state1)
-     /\    eval (E_VAR s) state = lookup s state 
+     /\    eval (E_VAR s) state = lookup s state
      /\    eval (E_TRUE) state = T
      /\    eval (E_AND e1 e2) state = (eval e1 state) AND (eval e2 state)
      /\    eval (E_NOT e) state = NOT (eval e state)
@@ -1703,8 +1703,8 @@ In order to make the fl code more readable, there is extensive
 support for changing the fixity of operators or functions.
 
 
-if\_then\_else\_binder 
-postfix 
+if\_then\_else\_binder
+postfix
 nonfix
 prefix 0
 prefix 1
@@ -1713,7 +1713,7 @@ infix 0-9
 infixr 0-9
 infix\_unary
 
-change the parsing of variables or 
+change the parsing of variables or
 
 
 declare
@@ -1804,13 +1804,13 @@ forall a b c. a || b && c;
 %%%END_CODE%%%%
 
 % \subsection{Overloading}
-% 
+%
 % fl supports a limited amount of user defined overloading%
 % \index{overloading}%
 % {} of functions
 % and operators.
 % However, in order to avoid an exponential type inference algorithm, the
-% overloaded operators must be resolved from the types of their arguments only. 
+% overloaded operators must be resolved from the types of their arguments only.
 % To illustrate the construct, consider the following example:
 % %%% START_CODE%%%%
 % let pplus ({a::int},{b::int}) (c,d) = (a+c, b+d);
@@ -1822,7 +1822,7 @@ forall a b c. a || b && c;
 % Here we overloaded the symbols + and *.
 % Note that we essentially added new meanings to + and * since we included
 % the (built-in) versions as possible candidates.
-% 
+%
 % Finally, overloaded operators and functions can of course also
 % be declared infix, binders, or postfix as any other function or operator.
 
@@ -1941,11 +1941,11 @@ tbl2list	    -- Return the (key,data) pairs stored in the table
 As stated earlier, fl is a lazy language.
 This is mostly true, but there are some subtle exceptions.
 In general, laziness means two aspects:
-1) an expression is never evaluated until it is needed and 
+1) an expression is never evaluated until it is needed and
 2) an expression is only evaluated once.
 Once you introduce side effects in the language this causes problems.
 In particular, the second aspect may no longer be what you want.
-In addition, as a consequence of property 1, the order in which 
+In addition, as a consequence of property 1, the order in which
 expressions get evaluated is difficult to predict.
 
 To mitigate the problem of evaluation order, fl provides two mechanisms.
@@ -1990,7 +1990,7 @@ letrec fac n =
 fac 7;
 fac 11;
 %%%END_CODE%%%%
-Not only do we only get two printouts for the fac 7 evaluation, we get 
+Not only do we only get two printouts for the fac 7 evaluation, we get
 no output the second time we call fac!
 The problem here is that the expressions (pr "Even") and (pr "Odd")
 does not depend on n and thus will only be evaluated once.
@@ -2009,7 +2009,7 @@ fac 11;
 %%%END_CODE%%%%
 in which we introduced a (dummy) dependency on n.
 
-Since situation is quite common when one use side-effecting functions, 
+Since situation is quite common when one use side-effecting functions,
 fl has introduced an automatic mechanism for it.
 By declaring the function pr as
 non\_lazy%
@@ -2042,7 +2042,7 @@ tcl\_eval%
 \index{tcl\_eval}%
 {} that takes a list of strings and send them over to the running
 tcl interpreter.
-For example: 
+For example:
 %%%START_CODE%%%%
 let go_on topic =
     let query = sprintf "Do you want to continue with %s?" topic in
@@ -2122,7 +2122,7 @@ would see:
 % \includegraphics[width=0.6\linewidth]{screen_shots/fac_calc.png}
 \includegraphics{screen_shots/fac_calc.png}
 \end{center}
- 
+
 Note that the tcl procedure (proc docomp) has to be given as a single string
 in tcl\_eval. Again, putting this code in a separate tcl file is far easier.
 

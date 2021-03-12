@@ -1,0 +1,180 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "fl",
+	"fileTypes": [".fl"],
+	"patterns": [
+		{ "include": "#let" },
+		{ "include": "#lettype" },
+		{ "include": "#lambda" },
+		{ "include": "#val" },
+		{ "include": "#types" },
+		{ "include": "#simple" }
+	],
+	"repository": {
+		"let": {
+			"begin": "(\\bcletrec\\b|\\bclet\\b|\\blet\\b|\\bletrec\\b|/\\\\\\s)\\s*(?:([^{ \t\n]\\S*)|({)\\s*(\\S*?)\\s*(::)(.*?)(}))",
+			"end": "(=)",
+			"beginCaptures": {
+				"1": { "name" : "keyword.control.fl" },
+				"2": { "name" : "constant.character.escape.fl" },
+				"3": { "name" : "keyword.other.fl" },
+				"4": { "name" : "constant.character.escape.fl" },
+				"5": { "name" : "keyword.other.fl" },
+				"6": { "name" : "support.class.fl", "patterns": [{"include": "#type_spec"}, {"include": "#simple"}]},
+				"7": { "name" : "keyword.other.fl" }
+			},
+			"endCaptures": {
+				"1": { "name" : "keyword.control.fl" }
+			},
+			"name" : "variable.parameter.fl",
+			"patterns": [{"include": "#types"}, {"include": "#simple"}]
+		},
+		"lettype": {
+			"begin": "(\\blettype\\b)(.+?)(=)",
+			"end": "(;)",
+			"beginCaptures": {
+				"1": { "name" : "keyword.control.fl" },
+				"2": { "name" : "support.class.fl" },
+				"3": { "name" : "keyword.control.fl" }
+			},
+			"endCaptures": {
+				"1": { "name" : "keyword.other.fl" }
+			},
+			"patterns": [{"include": "#inlettype"}, {"include": "#simple"}]
+		},
+		"inlettype": {
+			"begin": "(\\S+)",
+			"end": "(\\|)|(\\bandlettype\\b)(.+?)(=)|(?=;)",
+			"name": "support.class.fl",
+			"beginCaptures": {
+				"1": { "name": "constant.character.escape.fl" }
+			},
+			"endCaptures": {
+				"1": { "name": "keyword.control.fl" },
+				"2": { "name": "keyword.control.fl" },
+				"3": { "name": "support.class.fl" },
+				"4": { "name": "keyword.control.fl" }
+			},
+			"patterns": [{"include": "#types_param"}, {"include": "#simple"}]
+		},
+		"lambda": {
+			"match": "((?<![\\#\\\\\\/\\|\\%\\$\\^\\-\\+\\&\\~])\\\\)(.+?)(\\.)",
+			"captures": {
+				"1": { "name": "keyword.control.fl" },
+				"2": { "name": "variable.parameter.fl", "patterns": [{"include": "#types_param"}, {"include": "#simple"}]},
+				"3": { "name": "keyword.control.fl" }
+			}
+		},
+		"val": {
+			"begin": "\\b(val)\\b",
+			"end": "(=)",
+			"beginCaptures": {
+				"1": { "name": "keyword.control.fl" }
+			},
+			"endCaptures": {
+				"1": { "name": "keyword.control.fl" }
+			},
+			"name": "variable.parameter.fl",
+			"patterns": [{"include": "#types_param"}, {"include": "#simple"}]
+		},
+		"types": {
+			"match": "({)\\s*(\\S+?)\\s*(::)(.+?)(})",
+			"captures": {
+				"1": { "name" : "keyword.other.fl" },
+				"2": { "patterns" : [{ "include": "#simple"}]},
+				"3": { "name" : "keyword.other.fl" },
+				"4": { "name" : "support.class.fl", "patterns": [{"include": "#type_spec"}, {"include": "#simple"}]},
+				"5": { "name" : "keyword.other.fl" }
+			}
+		},
+		"types_param": {
+			"match": "({)\\s*(\\S+?)\\s*(::)(.+?)(})",
+			"captures": {
+				"1": { "name" : "keyword.other.fl" },
+				"2": { "name" : "variable.parameter.fl", "patterns" : [{ "include": "#simple"}]},
+				"3": { "name" : "keyword.other.fl" },
+				"4": { "name" : "support.class.fl", "patterns": [{"include": "#type_spec"}, {"include": "#simple"}]},
+				"5": { "name" : "keyword.other.fl" }
+			}
+		},
+		"type_spec": {
+			"match": "(\\*+|list|ref)",
+			"name": "support.class.fl"
+		},
+		"simple": {
+			"patterns": [
+				{ "include": "#keywords" },
+				{ "include": "#constants" },
+				{ "include": "#strings" },
+				{ "include": "#comments" },
+				{ "include": "#functions" }
+			]
+		},
+		"keywords": {
+			"patterns": [
+				{
+					"name": "keyword.control.fl",
+					"match": "\\b(andlettype|add_open_overload|assuming|begin_abstype|binder|binder_with_accumulator|clear_fixities|clet|cletrec|end_abstype|export_to_tcl|forward_declare|free_binder|if_then_else_binder|then_binder|else_binder|infix|infix_unary|infixr|then|in|install_print_function|let|letrec|lettype|list|new_type_abbrev|non_lazy|nonfix|open_overload|overload|postfix|prefix|print_fixities|ref|val)\\b"
+				},
+				{
+					"name": "keyword.other.fl",
+					"match": "[=,;\\(\\)\\[\\]\\{\\}\\#:\\?><\\-!\\|+\\-\\*\\%\\@\\'\\&~\\$\\^\\\\]|\\/(?!\\/)"
+				},
+				{
+					"name": "support.class.fl",
+					"match": "\\b(string|int|float|double|bool|list|ref|tbl|bv|bev|bexpr|void|window|iset|eq_info|opt|leaftype|term|mem|wexpr|update_fn|pexlif|content|vec_info|\\*|\\*\\*)\\b"
+				}
+			]
+		},
+		"strings": {
+			"name": "string.quoted.double.fl",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.fl",
+					"match": "\\\\."
+				}
+			]
+		},
+		"constants": {
+			"patterns": [
+					{
+							"match": "\\b(T|F|bT|bF|DIR)\\b",
+							"name": "markup.bold.fl"
+					},
+					{
+							"match": "(?<=\\W)(\\d*\\.?\\d+)([Ee][+-]?\\d+)?",
+							"name": "constant.numeric.fl"
+					},
+					{
+							"match": "(?<=\\W)\\d+(\\.(\\d*)?)",
+							"name": "constant.numeric.fl"
+					}
+			]
+		},
+		"functions": {
+			"patterns": [
+				{
+					"name": "support.function.builtin.fl",
+					"comment": "Can be obtained by 'get_matching_functions \"*\" \"*\" \"*\" \"*\" 10000;' in fl and removing operators",
+					"match": "\\b(AND|AND_list|APPLY|ARGS|BEXPR|BOOL|CONS|DBGmem|DBGwexpr|ELSE|EQ_INFO|EXT_OBJ|F|IF|INT|ISET|LAMBDA|LEAF|LP|LPsol|MEM|NIL|NONE|NOT|OR|OR_list|PINST|PRIM_FN|P_HIER|P_LEAF|Pleaftype|Pterm|Pvec_info|Pwexpr|Quant_forall|Quant_thereis|RANGES|SOME|STE|STRING|SUC|T|THEN|TXT|VAR|VARS|WINDOW|WTIME|W_ADD|W_AND|W_ASHR|W_CAT|W_CONST|W_DIV|W_EQ|W_EXPLICIT_VAR|W_GR|W_ITE|W_MEM_READ|W_MEM_WRITE|W_MOD|W_MUL|W_NAMED_CONST|W_NAMED_SLICE|W_NOT|W_OR|W_PHASE_DELAY|W_PRED|W_SHL|W_SHR|W_SLICE|W_SUB|W_SX|W_UPDATE_FN|W_UPDATE_NAMED_SLICE|W_VAR|W_X|W_ZX|XNOR|XOR|___z|_load|abs|accumulate|acos|append|asin|assoc|atan|atmost|bAND|bEqual|bF|bITE|bNOT|bOR|bSTE|bT|bTHEN|bXNOR|bXOR|basename|bdd2bexpr|bdd_current2next|bdd_load|bdd_next2current|bdd_reorder|bdd_save|bdd_signature|bdd_size|bdepends|bev2int|bev2list|bev2num|bev2str|bevTHEN|bev_AND|bev_NOT|bev_OR|bev_XNOR|bev_XOR|bev_ZX|bev_add|bev_ashr|bev_div|bev_eq|bev_geq|bev_greater|bev_leq|bev_less|bev_mod|bev_mul|bev_neq|bev_plus|bev_size|bev_sub|bev_unary_minus|bev_variable|bevabs|bexpr2bdd|bexpr2bdd_be|bexpr2bdd_bool|bexpr2bdd_float|bexpr2bdd_int|bexpr2bdd_list|bexpr2bdd_pair|bexpr2bdd_string|bexpr2bdd_void|bexpr2str|bexpr_load|bexpr_save|bget_arguments|bget_model|bget_sat_literal|bget_ste_result|bget_trace|bget_trace_val|bget_type|bget_variable|bget_vector_model|bits_needed|bl2int|bool2bexpr|bool2str|bsize|bsubstitute|busy|butfirstn|butlast|butlastn|bv2int|bv2list|bv2num|bv2str|bv_AND|bv_NOT|bv_OR|bv_XNOR|bv_XOR|bv_ZX|bv_add|bv_ashr|bv_constrained_variable|bv_div|bv_eq|bv_examples|bv_exp|bv_geq|bv_greater|bv_leq|bv_less|bv_mod|bv_mul|bv_neq|bv_plus|bv_range|bv_size|bv_small_exp|bv_sub|bv_unary_minus|bv_variable|bvabs|bvariable|bvpow|cVARS|catch|ceil|chr|clean_clets|cload|cluster|cos|dbg_clean_pexlif_ios|dbg_emit_fsm|depends|deref|downto|draw_bdd_profile|draw_bdds|draw_graph|early_quant_thereis|early_quant_thereis_preamble|edges|el|empty|enumerate_examples|error|eval|example|excitation_function|exec|exit|exp|explode|export_to_ppm|extract_vectors|f_div|f_ge|f_gt|f_le|f_lt|f_minus|f_mul|f_plus|f_unary_minus|fabs|fadd|fanin|fanin_dfs|fanout|fanout_dfs|fclose|fdiv|feof|feq|fflush|fge|fgets|fgt|file_exists|file_fullname|file_signature|filter|find|find_all|find_first|find_first0|find_smallest|firstn|fixed_bv2list|flat|flatmap|fle|float2str|floor|flt|fmul|fne|font_large|font_larger|font_largest|font_normal|font_small|font_tiny|fopen|forcing|foreach|fparam|fparam_rec|fseq|fst|fsub|full_example|gather|gcd|gen_bAND|gen_bNOT|gen_bOR|gen_bexpr2bdd|gen_catch|gen_str2int|get_abstract_depends|get_cur_eval_cond|get_fixity|get_matching_functions|get_stack_trace|get_ste_maxtime|get_ste_result|get_ste_type|get_trace|get_trace_val|get_value|get_visualization_attributes|get_visualization_fanins|get_visualization_id|get_visualization_outputs|get_visualization_pfn|get_vossrc|get_weak_expressions|get_window_result|has_value|hd|help|hsv_filter|i2i|i_div|i_ge|i_gt|i_le|i_lt|i_minus|i_mod|i_mul|i_plus|i_unary_minus|iabs|id|iintersect|image_get_pixel|image_size|imem|implode|import_xpm_image|inputs|int2bev|int2bl|int2bv|int2float|int2str|intAND|intNOT|intOR|intXOR|interleave|intersect|ipop_cnt|ipow|is_defined|is_phase_delay|iset2set|isubtract|itlist|iunion|last|lastn|length|list2bev|list2bv|list2fp|list2fp_1|list2fp_2|list2str|list2tbl|load|load_plugin|loaded_files_ref|log|log10|log2|map|map2|map3|max|md_expand_vector|md_expand_vectors|md_extract_vectors|md_merge_vectors|md_size|md_split_vector|mem|merge_funs|merge_vectors|min|mk_name|mktemp|mktempd|mutex|nat2bv|nearest_power_of_2|neg_s2bev|neg_s2bv|neg_s2float|neg_s2int|noX|node2value_list|node2vector|node_name_cmp|nodes|open_help|open_preferences|ord|outputs|param|parametric|partition|pexlif2fsm|pi|pow|pr_indices|prim_bexpr2bdd|prim_fns|primes|primfn2name|print|print_vectors|profile|prompt_for_inputs|qsort|quant_forall|quant_thereis|quit|random|random2|read_content|read_eq_info|read_iset|read_leaftype|read_mem|read_pexlif|read_term|read_update_fn|read_vec_info|read_wexpr|read_window|relprod_forall|relprod_thereis|replicate|report_result|report_result_in_file|rev|rev_assoc|rev_itlist|round|rvariable|s2bev|s2bv|s2float|s2int|save|select|seq|set2iset|set_font|setify|sha256_signature|sin|sitlist|snd|split|split_vector|sqrt|srandom|stderr|stdout|ste2fsm|str2float|str_cluster|str_is_prefix|str_is_substr|str_is_suffix|str_match|str_split|strcmp|stream2filename|string_butlastn|string_hd|string_lastn|string_tl|strlen|strstr|substitute|substr|subtract|system|tan|tbl2list|tbl_clear|tbl_create|tbl_delete|tbl_get|tbl_insert|tbl_member|tcl_eval|test|time|tl|top_cofactor|transpose|trim|truth_cover|unary_minus|undefined|union|unzip|update_vossrc|upto|var_order|variable|vec_info2str|vec_interleave|vector_atomize|vectors|visualisation2tcl|visualization_anon2real|visualization_nodes|visualization_set_stop_nodes|visualization_vecs2tags|visualize_expand_fanin|visualize_fanin|visualize_get_shown_anons|visualize_hide_fanin|visualize_undo|write_content|write_eq_info|write_iset|write_leaftype|write_mem|write_pexlif|write_term|write_update_fn|write_vec_info|write_wexpr|write_window|wtime|zip)\\b"
+				},
+				{
+					"name": "support.function.builtin.fl",
+					"match": "\\b(eprintf|fprintf|printf|sprintf|sscanf)\\b"
+				}
+			]
+		},
+		"comments": {
+			"name": "comment.line.fl",
+			"begin": "//",
+			"end": "\n",
+			"patterns": [{
+				"name": "constant.character.escape.fl",
+				"match": "\\\\."
+			}]
+		}
+	},
+	"scopeName": "source.fl"
+}
