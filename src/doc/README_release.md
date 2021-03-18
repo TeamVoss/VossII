@@ -19,7 +19,7 @@ Usage
 
 After installing VossII, simply run `fl` to start the standalone interpreter
 for VossII. You can also use our official editor integrations, to run VossII
-from within either vim or emacs.
+from within vim, emacs or visual studio code.
 
 See [the VossII tutorial](https://teamvoss.github.io) for more information.
 
