@@ -145,8 +145,8 @@ read_matrix(mat_ptr m, g_ptr redex)
 static void
 print_matrix(mat_ptr m)
 {
-    for(unint r = 0; r < iso->rows; r++) {
-        for(unint c = 0; c < iso->cols; c++) {
+    for(unint r = 0; r < m->rows; r++) {
+        for(unint c = 0; c < m->cols; c++) {
             fprintf(stderr, " %s", m->mat[r][c] ? "_" : "T");
         }
         fprintf(stderr, "\n");
