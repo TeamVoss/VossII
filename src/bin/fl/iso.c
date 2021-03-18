@@ -57,7 +57,7 @@ static mat_ptr         haystack;
 static int             mat_oidx;
 static typeExp_ptr     mat_tp;
 // Debugging.
-#define DEBUG_ISO 0
+#define DEBUG_ISO 1
 #define debug_print(fmt, ...)                                                  \
         do { if (DEBUG_ISO) fprintf(stderr, "%s:%d:%s(): " fmt, __FILE__,      \
                                 __LINE__, __func__, __VA_ARGS__); } while (0)
@@ -90,7 +90,7 @@ static void pick(mat_ptr iso, unint r, unint c);
 static void fill_points(mat_ptr iso, point_ptr ps);
 static void fill_shadow(mat_ptr iso, unint r);
 static void recurse(mat_ptr iso, unint row);
-static void isomatch(mat_ptr iso, mat_ptr p, mat_ptr g);
+static void isomatch(mat_ptr iso, mat_ptr p, mat_ptr g, unint r);
 
 /******************************************************************************/
 /*                                LOCAL FUNCTIONS                             */
@@ -147,7 +147,7 @@ print_matrix(mat_ptr m)
 {
     for(unint r = 0; r < m->rows; r++) {
         for(unint c = 0; c < m->cols; c++) {
-            fprintf(stderr, " %s", m->mat[r][c] ? "_" : "T");
+            fprintf(stderr, " %s", m->mat[r][c] ? "T" : "_");
         }
         fprintf(stderr, "\n");
     }
@@ -468,19 +468,13 @@ mk_iso_matrix(mat_ptr m, sig_ptr p, sig_ptr g)
     for(sig_ptr r = p; r != NULL; r = r->next) {
         int j = 0;
         for(sig_ptr c = g; c != NULL; c = c->next) {
-            if(r->fp == c->fp || strcmp(r->sha, c->sha)) {
+            if(r->fp == c->fp || strcmp(r->sha, c->sha) == 0) {
                 m->mat[i][j] = TRUE;
-                if(m->mat[i][j]) {
-                    fprintf(stderr, "true!\n");
-                }
             }
             j++;
         }
         i++;
     }
-    fprintf(stderr, "mat (iso?):\n");
-    print_matrix(m);
-    // /
     return TRUE;
 }
 
@@ -691,9 +685,10 @@ recurse(mat_ptr iso, unint row)
         print_matrix(iso);
         if(test_isomorphism_match(iso, needle, haystack)) {
             push_buf(res_buf_ptr, (pointer) iso);
-            Exit(-1);
+            fprintf(stderr, "yes!\n");
             return;
         } else {
+            fprintf(stderr, "no...\n");
             return;
         }
     }
@@ -715,7 +710,7 @@ recurse(mat_ptr iso, unint row)
 }
 
 static void
-isomatch(mat_ptr iso, mat_ptr p, mat_ptr g)
+isomatch(mat_ptr iso, mat_ptr p, mat_ptr g, unint row)
 {
     fprintf(stderr, "iso:\n");
     print_matrix(iso);
@@ -725,7 +720,7 @@ isomatch(mat_ptr iso, mat_ptr p, mat_ptr g)
     print_matrix(g);
     // /
     new_rec_mem(p, g);
-    recurse(iso, 0);
+    recurse(iso, row);
     rem_rec_mem();
 }
 
@@ -944,8 +939,11 @@ isomatch_fn(g_ptr redex)
         if(!fail) {
             if(box) {
                 trim_matrix_head(adj_p);
+                trim_matrix_head(iso);
+                isomatch(iso, adj_p, adj_g, 1);
+            } else {
+                isomatch(iso, adj_p, adj_g, 0);
             }
-            isomatch(iso, adj_p, adj_g);
             MAKE_REDEX_VOID(redex);
         }
         debug_print("(%d) done\n", 6);
@@ -1080,10 +1078,7 @@ Iso_Install_Functions()
 void
 _DuMMy_iso()
 {
-    free_matrix(NULL);
-    test_isomorphism_formatting(NULL);
-    test_isomorphism_match(NULL,NULL,NULL);
-    isomatch(NULL,NULL,NULL);
+    
 }
 
 /******************************************************************************/
