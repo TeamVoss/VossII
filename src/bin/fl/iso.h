@@ -52,6 +52,14 @@ typedef struct sig_rec {
     sig_ptr next;
 } sig_rec;
 
+// ? -----------------------------------
+typedef struct point_rec *point_ptr;
+typedef struct point_rec {
+    unint     row;
+    unint     col;
+    point_ptr next;
+} point_rec;
+
 // Matrix. -----------------------------
 typedef struct mat_rec *mat_ptr;
 typedef struct mat_rec {
