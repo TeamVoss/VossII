@@ -8,6 +8,7 @@
 /*     Original author: Markus Aronsson, 2020                                 */
 /*                                                                            */
 /******************************************************************************/
+#include <time.h> // for testing...
 #include "strings.h"
 #include "buf.h"
 #include "graph.h"
@@ -57,7 +58,7 @@ static mat_ptr         haystack;
 static int             mat_oidx;
 static typeExp_ptr     mat_tp;
 // Debugging.
-#define DEBUG_ISO 1
+#define DEBUG_ISO 0
 #define debug_print(fmt, ...)                                                  \
         do { if (DEBUG_ISO) fprintf(stderr, "%s:%d:%s(): " fmt, __FILE__,      \
                                 __LINE__, __func__, __VA_ARGS__); } while (0)
@@ -681,14 +682,12 @@ static void
 recurse(mat_ptr iso, unint row)
 {
     if(iso->rows == row) {
-        fprintf(stderr, "solution?\n");
-        print_matrix(iso);
         if(test_isomorphism_match(iso, needle, haystack)) {
             push_buf(res_buf_ptr, (pointer) iso);
-            fprintf(stderr, "yes!\n");
+            //print_matrix(iso);
+            fprintf(stderr, "found a solution!\n");
             return;
         } else {
-            fprintf(stderr, "no...\n");
             return;
         }
     }
@@ -712,12 +711,12 @@ recurse(mat_ptr iso, unint row)
 static void
 isomatch(mat_ptr iso, mat_ptr p, mat_ptr g, unint row)
 {
-    fprintf(stderr, "iso:\n");
-    print_matrix(iso);
-    fprintf(stderr, "needle:\n");
-    print_matrix(p);
-    fprintf(stderr, "haystack:\n");
-    print_matrix(g);
+    //fprintf(stderr, "iso:\n");
+    //print_matrix(iso);
+    //fprintf(stderr, "needle:\n");
+    //print_matrix(p);
+    //fprintf(stderr, "haystack:\n");
+    //print_matrix(g);
     // /
     new_rec_mem(p, g);
     recurse(iso, row);
@@ -937,6 +936,9 @@ isomatch_fn(g_ptr redex)
         }
         debug_print("(%d) isomatch\n", 5);
         if(!fail) {
+            clock_t start, end;
+            double cpu_time_used;
+            start = clock();
             if(box) {
                 trim_matrix_head(adj_p);
                 trim_matrix_head(iso);
@@ -944,6 +946,9 @@ isomatch_fn(g_ptr redex)
             } else {
                 isomatch(iso, adj_p, adj_g, 0);
             }
+            end = clock();
+            cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+            fprintf(stderr, "Done in %fs\n", cpu_time_used);
             MAKE_REDEX_VOID(redex);
         }
         debug_print("(%d) done\n", 6);
@@ -1078,7 +1083,7 @@ Iso_Install_Functions()
 void
 _DuMMy_iso()
 {
-    
+    print_matrix(NULL);
 }
 
 /******************************************************************************/
