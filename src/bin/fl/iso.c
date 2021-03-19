@@ -8,6 +8,7 @@
 /*     Original author: Markus Aronsson, 2020                                 */
 /*                                                                            */
 /******************************************************************************/
+#include <time.h> // for testing...
 #include "strings.h"
 #include "buf.h"
 #include "graph.h"
@@ -90,7 +91,7 @@ static void pick(mat_ptr iso, unint r, unint c);
 static void fill_points(mat_ptr iso, point_ptr ps);
 static void fill_shadow(mat_ptr iso, unint r);
 static void recurse(mat_ptr iso, unint row);
-static void isomatch(mat_ptr iso, mat_ptr p, mat_ptr g);
+static void isomatch(mat_ptr iso, mat_ptr p, mat_ptr g, unint r);
 
 /******************************************************************************/
 /*                                LOCAL FUNCTIONS                             */
@@ -147,7 +148,7 @@ print_matrix(mat_ptr m)
 {
     for(unint r = 0; r < m->rows; r++) {
         for(unint c = 0; c < m->cols; c++) {
-            fprintf(stderr, " %s", m->mat[r][c] ? "_" : "T");
+            fprintf(stderr, " %s", m->mat[r][c] ? "T" : "_");
         }
         fprintf(stderr, "\n");
     }
@@ -468,19 +469,13 @@ mk_iso_matrix(mat_ptr m, sig_ptr p, sig_ptr g)
     for(sig_ptr r = p; r != NULL; r = r->next) {
         int j = 0;
         for(sig_ptr c = g; c != NULL; c = c->next) {
-            if(r->fp == c->fp || strcmp(r->sha, c->sha)) {
+            if(r->fp == c->fp || strcmp(r->sha, c->sha) == 0) {
                 m->mat[i][j] = TRUE;
-                if(m->mat[i][j]) {
-                    fprintf(stderr, "true!\n");
-                }
             }
             j++;
         }
         i++;
     }
-    fprintf(stderr, "mat (iso?):\n");
-    print_matrix(m);
-    // /
     return TRUE;
 }
 
@@ -687,11 +682,10 @@ static void
 recurse(mat_ptr iso, unint row)
 {
     if(iso->rows == row) {
-        fprintf(stderr, "solution?\n");
-        print_matrix(iso);
         if(test_isomorphism_match(iso, needle, haystack)) {
             push_buf(res_buf_ptr, (pointer) iso);
-            Exit(-1);
+            //print_matrix(iso);
+            fprintf(stderr, "found a solution!\n");
             return;
         } else {
             return;
@@ -715,17 +709,17 @@ recurse(mat_ptr iso, unint row)
 }
 
 static void
-isomatch(mat_ptr iso, mat_ptr p, mat_ptr g)
+isomatch(mat_ptr iso, mat_ptr p, mat_ptr g, unint row)
 {
-    fprintf(stderr, "iso:\n");
-    print_matrix(iso);
-    fprintf(stderr, "needle:\n");
-    print_matrix(p);
-    fprintf(stderr, "haystack:\n");
-    print_matrix(g);
+    //fprintf(stderr, "iso:\n");
+    //print_matrix(iso);
+    //fprintf(stderr, "needle:\n");
+    //print_matrix(p);
+    //fprintf(stderr, "haystack:\n");
+    //print_matrix(g);
     // /
     new_rec_mem(p, g);
-    recurse(iso, 0);
+    recurse(iso, row);
     rem_rec_mem();
 }
 
@@ -942,10 +936,19 @@ isomatch_fn(g_ptr redex)
         }
         debug_print("(%d) isomatch\n", 5);
         if(!fail) {
+            clock_t start, end;
+            double cpu_time_used;
+            start = clock();
             if(box) {
                 trim_matrix_head(adj_p);
+                trim_matrix_head(iso);
+                isomatch(iso, adj_p, adj_g, 1);
+            } else {
+                isomatch(iso, adj_p, adj_g, 0);
             }
-            isomatch(iso, adj_p, adj_g);
+            end = clock();
+            cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+            fprintf(stderr, "Done in %fs\n", cpu_time_used);
             MAKE_REDEX_VOID(redex);
         }
         debug_print("(%d) done\n", 6);
@@ -1080,10 +1083,7 @@ Iso_Install_Functions()
 void
 _DuMMy_iso()
 {
-    free_matrix(NULL);
-    test_isomorphism_formatting(NULL);
-    test_isomorphism_match(NULL,NULL,NULL);
-    isomatch(NULL,NULL,NULL);
+    print_matrix(NULL);
 }
 
 /******************************************************************************/
