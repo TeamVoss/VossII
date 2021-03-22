@@ -23,6 +23,16 @@ void	    Iso_Install_Functions();
 
 #include "fl.h"
 
+// Matrix. -----------------------------
+typedef struct mat_rec *mat_ptr;
+typedef struct mat_rec {
+    int   mark;
+    //
+    bool  **mat;
+    unint rows;
+    unint cols;
+} mat_rec;
+
 // Adj. matrix construction ------------
 typedef struct bkt_rec *bkt_ptr;
 typedef struct bkt_rec {
@@ -60,15 +70,25 @@ typedef struct point_rec {
     point_ptr next;
 } point_rec;
 
-// Matrix. -----------------------------
-typedef struct mat_rec *mat_ptr;
-typedef struct mat_rec {
-    int   mark;
-    //
-    bool  **mat;
-    unint rows;
-    unint cols;
-} mat_rec;
+typedef struct search_rec *search_ptr;
+typedef struct search_rec {
+    // Memory managers.
+    rec_mgr    change_mgr;
+    buffer     results;
+    // Bookkeeping.
+    unint      start;
+    unint      row;
+    unint      *cols;    // A
+    bool       *used;    // B
+    point_ptr  *changes; // A
+    mat_ptr    copy;     // AxB
+    // Main matrices.
+    mat_ptr    isomatch; // AxB
+    mat_ptr    needle;   // AxA
+    mat_ptr    haystack; // BxB
+} search_rec;
+
+// Short-hands -------------------------
 
 #define FORMAL_OF_CONS(fa)                                                     \
     split_vector(GET_STRING(GET_FST(GET_CONS_HD(fa))))
