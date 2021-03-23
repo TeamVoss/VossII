@@ -23,7 +23,7 @@ void	    Iso_Install_Functions();
 
 #include "fl.h"
 
-// Matrix. -----------------------------
+// Matrix. ---------------------------------------------------------------------
 typedef struct mat_rec *mat_ptr;
 typedef struct mat_rec {
     int   mark;
@@ -33,7 +33,7 @@ typedef struct mat_rec {
     unint cols;
 } mat_rec;
 
-// Adj. matrix construction ------------
+// Adj. matrix construction ----------------------------------------------------
 typedef struct bkt_rec *bkt_ptr;
 typedef struct bkt_rec {
     unint   lbl;
@@ -54,7 +54,7 @@ typedef struct key_lst_rec {
     key_lst_ptr next;
 } key_lst_rec;
 
-// Iso. matrix construction ------------
+// Iso. matrix construction ----------------------------------------------------
 typedef struct sig_rec *sig_ptr;
 typedef struct sig_rec {
     string  sha;
@@ -62,34 +62,31 @@ typedef struct sig_rec {
     sig_ptr next;
 } sig_rec;
 
-// ? -----------------------------------
-typedef struct point_rec *point_ptr;
-typedef struct point_rec {
-    unint     row;
-    unint     col;
-    point_ptr next;
-} point_rec;
+// Isomatching. ----------------------------------------------------------------
+typedef struct updates_rec *updates_ptr;
+typedef struct updates_rec {
+    unint       row;
+    unint       col;
+    updates_ptr next;
+} updates_rec;
 
 typedef struct search_rec *search_ptr;
 typedef struct search_rec {
-    // Memory managers.
-    rec_mgr    change_mgr;
-    buffer     results;
     // Bookkeeping.
-    unint      start;
-    unint      row;
-    unint      *cols;    // A
-    bool       *set;     // A
-    bool       *used;    // B
-    point_ptr  *changes; // A
-    mat_ptr    copy;     // AxB
+    unint       start;
+    unint       row;
+    unint       *cols;    // A
+    bool        *set;     // A+1
+    bool        *used;    // B
+    updates_ptr *changes; // A
+    mat_ptr     copy;     // AxB
     // Main matrices.
-    mat_ptr    isomatch; // AxB
-    mat_ptr    needle;   // AxA
-    mat_ptr    haystack; // BxB
+    mat_ptr     isomatch; // AxB
+    mat_ptr     needle;   // AxA
+    mat_ptr     haystack; // BxB
 } search_rec;
 
-// Short-hands -------------------------
+// Short-hands -----------------------------------------------------------------
 
 #define FORMAL_OF_CONS(fa)                                                     \
     split_vector(GET_STRING(GET_FST(GET_CONS_HD(fa))))
