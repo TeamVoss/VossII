@@ -79,6 +79,7 @@ typedef struct search_rec {
     unint      start;
     unint      row;
     unint      *cols;    // A
+    bool       *set;     // A
     bool       *used;    // B
     point_ptr  *changes; // A
     mat_ptr    copy;     // AxB
