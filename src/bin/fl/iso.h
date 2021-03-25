@@ -72,6 +72,7 @@ typedef struct updates_rec {
 
 typedef struct search_rec *search_ptr;
 typedef struct search_rec {
+    int         mark;
     // Bookkeeping.
     unint       start;
     unint       row;

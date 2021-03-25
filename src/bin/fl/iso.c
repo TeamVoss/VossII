@@ -54,8 +54,11 @@ static rec_mgr         search_mgr;
 // Types.
 static int             mat_oidx;
 static typeExp_ptr     mat_tp;
-// Debugging.
-#define DEBUG_ISO 1
+static int             search_oidx;
+static typeExp_ptr     search_tp;
+
+// Debugging -------------------------------------------------------------------
+#define DEBUG_ISO 0
 #define debug_print(fmt, ...)                                                  \
         do { if (DEBUG_ISO) fprintf(stderr, "%s:%d:%s(): " fmt, __FILE__,      \
                                 __LINE__, __func__, __VA_ARGS__); } while (0)
@@ -603,8 +606,6 @@ trim(mat_ptr iso, mat_ptr p, mat_ptr g, unint r, unint c, updates_ptr *ps)
         if(p->mat[r][i]) {
             for(unint j = 0; j<iso->cols; j++) {
                 if(!g->mat[c][j] && iso->mat[i][j]) {
-                    //debug_print("Trimmed [%u][%u].\n", i, j);
-                    // /
                     iso->mat[i][j] = FALSE;
                     // Record update
                     updates_ptr new = (updates_ptr) new_rec(updates_mgr_ptr);
@@ -625,13 +626,8 @@ undo_trim(mat_ptr iso, updates_ptr ps)
 {
     updates_ptr p;
     while(ps != NULL) {
-        //debug_print("Un-trimmed [%u][%u].\n", ps->row, ps->col);
-        //
-        ASSERT(ps->row < iso->rows);
-        ASSERT(ps->col < iso->cols);
-        // /
         iso->mat[ps->row][ps->col] = TRUE;
-        // /
+        // Record removed.
         p  = ps;
         ps = ps->next;
         free_rec(updates_mgr_ptr, (pointer) p);
@@ -736,6 +732,7 @@ create_search(mat_ptr iso, mat_ptr p, mat_ptr g, unint start)
     ASSERT(g->rows   == g->cols);
     // /
     search_ptr s = (search_ptr) new_rec(&search_mgr);
+    s->mark      = 1;
     s->start     = start;
     s->row       = start;
     s->cols      = Calloc(iso->rows*sizeof(unint));
@@ -777,12 +774,12 @@ lazy_search(search_ptr s)
     mat_ptr G = s->haystack;
     unint   R = M->rows;
     unint   C = M->cols;
-    // /
+    // Main loop, called until solution is found or if search runs out of
+    // potential matches.
     loop: {
         if(s->row == R) {
             if(!s->set[R] && is_match(M, P, G)) {
-                debug_print("found %d solution!\n", 1);
-                // /
+                push_buf(results_buf_ptr, (pointer) M);
                 s->set[R] = TRUE;
                 return 1;
             } else {
@@ -798,7 +795,7 @@ lazy_search(search_ptr s)
             undo_pick(M, N, r);
             undo_trim(M, s->changes[r]);
             s->used[c] = FALSE;
-            // /
+            // Prep. for next col.
             s->set[r] = FALSE;
             start = s->cols[r] + 1;
         } else {
@@ -812,7 +809,7 @@ lazy_search(search_ptr s)
             trim(M, P, G, r, c, &s->changes[r]);
             pick(M, N, r, c);
             s->used[c] = TRUE;
-            // /
+            // Prep. for next row.
             s->cols[r] = c;
             s->set[r] = TRUE;
             s->row = r + 1;
@@ -826,7 +823,7 @@ lazy_search(search_ptr s)
             }
         }
     }
-    // /
+    // Something went wrong...
     return -1;
 }
 
@@ -834,9 +831,7 @@ static int
 lazy_isomatch(search_ptr s)
 {
     new_search_mem();
-    // /
     int res = lazy_search(s);
-    // /
     rem_search_mem();
     return res;
 }
@@ -876,146 +871,37 @@ sweep_mat_fn()
 //------------------------------------------------------------------------------
 
 static void
-pex2adj_fn(g_ptr redex)
+mark_search_fn(pointer p)
 {
-    debug_print("%p\n", (void *) redex);
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr g_pex, g_size;
-    EXTRACT_2_ARGS(redex, g_pex, g_size);
-    int size = GET_INT(g_size);
-    // /
-    if(size <= 0) {
-        MAKE_REDEX_FAILURE(redex, Fail_pr("pex2adj: pexlif must have a positive size."));
-    }
-    mat_ptr adj;
-    allocate_matrix(&adj, size, size);
-    if(!mk_adj(adj, g_pex)) {
-        free_matrix(adj);
-        MAKE_REDEX_FAILURE(redex, Fail_pr("pex2adj: pexlif couldn't be converted."));
-    } else {
-        MAKE_REDEX_EXT_OBJ(redex, mat_oidx, adj);
-    }
-    // /
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);
+    search_ptr s = (search_ptr) p;
+    s->mark = 2;
 }
 
 static void
-pex2iso_fn(g_ptr redex)
+sweep_search_fn()
 {
-    debug_print("%p\n", (void *) redex);
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr g_p, g_g, g_rows, g_cols;
-    EXTRACT_4_ARGS(redex, g_p, g_g, g_rows, g_cols);
-    int rows = GET_INT(g_rows);
-    int cols = GET_INT(g_cols);
-    // /
-    if (rows <= 0 || cols <= 0) {
-        MAKE_REDEX_FAILURE(redex, Fail_pr("pex2iso: pexlif must have a positive size."));
-    }
-    mat_ptr iso;
-    allocate_matrix(&iso, rows, cols);
-    if(!mk_iso(iso, g_p, g_g)) {
-        free_matrix(iso);
-        MAKE_REDEX_FAILURE(redex, Fail_pr("pex2iso: pexlif couldn't be converted."));
-    } else {
-        MAKE_REDEX_EXT_OBJ(redex, mat_oidx, iso);
-    }
-    // /
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);
-}
-
-static void
-trim_adj_fn(g_ptr redex)
-{
-    debug_print("%p\n", (void *) redex);
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr g_adj;
-    EXTRACT_1_ARG(redex, g_adj);
-    mat_ptr adj = (mat_ptr) GET_EXT_OBJ(g_adj);
-    // /
-    if(adj->rows <= 0 || adj->cols <= 0) {
-        MAKE_REDEX_FAILURE(redex, Fail_pr("trim_adj: empty adj."));
-    } else {
-        trim_matrix_head(adj);
-        MAKE_REDEX_VOID(redex);
-    }
-    // /
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);
-}
-
-static void
-is_adjacent_fn(g_ptr redex)
-{
-    debug_print("%p\n", (void *) redex);
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr g_adj, g_row, g_col;
-    EXTRACT_3_ARGS(redex, g_adj, g_row, g_col);
-    mat_ptr adj = (mat_ptr) GET_EXT_OBJ(g_adj);
-    int row = (unint) GET_INT(g_row);
-    int col = (unint) GET_INT(g_col);
-    // /
-    if(row <= 0 || col <= 0) {
-        MAKE_REDEX_FAILURE(redex, Fail_pr("is_adjacent: index negative."));
-    } else if ((unint) row-1 > adj->rows || (unint) col-1 > adj->cols) {
-        MAKE_REDEX_FAILURE(redex, Fail_pr("is_adjacent: index out of range."));
-    } else {
-        if(is_adjacent(adj, (unint) row-1, (unint) col-1)) {
-            MAKE_REDEX_BOOL(redex, B_One());
-        } else {
-            MAKE_REDEX_BOOL(redex, B_Zero());
+    search_ptr s;
+    FOR_REC(&search_mgr, search_ptr, s) {
+        switch(s->mark) {
+        case 0:
+            break;
+        case 1:
+            free_search(s);
+            s->mark = 0;
+            break;
+        case 2:
+            s->mark = 1;
+            break;
+        default:
+            DIE("Should not happen");
         }
     }
-    // /
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);
 }
 
-static void
-is_isomorphism_fn(g_ptr redex)
-{
-    debug_print("%p\n", (void *) redex);
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr g_p, g_g, g_iso;
-    EXTRACT_3_ARGS(redex, g_p, g_g, g_iso);
-    mat_ptr p = (mat_ptr) GET_EXT_OBJ(g_p);
-    mat_ptr g = (mat_ptr) GET_EXT_OBJ(g_g);
-    // /
-    int rows = List_length(g_iso);
-    int cols = List_length(GET_CONS_HD(g_iso));
-    mat_ptr iso;
-    allocate_matrix(&iso, p->rows, g->cols);
-    read_matrix(iso, g_iso);
-    if(rows <= 0 || cols <= 0) {
-        MAKE_REDEX_FAILURE(redex, Fail_pr("is_isomorphism: negative index."));
-    } else if((unint) rows != p->rows || (unint) cols != g->cols) {
-        MAKE_REDEX_FAILURE(redex, Fail_pr("is_isomorphism: mismatch in iso. size."));
-    } else if(p->rows != p->cols || g->rows != g->cols) {
-        MAKE_REDEX_FAILURE(redex, Fail_pr("is_isomorphism: mismatch in adj. sizes."));
-    } else if(iso->rows != p->rows || iso->cols != g->cols) {
-        MAKE_REDEX_FAILURE(redex, Fail_pr("is_isomorphism: iso. size doesn't match adj. sizes."));
-    } else {
-        if(is_match(iso, p, g)) {
-            MAKE_REDEX_BOOL(redex, B_One());
-        } else {
-            MAKE_REDEX_BOOL(redex, B_Zero());
-        }
-    }
-    free_matrix(iso);
-    // /
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);
-}
+//------------------------------------------------------------------------------
 
 static void
-isomatch_fn(g_ptr redex)
+strict_isomatch_fn(g_ptr redex)
 {
     debug_print("%p\n", (void *) redex);
     g_ptr l = GET_APPLY_LEFT(redex);
@@ -1031,33 +917,28 @@ isomatch_fn(g_ptr redex)
     } else if(g_size < 2) {
         MAKE_REDEX_FAILURE(redex, Fail_pr("isomatch: malformed haystack."));
     } else {
-        debug_print("(%d) allocate\n", 1);
         mat_ptr adj_p, adj_g, iso;
         allocate_matrix(&adj_p, p_size, p_size);
         allocate_matrix(&adj_g, g_size, g_size);
         allocate_matrix(&iso,   p_size, g_size);
-        debug_print("(%d) mk_adj(p)\n", 2);
         bool fail = FALSE;
         if(!fail && !mk_adj(adj_p, g_p)) {
             MAKE_REDEX_FAILURE(redex, Fail_pr("isomatch: invalid needle."));
             fail = TRUE;
         }
-        debug_print("(%d) mk_adj(g)\n", 3);
         if(!fail && !mk_adj(adj_g, g_g)) {
             MAKE_REDEX_FAILURE(redex, Fail_pr("isomatch: invalid haystack."));
             fail = TRUE;
         }
-        debug_print("(%d) mk_iso\n", 4);
         if(!fail && !mk_iso(iso, g_p, g_g)) {
             MAKE_REDEX_FAILURE(redex, Fail_pr("isomatch: invalid isomorphisms."));
             fail = TRUE;
         }
-        debug_print("(%d) isomatch\n", 5);
         if(!fail) {
             clock_t start, end;
             double cpu_time_used;
             start = clock();
-//////////////////////////////////////// Set-up.
+            // /
             unint start_row;
             if(box) {
                 trim_matrix_head(adj_p);
@@ -1066,22 +947,96 @@ isomatch_fn(g_ptr redex)
             } else {
                 start_row = 0;
             }
-//////////////////////////////////////// Strict.
-            /* strict_isomatch(iso, adj_p, adj_g, start_row); */
-            /* free_matrix(adj_p); */
-            /* free_matrix(adj_g); */
-            /* free_matrix(iso); */
-//////////////////////////////////////// Lazy.
-            search_ptr s = create_search(iso, adj_p, adj_g, start_row);
-            lazy_isomatch(s);
-            free_search(s);
-//////////////////////////////////////// End.
+            strict_isomatch(iso, adj_p, adj_g, start_row);
+            free_matrix(adj_p);
+            free_matrix(adj_g);
+            free_matrix(iso);
+            // /
             end = clock();
             cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-            fprintf(stderr, "Time spent: %fs\n", cpu_time_used);
+            debug_print("Time spent: %fs\n", cpu_time_used);
             MAKE_REDEX_VOID(redex);
         }
-        debug_print("(%d) done\n", 6);
+    }
+    // /
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+internal_search_create_fn(g_ptr redex)
+{
+    debug_print("%p\n", (void *) redex);
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_needle, g_haystack, g_trim;
+    EXTRACT_3_ARGS(redex, g_needle, g_haystack, g_trim);
+    // /
+    bool trim;
+    unint n_rows, h_rows, start;
+    mat_ptr needle, haystack, iso;
+    if(IS_BOOL(g_trim)) {
+        MAKE_REDEX_FAILURE(redex, Fail_pr("Expected a boolean."));
+    } else if(IS_NIL(g_needle) || IS_NIL(g_haystack)) {
+        MAKE_REDEX_FAILURE(redex, Fail_pr("Empty needle/haystack."));
+    } else {
+        trim   = GET_BOOL(g_trim);
+        n_rows = List_length(g_needle);
+        h_rows = List_length(g_haystack);
+        // /
+        allocate_matrix(&needle,   n_rows, n_rows);
+        allocate_matrix(&haystack, h_rows, h_rows);
+        allocate_matrix(&iso,      n_rows, h_rows);
+        if(!mk_adj(needle, g_needle)     ||
+           !mk_adj(haystack, g_haystack) ||
+           !mk_iso(iso, g_needle, g_haystack))
+        {
+            MAKE_REDEX_FAILURE(redex, Fail_pr("Invalid needle/haystack."));
+            free_matrix((pointer) needle);
+            free_matrix((pointer) haystack);
+            free_matrix((pointer) iso);
+        } else {
+            if(trim) {
+                trim_matrix_head(needle);
+                trim_matrix_head(iso);
+                start = 1;
+            } else {
+                start = 0;
+            }
+            create_search(iso, needle, haystack, start);
+        }
+    }
+    // /
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+internal_search_step_fn(g_ptr redex)
+{
+    debug_print("%p\n", (void *) redex);
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_search;
+    EXTRACT_1_ARG(redex, g_search);
+    // /
+    search_ptr search = (search_ptr) GET_EXT_OBJ(g_search);
+    int res = lazy_isomatch(search);
+    if(res == -1) {
+        MAKE_REDEX_FAILURE(redex, Fail_pr("What?!"));
+    } else if(res == 0) {
+        MAKE_REDEX_NIL(redex);
+        free_search(search);
+    } else {
+        mat_ptr res;
+        pop_buf(results_buf_ptr, (pointer) &res);
+        g_ptr tail = redex;
+        for(unint i = 0; i < res->rows; i++) {
+            unint j = 0;
+            while(j < res->cols && !res->mat[i][j]) { j++; }
+            g_ptr nd = Make_PAIR_ND(Make_INT_leaf(i), Make_INT_leaf(j));
+            APPEND1(tail, nd);
+        }
     }
     // /
     DEC_REF_CNT(l);
@@ -1107,12 +1062,25 @@ Iso_Init()
       , NULL //?2sha256_fn
     );
     mat_tp = Get_Type("bmat", NULL, TP_INSERT_FULL_TYPE);
+    // Search. state.
+    search_oidx = Add_ExtAPI_Object(
+        "internal_search_state"
+      , mark_search_fn
+      , sweep_search_fn
+      , NULL
+      , NULL
+      , NULL
+      , NULL
+      , NULL
+      , NULL
+      , NULL
+    );
+    search_tp = Get_Type("internal_search_state", NULL, TP_INSERT_FULL_TYPE);
     // Init. generics.
     new_ustrmgr(&lstrings);
     new_mgr(&vec_mgr, sizeof(vec_rec));
     new_mgr(&rng_mgr, sizeof(range_rec));
     new_mgr(&mat_mgr, sizeof(mat_rec));
-    //
     new_mgr(&search_mgr, sizeof(search_rec));
 }
 
@@ -1120,75 +1088,9 @@ void
 Iso_Install_Functions()
 {
     typeExp_ptr pexlif_tp = Get_Type("pexlif", NULL, TP_INSERT_PLACE_HOLDER);
+    typeExp_ptr step_tp = GLmake_list(GLmake_tuple(GLmake_int(), GLmake_int()));
     Add_ExtAPI_Function(
-          "pex2adj"
-        , "11"
-        , TRUE
-          // pex->int->adj
-        , GLmake_arrow(
-              pexlif_tp
-            , GLmake_arrow(
-                GLmake_int()
-              , mat_tp))
-        , pex2adj_fn
-    );
-    Add_ExtAPI_Function(
-          "pex2iso"
-        , "1111"
-        , TRUE
-          // pex->pex->int->int->iso
-        , GLmake_arrow(
-              pexlif_tp
-            , GLmake_arrow(
-                pexlif_tp
-              , GLmake_arrow(
-                  GLmake_int()
-                , GLmake_arrow(
-                    GLmake_int()
-                  , mat_tp))))
-        , pex2iso_fn
-    );
-    Add_ExtAPI_Function(
-          "trim_adj"
-        , "1"
-        , TRUE
-          // adj->void
-        , GLmake_arrow(
-              mat_tp
-            , GLmake_void())
-        , trim_adj_fn
-    );
-    Add_ExtAPI_Function(
-          "is_adjacent"
-        , "111"
-        , FALSE
-          // adj->int->int->bool
-        , GLmake_arrow(
-              mat_tp
-            , GLmake_arrow(
-                GLmake_int()
-              , GLmake_arrow(
-                  GLmake_int()
-                , GLmake_bool())))
-        , is_adjacent_fn
-    );
-    Add_ExtAPI_Function(
-          "is_isomorphism"
-        , "111"
-        , FALSE
-          // adj->adj->((bool list) list)->int->int->bool
-        , GLmake_arrow(
-            mat_tp
-          , GLmake_arrow(
-              mat_tp
-            , GLmake_arrow(
-                GLmake_list(GLmake_list(GLmake_bool()))
-              , GLmake_bool())))
-        , is_isomorphism_fn
-    );
-    // /
-    Add_ExtAPI_Function(
-          "isomatch"
+          "sisomatch"
         , "111"
         , TRUE
           // pex->pex->bool->void
@@ -1199,9 +1101,32 @@ Iso_Install_Functions()
               , GLmake_arrow(
                   GLmake_bool()
                 , GLmake_void())))
-        , isomatch_fn
+        , strict_isomatch_fn
     );
-
+    Add_ExtAPI_Function(
+          "internal_search_create"
+        , "111"
+        , TRUE
+          // pex->pex->bool->search
+        , GLmake_arrow(
+              pexlif_tp
+            , GLmake_arrow(
+                pexlif_tp
+              , GLmake_arrow(
+                  GLmake_bool()
+                , search_tp)))
+        , internal_search_create_fn
+    );
+    Add_ExtAPI_Function(
+          "internal_search_step"
+        , "1"
+        , TRUE
+          // search->step
+        , GLmake_arrow(
+              search_tp
+            , step_tp)
+        , internal_search_step_fn
+    );
 }
 
 /******************************************************************************/
@@ -1211,10 +1136,9 @@ Iso_Install_Functions()
 void
 _DuMMy_iso()
 {
+    read_matrix(NULL, NULL);
     print_matrix(NULL);
-    strict_isomatch(NULL, NULL, NULL, 0);
-    create_search(NULL, NULL, NULL, 0);
-    free_search(NULL);
+    is_adjacent(NULL, 0, 0);
     lazy_isomatch(NULL);
 }
 

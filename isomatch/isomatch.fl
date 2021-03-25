@@ -8,6 +8,15 @@ let pex_length (PINST _ _ _ _ _ _ (P_HIER cs)) = 1 + length cs
 /\  pex_length _ = 1
 ;
 
+let isomatch p g t =
+        letrec
+            go s =
+                let xs = internal_search_step s then
+                empty xs => [] | xs : go s
+        in
+        go (internal_search_create p g t)
+;
+
 //==============================================================================
 //
 // Construction of a subst. eq. between two pexlifs.
@@ -140,83 +149,15 @@ let
         fill (build xs)
 ;
 
-//------------------------------------------------------------------------------
-
-// ...
-//  expand::pexlif->[string]
-let expand = flatmap md_expand_vector;
-
-// ...
-//  child_of::pexlif->pexlif->bool
-clet
-    child_of x y =
-        let child_slow x y = (expand (formals x)) intersects (expand (actuals y)) in
-        let child_fast x y = (formals x) intersects (actuals y) in
-        child_fast x y => T | child_slow x y
-;
-
-// ...
-//  sibling_of::pexlif->pexlif->bool
-clet
-    sibling_of x y =
-        let sibling_slow x y = (expand (actuals x)) intersects (expand (actuals y)) in
-        let sibling_fast x y = (actuals x) intersects (actuals y) in
-        sibling_fast x y => T | sibling_slow x y
-;
-
-// Construct adj. matrix for 'pex' when "flattened" one level.
-//  adjacencies::pexlif->(bool mat)
-clet
-    adjacencies parent =
-        let children = hier parent in
-        // Compute adj. for "parent<->child".
-        let adj_parent   = F : map (child_of parent) children in
-        // Compute adj. for "child<->child".
-        let adj_children = compare_all sibling_of children in
-        // Merge above two adj. matrices.
-        let adj = adj_parent : map2 cons (tl adj_parent) adj_children in
-        //
-// (fprintf stderr "### adjacencies for '%s' with %d children %S:\n%s\n"
-//     (_pexlif_name parent)
-//     (length children)
-//     (map _pexlif_name children)
-//     (print_large_matrix print_bool (mat_tl adj))
-// ) fseq
-        //
-        adj
-;
-
-// Construct iso. matrix between 'pex' and 'qex' when "flattened" one level.
-//  isomorphisms::pexlif->pexlif->(bool mat)
-let
-    isomorphisms pex qex =
-        // Fetch parent&children.
-        let xs = pex : hier pex in
-        let ys = qex : hier qex in
-        // Compare every pos. pairing.
-        let iso = map (flip map ys # equal on fp) xs then
-        //
-// (fprintf stderr "### isomorphisms for '%s' and '%s':\n%s\n"
-//     (_pexlif_name pex)
-//     (_pexlif_name qex)
-//     (print_large_matrix print_bool (mat_tl iso))
-// ) fseq
-        //
-        iso
-;
-
 //==============================================================================
 //
 // Isomatch. searching.
 //
 //==============================================================================
 
-// Find el. given by mask 'xs' (one and only one el. of 'xs' must be 'T').
-//  find_mask::(bool list)->(* list)->*
-letrec
-    find_mask (F:xs) (y:ys) = find_mask xs ys
-/\  find_mask (T:xs) (y:ys) = y
-;
+// Reorder nodes in 'ns' by 'xs'.
+//  reorder_nodes::(int list)->(* list)->(* list)
+let reorder_nodes xs ns = map (\n. el (n+1) xs) ns;
 
 // Expand list of choices, i.e, '[[1,2],[3,4]] = [[1,3],[1,4],[2,3],[2,4]]'.
 //  expand_choices::((* list) list)->((* list) list)
@@ -228,31 +169,34 @@ letrec
 
 //------------------------------------------------------------------------------
 
-// Exand a matching of 'p' and 'g' to test whether it's valid pairing or not.
-//
-// expand(P, G)
-//     S = recurse(none, 1, adj(P), adj(G), iso(P, G))
-//     for all solutions R in S
-//         explore all pairings X of children in P and G according to R
-//
 forward_declare{explore::pexlif->pexlif->({((string#string) list)} opt list)};
+// Exand a matching of 'p' and 'g' to test whether it's valid pairing or not.
 //  expand::pexlif->pexlif->(({(string#string list)} opt list) list)
 let
     expand p g =
-        // Find possible solutions for a 'p' and 'g' mapping.
-        let adj_p = pex2adj p (pex_length p) then
-        let adj_g = pex2adj g (pex_length g) then
-        let iso   = isomorphisms p g then
-        let ss    = recurse iso adj_p adj_g then
-        // Explore each pairing in a solution to validate it.
-        pam (filter (hd # hd) ss) (\sol.
-            let matches = map (\col. find_mask col (g : hier g)) (tl sol) then
+        // Note: lhs of tuples (p) are already in order.
+        // Note: only interested in solutions mapping p to g.
+        let pred ((x,y):xs) = y == 0 in
+        pam (filter pred (isomatch p g F)) (\sol.
+            let matches = reorder_nodes (hier g) (map snd (tl sol)) then
             let options = map2 explore (hier p) matches then
             let choices = expand_choices options then
-            let res     = map collect choices then
-            //
-            res
+            let result  = map collect choices then
+            // /
+            result
         )
+        // let adj_p = pex2adj p (pex_length p) then
+        // let adj_g = pex2adj g (pex_length g) then
+        // let iso   = isomorphisms p g then
+        // let ss    = recurse iso adj_p adj_g then
+        // pam (filter (hd # hd) ss) (\sol.
+        //     let matches = map (\col. find_mask col (g : hier g)) (tl sol) then
+        //     let options = map2 explore (hier p) matches then
+        //     let choices = expand_choices options then
+        //     let res     = map collect choices then
+        //     //
+        //     res
+        // )
 ;
 
 // Explore two pexlifs to find if they are a potential match.
@@ -295,9 +239,6 @@ let clean_subst f = filter (flip elem f # fst);
 //  clean_solution::pexlif->(subst list)->(subst list)
 let clean_solution p = map (clean_subst (formals p));
 
-//  recover_matches::pexlif->pexlif->((bool mat) list)->(((pexlif#pexlif) list) list)
-let recover_matches p g iso = map (map2 (\n. \r. (n, find_mask r (hier g))) (hier p)) iso;
-
 //------------------------------------------------------------------------------
 
 //  print_subst::((string#string) list)->string
@@ -327,18 +268,6 @@ let pretty p g ms ss =
 //------------------------------------------------------------------------------
 
 let
-    mark_adj (r:rs) =
-        let mark_row (c:cs) = F : cs in
-        (replicate (length r) F) : map mark_row rs
-;
-
-let
-    mark_iso (r:rs) =
-        let mark_row (c:cs) = F : cs in
-        (T : replicate (length r - 1)  F) : rs
-;
-
-let
     WT msg e =
         (fprintf stderr "Start compute %s:\n" msg) fseq
         val (e',t) = wtime e then
@@ -350,32 +279,37 @@ let
 //  moo::pexlif->pexlif->void
 let
     moo p g =
-        let adj_g = pex2adj g (pex_length g) then
-        let adj_p = pex2adj p (pex_length p) then
-        let iso   = mark_iso (isomorphisms p g) then
-        // 
-        trim_adj adj_p fseq
-        //
-//(fprintf stderr "### adjacencies for P:\n%s\n" (print_large_matrix print_bool adj_p)) fseq
-//(fprintf stderr "### adjacencies for G:\n%s\n" (print_large_matrix print_bool adj_g)) fseq
-//(fprintf stderr "### isomorphisms:\n%s\n"      (print_large_matrix print_bool iso))   fseq
-        //
-        let ss = recurse iso adj_p adj_g then
-        flip foreach ss (\sol.
-            //  matches::(pexlif list)
-            let matches = map (flip find_mask (g : hier g)) (tl sol) then
-            //  pairs::(pexlif#pexlif list)
-            let pairs   = zip (hier p) matches then
-            //  options::(((subst opt) list) list)
-            let options = map (curry explore) pairs then
-            //  choices::(((subst opt) list) list)
-            let choices = expand_choices options then
-            //  res::((subst list) list)
-            let res = map filter_some options then
-            // Pretty-print sol.
-            pretty p g pairs res
+        // Note: lhs of tuples (p) are already in order.
+        flip foreach (isomatch p g T) (\sol.
+             let matches = reorder_nodes (hier g) (map snd (tl sol)) then
+             let options = map2 explore (hier p) matches then
+             let choices = expand_choices options then
+             let result  = map filter_some choices then
+             pretty p g (zip (hier p) matches) result
         )
 ;
+// let
+//     moo p g =
+//         let adj_g = pex2adj g (pex_length g) then
+//         let adj_p = pex2adj p (pex_length p) then
+//         let iso   = mark_iso (isomorphisms p g) then
+//         let ss    = recurse iso adj_p adj_g then
+//         // /
+//         flip foreach ss (\sol.
+//             //  matches::(pexlif list)
+//             let matches = map (flip find_mask (g : hier g)) (tl sol) then
+//             //  pairs::(pexlif#pexlif list)
+//             let pairs   = zip (hier p) matches then
+//             //  options::(((subst opt) list) list)
+//             let options = map (curry explore) pairs then
+//             //  choices::(((subst opt) list) list)
+//             let choices = expand_choices options then
+//             //  res::((subst list) list)
+//             let res = map filter_some options then
+//             // Pretty-print sol.
+//             pretty p g pairs res
+//         )
+// ;
 
 //==============================================================================
 // Fin.
