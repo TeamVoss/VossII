@@ -9,12 +9,13 @@ let pex_length (PINST _ _ _ _ _ _ (P_HIER cs)) = 1 + length cs
 ;
 
 let isomatch p g t =
+        let sp = internal_search_create p g t then
         letrec
             go s =
-                let xs = internal_search_step s then
+                let xs = internal_search_step s in
                 empty xs => [] | xs : go s
         in
-        go (internal_search_create p g t)
+        go sp
 ;
 
 //==============================================================================
@@ -157,7 +158,7 @@ let
 
 // Reorder nodes in 'ns' by 'xs'.
 //  reorder_nodes::(int list)->(* list)->(* list)
-let reorder_nodes xs ns = map (\n. el (n+1) xs) ns;
+let reorder_nodes xs ns = map (\n. el n xs) ns;
 
 // Expand list of choices, i.e, '[[1,2],[3,4]] = [[1,3],[1,4],[2,3],[2,4]]'.
 //  expand_choices::((* list) list)->((* list) list)
@@ -215,14 +216,18 @@ let
 //
 let
     explore p g =
+        let pr = print_list (print_some (print_subst)) in
         let leaf = _pexlif_leaf then
         sig p == sig g =>
-            let x = [actualize_sha p g] then x
+            let x = [actualize_sha p g] then
+            x
         | fp p == fp g =>
             leaf p AND leaf g =>
-                let x = [actualize_leaf p g] then x
+                let x = [actualize_leaf p g] then
+                x
             |
-                let x = map (\ss. actualize_hier ss p g) (expand p g) then x
+                let x = map (\ss. actualize_hier ss p g) (expand p g) then
+                x
         |
             []
 ;
@@ -241,28 +246,22 @@ let clean_solution p = map (clean_subst (formals p));
 
 //------------------------------------------------------------------------------
 
-//  print_subst::((string#string) list)->string
-let print_subst = print_list (curry print_pair);
-
-//  print_solution::((subst opt) list)->string
-let print_solution = print_list print_subst # filter_some;
-
-//  pretty::pexlif->pexlif->((pexlif#pexlif) list)->((subst list) list)->void
-let pretty p g ms ss =
+//  pretty::pexlif->pexlif->((pexlif#pexlif) list)->((subst list) list)->string
+let pretty p g ms sss =
         let
-            pretty_header =
-                (fprintf stdout "Found match for '%s' and '%s'\n"
-                    (_pexlif_name p)
-                    (_pexlif_name g))
-        in
-        let
-            pretty_one (a,b) s =
-                (fprintf stdout "matching '%s' and '%s' %s"
+            pretty_match (a,b) s = 
+                sprintf "'%s' = '%s' when %s"
                     (_pexlif_name a)
                     (_pexlif_name b)
-                    (list2str T "where " " or " "\n" (print_subst) s))
+                    (print_subst s)
+        in let
+            pretty_sol ss =
+                print_large_list (curry pretty_match) (zip ms ss)
         in
-        pretty_header fseq foreach (curry pretty_one) (zip ms ss)
+        sprintf "Found match for '%s' and '%s' %s"
+            (_pexlif_name p)
+            (_pexlif_name g)
+            (list2str T "where:\n" "Alternative pairing:\n" "\n" pretty_sol sss)
 ;
 
 //------------------------------------------------------------------------------
@@ -279,37 +278,27 @@ let
 //  moo::pexlif->pexlif->void
 let
     moo p g =
-        // Note: lhs of tuples (p) are already in order.
         flip foreach (isomatch p g T) (\sol.
+             // Find and order the solutions haystack nodes.
+             // Note: needle's nodes are already in order.
+             //  matches::(pexlif list)
              let matches = reorder_nodes (hier g) (map snd (tl sol)) then
-             let options = map2 explore (hier p) matches then
+             // List of needle nodes and their matched haystack nodes.
+             //  pairings::((pexlif#pexlif) list)
+             let pairings = zip (hier p) matches then
+             // For every pairing, a list of potential solutions (subst. opt).
+             //  options::(((subst opt) list) list)
+             let options = map (curry explore) pairings then
+             // Every combination of our potential solutions.
+             //  choices::(((subst opt) list) list)
              let choices = expand_choices options then
-             let result  = map filter_some choices then
-             pretty p g (zip (hier p) matches) result
+             // Actual solutions are filtered out from above choices.
+             //  result::((subst list) list)
+             let results = map filter_some choices then
+             // Pretty-print results.
+             print (pretty p g pairings results)
         )
 ;
-// let
-//     moo p g =
-//         let adj_g = pex2adj g (pex_length g) then
-//         let adj_p = pex2adj p (pex_length p) then
-//         let iso   = mark_iso (isomorphisms p g) then
-//         let ss    = recurse iso adj_p adj_g then
-//         // /
-//         flip foreach ss (\sol.
-//             //  matches::(pexlif list)
-//             let matches = map (flip find_mask (g : hier g)) (tl sol) then
-//             //  pairs::(pexlif#pexlif list)
-//             let pairs   = zip (hier p) matches then
-//             //  options::(((subst opt) list) list)
-//             let options = map (curry explore) pairs then
-//             //  choices::(((subst opt) list) list)
-//             let choices = expand_choices options then
-//             //  res::((subst list) list)
-//             let res = map filter_some options then
-//             // Pretty-print sol.
-//             pretty p g pairs res
-//         )
-// ;
 
 //==============================================================================
 // Fin.

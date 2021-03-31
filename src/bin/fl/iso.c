@@ -44,13 +44,14 @@ static hash_record_ptr tbl_out_ptr;
 // Iso. mat. construction.
 static rec_mgr         sig_mgr;
 static rec_mgr_ptr     sig_mgr_ptr;
-// Strict iso. matching.
+// Iso matching.
 static rec_mgr         updates_mgr;
-static rec_mgr_ptr     updates_mgr_ptr;
+// Strict iso. matching.
 static buffer          results_buf;
 static buffer_ptr      results_buf_ptr;
 // Lazy iso. matching.
 static rec_mgr         search_mgr;
+static rec_mgr         result_mgr;
 // Types.
 static int             mat_oidx;
 static typeExp_ptr     mat_tp;
@@ -97,8 +98,8 @@ static void strict_isomatch(mat_ptr iso, mat_ptr p, mat_ptr g, unint r);
 // Lazy isomatching.
 static search_ptr create_search(mat_ptr iso, mat_ptr p, mat_ptr g, unint start);
 static void free_search(search_ptr s);
-static int lazy_search(search_ptr s);
-static int lazy_isomatch(search_ptr s);
+static mat_ptr lazy_search(search_ptr s);
+static mat_ptr lazy_isomatch(search_ptr s);
 
 /******************************************************************************/
 /*                                LOCAL FUNCTIONS                             */
@@ -608,7 +609,7 @@ trim(mat_ptr iso, mat_ptr p, mat_ptr g, unint r, unint c, updates_ptr *ps)
                 if(!g->mat[c][j] && iso->mat[i][j]) {
                     iso->mat[i][j] = FALSE;
                     // Record update
-                    updates_ptr new = (updates_ptr) new_rec(updates_mgr_ptr);
+                    updates_ptr new = (updates_ptr) new_rec(&updates_mgr);
                     new->row  = i;
                     new->col  = j;
                     new->next = NULL;
@@ -630,12 +631,9 @@ undo_trim(mat_ptr iso, updates_ptr ps)
         // Record removed.
         p  = ps;
         ps = ps->next;
-        free_rec(updates_mgr_ptr, (pointer) p);
+        free_rec(&updates_mgr, (pointer) p);
     }
 }
-
-// -----------------------------------------------------------------------------
-// ...
 
 static inline void
 pick(mat_ptr iso, mat_ptr cpy, unint r, unint c)
@@ -655,26 +653,26 @@ undo_pick(mat_ptr iso, mat_ptr cpy, unint r)
     }
 }
 
+// -----------------------------------------------------------------------------
+// Strict searching.
+
 static inline void
-new_search_mem()
+new_strict_search_mem(mat_ptr *copy, bool **used, unint rows, unint cols)
 {
-    updates_mgr_ptr = &updates_mgr;
+    allocate_matrix(copy, rows, cols);
+    *used = Calloc(cols*sizeof(bool));
     results_buf_ptr = &results_buf;
-    new_mgr(updates_mgr_ptr, sizeof(updates_rec));
     new_buf(results_buf_ptr, 1, sizeof(mat_rec));
 }
 
 static inline void
-rem_search_mem()
-{    
+rem_strict_search_mem(mat_ptr copy, bool *used)
+{
+    free_matrix((pointer) copy);
+    Free((pointer) used);
     free_buf(results_buf_ptr);
-    free_mgr(updates_mgr_ptr);
     results_buf_ptr = NULL;
-    updates_mgr_ptr = NULL;
 }
-
-// -----------------------------------------------------------------------------
-// Strict searching.
 
 static void
 strict_search(mat_ptr iso, mat_ptr p, mat_ptr g, mat_ptr c, unint row, bool *used)
@@ -707,17 +705,14 @@ strict_search(mat_ptr iso, mat_ptr p, mat_ptr g, mat_ptr c, unint row, bool *use
 static void
 strict_isomatch(mat_ptr iso, mat_ptr p, mat_ptr g, unint row)
 {
-    new_search_mem();
-    // /
+    bool *used;
     mat_ptr copy;
-    allocate_matrix(&copy, p->rows, g->rows);
-    bool *used = Calloc(g->rows*sizeof(bool));
+    new_strict_search_mem(&copy, &used, p->rows, g->rows);
+    // /
     strict_search(iso, p, g, copy, row, used);
     debug_print("Found %u solutions\n", results_buf_ptr->buf_size);
-    free_matrix((pointer) copy);
-    Free((pointer) used);
     // /
-    rem_search_mem();
+    rem_strict_search_mem(copy, used);
 }
 
 // -----------------------------------------------------------------------------
@@ -764,7 +759,7 @@ free_search(search_ptr s)
     free_rec(&search_mgr, (pointer) s);
 }
 
-static int
+static mat_ptr
 lazy_search(search_ptr s)
 {
     // Short-hands.
@@ -779,9 +774,8 @@ lazy_search(search_ptr s)
     loop: {
         if(s->row == R) {
             if(!s->set[R] && is_match(M, P, G)) {
-                push_buf(results_buf_ptr, (pointer) M);
                 s->set[R] = TRUE;
-                return 1;
+                return M;
             } else {
                 s->set[R] = FALSE;
                 s->row = R - 1;
@@ -816,7 +810,7 @@ lazy_search(search_ptr s)
             goto loop;
         } else {
             if(s->row == 0) {
-                return 0;
+                return NULL;
             } else {
                 s->row = s->row - 1;
                 goto loop;
@@ -824,16 +818,14 @@ lazy_search(search_ptr s)
         }
     }
     // Something went wrong...
-    return -1;
+    DIE("Impossible");
 }
 
-static int
+static mat_ptr
 lazy_isomatch(search_ptr s)
 {
-    new_search_mem();
-    int res = lazy_search(s);
-    rem_search_mem();
-    return res;
+    // Used to do more, could remove now.
+    return lazy_search(s);
 }
 
 /******************************************************************************/
@@ -972,22 +964,25 @@ internal_search_create_fn(g_ptr redex)
     g_ptr g_needle, g_haystack, g_trim;
     EXTRACT_3_ARGS(redex, g_needle, g_haystack, g_trim);
     // /
-    bool trim;
-    unint n_rows, h_rows, start;
-    mat_ptr needle, haystack, iso;
-    if(IS_BOOL(g_trim)) {
+    unint n_rows = pexlif_size(g_needle);
+    unint h_rows = pexlif_size(g_haystack);
+    if(n_rows <= 1) {
+        MAKE_REDEX_FAILURE(redex, Fail_pr("Expected a hier. pexlif as needle."));
+    } else if(h_rows <= 1) {
+        MAKE_REDEX_FAILURE(redex, Fail_pr("Expected a hier. pexlif as haystack."));
+    } else if(!IS_BOOL(g_trim)) {
         MAKE_REDEX_FAILURE(redex, Fail_pr("Expected a boolean."));
-    } else if(IS_NIL(g_needle) || IS_NIL(g_haystack)) {
-        MAKE_REDEX_FAILURE(redex, Fail_pr("Empty needle/haystack."));
     } else {
-        trim   = GET_BOOL(g_trim);
-        n_rows = List_length(g_needle);
-        h_rows = List_length(g_haystack);
+        bool trim = GET_BOOL(g_trim);
+        debug_print("trim: %s\n", trim ? "T" : "F");
+        debug_print("needle rows: %u\n", n_rows);
+        debug_print("haystack rows: %u\n", h_rows);
         // /
+        mat_ptr needle, haystack, iso;
         allocate_matrix(&needle,   n_rows, n_rows);
         allocate_matrix(&haystack, h_rows, h_rows);
         allocate_matrix(&iso,      n_rows, h_rows);
-        if(!mk_adj(needle, g_needle)     ||
+        if(!mk_adj(needle, g_needle) ||
            !mk_adj(haystack, g_haystack) ||
            !mk_iso(iso, g_needle, g_haystack))
         {
@@ -996,6 +991,7 @@ internal_search_create_fn(g_ptr redex)
             free_matrix((pointer) haystack);
             free_matrix((pointer) iso);
         } else {
+            unint start;
             if(trim) {
                 trim_matrix_head(needle);
                 trim_matrix_head(iso);
@@ -1003,7 +999,8 @@ internal_search_create_fn(g_ptr redex)
             } else {
                 start = 0;
             }
-            create_search(iso, needle, haystack, start);
+            search_ptr s = create_search(iso, needle, haystack, start);
+            MAKE_REDEX_EXT_OBJ(redex, search_oidx, s);
         }
     }
     // /
@@ -1021,15 +1018,12 @@ internal_search_step_fn(g_ptr redex)
     EXTRACT_1_ARG(redex, g_search);
     // /
     search_ptr search = (search_ptr) GET_EXT_OBJ(g_search);
-    int res = lazy_isomatch(search);
-    if(res == -1) {
-        MAKE_REDEX_FAILURE(redex, Fail_pr("What?!"));
-    } else if(res == 0) {
+    mat_ptr res = lazy_isomatch(search);
+    if(res == NULL) {
         MAKE_REDEX_NIL(redex);
         free_search(search);
     } else {
-        mat_ptr res;
-        pop_buf(results_buf_ptr, (pointer) &res);
+        MAKE_REDEX_NIL(redex);
         g_ptr tail = redex;
         for(unint i = 0; i < res->rows; i++) {
             unint j = 0;
@@ -1081,7 +1075,9 @@ Iso_Init()
     new_mgr(&vec_mgr, sizeof(vec_rec));
     new_mgr(&rng_mgr, sizeof(range_rec));
     new_mgr(&mat_mgr, sizeof(mat_rec));
+    new_mgr(&updates_mgr, sizeof(updates_rec));
     new_mgr(&search_mgr, sizeof(search_rec));
+    new_mgr(&result_mgr, sizeof(result_rec));
 }
 
 void
