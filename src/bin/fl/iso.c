@@ -55,9 +55,8 @@ static typeExp_ptr search_tp;
 // Matrix mgm.
 static void allocate_matrix(mat_ptr *m, unint R, unint C);
 static void free_matrix(mat_ptr m);
+static void trim_matrix_head(mat_ptr m);
 static void read_matrix(mat_ptr m, g_ptr redex);
-// Matrix/Vector/Pexlif utils.
-static void    trim_matrix_head(mat_ptr m);
 // Adj. mat. construciton.
 static bool mk_adj(mat_ptr m, g_ptr p);
 // Iso. mat. construction.
@@ -164,14 +163,11 @@ mk_adj(mat_ptr m, g_ptr p)
     if(res == NULL || IS_NIL(res)) {
         return FALSE;
     }
-    g_ptr lr, lc, row, col;
-    unint i = 0, j;
-    FOR_CONS(res, lr, row) {
-        FOR_CONS(row, lc, col) {
-            j = GET_INT(col);
-            m->mat[i][j] = TRUE;
-        }
-        i++;
+    g_ptr tmp, pair;
+    FOR_CONS(res, tmp, pair) {
+        unint i = GET_INT(GET_FST(pair));
+        unint j = GET_INT(GET_SND(pair));
+        m->mat[i][j] = TRUE;
     }
     return TRUE;
 }

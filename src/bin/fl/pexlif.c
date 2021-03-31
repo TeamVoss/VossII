@@ -196,11 +196,11 @@ mk_adj_tables(vec_tmp_lst_ptr *keys, unint *count, g_ptr p)
         // Record vector names for parent's formals.
         // todo: count outputs as inputs for the environment and vice versa.
         FOREACH_FORMAL(vec, fa_inps) {
-            record_vector_signatures(tbl_in_ptr, key_tail, 0, vec);
+            record_vector_signatures(tbl_out_ptr, key_tail, 0, vec);
             key_tail = &(*key_tail)->next;
         }
         FOREACH_FORMAL(vec, fa_outs) {
-            record_vector_signatures(tbl_out_ptr, key_tail, 0, vec);
+            record_vector_signatures(tbl_in_ptr, key_tail, 0, vec);
             key_tail = &(*key_tail)->next;
         }
         vec_tmp_lst_ptr key_lst = (vec_tmp_lst_ptr) new_rec(vec_tmp_lst_mgr_ptr);
@@ -268,10 +268,6 @@ get_top_size(g_ptr p)
     return -1;
 }
 
-#define FOREACH_KEY(key, keys)                                                 \
-    for(; keys != NULL; keys = keys->next)                                     \
-        for(key = keys->vec; key != NULL; key = key->next)
-
 g_ptr
 get_top_adjacencies(g_ptr p)
 {
@@ -284,33 +280,31 @@ get_top_adjacencies(g_ptr p)
     mk_adj_tables(&keys, &count, p);
     // /
     g_ptr res = Make_NIL(), res_tail = res;
-//  FOREACH_KEY(key, keys) {
-    while(keys != NULL) {
-        g_ptr adj = Make_NIL(), adj_tail = adj;
+    for(unint i = 0; keys != NULL; i++, keys = keys->next) {
+        g_ptr lhs = Make_INT_leaf(i);
         for(key = keys->vec; key != NULL; key = key->next) {
             vec_ptr vec = key->vec;
             string signature = key->signature;
             bkt = (adj_ptr) find_hash(tbl_in_ptr, signature);
             while(bkt != NULL) {
                 if(Check_vector_overlap(vec, bkt->vec)) {
-                    g_ptr index = Make_INT_leaf(bkt->index);
-                    APPEND1(adj_tail, index);
+                    g_ptr rhs = Make_INT_leaf(bkt->index);
+                    g_ptr pair = Make_PAIR_ND(lhs,rhs);
+                    APPEND1(res_tail, pair);
                 }
                 bkt = bkt->next;
             }
             bkt = (adj_ptr) find_hash(tbl_out_ptr, signature);
             while(bkt != NULL) {
                 if(Check_vector_overlap(vec, bkt->vec)) {
-                    g_ptr index = Make_INT_leaf(bkt->index);
-                    APPEND1(adj_tail, index);
+                    g_ptr rhs = Make_INT_leaf(bkt->index);
+                    g_ptr pair = Make_PAIR_ND(rhs,lhs);
+                    APPEND1(res_tail, pair);
                 }
                 bkt = bkt->next;
             }
         }
-        APPEND1(res_tail, adj);
-        keys = keys->next;
     }
-//  }
     // /
     rem_adj_mem();
     return res;
