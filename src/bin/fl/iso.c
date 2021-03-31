@@ -12,6 +12,7 @@
 #include "strings.h"
 #include "buf.h"
 #include "graph.h"
+#include "pexlif.h"
 #include "iso.h"
 
 /******************************************************************************/
@@ -26,37 +27,23 @@ extern g_ptr void_nd;
 /******************************************************************************/
 /*                              PRIVATE VARIABLES                             */
 /******************************************************************************/
-static ustr_mgr        lstrings;
-static rec_mgr         vec_mgr;
-static rec_mgr         rng_mgr;
-static rec_mgr         mat_mgr;
-// Adj. mat. construction.
-static rec_mgr         bkt_mgr;
-static rec_mgr_ptr     bkt_mgr_ptr;
-static rec_mgr         key_mgr;
-static rec_mgr_ptr     key_mgr_ptr;
-static rec_mgr         key_lst_mgr;
-static rec_mgr_ptr     key_lst_mgr_ptr;
-static hash_record     tbl_in;
-static hash_record_ptr tbl_in_ptr;
-static hash_record     tbl_out;
-static hash_record_ptr tbl_out_ptr;
+static rec_mgr     mat_mgr;
 // Iso. mat. construction.
-static rec_mgr         sig_mgr;
-static rec_mgr_ptr     sig_mgr_ptr;
+static rec_mgr     sig_mgr;
+static rec_mgr_ptr sig_mgr_ptr;
 // Iso matching.
-static rec_mgr         updates_mgr;
+static rec_mgr     updates_mgr;
 // Strict iso. matching.
-static buffer          results_buf;
-static buffer_ptr      results_buf_ptr;
+static buffer      results_buf;
+static buffer_ptr  results_buf_ptr;
 // Lazy iso. matching.
-static rec_mgr         search_mgr;
-static rec_mgr         result_mgr;
+static rec_mgr     search_mgr;
+static rec_mgr     result_mgr;
 // Types.
-static int             mat_oidx;
-static typeExp_ptr     mat_tp;
-static int             search_oidx;
-static typeExp_ptr     search_tp;
+static int         mat_oidx;
+static typeExp_ptr mat_tp;
+static int         search_oidx;
+static typeExp_ptr search_tp;
 
 // Debugging -------------------------------------------------------------------
 #define DEBUG_ISO 0
@@ -70,13 +57,8 @@ static void allocate_matrix(mat_ptr *m, unint R, unint C);
 static void free_matrix(mat_ptr m);
 static void read_matrix(mat_ptr m, g_ptr redex);
 // Matrix/Vector/Pexlif utils.
-static vec_ptr split_vector(string name);
 static void    trim_matrix_head(mat_ptr m);
-static int     pexlif_size(g_ptr p);
 // Adj. mat. construciton.
-static void record_vector(hash_record_ptr tbl_ptr, key_ptr *tail, unint i, const vec_ptr v);
-static bool mk_adj_table(key_lst_ptr *k, unint *c, g_ptr p);
-static bool mk_adj_matrix(mat_ptr m, unint s, key_lst_ptr k);
 static bool mk_adj(mat_ptr m, g_ptr p);
 // Iso. mat. construction.
 static bool mk_iso_list(sig_ptr *s, g_ptr p);
@@ -135,6 +117,17 @@ free_matrix(mat_ptr m)
 }
 
 static void
+trim_matrix_head(mat_ptr m)
+{
+    for(unint i=0; i<m->rows; i++) {
+        m->mat[i][0] = FALSE;
+    }
+    for(unint i=1; i<m->cols; i++) {
+        m->mat[0][i] = FALSE;
+    }    
+}
+
+static void
 read_matrix(mat_ptr m, g_ptr redex)
 {
     g_ptr lr, lc, row, col;
@@ -162,217 +155,25 @@ print_matrix(mat_ptr m)
     }
 }
 
-// ? ---------------------------------------------------------------------------
-
-static vec_ptr
-split_vector(string name)
-{
-    vec_ptr vp = Split_vector_name(&lstrings, &vec_mgr, &rng_mgr, name);
-    for(vec_ptr p = vp; p != NULL; p = p->next) {
-        if(p->type == TXT) {
-            p->u.name = wastrsave(&strings, p->u.name);
-        }
-    }
-    return vp;
-}
-
-static void
-trim_matrix_head(mat_ptr m)
-{
-    for(unint i=0; i<m->rows; i++) {
-        m->mat[i][0] = FALSE;
-    }
-    for(unint i=1; i<m->cols; i++) {
-        m->mat[0][i] = FALSE;
-    }    
-}
-
-static int
-pexlif_size(g_ptr p)
-{
-    g_ptr attrs, fa_inps, fa_outs, inter, cont, children, fns;
-    string name;
-    bool leaf;
-    if(!is_PINST(p, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
-        return -1;
-    }
-    if(is_P_LEAF(cont, &fns)) {
-        return 1;
-    }
-    if(is_P_HIER(cont, &children)) {
-        return 1 + List_length(children);
-    }
-    return -1;
-}
-
 // Adj. matrix -----------------------------------------------------------------
-
-static void
-new_adj_mem()
-{
-    bkt_mgr_ptr = &bkt_mgr;
-    key_mgr_ptr = &key_mgr;
-    key_lst_mgr_ptr = &key_lst_mgr;
-    tbl_in_ptr = &tbl_in;
-    tbl_out_ptr = &tbl_out;
-    new_mgr(bkt_mgr_ptr, sizeof(bkt_rec));
-    new_mgr(key_mgr_ptr, sizeof(key_rec));
-    new_mgr(key_lst_mgr_ptr, sizeof(key_lst_rec));
-    create_hash(tbl_in_ptr, 100, str_hash, str_equ);
-    create_hash(tbl_out_ptr, 100, str_hash, str_equ);
-}
-
-static void
-rem_adj_mem()
-{
-    free_mgr(bkt_mgr_ptr);
-    free_mgr(key_mgr_ptr);
-    free_mgr(key_lst_mgr_ptr);
-    dispose_hash(tbl_in_ptr, NULLFCN);
-    dispose_hash(tbl_out_ptr, NULLFCN);
-    bkt_mgr_ptr = NULL;
-    key_mgr_ptr = NULL;
-    key_lst_mgr_ptr = NULL;
-    tbl_in_ptr = NULL;
-    tbl_out_ptr = NULL;
-}
-
-static void
-record_vector(hash_record_ptr tbl_ptr, key_ptr *tail, unint i, const vec_ptr v)
-{
-    string key = Get_vector_signature(&lstrings, v);
-    // Record in keys.
-    key_ptr n = (key_ptr) new_rec(key_mgr_ptr);
-    n->lbl  = key;
-    n->vec  = v;
-    n->next = NULL;
-    (*tail) = n;
-    // Record in table.
-    bkt_ptr bkt = find_hash(tbl_ptr, key);
-    if(bkt == NULL) {
-        bkt_ptr b = (bkt_ptr) new_rec(bkt_mgr_ptr);
-        b->lbl  = i;
-        b->vec  = v;
-        b->next = NULL;
-        insert_hash(tbl_ptr, key, b);
-    } else {
-        while(bkt->next != NULL) {
-            bkt = bkt->next;
-        }
-        bkt_ptr b = (bkt_ptr) new_rec(bkt_mgr_ptr);
-        b->lbl  = i;
-        b->vec  = v;
-        b->next = NULL;
-        bkt->next = b;
-    }
-}
-
-static bool
-mk_adj_table(key_lst_ptr *keys, unint *count, g_ptr p)
-{
-    g_ptr attrs, fa_inps, fa_outs, inter, cont, children, fns;
-    string name;
-    bool leaf;
-    if(!is_PINST(p, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
-        Fail_pr("mk_adj: expected a pexlif.");
-        return FALSE;
-    }    
-    if(is_P_LEAF(cont, &fns)) {
-        Fail_pr("mk_adj: expected a hierarchical pexlif.");
-        return FALSE;
-    }
-    if(is_P_HIER(cont, &children)) {
-        vec_ptr vec;
-        key_ptr key = NULL, *key_tail = &key;
-        // Record vector names for parent's formals.
-        // TODO: count outputs as inputs for the environment and vice versa.
-        FOREACH_FORMAL(vec, fa_inps) {
-            record_vector(tbl_in_ptr, key_tail, 0, vec);
-            key_tail = &(*key_tail)->next;
-        }
-        FOREACH_FORMAL(vec, fa_outs) {
-            record_vector(tbl_out_ptr, key_tail, 0, vec);
-            key_tail = &(*key_tail)->next;
-        }
-        key_lst_ptr key_lst = (key_lst_ptr) new_rec(key_lst_mgr_ptr);
-        key_lst->key = key;
-        key_lst->next = NULL;
-        *keys = key_lst;
-        *count = 1;
-        key_lst_ptr *key_lst_tail = &key_lst->next;
-        // Record vector names for each child's actuals.
-        g_ptr child, tmp;
-        FOR_CONS(children, tmp, child) {
-            if(!is_PINST(child, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
-                Fail_pr("mk_adj: expected all children to be pexlifs.");
-                return FALSE;
-            }
-            key_ptr key = NULL, *key_tail = &key;
-            FOREACH_ACTUAL(vec, fa_inps) {
-                record_vector(tbl_in_ptr, key_tail, *count, vec);
-                key_tail = &(*key_tail)->next;
-            }
-            FOREACH_ACTUAL(vec, fa_outs) {
-                record_vector(tbl_out_ptr, key_tail, *count, vec);
-                key_tail = &(*key_tail)->next;
-            }
-            key_lst_ptr key_lst = (key_lst_ptr) new_rec(key_lst_mgr_ptr);
-            key_lst->key = key;
-            key_lst->next = NULL;
-            *key_lst_tail = key_lst;
-            key_lst_tail = &key_lst->next;
-            *count = *count + 1;
-        }
-        return TRUE;
-    }
-    Fail_pr("What?!");
-    return FALSE;
-}
-
-static bool
-mk_adj_matrix(mat_ptr m, unint size, key_lst_ptr keys)
-{
-    ASSERT(m->cols == size);
-    ASSERT(m->cols == m->rows);
-    // /
-    key_ptr key;
-    bkt_ptr bkt;
-    FOREACH_KEY(key, keys) {
-        string name = key->lbl;
-        vec_ptr vec = key->vec;
-        // Search inputs.
-        bkt = (bkt_ptr) find_hash(tbl_in_ptr, name);
-        while(bkt != NULL) {
-            if(bkt->lbl != i && Check_vector_overlap(vec, bkt->vec)) {
-                m->mat[i][bkt->lbl] = TRUE;
-            }
-            bkt = bkt->next;
-        }
-        // Search outputs.
-        bkt = (bkt_ptr) find_hash(tbl_out_ptr, name);
-        while(bkt != NULL) {
-            if(bkt->lbl != i && Check_vector_overlap(vec, bkt->vec)) {
-                m->mat[i][bkt->lbl] = TRUE;
-            }
-            bkt = bkt->next;
-        }
-    }
-    return TRUE;
-}
 
 static bool
 mk_adj(mat_ptr m, g_ptr p)
 {
-    new_adj_mem();
-    // /
-    key_lst_ptr keys;
-    unint length;
-    bool fail = FALSE;
-    if(!fail && !mk_adj_table(&keys, &length, p)) { fail = TRUE; }
-    if(!fail && !mk_adj_matrix(m, length, keys))  { fail = TRUE; }
-    // /
-    rem_adj_mem();
-    return !fail;
+    g_ptr res = get_top_adjacencies(p);
+    if(res == NULL || IS_NIL(res)) {
+        return FALSE;
+    }
+    g_ptr lr, lc, row, col;
+    unint i = 0, j;
+    FOR_CONS(res, lr, row) {
+        FOR_CONS(row, lc, col) {
+            j = GET_INT(col);
+            m->mat[i][j] = TRUE;
+        }
+        i++;
+    }
+    return TRUE;
 }
 
 // Iso. matrix -----------------------------------------------------------------
@@ -902,8 +703,8 @@ strict_isomatch_fn(g_ptr redex)
     EXTRACT_3_ARGS(redex, g_p, g_g, g_box);
     bool box = GET_BOOL(g_box);
     // /
-    int p_size = pexlif_size(g_p);
-    int g_size = pexlif_size(g_g);
+    int p_size = get_top_size(g_p); //pexlif_size(g_p);
+    int g_size = get_top_size(g_g); //pexlif_size(g_g);
     if(p_size < 2) {
         MAKE_REDEX_FAILURE(redex, Fail_pr("isomatch: malformed needle."));
     } else if(g_size < 2) {
@@ -964,8 +765,8 @@ internal_search_create_fn(g_ptr redex)
     g_ptr g_needle, g_haystack, g_trim;
     EXTRACT_3_ARGS(redex, g_needle, g_haystack, g_trim);
     // /
-    unint n_rows = pexlif_size(g_needle);
-    unint h_rows = pexlif_size(g_haystack);
+    unint n_rows = get_top_size(g_needle); //pexlif_size(g_needle);
+    unint h_rows = get_top_size(g_haystack); //pexlif_size(g_haystack);
     if(n_rows <= 1) {
         MAKE_REDEX_FAILURE(redex, Fail_pr("Expected a hier. pexlif as needle."));
     } else if(h_rows <= 1) {
@@ -1071,9 +872,6 @@ Iso_Init()
     );
     search_tp = Get_Type("internal_search_state", NULL, TP_INSERT_FULL_TYPE);
     // Init. generics.
-    new_ustrmgr(&lstrings);
-    new_mgr(&vec_mgr, sizeof(vec_rec));
-    new_mgr(&rng_mgr, sizeof(range_rec));
     new_mgr(&mat_mgr, sizeof(mat_rec));
     new_mgr(&updates_mgr, sizeof(updates_rec));
     new_mgr(&search_mgr, sizeof(search_rec));
@@ -1134,6 +932,7 @@ _DuMMy_iso()
 {
     read_matrix(NULL, NULL);
     print_matrix(NULL);
+    mk_adj(NULL, NULL);
     is_adjacent(NULL, 0, 0);
     lazy_isomatch(NULL);
 }

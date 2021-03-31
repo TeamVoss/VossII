@@ -60,14 +60,181 @@ extern str_mgr strings;
 /*                              PRIVATE VARIABLES                             */
 /******************************************************************************/
 static char value_list_buf[1024];
+// ...
+static ustr_mgr        lstrings;
+static rec_mgr         vec_mgr;
+static rec_mgr         rng_mgr;
+static rec_mgr         adj_mgr;
+static rec_mgr_ptr     adj_mgr_ptr;
+static rec_mgr         vec_tmp_mgr;
+static rec_mgr_ptr     vec_tmp_mgr_ptr;
+static rec_mgr         vec_tmp_lst_mgr;
+static rec_mgr_ptr     vec_tmp_lst_mgr_ptr;
+static hash_record     tbl_in;
+static hash_record_ptr tbl_in_ptr;
+static hash_record     tbl_out;
+static hash_record_ptr tbl_out_ptr;
 
 // Forward definitions local functions -----------------------------------------
-// ...
+static void    new_adj_mem();
+static void    rem_adj_mem();
+static vec_ptr split_vector(string name);
+static void    record_vector_signatures(hash_record_ptr tbl, vec_tmp_ptr *tail, unint index, const vec_ptr vec);
+static void    mk_adj_tables(vec_tmp_lst_ptr *keys, unint *count, g_ptr p);
 
 /******************************************************************************/
 /*                                LOCAL FUNCTIONS                             */
 /******************************************************************************/
-// ...
+
+static void
+new_adj_mem()
+{
+    adj_mgr_ptr = &adj_mgr;
+    vec_tmp_mgr_ptr = &vec_tmp_mgr;
+    vec_tmp_lst_mgr_ptr = &vec_tmp_lst_mgr;
+    tbl_in_ptr = &tbl_in;
+    tbl_out_ptr = &tbl_out;
+    new_mgr(adj_mgr_ptr, sizeof(adj_rec));
+    new_mgr(vec_tmp_mgr_ptr, sizeof(vec_tmp_rec));
+    new_mgr(vec_tmp_lst_mgr_ptr, sizeof(vec_tmp_lst_rec));
+    create_hash(tbl_in_ptr, 100, str_hash, str_equ);
+    create_hash(tbl_out_ptr, 100, str_hash, str_equ);
+}
+
+static void
+rem_adj_mem()
+{
+    free_mgr(adj_mgr_ptr);
+    free_mgr(vec_tmp_mgr_ptr);
+    free_mgr(vec_tmp_lst_mgr_ptr);
+    dispose_hash(tbl_in_ptr, NULLFCN);
+    dispose_hash(tbl_out_ptr, NULLFCN);
+    adj_mgr_ptr = NULL;
+    vec_tmp_mgr_ptr = NULL;
+    vec_tmp_lst_mgr_ptr = NULL;
+    tbl_in_ptr = NULL;
+    tbl_out_ptr = NULL;
+}
+
+static vec_ptr
+split_vector(string name)
+{
+    vec_ptr vp = Split_vector_name(&lstrings, &vec_mgr, &rng_mgr, name);
+    for(vec_ptr p = vp; p != NULL; p = p->next) {
+        if(p->type == TXT) {
+            p->u.name = wastrsave(&strings, p->u.name);
+        }
+    }
+    return vp;
+}
+
+#define FORMAL_OF_CONS(fa)                                                     \
+    split_vector(GET_STRING(GET_FST(GET_CONS_HD(fa))))
+
+#define ACTUAL_OF_CONS(fa)                                                     \
+    split_vector(GET_STRING(GET_CONS_HD(fa)))
+
+#define FOREACH_FORMAL(vec, fa)                                                \
+    for( g_ptr li = fa                                                         \
+       ; !IS_NIL(li) && (vec = FORMAL_OF_CONS(li), TRUE)                       \
+       ; li = GET_CONS_TL(li))
+
+#define FOREACH_ACTUAL(vec, fa)                                                \
+    for( g_ptr li = fa                                                         \
+        ; !IS_NIL(li)                                                          \
+        ; li = GET_CONS_TL(li))                                                \
+        for( g_ptr as = GET_SND(GET_CONS_HD(li))                               \
+           ; !IS_NIL(as) && (vec = ACTUAL_OF_CONS(as), TRUE)                   \
+           ; as = GET_CONS_TL(as))
+
+static void
+record_vector_signatures(hash_record_ptr tbl, vec_tmp_ptr *tail, unint index, const vec_ptr vec)
+{
+    string key = Get_vector_signature(&lstrings, vec);
+    // Record signature as we'll need it later again.
+    vec_tmp_ptr n = (vec_tmp_ptr) new_rec(vec_tmp_mgr_ptr);
+    n->signature = key;
+    n->vec = vec;
+    n->next = NULL;
+    (*tail) = n;
+    // Record vec. in tabel.
+    adj_ptr bkt = (adj_ptr) find_hash(tbl, key);
+    if(bkt == NULL) {
+        adj_ptr b = (adj_ptr) new_rec(adj_mgr_ptr);
+        b->index = index;
+        b->vec = vec;
+        b->next = NULL;
+        insert_hash(tbl, key, b);
+    } else {
+        // todo: why not record as head since order does not matter? 
+        while(bkt->next != NULL) {
+            bkt = bkt->next;
+        }
+        adj_ptr b = (adj_ptr) new_rec(adj_mgr_ptr);
+        b->index = index;
+        b->vec = vec;
+        b->next = NULL;
+        bkt->next = b;
+    }
+}
+
+static void
+mk_adj_tables(vec_tmp_lst_ptr *keys, unint *count, g_ptr p)
+{
+    g_ptr attrs, fa_inps, fa_outs, inter, cont, children, fns;
+    string name;
+    bool leaf;
+    if(!is_PINST(p, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
+        DIE("Bad input");
+    }    
+    if(is_P_LEAF(cont, &fns)) {
+        DIE("Bad input");
+    }
+    if(is_P_HIER(cont, &children)) {
+        vec_ptr vec;
+        vec_tmp_ptr key = NULL, *key_tail = &key;
+        // Record vector names for parent's formals.
+        // todo: count outputs as inputs for the environment and vice versa.
+        FOREACH_FORMAL(vec, fa_inps) {
+            record_vector_signatures(tbl_in_ptr, key_tail, 0, vec);
+            key_tail = &(*key_tail)->next;
+        }
+        FOREACH_FORMAL(vec, fa_outs) {
+            record_vector_signatures(tbl_out_ptr, key_tail, 0, vec);
+            key_tail = &(*key_tail)->next;
+        }
+        vec_tmp_lst_ptr key_lst = (vec_tmp_lst_ptr) new_rec(vec_tmp_lst_mgr_ptr);
+        key_lst->vec = key;
+        key_lst->next = NULL;
+        *keys = key_lst;
+        vec_tmp_lst_ptr *key_lst_tail = &key_lst->next;
+        // Record vector names for each child's actuals.
+        *count = 1;
+        g_ptr child, tmp;
+        FOR_CONS(children, tmp, child) {
+            if(!is_PINST(child, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
+                DIE("Bad input");
+            }
+            vec_tmp_ptr key = NULL, *key_tail = &key;
+            FOREACH_ACTUAL(vec, fa_inps) {
+                record_vector_signatures(tbl_in_ptr, key_tail, *count, vec);
+                key_tail = &(*key_tail)->next;
+            }
+            FOREACH_ACTUAL(vec, fa_outs) {
+                record_vector_signatures(tbl_out_ptr, key_tail, *count, vec);
+                key_tail = &(*key_tail)->next;
+            }
+            vec_tmp_lst_ptr key_lst = (vec_tmp_lst_ptr) new_rec(vec_tmp_lst_mgr_ptr);
+            key_lst->vec = key;
+            key_lst->next = NULL;
+            *key_lst_tail = key_lst;
+            key_lst_tail = &key_lst->next;
+            *count = *count + 1;
+        }
+        return;
+    }
+    DIE("Impossible");
+}
 
 /******************************************************************************/
 /*                               PUBLIC FUNCTIONS                             */
@@ -81,6 +248,72 @@ get_top_name(g_ptr p)
     bool leaf;
     is_PINST(p,&name,&attrs,&leaf,&fa_inps,&fa_outs,&internals,&content);
     return name;
+}
+
+int
+get_top_size(g_ptr p)
+{
+    g_ptr attrs, fa_inps, fa_outs, inter, cont, children, fns;
+    string name;
+    bool leaf;
+    if(!is_PINST(p, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
+        return -1;
+    }
+    if(is_P_LEAF(cont, &fns)) {
+        return 1;
+    }
+    if(is_P_HIER(cont, &children)) {
+        return 1 + List_length(children);
+    }
+    return -1;
+}
+
+#define FOREACH_KEY(key, keys)                                                 \
+    for(; keys != NULL; keys = keys->next)                                     \
+        for(key = keys->vec; key != NULL; key = key->next)
+
+g_ptr
+get_top_adjacencies(g_ptr p)
+{
+    new_adj_mem();
+    // /
+    unint count;
+    adj_ptr bkt;
+    vec_tmp_ptr key;
+    vec_tmp_lst_ptr keys;
+    mk_adj_tables(&keys, &count, p);
+    // /
+    g_ptr res = Make_NIL(), res_tail = res;
+//  FOREACH_KEY(key, keys) {
+    while(keys != NULL) {
+        g_ptr adj = Make_NIL(), adj_tail = adj;
+        for(key = keys->vec; key != NULL; key = key->next) {
+            vec_ptr vec = key->vec;
+            string signature = key->signature;
+            bkt = (adj_ptr) find_hash(tbl_in_ptr, signature);
+            while(bkt != NULL) {
+                if(Check_vector_overlap(vec, bkt->vec)) {
+                    g_ptr index = Make_INT_leaf(bkt->index);
+                    APPEND1(adj_tail, index);
+                }
+                bkt = bkt->next;
+            }
+            bkt = (adj_ptr) find_hash(tbl_out_ptr, signature);
+            while(bkt != NULL) {
+                if(Check_vector_overlap(vec, bkt->vec)) {
+                    g_ptr index = Make_INT_leaf(bkt->index);
+                    APPEND1(adj_tail, index);
+                }
+                bkt = bkt->next;
+            }
+        }
+        APPEND1(res_tail, adj);
+        keys = keys->next;
+    }
+//  }
+    // /
+    rem_adj_mem();
+    return res;
 }
 
 string
@@ -724,14 +957,16 @@ Pexlif_Init()
     s_W_MEM_READ           = Mk_constructor_name("W_MEM_READ");
     s_W_MEM_WRITE          = Mk_constructor_name("W_MEM_WRITE");
     s_MEM                  = Mk_constructor_name("MEM");
-    //
+    // /
     s_no_instance = wastrsave(&strings, "{}");
 }
 
 void
 Pexlif_Install_Functions()
 {
-
+    new_ustrmgr(&lstrings);
+    new_mgr(&vec_mgr, sizeof(vec_rec));
+    new_mgr(&rng_mgr, sizeof(range_rec));
 }
 
 /******************************************************************************/
