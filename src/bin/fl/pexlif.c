@@ -269,6 +269,34 @@ get_top_size(g_ptr p)
 }
 
 g_ptr
+get_top_inst(g_ptr p, unint inst)
+{
+    g_ptr attrs, fa_inps, fa_outs, inter, cont, children, fns;
+    string name;
+    bool leaf;
+    if(!is_PINST(p, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
+        return NULL;
+    }
+    if(is_P_LEAF(cont, &fns)) {
+        if(inst == 0) {
+            return p;
+        } else {
+            return NULL;
+        }
+    }
+    if(is_P_HIER(cont, &children)) {
+        if(inst == 0) {
+            return p;
+        } else if(inst < (unint) List_length(children)) {
+            return List_element(p, inst-1);
+        } else {
+            return NULL;
+        }
+    }
+    return NULL;
+}
+
+g_ptr
 get_top_adjacencies(g_ptr p)
 {
     new_adj_mem();
@@ -308,6 +336,33 @@ get_top_adjacencies(g_ptr p)
     // /
     rem_adj_mem();
     return res;
+}
+
+void
+fold_pexlif(g_ptr p, unint *ids, unint size)
+{
+    g_ptr attrs, fa_inps, fa_outs, inter, cont, children, fns;
+    string name;
+    bool leaf;
+    if(!is_PINST(p, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
+        return;
+    }
+    if(is_P_LEAF(cont, &fns)) {
+        return;
+    }
+    if(is_P_HIER(cont, &children)) {
+        unint len = List_length(children);
+        g_ptr adj = get_top_adjacencies(p);
+        // Find out which nodes are not (to-be) folded.
+        unint *jds = Calloc((len-size)*sizeof(unint));
+        ids = ids;
+        jds = jds;
+        // Find out which nodes reference a (to-be) folded node.
+        g_ptr tmp, pair;
+        FOR_CONS(adj, tmp, pair) {
+            pair = pair;
+        }
+    }
 }
 
 string

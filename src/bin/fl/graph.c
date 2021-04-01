@@ -1314,6 +1314,19 @@ List_length(g_ptr l)
     return res;
 }
 
+g_ptr
+List_element(g_ptr l, unint index)
+{
+    while(!IS_NIL(l)) {
+        if(index == 0) {
+            return GET_CONS_HD(l);
+        }
+        index--;
+        l = GET_CONS_TL(l);
+    }
+    return NULL;
+}
+
 var_list_ptr
 Add_Var_to_Var_List(string var, typeExp_ptr type_hint, var_list_ptr vlp)
 {
