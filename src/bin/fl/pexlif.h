@@ -18,7 +18,7 @@ string get_top_name(g_ptr p);
 int    get_top_size(g_ptr p);
 g_ptr  get_top_inst(g_ptr p, unint index);
 g_ptr  get_top_adjacencies(g_ptr p);
-g_ptr  fold_pexlif(g_ptr p, unint *ids, unint size);
+g_ptr  fold_pexlif(g_ptr p, g_ptr ids, string name);
 string find_value_list(g_ptr attrs, string name);
 string find_instance_name(g_ptr attrs);
 
