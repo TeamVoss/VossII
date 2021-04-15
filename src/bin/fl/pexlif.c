@@ -312,15 +312,15 @@ get_top_adjacencies(g_ptr p)
     // /
     unint count;
     adj_ptr adj;
-    vec_adj_ptr vchild;
-    vec_adj_lst_ptr vchildren;
-    mk_adj_tables(&vchildren, &count, p);
+    vec_adj_ptr vfa;
+    vec_adj_lst_ptr vchild;
+    mk_adj_tables(&vchild, &count, p);
     g_ptr res = Make_NIL(), res_tail = res;
-    for(unint i = 0; vchildren != NULL; i++, vchildren = vchildren->next) {
+    for(unint i = 0; vchild != NULL; i++, vchild = vchild->next) {
         g_ptr lhs = Make_INT_leaf(i);
-        for(vchild = vchildren->vec; vchild != NULL; vchild = vchild->next) {
-            vec_ptr vec = vchild->vec;
-            string sig = vchild->signature;
+        for(vfa = vchild->vec; vfa != NULL; vfa = vfa->next) {
+            vec_ptr vec = vfa->vec;
+            string sig = vfa->signature;
             adj = (adj_ptr) find_hash(tbl_in_ptr, sig);
             while(adj != NULL) {
                 if(Check_vector_overlap(vec, adj->vec)) {
@@ -372,17 +372,23 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
         insert_hash(&ids_tbl, INT2PTR(GET_INT(it)), INT2PTR(TRUE));
     }
     // Record node connections in 'p' (skip root, first child should be '1').
+    unint ix = 0;
     unint count;
-    vec_adj_ptr vchild;
-    vec_adj_lst_ptr vchildren;
-    mk_adj_tables(&vchildren, &count, p);
-    for(vchildren = vchildren->next; vchildren != NULL; vchildren = vchildren->next) {        
-        for(vchild = vchildren->vec; vchild != NULL; vchild = vchild->next) {
-            vec_ptr vec = vchild->vec;
-            string sig  = vchild->signature;
-            string act  = vchild->name;
+    vec_adj_ptr vfa;
+    vec_adj_lst_ptr vchild;
+    mk_adj_tables(&vchild, &count, p);
+    for(vchild = vchild->next; vchild != NULL; vchild = vchild->next) {
+        ix++;
+        if(find_hash(&ids_tbl, INT2PTR(ix)) == NULL) {
+            continue;
+        }
+        for(vfa = vchild->vec; vfa != NULL; vfa = vfa->next) {
+            vec_ptr vec = vfa->vec;
+            string sig  = vfa->signature;
+            string act  = vfa->name;
             hash_record_ptr fa, tbl;
-            if(vchild->input) {
+            // reg. as input? check drivers, and vice versa.
+            if(vfa->input) {
                 tbl = tbl_out_ptr;
                 fa = &inps;
             } else {
@@ -397,6 +403,10 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
                     } else {
                         insert_check_hash(fa, act, act);
                     }
+                    // /
+                    bool b = find_hash(&ids_tbl, INT2PTR(adj->index)) != NULL;
+                    string pre = b ? "internal" : (vfa->input ? "input" : "output");
+                    fprintf(stderr, "%s (via %s): %u with %u\n", pre, vfa->name, ix, adj->index);
                 }
             }
         }
@@ -468,8 +478,8 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
     INC_REFCNT(fa_outs);
     g_ptr top_pinst =
         mk_PINST( old_name
-                , leaf
                 , Make_NIL() // note: SHA/FP added in FL wrapper.
+                , leaf
                 , fa_inps
                 , fa_outs
                 , top_internals
@@ -1092,7 +1102,8 @@ fold_pexlif_fn(g_ptr redex)
     g_ptr g_pex, g_ids, g_name;
     // /
     EXTRACT_3_ARGS(redex, g_pex, g_ids, g_name);
-    OVERWRITE(redex, fold_pexlif(g_pex, g_ids, GET_STRING(g_name)));
+    g_ptr fold = fold_pexlif(g_pex, g_ids, GET_STRING(g_name));
+    OVERWRITE(redex, fold);
     // /
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -1149,15 +1160,15 @@ Pexlif_Install_Functions()
     typeExp_ptr pexlif_tp = Get_Type("pexlif", NULL, TP_INSERT_PLACE_HOLDER);
     Add_ExtAPI_Function(
           "fold_pexlif"
-        , "11"
+        , "111"
         , FALSE
         , GLmake_arrow(
               pexlif_tp
             , GLmake_arrow(
                   GLmake_list(GLmake_int())
-                , pexlif_tp
-            )
-          )
+                , GLmake_arrow(
+                      GLmake_string()
+                    , pexlif_tp)))
         , fold_pexlif_fn
     );
 }
