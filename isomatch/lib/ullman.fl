@@ -86,11 +86,9 @@ letrec
 let
     thin_isomorphisms p g r c m =
         // Trim col. if 'G(y)' is not adj. to 'G(c)'.
-        let f col j = NOT (is_adjacent g j c) => F | col in
-        //            NOT (el c (el j g))
+        let f col j = NOT (el c (el j g)) => F | col in
         // Trim row if 'P(x)' is adj. to 'P(r)'.
-        let g row i = (is_adjacent p i r) => ixmap f row | row in
-        //            (el r (el i p))
+        let g row i = (el r (el i p)) => ixmap f row | row in
         // Check every matching.
         ixmap g m
 ;
@@ -138,8 +136,7 @@ let
 //  isomorphism::(bool mat)->(bool mat)->(bool mat)->bool
 let
     isomorphism mat p g =
-         // single_morphism mat AND valid_morphism mat p g
-         is_isomorphism p g mat;
+        single_morphism mat AND valid_morphism mat p g
 ;
 
 //==============================================================================

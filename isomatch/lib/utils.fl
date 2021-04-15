@@ -288,8 +288,8 @@ let print_bool b = b => "T" | "_";
 //  print_some::(* opt)->(*->string)->string;
 let print_some = flip (maybe "none");
 
-//  print_pair::string->string->string
-let print_pair = sprintf "%s:%s";
+//  print_pair::(*->string)->(**->string)->*->**->string
+let print_pair f g x y = sprintf "%s:%s" (f x) (g y);
 
 //  print_list::(*->string)->(* list)->string
 let print_list = list2str T "[" "," "]";
@@ -304,7 +304,10 @@ let print_large_list = list2str T "[ " "\n, " "\n]";
 let print_large_matrix = list2str T "[ " "\n, " "\n]" # print_list;
 
 //  print_fa::(string#(string list))->string
-let print_fa = print_list (curry print_pair # second (print_list id));
+let print_fa = print_list (curry (print_pair id id) # second (print_list id));
+
+//  print_bust::((string#string) list)->string
+let print_subst = print_list (curry (print_pair id id));
 
 //==============================================================================
 // SHA256.

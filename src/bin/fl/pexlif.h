@@ -12,13 +12,21 @@
 #ifdef EXPORT_FORWARD_DECL
 
 // Function prototypes for public functions ------------------------------------
+
+// utils.
 string get_top_name(g_ptr p);
+int    get_top_size(g_ptr p);
+g_ptr  get_top_inst(g_ptr p, unint index);
+g_ptr  get_top_adjacencies(g_ptr p);
+g_ptr  fold_pexlif(g_ptr p, unint *ids, unint size);
 string find_value_list(g_ptr attrs, string name);
 string find_instance_name(g_ptr attrs);
-//
+
+// destructors.
 void destr_PINST(g_ptr node,g_ptr *namep, g_ptr *attrsp, g_ptr *leafp, g_ptr *fa_inpsp, g_ptr *fa_outsp, g_ptr *internalsp, g_ptr *contentp);
 bool destr_MEM(g_ptr node, int *a_szp, int *linesp, int *d_szp);
-//
+
+// constructors.
 g_ptr mk_MEM(g_ptr addr_size, g_ptr lines, g_ptr data_size);
 g_ptr mk_W_X(g_ptr sz);
 g_ptr mk_W_CONST(g_ptr sz, g_ptr v);
@@ -51,7 +59,8 @@ g_ptr mk_W_PHASE_DELAY(g_ptr lhs, g_ptr rhs);
 g_ptr mk_PINST(g_ptr name, g_ptr attrs, g_ptr leaf, g_ptr fa_inps, g_ptr fa_outs, g_ptr internals, g_ptr content);
 g_ptr mk_P_HIER(g_ptr children);
 g_ptr mk_P_LEAF(g_ptr fns);
-//
+
+// 'is' tests.
 bool is_PINST(g_ptr node, string *namep, g_ptr *attrsp, bool *leafp, g_ptr *fa_inpsp, g_ptr *fa_outsp, g_ptr *internalsp, g_ptr *contentp);
 bool is_P_HIER(g_ptr node, g_ptr *childrenp);
 bool is_P_LEAF(g_ptr node, g_ptr *fnsp);
@@ -73,7 +82,8 @@ bool is_W_UPDATE_NAMED_SLICE(g_ptr node, g_ptr *basep, string *namep, g_ptr *idx
 bool is_W_CAT(g_ptr node, g_ptr *listp);
 bool is_W_MEM_READ(g_ptr node, int *a_szp, int *linesp, int *d_szp, g_ptr *memp, g_ptr *addrp);
 bool is_W_MEM_WRITE(g_ptr node, int *a_szp, int *linesp, int *d_szp, g_ptr *memp, g_ptr *addrp, g_ptr *datap);
-//
+
+// ...
 void Pexlif_Init();
 void Pexlif_Install_Functions();
 
@@ -83,6 +93,35 @@ void Pexlif_Install_Functions();
 #define PEXLIF_H
 
 #include "fl.h"	/* Global data types and include files */
+
+typedef struct adj_rec *adj_ptr;
+typedef struct adj_rec {
+    unint   index; // index of vec as found in (parent : children).
+    vec_ptr vec;   // the vec. itself.
+    adj_ptr next;  // next vec. with similar signature.
+} adj_rec;
+
+typedef struct vec_adj_rec *vec_adj_ptr;
+typedef struct vec_adj_rec {
+    string      name;      // orig. name of vec.
+    string      signature; // pre-computed signature of (formal/actual).
+    bool        input;     // name taken from 'fa_inps' or 'fa_outs'?
+    vec_ptr     vec;       // the vec. itself. (formal/actual)
+    vec_adj_ptr next;      // next vec. of same parent node.
+} vec_adj_rec;
+
+typedef struct vec_adj_lst_rec *vec_adj_lst_ptr;
+typedef struct vec_adj_lst_rec {
+    vec_adj_ptr     vec;  // record of node's vec's (formal/actuals).
+    vec_adj_lst_ptr next; // next node's vec's.
+} vec_adj_lst_rec;
+
+typedef struct fold_rec *fold_ptr;
+typedef struct fold_rec {
+    vec_ptr  from;
+    vec_ptr  to;
+    fold_ptr next;
+} fold_rec;
 
 #define DEST_GET(n)									                           \
 	ASSERT( GET_TYPE(node) == CONS_ND );			                           \
