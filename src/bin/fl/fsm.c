@@ -8416,29 +8416,6 @@ void
 _DuMMy_fsm()
 {
     SET_GBV(NULL, c_ZERO);
-    mk_MEM(NULL, NULL, NULL);
-    mk_W_EXPLICIT_VAR(NULL, NULL);
-    mk_W_NAMED_CONST(NULL, NULL, NULL);
-    mk_W_AND(NULL, NULL);
-    mk_W_OR(NULL, NULL);
-    mk_W_NOT(NULL);
-    mk_W_EQ(NULL, NULL);
-    mk_W_PRED(NULL, NULL);
-    mk_W_GR(NULL, NULL);
-    mk_W_ADD(NULL, NULL);
-    mk_W_SUB(NULL, NULL);
-    mk_W_MUL(NULL, NULL);
-    mk_W_DIV(NULL, NULL);
-    mk_W_MOD(NULL, NULL);
-    mk_W_SHL(NULL, NULL);
-    mk_W_SHR(NULL, NULL);
-    mk_W_ASHR(NULL, NULL);
-    mk_W_SX(NULL, NULL);
-    mk_W_ZX(NULL, NULL);
-    mk_W_ITE(NULL, NULL, NULL);
-    mk_W_MEM_READ(NULL, NULL, NULL);
-    mk_W_MEM_WRITE(NULL, NULL, NULL, NULL);
-    mk_W_PHASE_DELAY(NULL, NULL);
     clean_pexlif_ios(NULL);
 }
 

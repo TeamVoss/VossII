@@ -18,6 +18,7 @@ string get_top_name(g_ptr p);
 int    get_top_size(g_ptr p);
 g_ptr  get_top_inst(g_ptr p, unint index);
 g_ptr  get_top_adjacencies(g_ptr p);
+g_ptr  fold_pexlif(g_ptr p, unint *ids, unint size);
 string find_value_list(g_ptr attrs, string name);
 string find_instance_name(g_ptr attrs);
 
@@ -100,18 +101,27 @@ typedef struct adj_rec {
     adj_ptr next;  // next vec. with similar signature.
 } adj_rec;
 
-typedef struct vec_tmp_rec *vec_tmp_ptr;
-typedef struct vec_tmp_rec {
-    string      signature; // pre-computed signature of vec.
-    vec_ptr     vec;       // the vec. itself.
-    vec_tmp_ptr next;      // next vec. of same parent node.
-} vec_tmp_rec;
+typedef struct vec_adj_rec *vec_adj_ptr;
+typedef struct vec_adj_rec {
+    string      name;      // orig. name of vec.
+    string      signature; // pre-computed signature of (formal/actual).
+    bool        input;     // name taken from 'fa_inps' or 'fa_outs'?
+    vec_ptr     vec;       // the vec. itself. (formal/actual)
+    vec_adj_ptr next;      // next vec. of same parent node.
+} vec_adj_rec;
 
-typedef struct vec_tmp_lst_rec *vec_tmp_lst_ptr;
-typedef struct vec_tmp_lst_rec {
-    vec_tmp_ptr     vec;  // record of node's vec's.
-    vec_tmp_lst_ptr next; // next node's vec's.
-} vec_tmp_lst_rec;
+typedef struct vec_adj_lst_rec *vec_adj_lst_ptr;
+typedef struct vec_adj_lst_rec {
+    vec_adj_ptr     vec;  // record of node's vec's (formal/actuals).
+    vec_adj_lst_ptr next; // next node's vec's.
+} vec_adj_lst_rec;
+
+typedef struct fold_rec *fold_ptr;
+typedef struct fold_rec {
+    vec_ptr  from;
+    vec_ptr  to;
+    fold_ptr next;
+} fold_rec;
 
 #define DEST_GET(n)									                           \
 	ASSERT( GET_TYPE(node) == CONS_ND );			                           \

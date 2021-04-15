@@ -56,7 +56,6 @@ static typeExp_ptr search_tp;
 static void allocate_matrix(mat_ptr *m, unint R, unint C);
 static void free_matrix(mat_ptr m);
 static void trim_matrix_head(mat_ptr m);
-static void read_matrix(mat_ptr m, g_ptr redex);
 // Adj. mat. construciton.
 static bool mk_adj(mat_ptr m, g_ptr p);
 // Iso. mat. construction.
@@ -124,34 +123,6 @@ trim_matrix_head(mat_ptr m)
     for(unint i=1; i<m->cols; i++) {
         m->mat[0][i] = FALSE;
     }    
-}
-
-static void
-read_matrix(mat_ptr m, g_ptr redex)
-{
-    g_ptr lr, lc, row, col;
-    int i, j;
-    // /
-    i = 0;
-    FOR_CONS(redex, lr, row) {
-        j = 0;
-        FOR_CONS(row, lc, col) {
-            m->mat[i][j] = GET_BOOL(col);
-            j++;
-        }
-        i++;
-    }
-}
-
-static void
-print_matrix(mat_ptr m)
-{
-    for(unint r = 0; r < m->rows; r++) {
-        for(unint c = 0; c < m->cols; c++) {
-            fprintf(stderr, " %s", m->mat[r][c] ? "T" : "_");
-        }
-        fprintf(stderr, "\n");
-    }
 }
 
 // Adj. matrix -----------------------------------------------------------------
@@ -926,11 +897,7 @@ Iso_Install_Functions()
 void
 _DuMMy_iso()
 {
-    read_matrix(NULL, NULL);
-    print_matrix(NULL);
-    mk_adj(NULL, NULL);
     is_adjacent(NULL, 0, 0);
-    lazy_isomatch(NULL);
 }
 
 /******************************************************************************/
