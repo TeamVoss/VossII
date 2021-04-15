@@ -157,5 +157,11 @@ let
         PINST n (f : s : a) l i o t c
 ;
 
+let
+    fold_pexlif pex ids name =
+        val (PINST n a l i o t (P_HIER ((PINST n' a' l' i' o' t' c'):cs))) = fold_pexlif pex ids name in
+        PINST n a l i o t (P_HIER ((PINST n' a' l' i' o' t' c'):cs))
+;
+
 //------------------------------------------------------------------------------
 // Fin.
