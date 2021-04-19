@@ -1842,7 +1842,7 @@ let '>=' = wGEQ;
 infix 5 '>=';
 
 let wLEQ {a:: *a} {b:: *a} = wNOT (wGR a b);
-let '<=' = wLT;
+let '<=' = wLEQ;
 infix 5 '<=';
 
 let wADD {a:: *a} {b:: *a} =
