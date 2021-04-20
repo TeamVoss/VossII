@@ -89,25 +89,6 @@ typedef struct search_rec {
 
 // Short-hands -----------------------------------------------------------------
 
-#define FORMAL_OF_CONS(fa)                                                     \
-    split_vector(GET_STRING(GET_FST(GET_CONS_HD(fa))))
-
-#define ACTUAL_OF_CONS(fa)                                                     \
-    split_vector(GET_STRING(GET_CONS_HD(fa)))
-
-#define FOREACH_FORMAL(vec, fa)                                                \
-    for( g_ptr li = fa                                                         \
-       ; !IS_NIL(li) && (vec = FORMAL_OF_CONS(li), TRUE)                       \
-       ; li = GET_CONS_TL(li))
-
-#define FOREACH_ACTUAL(vec, fa)                                                \
-    for( g_ptr li = fa                                                         \
-        ; !IS_NIL(li)                                                          \
-        ; li = GET_CONS_TL(li))                                                \
-        for( g_ptr as = GET_SND(GET_CONS_HD(li))                               \
-           ; !IS_NIL(as) && (vec = ACTUAL_OF_CONS(as), TRUE)                   \
-           ; as = GET_CONS_TL(as))
-
 #define FOREACH_KEY(key, keys)                                                 \
     for(unint i = 0; keys != NULL; i++, keys = keys->next)                     \
         for(key = keys->key; key != NULL; key = key->next)    

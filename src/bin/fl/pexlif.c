@@ -168,25 +168,6 @@ record_vector_signatures(vec_adj_ptr *tail, unint index, string name, bool input
     }
 }
 
-#define FORMAL_OF_CONS(fa)                                                     \
-    GET_STRING(GET_FST(GET_CONS_HD(fa)))
-
-#define ACTUAL_OF_CONS(fa)                                                     \
-    GET_STRING(GET_CONS_HD(fa))
-
-#define FOREACH_FORMAL(vec, fa)                                                \
-    for( g_ptr li = fa                                                         \
-       ; !IS_NIL(li) && (vec = FORMAL_OF_CONS(li), TRUE)                       \
-       ; li = GET_CONS_TL(li))
-
-#define FOREACH_ACTUAL(vec, fa)                                                \
-    for( g_ptr li = fa                                                         \
-        ; !IS_NIL(li)                                                          \
-        ; li = GET_CONS_TL(li))                                                \
-        for( g_ptr as = GET_SND(GET_CONS_HD(li))                               \
-           ; !IS_NIL(as) && (vec = ACTUAL_OF_CONS(as), TRUE)                   \
-           ; as = GET_CONS_TL(as))
-
 static void
 mk_adj_tables(vec_adj_lst_ptr *keys, unint *count, g_ptr p)
 {
@@ -321,23 +302,19 @@ get_top_adjacencies(g_ptr p)
         for(vfa = vchild->vec; vfa != NULL; vfa = vfa->next) {
             vec_ptr vec = vfa->vec;
             string sig = vfa->signature;
-            adj = (adj_ptr) find_hash(tbl_in_ptr, sig);
-            while(adj != NULL) {
+            for(adj = find_hash(tbl_in_ptr, sig); adj != NULL; adj = adj->next) {
                 if(Check_vector_overlap(vec, adj->vec)) {
                     g_ptr rhs = Make_INT_leaf(adj->index);
                     g_ptr pair = Make_PAIR_ND(lhs,rhs);
                     APPEND1(res_tail, pair);
                 }
-                adj = adj->next;
             }
-            adj = (adj_ptr) find_hash(tbl_out_ptr, sig);
-            while(adj != NULL) {
+            for(adj = find_hash(tbl_out_ptr, sig); adj != NULL; adj = adj->next) {
                 if(Check_vector_overlap(vec, adj->vec)) {
                     g_ptr rhs = Make_INT_leaf(adj->index);
                     g_ptr pair = Make_PAIR_ND(rhs,lhs);
                     APPEND1(res_tail, pair);
                 }
-                adj = adj->next;
             }
         }
     }
@@ -346,20 +323,10 @@ get_top_adjacencies(g_ptr p)
     return res;
 }
 
-#define SCAN_HASH(hp, bpp, k, d)                                               \
-    FOR_BUF(&((hp)->table), bucket_ptr, bpp)                                   \
-        for( bucket_ptr chp = *bpp                                             \
-           ; chp != NULL                                                       \
-             && (k = chp->key, TRUE)                                           \
-             && (d = chp->data, TRUE)                                          \
-           ; chp = chp->next)                                                  \
-
 g_ptr
 fold_pexlif(g_ptr p, g_ptr ids, string name)
 {
     new_adj_mem();
-    rec_mgr fold_mgr;
-    new_mgr(&fold_mgr, sizeof(fold_rec));
     // "hash-set" for 'ids' and inputs/outputs/internals..
     hash_record inps, outs, ints, ids_tbl;
     create_hash(&inps, 10, str_hash, str_equ);
@@ -372,16 +339,14 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
         insert_hash(&ids_tbl, INT2PTR(GET_INT(it)), INT2PTR(TRUE));
     }
     // Record node connections in 'p' (skip root, first child should be '1').
-    unint ix = 0;
+    unint ix = 1;
     unint count;
+    adj_ptr adj;
     vec_adj_ptr vfa;
     vec_adj_lst_ptr vchild;
     mk_adj_tables(&vchild, &count, p);
-    for(vchild = vchild->next; vchild != NULL; vchild = vchild->next) {
-        ix++;
-        if(find_hash(&ids_tbl, INT2PTR(ix)) == NULL) {
-            continue;
-        }
+    for(vchild = vchild->next; vchild != NULL; vchild = vchild->next, ix++) {
+        if(find_hash(&ids_tbl, INT2PTR(ix)) == NULL) { continue; }
         for(vfa = vchild->vec; vfa != NULL; vfa = vfa->next) {
             vec_ptr vec = vfa->vec;
             string sig  = vfa->signature;
@@ -395,7 +360,7 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
                 tbl = tbl_in_ptr;
                 fa = &outs;
             }
-            for(adj_ptr adj = (adj_ptr) find_hash(tbl, sig); adj != NULL; adj = adj->next) {
+            for(adj = find_hash(tbl, sig); adj != NULL; adj = adj->next) {
                 if(Check_vector_overlap(vec, adj->vec)) {
                     if(find_hash(&ids_tbl, INT2PTR(adj->index)) != NULL) {
                         // note: 'act' might also be used as an inp/outp.
@@ -403,10 +368,6 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
                     } else {
                         insert_check_hash(fa, act, act);
                     }
-                    // /
-                    bool b = find_hash(&ids_tbl, INT2PTR(adj->index)) != NULL;
-                    string pre = b ? "internal" : (vfa->input ? "input" : "output");
-                    fprintf(stderr, "%s (via %s): %u with %u\n", pre, vfa->name, ix, adj->index);
                 }
             }
         }
@@ -419,14 +380,14 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
     //   - 'top_*' = top-level PINST and
     //   - 'new_*' = folded PINST
     g_ptr new_children = Make_NIL(), nc_tail = new_children;
-    g_ptr top_children = Make_NIL(), oc_tail = top_children;
+    g_ptr top_children = Make_NIL(), tc_tail = top_children;
     unint i = 1;
     FOR_CONS(children, tmp, it) {
         INC_REFCNT(it);
         if(find_hash(&ids_tbl, INT2PTR(i)) != NULL) {
             APPEND1(nc_tail, it);
         } else {
-            APPEND1(oc_tail, it);
+            APPEND1(tc_tail, it);
         }
         i++;
     }
@@ -456,7 +417,7 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
     }
     g_ptr top_internals = Make_NIL(), ti_tail = top_internals;
     FOR_CONS(inter, tmp, it) {
-        if(find_hash(&ints, it) == NULL) {
+        if(find_hash(&ints, GET_STRING(it)) == NULL) {
             INC_REFCNT(it);
             APPEND1(ti_tail, it);
         }
@@ -485,9 +446,103 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
                 , top_internals
                 , mk_P_HIER(Make_CONS_ND(new_pinst, top_children)));
     // /
-    free_mgr(&fold_mgr);
     rem_adj_mem();
     return top_pinst;
+}
+
+#define PREFIX_STRING(prefix, vec, res)                                        \
+    tstr_ptr ts = new_temp_str_mgr();                                          \
+    res = gen_strtemp(ts, prefix);                                             \
+    res = gen_strappend(ts, vec);                                              \
+    res = wastrsave(&strings, res);                                            \
+    free_temp_str_mgr(ts);
+
+g_ptr
+unfold_pexlif(g_ptr p, g_ptr id, string prefix)
+{
+    new_adj_mem();
+    // /
+    g_ptr name, leaf, attrs, fa_inps, fa_outs, inter, cont, children;
+    destr_PINST(p, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont);
+    is_P_HIER(cont, &children);
+    // Split children by folded child/other children.
+    unint ix = GET_INT(id);
+    g_ptr top_children = Make_NIL(), tc_tail = top_children;
+    g_ptr folded_child;
+    unint i = 1;
+    g_ptr tmp, it;
+    FOR_CONS(children, tmp, it) {
+        if(ix == i) {
+            folded_child = it;
+        } else {
+            INC_REFCNT(it);
+            APPEND1(tc_tail, it);
+        }
+        i++;
+    }
+    // Build subst. of old names to prefixed names.
+    // note: each f/as pair should be of the form "(x,[x])".
+    g_ptr f_name, f_leaf, f_attrs, f_fa_inps, f_fa_outs, f_inter, f_cont, f_children;
+    destr_PINST(folded_child, &f_name, &f_attrs, &f_leaf, &f_fa_inps, &f_fa_outs, &f_inter, &f_cont);
+    is_P_HIER(f_cont, &f_children);
+    hash_record names;
+    create_hash(&names, 100, str_hash, str_equ);
+    string res, vec;
+    FOREACH_FORMAL(vec, f_fa_inps) {
+        PREFIX_STRING(prefix, vec, res);
+        g_ptr pf = Make_STRING_leaf(res);
+        insert_hash(&names, vec, pf);
+    }
+    FOREACH_FORMAL(vec, f_fa_outs) {
+        PREFIX_STRING(prefix, vec, res);
+        g_ptr pf = Make_STRING_leaf(res);
+        insert_hash(&names, vec, pf);
+    }
+    FOR_CONS(f_inter, tmp, it) {
+        PREFIX_STRING(prefix, GET_STRING(it), res);
+        g_ptr pf = Make_STRING_leaf(res);
+        insert_hash(&names, vec, pf);
+    }
+    // Find out which references to folded node are inps/outs/internals.
+    hash_record inps, outs, ints;
+    create_hash(&inps, 10, str_hash, str_equ);
+    create_hash(&outs, 10, str_hash, str_equ);
+    create_hash(&ints, 10, str_hash, str_equ);
+    unint count;
+    adj_ptr adj;
+    vec_adj_ptr vfa;
+    vec_adj_lst_ptr vchild;
+    mk_adj_tables(&vchild, &count, p);
+    ASSERT(ix <= count);
+    for(unint i = ix; i > 0; i--) { vchild = vchild->next; }
+    for(vfa = vchild->vec; vfa != NULL; vfa = vfa->next) {
+        vec_ptr vec = vfa->vec;
+        string sig  = vfa->signature;
+        string act  = vfa->name;
+        for(adj = find_hash(tbl_in_ptr, sig); adj != NULL; adj = adj->next) {
+            if(Check_vector_overlap(vec, adj->vec)) {
+                if(adj->index == 0) {
+                    insert_hash(&outs, act, act);
+                } else {
+                    insert_hash(&ints, act, act);
+                }
+            }
+        }
+        for(adj = find_hash(tbl_out_ptr, sig); adj != NULL; adj = adj->next) {
+            if(Check_vector_overlap(vec, adj->vec)) {
+                if(adj->index == 0) {
+                    insert_hash(&inps, act, act);
+                } else {
+                    insert_hash(&ints, act, act);
+                }
+            }
+        }
+    }
+    // ...
+    
+    // /
+    rem_adj_mem();
+    return NULL;
 }
 
 string

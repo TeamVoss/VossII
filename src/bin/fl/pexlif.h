@@ -12,13 +12,12 @@
 #ifdef EXPORT_FORWARD_DECL
 
 // Function prototypes for public functions ------------------------------------
-
-// utils.
 string get_top_name(g_ptr p);
 int    get_top_size(g_ptr p);
 g_ptr  get_top_inst(g_ptr p, unint index);
 g_ptr  get_top_adjacencies(g_ptr p);
 g_ptr  fold_pexlif(g_ptr p, g_ptr ids, string name);
+g_ptr  unfold_pexlif(g_ptr p, g_ptr id, string prefix);
 string find_value_list(g_ptr attrs, string name);
 string find_instance_name(g_ptr attrs);
 
@@ -116,13 +115,6 @@ typedef struct vec_adj_lst_rec {
     vec_adj_lst_ptr next; // next node's vec's.
 } vec_adj_lst_rec;
 
-typedef struct fold_rec *fold_ptr;
-typedef struct fold_rec {
-    vec_ptr  from;
-    vec_ptr  to;
-    fold_ptr next;
-} fold_rec;
-
 #define DEST_GET(n)									                           \
 	ASSERT( GET_TYPE(node) == CONS_ND );			                           \
 	(n)  = GET_SND(node);							                           \
@@ -135,6 +127,34 @@ typedef struct fold_rec {
 	if( GET_TYPE(node) != CONS_ND ) { return FALSE; }			               \
 	(n)  = GET_SND(node);										               \
 	node = GET_FST(node);
+
+#define FORMAL_OF_CONS(fa)                                                     \
+    GET_STRING(GET_FST(GET_CONS_HD(fa)))
+
+#define ACTUAL_OF_CONS(fa)                                                     \
+    GET_STRING(GET_CONS_HD(fa))
+
+#define FOREACH_FORMAL(vec, fa)                                                \
+    for( g_ptr li = fa                                                         \
+       ; !IS_NIL(li) && (vec = FORMAL_OF_CONS(li), TRUE)                       \
+       ; li = GET_CONS_TL(li))
+
+#define FOREACH_ACTUAL(vec, fa)                                                \
+    for( g_ptr li = fa                                                         \
+        ; !IS_NIL(li)                                                          \
+        ; li = GET_CONS_TL(li))                                                \
+        for( g_ptr as = GET_SND(GET_CONS_HD(li))                               \
+           ; !IS_NIL(as) && (vec = ACTUAL_OF_CONS(as), TRUE)                   \
+           ; as = GET_CONS_TL(as))
+
+#define SCAN_HASH(hp, bpp, k, d)                                               \
+    ASSERT((hp)->initialized == HASH_MAGIC_NBR);                               \
+    FOR_BUF(&((hp)->table), bucket_ptr, bpp)                                   \
+        for( bucket_ptr chp = *bpp                                             \
+           ; chp != NULL                                                       \
+             && (k = chp->key, TRUE)                                           \
+             && (d = chp->data, TRUE)                                          \
+           ; chp = chp->next)                                                  \
 
 #endif /* PEXLIF_H */
 #endif /* EXPORT_FORWARD_DECL */
