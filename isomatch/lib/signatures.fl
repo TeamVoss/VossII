@@ -163,5 +163,12 @@ let
         PINST n a l i o t (P_HIER ((PINST n' a' l' i' o' t' c'):cs))
 ;
 
+let
+    unfold_pexlif pex id name =
+        let lbl (PINST n a l i o t c) = PINST n a l i o t c in
+        val (PINST n a l i o t (P_HIER cs)) = unfold_pexlif pex id name in
+        PINST n a l i o t (P_HIER (map lbl cs))
+;
+
 //------------------------------------------------------------------------------
 // Fin.

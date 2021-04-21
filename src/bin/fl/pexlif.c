@@ -323,6 +323,8 @@ get_top_adjacencies(g_ptr p)
     return res;
 }
 
+// note: keep non-SHA/FP attrs?
+// note: SHA/FP added in FL wrapper.
 g_ptr
 fold_pexlif(g_ptr p, g_ptr ids, string name)
 {
@@ -336,7 +338,7 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
     create_hash(&ids_tbl, len, int_hash, int_equ);
     g_ptr tmp, it;
     FOR_CONS(ids, tmp, it) {
-        insert_hash(&ids_tbl, INT2PTR(GET_INT(it)), INT2PTR(TRUE));
+        insert_check_hash(&ids_tbl, INT2PTR(GET_INT(it)), INT2PTR(TRUE));
     }
     // Record node connections in 'p' (skip root, first child should be '1').
     unint ix = 1;
@@ -426,7 +428,7 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
     INC_REFCNT(leaf);
     g_ptr new_pinst =
         mk_PINST( Make_STRING_leaf(name)
-                , Make_NIL() // note: SHA/FP added in FL wrapper.
+                , Make_NIL()
                 , leaf
                 , new_fa_inps
                 , new_fa_outs
@@ -439,7 +441,7 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
     INC_REFCNT(fa_outs);
     g_ptr top_pinst =
         mk_PINST( old_name
-                , Make_NIL() // note: SHA/FP added in FL wrapper.
+                , Make_NIL()
                 , leaf
                 , fa_inps
                 , fa_outs
@@ -451,98 +453,125 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
 }
 
 #define PREFIX_STRING(prefix, vec, res)                                        \
-    tstr_ptr ts = new_temp_str_mgr();                                          \
     res = gen_strtemp(ts, prefix);                                             \
     res = gen_strappend(ts, vec);                                              \
-    res = wastrsave(&strings, res);                                            \
-    free_temp_str_mgr(ts);
+    res = wastrsave(&strings, res);
 
+// note: should I inc each ptr in na?
 g_ptr
-unfold_pexlif(g_ptr p, g_ptr id, string prefix)
+unfold_pexlif(g_ptr p, unint id, string prefix)
 {
+    tstr_ptr ts = new_temp_str_mgr();
     new_adj_mem();
     // /
     g_ptr name, leaf, attrs, fa_inps, fa_outs, inter, cont, children;
     destr_PINST(p, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont);
     is_P_HIER(cont, &children);
-    // Split children by folded child/other children.
-    unint ix = GET_INT(id);
-    g_ptr top_children = Make_NIL(), tc_tail = top_children;
-    g_ptr folded_child;
-    unint i = 1;
-    g_ptr tmp, it;
-    FOR_CONS(children, tmp, it) {
-        if(ix == i) {
-            folded_child = it;
+    // ...
+    g_ptr f_child = NULL;
+    g_ptr o_children = Make_NIL(), o_children_tail = o_children;
+    g_ptr il, it;
+    FOR_CONS(children, il, it) {
+        if(id == 1) {
+            f_child = it;
         } else {
             INC_REFCNT(it);
-            APPEND1(tc_tail, it);
+            APPEND1(o_children_tail, it);
         }
-        i++;
+        id--;
     }
-    // Build subst. of old names to prefixed names.
-    // note: each f/as pair should be of the form "(x,[x])".
     g_ptr f_name, f_leaf, f_attrs, f_fa_inps, f_fa_outs, f_inter, f_cont, f_children;
-    destr_PINST(folded_child, &f_name, &f_attrs, &f_leaf, &f_fa_inps, &f_fa_outs, &f_inter, &f_cont);
+    destr_PINST(f_child, &f_name, &f_attrs, &f_leaf, &f_fa_inps, &f_fa_outs, &f_inter, &f_cont);
     is_P_HIER(f_cont, &f_children);
-    hash_record names;
-    create_hash(&names, 100, str_hash, str_equ);
-    string res, vec;
-    FOREACH_FORMAL(vec, f_fa_inps) {
-        PREFIX_STRING(prefix, vec, res);
-        g_ptr pf = Make_STRING_leaf(res);
-        insert_hash(&names, vec, pf);
+    // Build subst. of old names to prefixed names.
+    hash_record f_names;
+    create_hash(&f_names, 100, int_hash, int_equ);
+    FOR_CONS(f_fa_inps, il, it) {
+        insert_hash(&f_names, GET_FST(it), GET_SND(it));
     }
-    FOREACH_FORMAL(vec, f_fa_outs) {
-        PREFIX_STRING(prefix, vec, res);
-        g_ptr pf = Make_STRING_leaf(res);
-        insert_hash(&names, vec, pf);
-    }
-    FOR_CONS(f_inter, tmp, it) {
-        PREFIX_STRING(prefix, GET_STRING(it), res);
-        g_ptr pf = Make_STRING_leaf(res);
-        insert_hash(&names, vec, pf);
-    }
-    // Find out which references to folded node are inps/outs/internals.
-    hash_record inps, outs, ints;
-    create_hash(&inps, 10, str_hash, str_equ);
-    create_hash(&outs, 10, str_hash, str_equ);
-    create_hash(&ints, 10, str_hash, str_equ);
-    unint count;
-    adj_ptr adj;
-    vec_adj_ptr vfa;
-    vec_adj_lst_ptr vchild;
-    mk_adj_tables(&vchild, &count, p);
-    ASSERT(ix <= count);
-    for(unint i = ix; i > 0; i--) { vchild = vchild->next; }
-    for(vfa = vchild->vec; vfa != NULL; vfa = vfa->next) {
-        vec_ptr vec = vfa->vec;
-        string sig  = vfa->signature;
-        string act  = vfa->name;
-        for(adj = find_hash(tbl_in_ptr, sig); adj != NULL; adj = adj->next) {
-            if(Check_vector_overlap(vec, adj->vec)) {
-                if(adj->index == 0) {
-                    insert_hash(&outs, act, act);
-                } else {
-                    insert_hash(&ints, act, act);
-                }
-            }
-        }
-        for(adj = find_hash(tbl_out_ptr, sig); adj != NULL; adj = adj->next) {
-            if(Check_vector_overlap(vec, adj->vec)) {
-                if(adj->index == 0) {
-                    insert_hash(&inps, act, act);
-                } else {
-                    insert_hash(&ints, act, act);
-                }
-            }
-        }
+    FOR_CONS(f_fa_outs, il, it) {
+        insert_hash(&f_names, GET_FST(it), GET_SND(it));
     }
     // ...
-    
+    string res;
+    g_ptr t_inter = Make_NIL(), t_inter_tail = t_inter;
+    FOR_CONS(inter, il, it) {
+        INC_REFCNT(it);
+        APPEND1(t_inter_tail, it);
+    }
+    FOR_CONS(f_inter, il, it) {
+        PREFIX_STRING(prefix, GET_STRING(it), res);
+        g_ptr ip = Make_STRING_leaf(res);
+        insert_hash(&f_names, it, ip);
+        APPEND1(t_inter_tail, ip);
+    }
+    // ...
+    g_ptr t_children = Make_NIL(), t_children_tail = t_children;
+    FOR_CONS(f_children, il, it) {
+        g_ptr g_name, g_leaf, g_attrs, g_fa_inps, g_fa_outs, g_inter, g_cont;
+        destr_PINST(it, &g_name, &g_attrs, &g_leaf, &g_fa_inps, &g_fa_outs, &g_inter, &g_cont);
+        // /
+        g_ptr n_fa_inps = Make_NIL(), n_fa_inps_tail = n_fa_inps;
+        g_ptr jl, jt;
+        FOR_CONS(g_fa_inps, jl, jt) {
+            g_ptr f  = GET_FST(jt);
+            g_ptr as = Make_NIL(), as_tail = as;
+            g_ptr al, at;
+            FOR_CONS(GET_SND(jt), al, at) {
+                g_ptr na = find_hash(&f_names, at);
+                INC_REFCNT(na);
+                APPENDL(as_tail, na);
+            }
+            INC_REFCNT(f);
+            APPEND1(n_fa_inps_tail, Make_PAIR_ND(f, as));
+        }
+        // /
+        g_ptr n_fa_outs = Make_NIL(), n_fa_outs_tail = n_fa_outs;
+        FOR_CONS(g_fa_outs, jl, jt) {
+            g_ptr f  = GET_FST(jt);
+            g_ptr as = Make_NIL(), as_tail = as;
+            g_ptr al, at;
+            FOR_CONS(GET_SND(jt), al, at) {
+                g_ptr na = find_hash(&f_names, at);
+                INC_REFCNT(na);
+                APPENDL(as_tail, na);
+            }
+            INC_REFCNT(f);
+            APPEND1(n_fa_outs_tail, Make_PAIR_ND(f, as));
+        }
+        // /
+        INC_REFCNT(g_name);
+        INC_REFCNT(g_leaf);
+        INC_REFCNT(g_inter);
+        INC_REFCNT(g_cont);
+        g_ptr n_pinst =
+            mk_PINST( g_name
+                    , Make_NIL()
+                    , g_leaf
+                    , n_fa_inps
+                    , n_fa_outs
+                    , g_inter
+                    , g_cont);
+        APPEND1(t_children_tail, n_pinst);
+    }
+    SET_CONS_TL(t_children_tail, o_children);
+    // /
+    INC_REFCNT(name);
+    INC_REFCNT(leaf);
+    INC_REFCNT(fa_inps);
+    INC_REFCNT(fa_outs);
+    g_ptr t_pinst =
+        mk_PINST( name
+                , Make_NIL()
+                , leaf
+                , fa_inps
+                , fa_outs
+                , t_inter
+                , mk_P_HIER(t_children));
     // /
     rem_adj_mem();
-    return NULL;
+    free_temp_str_mgr(ts);
+    return t_pinst;
 }
 
 string
@@ -1164,6 +1193,21 @@ fold_pexlif_fn(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
+static void
+unfold_pexlif_fn(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_pex, g_id, g_prefix;
+    // /
+    EXTRACT_3_ARGS(redex, g_pex, g_id, g_prefix);
+    g_ptr unfold = unfold_pexlif(g_pex, GET_INT(g_id), GET_STRING(g_prefix));
+    OVERWRITE(redex, unfold);
+    // /
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
 void
 Pexlif_Init()
 {
@@ -1225,6 +1269,19 @@ Pexlif_Install_Functions()
                       GLmake_string()
                     , pexlif_tp)))
         , fold_pexlif_fn
+    );
+    Add_ExtAPI_Function(
+          "unfold_pexlif"
+        , "111"
+        , FALSE
+        , GLmake_arrow(
+              pexlif_tp
+            , GLmake_arrow(
+                  GLmake_int()
+                , GLmake_arrow(
+                      GLmake_string()
+                    , pexlif_tp)))
+        , unfold_pexlif_fn
     );
 }
 

@@ -12,8 +12,10 @@ let woof =
          b <- y '&' z
 ];
 
-let p = woof 'a 'b;
-let g = fold_pexlif p [1,2] "fold";
+let x = woof 'a 'b;
+let y = fold_pexlif x [1,2] "fold";
+let z = unfold_pexlif y 1 "prefix_";
 
-Emit_pexlif "un-folded.txt" p;
-Emit_pexlif "folded.txt" g;
+Emit_pexlif "orig.txt" x;
+Emit_pexlif "folded.txt" y;
+Emit_pexlif "unfolded.txt" y;

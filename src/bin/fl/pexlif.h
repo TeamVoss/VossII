@@ -17,7 +17,7 @@ int    get_top_size(g_ptr p);
 g_ptr  get_top_inst(g_ptr p, unint index);
 g_ptr  get_top_adjacencies(g_ptr p);
 g_ptr  fold_pexlif(g_ptr p, g_ptr ids, string name);
-g_ptr  unfold_pexlif(g_ptr p, g_ptr id, string prefix);
+g_ptr  unfold_pexlif(g_ptr p, unint id, string prefix);
 string find_value_list(g_ptr attrs, string name);
 string find_instance_name(g_ptr attrs);
 
@@ -133,6 +133,9 @@ typedef struct vec_adj_lst_rec {
 
 #define ACTUAL_OF_CONS(fa)                                                     \
     GET_STRING(GET_CONS_HD(fa))
+
+#define INTERNAL_OF_CONS(is)                                                   \
+    GET_STRING(GET_CONS_HD(is))
 
 #define FOREACH_FORMAL(vec, fa)                                                \
     for( g_ptr li = fa                                                         \

@@ -259,6 +259,11 @@ typedef struct g_rec {
                                 !IS_NIL(li)&&(data = M_GET_CONS_HD(li), TRUE); \
                                 li = M_GET_CONS_TL(li))
 
+#define APPENDL(tail,nlp)                             \
+    {                                                 \
+        g_ptr tmp, np;                                \
+        FOR_CONS(nlp, tmp, np) { APPEND1(tail, np); } \
+    }
 
 /* Leaf types */
 #define INT                     0
