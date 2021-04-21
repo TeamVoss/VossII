@@ -2,6 +2,8 @@
 
 This extension adds language support for [Voss II](https://github.com/TeamVoss/VossII)'s functional language fl to Visual Studio Code.
 
+Tested for VossII version 1.0 (built on 2021-04-21).
+
 ## Features
 
 Features include:
@@ -20,15 +22,17 @@ Features include:
 
 Commands and shortcuts:
 
-|Command|Effect|Shortcut|
-|-------|------|--------|
-|fl: start fl|Starts the interpreter|Automaticaly when opening fl files|
-|fl: stop fl|Stops the interpreter| |
-|fl: help|Displays help on the word/operator under the cursor in the fl interpreter| |
-|fl: restart and run file|Restarts the interpreter and runs current file|`f5`|
-|fl: run file|Runs the current file in the interpreter|`f6`|
-|fl: run line|Runs the current line in the interpreter|`f7`|
-|fl: run selection|Runs the current selection (or word under cursor) in the interpreter|`f8`|
+| Command                  | Effect                                                                              | Shortcut                           |
+| ------------------------ | ----------------------------------------------------------------------------------- | ---------------------------------- |
+| fl: start fl             | Starts the interpreter                                                              | Automaticaly when opening fl files |
+| fl: stop fl              | Stops the interpreter                                                               |                                    |
+| fl: help                 | Displays help on the word/operator under the cursor in the fl interpreter           |                                    |
+| fl: restart and run file | Restarts the interpreter and runs current file                                      | `f5`                               |
+| fl: run file             | Runs the current file in the interpreter                                            | `f6`                               |
+| fl: run line             | Runs the current line in the interpreter                                            | `f7`                               |
+| fl: run selection        | Runs the current selection (or word under cursor) in the interpreter                | `f8`                               |
+| fl: run paragraph        | Runs the current paragraph (text block separated by empty lines) in the interpreter | `f9`                               |
+
 
 > Commands can be run by typing their name in the command palette (`Ctrl+Shift+P`).
 
@@ -50,6 +54,8 @@ This extension contributes the following settings:
 	file/workspace with fl files (default on)
 * `vossii-fl.fl_setup`: fl code to run whenever starting fl
 	(default `set_font font_larger;`)
+* `vossii-fl.save_file_on_run`: behavior when running unsaved files.
+	Chose between `Ask me` (default), `Autosave` and `Don't save` (runs the last save).
 * `vossii-fl.temporary_files_root`: path and prefix of temporary files used to
 	communicate with fl (default `/tmp/fl_`)
 
@@ -57,7 +63,7 @@ This extension contributes the following settings:
 
 * When running a selection/line, `DIR` will be the workspace folder and not
 	the file root as expected (this isn't a problem when running files)
-* Getting tooltips/definition may not work on 1rst try.
+* Getting tooltips/definition may not work on first try.
 	If so, move mouse out and back over or hit `f12` again.
 * Can only get tooltips/go to definition for global function, both fail
 	for types or local variables.

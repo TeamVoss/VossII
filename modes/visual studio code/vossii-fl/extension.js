@@ -1,3 +1,12 @@
+// Copyright 2021 Dorian Lesbre
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 		http://www.apache.org/licenses/LICENSE-2.0
+//
+
 // ==============================================
 // Imports
 // ==============================================
@@ -17,8 +26,8 @@ const fl_in = `${config.temporary_files_root}in`;
 const fl_prein = `${config.temporary_files_root}prein`;
 const fl_out = `${config.temporary_files_root}out`;
 
-const no_help = /^(;|\||\/\\|=>|\d+.*|.\d+.*|\/\/.*|andlettype|add_open_overload|assuming|begin_abstype|binder|binder_with_accumulator|clear_fixities|clet|cletrec|end_abstype|export_to_tcl|forward_declare|free_binder|if_then_else_binder|then_binder|else_binder|infix|infix_unary|infixr|then|in|install_print_function|let|letrec|lettype|list|new_type_abbrev|non_lazy|nonfix|open_overload|overload|postfix|prefix|print_fixities|ref|val)$/;
-const unescaped_quotes = /(?<!\\\\)"/;
+const no_help = /^(;|\||\/\\|=>|\d+.*|.\d+.*|\/\/.*|andlettype|add_open_overload|assuming|begin_abstype|binder|binder_with_accumulator|clear_fixities|clet|cletrec|defix|end_abstype|export_to_tcl|forward_declare|free_binder|if_then_else_binder|then_binder|else_binder|infix|infix_unary|infixr|then|in|install_print_function|let|letrec|lettype|list|new_type_abbrev|non_lazy|nonfix|open_overload|overload|postfix|prefix|print_fixities|ref|val)$/;
+const unescaped_quotes = /(?<!\\)"/;
 const word_chars = "a-zA-Z0-9_";
 const operator_chars = "\\-\\+\\*\\/\\\\\\%\\^\\'\\&\\|\\?\\~\\#\\<\\=\\>\\!\\%\\@\\:";
 
@@ -85,9 +94,39 @@ function text_under_cursor() {
 // returns the selection text
 function current_selection() {
 	const editor = vscode.window.activeTextEditor;
+	if (!editor) return "";
 	const text = editor.document.getText(editor.selection);
 	if (text == "") return text_under_cursor();
 	return text;
+}
+
+function str_reverse(string) {
+	return string.split("").reverse().join("");
+}
+
+// returns current paragraph
+function current_paragraph() {
+	const editor = vscode.window.activeTextEditor;
+	if (!editor) return "";
+	const position = editor.document.offsetAt(editor.selection.active);
+	const text = editor.document.getText();
+	const regex = /\n\s*\n/; // paragraph separator
+
+	// find paragraph start
+	var left = str_reverse(text.slice(0, position)).search(regex);
+	if (left == -1)
+		left = 0;
+	else
+		left = position - left;
+
+	// find paragraph end
+	var right = text.slice(position).search(regex);
+	if (right == -1)
+		right = text.length;
+	else
+		right = position + right;
+
+	return text.slice(left, right);
 }
 
 
@@ -129,16 +168,14 @@ async function help_from_pos(document, position) {
 	const indexes = word_at_position(text, pos);
 	if (indexes.left == -1) return null;
 	const ident = text.slice(indexes.left, indexes.right);
-	if (no_help.test(ident)) return null;
-
 	const range = new vscode.Range(
 		document.positionAt(indexes.left), document.positionAt(indexes.right)
 	);
+	if (no_help.test(ident))
+		return {ident: ident, help: null, range: range, is_function: false};
 	const help = String(await get_help(ident));
-	return {ident: ident, help: help, range: range}
+	return {ident: ident, help: help, range: range, is_function: true};
 }
-
-
 
 
 // ==============================================
@@ -149,7 +186,14 @@ async function help_from_pos(document, position) {
 async function get_tooltip(document, position) {
 	// 1 - get identifier or operator under cursor
 	const res = await help_from_pos(document, position);
-	if (!res) return null;
+	if (!res.is_function) {
+		if (res.ident == "=>" || res.ident == "|")
+			return {
+				contents: ["if then else construct:\n\n\tcondition => if_true | if_false\n\tIF condition THEN if_true ELSE if_false"],
+				range: res.range
+			};
+		return null;
+	}
 	if (!res.help)
 		return { contents: [`Unknown function "${res.ident}"\n\nRun the file to define all functions`], range: res.range };
 	const regex = /Function:\s*.*\s*(?:File:(?:.|\n)*?\nEnd:\s*\d+|Built-in)\s*(?:Implicit dependencies:\s*((?:.|\n)*?)\s*)?\s*(?:is the overloading of:\s*((?:.|\n)*?))?\s*(?:Arguments:\s*((?:.|\n)*?))?\s*(?:Return type:\s*(.*?))?\s*Fixity:\s*((?:.|\n)*?)\s*(?:Description:\s*((?:.|\n)*?))?\s*$/;
@@ -189,7 +233,7 @@ async function get_tooltip(document, position) {
 
 async function go_to_definition(document, position) {
 	const res = await help_from_pos(document, position);
-	if (!res || !res.help) return null;
+	if (!res.is_function || !res.help) return null;
 	const match = res.help.match(/File:\s*(.*)\nStart:\s*(\d*)/);
 	if (match === null) return null;
 	const file = vscode.Uri.file(match[1].trim());
@@ -223,14 +267,34 @@ function help() {
 }
 
 function eval_selection() {
-	const text = current_selection()
+	const text = current_selection();
 	if (text) send_to_fl(`${text};`);
 }
 
-function eval_file() {
+function eval_paragraph() {
+	const text = current_paragraph();
+	if (text) send_to_fl(`${text};`);
+}
+
+async function eval_file() {
 	const editor = vscode.window.activeTextEditor;
 	if (!editor) return;
-	const filename = editor.document.fileName;
+	const document = editor.document;
+	if (document.isDirty) {
+		// prompt to save documents
+		if (config.save_file_on_run == "Ask me") {
+			const response_save = "Save";
+			const response_unsave = "Don't save"
+			const response = await vscode.window.showWarningMessage(
+				"File unsaved, ok to save ?", response_save, response_unsave
+			);
+			if (response == response_save)
+				await document.save();
+		}
+		else if (config.save_file_on_run == "Autosave")
+			await document.save();
+	}
+	const filename = document.fileName;
 	send_to_fl(`load "${filename}";`);
 }
 
@@ -270,6 +334,7 @@ function activate(context) {
 		{name: 'fl.stop', func: stop_fl},
 		{name: 'fl.help', func: help},
 		{name: 'fl.eval_selection', func: eval_selection},
+		{name: 'fl.eval_paragraph', func: eval_paragraph},
 		{name: 'fl.eval_file', func: eval_file},
 		{name: 'fl.eval_line', func: eval_line},
 		{name: 'fl.restart_and_eval_file', func: restart_and_eval_file},
