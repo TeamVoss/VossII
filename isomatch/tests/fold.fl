@@ -1,0 +1,21 @@
+load (DIR^"../isomatch.fl");
+load "ste.fl";
+
+let woof =
+    bit_input  a.
+    bit_output b.
+    bit_internal x y z.
+    CELL "draw_woof" [
+         x <- '~' a,
+         y <- '~' x,
+         z <- '~' a,
+         b <- y '&' z
+];
+
+let x = woof 'a 'b;
+let y = fold_pexlif x [1,2] "fold";
+let z = unfold_pexlif y 1 "prefix_";
+
+Emit_pexlif "orig.txt" x;
+Emit_pexlif "folded.txt" y;
+Emit_pexlif "unfolded.txt" y;
