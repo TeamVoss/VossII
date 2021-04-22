@@ -2,7 +2,18 @@
 
 All notable changes to the "vossii-fl" extension will be documented in this file.
 
-## Version 1.0.0 - 2020-03-02
+## Version 1.1.0 - 2021-04-21
+
+- New command `fl.eval_paragraph` bound to `f9`
+- Added special color/tooltip for `condition => if_true | if_false` construct.
+- Added `defix` to keywords
+- Fixed number constants not coloring on line start.
+- Fixed no syntac coloring for `{expr::type}` when `expr` contained multiple words
+- Removed special character coloring in comments, added coloration for TODO and FIXME
+- Fixed wrong escaped quotes detection leading to no hover for identifier and hover for strings
+- Added an option to save files before running unsaved files.
+
+## Version 1.0.0 - 2021-03-02
 
 - Initial release
 - Added syntax coloring for keywords, operators, builtin commands and builtin typs

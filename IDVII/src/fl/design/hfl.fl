@@ -3048,3 +3048,31 @@ let XOR_n l =
     accumulate (defix '^') l
 ;
 
+
+// User contribution: flip-flops that wish they were latches.
+// Flip-flops with bypass muxes.
+
+// A rising edge D flip-flop with enable and bypass mux.
+let re_ff_en_mux =
+    bit_input	clk.
+    bit_input	en.
+    input	d.
+    output	q.
+    internal    qtmp.
+    CELL "draw_hier re_ff_en_mux" [
+	base_re_ff_en d en clk qtmp,
+        q <- (IF en THEN d ELSE qtmp)
+];
+
+// A rising edge D flip-flop with enable and asynchronous reset (acive high) and bypass mux.
+let re_ff_en_reset_mux =
+    bit_input	clk.
+    bit_input	en.
+    bit_input	reset.
+    input	d.
+    output	q.
+    internal    qtmp.
+    CELL "draw_hier re_ff_en_reset_mux" [
+	base_re_ff_en_reset d en reset clk qtmp,
+        q <- (IF (en '&' ('~' reset)) THEN d ELSE qtmp)
+];
