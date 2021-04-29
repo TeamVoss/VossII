@@ -37,20 +37,24 @@ static rec_mgr	    merge_list_rec_mgr;
 static rec_mgr	    *merge_list_rec_mgrp;
 
 /* ----- Forward definitions local functions ----- */
-static void      begin_vector_ops();
-static void      end_vector_ops();
-static vec_ptr   split_name(string name);
-static range_ptr make_range_canonical(range_ptr rp);
-static void      emit_vector(vec_ptr vp, bool non_contig_vecs,g_ptr *tailp);
-static bool		 same_range(range_ptr r1, range_ptr r2);
-static range_ptr compress_ranges(range_ptr r1, range_ptr r2);
+static void           begin_vector_ops();
+static void           end_vector_ops();
+static vec_ptr        split_name(string name);
+static range_ptr      make_range_canonical(range_ptr rp);
+static void           emit_merge_list(merge_list_ptr ml, bool non_contig_vecs, g_ptr *tailp);
+static void           emit_vector(vec_ptr vp, bool non_contig_vecs, g_ptr *tailp);
+static bool		      same_range(range_ptr r1, range_ptr r2);
+static range_ptr      compress_ranges(range_ptr r1, range_ptr r2);
 static sname_list_ptr *prepend_index(int idx, sname_list_ptr rem, sname_list_ptr *resp);
 static sname_list_ptr expand_vec(vec_ptr vec);
-static int       vec_name_cmp(vec_ptr v1, vec_ptr v2);
-static int       nn_cmp(const void *pi, const void *pj);
-static void	     gen_extract_vectors(g_ptr redex, bool non_contig_vecs);
-static void	     gen_merge_vectors(g_ptr redex, g_ptr l, bool non_contig_vecs);
-static int	     vec_size(vec_ptr vec);
+static int            vec_name_cmp(vec_ptr v1, vec_ptr v2);
+static void           buffer_vectors(g_ptr r, buffer_ptr vec_buf, bool range_canonical);
+static int            nn_cmp(const void *pi, const void *pj);
+static merge_list_ptr gen_extract_vectors(buffer_ptr vec_buf);
+static merge_list_ptr gen_merge_vectors(buffer_ptr vec_buf);
+static void           merge_vectors_g(g_ptr list, g_ptr res, bool non_contig_vecs);
+static void           extract_vectors_g(g_ptr list, g_ptr res, bool non_contig_vecs, bool range_canonical);
+static int	          vec_size(vec_ptr vec);
 
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
@@ -68,7 +72,7 @@ Strings_Init()
 }
 
 vec_ptr
-Split_vector_name(ustr_mgr *str_mgr_ptr, 
+Split_vector_name(ustr_mgr *string_mgrp, 
 		  rec_mgr  *vector_mgrp,
 		  rec_mgr  *range_mgrp,
 		  string vec)
@@ -76,7 +80,7 @@ Split_vector_name(ustr_mgr *str_mgr_ptr,
     ustr_mgr *tmp_lstringsp = lstringsp;
     rec_mgr *tmp_vec_rec_mgrp = vec_rec_mgrp;
     rec_mgr *tmp_range_rec_mgrp = range_rec_mgrp;
-    lstringsp = str_mgr_ptr;
+    lstringsp = string_mgrp;
     vec_rec_mgrp = vector_mgrp;
     range_rec_mgrp = range_mgrp;
     vec_ptr res = split_name(vec);
@@ -87,10 +91,10 @@ Split_vector_name(ustr_mgr *str_mgr_ptr,
 }
 
 string
-Get_vector_signature(ustr_mgr *str_mgr_ptr, vec_ptr vp)
+Get_vector_signature(ustr_mgr *string_mgrp, vec_ptr vp)
 {
     ustr_mgr *tmp = lstringsp;
-    lstringsp = str_mgr_ptr;
+    lstringsp = string_mgrp;
     string res = mk_name_signature(vp);
     lstringsp = tmp;
     return res;
@@ -128,7 +132,7 @@ g_ptr
 Merge_Vectors(g_ptr nds, bool non_contig_vecs)
 {
     g_ptr res = Get_node();
-    gen_merge_vectors(res, nds, non_contig_vecs);
+    merge_vectors_g(nds, res, non_contig_vecs);
     return res;
 }
 
@@ -137,7 +141,6 @@ Check_range_overlap(range_ptr r1, range_ptr r2)
 {
     if(r1 == r2) { return TRUE; }
     while(r1 != NULL && r2 != NULL) {
-        // Check if range intervals are overlapping.
         if(!(r1->lower <= r2->upper && r2->lower <= r1->upper)) {
             return FALSE;
         }
@@ -150,7 +153,9 @@ Check_range_overlap(range_ptr r1, range_ptr r2)
 bool
 Check_vector_overlap(vec_ptr v1, vec_ptr v2)
 {
-    if(v1 == v2) { return TRUE; }
+    if(v1 == v2) {
+        return TRUE;
+    }
     while(v1 != NULL && v2 != NULL) {
         if(v1->type != v2->type) {
             return FALSE;
@@ -166,6 +171,40 @@ Check_vector_overlap(vec_ptr v1, vec_ptr v2)
     }
     return TRUE;
 }
+/* vec_list_ptr */
+/* Substitute_vector(rec_mgr *vector_mgrp, vec_ptr u, vec_ptr v, vec_list_ptr vs) */
+/* { */
+/*     // Exact match? Return directly. */
+/*     if(vec_size(u) == vec_size(v)) { */
+/*         return vs; */
+/*     } */
+/*     // Otherwise find indices. */
+/*     sname_list_ptr ul  = expand_vec(u); */
+/*     sname_list_ptr vl  = expand_vec(v); */
+/*     sname_list_ptr vsl = NULL, *vsl_tail = &vsl; */
+/*     for(; vs != NULL; vs = vs->next) { */
+/*         *vsl_tail = expand_vec(vs->vec); */
+/*         vsl_tail = &((*vsl_tail)->next); */
+/*     } */
+/*     sname_list_ptr res = NULL, *res_tail = &res; */
+/*     for(; ul != NULL; ul = ul->next, vl = vl->next, vsl = vsl->next) { */
+/*         while(strcmp(ul->name, vl->name) != 1) { */
+/*             vl  = vl->next; */
+/*             vsl = vsl->next; */
+/*         } */
+/*         *res_tail = vsl; */
+/*         res_tail = &((*res_tail)->next); */
+/*     } */
+/*     // Merge selected indices. */
+/*     g_ptr g_res = Make_NIL(), g_res_tail = g_res; */
+/*     for(; res != NULL; res = res->next) { */
+/*         APPEND1(g_res_tail, res->name); */
+/*     } */
+/*     g_ptr g_merged; */
+/*     gen_merge_vectors(g_merged, g_res, TRUE); */
+/*     // / */
+/*     return NULL; */
+/* } */
 
 /********************************************************/
 /*	    EXPORTED EXTAPI FUNCTIONS    		*/
@@ -425,13 +464,21 @@ md_size(g_ptr redex)
 static void
 md_extract_vectors(g_ptr redex)
 {
-    gen_extract_vectors(redex, TRUE);
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    extract_vectors_g(r, redex, TRUE, TRUE);
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
 }
 
 static void
 extract_vectors(g_ptr redex)
 {
-    gen_extract_vectors(redex, FALSE);
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    extract_vectors_g(r, redex, FALSE, TRUE);
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
 }
 
 static void
@@ -439,7 +486,7 @@ md_merge_vectors(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
-    gen_merge_vectors(redex, r, TRUE);
+    merge_vectors_g(r, redex, FALSE);
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
@@ -449,7 +496,7 @@ merge_vectors(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
-    gen_merge_vectors(redex, r, FALSE);
+    merge_vectors_g(r, redex, FALSE);
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
@@ -957,6 +1004,19 @@ make_range_canonical(range_ptr rp)
     return rem;
 }
 
+static void
+emit_merge_list(merge_list_ptr ml, bool non_contig_vecs, g_ptr *tailp)
+{
+    if(ml == NULL) {
+        return;
+    }
+    merge_list_ptr ml0 = ml;
+    do {
+        strtemp("");
+        emit_vector(ml->vec, non_contig_vecs, tailp);
+        ml = ml->next;
+    } while(ml != ml0);
+}
 
 static void
 emit_vector(vec_ptr vp, bool non_contig_vecs, g_ptr *tailp)
@@ -1150,6 +1210,22 @@ vec_name_cmp(vec_ptr v1, vec_ptr v2)
     }
 }
 
+static void
+buffer_vectors(g_ptr r, buffer_ptr vec_buf, bool range_canonical)
+{
+    for(; !IS_NIL(r); r = GET_CONS_TL(r)) {
+        vec_ptr vp = split_name(GET_STRING(GET_CONS_HD(r)));
+        if(range_canonical) {
+            for(vec_ptr tp = vp; tp != NULL; tp = tp->next) {
+                if(tp->type == INDEX) {
+                    tp->u.ranges = make_range_canonical(tp->u.ranges);
+                }
+            }
+        }
+        push_buf(vec_buf, &vp);
+    }
+}
+
 static int
 nn_cmp(const void *pi, const void *pj)
 {
@@ -1158,36 +1234,19 @@ nn_cmp(const void *pi, const void *pj)
     return( vec_name_cmp(vi, vj) );
 }
 
-static void
-gen_extract_vectors(g_ptr redex, bool non_contig_vecs)
+static merge_list_ptr
+gen_extract_vectors(buffer_ptr vec_buf)
 {
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    if( IS_NIL(r) ) {
-        MAKE_REDEX_NIL(redex);
-        DEC_REF_CNT(l);
-        DEC_REF_CNT(r);
-        return;
-    }
-    // At least one vector in the list
-    begin_vector_ops();
-    buffer name_buf;
-    new_buf(&name_buf, 100, sizeof(vec_ptr));
-    for(g_ptr np = r; !IS_NIL(np); np = GET_CONS_TL(np)) {
-        vec_ptr vp = split_name(GET_STRING(GET_CONS_HD(np)));
-        for(vec_ptr cp = vp; cp != NULL; cp = cp->next) {
-            if( cp->type == INDEX ) {
-                cp->u.ranges = make_range_canonical(cp->u.ranges); 
-            }
-        }
-        push_buf(&name_buf, &vp);
+    // At least one vector in the buffer
+    if(vec_buf == NULL || COUNT_BUF(vec_buf) == 0) {
+        return NULL;
     }
     // Sort according to merge order
-    qsort(START_BUF(&name_buf), COUNT_BUF(&name_buf), sizeof(vec_ptr), nn_cmp);
+    qsort(START_BUF(vec_buf), COUNT_BUF(vec_buf), sizeof(vec_ptr), nn_cmp);
     vec_ptr *vpp;
     merge_list_ptr  mp = NULL;
     int alts = 0;
-    FOR_BUF(&name_buf, vec_ptr, vpp) {
+    FOR_BUF(vec_buf, vec_ptr, vpp) {
         merge_list_ptr m = new_rec (merge_list_rec_mgrp);
         m->vec = *vpp;
         m->name_signature = mk_name_signature(*vpp);
@@ -1256,37 +1315,20 @@ gen_extract_vectors(g_ptr redex, bool non_contig_vecs)
             }
         }
     } while( alts > 1 && (not_changed <= alts) );
-    MAKE_REDEX_NIL(redex);
-    g_ptr tail = redex;
-    for(int i = 0; i < alts; i++ ) {
-        strtemp("");
-        emit_vector(mp->vec, non_contig_vecs, &tail);
-        mp = mp->next;
-    }
-    end_vector_ops();
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);
+    return mp;
 }
 
-static void
-gen_merge_vectors(g_ptr redex, g_ptr r, bool non_contig_vecs)
+static merge_list_ptr
+gen_merge_vectors(buffer_ptr vec_buf)
 {
-    if( IS_NIL(r) ) {
-        MAKE_REDEX_NIL(redex);
-        return;
-    }
     // At least one vector in the list
-    begin_vector_ops();
-    buffer name_buf;
-    new_buf(&name_buf, 100, sizeof(vec_ptr));
-    for(g_ptr np = r; !IS_NIL(np); np = GET_CONS_TL(np)) {
-        vec_ptr vp = split_name(GET_STRING(GET_CONS_HD(np)));
-        push_buf(&name_buf, &vp);
+    if(vec_buf == NULL || COUNT_BUF(vec_buf) == 0) {
+        return NULL;
     }
     vec_ptr *vpp;
-    merge_list_ptr  mp = NULL;
+    merge_list_ptr mp = NULL;
     int alts = 0;
-    FOR_BUF(&name_buf, vec_ptr, vpp) {
+    FOR_BUF(vec_buf, vec_ptr, vpp) {
         merge_list_ptr m = new_rec (merge_list_rec_mgrp);
         m->vec = *vpp;
         m->name_signature = mk_name_signature(*vpp);
@@ -1372,14 +1414,34 @@ gen_merge_vectors(g_ptr redex, g_ptr r, bool non_contig_vecs)
             }
         }
     };
-    MAKE_REDEX_NIL(redex);
-    g_ptr tail = redex;
-    mp = mp0;
-    for(int i = 0; i < alts; i++ ) {
-        strtemp("");
-        emit_vector(mp->vec, non_contig_vecs, &tail);
-        mp = mp->next;
-    }
+    return mp0;
+}
+
+static void
+merge_vectors_g(g_ptr list, g_ptr res, bool non_contig_vecs)
+{
+    begin_vector_ops();
+    buffer vec_buf;
+    new_buf(&vec_buf, 100, sizeof(vec_ptr));
+    buffer_vectors(list, &vec_buf, FALSE);
+    merge_list_ptr ml = gen_merge_vectors(&vec_buf);
+    MAKE_REDEX_NIL(res);
+    emit_merge_list(ml, non_contig_vecs, &res);
+    free_buf(&vec_buf);
+    end_vector_ops();
+}
+
+static void
+extract_vectors_g(g_ptr list, g_ptr res, bool non_contig_vecs, bool range_canonical)
+{
+    begin_vector_ops();
+    buffer vec_buf;
+    new_buf(&vec_buf, 100, sizeof(vec_ptr));
+    buffer_vectors(list, &vec_buf, range_canonical);
+    merge_list_ptr ml = gen_extract_vectors(&vec_buf);
+    MAKE_REDEX_NIL(res);
+    emit_merge_list(ml, non_contig_vecs, &res);
+    free_buf(&vec_buf);
     end_vector_ops();
 }
 
@@ -1416,4 +1478,3 @@ vec_size(vec_ptr vec)
         return sum;
     }
 }
-

@@ -18,11 +18,11 @@ typedef struct vec_rec   *vec_ptr;
 void	    Strings_Init();
 void	    Strings_Install_Functions();
 g_ptr	    Vec2nodes(string name);
-vec_ptr	    Split_vector_name(ustr_mgr *str_mgr_ptr,
+vec_ptr	    Split_vector_name(ustr_mgr *string_mgrp,
                               rec_mgr  *vector_mgrp,
                               rec_mgr  *range_mgrp,
                               string vec);
-string	    Get_vector_signature(ustr_mgr *str_mgr_ptr, vec_ptr vp);
+string	    Get_vector_signature(ustr_mgr *string_mgrp, vec_ptr vp);
 int	        Get_Vector_Size(string vec);
 g_ptr	    Merge_Vectors(g_ptr nds, bool non_contig_vecs);
 //
@@ -51,6 +51,12 @@ typedef struct vec_rec {
     }              u;
     vec_ptr	       next;
 } vec_rec;
+
+typedef struct vec_list_rec *vec_list_ptr;
+typedef struct vec_list_rec {
+    vec_ptr      vec;
+    vec_list_ptr next;
+} vec_list_rec;
 
 typedef struct sname_list_rec *sname_list_ptr;
 typedef struct sname_list_rec {
