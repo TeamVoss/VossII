@@ -452,12 +452,6 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
     return top_pinst;
 }
 
-#define PREFIX_STRING(prefix, vec, res)                                        \
-    res = gen_strtemp(ts, prefix);                                             \
-    res = gen_strappend(ts, vec);                                              \
-    res = wastrsave(&strings, res);
-
-// note: should I inc each ptr in na?
 g_ptr
 unfold_pexlif(g_ptr p, unint id, string prefix)
 {
@@ -493,14 +487,15 @@ unfold_pexlif(g_ptr p, unint id, string prefix)
         insert_hash(&f_names, GET_FST(it), GET_SND(it));
     }
     // ...
-    string res;
     g_ptr t_inter = Make_NIL(), t_inter_tail = t_inter;
     FOR_CONS(inter, il, it) {
         INC_REFCNT(it);
         APPEND1(t_inter_tail, it);
     }
     FOR_CONS(f_inter, il, it) {
-        PREFIX_STRING(prefix, GET_STRING(it), res);
+        string res = gen_strtemp(ts, prefix);
+        res = gen_strappend(ts, GET_STRING(it));
+        res = wastrsave(&strings, res);
         g_ptr ip = Make_STRING_leaf(res);
         insert_hash(&f_names, it, ip);
         APPEND1(t_inter_tail, ip);
@@ -1290,3 +1285,66 @@ Pexlif_Install_Functions()
 /******************************************************************************/
 
 // ...
+/* void */
+/* Build_formal_substitution(ustr_mgr *string_mgrp, rec_mgr *vector_mgrp, rec_mgr  *range_mgrp, hash_record_ptr tbl, g_ptr fa) */
+/* { */
+/*     ASSERT(IS_CONS(fa)); */
+/*     for(; !IS_NIL(fa); fa = GET_CONS_TL(fa)) { */
+/*         g_ptr pair = GET_CONS_HD(fa); */
+/*         string formal = GET_STRING(GET_FST(pair)); */
+/*         vec_ptr formal_vec = Split_vector_name(string_mgrp, vector_mgrp, range_mgrp, formal); */
+/*         string formal_sig = Get_vector_signature(string_mgrp, formal_vec); */
+/*         // /  */
+/*         vec_ptr vec = NULL, *vec_tail = &vec; */
+/*         for(g_ptr actuals = GET_SND(pair); !IS_NIL(actuals); actuals = GET_CONS_TL(actuals)) { */
+/*             string actual = GET_STRING(GET_CONS_HD(actuals)); */
+/*             vec_ptr actual_vec = Split_vector_name(string_mgrp, vector_mgrp, range_mgrp, actual); */
+/*             *vec_tail = actual_vec; */
+/*             while(vec_tail != NULL) { vec_tail = &(*vec_tail)->next; } */
+/*         } */
+/*         // / */
+/*         insert_hash(tbl, formal_sig, vec); */
+/*     } */
+/* } */
+
+/* vec_ptr */
+/* Lookup_formal_substitution(ustr_mgr *string_mgrp, rec_mgr *vector_mgrp, rec_mgr  *range_mgrp, hash_record_ptr tbl, string a) */
+/* { */
+/*     vec_ptr v1 = Split_vector_name(string_mgrp, vector_mgrp, range_mgrp, a); */
+/*     string sig = Get_vector_signature(string_mgrp, v1); */
+/*     vec_ptr v2 = find_hash(tbl, sig); */
+/*     // / */
+/*     vec_ptr res = NULL, *res_tail = &res; */
+/*     while(v1 != NULL) { */
+/*         range_ptr rng; */
+/*         if(v1->type == TXT) { */
+/*             v1 = v1->next; */
+/*             continue; */
+/*         } else { */
+/*             rng = v1->u.ranges; */
+/*         } */
+/*         while(rng != NULL) { */
+/*             int lower = rng->lower; */
+/*             int uppper = rng->upper; */
+/*             // / */
+/*             while(v2 != NULL) { */
+/*                 if(v2->type == TXT) { */
+/*                     vec_ptr v = (vec_ptr) new_rec(vector_mgrp); */
+/*                     v->type = TXT; */
+/*                     v->u.name = v2->u.name; */
+/*                     v->next = NULL; */
+/*                     *res_tail = v; */
+/*                     // / */
+/*                     v2 = v2->next; */
+/*                     continue; */
+/*                 } else { */
+                    
+/*                 } */
+/*             } */
+/*             // / */
+/*             rng = rng->next; */
+/*         } */
+/*     } */
+/*     // / */
+/*     return NULL; */
+/* } */
