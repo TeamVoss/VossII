@@ -11,23 +11,35 @@
 /* strings.h -- header for strings.c */
 #ifdef EXPORT_FORWARD_DECL
 /* --- Forward declarations that need to be exported to earlier .h files --- */
-typedef struct range_rec *range_ptr;
-typedef struct vec_rec   *vec_ptr;
+typedef struct range_rec    *range_ptr;
+typedef struct vec_rec      *vec_ptr;
+typedef struct vec_list_rec *vec_list_ptr;
 
 /* ----- Function prototypes for public functions ----- */
-void	    Strings_Init();
-void	    Strings_Install_Functions();
-g_ptr	    Vec2nodes(string name);
-vec_ptr	    Split_vector_name(ustr_mgr *string_mgrp,
-                              rec_mgr  *vector_mgrp,
-                              rec_mgr  *range_mgrp,
-                              string vec);
-string	    Get_vector_signature(ustr_mgr *string_mgrp, vec_ptr vp);
-int	        Get_Vector_Size(string vec);
-g_ptr	    Merge_Vectors(g_ptr nds, bool non_contig_vecs);
-//
-bool        Check_vector_overlap(vec_ptr v1, vec_ptr v2);
-bool        Check_range_overlap(range_ptr r1, range_ptr r2);
+void	     Strings_Init();
+void	     Strings_Install_Functions();
+g_ptr	     Vec2nodes(string name);
+vec_ptr	     Split_vector_name(ustr_mgr *string_mgrp,
+                               rec_mgr  *vector_mgrp,
+                               rec_mgr  *range_mgrp,
+                               string vec);
+string       Get_vector_signature(ustr_mgr *string_mgrp, vec_ptr vp);
+int	         Get_Vector_Size(string vec);
+vec_list_ptr Expand_vector(vec_ptr vec);
+vec_list_ptr Merge_Vectors_gen(rec_mgr *vec_list_mgr, vec_list_ptr vecs);
+g_ptr	     Merge_Vectors(g_ptr nds, bool non_contig_vecs);
+bool         Check_vector_overlap(vec_ptr v1, vec_ptr v2);
+bool         Check_range_overlap(range_ptr r1, range_ptr r2);
+// /
+string       Show_vector(vec_ptr vec, bool non_contig_vec);
+string       Show_vectors(vec_list_ptr vecs, bool non_contig_vecs);
+// /
+unint        range_hash(pointer k, unint n);
+int          range_cmp(pointer k1, pointer k2);
+bool         range_equ(pointer k1, pointer k2);
+unint        vec_hash(pointer k, unint n);
+int          vec_cmp(pointer k1, pointer k2);
+bool         vec_equ(pointer k1, pointer k2);
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */
@@ -52,7 +64,6 @@ typedef struct vec_rec {
     vec_ptr	       next;
 } vec_rec;
 
-typedef struct vec_list_rec *vec_list_ptr;
 typedef struct vec_list_rec {
     vec_ptr      vec;
     vec_list_ptr next;

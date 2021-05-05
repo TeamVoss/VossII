@@ -250,20 +250,18 @@ typedef struct g_rec {
                                 && (M_GET_CONS_HD(p) == NULL)     \
                                 && (M_GET_CONS_TL(p) == NULL))
 
-#define APPEND1(tail,np)	SET_CONS_HD((tail),(np));	    \
-				SET_CONS_TL((tail), Make_NIL());    \
-				(tail) = GET_CONS_TL((tail));
+#define FOR_CONS(list,li,data)                                                 \
+    for(li = list;                                                             \
+        !IS_NIL(li)&&(data = M_GET_CONS_HD(li), TRUE);                         \
+        li = M_GET_CONS_TL(li))
 
-#define FOR_CONS(list,li,data)                                               \
-                            for(li = list;                                   \
-                                !IS_NIL(li)&&(data = M_GET_CONS_HD(li), TRUE); \
-                                li = M_GET_CONS_TL(li))
+#define APPEND1(tail,np)                                                       \
+    SET_CONS_HD((tail),(np));	                                               \
+	SET_CONS_TL((tail), Make_NIL());                                           \
+	(tail) = GET_CONS_TL((tail));
 
-#define APPENDL(tail,nlp)                             \
-    {                                                 \
-        g_ptr tmp, np;                                \
-        FOR_CONS(nlp, tmp, np) { APPEND1(tail, np); } \
-    }
+#define APPENDL(tail,nlp)                                                      \
+    { g_ptr tmp, np; FOR_CONS(nlp, tmp, np) { APPEND1(tail, np); } }
 
 /* Leaf types */
 #define INT                     0
