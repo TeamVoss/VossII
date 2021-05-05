@@ -106,14 +106,21 @@ typedef struct vec_adj_rec {
     string      signature; // pre-computed signature of (formal/actual).
     bool        input;     // name taken from 'fa_inps' or 'fa_outs'?
     vec_ptr     vec;       // the vec. itself. (formal/actual)
-    vec_adj_ptr next;      // next vec. of same parent node.
+    vec_adj_ptr next;
 } vec_adj_rec;
 
 typedef struct vec_adj_lst_rec *vec_adj_lst_ptr;
 typedef struct vec_adj_lst_rec {
     vec_adj_ptr     vec;  // record of node's vec's (formal/actuals).
-    vec_adj_lst_ptr next; // next node's vec's.
+    vec_adj_lst_ptr next;
 } vec_adj_lst_rec;
+
+typedef struct fa_subst_rec *fa_subst_ptr;
+typedef struct fa_subst_rec {
+    string          formal;
+    string          actuals;
+    hash_record_ptr subst;
+} fa_subst_rec;
 
 #define DEST_GET(n)									                           \
 	ASSERT( GET_TYPE(node) == CONS_ND );			                           \
