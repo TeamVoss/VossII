@@ -69,6 +69,7 @@ g_ptr        Make_STRING_leaf(string s);
 g_ptr        Make_VAR_leaf(string s);
 g_ptr	     Make_USERDEF_leaf(fn_ptr fp);
 g_ptr        Make_NIL();
+g_ptr        Make_SINGLETON(g_ptr leaf);
 g_ptr        Make_Printf_Primitive(int pr_fn, string pat);
 g_ptr        Make_0inp_Primitive(int pr_fn);
 g_ptr        Make_1inp_Primitive(int pr_fn, g_ptr arg1);

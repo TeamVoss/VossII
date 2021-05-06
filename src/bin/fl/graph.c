@@ -680,6 +680,13 @@ Make_NIL()
 }
 
 g_ptr
+Make_SINGLETON(g_ptr leaf)
+{
+    g_ptr ret = Make_CONS_ND(leaf, Make_NIL());
+    return ret;
+}
+
+g_ptr
 Make_Printf_Primitive(int pr_fn, string pat)
 {
     g_ptr res;

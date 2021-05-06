@@ -25,7 +25,10 @@ vec_ptr	     Split_vector_name(ustr_mgr *string_mgrp,
                                string vec);
 string       Get_vector_signature(ustr_mgr *string_mgrp, vec_ptr vp);
 int	         Get_Vector_Size(string vec);
-vec_list_ptr Expand_vector(vec_ptr vec);
+vec_list_ptr Expand_vector(rec_mgr *vector_list_mgr,
+                           rec_mgr *vector_mgr,
+                           rec_mgr *range_mgr,
+                           vec_ptr vec);
 vec_list_ptr Merge_Vectors_gen(rec_mgr *vec_list_mgr, vec_list_ptr vecs);
 g_ptr	     Merge_Vectors(g_ptr nds, bool non_contig_vecs);
 bool         Check_vector_overlap(vec_ptr v1, vec_ptr v2);

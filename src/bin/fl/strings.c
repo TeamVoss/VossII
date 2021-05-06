@@ -157,7 +157,7 @@ Vec2nodes(string name)
     g_ptr res = Make_NIL();
     g_ptr tail = res;
     vec_ptr vp = split_name(name);
-    vec_list_ptr vlp = Expand_vector(vp);
+    vec_list_ptr vlp = Expand_vector(vec_list_rec_mgrp, vec_rec_mgrp, range_rec_mgrp, vp);
     sname_list_ptr nlp = show_non_contig_vectors(tstrings, vlp);
     //sname_list_ptr nlp = expand_vec(vp);
     while( nlp != NULL ) {
@@ -182,18 +182,18 @@ Get_Vector_Size(string vec)
 }
 
 vec_list_ptr
-Expand_vector(vec_ptr vec)
+Expand_vector(rec_mgr *vector_list_mgr, rec_mgr *vector_mgr, rec_mgr *range_mgr, vec_ptr vec)
 {
     if(vec == NULL) {
-        vec_list_ptr vlp = (vec_list_ptr) new_rec(vec_list_rec_mgrp);
+        vec_list_ptr vlp = (vec_list_ptr) new_rec(vector_list_mgr);
         vlp->vec  = NULL;
         vlp->next = NULL;
         return vlp;
     }
-    vec_list_ptr rem = Expand_vector(vec->next);
+    vec_list_ptr rem = Expand_vector(vector_list_mgr, vector_mgr, range_mgr, vec->next);
     if(vec->type == TXT) {
         for(vec_list_ptr vlp = rem; vlp != NULL; vlp = vlp->next) {
-            vec_ptr v = (vec_ptr) new_rec(vec_rec_mgrp);
+            vec_ptr v = (vec_ptr) new_rec(vector_mgr);
             v->type = TXT;
             v->u.name = vec->u.name;
             v->next = vlp->vec;
@@ -205,17 +205,17 @@ Expand_vector(vec_ptr vec)
         for(range_ptr rp = vec->u.ranges; rp != NULL; rp = rp->next) {
             if(rp->upper >= rp->lower) {
                 for(int i = rp->upper; i >= rp->lower; i--) {
-                    range_ptr ri = (range_ptr) new_rec(range_rec_mgrp);
+                    range_ptr ri = (range_ptr) new_rec(range_mgr);
                     ri->upper = i;
                     ri->lower = i;
                     ri->next = NULL;
                     for(vec_list_ptr vlp = rem; vlp != NULL; vlp = vlp->next) {
-                        vec_ptr n = (vec_ptr) new_rec(vec_rec_mgrp);
+                        vec_ptr n = (vec_ptr) new_rec(vector_mgr);
                         n->type = INDEX;
                         n->u.ranges = ri;
                         n->next = vlp->vec;
                         // /
-                        vec_list_ptr nl = (vec_list_ptr) new_rec(vec_list_rec_mgrp);
+                        vec_list_ptr nl = (vec_list_ptr) new_rec(vector_list_mgr);
                         nl->vec = n;
                         nl->next = NULL;
                         // /
@@ -225,17 +225,17 @@ Expand_vector(vec_ptr vec)
                 }
             } else {
                 for(int i = rp->upper; i <= rp->lower; i++) {
-                    range_ptr ri = (range_ptr) new_rec(range_rec_mgrp);
+                    range_ptr ri = (range_ptr) new_rec(range_mgr);
                     ri->upper = i;
                     ri->lower = i;
                     ri->next = NULL;
                     for(vec_list_ptr vlp = rem; vlp != NULL; vlp = vlp->next) {
-                        vec_ptr n = (vec_ptr) new_rec(vec_rec_mgrp);
+                        vec_ptr n = (vec_ptr) new_rec(vector_mgr);
                         n->type = INDEX;
                         n->u.ranges = ri;
                         n->next = vlp->vec;
                         // /
-                        vec_list_ptr nl = (vec_list_ptr) new_rec(vec_list_rec_mgrp);
+                        vec_list_ptr nl = (vec_list_ptr) new_rec(vector_list_mgr);
                         nl->vec = n;
                         nl->next = NULL;
                         // /
@@ -675,7 +675,7 @@ md_expand_vectors(g_ptr redex)
     g_ptr tail = redex;
     for(g_ptr np = r; !IS_NIL(np); np = GET_CONS_TL(np)) {
         vec_ptr vp = split_name(GET_STRING(GET_CONS_HD(np)));
-        vec_list_ptr vlp = Expand_vector(vp);        
+        vec_list_ptr vlp = Expand_vector(vec_list_rec_mgrp, vec_rec_mgrp, range_rec_mgrp, vp);        
         sname_list_ptr nlp = show_non_contig_vectors(tstrings, vlp);
         //sname_list_ptr nlp = expand_vec(vp);
         while( nlp != NULL ) {
@@ -703,7 +703,7 @@ md_expand_vector(g_ptr redex)
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
     vec_ptr vp = split_name(GET_STRING(r));
-    vec_list_ptr vlp = Expand_vector(vp);
+    vec_list_ptr vlp = Expand_vector(vec_list_rec_mgrp, vec_rec_mgrp, range_rec_mgrp, vp);
     sname_list_ptr nlp = show_non_contig_vectors(tstrings, vlp);
     //sname_list_ptr nlp = expand_vec(vp);
     while( nlp != NULL ) {
