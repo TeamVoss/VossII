@@ -18,7 +18,6 @@ new_buf(buffer_ptr bp, unint n, unint size)
     bp->allocated = n*size;
     bp->data = Calloc(n*size);
     bp->initialized = BUF_MAGIC_NBR;
-
 }
 
 void
