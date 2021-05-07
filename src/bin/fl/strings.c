@@ -44,17 +44,10 @@ static void           end_vector_ops();
 static vec_ptr        split_name(string name);
 static range_ptr      make_range_canonical(range_ptr rp);
 static vec_ptr        make_vector_ranges_canonical(vec_ptr vp);
-//static void           gen_emit_vector(vec_ptr vp, bool non_contig_vecs, pointer dp, void (append_fun)(pointer dp, string v));
-//static void           emit_merge_list(merge_list_ptr ml, bool non_contig_vecs, g_ptr *tailp);
-//static void           emit_vector(vec_ptr vp, bool non_contig_vecs, g_ptr *tailp);
-//static string         show_vector(vec_ptr vp, bool non_contig_vecs);
-//static sname_list_ptr show_vector_list(vec_list_ptr vlp, bool non_contig_vecs);
 static range_ptr      compress_ranges(range_ptr r1, range_ptr r2);
-//static sname_list_ptr *prepend_index(int idx, sname_list_ptr rem, sname_list_ptr *resp);
-//static vec_list_ptr   expand_vector(vec_ptr vec);
-//static sname_list_ptr expand_vec(vec_ptr vec);
 static void           buffer_vectors_list(vec_list_ptr vs, buffer_ptr vec_buf, bool range_canonical);
 static void           buffer_vectors_fl(g_ptr r, buffer_ptr vec_buf, bool range_canonical);
+// /
 static bool	          same_range(range_ptr r1, range_ptr r2);
 static int            vec_name_cmp(vec_ptr v1, vec_ptr v2);
 static int            nn_cmp(const void *pi, const void *pj);
@@ -362,6 +355,8 @@ Show_vectors(vec_list_ptr vecs, bool non_contig_vecs)
     return res;
 }
 
+// -----------------------------------------------------------------------------
+
 unint
 range_hash(pointer k, unint n)
 {
@@ -404,6 +399,8 @@ range_equ(pointer k1, pointer k2)
 {
     return range_cmp(k1, k2) == 0;
 }
+
+// -----------------------------------------------------------------------------
 
 // todo: ask Carl about hashing.
 unint
