@@ -18,4 +18,6 @@ let z = unfold_pexlif y 1 "prefix_";
 
 Emit_pexlif "orig.txt" x;
 Emit_pexlif "folded.txt" y;
-Emit_pexlif "unfolded.txt" y;
+Emit_pexlif "unfolded.txt" z;
+
+quit;
