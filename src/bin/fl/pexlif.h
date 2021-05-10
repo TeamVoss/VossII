@@ -89,12 +89,6 @@ void Pexlif_Install_Functions();
 
 #include "fl.h"	/* Global data types and include files */
 
-// adj_rec         -> adj_bkt_rec
-// vec_adj_rec     -> adj_key_rec
-// vec_adj_lst_rec -> adj_key_list_rec
-// tbl_in  -> inputs_tbl
-// tbl_out -> outputs_tbl
-
 typedef struct adj_bkt_rec *adj_bkt_ptr;
 typedef struct adj_bkt_rec {
     unint       index;     // index as found in (parent : children).
@@ -120,7 +114,7 @@ typedef struct adj_key_list_rec {
 typedef struct fa_subst_rec *fa_subst_ptr;
 typedef struct fa_subst_rec {
     string          formal;
-    string          actuals;
+    sname_list_ptr  actuals;
     hash_record_ptr subst;
 } fa_subst_rec;
 

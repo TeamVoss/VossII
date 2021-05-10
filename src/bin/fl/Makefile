@@ -100,7 +100,7 @@ plugin_checker.o:   plugin_loader.h plugin.h strings.h typecheck.h abi_version.h
 plugin_errlog.o:    plugin_errlog.h
 table.o:	    table.h graph.h typecheck.h fl.h
 iso.o:              iso.h fsm.h pexlif.h graph.h fl.h
-pexlif.o:           pexlif.h graph.h fl.h
+pexlif.o:           pexlif.h graph.h strings.h fl.h
 
 prefs.h: prefs.tcl
 	tclsh make_prefs.tcl

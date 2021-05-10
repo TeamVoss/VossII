@@ -55,7 +55,6 @@ string s_no_instance;
 
 // Global variables referenced -------------------------------------------------
 extern str_mgr strings;
-extern symbol_tbl_ptr	symb_tbl;
 
 /******************************************************************************/
 /*                              PRIVATE VARIABLES                             */
@@ -72,6 +71,8 @@ static rec_mgr         vector_mgr;
 static rec_mgr_ptr     vector_mgr_ptr;
 static rec_mgr         range_mgr;
 static rec_mgr_ptr     range_mgr_ptr;
+static rec_mgr         sname_list_mgr;
+static rec_mgr_ptr     sname_list_mgr_ptr;
 static rec_mgr         fa_subst_mgr;
 static rec_mgr_ptr     fa_subst_mgr_ptr;
 // Adj-tbl construction.
@@ -87,17 +88,20 @@ static hash_record     outputs_tbl;
 static hash_record_ptr outputs_tbl_ptr;
 
 // Forward definitions local functions -----------------------------------------
-static void    new_adj_mem();
-static void    rem_adj_mem();
-static vec_ptr split_vector(string name);
-static void    record_vector_signatures(adj_key_ptr *tail, unint index, string name, bool input);
-static void    mk_adj_tables(adj_key_list_ptr *keys, unint *count, g_ptr p);
-// /
-static void    new_fold_mem();
-static void    rem_fold_mem();
-static void    mk_formal_actuals_substitution(hash_record_ptr tbl, g_ptr fa);
-static string  subst_formal(hash_record_ptr tbl, g_ptr f);
-static g_ptr   subst_fa_list(hash_record_ptr tbl, g_ptr fa_list);
+static void           new_adj_mem();
+static void           rem_adj_mem();
+static vec_ptr        split_vector(string name);
+static void           record_vector_signatures(
+                          adj_key_ptr *tail, unint index, string name,
+                          bool input);
+static void           mk_adj_tables(
+                          adj_key_list_ptr *keys, unint *count, g_ptr p);
+static void           new_fold_mem();
+static void           rem_fold_mem();
+static void           mk_formal_actuals_substitution(
+                          hash_record_ptr tbl, g_ptr fa);
+static sname_list_ptr subst_formal(hash_record_ptr tbl, g_ptr f);
+static g_ptr          subst_fa_list(hash_record_ptr tbl, g_ptr fa_list);
 
 /******************************************************************************/
 /*                                LOCAL FUNCTIONS                             */
@@ -106,15 +110,15 @@ static g_ptr   subst_fa_list(hash_record_ptr tbl, g_ptr fa_list);
 static void
 new_adj_mem()
 {
-    adj_bkt_mgr_ptr      = &adj_bkt_mgr;
-    adj_key_mgr_ptr      = &adj_key_mgr;
+    adj_bkt_mgr_ptr = &adj_bkt_mgr;
+    adj_key_mgr_ptr = &adj_key_mgr;
     adj_key_list_mgr_ptr = &adj_key_list_mgr;
-    inputs_tbl_ptr       = &inputs_tbl;
-    outputs_tbl_ptr      = &outputs_tbl;
-    new_mgr(adj_bkt_mgr_ptr,      sizeof(adj_bkt_rec));
-    new_mgr(adj_key_mgr_ptr,      sizeof(adj_key_rec));
+    inputs_tbl_ptr = &inputs_tbl;
+    outputs_tbl_ptr = &outputs_tbl;
+    new_mgr(adj_bkt_mgr_ptr, sizeof(adj_bkt_rec));
+    new_mgr(adj_key_mgr_ptr, sizeof(adj_key_rec));
     new_mgr(adj_key_list_mgr_ptr, sizeof(adj_key_list_rec));
-    create_hash(inputs_tbl_ptr,  100, str_hash, str_equ);
+    create_hash(inputs_tbl_ptr, 100, str_hash, str_equ);
     create_hash(outputs_tbl_ptr, 100, str_hash, str_equ);
 }
 
@@ -124,13 +128,13 @@ rem_adj_mem()
     free_mgr(adj_bkt_mgr_ptr);
     free_mgr(adj_key_mgr_ptr);
     free_mgr(adj_key_list_mgr_ptr);
-    dispose_hash(inputs_tbl_ptr,  NULLFCN);
+    dispose_hash(inputs_tbl_ptr, NULLFCN);
     dispose_hash(outputs_tbl_ptr, NULLFCN);
-    adj_bkt_mgr_ptr      = NULL;
-    adj_key_mgr_ptr      = NULL;
+    adj_bkt_mgr_ptr = NULL;
+    adj_key_mgr_ptr = NULL;
     adj_key_list_mgr_ptr = NULL;
-    inputs_tbl_ptr       = NULL;
-    outputs_tbl_ptr      = NULL;
+    inputs_tbl_ptr = NULL;
+    outputs_tbl_ptr = NULL;
 }
 
 static vec_ptr
@@ -249,13 +253,15 @@ static void
 new_fold_mem()
 {
     vector_list_mgr_ptr = &vector_list_mgr;
-    vector_mgr_ptr      = &vector_mgr;
-    range_mgr_ptr       = &range_mgr;
-    fa_subst_mgr_ptr    = &fa_subst_mgr;
+    vector_mgr_ptr = &vector_mgr;
+    range_mgr_ptr = &range_mgr;
+    sname_list_mgr_ptr = &sname_list_mgr;
+    fa_subst_mgr_ptr = &fa_subst_mgr;
     new_mgr(vector_list_mgr_ptr, sizeof(vec_list_rec));
-    new_mgr(vector_mgr_ptr,      sizeof(vec_rec));
-    new_mgr(range_mgr_ptr,       sizeof(range_rec));
-    new_mgr(fa_subst_mgr_ptr,    sizeof(fa_subst_rec));
+    new_mgr(vector_mgr_ptr, sizeof(vec_rec));
+    new_mgr(range_mgr_ptr, sizeof(range_rec));
+    new_mgr(sname_list_mgr_ptr, sizeof(sname_list_rec));
+    new_mgr(fa_subst_mgr_ptr, sizeof(fa_subst_rec));
 }
 
 static void
@@ -264,11 +270,13 @@ rem_fold_mem()
     free_mgr(vector_list_mgr_ptr);
     free_mgr(vector_mgr_ptr);
     free_mgr(range_mgr_ptr);
+    free_mgr(sname_list_mgr_ptr);
     free_mgr(fa_subst_mgr_ptr);
     vector_list_mgr_ptr = NULL;
-    vector_mgr_ptr      = NULL;
-    range_mgr_ptr       = NULL;
-    fa_subst_mgr_ptr    = NULL;
+    vector_mgr_ptr = NULL;
+    range_mgr_ptr = NULL;
+    sname_list_mgr_ptr = NULL;
+    fa_subst_mgr_ptr = NULL;
 }
 
 static void
@@ -289,32 +297,22 @@ mk_formal_actuals_substitution(hash_record_ptr tbl, g_ptr fa)
         vec_list_ptr act_exp = NULL, *tail = &act_exp;
         FOR_CONS(actuals, lj, actual) {
             vec_ptr act_vec =
-                Split_vector_name(&lstrings,
-                                  vector_mgr_ptr,
-                                  range_mgr_ptr,
+                Split_vector_name(&lstrings, vector_mgr_ptr, range_mgr_ptr,
                                   GET_STRING(actual));
-            *tail =
-                Expand_vector(vector_list_mgr_ptr,
-                              vector_mgr_ptr,
-                              range_mgr_ptr,
-                              act_vec);
+            *tail = Expand_vector(
+                vector_list_mgr_ptr, vector_mgr_ptr, range_mgr_ptr, act_vec);
             while(*tail != NULL) {
                 tail = &((*tail)->next);
                 size++;
             }
         }
-        string act_exp_str = Show_vectors(act_exp, FALSE);
         // Expand formal and build a mapping of each vector to its corr. actual.
         string form_str = GET_STRING(formal);
         vec_ptr form_vec =
-            Split_vector_name(&lstrings,
-                              vector_mgr_ptr,
-                              range_mgr_ptr,
+            Split_vector_name(&lstrings, vector_mgr_ptr, range_mgr_ptr,
                               form_str);
         vec_list_ptr form_exp =
-            Expand_vector(vector_list_mgr_ptr,
-                          vector_mgr_ptr,
-                          range_mgr_ptr,
+            Expand_vector(vector_list_mgr_ptr, vector_mgr_ptr, range_mgr_ptr,
                           form_vec);
         hash_record subst;
         create_hash(&subst, size, vec_hash, vec_equ);
@@ -326,7 +324,7 @@ mk_formal_actuals_substitution(hash_record_ptr tbl, g_ptr fa)
         // Record orig. formal/actual for quick lookup and exp. subst.
         fa_subst_ptr sub = (fa_subst_ptr) new_rec(fa_subst_mgr_ptr);
         sub->formal  = form_str;
-        sub->actuals = act_exp_str;
+        sub->actuals = Show_vectors(sname_list_mgr_ptr, act_exp, FALSE);
         sub->subst   = &subst;
         string form_sig = Get_vector_signature(&lstrings, form_vec);
         insert_hash(tbl, form_sig, sub);
@@ -334,7 +332,7 @@ mk_formal_actuals_substitution(hash_record_ptr tbl, g_ptr fa)
 }
 
 // todo: are vectors contig. or not?
-static string
+static sname_list_ptr
 subst_formal(hash_record_ptr tbl, g_ptr f)
 {
     if(tbl == NULL) {
@@ -344,7 +342,8 @@ subst_formal(hash_record_ptr tbl, g_ptr f)
         DIE("Bad input");
     }
     string  form_str = GET_STRING(f);
-    vec_ptr form_vec = Split_vector_name(&lstrings, vector_mgr_ptr, range_mgr_ptr, form_str);
+    vec_ptr form_vec =
+        Split_vector_name(&lstrings, vector_mgr_ptr, range_mgr_ptr, form_str);
     string  form_sig = Get_vector_signature(&lstrings, form_vec);
     fa_subst_ptr bkt = (fa_subst_ptr) find_hash(tbl, form_sig);
     if(bkt == NULL) {
@@ -353,7 +352,9 @@ subst_formal(hash_record_ptr tbl, g_ptr f)
     if(str_equ(form_str, bkt->formal)) {
         return bkt->actuals;
     }
-    vec_list_ptr form_exp = Expand_vector(vector_list_mgr_ptr, vector_mgr_ptr, range_mgr_ptr, form_vec);
+    vec_list_ptr form_exp =
+        Expand_vector(vector_list_mgr_ptr, vector_mgr_ptr, range_mgr_ptr,
+                      form_vec);
     vec_list_ptr sub_exp  = NULL, *tail = &sub_exp;
     for(; form_exp != NULL; form_exp = form_exp->next) {
         vec_ptr key = form_exp->vec;
@@ -368,21 +369,24 @@ subst_formal(hash_record_ptr tbl, g_ptr f)
         tail  = &(vlp->next);
     }
     vec_list_ptr sub = Merge_Vectors_gen(vector_list_mgr_ptr, sub_exp);
-    return Show_vectors(sub, FALSE);
+    sname_list_ptr names = Show_vectors(sname_list_mgr_ptr, sub, FALSE);
+    return names;
 }
 
 static g_ptr
 subst_fa_list(hash_record_ptr tbl, g_ptr fa_list)
 {
     g_ptr i, j, pair, actual;
-    // /
     g_ptr res = Make_NIL(), res_tail = res;
     FOR_CONS(fa_list, i, pair) {
         g_ptr formal  = GET_FST(pair);
         g_ptr actuals = GET_SND(pair);
         g_ptr as = Make_NIL(), as_tail = as;
         FOR_CONS(actuals, j, actual) {
-            APPEND1(as_tail, Make_STRING_leaf(subst_formal(tbl, actual)));
+            sname_list_ptr names = subst_formal(tbl, actual);
+            for(; names != NULL; names = names->next) {
+                APPEND1(as_tail, Make_STRING_leaf(names->name));
+            }
         }
         INC_REFCNT(formal);
         APPEND1(res_tail, Make_PAIR_ND(formal, as));

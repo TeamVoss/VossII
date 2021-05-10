@@ -45,24 +45,36 @@ static vec_ptr        split_name(string name);
 static range_ptr      make_range_canonical(range_ptr rp);
 static vec_ptr        make_vector_ranges_canonical(vec_ptr vp);
 static range_ptr      compress_ranges(range_ptr r1, range_ptr r2);
-static void           buffer_vectors_list(vec_list_ptr vs, buffer_ptr vec_buf, bool range_canonical);
-static void           buffer_vectors_fl(g_ptr r, buffer_ptr vec_buf, bool range_canonical);
-// /
+static void           buffer_vectors_list(
+                          vec_list_ptr vs, buffer_ptr vec_buf,
+                          bool range_canonical);
+static void           buffer_vectors_fl(
+                          g_ptr r, buffer_ptr vec_buf, bool range_canonical);
 static bool	          same_range(range_ptr r1, range_ptr r2);
 static int            vec_name_cmp(vec_ptr v1, vec_ptr v2);
 static int            nn_cmp(const void *pi, const void *pj);
 static merge_list_ptr gen_extract_vectors(buffer_ptr vec_buf);
 static merge_list_ptr gen_merge_vectors(buffer_ptr vec_buf);
 static void           record_names_fl(sname_list_ptr nlp, g_ptr redex);
-static void           merge_vectors_fl(g_ptr list, g_ptr res, bool non_contig_vecs);
-static void           extract_vectors_fl(g_ptr list, g_ptr res, bool non_contig_vecs, bool range_canonical);
+static void           merge_vectors_fl(
+                          g_ptr list, g_ptr res, bool non_contig_vecs);
+static void           extract_vectors_fl(
+                          g_ptr list, g_ptr res, bool non_contig_vecs,
+                          bool range_canonical);
 static int	          vec_size(vec_ptr vec);
-// /
 static string         show_non_contig_vector(tstr_ptr tstrings, vec_ptr vp);
-static sname_list_ptr show_non_contig_vectors(tstr_ptr tstrings, vec_list_ptr vlp);
-static sname_list_ptr show_contig_vector(tstr_ptr tstrings, vec_ptr vp);
-static sname_list_ptr show_contig_vectors(tstr_ptr tstrings, vec_list_ptr vp);
-static sname_list_ptr show_merge_list(tstr_ptr tstrings, merge_list_ptr mlp, bool non_contig_vecs);
+static sname_list_ptr show_non_contig_vectors(
+                          rec_mgr *sname_list_mgrp, tstr_ptr tstrings,
+                          vec_list_ptr vlp);
+static sname_list_ptr show_contig_vector(
+                          rec_mgr *sname_list_mgrp,
+                          tstr_ptr tstrings, vec_ptr vp);
+static sname_list_ptr show_contig_vectors(
+                          rec_mgr *sname_list_mgrp, tstr_ptr tstrings,
+                          vec_list_ptr vp);
+static sname_list_ptr show_merge_list(
+                          rec_mgr *sname_list_mgrp, tstr_ptr tstrings,
+                          merge_list_ptr mlp, bool non_contig_vecs);
 
 #define EMIT_RNG(rp)                                                           \
     for(range_ptr rs = rp; rs != NULL; rs = rs->next) {                        \
@@ -77,7 +89,7 @@ static sname_list_ptr show_merge_list(tstr_ptr tstrings, merge_list_ptr mlp, boo
     }
 
 #define EMIT_VEC_LIST(vlp)                                                     \
-    for(vec_list_ptr vls = vpl; vls != NULL; vls = vls->next) {                \
+    for(vec_list_ptr vls = vlp; vls != NULL; vls = vls->next) {                \
         EMIT_VEC(vls->vec);                                                    \
         fprintf(stderr, "; ");                                                 \
     }                                                                          \
@@ -90,6 +102,12 @@ static sname_list_ptr show_merge_list(tstr_ptr tstrings, merge_list_ptr mlp, boo
         fprintf(stderr, "; ");                                                 \
         mls = mls->next;                                                       \
     } while(mls != NULL && mls != mlp);                                        \
+    fprintf(stderr, "\n");
+
+#define EMIT_STR_LIST(slp)                                                     \
+    for(sname_list_ptr sls = slp; sls != NULL; sls = sls->next) {              \
+        fprintf(stderr, "%s; ", sls->name);                                    \
+    }                                                                          \
     fprintf(stderr, "\n");
 
 #define EMIT_FL_LIST(glp)                                                      \
@@ -150,9 +168,10 @@ Vec2nodes(string name)
     g_ptr res = Make_NIL();
     g_ptr tail = res;
     vec_ptr vp = split_name(name);
-    vec_list_ptr vlp = Expand_vector(vec_list_rec_mgrp, vec_rec_mgrp, range_rec_mgrp, vp);
-    sname_list_ptr nlp = show_non_contig_vectors(tstrings, vlp);
-    //sname_list_ptr nlp = expand_vec(vp);
+    vec_list_ptr vlp =
+        Expand_vector(vec_list_rec_mgrp, vec_rec_mgrp, range_rec_mgrp, vp);
+    sname_list_ptr nlp =
+        show_non_contig_vectors(sname_list_rec_mgrp, tstrings, vlp);
     while( nlp != NULL ) {
         SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, nlp->name)));
         SET_CONS_TL(tail, Make_NIL());
@@ -175,7 +194,10 @@ Get_Vector_Size(string vec)
 }
 
 vec_list_ptr
-Expand_vector(rec_mgr *vector_list_mgr, rec_mgr *vector_mgr, rec_mgr *range_mgr, vec_ptr vec)
+Expand_vector(rec_mgr *vector_list_mgr,
+              rec_mgr *vector_mgr,
+              rec_mgr *range_mgr,
+              vec_ptr vec)
 {
     if(vec == NULL) {
         vec_list_ptr vlp = (vec_list_ptr) new_rec(vector_list_mgr);
@@ -183,7 +205,8 @@ Expand_vector(rec_mgr *vector_list_mgr, rec_mgr *vector_mgr, rec_mgr *range_mgr,
         vlp->next = NULL;
         return vlp;
     }
-    vec_list_ptr rem = Expand_vector(vector_list_mgr, vector_mgr, range_mgr, vec->next);
+    vec_list_ptr rem =
+        Expand_vector(vector_list_mgr, vector_mgr, range_mgr, vec->next);
     if(vec->type == TXT) {
         for(vec_list_ptr vlp = rem; vlp != NULL; vlp = vlp->next) {
             vec_ptr v = (vec_ptr) new_rec(vector_mgr);
@@ -311,48 +334,34 @@ Check_vector_overlap(vec_ptr v1, vec_ptr v2)
     return TRUE;
 }
 
-string
-Show_vector(vec_ptr vec, bool non_contig_vec)
+sname_list_ptr
+Show_vector(rec_mgr *sname_list_mgrp, vec_ptr vec, bool non_contig_vec)
 {
-    begin_vector_ops();
     tstr_ptr tstrings = new_temp_str_mgr();
     sname_list_ptr names;
     if(non_contig_vec) {
-        names = (sname_list_ptr) new_rec(sname_list_rec_mgrp);
+        names = (sname_list_ptr) new_rec(sname_list_mgrp);
         names->name = show_non_contig_vector(tstrings, vec);
         names->next = NULL;
     } else {
-        names = show_contig_vector(tstrings, vec);
+        names = show_contig_vector(sname_list_mgrp, tstrings, vec);
     }
-    string name = gen_strtemp(tstrings, "");
-    for(; names != NULL; names = names->next) {
-        gen_strappend(tstrings, names->name);
-    }
-    string res = wastrsave(&strings, name);
     free_temp_str_mgr(tstrings);
-    end_vector_ops();
-    return res;
+    return names;
 }
 
-string
-Show_vectors(vec_list_ptr vecs, bool non_contig_vecs)
+sname_list_ptr
+Show_vectors(rec_mgr *sname_list_mgrp, vec_list_ptr vecs, bool non_contig_vecs)
 {
-    begin_vector_ops();
     tstr_ptr tstrings = new_temp_str_mgr();
     sname_list_ptr names;
     if(non_contig_vecs) {
-        names = show_non_contig_vectors(tstrings, vecs);
+        names = show_non_contig_vectors(sname_list_mgrp, tstrings, vecs);
     } else {
-        names = show_contig_vectors(tstrings, vecs);
+        names = show_contig_vectors(sname_list_mgrp, tstrings, vecs);
     }
-    string name = gen_strtemp(tstrings, "");
-    for(; names != NULL; names = names->next) {
-        gen_strappend(tstrings, names->name);
-    }
-    string res = wastrsave(&strings, name);
     free_temp_str_mgr(tstrings);
-    end_vector_ops();
-    return res;
+    return names;
 }
 
 // -----------------------------------------------------------------------------
@@ -672,9 +681,10 @@ md_expand_vectors(g_ptr redex)
     g_ptr tail = redex;
     for(g_ptr np = r; !IS_NIL(np); np = GET_CONS_TL(np)) {
         vec_ptr vp = split_name(GET_STRING(GET_CONS_HD(np)));
-        vec_list_ptr vlp = Expand_vector(vec_list_rec_mgrp, vec_rec_mgrp, range_rec_mgrp, vp);        
-        sname_list_ptr nlp = show_non_contig_vectors(tstrings, vlp);
-        //sname_list_ptr nlp = expand_vec(vp);
+        vec_list_ptr vlp =
+            Expand_vector(vec_list_rec_mgrp, vec_rec_mgrp, range_rec_mgrp, vp);
+        sname_list_ptr nlp =
+            show_non_contig_vectors(sname_list_rec_mgrp, tstrings, vlp);
         while( nlp != NULL ) {
             SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, nlp->name)));
             SET_CONS_TL(tail, Make_NIL());
@@ -700,9 +710,10 @@ md_expand_vector(g_ptr redex)
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
     vec_ptr vp = split_name(GET_STRING(r));
-    vec_list_ptr vlp = Expand_vector(vec_list_rec_mgrp, vec_rec_mgrp, range_rec_mgrp, vp);
-    sname_list_ptr nlp = show_non_contig_vectors(tstrings, vlp);
-    //sname_list_ptr nlp = expand_vec(vp);
+    vec_list_ptr vlp =
+        Expand_vector(vec_list_rec_mgrp, vec_rec_mgrp, range_rec_mgrp, vp);
+    sname_list_ptr nlp =
+        show_non_contig_vectors(sname_list_rec_mgrp, tstrings, vlp);
     while( nlp != NULL ) {
         SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, nlp->name)));
         SET_CONS_TL(tail, Make_NIL());
@@ -1353,91 +1364,29 @@ mk_name_signature(vec_ptr vp)
 
 // -----------------------------------------------------------------------------
 
-/* static sname_list_ptr * */
-/* prepend_index(int idx, sname_list_ptr rem, sname_list_ptr *resp) */
-/* { */
-/*     char buf[10]; */
-/*     Sprintf(buf, "%d", idx); */
-/*     for(sname_list_ptr np = rem; np != NULL; np = np->next) { */
-/*         sname_list_ptr nnp = new_rec(sname_list_rec_mgrp); */
-/*         string nname = strtemp(buf); */
-/*         nname = strappend(np->name); */
-/*         nnp->name = uStrsave(lstringsp, nname); */
-/*         nnp->next = NULL; */
-/*         *resp = nnp; */
-/*         resp = &(nnp->next); */
-/*     } */
-/*     return resp; */
-/* } */
-
-/* static sname_list_ptr */
-/* expand_vec(vec_ptr vec) */
-/* { */
-/*     if( vec == NULL ) { */
-/*         sname_list_ptr np = new_rec(sname_list_rec_mgrp); */
-/*         np->next = NULL; */
-/*         np->name = uStrsave(lstringsp, ""); */
-/*         return np; */
-/*     } */
-/*     sname_list_ptr rem = expand_vec(vec->next); */
-/*     if( vec->type == TXT ) { */
-/*         // A text item */
-/*         for(sname_list_ptr np = rem; np != NULL; np = np->next) { */
-/*             string nname = strtemp(vec->u.name); */
-/*             nname = strappend(np->name); */
-/*             np->name = uStrsave(lstringsp, nname); */
-/*         } */
-/*         return rem; */
-/*     } else { */
-/*         // Indices */
-/*         sname_list_ptr res = NULL; */
-/*         sname_list_ptr *tailp = &res; */
-/*         for(range_ptr rp = vec->u.ranges; rp != NULL; rp = rp->next) { */
-/*             if( rp->upper >= rp->lower ) { */
-/*                 for(int i = rp->upper; i >= rp->lower; i--) { */
-/*                     tailp = prepend_index(i, rem, tailp); */
-/*                 } */
-/*             } else { */
-/*                 for(int i = rp->upper; i <= rp->lower; i++) { */
-/*                     tailp = prepend_index(i, rem, tailp); */
-/*                 } */
-/*             } */
-/*         } */
-/*         return res; */
-/*     } */
-/* } */
-
 static void
 buffer_vectors_list(vec_list_ptr vs, buffer_ptr vec_buf, bool range_canonical)
 {
-    //fprintf(stderr, "buffer_vectors_list\n");
     for(; vs != NULL; vs = vs->next) {
         vec_ptr vp = vs->vec;
         if(range_canonical) {
-            // todo: why is this wrong?
-            //vp = make_vector_ranges_canonical(vp);
+            // todo: why is 'vp = make_...;' wrong?
             make_vector_ranges_canonical(vp);
         }
         push_buf(vec_buf, &vp);
-        //EMIT_VEC(vp);
-        //fprintf(stderr, "\n");
     }
 }
 
 static void
 buffer_vectors_fl(g_ptr r, buffer_ptr vec_buf, bool range_canonical)
 {
-    //fprintf(stderr, "buffer_vectors_fl\n");
     for(; !IS_NIL(r); r = GET_CONS_TL(r)) {
         vec_ptr vp = split_name(GET_STRING(GET_CONS_HD(r)));
         if(range_canonical) {
-            // todo: why is this wrong?
-            //vp = make_vector_ranges_canonical(vp);
+            // todo: why is 'vp = make_...;' wrong?
             make_vector_ranges_canonical(vp);
         }
         push_buf(vec_buf, &vp);
-        //EMIT_VEC(vp);
-        //fprintf(stderr, "\n");
     }
 }
 
@@ -1707,10 +1656,8 @@ record_names_fl(sname_list_ptr nlp, g_ptr redex)
 static void
 merge_vectors_fl(g_ptr list, g_ptr res, bool non_contig_vecs)
 {
-    //fprintf(stderr, "merge_vectors_fl\n");
-    //EMIT_FL_LIST(list);
     begin_vector_ops();
-    // /
+    //
     buffer vec_buf;
     new_buf(&vec_buf, 100, sizeof(vec_ptr));
     buffer_vectors_fl(list, &vec_buf, FALSE);
@@ -1718,8 +1665,10 @@ merge_vectors_fl(g_ptr list, g_ptr res, bool non_contig_vecs)
     free_buf(&vec_buf);
     // /
     tstr_ptr tstrings = new_temp_str_mgr();
-    sname_list_ptr nlp = show_merge_list(tstrings, mlp, non_contig_vecs);
+    sname_list_ptr nlp =
+        show_merge_list(sname_list_rec_mgrp, tstrings, mlp, non_contig_vecs);
     record_names_fl(nlp, res);
+    free_temp_str_mgr(tstrings);
     // /
     end_vector_ops();
 }
@@ -1727,8 +1676,6 @@ merge_vectors_fl(g_ptr list, g_ptr res, bool non_contig_vecs)
 static void
 extract_vectors_fl(g_ptr list, g_ptr res, bool non_contig_vecs, bool range_canonical)
 {
-    //fprintf(stderr, "extract_vectors_fl\n");
-    //EMIT_FL_LIST(list);
     begin_vector_ops();
     // /
     buffer vec_buf;
@@ -1736,11 +1683,12 @@ extract_vectors_fl(g_ptr list, g_ptr res, bool non_contig_vecs, bool range_canon
     buffer_vectors_fl(list, &vec_buf, range_canonical);
     merge_list_ptr mlp = gen_extract_vectors(&vec_buf);
     free_buf(&vec_buf);
-    //EMIT_MRG_LIST(mlp);
     // /
     tstr_ptr tstrings = new_temp_str_mgr();
-    sname_list_ptr nlp = show_merge_list(tstrings, mlp, non_contig_vecs);
+    sname_list_ptr nlp =
+        show_merge_list(sname_list_rec_mgrp, tstrings, mlp, non_contig_vecs);
     record_names_fl(nlp, res);
+    free_temp_str_mgr(tstrings);
     // /
     end_vector_ops();
 }
@@ -1776,11 +1724,12 @@ show_non_contig_vector(tstr_ptr tstrings, vec_ptr vp)
 }
 
 static sname_list_ptr
-show_non_contig_vectors(tstr_ptr tstrings, vec_list_ptr vlp)
+show_non_contig_vectors(
+    rec_mgr *sname_list_mgrp, tstr_ptr tstrings, vec_list_ptr vlp)
 {
     sname_list_ptr res, *tail_ptr = &res;
     for(; vlp != NULL; vlp = vlp->next) {
-        sname_list_ptr slp = (sname_list_ptr) new_rec(sname_list_rec_mgrp);
+        sname_list_ptr slp = (sname_list_ptr) new_rec(sname_list_mgrp);
         slp->name = show_non_contig_vector(tstrings, vlp->vec);
         slp->next = NULL;
         // /
@@ -1790,77 +1739,75 @@ show_non_contig_vectors(tstr_ptr tstrings, vec_list_ptr vlp)
     return res;
 }
 
-// TODO: Not sure about this one yet...
-// TODO: Also, it assumes '_strtemp' has been called, I think.
+// todo: assumes '_strtemp' has been called, I think.
 static sname_list_ptr
-show_contig_vector(tstr_ptr tstrings, vec_ptr vp)
+show_contig_vector(rec_mgr *sname_list_mgrp, tstr_ptr tstrings, vec_ptr vp)
 {
     string str_buf = gen_strappend(tstrings, "");
     for(; vp != NULL; vp = vp->next) {
         if(vp->type == TXT) {
             gen_strappend(tstrings, vp->u.name);
         } else {
-            sname_list_ptr res, *tail_ptr = &res;
+            sname_list_ptr res = NULL, *tail_ptr = &res;
             for(range_ptr rp = vp->u.ranges; rp != NULL; rp = rp->next) {
                 gen_strtemp(tstrings, str_buf);
                 SPRINT_RANGE(tstrings, rp);
+                sname_list_ptr slp =
+                    show_contig_vector(sname_list_mgrp, tstrings, vp->next);
                 // /
-                sname_list_ptr slp = show_contig_vector(tstrings, vp->next);
                 *tail_ptr = slp;
-                while(slp != NULL) { slp = slp->next; }
-                tail_ptr = &slp;
+                while(slp->next != NULL) { slp = slp->next; }
+                tail_ptr = &slp->next;
             }
             return res;
         }
     }
-    sname_list_ptr slp = (sname_list_ptr) new_rec(sname_list_rec_mgrp);
+    sname_list_ptr slp = (sname_list_ptr) new_rec(sname_list_mgrp);
     slp->name = wastrsave(&strings, str_buf);
     slp->next = NULL;
     return slp;
 }
 
-// TODO: Same as above...
 static sname_list_ptr
-show_contig_vectors(tstr_ptr tstrings, vec_list_ptr vlp)
+show_contig_vectors(rec_mgr *sname_list_mgrp, tstr_ptr tstrings, vec_list_ptr vlp)
 {
-    sname_list_ptr res, *tail_ptr = &res;
+    sname_list_ptr res = NULL, *tail_ptr = &res;
     for(; vlp != NULL; vlp = vlp->next) {
         gen_strtemp(tstrings, "");
-        sname_list_ptr slp = show_contig_vector(tstrings, vlp->vec);
+        sname_list_ptr slp =
+            show_contig_vector(sname_list_mgrp, tstrings, vlp->vec);
         // /
         *tail_ptr = slp;
-        while(*tail_ptr != NULL) { tail_ptr = &((*tail_ptr)->next); }
+        while(slp->next != NULL) { slp = slp->next; }
+        tail_ptr = &slp->next;
     }
     return res;
 }
 
 static sname_list_ptr
-show_merge_list(tstr_ptr tstrings, merge_list_ptr mlp, bool non_contig_vecs)
+show_merge_list(rec_mgr *sname_list_mgrp, tstr_ptr tstrings, merge_list_ptr mlp, bool non_contig_vecs)
 {
-    //fprintf(stderr, "show_merge_list\n");
     if(mlp == NULL) {
-        //fprintf(stderr, "empty!\n");
         return NULL;
     }
-    // Record vectors in 'mlp'.
+    // Record 'mlp' vectors in 'vlp'.
     merge_list_ptr start = mlp;
     vec_list_ptr vlp, *tail_ptr = &vlp;
     do {
         vec_list_ptr vlp = (vec_list_ptr) new_rec(vec_list_rec_mgrp);
         vlp->vec = mlp->vec;
         vlp->next = NULL;
+        mlp = mlp->next;
+        // /
         *tail_ptr = vlp;
         tail_ptr = &(vlp->next);
-        mlp = mlp->next;
-        //EMIT_VEC(mlp->vec);
-        //fprintf(stderr, "\n");
     } while(mlp != NULL && mlp != start);
     // Show vectors in 'vlp'.
     sname_list_ptr res;
     if(non_contig_vecs) {
-        res = show_non_contig_vectors(tstrings, vlp);
+        res = show_non_contig_vectors(sname_list_mgrp, tstrings, vlp);
     } else {
-        res = show_contig_vectors(tstrings, vlp);
+        res = show_contig_vectors(sname_list_mgrp, tstrings, vlp);
     }
     return res;
 }
