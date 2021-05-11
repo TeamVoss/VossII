@@ -86,5 +86,45 @@ typedef struct merge_list_rec {
     merge_list_ptr next;
 } merge_list_rec;
 
+#define EMIT_RNG(rp)                                                           \
+    for(range_ptr rs = rp; rs != NULL; rs = rs->next) {                        \
+        if(rs->upper == rs->lower) { fprintf(stderr, "%d, ", rs->upper); }     \
+        else { fprintf(stderr, "%d:%d, ", rs->upper, rs->lower); }             \
+    }
+
+#define EMIT_VEC(vp)                                                           \
+    for(vec_ptr vs = vp; vs != NULL; vs = vs->next) {                          \
+        if(vs->type == TXT) { fprintf(stderr, "%s", vs->u.name); }             \
+        else { EMIT_RNG(vs->u.ranges); }                                       \
+    }
+
+#define EMIT_VEC_LIST(vlp)                                                     \
+    for(vec_list_ptr vls = vlp; vls != NULL; vls = vls->next) {                \
+        EMIT_VEC(vls->vec);                                                    \
+        fprintf(stderr, "; ");                                                 \
+    }                                                                          \
+    fprintf(stderr, "\n");
+
+#define EMIT_MRG_LIST(mlp)                                                     \
+    merge_list_ptr mls = mlp;                                                  \
+    do {                                                                       \
+        EMIT_VEC(mls->vec);                                                    \
+        fprintf(stderr, "; ");                                                 \
+        mls = mls->next;                                                       \
+    } while(mls != NULL && mls != mlp);                                        \
+    fprintf(stderr, "\n");
+
+#define EMIT_STR_LIST(slp)                                                     \
+    for(sname_list_ptr sls = slp; sls != NULL; sls = sls->next) {              \
+        fprintf(stderr, "%s; ", sls->name);                                    \
+    }                                                                          \
+    fprintf(stderr, "\n");
+
+#define EMIT_FL_LIST(glp)                                                      \
+    for(g_ptr gls = glp; !IS_NIL(gls); gls = M_GET_CONS_TL(gls)) {             \
+        fprintf(stderr, "%s; ", GET_STRING(M_GET_CONS_HD(gls)));               \
+    }                                                                          \
+    fprintf(stderr, "\n");
+
 #endif /* STRING_H */
 #endif /* EXPORT_FORWARD_DECL */

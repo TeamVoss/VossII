@@ -76,46 +76,6 @@ static sname_list_ptr show_merge_list(
                           rec_mgr *sname_list_mgrp, tstr_ptr tstrings,
                           merge_list_ptr mlp, bool non_contig_vecs);
 
-#define EMIT_RNG(rp)                                                           \
-    for(range_ptr rs = rp; rs != NULL; rs = rs->next) {                        \
-        if(rs->upper == rs->lower) { fprintf(stderr, "%d, ", rs->upper); }     \
-        else { fprintf(stderr, "%d:%d, ", rs->upper, rs->lower); }             \
-    }
-
-#define EMIT_VEC(vp)                                                           \
-    for(vec_ptr vs = vp; vs != NULL; vs = vs->next) {                          \
-        if(vs->type == TXT) { fprintf(stderr, "%s", vs->u.name); }             \
-        else { EMIT_RNG(vs->u.ranges); }                                       \
-    }
-
-#define EMIT_VEC_LIST(vlp)                                                     \
-    for(vec_list_ptr vls = vlp; vls != NULL; vls = vls->next) {                \
-        EMIT_VEC(vls->vec);                                                    \
-        fprintf(stderr, "; ");                                                 \
-    }                                                                          \
-    fprintf(stderr, "\n");
-
-#define EMIT_MRG_LIST(mlp)                                                     \
-    merge_list_ptr mls = mlp;                                                  \
-    do {                                                                       \
-        EMIT_VEC(mls->vec);                                                    \
-        fprintf(stderr, "; ");                                                 \
-        mls = mls->next;                                                       \
-    } while(mls != NULL && mls != mlp);                                        \
-    fprintf(stderr, "\n");
-
-#define EMIT_STR_LIST(slp)                                                     \
-    for(sname_list_ptr sls = slp; sls != NULL; sls = sls->next) {              \
-        fprintf(stderr, "%s; ", sls->name);                                    \
-    }                                                                          \
-    fprintf(stderr, "\n");
-
-#define EMIT_FL_LIST(glp)                                                      \
-    for(g_ptr gls = glp; !IS_NIL(gls); gls = M_GET_CONS_TL(gls)) {             \
-        fprintf(stderr, "%s; ", GET_STRING(M_GET_CONS_HD(gls)));               \
-    }                                                                          \
-    fprintf(stderr, "\n");
-
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
 /********************************************************/
@@ -353,6 +313,16 @@ Show_vector(rec_mgr *sname_list_mgrp, vec_ptr vec, bool non_contig_vec)
 sname_list_ptr
 Show_vectors(rec_mgr *sname_list_mgrp, vec_list_ptr vecs, bool non_contig_vecs)
 {
+    /* if(vecs == NULL) { */
+    /*     fprintf(stderr, "Show_vectors for NULL!\n"); */
+    /*     return NULL; */
+    /* } else { */
+    /*     fprintf(stderr, "Show_vectors for "); */
+    /*     for(vec_list_ptr vls = vecs; vls != NULL; vls = vls->next) { */
+    /*         EMIT_VEC(vls->vec); */
+    /*     } */
+    /* } */
+    // /
     tstr_ptr tstrings = new_temp_str_mgr();
     sname_list_ptr names;
     if(non_contig_vecs) {
@@ -361,6 +331,8 @@ Show_vectors(rec_mgr *sname_list_mgrp, vec_list_ptr vecs, bool non_contig_vecs)
         names = show_contig_vectors(sname_list_mgrp, tstrings, vecs);
     }
     free_temp_str_mgr(tstrings);
+    /* fprintf(stderr, " => "); */
+    /* EMIT_STR_LIST(names); */
     return names;
 }
 
