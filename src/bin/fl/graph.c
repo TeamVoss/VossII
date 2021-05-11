@@ -1246,6 +1246,42 @@ Compile(symbol_tbl_ptr stbl, g_ptr onode, typeExp_ptr type, bool delayed)
 }
 
 g_ptr
+Execute_fl_code(const string function, ...)
+{
+    va_list args;
+    va_start(args, function);
+    
+    fn_ptr fp = Find_Function_Def(symb_tbl, function);
+    if( fp == NULL ) {
+	g_ptr res = Get_node();
+	string msg = strtemp("Cannot find function ");
+	msg = strappend(function);
+	MAKE_REDEX_FAILURE(res, msg);
+	return res;
+    }
+    if( fp->overload ) {
+	g_ptr res = Get_node();
+	string msg = strtemp("Execute_fl_code cannot use overloaded function ");
+	msg = strappend(function);
+	MAKE_REDEX_FAILURE(res, msg);
+	return res;
+    }
+    g_ptr expr = fp->expr;
+    g_ptr g_arg;
+    while( (g_arg = va_arg(args, g_ptr)) != NULL ) {
+	expr = Make_APPL_ND(expr, g_arg);
+    }
+    result_ptr rp = (result_ptr) new_rec(&result_rec_mgr);
+    rp->expr = expr;
+    rp->type = NULL;
+    Print_Result(rp, stdout_fp, FALSE);
+    expr = rp->expr;
+    Free_result_ptr(rp);
+    va_end(args);
+    return expr;
+}
+
+g_ptr
 Make_TYPE(string constr_name, int arg_cnt)
 {
     g_ptr res = mk_constr_nd(constr_name);

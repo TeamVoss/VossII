@@ -101,6 +101,7 @@ void         Do_garbage_collect();
 #endif
 result_ptr   Compile(symbol_tbl_ptr stbl, g_ptr node, typeExp_ptr type,
 		     bool delayed);
+g_ptr	     Execute_fl_code(const string function, ...);
 void	     Free_result_ptr(result_ptr rp);
 FILE *       Return_to_old_fid();
 void         Debug_change_string(char *new_name, g_ptr n);

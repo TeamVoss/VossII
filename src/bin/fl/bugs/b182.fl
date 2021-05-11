@@ -49,15 +49,15 @@ p_test;
 let ckt_test = pexlif2fsm p_test;
 ckt_test;
 
-let vis = STE_debug ckt_test;
+//let vis = STE_debug ckt_test;
 
-let ant =
-    "foo[7:0]" is "a[7:0]" for 4 cycles
-  and
-    "bar" is 0 for 1 cycle followed_by 
-	     1 for 1 cycle followed_by 
-	     0 for 1 cycle followed_by 
-	     1 for 1 cycle
-;
-
-STE "-e" vis [] ant [] [];
+//let ant =
+//    "foo[7:0]" is "a[7:0]" for 4 cycles
+//  and
+//    "bar" is 0 for 1 cycle followed_by 
+//	     1 for 1 cycle followed_by 
+//	     0 for 1 cycle followed_by 
+//	     1 for 1 cycle
+//;
+//
+//STE "-e" vis [] ant [] [];
