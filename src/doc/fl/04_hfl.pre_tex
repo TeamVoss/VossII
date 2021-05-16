@@ -4,13 +4,13 @@ An important part of the {\voss} system is its symbolic trajectory evaluation
 (STE) formal verification engine.
 Intuitively, STE is a generalization of a symbolic simulator in which the
 Boolean domain has been extended to a lattice structure and thus
-combines symbolic varaibles/expressions and lattice operations.
+combines symbolic variables/expressions and lattice operations.
 For the STE system to work, a model of some hardware is needed.
 Currently, {\voss} provides two ways of getting such a model: 1) by reading in
 a Verilog description using, a slightly extended, Yosys~\cite{yosys} system
 or define the model directly in an extension of fl, called HFL.
 Either way, an fl datatype called pexlif will be created first.
-This datatype captures hiearchy, wire names, and RTL level assignments
+This datatype captures hierarchy, wire names, and RTL level assignments
 (both instantaneous as well as delayed) of the hardware.
 For further use, the pexlif is often compiled to a more
 efficient model, called fsm.
@@ -40,13 +40,14 @@ andlettype content =
         |   P_LEAF \{fns::update_fn list\}
 ;
 \end{hol}
-and
+where
 \begin{hol}
 lettype update_fn =
             W_UPDATE_FN \{lhs::wexpr\} \{rhs::wexpr\}
         |   W_PHASE_DELAY \{lhs::wexpr\} \{rhs::wexpr\}
 ;
 \end{hol}
+
 The word-level expressions (wexpr)%
 \index{wexpr}
 are defined as:
@@ -92,6 +93,37 @@ lettype mem = MEM
 ;
 \end{hol}
 and is used to represent the various expressions in an RTL model.
+
+In the {\tt PINST} constructor, the name field is an arbitrary string.
+However, the visualizer recognizes names that start with {\tt draw\_}.
+For example, {\tt draw\_hier foo} will create a hierarchical box named {\tt foo}
+that one can traverse into in the circuit visualizer.
+Note that if the name starts with {\tt draw\_} but does not correspond
+to any known drawing routine, the visualizer will likely misbehave at the
+moment.  
+The {\tt attrs} is a list of pairs of strings; attribute name and attribute
+value.
+The {\tt leaf} field is {\tt F} for hierarchical {\tt PINSTs} and {\tt T}
+for leaves.
+The {\tt fa\_inps} is a list of pairs where each pair is the ``inside name''
+and a list of outside names. 
+For example, {\tt [("a[4:0]", ["cout", "res[3:0]"])]} is a perfectly plausible
+formal-actual input list.
+Note that the size of the formal vector must be the same as the sum of the
+sizes of the actual vectors.
+The {\tt internals} is a list of node vectors for all the
+intermediate wires used to create the connections between the child
+{\tt PINSTs}.
+The {\tt content} is either a list of {\tt PINSTs}, for a hierarchical 
+module, or a list of update functions.
+
+An update function is either a zero-delay update function or a phase
+delay update function.
+Both have a left-hand side expression for the driven signals and
+an expression for what the signal should be driven to.
+Not all constructors of {\tt wexpr} can be used as left-hand side expressions.
+Only {\tt W\_VAR}, {\tt W\_EXPLICIT\_VAR}, {\tt W\_SLICE},
+{\tt W\_NAMED\_SLICE}, and {\tt W\_CAT} are possible.
 
 
 To illustrate a simple function operating over a pexlif, here is one
@@ -236,14 +268,14 @@ Note also that evaluating this command will create (zero-arity) functions
 for the enumerated constants.
 In addition, there will be one predicate, named is\_<constant> for every
 constant declared.
-Note that these functions are overloaded (if needed) so that two differnt
+Note that these functions are overloaded (if needed) so that two different
 ENUMs can have the same named constants.
 It is up to the typechecking to resolve the usage so that the correct
 encoding is used.
 Sometimes, this will require a typecast.
 
 Since enumerated types do not have any numerical value, it is
-an error to try to perform aritmetic operations on them.
+an error to try to perform arithmetic operations on them.
 For example:
 %%%START_CODE%%%%
 ADD '+' JMP;
@@ -272,7 +304,7 @@ field refers to.
 For example:
 %%%START_CODE%%%%
 STRUCT "opcode" 32 [
-                    ("opcode", "op", [31,29]),  // Non-contigous!
+                    ("opcode", "op", [31,29]),  // Non-contiguous!
                     ("dest", "addr", (23--16)),
                     ("src1", "addr", (15--8)),
                     ("src2", "addr", (7--0)),
@@ -337,7 +369,7 @@ write_array 'a '0x3 '0x2 'd;
 To make it more convenient to describe combinational circuits a small
 embedded DSL has been created for expressions as well.
 We have already shown some examples.
-Basically, the folloing operators are availble
+Basically, the following operators are available
 \begin{hol}
 Constants:
 '23                 // Decimal number
@@ -346,7 +378,7 @@ Constants:
 'X                  // Unknown (Don't care) value
 
 Variables:
-'a                  // A singel bit or simple vector depending on return type
+'a                  // A single bit or simple vector depending on return type
 
 Logical expressions:
 '\~' e              // (Bitwise) negation
@@ -500,9 +532,9 @@ build up the circuit.
 Of course, the last version will generate a long chain of adders which
 will likely be too slow in practice.
 Thus one would typically want to create a tree structured adder circuit
-so that the maximum delay will grow logratihmically with the number of
+so that the maximum delay will grow logarithmically with the number of
 terms to be added.
-This can be accomplised as:
+This can be accomplished as:
 %%%START_CODE%%%%
 letrec add_tree =
     list_input  il.     
@@ -616,7 +648,7 @@ and
 module  mux4(
     din_0      , // Mux first input
     din_1      , // Mux Second input
-    din_2      , // Mux Thirsd input
+    din_2      , // Mux Third input
     din_3      , // Mux Fourth input
     sel        , // Select input
     mux_out      // Mux output
@@ -683,7 +715,7 @@ fanout ckt "mid01";
 // Find the full vector given a node in it.
 node2vector ckt "sel[0]";
 
-// Use fanin_dfs to recursively go back until a toplevel node is encounterd
+// Use fanin_dfs to recursively go back until a toplevel node is encountered
 let top_fanin ckt nd =
     let toplevel n = NOT (str_is_substr "/" n) in
     let all_inps = fanin_dfs ckt toplevel [nd] in

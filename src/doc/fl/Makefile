@@ -1,8 +1,7 @@
 #
 DOCS =  fl_guide.tex 02_fl.tex 03_bv.tex 04_hfl.tex \
 	05_ste.tex \
-	06_fl-syntax.tex 07_built-in-fl.tex \
-	08_vossrc.tex 09_standard-library.tex \
+	06_fl-syntax.tex \
 	16_biblio.tex
 
 FIGS = figs/forte_start.jpg figs/forte_with_args_start.jpg figs/forte_help.jpg
