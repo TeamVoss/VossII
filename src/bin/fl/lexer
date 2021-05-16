@@ -18,9 +18,9 @@ symbol	[!%&$#+\-*/:<=>?@\\~`'^|\_]
 #include "y.tab.h"
 #include <unistd.h>
 
-#undef YYLMAX
-#define YYLMAX                  15000           // For really long lines
 #define YY_DECL                 int yylex (YYSTYPE *lvalp)
+
+#define MAX_LINE_LENGTH		1000
 
 YY_DECL;
 
@@ -47,7 +47,8 @@ extern string		prompt;
 extern bool		RCverbose_eval_command;
 
 string                  DIR;        /* Current directory */
-char			prev_lines[2][YYLMAX+1];
+char			prev_line[MAX_LINE_LENGTH+1];
+int			prev_line_used = 0;
 int			last_inp;
 old_yyin_ptr	        cur_file = NULL;
 string		        cur_file_name = "stdin";
@@ -67,6 +68,24 @@ static char		cmd_buf[1024];
 static string		expand_string(string s);
 static void		start_extern_parsing();
 static void		end_extern_parsing(string cmd);
+
+static void
+append_line(string txt)
+{
+    int len = strlen(txt);
+    if( len >= MAX_LINE_LENGTH ) {
+	prev_line[0] = 0;
+	prev_line_used = 0;
+	return;
+    }
+    if( prev_line_used + len >= MAX_LINE_LENGTH ) {
+	prev_line[0] = 0;
+	prev_line_used = 0;
+    }
+    prev_line_used += len;
+    strcat(prev_line, txt);
+    last_inp = len;
+}
 
 static struct keyword_rec {
         char	*name;
@@ -135,16 +154,14 @@ static hash_record      symbword_tbl;
 #if 0
 #define RETURN(v, t)	{						\
 			    print_prompt=0;				\
-			    strcat(prev_lines[0], (char *)yytext);	\
-			    last_inp = strlen((char*)yytext);		\
+			    append_line(yytext);			\
 			    fprintf(stderr, "%s -->%s\n", yytext,t);	\
 			    return(v);					\
 			}
 #else
 #define RETURN(v, t)	{						\
 			    print_prompt = 0;				\
-			    strcat(prev_lines[0], (char *)yytext);	\
-			    last_inp = strlen((char *)yytext);		\
+			    append_line(yytext);			\
 			    return(v);					\
 			}
 #endif
@@ -193,7 +210,8 @@ sscanf                              { RETURN(SSCANFT,  "SSCANF"); }
 
 set_line_number\ [0-9]+;	    {
 					line_nbr = atoi(&yytext[16])-1;
-					prev_lines[0][0] = '\0';
+					prev_line[0] = '\0';
+					prev_line_used = 0;
 					last_inp = 0;
 				    }
 
@@ -205,7 +223,8 @@ set_file_name\ \"[^"]+\";	    {
 					cur_file_name =
 						wastrsave(&strings, start+1);
 					*end = tmp;
-					prev_lines[0][0] = '\0';
+					prev_line[0] = '\0';
+					prev_line_used = 0;
 					last_inp = 0;
 				    }
 
@@ -350,19 +369,16 @@ defix\ [\ \t]*{symbol}({symbol})* {
 			    RETURN(STRINGT, "_STRINGT");
 			}
 \n			{
-			    strcat(prev_lines[0], (string) yytext);
-			    strcpy(prev_lines[1], prev_lines[0]);
-			    prev_lines[0][0] = '\0';
+			    prev_line[0] = '\0';
+			    prev_line_used = 0;
 			    last_inp = 0;
 			    line_nbr++;
 			}
 \ 			{
-			    strcat(prev_lines[0], (string) yytext);
-			    last_inp = strlen((string) yytext);
+			    append_line(yytext);
 			}
 \t			{
-			    strcat(prev_lines[0], (string) yytext);
-			    last_inp = strlen((string) yytext);
+			    append_line(yytext);
 			}
 \r                      { }
 .			{
@@ -387,8 +403,8 @@ Init_lexer()
 	insert_hash(&symbword_tbl, (pointer) symbwords[i].name,
 				   (pointer) &(symbwords[i].token));
     cur_quote = FALSE;
-    prev_lines[0][0] = '\0';
-    prev_lines[1][0] = '\0';
+    prev_line[0] = '\0';
+    prev_line_used = 0;
     last_inp = 0;
     static char path[1024];
     strtemp(getcwd(path,1024));
@@ -454,7 +470,9 @@ perform_fl_command(string txt)
 {
     YY_BUFFER_STATE old_buffer = YY_CURRENT_BUFFER;
     YY_BUFFER_STATE cmd_buffer = yy_scan_string(txt);
-    prev_lines[0][0] = '\0';
+    prev_line[0] = '\0';
+    prev_line_used = 0;
+    last_inp = 0;
     Set_default_break_handler();
     bool old_file_load = file_load;
     if( RCverbose_eval_command )

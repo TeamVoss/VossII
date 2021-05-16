@@ -1,0 +1,4 @@
+let f x =
+    let y = x + 2 - in
+    y-2*x
+;

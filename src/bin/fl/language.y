@@ -1761,7 +1761,7 @@ yyerror(const char *msg)
     unint		  i;
     extern int	  line_nbr;
     extern string cur_file_name;
-    extern char	  prev_lines[2][256];
+    extern char	  prev_line[1001];
     extern int	  last_inp;
     int slen = strlen("syntax error,");
     if( strncmp("syntax error,", msg, slen) == 0 ) {
@@ -1769,16 +1769,15 @@ yyerror(const char *msg)
     }
     FP(err_fp, "#### Syntax error in file %s, close to line %d: %s\n",
 	    cur_file_name, line_nbr, msg);
-    FP(err_fp, "%s\n", prev_lines[0]);
-    for(i = 0; i < strlen(prev_lines[0])-last_inp; i++) {
-	if( prev_lines[0][i] == '\t' )
+    FP(err_fp, "%s\n", prev_line);
+    for(i = 0; i < strlen(prev_line)-last_inp; i++) {
+	if( prev_line[i] == '\t' )
 	    FP(err_fp, "\t");
 	else
 	    FP(err_fp, " ");
     }
     FP(err_fp, "^\n");
-    prev_lines[0][0] = '\0';
-    prev_lines[1][0] = '\0';
+    prev_line[0] = '\0';
     Emit_prompt("");
     extern jmp_buf *start_envp;
     longjmp(*start_envp,1);
