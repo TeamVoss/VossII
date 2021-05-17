@@ -1796,7 +1796,8 @@ if_then_else_binder '?' ':';
 let IF c = c;
 let ELSE {t:: *a} {e:: *a} = (t,e);
 let bitTHEN c (t,e) = c '?' t ':' e;
-overload THEN THEN bitTHEN;
+//overload THEN THEN bitTHEN;
+let THEN = bitTHEN;
 if_then_else_binder THEN ELSE;
 
 let wOR {a:: *a} {b:: *a} = 
