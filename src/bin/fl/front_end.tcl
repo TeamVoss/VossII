@@ -1338,6 +1338,7 @@ namespace eval voss2_help {
 	    ttk::scrollbar $f.xscroll -orient horizontal \
 				      -command [list $f.t xview]
 	    text $f.t -background white -font $::voss2_help_font \
+		-foreground black \
 		-wrap none \
 		-xscrollcommand [list $f.xscroll set] \
 		-yscrollcommand [list $f.yscroll set] \
