@@ -1,0 +1,19 @@
+let sum as = sitlist (\a. \s. a + s) as 0;
+
+let md_sizes as = sum (map md_size as);
+
+let compare f as =
+    let l  = md_sizes as in
+    let bs = md_expand_vectors as in
+    let cs = f bs in
+    l == md_sizes bs AND l == md_sizes cs
+;
+
+let compare_merge = compare md_merge_vectors;
+let compare_extract = compare md_extract_vectors;
+
+compare_merge ["a[31:24, 15:8,4,1:0]"];
+compare_merge ["a[31:24, 15:8,4,1:0]","b[4:2, 0]"];
+
+compare_extract ["a[31:24, 15:8,4,1:0]"];
+compare_extract ["a[31:24, 15:8,4,1:0]","b[4:2, 0]"];
