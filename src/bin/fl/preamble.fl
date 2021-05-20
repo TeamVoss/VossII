@@ -714,6 +714,16 @@ let random min max =
 ;
 non_lazy random;
 
+// Normalizes a float to [0,1] range.
+let normalize x min max = fdiv (x - min) (max - min);
+
+// Returns a random and normalized ([0,1] range) float of 'bits' size.
+let randomf bits =
+    bits > 32 => eprintf "randomf with %d > 32" bits |
+    normalize (int2float (random2 bits)) 0.0 (int2float (2**bits))
+;
+non_lazy randomf;
+
 // Return a unique integer representing the content of filename.
 // Uses SHA256 for signature computation to ensure (almost guaranteed)
 // uniqueness.
