@@ -230,7 +230,21 @@ let
 // Generation of a PEXLIF.
 //------------------------------------------------------------------------------
 
-
+// ...
+//  gen_DAG::int->int->[[bool]]
+let
+    gen_DAG n p =
+        let threshold = fdiv (fmul 2.0 (log (int2float n))) (int2float n) in
+        let flip F    = randomf 32 > threshold in
+        letrec
+            map_from _ []     _ = []
+        /\  map_from f (x:xs) 0 = f x : map_from f xs 0
+        /\  map_from f (x:xs) i = x   : map_from f xs (i-1)
+        in
+        let empty     = replicate n (replicate n F) in
+        let marked    = ixmap (map_from flip) empty in
+        marked
+;
 
 //------------------------------------------------------------------------------
 // Fin.
