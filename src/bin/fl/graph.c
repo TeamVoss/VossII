@@ -4046,6 +4046,9 @@ traverse_left(g_ptr oroot)
 		    redex = *(sp+1);
 		    /* Force all arguments (note P_STRICT_TUPLE is used!) */
 		    arg1 = force(GET_APPLY_RIGHT(*sp), FALSE);
+		    if( is_fail(arg1) ) {
+			goto fail2;
+		    }
 		    ASSERT( IS_CONS(arg1) );
 		    arg3 = arg1;
 		    while( !IS_NIL(arg3) ) {
