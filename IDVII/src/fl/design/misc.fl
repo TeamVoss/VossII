@@ -34,6 +34,10 @@ let flip f a b = f b a;
 //     iterate::(a->a)->a->(a list)
 letrec iterate f x = x : iterate f (f x);
 
+// Apply 'f' to 'x' 'n' times.
+//  repeat::int->(a->a)->a->a
+let repeat n f x = el (n+1) (iterate f x);
+
 // "Curry" a function.
 //  curry::((a->b->c)->(a#b)->c
 let curry f (a,b) = f a b;
@@ -89,11 +93,7 @@ let when m f = maybe NONE m (SOME # f);
 
 // ...
 //  filter_some::((* opt) list)->(* list)
-letrec
-    filter_some []            = []
-/\  filter_some (NONE:xs)     = filter_some xs
-/\  filter_some ((SOME x):xs) = x : filter_some xs
-;
+let filter_some = map get_value # filter has_value;
 
 // ...
 //  exhaust::((a opt) list)->(a opt)
@@ -113,9 +113,13 @@ let nonempty = NOT # empty;
 //  butfirst::(a list)->(a list)
 let butfirst = tl;
 
+// Checks if an element is a memeber of the given list.
+//  elem::a->(a list)->bool
+let elem a as = find_first0 (defix == a) as != 0;
+
 // Sum a list of integers.
 //  sum::(int list)->int
-let sum as = sitlist (\a. \s. a + s) as 0;
+let sum as = sitlist (defix +) as 0;
 
 // Takes two lists and returns a list of corresponding pairs. If one input list
 // is short, excess elements of the longer list are discarded.
@@ -157,27 +161,42 @@ letrec
 ;
 
 // ...
-//  reorder::(int list)->(a list)->(a list)
+//  split_at::int->(a list)->((a list)#(a list))
+let split_at n xs =
+        letrec
+            go _ []     = ([], [])
+        /\  go 2 (y:ys) = ([y], ys)
+        /\  go m (y:ys) = val (as, bs) = go (m-1) ys in (y:as, bs)
+        in
+        n <= 1 => ([], xs) | go n xs
+;
+
+// ...
+//  chunks::int->(a list)->(a list)
 letrec
-    reorder []     _  = []
-/\  reorder (o:os) xs = el o xs : reorder os xs
+    chunks _ [] = []
+/\  chunks n xs =
+        val (as, bs) = split_at n xs in
+        as : chunks n bs
+;
+
+// ...
+//  remove::int->(a list)->(a list)
+let remove n xs =
+        val (as, bs) = split_at n xs in
+        empty bs => as | as @ (tl bs)
 ;
 
 // Modify the 'n'th element of a list 'xs' with 'f'.
 //  modify::(a->a)->int->(a list)->(a list)
-letrec
-    modify _ _ []     = []
-/\  modify f 1 (x:xs) = f x : xs
-/\  modify f n (x:xs) = x : modify f (n-1) xs
+let modify f n xs =
+        val (as, bs) = split_at n xs in
+        empty bs => as | as @ (f (hd bs) : tl bs)
 ;
 
-// Set the 'n'th element of a list 'x' to 'v'.
-//  list_update::a->int->(a vec)->(a vec)
-let list_update v i = modify (const v) i;
-
-// Checks if an element is a memeber of the given list.
-//  elem::a->(a list)->bool
-let elem a as = find_first0 (defix == a) as != 0;
+// ...
+//  reorder::(int list)->(a list)->(a list)
+let reorder os xs = qsort ((defix -) on fst) (zip os xs);
 
 // Left-shift a list one element.
 //  rotate::(a list)->(a list)
@@ -210,25 +229,6 @@ letrec
 ;
 
 //------------------------------------------------------------------------------
-// Matrix.
-
-// Removes the first column and row of a matrix.
-//  mat_tl::(* mat)->(* mat)
-let mat_tl = map tl # tl;
-
-// Set the '(i,j)'th element of matrix 'mat' to 'v'.
-//  mat_update::a->(int#int)->(a mat)->(a mat)
-let mat_update v (i,j) = modify (list_update v j) i;
-
-// Count the number of rows in a matrix.
-//  num_rows::(a mat)->int
-let num_rows = length;
-
-// Count the number of columns in a square matrix.
-//  num_columns::(a mat)->int
-let num_columns xs = empty xs => 0 | length (hd xs);
-
-//------------------------------------------------------------------------------
 // String.
 
 // Drops the first 'n' characters from the string 's'.
@@ -246,6 +246,10 @@ let string_butlast s = string_butlastn s 1;
 // Checks if a string is empty.
 //  string_empty::string->bool
 let string_empty s = strlen s == 0;
+
+// ...
+//  concat::(string list)->string
+let concat ss = itlist (defix ^) ss "";
 
 //------------------------------------------------------------------------------
 // Fin.

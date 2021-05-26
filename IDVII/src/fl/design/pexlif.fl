@@ -231,19 +231,158 @@ let
 //------------------------------------------------------------------------------
 
 // ...
-//  gen_DAG::int->int->[[bool]]
+//  gen_DAG_with_threshold::int->int->[[bool]]
 let
-    gen_DAG n p =
-        let threshold = fdiv (fmul 2.0 (log (int2float n))) (int2float n) in
-        let flip F    = randomf 32 > threshold in
+    gen_DAG_with_threshold n p =
         letrec
             map_from _ []     _ = []
         /\  map_from f (x:xs) 0 = f x : map_from f xs 0
         /\  map_from f (x:xs) i = x   : map_from f xs (i-1)
         in
-        let empty     = replicate n (replicate n F) in
-        let marked    = ixmap (map_from flip) empty in
+        let flip F = randomf 32 > p in
+        let empty  = replicate n (replicate n F) in
+        let marked = ixmap (map_from flip) empty in
         marked
+;
+
+// ...
+//  gen_DAG::int->(bool mat)
+let gen_DAG n =
+        gen_DAG_with_threshold n
+            (fdiv (fmul 2.0 (log (int2float n))) (int2float n))
+;
+
+// ...
+//  gen_DAG_internals::(bool mat)->(((int#int)#(string#int)) list)
+let gen_DAG_internals dag sz =
+        let new i j =
+                let name = "int(" ^ (int2str i) ^ "-" ^ (int2str j) ^ ")" in
+                ((i,j), (name,sz))
+        in
+        let opt_new _ _ F = NONE
+        /\  opt_new i j T = SOME (new i j)
+        in
+        letrec
+            build _ []      = []
+        /\  build i (rs:ms) = 
+                let is = filter_some
+                       $ map (curry (flip (opt_new i)))
+                       $ ixlabel rs
+                in
+                is @ build (i+1) (map tl ms)
+        in
+        build 0 dag
+;
+
+//------------------------------------------------------------------------------
+
+let ?! = undefined;
+
+let one_of [] = eprintf "one_of called on empty list"
+/\  one_of xs = el (random 1 (length xs)) xs
+;
+
+let one_of_weighted [] = eprintf "one_of_weighted called on empty list"
+/\  one_of_weighted xs =
+        letrec
+            pick n ((k,a):as) = (n <= k) => a | pick (n-k) as
+        in
+        pick (random 1 (sum (map fst xs))) xs
+;
+
+let expand_range l h = firstn (h-l) (iterate (defix + 1) l);
+let random_remove xs = remove (random 1 (length xs)) xs;
+let random_slice lz hz = repeat (hz-lz) random_remove (expand_range 0 hz);
+let random_split sz =
+        let r = random 1 sz in
+        (r+(sz%r)) : (firstn ((sz/r)-1) (iterate id r))
+;
+
+let resize_vector sz = md_merge_vectors # firstn sz # md_expand_vector;
+let resize_input sz = map (\j. W_VAR (md_size j) j) # resize_vector sz;
+
+// ...
+//  gen_WEXPR::(int#(string#int))->int->int->...
+let gen_WEXPR env size depth =
+        // Fetch input from 'env' or request a new one.
+        letrec
+            build sz =
+                val (i, s) = one_of_weighted env in
+                s < sz => W_VAR s i : build (sz-s) |
+                s > sz => [W_SLICE (random_slice sz s) (W_VAR s i)] |
+                [W_VAR s i]
+        in
+        // Generate driver for a wire of size 'sz'.
+        letrec
+            gen sz 0 =
+                let var  = build sz in
+                let var' = length var == 1 => hd var | W_CAT var in
+                // Gen.
+                one_of_weighted
+                       [ (1, W_X     sz)
+                       , (1, W_CONST sz (random2 sz))
+                    // , (x, W_NAMED_CONST ?! ?! ?!)
+                       , (5, var')
+                    // , (x, W_EXPLICIT_VAR ?! ?!)
+                    // , (x, W_MEM_READ ?! ?! ?!)
+                       ]
+        /\  gen sz n =
+                let n2  = n / 2 in
+                // W_SLIZE
+                let hz  = random sz (sz*2) in
+                // W_CAT
+                let czs = random_split sz in
+                let cn  = n / (length czs) in
+                // Gen.
+                one_of [ W_NOT  (gen sz (n-1))
+                       , W_AND  (gen sz n2) (gen sz n2)
+                       , W_OR   (gen sz n2) (gen sz n2)
+                       , W_EQ   (gen sz n2) (gen sz n2)
+                       , W_GR   (gen sz n2) (gen sz n2)
+                       , W_ADD  (gen sz n2) (gen sz n2)
+                       , W_SUB  (gen sz n2) (gen sz n2)
+                       , W_MUL  (gen sz n2) (gen sz n2)
+                       , W_DIV  (gen sz n2) (gen sz n2)
+                       , W_MOD  (gen sz n2) (gen sz n2)
+                       , W_SHL  (gen sz n2) (gen sz n2)
+                       , W_SHR  (gen sz n2) (gen sz n2)
+                       , W_ASHR (gen sz n2) (gen sz n2)
+                    // , W_PRED ?! ?!
+                    // , W_SX ?! (gen ?! n2)
+                    // , W_ZX ?! (gen ?! n2)
+                    // , W_ITE (gen 1 n3) (gen sz n3) (gen sz n3)
+                       , W_SLICE (random_slice sz hz) (gen hz n2)
+                    // , W_NAMED_SLICE ?! ?! ?!
+                    // , W_UPDATE_NAMED_SLICE ?! ?! ?! ?!
+                       , W_CAT (map (flip gen cn) czs)
+                    // , W_MEM_WRITE ?! ?! ?! ?!
+                       ]
+        in
+        gen size depth
+;
+// todo: Does an op like 'ADD' increase the size of an expression?
+
+//------------------------------------------------------------------------------
+
+//  gen_combinatorial::int->((string#int) list)->((string#int) list)->...
+let gen_combinatorial size sz is os =
+        let fetch_internals j is =
+                zip_uneven (iterate id 3) $
+                map snd $
+                filter ((defix ==) j # snd # fst) is
+        in
+        // 
+        let layout    = gen_DAG size in
+        let internals = gen_DAG_internals layout sz in
+        //
+        PINST
+            ""
+            []
+            T
+            (map fst is)
+            (map fst os)
+            (map (fst # snd) internals)
+            ?!
 ;
 
 //------------------------------------------------------------------------------
