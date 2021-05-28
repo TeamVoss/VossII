@@ -20,6 +20,7 @@
 
 typedef struct rec_struct {
 	int		initialized;	/* Debugging help		   */
+	unint		live;		/* Numer of live records	   */
 	unint		alignment;	/* Alignment requirement	   */
 	unint		rec_size;	/* Size of each record		   */
 	unint		blk_size;	/* Size of each block		   */

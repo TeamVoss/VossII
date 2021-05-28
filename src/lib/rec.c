@@ -63,6 +63,7 @@ new_rec(rec_mgr_ptr mp)
     pointer new_blk;
 
     ASSERT(mp->initialized == REC_MAGIC_NBR);
+    mp->live++;
     if( mp->free_rec != NULL ) {
 	/* Some record on the free list */
 	ret = mp->free_rec;
@@ -107,6 +108,8 @@ free_rec(rec_mgr_ptr mp, pointer r)
     pointer p;
     ASSERT(mp->initialized == REC_MAGIC_NBR);
     ASSERT(mp->allocated > 0);
+    ASSERT(mp->live > 0);
+    mp->live--;
     if( r == REC_ADDR(mp->last_blk, mp->allocated-1) ) {
 	mp->allocated--;
 	if( mp->allocated == 0 ) {

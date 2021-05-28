@@ -231,6 +231,7 @@ let vfsm_STE opts vfsm wl ant cons trl =
     let ste = busy (STE opts fsm wl ant cons trl) then
     (tcl_eval [sprintf "unset ::active_gui"]) fseq
     ((vfsm2ste_r vfsm) := ste) fseq
+    ((deref (vfsm2wvr vfsm)) = "" => error "Missing waveform canvas!" | ()) fseq
     (tcl_eval [sprintf "wv:set_new_max_time %s 1" (deref (vfsm2wvr vfsm))]) fseq
     let cur_time = deref (vfsm2cur_time_r vfsm) then 
     (tcl_eval [sprintf "set ::vstatus(time,%s) %d" w cur_time]) fseq

@@ -3622,6 +3622,7 @@ static void
 mark_fsm_fn(pointer p)
 {
     fsm_ptr fsm = (fsm_ptr) p;
+    if( fsm->mark == 2 ) { return; }
     fsm->mark = 2;
     ncomp_ptr	cp;
     FOR_BUF(&(fsm->composites), ncomp_rec, cp) {
@@ -3672,6 +3673,7 @@ static void
 mark_ste_fn(pointer p)
 {
     ste_ptr ste = (ste_ptr) p;
+    if( ste->mark == 2 ) { return; }
     push_ste(ste);
     push_fsm_env(ste->fsm);
     ste->mark = 2;
@@ -3754,6 +3756,9 @@ sweep_fsm_fn(void)
 		free_mgr(&(fsm->range_rec_mgr));
 		free_buf(&(fsm->nodes));
 		free_buf(&(fsm->composites));
+		free_mgr(&(fsm->vis_io_rec_mgr));
+		free_mgr(&(fsm->vis_rec_mgr));
+		free_mgr(&(fsm->vis_list_rec_mgr));
 		fsm->next = fsm_free_list;
 		fsm_free_list = fsm;
 		fsm->mark = 0;

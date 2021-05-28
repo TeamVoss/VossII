@@ -152,7 +152,7 @@ proc nb:create_mandatory_tabs {w} {
     nb:create_node_browser $w $pw.node_browser
     sl:create_stop_node_browser $w $pw.stop_nodes
     cm:create_commands $w $pw.cmds
-
+    update
     return $nb.waveform
 }
 
