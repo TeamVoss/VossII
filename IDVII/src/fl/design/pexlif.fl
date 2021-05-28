@@ -230,6 +230,26 @@ let
 // Generation of a PEXLIF.
 //------------------------------------------------------------------------------
 
+let ?! = undefined;
+
+// ...
+//  one_of::(a list)->a
+let one_of [] = eprintf "one_of called on empty list"
+/\  one_of xs = el (random 1 (length xs)) xs
+;
+
+// ...
+//  one_of_weighted::((int#a) list)->a
+let one_of_weighted [] = eprintf "one_of_weighted called on empty list"
+/\  one_of_weighted xs =
+        letrec
+            pick n ((k,a):as) = (n <= k) => a | pick (n-k) as
+        in
+        pick (random 1 (sum (map fst xs))) xs
+;
+
+//------------------------------------------------------------------------------
+
 // ...
 //  gen_DAG_with_threshold::int->int->[[bool]]
 let
@@ -252,88 +272,128 @@ let gen_DAG n =
             (fdiv (fmul 2.0 (log (int2float n))) (int2float n))
 ;
 
+// List nodes connected to node 'i' via incoming edges.
+let inputs_of i dag =
+    letrec
+            go rs [] = rs
+        /\  go rs ((xs, j):ys) = el i xs => go (j:rs) ys | go rs ys
+        in
+        go [] (ixlabel dag)
+;
+
+// List nodes driving outputs, i.e. those with no outgoing edges.
+let outputs_of = map (any id);
+
+//------------------------------------------------------------------------------
+
 // ...
-//  gen_DAG_internals::(bool mat)->(((int#int)#(string#int)) list)
-let gen_DAG_internals dag sz =
-        let new i j =
-                let name = "int(" ^ (int2str i) ^ "-" ^ (int2str j) ^ ")" in
-                ((i,j), (name,sz))
+//  gen_DAG_internals::(bool mat)->(int list)->((int#{(string#int) opt}) list)
+let gen_DAG_internals dag szs =
+        // When selecting sizes, go for common sizes with a chance for random.
+        let ms = 2 * (itlist1 max szs) in
+        let hs = map swap (hist szs) in
+        let random_size x =
+                1 == random 1 5 => random 1 ms | one_of_weighted hs
         in
-        let opt_new _ _ F = NONE
-        /\  opt_new i j T = SOME (new i j)
-        in
-        letrec
-            build _ []      = []
-        /\  build i (rs:ms) = 
-                let is = filter_some
-                       $ map (curry (flip (opt_new i)))
-                       $ ixlabel rs
+        // Build new vector with random size for internal node 'ix'.
+        let new_internal T i = (i, NONE)
+        /\  new_internal F i =
+                let sz  = random_size i in
+                let vec =
+                        let name  = "i" ^ (int2str i) in
+                        let range = "[" ^ (int2str (sz-1)) ^ ":0]" in
+                        sz == 1 => name | name ^ range
                 in
-                is @ build (i+1) (map tl ms)
+                (i, SOME (vec, sz))
         in
-        build 0 dag
+        map (curry new_internal)
+          $ zip_uneven (outputs_of dag) (1 upto (length dag))
 ;
 
 //------------------------------------------------------------------------------
 
-let ?! = undefined;
-
-let one_of [] = eprintf "one_of called on empty list"
-/\  one_of xs = el (random 1 (length xs)) xs
+let random_slice lz hz =
+        let expand_range l h = firstn (h-l) (iterate (defix + 1) l) in
+        let random_remove xs = remove (random 1 (length xs)) xs in
+        repeat (hz-lz) random_remove (expand_range 0 hz)
 ;
 
-let one_of_weighted [] = eprintf "one_of_weighted called on empty list"
-/\  one_of_weighted xs =
-        letrec
-            pick n ((k,a):as) = (n <= k) => a | pick (n-k) as
-        in
-        pick (random 1 (sum (map fst xs))) xs
-;
-
-let expand_range l h = firstn (h-l) (iterate (defix + 1) l);
-let random_remove xs = remove (random 1 (length xs)) xs;
-let random_slice lz hz = repeat (hz-lz) random_remove (expand_range 0 hz);
 let random_split sz =
         let r = random 1 sz in
         (r+(sz%r)) : (firstn ((sz/r)-1) (iterate id r))
 ;
 
-let resize_vector sz = md_merge_vectors # firstn sz # md_expand_vector;
-let resize_input sz = map (\j. W_VAR (md_size j) j) # resize_vector sz;
+let resize_input sz =
+          map (\j. W_VAR (md_size j) j)
+        # md_merge_vectors
+        # firstn sz
+        # md_expand_vector
+;
 
 // ...
 //  gen_WEXPR::(int#(string#int))->int->int->...
 let gen_WEXPR env size depth =
-        // Fetch input from 'env' or request a new one.
         letrec
-            build sz =
-                val (i, s) = one_of_weighted env in
-                s < sz => W_VAR s i : build (sz-s) |
-                s > sz => [W_SLICE (random_slice sz s) (W_VAR s i)] |
-                [W_VAR s i]
+            select_inputs sz =
+                val (inp, s) = one_of_weighted env in
+                let variable = W_VAR s inp in
+                // If smaller, extend or pad.
+                s < sz =>
+                    let more = select_inputs (sz-s) in
+                    one_of_weighted
+                        [ (2, [W_SX sz variable])
+                        , (2, [W_ZX sz variable])
+                        , (1, (variable : more))
+                        ] |
+                // If larger, slice to fit req.
+                s > sz =>
+                    one_of_weighted
+                        [ (3, [W_SLICE (sz downto 1) variable])
+                        , (1, [W_SLICE (random_slice sz s) variable])
+                        ] |
+                // Otherwise, use as is.
+                [variable]
         in
-        // Generate driver for a wire of size 'sz'.
         letrec
             gen sz 0 =
-                let var  = build sz in
-                let var' = length var == 1 => hd var | W_CAT var in
-                // Gen.
+                let variable =
+                        let vs = select_inputs sz in
+                        length vs == 1 => hd vs | W_CAT vs
+                in
+                // Lean towards variables as leaves.
                 one_of_weighted
-                       [ (1, W_X     sz)
+                       [ (4, variable)
+                       , (1, W_X sz)
                        , (1, W_CONST sz (random2 sz))
                     // , (x, W_NAMED_CONST ?! ?! ?!)
-                       , (5, var')
                     // , (x, W_EXPLICIT_VAR ?! ?!)
                     // , (x, W_MEM_READ ?! ?! ?!)
                        ]
+        /\  gen 1 n =
+                let n2  = n / 2 in
+                let n3  = n / 3 in
+                // misc. for W_SLICE
+                let sz = snd $ one_of_weighted env in
+                let si = (random 1 sz) - 1 in
+                // ...
+                one_of [ W_NOT (gen 1 (n-1))
+                       , W_AND (gen 1 n2) (gen 1 n2)
+                       , W_OR  (gen 1 n2) (gen 1 n2)
+                       , W_EQ  (gen 1 n2) (gen 1 n2)
+                       , W_ITE (gen 1 n3) (gen 1 n3) (gen 1 n3)
+                       , W_SLICE [si] (gen sz (n-1))
+                       ]
         /\  gen sz n =
                 let n2  = n / 2 in
-                // W_SLIZE
+                let n3  = n / 3 in
+                // misc. for W_SLIZE
                 let hz  = random sz (sz*2) in
-                // W_CAT
+                // misc. for W_SX/W_ZX
+                let ez  = random 1 sz in
+                // misc. for W_CAT
                 let czs = random_split sz in
                 let cn  = n / (length czs) in
-                // Gen.
+                // ...
                 one_of [ W_NOT  (gen sz (n-1))
                        , W_AND  (gen sz n2) (gen sz n2)
                        , W_OR   (gen sz n2) (gen sz n2)
@@ -348,9 +408,9 @@ let gen_WEXPR env size depth =
                        , W_SHR  (gen sz n2) (gen sz n2)
                        , W_ASHR (gen sz n2) (gen sz n2)
                     // , W_PRED ?! ?!
-                    // , W_SX ?! (gen ?! n2)
-                    // , W_ZX ?! (gen ?! n2)
-                    // , W_ITE (gen 1 n3) (gen sz n3) (gen sz n3)
+                       , W_SX sz (gen ez (n-1))
+                       , W_ZX sz (gen ez (n-1))
+                       , W_ITE (gen 1 n3) (gen sz n3) (gen sz n3)
                        , W_SLICE (random_slice sz hz) (gen hz n2)
                     // , W_NAMED_SLICE ?! ?! ?!
                     // , W_UPDATE_NAMED_SLICE ?! ?! ?! ?!
@@ -360,29 +420,63 @@ let gen_WEXPR env size depth =
         in
         gen size depth
 ;
-// todo: Does an op like 'ADD' increase the size of an expression?
+// todo: ensure we respect the DAG edges when selecting from 'env'?
+
+// ...
+//  gen_DAG_content::...
+let gen_DAG_content dag wires is os size =
+        let outputs =
+                let xs = map snd $ filter fst $ ixlabel $ outputs_of dag in
+                map (\a. (snd (hd a), map fst a))
+                  $ group ((defix ==) on snd)
+                  $ qsort (cmp_fun on snd)
+                  $ map (\o. (o, one_of xs)) os
+        in
+        // Prefer internal wires over inputs whenever they are available.
+        let build_env i =
+                let xs = inputs_of i dag in
+                let ys = filter (\(j,o). has_value o AND elem j xs) wires in
+                (map (pair 10 # get_value # snd) ys) @ (map (pair 1) is)
+        in
+        // ...
+        let build_variable (i, NONE) =
+                let vs  = map (curry (flip W_VAR)) (assoc i outputs) in
+                let s   = sum $ map (\(W_VAR s _). s) vs in
+                length vs == 1 =>
+                    (s, hd    vs)
+                  | (s, W_CAT vs)
+        /\  build_variable (_, SOME (n, s)) = (s, W_VAR s n)
+        in
+        // ...
+        let build_driver (s, v) =
+                W_UPDATE_FN v (gen_WEXPR (build_env s) s (random 1 size))
+        in
+        P_LEAF (map (build_driver # build_variable) wires)
+;
+// todo: fails if 'build_variable.vs' ends up being empty.
 
 //------------------------------------------------------------------------------
 
-//  gen_combinatorial::int->((string#int) list)->((string#int) list)->...
-let gen_combinatorial size sz is os =
-        let fetch_internals j is =
-                zip_uneven (iterate id 3) $
-                map snd $
-                filter ((defix ==) j # snd # fst) is
-        in
-        // 
+// ...
+//  gen_combinatorial::...
+let gen_combinatorial size depth inputs outputs =
+        let build n = (n, md_size n) in
+        let is  = map (build # fst) inputs  in
+        let os  = map (build # fst) outputs in
+        let szs = map snd (is @ os) in
+        // ...
         let layout    = gen_DAG size in
-        let internals = gen_DAG_internals layout sz in
-        //
+        let internals = gen_DAG_internals layout szs in
+        let content   = gen_DAG_content layout internals is os depth in
+        // ...
         PINST
-            ""
+            "leaf"
             []
             T
-            (map fst is)
-            (map fst os)
-            (map (fst # snd) internals)
-            ?!
+            inputs
+            outputs
+            (map fst $ filter_some $ map snd internals)
+            content
 ;
 
 //------------------------------------------------------------------------------

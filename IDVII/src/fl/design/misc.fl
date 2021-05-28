@@ -52,6 +52,10 @@ let uncurry f a b = f (a,b);
 let on g f x y = g (f x) (f y);
 infix 3 on;
 
+// ...
+//  cmp_fun::[>,<,unary_minus].a->a->int
+let cmp_fun x y = x > y => 1 | x < y => (-1) | 0;
+
 // Substitution of a value 'n' given its presence in 's'.
 //  subst::((a#a) list)->a->a
 let subst s n = (assoc n s) catch n;
@@ -68,13 +72,17 @@ let first f (a,b) = (f a,b);
 //  second::(b->d)->(a#b)->(a#d)
 let second f (a,b) = (a,f b);
 
-// Apply 'f' and 'g' to the first and second element of a pair '(a,b)', respectively.
+// For a pair '(a,b)', apply 'f' to 'a' and 'g' to 'b'.
 //  both::(a->c)->(b->d)->(a#b)->(c#d)
 let both f g (a,b) = (f a,g b);
 
 // 'map' with its arguments flipped.
 //  pam::(a list)->(a->b)->(b list)
 let pam = flip map;
+
+// ...
+//  pair::a->b->(a#b)
+let pair a b = (a,b);
 
 // Swaps the element's of a pair.
 //  swap::(a#b)->(b#a)
@@ -153,12 +161,16 @@ letrec
 /\  span p (x:xs) = p x => val (ys,zs) = span p xs in (x:ys,zs) | ([],x:xs)
 ;
 
-// ...
+// Group 'xs' into sublists that satisfy 'p'.
 //  group::(a->a->bool)->(a list)->((a list) list)
 letrec
     group _ []     = []
 /\  group p (x:xs) = val (ys,zs) = span (p x) xs in (x:ys) : group p zs
 ;
+
+// Build histogram from list.
+//  hist::{>}.(a list)->((a#int) list)
+let hist = map (\a. (hd a, length a)) # group (defix ==) # qsort cmp_fun;
 
 // ...
 //  split_at::int->(a list)->((a list)#(a list))
