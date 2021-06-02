@@ -138,6 +138,10 @@ letrec
 /\  zip_uneven []     _      = []
 ;
 
+// ...
+//  concat::((a list) list)->(a list)
+let concat xs = itlist (defix @) xs [];
+
 // Fold (rigth-to-left) 'xs' into itself with 'f'.
 //  itlist1::(a->a->a)->(a list)->a
 let itlist1 f (x:xs) = sitlist f xs x;
@@ -184,12 +188,21 @@ let split_at n xs =
 ;
 
 // ...
-//  chunks::int->(a list)->(a list)
+//  chunks::int->(a list)->((a list) list)
 letrec
     chunks _ [] = []
 /\  chunks n xs =
-        val (as, bs) = split_at n xs in
+        val (as, bs) = split_at (n + 1) xs in
         as : chunks n bs
+;
+
+// ...
+//  split_into::int->(a list)->((a list) list)
+let split_into n xs =
+        let y = length xs in
+        n > y => eprintf "split_into: list shorter than %d." n |
+        val (as, bs) = split_at ((y / n) + (y % n) + 1) xs in
+        as : chunks (y / n) bs
 ;
 
 // ...
@@ -260,8 +273,8 @@ let string_butlast s = string_butlastn s 1;
 let string_empty s = strlen s == 0;
 
 // ...
-//  concat::(string list)->string
-let concat ss = itlist (defix ^) ss "";
+//  string_concat::(string list)->string
+let string_concat ss = itlist (defix ^) ss "";
 
 //------------------------------------------------------------------------------
 // Fin.
