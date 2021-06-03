@@ -4759,16 +4759,18 @@ reduce_list(g_ptr redex, int levels)
     if( IS_FORCED(redex) ) {
 	return( redex );
     }
-    if( levels < 0 ) {
+    if( levels <= 0 ) {
 	return( redex );
     }
     g_ptr cur = traverse_left(redex);
     if( is_fail(cur) ) { return(redex); }
     while( GET_TYPE(cur) == CONS_ND && !IS_NIL(cur) ) {
-	g_ptr hd = reduce_list(GET_CONS_HD(cur), levels-1);
-	if( is_fail(hd) ) {
-	    OVERWRITE(redex, hd);
-	    return( redex );
+	if( levels > 1 ) {
+	    g_ptr hd = reduce_list(GET_CONS_HD(cur), levels-1);
+	    if( is_fail(hd) ) {
+		OVERWRITE(redex, hd);
+		return( redex );
+	    }
 	}
 	cur = traverse_left(GET_CONS_TL(cur));
 	if( is_fail(cur) ) {
