@@ -415,13 +415,12 @@ let gen_update_fn_outputs
         in
         map2 (\xs. \o. gen_update_fn is xs o d) (split_into l_os (pad ts)) os
 ;
-let gen_p_wires
-        {sc :: (bool list) list}
-        {is :: (wexpr#int) list}
-        {os :: (wexpr#int) list}
+let gen_pinst_wires
+        {pre   :: string}
+        {sizes :: int list}
+        {num   :: int}
         =
         // When selecting a size, prefer known sizes over the random choice.
-        let sizes   = map snd (is @ os) in
         let max_sz  = 2 * (itlist1 max sizes) in
         let hist_sz = map swap (hist sizes) in
         let random_size x =
@@ -433,15 +432,15 @@ let gen_p_wires
         let new_internal i =
                 let sz  = random_size i in
                 let vec =
-                        let name  = "i" ^ (int2str i) in
+                        let name  = pre ^ (int2str i) in
                         let range = "[" ^ (int2str (sz-1)) ^ ":0]" in
                         sz == 1 => name | name ^ range
                 in
                 (W_VAR sz vec, sz)
         in
-        map new_internal (1 upto (length sc))
+        map new_internal (1 upto num)
 ;
-let gen_p_leaf
+let gen_pinst_leaf
         {sc :: (bool list) list}
         {is :: (wexpr#int) list}
         {ts :: (wexpr#int) list}
@@ -453,6 +452,19 @@ let gen_p_leaf
         let ts_o  = map snd $ filter fst $ zip (map (any id) sc) ts in
         let fns_o = gen_update_fn_outputs is ts_o os d in
         P_LEAF (fns @ fns_o)
+;
+
+let gen_phase_delay
+        {is    :: (wexpr#int) list}
+        {ts    :: (wexpr#int) list}
+        {(o,s) :: (wexpr#int)}
+        {d     :: int}
+        =
+        W_PHASE_DELAY o (gen_wexpr is ts s d)
+;
+let gen_phase_delay_internals
+        =
+        ?!
 ;
 
 let
@@ -471,26 +483,56 @@ let gen_DAG n =
         gen_DAG_with_threshold n
             (fdiv (fmul 2.0 (log (int2float n))) (int2float n))
 ;
-let gen_pinst_leaf
+let formal_to_wire fas =
+        let build f = let s = md_size f in (W_VAR s f, s) in
+        map (build # fst) fas
+;
+let gen_pinst_logic
         {fa_is :: (string#(string list)) list}
         {fa_os :: (string#(string list)) list}
         {size  :: int}
         {d     :: int}
         =
         // Build wexpr variables for each formal.
-        let build f =
-                let s = md_size f in (W_VAR s f, s)
-        in
-        let is = map (build # fst) fa_is in
-        let os = map (build # fst) fa_os in
+        let is = formal_to_wire fa_is in
+        let os = formal_to_wire fa_os in
         // Generate DAG that dictates body of PINST and then fill it with
         // semi-random, combinatorial update-functions.
         let sc   = gen_DAG size then
-        let ts   = gen_p_wires sc is os then
-        let leaf = gen_p_leaf sc is ts os d then
+        let ts   = gen_pinst_wires "i" (map snd (is @ os)) (length sc) then
+        let leaf = gen_pinst_leaf sc is ts os d then
         let name (W_VAR _ v, _) = v in
         // ...
         PINST "combinatorial" [] T fa_is fa_os (map name ts) leaf
+;
+let gen_pinst_updates
+        {fa_is :: (string#(string list)) list}
+        {fa_os :: (string#(string list)) list}
+        {size  :: int}
+        {d     :: int}
+        =
+        PINST "sequential" [] T fa_is fa_os [] (P_LEAF [])
+;
+let gen_pinst
+        {fa_is :: (string#(string list)) list}
+        {fa_os :: (string#(string list)) list}
+        {size  :: int}
+        {d     :: int}
+        =
+        // Split inputs between comb. & seq. parts of PINST, with the biggest
+        // of the two going towards comb. logic to ensure it can drive updates.
+        val (as,   bs)   = split_at_random fa_is in
+        val (fa_c, fa_s) = length as >= length bs => (as, bs) | (bs, as) in
+        // Build internal wires to make up for inputs directed to comb. logic.
+        let sizes  = map (md_size # fst) $ (fa_is @ fa_os) in
+        let var_ts = gen_pinst_wires "t" sizes (length fa_c) in
+        let formal (W_VAR _ v, _) = (v, []) in
+        // ..
+        let {f_ts :: (string#(string list)) list} = map formal var_ts in
+        let comb = gen_pinst_logic   fa_c          f_ts  size (d / 2) in
+        let sequ = gen_pinst_updates (fa_s @ f_ts) fa_os size (d / 2) in
+        // ...
+        PINST "node" [] F fa_is fa_os (map fst f_ts) (P_HIER [comb, sequ])
 ;
 
 //------------------------------------------------------------------------------
