@@ -244,6 +244,7 @@ letrec
 let one_of [] = eprintf "one_of called on empty list"
 /\  one_of xs = el (random 1 (length xs)) xs
 ;
+non_lazy one_of;
 
 let one_of_weighted [] = eprintf "one_of_weighted called on empty list"
 /\  one_of_weighted xs =
@@ -253,6 +254,7 @@ let one_of_weighted [] = eprintf "one_of_weighted called on empty list"
         in
         pick (random 1 (sum (map fst xs))) xs
 ;
+non_lazy one_of_weighted;
 
 let split_at_random [] = ([],[])
 /\  split_at_random xs = split_at (random 1 (length xs + 1)) xs
@@ -304,66 +306,67 @@ let gen_wexpr_input
         let vs = gen_wexpr_inputs is sz in length vs == 1 => hd vs | W_CAT vs
 ;
 letrec
-    gen_wexpr is []      sz 0 = gen_wexpr_input is sz
-/\  gen_wexpr is [(x,s)] sz 0 =
-        s < sz => one_of [ W_SX sz x, W_ZX sz x ]  |
-        s > sz => W_SLICE (slice_at_random sz s) x |
-        x
-/\  gen_wexpr
+    gen_wexpr
         {is :: (wexpr#int) list}
         {ts :: (wexpr#int) list}
         {sz :: int}
         {d  :: int}
         =
-        // Misc. for unary ops.
-        let gen_unary  sz = gen_wexpr is ts sz (max 0 (d - 1)) in
-        // Misc. for binary ops.
+        // If complexity 'd' is satisfied and 'ts' distributed, build leaf.
+        let l = length ts in
+        (l == 0) AND (d <= 0) => gen_wexpr_input is sz |
+        (l == 1) AND (d <= 0) =>
+            val (x,s) = hd ts in
+            s < sz => one_of [ W_SX sz x, W_ZX sz x ]  |
+            s > sz => W_SLICE (slice_at_random sz s) x |
+            x |
+        // Misc. for unary/binary ops.
+        let gen_unary  sz = gen_wexpr is ts sz (d - 1) in
         let gen_binary ts = gen_wexpr is ts sz (d / 2) in
         val (as, bs) = split_at_random ts in
+        let u = (d <= 0) => 0 | 1 in // Weight for unary op.
+        let b = 1 in                 // ...        binary op.
+        let x = (sz > 1) => 1 | 0 in // ...        ext. op.
         // Pick a valid PINST op.
-        (fprintf stderr "gen_wexpr ts:%d sz:%d d:%d -> " (length ts) sz d) fseq
-        one_of
-            [ (fprintf stderr "NOT\n") fseq W_NOT  (gen_unary sz)
-            , (fprintf stderr "AND\n") fseq W_AND  (gen_binary as) (gen_binary bs)
-            // , W_OR   (gen_binary as) (gen_binary bs)
-            // , W_EQ   (gen_binary as) (gen_binary bs)
-            // , W_GR   (gen_binary as) (gen_binary bs)
-            // , W_ADD  (gen_binary as) (gen_binary bs)
-            // , W_SUB  (gen_binary as) (gen_binary bs)
-            // , W_MUL  (gen_binary as) (gen_binary bs)
-            // , W_DIV  (gen_binary as) (gen_binary bs)
-            // , W_MOD  (gen_binary as) (gen_binary bs)
-            // , W_SHL  (gen_binary as) (gen_binary bs)
-            // , W_SHR  (gen_binary as) (gen_binary bs)
-            // , W_ASHR (gen_binary as) (gen_binary bs)
-            // , ( let smaller_sz = random 1 sz in
-            //     W_SX sz (gen_unary smaller_sz)
-            //     // todo: 'sz' might be '1' already.
-            //   )
-            // , ( let smaller_sz = random 1 sz in
-            //     W_ZX sz (gen_unary smaller_sz)
-            //     // todo: 'sz' might be '1' already.
-            //   )
-            // , ( val (cs, ds)   = split_at 2 ts in
-            //     val (es, fs)   = split_at_random ds in
-            //     let gen ts sz  = gen_wexpr is ts sz (d / 3) in
-            //     W_ITE (gen cs 1) (gen es sz) (gen fs sz)
-            //   )
-            // , ( let larger_sz  = random sz (sz * 2) in
-            //     let slice      = slice_at_random sz larger_sz in
-            //     W_SLICE slice (gen_unary larger_sz)
-            //   )
-            // , ( let chunked_sz = segment_at_random sz in
-            //     let len_sz     = length chunked_sz in
-            //     let len_ts     = length ts in
-            //     let chunked_ts =
-            //             len_sz <= len_ts => split_into len_sz ts |
-            //             (map (\t. [t]) ts) @ (replicate (len_sz - len_ts) [])
-            //     in
-            //     let gen ts sz  = gen_wexpr is ts sz (d / len_sz) in
-            //     W_CAT (map2 gen chunked_ts chunked_sz)
-            //     // todo: can fail if 'length chunked_sz' > 'length ts'.
-            //   )
+        one_of_weighted
+            [ (u, W_NOT  (gen_unary sz))
+            , (b, W_AND  (gen_binary as) (gen_binary bs))
+            , (b, W_OR   (gen_binary as) (gen_binary bs))
+            , (b, W_EQ   (gen_binary as) (gen_binary bs))
+            , (b, W_GR   (gen_binary as) (gen_binary bs))
+            , (b, W_ADD  (gen_binary as) (gen_binary bs))
+            , (b, W_SUB  (gen_binary as) (gen_binary bs))
+            , (b, W_MUL  (gen_binary as) (gen_binary bs))
+            , (b, W_DIV  (gen_binary as) (gen_binary bs))
+            , (b, W_MOD  (gen_binary as) (gen_binary bs))
+            , (b, W_SHL  (gen_binary as) (gen_binary bs))
+            , (b, W_SHR  (gen_binary as) (gen_binary bs))
+            , (b, W_ASHR (gen_binary as) (gen_binary bs))
+            , ( let smaller_sz = random 1 sz in
+                (x, W_SX sz (gen_unary smaller_sz))
+              )
+            , ( let smaller_sz = random 1 sz in
+                (x, W_ZX sz (gen_unary smaller_sz))
+              )
+            , ( val (cs, ds)   = split_at 2 ts in
+                val (es, fs)   = split_at_random ds in
+                let gen ts sz  = gen_wexpr is ts sz (d / 3) in
+                (b, W_ITE (gen cs 1) (gen es sz) (gen fs sz))
+              )
+            , ( let larger_sz  = random sz (sz * 2) in
+                let slice      = slice_at_random sz larger_sz in
+                (b, W_SLICE slice (gen_unary larger_sz))
+              )
+            , ( let chunked_sz = segment_at_random sz in
+                let len_sz     = length chunked_sz in
+                let len_ts     = length ts in
+                let chunked_ts =
+                        len_sz <= len_ts => split_into len_sz ts |
+                        (map (\t. [t]) ts) @ (replicate (len_sz - len_ts) [])
+                in
+                let gen ts sz  = gen_wexpr is ts sz (d / len_sz) in
+                (x, W_CAT (map2 gen chunked_ts chunked_sz))
+              )
          // , W_PRED ?! ?!
          // , W_NAMED_SLICE ?! ?! ?!
          // , W_UPDATE_NAMED_SLICE ?! ?! ?! ?!
@@ -422,8 +425,9 @@ let gen_p_wires
         let max_sz  = 2 * (itlist1 max sizes) in
         let hist_sz = map swap (hist sizes) in
         let random_size x =
-                one_of_weighted [ (1, random 1 max_sz),
-                                  (5, one_of_weighted hist_sz) ]
+                one_of_weighted
+                    [ (1, random 1 max_sz),
+                      (5, one_of_weighted hist_sz) ]
         in
         // Build internal wires for node 'ix' and give it a random size.
         let new_internal i =
@@ -444,11 +448,10 @@ let gen_p_leaf
         {os :: (wexpr#int) list}
         {d  :: int}
         =
+        // note: nodes without outgoing edges are connected to outputs.
         let fns = gen_update_fn_internals sc is ts d in
-        // Any node without outgoing edges are connected to the outputs instead.
         let ts_o  = map snd $ filter fst $ zip (map (any id) sc) ts in
         let fns_o = gen_update_fn_outputs is ts_o os d in
-        // ...
         P_LEAF (fns @ fns_o)
 ;
 
