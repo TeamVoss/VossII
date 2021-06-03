@@ -324,9 +324,10 @@ letrec
         let gen_unary  sz = gen_wexpr is ts sz (d - 1) in
         let gen_binary ts = gen_wexpr is ts sz (d / 2) in
         val (as, bs) = split_at_random ts in
-        let u = (d <= 0) => 0 | 1 in // Weight for unary op.
-        let b = 1 in                 // ...        binary op.
-        let x = (sz > 1) => 1 | 0 in // ...        ext. op.
+        // Weights for ...
+        let u = (d <= 0) => 1  | 10 in // unary op.
+        let x = (sz > 1) => 10 | 0  in // ext. op.
+        let b = (sz > 1) => 10 | 1  in // binary op.
         // Pick a valid PINST op.
         one_of_weighted
             [ (u, W_NOT  (gen_unary sz))
