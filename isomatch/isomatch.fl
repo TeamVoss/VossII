@@ -216,7 +216,6 @@ let
 //
 let
     explore p g =
-        let pr = print_list (print_some (print_subst)) in
         let leaf = _pexlif_leaf then
         sig p == sig g =>
             let x = [actualize_sha p g] then

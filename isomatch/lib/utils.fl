@@ -241,6 +241,18 @@ letrec
         xs : perms xs []
 ;
 
+// let
+//     subseq n xs =
+//         letrec
+//             bysize []     = [[[]]]
+//             bysize (x:xs) =
+//                 let next = bysize xs then
+//                 map2 cons 
+//         in
+//         let l = length xs in
+//         (n > l) => [] | el (l-n) (bysize xs)
+// ;
+
 //==============================================================================
 // Matrix.
 
