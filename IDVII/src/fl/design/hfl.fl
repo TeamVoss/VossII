@@ -12,7 +12,7 @@ open_overload {hw_constr:: wexpr -> *a};
 open_overload {hw_values:: *a -> string};
 
 // Make sure there are at least two possibilities for the open overloaded
-// functions. 
+// functions.
 lettype dummy1 = DUMMY1;
 let {dummy1_hw_type_name:: dummy1 -> string} = error "dummy";
 let {dummy1_hw_mk_var:: dummy1 -> string -> wexpr} = error "dummy";
@@ -44,7 +44,7 @@ let CELL {name::string} {body::pexlif list} =
 ;
 
 // Convert a positive integer to a hw type, or X, or variable.
-// E.g., if byte as an 8-bit hw type (TYPE "byte" 8;), then 
+// E.g., if byte as an 8-bit hw type (TYPE "byte" 8;), then
 //	{'10::byte};
 //	{'0xa::byte};
 //	{'0b1010::byte};
@@ -234,7 +234,7 @@ let base_compact_wprint inps rhs =
      /\    P pri (W_NAMED_SLICE name indices w) =
 		pri > 9 => sprintf "(%s-->%s)" (P 9 w) name
 			 | sprintf "%s-->%s" (P 9 w) name
-     /\    P pri (W_UPDATE_NAMED_SLICE base name ids w) = 
+     /\    P pri (W_UPDATE_NAMED_SLICE base name ids w) =
 		letrec get_exprs (W_UPDATE_NAMED_SLICE base name ids w) =
 		    (sprintf "%s ? %s" name (P 10 w)):(get_exprs base)
 		 /\    get_exprs other = [(P 10 other)]
@@ -343,8 +343,8 @@ let get_binary_draw_cmd (W_EQ  a b)  = "draw_binary_arithm {=}"
  /\ get_binary_draw_cmd other = error "Should not happen"
 ;
 
-let is_XOR (W_OR (W_AND (W_NOT a) b) (W_AND c (W_NOT d))) = (a==c) AND (b==d) 
- /\ is_XOR (W_OR (W_AND a (W_NOT b)) (W_AND (W_NOT c) d)) = (a==c) AND (b==d) 
+let is_XOR (W_OR (W_AND (W_NOT a) b) (W_AND c (W_NOT d))) = (a==c) AND (b==d)
+ /\ is_XOR (W_OR (W_AND a (W_NOT b)) (W_AND (W_NOT c) d)) = (a==c) AND (b==d)
  /\ is_XOR _ = F
 ;
 
@@ -592,10 +592,10 @@ clet base_assignment make_draw_command lhs rhs =
 		in
 		val (as, pl) = unzip (map mk1 raw_as) then
 		let ps = flat pl then
-		let p = 
+		let p =
 		    let rhs = accumulate W_OR as in
 		    let dep_vars = md_extract_vectors (w_depends rhs) in
-		    let inps = map (\n.n,[n]) dep_vars in 
+		    let inps = map (\n.n,[n]) dep_vars in
 		    let driven = base_get_lhs_vars lhs in
 		    let sz = length driven in
 		    let lhs' = W_VAR sz "_tmp" in
@@ -621,10 +621,10 @@ clet base_assignment make_draw_command lhs rhs =
 		in
 		val (as, pl) = unzip (map mk1 raw_as) then
 		let ps = flat pl then
-		let p = 
+		let p =
 		    let rhs = W_NOT (accumulate W_OR as) in
 		    let dep_vars = md_extract_vectors (w_depends rhs) in
-		    let inps = map (\n.n,[n]) dep_vars in 
+		    let inps = map (\n.n,[n]) dep_vars in
 		    let driven = base_get_lhs_vars lhs in
 		    let sz = length driven in
 		    let lhs' = W_VAR sz "_tmp" in
@@ -650,10 +650,10 @@ clet base_assignment make_draw_command lhs rhs =
 		in
 		val (as, pl) = unzip (map mk1 raw_as) then
 		let ps = flat pl then
-		let p = 
+		let p =
 		    let rhs = accumulate W_AND as in
 		    let dep_vars = md_extract_vectors (w_depends rhs) in
-		    let inps = map (\n.n,[n]) dep_vars in 
+		    let inps = map (\n.n,[n]) dep_vars in
 		    let driven = base_get_lhs_vars lhs in
 		    let sz = length driven in
 		    let lhs' = W_VAR sz "_tmp" in
@@ -679,10 +679,10 @@ clet base_assignment make_draw_command lhs rhs =
 		in
 		val (as, pl) = unzip (map mk1 raw_as) then
 		let ps = flat pl then
-		let p = 
+		let p =
 		    let rhs = W_NOT (accumulate W_AND as) in
 		    let dep_vars = md_extract_vectors (w_depends rhs) in
-		    let inps = map (\n.n,[n]) dep_vars in 
+		    let inps = map (\n.n,[n]) dep_vars in
 		    let driven = base_get_lhs_vars lhs in
 		    let sz = length driven in
 		    let lhs' = W_VAR sz "_tmp" in
@@ -809,7 +809,7 @@ infix 1 <:;
 
 let anon_arg_cnt = ref 0;
 
-clet get_act_args fn a = 
+clet get_act_args fn a =
     (
 	let we = hw_destr a in
 	let res = merge_vectors (base_get_lhs_vars we) then
@@ -826,7 +826,7 @@ clet get_act_args fn a =
     )
 ;
 
-let mk_wrap_ifc fas = 
+let mk_wrap_ifc fas =
     let raw_all_act_inps = flatmap snd fas in
     let all_acts = extract_vectors raw_all_act_inps in
     map (\v.v,[v]) all_acts
@@ -852,7 +852,7 @@ let get_tmp_outs pexlifs =
 ;
 
 // Declare inputs to a unit.
-// Example: 
+// Example:
 //	input a b c.
 //	    ...
 let input body_fun {fs::string} acc =
@@ -891,10 +891,10 @@ let input body_fun {fs::string} acc =
 		    in
 		    let inps_n = inps@[(fv,av)] in
 		    mem fv ints =>
-			eprintf "Node %s declared both input and internal" fv 
+			eprintf "Node %s declared both input and internal" fv
 		    |
 		    mem fv (map fst outs) =>
-			eprintf "Node %s declared both input and output" fv 
+			eprintf "Node %s declared both input and output" fv
 		    |
 		    let p_main' = PINST n attrs' leaf inps_n outs ints body in
 		    (p_main', expr_pexlifs)
@@ -912,11 +912,11 @@ let input body_fun {fs::string} acc =
 binder_with_accumulator input CELL;
 
 // Declare list inputs to a unit.
-// Example: 
+// Example:
 //	list_input al bl.
 //	    ...
 let list_input body_fun {base_fs::string} acc =
-        \{aa:: (*a list)}. 
+        \{aa:: (*a list)}.
             let a = map hw_destr {aa:: *a list} in
             let fs = map (sprintf "%s[%d]" base_fs) ((length aa-1) downto 0) in
 	    let sz = hw_size {undefined:: *a} in
@@ -930,7 +930,7 @@ let list_input body_fun {base_fs::string} acc =
 		let p0 = acc name bd in
                 val (PINST n attrs leaf inps outs ints body) = p0 in
 		let fv1 = hd (md_merge_vectors fv) in
-                let new_inps = aa = [] => [] 
+                let new_inps = aa = [] => []
 					| [(fv1, (md_merge_vectors (flat avs)))]
 		in
 		val (p_main, p_exprs) =
@@ -949,10 +949,10 @@ let list_input body_fun {base_fs::string} acc =
 		    |
 		    let inps_n = inps@new_inps in
 		    (aa != []) AND (mem fv1 ints) =>
-			eprintf "Node %s declared both input and internal" fv1 
+			eprintf "Node %s declared both input and internal" fv1
 		    |
 		    (aa != []) AND (mem fv1 (map fst outs)) =>
-			eprintf "Node %s declared both input and output" fv1 
+			eprintf "Node %s declared both input and output" fv1
 		    |
 		    let p_main' = PINST n attrs leaf inps_n outs ints body in
 		    (p_main', flat expr_pexlifs)
@@ -971,7 +971,7 @@ binder_with_accumulator list_input CELL;
 
 
 // Declare outputs to a unit.
-// Example: 
+// Example:
 //	output a b c.
 //	    ...
 let output body_fun {fs::string} acc =
@@ -1010,10 +1010,10 @@ let output body_fun {fs::string} acc =
 		    in
 		    let outs_n = outs@[(fv,av)] in
 		    mem fv ints =>
-			eprintf "Node %s declared both output and internal" fv 
+			eprintf "Node %s declared both output and internal" fv
 		    |
 		    mem fv (map fst inps) =>
-			eprintf "Node %s declared both input and output" fv 
+			eprintf "Node %s declared both input and output" fv
 		    |
 		    let p_main' = PINST n attrs' leaf inps outs_n ints body in
 		    (p_main', [])
@@ -1031,7 +1031,7 @@ let output body_fun {fs::string} acc =
 binder_with_accumulator output CELL;
 
 // Declare list outputs to a unit.
-// Example: 
+// Example:
 //	list_output al bl.
 //	    ...
 let list_output body_fun {base_fs::string} acc =
@@ -1066,10 +1066,10 @@ let list_output body_fun {base_fs::string} acc =
 		    |
 		    let outs_n = outs@new_outs in
 		    (aa != []) AND (mem fv1 ints) =>
-			eprintf "Node %s declared both output and internal" fv1 
+			eprintf "Node %s declared both output and internal" fv1
 		    |
 		    (aa != []) AND (mem fv1 (map fst inps)) =>
-			eprintf "Node %s declared both input and output" fv1 
+			eprintf "Node %s declared both input and output" fv1
 		    |
 		    let p_main' = PINST n attrs leaf inps outs_n ints body in
 		    (p_main', [])
@@ -1088,7 +1088,7 @@ binder_with_accumulator list_output CELL;
 
 //
 // Declare inout to a unit.
-// Example: 
+// Example:
 //	inout a b c.
 //	    ...
 let inout body_fun {fs::string} acc =
@@ -1300,7 +1300,7 @@ let core_TYPE name size is_arithmetic value_list =
     let ssz = sprintf "%d" size in
     let sarithm = is_arithmetic => "T" | "F" in
     eval_fl_code
-    <{ 
+    <{
 	lettype `name` = BV_`name` wexpr;
 	let hw_`name`_is_arithmetic {bv::`name`} = `sarithm`;
 	add_open_overload hw_is_arithmetic hw_`name`_is_arithmetic;
@@ -1326,19 +1326,19 @@ let core_TYPE name size is_arithmetic value_list =
 			    {fs::string} acc =
 	    (defix internal) body_fun fs acc;
 	let `name`_list_internal
-		    {cnt::int} 
+		    {cnt::int}
 		    {body_fun:: (`name` list) -> (string-> *a -> pexlif)-> *b}
 		    {fs::string} acc
 		=
 	    (defix list_internal) cnt  body_fun fs acc
 	;
-	let `name`_list_input 
+	let `name`_list_input
 		    {body_fun:: (`name` list) -> (string-> *a -> pexlif)-> *b}
 		    {fs::string} acc
 	    =
 		(defix list_input) body_fun fs acc
 	;
-	let `name`_list_output 
+	let `name`_list_output
 		    {body_fun:: (`name` list) -> (string-> *a -> pexlif)-> *b}
 		    {fs::string} acc
 	    =
@@ -1351,7 +1351,7 @@ let core_TYPE name size is_arithmetic value_list =
 	sized_binder_with_accumulator `name`_list_internal CELL;
 	binder_with_accumulator `name`_list_input CELL;
 	binder_with_accumulator `name`_list_output CELL;
-	let P_`name` t = 
+	let P_`name` t =
 	    let we = hw_`name`_destr t then
 	    NOT (wexpr_is_binary we) =>
 		let pX (W_X sz) = sprintf "X[%d:0]" (sz-1)
@@ -1542,7 +1542,7 @@ let base_STRUCT_explicit name size field_list do_check =
 	let c1 =
 	    sprintf "//Assemble a %s from its individual fields.\n" name
 	in
-	let c2 = 
+	let c2 =
 	    let pre = sprintf "\n//Usage:\n//\tmk_%s " name in
 	    list2str T pre " " ";\n" fst field_list
 	in
@@ -1613,14 +1613,14 @@ let MEMORY name size_list word_type =
     let saddr_list =
         letrec mk_args cnt ((lns,atp):rem) =
             (sprintf " {addr%d :: %s}" cnt atp)^(mk_args (cnt+1) rem)
-         /\    mk_args cnt [] = " " 
+         /\    mk_args cnt [] = " "
         in
         mk_args 1 size_list
     in
     let saddr_args =
         letrec mk_args cnt ((lns,atp):rem) =
             (sprintf "    %s_input  addr%d.\n" atp cnt)^(mk_args (cnt+1) rem)
-         /\    mk_args cnt [] = " " 
+         /\    mk_args cnt [] = " "
         in
         mk_args 1 size_list
     in
@@ -1654,7 +1654,7 @@ let MEMORY name size_list word_type =
         mk_expr (lsz) (rev size_list)
     in
     eval_fl_code
-    <{ 
+    <{
 	lettype `name` = BV_`name` wexpr;
 	let hw_`name`_is_arithmetic {bv::`name`} = F;
 	add_open_overload hw_is_arithmetic hw_`name`_is_arithmetic;
@@ -1712,7 +1712,7 @@ let MEMORY name size_list word_type =
 						      (`saddr_w_adr_comp`)
 						      (hw_destr din)))
 	];
-	let P_`name` t = 
+	let P_`name` t =
 	    let bits = wexpr2bool [] (hw_`name`_destr t) then
 	    let raw_res0 = map (sprintf "%B") bits in
 	    let tr s = s = "F" => "0" | s = "T" => "1" | s in
@@ -1771,13 +1771,13 @@ let hw_unsplit l =
 ;
 
 
-let wNOT {a:: *a} = 
+let wNOT {a:: *a} =
     let res = W_NOT (hw_destr a) in
     {hw_constr res:: *a}
 ;
 let '~' a = wNOT a;
 
-let wAND {a:: *a} {b:: *a} = 
+let wAND {a:: *a} {b:: *a} =
     let res = W_AND (hw_destr a) (hw_destr b) in
     {hw_constr res:: *a}
 ;
@@ -1800,7 +1800,7 @@ let bitTHEN c (t,e) = c '?' t ':' e;
 let THEN = bitTHEN;
 if_then_else_binder THEN ELSE;
 
-let wOR {a:: *a} {b:: *a} = 
+let wOR {a:: *a} {b:: *a} =
     let res = W_OR (hw_destr a) (hw_destr b) in
     {hw_constr res:: *a}
 ;
@@ -1809,23 +1809,23 @@ infix 3 '|';
 
 let wXOR a b = wOR (wAND (wNOT a) b) (wAND a (wNOT b));
 let '^' = wXOR;
-infix 4 '^'; 
+infix 4 '^';
 
-let wEQ {a:: *a} {b:: *a} = 
+let wEQ {a:: *a} {b:: *a} =
     let res = W_EQ (hw_destr a) (hw_destr b) in
     {hw_constr res:: bit}
 ;
 let '=' = wEQ;
 infix 5 '=';
 
-let wNEQ {a:: *a} {b:: *a} = 
+let wNEQ {a:: *a} {b:: *a} =
     let res = W_NOT (W_EQ (hw_destr a) (hw_destr b)) in
     {hw_constr res:: bit}
 ;
 let '!=' = wNEQ;
 infix 5 '!=';
 
-let wGR {a:: *a} {b:: *a} = 
+let wGR {a:: *a} {b:: *a} =
     NOT (hw_is_arithmetic a) =>
 	eprintf "Cannot perform > on vectors of type %s\n" (hw_type_name a)
     |
@@ -1909,7 +1909,7 @@ let wSHL {a:: *a} {b:: *a} =
     {hw_constr res:: *a}
 ;
 let '<<' = wSHL;
-infix 9 '<<';	    // Fixity??????? 
+infix 9 '<<';	    // Fixity???????
 
 let wSHR {a:: *a} {b:: *a} =
     NOT (hw_is_arithmetic a) =>
@@ -1922,7 +1922,7 @@ let wSHR {a:: *a} {b:: *a} =
     {hw_constr res:: *a}
 ;
 let '>>' = wSHR;
-infix 9 '>>';	    // Fixity??????? 
+infix 9 '>>';	    // Fixity???????
 
 let wASHR {a:: *a} {b:: *a} =
     NOT (hw_is_arithmetic a) =>
@@ -1935,7 +1935,7 @@ let wASHR {a:: *a} {b:: *a} =
     {hw_constr res:: *a}
 ;
 let '|>>' = wASHR;
-infix 9 '|>>';	    // Fixity??????? 
+infix 9 '|>>';	    // Fixity???????
 
 let ZX {inp:: *a} =
     let sz_out = hw_size {undefined :: *b} in
@@ -1967,7 +1967,7 @@ let is_stable duration_in_phases inp ok = (
         old <: inp,
         same <- (old '=' inp),
         ok <- itlist (\s.\r. s '&' r) same_list same
-])) inp ok; 
+])) inp ok;
 
 
 // MUX between two signals.
@@ -2043,7 +2043,7 @@ let base_re_ff_en_reset =
 ];
 
 // A rising edge D flip-flop.
-let re_ff = 
+let re_ff =
     bit_input	clk.
     input	d.
     output	q.
@@ -2051,7 +2051,7 @@ let re_ff =
 	base_re_ff d clk q
 ];
 
-// A rising edge D flip-flop with asynchronous reset (acive high).
+// A rising edge D flip-flop with asynchronous reset (active high).
 let re_ff_reset =
     bit_input	clk.
     bit_input	reset.
@@ -2071,7 +2071,7 @@ let re_ff_en =
 	base_re_ff_en d en clk q
 ];
 
-// A rising edge D flip-flop with enable and asynchronous reset (acive high).
+// A rising edge D flip-flop with enable and asynchronous reset (active high).
 let re_ff_en_reset =
     bit_input	clk.
     bit_input	en.
@@ -2083,7 +2083,7 @@ let re_ff_en_reset =
 ];
 
 // A falling edge D flip-flop.
-let fe_ff = 
+let fe_ff =
     bit_input clk.
     input d.
     output q.
@@ -2191,7 +2191,7 @@ let frombits bl =
 //begin_abstype;
 
 let R_excluded e =
-    let res = 
+    let res =
 	letrec get_prods (W_AND a b) = (get_prods a)@(get_prods b)
 	 /\    get_prods other = [other]
 	in
@@ -2225,23 +2225,23 @@ let R_excluded e =
 let rewrite e =
     e fseq
     let rewrite (W_AND (W_CONST 1 1) e) = e
-     /\ rewrite (W_AND (W_CONST 1 0) e) = (W_CONST 1 0)  
+     /\ rewrite (W_AND (W_CONST 1 0) e) = (W_CONST 1 0)
      /\ rewrite (W_AND e (W_CONST 1 1)) = e
-     /\ rewrite (W_AND e (W_CONST 1 0)) = (W_CONST 1 0)  
-     /\ rewrite (W_AND e f) assuming (e == f) = e  
+     /\ rewrite (W_AND e (W_CONST 1 0)) = (W_CONST 1 0)
+     /\ rewrite (W_AND e f) assuming (e == f) = e
      /\ rewrite (W_AND e f) = R_excluded (W_AND e f)
      /\ rewrite (W_OR (W_CONST 1 0) e) = e
-     /\ rewrite (W_OR (W_CONST 1 1) e) = (W_CONST 1 1)  
+     /\ rewrite (W_OR (W_CONST 1 1) e) = (W_CONST 1 1)
      /\ rewrite (W_OR e (W_CONST 1 0)) = e
-     /\ rewrite (W_OR e (W_CONST 1 1)) = (W_CONST 1 1)  
-     /\ rewrite (W_OR e f) assuming (e == f) = e  
+     /\ rewrite (W_OR e (W_CONST 1 1)) = (W_CONST 1 1)
+     /\ rewrite (W_OR e f) assuming (e == f) = e
      /\ rewrite (W_NOT (W_OR (W_NOT e) f)) = W_AND e (W_NOT f)
      /\ rewrite (W_NOT (W_OR e (W_NOT f))) = W_AND (W_NOT e) f
      /\ rewrite (W_NOT (W_AND (W_NOT e) f)) = W_OR e (W_NOT f)
      /\ rewrite (W_NOT (W_AND e (W_NOT f))) = W_OR (W_NOT e) f
-     /\ rewrite (W_NOT (W_CONST 1 0)) = (W_CONST 1 1)  
-     /\ rewrite (W_NOT (W_CONST 1 1)) = (W_CONST 1 0)  
-     /\ rewrite (W_NOT (W_NOT e)) = e  
+     /\ rewrite (W_NOT (W_CONST 1 0)) = (W_CONST 1 1)
+     /\ rewrite (W_NOT (W_CONST 1 1)) = (W_CONST 1 0)
+     /\ rewrite (W_NOT (W_NOT e)) = e
      /\ rewrite e = e
     in
     rewrite e
@@ -2316,7 +2316,7 @@ clet draw_fsm reset S0 orig_trans base_inps =
     let mk_state (name,v) =
         fprintf fp "%s [shape = circle, fixedsize=true, label = \"S%d\"]\n"
 			name v
-    in 
+    in
     (foreach mk_state states) fseq
     let ptrans = partition fst trans in
     let emit_edge ((f,fv),on',(t,tv)) =
@@ -2328,12 +2328,12 @@ clet draw_fsm reset S0 orig_trans base_inps =
 	let s_cond = base_compact_wprint base_inps scond in
 	let f_cond = Pwexpr scond in
 	(emit_edge (f,s_cond,t)) fseq
-	(s_cond,f_cond):(mk_edges (W_OR done on') rem) 
+	(s_cond,f_cond):(mk_edges (W_OR done on') rem)
      /\    mk_edges done [] = []
     in
     let edges = flatmap (mk_edges (W_CONST 1 0)) ptrans then
     (emit_edge (("dummy_inp",0), reset, S0n)) fseq
-    (fprintf fp "}\n") fseq 
+    (fprintf fp "}\n") fseq
     (fclose fp) fseq
     file, states, edges
 ;
@@ -2470,7 +2470,7 @@ let CASE {out:: *a} {cond_res_list:: (bit # *a) list} {default_value:: *a} =
 	    |
 	    ([], hd v, [])
         in
-        val (fas, e, ints, extras) = select (cnt+1) rem then 
+        val (fas, e, ints, extras) = select (cnt+1) rem then
         let fas = (mk_name 1 bc, [c_act]):(mk_name sz br, [r_act]):fas then
         let e = W_ITE lc lr e then
         let ints = c_ints@r_ints@ints then
@@ -2534,7 +2534,7 @@ let STATE {clk::bit} {state:: *a} {cond_res_list:: (bit # *a) list} =
 	    |
 	    ([], hd v, [])
         in
-        val (fas, e, ints, extras) = select (cnt+1) rem then 
+        val (fas, e, ints, extras) = select (cnt+1) rem then
         let fas = (mk_name 1 bc, [c_act]):(mk_name sz br, [r_act]):fas then
         let e = W_ITE lc lr e then
         let ints = c_ints@r_ints@ints in
@@ -2601,7 +2601,7 @@ let EN_STATE {clk::bit} {enable::bit} {state:: *a}
 	    |
 	    ([], hd v, [])
         in
-        val (fas, e, ints, extras) = select (cnt+1) rem then 
+        val (fas, e, ints, extras) = select (cnt+1) rem then
         let fas = (mk_name 1 bc, [c_act]):(mk_name sz br, [r_act]):fas then
         let e = W_ITE lc lr e then
         let ints = c_ints@r_ints@ints in
@@ -2725,7 +2725,7 @@ begin_abstype;
 
 letrec encode_rec =
     list_input  {bl :: bit list}.
-    bit_output  valid.  
+    bit_output  valid.
     output      {addr :: *a}.
     bit_internal    l_valid h_valid.
     internal        {l_addr:: *a} {h_addr:: *a} {base:: *a}.
@@ -2735,13 +2735,13 @@ letrec encode_rec =
         let n = length bl in
         let lsbs = lastn (n/2) bl in
         let msbs = butlastn (n/2) bl in
-        [   
+        [
             encode_rec lsbs l_valid l_addr,
             encode_rec msbs h_valid h_addr,
             valid <- l_valid '|' h_valid,
             base <- ''(n/2),
             addr <- (IF l_valid THEN l_addr ELSE (base '|' h_addr))
-        ]   
+        ]
 );
 
 //
@@ -2836,7 +2836,7 @@ let RAM name lines {raddr:: *a} {waddr:: *a} {din:: *d} {we::bit} {out:: *d} =
                     [(s_out,[s_out])] [] rlf
     then
     //
-    let old = 
+    let old =
       W_CAT (map (\i. W_VAR d_sz (sprintf "%s[%d]" name i)) ((lines-1)--0))
     then
     letrec write i =
@@ -2870,7 +2870,7 @@ letrec delay_rec N =
     input       din.
     output      dout.
     internal    tmp1 tmp2.
-    CELL "delay_rec" 
+    CELL "delay_rec"
     (N <= 0 => [dout <- din] | [
 	tmp1 <- (IF reset THEN '0 ELSE din),
 	re_ff clk tmp1 tmp2,
@@ -2915,9 +2915,9 @@ let hw__pair__constr we =
     let e1 = W_SLICE ((sz-1) downto sz2) we in
     let e2 = W_SLICE ((sz2-1) downto 0) we in
     {hw_constr e1:: *a}, {hw_constr e2:: *b}
-;   
+;
 add_open_overload hw_constr hw__pair__constr;
-    
+
 let hw__pair__mk_var p base =
     let sz = hw__pair__size p in
     W_VAR sz base
@@ -2954,7 +2954,7 @@ infix 1 <==;
 // Intermediate wire names are created on demand and are named
 // i<number>/i<number>/.../<name> where the i<number>s refere to
 // the cardinality of a subfub.
-// 
+//
 let gen_flatten_pexlif stop_pred p =
     letrec do_flat sub pref p =
         let tr n = (assoc n sub) catch n in
@@ -3066,7 +3066,7 @@ let re_ff_en_mux =
         q <- (IF en THEN d ELSE qtmp)
 ];
 
-// A rising edge D flip-flop with enable and asynchronous reset (acive high) and bypass mux.
+// A rising edge D flip-flop with enable and asynchronous reset (active high) and bypass mux.
 let re_ff_en_reset_mux =
     bit_input	clk.
     bit_input	en.
