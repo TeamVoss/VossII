@@ -1,0 +1,539 @@
+//-------------------------------------------------------------------
+// Copyright 2020 ...
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
+load (DIR^"misc.fl");
+load (DIR^"primes.fl");
+
+// Find first element accepted by 'f' in 'xs'. If none is found, returns 'x'.
+//  find_maybe::(a->bool)->a->(a list)->a
+let find_maybe f x xs = let i = find_first0 f xs in i == 0 => x | (el i xs);
+
+// Fetch attribute 's'. If none exists, returns 'a'.
+//  find_attr::string->string->(string#string list)->string
+let find_attr s a = snd # find_maybe (defix == s # fst) ("", a);
+
+// Fetch the "fingerprint" attribute, if any.
+//  find_fingerprint::(string#string list)->int
+let find_fingerprint = s2int # find_attr "fingerprint" "0";
+
+// Fetch the "signature" attribute, if any.
+//  find_signature::(string#string list)->string
+let find_signature = find_attr "signature" "";
+
+//------------------------------------------------------------------------------
+
+// Expand and pair up each formal/actual vector.
+//  lineup::(formal#(actual list) list)->(formal#actual list)
+let fa_lineup = flatmap (curry zip # both md_expand_vector md_expand_vectors);
+
+// Subst. each formal by its matched actual.
+//  raise::(formal#actual list)->(formal list)->(actual list)
+let fa_raise = map # subst;
+
+// Subst. each actual by its matched formal.
+//  lower::(formal#actual list)->(actual list)->(formal list)
+let fa_lower = map # rev_subst;
+
+// Subst. each formal/actual pairing by 
+//  promote::(formal/actual->b)->(formal#actual list)->(formal#actual list)->(a#a list)->(b#b list)
+let fa_promote f ns hs = curry zip # both (f ns) (f hs) # unzip;
+
+// Turns a subst. of formals into one over actuals.
+//  fa_actualize::...
+let fa_actualize fa_n fa_h = fa_promote fa_raise (fa_lineup fa_n) (fa_lineup fa_h);
+
+// Turns a subst. of actuals into one over formals.
+//  fa_formalize::...
+let fa_formalize fa_n fa_h = fa_promote fa_lower (fa_lineup fa_n) (fa_lineup fa_h);
+
+//------------------------------------------------------------------------------
+// Fingerprint generation for a PEXLIF.
+//------------------------------------------------------------------------------
+
+// Multiply a value by a prime.
+//  pm_val::...
+let pm_val = prime_mult;
+
+// Multiply each value by a prime, starting at some 'n', and sum the results.
+//  pm_list::(a->int)->int->(a list)->int
+let pm_list f n vs = ixlist (\a. \i. \s. pm_val i (f a) + s) vs n;
+
+//------------------------------------------------------------------------------
+
+// Gen. a fingerprint for 'MEM'.
+//  fp_mem::MEM->int
+let
+    fp_mem (MEM as l ds) = pm_val 0 as + pm_val 1 l + pm_val 2 ds
+;
+
+// Gen. a fingerprint for 'WEXPR'.
+//  fp_w::WEXPR->int
+letrec
+    fp_w (W_X s)                = pm_val 1 s
+/\  fp_w (W_CONST s i)          = pm_val 2 s + pm_val 3 i
+/\  fp_w (W_NAMED_CONST _ s i)	= pm_val 4 s + pm_val 5 i
+/\  fp_w (W_VAR s _)            = pm_val 6 s
+/\  fp_w (W_EXPLICIT_VAR s _)	= pm_val 7 s
+/\  fp_w (W_AND a b)            = pm_val 8 (fp_w a + fp_w b)
+/\  fp_w (W_OR a b)             = pm_val 9 (fp_w a + fp_w b)
+/\  fp_w (W_NOT a)              = pm_val 10 (fp_w a)
+/\  fp_w (W_EQ a b)             = pm_val 11 (fp_w a + fp_w b)
+/\  fp_w (W_PRED _ a)           = pm_val 12 (fp_w a)
+/\  fp_w (W_GR a b)             = pm_val 13 (fp_w a) + pm_val 14 (fp_w b)
+/\  fp_w (W_ADD a b)            = pm_val 15 (fp_w a + fp_w b)
+/\  fp_w (W_SUB a b)            = pm_val 16 (fp_w a) + pm_val 17 (fp_w b)
+/\  fp_w (W_MUL a b)            = pm_val 18 (fp_w a) + pm_val 19 (fp_w b)
+/\  fp_w (W_DIV a b)            = pm_val 20 (fp_w a) + pm_val 21 (fp_w b)
+/\  fp_w (W_MOD a b)            = pm_val 22 (fp_w a) + pm_val 23 (fp_w b)
+/\  fp_w (W_SHL a b)            = pm_val 24 (fp_w a) + pm_val 25 (fp_w b)
+/\  fp_w (W_SHR a b)            = pm_val 26 (fp_w a) + pm_val 27 (fp_w b)
+/\  fp_w (W_ASHR a b)           = pm_val 28 (fp_w a) + pm_val 29 (fp_w b)
+/\  fp_w (W_SX s a)             = pm_val 30 s + pm_val 31 (fp_w a)
+/\  fp_w (W_ZX s a)             = pm_val 32 s + pm_val 33 (fp_w a)
+/\  fp_w (W_ITE a b c)          = pm_val 34 (fp_w a) + pm_val 35 (fp_w b)
+                                + pm_val 36 (fp_w c)
+/\  fp_w (W_SLICE ix a)	        = pm_val 37 (fp_w a) + pm_list id 1 ix
+/\  fp_w (W_NAMED_SLICE _ ix a) = pm_val 38 (fp_w a) + pm_list id 1 ix
+/\  fp_w (W_UPDATE_NAMED_SLICE a _ ix b)
+                                = pm_val 39 (fp_w a) + pm_val 40 (fp_w b)
+                                + pm_list id 1 ix
+/\  fp_w (W_CAT as)             = pm_list fp_w 41 as
+/\  fp_w (W_MEM_READ m a b)     = pm_val 42 (fp_mem m) + pm_val 43 (fp_w a)
+                                + pm_val 44 (fp_w b)
+/\  fp_w (W_MEM_WRITE m a b d)  = pm_val 45 (fp_mem m) + pm_val 46 (fp_w a)
+                                + pm_val 47 (fp_w b) + pm_val 48 (fp_w d)
+;
+
+// Gen. a fingerprint for 'UPDATE_FN'.
+//  fp_fn::UPDATE_FN->int
+let
+    fp_fn (W_UPDATE_FN l r)   = pm_val 49 (fp_w l) + pm_val 50 (fp_w r)
+/\  fp_fn (W_PHASE_DELAY l r) = pm_val 51 (fp_w l) + pm_val 52 (fp_w r)
+;
+
+// Gen. a fingerprint for the "formals" of an input/output declaration.
+//  fp_formal::[str]->int
+let
+    fp_formal ps = pm_val 53 (sum (map md_size ps))
+;
+
+// Gen. a fingerprint for the internals of a 'PINST'.
+//  fp_internal::[str]->int
+let
+    fp_internal ps = pm_val 54 (sum (map md_size ps))
+;
+
+// Gen. a fingerprint for 'CONTENT'.
+//  fp_content::CONTENT->int
+let
+    fp_content (P_LEAF fs) = pm_val 59 (sum (map fp_fn fs))
+/\  fp_content (P_HIER cs) =
+        let
+            go (PINST _ a _ i o t _) =
+                ( find_fingerprint a
+                + fp_formal (map fst i)
+                + fp_formal (map fst o)
+                + fp_internal t
+                )
+        in
+        pm_val 65 (sum (map go cs))
+;
+
+// Gen. a fingerprint for the components of a 'PINST'.
+//  fp_pinst::'pinst contents'->string
+let
+    fp_pinst i o t c = int2str
+        ( fp_formal (map fst i)
+        + fp_formal (map fst o)
+        + fp_internal t
+        + fp_content c
+        )
+;
+
+//------------------------------------------------------------------------------
+// SHA256 signature generation for a PEXLIF.
+//------------------------------------------------------------------------------
+
+// Compute the SHA256 signature of a 'set' of components.
+//  sha_set::(a list)->string
+let sha_set = sha256_signature # qsort strcmp # map sha256_signature;
+
+// Compute the SHA256 signature of a 'CONTENT'.
+//  sha_content::content->string
+let
+    sha_content (P_LEAF fs) = sha_set fs
+/\  sha_content (P_HIER cs) =
+        let
+            go (PINST n a _ i o t _) =
+                ( n
+                , find_signature a
+                , sha256_signature (map fst i)
+                , sha256_signature (map fst o)
+                , sha_set t
+                )
+        in
+        sha_set (map go cs)
+;
+
+// Compute the SHA256 signature of a 'PINST'.
+//  sha_pinst::'pinst contents'->string
+let
+    sha_pinst n i o t c = sha256_signature
+        ( n
+        , sha256_signature (map fst i)
+        , sha256_signature (map fst o)
+        , sha_set t
+        , sha_content c
+        )
+;
+
+//------------------------------------------------------------------------------
+// Extension of the PINST constructor with fingerprints and SHA256 signatures.
+//------------------------------------------------------------------------------
+
+let
+    PINST n a l i o t c =
+        find_fingerprint a != 0 => PINST n a l i o t c | 
+        let f = ("fingerprint", fp_pinst    i o t c) then
+        let s = ("signature",   sha_pinst n i o t c) then
+        PINST n (f : s : a) l i o t c
+;
+
+//------------------------------------------------------------------------------
+// Folding/Unfolding of a PEXLIF.
+//------------------------------------------------------------------------------
+
+// ...
+//  fold_pexlif::PINST->[int]->string->PINST
+let
+    fold_pexlif pex ids name =
+        val (PINST n a l i o t (P_HIER ((PINST n' a' l' i' o' t' c'):cs))) =
+                fold_pexlif pex ids name
+        in
+        PINST n a l i o t (P_HIER ((PINST n' a' l' i' o' t' c'):cs))
+;
+
+// ...
+//  unfold_pexlif::PINST->int->string->PINST
+let
+    unfold_pexlif pex id name =
+        val (PINST n a l i o t (P_HIER cs)) =
+                unfold_pexlif pex id name
+        in
+        let lbl (PINST n a l i o t c) = PINST n a l i o t c in
+        PINST n a l i o t (P_HIER (map lbl cs))
+;
+
+//------------------------------------------------------------------------------
+// Generation of a PEXLIF.
+//------------------------------------------------------------------------------
+
+let ?! = undefined;
+
+letrec
+    split_by p []     = ([],[])
+/\  split_by p (x:xs) =
+        val (as, bs) = split_by p xs in
+        p x => (x:as, bs) | (as, x:bs)
+;
+
+//------------------------------------------------------------------------------
+
+let one_of [] = eprintf "one_of called on empty list"
+/\  one_of xs = el (random 1 (length xs)) xs
+;
+non_lazy one_of;
+
+let one_of_weighted [] = eprintf "one_of_weighted called on empty list"
+/\  one_of_weighted xs =
+        letrec
+            pick _ []         = eprintf "?!"
+        /\  pick n ((k,a):as) = (n <= k) => a | pick (n - k) as
+        in
+        pick (random 1 (sum (map fst xs))) xs
+;
+non_lazy one_of_weighted;
+
+let split_at_random [] = ([],[])
+/\  split_at_random xs = split_at (random 1 (length xs + 1)) xs
+;
+
+let segment_at_random 1  = [1]
+/\  segment_at_random sz = let r = random 1 sz in
+        ((sz / r) + (sz % r)) : (replicate ((sz / r) - 1) r)
+;
+
+let slice_at_random lz hz =
+        let expand_range l h = firstn (h-l) (iterate (defix + 1) l) in
+        let random_remove xs = remove (random 1 (length xs)) xs in
+        repeat (hz-lz) random_remove (expand_range 0 hz)
+;
+
+//------------------------------------------------------------------------------
+
+letrec
+    gen_wexpr_inputs
+        {is :: (wexpr#int) list}
+        {sz :: int}
+        =
+        let use_var =
+                val (i,s) = one_of is in
+                // If the selected variable is too small, pad it or get more.
+                s < sz => one_of
+                    [ [W_SX sz i]
+                    , [W_ZX sz i]
+                    , i : gen_wexpr_inputs is (sz-s)] |
+                // If too small instead, slice at random.
+                s > sz =>
+                    [W_SLICE (slice_at_random sz s) i] |
+                // Otherwise, use as is.
+                [i]
+        in
+        one_of_weighted
+            [ (1, [W_X sz])
+            , (1, [W_CONST sz (random2 sz)])
+         // , (x, W_NAMED_CONST ?! ?! ?!)
+         // , (x, W_EXPLICIT_VAR ?! ?!)
+         // , (x, W_MEM_READ ?! ?! ?!)
+            , (2, use_var) ]
+;
+let gen_wexpr_input
+        {is :: (wexpr#int) list}
+        {sz :: int}
+        =
+        let vs = gen_wexpr_inputs is sz in length vs == 1 => hd vs | W_CAT vs
+;
+letrec
+    gen_wexpr
+        {is :: (wexpr#int) list}
+        {ts :: (wexpr#int) list}
+        {sz :: int}
+        {d  :: int}
+        =
+        // If complexity 'd' is satisfied and 'ts' distributed, build leaf.
+        let l = length ts in
+        (l == 0) AND (d <= 0) => gen_wexpr_input is sz |
+        (l == 1) AND (d <= 0) =>
+            val (x,s) = hd ts in
+            s < sz => one_of [ W_SX sz x, W_ZX sz x ]  |
+            s > sz => W_SLICE (slice_at_random sz s) x |
+            x |
+        // Misc. for unary/binary ops.
+        let gen_unary  sz = gen_wexpr is ts sz (d - 1) in
+        let gen_binary ts = gen_wexpr is ts sz (d / 2) in
+        val (as, bs) = split_at_random ts in
+        let u = (d <= 0) => 0 | 1 in // Weight for unary op.
+        let b = 1 in                 // ...        binary op.
+        let x = (sz > 1) => 1 | 0 in // ...        ext. op.
+        // Pick a valid PINST op.
+        one_of_weighted
+            [ (u, W_NOT  (gen_unary sz))
+            , (b, W_AND  (gen_binary as) (gen_binary bs))
+            , (b, W_OR   (gen_binary as) (gen_binary bs))
+            , (b, W_EQ   (gen_binary as) (gen_binary bs))
+            , (b, W_GR   (gen_binary as) (gen_binary bs))
+            , (b, W_ADD  (gen_binary as) (gen_binary bs))
+            , (b, W_SUB  (gen_binary as) (gen_binary bs))
+            , (b, W_MUL  (gen_binary as) (gen_binary bs))
+            , (b, W_DIV  (gen_binary as) (gen_binary bs))
+            , (b, W_MOD  (gen_binary as) (gen_binary bs))
+            , (b, W_SHL  (gen_binary as) (gen_binary bs))
+            , (b, W_SHR  (gen_binary as) (gen_binary bs))
+            , (b, W_ASHR (gen_binary as) (gen_binary bs))
+            , ( let smaller_sz = random 1 sz in
+                (x, W_SX sz (gen_unary smaller_sz))
+              )
+            , ( let smaller_sz = random 1 sz in
+                (x, W_ZX sz (gen_unary smaller_sz))
+              )
+            , ( val (cs, ds)   = split_at 2 ts in
+                val (es, fs)   = split_at_random ds in
+                let gen ts sz  = gen_wexpr is ts sz (d / 3) in
+                (b, W_ITE (gen cs 1) (gen es sz) (gen fs sz))
+              )
+            , ( let larger_sz  = random sz (sz * 2) in
+                let slice      = slice_at_random sz larger_sz in
+                (b, W_SLICE slice (gen_unary larger_sz))
+              )
+            , ( let chunked_sz = segment_at_random sz in
+                let len_sz     = length chunked_sz in
+                let len_ts     = length ts in
+                let chunked_ts =
+                        len_sz <= len_ts => split_into len_sz ts |
+                        (map (\t. [t]) ts) @ (replicate (len_sz - len_ts) [])
+                in
+                let gen ts sz  = gen_wexpr is ts sz (d / len_sz) in
+                (x, W_CAT (map2 gen chunked_ts chunked_sz))
+              )
+         // , W_PRED ?! ?!
+         // , W_NAMED_SLICE ?! ?! ?!
+         // , W_UPDATE_NAMED_SLICE ?! ?! ?! ?!
+         // , W_MEM_WRITE ?! ?! ?! ?!
+            ]
+;
+
+let gen_update_fn
+        {is    :: (wexpr#int) list} // Global inputs
+        {ts    :: (wexpr#int) list} // Internals connected to this wire
+        {(o,s) :: (wexpr#int)}      // Wire to be assigned
+        {d     :: int}              // Complexity of assignment
+        =
+        W_UPDATE_FN o (gen_wexpr is ts s d)
+;
+let gen_update_fn_internals
+        {sc    :: (bool list) list} // Connection schema for internals.
+        {is    :: (wexpr#int) list}
+        {ts    :: (wexpr#int) list} // Internals to assign (ordered as in 'sc').
+        {d     :: int}
+        =
+        let inputs = map (map fst # filter snd # zip ts) sc in
+        map (\(t,i). gen_update_fn is (el i inputs) t d) (ixlabel ts)
+;
+let gen_update_fn_outputs
+        {is    :: (wexpr#int) list}
+        {ts    :: (wexpr#int) list} // Internals to drive outputs.
+        {os    :: (wexpr#int) list} // Outputs to be assigned.
+        {d     :: int}
+        =
+        // If there aren't enough inputs to drive each output, then we must
+        // first extend them by splitting/copying/... their wires.
+        let l_os = length os in
+        let split (x, s) =
+                val (ls, rs) = split_at_random ((s - 1) downto 0) in
+                let slice is = (W_SLICE is x, length is) in
+                [slice ls, slice rs]
+        in
+        let extend (x, s) =
+                let pair = (x, s) in
+                let copy = [(1, [pair]), (1, [pair, pair])] in
+                one_of_weighted (copy @ (s == 1 => [] | [(2, split pair)]))
+        in
+        letrec pad xs =
+            length xs >= l_os => xs | pad $ concat $ map extend xs
+        in
+        map2 (\xs. \o. gen_update_fn is xs o d) (split_into l_os (pad ts)) os
+;
+let gen_pinst_wires
+        {pre   :: string}
+        {sizes :: int list}
+        {num   :: int}
+        =
+        // When selecting a size, prefer known sizes over the random choice.
+        let max_sz  = 2 * (itlist1 max sizes) in
+        let hist_sz = map swap (hist sizes) in
+        let random_size x =
+                one_of_weighted
+                    [ (1, random 1 max_sz),
+                      (5, one_of_weighted hist_sz) ]
+        in
+        // Build internal wires for node 'ix' and give it a random size.
+        let new_internal i =
+                let sz  = random_size i in
+                let vec =
+                        let name  = pre ^ (int2str i) in
+                        let range = "[" ^ (int2str (sz-1)) ^ ":0]" in
+                        sz == 1 => name | name ^ range
+                in
+                (W_VAR sz vec, sz)
+        in
+        map new_internal (1 upto num)
+;
+let gen_pinst_leaf
+        {sc :: (bool list) list}
+        {is :: (wexpr#int) list}
+        {ts :: (wexpr#int) list}
+        {os :: (wexpr#int) list}
+        {d  :: int}
+        =
+        // note: nodes without outgoing edges are connected to outputs.
+        let fns = gen_update_fn_internals sc is ts d in
+        let ts_o  = map snd $ filter fst $ zip (map (any id) sc) ts in
+        let fns_o = gen_update_fn_outputs is ts_o os d in
+        P_LEAF (fns @ fns_o)
+;
+
+let gen_phase_delay
+        {is    :: (wexpr#int) list}
+        {ts    :: (wexpr#int) list}
+        {(o,s) :: (wexpr#int)}
+        {d     :: int}
+        =
+        W_PHASE_DELAY o (gen_wexpr is ts s d)
+;
+let gen_phase_delay_internals
+        =
+        ?!
+;
+
+let
+    gen_DAG_with_threshold n p =
+        letrec
+            map_from _ []     _ = []
+        /\  map_from f (x:xs) 0 = f x : map_from f xs 0
+        /\  map_from f (x:xs) i = x   : map_from f xs (i-1)
+        in
+        let flip F = randomf 32 > p in
+        let empty  = replicate n (replicate n F) in
+        let marked = ixmap (map_from flip) empty in
+        marked
+;
+let gen_DAG n =
+        gen_DAG_with_threshold n
+            (fdiv (fmul 2.0 (log (int2float n))) (int2float n))
+;
+let formal_to_wire fas =
+        let build f = let s = md_size f in (W_VAR s f, s) in
+        map (build # fst) fas
+;
+let gen_pinst_logic
+        {fa_is :: (string#(string list)) list}
+        {fa_os :: (string#(string list)) list}
+        {size  :: int}
+        {d     :: int}
+        =
+        // Build wexpr variables for each formal.
+        let is = formal_to_wire fa_is in
+        let os = formal_to_wire fa_os in
+        // Generate DAG that dictates body of PINST and then fill it with
+        // semi-random, combinatorial update-functions.
+        let sc   = gen_DAG size then
+        let ts   = gen_pinst_wires "i" (map snd (is @ os)) (length sc) then
+        let leaf = gen_pinst_leaf sc is ts os d then
+        let name (W_VAR _ v, _) = v in
+        // ...
+        PINST "combinatorial" [] T fa_is fa_os (map name ts) leaf
+;
+let gen_pinst_updates
+        {fa_is :: (string#(string list)) list}
+        {fa_os :: (string#(string list)) list}
+        {size  :: int}
+        {d     :: int}
+        =
+        PINST "sequential" [] T fa_is fa_os [] (P_LEAF [])
+;
+let gen_pinst
+        {fa_is :: (string#(string list)) list}
+        {fa_os :: (string#(string list)) list}
+        {size  :: int}
+        {d     :: int}
+        =
+        // Split inputs between comb. & seq. parts of PINST, with the biggest
+        // of the two going towards comb. logic to ensure it can drive updates.
+        val (as,   bs)   = split_at_random fa_is in
+        val (fa_c, fa_s) = length as >= length bs => (as, bs) | (bs, as) in
+        // Build internal wires to make up for inputs directed to comb. logic.
+        let sizes  = map (md_size # fst) $ (fa_is @ fa_os) in
+        let var_ts = gen_pinst_wires "t" sizes (length fa_c) in
+        let formal (W_VAR _ v, _) = (v, []) in
+        // ..
+        let {f_ts :: (string#(string list)) list} = map formal var_ts in
+        let comb = gen_pinst_logic   fa_c          f_ts  size (d / 2) in
+        let sequ = gen_pinst_updates (fa_s @ f_ts) fa_os size (d / 2) in
+        // ...
+        PINST "node" [] F fa_is fa_os (map fst f_ts) (P_HIER [comb, sequ])
+;
+
+//------------------------------------------------------------------------------
+// Fin.

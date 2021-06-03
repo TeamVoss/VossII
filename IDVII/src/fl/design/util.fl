@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
-
 // Create a (potential vector) name given size and base.
 let mk_name sz base = sz = 1 => base | sprintf "%s[%d:0]" base (sz-1);
 
