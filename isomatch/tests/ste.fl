@@ -1,3 +1,5 @@
 load "ste.fl";
 
 gen_pinst [("a",["a"]),("b",["b"])] [("c",["c"])] 5 3;
+
+gen_pinst_graph [("a",["a"]),("b",["b"])] [("c",["c"])] 5 3;
