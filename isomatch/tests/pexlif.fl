@@ -1,0 +1,24 @@
+load "ste.fl";
+
+//------------------------------------------------------------------------------
+
+let p = gen_pinst [("a",["a"]),("b",["b"])] [("c",["c"])] 5 3;
+//p;
+//STE_debug (pexlif2fsm p);
+
+let draw_p = draw_hier_pinst p;
+//draw_p;
+//STE_debug (pexlif2fsm draw_p);
+
+//------------------------------------------------------------------------------
+
+let g = gen_pinst_graph [("a",["a"]),("b",["b"])] [("c",["c"])] 5 3;
+//g;
+//STE_debug (pexlif2fsm g);
+
+let draw_g = draw_hier_pinst g;
+draw_g;
+//STE_debug (pexlif2fsm draw_g);
+
+//------------------------------------------------------------------------------
+// Fin.

@@ -272,10 +272,7 @@ let segment_at_random 1  = [1]
         ((sz / r) + (sz % r)) : (replicate ((sz / r) - 1) r)
 ;
 
-let slice_at_random lz hz =
-        let expand_range l h = firstn (h-l) (iterate (defix + 1) l) in
-        repeat (hz-lz) remove_one (expand_range 0 hz)
-;
+let slice_at_random lz hz = repeat (hz-lz) remove_one (0 upto hz);
 
 letrec
     gen_wexpr_inputs
@@ -284,24 +281,20 @@ letrec
         =
         let use_var =
                 val (i,s) = one_of is in
-                // If the selected variable is too small, pad it or get more.
-                s < sz => one_of
-                    [ [W_SX sz i]
-                    , [W_ZX sz i]
-                    , i : gen_wexpr_inputs is (sz-s)] |
-                // If too small instead, slice at random.
-                s > sz =>
-                    [W_SLICE (slice_at_random sz s) i] |
-                // Otherwise, use as is.
+                s < sz => one_of_weighted
+                    [ (1, [W_SX sz i])
+                    , (1, [W_ZX sz i])
+                    , (2, (i : gen_wexpr_inputs is (sz-s)))] |
+                s > sz => [W_SLICE (slice_at_random (sz - 1) (s - 1)) i] |
                 [i]
         in
         one_of_weighted
             [ (1, [W_X sz])
-            , (1, [W_CONST sz (random2 sz)])
+            , (2, [W_CONST sz (random2 sz)])
          // , (x, W_NAMED_CONST ?! ?! ?!)
          // , (x, W_EXPLICIT_VAR ?! ?!)
          // , (x, W_MEM_READ ?! ?! ?!)
-            , (2, use_var) ]
+            , (4, use_var) ]
 ;
 
 let gen_wexpr_input
@@ -319,12 +312,11 @@ letrec
         {d  :: int}
         =
         // If complexity 'd' is satisfied and 'ts' distributed, build leaf.
-        let l = length ts in
-        (l == 0) AND (d <= 0) => gen_wexpr_input is sz |
-        (l == 1) AND (d <= 0) =>
+        (length ts == 0) AND (d <= 0) => gen_wexpr_input is sz |
+        (length ts == 1) AND (d <= 0) =>
             val (x,s) = hd ts in
             s < sz => one_of [ W_SX sz x, W_ZX sz x ]  |
-            s > sz => W_SLICE (slice_at_random sz s) x |
+            s > sz => W_SLICE (slice_at_random (sz - 1) (s - 1)) x |
             x |
         // Misc. for unary/binary ops.
         let gen_unary  sz = gen_wexpr is ts sz (d - 1) in
@@ -350,20 +342,16 @@ letrec
             , (b, W_SHR  (gen_binary as) (gen_binary bs))
             , (b, W_ASHR (gen_binary as) (gen_binary bs))
             , ( let smaller_sz = random 1 sz in
-                (x, W_SX sz (gen_unary smaller_sz))
-              )
+                (x, W_SX sz (gen_unary smaller_sz)))
             , ( let smaller_sz = random 1 sz in
-                (x, W_ZX sz (gen_unary smaller_sz))
-              )
+                (x, W_ZX sz (gen_unary smaller_sz)))
             , ( val (cs, ds)   = split_at 2 ts in
                 val (es, fs)   = split_at_random ds in
                 let gen ts sz  = gen_wexpr is ts sz (d / 3) in
-                (b, W_ITE (gen cs 1) (gen es sz) (gen fs sz))
-              )
-            , ( let larger_sz  = random sz (sz * 2) in
-                let slice      = slice_at_random sz larger_sz in
-                (b, W_SLICE slice (gen_unary larger_sz))
-              )
+                (b, W_ITE (gen cs 1) (gen es sz) (gen fs sz)))
+            // , ( let larger_sz  = random (sz + 1) ((sz + 1) * 2) in
+            //     let slice      = slice_at_random (sz - 1) larger_sz in
+            //     (b, W_SLICE slice (gen_unary larger_sz)))
             , ( let chunked_sz = segment_at_random sz in
                 let len_sz     = length chunked_sz in
                 let len_ts     = length ts in
@@ -372,8 +360,7 @@ letrec
                         (map (\t. [t]) ts) @ (replicate (len_sz - len_ts) [])
                 in
                 let gen ts sz  = gen_wexpr is ts sz (d / len_sz) in
-                (x, W_CAT (map2 gen chunked_ts chunked_sz))
-              )
+                (x, W_CAT (map2 gen chunked_ts chunked_sz)))
          // , W_PRED ?! ?!
          // , W_NAMED_SLICE ?! ?! ?!
          // , W_UPDATE_NAMED_SLICE ?! ?! ?! ?!
@@ -416,7 +403,7 @@ let extend_wires
                 let p = (x, s) in
                 one_of_weighted
                     [ (1,            [p])
-                    , (b2i (s == 1), [p, p])
+                    , (b2i (s >= 1), [p, p])
                     , (b2i (s != 1), (split p)) ]
         in
         letrec
@@ -446,22 +433,17 @@ let gen_wires
         {num   :: int}
         =
         // When selecting a size, prefer known sizes over the random choice.
-        let max_sz  = 2 * (itlist1 max sizes) in
         let hist_sz = map swap (hist sizes) in
         let random_size x =
                 one_of_weighted
-                    [ (1, random 1 max_sz),
-                      (5, one_of_weighted hist_sz) ]
+                    [ (1, one_of [1,2,4,8,16,32]),
+                      (1, one_of_weighted hist_sz) ] // todo: increase weight.
         in
         // Build internal wires for node 'ix' and give it a random size.
         let new_internal i =
-                let sz  = random_size i in
-                let vec =
-                        let name  = pre ^ (int2str i) in
-                        let range = "[" ^ (int2str (sz-1)) ^ ":0]" in
-                        sz == 1 => name | name ^ range
-                in
-                (W_VAR sz vec, sz)
+                let sz   = random_size i in
+                let name = pre ^ (int2str i) in
+                (W_VAR sz name, sz)
         in
         map new_internal (1 upto num)
 ;
@@ -498,9 +480,14 @@ let gen_DAG n =
             (fdiv (fmul 2.0 (log (int2float n))) (int2float n))
 ;
 
-let formal_to_wire fas =
-        let build f = let s = md_size f in (W_VAR s f, s) in
-        map (build # fst) fas
+let formal_to_wire f =
+        let sz = md_size f in
+        let n  = sz == 1 => f | hd (str_split f "[") in
+        (W_VAR sz n, sz)
+;
+
+let wire_to_formal (W_VAR sz n, _) =
+        sz == 1 => n | sprintf "%s[%d:0]" n (sz-1);
 ;
 
 let gen_pinst_leaf
@@ -512,16 +499,15 @@ let gen_pinst_leaf
         {d     :: int}
         =
         // Build wexpr variables for each formal.
-        let is = formal_to_wire fa_is in
-        let os = formal_to_wire fa_os in
+        let is = map (formal_to_wire # fst) fa_is in
+        let os = map (formal_to_wire # fst) fa_os in
         // Generate DAG that dictates body of PINST and then fill it with
         // semi-random, combinatorial update-functions.
         let sc   = gen_DAG size in
         let ts   = gen_wires "i" (map snd (is @ os)) (length sc) in
         let leaf = gen_pinst_update_fn_leaf sc is ts os delay d in
-        let formal (W_VAR _ v, _) = v in
         // ...
-        PINST name [] T fa_is fa_os (map formal ts) leaf
+        PINST name [] T fa_is fa_os (map wire_to_formal ts) leaf
 ;
 
 let gen_pinst
@@ -538,12 +524,13 @@ let gen_pinst
         // Connect comb. & seq. parts via internals and build additional
         // internals wires to make up for inputs directed to comb. logic.
         let sizes  = map (md_size # fst) $ (fa_is @ fa_os) in
-        let var_cs = gen_wires "t" sizes (max 1 (length fa_is_c)) in
-        let var_sc = gen_wires "t" sizes (max 1 (length fa_is_s)) in
-        let formal (W_VAR _ v, _) = (v, [v]) in
+        let var_cs = gen_wires "ct" sizes (max 1 (length fa_is_c)) in
+        let var_sc = gen_wires "st" sizes (max 1 (length fa_is_s)) in
         // ..
-        let f_cs = map formal var_cs in
-        let f_sc = map formal var_sc in
+        let actual v = (v, [v]) in
+        let f_cs = map (actual # wire_to_formal) var_cs in // comb. -> seq.
+        let f_sc = map (actual # wire_to_formal) var_sc in // seq.  -> comb.
+        // ...
         let c = gen_pinst_leaf "comb" (fa_is_c @ f_sc) (fa_os_c @ f_cs) F size d in
         let s = gen_pinst_leaf "seq"  (fa_is_s @ f_cs) (fa_os_s @ f_sc) T size d in
         // ...
@@ -558,17 +545,17 @@ let gen_pinst_hier
         {size  :: int}
         {d     :: int}
         =
-        let size' = size / length sc in
-        let formalize v = (v, [v]) in
+        let size'    = size / length sc in
+        let actual v = (v, [v]) in
         // note: nodes whitout outgoing edges are connected to outputs.
         let ts_i  = map (map fst # filter snd # zip f_ts) sc in
-        let ts_ip = map (\i. empty i => some_of fa_is | map formalize i) ts_i in
+        let ts_ip = map (\i. empty i => some_of fa_is | map actual i) ts_i in
         let ns_t  = map2 (\is. \o. gen_pinst is [o] size' d) ts_ip
-                  $ map formalize f_ts
+                  $ map actual f_ts
         in
         // ...
         let l_os  = length fa_os in
-        let ts_o  = map (formalize # snd)
+        let ts_o  = map (actual # snd)
                   $ filter fst $ zip (map (NOT # any id) sc) f_ts
         in
         let ns_o  = map2 (\o. \is. gen_pinst is [o] size' d) fa_os
@@ -583,16 +570,88 @@ let gen_pinst_graph
         {size  :: int}
         {d     :: int}
         =
-        let formal (W_VAR _ v, _) = v in
         let sizes = map (md_size # fst) (fa_is @ fa_os) in
         let sc    = gen_DAG size in
         let ts    = gen_wires "w" sizes (length sc) in
-        let hier  = gen_pinst_hier sc fa_is (map formal ts) fa_os size d in
+        let hier  =
+                gen_pinst_hier sc fa_is (map wire_to_formal ts) fa_os size d
+        in
         // ...
-        PINST "graph" [] F fa_is fa_os (map formal ts) hier
+        PINST "graph" [] F fa_is fa_os (map wire_to_formal ts) hier
 ;
 
 end_abstype gen_pinst gen_pinst_graph;
+
+//------------------------------------------------------------------------------
+
+begin_abstype;
+
+let str_is_signature s = s == "fingerprint" OR s == "signature";
+let filter_signatures  = filter (NOT # str_is_signature # fst);
+
+let collect_names wexpr =
+        letrec 
+            collect (W_X _) = []
+        /\  collect (W_CONST _ _) = []
+        /\  collect (W_NAMED_CONST n sz _) = [(n, sz)]
+        /\  collect (W_VAR sz s) = [(s, sz)]
+        /\  collect (W_EXPLICIT_VAR sz s) = [(s, sz)]
+        /\  collect (W_AND a b) = collect a @ collect b
+        /\  collect (W_OR a b) = collect a @ collect b
+        /\  collect (W_NOT a) = collect a
+        /\  collect (W_EQ a b) = collect a @ collect b
+        /\  collect (W_PRED _ c) = collect c
+        /\  collect (W_GR a b) = collect a @ collect b
+        /\  collect (W_ADD a b) = collect a @ collect b
+        /\  collect (W_SUB a b) = collect a @ collect b
+        /\  collect (W_MUL a b) = collect a @ collect b
+        /\  collect (W_DIV a b) = collect a @ collect b
+        /\  collect (W_MOD a b) = collect a @ collect b
+        /\  collect (W_SHL a b) = collect a @ collect b
+        /\  collect (W_SHR a b) = collect a @ collect b
+        /\  collect (W_ASHR a b) = collect a @ collect b
+        /\  collect (W_SX _ w) = collect w
+        /\  collect (W_ZX _ w) = collect w
+        /\  collect (W_ITE c a b) = collect c @ collect a @ collect b
+        /\  collect (W_SLICE _ w) = collect w
+        /\  collect (W_NAMED_SLICE _ _ w) = collect w
+        /\  collect (W_UPDATE_NAMED_SLICE a _ _ b) = collect a @ collect b
+        /\  collect (W_CAT as) = concat (map collect as)
+        /\  collect (W_MEM_READ _ m a) = collect m @ collect a
+        /\  collect (W_MEM_WRITE _ m a d) = collect m @ collect a @ collect d
+        in
+        setify $ collect wexpr
+;
+// todo: not sure about size on 'W_UPDATE_NAMED_SLICE'.
+
+let name_to_formal_actuals n sz =
+        let f = sz == 1 => n | sprintf "%s[%d:0]" n (sz-1) in (f, [f])
+;
+
+let draw_hier_leaf fs =
+        let collect = map (curry name_to_formal_actuals) # collect_names in
+        let draw_hier (W_UPDATE_FN lhs rhs) =
+                PINST ("draw_hier comb.") [] T
+                      (collect rhs) (collect lhs) []
+                      (P_LEAF [W_UPDATE_FN lhs rhs])
+        /\  draw_hier (W_PHASE_DELAY lhs rhs) =
+                PINST ("draw_hier seq.") [] T
+                      (collect rhs) (collect lhs) []
+                      (P_LEAF [W_PHASE_DELAY lhs rhs])
+        in
+        P_HIER (map draw_hier fs)
+;
+
+letrec
+    draw_hier_pinst (PINST n as T is os ts (P_LEAF fs)) =
+        let as' = filter_signatures as in
+        PINST n as' F is os ts (draw_hier_leaf fs)
+/\  draw_hier_pinst (PINST n as F is os ts (P_HIER cs)) =
+        let as' = filter_signatures as in
+        PINST n as' F is os ts (P_HIER (map draw_hier_pinst cs))
+;
+
+end_abstype draw_hier_pinst;
 
 //------------------------------------------------------------------------------
 // Fin.
