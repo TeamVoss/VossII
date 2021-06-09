@@ -29,19 +29,21 @@ let {dummy2_hw_size:: dummy2 -> int} = error "dummy";
 let {dummy2_hw_destr:: dummy2 -> wexpr} = error "dummy";
 let {dummy2_hw_constr:: wexpr -> dummy2} = error "dummy";
 let {dummy2_hw_values:: dummy2 -> string} = error "dummy";
-add_open_overload hw_type_name dummy1_hw_type_name dummy1_hw_type_name;
-add_open_overload hw_mk_var dummy1_hw_mk_var dummy1_hw_mk_var;
+add_open_overload hw_type_name dummy1_hw_type_name dummy2_hw_type_name;
+add_open_overload hw_mk_var dummy1_hw_mk_var dummy2_hw_mk_var;
 add_open_overload hw_is_arithmetic
-		    dummy1_hw_is_arithmetic dummy1_hw_is_arithmetic;
-add_open_overload hw_size dummy1_hw_size dummy1_hw_size;
-add_open_overload hw_destr dummy1_hw_destr dummy1_hw_destr;
-add_open_overload hw_constr dummy1_hw_constr dummy1_hw_constr;
-add_open_overload hw_values dummy1_hw_values dummy1_hw_values;
+		    dummy1_hw_is_arithmetic dummy2_hw_is_arithmetic;
+add_open_overload hw_size dummy1_hw_size dummy2_hw_size;
+add_open_overload hw_destr dummy1_hw_destr dummy2_hw_destr;
+add_open_overload hw_constr dummy1_hw_constr dummy2_hw_constr;
+add_open_overload hw_values dummy1_hw_values dummy2_hw_values;
 
 
 let CELL {name::string} {body::pexlif list} =
     (PINST name [] F [] [] [] (P_HIER body))
 ;
+
+let ileq {i::int} {j::int} = i <= j;
 
 // Convert a positive integer to a hw type, or X, or variable.
 // E.g., if byte as an 8-bit hw type (TYPE "byte" 8;), then
@@ -67,7 +69,7 @@ let make_const_or_var s =
 	|
 	let s0 = string_hd s in
 	let os = ord s0 in
-	(ord "0" <= os) AND (os <= ord "9") =>
+	(ileq (ord "0") os) AND (ileq os (ord "9")) =>
 	    let i = sscanf "%d" s in
 	    W_CONST sz i
 	|
@@ -76,7 +78,7 @@ let make_const_or_var s =
     {hw_constr w:: *r}
 ;
 nonfix ';
-overload ' ' make_const_or_var;
+overload ' s2float s2int s2bev s2bv  make_const_or_var;
 free_binder ';
 
 // Convert a negative integer to a hw type.
@@ -85,17 +87,17 @@ let neg_make_const_or_var s =
     let w =
 	str_is_prefix "0x" s =>
 	    let i = sscanf "0x%x" s in
-	    W_CONST sz (-1*i)
+	    W_CONST sz (i_mul (i_minus 0 1) i)
 	|
 	str_is_prefix "0b" s =>
 	    let i = sscanf "0b%b" s in
-	    W_CONST sz (-1*i)
+	    W_CONST sz (i_mul (i_minus 0 1) i)
 	|
 	let s0 = string_hd s in
 	let os = ord s0 in
-	(ord "0" <= os) AND (os <= ord "9") =>
+	(ileq (ord "0") os) AND (ileq os (ord "9")) =>
 	    let i = sscanf "%d" s in
-	    W_CONST sz (-1*i)
+	    W_CONST sz (i_mul (i_minus 0 1) i)
 	|
 	s == "X" => W_X sz | eprintf "'- not defined for variables (%s)" s
     in
@@ -1785,19 +1787,22 @@ let '&' = wAND;
 infix 4 '&';
 
 let wITE {c::bit} {t:: *a} {e:: *a} =
-    let res = W_ITE (hw_destr c) (hw_destr t) (hw_destr e) in
+    let res = W_ITE (hw_bit_destr c) (hw_destr t) (hw_destr e) in
     {hw_constr res :: *a}
 ;
 let ':' {a:: *a} {b:: *a} = (a,b);
 let '?' c (t,e) = wITE c t e;
 if_then_else_binder '?' ':';
 
-
 let IF c = c;
 let ELSE {t:: *a} {e:: *a} = (t,e);
 let bitTHEN c (t,e) = c '?' t ':' e;
-//overload THEN THEN bitTHEN;
-let THEN = bitTHEN;
+overload tmp_THEN bTHEN bevTHEN bitTHEN;
+
+let THEN {c:: *b} ({te:: *a # *a}) =
+    let res = tmp_THEN c te in
+    {res :: *a}
+;
 if_then_else_binder THEN ELSE;
 
 let wOR {a:: *a} {b:: *a} =
@@ -2428,6 +2433,7 @@ clet Moore_FSM name clk state reset_condition transitions =
 
 end_abstype Moore_FSM;
 
+
 //let Hier_FSM name clk state (reset,S0) transitions children =
 //    Moore_FSM name clk state (reset,S0) transitions =
 
@@ -2900,7 +2906,7 @@ add_open_overload hw_is_arithmetic hw__pair__is_arithmetic;
 let hw__pair__size {p:: *a # *b} =
     let a = {undefined :: *a} in
     let b = {undefined :: *b} in
-    (hw_size a) + (hw_size b)
+    i_plus (hw_size a) (hw_size b)
 ;
 add_open_overload hw_size hw__pair__size;
 
@@ -2911,9 +2917,9 @@ let hw__pair__constr we =
     let res = {undefined:: (*a # *b) } in
     let sz1 = hw_size {undefined:: *a} in
     let sz2 = hw_size {undefined:: *b} in
-    let sz = sz1 + sz2 in
-    let e1 = W_SLICE ((sz-1) downto sz2) we in
-    let e2 = W_SLICE ((sz2-1) downto 0) we in
+    let sz = i_plus sz1 sz2 in
+    let e1 = W_SLICE ((i_minus sz 1) downto sz2) we in
+    let e2 = W_SLICE ((i_minus sz2 1) downto 0) we in
     {hw_constr e1:: *a}, {hw_constr e2:: *b}
 ;
 add_open_overload hw_constr hw__pair__constr;
@@ -2923,7 +2929,6 @@ let hw__pair__mk_var p base =
     W_VAR sz base
 ;
 add_open_overload hw_mk_var hw__pair__mk_var;
-
 
 let hw__list__destr as = W_CAT (map hw_destr as);
 add_open_overload hw_destr hw__list__destr;

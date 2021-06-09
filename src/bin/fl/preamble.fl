@@ -448,6 +448,29 @@ end_abstype bv_exp bv_abs;
 // Compute the condition for two bitvectors not to be equal.
 let bv_neq {a::bv} {b::bv} = a != b;
 
+// Compute base to the power of n.
+letrec bv_pow {base::bv} {n::bv} =
+    n <= '0 => '1 |
+    base * (bv_pow base (n - '1))
+;
+
+// Compute n shifted left by amount.
+let bv_shl n amount =
+    bv_mul n (bv_pow (int2bv 2) amount)
+;
+
+// Compute n shifted right by amount.
+let bv_shr n amount =
+    bv_div (bv_ZX n) (bv_pow (int2bv 2) amount)
+;
+
+// Compute n arithmetically shifted right by amount.
+let bv_ashr_bvbv n amount =
+    bv_div n (bv_pow (int2bv 2) amount)
+;
+
+overload bv_ashr bv_ashr bv_ashr_bvbv;
+
 // Compute a substitution for all variables that must take on 
 // some value for cond to be satisfied.
 // For example, if cond = a & b & c' + a & b' & c'

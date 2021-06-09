@@ -6,7 +6,7 @@
 
 int Dbg_en = 0;
 
-#define YYMAXDEPTH 512		/* To make the parser a bit more robust */
+// #define YYMAXDEPTH 10000	/* To make the parser a bit more robust */
 
 /* --------------- External references --------------- */
 extern bool	file_load;

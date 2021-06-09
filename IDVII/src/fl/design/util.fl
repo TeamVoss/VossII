@@ -273,8 +273,6 @@ let check_memory a_sz lines d_sz addr mem =
 	()
 ;
 
-begin_abstype;
-
 
 cletrec wexpr_is_binary (W_X sz) = F
  /\     wexpr_is_binary (W_NAMED_CONST name sz v) = T
@@ -321,173 +319,119 @@ cletrec wexpr_is_binary (W_X sz) = F
 ;
 
 
-let dT = T;
-let dF = F;
-let dX = variable "X";
-let dvariable n = variable n;
-let dNOT a = NOT a;
-let dAND = defix AND;
-infix 4 dAND;
-let dOR  = defix OR;
-infix 3 dOR;
-let dXOR = defix XOR;
-infix 4 dXOR;
-let dXNOR = defix XNOR;
-infix 4 dXNOR;
-
-let dsubstitute sub f = substitute sub f;
-
-let dTHEN_1 c (t,e) = (c dAND t) dOR (dNOT c dAND e);
-
-let dTHEN_2 c (lt,le) = map2 (\t.\e. dTHEN_1 c (t,e)) lt le;
-
-let dTHEN_3 c ((lt1,lt2),(le1,le2)) =
-	(dTHEN_2 c (lt1,le1)), (dTHEN_2 c (lt2,le2));
-
-
-overload dTHEN dTHEN_1 dTHEN_2 dTHEN_3;
-
-let gT = T;
-let gF = F;
-let gvariable = dvariable;
-let gNOT = dNOT;
-let gAND = defix dAND;
-infix 4 gAND;
-let gXNOR = defix dXNOR;
-infix 4 gXNOR;
-let gXOR = defix dXOR;
-infix 4 gXOR;
-let gOR = defix dOR;
-infix 3 gOR;
-let gIF c = c;
-let gTHEN c te = dTHEN c te;
-let gELSE t e = (t,e);
-if_then_else_binder gTHEN gELSE;
-let gEQUIV a b = a == b;
-infix 5 gEQUIV;
-letrec dveq (a:as) (b:bs) = a dXNOR b dAND (dveq as bs)
- /\    dveq []     []     = dT
-;
-let gEQUAL a b = dveq a b;
-infix 5 gEQUAL;
-let gdepends = depends;
-
-load "gen_u_arithm.fl";
-
 let x_var_cnt = ref 0;
 
 let mk_xvars sz =
     let idx = deref x_var_cnt then
     (x_var_cnt := (idx+1)) fseq
     let base = sprintf "#Xvar%d" idx then
-    map dvariable (md_expand_vector (mk_name sz base))
+    bv_variable (mk_name sz base)
 ;
 
-cletrec wexpr2bool sub (W_NAMED_CONST name sz v) =
-	    v >= 0 => int2fbv sz v | int2fbv sz (2**sz+v)
- /\     wexpr2bool sub (W_X sz) =
-	    // Generate new unique BDD variables for X's
-	    // A bit of a hack, but there is no clean solution to this
-	    // that I can think of. The rigth answer would probably have
-	    // a wexpr2dualrail but that's pretty cumbersome too
-	    mk_xvars sz
- /\     wexpr2bool sub (W_CONST sz v) =
-	    v >= 0 => int2fbv sz v | int2fbv sz (2**sz+v)
- /\     wexpr2bool sub (W_VAR sz b) =
-	dsubstitute sub (map dvariable (md_expand_vector (mk_name sz b)))
- /\     wexpr2bool sub (W_EXPLICIT_VAR sz n) =
-	dsubstitute sub (map dvariable (md_expand_vector n))
- /\     wexpr2bool sub (W_AND a b) =
-	    map2 (defix dAND) (wexpr2bool sub a) (wexpr2bool sub b)
- /\     wexpr2bool sub (W_OR a b) =
-	    map2 (defix dOR) (wexpr2bool sub a) (wexpr2bool sub b)
- /\     wexpr2bool sub (W_NOT a) = map dNOT (wexpr2bool sub a)
- /\     wexpr2bool sub (W_PRED name cond) = wexpr2bool sub cond
- /\     wexpr2bool sub (W_EQ a b) =
-	[(wexpr2bool sub a) '=' (wexpr2bool sub b)]
- /\     wexpr2bool sub (W_GR a b) =
-	[(wexpr2bool sub a) '>' (wexpr2bool sub b)]
- /\     wexpr2bool sub (W_ADD a b) = (wexpr2bool sub a) '+' (wexpr2bool sub b)
- /\     wexpr2bool sub (W_SUB a b) = (wexpr2bool sub a) '-' (wexpr2bool sub b)
- /\     wexpr2bool sub (W_MUL a b) = (wexpr2bool sub a) '*' (wexpr2bool sub b)
- /\     wexpr2bool sub (W_DIV a b) = (wexpr2bool sub a) '/' (wexpr2bool sub b)
- /\     wexpr2bool sub (W_MOD a b) = (wexpr2bool sub a) '%' (wexpr2bool sub b)
- /\     wexpr2bool sub (W_SHL a b) = (wexpr2bool sub a) '<<' (wexpr2bool sub b)
- /\     wexpr2bool sub (W_SHR a b) = (wexpr2bool sub a) '>>' (wexpr2bool sub b)
- /\     wexpr2bool sub (W_ASHR a b) = (wexpr2bool sub a) '|>>' (wexpr2bool sub b)
- /\     wexpr2bool sub (W_SX sz w) =
-	    let short = wexpr2bool sub w in
-	    let l = length short in
-	    (replicate (sz-l) (hd short))@short
- /\     wexpr2bool sub (W_ZX sz w) =
-	    let short = wexpr2bool sub w in
-	    let l = length short in
-	    (replicate (sz-l) dF)@short
- /\     wexpr2bool sub (W_ITE c t e) =
-	val [cond] = wexpr2bool sub c in
-	let tv = wexpr2bool sub t in
-	let ev = wexpr2bool sub e in
-	IF cond THEN tv ELSE ev
- /\     wexpr2bool sub (W_SLICE indices w) =
-	    let bv = wexpr2bool sub w in
-	    let l = length bv in
-	    map (\idx. el (l-idx) bv) indices
- /\     wexpr2bool sub (W_NAMED_SLICE name indices w) =
-	    let bv = wexpr2bool sub w in
-	    let l = length bv in
-	    map (\idx. el (l-idx) bv) indices
- /\     wexpr2bool sub (W_UPDATE_NAMED_SLICE old name indices new) =
-	    let old_bv = wexpr2bool sub old in
-	    let new_bv = wexpr2bool sub new in
-	    let sz = length old_bv in
-	    let new_map = zip indices ((length indices-1) downto 0) in
-	    let get_el idx l = el (length l - idx) l in
-	    let mk_part inside f t =
-		inside =>
-		    let sel_indices = map (\i. assoc i new_map) (f downto t) in
-		    map (\i. get_el i new_bv) sel_indices
-		|
-		    map (\i. get_el i old_bv) (f downto t)
-	    in
-	    letrec collect inside f cur (idx:idxs) =
-		let new_inside = mem idx indices then
-		(new_inside = inside) => collect inside f idx idxs |
-		// Switching from inside to outside or vice versa
-		let part = mk_part inside f cur in
-		part@(collect new_inside idx idx idxs)
-	      /\   collect inside f cur [] =
-		let part = mk_part inside f cur in 
-		part
-	    in
-	    let start = sz-1 in
-	    collect (mem start indices) start start ((start-1) downto 0)
- /\     wexpr2bool sub (W_CAT wl) = itlist (\w.\l. (wexpr2bool sub w)@l) wl []
- /\     wexpr2bool sub (W_MEM_READ info mem addr) =
-	    val (MEM a_sz lines d_sz) = info in
-	    (check_memory a_sz lines d_sz addr mem) fseq
-	    letrec read i =
-		i >= lines => W_X d_sz |
-		let range = (d_sz*(i+1)-1) downto (d_sz*i) in
-		let cond = W_EQ (W_CONST a_sz i) addr in
-		W_ITE cond (W_SLICE range mem) (read (i+1))
-	    in
-	    wexpr2bool sub (read 0)
- /\     wexpr2bool sub (W_MEM_WRITE info mem addr d) =
-	    val (MEM a_sz lines d_sz) = info in
-	    (check_memory a_sz lines d_sz addr mem) fseq
-	    letrec write i =
-		i >= lines => [] |
-		let range = (d_sz*(i+1)-1) downto (d_sz*i) in
-		let cond = W_EQ (W_CONST a_sz i) addr in
-		let dr = W_ITE cond d (W_SLICE range mem) in
-		(wexpr2bool sub dr):(write (i+1))
-	    in
-	    flat (rev (write 0))
- /\     wexpr2bool sub other =
-	(draw_graph 10 other) fseq error "No pattern matched in wexpr2bool sub"
+cletrec w2bv sub w =
+    let w2bl w =
+	let sz = wexpr_size w in
+	let base = bv2list (w2bv sub w) in
+	lastn sz ((replicate sz (hd base))@base)
+    in
+    let w2bv (W_NAMED_CONST name sz v) = int2bv v
+     /\ w2bv (W_X sz) =
+		// Generate new unique BDD variables for X's
+		// A bit of a hack, but there is no clean solution to this
+		// that I can think of. The rigth answer would probably have
+		// a wexpr2dualrail but that's pretty cumbersome too
+		mk_xvars sz
+     /\ w2bv (W_CONST sz v) = int2bv v
+     /\ w2bv (W_VAR sz b) = substitute sub (bv_variable (mk_name sz b))
+     /\ w2bv (W_EXPLICIT_VAR sz n) = substitute sub (bv_variable n)
+     /\ w2bv (W_AND a b) = bv_AND (w2bv sub a) (w2bv sub b)
+     /\ w2bv (W_OR a b) = bv_OR (w2bv sub a) (w2bv sub b)
+     /\ w2bv (W_NOT a) = bv_NOT (w2bv sub a)
+     /\ w2bv (W_PRED name cond) = w2bv sub cond
+     /\ w2bv (W_EQ a b) =
+	    (bv_eq (w2bv sub a) (w2bv sub b)) => (int2bv 1) | (int2bv 0)
+     /\ w2bv (W_GR a b) =
+	    (bv_greater (w2bv sub a) (w2bv sub b)) => (int2bv 1) | (int2bv 0)
+     /\ w2bv (W_ADD a b) = bv_add (w2bv sub a) (w2bv sub b)
+     /\ w2bv (W_SUB a b) = bv_sub (w2bv sub a) (w2bv sub b)
+     /\ w2bv (W_MUL a b) = bv_mul (w2bv sub a) (w2bv sub b)
+     /\ w2bv (W_DIV a b) = bv_div (w2bv sub a) (w2bv sub b)
+     /\ w2bv (W_MOD a b) = bv_mod (w2bv sub a) (w2bv sub b)
+     /\ w2bv (W_SHL a b) = bv_shl (w2bv sub a) (w2bv sub b)
+     /\ w2bv (W_SHR a b) = bv_shr (w2bv sub a) (w2bv sub b)
+     /\ w2bv (W_ASHR a b) = bv_ashr (w2bv sub a) (w2bv sub b)
+     /\ w2bv (W_SX sz w) = w2bv sub w
+     /\ w2bv (W_ZX sz w) = bv_ZX (w2bv sub w)
+     /\ w2bv (W_ITE c t e) =
+	    (w2bv sub c) = (int2bv 1) => (w2bv sub t) | (w2bv sub e)
+     /\ w2bv (W_SLICE indices w) =
+		let sz = wexpr_size w in
+		list2bv (map (\idx. el (sz-idx) (w2bl w)) indices)
+     /\ w2bv (W_NAMED_SLICE name indices w) =
+		let sz = wexpr_size w in
+		list2bv (map (\idx. el (sz-idx) (w2bl w)) indices)
+     /\ w2bv (W_UPDATE_NAMED_SLICE old name indices new) =
+		let old_bv = w2bl old in
+		let new_bv = w2bl new in
+		let sz = length old_bv in
+		let new_map = zip indices ((length indices-1) downto 0) in
+		let get_el idx l = el (length l - idx) l in
+		let mk_part inside f t =
+		    inside =>
+			let sels = map (\i.assoc i new_map) (f downto t) in
+			map (\i. get_el i new_bv) sels
+		    |
+			map (\i. get_el i old_bv) (f downto t)
+		in
+		letrec collect inside f cur (idx:idxs) =
+		    let new_inside = mem idx indices then
+		    (new_inside = inside) => collect inside f idx idxs |
+		    // Switching from inside to outside or vice versa
+		    let part = mk_part inside f cur in
+		    part@(collect new_inside idx idx idxs)
+		  /\   collect inside f cur [] =
+		    let part = mk_part inside f cur in 
+		    part
+		in
+		let start = sz-1 in
+		let r =
+		    collect (mem start indices) start start ((start-1) downto 0)
+		in
+		list2bv r
+     /\  w2bv (W_CAT wl) = list2bv (itlist (\w.\l. (w2bl w)@l) wl [])
+     /\  w2bv (W_MEM_READ info mem addr) =
+		val (MEM a_sz lines d_sz) = info in
+		(check_memory a_sz lines d_sz addr mem) fseq
+		letrec read i =
+		    i >= lines => W_X d_sz |
+		    let range = (d_sz*(i+1)-1) downto (d_sz*i) in
+		    let cond = W_EQ (W_CONST a_sz i) addr in
+		    W_ITE cond (W_SLICE range mem) (read (i+1))
+		in
+		w2bv sub (read 0)
+     /\  w2bv (W_MEM_WRITE info mem addr d) =
+		val (MEM a_sz lines d_sz) = info in
+		(check_memory a_sz lines d_sz addr mem) fseq
+		letrec write i =
+		    i >= lines => [] |
+		    let range = (d_sz*(i+1)-1) downto (d_sz*i) in
+		    let cond = W_EQ (W_CONST a_sz i) addr in
+		    let dr = W_ITE cond d (W_SLICE range mem) in
+		    (w2bl dr):(write (i+1))
+		in
+		list2bv (flat (rev (write 0)))
+     /\  w2bv other =
+	    (draw_graph 10 other) fseq
+	    error "No pattern matched in wexpr2bool sub"
+    in
+    w2bv w
 ;
 
-end_abstype wexpr_is_binary wexpr2bool;
+letrec wexpr2bool sub w = 
+    let sz = wexpr_size w in
+    let base = bv2list (w2bv sub w) in
+    lastn sz ((replicate sz (hd base))@base)
+;
 
 let extract_pexlif_hierarchy pexlif hierarchy =
     let indices = map (sscanf "i%d") (str_split hierarchy "/") in
