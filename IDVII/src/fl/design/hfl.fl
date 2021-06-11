@@ -15,62 +15,69 @@ lettype *a hw_type =
 	{hw_values:: *a -> string}
 ;
 
-open_overload {hw_type_destr :: *a -> ({*a} hw_type)};
+open_overload {hw_type_destr :: ({*a} hw_type)};
 
 // Make sure there are at least two possibilities for the open overloaded
 // functions.
 lettype dummy1 = DUMMY1;
-let {dummy1_hw_type_destr :: dummy1 -> {dummy1} hw_type} = error "dummy1";
+let {dummy1_hw_type_destr :: {dummy1} hw_type} = error "dummy1";
 lettype dummy2 = DUMMY2;
-let {dummy2_hw_type_destr :: dummy2 -> {dummy2} hw_type} = error "dummy2";
+let {dummy2_hw_type_destr :: {dummy2} hw_type} = error "dummy2";
 add_open_overload hw_type_destr dummy1_hw_type_destr dummy2_hw_type_destr;
 
-let hw_type_name o =
+let hw_constr w =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr o
+		 hw_size hw_destr hw_constr hw_values)
+	= {hw_type_destr:: {*a} hw_type}
+    in
+    {hw_constr w:: *a}
+;
+
+let hw_type_name {o:: *a} =
+    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
+		 hw_size hw_destr hw_constr hw_values)
+	= {hw_type_destr:: {*a} hw_type}
     in
     hw_type_name o
 ;
 
-let hw_mk_var o =
+
+let hw_mk_var {o:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr o
+		 hw_size hw_destr hw_constr hw_values)
+	= {hw_type_destr:: {*a} hw_type}
     in
     hw_mk_var o
 ;
 
-let hw_is_arithmetic o =
+let hw_is_arithmetic {o:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr o
+		 hw_size hw_destr hw_constr hw_values)
+	= {hw_type_destr:: {*a} hw_type}
     in
     hw_is_arithmetic o
 ;
 
-let hw_size o =
+let hw_size {o:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr o
+		 hw_size hw_destr hw_constr hw_values)
+	= {hw_type_destr:: {*a} hw_type}
     in
     hw_size o
 ;
 
-let hw_destr o =
+let hw_destr {o:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr o
+		 hw_size hw_destr hw_constr hw_values)
+	= {hw_type_destr:: {*a} hw_type}
     in
     hw_destr o
 ;
 
-let hw_constr w =
-    let o = {undefined:: *r} in
+let hw_values {o:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr o
-    in
-    {hw_constr w:: *r}
-;
-
-let hw_values o =
-    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr o
+		 hw_size hw_destr hw_constr hw_values)
+	= {hw_type_destr:: {*a} hw_type}
     in
     hw_values o
 ;
@@ -95,9 +102,9 @@ let ileq {i::int} {j::int} = i <= j;
 // creates a byte with 8 symbolic variables named a[7] downto a[0].
 //
 let make_const_or_var s =
-    let o = {undefined:: *r} in
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr o
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*r} hw_type}
     in
     let sz = hw_size {undefined:: *r} in
     let w =
@@ -127,7 +134,8 @@ free_binder ';
 let neg_make_const_or_var s =
     let o = {undefined:: *r} in
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr o
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*r} hw_type}
     in
     let sz = hw_size {undefined:: *r} in
     let w =
@@ -1358,7 +1366,7 @@ let core_TYPE name size is_arithmetic value_list =
 	let hw_`name`_size {bv::`name`} = `ssz`;
 	let hw_`name`_constr w = BV_`name` w;
 	let hw_`name`_destr (BV_`name` w) = w;
-	let `name`_hw_type_destr (BV_`name` w) =
+	let {`name`_hw_type_destr:: {`name`} hw_type} =
 	    HW_TYPE hw_`name`_type_name
 		    hw_`name`_mk_var 
 		    hw_`name`_is_arithmetic 
@@ -1715,7 +1723,7 @@ let MEMORY name size_list word_type =
 	let hw_`name`_size {bv::`name`} = `ssz`;
 	let hw_`name`_constr w = BV_`name` w;
 	let hw_`name`_destr (BV_`name` w) = w;
-	let `name`_hw_type_destr (BV_`name` w) =
+	let `name`_hw_type_destr =
 	    HW_TYPE hw_`name`_type_name
 		    hw_`name`_mk_var 
 		    hw_`name`_is_arithmetic 
@@ -1828,7 +1836,8 @@ let hw_unsplit l =
 
 let wNOT {a:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr a
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
     in
     let res = W_NOT (hw_destr a) in
     {hw_constr res:: *a}
@@ -1837,7 +1846,8 @@ let '~' a = wNOT a;
 
 let wAND {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr a
+		 hw_size hw_destr hw_constr hw_values) = 
+	{hw_type_destr :: {*a} hw_type}
     in
     let res = W_AND (hw_destr a) (hw_destr b) in
     {hw_constr res:: *a}
@@ -1846,9 +1856,9 @@ let '&' = wAND;
 infix 4 '&';
 
 let wITE {c::bit} {t:: *a} {e:: *a} =
-    let o = {undefined:: *a} in
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr o
+		 hw_size hw_destr hw_constr hw_values) = 
+	{hw_type_destr :: {*a} hw_type}
     in
     let res = W_ITE (hw_bit_destr c) (hw_destr t) (hw_destr e) in
     {hw_constr res :: *a}
@@ -1861,7 +1871,6 @@ let IF c = c;
 let ELSE {t:: *a} {e:: *a} = (t,e);
 let bitTHEN c (t,e) = c '?' t ':' e;
 overload tmp_THEN bTHEN bevTHEN bitTHEN;
-//let tmp_THEN = bitTHEN;
 
 let THEN {c:: *b} ({te:: *a # *a}) =
     let res = tmp_THEN c te in
@@ -1871,7 +1880,8 @@ if_then_else_binder THEN ELSE;
 
 let wOR {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr a
+		 hw_size hw_destr hw_constr hw_values) = 
+	{hw_type_destr :: {*a} hw_type}
     in
     let res = W_OR (hw_destr a) (hw_destr b) in
     {hw_constr res:: *a}
@@ -1885,7 +1895,8 @@ infix 4 '^';
 
 let wEQ {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr a
+		 hw_size hw_destr hw_constr hw_values) = 
+	{hw_type_destr :: {*a} hw_type}
     in
     let res = W_EQ (hw_destr a) (hw_destr b) in
     hw_bit_constr res
@@ -1895,7 +1906,8 @@ infix 5 '=';
 
 let wNEQ {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr a
+		 hw_size hw_destr hw_constr hw_values) = 
+	{hw_type_destr :: {*a} hw_type}
     in
     let res = W_NOT (W_EQ (hw_destr a) (hw_destr b)) in
     {hw_bit_constr res:: bit}
@@ -1905,7 +1917,8 @@ infix 5 '!=';
 
 let wGR {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr a
+		 hw_size hw_destr hw_constr hw_values) = 
+	{hw_type_destr :: {*a} hw_type}
     in
     NOT (hw_is_arithmetic a) =>
 	eprintf "Cannot perform > on vectors of type %s\n" (hw_type_name a)
@@ -1930,7 +1943,8 @@ infix 5 '<=';
 
 let wADD {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr a
+		 hw_size hw_destr hw_constr hw_values) = 
+	{hw_type_destr :: {*a} hw_type}
     in
     NOT (hw_is_arithmetic a) =>
 	eprintf "Cannot perform + on vectors of type %s\n" (hw_type_name a)
@@ -1943,7 +1957,8 @@ infix 7 '+';
 
 let wDIV {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr a
+		 hw_size hw_destr hw_constr hw_values) = 
+	{hw_type_destr :: {*a} hw_type}
     in
     NOT (hw_is_arithmetic a) =>
 	eprintf "Cannot perform / on vectors of type %s\n" (hw_type_name a)
@@ -1956,7 +1971,8 @@ infix 8 '/';
 
 let wMUL {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr a
+		 hw_size hw_destr hw_constr hw_values) = 
+	{hw_type_destr :: {*a} hw_type}
     in
     NOT (hw_is_arithmetic a) =>
 	eprintf "Cannot perform * on vectors of type %s\n" (hw_type_name a)
@@ -1970,7 +1986,8 @@ infix 8 '*';
 
 let wSUB {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr a
+		 hw_size hw_destr hw_constr hw_values) = 
+	{hw_type_destr :: {*a} hw_type}
     in
     NOT (hw_is_arithmetic a) =>
 	eprintf "Cannot perform - on vectors of type %s\n" (hw_type_name a)
@@ -1983,7 +2000,8 @@ infix 7 '-';
 
 let wMOD {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr a
+		 hw_size hw_destr hw_constr hw_values) = 
+	{hw_type_destr :: {*a} hw_type}
     in
     NOT (hw_is_arithmetic a) =>
 	eprintf "Cannot perform %% on vectors of type %s\n" (hw_type_name a)
@@ -1996,7 +2014,8 @@ infix 8 '%';
 
 let wSHL {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr a
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
     in
     NOT (hw_is_arithmetic a) =>
 	eprintf "Cannot perform << on vectors of type %s\n" (hw_type_name a)
@@ -2012,7 +2031,8 @@ infix 9 '<<';	    // Fixity???????
 
 let wSHR {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr a
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
     in
     NOT (hw_is_arithmetic a) =>
 	eprintf "Cannot perform >> on vectors of type %s\n" (hw_type_name a)
@@ -2028,7 +2048,8 @@ infix 9 '>>';	    // Fixity???????
 
 let wASHR {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr a
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
     in
     NOT (hw_is_arithmetic a) =>
 	eprintf "Cannot perform |>> on vectors of type %s\n" (hw_type_name a)
@@ -2043,12 +2064,13 @@ let '|>>' = wASHR;
 infix 9 '|>>';	    // Fixity???????
 
 let ZX {inp:: *a} =
-    let o = {undefined:: *b} in
-    val (HW_TYPE ohw_type_name ohw_mk_var ohw_is_arithmetic
-		 ohw_size ohw_destr ohw_constr ohw_values) = hw_type_destr o
-    in
     val (HW_TYPE ihw_type_name ihw_mk_var ihw_is_arithmetic
-		 ihw_size ihw_destr ihw_constr ihw_values) = hw_type_destr inp
+		 ihw_size ihw_destr ihw_constr ihw_values) = 
+	{hw_type_destr :: {*q} hw_type}
+    in
+    val (HW_TYPE ohw_type_name ohw_mk_var ohw_is_arithmetic
+		 ohw_size ohw_destr ohw_constr ohw_values) =
+	{hw_type_destr :: {*b} hw_type}
     in
     let sz_out = ohw_size {undefined :: *b} in
     let w_out = W_ZX sz_out (ihw_destr inp) in
@@ -2057,12 +2079,13 @@ let ZX {inp:: *a} =
 ;
 
 let SX {inp:: *a} =
-    let o = {undefined:: *b} in
-    val (HW_TYPE ohw_type_name ohw_mk_var ohw_is_arithmetic
-		 ohw_size ohw_destr ohw_constr ohw_values) = hw_type_destr o
-    in
     val (HW_TYPE ihw_type_name ihw_mk_var ihw_is_arithmetic
-		 ihw_size ihw_destr ihw_constr ihw_values) = hw_type_destr inp
+		 ihw_size ihw_destr ihw_constr ihw_values) = 
+	{hw_type_destr :: {*q} hw_type}
+    in
+    val (HW_TYPE ohw_type_name ohw_mk_var ohw_is_arithmetic
+		 ohw_size ohw_destr ohw_constr ohw_values) =
+	{hw_type_destr :: {*b} hw_type}
     in
     let sz_out = ohw_size {undefined :: *b} in
     let w_out = W_SX sz_out (ihw_destr inp) in
@@ -2291,9 +2314,10 @@ infix 9 ~~~;
 let default = {'1::bit};
 
 // Covert a hardware type to a list of bits
-let tobits t =
+let tobits {t:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr t
+		 hw_size hw_destr hw_constr hw_values) = 
+	{hw_type_destr :: {*a} hw_type}
     in
     let sz = hw_size t in
     let w = hw_destr t in
@@ -2302,9 +2326,9 @@ let tobits t =
 
 // Covert a list of bits to a hardware type
 let frombits bl =
-    let o = {undefined:: *r} in
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) = hw_type_destr o
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*r} hw_type}
     in
     let rsz = hw_size {undefined:: *r} in
     rsz != length bl =>
@@ -3046,7 +3070,7 @@ let hw__pair__mk_var p base =
 
 let hw__pair__values {p:: *a # *b} = error "Not relevant";
 
-let hw_pair_hw_type_destr {p:: *a # *b} =
+let hw_pair_hw_type_destr =
 	    HW_TYPE hw__pair__type_name
 		    hw__pair__mk_var 
 		    hw__pair__is_arithmetic 
@@ -3060,7 +3084,7 @@ add_open_overload hw_type_destr hw_pair_hw_type_destr;
 
 let hw__list__destr as = W_CAT (map hw_destr as);
 
-let hw_list_hw_type_destr {p:: *a list} =
+let hw_list_hw_type_destr =
 	    HW_TYPE (error "Not defined for lists")
 		    (error "Not defined for lists")
 		    (error "Not defined for lists")
