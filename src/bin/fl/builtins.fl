@@ -806,6 +806,12 @@ let feof fp = defix feof fp;
 let fgets fp = defix fgets fp;
 non_lazy fgets;
 
+// Read content from the open file descriptor fp.
+// Function fails if fp is not open for reading.
+// Usage: fget fp;
+let fget fp = defix fget fp;
+non_lazy fget;
+
 // Return the string consisting of the last cnt characters in s.
 // Usage: string_lastn s cnt;
 let string_lastn s cnt = defix string_lastn s cnt;
