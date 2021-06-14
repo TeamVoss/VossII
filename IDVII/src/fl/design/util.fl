@@ -57,7 +57,7 @@ let update_fn_get_update_fun_rhs (W_UPDATE_FN lhs rhs) = rhs
 
 letrec prim_Ppexlif ind fp (inst,pexlif) =
     val (PINST name attrs leaf inps outs ints body) = pexlif then
-    let pattr a v = (a == "fingerprint") OR (a == "signature") =>
+    let pattr a v = (a == "FP") OR (a == "SHA") =>
             (substr v 1 4) ^ ".." | v
     in
     let sattrs = list2str T "[" "," "]"

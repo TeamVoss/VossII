@@ -16,13 +16,15 @@ let find_attr s a = snd # find_maybe (defix == s # fst) ("", a);
 
 // Fetch the "fingerprint" attribute, if any.
 //  find_fingerprint::(string#string list)->int
-let find_fingerprint = s2int # find_attr "fingerprint" "0";
+let find_fingerprint = s2int # find_attr "FP" "0";
 
 // Fetch the "signature" attribute, if any.
 //  find_signature::(string#string list)->string
-let find_signature = find_attr "signature" "";
+let find_signature = find_attr "SHA" "";
 
 //------------------------------------------------------------------------------
+
+begin_abstype;
 
 // Expand and pair up each formal/actual vector.
 //  lineup::(formal#(actual list) list)->(formal#actual list)
@@ -48,9 +50,13 @@ let fa_actualize fa_n fa_h = fa_promote fa_raise (fa_lineup fa_n) (fa_lineup fa_
 //  fa_formalize::...
 let fa_formalize fa_n fa_h = fa_promote fa_lower (fa_lineup fa_n) (fa_lineup fa_h);
 
+end_abstype fa_actualize fa_formalize;
+
 //------------------------------------------------------------------------------
 // Fingerprint generation for a PEXLIF.
 //------------------------------------------------------------------------------
+
+begin_abstype;
 
 // Multiply a value by a prime.
 //  pm_val::...
@@ -59,8 +65,6 @@ let pm_val = prime_mult;
 // Multiply each value by a prime, starting at some 'n', and sum the results.
 //  pm_list::(a->int)->int->(a list)->int
 let pm_list f n vs = ixlist (\a. \i. \s. pm_val i (f a) + s) vs n;
-
-//------------------------------------------------------------------------------
 
 // Gen. a fingerprint for 'MEM'.
 //  fp_mem::MEM->int
@@ -152,6 +156,8 @@ let
         )
 ;
 
+end_abstype fp_pinst;
+
 //------------------------------------------------------------------------------
 // SHA256 signature generation for a PEXLIF.
 //------------------------------------------------------------------------------
@@ -159,6 +165,8 @@ let
 // Compute the SHA256 signature of a 'set' of components.
 //  sha_set::(a list)->string
 let sha_set = sha256_signature # qsort strcmp # map sha256_signature;
+
+begin_abstype;
 
 // Compute the SHA256 signature of a 'CONTENT'.
 //  sha_content::content->string
@@ -189,6 +197,8 @@ let
         )
 ;
 
+end_abstype sha_pinst;
+
 //------------------------------------------------------------------------------
 // Extension of the PINST constructor with fingerprints and SHA256 signatures.
 //------------------------------------------------------------------------------
@@ -196,8 +206,8 @@ let
 let
     PINST n a l i o t c =
         find_fingerprint a != 0 => PINST n a l i o t c | 
-        let f = ("fingerprint", fp_pinst    i o t c) then
-        let s = ("signature",   sha_pinst n i o t c) then
+        let f = ("FP",  fp_pinst    i o t c) then
+        let s = ("SHA", sha_pinst n i o t c) then
         PINST n (f : s : a) l i o t c
 ;
 
@@ -265,14 +275,18 @@ begin_abstype;
 let split_at_random [] = ([],[])
 /\  split_at_random xs = split_at (random 1 (length xs + 1)) xs
 ;
+non_lazy split_at_random;
 
 let segment_at_random 1  = [1]
 /\  segment_at_random sz =
         let r = random 1 sz in
         ((sz / r) + (sz % r)) : (replicate ((sz / r) - 1) r)
 ;
+non_lazy segment_at_random;
 
-let slice_at_random lz hz = repeat (hz-lz) remove_one (0 upto hz);
+let slice_at_random lz hz = repeat (hz-lz) remove_one (0 upto hz)
+;
+non_lazy slice_at_random;
 
 letrec
     gen_wexpr_inputs
@@ -296,6 +310,7 @@ letrec
          // , (x, W_MEM_READ ?! ?! ?!)
             , (4, use_var) ]
 ;
+non_lazy gen_wexpr_inputs;
 
 let gen_wexpr_input
         {is :: (wexpr#int) list}
@@ -303,6 +318,7 @@ let gen_wexpr_input
         =
         let vs = gen_wexpr_inputs is sz in length vs == 1 => hd vs | W_CAT vs
 ;
+non_lazy gen_wexpr_input;
 
 letrec
     gen_wexpr
@@ -367,6 +383,7 @@ letrec
          // , W_MEM_WRITE ?! ?! ?! ?!
             ]
 ;
+non_lazy gen_wexpr;
 
 let gen_update_fn
         {is    :: (wexpr#int) list} // Global inputs
@@ -377,6 +394,7 @@ let gen_update_fn
         =
         (delay => W_PHASE_DELAY | W_UPDATE_FN) o (gen_wexpr is ts s d)
 ;
+non_lazy gen_update_fn;
 
 let gen_update_fn_internals
         {sc    :: (bool list) list} // Connection schema for internals.
@@ -388,6 +406,7 @@ let gen_update_fn_internals
         let inputs = map (map fst # filter snd # zip ts) sc in
         map (\(t,i). gen_update_fn is (el i inputs) t delay d) (ixlabel ts)
 ;
+non_lazy gen_update_fn_internals;
 
 let extend_wires
         {xs   :: (wexpr#int) list}
@@ -412,6 +431,7 @@ let extend_wires
         in
         pad xs
 ;
+non_lazy extend_wires;
 
 let gen_update_fn_outputs
         {is    :: (wexpr#int) list}
@@ -426,6 +446,7 @@ let gen_update_fn_outputs
         let xs'  = extend_wires ts l_os in
         map2 (\ts. \o. gen_update_fn is ts o delay d) (split_into l_os xs') os
 ;
+non_lazy gen_update_fn_outputs;
 
 let gen_wires
         {pre   :: string}
@@ -447,6 +468,7 @@ let gen_wires
         in
         map new_internal (1 upto num)
 ;
+non_lazy gen_wires;
 
 let gen_pinst_update_fn_leaf
         {sc    :: (bool list) list}
@@ -462,6 +484,7 @@ let gen_pinst_update_fn_leaf
         let fns_o = gen_update_fn_outputs is ts_o os delay d in
         P_LEAF (fns_t @ fns_o)
 ;
+non_lazy gen_pinst_update_fn_leaf;
 
 let gen_DAG_with_threshold n p =
         letrec
@@ -474,11 +497,13 @@ let gen_DAG_with_threshold n p =
         let marked = ixmap (map_from flip) empty in
         marked
 ;
+non_lazy gen_DAG_with_threshold;
 
 let gen_DAG n =
         gen_DAG_with_threshold n
             (fdiv (fmul 2.0 (log (int2float n))) (int2float n))
 ;
+non_lazy gen_DAG;
 
 let formal_to_wire f =
         let sz = md_size f in
@@ -509,6 +534,7 @@ let gen_pinst_leaf
         // ...
         PINST name [] T fa_is fa_os (map wire_to_formal ts) leaf
 ;
+non_lazy gen_pinst_leaf;
 
 let gen_pinst
         {fa_is :: (string#(string list)) list}
@@ -536,6 +562,7 @@ let gen_pinst
         // ...
         PINST "node" [] F fa_is fa_os (map fst (f_cs @ f_sc)) (P_HIER [c, s])
 ;
+non_lazy gen_pinst;
 
 let gen_pinst_hier
         {sc    :: (bool list) list}
@@ -563,6 +590,7 @@ let gen_pinst_hier
         in
         P_HIER (ns_t @ ns_o)
 ;        
+non_lazy gen_pinst_hier;
 
 let gen_pinst_graph
         {fa_is :: (string#(string list)) list}
@@ -576,9 +604,9 @@ let gen_pinst_graph
         let hier  =
                 gen_pinst_hier sc fa_is (map wire_to_formal ts) fa_os size d
         in
-        // ...
         PINST "graph" [] F fa_is fa_os (map wire_to_formal ts) hier
 ;
+non_lazy gen_pinst_graph;
 
 end_abstype gen_pinst gen_pinst_graph;
 
@@ -586,7 +614,7 @@ end_abstype gen_pinst gen_pinst_graph;
 
 begin_abstype;
 
-let str_is_signature s = s == "fingerprint" OR s == "signature";
+let str_is_signature s = s == "FP" OR s == "SHA";
 let filter_signatures  = filter (NOT # str_is_signature # fst);
 
 let collect_names wexpr =
@@ -631,12 +659,12 @@ let name_to_formal_actuals n sz =
 let draw_hier_leaf fs =
         let collect = map (curry name_to_formal_actuals) # collect_names in
         let draw_hier (W_UPDATE_FN lhs rhs) =
-                PINST ("draw_hier comb.") [] T
-                      (collect rhs) (collect lhs) []
+                PINST ("draw_hier " ^ (Pwexpr lhs) ^ " <- " ^ (Pwexpr rhs))
+                      [] T (collect rhs) (collect lhs) []
                       (P_LEAF [W_UPDATE_FN lhs rhs])
         /\  draw_hier (W_PHASE_DELAY lhs rhs) =
-                PINST ("draw_hier seq.") [] T
-                      (collect rhs) (collect lhs) []
+                PINST ("draw_hier " ^ (Pwexpr lhs) ^ " := " ^ (Pwexpr rhs))
+                      [] T (collect rhs) (collect lhs) []
                       (P_LEAF [W_PHASE_DELAY lhs rhs])
         in
         P_HIER (map draw_hier fs)
