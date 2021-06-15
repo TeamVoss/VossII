@@ -43,6 +43,7 @@ install_print_function Pupdate_fn;
 
 
 let pexlif_get_name (PINST name attrs leaf fa_inps fa_outs ints cont) = name;
+let pexlif_get_attrs (PINST name attrs leaf fa_inps fa_outs ints cont) = attrs;
 let pexlif_get_leaf (PINST name attrs leaf fa_inps fa_outs ints cont) = leaf;
 let pexlif_get_fa_inps (PINST name attrs leaf fa_inps fa_outs ints cont) = fa_inps;
 let pexlif_get_fa_outs (PINST name attrs leaf fa_inps fa_outs ints cont) = fa_outs;
@@ -57,12 +58,10 @@ let update_fn_get_update_fun_rhs (W_UPDATE_FN lhs rhs) = rhs
 
 letrec prim_Ppexlif ind fp (inst,pexlif) =
     val (PINST name attrs leaf inps outs ints body) = pexlif then
-    let pattr a v = (a == "FP") OR (a == "SHA") =>
-            (substr v 1 4) ^ ".." | v
-    in
-    let sattrs = list2str T "[" "," "]"
-            (\(a,v). sprintf "%s->%s" a (pattr a v)) attrs
-    in
+    // let pattr a v = (a == "FP") OR (a == "SHA") =>
+    //         (substr v 1 4) ^ ".." | v
+    // in
+    let sattrs = list2str T "[" "," "]" (\(a,v). sprintf "%s->%s" a v) attrs in
     let sleaf = leaf => "T" | "F" then
     (fprintf fp "%s:\n%*s(PINST \"%s\" %s %s\n" inst ind "" name sattrs sleaf)
     fseq

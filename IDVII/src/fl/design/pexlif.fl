@@ -4,6 +4,7 @@
 //-------------------------------------------------------------------
 
 load (DIR^"misc.fl");
+load (DIR^"util.fl");
 load (DIR^"primes.fl");
 
 // Find first element accepted by 'f' in 'xs'. If none is found, returns 'x'.
@@ -200,11 +201,10 @@ let
 end_abstype sha_pinst;
 
 //------------------------------------------------------------------------------
-// Extension of the PINST constructor with fingerprints and SHA256 signatures.
+// ...
 //------------------------------------------------------------------------------
 
-let
-    PINST n a l i o t c =
+let PINST n a l i o t c =
         find_fingerprint a != 0 => PINST n a l i o t c | 
         let f = ("FP",  fp_pinst    i o t c) then
         let s = ("SHA", sha_pinst n i o t c) then
@@ -212,13 +212,11 @@ let
 ;
 
 //------------------------------------------------------------------------------
-// Folding/Unfolding of a PEXLIF.
-//------------------------------------------------------------------------------
+// Folding/Unfolding of a pexlif.
 
 // ...
 //  fold_pexlif::PINST->[int]->string->PINST
-let
-    fold_pexlif pex ids name =
+let fold_pexlif pex ids name =
         val (PINST n a l i o t (P_HIER ((PINST n' a' l' i' o' t' c'):cs))) =
                 fold_pexlif pex ids name
         in
@@ -227,13 +225,53 @@ let
 
 // ...
 //  unfold_pexlif::PINST->int->string->PINST
-let
-    unfold_pexlif pex id name =
+let unfold_pexlif pex id name =
         val (PINST n a l i o t (P_HIER cs)) =
                 unfold_pexlif pex id name
         in
         let lbl (PINST n a l i o t c) = PINST n a l i o t c in
         PINST n a l i o t (P_HIER (map lbl cs))
+;
+
+//------------------------------------------------------------------------------
+// Management of pexlif examples.
+
+let store_pexlif_example pex =
+        let sha  = find_signature (pexlif_get_attrs pex) then
+        let sha' = string_empty sha => "bad" | sha then
+        let file = fopen ("pexlif_examples/" ^ sha' ^ ".pex") "w" then
+        (prim_Ppexlif 0 file ("", pex)) fseq (fclose file)
+;
+
+let load_pexlif_example sha =
+        let file = fopen ("pexlif_examples/" ^ sha ^ ".pex") "r" then
+        let pex  = read_pexlif (fget file) then
+        (fclose file) fseq (pex)
+;
+non_lazy load_pexlif_example;
+
+let fetch_pexlif_matches pex =
+        let file = fopen ("pexlif_examples/matches") "r" then
+        let sha  = find_signature (pexlif_get_attrs pex) then
+        letrec
+            read f =
+                let line = fgets f then
+                string_empty line => [] |
+                let real  = string_butlast line then
+                val [l,r] = str_cluster real 64 then
+                l == sha => r : read f |
+                read f
+        in
+        let matches = read file then
+        (fclose file) fseq (matches)
+;
+non_lazy fetch_pexlif_matches;
+
+let append_pexlif_match pex1 pex2 =
+        let file = fopen ("pexlif_examples/matches") "a" then
+        let sha1 = find_signature (pexlif_get_attrs pex1) then
+        let sha2 = find_signature (pexlif_get_attrs pex2) then
+        (fprintf file "%s\n" (sha1 ^ sha2)) fseq (fclose file)
 ;
 
 //------------------------------------------------------------------------------
