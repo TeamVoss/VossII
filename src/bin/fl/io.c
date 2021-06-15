@@ -29,13 +29,17 @@ static char		bdd_pbuf[4096];
 static char		buf[4096];
 static uniq_buffer	bexpr_buf;
 static uniq_buffer	bool_buf;
+#if 0
 static uniq_buffer	fsm_buf;
+#endif
 static uniq_buffer	string_buf;
 static hash_record	g_save_tbl;
 static int		g_save_cnt;
 static buffer		bool_results;
 static buffer		bexpr_results;
+#if 0
 static buffer		fsm_results;
+#endif
 static buffer		str_results;
 
 /* ----- Forward definitions local functions ----- */
@@ -904,11 +908,13 @@ Load_get_string_from_idx(int idx)
     return( *((string *) FAST_LOC_BUF(&str_results, idx)) );
 }
 
+#if 0
 int
 Load_get_fsm_from_idx(int idx)
 {
     return( *((int *) FAST_LOC_BUF(&fsm_results, idx)) );
 }
+#endif
 
 int
 Save_get_bool_idx(formula f)
@@ -928,11 +934,13 @@ Save_get_string_idx(string s)
     return( get_uniq_buf_index(&string_buf, (pointer) &s) );
 }
 
+#if 0
 int
 Save_get_fsm_idx(int ckt)
 {
     return( get_uniq_buf_index(&fsm_buf, (pointer) &ckt) );
 }
+#endif
 
 static g_ptr
 record_bexpr(g_ptr leaf_node)
@@ -1018,7 +1026,9 @@ Save_graph(string type_sig, string file_name, g_ptr node)
     string bool_file_name = wastrsave(&strings, buf);
     new_uniq_buf(&bexpr_buf, 100, sizeof(bexpr));
     new_uniq_buf(&bool_buf, 100, sizeof(formula));
+#if 0
     new_uniq_buf(&fsm_buf, 100, sizeof(int));
+#endif
     new_uniq_buf(&string_buf, 100, sizeof(string));
     // Bexpr saving
     Gen_map(record_bexpr, node, TRUE);
@@ -1065,12 +1075,17 @@ Save_graph(string type_sig, string file_name, g_ptr node)
     fclose(fp);
     free_uniq_buf(&bexpr_buf);
     free_uniq_buf(&bool_buf);
+#if 0
     free_uniq_buf(&fsm_buf);
+#endif
     free_uniq_buf(&string_buf);
     // Tar up the files
+#if 0
+#else
     Sprintf(buf,
-	    "tar -c -z -C %s -f %s signature bexprs bools ckts strings graph",
+	    "tar -c -z -C %s -f %s signature bexprs bools strings graph",
 	    dir, file_name);
+#endif
     if( system(buf) != 0 ) {
 	Fail_pr("Command '%s' failed????", buf);
 	return FALSE;
@@ -1157,7 +1172,9 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Failed to read exe file %s", buf));
 	free_buf(&bool_results);
 	free_buf(&bexpr_results);
+#if 0
 	free_buf(&fsm_results);
+#endif
 	free_buf(&str_results);
 	return( FALSE );
     }
@@ -1175,7 +1192,9 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 					   str_file_name, i+1));
 		free_buf(&bool_results);
 		free_buf(&bexpr_results);
+#if 0
 		free_buf(&fsm_results);
+#endif
 		free_buf(&str_results);
 		return( FALSE );
 	    }
@@ -1198,7 +1217,9 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot open %s", graph_file_name));
 	free_buf(&bool_results);
 	free_buf(&bexpr_results);
+#if 0
 	free_buf(&fsm_results);
+#endif
 	free_buf(&str_results);
 	free_buf(&gbuf);
 	return( FALSE );
@@ -1384,7 +1405,9 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
     OVERWRITE(redex, result);
     free_buf(&bool_results);
     free_buf(&bexpr_results);
+#if 0
     free_buf(&fsm_results);
+#endif
     free_buf(&str_results);
     free_buf(&gbuf);
     Sprintf(buf, "/bin/rm -rf %s", dir);
@@ -1397,7 +1420,9 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 	Fail_pr("Syntax error at line %d in %s", line+1, graph_file_name));
     free_buf(&bool_results);
     free_buf(&bexpr_results);
+#if 0
     free_buf(&fsm_results);
+#endif
     free_buf(&str_results);
     free_buf(&gbuf);
     Sprintf(buf, "/bin/rm -rf %s", dir);

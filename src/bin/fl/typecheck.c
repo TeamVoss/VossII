@@ -7,6 +7,8 @@
 #include "graph.h"
 #include "symbol.h"
 
+#define MAX_OVERLOAD_RESOLUTION_DEPTH	10000
+
 #if 0
 #define USE_BDDS_FOR_OR
 #endif
@@ -77,7 +79,7 @@ static tc_context_ptr	current_tc_context;
 /* -----Function prototypes for local functions-----*/
 static int		nbr_succ_overload_res(node_type_ptr cur,
 					      node_replace_ptr *replsp,
-					      bool closed);
+					      bool closed, int level);
 g_ptr			make_implicit_call(impl_arg_ptr iargs, fn_ptr fun);
 static node_type_ptr	build_node_type_struct(hash_record *lvars_tbl,
 					       g_ptr node);
@@ -117,6 +119,9 @@ static typeExp_ptr	new_concrete_type(string name, typeList_ptr tvars,
 static void		annotate_star_cnt(typeExp_ptr type);
 static void		push_tc_context();
 static void		pop_tc_context(bool restore);
+#if 0
+static void		dbg_print_node_type_tree(node_type_ptr ntp, int level);
+#endif
 
 /************************************************************************/
 /*			Public Functions				*/
@@ -214,10 +219,10 @@ TypeCheck(g_ptr *ondp, bool delayed, impl_arg_ptr *impl_argsp)
 	int nbr_solns;
       redo_overload_resolution:
 #if 0
-	nbr_solns = nbr_succ_overload_res(to_be_resolved, &nrp, !delayed);
+	nbr_solns = nbr_succ_overload_res(to_be_resolved, &nrp, !delayed, 0);
 #else
 	(void) delayed;
-	nbr_solns = nbr_succ_overload_res(to_be_resolved, &nrp, TRUE);
+	nbr_solns = nbr_succ_overload_res(to_be_resolved, &nrp, TRUE, 0);
 #endif
 	if( nbr_solns == 0 ) {
 	    while( nrp != NULL && nrp->alts_found != 0 ) { nrp = nrp->next; }
@@ -2113,17 +2118,28 @@ Find_Overload_Choice(fn_ptr fn, typeExp_ptr type)
 }
 
 static int
-nbr_succ_overload_res(node_type_ptr cur, node_replace_ptr *replsp, bool closed)
+nbr_succ_overload_res(node_type_ptr cur, node_replace_ptr *replsp, bool closed,
+		      int level)
 {
     if( cur == NULL ) {
 	*replsp = NULL;
 	return 1;
     }
+    if( level > MAX_OVERLOAD_RESOLUTION_DEPTH ) {
+	if( file_load )
+	    FP(err_fp, "===Type error around line %d in file %s\n",
+		    GET_LINE_NBR(cur->node),
+		    cur_file_name);
+	else
+	    FP(err_fp, "===Type error around line %d\n",
+		    GET_LINE_NBR(cur->node));
+	FP(err_fp, "Cannot resolve overloading. Infinite loop in resolution\n");
+	failure("");
+    }
     ASSERT(cur->l == NULL);
     ASSERT(cur->r == NULL);
     ASSERT(IS_USERDEF(cur->node));
     fn_ptr fn = GET_USERDEF(cur->node);
-
     oll_ptr alts = fn->overload_list;
     int cnt = 0;
     typeExp_ptr cur_type = get_real_type(cur->type);
@@ -2142,7 +2158,7 @@ nbr_succ_overload_res(node_type_ptr cur, node_replace_ptr *replsp, bool closed)
 		DIE("Should not be possible");
 	    }
 	    node_replace_ptr nrp;
-	    int rem_solns = nbr_succ_overload_res(to_be_resolved, &nrp,closed);
+	    int rem_solns = nbr_succ_overload_res(to_be_resolved, &nrp,closed, level+1);
 	    cnt += rem_solns;
 	    if( cnt > 1 ) {
 		node_replace_ptr np =
@@ -2867,3 +2883,47 @@ annotate_star_cnt(typeExp_ptr type)
     }
 }
 
+#if 0
+static void
+dbg_print_node_type_tree(node_type_ptr ntp, int level)
+{
+    if( ntp == NULL ) {
+	FP(err_fp, "<NULL>");
+	return;
+    }
+    switch( GET_TYPE(ntp->node) ) {
+	case LAMBDA_ND:
+	    FP(err_fp, "\n%*s{\\%s. (", level*3,"", GET_LAMBDA_VAR(ntp->node));
+	    dbg_print_node_type_tree(ntp->l, level+1);
+	    FP(err_fp, ")::");
+	    dbg_print_type_rec(ntp->type, err_fp, 0);
+	    FP(err_fp, "\n%*s}", level*3, "");
+	    break;
+	case APPLY_ND:
+	    FP(err_fp, "\n%*s{( (", level*3, "");
+	    dbg_print_node_type_tree(ntp->l, level+1);
+	    FP(err_fp, "\n%*s   )\n%*s    (", level*3,"",level*3,"");
+	    dbg_print_node_type_tree(ntp->r,level+1);
+	    FP(err_fp, "))::");
+	    dbg_print_type_rec(ntp->type, err_fp, 0);
+	    FP(err_fp, "\n%*s}", level*3, "");
+	    break;
+	case CONS_ND:
+	    FP(err_fp, "\n%*s{( (", level*3, "");
+	    dbg_print_node_type_tree(ntp->l, level+1);
+	    FP(err_fp, "\n%*s   ) :\n%*s    (", level*3,"",level*3,"");
+	    dbg_print_node_type_tree(ntp->r, level+1);
+	    FP(err_fp, "))::");
+	    dbg_print_type_rec(ntp->type, err_fp, 0);
+	    FP(err_fp, "\n%*s}", level*3, "");
+	    break;
+	case LEAF:
+	    FP(err_fp, "\n%*s{", level*3, "");
+	    Print_leaf(ntp->node, err_fp);
+	    FP(err_fp, "::");
+	    dbg_print_type_rec(ntp->type, err_fp, 0);
+	    FP(err_fp, "}");
+	    break;
+    }
+}
+#endif
