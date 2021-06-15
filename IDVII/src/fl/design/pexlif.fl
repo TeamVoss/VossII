@@ -236,21 +236,18 @@ let unfold_pexlif pex id name =
 //------------------------------------------------------------------------------
 // Management of pexlif examples.
 
-let store_pexlif_example pex =
+let store_pexlif pex =
         let sha  = find_signature (pexlif_get_attrs pex) then
         let sha' = string_empty sha => "bad" | sha then
-        let file = fopen ("pexlif_examples/" ^ sha' ^ ".pex") "w" then
-        (prim_Ppexlif 0 file ("", pex)) fseq (fclose file)
+        (pex) fseq (write_pexlif ("pexlif_examples/" ^ sha' ^ ".pex") pex)
 ;
 
-let load_pexlif_example sha =
-        let file = fopen ("pexlif_examples/" ^ sha ^ ".pex") "r" then
-        let pex  = read_pexlif (fget file) then
-        (fclose file) fseq (pex)
+let load_pexlif sha =
+        read_pexlif ("pexlif_examples/" ^ sha ^ ".pex")
 ;
 non_lazy load_pexlif_example;
 
-let fetch_pexlif_matches pex =
+let fetch_matches pex =
         let file = fopen ("pexlif_examples/matches") "r" then
         let sha  = find_signature (pexlif_get_attrs pex) then
         letrec
@@ -267,7 +264,7 @@ let fetch_pexlif_matches pex =
 ;
 non_lazy fetch_pexlif_matches;
 
-let append_pexlif_match pex1 pex2 =
+let new_match pex1 pex2 =
         let file = fopen ("pexlif_examples/matches") "a" then
         let sha1 = find_signature (pexlif_get_attrs pex1) then
         let sha2 = find_signature (pexlif_get_attrs pex2) then
