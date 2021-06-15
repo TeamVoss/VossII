@@ -21,7 +21,7 @@ typedef struct bdd_rec			*bdd_ptr;
 #define FORMULA2PTR(p) ((pointer) ((lunint)(p)))
 
 
-#if 0
+#if 1
 #define REF_CNT_DEBUG	1
 #endif
 
