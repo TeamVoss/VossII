@@ -283,10 +283,10 @@ static void
 mk_formal_actuals_substitution(hash_record_ptr tbl, g_ptr fa)
 {
     if(tbl == NULL) {
-        DIE("Bad input");
+        DIE("Passed a null hash-table.");
     }
     if(IS_NIL(fa)) {
-        DIE("Bad input");
+        return;
     }
     g_ptr li, lj, pair, actual;
     FOR_CONS(fa, li, pair) {
@@ -678,6 +678,9 @@ unfold_pexlif(g_ptr p, unint id, string prefix)
     // build new list of internals while constructing the inter. subst.
     hash_record sub;
     create_hash(&sub, 100, str_hash, str_equ);
+    if(IS_NIL(un_fa_inps) || IS_NIL(un_fa_outs)) {
+        DIE("Pexlif to unfold has empty inputs/outputs.");
+    }
     mk_formal_actuals_substitution(&sub, un_fa_inps);
     mk_formal_actuals_substitution(&sub, un_fa_outs);
     g_ptr new_inter = Make_NIL(), new_inter_tail = new_inter;
