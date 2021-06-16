@@ -1,0 +1,68 @@
+load "ste.fl";
+
+//------------------------------------------------------------------------------
+//
+//------------------------------------------------------------------------------
+
+let buf1 =
+    bit_input a.
+    bit_output out.
+    bit_internal mid.
+    CELL "draw_hier buf1" [
+      mid <- '~' a,
+      out <- '~' mid
+    ];
+let buf1_pex = buf1 'i1 'o1;
+let buf1_sha = pexlif_get_SHA buf1_pex;
+store_pexlif buf1_pex;
+
+let buf2 =
+    bit_input x.
+    bit_output y.
+    bit_internal mid.
+    CELL "draw_hier buf2" [
+      mid <- '~' x,
+      y <- '~' mid
+];
+let buf2_pex = buf2 'i1 'o1;
+let buf2_sha = pexlif_get_SHA buf2_pex;
+store_pexlif buf2_pex;
+
+let buf3 =
+    bit_input a.
+    bit_output out.
+    bit_internal oink.
+    CELL "draw_hier buf3" [
+      oink <- '~' a,
+      out <- '~' oink
+    ];
+let buf3_pex = buf3 'i1 'o1;
+let buf3_sha = pexlif_get_SHA buf3_pex;
+store_pexlif buf3_pex;
+
+letrec inv_rec n =
+    bit_input    a.
+    bit_output  out.
+    bit_internal mid.
+    CELL "draw_hier inv_rec" (
+      n = 1 => [ out <- '~' a ] |
+      [
+          mid <- '~' a,
+          inv_rec (n-1) mid out
+      ]);
+let buf4 =
+    bit_input    a.
+    bit_output  out.
+    CELL "buf4" [
+        inv_rec 2 a out
+    ];
+let buf4_pex = buf4 'i1 'o1;
+let buf4_sha = pexlif_get_SHA buf4_pex;
+store_pexlif buf4_pex;
+
+//------------------------------------------------------------------------------
+
+
+
+//------------------------------------------------------------------------------
+// Fin.

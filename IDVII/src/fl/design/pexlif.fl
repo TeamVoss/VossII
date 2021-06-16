@@ -23,6 +23,20 @@ let find_fingerprint = s2int # find_attr "FP" "0";
 //  find_signature::(string#string list)->string
 let find_signature = find_attr "SHA" "";
 
+let pexlif_get_FP  = find_fingerprint # pexlif_get_attrs;
+let pexlif_get_SHA = find_signature # pexlif_get_attrs;
+let pexlif_get_size (PINST _ _ _ _ _ _ (P_HIER cs)) = 1 + length cs
+/\  pexlif_get_size _ = 1
+;
+let pexlif_get_actuals (PINST _ _ _ fa_inps fa_outs _ _) =
+        flatmap snd (fa_inps @ fa_outs)
+;
+let pexlif_get_formals (PINST _ _ _ fa_inps fa_outs _ _) =
+        map fst (fa_inps @ fa_outs)
+;
+let pexlif_get_children (PINST _ _ _ _ _ _ (P_HIER cs)) = cs
+/\  pexlif_get_children _ = []
+;
 //------------------------------------------------------------------------------
 
 begin_abstype;
@@ -245,7 +259,7 @@ let store_pexlif pex =
 let load_pexlif sha =
         read_pexlif ("pexlif_examples/" ^ sha ^ ".pex")
 ;
-non_lazy load_pexlif_example;
+non_lazy load_pexlif;
 
 let fetch_matches pex =
         let file = fopen ("pexlif_examples/matches") "r" then
@@ -262,7 +276,7 @@ let fetch_matches pex =
         let matches = read file then
         (fclose file) fseq (matches)
 ;
-non_lazy fetch_pexlif_matches;
+non_lazy fetch_matches;
 
 let new_match pex1 pex2 =
         let file = fopen ("pexlif_examples/matches") "a" then

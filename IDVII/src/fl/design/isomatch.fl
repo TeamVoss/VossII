@@ -1,0 +1,193 @@
+//-------------------------------------------------------------------
+// Copyright 2020 ...
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
+load (DIR^"misc.fl");
+load (DIR^"util.fl");
+
+//------------------------------------------------------------------------------
+// Construction of a subst. eq. between two pexlifs.
+
+begin_abstype;
+
+// ...
+let internal_isomatch p g t =
+        let sp = internal_search_create p g t then
+        letrec
+            go s =
+                let xs = internal_search_step s in
+                empty xs => [] | xs : go s
+        in
+        go sp
+;
+
+//------------------------------------------------------------------------------
+
+// Merge two subst., fails if any is empty.
+//  @@::(subst opt)->(subst opt)->(subst opt)
+let
+    @@ (SOME x) (SOME y) = SOME (x @ y)
+/\  @@ _        _        = NONE
+;
+infix 9 @@;
+
+// Merge a list of opt. subst., fails if any is empty.
+//  collect::((subst opt) list)->(subst opt)
+let collect ss = itlist (defix @@) ss (SOME []);
+
+// For every pair '(x,y)' in 's', 'assoc x s == y' and 'rev_assoc y s == x'.
+//  coherent::subst->bool
+let coherent s = all (\(u,t). all (\(x,y). (u == x) <==> (t == y)) s) s;
+
+
+// Find a subst., if any, s.t. both expressions are equal.
+//  alpha::wexpr->wexpr->subst
+letrec
+    alpha (W_X _)       (W_X _)       = SOME []
+/\  alpha (W_CONST _ _) (W_CONST _ _) = SOME []
+/\  alpha (W_VAR _ n)   (W_VAR _ m)   = SOME [(n,m)]
+/\  alpha (W_NAMED_CONST n _ _) (W_NAMED_CONST m _ _) = SOME [(n,m)]
+/\  alpha (W_EXPLICIT_VAR _ n)  (W_EXPLICIT_VAR _ m)  = SOME [(n,m)]
+/\  alpha (W_AND a b)   (W_AND x y)   = alpha a x @@ alpha b y
+/\  alpha (W_OR a b)    (W_OR x y)    = alpha a x @@ alpha b y
+/\  alpha (W_NOT a)     (W_NOT x)     = alpha a x
+/\  alpha (W_EQ a b)    (W_EQ x y)    = alpha a x @@ alpha b y
+/\  alpha (W_GR a b)    (W_GR x y)    = alpha a x @@ alpha b y
+/\  alpha (W_ADD a b)   (W_ADD x y)   = alpha a x @@ alpha b y
+/\  alpha (W_SUB a b)   (W_SUB x y)   = alpha a x @@ alpha b y
+/\  alpha (W_MUL a b)   (W_MUL x y)   = alpha a x @@ alpha b y
+/\  alpha (W_DIV a b)   (W_DIV x y)   = alpha a x @@ alpha b y
+/\  alpha (W_MOD a b)   (W_MOD x y)   = alpha a x @@ alpha b y
+/\  alpha (W_SHL a b)   (W_SHL x y)   = alpha a x @@ alpha b y
+/\  alpha (W_SHR a b)   (W_SHR x y)   = alpha a x @@ alpha b y
+/\  alpha (W_ASHR a b)  (W_ASHR x y)  = alpha a x @@ alpha b y
+/\  alpha (W_SX _ a)    (W_SX _ x)    = alpha a x
+/\  alpha (W_ZX _ a)    (W_ZX _ x)    = alpha a x
+/\  alpha (W_ITE a b c) (W_ITE x y z) = alpha a x @@ alpha b y @@ alpha c z
+/\  alpha _ _ = NONE
+;
+// todo: Some cases are missing.
+
+// Find a subst., if any, s.t. both update functions are equal.
+//  alpha_fn::update_fn->update_fn->subst
+let alpha_fn (W_UPDATE_FN a b)   (W_UPDATE_FN x y)   = alpha a x @@ alpha b y
+/\  alpha_fn (W_PHASE_DELAY a b) (W_PHASE_DELAY x y) = alpha a x @@ alpha b y
+/\  alpha_fn _ _ = NONE
+;
+
+// Find subst., if any, s.t. both sets of functions are equal.
+//  alpha_leaf::content->content->subst
+let alpha_leaf (P_LEAF fs) (P_LEAF gs) =
+        let
+            verify (SOME x) = coherent x => SOME x | NONE
+        /\  verify _        = NONE
+        in
+        let test = verify # collect # map2 alpha_fn fs in
+        exhaust (map test (permutations gs))
+;
+
+// Given an SHA eq. between 'p' and 'g', construct a formal subst.
+//  actualize_sha::pexlif->pexlif->subst
+let actualize_sha p g = zip (pexlif_get_actuals p) (pexlif_get_actuals g);
+
+// Find formal subst. for two leaf pexlif's.
+//  actualize_leaf::pexlif->pexlif->(subst opt)
+let actualize_leaf (PINST _ _ _ i1 o1 _ l1) (PINST _ _ _ i2 o2 _ l2) =
+        let lift = fa_actualize (i1 @ o1) (i2 @ o2) in
+        maybe NONE (alpha_leaf l1 l2) (SOME # lift)
+;
+
+// Given a list of subst. of actuals for their children, find formal subst.
+//  actualize_hier::((subst opt) list)->pexlif->pexlif->(subst opt)
+let actualize_hier ss (PINST _ _ _ i1 o1 _ _) (PINST _ _ _ i2 o2 _ _) =
+        let lift = fa_actualize (i1 @ o1) (i2 @ o2) in
+        maybe NONE (collect ss) (\s. coherent s => SOME (lift s) | NONE)
+;
+
+//------------------------------------------------------------------------------
+
+// Reorder nodes in 'ns' by 'xs'.
+//  reorder_nodes::(int list)->(* list)->(* list)
+let reorder_nodes xs ns = map (\n. el n xs) ns;
+// todo: this is really bad...
+
+// Expand list of choices, i.e, '[[1,2],[3,4]] = [[1,3],[1,4],[2,3],[2,4]]'.
+//  expand_choices::((* list) list)->((* list) list)
+letrec
+    expand_choices []       = []
+/\  expand_choices (xs:[])  = map (\x. [x]) xs
+/\  expand_choices (xs:xss) = flatmap (\x. map (\ys. x:ys) (expand_choices xss)) xs
+;
+
+forward_declare{explore::pexlif->pexlif->({((string#string) list)} opt list)};
+// Exand a matching of 'p' and 'g' to test whether it's valid pairing or not.
+//  expand::pexlif->pexlif->(({(string#string list)} opt list) list)
+let
+    expand p g =
+        // Note: lhs of tuples (p) are already in order.
+        // Note: only interested in solutions mapping p to g.
+        let pred ((x,y):xs) = y == 0 in
+        pam (filter pred (internal_isomatch p g F)) (\sol.
+            let matches = reorder_nodes (pexlif_get_children g) (map snd (tl sol)) then
+            let options = map2 explore (pexlif_get_children p) matches then
+            let choices = expand_choices options then
+            let result  = map collect choices then
+            // /
+            result
+        )
+;
+
+// Explore two pexlifs to find if they are a potential match.
+//
+// explore(P, G)
+//     if P == G
+//         report direct mapping
+//     else if P ~ G
+//         if P and G are leafs
+//             report subst. s.t. P == G, if any.
+//         else if P and G are hierarchies
+//             CS = sets of possible subst. s.t. P == G
+//             report each coherent choice C in CS
+//     else
+//         report no solution
+//
+//  explore::pexlif->pexlif->({((string#string) list)} opt list)
+let
+    explore p g =
+        pexlif_get_SHA p == pexlif_get_SHA g =>
+            [SOME (actualize_sha p g)] |
+        pexlif_get_FP p == pexlif_get_FP g  =>
+            pexlif_get_leaf p AND pexlif_get_leaf g =>
+                [actualize_leaf p g] |
+                map (\ss. actualize_hier ss p g) (expand p g) |
+        []
+;
+
+let isomatch p g =
+        flip foreach (internal_isomatch p g T) (\sol.
+             // Find and order the solutions haystack nodes.
+             // Note: needle's nodes are already in order.
+             //  matches::(pexlif list)
+             let matches = reorder_nodes (pexlif_get_children g) (map snd (tl sol)) then
+             // List of needle nodes and their matched haystack nodes.
+             //  pairings::((pexlif#pexlif) list)
+             let pairings = zip (pexlif_get_children p) matches then
+             // For every pairing, a list of potential solutions (subst. opt).
+             //  options::(((subst opt) list) list)
+             let options = map (curry explore) pairings then
+             // Every combination of our potential solutions.
+             //  choices::(((subst opt) list) list)
+             let choices = expand_choices options then
+             // Actual solutions are filtered out from above choices.
+             //  result::((subst list) list)
+             let results = map filter_some choices then
+             // ...
+             (print "wow\n")
+       )
+;
+
+end_abstype isomatch;
+
+//------------------------------------------------------------------------------
+// Fin.
