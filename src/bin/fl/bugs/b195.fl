@@ -1,0 +1,10 @@
+
+lettype tr = BR tr tr | LF int;
+
+rvariable "a";
+
+letrec sum (BR tr t2) = sum tr + sum t2
+ /\    sum (LF i) = i
+;
+
+//let f x y = x*x + y*y + 0;

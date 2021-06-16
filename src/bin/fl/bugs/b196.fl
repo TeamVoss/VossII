@@ -1,0 +1,21 @@
+load "ste.fl";
+
+let p = (PINST "" [] T [] [] [] (P_LEAF []));
+write_pexlif "/tmp/test_1" p;
+p fseq ();
+write_pexlif "/tmp/test_2" p;
+
+let q = read_pexlif "/tmp/test_2";
+
+let qq = read_pexlif "/tmp/test_1";
+
+
+q fseq ();
+11111;
+qq fseq ();
+2222;
+
+q == qq;
+q == p;
+qq == p;
+
