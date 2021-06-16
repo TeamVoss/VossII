@@ -58,10 +58,12 @@ let update_fn_get_update_fun_rhs (W_UPDATE_FN lhs rhs) = rhs
 
 letrec prim_Ppexlif ind fp (inst,pexlif) =
     val (PINST name attrs leaf inps outs ints body) = pexlif then
-    // let pattr a v = (a == "FP") OR (a == "SHA") =>
-    //         (substr v 1 4) ^ ".." | v
-    // in
-    let sattrs = list2str T "[" "," "]" (\(a,v). sprintf "%s->%s" a v) attrs in
+    let pattr a v = (a == "FP") OR (a == "SHA") =>
+            (substr v 1 4) ^ ".." | v
+    in
+    let sattrs = list2str T "[" "," "]"
+            (\(a,v). sprintf "%s->%s" a (pattr a v)) attrs
+    in
     let sleaf = leaf => "T" | "F" then
     (fprintf fp "%s:\n%*s(PINST \"%s\" %s %s\n" inst ind "" name sattrs sleaf)
     fseq
