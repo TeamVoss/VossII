@@ -87,6 +87,14 @@ static hash_record_ptr inputs_tbl_ptr;
 static hash_record     outputs_tbl;
 static hash_record_ptr outputs_tbl_ptr;
 
+// Debugging -------------------------------------------------------------------
+#define DEBUG_PEX 1
+#define debug_print(fmt, ...)                                                  \
+        do { if (DEBUG_PEX) fprintf(stderr, "%s:%d:%s: " fmt, __FILE__,        \
+                                __LINE__, __func__, __VA_ARGS__); } while (0)
+#define debug_append(fmt, ...)                                                 \
+        do { if (DEBUG_PEX) fprintf(stderr, "" fmt, __VA_ARGS__); } while (0)
+
 // Forward definitions local functions -----------------------------------------
 static void           new_adj_mem();
 static void           rem_adj_mem();
@@ -472,6 +480,7 @@ get_top_inst(g_ptr p, unint inst)
 g_ptr
 get_top_adjacencies(g_ptr p)
 {
+    debug_print("%p\n", (void *) p);
     new_adj_mem();
     // /
     unint count;
@@ -479,22 +488,37 @@ get_top_adjacencies(g_ptr p)
     mk_adj_tables(&vchild, &count, p);
     g_ptr res = Make_NIL(), res_tail = res;
     for(unint i = 0; vchild != NULL; i++, vchild = vchild->next) {
-        g_ptr lhs = Make_INT_leaf(i);
+        g_ptr index = Make_INT_leaf(i);
         for(adj_key_ptr vfa = vchild->key; vfa != NULL; vfa = vfa->next) {
             vec_ptr vec = vfa->vec;
             string sig = vfa->signature;
-            for(adj_bkt_ptr adj = find_hash(inputs_tbl_ptr, sig); adj != NULL; adj = adj->next) {
-                if(Check_vector_overlap(vec, adj->vec)) {
-                    g_ptr rhs = Make_INT_leaf(adj->index);
-                    g_ptr pair = Make_PAIR_ND(lhs,rhs);
-                    APPEND1(res_tail, pair);
+            if(vfa->input) {
+                for(adj_bkt_ptr adj = find_hash(outputs_tbl_ptr, sig);
+                    adj != NULL;
+                    adj = adj->next)
+                {
+                    if(Check_vector_overlap(vec, adj->vec)) {
+                        APPEND1(res_tail,
+                            Make_PAIR_ND(
+                                Make_INT_leaf(adj->index),
+                                index));
+                        // /
+                        debug_print("%s: %u <- %u\n", sig, i, adj->index);
+                    }
                 }
-            }
-            for(adj_bkt_ptr adj = find_hash(outputs_tbl_ptr, sig); adj != NULL; adj = adj->next) {
-                if(Check_vector_overlap(vec, adj->vec)) {
-                    g_ptr rhs = Make_INT_leaf(adj->index);
-                    g_ptr pair = Make_PAIR_ND(rhs,lhs);
-                    APPEND1(res_tail, pair);
+            } else {
+                for(adj_bkt_ptr adj = find_hash(inputs_tbl_ptr, sig);
+                    adj != NULL;
+                    adj = adj->next)
+                {
+                    if(Check_vector_overlap(vec, adj->vec)) {
+                        APPEND1(res_tail,
+                            Make_PAIR_ND(
+                                index,
+                                Make_INT_leaf(adj->index)));
+                        // /
+                        debug_print("%s: %u -> %u\n", sig, i, adj->index);
+                    }
                 }
             }
         }

@@ -100,7 +100,7 @@ typedef struct adj_key_rec *adj_key_ptr;
 typedef struct adj_key_rec {
     string      name;      // orig. name of vec.
     string      signature;
-    bool        input;     // found in 'fa_inps' or 'fa_outs'?
+    bool        input;     // found in 'fa_inps'(T) or 'fa_outs'(F)?
     vec_ptr     vec;
     adj_key_ptr next;
 } adj_key_rec;
