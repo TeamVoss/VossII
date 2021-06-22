@@ -193,8 +193,12 @@ let
 // FP-equality with the needle.
 //  isomatch::pexlif->pexlif->((((string#string list) list) list) list)
 let isomatch p (PINST _ _ _ _ _ _ (P_HIER gs)) =
-        filter (NOT # empty # snd) $
-        map (\g. pair (pexlif_get_SHA g) $ map filter_some $ expand p g) gs
+        // filter (NOT # empty # snd) $
+        pam gs (\g.
+            pair (pexlif_get_SHA g) $
+            map filter_some $
+            expand p g
+        )
 /\  isomatch _ _ = error "isomatch expects a 'boxed' haystack."
 ;
 
@@ -212,14 +216,18 @@ let print_subst = print_list (print_pair id id);
 // 	Emit_isomatch::((string#(((string#string list) list) list)) list)->string
 let Emit_isomatch [] = sprintf "Found no matches."
 /\  Emit_isomatch {ms :: (string#((((string#string) list) list) list)) list} =
-    let pretty_matches {x :: (((string#string) list) list)} =
-            list2str T "where: " ",\nor: " "\n" print_subst x
+    let pretty_matches {sub :: (((string#string) list) list)} =
+            list2str T "\twhere: " ",\n\tor: " "" print_subst sub
     in
-    let pretty_solution {(x,y) :: (string#((((string#string) list) list) list))} =
-            sprintf "Found match(s) with %s {%s" x
-                (list2str T "\n" "\n" "\n}" pretty_matches y)
+    let pretty_solution ((pex,[]), i) =
+            sprintf "Found no match with node %d (%s)\n"
+                i (substr pex 1 4 ^ "..")
+    /\  pretty_solution {((pex,sub), i) :: ((string#((((string#string) list) list) list))#int)} =
+            sprintf "Found match(s) with node %d (%s) {%s"
+                i (substr pex 1 4 ^ "..")
+                (list2str T "\n" "\n" "\n}" pretty_matches sub)
     in
-    list2str T "" "\n" "" pretty_solution ms
+    list2str T "" "\n" "" pretty_solution (ixlabel ms)
 ;
 
 end_abstype isomatch Emit_isomatch;

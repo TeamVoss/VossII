@@ -88,7 +88,7 @@ static hash_record     outputs_tbl;
 static hash_record_ptr outputs_tbl_ptr;
 
 // Debugging -------------------------------------------------------------------
-#define DEBUG_PEX 1
+#define DEBUG_PEX 0
 #define debug_print(fmt, ...)                                                  \
         do { if (DEBUG_PEX) fprintf(stderr, "%s:%d:%s: " fmt, __FILE__,        \
                                 __LINE__, __func__, __VA_ARGS__); } while (0)
