@@ -509,8 +509,8 @@ is_match(const mat_ptr iso, const mat_ptr p, const mat_ptr g)
     debug_print("P:   %s\n", sprint_mat(p));
     debug_print("G:   %s\n", sprint_mat(g));
     // /
-    (void)is_isomorphism_fast(iso, p, g);
-    return (is_single(iso) && is_isomorphism_slow(iso, p, g));
+    (void)is_isomorphism_slow(iso, p, g);
+    return (is_single(iso) && is_isomorphism_fast(iso, p, g));
 }
 
 // Trimming of solution space --------------------------------------------------
