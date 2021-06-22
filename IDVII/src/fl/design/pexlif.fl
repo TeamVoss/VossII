@@ -278,7 +278,8 @@ let fetch_matches pex =
 ;
 non_lazy fetch_matches;
 
-let new_match pex1 pex2 =
+let store_match pex1 pex2 =
+        NOT $ empty $ fetch_matches pex1 => () |
         let file = fopen ("pexlif_examples/matches") "a" then
         let sha1 = find_signature (pexlif_get_attrs pex1) then
         let sha2 = find_signature (pexlif_get_attrs pex2) then
