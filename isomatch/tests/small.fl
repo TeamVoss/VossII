@@ -1,4 +1,3 @@
-load (DIR^"../isomatch.fl");
 load "ste.fl";
 
 let not =
@@ -17,14 +16,7 @@ let mix =
         b <- a '&' m
 ];
 
-let one =
-    bit_input a.
-    bit_output b.
-    CELL "draw_hier one" [
-        mix a b
-];
-
-let two =
+let big =
     bit_input a.
     bit_output b.
     bit_internal m.
@@ -33,14 +25,13 @@ let two =
         mix m b
 ];
 
-let p = one 'a 'b;
-let g = two 'a 'b;
+let p = mix 'a 'b;
+let g = big 'a 'b;
 
-let p_flat = flatten_pexlif p;
-let g_flat = flatten_pexlif g;
+let m = isomatch p g;
+Emit_isomatch m;
 
-//Emit_pexlif "piece.txt" p_flat;
-//Emit_pexlif "puzzle.txt" g_flat;
+//let p_flat = flatten_pexlif p;
+//let g_flat = flatten_pexlif g;
 
-p_flat fseq g_flat fseq (moo p_flat g_flat);
-// p_flat fseq g_flat fseq (isomatch p_flat g_flat T);
+quit;
