@@ -11,19 +11,6 @@ load (DIR^"util.fl");
 
 begin_abstype;
 
-// ...
-let internal_isomatch p g t =
-        let sp = internal_search_create p g t then
-        letrec
-            go s =
-                let xs = internal_search_step s in
-                empty xs => [] | xs : go s
-        in
-        go sp
-;
-
-//------------------------------------------------------------------------------
-
 // Merge two subst., fails if any is empty.
 //  @@::(subst opt)->(subst opt)->(subst opt)
 let
@@ -40,9 +27,8 @@ let collect ss = itlist (defix @@) ss (SOME []);
 //  coherent::subst->bool
 let coherent s = all (\(u,t). all (\(x,y). (u == x) <==> (t == y)) s) s;
 
-
 // Find a subst., if any, s.t. both expressions are equal.
-//  alpha::wexpr->wexpr->subst
+//  alpha::wexpr->wexpr->(subst opt)
 letrec
     alpha (W_X _)       (W_X _)       = SOME []
 /\  alpha (W_CONST _ _) (W_CONST _ _) = SOME []
@@ -120,23 +106,60 @@ letrec
 /\  expand_choices (xs:xss) = flatmap (\x. map (\ys. x:ys) (expand_choices xss)) xs
 ;
 
+//  internal_isomatch::pexlif->pexlif->(((int#int) list) list)
+let internal_isomatch p g =
+        let sp = internal_search_create p g in
+        letrec
+            go s =
+                let xs = internal_search_step s then
+                empty xs => [] | (xs : go s)
+        in
+        (sp) fseq (go sp)
+;
+
+//------------------------------------------------------------------------------
+
 forward_declare{explore::pexlif->pexlif->({((string#string) list)} opt list)};
 // Exand a matching of 'p' and 'g' to test whether it's valid pairing or not.
+//
+// expand(P, G, T)
+//     Sols = isomatch P G
+//     if not T then
+//         filter out Sols where 'hd P' is matched to 'hd G'
+//     for earch Sol in Sols
+//         Ms = match P and G according to Sol
+//         Os = explore each (P',G') in Ms
+//         Rs = merge/check that each solution-set O in Os is complete and valid.
+//         report each valid O
+//
 //  expand::pexlif->pexlif->(({(string#string list)} opt list) list)
-let
-    expand p g =
-        // Note: lhs of tuples (p) are already in order.
-        // Note: only interested in solutions mapping p to g.
-        let pred ((x,y):xs) = y == 0 in
-        pam (filter pred (internal_isomatch p g F)) (\sol.
-            let matches = reorder_nodes (pexlif_get_children g) (map snd (tl sol)) then
-            let options = map2 explore (pexlif_get_children p) matches then
+let expand p g =
+        let ss = internal_isomatch p g then
+        let ps = pexlif_get_children p then
+        let gs = pexlif_get_children g then
+        pam ss (\sol.
+            // Find and order the solutions haystack nodes.
+            // Note: needle's nodes are already in order.
+            //  matches::(pexlif list)
+            let matches = reorder_nodes gs (map snd (tl sol)) then
+            // List of needle nodes and their matched haystack nodes.
+            //  pairings::((pexlif#pexlif) list)
+            let pairings = zip ps matches then
+            // For every pairing, a list of potential solutions (subst. opt).
+            //  options::(((subst opt) list) list)
+            let options = map (curry explore) pairings then
+            // Every combination of our potential solutions.
+            //  choices::(((subst opt) list) list)
             let choices = expand_choices options then
+            // Filter out potential solutions by only merging complete substs.
+            //  result::((subst opt) list)
             let result  = map collect choices then
             // /
             result
         )
 ;
+// todo: we could probably speed this up by not attempting to finding non-top
+//       solutions that we will filter out anyway.
 
 // Explore two pexlifs to find if they are a potential match.
 //
@@ -164,30 +187,42 @@ let
         []
 ;
 
-let isomatch p g =
-        flip foreach (internal_isomatch p g T) (\sol.
-             // Find and order the solutions haystack nodes.
-             // Note: needle's nodes are already in order.
-             //  matches::(pexlif list)
-             let matches = reorder_nodes (pexlif_get_children g) (map snd (tl sol)) then
-             // List of needle nodes and their matched haystack nodes.
-             //  pairings::((pexlif#pexlif) list)
-             let pairings = zip (pexlif_get_children p) matches then
-             // For every pairing, a list of potential solutions (subst. opt).
-             //  options::(((subst opt) list) list)
-             let options = map (curry explore) pairings then
-             // Every combination of our potential solutions.
-             //  choices::(((subst opt) list) list)
-             let choices = expand_choices options then
-             // Actual solutions are filtered out from above choices.
-             //  result::((subst list) list)
-             let results = map filter_some choices then
-             // ...
-             (print "wow\n")
-       )
+// Isomatch reports, for each child of the haystack (second argument), every
+// potential matching with the needle (first argument). Where a matching
+// consists of a list of potential substitutions that preserves, at worst,
+// FP-equality with the needle.
+//  isomatch::pexlif->pexlif->((((string#string list) list) list) list)
+let isomatch p (PINST _ _ _ _ _ _ (P_HIER gs)) =
+        filter (NOT # empty # snd) $
+        map (\g. pair (pexlif_get_SHA g) $ map filter_some $ expand p g) gs
+/\  isomatch _ _ = error "isomatch expects a 'boxed' haystack."
 ;
 
-end_abstype isomatch;
+//------------------------------------------------------------------------------
+
+//  print_pair::(*->string)->(**->string)->(*#**)->string
+let print_pair f g (x,y) = sprintf "%s:%s" (f x) (g y);
+
+//  print_list::(*->string)->(* list)->string
+let print_list = list2str T "[" "," "]";
+
+//  print_bust::((string#string) list)->string
+let print_subst = print_list (print_pair id id);
+
+// 	Emit_isomatch::((string#(((string#string list) list) list)) list)->string
+let Emit_isomatch [] = sprintf "Found no matches."
+/\  Emit_isomatch {ms :: (string#((((string#string) list) list) list)) list} =
+    let pretty_matches {x :: (((string#string) list) list)} =
+            list2str T "where: " ",\nor: " "\n" print_subst x
+    in
+    let pretty_solution {(x,y) :: (string#((((string#string) list) list) list))} =
+            sprintf "Found match(s) with %s {%s" x
+                (list2str T "\n" "\n" "\n}" pretty_matches y)
+    in
+    list2str T "" "\n" "" pretty_solution ms
+;
+
+end_abstype isomatch Emit_isomatch;
 
 //------------------------------------------------------------------------------
 // Fin.
