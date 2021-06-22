@@ -261,9 +261,13 @@ let load_pexlif sha =
 ;
 non_lazy load_pexlif;
 
-let fetch_matches pex =
+let subst_pexlif_formals sub (PINST n a l i o t c) =
+        let swap (f,as) = (f, map (\a. subst sub a) as) in
+        PINST n a l (map swap i) (map swap o) t c
+;
+
+let fetch_matches sha =
         let file = fopen ("pexlif_examples/matches") "r" then
-        let sha  = find_signature (pexlif_get_attrs pex) then
         letrec
             read f =
                 let line = fgets f then
@@ -278,11 +282,9 @@ let fetch_matches pex =
 ;
 non_lazy fetch_matches;
 
-let store_match pex1 pex2 =
-        NOT $ empty $ fetch_matches pex1 => () |
+let store_match sha1 sha2 =
+        NOT $ empty $ fetch_matches sha1 => () |
         let file = fopen ("pexlif_examples/matches") "a" then
-        let sha1 = find_signature (pexlif_get_attrs pex1) then
-        let sha2 = find_signature (pexlif_get_attrs pex2) then
         (fprintf file "%s\n" (sha1 ^ sha2)) fseq (fclose file)
 ;
 

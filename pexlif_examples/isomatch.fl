@@ -2,18 +2,41 @@ load "ste.fl";
 
 //------------------------------------------------------------------------------
 // ...
-// 
-// haystack : 81689ba3dc138265153ea52795cd9410447017d3bb863c960d1b319a0bcae508
-// buf1     : b120d4b5ba9eb56981511f735a9e9d28dafffdfbf384194aa0a2595563ae534d
-// buf2     : 9f057661a401029d7dcb3b570187f6cc6c1c18614bc66e4da8ceb9370188b76c
-// buf3     : 83ae3e3dc40a83ab0575332eccdbaa061f66fcda4fbf74f171c5e664c358b0f0
-// buf4     : ace6ee67999fdd1869f24a2b2f4478a11e2471ea1cb5b56239f430575bb8dbd2
 //------------------------------------------------------------------------------
 
-let g = load_pexlif "81689ba3dc138265153ea52795cd9410447017d3bb863c960d1b319a0bcae508";
-let p = load_pexlif "b120d4b5ba9eb56981511f735a9e9d28dafffdfbf384194aa0a2595563ae534d";
+// Pexlifs used for this example, build by 'isomatch_build'.
+let haystack = "81689ba3dc138265153ea52795cd9410447017d3bb863c960d1b319a0bcae508";
+let buf1     = "b120d4b5ba9eb56981511f735a9e9d28dafffdfbf384194aa0a2595563ae534d";
+let buf2     = "9f057661a401029d7dcb3b570187f6cc6c1c18614bc66e4da8ceb9370188b76c";
+let buf3     = "83ae3e3dc40a83ab0575332eccdbaa061f66fcda4fbf74f171c5e664c358b0f0";
+let buf4     = "ace6ee67999fdd1869f24a2b2f4478a11e2471ea1cb5b56239f430575bb8dbd2";
+
+// Run isomatching for 'haystack' and 'buf1'.
+let g = load_pexlif haystack;
+let p = load_pexlif buf1;
 let m = isomatch p g;
 Emit_isomatch m;
+
+// If any matches, should be two, construct and store the equiv. 'buf1' pexlifs.
+flip foreach m (\(n,subs).
+    flip foreach subs (\[sub].
+        let pe  = subst_pexlif_formals sub p then
+        let sha = pexlif_get_SHA pe then
+        (store_pexlif pe) fseq (store_match n sha)
+));
+
+flip foreach m (\(n,subst).
+    let pn = load_pexlif n then
+    fprintf stdout "\nFor pexlif %s"  (substr n 1 4) fseq
+    pretty_pexlif pn fseq
+    // /
+    let ms = fetch_matches n then
+    flip foreach ms (\m.
+        let pm = load_pexlif m then
+        fprintf stdout "We recorded %s as matching" (substr m 1 4) fseq
+        pretty_pexlif pm fseq
+        ()
+));
 
 //------------------------------------------------------------------------------
 // Fin.
