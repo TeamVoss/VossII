@@ -96,16 +96,16 @@ static hash_record_ptr outputs_tbl_ptr;
         do { if (DEBUG_PEX) fprintf(stderr, "" fmt, __VA_ARGS__); } while (0)
 
 // Forward definitions local functions -----------------------------------------
-static void           new_adj_mem();
-static void           rem_adj_mem();
+static inline void    new_adj_mem();
+static inline void    rem_adj_mem();
 static vec_ptr        split_vector(string name);
 static void           record_vector_signatures(
                           adj_key_ptr *tail, unint index, string name,
                           bool input);
 static void           mk_adj_tables(
                           adj_key_list_ptr *keys, unint *count, g_ptr p);
-static void           new_fold_mem();
-static void           rem_fold_mem();
+static inline void    new_fold_mem();
+static inline void    rem_fold_mem();
 static void           mk_formal_actuals_substitution(
                           hash_record_ptr tbl, g_ptr fa);
 static sname_list_ptr subst_formal(hash_record_ptr tbl, g_ptr f);
@@ -115,7 +115,7 @@ static g_ptr          subst_fa_list(hash_record_ptr tbl, g_ptr fa_list);
 /*                                LOCAL FUNCTIONS                             */
 /******************************************************************************/
 
-static void
+static inline void
 new_adj_mem()
 {
     adj_bkt_mgr_ptr = &adj_bkt_mgr;
@@ -130,7 +130,7 @@ new_adj_mem()
     create_hash(outputs_tbl_ptr, 100, str_hash, str_equ);
 }
 
-static void
+static inline void
 rem_adj_mem()
 {
     free_mgr(adj_bkt_mgr_ptr);
@@ -257,7 +257,7 @@ mk_adj_tables(adj_key_list_ptr *keys, unint *count, g_ptr p)
 
 // -----------------------------------------------------------------------------
 
-static void
+static inline void
 new_fold_mem()
 {
     vector_list_mgr_ptr = &vector_list_mgr;
@@ -272,7 +272,7 @@ new_fold_mem()
     new_mgr(fa_subst_mgr_ptr, sizeof(fa_subst_rec));
 }
 
-static void
+static inline void
 rem_fold_mem()
 {
     free_mgr(vector_list_mgr_ptr);

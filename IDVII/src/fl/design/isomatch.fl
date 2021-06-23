@@ -214,25 +214,22 @@ let print_list = list2str T "[" "," "]";
 //  print_bust::((string#string) list)->string
 let print_subst = print_list (print_pair id id);
 
-// 	Emit_isomatch::((string#(((string#string list) list) list)) list)->string
-let Emit_isomatch [] = sprintf "Found no matches."
-/\  Emit_isomatch {ms :: (string#((((string#string) list) list) list)) list} =
+// 	pretty_isomatch::((string#(((string#string list) list) list)) list)->string
+let pretty_isomatch [] = sprintf "Found no matches."
+/\  pretty_isomatch {ms :: (string#((((string#string) list) list) list)) list} =
     let pretty_matches {sub :: (((string#string) list) list)} =
             list2str T "" ", " "" print_subst sub
     in
     let pretty_solution ((pex,[]), i) =
-            sprintf "Found no match with node %d (%s)" i
-            (substr pex 1 4 ^ "..")
-    /\  pretty_solution {((pex,sub), i) :: ((string#((((string#string) list) list) list))#int)} =
-            sprintf "Found match(s) with node %d (%s) {%s" i
-                (substr pex 1 4 ^ "..")
-                (list2str T "\n\twhere: " "\n\tor:    " "\n}"
-                    pretty_matches sub)
+            sprintf "Found no match with node %d (%s)" i (shorten_sha pex)
+    /\  pretty_solution ((pex,sub), i) =
+            sprintf "Found match(s) with node %d (%s) {%s" i (shorten_sha pex)
+                (list2str T "\n\twhere: " "\n\tor:    " "\n}" pretty_matches sub)
     in
     list2str T "" "\n" "\n" pretty_solution (ixlabel ms)
 ;
 
-end_abstype isomatch Emit_isomatch;
+end_abstype isomatch pretty_isomatch;
 
 //------------------------------------------------------------------------------
 // Fin.

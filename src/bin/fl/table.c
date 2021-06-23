@@ -180,7 +180,6 @@ get_table_rec()
     return res;
 }
 
-
 static void
 scan_mark_entries(pointer pkey, pointer pdata)
 {

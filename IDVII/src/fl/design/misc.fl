@@ -125,6 +125,10 @@ let butfirst = tl;
 //  elem::a->(a list)->bool
 let elem a as = find_first0 (defix == a) as != 0;
 
+// Find first element accepted by 'f' in 'xs'. If none is found, returns 'x'.
+//  find_maybe::(a->bool)->a->(a list)->a
+let find_maybe f x xs = let i = find_first0 f xs in i == 0 => x | (el i xs);
+
 // Sum a list of integers.
 //  sum::(int list)->int
 let sum as = sitlist (defix +) as 0;
@@ -275,6 +279,47 @@ let string_empty s = strlen s == 0;
 // ...
 //  string_concat::(string list)->string
 let string_concat ss = itlist (defix ^) ss "";
+
+//------------------------------------------------------------------------------
+// Random.
+
+let one_of [] = eprintf "one_of called on empty list"
+/\  one_of xs = el (random 1 (length xs)) xs
+;
+non_lazy one_of;
+
+let one_of_weighted [] = eprintf "one_of_weighted called on empty list"
+/\  one_of_weighted xs =
+        letrec
+            pick _ []         = eprintf "?!"
+        /\  pick n ((k,a):as) = (n <= k) => a | pick (n - k) as
+        in
+        pick (random 1 (sum (map fst xs))) xs
+;
+non_lazy one_of_weighted;
+
+let remove_one [] = []
+/\  remove_one xs = remove (random 1 (length xs)) xs
+;
+non_lazy remove_one;
+
+let some_of [ ] = [ ]
+/\  some_of [x] = [x]
+/\  some_of xs  = repeat (random 0 (length xs - 1)) remove_one xs
+;
+non_lazy some_of;
+
+let split_at_random [] = ([],[])
+/\  split_at_random xs = split_at (random 1 (length xs + 1)) xs
+;
+non_lazy split_at_random;
+
+//------------------------------------------------------------------------------
+// SHA.
+
+// Compute the SHA256 signature of a 'set' of components.
+//  sha_set::(a list)->string
+let sha_set = sha256_signature # qsort strcmp # map sha256_signature;
 
 //------------------------------------------------------------------------------
 // Fin.
