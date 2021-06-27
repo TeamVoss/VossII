@@ -151,7 +151,9 @@ static rec_mgr	    *old_trace_event_rec_mgrp;
 static rec_mgr	    *trace_rec_mgrp;
 static rec_mgr	    *old_trace_rec_mgrp;
 static buffer	    *weakening_bufp;
+static buffer	    *event_bufp;
 static buffer	    *old_weakening_bufp;
+static buffer	    *old_event_bufp;
 static value_type   current_type;
 static value_type   old_type;
 //
@@ -610,8 +612,7 @@ gSTE(g_ptr redex, value_type type)
     //
     // Now translate weakenings, ant, cons and trl into events
     //
-    buffer event_buf;
-    bool ok = create_event_buffer(ste,&event_buf,wl,ant,cons,trl,abort_ASAP);
+    bool ok = create_event_buffer(ste,event_bufp,wl,ant,cons,trl,abort_ASAP);
     //
     // Allocate value buffers
     //
@@ -659,7 +660,7 @@ gSTE(g_ptr redex, value_type type)
     RCverbose_ste_run = old_RCverbose_ste_run;
  
     // Is there anything to run?
-    if( COUNT_BUF(&event_buf) == 0 ) {
+    if( COUNT_BUF(event_bufp) == 0 ) {
 	MAKE_REDEX_EXT_OBJ(redex, ste_oidx, ste);
 	ste->max_time = 0;
 	free_ste_buffers();
@@ -671,9 +672,9 @@ gSTE(g_ptr redex, value_type type)
     //
     // If yes, run the real STE algorithm
     //
-    event_ptr ep = M_LOCATE_BUF(&event_buf, COUNT_BUF(&event_buf)-1);
+    event_ptr ep = M_LOCATE_BUF(event_bufp, COUNT_BUF(event_bufp)-1);
     int min_time = ep->time;
-    ep = FAST_LOC_BUF(&event_buf, 0);
+    ep = FAST_LOC_BUF(event_bufp, 0);
     int max_time = ep->time+1;
 
     if( RCprint_time ) {
@@ -704,7 +705,7 @@ gSTE(g_ptr redex, value_type type)
 		FP(sim_fp, "Time: %d\n", t);
 	    }
 	}
-	process_event(&event_buf, t);
+	process_event(event_bufp, t);
 	nnode_ptr np;
 	// Put nodes whose weak/ant changed on evaluation list.
 	int idx = 0;
@@ -3220,7 +3221,6 @@ static bool
 create_event_buffer(ste_ptr ste, buffer *ebufp,
 		    g_ptr wl, g_ptr ant, g_ptr cons, g_ptr trl, bool abort_ASAP)
 {
-    new_buf(ebufp, 1000, sizeof(event_rec));
     for(g_ptr cur = wl; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
 	g_ptr t = GET_CONS_HD(cur);
 	gbv when;
@@ -3499,6 +3499,8 @@ create_ste(fsm_ptr fsm, value_type type)
     new_mgr(_trace_rec_mgrp, sizeof(trace_rec));
     buffer     *_weakening_bufp = &(ste->weakening_buf);
     new_buf(_weakening_bufp, 100, sizeof(formula));
+    buffer     *_event_bufp = &(ste->event_buf);
+    new_buf(_event_bufp, 1000, sizeof(event_rec));
     push_ste(ste);
     ste->validTrajectory = c_ONE;
     ste->checkTrajectory = c_ONE;
@@ -3515,6 +3517,7 @@ push_ste(ste_ptr ste)
     old_trace_event_rec_mgrp = trace_event_rec_mgrp;
     old_trace_rec_mgrp = trace_rec_mgrp;
     old_weakening_bufp = weakening_bufp;
+    old_event_bufp = event_bufp;
     current_type = ste->type;
     switch( current_type ) {
 	case use_bdds:
@@ -3533,6 +3536,7 @@ push_ste(ste_ptr ste)
     trace_event_rec_mgrp = &(ste->trace_event_rec_mgr);
     trace_rec_mgrp = &(ste->trace_rec_mgr);
     weakening_bufp = &(ste->weakening_buf);
+    event_bufp = &(ste->event_buf);
 }
 
 static void
@@ -3556,6 +3560,7 @@ pop_ste()
     trace_event_rec_mgrp = old_trace_event_rec_mgrp;
     trace_rec_mgrp = old_trace_rec_mgrp;
     weakening_bufp = old_weakening_bufp;
+    event_bufp = old_event_bufp;
 }
 
 static void
@@ -3689,18 +3694,23 @@ mark_ste_fn(pointer p)
 	    gbv_mark(*(weak_buf+2*i));
 	    gbv_mark(*(weak_buf+2*i+1));
 	    gbv_mark(*(ant_buf+2*i));
-	    gbv_mark(*(ant_buf+2*i));
+	    gbv_mark(*(ant_buf+2*i+1));
 	    gbv_mark(*(cons_buf+2*i));
-	    gbv_mark(*(cons_buf+2*i));
+	    gbv_mark(*(cons_buf+2*i+1));
 	    gbv_mark(*(cur_buf+2*i));
-	    gbv_mark(*(cur_buf+2*i));
+	    gbv_mark(*(cur_buf+2*i+1));
 	    gbv_mark(*(next_buf+2*i));
-	    gbv_mark(*(next_buf+2*i));
+	    gbv_mark(*(next_buf+2*i+1));
 	}
     }
     formula *fp;
     FOR_BUF(weakening_bufp, formula, fp) {
 	B_Mark(*fp);
+    }
+    event_ptr ep;
+    FOR_BUF(event_bufp, event_rec, ep) {
+	gbv_mark(ep->H);
+	gbv_mark(ep->L);
     }
     pop_fsm_env();
     pop_ste();
@@ -3784,6 +3794,8 @@ sweep_ste_fn(void)
 		dispose_hash(&(ste->trace_tbl), NULLFCN);
 		free_mgr(&(ste->trace_event_rec_mgr));
 		free_mgr(&(ste->trace_rec_mgr));
+		free_buf(&(ste->event_buf));
+		free_buf(&(ste->weakening_buf));
 		ste->next = ste_free_list;
 		ste_free_list = ste;
 		ste->mark = 0;
