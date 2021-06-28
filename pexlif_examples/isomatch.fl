@@ -5,11 +5,11 @@ load "ste.fl";
 //------------------------------------------------------------------------------
 
 // Pexlifs used for this example, build by 'isomatch_build'.
-let haystack = "81689ba3dc138265153ea52795cd9410447017d3bb863c960d1b319a0bcae508";
-let buf1     = "b120d4b5ba9eb56981511f735a9e9d28dafffdfbf384194aa0a2595563ae534d";
-let buf2     = "9f057661a401029d7dcb3b570187f6cc6c1c18614bc66e4da8ceb9370188b76c";
-let buf3     = "83ae3e3dc40a83ab0575332eccdbaa061f66fcda4fbf74f171c5e664c358b0f0";
-let buf4     = "ace6ee67999fdd1869f24a2b2f4478a11e2471ea1cb5b56239f430575bb8dbd2";
+let buf1     = "ac88643d4bc579102ac9a51c5f9f2939246f6dc966f84ec808af8e190f0951e7";
+let buf2     = "9cc81a9e8c8940172a53edd086301cfd4552a606e405de80d0485412e10d8fcf";
+let buf3     = "6e3b2c563e9a593a672331d7f3f70dae9a45f2565b2441aff77e0146e8dee4a8";
+let buf4     = "80543250b0e38eeacbc13494ac8dd7f08ccecb1935183baea97d67a4787407e0";
+let haystack = "606318b24ee7ebf383912c1087c13892c25ae1e3839e4db4801613aa28aa0485";
 
 // Run isomatching for 'haystack' and 'buf1'.
 let g = load_pexlif haystack;
@@ -18,15 +18,15 @@ let m = isomatch p g;
 print (pretty_isomatch m);
 
 // If any matches, should be two, construct and store the equiv. 'buf1' pexlifs.
+pretty_pexlif p;
 let x = shorten_sha (pexlif_get_SHA p);
 flip foreach m (\(n,subs).
     let y = shorten_sha n in
     flip foreach subs (\[sub].
         let pe  = subst_pexlif_actuals sub p then
         let sha = pexlif_get_SHA pe in
-        let z   = shorten_sha sha in
-        (printf "Rewrite of %s into %s to match %s\n" x z y) fseq
-     // (pretty_pexlif pe) fseq
+        (printf "Rewrite of %s into \"%s\" to match %s\n" x (shorten_sha sha) y) fseq
+        (pretty_pexlif pe) fseq
         (store_pexlif pe) fseq
         (store_match n sha)
 ));

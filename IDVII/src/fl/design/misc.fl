@@ -104,6 +104,10 @@ let when m f = maybe NONE m (SOME # f);
 let filter_some = map get_value # filter has_value;
 
 // ...
+//  filter_opt::(*->bool)->((* opt) list)->((* opt) list)
+let filter_opt f = filter (\o. has_value o AND f (get_value o));
+
+// ...
 //  exhaust::((a opt) list)->(a opt)
 letrec
     exhaust []     = NONE
@@ -145,6 +149,10 @@ letrec
 // ...
 //  concat::((a list) list)->(a list)
 let concat xs = itlist (defix @) xs [];
+
+// ...
+//  concatMap::(a->b list)->(a list)->(b list)
+let concatMap f = concat # map f;
 
 // Fold (rigth-to-left) 'xs' into itself with 'f'.
 //  itlist1::(a->a->a)->(a list)->a

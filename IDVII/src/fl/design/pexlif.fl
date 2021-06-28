@@ -59,11 +59,11 @@ let fa_lower = map # rev_subst;
 let fa_promote f ns hs = curry zip # both (f ns) (f hs) # unzip;
 
 // Turns a subst. of formals into one over actuals.
-//  fa_actualize::...
+//  fa_actualize::fa->fa->subst
 let fa_actualize fa_n fa_h = fa_promote fa_raise (fa_lineup fa_n) (fa_lineup fa_h);
 
 // Turns a subst. of actuals into one over formals.
-//  fa_formalize::...
+//  fa_formalize::fa->fa->subst
 let fa_formalize fa_n fa_h = fa_promote fa_lower (fa_lineup fa_n) (fa_lineup fa_h);
 
 end_abstype fa_actualize fa_formalize;
@@ -201,7 +201,7 @@ let PINST n a l i o t c =
         let a' = filter (NOT # is_signature # fst) a in
         let f  = ("FP",  fp_pinst    i o t c) in
         let s  = ("SHA", sha_pinst n i o t c) in
-        PINST n (f : s : a) l i o t c
+        PINST n (f : s : a') l i o t c
 ;
 
 //------------------------------------------------------------------------------
@@ -241,6 +241,9 @@ let subst_pexlif_actuals sub (PINST n a l i o t c) =
         let swap (f, as) = (f, map (subst sub) as) in
         PINST n a l (map swap i) (map swap o) t c
 ;
+
+// ...
+let id_pexlif (PINST n a l i o t c) = PINST n a l i o t c;
 
 // ...
 let load_matches sha flip =

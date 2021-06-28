@@ -11,10 +11,41 @@ load (DIR^"util.fl");
 
 begin_abstype;
 
+//  print_pair::(*->string)->(**->string)->(*#**)->string
+let print_pair f g (x,y) = sprintf "%s:%s" (f x) (g y);
+
+//  print_list::(*->string)->(* list)->string
+let print_list = list2str T "[" "," "]";
+
+//  print_fa_list::((string#(string list) list)->string
+let print_fa_list = print_list (print_pair id (print_list id));
+
+//  print_bust::((string#string) list)->string
+let print_subst = print_list (print_pair id id);
+
+//  print_subst_opt::(((string#string) list) opt)->string
+let print_subst_opt s = maybe "[]" s print_subst;
+
+// 	pretty_isomatch::((string#(((string#string list) list) list)) list)->string
+let pretty_isomatch [] = sprintf "Found no matches."
+/\  pretty_isomatch {ms :: (string#((((string#string) list) list) list)) list} =
+    let pretty_matches {sub :: (((string#string) list) list)} =
+            list2str T "" ", " "" print_subst sub
+    in
+    let pretty_solution ((pex,[]), i) =
+            sprintf "Found no match with node %d (%s)" i (shorten_sha pex)
+    /\  pretty_solution ((pex,sub), i) =
+            sprintf "Found match(s) with node %d (%s) {%s" i (shorten_sha pex)
+                (list2str T "\n\twhere: " "\n\tor:    " "\n}" pretty_matches sub)
+    in
+    list2str T "" "\n" "\n" pretty_solution (ixlabel ms)
+;
+
+//------------------------------------------------------------------------------
+
 // Merge two subst., fails if any is empty.
 //  @@::(subst opt)->(subst opt)->(subst opt)
-let
-    @@ (SOME x) (SOME y) = SOME (x @ y)
+let @@ (SOME x) (SOME y) = SOME (x @ y)
 /\  @@ _        _        = NONE
 ;
 infix 9 @@;
@@ -26,6 +57,10 @@ let collect ss = itlist (defix @@) ss (SOME []);
 // For every pair '(x,y)' in 's', 'assoc x s == y' and 'rev_assoc y s == x'.
 //  coherent::subst->bool
 let coherent s = all (\(u,t). all (\(x,y). (u == x) <==> (t == y)) s) s;
+
+// Checks that directions of wires are respected by a subst.
+//  directed::formals->formals->subst->bool
+let directed f1 f2 s = all (\(u,t). elem u f1 <==> elem t f2) s;
 
 // Find a subst., if any, s.t. both expressions are equal.
 //  alpha::wexpr->wexpr->(subst opt)
@@ -65,8 +100,7 @@ let alpha_fn (W_UPDATE_FN a b)   (W_UPDATE_FN x y)   = alpha a x @@ alpha b y
 // Find subst., if any, s.t. both sets of functions are equal.
 //  alpha_leaf::content->content->subst
 let alpha_leaf (P_LEAF fs) (P_LEAF gs) =
-        let
-            verify (SOME x) = coherent x => SOME x | NONE
+        let verify (SOME x) = coherent x => SOME x | NONE
         /\  verify _        = NONE
         in
         let test = verify # collect # map2 alpha_fn fs in
@@ -77,18 +111,35 @@ let alpha_leaf (P_LEAF fs) (P_LEAF gs) =
 //  actualize_sha::pexlif->pexlif->subst
 let actualize_sha p g = zip (pexlif_get_actuals p) (pexlif_get_actuals g);
 
+// Check that a subst. hasn't changed the direction of any wires.
+//  directions::pexlif->pexlif->subst->bool
+let directions (PINST _ _ _ i1 o1 _ _) (PINST _ _ _ i2 o2 _ _) s =
+        (directed (concatMap snd i1) (concatMap snd i2) s) AND
+        (directed (concatMap snd o1) (concatMap snd o2) s)        
+;
+
+// If optional valued satisfies pred, transform.
+//  predicated::(a->bool)->(a opt)->(a->b)->(b opt)
+let predicated p a f = maybe NONE a (\x. p x => SOME (f x) | NONE);
+
 // Find formal subst. for two leaf pexlif's.
 //  actualize_leaf::pexlif->pexlif->(subst opt)
-let actualize_leaf (PINST _ _ _ i1 o1 _ l1) (PINST _ _ _ i2 o2 _ l2) =
+let actualize_leaf p g =
+        val (PINST _ _ _ i1 o1 _ l1) = p in
+        val (PINST _ _ _ i2 o2 _ l2) = g in
         let lift = fa_actualize (i1 @ o1) (i2 @ o2) in
-        maybe NONE (alpha_leaf l1 l2) (SOME # lift)
+        let sub  = alpha_leaf l1 l2 in
+        predicated (\s. directions p g s) (sub) (lift)
 ;
 
 // Given a list of subst. of actuals for their children, find formal subst.
 //  actualize_hier::((subst opt) list)->pexlif->pexlif->(subst opt)
-let actualize_hier ss (PINST _ _ _ i1 o1 _ _) (PINST _ _ _ i2 o2 _ _) =
+let actualize_hier ss p g =
+        val (PINST _ _ _ i1 o1 _ _) = p in
+        val (PINST _ _ _ i2 o2 _ _) = g in
         let lift = fa_actualize (i1 @ o1) (i2 @ o2) in
-        maybe NONE (collect ss) (\s. coherent s => SOME (lift s) | NONE)
+        let sub  = collect ss in
+        predicated (\s. coherent s AND directions p g s) (sub) (lift)
 ;
 
 //------------------------------------------------------------------------------
@@ -106,6 +157,7 @@ letrec
 /\  expand_choices (xs:xss) = flatmap (\x. map (\ys. x:ys) (expand_choices xss)) xs
 ;
 
+// ...
 //  internal_isomatch::pexlif->pexlif->(((int#int) list) list)
 let internal_isomatch p g =
         let sp = internal_search_create p g in
@@ -137,7 +189,7 @@ let expand p g =
         let ss = internal_isomatch p g then
         let ps = pexlif_get_children p then
         let gs = pexlif_get_children g then
-        pam ss (\sol.
+        filter (NOT # empty) $ pam ss (\sol.
             // Find and order the solutions haystack nodes.
             // Note: needle's nodes are already in order.
             //  matches::(pexlif list)
@@ -154,12 +206,12 @@ let expand p g =
             // Filter out potential solutions by only merging complete substs.
             //  result::((subst opt) list)
             let result  = map collect choices then
+            // Filter out inconsistent solutions.
+            //  final::((subst opt) list)
+            let final   = filter_opt coherent result then
             // /
-            result
-        )
+            final)
 ;
-// todo: we could probably speed this up by not attempting to finding non-top
-//       solutions that we will filter out anyway.
 
 // Explore two pexlifs to find if they are a potential match.
 //
@@ -201,32 +253,6 @@ let isomatch p (PINST _ _ _ _ _ _ (P_HIER gs)) =
             expand p g
         )
 /\  isomatch _ _ = error "isomatch expects a 'boxed' haystack."
-;
-
-//------------------------------------------------------------------------------
-
-//  print_pair::(*->string)->(**->string)->(*#**)->string
-let print_pair f g (x,y) = sprintf "%s:%s" (f x) (g y);
-
-//  print_list::(*->string)->(* list)->string
-let print_list = list2str T "[" "," "]";
-
-//  print_bust::((string#string) list)->string
-let print_subst = print_list (print_pair id id);
-
-// 	pretty_isomatch::((string#(((string#string list) list) list)) list)->string
-let pretty_isomatch [] = sprintf "Found no matches."
-/\  pretty_isomatch {ms :: (string#((((string#string) list) list) list)) list} =
-    let pretty_matches {sub :: (((string#string) list) list)} =
-            list2str T "" ", " "" print_subst sub
-    in
-    let pretty_solution ((pex,[]), i) =
-            sprintf "Found no match with node %d (%s)" i (shorten_sha pex)
-    /\  pretty_solution ((pex,sub), i) =
-            sprintf "Found match(s) with node %d (%s) {%s" i (shorten_sha pex)
-                (list2str T "\n\twhere: " "\n\tor:    " "\n}" pretty_matches sub)
-    in
-    list2str T "" "\n" "\n" pretty_solution (ixlabel ms)
 ;
 
 end_abstype isomatch pretty_isomatch;
