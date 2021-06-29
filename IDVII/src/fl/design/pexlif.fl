@@ -59,11 +59,11 @@ let fa_lower = map # rev_subst;
 let fa_promote f ns hs = curry zip # both (f ns) (f hs) # unzip;
 
 // Turns a subst. of formals into one over actuals.
-//  fa_actualize::fa->fa->subst
+//  fa_actualize::fa->fa->subst->subst
 let fa_actualize fa_n fa_h = fa_promote fa_raise (fa_lineup fa_n) (fa_lineup fa_h);
 
 // Turns a subst. of actuals into one over formals.
-//  fa_formalize::fa->fa->subst
+//  fa_formalize::fa->fa->subst->subst
 let fa_formalize fa_n fa_h = fa_promote fa_lower (fa_lineup fa_n) (fa_lineup fa_h);
 
 end_abstype fa_actualize fa_formalize;
@@ -236,12 +236,6 @@ let store_pexlif pex =
 let load_pexlif sha = read_pexlif ("pexlif_examples/" ^ sha ^ ".pex");
 non_lazy load_pexlif;
 
-// ...
-let subst_pexlif_actuals sub (PINST n a l i o t c) =
-        let swap (f, as) = (f, map (subst sub) as) in
-        PINST n a l (map swap i) (map swap o) t c
-;
-
 begin_abstype;
 
 lettype wrapper = WRAPPER ((string#string) list);
@@ -300,6 +294,13 @@ let store_match {sha1::string} {sha2::string} {sub::((string#string) list)} =
 ;
 
 end_abstype store_match fetch_matches rev_fetch_matches;
+
+// ...
+let subst_match sub (PINST n a l i1 o1 t c) (PINST _ _ _ i2 o2 _ _) =
+        let sub2 = fa_actualize (i1 @ o1) (i2 @ o2) sub in
+        let swap (f, as) = (f, map (subst sub2) as) in
+        PINST n a l (map swap i1) (map swap o1) t c
+;
 
 //------------------------------------------------------------------------------
 // Generation of a PEXLIF.

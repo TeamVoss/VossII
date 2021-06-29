@@ -24,14 +24,15 @@ let m = isomatch p g;
 print (pretty_isomatch m);
 
 // If any matches, should be two, construct and store the equiv. 'buf1' pexlifs.
+(printf "Original pexlif") fseq
 pretty_pexlif p;
 let x = shorten_sha (pexlif_get_SHA p);
 flip foreach m (\(n,subs).
     let y = shorten_sha n in
     flip foreach subs (\[sub].
-        let pe  = subst_pexlif_actuals sub p then
-        let sha = pexlif_get_SHA pe in
-        (printf "Rewrite of %s into \"%s\" to match %s\n" x (shorten_sha sha) y) fseq
+        let pe  = subst_match sub p g then
+        let sha = pexlif_get_SHA pe then
+        (printf "Rewrite of %s into \"%s\" to match %s" x (shorten_sha sha) y) fseq
         (pretty_pexlif pe) fseq
         (store_pexlif pe) fseq
         (store_match n sha sub)
