@@ -242,40 +242,64 @@ let subst_pexlif_actuals sub (PINST n a l i o t c) =
         PINST n a l (map swap i) (map swap o) t c
 ;
 
-// ...
-let id_pexlif (PINST n a l i o t c) = PINST n a l i o t c;
+begin_abstype;
+
+lettype wrapper = WRAPPER ((string#string) list);
+
+let read_subst name =
+        let file = fopen name "r" then
+        let text = fget file then
+        val (WRAPPER sub) = read_wrapper text then
+        (fclose file) fseq
+        (sub)
+;
+
+let write_subst name {sub::((string#string) list)} =
+        let {w::wrapper} = WRAPPER sub in write_wrapper name w
+;
 
 // ...
 let load_matches sha flip =
         let file = fopen ("pexlif_examples/matches") "r" then
+        let read_subst n =
+                read_subst 
+        in
         letrec
-            read f =
+            read_line f =
                 let line = fgets f then
                 string_empty line => [] |
+                // /
                 let real  = string_butlast line then
                 val [l,r] = str_cluster real 64 then
                 val (x,y) = flip => (r,l) | (l,r) then
-                x == sha => y : read f | read f
+                x != sha => read_line f |
+                // /
+                let sub = read_subst ("pexlif_examples/" ^ l ^ r ^ ".match") then
+                (y,sub) : read_line f
         in
-        let matches = read file then
-        (fclose file) fseq (matches)
+        let matches = read_line file then
+        (fclose file) fseq
+        (matches)
 ;
 non_lazy load_matches;
 
-// ...
 let fetch_matches sha = load_matches sha F;
 non_lazy fetch_matches;
 
-// ...
 let rev_fetch_matches sha = load_matches sha T;
 non_lazy rev_fetch_matches;
 
 // ...
-let store_match sha1 sha2 =
+let store_match {sha1::string} {sha2::string} {sub::((string#string) list)} =
         NOT $ empty $ fetch_matches sha1 => () |
         let file = fopen ("pexlif_examples/matches") "a" then
-        (fprintf file "%s\n" (sha1 ^ sha2)) fseq (fclose file)
+        (fprintf file "%s\n" (sha1 ^ sha2)) fseq
+        (fclose file) fseq
+        (write_subst ("pexlif_examples/" ^ sha1 ^ sha2 ^ ".match")) fseq
+        ()
 ;
+
+end_abstype store_match fetch_matches rev_fetch_matches;
 
 //------------------------------------------------------------------------------
 // Generation of a PEXLIF.

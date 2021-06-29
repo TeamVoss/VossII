@@ -20,7 +20,7 @@ let print_list = list2str T "[" "," "]";
 //  print_fa_list::((string#(string list) list)->string
 let print_fa_list = print_list (print_pair id (print_list id));
 
-//  print_bust::((string#string) list)->string
+//  print_subst::((string#string) list)->string
 let print_subst = print_list (print_pair id id);
 
 //  print_subst_opt::(((string#string) list) opt)->string

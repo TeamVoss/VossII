@@ -1,7 +1,13 @@
 load "ste.fl";
 
 //------------------------------------------------------------------------------
-// ...
+// Isomatch on a random example.
+//------------------------------------------------------------------------------
+
+// let pex = gen_pinst [("inp",["inp"])] [("out",["out"])] 5 3;
+
+//------------------------------------------------------------------------------
+// Isomatch on a specific example (Buffers).
 //------------------------------------------------------------------------------
 
 // Pexlifs used for this example, build by 'isomatch_build'.
@@ -28,7 +34,7 @@ flip foreach m (\(n,subs).
         (printf "Rewrite of %s into \"%s\" to match %s\n" x (shorten_sha sha) y) fseq
         (pretty_pexlif pe) fseq
         (store_pexlif pe) fseq
-        (store_match n sha)
+        (store_match n sha sub)
 ));
 
 //------------------------------------------------------------------------------

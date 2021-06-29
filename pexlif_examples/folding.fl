@@ -1,7 +1,7 @@
 load "ste.fl";
 
 //------------------------------------------------------------------------------
-//
+// Folding/Unfolding on a random example.
 //------------------------------------------------------------------------------
 
 // First we generate an 'comb/seq' split PINST to run our fold in.
@@ -24,6 +24,12 @@ let unfolded_pex = unfold_pexlif folded_pex 1 "internal";
 // ...
 let fp_of = find_fingerprint # pexlif_get_attrs;
 (print "> FP still equal?\n") fseq ((fp_of pex) == (fp_of unfolded_pex));
+
+//------------------------------------------------------------------------------
+// Folding/Unfolding on a specific example (..)
+//------------------------------------------------------------------------------
+
+// ..
 
 //------------------------------------------------------------------------------
 // Fin.
