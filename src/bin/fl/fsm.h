@@ -225,6 +225,7 @@ typedef struct ste_rec {
     hash_record	trace_tbl;
     rec_mgr	trace_event_rec_mgr;
     rec_mgr	trace_rec_mgr;
+    buffer	event_buf;
     buffer	weakening_buf;
 } ste_rec;
 

@@ -981,6 +981,7 @@ record_string(g_ptr leaf_node)
 	    case P_FPRINTF:
 	    case P_EPRINTF:
 	    case P_SPRINTF:
+	    case P_SSCANF:
 		s = GET_PRINTF_STRING(leaf_node);
 		push_uniq_buf(&string_buf, (pointer) &s);
 		break;
@@ -1007,6 +1008,7 @@ record_string(g_ptr leaf_node)
 #define TAG_EPRINTF	'@'
 #define TAG_FPRINTF	'#'
 #define TAG_SPRINTF	'$'
+#define TAG_SSCANF	'<'
 #define TAG_CACHE	'='
 #define TAG_EXTAPI	'X'
 #define TAG_PRIM_FN	'P'
@@ -1224,7 +1226,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 	free_buf(&gbuf);
 	return( FALSE );
     }
-    int line = 0;
+    int line;
     for(line = 0; line < g_node_cnt; line++) {
         int c = fgetc(fp);
         ungetc(c, fp);
@@ -1322,6 +1324,14 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		    SET_REF_VAR(g, ref_var);
 		    break;
 		}
+	    case TAG_SSCANF:
+		if( fscanf(fp,"< %d %d\n", &ig, &il) != 2 )
+		    RD_FAIL("TAG_SSCANF");
+		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
+		s = *((string *) FAST_LOC_BUF(&str_results, il));
+		MAKE_REDEX_PRIM_FN(g, P_SSCANF);
+		SET_PRINTF_STRING(g, s);
+		break;
 	    case TAG_PRINTF:
 		if( fscanf(fp,"! %d %d\n", &ig, &il) != 2 )
 		    RD_FAIL("TAG_PRINTF");
@@ -1779,6 +1789,8 @@ can_be_saved(g_ptr np)
 				    np = Get_RefVar(ref_var);
 				    goto restart;
 				}
+			    case P_SSCANF:
+				return( TRUE );
 			    case P_PRINTF:
 				return( TRUE );
 			    case P_FPRINTF:
@@ -1888,6 +1900,11 @@ save_graph_rec(FILE *fp, g_ptr np)
 				    INT_EMIT(TAG_REF_VAR, ch);
 				    return( res );
 				}
+			    case P_SSCANF:
+				s = GET_PRINTF_STRING(np);
+				INT_EMIT(TAG_SSCANF,
+					get_uniq_buf_index(&string_buf,&s));
+				return( res );
 			    case P_PRINTF:
 				s = GET_PRINTF_STRING(np);
 				INT_EMIT(TAG_PRINTF,

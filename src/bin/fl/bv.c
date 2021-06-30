@@ -495,7 +495,7 @@ less_rec(g_ptr l1, g_ptr l2)
     formula nab = B_And(B_Not(a), b);
     PUSH_BDD_GC(nab); if( Do_gc_asap ) Garbage_collect();
     formula res = B_Or(nab, abrem);
-    PUSH_BDD_GC(nab); if( Do_gc_asap ) Garbage_collect();
+    PUSH_BDD_GC(res); if( Do_gc_asap ) Garbage_collect();
     POP_BDD_GC(5);
     return( res );
 }
@@ -918,8 +918,8 @@ signed_bvdiv(g_ptr dv, g_ptr nv, g_ptr *Q, g_ptr *R)
     PUSH_GLOBAL_GC(Qraw);
     PUSH_GLOBAL_GC(Rraw);
     formula exact = is_zero_list(Rraw);
-    formula same_sign = B_Xnor(neg_d, neg_n);
     PUSH_BDD_GC(exact);
+    formula same_sign = B_Xnor(neg_d, neg_n);
     PUSH_BDD_GC(same_sign);
     g_ptr Q0 = ite_bv_list(same_sign, Qraw, (negate_bv_list(Qraw)));
     PUSH_GLOBAL_GC(Q0);

@@ -1,0 +1,7 @@
+load "ste.fl";
+TYPE "byte" 8;
+
+help "THEN";
+rvariable "a";
+
+{IF {'1::bit} THEN '1 ELSE '0 :: byte};
