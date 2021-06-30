@@ -41,7 +41,11 @@ let pretty_isomatch [] = sprintf "Found no matches."
     list2str T "" "\n" "\n" pretty_solution (ixlabel ms)
 ;
 
+end_abstype pretty_isomatch;
+
 //------------------------------------------------------------------------------
+
+begin_abstype;
 
 // Merge two subst., fails if any is empty.
 //  @@::(subst opt)->(subst opt)->(subst opt)
@@ -255,7 +259,7 @@ let isomatch p (PINST _ _ _ _ _ _ (P_HIER gs)) =
 /\  isomatch _ _ = error "isomatch expects a 'boxed' haystack."
 ;
 
-end_abstype isomatch pretty_isomatch;
+end_abstype isomatch;
 
 //------------------------------------------------------------------------------
 // Fin.
