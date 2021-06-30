@@ -338,8 +338,7 @@ Reset_Ref_cnts()
 	bdd_ptr bp = MainTbl;
 	for(unint i = 0; i < sz_MainTbl; i++) {
 	    bp->mark = 0;
-	    if( bp->ref_cnt != BDD_MAX_REF_CNT )
-		bp->ref_cnt = 0;
+	    bp->ref_cnt = 0;
 	    bp++;
 	}
     }
@@ -430,30 +429,49 @@ B_New_unique_var(formula f)
 formula
 B_Not(formula f1)
 {
+#ifdef REF_CNT_DEBUG
+    ASSERT( GET_BDDP(f1)->in_use );
+#endif
     BDD_RETURN(NOT(f1));
 }
 
 formula
 B_Nor(formula f1, formula f2)
 {
+#ifdef REF_CNT_DEBUG
+    ASSERT( GET_BDDP(f1)->in_use );
+    ASSERT( GET_BDDP(f2)->in_use );
+#endif
     BDD_RETURN( NOT(bdd_step(OR, f1, f2)) );
 }
 
 formula
 B_Nand(formula f1, formula f2)
 {
+#ifdef REF_CNT_DEBUG
+    ASSERT( GET_BDDP(f1)->in_use );
+    ASSERT( GET_BDDP(f2)->in_use );
+#endif
     BDD_RETURN( NOT(bdd_step(AND, f1, f2)) );
 }
 
 formula
 B_And(formula f1, formula f2)
 {
+#ifdef REF_CNT_DEBUG
+    ASSERT( GET_BDDP(f1)->in_use );
+    ASSERT( GET_BDDP(f2)->in_use );
+#endif
     BDD_RETURN( bdd_step(AND, f1, f2) );
 }
 
 formula
 B_Or(formula f1, formula f2)
 {
+#ifdef REF_CNT_DEBUG
+    ASSERT( GET_BDDP(f1)->in_use );
+    ASSERT( GET_BDDP(f2)->in_use );
+#endif
     BDD_RETURN( bdd_step(OR, f1, f2) );
 }
 
@@ -461,18 +479,31 @@ B_Or(formula f1, formula f2)
 formula
 B_Xor(formula f1, formula f2)
 {
+#ifdef REF_CNT_DEBUG
+    ASSERT( GET_BDDP(f1)->in_use );
+    ASSERT( GET_BDDP(f2)->in_use );
+#endif
     BDD_RETURN( bdd_step(XOR, f1, f2) );
 }
 
 formula
 B_Xnor(formula f1, formula f2)
 {
+#ifdef REF_CNT_DEBUG
+    ASSERT( GET_BDDP(f1)->in_use );
+    ASSERT( GET_BDDP(f2)->in_use );
+#endif
     BDD_RETURN( NOT(bdd_step(XOR, f1, f2)) );
 }
 
 formula
 B_Ite(formula i, formula t, formula e)
 {
+#ifdef REF_CNT_DEBUG
+    ASSERT( GET_BDDP(i)->in_use );
+    ASSERT( GET_BDDP(t)->in_use );
+    ASSERT( GET_BDDP(e)->in_use );
+#endif
     formula f1 = B_And(i, t);
     formula f2 = B_And(B_Not(i), e);
     formula res = B_Or(f1, f2);
@@ -481,10 +512,12 @@ B_Ite(formula i, formula t, formula e)
 
 /* B_Equal -- Compare two Boolean functions */
 bool
-B_Equal(f1, f2)
-formula f1;
-formula f2;
+B_Equal(formula f1, formula f2)
 {
+#ifdef REF_CNT_DEBUG
+    ASSERT( GET_BDDP(f1)->in_use );
+    ASSERT( GET_BDDP(f2)->in_use );
+#endif
     return( f1 == f2 );
 }
 
@@ -492,6 +525,9 @@ formula f2;
 void
 F_not(formula op1, formula op2, formula *res)
 {
+#ifdef REF_CNT_DEBUG
+    ASSERT( GET_BDDP(op1)->in_use );
+#endif
     (void) op2;
     *res = NOT(op1);
 }
@@ -499,6 +535,10 @@ F_not(formula op1, formula op2, formula *res)
 void
 F_and(formula op1, formula op2, formula *res)
 {
+#ifdef REF_CNT_DEBUG
+    ASSERT( GET_BDDP(op1)->in_use );
+    ASSERT( GET_BDDP(op2)->in_use );
+#endif
     if( op1 == ZERO || op2 == ZERO )
 	*res = ZERO;
     else
@@ -514,6 +554,10 @@ F_and(formula op1, formula op2, formula *res)
 void
 F_or(formula op1, formula op2, formula *res)
 {
+#ifdef REF_CNT_DEBUG
+    ASSERT( GET_BDDP(op1)->in_use );
+    ASSERT( GET_BDDP(op2)->in_use );
+#endif
     if( op1 == ONE || op2 == ONE )
 	*res = ONE;
     else
@@ -1049,6 +1093,9 @@ B_Init()
 	i--;
     }
     MainTbl->ref_cnt = BDD_MAX_REF_CNT;		/* Zero is always used */
+#ifdef REF_CNT_DEBUG
+    MainTbl->in_use = 1;			/* Zero is always used */
+#endif
     sz_VarTbl = 64;
     VarTbl = (var_ptr) Calloc(sz_VarTbl*sizeof(var_rec));
     nbr_VarTbl = 0;
@@ -1748,6 +1795,10 @@ find_insert_bdd(var_ptr vp, formula lson, formula rson)
     unint		neg, var;
     bdd_ptr		bp;
 
+#ifdef REF_CNT_DEBUG
+    ASSERT( GET_BDDP(lson)->in_use );
+    ASSERT( GET_BDDP(rson)->in_use );
+#endif
     CHECK_FOR_INTERRUPT;
     if( lson == rson ) {
 	return(lson);
