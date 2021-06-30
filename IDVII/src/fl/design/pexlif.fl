@@ -236,7 +236,7 @@ let store_pexlif pex =
 let load_pexlif sha = read_pexlif ("pexlif_examples/" ^ sha ^ ".pex");
 non_lazy load_pexlif;
 
-begin_abstype;
+//begin_abstype;
 
 lettype wrapper = WRAPPER ((string#string) list);
 
@@ -252,12 +252,8 @@ let write_subst name {sub::((string#string) list)} =
         let {w::wrapper} = WRAPPER sub in write_wrapper name w
 ;
 
-// ...
 let load_matches sha flip =
         let file = fopen ("pexlif_examples/matches") "r" then
-        let read_subst n =
-                read_subst 
-        in
         letrec
             read_line f =
                 let line = fgets f then
@@ -268,8 +264,8 @@ let load_matches sha flip =
                 val (x,y) = flip => (r,l) | (l,r) then
                 x != sha => read_line f |
                 // /
-                let sub = read_subst ("pexlif_examples/" ^ l ^ r ^ ".match") then
-                (y,sub) : read_line f
+                let s = read_subst ("pexlif_examples/" ^ l ^ r ^ ".match") then
+                (y,s) : read_line f
         in
         let matches = read_line file then
         (fclose file) fseq
@@ -283,17 +279,18 @@ non_lazy fetch_matches;
 let rev_fetch_matches sha = load_matches sha T;
 non_lazy rev_fetch_matches;
 
-// ...
 let store_match {sha1::string} {sha2::string} {sub::((string#string) list)} =
-        NOT $ empty $ fetch_matches sha1 => () |
+        (elem sha2 $ map fst $ fetch_matches sha1) => () |
+        // /
         let file = fopen ("pexlif_examples/matches") "a" then
         (fprintf file "%s\n" (sha1 ^ sha2)) fseq
         (fclose file) fseq
-        (write_subst ("pexlif_examples/" ^ sha1 ^ sha2 ^ ".match")) fseq
+        // /
+        (write_subst ("pexlif_examples/" ^ sha1 ^ sha2 ^ ".match") sub) fseq
         ()
 ;
 
-end_abstype store_match fetch_matches rev_fetch_matches;
+//end_abstype store_match fetch_matches rev_fetch_matches;
 
 // ...
 let subst_match sub (PINST n a l i1 o1 t c) (PINST _ _ _ i2 o2 _ _) =
