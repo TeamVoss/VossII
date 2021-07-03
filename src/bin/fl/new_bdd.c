@@ -408,6 +408,9 @@ B_Clean()
 		gc_update_ref_cnt(bp);
 	    }
 	}
+	bdd_ptr bp = MainTbl;
+	bp->mark = TRUE;
+	bp->ref_cnt = MAX_REF_CNT;
 	// Then do the g.c.
 	garbage_collect();
     }
