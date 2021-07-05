@@ -139,7 +139,7 @@ static unsigned int	bdd_hash(pointer np, unsigned int n);
 static bool		bdd_eq(pointer p1, pointer p2);
 static void		clean_cache(bool erase);
 static lunint		uniq_hash_fn(formula l, formula r, lunint n);
-static void		Bdec_ref_cnt(bdd_ptr bp);
+static void		Bdec_ref_cnt(formula f);
 static void		re_order();
 static void		user_defined_reorder();
 static void		do_swap_down(buffer *rev_tablep, unint pos);
@@ -336,6 +336,8 @@ Reset_Ref_cnts()
 {
     if( Do_gc_asap ) {
 	bdd_ptr bp = MainTbl;
+	bp->mark = TRUE;
+	bp->ref_cnt = MAX_REF_CNT;
 	for(unint i = 0; i < sz_MainTbl; i++) {
 	    bp->mark = 0;
 	    bp->ref_cnt = 0;
@@ -2742,8 +2744,8 @@ swap_down(buffer *rev_tablep, unint pos)
 		/* Update the reference counters */
 		inc_ref_cnt(nlson);
 		inc_ref_cnt(nrson);
-		Bdec_ref_cnt(GET_BDDP(lson));
-		Bdec_ref_cnt(GET_BDDP(rson));
+		Bdec_ref_cnt(lson);
+		Bdec_ref_cnt(rson);
 	    }
 	  end_loop:
 	    cur = ncur;
@@ -2791,12 +2793,18 @@ inc_ref_cnt(formula f)
 }
 
 static void
-Bdec_ref_cnt(bdd_ptr bp)
+Bdec_ref_cnt(formula f)
 {
     formula 	lson, rson, cur, prev;
     var_ptr	vp;
     bdd_ptr	np;
+    bdd_ptr	bp;
     unint	hash;
+
+    if( f == ONE || f == ZERO ) 
+	return;
+
+    bp = GET_BDDP(f);
 
     ASSERT( bp->ref_cnt > 0 );
     if( bp->ref_cnt == BDD_MAX_REF_CNT ) {
@@ -2808,9 +2816,9 @@ Bdec_ref_cnt(bdd_ptr bp)
 
     /* Free the DAG */
     lson = GET_LSON(bp);
-    Bdec_ref_cnt(GET_BDDP(lson));
+    Bdec_ref_cnt(lson);
     rson = GET_RSON(bp);
-    Bdec_ref_cnt(GET_BDDP(rson));
+    Bdec_ref_cnt(rson);
 
     /* Remove the node */
     vp   = VarTbl + BDD_GET_VAR(bp);
