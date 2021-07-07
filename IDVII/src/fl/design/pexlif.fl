@@ -241,15 +241,13 @@ begin_abstype;
 lettype wrapper = WRAPPER ((string#string) list);
 
 let read_subst name =
-        (printf "### read_subst %s\n" name) fseq
-        let file = fopen name "r" then
-        let text = fget file then
-        val (WRAPPER sub) = read_wrapper text then
-        (fclose file) fseq (sub)
+        let file = "pexlif_examples/" ^ name ^ ".match" in
+        val (WRAPPER sub) = ((read_wrapper file) catch (WRAPPER [])) then sub
 ;
 
 let write_subst name {sub::((string#string) list)} =
-        let {w::wrapper} = WRAPPER sub in write_wrapper name w
+        let file = "pexlif_examples/" ^ name ^ ".match" in
+        let {w::wrapper} = WRAPPER sub in write_wrapper file w
 ;
 
 let load_matches sha flip =
@@ -265,7 +263,7 @@ let load_matches sha flip =
                 x != sha => read_line f |
                 // /
                 let name = l ^ r in
-                let sub  = read_subst ("pexlif_examples/" ^ name ^ ".match") then
+                let sub  = read_subst name then
                 (y,sub) : read_line f
         in
         let matches = read_line file then
@@ -286,7 +284,7 @@ let store_match {sha1::string} {sha2::string} {sub::((string#string) list)} =
         let file = fopen ("pexlif_examples/matches") "a" then
         (fprintf file "%s\n" name) fseq
         (fclose file) fseq
-        (write_subst ("pexlif_examples/" ^ name ^ ".match") sub) fseq
+        (write_subst name sub) fseq
         ()
 ;
 
