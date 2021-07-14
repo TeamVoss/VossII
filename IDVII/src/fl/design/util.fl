@@ -13,20 +13,36 @@ let is_user_given s =
     NOT (str_is_substr "TmP_" s)
 ;
 
-let pr_indices indices =
-    letrec merge msb cur (idx:rem) =
-	idx = cur-1 => merge msb idx rem |
-	msb > cur => (sprintf "%d:%d" msb cur):(merge idx idx rem) |
-	(int2str msb):(merge idx idx rem)
-     /\    merge msb cur [] =
-	msb > cur => [(sprintf "%d:%d" msb cur)] | [(int2str msb)]
-    in
-    let i0 = hd indices then
-    let ranges = merge i0 i0 (tl indices) then
-    list2str T "[" "," "]" id ranges
+// A type to represent continous index ranges
+// and individual index bits
+lettype IndexRanges = SingleIndex int | IndexSlice {msb::int} {lsb::int};
+
+// Groups indices into continous slices
+// Input: non-empty list of ints in decreasing order
+// Outputs list grouping continuous slices
+// Ex: [5,4,3,0] -> [IndexSlice 5 3, SingleIndex 0]
+let group_indices indices =
+	letrec merge msb cur (idx:rem) =
+		idx = cur-1 => merge msb idx rem |
+		msb > cur => (IndexSlice msb cur):(merge idx idx rem)
+		          |  (SingleIndex msb):(merge idx idx rem)
+	   /\  merge msb cur [] =
+		msb > cur => [IndexSlice msb cur] | [SingleIndex msb]
+	in
+	let i0 = hd indices in
+	merge i0 i0 (tl indices)
 ;
 
-    
+// Groups indices by continous ranges and
+// prints the results
+let pr_indices indices =
+	let ranges = group_indices indices in
+	let format (IndexSlice msb lsb) = sprintf "%d:%d" msb lsb
+	 /\ format (SingleIndex index) = int2str index in
+    list2str T "[" "," "]" format ranges
+;
+
+
 let update_fn_get_lhs (W_UPDATE_FN lhs rhs) = lhs
  /\ update_fn_get_lhs (W_PHASE_DELAY lhs rhs) = lhs
 ;
@@ -390,7 +406,7 @@ cletrec w2bv sub w =
 		    let part = mk_part inside f cur in
 		    part@(collect new_inside idx idx idxs)
 		  /\   collect inside f cur [] =
-		    let part = mk_part inside f cur in 
+		    let part = mk_part inside f cur in
 		    part
 		in
 		let start = sz-1 in
@@ -427,7 +443,7 @@ cletrec w2bv sub w =
     w2bv w
 ;
 
-letrec wexpr2bool sub w = 
+letrec wexpr2bool sub w =
     let sz = wexpr_size w in
     let base = bv2list (w2bv sub w) in
     lastn sz ((replicate sz (hd base))@base)
