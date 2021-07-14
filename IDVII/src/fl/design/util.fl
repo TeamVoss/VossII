@@ -66,10 +66,6 @@ let pexlif_get_internals (PINST name attrs leaf fa_inps fa_outs ints cont) = int
 let pexlif_get_content (PINST name attrs leaf fa_inps fa_outs ints cont) = cont;
 let content_get_children (P_HIER children) = children;
 let content_get_leaf (P_LEAF fns) = fns;
-let update_fn_get_update_fun_lhs (W_UPDATE_FN lhs rhs) = lhs
- /\ update_fn_get_update_fun_lhs (W_PHASE_DELAY lhs rhs) = lhs;
-let update_fn_get_update_fun_rhs (W_UPDATE_FN lhs rhs) = rhs
- /\ update_fn_get_update_fun_rhs (W_PHASE_DELAY lhs rhs) = rhs;
 
 letrec prim_Ppexlif ind fp (inst,pexlif) =
     val (PINST name attrs leaf inps outs ints body) = pexlif then
