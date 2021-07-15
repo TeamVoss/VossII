@@ -15,19 +15,19 @@ let is_user_given s =
 
 // A type to represent continous index ranges
 // and individual index bits
-lettype IndexRanges = SingleIndex int | IndexSlice {msb::int} {lsb::int};
+lettype index = SINGLE int | SLICE {msb::int} {lsb::int};
 
 // Groups indices into continous slices
 // Input: non-empty list of ints in decreasing order
 // Outputs list grouping continuous slices
-// Ex: [5,4,3,0] -> [IndexSlice 5 3, SingleIndex 0]
+// Ex: [5,4,3,0] -> [SLICE 5 3, SINGLE 0]
 let group_indices indices =
 	letrec merge msb cur (idx:rem) =
 		idx = cur-1 => merge msb idx rem |
-		msb > cur => (IndexSlice msb cur):(merge idx idx rem)
-		          |  (SingleIndex msb):(merge idx idx rem)
+		msb > cur => (SLICE msb cur):(merge idx idx rem)
+		          |  (SINGLE msb):(merge idx idx rem)
 	   /\  merge msb cur [] =
-		msb > cur => [IndexSlice msb cur] | [SingleIndex msb]
+		msb > cur => [SLICE msb cur] | [SINGLE msb]
 	in
 	let i0 = hd indices in
 	merge i0 i0 (tl indices)
@@ -37,8 +37,8 @@ let group_indices indices =
 // prints the results
 let pr_indices indices =
 	let ranges = group_indices indices in
-	let format (IndexSlice msb lsb) = sprintf "%d:%d" msb lsb
-	 /\ format (SingleIndex index) = int2str index in
+	let format (SLICE msb lsb) = sprintf "%d:%d" msb lsb
+	 /\ format (SINGLE index) = int2str index in
     list2str T "[" "," "]" format ranges
 ;
 
