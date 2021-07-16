@@ -2072,7 +2072,11 @@ let ZX {inp:: *a} =
 		 ohw_size ohw_destr ohw_constr ohw_values) =
 	{hw_type_destr :: {*b} hw_type}
     in
+    let sz_in = ihw_size inp in
     let sz_out = ohw_size {undefined :: *b} in
+    (sz_in > sz_out)
+        => eprintf "ZX can't extend into smaller type (%d bits into %d bits)" sz_in sz_out
+        |
     let w_out = W_ZX sz_out (ihw_destr inp) in
     let out = ohw_constr w_out in
     {out :: *b}
@@ -2087,7 +2091,11 @@ let SX {inp:: *a} =
 		 ohw_size ohw_destr ohw_constr ohw_values) =
 	{hw_type_destr :: {*b} hw_type}
     in
+    let sz_in = ihw_size inp in
     let sz_out = ohw_size {undefined :: *b} in
+    (sz_in > sz_out)
+        => eprintf "SX can't extend into smaller type (%d bits into %d bits)" sz_in sz_out
+        |
     let w_out = W_SX sz_out (ihw_destr inp) in
     let out = ohw_constr w_out in
     {out :: *b}
