@@ -2,7 +2,7 @@
 	"name": "vossii-fl",
 	"displayName": "Voss II fl",
 	"description": "Language support for Voss II functional language fl",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"license": "Apache-2.0",
 	"publisher": "teamvoss",
 	"repository": {
@@ -19,21 +19,37 @@
 	"main": "extension.js",
 	"activationEvents": [
 		"onLanguage:fl",
+		"onLanguage:jl",
 		"onCommand:fl.start",
 		"onCommand:fl.restart_and_eval_file"
 	],
 	"contributes": {
-		"languages": [{
-			"id": "fl",
-			"aliases": ["fl", "fl"],
-			"extensions": [".fl"],
-			"configuration": "./language-configuration.json"
-		}],
-		"grammars": [{
-			"language": "fl",
-			"scopeName": "source.fl",
-			"path": "./syntaxes/fl.tmLanguage.json"
-		}],
+		"languages": [
+			{
+				"id": "fl",
+				"aliases": ["fl", "fl"],
+				"extensions": [".fl"],
+				"configuration": "./fl-language-configuration.json"
+			},
+			{
+				"id": "jl",
+				"aliases": ["jl", "jl"],
+				"extensions": [".prog", ".intf"],
+				"configuration": "./jl-language-configuration.json"
+			}
+		],
+		"grammars": [
+			{
+				"language": "fl",
+				"scopeName": "source.fl",
+				"path": "./syntaxes/fl.tmLanguage.json"
+			},
+			{
+				"language": "jl",
+				"scopeName": "source.jl",
+				"path": "./syntaxes/jl.tmLanguage.json"
+			}
+		],
 		"commands": [
 			{
 				"command": "fl.start",
