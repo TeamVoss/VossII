@@ -36,6 +36,11 @@ let bit_range_lsb (BR_SINGLE i) = i
 let bit_range_msb (BR_SINGLE i) = i
  /\ bit_range_msb (BR_SLICE msb _) = msb;
 
+// Prints a bit range to a string
+// format: "nb" or "msb:lsb"
+let sprint_bit_range (BR_SINGLE i) = int2str i
+ /\ sprint_bit_range (BR_SLICE msb lsb) = sprintf "%d:%d" msb lsb;
+
 // Groups indices into continous slices
 // Input: non-empty list of ints in decreasing order
 // Outputs list grouping continuous slices
@@ -56,9 +61,7 @@ let group_indices indices =
 // prints the results
 let pr_indices indices =
 	let ranges = group_indices indices in
-	let format (BR_SLICE msb lsb) = sprintf "%d:%d" msb lsb
-	 /\ format (BR_SINGLE index) = int2str index in
-    list2str T "[" "," "]" format ranges
+    list2str T "[" "," "]" sprint_bit_range ranges
 ;
 
 
