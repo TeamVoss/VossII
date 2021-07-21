@@ -13,6 +13,7 @@
 /************************************************************************/
 /*			Global Variables				*/
 /************************************************************************/
+extern bool		cephalopode_mode;
 extern bool		compile_to_C_flag;
 extern bool		transitive_visibility;
 extern bool		debug_on;
@@ -123,6 +124,7 @@ static string		s_LAMBDA;
 static string		s_LEAF;
 static string		s_NIL;
 static string		s_PRIM_FN;
+static string		s_EXT_PRIM_FN;
 static string		s_STRING;
 static string		s_VAR;
 static string		s_USERDEF;
@@ -517,22 +519,22 @@ G_Init()
     s_ite = wastrsave(&strings, "symbolic if-the-else");
     s_update_ref_var = wastrsave(&strings, "symbolic :=");
     //
-    s_APPLY   = wastrsave(&strings, "APPLY");
-    s_VAR     = wastrsave(&strings, "VAR");
-    s_USERDEF = wastrsave(&strings, "USERDEF");
-    s_LAMBDA  = wastrsave(&strings, "LAMBDA");
-    s_LEAF    = wastrsave(&strings, "LEAF");
-    s_CONS    = wastrsave(&strings, "CONS");
-    s_NIL     = wastrsave(&strings, "NIL");
-    s_INT     = wastrsave(&strings, "INT");
-    s_STRING  = wastrsave(&strings, "STRING");
-    s_BOOL    = wastrsave(&strings, "BOOL");
-    s_BEXPR   = wastrsave(&strings, "BEXPR");
-    s_EXT_OBJ = wastrsave(&strings, "EXT_OBJ");
-    s_PRIM_FN = wastrsave(&strings, "PRIM_FN");
-
-    s_NONE    = Mk_constructor_name("NONE");
-    s_SOME    = Mk_constructor_name("SOME");
+    s_APPLY       = wastrsave(&strings, "APPLY");
+    s_VAR         = wastrsave(&strings, "VAR");
+    s_USERDEF     = wastrsave(&strings, "USERDEF");
+    s_LAMBDA      = wastrsave(&strings, "LAMBDA");
+    s_LEAF        = wastrsave(&strings, "LEAF");
+    s_CONS        = wastrsave(&strings, "CONS");
+    s_NIL         = wastrsave(&strings, "NIL");
+    s_INT         = wastrsave(&strings, "INT");
+    s_STRING      = wastrsave(&strings, "STRING");
+    s_BOOL        = wastrsave(&strings, "BOOL");
+    s_BEXPR       = wastrsave(&strings, "BEXPR");
+    s_EXT_OBJ     = wastrsave(&strings, "EXT_OBJ");
+    s_PRIM_FN     = wastrsave(&strings, "PRIM_FN");
+    s_EXT_PRIM_FN = wastrsave(&strings, "EXT_PRIM_FN");
+    s_NONE        = Mk_constructor_name("NONE");
+    s_SOME        = Mk_constructor_name("SOME");
 }
 
 string
@@ -1201,6 +1203,9 @@ Compile(symbol_tbl_ptr stbl, g_ptr onode, typeExp_ptr type, bool delayed)
 	longjmp(*start_envp,1);
     }
 
+    result_ptr rp = (result_ptr) new_rec(&result_rec_mgr);
+    rp->expr_init =  cephalopode_mode? Reflect_expr(node) : NULL;
+
 #ifdef CHECK_REF_CNTS
     check_ref_cnts(node);
 #endif
@@ -1224,6 +1229,7 @@ Compile(symbol_tbl_ptr stbl, g_ptr onode, typeExp_ptr type, bool delayed)
 #ifdef CHECK_REF_CNTS
     check_ref_cnts(node);
 #endif
+    rp->expr_comb = cephalopode_mode? Reflect_expr(node) : NULL;
 
     /* Link in used definitions */
     node = Replace_name(node, stbl);
@@ -1237,7 +1243,6 @@ Compile(symbol_tbl_ptr stbl, g_ptr onode, typeExp_ptr type, bool delayed)
     if( do_gc_asap ) {
 	Garbage_collect();
     }
-    result_ptr rp = (result_ptr) new_rec(&result_rec_mgr);
     rp->expr = node;
     rp->super_comb = super_comb;
     rp->type = type;
@@ -5619,21 +5624,21 @@ g_b_ite(g_ptr l, g_ptr r)
 
 
 static g_ptr
-mkFunCall0(string name)
+mkConstr0(string name)
 {
-    return( Make_VAR_leaf(name) );
+    return( mk_constr_nd(name) );
 }
 
 static g_ptr
-mkFunCall1(string name, g_ptr e1)
+mkConstr1(string name, g_ptr e1)
 {
-    return( Make_APPL_ND(Make_VAR_leaf(name), e1) );
+    return( Make_CONS_ND(mk_constr_nd(name), e1) );
 }
 
 static g_ptr
-mkFunCall2(string name, g_ptr e1, g_ptr e2)
+mkConstr2(string name, g_ptr e1, g_ptr e2)
 {
-    return( Make_APPL_ND(Make_APPL_ND(Make_VAR_leaf(name), e1),e2) );
+    return( Make_CONS_ND(Make_CONS_ND(mk_constr_nd(name), e1),e2) );
 }
 
 g_ptr
@@ -5641,65 +5646,90 @@ Reflect_expr(g_ptr node)
 {
 
     if( IS_NIL(node)) {
-	return( mkFunCall0(s_NIL) );
+	return( mkConstr0(s_NIL) );
     }
     switch( GET_TYPE(node) ) {
 	case APPLY_ND:
+#if 0
 	    if( IS_DEBUG(GET_APPLY_LEFT(node)) ) {
 		return( Reflect_expr(GET_APPLY_RIGHT(node)) );
 	    }
+#endif
 	    if( IS_UNQUOTE(GET_APPLY_LEFT(node)) ) {
 		return( GET_APPLY_RIGHT(node) );
 	    }
-	    return( mkFunCall2(s_APPLY,
+	    return( mkConstr2(s_APPLY,
 			       Reflect_expr(GET_APPLY_LEFT(node)),
 			       Reflect_expr(GET_APPLY_RIGHT(node))) );
 	case LAMBDA_ND:
-	    return( mkFunCall2(s_LAMBDA,
+	    return( mkConstr2(s_LAMBDA,
 			       Make_STRING_leaf(GET_LAMBDA_VAR(node)),
 			       Reflect_expr(GET_LAMBDA_BODY(node))) );
 	case CONS_ND:
-	    return( mkFunCall2(s_CONS,
+	    return( mkConstr2(s_CONS,
 			       Reflect_expr(GET_CONS_HD(node)) ,
 			       Reflect_expr(GET_CONS_TL(node))) );
 	case LEAF:
 	    switch( GET_LEAF_TYPE(node) ) {
 		case INT:
-		    return( mkFunCall1(
+		    return( mkConstr1(
 				s_LEAF,
-			        mkFunCall1(s_INT,
+			        mkConstr1(s_INT,
 					   Make_INT_leaf(GET_INT(node)))) );
 		case STRING:
-		    return( mkFunCall1(
+		    return( mkConstr1(
 				s_LEAF,
-			        mkFunCall1(
+			        mkConstr1(
 				    s_STRING,
 				    Make_STRING_leaf(GET_STRING(node)))) );
 		case BOOL:
-		    return( mkFunCall1(
+		    return( mkConstr1(
 				s_LEAF,
-			        mkFunCall1(
+			        mkConstr1(
 				    s_BOOL,
 				    Make_BOOL_leaf(GET_BOOL(node)))) );
 		case BEXPR:
-		    return( mkFunCall1(
+		    return( mkConstr1(
 				s_LEAF,
-			        mkFunCall1(
+			        mkConstr1(
 				    s_BEXPR,
 				    Make_BEXPR_leaf(GET_BEXPR(node)))) );
 		case PRIM_FN:
-		    return( mkFunCall1(
-				s_LEAF,
-			        mkFunCall1(
-				    s_PRIM_FN,
-				    Make_INT_leaf(GET_PRIM_FN(node)))) );
+		    {
+			int pfn = GET_PRIM_FN(node);
+			if( pfn == P_DEBUG ) {
+			    string name = GET_DEBUG_STRING(node);
+			    return( mkConstr1(
+					s_LEAF,
+					mkConstr2(
+					    s_EXT_PRIM_FN,
+					    Make_INT_leaf(pfn),
+					    Make_STRING_leaf(name))) );
+			}
+			if( pfn == P_PRINTF || pfn == P_SPRINTF ||
+			    pfn == P_EPRINTF || pfn == P_FPRINTF )
+			{
+			    string fmt = GET_PRINTF_STRING(node);
+			    return( mkConstr1(
+					s_LEAF,
+					mkConstr2(
+					    s_EXT_PRIM_FN,
+					    Make_INT_leaf(pfn),
+					    Make_STRING_leaf(fmt))) );
+			}
+			return( mkConstr1(
+				    s_LEAF,
+				    mkConstr1(
+					s_PRIM_FN,
+					Make_INT_leaf(pfn))) );
+		    }
 		case VAR:
-		    return( mkFunCall1(s_VAR,
+		    return( mkConstr1(s_VAR,
 				       Make_STRING_leaf(GET_VAR(node))) );
 		case USERDEF: {
 		    // Not clear what to do here....
 		    fn_ptr fp = GET_USERDEF(node);
-		    return( mkFunCall1(s_VAR, Make_STRING_leaf(fp->name)) );
+		    return( mkConstr1(s_VAR, Make_STRING_leaf(fp->name)) );
 		}
 		default:
 		    DIE("Illegal leaf node type");

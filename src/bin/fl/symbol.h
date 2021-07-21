@@ -114,6 +114,8 @@ typedef struct fn_rec {
         comment_list_ptr    comments;
         string		    name;
         g_ptr		    expr;
+	g_ptr		    expr_init;
+	g_ptr		    expr_comb;
         g_ptr		    super_comb;
         typeExp_ptr	    type;
         oll_ptr		    overload_list;

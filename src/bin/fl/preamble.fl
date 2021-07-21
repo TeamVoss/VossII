@@ -1322,6 +1322,7 @@ lettype leaftype =
 	    |   BEXPR bexpr
 	    |	EXT_OBJ int
 	    |   PRIM_FN int
+	    |   EXT_PRIM_FN int string
 ;
 
 lettype term =
@@ -1388,6 +1389,7 @@ let Pleaftype (INT i) = sprintf "%d" i
  /\ Pleaftype (BEXPR be) = bexpr2str 10 be
  /\ Pleaftype (EXT_OBJ i) = sprintf "EXT_OBJ %d" i
  /\ Pleaftype (PRIM_FN i) = primfn2name i
+ /\ Pleaftype (EXT_PRIM_FN i s) = sprintf "<%s %s>" (primfn2name i) s
 ;
 
 // Pretty printer for terms.

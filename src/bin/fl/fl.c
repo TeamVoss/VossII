@@ -33,6 +33,7 @@ bool	    hide_window = FALSE;
 bool	    use_stdin = FALSE;
 bool	    use_stdout = FALSE;
 bool        Interrupt_asap = FALSE;
+bool	    cephalopode_mode = FALSE;
 #if DBG_TRACE_AND_SAVE
 int	    debug_id = -1;
 int	    debug_start_comparing = 0;
@@ -230,6 +231,12 @@ fl_main(int argc, char *argv[])
             use_stdin = TRUE;
             argc--, argv++;
         } else
+        if( (strcmp(argv[1], "-C") == 0) ||
+	    (strcmp(argv[1], "--cephalopode") == 0) )
+	{
+            cephalopode_mode = TRUE;
+            argc--, argv++;
+        } else
         if( (strcmp(argv[1], "-use_stdout") == 0) ||
 	    (strcmp(argv[1], "--use_stdout") == 0) )
 	{
@@ -260,12 +267,6 @@ fl_main(int argc, char *argv[])
             v_order_file = argv[2];
             argc -= 2; argv += 2;
         } else
-#if 0
-        if( strcmp(argv[1], "-c") == 0 ) {
-            compile_to_C_flag = TRUE;
-            argc--, argv++;
-        } else
-#endif
         if( strcmp(argv[1], "-f") == 0 ) {
             start_file = argv[2];
             argc -= 2; argv += 2;
@@ -1060,10 +1061,10 @@ print_help()
  P("    -I dir			    Search for fl libraries in dir\n");
  P("    -hide-window		    hide the main window while still preserving X functionality\n");
  P("    -noX			    do not use X windows (text only)\n");
+ P("    --noX			    do not use X windows (text only)\n");
  P("    -use_stdin		    read inputs also from stdin\n");
  P("    -use_stdout		    write outputs also to stdout\n");
  P("    --hide-window		    hide the main window while still preserving X functionality\n");
- P("    --noX			    do not use X windows (text only)\n");
  P("    --use_stdin		    read inputs also from stdin\n");
  P("    --use_stdout		    write outputs also to stdout\n");
  P("    --read_input_from_file file read inputs from file\n");
@@ -1072,5 +1073,8 @@ print_help()
  P("    -v file			    save dynamic variable order in file\n");
  P("    -h			    print out this message and quit\n");
  P("    --help			    print out this message and quit\n");
+ P("    -d			    turn off function tracing information\n");
+ P("    -C			    Cephalopode mode\n");
+ P("    -cephalopode		    Cephalopode mode\n");
 
 }
