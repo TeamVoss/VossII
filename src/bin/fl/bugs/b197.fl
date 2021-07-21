@@ -1,0 +1,17 @@
+load "ste.fl";
+
+
+get_combinator_expression "i_plus";
+
+let f1 x = x+1;
+
+let f2 x y = f1 (x*x + y*y);
+
+let f3 x y = x*x + y*y;
+
+get_definition "f1";
+get_combinator_expression "f1";
+get_definition "f2";
+get_combinator_expression "f2";
+get_definition "f3";
+get_combinator_expression "f3";

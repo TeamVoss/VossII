@@ -1560,6 +1560,8 @@ let i_merge ilist =
 let eval1 cmd = eval_fl_code [cmd];
 non_lazy eval1;
 
+let field_name_info_ref = ref {[]::(string#((string#string)list)) list};
+
 let base_STRUCT_explicit name size field_list do_check =
     letrec check ((field_name, type, bits):rem) =
         NOT (is_defined (sprintf "BV_%s" type)) =>
@@ -1580,6 +1582,8 @@ let base_STRUCT_explicit name size field_list do_check =
     in
     (do_check => check field_list | ()) fseq
     NOT (core_TYPE name size F "") => () |
+    let info = (name, map (\(field,type,_). (field,type)) field_list) in
+    (field_name_info_ref := (info:(deref field_name_info_ref))) fseq
     let declare_field (fn, type, bits) =
 	let ranges = i_merge bits then
 	let pr_range (f,t) = sprintf "(%d -- %d)" f t in
@@ -1803,6 +1807,22 @@ let MEMORY name size_list word_type =
     }> "functor"
 ;
 
+let emit_hw_type_info filename =
+    let fp = fopen filename "w" then
+    let fields = deref field_name_info_ref in
+    let types = rev (deref hw_types_decl_ref) in
+    let pr1 (name, sz) =
+	(name = "bit") => () |
+	(fprintf fp "type %s => \"%s\";\n" name name) fseq
+	let fields = (assoc name fields) catch [] then
+	let pre = sprintf "fields %s = [" name in
+	let pfn fp (field,type) = fprintf fp "%s:%s" field type in
+	(list2fp fp F pre ", " "];\n" pfn fields) fseq
+	()
+    in
+    (foreach pr1 types) fseq
+    (fclose fp)
+;
 
 let hw_split v =
     let sz = hw_size v in
