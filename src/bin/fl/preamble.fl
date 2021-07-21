@@ -174,7 +174,7 @@ infix 9 @;
 // Return a list with at most cnt elements from l.
 // If the list has more than cnt elements, the tail list is appended
 // after the first cnt elements.
-// Common usage is:  atmost 5 l ["..."]; 
+// Common usage is:  atmost 5 l ["..."];
 // Usage: atmost cnt l trunc_list;
 let atmost cnt l trunc_list = length l <= cnt => l | (firstn cnt l)@trunc_list;
 
@@ -279,7 +279,7 @@ letrec interleave ll = (empty ll) => [] |
                 rm @ (rem (tl ll)) in
         (hdlist ll) @ (interleave (rem ll));
 
-// Take two lists of the same length and return a list of pairs 
+// Take two lists of the same length and return a list of pairs
 letrec zip l1 l2 =
         empty l1 =>
             empty l2 => [] | error "Length mismatch in zip"
@@ -289,8 +289,8 @@ letrec zip l1 l2 =
             (hd l1, hd l2):(zip (tl l1) (tl l2))
 ;
 
-// Take a list of pairs pl and return a pair of lists 
-letrec unzip pl = empty pl => ([],[]) | 
+// Take a list of pairs pl and return a pair of lists
+letrec unzip pl = empty pl => ([],[]) |
 		let res = unzip (tl pl) in
 		let h = hd pl in
 		(((fst h):(fst res)), ((snd h):(snd res)));
@@ -345,7 +345,7 @@ let list2fp_1 fp print_empty_list pre sep post pr_fun l =
 //	pre		    The string that will be prepended before the list
 //	sep		    The separator string between elements
 //	post		    The string that will be appended after the list
-//	pr_fun		    A function that convert an element of the list 
+//	pr_fun		    A function that convert an element of the list
 //			    to a string.
 //	l		    List of elements to print
 let list2fp_2 fp print_empty_list pre sep post pr_fun l =
@@ -382,9 +382,9 @@ overload {** :: *a -> *a -> *a} ipow pow bvpow;
 infix 9 **;
 
 // Convert a list of bools to a signed integer.
-let bl2int bv = 
+let bl2int bv =
     let sz = length bv in
-    (hd bv) => -1*(2**sz-(bv2num bv)) | (bv2num bv) 
+    (hd bv) => -1*(2**sz-(bv2num bv)) | (bv2num bv)
 ;
 
 // Convert a signed integer to a list of bools.
@@ -471,7 +471,7 @@ let bv_ashr_bvbv n amount =
 
 overload bv_ashr bv_ashr bv_ashr_bvbv;
 
-// Compute a substitution for all variables that must take on 
+// Compute a substitution for all variables that must take on
 // some value for cond to be satisfied.
 // For example, if cond = a & b & c' + a & b' & c'
 // forcing cond will return [("a",T),("c",F)]
@@ -643,7 +643,7 @@ let cload filename =
 	|
 	()
     |
-    let full_name = 
+    let full_name =
 	(file_exists full_name1) =>
 	    ((_load full_name1 F) seq full_name1) gen_catch
 	    (\msg.  eprintf "Failed to load |%s|\n%s\n" full_name1 msg)
@@ -662,7 +662,7 @@ end_abstype cload;
 // Replace all current state variables (not ending in _n) with their
 // corresponding next-state variables in all the BDDs in fs.
 // All other variables remain as they were.
-// NOTE: If fs already depends on one of the new next-state variables, 
+// NOTE: If fs already depends on one of the new next-state variables,
 // you will likely not get what you expect, so beware!
 // Usage: bdd_current2next fs;
 let bdd_current2next f =
@@ -676,7 +676,7 @@ let bdd_current2next f =
 // Replace all next-state variables (ending in _n) with their
 // corresponding current-state variables in all the BDDs in fs.
 // All other variables remain as they were.
-// NOTE: If fs already depends on one of the new current-state variables, 
+// NOTE: If fs already depends on one of the new current-state variables,
 // you will likely not get what you expect, so beware!
 // Usage: bdd_next2current fs;
 let bdd_next2current f =
@@ -770,7 +770,7 @@ lettype window = WINDOW {window_name::string};
 // The function returns a handle to the window and a call to get_window_result
 // with this handle will wait to a button to be pressed when pressed,
 // the window will be destroyed and ret_val returned.
-// 
+//
 // NOTE: Only functional in normal (i.e., not -noX) mode!
 let report_result msg_header msg_details return_alts =
     let pre = sprintf "util:report_result {%s} {%s} {"
@@ -797,7 +797,7 @@ let get_window_result window =
 // Also create a list of buttons, one for each (name,ret_val) pair
 // in return_alts. The button will be named "name" and when pressed,
 // the window will be destroyed and ret_val returned.
-// 
+//
 // NOTE: Only functional in normal (i.e., not -noX) mode!
 let report_result_in_file msg msg_file return_alts =
     let pre = sprintf "util:report_result_in_file {%s} {%s} {" msg msg_file then
@@ -832,8 +832,8 @@ cletrec set2iset set =
 // Return the list of elements in the iset. Elements are numbers 1, 2, 3, ...
 cletrec iset2set iset =
     val (ISET i) = iset in
-    i = 0 => [] | 
-    letrec try ci pow = 
+    i = 0 => [] |
+    letrec try ci pow =
         ci = 0 => [] |
         (ci intAND 4294967295) = 0 => try (ci/4294967296) (pow+32) |
         (ci intAND 65535) = 0 => try (ci/65536) (pow+16) |
@@ -880,7 +880,7 @@ infix 7 isubtract;
 // Return the number of elements in iset.
 cletrec ipop_cnt iset =
     val (ISET i) = iset in
-    i = 0 => 0 | 
+    i = 0 => 0 |
     letrec try ci pow =
         ci = 0 => 0 |
         (ci intAND 4294967295) = 0 => try (ci/4294967296) (pow+32) |
@@ -1007,7 +1007,7 @@ let cVARS s cond =
     let cmd4 =
 	sprintf "  cond == F => error \"Constraint unsatisfiable\" |\n"
     in
-    let cmd5 = 
+    let cmd5 =
 	let nds = md_expand_vectors ss then
 	list2str T "  let vs = [" "," "] in\n" (sprintf "\"%s\"") nds
     in
@@ -1281,7 +1281,7 @@ end_abstype param fparam;
 
 let iabs i = i < 0 => -1*i | i;
 let fabs f = f < 0.0 => -1.0*f | f;
-let bevabs {bev::bev} = 
+let bevabs {bev::bev} =
     let is_neg = list2bev [(bev < (int2bev 0))] in
     let neg = (int2bev 0) - bev in
     bev_OR (bev_AND is_neg neg) (bev_AND (bev_NOT is_neg) bev)
@@ -1437,7 +1437,7 @@ install_print_function Pterm;
 
 // Create a bv that satisfies the constraint pred_fun.
 // Pred_fun is given as a function of the generated bv_variable.
-// For example: 
+// For example:
 // bv_constrained_variable "a[4:0]"
 // 			   (\v. v > '0 AND v < '10 AND ((v % '2) = '1));
 //
@@ -1451,7 +1451,7 @@ let bv_constrained_variable vec pred =
 
 // Function that computes the condition under which the bitvector v
 // has exactly one bit high.
-let mutex v = 
+let mutex v =
     v <= '0 => F |
     v = (bv_AND v ('-1*v))
 ;
@@ -1543,7 +1543,7 @@ lettype wexpr =
         |   W_CONST {sz::int} {v::int}
         |   W_NAMED_CONST {name::string} {sz::int} {v::int}
         |   W_VAR {sz::int} {base::string}
-	|   W_EXPLICIT_VAR {sz::int} {name::string}
+        |   W_EXPLICIT_VAR {sz::int} {name::string}
         |   W_AND {a::wexpr} {b::wexpr}
         |   W_OR {a::wexpr} {b::wexpr}
         |   W_NOT {a::wexpr}
@@ -1564,7 +1564,7 @@ lettype wexpr =
         |   W_SLICE {indices::int list} {w::wexpr}
         |   W_NAMED_SLICE {name::string} {indices::int list} {w::wexpr}
         |   W_UPDATE_NAMED_SLICE {base::wexpr}
-				 {name::string} {indices::int list} {new::wexpr}
+                {name::string} {indices::int list} {new::wexpr}
         |   W_CAT {parts::wexpr list}
         |   W_MEM_READ {info::mem} {mem::wexpr} {addr::wexpr}
         |   W_MEM_WRITE {info::mem} {mem::wexpr} {addr::wexpr} {data::wexpr}
@@ -1637,7 +1637,7 @@ letrec DBGwexpr (W_X sz) =
 	    sprintf "(W_CONST %d 0b%0*b)" sz sz v
  /\    DBGwexpr (W_VAR sz base) =
 	    sprintf "(W_VAR %d %s)" sz base
- /\    DBGwexpr (W_EXPLICIT_VAR sz name) = 
+ /\    DBGwexpr (W_EXPLICIT_VAR sz name) =
 	    sprintf "(W_EXPLICIT_VAR %d %s)" sz name
  /\    DBGwexpr (W_AND a b) =
 	    sprintf "(W_AND %s %s)" (DBGwexpr a) (DBGwexpr b)
@@ -1735,7 +1735,7 @@ let bexpr2bdd_void  {b::void} = b;
 add_open_overload bexpr2bdd bexpr2bdd_void;
 let bexpr2bdd_list  l = map (bexpr2bdd ) l;
 add_open_overload bexpr2bdd bexpr2bdd_list;
-let bexpr2bdd_pair  (a,b) = 
+let bexpr2bdd_pair  (a,b) =
     ((bexpr2bdd a), (bexpr2bdd b))
 ;
 add_open_overload bexpr2bdd bexpr2bdd_pair;
@@ -1807,7 +1807,7 @@ non_lazy set_font;
 //
 let vec_interleave vecs = interleave (map md_expand_vector vecs);
 
-// Evaluate expression e inside a context in which all of the GUI, 
+// Evaluate expression e inside a context in which all of the GUI,
 // except Interrupt button(s), is made inactive.
 let busy e =
     (tcl_eval ["i_am_busy"]) fseq
