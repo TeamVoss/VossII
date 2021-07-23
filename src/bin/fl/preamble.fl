@@ -1323,6 +1323,7 @@ lettype leaftype =
 	    |	EXT_OBJ int
 	    |   PRIM_FN int
 	    |   EXT_PRIM_FN int string
+	    |   USERDEF int
 ;
 
 lettype term =
@@ -1390,6 +1391,7 @@ let Pleaftype (INT i) = sprintf "%d" i
  /\ Pleaftype (EXT_OBJ i) = sprintf "EXT_OBJ %d" i
  /\ Pleaftype (PRIM_FN i) = primfn2name i
  /\ Pleaftype (EXT_PRIM_FN i s) = sprintf "<%s %s>" (primfn2name i) s
+ /\ Pleaftype (USERDEF i) = sprintf "USERDEF %d" i
 ;
 
 // Pretty printer for terms.
@@ -1429,6 +1431,8 @@ let Pterm t =
             fprintf stdout "NIL"
      /\    pr prec (LEAF lt) =
             fprintf stdout "%s" (Pleaftype lt)
+/\    pr prec other = (draw_graph 10 other) fseq error "Missing case!"
+
     in
     (pr 0 t) fseq (fprintf stdout "\n") fseq ""
 ;

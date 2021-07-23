@@ -102,6 +102,7 @@ typedef struct oll_rec {
 } oll_rec;
 
 typedef struct fn_rec {
+	int		    id;
         string		    file_name;
 	int		    ADT_level;
         int		    start_line_nbr:29;

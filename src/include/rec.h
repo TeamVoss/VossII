@@ -46,6 +46,7 @@ pointer	new_rec(rec_mgr_ptr mp);
 int	ensure_pure_mgr(rec_mgr_ptr mp, string file, int line);
 bool	owned_by_mgr(rec_mgr_ptr mp, pointer item);
 void	free_rec(rec_mgr_ptr mp, pointer r);
+pointer	rec_element(rec_mgr_ptr mp, unint idx, char *file, int line);
 
 #define FOR_REC(mp, type, Tp) for( ensure_pure_mgr(mp,__FILE__,__LINE__),   \
 	     (mp)->cur_blk = (mp)->first_blk;				    \
@@ -60,5 +61,7 @@ void	free_rec(rec_mgr_ptr mp, pointer r);
 		Tp = (type) (((mp)->cur_blk) +				    \
 		     ((2*POINTER_SIZE) + (((mp)->cur_rec)*((mp)->rec_size)))))
 
+
+#define REC_EL(mp,idx)  rec_element((mp), (idx), __FILE__, __LINE__)
 
 #endif

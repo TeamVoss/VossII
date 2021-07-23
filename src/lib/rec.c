@@ -130,6 +130,25 @@ free_rec(rec_mgr_ptr mp, pointer r)
     }
 }
 
+pointer
+rec_element(rec_mgr_ptr mp, unint idx, char *file, int line)
+{
+    ensure_pure_mgr(mp, file, line);
+    unint blocks = idx / mp->capacity;
+    pointer cur = mp->first_blk;
+    if( cur == NULL ) { return NULL; }
+    for(unint i = 0; i < blocks; i++) {
+	cur = FWD_BLK_PTR(cur); 
+	if( cur == NULL ) { return NULL; }
+    }
+    unint sel = idx % mp->capacity;
+    if( FWD_BLK_PTR(cur) == NULL && sel >= mp->allocated ) {
+	return NULL;
+    }
+    return( REC_ADDR(cur, idx % mp->capacity) );
+}
+
+
 bool
 owned_by_mgr(rec_mgr_ptr mp, pointer item)
 {

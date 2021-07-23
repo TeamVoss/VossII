@@ -40,6 +40,7 @@ rec_mgr                 impl_arg_rec_mgr;
 static buffer       ADT_buf;
 static int          ADT_level = 1;
 static rec_mgr      fn_rec_mgr;
+static int	    fn_rec_id_cnt = 0;
 static rec_mgr      hash_table_mgr;
 static rec_mgr      oll_rec_mgr;
 static rec_mgr      symb_tbl_mgr;
@@ -423,6 +424,7 @@ static g_ptr            ignore_simple_P_PCATCH(g_ptr onode);
 static g_ptr            ignore_P_CACHE(g_ptr onode);
 static bool		get_HFL_arg_name(g_ptr node, string *namep,
 					 g_ptr *next_nodep);
+static fn_ptr		get_fn_rec();
 
 /************************************************************************/
 /*                      Public Functions                                */
@@ -443,7 +445,7 @@ Init_symbol()
     s_star = wastrsave(&strings, "*");
     s_CELL = wastrsave(&strings, "CELL");
     s_dummy = wastrsave(&strings, "//DuMmY");
-    fn_ptr dummy = (fn_ptr) new_rec(&fn_rec_mgr);
+    fn_ptr dummy = (fn_ptr) get_fn_rec();
     dummy->ADT_level = ADT_level;
     dummy->name = s_dummy;
     dummy->next      = symb_tbl->def_list;
@@ -612,7 +614,7 @@ Add_Destructors(string name, typeExp_ptr new_type,
         dest_name          = strtemp("__DeStRuCtOr");
         dest_name          = strappend(fnp->name);
         dest_name          = wastrsave(&strings, dest_name);
-        tmp                = (fn_ptr) new_rec(&fn_rec_mgr);
+        tmp                = (fn_ptr) get_fn_rec();
         tmp->ADT_level     = ADT_level;
         tmp->visible       = TRUE;
         tmp->non_lazy      = FALSE;
@@ -651,7 +653,7 @@ Add_Destructors(string name, typeExp_ptr new_type,
         typeExp_ptr save_type = GLmake_arrow(GLmake_string(),
                                          GLmake_arrow(new_type, GLmake_bool()));
         fn_ptr  save_fun;
-        save_fun = (fn_ptr) new_rec(&fn_rec_mgr);
+        save_fun = (fn_ptr) get_fn_rec();
         save_fun->visible        = TRUE;
         save_fun->ADT_level          = ADT_level;
         save_fun->non_lazy       = FALSE;
@@ -661,8 +663,10 @@ Add_Destructors(string name, typeExp_ptr new_type,
         save_fun->start_line_nbr = start_line;
         save_fun->end_line_nbr   = line_nbr;
         save_fun->expr           = save_expr;
-        save_fun->expr_init      = NULL;
-        save_fun->expr_comb      = NULL;
+        save_fun->expr_init      = cephalopode_mode?
+					Reflect_expr(save_fun->expr) : NULL;
+        save_fun->expr_comb      = cephalopode_mode?
+					Reflect_expr(save_fun->expr) : NULL;
         save_fun->super_comb     = save_expr;    // ????
         save_fun->type           = save_type;
         save_fun->overload           = FALSE;
@@ -680,7 +684,7 @@ Add_Destructors(string name, typeExp_ptr new_type,
                                               Make_STRING_leaf(type_sig));
         typeExp_ptr load_type = GLmake_arrow(GLmake_string(), new_type);
         fn_ptr  load_fun;
-        load_fun = (fn_ptr) new_rec(&fn_rec_mgr);
+        load_fun = (fn_ptr) get_fn_rec();
         load_fun->ADT_level          = ADT_level;
         load_fun->visible        = TRUE;
         load_fun->non_lazy       = FALSE;
@@ -690,8 +694,10 @@ Add_Destructors(string name, typeExp_ptr new_type,
         load_fun->start_line_nbr = start_line;
         load_fun->end_line_nbr   = line_nbr;
         load_fun->expr           = load_expr;
-        load_fun->expr_init      = NULL;
-        load_fun->expr_comb      = NULL;
+        load_fun->expr_init      = cephalopode_mode?
+					Reflect_expr(load_fun->expr) : NULL;
+        load_fun->expr_comb      = cephalopode_mode?
+					Reflect_expr(load_fun->expr) : NULL;
         load_fun->super_comb     = load_expr;    // ????
         load_fun->type           = load_type;
         load_fun->overload           = FALSE;
@@ -752,7 +758,7 @@ InsertOverloadDef(string name, bool open_overload, oll_ptr alts,
                   string file, int start_line)
 {
     fn_ptr      ret;
-    ret                 = (fn_ptr) new_rec(&fn_rec_mgr);
+    ret                 = (fn_ptr) get_fn_rec();
     ret->ADT_level      = ADT_level;
     ret->name           = name;
     ret->file_name      = file;
@@ -813,7 +819,7 @@ Make_forward_declare(string name, typeExp_ptr type, symbol_tbl_ptr stbl,
     g_ptr rv = Make_0inp_Primitive(P_REF_VAR);
     SET_REF_VAR(rv, ref_var);
     g_ptr expr = Make_1inp_Primitive(P_DEREFERENCE, rv);
-    fn_ptr ret = (fn_ptr) new_rec(&fn_rec_mgr);
+    fn_ptr ret = (fn_ptr) get_fn_rec();
     ret->ADT_level      = ADT_level;
     ret->forward        = TRUE;
     ret->visible        = TRUE;
@@ -825,8 +831,8 @@ Make_forward_declare(string name, typeExp_ptr type, symbol_tbl_ptr stbl,
     ret->non_lazy       = FALSE;
     ret->name           = name;
     ret->expr           = expr;
-    ret->expr_init      = NULL;
-    ret->expr_comb      = NULL;
+    ret->expr_init      = cephalopode_mode? Reflect_expr(ret->expr) : NULL;
+    ret->expr_comb      = cephalopode_mode? Reflect_expr(ret->expr) : NULL;
     ret->super_comb     = err;
     ret->overload       = FALSE;
     ret->open_overload  = FALSE;
@@ -890,7 +896,7 @@ New_fn_def(string name, result_ptr res, symbol_tbl_ptr stbl, bool print,
         Set_RefVar(ref_var, res->expr);
         ret = cur;
     } else {
-        ret = (fn_ptr) new_rec(&fn_rec_mgr);
+        ret = (fn_ptr) get_fn_rec();
         ret->ADT_level = ADT_level;
         ret->name      = name;
         ret->next      = stbl->def_list;
@@ -1303,7 +1309,7 @@ Add_ExtAPI_Function(string name, string strictness,
     SET_LEAF_TYPE(expr,PRIM_FN);
     SET_PRIM_FN(expr, P_EXTAPI_FN);
     SET_EXTAPI_FN(expr, id);
-    fn_ptr ret = (fn_ptr) new_rec(&fn_rec_mgr);
+    fn_ptr ret = (fn_ptr) get_fn_rec();
     ret->ADT_level      = ADT_level;
     ret->visible        = TRUE;
     ret->file_name      = wastrsave(&strings, "builtin");
@@ -1315,8 +1321,8 @@ Add_ExtAPI_Function(string name, string strictness,
     ret->forward        = FALSE;
     ret->name           = name;
     ret->expr           = expr;
-    ret->expr_init      = NULL;
-    ret->expr_comb      = NULL;
+    ret->expr_init      = cephalopode_mode? Reflect_expr(ret->expr) : NULL;
+    ret->expr_comb      = cephalopode_mode? Reflect_expr(ret->expr) : NULL;
     ret->super_comb     = NULL;
     ret->overload       = FALSE;
     ret->open_overload  = FALSE;
@@ -1450,7 +1456,12 @@ get_definition(g_ptr redex)
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot find any function named '%s'",
 					  name));
     } else {
-	OVERWRITE(redex, fp->expr_init);
+	if( fp->overload ) {
+	    MAKE_REDEX_FAILURE(redex,
+			       Fail_pr("Function %s is overloaded", name));
+	} else  {
+	    OVERWRITE(redex, fp->expr_init);
+	}
     }
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -1474,7 +1485,36 @@ get_combinator_expression(g_ptr redex)
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot find any function named '%s'",
 					  name));
     } else {
-	OVERWRITE(redex, fp->expr_comb);
+	if( fp->overload ) {
+	    MAKE_REDEX_FAILURE(redex,
+			       Fail_pr("Function %s is overloaded", name));
+	} else  {
+	    OVERWRITE(redex, fp->expr_comb);
+	}
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+get_userdef_combinator_expression(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    if( !cephalopode_mode ) {
+	MAKE_REDEX_FAILURE(redex,
+		"get_userdef_combinator_expression only available in -C mode");
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
+    int idx = GET_INT(r);
+    fn_ptr fp = (fn_ptr) REC_EL(&fn_rec_mgr, idx);
+    if( fp == NULL ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot find USERDEF %d", idx));
+    } else {
+	MAKE_REDEX_PAIR(redex,Make_STRING_leaf(fp->name),
+			      fp->expr_comb);
     }
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -1589,6 +1629,10 @@ Symbols_Install_Functions()
     Add_ExtAPI_Function("get_combinator_expression", "1", TRUE,
                         GLmake_arrow(GLmake_string(), term),
                         get_combinator_expression);
+    Add_ExtAPI_Function("get_userdef_combinator_expression", "1", TRUE,
+                        GLmake_arrow(GLmake_int(),
+				     GLmake_tuple(GLmake_string(), term)),
+                        get_userdef_combinator_expression);
 
     Add_ExtAPI_Function("is_defined", "1", TRUE,
                         GLmake_arrow(GLmake_string(),GLmake_bool()),
@@ -2102,4 +2146,13 @@ ignore_P_CACHE(g_ptr onode)
     if( !IS_P_CACHE(GET_APPLY_LEFT(GET_APPLY_LEFT(node))) ) return onode;
     node = GET_APPLY_RIGHT(node);
     return node;
+}
+
+static fn_ptr
+get_fn_rec()
+{
+    fn_ptr res = (fn_ptr) new_rec(&fn_rec_mgr);
+    res->id = fn_rec_id_cnt;
+    fn_rec_id_cnt++;
+    return res;
 }

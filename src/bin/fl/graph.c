@@ -5650,11 +5650,6 @@ Reflect_expr(g_ptr node)
     }
     switch( GET_TYPE(node) ) {
 	case APPLY_ND:
-#if 0
-	    if( IS_DEBUG(GET_APPLY_LEFT(node)) ) {
-		return( Reflect_expr(GET_APPLY_RIGHT(node)) );
-	    }
-#endif
 	    if( IS_UNQUOTE(GET_APPLY_LEFT(node)) ) {
 		return( GET_APPLY_RIGHT(node) );
 	    }
@@ -5717,6 +5712,16 @@ Reflect_expr(g_ptr node)
 					    Make_INT_leaf(pfn),
 					    Make_STRING_leaf(fmt))) );
 			}
+			if( pfn == P_EXTAPI_FN ) {
+			    string name = Get_ExtAPI_Function_Name(
+						GET_EXTAPI_FN(node));
+			    return( mkConstr1(
+					s_LEAF,
+					mkConstr2(
+					    s_EXT_PRIM_FN,
+					    Make_INT_leaf(pfn),
+					    Make_STRING_leaf(name))) );
+			}
 			return( mkConstr1(
 				    s_LEAF,
 				    mkConstr1(
@@ -5729,7 +5734,11 @@ Reflect_expr(g_ptr node)
 		case USERDEF: {
 		    // Not clear what to do here....
 		    fn_ptr fp = GET_USERDEF(node);
-		    return( mkConstr1(s_VAR, Make_STRING_leaf(fp->name)) );
+		    return( mkConstr1(
+				s_LEAF,
+				mkConstr1(
+				    s_USERDEF,
+				    Make_INT_leaf(fp->id))) );
 		}
 		default:
 		    DIE("Illegal leaf node type");
