@@ -1252,14 +1252,14 @@ binder_with_accumulator internal CELL;
 //	let foo = mk_internal (sprintf "_KeY_%s" name) in
 //	add_internal foo (CELL .... );
 //
-let mk_internal name =
-    let sz = hw_size {undefined:: *r} in
-    val w =
-	let nsz = md_size name in
-	sz = nsz => W_EXPLICIT_VAR sz name |
-	W_EXPLICIT_VAR sz (sprintf "%s[%d:0]" name (sz-1))
-    in
-    {hw_constr w:: *r}
+let mk_internal name = make_const_or_var name;
+//    let sz = hw_size {undefined:: *r} in
+//    val w =
+//	let nsz = md_size name in
+//	sz = nsz => W_EXPLICIT_VAR sz name |
+//	W_EXPLICIT_VAR sz (sprintf "%s[%d:0]" name (sz-1))
+//    in
+//    {hw_constr w:: *r}
 ;
 
 // Add an internal wire created by mk_internal to the internals list in pexlif.

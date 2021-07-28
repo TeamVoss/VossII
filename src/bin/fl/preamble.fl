@@ -1439,6 +1439,26 @@ let Pterm t =
 
 install_print_function Pterm;
 
+let DBGterm t =
+    letrec pr (APPLY t1 t2) =
+	sprintf "(APPLY %s %s)" (pr t1) (pr t2)
+     /\    pr (LAMBDA s t) =
+	sprintf "(LAMBDA %s %s)" s (pr t)
+     /\    pr (CONS t1 t2) =
+	sprintf "(CONS %s %s)" (pr t1) (pr t2)
+     /\    pr (NIL) =
+	sprintf "NIL"
+     /\    pr (VAR s) =
+	sprintf "(VAR %s)" s
+     /\    pr (LEAF lt) =
+	sprintf "(LEAF %s)" (Pleaftype lt)
+    in
+    pr t
+;
+
+
+
+
 // Create a bv that satisfies the constraint pred_fun.
 // Pred_fun is given as a function of the generated bv_variable.
 // For example:

@@ -26,6 +26,8 @@ void Fsm_Install_Functions();
 #define FSM_H
 #include "fl.h"	/* Global data types and include files 		     */
 
+typedef struct event_rec    *event_ptr;
+
 typedef struct ilist_rec {
     int		from;
     int		to;
@@ -135,6 +137,12 @@ typedef struct ncomp_rec {
 	ilist_ptr			outs;
 } ncomp_rec;
 
+typedef struct event_list_rec	*event_list_ptr;
+typedef struct event_list_rec {
+    event_ptr	    ep;
+    event_list_ptr  next;
+} event_list_rec;
+
 typedef struct nnode_rec    *nnode_ptr;
 typedef struct nnode_rec {
     vec_info_ptr    vec;
@@ -165,8 +173,8 @@ typedef enum {
 		end_trace   = 7
 }	    event_type;
 
-typedef struct event_rec    *event_ptr;
 typedef struct event_rec {
+    int		    event_id;
     event_type	    type;
     int		    nd_idx;
     int		    time;
@@ -223,10 +231,14 @@ typedef struct ste_rec {
     gbv         assertion_OK;
     gbv         check_OK;
     hash_record	trace_tbl;
+    hash_record	active_weak_tbl;
+    hash_record	active_ant_tbl;
+    hash_record	active_cons_tbl;
     rec_mgr	trace_event_rec_mgr;
     rec_mgr	trace_rec_mgr;
     buffer	event_buf;
     buffer	weakening_buf;
+    rec_mgr	event_list_rec_mgr;
 } ste_rec;
 
 // Simulation state

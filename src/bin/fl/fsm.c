@@ -75,6 +75,7 @@ extern string s_MEM;
 extern string s_no_instance;
 
 /***** PRIVATE VARIABLES *****/
+static int	    event_id_cnt = 0;
 static int	    undeclared_node_cnt;
 static bool         quit_simulation_early;
 static int	    nbr_errors_reported;
@@ -144,8 +145,16 @@ static ilist_ptr    im_cur;
 static hash_record  idx_list_uniq_tbl;
 static buffer	    *sim_wheel_bufp;
 //
+static hash_record  *active_weak_tblp;
+static hash_record  *old_active_weak_tblp;
+static hash_record  *active_ant_tblp;
+static hash_record  *old_active_ant_tblp;
+static hash_record  *active_cons_tblp;
+static hash_record  *old_active_cons_tblp;
 static hash_record  *trace_tblp;
 static hash_record  *old_trace_tblp;
+static rec_mgr	    *event_list_rec_mgrp;
+static rec_mgr	    *old_event_list_rec_mgrp;
 static rec_mgr	    *trace_event_rec_mgrp;
 static rec_mgr	    *old_trace_event_rec_mgrp;
 static rec_mgr	    *trace_rec_mgrp;
@@ -410,6 +419,9 @@ static gbv	    BDD_c_limited_OR(gbv a, gbv b);
 static void	    base_print_ilist(ilist_ptr il);
 static int	    fsm_sha256_fn(int *g_cntp, hash_record *g_tblp,
 				  SHA256_ptr sha, pointer a);
+static event_list_ptr add_active_event(hash_record *tblp, event_ptr ep);
+static event_list_ptr delete_active_event(hash_record *tblp, event_ptr ep);
+
 // Use of "wl_op" means these two don't fit in "pexlif.c".
 static bool is_binary_wexpr(g_ptr node, wl_op *opp, g_ptr *ap, g_ptr *bp);
 static bool is_relation_wexpr(g_ptr node, wl_op *opp, g_ptr *ap, g_ptr *bp);
@@ -3221,6 +3233,7 @@ static bool
 create_event_buffer(ste_ptr ste, buffer *ebufp,
 		    g_ptr wl, g_ptr ant, g_ptr cons, g_ptr trl, bool abort_ASAP)
 {
+    event_id_cnt = 0;
     for(g_ptr cur = wl; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
 	g_ptr t = GET_CONS_HD(cur);
 	gbv when;
@@ -3233,12 +3246,15 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	    longjmp(event_jmp_env, 1);
 	}
 	event_rec er;
+	int event_id = event_id_cnt++;
+	er.event_id = event_id;
 	er.type = start_weak;
 	er.nd_idx = nd_idx;
 	er.time = from;
 	er.H = when;
 	er.L = when;
 	push_buf(ebufp, &er);
+	er.event_id = event_id;
 	er.type = end_weak;
 	er.nd_idx = nd_idx;
 	er.time = to;
@@ -3258,6 +3274,8 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	    longjmp(event_jmp_env, 1);
 	}
 	event_rec er;
+	int event_id = event_id_cnt++;
+	er.event_id = event_id;
 	er.type = start_ant;
 	er.nd_idx = nd_idx;
 	er.time = from;
@@ -3280,6 +3298,7 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	}
 	ste->assertion_OK = c_AND(ste->assertion_OK, okA);
 	push_buf(ebufp, &er);
+	er.event_id = event_id;
 	er.type = end_ant;
 	er.nd_idx = nd_idx;
 	er.time = to;
@@ -3299,6 +3318,8 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	    longjmp(event_jmp_env, 1);
 	}
 	event_rec er;
+	int event_id = event_id_cnt++;
+	er.event_id = event_id;
 	er.type = start_cons;
 	er.nd_idx = nd_idx;
 	er.time = from;
@@ -3321,6 +3342,7 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	}
 	ste->check_OK = c_AND(ste->check_OK, okC);
 	push_buf(ebufp, &er);
+	er.event_id = event_id;
 	er.type = end_cons;
 	er.nd_idx = nd_idx;
 	er.time = to;
@@ -3339,12 +3361,15 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	    longjmp(event_jmp_env, 1);
 	}
 	event_rec er;
+	int event_id = event_id_cnt++;
+	er.event_id = event_id;
 	er.type = start_trace;
 	er.nd_idx = nd_idx;
 	er.time = from;
 	er.H = c_ZERO;	// Don't care
 	er.L = c_ZERO;	// Don't care
 	push_buf(ebufp, &er);
+	er.event_id = event_id;
 	er.type = end_trace;
 	er.nd_idx = nd_idx;
 	er.time = to;
@@ -3383,6 +3408,7 @@ process_event(buffer *event_bufp, int time)
 		record_trace(idx, time, c_ONE, c_ONE);
 	    } else {
 		gbv *buf;
+		event_list_ptr	cur_active = NULL;
 		switch( ep->type ) {
 		    case start_weak:
 			np->has_weak = TRUE;
@@ -3395,6 +3421,7 @@ process_event(buffer *event_bufp, int time)
 				c->no_weakening = TRUE;
 			    }
 			}
+			cur_active = add_active_event(active_weak_tblp, ep);
 			buf = weak_buf;
 			break;
 		    case end_weak:
@@ -3408,32 +3435,44 @@ process_event(buffer *event_bufp, int time)
 				c->no_weakening = FALSE;
 			    }
 			}
+			cur_active = delete_active_event(active_weak_tblp, ep);
 			buf = weak_buf;
 			break;
 		    case start_ant:
 			np->has_ant = TRUE;
 			np->has_ant_or_weak_change = TRUE;
+			cur_active = add_active_event(active_ant_tblp, ep);
 			buf = ant_buf;
 			break;
 		    case end_ant:
 			np->has_ant = FALSE;
 			np->has_ant_or_weak_change = TRUE;
+			cur_active = delete_active_event(active_ant_tblp, ep);
 			buf = ant_buf;
 			break;
 		    case start_cons:
 			np->has_cons = TRUE;
+			cur_active = add_active_event(active_cons_tblp, ep);
 			buf = cons_buf;
 			break;
 		    case end_cons:
 			np->has_cons = FALSE;
+			cur_active = delete_active_event(active_cons_tblp, ep);
 			buf = cons_buf;
 			break;
 		    default:
 			DIE("Should not happen");
 			break;
 		}
-		*(buf + 2*idx)   = ep->H;
-		*(buf + 2*idx+1) = ep->L;
+		gbv H = c_ONE;
+		gbv L = c_ONE;
+		while( cur_active ) {
+		    H = c_AND(H, cur_active->ep->H);
+		    L = c_AND(L, cur_active->ep->L);
+		    cur_active = cur_active->next;
+		}
+		*(buf + 2*idx)   = H;
+		*(buf + 2*idx+1) = L;
 	    }
 	    pop_buf(event_bufp, NULL);
 	}
@@ -3491,12 +3530,20 @@ create_ste(fsm_ptr fsm, value_type type)
     ste->next = NULL;
     ste->fsm = fsm;
     ste->type = type;
+    hash_record *_active_weak_tblp = &(ste->active_weak_tbl);
+    create_hash(_active_weak_tblp, 100, int_hash, int_equ);
+    hash_record *_active_ant_tblp = &(ste->active_ant_tbl);
+    create_hash(_active_ant_tblp, 100, int_hash, int_equ);
+    hash_record *_active_cons_tblp = &(ste->active_cons_tbl);
+    create_hash(_active_cons_tblp, 100, int_hash, int_equ);
     hash_record *_trace_tblp = &(ste->trace_tbl);
     create_hash(_trace_tblp, 100, int_hash, int_equ);
     rec_mgr     *_trace_event_rec_mgrp = &(ste->trace_event_rec_mgr);
     new_mgr(_trace_event_rec_mgrp, sizeof(trace_event_rec));
     rec_mgr     *_trace_rec_mgrp = &(ste->trace_rec_mgr);
     new_mgr(_trace_rec_mgrp, sizeof(trace_rec));
+    rec_mgr     *_event_list_rec_mgr = &(ste->event_list_rec_mgr);
+    new_mgr(_event_list_rec_mgr, sizeof(event_list_rec));
     buffer     *_weakening_bufp = &(ste->weakening_buf);
     new_buf(_weakening_bufp, 100, sizeof(formula));
     buffer     *_event_bufp = &(ste->event_buf);
@@ -3513,8 +3560,12 @@ static void
 push_ste(ste_ptr ste)
 {
     old_type = current_type;
+    old_active_weak_tblp = active_weak_tblp;
+    old_active_ant_tblp = active_ant_tblp;
+    old_active_cons_tblp = active_cons_tblp;
     old_trace_tblp = trace_tblp;
     old_trace_event_rec_mgrp = trace_event_rec_mgrp;
+    old_event_list_rec_mgrp = event_list_rec_mgrp;
     old_trace_rec_mgrp = trace_rec_mgrp;
     old_weakening_bufp = weakening_bufp;
     old_event_bufp = event_bufp;
@@ -3532,8 +3583,12 @@ push_ste(ste_ptr ste)
 	default:
 	    break;
     }
+    active_weak_tblp = &(ste->active_weak_tbl);
+    active_ant_tblp  = &(ste->active_ant_tbl);
+    active_cons_tblp = &(ste->active_cons_tbl);
     trace_tblp = &(ste->trace_tbl);
     trace_event_rec_mgrp = &(ste->trace_event_rec_mgr);
+    event_list_rec_mgrp = &(ste->event_list_rec_mgr);
     trace_rec_mgrp = &(ste->trace_rec_mgr);
     weakening_bufp = &(ste->weakening_buf);
     event_bufp = &(ste->event_buf);
@@ -3556,8 +3611,12 @@ pop_ste()
 	default:
 	    break;
     }
+    active_weak_tblp = old_active_weak_tblp;
+    active_ant_tblp  = old_active_ant_tblp;
+    active_cons_tblp = old_active_cons_tblp;
     trace_tblp = old_trace_tblp;
     trace_event_rec_mgrp = old_trace_event_rec_mgrp;
+    event_list_rec_mgrp = old_event_list_rec_mgrp;
     trace_rec_mgrp = old_trace_rec_mgrp;
     weakening_bufp = old_weakening_bufp;
     event_bufp = old_event_bufp;
@@ -3791,8 +3850,12 @@ sweep_ste_fn(void)
 	    case 0:
 		break;
 	    case 1:
+		dispose_hash(&(ste->active_weak_tbl), NULLFCN);
+		dispose_hash(&(ste->active_ant_tbl), NULLFCN);
+		dispose_hash(&(ste->active_cons_tbl), NULLFCN);
 		dispose_hash(&(ste->trace_tbl), NULLFCN);
 		free_mgr(&(ste->trace_event_rec_mgr));
+		free_mgr(&(ste->event_list_rec_mgr));
 		free_mgr(&(ste->trace_rec_mgr));
 		free_buf(&(ste->event_buf));
 		free_buf(&(ste->weakening_buf));
@@ -8435,4 +8498,50 @@ _DuMMy_fsm()
     SET_GBV(NULL, c_ZERO);
     clean_pexlif_ios(NULL);
 }
+
+static event_list_ptr
+add_active_event(hash_record *tblp, event_ptr ep)
+{
+    int nd_idx = ep->nd_idx;
+    event_list_ptr new_elp = (event_list_ptr) new_rec(event_list_rec_mgrp);
+    new_elp->ep = ep;
+    event_list_ptr  elp = (event_list_ptr) find_hash(tblp, INT2PTR(nd_idx));
+    new_elp->next = elp;
+    if( elp != NULL ) {
+	delete_hash(tblp, INT2PTR(nd_idx));
+    }
+    insert_hash(tblp, INT2PTR(nd_idx), new_elp);
+    return new_elp;
+}
+
+static event_list_ptr
+delete_active_event(hash_record *tblp, event_ptr ep)
+{
+    int nd_idx = ep->nd_idx;
+    event_list_ptr  elp = (event_list_ptr) find_hash(tblp, INT2PTR(nd_idx));
+    ASSERT(elp != NULL);
+    int event_id = ep->event_id;
+    if( elp->ep->event_id == event_id ) {
+	// First in list
+	delete_hash(tblp, INT2PTR(nd_idx));
+	event_list_ptr next = elp->next;
+	if( next != NULL ) {
+	    insert_hash(tblp, INT2PTR(nd_idx), next);
+	}
+	free_rec(event_list_rec_mgrp, elp);
+	return next;
+    }
+    event_list_ptr start = elp;
+    event_list_ptr prev = elp;
+    elp = elp->next;
+    while( elp && elp->ep->event_id != event_id) {
+	prev = elp;
+	elp = elp->next;
+    }
+    ASSERT(elp != NULL);
+    prev->next = elp->next;
+    free_rec(event_list_rec_mgrp, elp);
+    return start;
+}
+
 

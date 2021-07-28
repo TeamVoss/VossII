@@ -575,8 +575,9 @@ let fl_wv_get_short w vec t =
 	(alts subtract ["0","1"]) = [] =>
 	    let s = implode vs then
 	    opt_states != [] =>
+		// An ENUM (e.g. state machine)
 		let i = sscanf "%b" s in
-		assoc i opt_states
+		(assoc i opt_states) catch "-"
 	    |
 	    let res = length nds >= 4 =>
 			sprintf "0x%x" (sscanf "%b" s) | (implode vs)
@@ -664,7 +665,7 @@ let fl_get_short_value w vecs compute_alternatives =
 	    opt_states != [] =>
 		// An ENUM (e.g. state machine)
 		let i = sscanf "%b" s in
-		assoc i opt_states
+		(assoc i opt_states) catch "-"
 	    |   
 	    let res = length nds >= 4 =>
 			sprintf "0x%x" (sscanf "%b" s) | (implode vs)
@@ -1238,7 +1239,7 @@ let base_get_waveform w vec show_depend =
 		    opt_states != [] =>
                         // An ENUM (e.g. state machine)
 			let i = sscanf "%b" s in
-			assoc i opt_states
+			(assoc i opt_states) catch "-"
                     |   
                     length nds >= 4 => sprintf "0x%x" (sscanf "%b" s)
                                      | (implode vs) 
