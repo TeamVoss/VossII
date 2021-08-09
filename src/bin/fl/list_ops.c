@@ -21,6 +21,7 @@ extern bool	    Disable_GC;
 
 /***** PRIVATE VARIABLES *****/
 static hash_record	assoc_tbls;
+static hash_record	rev_assoc_tbls;
 static hash_record	el_tbls;
 static hash_record	mem_tbls;
 static rec_mgr		assoc_tbl_rec_mgr;
@@ -42,6 +43,7 @@ List_ops_Init()
     // Any needed initialization code
     new_mgr(&assoc_tbl_rec_mgr, sizeof(assoc_tbl_rec));
     create_hash(&assoc_tbls, 100, ptr_hash, ptr_equ);
+    create_hash(&rev_assoc_tbls, 100, ptr_hash, ptr_equ);
     create_hash(&mem_tbls, 100, ptr_hash, ptr_equ);
     create_hash(&el_tbls, 100, ptr_hash, ptr_equ);
     ai_zero = Make_INT_leaf(0);
@@ -61,6 +63,8 @@ List_GC()
 	    if( GET_REFCNT(atp->assoc_list) == 0 ) {
 		if( find_hash(&assoc_tbls, atp->assoc_list) != NULL )
 		    delete_hash(&assoc_tbls, atp->assoc_list);
+		if( find_hash(&rev_assoc_tbls, atp->assoc_list) != NULL )
+		    delete_hash(&rev_assoc_tbls, atp->assoc_list);
 		if( find_hash(&mem_tbls, atp->assoc_list) != NULL )
 		    delete_hash(&mem_tbls, atp->assoc_list);
 		if( find_hash(&el_tbls, atp->assoc_list) != NULL )
@@ -189,14 +193,14 @@ rev_assoc(g_ptr redex)
     g_ptr key = GET_APPLY_RIGHT(l);
     g_ptr alist = GET_APPLY_RIGHT(redex);
     assoc_tbl_ptr atp;
-    atp = (assoc_tbl_ptr) find_hash(&assoc_tbls, (pointer) alist);
+    atp = (assoc_tbl_ptr) find_hash(&rev_assoc_tbls, (pointer) alist);
     if( atp == NULL ) {
 	atp = get_assoc_tbl_record();
 	create_hash(&(atp->tbl), 100, G_rec_hash, G_rec_equ);
 	atp->assoc_list = alist;
 	atp->next_to_insert = alist;
 	SET_REFCNT(alist,MAX_REF_CNT);
-	insert_hash(&assoc_tbls, (pointer) alist, (pointer) atp);
+	insert_hash(&rev_assoc_tbls, (pointer) alist, (pointer) atp);
     }
     g_ptr res = find_hash(&(atp->tbl), (pointer) key);
     if( res != NULL ) {
