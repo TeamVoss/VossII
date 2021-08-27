@@ -711,6 +711,22 @@ md_size(g_ptr redex)
 }
 
 static void
+md_sizes(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    int sz = 0;
+    g_ptr nl = r;
+    while( !IS_NIL(nl) ) {
+	sz += Get_Vector_Size(GET_STRING(GET_CONS_HD(nl)));
+	nl = GET_CONS_TL(nl);
+    }
+    MAKE_REDEX_INT(redex, sz);
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
 md_extract_vectors(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
@@ -735,7 +751,7 @@ md_merge_vectors(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
-    merge_vectors_fl(r, redex, FALSE);
+    merge_vectors_fl(r, redex, TRUE);
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
@@ -1023,6 +1039,11 @@ Strings_Install_Functions()
 			GLmake_arrow(GLmake_string(), GLmake_int()),
 			md_size);
 
+    Add_ExtAPI_Function("md_sizes", "1", FALSE,
+			GLmake_arrow(GLmake_list(GLmake_string()),
+				     GLmake_int()),
+			md_sizes);
+
     Add_ExtAPI_Function("md_extract_vectors", "1", FALSE,
 			GLmake_arrow(GLmake_list(GLmake_string()),
 				     GLmake_list(GLmake_string())),
@@ -1134,6 +1155,34 @@ end_vector_ops()
     merge_list_rec_mgrp = NULL;
 }
 
+static range_ptr
+merge_indices(range_ptr indices)
+{
+    range_ptr res = indices;
+    range_ptr tail = indices;
+    range_ptr cur = indices->next;
+    while(cur) {
+	if( (tail->upper >= tail->lower) && (cur->upper >= cur->lower) &&
+	    ((tail->lower - 1) == cur->upper) )
+	{
+	    tail->lower = cur->lower;
+	    cur = cur->next;
+	    tail->next = cur;
+	} else
+	if( (tail->upper <= tail->lower) && (cur->upper <= cur->lower) &&
+	    ((tail->lower + 1) == cur->upper) )
+	{
+	    tail->lower = cur->lower;
+	    cur = cur->next;
+	    tail->next = cur;
+	} else {
+	    tail = cur;
+	    cur = cur->next;
+	}
+    }
+    return res;
+}
+
 static vec_ptr
 split_name(string name)
 {
@@ -1174,7 +1223,7 @@ split_name(string name)
             }
             vec_ptr n = (vec_ptr) new_rec(vec_rec_mgrp);
             n->type = INDEX;
-            n->u.ranges = indices;
+            n->u.ranges = merge_indices(indices);
             n->next = NULL;
             *res_tl_ptr = n;
             res_tl_ptr = &(n->next);
@@ -1572,42 +1621,49 @@ gen_merge_vectors(buffer_ptr vec_buf)
             } else {
                 // Make sure the rest matches
                 range_ptr r1 = v1->u.ranges;
+		while( r1->next != NULL ) { r1 = r1->next; }
                 range_ptr r2 = v2->u.ranges;
                 v1 = v1->next;
                 v2 = v2->next;
                 while( v1 && 
                        (v1->type == TXT ||
-                        //range_equ(v1->u.ranges, v2->u.ranges)) )
                         same_range(v1->u.ranges,v2->u.ranges)) )
                 {
                     v1 = v1->next;
                     v2 = v2->next;
                 }
                 if( v1 != NULL ) {
+		    // Different suffix
                     not_changed++;
                     mp = mp->next;
                 } else {
-                    if( (r1->upper >= r1->lower) && (r1->next == NULL) &&
-                        (r2->upper >= r2->lower) && (r2->next == NULL) &&
-                        (r2->upper == (r1->lower - 1)) )
+		    // Same prefix and suffix
+                    if( (r1->upper >= r1->lower) && (r2->upper >= r2->lower) &&
+                        ((r1->lower - 1) == r2->upper) )
                     {
+			// Continuous downwards range
                         r1->lower = r2->lower;
+			r1->next = r2->next;
                         mp->next->next->prev = mp;
                         mp->next = mp->next->next;
                         not_changed = 0;
                         alts--;
-                    } else if( (r1->upper <= r1->lower) && (r1->next == NULL) &&
-                               (r2->upper <= r2->lower) && (r2->next == NULL) &&
-                               (r2->upper == (r1->lower + 1)) )
+                    } else
+		    if( (r1->upper <= r1->lower) && (r2->upper <= r2->lower) &&
+                        ((r1->lower + 1) == r2->upper) )
                     {
+			// Continuous upwards range
                         r1->lower = r2->lower;
+			r1->next = r2->next;
                         mp->next->next->prev = mp;
                         mp->next = mp->next->next;
                         not_changed = 0;
                         alts--;
                     } else {
-                        not_changed++;
-                        mp = mp->next;
+			r1->next = r2;
+                        mp->next->next->prev = mp;
+                        mp->next = mp->next->next;
+                        not_changed = 0;
                     }
                 }
             }
@@ -1721,8 +1777,10 @@ show_contig_vector(rec_mgr *sname_list_mgrp, tstr_ptr tstrings, vec_ptr vp)
             gen_strappend(tstrings, vp->u.name);
         } else {
             sname_list_ptr res = NULL, *tail_ptr = &res;
+	    string end_s = str_buf+strlen(str_buf);
             for(range_ptr rp = vp->u.ranges; rp != NULL; rp = rp->next) {
-                gen_strtemp(tstrings, str_buf);
+		*end_s = 0;
+		gen_strtemp(tstrings, str_buf);
                 SPRINT_RANGE(tstrings, rp);
                 sname_list_ptr slp =
                     show_contig_vector(sname_list_mgrp, tstrings, vp->next);

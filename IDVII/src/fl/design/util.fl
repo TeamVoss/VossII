@@ -132,33 +132,29 @@ let Emit_pexlif file pexlif =
 ;
 
 let base_get_lhs_vars we =
-    letrec get_names (W_VAR sz b) =
-	    sz = 1 => [b] | md_expand_vector (mk_name sz b)
-     /\    get_names (W_EXPLICIT_VAR sz b) =
-	    md_expand_vector b
-     /\	   get_names (W_SLICE indices (W_VAR sz b)) =
-	    let v = list2str T (b^"[") "," "]" int2str indices then
-	    md_expand_vector v
-     /\	   get_names (W_NAMED_SLICE name indices (W_VAR sz b)) =
-	    let v = list2str T (b^"[") "," "]" int2str indices then
-	    md_expand_vector v
-     /\	   get_names (W_SLICE indices w) =
-	let l = get_names w in
-	let sz = length l in
-	map (\idx. el (sz-idx) l) indices
-     /\	   get_names (W_NAMED_SLICE name indices w) =
-	let l = get_names w in
-	let sz = length l in
-	map (\idx. el (sz-idx) l) indices
-     /\    get_names (W_CAT parts) =
-	    flat (map get_names parts)
-     /\    get_names other =
+    letrec gen_get_names (W_VAR sz b) = sz = 1 => [b] | [(mk_name sz b)]
+     /\    gen_get_names (W_EXPLICIT_VAR sz b) = [b]
+     /\	   gen_get_names (W_SLICE indices (W_VAR sz b)) =
+	    merge_vectors [list2str T (b^"[") "," "]" int2str indices]
+     /\	   gen_get_names (W_NAMED_SLICE name indices (W_VAR sz b)) =
+	    merge_vectors [list2str T (b^"[") "," "]" int2str indices]
+     /\	   gen_get_names (W_SLICE indices w) =
+	let l = md_expand_vectors (gen_get_names w) then
+	let sz = length l then
+	md_merge_vectors (map (\idx. el (sz-idx) l) indices)
+     /\	   gen_get_names (W_NAMED_SLICE name indices w) =
+	let l = md_expand_vectors (gen_get_names w) then
+	let sz = length l then
+	md_merge_vectors (map (\idx. el (sz-idx) l) indices)
+     /\    gen_get_names (W_CAT parts) =
+	    flat (map gen_get_names parts)
+     /\    gen_get_names other =
 	eprintf "Illegal lhs expression\n(%s)" (Pwexpr other)
     in
-    get_names we
+    gen_get_names we
 ;
 
-let get_lhs_vars we = merge_vectors (base_get_lhs_vars we);
+let get_lhs_vars we = (base_get_lhs_vars we);
 
 
 let valid_lhs we =

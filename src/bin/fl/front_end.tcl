@@ -1679,13 +1679,16 @@ fileevent $::callback_from_tcl_fp_res readable \
 proc do_remote_tcl_request {chan} {
     if ![eof $::sync_to_tcl_fp] {
         if { [gets $::sync_to_tcl_fp line] > 0 } {
-	    set line2 [unprotect $line]
+	    regexp {([0-9][0-9]*) (.*)$} $line -> tcl_eval_id raw_line
+	    set line2 [unprotect $raw_line]
             if [catch {uplevel #0 $line2} res] {
-                puts -nonewline $::sync_to_tcl_fp "1"
 		set msg "$res $::errorInfo"
+                puts -nonewline $::sync_to_tcl_fp "1"
+                puts -nonewline $::sync_to_tcl_fp "$tcl_eval_id "
                 puts $::sync_to_tcl_fp [protect $msg]
             } else {
                 puts -nonewline $::sync_to_tcl_fp "0"
+                puts -nonewline $::sync_to_tcl_fp "$tcl_eval_id "
                 puts $::sync_to_tcl_fp [protect $res]
             }
             flush $::sync_to_tcl_fp
@@ -1791,7 +1794,7 @@ proc sg:screen_grab {} {
 	pack $w.window.cb -side left -fill x -expand yes
 
     frame $w.sz -relief flat
-    set ::sg_desired_width 1000
+    set ::sg_desired_width current
     pack $w.sz -side top -fill x
 	label $w.sz.l -text "Width: "
 	entry $w.sz.e -textvariable ::sg_desired_width
@@ -1816,10 +1819,15 @@ proc sg:screen_grab {} {
 	pack $w.bname.l -side left
 	pack $w.bname.e -side left -fill x -expand yes
 
-    button $w.capture -text Capture -command "sg:capture $w"
-    pack $w.capture -fill x
 
+    frame $w.bf -relief flat
+    pack $w.bf -fill x
 
+	button $w.bf.capture -text Capture -command "sg:capture $w"
+	pack $w.bf.capture -fill x -expand yes -side left
+
+	button $w.bf.cancel -text Cancel -command "destroy $w"
+	pack $w.bf.cancel -fill x -expand yes -side left
 }
 
 proc sg:choose_dir {w} {
@@ -1846,12 +1854,16 @@ proc sg:capture {w} {
 		     $::screen_shot_dir \
 		     $::screen_shot_basename \
 		     $::screen_grab_file_cnt($::screen_shot_basename)]
-    
-    set ratio [expr $::sg_desired_width.0/$::screen_grab_width.0]
-    set wid [expr round($ratio * $::::screen_grab_width.0)]
-    set ht [expr round($ratio * $::::screen_grab_height.0)]
-    eval exec import -window $::screen_grab_id png:- | \
-	 convert -resize [format {%dx%d} $wid $ht] png:- $file
+
+    if { $::sg_desired_width != "current" } {
+	set ratio [expr $::sg_desired_width.0/$::screen_grab_width.0]
+	set wid [expr round($ratio * $::::screen_grab_width.0)]
+	set ht [expr round($ratio * $::::screen_grab_height.0)]
+	eval exec import -window $::screen_grab_id png:- | \
+	     convert -resize [format {%dx%d} $wid $ht] png:- $file
+    } else {
+	eval exec import -window $::screen_grab_id png:$file
+    }
 }
 
 

@@ -1381,7 +1381,9 @@ let prim_fns = [
 		(1022, "P_VOID"), (200, "P_START_SUPER_COMB"),
 		(1023, "P_ILLEGAL")
 ];
-clet primfn2name i = assoc i prim_fns;
+clet primfn2name i = 
+    (assoc i prim_fns) catch (sprintf "<PFN %d>" i)
+;
 end_abstype primfn2name;
 
 let Pleaftype (INT i) = sprintf "%d" i
@@ -1455,9 +1457,6 @@ let DBGterm t =
     in
     pr t
 ;
-
-
-
 
 // Create a bv that satisfies the constraint pred_fun.
 // Pred_fun is given as a function of the generated bv_variable.

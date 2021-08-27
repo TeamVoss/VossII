@@ -567,9 +567,9 @@ clet base_assignment make_draw_command lhs rhs =
         let dep_vars = (w_depends rhs) in
         let inps = map (\n.n,[n]) dep_vars in
         let driven = base_get_lhs_vars lhs in
-        let sz = length driven in
+        let sz = md_sizes driven in
         let lhs' = W_VAR sz "_tmp" in
-        let outs = [(mk_name sz "_tmp", merge_vectors driven)] in
+        let outs = [(mk_name sz "_tmp", driven)] in
         let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
         let pfn = make_draw_command => mk_draw_cmd F rhs | "" in
         PINST pfn [] T inps outs [] body
@@ -577,9 +577,9 @@ clet base_assignment make_draw_command lhs rhs =
     let mk_pinst_w_order lhs rhs inps =
 	let inps = map (\n.n,[n]) (flatmap w_depends (rev inps)) in
         let driven = base_get_lhs_vars lhs in
-        let sz = length driven in
+        let sz = md_sizes driven in
         let lhs' = W_VAR sz "_tmp" in
-        let outs = [(mk_name sz "_tmp", merge_vectors driven)] in
+        let outs = [(mk_name sz "_tmp", driven)] in
         let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
         let pfn = make_draw_command => mk_draw_cmd F rhs | "" in
         PINST pfn [] T inps outs [] body
@@ -653,9 +653,9 @@ clet base_assignment make_draw_command lhs rhs =
 		    let dep_vars = md_extract_vectors (w_depends rhs) in
 		    let inps = map (\n.n,[n]) dep_vars in
 		    let driven = base_get_lhs_vars lhs in
-		    let sz = length driven in
+		    let sz = md_sizes driven in
 		    let lhs' = W_VAR sz "_tmp" in
-		    let outs = [(mk_name sz "_tmp", merge_vectors driven)] in
+		    let outs = [(mk_name sz "_tmp", driven)] in
 		    let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
 		    let n = length dep_vars in
 		    let pfn = make_draw_command =>
@@ -682,9 +682,9 @@ clet base_assignment make_draw_command lhs rhs =
 		    let dep_vars = md_extract_vectors (w_depends rhs) in
 		    let inps = map (\n.n,[n]) dep_vars in
 		    let driven = base_get_lhs_vars lhs in
-		    let sz = length driven in
+		    let sz = md_sizes driven in
 		    let lhs' = W_VAR sz "_tmp" in
-		    let outs = [(mk_name sz "_tmp", merge_vectors driven)] in
+		    let outs = [(mk_name sz "_tmp", driven)] in
 		    let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
 		    let n = length dep_vars in
 		    let pfn = make_draw_command =>
@@ -711,9 +711,9 @@ clet base_assignment make_draw_command lhs rhs =
 		    let dep_vars = md_extract_vectors (w_depends rhs) in
 		    let inps = map (\n.n,[n]) dep_vars in
 		    let driven = base_get_lhs_vars lhs in
-		    let sz = length driven in
+		    let sz = md_sizes driven in
 		    let lhs' = W_VAR sz "_tmp" in
-		    let outs = [(mk_name sz "_tmp", merge_vectors driven)] in
+		    let outs = [(mk_name sz "_tmp", driven)] in
 		    let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
 		    let n = length dep_vars in
 		    let pfn = make_draw_command =>
@@ -740,9 +740,9 @@ clet base_assignment make_draw_command lhs rhs =
 		    let dep_vars = md_extract_vectors (w_depends rhs) in
 		    let inps = map (\n.n,[n]) dep_vars in
 		    let driven = base_get_lhs_vars lhs in
-		    let sz = length driven in
+		    let sz = md_sizes driven in
 		    let lhs' = W_VAR sz "_tmp" in
-		    let outs = [(mk_name sz "_tmp", merge_vectors driven)] in
+		    let outs = [(mk_name sz "_tmp", driven)] in
 		    let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
 		    let n = length dep_vars in
 		    let pfn = make_draw_command =>
@@ -868,7 +868,7 @@ let anon_arg_cnt = ref 0;
 clet get_act_args fn a =
     (
 	let we = hw_destr a in
-	let res = merge_vectors (base_get_lhs_vars we) then
+	let res = base_get_lhs_vars we then
 	([], res)
     ) catch (
 	let cnt = deref anon_arg_cnt then
@@ -1205,7 +1205,7 @@ let internal body_fun {fs::string} acc =
     let fv = hd (get_lhs_vars wf) in
     let values = hw_values {undefined :: *a} in
     let acc' name bd =
-	let p0 = acc name bd in
+	let p0 = acc name bd then
 	val (PINST n attrs leaf inps outs ints body) = p0 in
 	val (p_main, p_exprs) =
 	    n = "_WrApPeR_" =>
@@ -1235,11 +1235,11 @@ let internal body_fun {fs::string} acc =
 	    (p_main', [])
 	in
 	p_exprs = [] => p_main |
-	let c_ints = get_tmp_outs p_exprs in
-	let c_inps = mk_wrap_inps c_ints (p_main:p_exprs) in
-	let c_outs = mk_wrap_outs [p_main] in
+	let c_ints = get_tmp_outs p_exprs then
+	let c_inps = mk_wrap_inps c_ints (p_main:p_exprs) then
+	let c_outs = mk_wrap_outs [p_main] then
 	let res = PINST "_WrApPeR_" attrs F c_inps c_outs c_ints
-		    (P_HIER (p_main:p_exprs)) in
+		    (P_HIER (p_main:p_exprs)) then
 	res
     in
     body_fun {f:: *a} acc'
@@ -1266,11 +1266,10 @@ let mk_internal name = make_const_or_var name;
 // See mk_internal for example of use.
 let add_internal new_int cell =
     let w_int = hw_destr new_int in
-    let new_ints = merge_vectors (base_get_lhs_vars w_int) in
+    let new_ints = base_get_lhs_vars w_int in
     val (PINST nm attrs leaf inps outs ints body) = cell in
     PINST nm attrs leaf inps outs (new_ints@ints) body
 ;
-
 
 
 // Declare internal array of signals to a unit.
@@ -1279,7 +1278,7 @@ let list_internal cnt body_fun {base_fs::string} acc =
     let sz = hw_size {undefined :: *a} in
     let wfs = map (hw_mk_var {undefined :: *a}) fs in
     let f  = {map  hw_constr wfs:: *a list} in
-    let fv = map (\wf. hd (get_lhs_vars wf)) wfs in
+    let fv = map (mk_name sz) fs in
     let values = hw_values {undefined :: *a} in
     let acc' name bd =
 	let p0 = acc name bd in
