@@ -1,0 +1,160 @@
+// Various test for the compiler
+//
+// File sections:
+//  - Unit tests (for small functions)
+//  - Generating and reading verilog
+
+cload (DIR^"ast.fl");
+cload (DIR^"utils.fl");
+cload (DIR^"wexpr2swexpr.fl");
+
+
+// =====================================
+// $ Unit tests
+// =====================================
+
+
+// Test if all pairs in values are equal
+let TEST_EQ name values =
+	letrec tester _ ([]) = 0
+		/\ tester i ((val_a, val_b):rest) =
+			(val_a == val_b)
+				=> 1 + (tester (i+1) rest)
+				| printf "  TEST_EQ %-27s %d FAILED\n"
+					name i fseq (tester (i+1) rest)
+	in
+	let passed = tester 1 values in
+	let total  = length values in
+	printf "TEST_EQ %-27s PASSED %2d / %2d TESTS\n"
+	name passed total;
+
+
+let test_utils_arith = TEST_EQ "get_signed" [
+		get_signed 3 0b000 --- 0,
+		get_signed 3 0b001 --- 1,
+		get_signed 3 0b010 --- 2,
+		get_signed 3 0b011 --- 3,
+		get_signed 3 0b100 --- -4,
+		get_signed 3 0b101 --- -3,
+		get_signed 3 0b110 --- -2,
+		get_signed 3 0b111 --- -1,
+		get_signed 3 (-1) --- -1,
+		get_signed 3 (-2) --- -2,
+		get_signed 3 (-3) --- -3,
+		get_signed 3 (-4) --- -4
+	] fseq
+	TEST_EQ "get_unsigned" [
+		get_unsigned 3 0b000 --- 0,
+		get_unsigned 3 0b001 --- 1,
+		get_unsigned 3 0b010 --- 2,
+		get_unsigned 3 0b011 --- 3,
+		get_unsigned 3 0b100 --- 4,
+		get_unsigned 3 0b101 --- 5,
+		get_unsigned 3 0b110 --- 6,
+		get_unsigned 3 0b111 --- 7,
+		get_unsigned 3 (-1) --- 7,
+		get_unsigned 3 (-2) --- 6,
+		get_unsigned 3 (-3) --- 5,
+		get_unsigned 3 (-4) --- 4
+	] fseq
+	TEST_EQ "right_shift" [
+		right_shift 3 1 0 --- 1,
+		right_shift 3 0b100 1 --- get_signed 3 0b010,
+		right_shift 3 0b100 2 --- get_signed 3 0b001,
+		right_shift 3 0b100 3 --- get_signed 3 0b000,
+		right_shift 3 0b111 1 --- get_signed 3 0b011
+	] fseq
+	TEST_EQ "arithmetic_right_shift" [
+		arithmetic_right_shift 3 1 0 --- 1,
+		arithmetic_right_shift 3 0b100 1 --- get_signed 3 0b110,
+		arithmetic_right_shift 3 0b100 2 --- get_signed 3 0b111,
+		arithmetic_right_shift 3 0b100 3 --- get_signed 3 0b111,
+		arithmetic_right_shift 3 0b111 1 --- get_signed 3 0b111,
+		arithmetic_right_shift 3 0b010 1 --- get_signed 3 0b001,
+		arithmetic_right_shift 3 0b010 2 --- get_signed 3 0b000
+	] fseq
+	TEST_EQ "left_shift" [
+		left_shift 3 1 0 --- 1,
+		left_shift 3 0b001 1 --- get_signed 3 0b010,
+		left_shift 3 0b001 2 --- get_signed 3 0b100,
+		left_shift 3 0b101 3 --- get_signed 3 0b000,
+		left_shift 3 0b111 1 --- get_signed 3 0b110
+	];
+
+let test_util_clean = TEST_EQ "clean_functions" [
+		clean_cat [clean_const 3 0b011, clean_const 4 0b0101] --- clean_const 7 0b0110101,
+		clean_slice [5,4,2] (clean_const 8 0b00010100) --- clean_const 3 0b011,
+		clean_slice [0,1,2] (SW_SLICE [4,5,6] (SW_X 12)) --- SW_X 3,
+		clean_slice [0,1,2] (SW_SLICE [4,5,6] (clean_const 12 0b0110000)) --- clean_const 3 0b011,
+		clean_not (clean_const 3 0b011) --- clean_const 3 0b100,
+		clean_slice [5,4,2,1,3] (SW_CAT [
+			SW_VAR 3 "high",
+			SW_VAR 3 "low"
+		]) --- SW_CAT [
+			SW_SLICE [2,1] (SW_VAR 3 "high"),
+			SW_SLICE [2,1] (SW_VAR 3 "low"),
+			SW_SLICE [0] (SW_VAR 3 "high")
+		]
+	];
+
+
+// =====================================
+// $ Generating and reading verilog
+// =====================================
+
+
+cload (DIR^"main.fl");
+
+TYPE "byte" 8;
+TYPE "addr" 6;
+MEMORY "RAM" [(163, "addr")] "byte";
+
+STRUCT "pair" 16 [
+	"high" --- "byte" --- (15 -- 8),
+	"low"  --- "byte" --- (7  -- 0),
+	"bla"  --- "byte" --- [2,3,8,7,6,15,14,13] // This horror right there
+];
+
+
+
+let non_inlined_cell =
+	bit_input bit_in.
+	byte_input byte_in.
+	bit_output bit_out.
+	CELL "draw_hier a name with spaces" [
+		// or all the bits of byte_in
+		bit_out <- bit_in '&' (sitlist (defix '|') (tobits byte_in) ('0))
+	];
+
+let test_cell =
+	bit_input clk.
+	byte_input byte_in_1 byte_in_2.
+	bit_output c1.
+	byte_output byte_out_1 byte_out_2 byte_out_3.
+	pair_output pair_1 pair_2 pair_3 pair_4.
+	RAM_internal ram ram_w.
+	addr_internal addr_1 addr_2.
+	CELL "main" [
+		re_ff clk byte_in_1 byte_out_1,
+		re_ff_en clk (byte_in_1 ~~ 0) byte_in_2 byte_out_2,
+		//pair_1 <: frombits ((tobits byte_in_1) @ (tobits (byte_in_2 '+' byte_out_2))),
+		//pair_1-->low <- byte_in_2 '+' byte_out_2,
+		pair_1 <- '0<--high ? '5 <--low ? '3,
+		pair_2-->high <- byte_out_2,
+		// Read_RAM ram addr_1 byte_out_1,
+		// Write_RAM ram addr_2 byte_in_1 ram_w
+		pair_2-->low <- '26,
+		pair_3 <- '0<--low ? '5 <--high ? '7,
+		byte_out_3 <- pair_2-->bla,
+		pair_4 <- (SX byte_in_1) '&' (ZX byte_in_2),
+		non_inlined_cell clk byte_out_2 c1
+	];
+
+let FILEPATH = DIR^"tests.v";
+
+let text_pexlif = test_cell 'clk 'byte_in_1 'byte_in_2 'c1 'byte_out_1 'byte_out_2 'byte_out_3 'pair_1 'pair_2 'pair_3 'pair_4;
+
+pexlif2verilog inline_pexlif text_pexlif FILEPATH;
+
+let result_pexlif = verilog2pexlif "" MAIN_MODULE_NAME [FILEPATH] [];
+result_pexlif;
