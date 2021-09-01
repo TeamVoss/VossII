@@ -1,0 +1,110 @@
+load (DIR^"grammar.fl");
+load (DIR^"pretty.fl");
+
+// =============================================================================
+//
+// =============================================================================
+
+let collect ds = itlist (defix <->) ds empty;
+
+let in_braces {d :: doc} = text "[" <-> d <-> text "]";
+
+let in_list {ds :: (doc list)} = collect (punctuate (text ",") ds);
+
+// -----------------------------------------------------------------------------
+
+let p_identifier (ID s) = text s;
+
+forward_declare{p_constant_expression::constant_expression->doc};
+
+let p_hierarchical_identifier (HID (NONE) i) =
+      p_identifier i
+/\  p_hierarchical_identifier (HID (SOME (j, (NONE))) i) =
+      p_identifier j <-> text "." <-> p_identifier i
+/\  p_hierarchical_identifier (HID (SOME (j, (SOME c))) i) =
+            p_identifier j
+        <-> in_braces (p_constant_expression c)
+        <-> text "."
+        <-> p_identifier i
+;
+
+let p_number (Num i) = text (int2str i);
+
+let p_unary_operator (U_pos) = text "+"
+/\  p_unary_operator (U_neg) = text "-"
+/\  p_unary_operator (U_log_neg) = text "!"
+/\  p_unary_operator (U_bit_neg) = text "~"
+/\  p_unary_operator (U_red_and) = text "&"
+/\  p_unary_operator (U_red_nand) = text "~&"
+/\  p_unary_operator (U_red_or) = text "|"
+/\  p_unary_operator (U_red_nor) = text "~|"
+/\  p_unary_operator (U_red_xor) = text "^"
+/\  p_unary_operator (U_red_xnor_l) = text "~^"
+/\  p_unary_operator (U_red_xnor_r) = text "^~"
+;
+
+let p_binary_operator (B_add) = text "+"
+/\  p_binary_operator (B_sub) = text "-"
+/\  p_binary_operator (B_mult) = text "*"
+/\  p_binary_operator (B_div) = text "/"
+/\  p_binary_operator (B_mod) = text "%"
+/\  p_binary_operator (B_log_eq) = text "=="
+/\  p_binary_operator (B_log_neq) = text "!="
+/\  p_binary_operator (B_case_eq) = text "==="
+/\  p_binary_operator (B_case_neq) = text "!=="
+/\  p_binary_operator (B_log_and) = text "&&"
+/\  p_binary_operator (B_log_or) = text "||"
+/\  p_binary_operator (B_exp) = text "**"
+/\  p_binary_operator (B_lt) = text "<"
+/\  p_binary_operator (B_lte) = text "<="
+/\  p_binary_operator (B_gt) = text ">"
+/\  p_binary_operator (B_gte) = text ">="
+/\  p_binary_operator (B_bit_and) = text "&"
+/\  p_binary_operator (B_bit_or) = text "|"
+/\  p_binary_operator (B_bit_xor) = text "^"
+/\  p_binary_operator (B_bit_eq_l) = text "^~"
+/\  p_binary_operator (B_bit_eq_r) = text "~^"
+/\  p_binary_operator (B_log_shr) = text ">>"
+/\  p_binary_operator (B_log_shl) = text "<<"
+/\  p_binary_operator (B_shr) = text ">>>"
+/\  p_binary_operator (B_shl) = text "<<<"
+;
+
+forward_declare{p_constant_range_expression::constant_range_expression->doc};
+
+letrec
+    p_net_lvalue (NLV_hier i (NONE)) = p_hierarchical_identifier i
+/\  p_net_lvalue (NLV_hier i (SOME (cs,cr))) =
+          p_hierarchical_identifier i
+      <-> collect (map (\c. in_braces (p_constant_expression c)) cs)
+      <-> in_braces (p_constant_range_expression cr)
+/\  p_net_lvalue (NLV_list ns) = in_list (map p_net_lvalue ns)
+;
+
+forward_declare{p_range_expression::range_expression->doc};
+forward_declare{p_expression::expression->doc};
+
+let p_variable_lvalue (VLV_hier i (NONE)) = p_hierarchical_identifier i
+/\  p_variable_lvalue (VLV_hier i (SOME (es,r))) =
+          p_hierarchical_identifier i
+      <-> collect (map (\e. in_braces (p_expression e)) es)
+      <-> in_braces (p_range_expression r)
+;
+
+let p_variable_assignment (Variable_assignment vlv e) =
+      p_variable_lvalue vlv <+> p_expression e
+;
+
+let p_constant_primary (CPrim_num n) = p_number n
+/\  p_constant_primary (CPrim_str s) = text s;
+;
+
+let p_constant_expression {ce :: constant_expression} = text "";
+
+let p_constant_range_expression {cr :: constant_range_expression} = text "";
+
+let p_range_expression {r :: range_expression} = text "";
+
+let p_expression {e :: expression} = text "";
+
+// =============================================================================

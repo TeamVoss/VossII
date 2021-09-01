@@ -1,0 +1,326 @@
+// =============================================================================
+// This file provides a FL version of pretty-print by J. Hughes & S. P.Jones.
+// =============================================================================
+
+new_type_abbrev str = (int)#(string->string);
+
+lettype doc =
+    Nil                   // text ""
+  | NilAbove (doc)        // text "" $$ x
+  | TxtBeside (str) (doc) // text s <> x
+  | Nest (int) (doc)      // next k x
+  | Union (doc) (doc)     // union x y
+  | Beside (doc) (bool) (doc)
+  | Above (doc) (bool) (doc)
+  | Empty                 // empty document
+  ;
+
+let is_nil (Nil) = T
+/\  is_nil _     = F
+;
+
+let indent n = implode (replicate n " ");
+
+let str s = let l = strlen s then (l, defix ^ s);
+
+// -----------------------------------------------------------------------------
+
+// Empty document.
+let empty = Nil;
+
+// Simple text.
+let text {s :: string} = let s' = str s in (TxtBeside s' Nil);
+
+// Indent document 'd' by 'k' units.
+let nest {k :: int} {d :: doc} =
+    // Checks for 'Nest's invariant that it doesn't have an 'Empty' inside it.
+    letrec
+        nest_ l (Nest i p) = let j = l + i then nest_ j p
+    /\  nest_ _ Nil        = Nil
+    /\  nest_ 0 p          = p
+    /\  nest_ l p          = Nest l p
+    in
+    k fseq nest_ k d
+;
+
+// Union (but that name it's taken).
+let join Nil _ = Nil
+/\  join p   q = Union p q
+;
+
+// Vertical composition.
+let above Nil _ q   = q
+/\  above p   _ Nil = p
+/\  above p   b q   = Above p b q
+;
+
+// Horizontal composition.
+let beside Nil _ q   = q
+/\  beside p   _ Nil = p
+/\  beside p   b q   = Beside p b q
+;
+
+// -----------------------------------------------------------------------------
+// Reduction of documents.
+
+forward_declare{reduce::doc->doc};
+
+letrec
+    besideNil _ Nil        = Nil
+/\  besideNil b (Nest _ p) = besideNil b p
+/\  besideNil b p          = b => let s = str " " then TxtBeside s p | p
+;
+
+// note: 'q' is reduced.
+letrec
+    besideReduce (Empty)          _ _ = Empty
+/\  besideReduce (Nil)            _ q = q
+/\  besideReduce (NilAbove p)     b q = let x = besideReduce p b q then NilAbove x
+/\  besideReduce (TxtBeside s p)  b q =
+      let x = is_nil p => besideNil b q | besideReduce p b q in TxtBeside s x
+/\  besideReduce (Nest i p)       b q = let x = besideReduce p b q then Nest i x
+/\  besideReduce (Union pl pr)    b q = Union (besideReduce pl b q) (besideReduce pr b q)
+/\  besideReduce (Above p b' q')  b q =
+      let x = reduce (Above p b' q') then besideReduce x b q
+/\  besideReduce (Beside p b' q') b q =
+      b' == b => let x = besideReduce q' b q then besideReduce p b' x |
+      besideReduce (reduce (Beside p b' q')) b q
+;
+
+letrec
+    aboveNil _ _ (Empty)    = Empty
+/\  aboveNil b k (Nest i q) = let j = k + i then aboveNil b j q
+/\  aboveNil b k q          =
+      // Skip newline if no overlap.
+      NOT b AND (k > 0) => let s = str (indent k) in TxtBeside s q |
+      NilAbove (nest k q)
+;
+
+letrec
+    aboveNest (Empty)         _ _ _ = Empty
+/\  aboveNest (Nil)           _ k q = nest k q
+/\  aboveNest (NilAbove p)    b k q = NilAbove (aboveNest p b k q)
+/\  aboveNest (TxtBeside (i,s) p) b k q =
+      let j = k - i then
+      let x = is_nil p => aboveNil b j q | aboveNest p b j q in
+      TxtBeside (i,s) x
+/\  aboveNest (Nest i p)      b k q = let j = k - i then Nest i (aboveNest p b j q)
+/\  aboveNest (Union pl pr)   b k q = Union (aboveNest pl b k q) (aboveNest pr b k q)
+/\  aboveNest (Above _ _ _)   _ _ _ = error "aboveNest Above"
+/\  aboveNest (Beside _ _ _)  _ _ _ = error "aboveNest Beside"
+;
+
+// note: 'q' is reduced.
+letrec
+    aboveReduce (Above  p b' q') b q = aboveReduce p b' (aboveReduce q' b q)
+/\  aboveReduce (Beside p b' q') b q = aboveNest (reduce (Beside p b' q')) b 0 (reduce q)
+/\  aboveReduce p b q                = aboveNest p b 0 (reduce q)
+;
+
+letrec
+    reduce (Beside p b q) = besideReduce p b (reduce q)
+/\  reduce (Above  p b q) = aboveReduce  p b (reduce q)
+/\  reduce p = p
+;
+
+// Above, with overlap if 'q' is indented further than 'p' is long.
+let $-$ {p :: doc} {q :: doc} = above p F q;
+infix 5 $-$;
+
+// Above, without any overlap.
+let $+$ {p :: doc} {q :: doc} = above p T q;
+infix 5 $+$;
+
+// Beside.
+let <-> {p :: doc} {q :: doc} = beside p F q;
+infix 6 <->;
+
+// Beside, but seperated by a space if neither 'p' nor 'q' is empty.
+let <+> {p :: doc} {q :: doc} = beside p T q;
+infix 6 <+>;
+
+// -----------------------------------------------------------------------------
+
+letrec
+    emptyReduce _    Nil _ q = q
+/\  emptyReduce cons p   b q = (F, (fst q => p | cons p b (snd q)))
+;
+
+letrec
+    verticalReduce (Above p b q) =
+      emptyReduce Above (snd (verticalReduce p)) b (verticalReduce q)
+/\  verticalReduce d = (F, d)
+;
+
+letrec
+    horizontalReduce (Beside p b q) =
+      emptyReduce Beside (snd (horizontalReduce p)) b (horizontalReduce q)
+/\  horizontalReduce d = (F, d)
+;
+
+letrec
+    oneLine (Empty)        = Empty
+/\  oneLine (Nil)          = Nil
+/\  oneLine (NilAbove _)   = Empty
+/\  oneLine (Nest k p)     = Nest k (oneLine p)
+/\  oneLine (Union p _)    = oneLine p
+/\  oneLine (Beside _ _ _) = error "oneLine Beside"
+/\  oneLine (Above _ _ _)  = error "oneLine Above"
+;
+
+forward_declare{sepSpace::bool->(doc list)->doc};
+forward_declare{sepLine::bool->doc->int->(doc list)->doc};
+forward_declare{hsep::(doc list)->doc};
+forward_declare{hcat::(doc list)->doc};
+forward_declare{vcat::(doc list)->doc};
+
+letrec
+    sepNB b (Nest _ p) k ds = sepNB b p k ds
+/\  sepNB b (Nil)      k ds =
+      let x = b => hsep ds | hcat ds in
+      let y = oneLine (besideNil b (reduce x)) in
+      let z = aboveNil F k (reduce (vcat ds)) in
+      join y z
+/\  sepNB b p k ds = sepLine b p k ds
+;
+
+letrec
+    sepLine _ (Empty)       _ _  = Empty
+/\  sepLine b (Nil)         k ds = nest k (sepSpace b ds)
+/\  sepLine _ (NilAbove p)  k ds =
+      NilAbove (aboveNest p F k (reduce (vcat ds)))
+/\  sepLine b (TxtBeside (i,s) p) k ds =
+      let j = k - i then TxtBeside (i,s) (sepNB b p j ds)
+/\  sepLine b (Nest n p)    k ds =
+      let j = k - n then Nest n (sepLine b p j ds)
+/\  sepLine b (Union pl pr) k ds =
+      Union (sepLine b pl k ds) (aboveNest pr F k (reduce (vcat ds)))
+/\  sepLine _ (Beside _ _ _) _ _ = error "sepLine Beside"
+/\  sepLine _ (Above _ _ _)  _ _ = error "sepLine Above"
+;
+
+let sepSpace _ []     = empty
+/\  sepSpace b (d:ds) = sepLine b (reduce d) 0 ds
+;
+
+let sep = sepSpace T; // Seperate with spaces.
+let cat = sepSpace F; // .. without spaces.
+
+let hsep {ds :: doc list} =
+  snd (horizontalReduce (itlist (\p. \q. Beside p T q) ds empty))
+;
+
+let hcat {ds :: doc list} =
+  snd (horizontalReduce (itlist (\p. \q. Beside p F q) ds empty))
+;
+
+let vcat {ds :: doc list} =
+  snd (verticalReduce (itlist (\p. \q. Above p F q) ds empty))
+;
+
+let hang {p :: doc} {k :: int} {q :: doc} = sep [p, nest k q];
+
+let punctuate _ []     = []
+/\  punctuate p (d:ds) =
+      letrec
+          go x []     = [x]
+      /\  go x (y:ys) = (y <-> p) : go y ys
+      in
+      go d ds
+;
+
+// -----------------------------------------------------------------------------
+
+let fits {m :: int} {d :: doc} =
+      letrec
+          go _ (Empty)             = F
+      /\  go _ (Nil)               = T
+      /\  go _ (NilAbove _)        = T
+      /\  go n (TxtBeside (i,_) p) = let j = n - i then go j p
+      /\  go _ (Nest _ _)          = error "fits Nest"
+      /\  go _ (Union _ _)         = error "fits Union"
+      /\  go _ (Beside _ _ _)      = error "fits Beside"
+      /\  go _ (Above _ _ _)       = error "fits Above"
+      in
+      m < 0 => F | go m d
+;
+
+let nicestL {w :: int} {r :: int} {l :: int} {p :: doc} {q :: doc} =
+      let m = (min w r) - l then
+      fits m p => p | q
+;
+
+let nicest {w :: int} {r :: int} {p :: doc} {q :: doc} = nicestL w r 0 p q;
+
+forward_declare{nice::int->int->doc->doc};
+
+let niceL {w0 :: int} {r0 :: int} {i :: int} {d :: doc} =
+      letrec
+          go _ _ (Empty)             = Empty
+      /\  go _ _ (Nil)               = Nil
+      /\  go w l (NilAbove q)        = let j = w - l then NilAbove (nice j r0 q)
+      /\  go w l (TxtBeside (i,s) q) = let j = l - i then TxtBeside (i,s) (go w j q)
+      /\  go w l (Nest _ q)          = go w l q
+      /\  go w l (Union ql qr)       = nicestL w r0 l (go w l ql) (go w l qr)
+      /\  go w l (Beside _ _ _)      = error "niceL Beside"
+      /\  go w l (Above _ _ _)       = error "niceL Above"
+      in
+      go w0 i d
+;
+
+let nice {w0 :: int} {r0 :: int} {d :: doc} =
+      letrec
+          go _ (Empty)             = Empty
+      /\  go _ (Nil)               = Nil
+      /\  go w (NilAbove q)        = NilAbove (go w q)
+      /\  go w (TxtBeside (i,s) q) = TxtBeside (i,s) (niceL w r0 i q)
+      /\  go w (Nest i q)          = let j = w - i then Nest i (go j q)
+      /\  go w (Union ql qr)       = nicest w r0 (go w ql) (go w qr)
+      /\  go w (Beside _ _ _)      = error "nice Beside"
+      /\  go w (Above _ _ _)       = error "nice Above"
+      in
+      go w0 d
+;
+
+let best {w0 :: int} {r0 :: int} {d :: doc} = nice w0 r0 d;
+
+// -----------------------------------------------------------------------------
+
+let newline = "\n";
+
+forward_declare{lay::int->string->doc->string};
+
+let layL {k :: int} {end :: string} {d :: doc} =
+    letrec
+        go _ (Empty)             = error "layL Empty"
+    /\  go _ (Nil)               = end
+    /\  go k (NilAbove p)        = newline ^ lay k end p
+    /\  go k (TxtBeside (i,s) p) = let j = k + i then (s "") ^ go j p
+    /\  go k (Nest _ p)          = go k p
+    /\  go _ (Union _ _)         = error "layL Union"
+    /\  go _ (Beside _ _ _)      = error "layL Beside"
+    /\  go _ (Above _ _ _)       = error "layL Above"
+    in
+    go k d
+;
+
+let lay {k :: int} {end :: string} {d :: doc} =
+      letrec
+          go _ (Empty)             = error "lay Empty"
+      /\  go _ (Nil)               = end
+      /\  go k (NilAbove p)        = newline ^ go k p
+      /\  go k (TxtBeside (i,s) p) =
+            let j = k + i then indent k ^ (s "") ^ layL j end p
+      /\  go k (Nest i p)          = let j = k + i then go j p
+      /\  go _ (Union _ _)         = error "lay Union"
+      /\  go _ (Beside _ _ _)      = error "lay Beside"
+      /\  go _ (Above _ _ _)       = error "lay Above"
+      in
+      go k d
+;
+
+let display {l :: int} {r :: int} {end :: string} {d :: doc} = lay 0 end (reduce d);
+
+let render {d :: doc} = display 100 67 "" d; // 67 = round (100/1.5)
+
+// =============================================================================
