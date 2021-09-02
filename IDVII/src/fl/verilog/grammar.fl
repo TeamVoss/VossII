@@ -99,9 +99,9 @@ lettype primary =
 
 // constant_expression ::=
 //     constant_primary
-//   | unary_operator { attribute_instance } constant_primary
-//   | constant_expression binary_operator { attribute_instance } constant_expression
-//   | constant_expression ? { attribute_instance } constant_expression : constant_expression
+//   | unary_operator constant_primary
+//   | constant_expression binary_operator constant_expression
+//   | constant_expression ? constant_expression : constant_expression
 // dimension_constant_expression ::= constant_expression
 // msb_constant_expression ::= constant_expression
 // lsb_constant_expression ::= constant_expression
@@ -109,10 +109,14 @@ lettype constant_expression =
     CExp_primary (constant_primary)
   | CExp_unary (unary_operator) (constant_primary)
   | CExp_binary (constant_expression) (binary_operator) (constant_expression)
-  | CExp_conditional (constant_expression) (constant_expression) (constant_expression);
+  | CExp_conditional (constant_expression)
+                     (constant_expression)
+                     (constant_expression);
 
 // See A.9.3.
-lettype hierarchical_identifier = HID ({(identifier)#({constant_expression} opt)} opt) (identifier);
+lettype hierarchical_identifier =
+    HID ({(identifier)#({constant_expression} opt)} opt) (identifier)
+;
 
 // constant_range_expression ::=
 //     constant_expression
@@ -121,14 +125,14 @@ lettype hierarchical_identifier = HID ({(identifier)#({constant_expression} opt)
 //   | constant_base_expression -: width_constant_expression
 lettype constant_range_expression =
     CRange_value (constant_expression)
-  | CRange_range (constant_expression) (constant_expression);
+  | CRange_m2l (constant_expression) (constant_expression);
 
 // expression ::=
 //     primary
-//   | unary_operator { attribute_instance } primary
-//   | expression binary_operator { attribute_instance } expression
+//   | unary_operator primary
+//   | expression binary_operator expression
 //   | conditional_expression
-// conditional_expression ::= expression1 ? { attribute_instance } expression2 : expression3
+// conditional_expression ::= expression1 ? expression2 : expression3
 // expression1 ::= expression
 // expression2 ::= expression
 // expression3 ::= expression
@@ -149,11 +153,15 @@ lettype range_expression =
 
 // See A.8.5 Expression left-side values.
 lettype net_lvalue =
-    NLV_hier (hierarchical_identifier) ({(constant_expression list)#(constant_range_expression)} opt)
+    NLV_hier (hierarchical_identifier)
+             ({(constant_expression list)#(constant_range_expression)} opt)
   | NLV_list (net_lvalue list);
+
 lettype variable_lvalue =
-    VLV_hier (hierarchical_identifier) ({(expression list)#(range_expression)} opt)
+    VLV_hier (hierarchical_identifier)
+             ({(expression list)#(range_expression)} opt)
   | VLV_list (variable_lvalue list);
+
 lettype variable_assignment =
     Variable_assignment (variable_lvalue) (expression);
 
@@ -194,7 +202,7 @@ lettype variable_assignment =
 // note: Moved to 'statement' (A.6.4).
 
 // conditional_statement ::=
-//     "if" ( expression ) statement_or_null [ "else" statement_or_null ]
+//     "if(" expression ")" statement_or_null [ "else" statement_or_null ]
 //   | if_else_if_statement
 // note: Moved to 'statement' (A.6.4).
 
@@ -219,7 +227,7 @@ lettype event_expression =
 //   | "@*"
 //   | "@(*)"
 lettype event_control =
-    Event_control_hier
+    Event_control_hier (hierarchical_identifier)
   | Event_control_exp (event_expression)
   | Event_star
   | Event_pstar;
@@ -254,20 +262,21 @@ lettype statement =
     Statement_null
   | Statement_timing (procedural_timing_control_statement)
   | Statement_if (if_else_if_statement)
-  | Statement_cont (conditional_statement)
+  | Statement_cond (conditional_statement)
   | Statement_loop (loop_statement)
 andlettype procedural_timing_control_statement =
     PTC (procedural_timing_control) (statement)
 andlettype if_else_if_statement =
-    IEI (cstatement) (cstatement list) ({cstatement} opt)
+    IEI (cstatement) (cstatement list) ({statement} opt)
 andlettype conditional_statement =
-    COND_if_else (cstatement) ({cstatement} opt)
+    COND_if_else (cstatement) ({statement} opt)
   | COND_if_else_if (if_else_if_statement)
 andlettype loop_statement =
     LOOP_forever (statement)
   | LOOP_repeat (expression) (statement)
   | LOOP_while (expression) (statement)
-  | LOOP_for (expression) (statement);
+  | LOOP_for (variable_assignment) (expression) (variable_assignment) (statement)
+;
 
 // A.6.3 Parallel and sequential blocks ----------------------------------------
 // A.6.2 Procedural blocks and assignments -------------------------------------
@@ -294,7 +303,13 @@ lettype continuous_assign = Cont_assign (((net_lvalue)#(expression)) list);
 // udp_instantiation ::= udp_identifier [ drive_strength ] [ delay2 ] udp_instance { "," udp_instance } ";"
 // udp_instance ::= [ name_of_udp_instance ] "(" output_terminal , input_terminal { "," input_terminal } ")"
 // name_of_udp_instance ::= udp_instance_identifier [ range ]
-lettype udp_instantiation = UDP_inst (identifier) (((identifier)#({range} opt)#(net_lvalue)#(expression list)) list);
+lettype udp_instantiation =
+    UDP_inst (identifier)
+             (( ({(identifier)#({range} opt)} opt)
+               #(net_lvalue)
+               #(expression list)
+              ) list)
+;
 
 // A.5.3 UDP body --------------------------------------------------------------
 // A.5.2 UDP ports -------------------------------------------------------------
@@ -318,10 +333,14 @@ lettype port_connection =
 
 // module_instance ::= name_of_module_instance "(" [ list_of_port_connections ] ")"
 // name_of_module_instance ::= module_instance_identifier [ range ]
-lettype module_instance = Module_instance (identifier) ({range} opt) ({port_connection list} opt);
+lettype module_instance =
+    Module_instance (identifier) ({range} opt) ({port_connection list} opt)
+;
 
-// module_instantiation ::= module_identifier [ parameter_value_assignment ] module_instance { "," module_instance } ;
-lettype module_instantiation = Module_instantiation (identifier) (module_instance list);
+// module_instantiation ::= module_identifier module_instance { "," module_instance } ;
+lettype module_instantiation =
+    Module_instantiation (identifier) (module_instance list)
+;
 
 // =============================================================================
 // A.4 Module instantiation and generate construct
@@ -357,6 +376,10 @@ lettype range = Range (constant_expression) (constant_expression);
 lettype net_decl_assignment = NDA (identifier) (expression);
 
 // A.2.3 Declaration lists -----------------------------------------------------
+
+// list_of_variable_port_identifiers ::= port_identifier [ = constant_expression ] { , port_identifier [ = constant_expression ] }
+lettype variable_port_identifier = VPI (identifier) ({constant_expression} opt);
+
 // A.2.2.3 Delays --------------------------------------------------------------
 
 // delay3 ::= "#" delay_value | "#(" mintypmax_expression [ , mintypmax_expression [ , mintypmax_expression ] ] ")"
@@ -366,12 +389,12 @@ lettype net_decl_assignment = NDA (identifier) (expression);
 // A.2.2.2 Strengths -----------------------------------------------------------
 
 // drive_strength ::=
-//     ( strength0 , strength1 )
-//   | ( strength1 , strength0 )
-//   | ( strength0 , "highz1" )
-//   | ( strength1 , "highz0" )
-//   | ( "highz0" , strength1 )
-//   | ( "highz1" , strength0 )
+//     "(" strength0 "," strength1 ")"
+//   | "(" strength1 "," strength0 ")"
+//   | "(" strength0 "," "highz1"  ")"
+//   | "(" strength1 "," "highz0"  ")"
+//   | "(" "highz0"  "," strength1 ")"
+//   | "(" "highz1"  "," strength0 ")"
 // strength0 ::= "supply0" | "strong0" | "pull0" | "weak0"
 // strength1 ::= "supply1" | "strong1" | "pull1" | "weak1"
 // charge_strength ::= "( small )" | "( medium )" | "( large )"
@@ -380,39 +403,47 @@ lettype net_decl_assignment = NDA (identifier) (expression);
 
 // variable_type ::=
 //     variable_identifier { dimension }
-//   | variable_identifier = constant_expression
+//   | variable_identifier "=" constant_expression
 lettype variable_type =
     VT_dim (identifier) (dimension list)
   | VT_const (identifier) (constant_expression);
 
+// output_variable_type ::= "integer" | "time"
+lettype output_variable_type =
+    OVT_int
+  | OVT_time
+;
+
 // A.2.2 Declaration data types ------------------------------------------------
 
-// net_type ::= supply0 | supply1 | tri | triand | trior | tri0 | tri1 | uwire | wire | wand | wor
+// net_type ::=
+//     "supply0" | "supply1" | "tri" | "triand" | "trior" | "tri0"
+//   | "tri1" | "uwire" | "wire" | "wand" | "wor"
 lettype net_type = NT_wire;
 
 // A.2.1.3 Type declarations ---------------------------------------------------
 
-// list_of_net_identifiers ::= net_identifier { dimension } { , net_identifier { dimension } }
+// list_of_net_identifiers ::= net_identifier { dimension } { "," net_identifier { dimension } }
 lettype net_identifier = Net_id (identifier) (dimension list);
 
 // net_declaration ::=
-//     net_type [ "signed" ] [ delay3 ] list_of_net_identifiers ;
-//   | net_type [ "drive_strength" ] [ "signed" ] [ delay3 ] list_of_net_decl_assignments ;
-//   | net_type [ "vectored" | "scalared" ] [ "signed" ] range [ delay3 ] list_of_net_identifiers ;
-//   | net_type [ drive_strength ] [ "vectored" | "scalared" ] [ "signed" ] range [ delay3 ] list_of_net_decl_assignments ;
-//   | trireg [ charge_strength ] [ "signed" ] [ delay3 ] list_of_net_identifiers ;
-//   | trireg [ drive_strength ] [ "signed" ] [ delay3 ] list_of_net_decl_assignments ;
-//   | trireg [ charge_strength ] [ "vectored" | "scalared" ] [ "signed" ] range [ delay3 ] list_of_net_identifiers ;
-//   | trireg [ drive_strength ] [ "vectored" | "scalared" ] [ "signed" ] range [ delay3 ] list_of_net_decl_assignments ;
-// list_of_net_decl_assignments ::= net_decl_assignment { , net_decl_assignment }
+//     net_type [ "signed" ] [ delay3 ] list_of_net_identifiers ";"
+//   | net_type [ "drive_strength" ] [ "signed" ] [ delay3 ] list_of_net_decl_assignments ";"
+//   | net_type [ "vectored" | "scalared" ] [ "signed" ] range [ delay3 ] list_of_net_identifiers ";"
+//   | net_type [ drive_strength ] [ "vectored" | "scalared" ] [ "signed" ] range [ delay3 ] list_of_net_decl_assignments ";"
+//   | "trireg" [ charge_strength ] [ "signed" ] [ delay3 ] list_of_net_identifiers ";"
+//   | "trireg" [ drive_strength ] [ "signed" ] [ delay3 ] list_of_net_decl_assignments ";"
+//   | "trireg" [ charge_strength ] [ "vectored" | "scalared" ] [ "signed" ] range [ delay3 ] list_of_net_identifiers ;
+//   | "trireg" [ drive_strength ] [ "vectored" | "scalared" ] [ "signed" ] range [ delay3 ] list_of_net_decl_assignments ";"
+// list_of_net_decl_assignments ::= net_decl_assignment { "," net_decl_assignment }
 lettype net_declaration =
     ND_scalar_id (net_type) (bool) (net_identifier list)
   | ND_scalar_decl (net_type) (bool) (net_decl_assignment list)
   | ND_vector_id (net_type) (bool) (bool) (range) (net_identifier list)
   | ND_vector_decl (net_type) (bool) (bool) (range) (net_decl_assignment list);
 
-// reg_declaration ::= "reg" [ "signed" ] [ range ] list_of_variable_identifiers ;
-// list_of_variable_identifiers ::= variable_type { , variable_type }
+// reg_declaration ::= "reg" [ "signed" ] [ range ] list_of_variable_identifiers ";"
+// list_of_variable_identifiers ::= variable_type { "," variable_type }
 lettype reg_declaration = Reg_decl (bool) ({range} opt) (variable_type list);
 
 // real_declaration ::= "real" list_of_real_identifiers ;
@@ -425,16 +456,24 @@ lettype integer_declaration = Int_decl (variable_type list);
 
 // inout_declaration ::= "inout" [ net_type ] [ "signed" ] [ range ] list_of_port_identifiers
 // list_of_port_identifiers ::= port_identifier { "," port_identifier }
-lettype inout_declaration = Inout_decl (bool) ({range} opt) (identifier list);
+lettype inout_declaration =
+    Inout_decl ({net_type} opt) (bool) ({range} opt) (identifier list)
+;
 
-// input_declaration ::= "input" [ net_type ] [ "signed" ] [ "range" ] list_of_port_identifiers
-lettype input_declaration = Input_decl (bool) ({range} opt) (identifier list);
+// input_declaration ::= "input" [ net_type ] [ "signed" ] [ range ] list_of_port_identifiers
+lettype input_declaration =
+    Input_decl ({net_type} opt) (bool) ({range} opt) (identifier list)
+;
 
 // output_declaration ::=
 //     "output" [ net_type ] [ "signed" ] [ range ] list_of_port_identifiers
 //   | "output" "reg" [ "signed" ] [ range ] list_of_variable_port_identifiers
 //   | "output" output_variable_type list_of_variable_port_identifiers
-lettype output_declaration = Output_decl (bool) ({range} opt) (identifier list);
+lettype output_declaration =
+    Output_decl_port ({net_type} opt) (bool) ({range} opt) (identifier list)
+  | Output_decl_reg (bool) ({range} opt) (variable_port_identifier list)
+  | Output_decl_var (output_variable_type) (variable_port_identifier list)
+;
 
 // A.2.1.1 Module parameter declarations ---------------------------------------
 // A.2.1 Declaration types -----------------------------------------------------
@@ -504,13 +543,21 @@ lettype module_item =
 // A.1.3 Module parameters and ports -------------------------------------------
 
 // port_reference ::= port_identifier [ "[" constant_range_expression "]" ]
-lettype port_reference = Port_ref_id (identifier) ({constant_range_expression} opt);
+lettype port_reference =
+    Port_ref_id (identifier) ({constant_range_expression} opt)
+;
 
 // port_expression ::= port_reference | "{" port_reference { "," port_reference } "}"
-lettype port_expression = Port_exp_one (port_reference) | Port_exp_many (port_reference list);
+lettype port_expression =
+    Port_exp_one (port_reference)
+  | Port_exp_many (port_reference list)
+;
 
 // port ::= [ port_expression ] | "." port_identifier "(" [ port_expression ] ")"
-lettype port = Port_exp ({port_expression} opt) | Port_ref (identifier) ({port_expression} opt);
+lettype port =
+    Port_exp ({port_expression} opt)
+  | Port_ref (identifier) ({port_expression} opt)
+;
 
 // port_declaration ::= inout_declaration | input_declaration | output_declaration
 lettype port_declaration =
