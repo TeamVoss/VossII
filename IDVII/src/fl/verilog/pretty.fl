@@ -74,7 +74,6 @@ let beside Nil _ q   = q
 // -----------------------------------------------------------------------------
 // Reduction of documents.
 
-// ok
 letrec
     besideNil _ Nil        = Nil
 /\  besideNil b (Nest _ p) = besideNil b p
@@ -82,7 +81,6 @@ letrec
 /\  besideNil F p          = p
 ;
 
-// ok
 letrec
     besideRed (Empty)          _ _ = Empty
 /\  besideRed (Nil)            _ q = q
@@ -102,7 +100,6 @@ letrec
       besideRed (reduce (Beside p b' q')) b q
 ;
 
-// ok
 letrec
     aboveNil _ _ (Nil)      = Nil
 /\  aboveNil b k (Nest i q) = let j = k + i then aboveNil b j q
@@ -112,7 +109,6 @@ letrec
       NilAbove (nest k q)
 ;
 
-// ok
 letrec
     aboveNest (Empty)         _ _ _ = Empty
 /\  aboveNest (Nil)           _ k q = nest k q
@@ -129,7 +125,6 @@ letrec
 /\  aboveNest (Beside _ _ _)  _ _ _ = error "aboveNest Beside"
 ;
 
-// ok
 letrec
     aboveRed (Above  p b' q') b q =
       aboveRed p b' (aboveRed q' b q)
@@ -138,7 +133,6 @@ letrec
 /\  aboveRed p b q = aboveNest p b 0 (reduce q)
 ;
 
-// ok
 //  reduce::doc->rdoc
 letrec
     reduce (Beside p b q) = besideRed p b (reduce q)
@@ -164,27 +158,23 @@ infix 6 <+>;
 
 // -----------------------------------------------------------------------------
 
-// ok
 letrec
     emptyReduce _    (Nil) _ q = q
 /\  emptyReduce cons p     b q = (F, (fst q => p | cons p b (snd q)))
 ;
 
-// ok
 letrec
     verticalReduce (Above p b q) =
       emptyReduce Above (snd (verticalReduce p)) b (verticalReduce q)
 /\  verticalReduce d = (F, d)
 ;
 
-// ok
 letrec
     horizontalReduce (Beside p b q) =
       emptyReduce Beside (snd (horizontalReduce p)) b (horizontalReduce q)
 /\  horizontalReduce d = (F, d)
 ;
 
-// ok
 letrec
     oneLine (Empty)         = Empty
 /\  oneLine (Nil)           = Nil
@@ -202,7 +192,6 @@ forward_declare{hsep::(doc list)->doc};
 forward_declare{hcat::(doc list)->doc};
 forward_declare{vcat::(doc list)->doc};
 
-// ok
 letrec
     sepNB b (Nest _ p) k ds = sepNB b p k ds
 /\  sepNB b (Nil)      k ds =
@@ -213,7 +202,6 @@ letrec
 /\  sepNB b p k ds = sepLine b p k ds
 ;
 
-// ok
 letrec
     sepLine _ (Empty)       _ _  = Empty
 /\  sepLine b (Nil)         k ds = nest k (sepSpace b ds)
@@ -229,45 +217,38 @@ letrec
 /\  sepLine _ (Above _ _ _)  _ _ = error "sepLine Above"
 ;
 
-// ok
 let sepSpace _ []     = empty
 /\  sepSpace b (d:ds) = sepLine b (reduce d) 0 ds
 ;
 
-// ok.
 let sep = sepSpace T; // Seperate with spaces.
 let cat = sepSpace F; // .. without spaces.
 
-// ok
 let hsep {ds :: doc list} =
   snd (horizontalReduce (itlist (\p. \q. Beside p T q) ds empty))
 ;
 
-// ok
 let hcat {ds :: doc list} =
   snd (horizontalReduce (itlist (\p. \q. Beside p F q) ds empty))
 ;
 
-// ok
 let vcat {ds :: doc list} =
   snd (verticalReduce (itlist (\p. \q. Above p F q) ds empty))
 ;
 
-// ok
 let hang {p :: doc} {k :: int} {q :: doc} = sep [p, nest k q];
 
 let punctuate _ []     = []
 /\  punctuate p (d:ds) =
       letrec
           go x []     = [x]
-      /\  go x (y:ys) = (y <-> p) : go y ys
+      /\  go x (y:ys) = (x <-> p) : go y ys
       in
       go d ds
 ;
 
 // -----------------------------------------------------------------------------
 
-// ok
 letrec
     fits {m :: int} {d :: doc} =
       let
@@ -283,17 +264,14 @@ letrec
       m < 0 => F | go m d
 ;
 
-// ok
 let nicestL {w :: int} {r :: int} {l :: int} {p :: doc} {q :: doc} =
       let m = (min w r) - l then fits m p => p | q
 ;
 
-// ok
 let nicest {w :: int} {r :: int} {p :: doc} {q :: doc} = nicestL w r 0 p q;
 
 forward_declare{nice::int->int->doc->doc};
 
-// ok
 let niceL {w0 :: int} {r0 :: int} {i :: int} {d :: doc} =
       letrec
           go _ _ (Empty)             = Empty
@@ -310,7 +288,6 @@ let niceL {w0 :: int} {r0 :: int} {i :: int} {d :: doc} =
       go w0 i d
 ;
 
-// ok
 let nice {w0 :: int} {r0 :: int} {d :: doc} =
       letrec
           go _ (Empty)             = Empty
@@ -325,7 +302,6 @@ let nice {w0 :: int} {r0 :: int} {d :: doc} =
       go w0 d
 ;
 
-// ok
 let best {w0 :: int} {r0 :: int} {d :: doc} = nice w0 r0 d;
 
 // -----------------------------------------------------------------------------
@@ -334,7 +310,6 @@ let newline = "\n";
 
 forward_declare{lay::int->string->doc->string};
 
-// ok
 let layL {k :: int} {end :: string} {d :: doc} =
     letrec
         go _ (Empty)             = error "layL Empty"
@@ -349,7 +324,6 @@ let layL {k :: int} {end :: string} {d :: doc} =
     go k d
 ;
 
-// ok
 let lay {k :: int} {end :: string} {d :: doc} =
       letrec
           go _ (Empty)             = error "lay Empty"
@@ -365,12 +339,10 @@ let lay {k :: int} {end :: string} {d :: doc} =
       go k d
 ;
 
-// ok
 let display {l :: int} {r :: int} {end :: string} {d :: doc} =
       lay 0 end (best l r (reduce d))
 ;
 
-// ok
 let render {d :: doc} = display 100 67 "" d; // 67 = round (100/1.5)
 
 // =============================================================================

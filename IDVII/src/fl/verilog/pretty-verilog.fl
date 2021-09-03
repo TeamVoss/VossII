@@ -21,7 +21,7 @@ let in_paren {d :: doc} = is_nil d => d | text "(" <-> d <-> text ")";
 
 let in_list {ds :: (doc list)} = collect (punctuate (text ", ") ds);
 
-let in_vert_list {ds :: (doc list)} = vcat (punctuate (text ", ") ds);
+let in_vert_list {ds :: (doc list)} = vcat (punctuate (text ",") ds);
 
 // -----------------------------------------------------------------------------
 
@@ -386,11 +386,6 @@ let p_output_declaration (Output_decl_port t' s r' is) =
       <+> in_list (map p_variable_port_identifier vs)
 ;
 
-let p_port_declaration (Port_inout d) = p_inout_declaration d
-/\  p_port_declaration (Port_in d) = p_input_declaration d
-/\  p_port_declaration (Port_out d) = p_output_declaration d
-;
-
 let p_module_or_generate_item_declaration (MOGID_net d) = p_net_declaration d
 /\  p_module_or_generate_item_declaration (MOGID_reg d) = p_reg_declaration d
 ;
@@ -405,6 +400,8 @@ let p_module_or_generate_item (MOGI_decl d) =
 ;
 
 let p_non_port_module_item (NPM_Item i) = p_module_or_generate_item i;
+
+forward_declare{p_port_declaration::port_declaration->doc};
 
 let p_module_item (Module_Port d) = p_port_declaration d <+> text ";"
 /\  p_module_item (Module_Item i) = p_non_port_module_item i

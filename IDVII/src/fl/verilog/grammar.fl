@@ -508,13 +508,6 @@ lettype output_declaration =
 // A.1.5 Configuration source text ---------------------------------------------
 // A.1.4 Module items ----------------------------------------------------------
 
-// port_declaration ::= inout_declaration | input_declaration | output_declaration
-lettype port_declaration =
-    Port_inout (inout_declaration)
-  | Port_in (input_declaration)
-  | Port_out (output_declaration)
-;
-
 // module_or_generate_item_declaration ::=
 //     net_declaration
 //   | reg_declaration
