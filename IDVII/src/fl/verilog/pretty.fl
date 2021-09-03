@@ -32,7 +32,7 @@ let is_nil (Nil) = T
 
 // -----------------------------------------------------------------------------
 
-// The argument to any Doc constructor should be reduced.
+// The argument to any non-reducible 'Doc' constructor should be reduced.
 forward_declare{reduce::doc->rdoc};
 
 // Empty document.
@@ -54,18 +54,18 @@ let nest {k :: int} {d :: doc} =
     k fseq nest_ k (reduce d)
 ;
 
-// Union (but that name it's taken).
+// Union (but that name it's taken) that checks for empty doc.
 let join Nil _ = Nil
 /\  join p   q = Union p q
 ;
 
-// Vertical composition.
+// Vertical composition that checks for empty doc.
 let above Nil _ q   = q
 /\  above p   _ Nil = p
 /\  above p   b q   = Above p b q
 ;
 
-// Horizontal composition.
+// Horizontal composition that checks for empty doc.
 let beside Nil _ q   = q
 /\  beside p   _ Nil = p
 /\  beside p   b q   = Beside p b q
@@ -74,21 +74,27 @@ let beside Nil _ q   = q
 // -----------------------------------------------------------------------------
 // Reduction of documents.
 
+// ok
 letrec
     besideNil _ Nil        = Nil
 /\  besideNil b (Nest _ p) = besideNil b p
-/\  besideNil b p          = b => let s = str " " then TxtBeside s p | p
+/\  besideNil T p          = let s = str " " then TxtBeside s p
+/\  besideNil F p          = p
 ;
 
-// note: 'q' is reduced.
+// ok
 letrec
     besideRed (Empty)          _ _ = Empty
 /\  besideRed (Nil)            _ q = q
-/\  besideRed (NilAbove p)     b q = let x = besideRed p b q then NilAbove x
+/\  besideRed (NilAbove p)     b q =
+      let x = besideRed p b q then NilAbove x
 /\  besideRed (TxtBeside s p)  b q =
-      let x = is_nil p => besideNil b q | besideRed p b q in TxtBeside s x
-/\  besideRed (Nest i p)       b q = let x = besideRed p b q then Nest i x
-/\  besideRed (Union pl pr)    b q = Union (besideRed pl b q) (besideRed pr b q)
+      let x = is_nil p => besideNil b q | besideRed p b q then
+      TxtBeside s x
+/\  besideRed (Nest i p)       b q =
+      let x = besideRed p b q then Nest i x
+/\  besideRed (Union pl pr)    b q =
+      Union (besideRed pl b q) (besideRed pr b q)
 /\  besideRed (Above p b' q')  b q =
       let x = reduce (Above p b' q') then besideRed x b q
 /\  besideRed (Beside p b' q') b q =
@@ -232,18 +238,22 @@ let sepSpace _ []     = empty
 let sep = sepSpace T; // Seperate with spaces.
 let cat = sepSpace F; // .. without spaces.
 
+// ok
 let hsep {ds :: doc list} =
   snd (horizontalReduce (itlist (\p. \q. Beside p T q) ds empty))
 ;
 
+// ok
 let hcat {ds :: doc list} =
   snd (horizontalReduce (itlist (\p. \q. Beside p F q) ds empty))
 ;
 
+// ok
 let vcat {ds :: doc list} =
   snd (verticalReduce (itlist (\p. \q. Above p F q) ds empty))
 ;
 
+// ok
 let hang {p :: doc} {k :: int} {q :: doc} = sep [p, nest k q];
 
 let punctuate _ []     = []
@@ -324,12 +334,13 @@ let newline = "\n";
 
 forward_declare{lay::int->string->doc->string};
 
+// ok
 let layL {k :: int} {end :: string} {d :: doc} =
     letrec
         go _ (Empty)             = error "layL Empty"
     /\  go _ (Nil)               = end
     /\  go k (NilAbove p)        = newline ^ lay k end p
-    /\  go k (TxtBeside (i,s) p) = let j = k + i then (s "") ^ go j p
+    /\  go k (TxtBeside (i,s) p) = let j = k + i then s (go j p)
     /\  go k (Nest _ p)          = go k p
     /\  go _ (Union _ _)         = error "layL Union"
     /\  go _ (Beside _ _ _)      = error "layL Beside"
@@ -338,13 +349,14 @@ let layL {k :: int} {end :: string} {d :: doc} =
     go k d
 ;
 
+// ok
 let lay {k :: int} {end :: string} {d :: doc} =
       letrec
           go _ (Empty)             = error "lay Empty"
       /\  go _ (Nil)               = end
       /\  go k (NilAbove p)        = newline ^ go k p
       /\  go k (TxtBeside (i,s) p) =
-            let j = k + i then indent k ^ (s "") ^ layL j end p
+            let j = k + i then indent k ^ s (layL j end p)
       /\  go k (Nest i p)          = let j = k + i then go j p
       /\  go _ (Union _ _)         = error "lay Union"
       /\  go _ (Beside _ _ _)      = error "lay Beside"
@@ -353,8 +365,12 @@ let lay {k :: int} {end :: string} {d :: doc} =
       go k d
 ;
 
-let display {l :: int} {r :: int} {end :: string} {d :: doc} = lay 0 end (reduce d);
+// ok
+let display {l :: int} {r :: int} {end :: string} {d :: doc} =
+      lay 0 end (best l r (reduce d))
+;
 
+// ok
 let render {d :: doc} = display 100 67 "" d; // 67 = round (100/1.5)
 
 // =============================================================================
