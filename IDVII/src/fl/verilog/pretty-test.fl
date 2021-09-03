@@ -6,7 +6,7 @@ load (DIR^"pretty-verilog.fl");
 // =============================================================================
 
 let doc1 =
-  Source_text [Desc_module (Module_declaration_many (ID "test")
+  Source_text [Desc_module (Module_declaration_many (ID "test1")
     (SOME [ Port_decl_in  (Input_decl NONE F NONE [ID "a", ID "b"])
           , Port_decl_out (Output_decl_port NONE F NONE [ID "c"])
           ])
@@ -17,14 +17,40 @@ let doc1 =
               (B_add)
               (Exp_primary (Prim_hier (HID NONE (ID "b")) NONE))
           )
-        ]
-    ))]
-  )]
-;
-
-// -----------------------------------------------------------------------------
+        ]))
+    ]
+)];
 
 let ex1 = p_source_text doc1;
 render ex1;
+
+// -----------------------------------------------------------------------------
+
+let doc2 =
+  Source_text [Desc_module (Module_declaration_many (ID "test2")
+    (SOME [ Port_decl_in  (Input_decl NONE F NONE [ID "a", ID "b"])
+          , Port_decl_out (Output_decl_port NONE F NONE [ID "c"])
+          ])
+    [ NPM_Item (MOGI_always (Always
+        (Statement_timing (PTC
+          (PTC_event (Event_control_exp (Event_pos
+            (Exp_primary (Prim_hier (HID NONE (ID "a")) NONE)))))
+          (Statement_if (IEI
+            ( Exp_unary (U_log_neg) (Prim_hier (HID NONE (ID "b")) NONE)
+            , (Statement_nonblocking (Nonblocking_assignment
+              (VLV_hier (HID NONE (ID "c")) NONE)
+              (NONE)
+              (Exp_primary (Prim_num (Num 1)))))
+            )
+            []
+            (SOME (Statement_nonblocking (Nonblocking_assignment
+              (VLV_hier (HID NONE (ID "c")) NONE)
+              (NONE)
+              (Exp_primary (Prim_num (Num 0))))))
+    ))))))]
+)];
+
+let ex2 = p_source_text doc2;
+render ex2;
 
 // =============================================================================

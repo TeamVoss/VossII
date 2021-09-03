@@ -162,6 +162,14 @@ let p_range_expression (Range_exp e) = p_expression e
       p_constant_expression c1 <+> text ":" <+> p_constant_expression c2
 ;
 
+let p_mintypmax_expression (Mintypmax_expression e) = p_expression e
+/\  p_mintypmax_expression (Mintypmax_minmax e1 e2 e3) =
+          p_expression e1
+      <+> text ":"
+      <+> p_expression e2
+      <+> text ":"
+      <+> p_expression e3
+;
 letrec
     p_event_expression (Event_exp e) = p_expression e
 /\  p_event_expression (Event_pos e) = text "posedge" <+> p_expression e
@@ -180,6 +188,19 @@ let p_event_control (Event_control_hier i) =
 /\  p_event_control (Event_pstar) = text "@(*)"
 ;
 
+forward_declare{p_delay_value::delay_value->doc};
+
+let p_delay_control (Delay_control_value dv) = text "#" <-> p_delay_value dv
+/\  p_delay_control (Delay_control_minmax mtm) =
+      text "#" <-> in_paren (p_mintypmax_expression mtm)
+;
+
+let p_delay_or_event_control (DOEC_delay dc) = p_delay_control dc
+/\  p_delay_or_event_control (DOEC_event ec) = p_event_control ec
+/\  p_delay_or_event_control (DOEC_repeat e ec) =
+      text "repeat" <-> in_paren (p_expression e) <+> p_event_control ec
+;
+
 let p_procedural_timing_control (PTC_event ev) = p_event_control ev;
 
 forward_declare{p_statement::statement->doc};
@@ -189,8 +210,12 @@ let p_procedural_timing_control_statement (PTC t s) =
 ;
 
 // Some helpers.
-let p_if  (c,s) = hangs (text "if" <+> in_paren (p_expression c)) (p_statement s);
-let p_eif (c,s) = hangs (text "else if" <+> in_paren (p_expression c)) (p_statement s);
+let p_if  (c,s) =
+      hangs (text "if" <+> in_paren (p_expression c)) (p_statement s)
+;
+let p_eif (c,s) =
+      hangs (text "else if" <+> in_paren (p_expression c)) (p_statement s)
+;
 let p_else s    = hangs (text "else") (p_statement s);
 
 let p_if_else_if_statement (IEI b cs (NONE)) =
@@ -221,7 +246,12 @@ let p_loop_statement (LOOP_forever s) =
             (p_statement s)
 ;
 
+forward_declare{p_blocking_assignment::blocking_assignment->doc};
+forward_declare{p_nonblocking_assignment::nonblocking_assignment->doc};
+
 let p_statement (Statement_null) = text ";"
+/\  p_statement (Statement_blocking s) = p_blocking_assignment s <+> text ";"
+/\  p_statement (Statement_nonblocking s) = p_nonblocking_assignment s <+> text ";"
 /\  p_statement (Statement_timing s) = p_procedural_timing_control_statement s
 /\  p_statement (Statement_if s) = p_if_else_if_statement s
 /\  p_statement (Statement_cond s) = p_conditional_statement s
@@ -232,6 +262,19 @@ let p_initial_construct (Initial s) = text "initial" <+> p_statement s;
 
 let p_always_construct (Always s) = text "always" <+> p_statement s;
 
+let p_blocking_assignment (Blocking_assignment vlv doec' e) =
+          p_variable_lvalue vlv
+      <+> text "="
+      <+> p_opt p_delay_or_event_control doec'
+      <+> p_expression e
+;
+
+let p_nonblocking_assignment (Nonblocking_assignment vlv doec' e) =
+          p_variable_lvalue vlv
+      <+> text "<="
+      <+> p_opt p_delay_or_event_control doec'
+      <+> p_expression e
+;
 let p_continuous_assign (Cont_assign as) =
       let pr (nlv,e) = p_net_lvalue nlv <+> text "=" <+> p_expression e in
       text "assign" <+> in_list (map pr as) <+> text ";"
@@ -290,6 +333,11 @@ let p_net_decl_assignment (NDA i e) =
 let p_variable_port_identifier (VPI i (NONE)) = p_identifier i
 /\  p_variable_port_identifier (VPI i (SOME c)) =
       p_identifier i <+> text "=" <+> p_constant_expression c
+;
+
+let p_delay_value (Delay_value_unum unum) = p_number unum
+/\  p_delay_value (Delay_value_real rnum) = p_number rnum
+/\  p_delay_value (Delay_value_id i) = p_identifier i
 ;
 
 let p_variable_type (VT_dim i ds) =
