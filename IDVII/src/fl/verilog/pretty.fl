@@ -2,8 +2,16 @@
 // This file provides a FL version of pretty-print by J. Hughes & S. P.Jones.
 // =============================================================================
 
+// faster string type for length and concatenation.
 new_type_abbrev str = (int)#(string->string);
 
+let str {s :: string} = let l = strlen s then (l, defix ^ s);
+
+let indent {n :: int} = implode (replicate n " ");
+
+// -----------------------------------------------------------------------------
+
+// layout document.
 lettype doc =
     Nil                   // text ""
   | NilAbove (doc)        // text "" $$ x
@@ -15,15 +23,17 @@ lettype doc =
   | Empty                 // empty document
   ;
 
+// document which has been reduced (no top-level 'Above' or 'Beside').
+new_type_abbrev rdoc = doc;
+
 let is_nil (Nil) = T
 /\  is_nil _     = F
 ;
 
-let indent n = implode (replicate n " ");
-
-let str s = let l = strlen s then (l, defix ^ s);
-
 // -----------------------------------------------------------------------------
+
+// The argument to any Doc constructor should be reduced.
+forward_declare{reduce::doc->rdoc};
 
 // Empty document.
 let empty = Nil;
@@ -36,11 +46,12 @@ let nest {k :: int} {d :: doc} =
     // Checks for 'Nest's invariant that it doesn't have an 'Empty' inside it.
     letrec
         nest_ l (Nest i p) = let j = l + i then nest_ j p
-    /\  nest_ _ Nil        = Nil
+    /\  nest_ _ (Empty)    = Empty
+    /\  nest_ _ (Nil)      = Nil
     /\  nest_ 0 p          = p
     /\  nest_ l p          = Nest l p
     in
-    k fseq nest_ k d
+    k fseq nest_ k (reduce d)
 ;
 
 // Union (but that name it's taken).
@@ -63,8 +74,6 @@ let beside Nil _ q   = q
 // -----------------------------------------------------------------------------
 // Reduction of documents.
 
-forward_declare{reduce::doc->doc};
-
 letrec
     besideNil _ Nil        = Nil
 /\  besideNil b (Nest _ p) = besideNil b p
@@ -73,29 +82,31 @@ letrec
 
 // note: 'q' is reduced.
 letrec
-    besideReduce (Empty)          _ _ = Empty
-/\  besideReduce (Nil)            _ q = q
-/\  besideReduce (NilAbove p)     b q = let x = besideReduce p b q then NilAbove x
-/\  besideReduce (TxtBeside s p)  b q =
-      let x = is_nil p => besideNil b q | besideReduce p b q in TxtBeside s x
-/\  besideReduce (Nest i p)       b q = let x = besideReduce p b q then Nest i x
-/\  besideReduce (Union pl pr)    b q = Union (besideReduce pl b q) (besideReduce pr b q)
-/\  besideReduce (Above p b' q')  b q =
-      let x = reduce (Above p b' q') then besideReduce x b q
-/\  besideReduce (Beside p b' q') b q =
-      b' == b => let x = besideReduce q' b q then besideReduce p b' x |
-      besideReduce (reduce (Beside p b' q')) b q
+    besideRed (Empty)          _ _ = Empty
+/\  besideRed (Nil)            _ q = q
+/\  besideRed (NilAbove p)     b q = let x = besideRed p b q then NilAbove x
+/\  besideRed (TxtBeside s p)  b q =
+      let x = is_nil p => besideNil b q | besideRed p b q in TxtBeside s x
+/\  besideRed (Nest i p)       b q = let x = besideRed p b q then Nest i x
+/\  besideRed (Union pl pr)    b q = Union (besideRed pl b q) (besideRed pr b q)
+/\  besideRed (Above p b' q')  b q =
+      let x = reduce (Above p b' q') then besideRed x b q
+/\  besideRed (Beside p b' q') b q =
+      b' == b => let x = besideRed q' b q then besideRed p b' x |
+      besideRed (reduce (Beside p b' q')) b q
 ;
 
+// ok
 letrec
-    aboveNil _ _ (Empty)    = Empty
+    aboveNil _ _ (Nil)      = Nil
 /\  aboveNil b k (Nest i q) = let j = k + i then aboveNil b j q
 /\  aboveNil b k q          =
       // Skip newline if no overlap.
-      NOT b AND (k > 0) => let s = str (indent k) in TxtBeside s q |
+      (NOT b) AND (k > 0) => let s = str (indent k) in TxtBeside s q |
       NilAbove (nest k q)
 ;
 
+// ok
 letrec
     aboveNest (Empty)         _ _ _ = Empty
 /\  aboveNest (Nil)           _ k q = nest k q
@@ -104,22 +115,28 @@ letrec
       let j = k - i then
       let x = is_nil p => aboveNil b j q | aboveNest p b j q in
       TxtBeside (i,s) x
-/\  aboveNest (Nest i p)      b k q = let j = k - i then Nest i (aboveNest p b j q)
-/\  aboveNest (Union pl pr)   b k q = Union (aboveNest pl b k q) (aboveNest pr b k q)
+/\  aboveNest (Nest i p)      b k q =
+      let j = k - i then Nest i (aboveNest p b j q)
+/\  aboveNest (Union pl pr)   b k q =
+      Union (aboveNest pl b k q) (aboveNest pr b k q)
 /\  aboveNest (Above _ _ _)   _ _ _ = error "aboveNest Above"
 /\  aboveNest (Beside _ _ _)  _ _ _ = error "aboveNest Beside"
 ;
 
-// note: 'q' is reduced.
+// ok
 letrec
-    aboveReduce (Above  p b' q') b q = aboveReduce p b' (aboveReduce q' b q)
-/\  aboveReduce (Beside p b' q') b q = aboveNest (reduce (Beside p b' q')) b 0 (reduce q)
-/\  aboveReduce p b q                = aboveNest p b 0 (reduce q)
+    aboveRed (Above  p b' q') b q =
+      aboveRed p b' (aboveRed q' b q)
+/\  aboveRed (Beside p b' q') b q =
+      aboveNest (reduce (Beside p b' q')) b 0 (reduce q)
+/\  aboveRed p b q = aboveNest p b 0 (reduce q)
 ;
 
+// ok
+//  reduce::doc->rdoc
 letrec
-    reduce (Beside p b q) = besideReduce p b (reduce q)
-/\  reduce (Above  p b q) = aboveReduce  p b (reduce q)
+    reduce (Beside p b q) = besideRed p b (reduce q)
+/\  reduce (Above  p b q) = aboveRed  p b (reduce q)
 /\  reduce p = p
 ;
 
@@ -141,31 +158,36 @@ infix 6 <+>;
 
 // -----------------------------------------------------------------------------
 
+// ok
 letrec
-    emptyReduce _    Nil _ q = q
-/\  emptyReduce cons p   b q = (F, (fst q => p | cons p b (snd q)))
+    emptyReduce _    (Nil) _ q = q
+/\  emptyReduce cons p     b q = (F, (fst q => p | cons p b (snd q)))
 ;
 
+// ok
 letrec
     verticalReduce (Above p b q) =
       emptyReduce Above (snd (verticalReduce p)) b (verticalReduce q)
 /\  verticalReduce d = (F, d)
 ;
 
+// ok
 letrec
     horizontalReduce (Beside p b q) =
       emptyReduce Beside (snd (horizontalReduce p)) b (horizontalReduce q)
 /\  horizontalReduce d = (F, d)
 ;
 
+// ok
 letrec
-    oneLine (Empty)        = Empty
-/\  oneLine (Nil)          = Nil
-/\  oneLine (NilAbove _)   = Empty
-/\  oneLine (Nest k p)     = Nest k (oneLine p)
-/\  oneLine (Union p _)    = oneLine p
-/\  oneLine (Beside _ _ _) = error "oneLine Beside"
-/\  oneLine (Above _ _ _)  = error "oneLine Above"
+    oneLine (Empty)         = Empty
+/\  oneLine (Nil)           = Nil
+/\  oneLine (NilAbove _)    = Empty
+/\  oneLine (TxtBeside s p) = TxtBeside s (oneLine p)
+/\  oneLine (Nest k p)      = Nest k (oneLine p)
+/\  oneLine (Union p _)     = oneLine p
+/\  oneLine (Beside _ _ _)  = error "oneLine Beside"
+/\  oneLine (Above _ _ _)   = error "oneLine Above"
 ;
 
 forward_declare{sepSpace::bool->(doc list)->doc};
@@ -174,6 +196,7 @@ forward_declare{hsep::(doc list)->doc};
 forward_declare{hcat::(doc list)->doc};
 forward_declare{vcat::(doc list)->doc};
 
+// ok
 letrec
     sepNB b (Nest _ p) k ds = sepNB b p k ds
 /\  sepNB b (Nil)      k ds =
@@ -184,6 +207,7 @@ letrec
 /\  sepNB b p k ds = sepLine b p k ds
 ;
 
+// ok
 letrec
     sepLine _ (Empty)       _ _  = Empty
 /\  sepLine b (Nil)         k ds = nest k (sepSpace b ds)
@@ -199,10 +223,12 @@ letrec
 /\  sepLine _ (Above _ _ _)  _ _ = error "sepLine Above"
 ;
 
+// ok
 let sepSpace _ []     = empty
 /\  sepSpace b (d:ds) = sepLine b (reduce d) 0 ds
 ;
 
+// ok.
 let sep = sepSpace T; // Seperate with spaces.
 let cat = sepSpace F; // .. without spaces.
 
@@ -231,12 +257,14 @@ let punctuate _ []     = []
 
 // -----------------------------------------------------------------------------
 
-let fits {m :: int} {d :: doc} =
-      letrec
+// ok
+letrec
+    fits {m :: int} {d :: doc} =
+      let
           go _ (Empty)             = F
       /\  go _ (Nil)               = T
       /\  go _ (NilAbove _)        = T
-      /\  go n (TxtBeside (i,_) p) = let j = n - i then go j p
+      /\  go n (TxtBeside (i,_) p) = let j = n - i then fits j p
       /\  go _ (Nest _ _)          = error "fits Nest"
       /\  go _ (Union _ _)         = error "fits Union"
       /\  go _ (Beside _ _ _)      = error "fits Beside"
@@ -245,21 +273,25 @@ let fits {m :: int} {d :: doc} =
       m < 0 => F | go m d
 ;
 
+// ok
 let nicestL {w :: int} {r :: int} {l :: int} {p :: doc} {q :: doc} =
-      let m = (min w r) - l then
-      fits m p => p | q
+      let m = (min w r) - l then fits m p => p | q
 ;
 
+// ok
 let nicest {w :: int} {r :: int} {p :: doc} {q :: doc} = nicestL w r 0 p q;
 
 forward_declare{nice::int->int->doc->doc};
 
+// ok
 let niceL {w0 :: int} {r0 :: int} {i :: int} {d :: doc} =
       letrec
           go _ _ (Empty)             = Empty
       /\  go _ _ (Nil)               = Nil
-      /\  go w l (NilAbove q)        = let j = w - l then NilAbove (nice j r0 q)
-      /\  go w l (TxtBeside (i,s) q) = let j = l - i then TxtBeside (i,s) (go w j q)
+      /\  go w l (NilAbove q)        =
+            let j = w - l then NilAbove (nice j r0 q)
+      /\  go w l (TxtBeside (i,s) q) =
+            let j = l + i then TxtBeside (i,s) (go w j q)
       /\  go w l (Nest _ q)          = go w l q
       /\  go w l (Union ql qr)       = nicestL w r0 l (go w l ql) (go w l qr)
       /\  go w l (Beside _ _ _)      = error "niceL Beside"
@@ -268,6 +300,7 @@ let niceL {w0 :: int} {r0 :: int} {i :: int} {d :: doc} =
       go w0 i d
 ;
 
+// ok
 let nice {w0 :: int} {r0 :: int} {d :: doc} =
       letrec
           go _ (Empty)             = Empty
@@ -282,6 +315,7 @@ let nice {w0 :: int} {r0 :: int} {d :: doc} =
       go w0 d
 ;
 
+// ok
 let best {w0 :: int} {r0 :: int} {d :: doc} = nice w0 r0 d;
 
 // -----------------------------------------------------------------------------

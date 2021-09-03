@@ -2,7 +2,7 @@ load (DIR^"grammar.fl");
 load (DIR^"pretty.fl");
 
 // =============================================================================
-//
+// Pretty printing rules for the Verilog grammar.
 // =============================================================================
 
 let hangs {d :: doc} {b :: doc} = hang d 4 b;
@@ -112,6 +112,12 @@ let p_constant_primary (CPrim_num n) = p_number n
 ;
 
 let p_primary (Prim_num n) = p_number n
+/\  p_primary (Prim_hier i es') =
+      let pr (es, re) =
+              collect (map (\e. in_braces (p_expression e)) es)
+          <-> in_braces (p_range_expression re)
+      in
+      p_hierarchical_identifier i <-> p_opt pr es'
 /\  p_primary (Prim_str s) = text s
 ;
 

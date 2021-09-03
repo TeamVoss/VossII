@@ -1,0 +1,30 @@
+load (DIR^"grammar.fl");
+load (DIR^"pretty-verilog.fl");
+
+// =============================================================================
+// Sanity checks.
+// =============================================================================
+
+let doc1 =
+  Source_text [Desc_module (Module_declaration_many (ID "test")
+    (SOME [ Port_decl_in  (Input_decl NONE F NONE [ID "a", ID "b"])
+          , Port_decl_out (Output_decl_port NONE F NONE [ID "c"])
+          ])
+    [ NPM_Item (MOGI_cont (Cont_assign
+        [ ( NLV_hier (HID NONE (ID "c")) NONE
+          , Exp_binary
+              (Exp_primary (Prim_hier (HID NONE (ID "a")) NONE))
+              (B_add)
+              (Exp_primary (Prim_hier (HID NONE (ID "b")) NONE))
+          )
+        ]
+    ))]
+  )]
+;
+
+// -----------------------------------------------------------------------------
+
+let ex1 = p_source_text doc1;
+ex1;
+
+// =============================================================================

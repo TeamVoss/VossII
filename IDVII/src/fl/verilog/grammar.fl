@@ -40,7 +40,8 @@ lettype number = Num (int);
 //     + | - | ! | ~ | & | ~& | | | ~| | ^ | ~^ | ^~
 lettype unary_operator =
     U_pos | U_neg | U_log_neg | U_bit_neg | U_red_and | U_red_nand
-  | U_red_or | U_red_nor | U_red_xor | U_red_xnor_l | U_red_xnor_r ;
+  | U_red_or | U_red_nor | U_red_xor | U_red_xnor_l | U_red_xnor_r
+;
 
 // binary_operator ::=
 //     +  | -  | * | /  | % | == | != | === | !== | && | || | **
@@ -49,7 +50,8 @@ lettype binary_operator =
     B_add | B_sub | B_mult | B_div | B_mod | B_log_eq | B_log_neq | B_case_eq
   | B_case_neq | B_log_and | B_log_or | B_exp | B_lt | B_lte | B_gt | B_gte
   | B_bit_and | B_bit_or | B_bit_xor | B_bit_eq_l | B_bit_eq_r | B_log_shr
-  | B_log_shl | B_shr | B_shl;
+  | B_log_shl | B_shr | B_shl
+;
 
 // A.8.5 Expression left-side values -------------------------------------------
 
@@ -64,7 +66,7 @@ lettype binary_operator =
 // note: Moved to 'expressions' (A.8.3).
 
 // variable_assignment ::= variable_lvalue "=" expression
-// note: Moved to 'expressions' (A.8.3).
+// note: Moved to 'Expressions' (A.8.3).
 
 // A.8.4 Primaries -------------------------------------------------------------
 
@@ -80,7 +82,8 @@ lettype binary_operator =
 //   | string
 lettype constant_primary =
     CPrim_num (number)
-  | CPrim_str (string);
+  | CPrim_str (string)
+;
 
 // primary ::=
 //     number
@@ -91,9 +94,7 @@ lettype constant_primary =
 //   | system_function_call
 //   | "(" mintypmax_expression ")"
 //   | string
-lettype primary =
-    Prim_num (number)
-  | Prim_str (string);
+// note: Moved to 'Expressions' (A.8.3).
 
 // A.8.3 Expressions -----------------------------------------------------------
 
@@ -109,13 +110,24 @@ lettype constant_expression =
     CExp_primary (constant_primary)
   | CExp_unary (unary_operator) (constant_primary)
   | CExp_binary (constant_expression) (binary_operator) (constant_expression)
-  | CExp_conditional (constant_expression)
-                     (constant_expression)
-                     (constant_expression);
+  | CExp_conditional
+      (constant_expression)
+      (constant_expression)
+      (constant_expression)
+;
 
 // See A.9.3.
 lettype hierarchical_identifier =
     HID ({(identifier)#({constant_expression} opt)} opt) (identifier)
+;
+
+// See A.8.4
+lettype primary =
+    Prim_num (number)
+  | Prim_hier
+      (hierarchical_identifier)
+      ({(expression list)#(range_expression)} opt)
+  | Prim_str (string)
 ;
 
 // constant_range_expression ::=
@@ -125,7 +137,8 @@ lettype hierarchical_identifier =
 //   | constant_base_expression -: width_constant_expression
 lettype constant_range_expression =
     CRange_value (constant_expression)
-  | CRange_m2l (constant_expression) (constant_expression);
+  | CRange_m2l (constant_expression) (constant_expression)
+;
 
 // expression ::=
 //     primary
@@ -140,7 +153,8 @@ lettype expression =
     Exp_primary (primary)
   | Exp_unary (unary_operator) (primary)
   | Exp_binary (expression) (binary_operator) (expression)
-  | Exp_conditional (expression) (expression) (expression);
+  | Exp_conditional (expression) (expression) (expression)
+;
 
 // range_expression ::=
 //     expression
@@ -149,21 +163,25 @@ lettype expression =
 //   | base_expression -: width_constant_expression
 lettype range_expression =
     Range_exp (expression)
-  | Range_m2l (constant_expression) (constant_expression);
+  | Range_m2l (constant_expression) (constant_expression)
+;
 
 // See A.8.5 Expression left-side values.
 lettype net_lvalue =
     NLV_hier (hierarchical_identifier)
              ({(constant_expression list)#(constant_range_expression)} opt)
-  | NLV_list (net_lvalue list);
+  | NLV_list (net_lvalue list)
+;
 
 lettype variable_lvalue =
     VLV_hier (hierarchical_identifier)
              ({(expression list)#(range_expression)} opt)
-  | VLV_list (variable_lvalue list);
+  | VLV_list (variable_lvalue list)
+;
 
 lettype variable_assignment =
-    Variable_assignment (variable_lvalue) (expression);
+    Variable_assignment (variable_lvalue) (expression)
+;
 
 // A.8.2 Function calls --------------------------------------------------------
 // A.8.1 Concatenations --------------------------------------------------------
@@ -219,7 +237,8 @@ lettype event_expression =
   | Event_pos (expression)
   | Event_neg (expression)
   | Event_or (event_expression) (event_expression)
-  | Event_and (event_expression) (event_expression);
+  | Event_and (event_expression) (event_expression)
+;
 
 // event_control ::=
 //     "@" hierarchical_event_identifier
@@ -230,7 +249,8 @@ lettype event_control =
     Event_control_hier (hierarchical_identifier)
   | Event_control_exp (event_expression)
   | Event_star
-  | Event_pstar;
+  | Event_pstar
+;
 
 // procedural_timing_control ::= delay_control | event_control
 lettype procedural_timing_control = PTC_event (event_control);
@@ -329,7 +349,8 @@ lettype udp_instantiation =
 // named_port_connection ::= "." port_identifier "(" [ expression ] ")"
 lettype port_connection =
     Port_con_ordered ({expression} opt)
-  | Port_con_named (identifier) ({expression} opt);
+  | Port_con_named (identifier) ({expression} opt)
+;
 
 // module_instance ::= name_of_module_instance "(" [ list_of_port_connections ] ")"
 // name_of_module_instance ::= module_instance_identifier [ range ]
@@ -406,7 +427,8 @@ lettype variable_port_identifier = VPI (identifier) ({constant_expression} opt);
 //   | variable_identifier "=" constant_expression
 lettype variable_type =
     VT_dim (identifier) (dimension list)
-  | VT_const (identifier) (constant_expression);
+  | VT_const (identifier) (constant_expression)
+;
 
 // output_variable_type ::= "integer" | "time"
 lettype output_variable_type =
@@ -440,7 +462,8 @@ lettype net_declaration =
     ND_scalar_id (net_type) (bool) (net_identifier list)
   | ND_scalar_decl (net_type) (bool) (net_decl_assignment list)
   | ND_vector_id (net_type) (bool) (bool) (range) (net_identifier list)
-  | ND_vector_decl (net_type) (bool) (bool) (range) (net_decl_assignment list);
+  | ND_vector_decl (net_type) (bool) (bool) (range) (net_decl_assignment list)
+;
 
 // reg_declaration ::= "reg" [ "signed" ] [ range ] list_of_variable_identifiers ";"
 // list_of_variable_identifiers ::= variable_type { "," variable_type }
@@ -489,7 +512,8 @@ lettype output_declaration =
 lettype port_declaration =
     Port_inout (inout_declaration)
   | Port_in (input_declaration)
-  | Port_out (output_declaration);
+  | Port_out (output_declaration)
+;
 
 // module_or_generate_item_declaration ::=
 //     net_declaration
@@ -504,7 +528,8 @@ lettype port_declaration =
 //   | function_declaration
 lettype module_or_generate_item_declaration =
     MOGID_net (net_declaration)
-  | MOGID_reg (reg_declaration);
+  | MOGID_reg (reg_declaration)
+;
 
 // module_or_generate_item ::=
 //     module_or_generate_item_declaration
@@ -524,7 +549,8 @@ lettype module_or_generate_item =
   | MOGI_udp (udp_instantiation)
   | MOGI_module (module_instantiation)
   | MOGI_initial (initial_construct)
-  | MOGI_always (always_construct);
+  | MOGI_always (always_construct)
+;
 
 // non_port_module_item ::=
 //    module_or_generate_item
@@ -533,12 +559,14 @@ lettype module_or_generate_item =
 //  | parameter_declaration ";"
 //  | specparam_declaration
 lettype non_port_module_item =
-    NPM_Item (module_or_generate_item);
+    NPM_Item (module_or_generate_item)
+;
 
 // module_item ::= port_declaration ";" | non_port_module_item
 lettype module_item =
     Module_Port (port_declaration)
-  | Module_Item (non_port_module_item);
+  | Module_Item (non_port_module_item)
+;
 
 // A.1.3 Module parameters and ports -------------------------------------------
 
@@ -563,7 +591,8 @@ lettype port =
 lettype port_declaration =
     Port_decl_inout (inout_declaration)
   | Port_decl_in (input_declaration)
-  | Port_decl_out (output_declaration);
+  | Port_decl_out (output_declaration)
+;
 
 // A.1.2 Verilog source text ---------------------------------------------------
 
@@ -574,7 +603,11 @@ lettype port_declaration =
 // list_of_port_declarations ::= "(" port_declaration { "," port_declaration } ")" | "()"
 lettype module_declaration =
     Module_declaration_one (identifier) (port list) (module_item list)
-  | Module_declaration_many (identifier) ({port_declaration list} opt) (non_port_module_item list);
+  | Module_declaration_many
+      (identifier)
+      ({port_declaration list} opt)
+      (non_port_module_item list)
+;
 
 // description ::= module_declaration | udp_declaration | config_declaration
 lettype description = Desc_module (module_declaration);
