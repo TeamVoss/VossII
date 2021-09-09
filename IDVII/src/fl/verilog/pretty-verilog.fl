@@ -7,11 +7,11 @@ load (DIR^"pretty.fl");
 
 let hangs {d :: doc} {b :: doc} = hang d 4 b;
 
-let p_opt f s = has_value s => f (get_value s) | empty;
+let p_opt f s = has_value s => f (get_value s) | nil;
 
-let p_when b s = b => s | empty;
+let p_when b s = b => s | nil;
 
-let collect {ds :: (doc list)} = itlist (defix <->) ds empty;
+let collect {ds :: (doc list)} = itlist (defix <->) ds nil;
 
 let in_braces {d :: doc} = is_nil d => d | text "[" <-> d <-> text "]";
 
@@ -111,6 +111,8 @@ let p_constant_primary (CPrim_num n) = p_number n
 /\  p_constant_primary (CPrim_str s) = text s;
 ;
 
+forward_declare{p_concatenation::concatenation->doc};
+
 let p_primary (Prim_num n) = p_number n
 /\  p_primary (Prim_hier i es') =
       let pr (es, re) =
@@ -118,6 +120,7 @@ let p_primary (Prim_num n) = p_number n
           <-> in_braces (p_range_expression re)
       in
       p_hierarchical_identifier i <-> p_opt pr es'
+/\  p_primary (Prim_cat es) = p_concatenation es
 /\  p_primary (Prim_str s) = text s
 ;
 
@@ -170,6 +173,9 @@ let p_mintypmax_expression (Mintypmax_expression e) = p_expression e
       <+> text ":"
       <+> p_expression e3
 ;
+
+let p_concatenation (CAT es) = in_curly (in_list (map p_expression es));
+
 letrec
     p_event_expression (Event_exp e) = p_expression e
 /\  p_event_expression (Event_pos e) = text "posedge" <+> p_expression e

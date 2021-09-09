@@ -1,0 +1,245 @@
+load (DIR^"grammar.fl");
+load (DIR^"../design/misc.fl");
+
+// =============================================================================
+// 
+// =============================================================================
+
+begin_abstype;
+
+// string->port_declaration
+let v_port T f = Port_decl_in  (Input_decl NONE F NONE [ID f])
+/\  v_port F f = Port_decl_out (Output_decl_port NONE F NONE [ID f])
+;
+
+//  string->module_or_generate_item
+let v_decl_wire i = MOGI_decl (MOGID_net (ND_scalar_id NT_wire F [Net_id (ID i) []]));
+let v_decl_reg i  = MOGI_decl (MOGID_reg (Reg_decl F NONE [VT_dim (ID i) []]));
+
+// net_lvalue->expression->non_port_module_item
+let v_assign net_lv exp = NPM_Item (MOGI_cont (Cont_assign [(net_lv, exp)]));
+
+// var_lvalue->expression->non_port_module_item
+let v_always var_lv exp = NPM_Item (MOGI_always (Always (Statement_timing (PTC
+      (PTC_event (Event_pstar))
+      (Statement_nonblocking (Nonblocking_assignment var_lv NONE exp))))))
+;
+
+// -----------------------------------------------------------------------------
+
+forward_declare{c_wexpr::wexpr->expression};
+
+// wexpr->primary
+let
+    c_primary (W_X _) = Prim_num X
+/\  c_primary (W_CONST _ v) = Prim_num (Num v)
+/\  c_primary (W_NAMED_CONST _ _ v) = Prim_num (Num v)
+/\  c_primary (W_VAR _ i) = Prim_hier (HID NONE (ID i)) NONE
+/\  c_primary (W_EXPLICIT_VAR _ i) = Prim_hier (HID NONE (ID i)) NONE
+/\  c_primary (W_CAT es) = Prim_cat (CAT (map c_wexpr es))
+/\  c_primary _ = error "expected a 'primary' wexpr"
+;
+// todo: sizes?
+
+// wexpr->expression
+letrec
+    c_wexpr (W_X _) = Exp_primary (Prim_num X)
+/\  c_wexpr (W_CONST _ v) = Exp_primary (Prim_num (Num v))
+/\  c_wexpr (W_NAMED_CONST _ _ v) = Exp_primary (Prim_num (Num v))
+/\  c_wexpr (W_VAR _ i) = Exp_primary (Prim_hier (HID NONE (ID i)) NONE)
+/\  c_wexpr (W_EXPLICIT_VAR _ i) = Exp_primary (Prim_hier (HID NONE (ID i)) NONE)
+/\  c_wexpr (W_AND a b) = Exp_binary (c_wexpr a) B_log_and (c_wexpr b)
+/\  c_wexpr (W_OR a b) = Exp_binary (c_wexpr a) B_log_or (c_wexpr b)
+/\  c_wexpr (W_NOT a) = Exp_unary U_log_neg (c_primary a)
+/\  c_wexpr (W_EQ a b) = Exp_binary (c_wexpr a) B_log_eq (c_wexpr b)
+/\  c_wexpr (W_PRED _ _) = error "todo: c_wexpr PRED"
+/\  c_wexpr (W_GR _ _) = error "todo: c_wexpr ?GR?"
+/\  c_wexpr (W_ADD a b) = Exp_binary (c_wexpr a) B_add (c_wexpr b)
+/\  c_wexpr (W_SUB a b) = Exp_binary (c_wexpr a) B_sub (c_wexpr b)
+/\  c_wexpr (W_MUL a b) = Exp_binary (c_wexpr a) B_mult (c_wexpr b)
+/\  c_wexpr (W_DIV a b) = Exp_binary (c_wexpr a) B_div (c_wexpr b)
+/\  c_wexpr (W_MOD a b) = Exp_binary (c_wexpr a) B_mod (c_wexpr b)
+/\  c_wexpr (W_SHL a b) = Exp_binary (c_wexpr a) B_log_shl (c_wexpr b)
+/\  c_wexpr (W_SHR a b) = Exp_binary (c_wexpr a) B_log_shr (c_wexpr b)
+/\  c_wexpr (W_ASHR a b) = error "todo: c_wexpr ?ASHR?"
+/\  c_wexpr (W_SX _ _) = error "todo: c_wexpr SX" // extended[15:0] <= { {8{extend[7]}}, extend[7:0] };
+/\  c_wexpr (W_ZX _ _) = error "todo: c_wexpr ZX" // extended[15:0] <= { {8{...}}, extend[7:0] };
+/\  c_wexpr (W_ITE c a b) = Exp_conditional (c_wexpr c) (c_wexpr a) (c_wexpr b)
+/\  c_wexpr (W_SLICE _ _) = error "todo: c_wexpr W_SLICE"
+/\  c_wexpr (W_NAMED_SLICE _ _ _) = error "todo: c_wexpr W_NAMED_SLICE"
+/\  c_wexpr (W_UPDATE_NAMED_SLICE _ _ _ _) = error "todo: c_wexpr W_UPDATE_NAMED_SLICE"
+/\  c_wexpr (W_CAT es) = Exp_primary (Prim_cat (CAT (map c_wexpr es)))
+/\  c_wexpr (W_MEM_READ _ _ _) = error "todo: c_wexpr W_MEM_READ"
+/\  c_wexpr (W_MEM_WRITE _ _ _ _) = error "todo: c_wexpr W_MEM_WRITE"
+;
+// todo: sizes?
+
+// wexpr->net_lvalue
+let net_wexpr (W_VAR _ i) = NLV_hier (HID NONE (ID i)) NONE
+/\  net_wexpr (W_EXPLICIT_VAR _ i) = NLV_hier (HID NONE (ID i)) NONE
+/\  net_wexpr (W_CAT _) = error "todo: net_wexpr W_CAT"
+/\  net_wexpr (W_SLICE _ _) = error "todo: net_wexpr W_SLICE"
+/\  net_wexpr (W_NAMED_SLICE _ _ _) = error "todo: net_wexpr W_NAMED_SLICE"
+/\  net_wexpr _ = error "expected a 'net_lvalue' wexpr"
+;
+
+// wexpr->var_lvalue
+let var_wexpr (W_VAR _ i) = VLV_hier (HID NONE (ID i)) NONE
+/\  var_wexpr (W_EXPLICIT_VAR _ i) = VLV_hier (HID NONE (ID i)) NONE
+/\  var_wexpr (W_CAT _) = error "todo: var_wexpr W_CAT"
+/\  var_wexpr (W_SLICE _ _) = error "todo: var_wexpr W_SLICE"
+/\  var_wexpr (W_NAMED_SLICE _ _ _) = error "todo: var_wexpr W_NAMED_SLICE"
+/\  var_wexpr _ = error "expected a 'var_lvalue' wexpr"
+;
+
+// update_fn->non_port_module_item
+let c_update_fn (W_UPDATE_FN lhs rhs) =
+      let net_lv = net_wexpr lhs in
+      let exp = c_wexpr rhs in
+      v_assign net_lv exp
+/\  c_update_fn (W_PHASE_DELAY lhs rhs) =
+      let var_lv = var_wexpr lhs in
+      let exp = c_wexpr rhs in
+      v_always var_lv exp
+;
+
+// -----------------------------------------------------------------------------
+
+let find_wexpr i (W_VAR _ j) = i == j
+/\  find_wexpr i (W_EXPLICIT_VAR _ j) = i == j
+/\  find_wexpr _ (W_CAT _) = error "todo: find_wexpr W_CAT"
+/\  find_wexpr _ (W_SLICE _ _) = error "todo: find_wexpr W_SLICE"
+/\  find_wexpr _ (W_NAMED_SLICE _ _ _) = error "todo: find_wexpr W_NAMED_SLICE"
+;
+
+// string->update_fn->{wire(T)/reg(F)} opt
+let is_wire_fn i (W_UPDATE_FN lhs _) =
+      find_wexpr i lhs => SOME T | NONE
+/\  is_wire_fn i (W_PHASE_DELAY lhs _) =
+      find_wexpr i lhs => SOME F | NONE
+;
+
+// string->(update_fn list)->{wire(T)/reg(F)} opt
+let is_wire i fs = exhaust (map (is_wire_fn i) fs);
+
+let is_reg_fn i fn = maybe NONE (is_wire i fn) (SOME # NOT);
+
+let is_reg i fs = exhaust (map (is_reg_fn i) fs);
+
+// string->(((cexp)#(cexp)) list)->bool->non_port_module_item
+let c_internal i ds T =
+      NPM_Item (MOGI_decl (MOGID_net
+        ( ND_scalar_id
+            NT_wire // type
+            F // signed
+            [ Net_id
+                (ID i) // id
+                (map (curry Dimension) ds) // dimension
+            ]
+        )
+      ))
+/\  c_internal i ds F =
+      NPM_Item (MOGI_decl (MOGID_reg
+        ( Reg_decl
+            F // signed
+            NONE // range
+            [ VT_dim
+                (ID i) // id
+                (map (curry Dimension) ds) // dimension
+            ]
+        )
+      ))
+;
+// todo: signed?
+// todo: range?
+
+// -----------------------------------------------------------------------------
+
+// string->bool->port_declaration
+let c_port f T = Port_decl_in  (Input_decl NONE F NONE [(ID f)])
+/\  c_port f F = Port_decl_out (Output_decl_port NONE F NONE [(ID f)])
+;
+// todo: net/reg type?
+// todo: range?
+// todo: signed?
+
+let c_fa_inps = map (flip c_port T # fst);
+let c_fa_outs = map (flip c_port F # fst);
+
+// -----------------------------------------------------------------------------
+
+let port_exp a = Exp_primary (Prim_hier (HID NONE (ID a)) NONE);
+// todo: hierarchy?
+// todo: range?
+
+let connect_ports (f,as) =
+      let port_expr []  = NONE
+      /\  port_expr [a] = SOME (port_exp a)
+      /\  port_expr as  =
+            SOME (Exp_primary (Prim_cat (CAT (map port_exp as))))
+      in
+      Port_con_named (ID f) (port_expr as)
+;
+
+let c_pexlif_inst ix (PINST name _ _ fa_inps fa_outs _ _) =
+      NPM_Item (MOGI_module (Module_instantiation
+        (ID name) // module name
+        [ Module_instance
+            (ID ("m" ^ int2str ix)) // local name
+            (NONE) // range
+            (SOME ((map connect_ports fa_inps) @ // port mapping
+                   (map connect_ports fa_outs)))
+        ]
+      ))
+;
+
+// -----------------------------------------------------------------------------
+
+let net_or_reg fs i = maybe T (is_wire i fs) id;
+// note: net (wire) as default.
+
+// pexlif->(description list)
+letrec
+    c_pexlif (PINST name _ _ fa_inps fa_outs f_ints (P_HIER cs)) =
+      let ports =
+            (c_fa_inps fa_inps) @
+            (c_fa_outs fa_outs)
+      in
+      let internals =
+            map3 c_internal
+              f_ints
+              (replicate (length f_ints) [])
+              (replicate (length f_ints) T)
+      in
+      let instantiations = ixmap (\c. \i. c_pexlif_inst i c) cs in
+      let children = flatmap c_pexlif cs in
+      (Desc_module (Module_declaration_many
+        (ID name)
+        (SOME ports)
+        (internals @ instantiations)
+      )) : children
+/\  c_pexlif (PINST name _ _ fa_inps fa_outs f_ints (P_LEAF fs)) =
+      let ports =
+            (c_fa_inps fa_inps) @
+            (c_fa_outs fa_outs)
+      in
+      let internals =
+            map3 c_internal
+              f_ints
+              (replicate (length f_ints) [])
+              (map (net_or_reg fs) f_ints)
+      in
+      let functions = map c_update_fn fs in
+      [Desc_module (Module_declaration_many
+        (ID name)
+        (SOME ports)
+        (internals @ functions)
+      )]
+;
+
+// pexlif->source_text
+let pexlif2verilog pex = Source_text (c_pexlif pex);
+
+end_abstype pexlif2verilog;
+
+// =============================================================================

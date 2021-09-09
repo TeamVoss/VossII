@@ -32,7 +32,7 @@ lettype identifier = ID (string);
 // A.8.7 Numbers ---------------------------------------------------------------
 
 // number ::= decimal_number | octal_number | binary_number | hex_number | real_number
-lettype number = Num (int);
+lettype number = X | Z | Num (int);
 
 // todo:
 new_type_abbrev unsigned_number = number;
@@ -98,7 +98,7 @@ lettype constant_primary =
 //   | system_function_call
 //   | "(" mintypmax_expression ")"
 //   | string
-// note: Moved to 'Expressions' (A.8.3).
+// Moved to 'Expressions' (A.8.3).
 
 // A.8.3 Expressions -----------------------------------------------------------
 
@@ -125,15 +125,6 @@ lettype hierarchical_identifier =
     HID ({(identifier)#({constant_expression} opt)} opt) (identifier)
 ;
 
-// See A.8.4
-lettype primary =
-    Prim_num (number)
-  | Prim_hier
-      (hierarchical_identifier)
-      ({(expression list)#(range_expression)} opt)
-  | Prim_str (string)
-;
-
 // constant_range_expression ::=
 //     constant_expression
 //   | msb_constant_expression : lsb_constant_expression
@@ -158,6 +149,16 @@ lettype expression =
   | Exp_unary (unary_operator) (primary)
   | Exp_binary (expression) (binary_operator) (expression)
   | Exp_conditional (expression) (expression) (expression)
+// See A.8.4
+andlettype primary =
+    Prim_num (number)
+  | Prim_hier
+      (hierarchical_identifier)
+      ({(expression list)#(range_expression)} opt)
+  | Prim_cat (concatenation)
+  | Prim_str (string)
+// See A.8.1
+andlettype concatenation = CAT (expression list)
 ;
 
 // range_expression ::=
@@ -195,6 +196,9 @@ lettype variable_assignment =
 
 // A.8.2 Function calls --------------------------------------------------------
 // A.8.1 Concatenations --------------------------------------------------------
+
+// concatenation ::= "{" expression { "," expression } "}"
+// Moved to 'Expressions' (A.8.3).
 
 // =============================================================================
 // A.8 Expressions
@@ -411,6 +415,8 @@ lettype port_connection =
     Port_con_ordered ({expression} opt)
   | Port_con_named (identifier) ({expression} opt)
 ;
+// note: 'port_connection list' allows one to mix ordered and named connections,
+// please don't do that.
 
 // module_instance ::= name_of_module_instance "(" [ list_of_port_connections ] ")"
 // name_of_module_instance ::= module_instance_identifier [ range ]

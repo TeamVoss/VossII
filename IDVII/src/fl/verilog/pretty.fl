@@ -3,6 +3,7 @@
 // =============================================================================
 
 // faster string type for length and concatenation.
+// todo: use a list of strings instead concat.
 new_type_abbrev str = (int)#(string->string);
 
 let str {s :: string} = let l = strlen s then (l, defix ^ s);
@@ -36,7 +37,7 @@ let is_nil (Nil) = T
 forward_declare{reduce::doc->rdoc};
 
 // Empty document.
-let empty = Nil;
+let nil = Nil;
 
 // Simple text.
 let text {s :: string} = let s' = str s in (TxtBeside s' Nil);
@@ -217,7 +218,7 @@ letrec
 /\  sepLine _ (Above _ _ _)  _ _ = error "sepLine Above"
 ;
 
-let sepSpace _ []     = empty
+let sepSpace _ []     = nil
 /\  sepSpace b (d:ds) = sepLine b (reduce d) 0 ds
 ;
 
@@ -225,15 +226,15 @@ let sep = sepSpace T; // Seperate with spaces.
 let cat = sepSpace F; // .. without spaces.
 
 let hsep {ds :: doc list} =
-  snd (horizontalReduce (itlist (\p. \q. Beside p T q) ds empty))
+  snd (horizontalReduce (itlist (\p. \q. Beside p T q) ds nil))
 ;
 
 let hcat {ds :: doc list} =
-  snd (horizontalReduce (itlist (\p. \q. Beside p F q) ds empty))
+  snd (horizontalReduce (itlist (\p. \q. Beside p F q) ds nil))
 ;
 
 let vcat {ds :: doc list} =
-  snd (verticalReduce (itlist (\p. \q. Above p F q) ds empty))
+  snd (verticalReduce (itlist (\p. \q. Above p F q) ds nil))
 ;
 
 let hang {p :: doc} {k :: int} {q :: doc} = sep [p, nest k q];

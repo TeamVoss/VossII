@@ -1,9 +1,18 @@
 load (DIR^"grammar.fl");
 load (DIR^"pretty-verilog.fl");
+load (DIR^"compiler.fl");
+
+load "ste.fl";
 
 // =============================================================================
 // Sanity checks.
 // =============================================================================
+
+// pexlif is a module
+//   phase delay -> always <=
+//   contig -> assign <=
+//
+// verilog2pexlif in STE.fl
 
 let doc1 =
   Source_text [Desc_module (Module_declaration_many (ID "test1")
@@ -22,6 +31,7 @@ let doc1 =
 )];
 
 let ex1 = p_source_text doc1;
+print "=== Ex 1 ===\n";
 render ex1;
 
 // -----------------------------------------------------------------------------
@@ -51,6 +61,23 @@ let doc2 =
 )];
 
 let ex2 = p_source_text doc2;
+print "\n\n=== Ex 2 ===\n";
 render ex2;
+
+// -----------------------------------------------------------------------------
+
+let buf1 =
+    bit_input a.
+    bit_output out.
+    bit_internal mid.
+    CELL "draw_hier buf1" [
+      mid <- '~' a,
+      out <- '~' mid
+    ];
+let buf1_pex = buf1 'a 'out;
+
+let ex3 = p_source_text (pexlif2verilog buf1_pex);
+print "\n\n=== Ex 3 ===\n";
+render ex3;
 
 // =============================================================================
