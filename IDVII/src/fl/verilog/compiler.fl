@@ -41,13 +41,24 @@ let
 ;
 // todo: sizes?
 
+let c_size 1  = NONE
+/\  c_size sz = SOME ([],(Range_m2l
+      (CExp_primary (CPrim_num (Num (sz-1))))
+      (CExp_primary (CPrim_num (Num 0)))))
+;
+// todo: range is always size-1 to 0?
+
 // wexpr->expression
 letrec
     c_wexpr (W_X _) = Exp_primary (Prim_num X)
 /\  c_wexpr (W_CONST _ v) = Exp_primary (Prim_num (Num v))
 /\  c_wexpr (W_NAMED_CONST _ _ v) = Exp_primary (Prim_num (Num v))
-/\  c_wexpr (W_VAR _ i) = Exp_primary (Prim_hier (HID NONE (ID i)) NONE)
-/\  c_wexpr (W_EXPLICIT_VAR _ i) = Exp_primary (Prim_hier (HID NONE (ID i)) NONE)
+/\  c_wexpr (W_VAR sz i) =
+      let range = c_size sz in
+      Exp_primary (Prim_hier (HID NONE (ID i)) range)
+/\  c_wexpr (W_EXPLICIT_VAR sz i) =
+      let range = c_size sz in
+      Exp_primary (Prim_hier (HID NONE (ID i)) range)
 /\  c_wexpr (W_AND a b) = Exp_binary (c_wexpr a) B_log_and (c_wexpr b)
 /\  c_wexpr (W_OR a b) = Exp_binary (c_wexpr a) B_log_or (c_wexpr b)
 /\  c_wexpr (W_NOT a) = Exp_unary U_log_neg (c_primary a)
@@ -155,12 +166,21 @@ let c_internal i ds T =
 
 // -----------------------------------------------------------------------------
 
+let c_range 1  = NONE
+/\  c_range sz = SOME (Range
+      (CExp_primary (CPrim_num (Num (sz-1))))
+      (CExp_primary (CPrim_num (Num 0))))
+;
+
 // string->bool->port_declaration
-let c_port f T = Port_decl_in  (Input_decl NONE F NONE [(ID f)])
-/\  c_port f F = Port_decl_out (Output_decl_port NONE F NONE [(ID f)])
+let c_port f T =
+      let range = c_range (md_size f) in
+      Port_decl_in (Input_decl NONE F range [(ID f)])
+/\  c_port f F =
+      let range = c_range (md_size f) in
+      Port_decl_out (Output_decl_port NONE F range [(ID f)])
 ;
 // todo: net/reg type?
-// todo: range?
 // todo: signed?
 
 let c_fa_inps = map (flip c_port T # fst);
@@ -168,9 +188,11 @@ let c_fa_outs = map (flip c_port F # fst);
 
 // -----------------------------------------------------------------------------
 
-let port_exp a = Exp_primary (Prim_hier (HID NONE (ID a)) NONE);
+let port_exp a =
+      let range = c_size (md_size a) in
+      Exp_primary (Prim_hier (HID NONE (ID a)) range)
+;
 // todo: hierarchy?
-// todo: range?
 
 let connect_ports (f,as) =
       let port_expr []  = NONE
@@ -181,9 +203,9 @@ let connect_ports (f,as) =
       Port_con_named (ID f) (port_expr as)
 ;
 
-let c_pexlif_inst ix (PINST name _ _ fa_inps fa_outs _ _) =
+let c_pexlif_inst ix inst (PINST name _ _ fa_inps fa_outs _ _) =
       NPM_Item (MOGI_module (Module_instantiation
-        (ID name) // module name
+        (ID (inst^name)) // module name
         [ Module_instance
             (ID ("m" ^ int2str ix)) // local name
             (NONE) // range
@@ -200,45 +222,48 @@ let net_or_reg fs i = maybe T (is_wire i fs) id;
 
 // pexlif->(description list)
 letrec
-    c_pexlif (PINST name _ _ fa_inps fa_outs f_ints (P_HIER cs)) =
+    c_pexlif inst (PINST name _ _ fa_inps fa_outs f_ints (P_HIER cs)) =
       let ports =
-            (c_fa_inps fa_inps) @
-            (c_fa_outs fa_outs)
+            (c_fa_inps fa_inps) @ (c_fa_outs fa_outs)
       in
       let internals =
-            map3 c_internal
-              f_ints
-              (replicate (length f_ints) [])
-              (replicate (length f_ints) T)
+            map3 c_internal f_ints
+              (replicate (length f_ints) []) (replicate (length f_ints) T)
       in
-      let instantiations = ixmap (\c. \i. c_pexlif_inst i c) cs in
-      let children = flatmap c_pexlif cs in
+      let inst_cs =
+            ixmap (\b. \i. sprintf "%d_%s" i b) (replicate (length cs) inst)
+      in
+      let instantiations =
+            ixmap (\(inst_c, c). \i. c_pexlif_inst i inst_c c) (zip inst_cs cs)
+      in
+      let children =
+            flatmap (\(inst_c, c). c_pexlif inst_c c) (zip inst_cs cs)
+      in
       (Desc_module (Module_declaration_many
-        (ID name)
+        (ID (inst^name))
         (SOME ports)
         (internals @ instantiations)
       )) : children
-/\  c_pexlif (PINST name _ _ fa_inps fa_outs f_ints (P_LEAF fs)) =
+/\  c_pexlif inst (PINST name _ _ fa_inps fa_outs f_ints (P_LEAF fs)) =
       let ports =
-            (c_fa_inps fa_inps) @
-            (c_fa_outs fa_outs)
+            (c_fa_inps fa_inps) @ (c_fa_outs fa_outs)
       in
       let internals =
-            map3 c_internal
-              f_ints
-              (replicate (length f_ints) [])
-              (map (net_or_reg fs) f_ints)
+            map3 c_internal f_ints
+              (replicate (length f_ints) []) (map (net_or_reg fs) f_ints)
       in
-      let functions = map c_update_fn fs in
+      let functions =
+            map c_update_fn fs
+      in
       [Desc_module (Module_declaration_many
-        (ID name)
+        (ID (inst^name))
         (SOME ports)
         (internals @ functions)
       )]
 ;
 
 // pexlif->source_text
-let pexlif2verilog pex = Source_text (c_pexlif pex);
+let pexlif2verilog pex = Source_text (c_pexlif "" pex);
 
 end_abstype pexlif2verilog;
 

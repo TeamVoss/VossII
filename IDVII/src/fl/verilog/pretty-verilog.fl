@@ -245,9 +245,9 @@ let p_loop_statement (LOOP_forever s) =
 /\  p_loop_statement (LOOP_for i e n s) =
       hangs (text "for" <+> in_paren (
                   p_variable_assignment i
-              <+> text ";"
+              <-> text ";"
               <+> p_expression e
-              <+> text ";"
+              <-> text ";"
               <+> p_variable_assignment n))
             (p_statement s)
 ;
@@ -256,8 +256,8 @@ forward_declare{p_blocking_assignment::blocking_assignment->doc};
 forward_declare{p_nonblocking_assignment::nonblocking_assignment->doc};
 
 let p_statement (Statement_null) = text ";"
-/\  p_statement (Statement_blocking s) = p_blocking_assignment s <+> text ";"
-/\  p_statement (Statement_nonblocking s) = p_nonblocking_assignment s <+> text ";"
+/\  p_statement (Statement_blocking s) = p_blocking_assignment s <-> text ";"
+/\  p_statement (Statement_nonblocking s) = p_nonblocking_assignment s <-> text ";"
 /\  p_statement (Statement_timing s) = p_procedural_timing_control_statement s
 /\  p_statement (Statement_if s) = p_if_else_if_statement s
 /\  p_statement (Statement_cond s) = p_conditional_statement s
@@ -283,7 +283,7 @@ let p_nonblocking_assignment (Nonblocking_assignment vlv doec' e) =
 ;
 let p_continuous_assign (Cont_assign as) =
       let pr (nlv,e) = p_net_lvalue nlv <+> text "=" <+> p_expression e in
-      text "assign" <+> in_list (map pr as) <+> text ";"
+      text "assign" <+> in_list (map pr as) <-> text ";"
 ;
 
 forward_declare{p_range::range->doc};
@@ -298,7 +298,7 @@ let p_udp_instantiation (UDP_inst i ds) =
       let p_udp (i', o, is) =
             p_opt p_instance i' <-> in_paren (p_terminals o is)
       in
-      p_identifier i <+> in_list (map p_udp ds) <+> text ";"
+      p_identifier i <+> in_list (map p_udp ds) <-> text ";"
 ;
 
 let p_port_connection (Port_con_ordered e') = p_opt p_expression e'
@@ -317,7 +317,7 @@ let p_module_instance (Module_instance i r' (NONE)) =
 ;
 
 let p_module_instantiation (Module_instantiation i l) =
-      p_identifier i <+> in_list (map p_module_instance l)
+      p_identifier i <+> in_list (map p_module_instance l) <-> text ";"
 ;
 
 let p_dimension (Dimension c1 c2) = in_braces (
@@ -369,26 +369,26 @@ let p_net_declaration (ND_scalar_id t s is) =
           p_net_type t
       <+> p_when s (text "signed")
       <+> p_net_identifiers is
-      <+> text ";"
+      <-> text ";"
 /\  p_net_declaration (ND_scalar_decl t s ds) =
           p_net_type t
       <+> p_when s (text "signed")
       <+> p_net_decls ds
-      <+> text ";"
+      <-> text ";"
 /\  p_net_declaration (ND_vector_id t v s r is) =
           p_net_type t
       <+> text (v => "vectored" | "scalared")
       <+> p_when s (text "signed")
       <+> p_range r
       <+> p_net_identifiers is
-      <+> text ";"
+      <-> text ";"
 /\  p_net_declaration (ND_vector_decl t v s r ds) =
           p_net_type t
       <+> text (v => "vectored" | "scalared")
       <+> p_when s (text "signed")
       <+> p_range r
       <+> p_net_decls ds
-      <+> text ";"
+      <-> text ";"
 ;
 
 let p_reg_declaration (Reg_decl s r' is) =
@@ -396,7 +396,7 @@ let p_reg_declaration (Reg_decl s r' is) =
       <+> p_when s (text "signed")
       <+> p_opt p_range r'
       <+> in_list (map p_variable_type is)
-      <+> text ";"
+      <-> text ";"
 ;
 
 let p_real_declaration (Real_decl is) =
@@ -457,7 +457,7 @@ let p_non_port_module_item (NPM_Item i) = p_module_or_generate_item i;
 
 forward_declare{p_port_declaration::port_declaration->doc};
 
-let p_module_item (Module_Port d) = p_port_declaration d <+> text ";"
+let p_module_item (Module_Port d) = p_port_declaration d <-> text ";"
 /\  p_module_item (Module_Item i) = p_non_port_module_item i
 ;
 
@@ -490,7 +490,7 @@ let p_module_declaration (Module_declaration_one i ps ms) =
       let footer = text "endmodule" in
       vcat [hangs header ports, middle, body, footer]
 /\  p_module_declaration (Module_declaration_many i (NONE) ms) =
-      let header = text "module" <+> p_identifier i <+> text ";" in
+      let header = text "module" <+> p_identifier i <-> text ";" in
       let body   = vcat (map p_non_port_module_item ms) in
       let footer = text "endmodule" in
       vcat [header, body, footer]

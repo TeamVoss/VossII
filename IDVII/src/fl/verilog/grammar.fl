@@ -424,7 +424,7 @@ lettype module_instance =
     Module_instance (identifier) ({range} opt) ({port_connection list} opt)
 ;
 
-// module_instantiation ::= module_identifier module_instance { "," module_instance } ;
+// module_instantiation ::= module_identifier module_instance { "," module_instance } ";"
 lettype module_instantiation =
     Module_instantiation (identifier) (module_instance list)
 ;
