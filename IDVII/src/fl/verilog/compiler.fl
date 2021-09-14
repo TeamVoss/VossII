@@ -7,6 +7,14 @@ load (DIR^"../design/misc.fl");
 
 begin_abstype;
 
+let c_range 1  = NONE
+/\  c_range sz = SOME (Range
+      (CExp_primary (CPrim_num (Num (sz-1))))
+      (CExp_primary (CPrim_num (Num 0))))
+;
+
+// -----------------------------------------------------------------------------
+
 // string->port_declaration
 let v_port T f = Port_decl_in  (Input_decl NONE F NONE [ID f])
 /\  v_port F f = Port_decl_out (Output_decl_port NONE F NONE [ID f])
@@ -27,44 +35,96 @@ let v_always var_lv exp = NPM_Item (MOGI_always (Always (Statement_timing (PTC
 
 // -----------------------------------------------------------------------------
 
+// Fetch the size of a wexpr.
+letrec
+    size_of (W_X sz) = sz
+/\  size_of (W_CONST sz _) = sz
+/\  size_of (W_NAMED_CONST _ sz _) = sz
+/\  size_of (W_VAR sz _) = sz
+/\  size_of (W_EXPLICIT_VAR sz _) = sz
+/\  size_of (W_AND a _) = size_of a
+/\  size_of (W_OR a _) = size_of a
+/\  size_of (W_NOT a) = size_of a
+/\  size_of (W_EQ a _) = size_of a
+/\  size_of (W_PRED _ c) = print "W_PRED no yet supported" fseq size_of c
+/\  size_of (W_GR a _) = size_of a
+/\  size_of (W_ADD a _) = size_of a
+/\  size_of (W_SUB a _) = size_of a
+/\  size_of (W_MUL a _) = size_of a
+/\  size_of (W_DIV a _) = size_of a
+/\  size_of (W_MOD a _) = size_of a
+/\  size_of (W_SHL a _) = size_of a
+/\  size_of (W_SHR a _) = size_of a
+/\  size_of (W_ASHR a _) = size_of a
+/\  size_of (W_SX sz _) = sz
+/\  size_of (W_ZX sz _) = sz
+/\  size_of (W_ITE _ t e) = size_of t
+/\  size_of (W_SLICE is _) = length is
+/\  size_of (W_NAMED_SLICE _ is _) = length is
+/\  size_of (W_UPDATE_NAMED_SLICE _ _ is _) = length is
+/\  size_of (W_CAT ws) = sum (map size_of ws)
+/\  size_of (W_MEM_READ _ _ _) = error "todo: size_of W_MEM_READ"
+/\  size_of (W_MEM_WRITE _ _ _ _) = error "todo: size_of W_MEM_WRITE"
+;
+
 forward_declare{c_wexpr::wexpr->expression};
 
+let c_size 1  = NONE
+/\  c_size sz = SOME ([], (Range_m2l
+      (CExp_primary (CPrim_num (Num (sz-1))))
+      (CExp_primary (CPrim_num (Num 0)))))
+;
+// todo: range is always sz-1 to 0? No!
+// todo: 2-dim arrays is a thing, check for them with 'md_split_vector'.
+// todo: could also be non-contig., need to account for that.
+
+let c_primary_id sz i =
+      let range = c_size sz in
+      Prim_hier (HID NONE (ID i)) range
+;
+
+// let valid_lhs we =
+//     letrec rec_ok (W_VAR sz b) = T
+//      /\    rec_ok (W_SLICE msb lsb w) = rec_ok w
+//      /\    rec_ok (W_CAT parts) = itlist (\w.\r. rec_ok w AND r) parts T
+//      /\    rec_ok other = F
+//     in
+//     rec_ok we
+// ;
+
+// Compiler for the LHS of an update_fn.
 // wexpr->primary
 let
     c_primary (W_X _) = Prim_num X
 /\  c_primary (W_CONST _ v) = Prim_num (Num v)
 /\  c_primary (W_NAMED_CONST _ _ v) = Prim_num (Num v)
-/\  c_primary (W_VAR _ i) = Prim_hier (HID NONE (ID i)) NONE
-/\  c_primary (W_EXPLICIT_VAR _ i) = Prim_hier (HID NONE (ID i)) NONE
+/\  c_primary (W_VAR sz i) = c_primary_id sz i
+/\  c_primary (W_EXPLICIT_VAR sz i) = c_primary_id sz i
 /\  c_primary (W_CAT es) = Prim_cat (CAT (map c_wexpr es))
-/\  c_primary _ = error "expected a 'primary' wexpr"
+/\  c_primary _ = error "expected a 'primary'-like wexpr"
 ;
-// todo: sizes?
+// todo: what exactly is allowed on the LHS?
 
-let c_size 1  = NONE
-/\  c_size sz = SOME ([],(Range_m2l
-      (CExp_primary (CPrim_num (Num (sz-1))))
-      (CExp_primary (CPrim_num (Num 0)))))
+// ...
+// wexpr->(identifier) opt
+let valid_sx_wexpr (W_VAR _ i) = SOME (ID i)
+/\  valid_sx_wexpr _ = NONE
 ;
-// todo: range is always size-1 to 0?
 
+// Compiler for the RHS of an update_fn.
 // wexpr->expression
 letrec
     c_wexpr (W_X _) = Exp_primary (Prim_num X)
 /\  c_wexpr (W_CONST _ v) = Exp_primary (Prim_num (Num v))
 /\  c_wexpr (W_NAMED_CONST _ _ v) = Exp_primary (Prim_num (Num v))
-/\  c_wexpr (W_VAR sz i) =
-      let range = c_size sz in
-      Exp_primary (Prim_hier (HID NONE (ID i)) range)
-/\  c_wexpr (W_EXPLICIT_VAR sz i) =
-      let range = c_size sz in
-      Exp_primary (Prim_hier (HID NONE (ID i)) range)
+/\  c_wexpr (W_VAR sz i) = Exp_primary (c_primary_id sz i)
+/\  c_wexpr (W_EXPLICIT_VAR sz i) = Exp_primary (c_primary_id sz i)
 /\  c_wexpr (W_AND a b) = Exp_binary (c_wexpr a) B_log_and (c_wexpr b)
 /\  c_wexpr (W_OR a b) = Exp_binary (c_wexpr a) B_log_or (c_wexpr b)
-/\  c_wexpr (W_NOT a) = Exp_unary U_log_neg (c_primary a)
+/\  c_wexpr (W_NOT a) = Exp_unary U_bit_neg (c_primary a)
 /\  c_wexpr (W_EQ a b) = Exp_binary (c_wexpr a) B_log_eq (c_wexpr b)
-/\  c_wexpr (W_PRED _ _) = error "todo: c_wexpr PRED"
-/\  c_wexpr (W_GR _ _) = error "todo: c_wexpr ?GR?"
+/\  c_wexpr (W_PRED _ a) = print "PRED is not yet supported" fseq c_wexpr a
+/\  c_wexpr (W_GR a b) = Exp_binary (c_wexpr a) B_gt (c_wexpr b)
 /\  c_wexpr (W_ADD a b) = Exp_binary (c_wexpr a) B_add (c_wexpr b)
 /\  c_wexpr (W_SUB a b) = Exp_binary (c_wexpr a) B_sub (c_wexpr b)
 /\  c_wexpr (W_MUL a b) = Exp_binary (c_wexpr a) B_mult (c_wexpr b)
@@ -72,9 +132,40 @@ letrec
 /\  c_wexpr (W_MOD a b) = Exp_binary (c_wexpr a) B_mod (c_wexpr b)
 /\  c_wexpr (W_SHL a b) = Exp_binary (c_wexpr a) B_log_shl (c_wexpr b)
 /\  c_wexpr (W_SHR a b) = Exp_binary (c_wexpr a) B_log_shr (c_wexpr b)
-/\  c_wexpr (W_ASHR a b) = error "todo: c_wexpr ?ASHR?"
-/\  c_wexpr (W_SX _ _) = error "todo: c_wexpr SX" // extended[15:0] <= { {8{extend[7]}}, extend[7:0] };
-/\  c_wexpr (W_ZX _ _) = error "todo: c_wexpr ZX" // extended[15:0] <= { {8{...}}, extend[7:0] };
+/\  c_wexpr (W_ASHR a b) = Exp_binary (c_wexpr a) B_shr (c_wexpr b)
+/\  c_wexpr (W_SX sz a) =
+      let hd = valid_sx_wexpr a in
+      NOT (has_value hd) => error "SX is only permitted on variables" |
+      // note: since this seems to be the only way of indexing in Verilog
+      // > extended[15:0] <= { {8{extend[7]}}, extend[7:0] };
+      // we need 'a' to be something which we can extract an identifier from.
+      // This basically limits 'a' to variables.
+      let a' = c_wexpr a in
+      let sz_ex = sz - size_of a in
+      let hd_a =
+            Exp_primary (Prim_hier
+              (HID NONE (get_value hd))
+              (SOME ([], Range_exp (Exp_primary (Prim_num (Num (sz-1)))))))
+      in
+      let mcat_a =
+            Exp_primary (Prim_mcat (MCAT
+              (CExp_primary (CPrim_num (Num sz_ex)))
+              (CAT [hd_a])))
+      in
+      Exp_primary (Prim_cat (CAT [mcat_a, a']))
+      // todo: need local variable to hold potential expr of a?
+      // todo: sign-extension function with paramaters for sz and (sz - size_of a)?
+/\  c_wexpr (W_ZX sz a) =
+      // note: same as for 'SX', but no limit since it uses '0'.
+      // extended[15:0] <= { {8{0}}, extend[7:0] };
+      let a' = c_wexpr a in
+      let sz_ex = sz - size_of a in
+      let mcat_zero =
+            Exp_primary (Prim_mcat (MCAT
+              (CExp_primary (CPrim_num (Num sz_ex)))
+              (CAT [Exp_primary (Prim_num (Num 0))])))
+      in
+      Exp_primary (Prim_cat (CAT [mcat_zero, a']))
 /\  c_wexpr (W_ITE c a b) = Exp_conditional (c_wexpr c) (c_wexpr a) (c_wexpr b)
 /\  c_wexpr (W_SLICE _ _) = error "todo: c_wexpr W_SLICE"
 /\  c_wexpr (W_NAMED_SLICE _ _ _) = error "todo: c_wexpr W_NAMED_SLICE"
@@ -83,7 +174,6 @@ letrec
 /\  c_wexpr (W_MEM_READ _ _ _) = error "todo: c_wexpr W_MEM_READ"
 /\  c_wexpr (W_MEM_WRITE _ _ _ _) = error "todo: c_wexpr W_MEM_WRITE"
 ;
-// todo: sizes?
 
 // wexpr->net_lvalue
 let net_wexpr (W_VAR _ i) = NLV_hier (HID NONE (ID i)) NONE
@@ -138,50 +228,51 @@ let is_reg_fn i fn = maybe NONE (is_wire i fn) (SOME # NOT);
 let is_reg i fs = exhaust (map (is_reg_fn i) fs);
 
 // string->(((cexp)#(cexp)) list)->bool->non_port_module_item
-let c_internal i ds T =
+let c_internalH i ds T =
+      let internal = hd (str_split i "[") in
       NPM_Item (MOGI_decl (MOGID_net
         ( ND_scalar_id
             NT_wire // type
             F // signed
             [ Net_id
-                (ID i) // id
+                (ID internal) // id
                 (map (curry Dimension) ds) // dimension
             ]
         )
       ))
-/\  c_internal i ds F =
+/\  c_internalH i ds F =
+      let range = c_range (md_size i) in
+      let internal = hd (str_split i "[") in
       NPM_Item (MOGI_decl (MOGID_reg
         ( Reg_decl
             F // signed
-            NONE // range
+            range // range
             [ VT_dim
-                (ID i) // id
+                (ID internal) // id
                 (map (curry Dimension) ds) // dimension
             ]
         )
       ))
 ;
-// todo: signed?
-// todo: range?
+// todo: dimensions?
+
+let c_internal i ds =
+      md_size i > 1 => c_internalH i ds F | c_internalH i ds T
+;
 
 // -----------------------------------------------------------------------------
 
-let c_range 1  = NONE
-/\  c_range sz = SOME (Range
-      (CExp_primary (CPrim_num (Num (sz-1))))
-      (CExp_primary (CPrim_num (Num 0))))
-;
-
 // string->bool->port_declaration
 let c_port f T =
+      let formal = hd (str_split f "[") in
       let range = c_range (md_size f) in
-      Port_decl_in (Input_decl NONE F range [(ID f)])
+      Port_decl_in (Input_decl NONE F range [(ID formal)])
 /\  c_port f F =
+      let formal = hd (str_split f "[") in
       let range = c_range (md_size f) in
-      Port_decl_out (Output_decl_port NONE F range [(ID f)])
+      Port_decl_out (Output_decl_port NONE F range [(ID formal)])
 ;
 // todo: net/reg type?
-// todo: signed?
 
 let c_fa_inps = map (flip c_port T # fst);
 let c_fa_outs = map (flip c_port F # fst);
@@ -190,7 +281,8 @@ let c_fa_outs = map (flip c_port F # fst);
 
 let port_exp a =
       let range = c_size (md_size a) in
-      Exp_primary (Prim_hier (HID NONE (ID a)) range)
+      let actual = hd (str_split a "[") in
+      Exp_primary (Prim_hier (HID NONE (ID actual)) range)
 ;
 // todo: hierarchy?
 
@@ -200,12 +292,13 @@ let connect_ports (f,as) =
       /\  port_expr as  =
             SOME (Exp_primary (Prim_cat (CAT (map port_exp as))))
       in
-      Port_con_named (ID f) (port_expr as)
+      let formal = hd (str_split f "[") in
+      Port_con_named (ID formal) (port_expr as)
 ;
 
 let c_pexlif_inst ix inst (PINST name _ _ fa_inps fa_outs _ _) =
       NPM_Item (MOGI_module (Module_instantiation
-        (ID (inst^name)) // module name
+        (ID ("m"^name^inst)) // module name
         [ Module_instance
             (ID ("m" ^ int2str ix)) // local name
             (NONE) // range
@@ -227,8 +320,7 @@ letrec
             (c_fa_inps fa_inps) @ (c_fa_outs fa_outs)
       in
       let internals =
-            map3 c_internal f_ints
-              (replicate (length f_ints) []) (replicate (length f_ints) T)
+            map2 c_internal f_ints (replicate (length f_ints) [])
       in
       let inst_cs =
             ixmap (\b. \i. sprintf "%d_%s" i b) (replicate (length cs) inst)
@@ -240,7 +332,7 @@ letrec
             flatmap (\(inst_c, c). c_pexlif inst_c c) (zip inst_cs cs)
       in
       (Desc_module (Module_declaration_many
-        (ID (inst^name))
+        (ID ("m"^name^inst))
         (SOME ports)
         (internals @ instantiations)
       )) : children
@@ -249,14 +341,13 @@ letrec
             (c_fa_inps fa_inps) @ (c_fa_outs fa_outs)
       in
       let internals =
-            map3 c_internal f_ints
-              (replicate (length f_ints) []) (map (net_or_reg fs) f_ints)
+            map2 c_internal f_ints (replicate (length f_ints) [])
       in
       let functions =
             map c_update_fn fs
       in
       [Desc_module (Module_declaration_many
-        (ID (inst^name))
+        (ID ("m"^name^inst))
         (SOME ports)
         (internals @ functions)
       )]

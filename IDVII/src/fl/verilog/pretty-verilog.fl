@@ -112,6 +112,7 @@ let p_constant_primary (CPrim_num n) = p_number n
 ;
 
 forward_declare{p_concatenation::concatenation->doc};
+forward_declare{p_multiple_concatenation::multiple_concatenation->doc};
 
 let p_primary (Prim_num n) = p_number n
 /\  p_primary (Prim_hier i es') =
@@ -120,7 +121,8 @@ let p_primary (Prim_num n) = p_number n
           <-> in_braces (p_range_expression re)
       in
       p_hierarchical_identifier i <-> p_opt pr es'
-/\  p_primary (Prim_cat es) = p_concatenation es
+/\  p_primary (Prim_cat c) = p_concatenation c
+/\  p_primary (Prim_mcat mc) = p_multiple_concatenation mc
 /\  p_primary (Prim_str s) = text s
 ;
 
@@ -162,7 +164,7 @@ letrec
 
 let p_range_expression (Range_exp e) = p_expression e
 /\  p_range_expression (Range_m2l c1 c2) =
-      p_constant_expression c1 <+> text ":" <+> p_constant_expression c2
+      p_constant_expression c1 <-> text ":" <-> p_constant_expression c2
 ;
 
 let p_mintypmax_expression (Mintypmax_expression e) = p_expression e
@@ -175,6 +177,10 @@ let p_mintypmax_expression (Mintypmax_expression e) = p_expression e
 ;
 
 let p_concatenation (CAT es) = in_curly (in_list (map p_expression es));
+
+let p_multiple_concatenation (MCAT ce cat) =
+      in_curly (p_constant_expression ce <-> p_concatenation cat)
+;
 
 letrec
     p_event_expression (Event_exp e) = p_expression e

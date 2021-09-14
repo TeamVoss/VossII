@@ -66,20 +66,29 @@ let ex2 = p_source_text doc2;
 
 // -----------------------------------------------------------------------------
 
+TYPE "byte" 8;
+
+// todo: remove spaces.
 let buf1 =
-    bit_input a.
-    bit_output out.
-    bit_internal mid.
-    CELL "draw_hier buf1" [
+    byte_input a.
+    byte_output out.
+    byte_internal mid.
+    CELL "buf1" [
       mid <- '~' a,
       out <- '~' mid
     ];
 let buf1_pex = buf1 'a 'out;
+//buf1_pex;
 
 let ex3 = p_source_text (pexlif2verilog buf1_pex);
 //print "\n\n=== Ex 3 ===\n";
-render ex3;
 
-//verilog2pexlif (sprintf "-I%s" DIR) "draw_hier buf1" ["test.v"] [];
+let res = render ex3;
+let fp = fopen "test.v" "w";
+fprintf fp "%s\n" res;
+fclose fp;
+
+//let p = verilog2pexlif ("-I.") "mbuf1" ["test.v"] [];
+//STE_debug (pexlif2fsm p);
 
 // =============================================================================

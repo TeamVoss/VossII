@@ -156,9 +156,12 @@ andlettype primary =
       (hierarchical_identifier)
       ({(expression list)#(range_expression)} opt)
   | Prim_cat (concatenation)
+  | Prim_mcat (multiple_concatenation)
   | Prim_str (string)
 // See A.8.1
 andlettype concatenation = CAT (expression list)
+// See A.8.1
+andlettype multiple_concatenation = MCAT (constant_expression) (concatenation)
 ;
 
 // range_expression ::=
@@ -198,6 +201,9 @@ lettype variable_assignment =
 // A.8.1 Concatenations --------------------------------------------------------
 
 // concatenation ::= "{" expression { "," expression } "}"
+// Moved to 'Expressions' (A.8.3).
+
+// multiple_concatenation ::= "{" constant_expression concatenation "}"
 // Moved to 'Expressions' (A.8.3).
 
 // =============================================================================

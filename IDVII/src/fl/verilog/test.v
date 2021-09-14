@@ -1,32 +1,32 @@
-module draw_hier buf1 (
-    input a,
-    output out
+module mbuf1 (
+    input [7 : 0] a,
+    output [7 : 0] out
 );
-wire mid ;
- m1(.a(a), .mid(mid))
- m2(.mid(mid), .out(out))
+reg [7 : 0] mid;
+m1_ m1(.a(a[7:0]), .mid(mid[7:0]));
+m2_ m2(.mid(mid[7:0]), .out(out[7:0]));
 endmodule
-module  (
-    input a,
-    output mid
+module m1_ (
+    input [7 : 0] a,
+    output [7 : 0] mid
 );
-draw_inverter m1(.a(a), ._tmp(mid))
+mdraw_inverter1_1_ m1(.a(a[7:0]), ._tmp(mid[7:0]));
 endmodule
-module draw_inverter (
-    input a,
-    output _tmp
+module mdraw_inverter1_1_ (
+    input [7 : 0] a,
+    output [7 : 0] _tmp
 );
-assign _tmp = !a ;
+assign _tmp = ~a[7:0];
 endmodule
-module  (
-    input mid,
-    output out
+module m2_ (
+    input [7 : 0] mid,
+    output [7 : 0] out
 );
-draw_inverter m1(.mid(mid), ._tmp(out))
+mdraw_inverter1_2_ m1(.mid(mid[7:0]), ._tmp(out[7:0]));
 endmodule
-module draw_inverter (
-    input mid,
-    output _tmp
+module mdraw_inverter1_2_ (
+    input [7 : 0] mid,
+    output [7 : 0] _tmp
 );
-assign _tmp = !mid ;
+assign _tmp = ~mid[7:0];
 endmodule
