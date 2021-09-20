@@ -289,6 +289,13 @@ let string_empty s = strlen s == 0;
 //  string_concat::(string list)->string
 let string_concat ss = itlist (defix ^) ss "";
 
+// Replace every occurence of 'x' with 'y' in 's'.
+//  string_replace::string->string->string->string
+let string_replace s x y = let xs = str_split s x in list2str T "" y "" id xs;
+
+// Keep only the characters in 's' that satisfy the predicate 'pred'.
+let string_filter s pred = list2str T "" "" "" id (filter pred (explode s));
+
 //------------------------------------------------------------------------------
 // Random.
 

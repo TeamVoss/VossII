@@ -37,7 +37,8 @@ let hier i = HID NONE (ID i);
 
 // Hierarchical ID with an optional range.
 let prim_hier i []     = Prim_hier (hier i) (NONE)
-/\  prim_hier i (r:rs) = Prim_hier (hier i) (SOME (map index_exp rs, range_exp r))
+/\  prim_hier i (r:rs) =
+      Prim_hier (hier i) (SOME (map index_exp rs, range_exp r))
 ;
 // note: Assumes the size of 'i' is not included in its name.
 // note: We assume ranges are on the form [msb:0].
@@ -75,6 +76,17 @@ let split_name_dim {vec::string} =
 // todo: My simple Google-fu skills tell me that Verilog-people tend to swap the
 // msb & lsb when declaring an array's range. Not sure why though..
 
+// A simple identifier shall be any sequence of letters, digits,
+// dollar signs ($), and underscore characters (_).
+let valid_ident s =
+      let c = ord s in
+      ((c >= 65) AND (c <= 90)) OR // A-Z
+      ((c >= 97) AND (c <= 122)) OR // a-z
+      ((c >= 48) AND (c <= 57)) OR // 0-9
+      (c == 36) OR // $
+      (c == 95) // _
+;
+
 // Positive index.
 let valid_index i = i >= 0;
 
@@ -83,6 +95,11 @@ letrec
     valid_slice [] = T
 /\  valid_slice (i:[]) = valid_index i
 /\  valid_slice (i:j:is) = (valid_index i) AND (i-j==1) AND (valid_slice (j:is))
+;
+
+let contig_slice [] = error "Empty slice."
+/\  contig_slice is = NOT (valid_slice is) => error "Non-contig. slice." |
+      (hd is, last is)
 ;
 
 // Valid LHS for both 'net_lvalue' and 'variable_lvalue'.
@@ -141,6 +158,8 @@ let var_lvalue {we::wexpr} =
       let to_slice is = Range_m2l (prim_cnum (hd is)) (prim_cnum (last is)) in
       gen_lvalue we to_hier prim_num to_slice VLV_list
 ;
+
+// -----------------------------------------------------------------------------
 
 // Width of a 'wexpr'.
 letrec
@@ -216,55 +235,58 @@ let precedence_binary (B_add) = 4
 
 forward_declare{expression::wexpr->(expression#int)};
 
-let size2range {sz::int} = [(sz-1,0)];
+let paren_exp a = Prim_mintypmax (Mintypmax_expression a);
 
 let x_exp = (Exp_primary (Prim_num X), 1);
 
 let const_exp c = (prim_num c, 1);
 
-let variable_exp sz v = (Exp_primary (prim_hier v (size2range sz)), 1);
-
-let paren_exp a = Prim_mintypmax (Mintypmax_expression a);
+let variable_exp 1  v = (Exp_primary (prim_hier v []), 1)
+/\  variable_exp sz v = (Exp_primary (prim_hier v [(sz-1,0)]), 1)
+;
 
 let unary_exp op a =
-      let unwrap_unary (Exp_primary p) o =
-            1 <= o => paren_exp (Exp_primary p) | p
-      /\  unwrap_unary exp _ = paren_exp exp
+      let unwrap (Exp_primary p) o = 1 <= o => paren_exp (Exp_primary p) | p
+      /\  unwrap exp _ = paren_exp exp
       in
-      (Exp_unary op (curry unwrap_unary (expression a)), 1)
+      (Exp_unary op (curry unwrap (expression a)), 1)
 ;
 
 let binary_exp op a b =
-      let wrap_binary exp n o =
-            (n <= o) => exp | Exp_primary (paren_exp exp)
-      in
+      let wrap exp n o = n <= o => exp | Exp_primary (paren_exp exp) in
       let p = precedence_binary op in
       val (a', n) = expression a in
       val (b', m) = expression b in
-      (Exp_binary (wrap_binary a' p n) op (wrap_binary b' p m), p)
+      (Exp_binary (wrap a' p n) op (wrap b' p m), p)
+;
+
+let unwrap_prim (Exp_primary (Prim_hier (HID NONE (ID i)) rng)) = (i, rng)
+/\  unwrap_prim _ = error "SX/Slice is only supported for variables."
 ;
 
 let sign_extend_exp sz a =
-      let is_primary (Exp_primary (Prim_hier _ _)) = T
-      /\  is_primary _ = F
-      in
-      let a' = fst (expression a) in
+      let a'  = fst (expression a) in
       let sz' = width a in
-      let sign = Exp_primary (Prim_mcat (MCAT (prim_cnum (sz-sz')) (CAT [a']))) in
-      //
-      is_primary a' => error "SX is currently supported for variables only." |
+      let id  = fst (unwrap_prim a') in
+      let rng = [(sz'-1,sz'-1)] in
+      let sign =
+            Exp_primary (Prim_mcat (MCAT (prim_cnum (sz-sz'))
+              (CAT [Exp_primary (prim_hier id rng)])))
+      in
+      // Check for complicated expressions.
       (Exp_primary (Prim_cat (CAT [sign, a'])), 14)
 ;
 // todo: Extend with local variable to hold potential expr in 'a'? Or, gen.
 // sign-extension function with paramaters for sizes?
 
 let zero_extend_exp sz a =
-      let a_exp = fst $ expression a in
-      let zeroes_exp =
-            Exp_primary (Prim_mcat (MCAT (prim_cnum (sz - width a))
+      let a'  = fst $ expression a in
+      let sz' = width a in
+      let zero =
+            Exp_primary (Prim_mcat (MCAT (prim_cnum (sz-sz'))
               (CAT [prim_num 0])))
       in
-      (Exp_primary (Prim_cat (CAT [zeroes_exp, a_exp])), 14)
+      (Exp_primary (Prim_cat (CAT [zero, a'])), 14)
 ;
 
 let conditional_exp c a b =
@@ -276,9 +298,12 @@ let conditional_exp c a b =
 ;
 
 let slice_exp is a =
-      (undefined, 14)
+      let a'  = fst (expression a) in
+      let id  = fst (unwrap_prim a') in
+      let rng = [contig_slice is] in
+      (Exp_primary (prim_hier id rng), 14)
 ;
-// todo: not sure about the precedence here...
+// todo: precedence correct?
 
 let concat_exp as =
       (Exp_primary (Prim_cat (CAT (map (fst # expression) as))), 14)
@@ -441,11 +466,17 @@ let port_instantiation mi ai {args::(string#(string list))list} =
 ;
 // todo: Not sure what the 'range' is used for in module instantiation.
 
-let inst_name name inst = ID ("m"^name^inst);
+let inst_name name inst =
+      let n1 = string_empty name => "m" | name in
+      let n2 = string_replace n1 " " "_" in
+      let n3 = string_filter n2 valid_ident in
+      ID (n3^inst)
+;
+// note: Can't have spaces in names.
 
 let pretty_port_instantiation {inst::string} (PINST name _ _ fa_inps fa_outs _ _) =
       let module = inst_name name inst in
-      let anon   = inst_name "" inst in
+      let anon   = inst_name "anon" inst in
       port_instantiation module anon (fa_inps @ fa_outs)
 ;
 
@@ -482,7 +513,7 @@ let pretty_pexlif_hier {inst::string} {name::string} {fa_inps::(string#(string l
       // Declare internals as 'net' types (hier. pex. only connects other pex.).
       let decl_int = map (flip pretty_internal_decl F) f_ints in
       // Instantiate and pretty children.
-      let child i = sprintf "%d_%s" i inst in
+      let child i = sprintf "%s_%d" inst i in
       let children = concat (ixmap (\c. \i. pretty_pexlif_h (child i) c) cs) in
       let instant = ixmap (\c. \i. pretty_port_instantiation (child i) c) cs in
       //
