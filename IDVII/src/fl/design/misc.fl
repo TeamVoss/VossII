@@ -165,6 +165,7 @@ let ixlist f xs b = snd (sitlist (\x. \(ix,s). (ix-1,f x ix s)) xs (length xs,b)
 // ...
 //  ixmap::(a->int->b)->(a list)->(b list)
 let ixmap f xs = ixlist (\x. \ix. (defix :) (f x ix)) xs [];
+let ixmap2 f xs ys = ixmap (curry f) (zip xs ys);
 
 // Label each element with its index in the list.
 //  ixlabel::(a list)->((a#int) list)

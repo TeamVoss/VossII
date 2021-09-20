@@ -1,0 +1,508 @@
+load (DIR^"grammar.fl");
+load (DIR^"pretty.fl");
+load (DIR^"pretty-verilog.fl");
+load (DIR^"../design/misc.fl");
+
+// =============================================================================
+// "Pretty-printing" of pexlif's via a translation into Verilog.
+// =============================================================================
+
+let warn msg v = print msg fseq v;
+
+// -----------------------------------------------------------------------------
+// ...
+
+// begin_abstype;
+
+let prim_num {i::int} = Exp_primary $ Prim_num $ Num i;
+
+let prim_cnum {i::int} = CExp_primary $ CPrim_num $ Num i;
+
+let range (a,b) = Range (prim_cnum a) (prim_cnum b);
+
+let dimension (a,b) = Dimension (prim_cnum a) (prim_cnum b);
+
+let index_exp (a,b) =
+      a == b => prim_num a | error "internal: index not dot."
+;
+
+let range_exp (a,b) =
+      a == b => Range_exp (prim_num a) | Range_m2l (prim_cnum a) (prim_cnum b)
+;
+
+// Wrapped ID in a flat hierarchy.
+let hier i = HID NONE (ID i);
+// note: Pexlif hierarchies are blackboxes and IDs are unique, hence there's no
+// need to make a distinction between IDs and hierarchical IDs in.
+
+// Hierarchical ID with an optional range.
+let prim_hier i []     = Prim_hier (hier i) (NONE)
+/\  prim_hier i (r:rs) = Prim_hier (hier i) (SOME (map index_exp rs, range_exp r))
+;
+// note: Assumes the size of 'i' is not included in its name.
+// note: We assume ranges are on the form [msb:0].
+
+// Split a "simple" vector into its name and size.
+let split_name_gen {vec::string} =
+      let parse_name (TXT v) = hd (str_split v "[")
+      /\  parse_name _ = error "split_name: Expected a name."
+      in
+      letrec
+          parse_dim [] = []
+      /\  parse_dim ((RANGES [r]):(TXT "]") :[]) = [r]
+      /\  parse_dim ((RANGES [r]):(TXT "]["):ds) = r : parse_dim ds
+      /\  parse_dim _ = error "split_name: Expected a contig. range."
+      in
+      let is = md_split_vector vec in
+      empty is => error "split_name: Empty vector." |
+      (parse_name (hd is), parse_dim (tl is))
+;
+// todo: I currenply assume the given vector is on a simple form, or at least
+// similar to the following examples:
+//   > md_split_vector "a" = ["a"];
+//   > md_split_vector "a[0]" = ["a[",{0:0},"]"];
+//   > md_split_vector "a[31:0]" = ["a[",{31:0},"]"];
+//   > md_split_vector "a[7:0][7:0]" = ["a[",{7:0},"][",{7:0},"]"];
+// where the first range gives the vector size, and the latter give the array
+// dimensions.
+
+let split_name_rng {vec::string} = split_name_gen vec;
+
+let split_name_dim {vec::string} =
+      val (n,rs) = split_name_gen vec in
+      empty rs => (n,[]) | (n, (hd rs) : (map swap (tl rs)))
+;
+// todo: My simple Google-fu skills tell me that Verilog-people tend to swap the
+// msb & lsb when declaring an array's range. Not sure why though..
+
+// Positive index.
+let valid_index i = i >= 0;
+
+// Contig. MSB to LSB slice.
+letrec
+    valid_slice [] = T
+/\  valid_slice (i:[]) = valid_index i
+/\  valid_slice (i:j:is) = (valid_index i) AND (i-j==1) AND (valid_slice (j:is))
+;
+
+// Valid LHS for both 'net_lvalue' and 'variable_lvalue'.
+let valid_lhs {we::wexpr} =
+      let is_var (W_VAR _ _) = T
+      /\  is_var (W_EXPLICIT_VAR _ _) = T
+      /\  is_var other = F
+      in
+      letrec
+          rec_ix (W_SLICE [i] w) = (valid_index i) AND (rec_ix w)
+      /\  rec_ix (W_SLICE is w) = (valid_slice is) AND (is_var w)
+      /\  rec_ix (W_NAMED_SLICE _ [i] w) = (valid_index i) AND (rec_ix w)
+      /\  rec_ix (W_NAMED_SLICE _ is w) = (valid_slice is) AND (is_var w)
+      in
+      letrec
+          rec_top (W_VAR _ _) = T
+      /\  rec_top (W_EXPLICIT_VAR _ _) = T
+      /\  rec_top (W_SLICE [i] w) = (valid_index i) AND (rec_ix w)
+      /\  rec_top (W_SLICE is w) = (valid_slice is) AND (is_var w)
+      /\  rec_top (W_NAMED_SLICE _ [i] w) = (valid_index i) AND (rec_ix w)
+      /\  rec_top (W_NAMED_SLICE _ is w) = (valid_slice is) AND (is_var w)
+      /\  rec_top (W_CAT parts) = all rec_top parts
+      /\  rec_top other = F
+      in
+      rec_top we
+;
+
+// Generic construction of a 'X_lvalue'.
+let gen_lvalue {we::wexpr} hier_f index_f slice_f cat_f =
+      let to_hier v _  (NONE)   = hier_f v (NONE)
+      /\  to_hier v is (SOME r) = hier_f v (SOME (rev is, r))
+      in
+      letrec
+          go (W_VAR _ v) js r' = to_hier v js r'
+      /\  go (W_EXPLICIT_VAR _ v) js r' = to_hier v js r'
+      /\  go (W_SLICE [i] w) js r' = go w (index_f i : js) r'
+      /\  go (W_SLICE is w) js _ = go w js (SOME (slice_f is))
+      /\  go (W_NAMED_SLICE _ [i] w) js r' = go w (index_f i : js) r'
+      /\  go (W_NAMED_SLICE _ is w) js _ = go w js (SOME (slice_f is))
+      /\  go (W_CAT ws) js r' = cat_f (map (\w. go w js r') ws)
+      in
+      valid_lhs we => go we [] NONE | error "gen_lvalue: Invalid LHS."
+;
+
+// note: 'net_lvalue' is used as the LHS of a 'assign' statement.
+let net_lvalue {we::wexpr} =
+      let to_hier v d = NLV_hier (hier v) d in
+      let to_slice is = CRange_m2l (prim_cnum (hd is)) (prim_cnum (last is)) in
+      gen_lvalue we to_hier prim_cnum to_slice NLV_list
+;
+
+// note: 'var_lvalue' is used as the LHS of non-blocking assignments in a
+// 'always' statement.
+let var_lvalue {we::wexpr} =
+      let to_hier v d = VLV_hier (hier v) d in
+      let to_slice is = Range_m2l (prim_cnum (hd is)) (prim_cnum (last is)) in
+      gen_lvalue we to_hier prim_num to_slice VLV_list
+;
+
+// Width of a 'wexpr'.
+letrec
+    width (W_X sz) = sz
+/\  width (W_CONST sz _) = sz
+/\  width (W_NAMED_CONST _ sz _) = sz
+/\  width (W_VAR sz _) = sz
+/\  width (W_EXPLICIT_VAR sz _) = sz
+/\  width (W_AND a _) = width a
+/\  width (W_OR a _) = width a
+/\  width (W_NOT a) = width a
+/\  width (W_EQ a _) = width a
+/\  width (W_PRED _ c) = print "W_PRED no yet supported" fseq width c
+/\  width (W_GR a _) = width a
+/\  width (W_ADD a _) = width a
+/\  width (W_SUB a _) = width a
+/\  width (W_MUL a _) = width a
+/\  width (W_DIV a _) = width a
+/\  width (W_MOD a _) = width a
+/\  width (W_SHL a _) = width a
+/\  width (W_SHR a _) = width a
+/\  width (W_ASHR a _) = width a
+/\  width (W_SX sz _) = sz
+/\  width (W_ZX sz _) = sz
+/\  width (W_ITE _ t e) = width t
+/\  width (W_SLICE is _) = length is
+/\  width (W_NAMED_SLICE _ is _) = length is
+/\  width (W_UPDATE_NAMED_SLICE _ _ is _) = length is
+/\  width (W_CAT ws) = sum (map width ws)
+/\  width (W_MEM_READ _ _ _) = error "todo: width W_MEM_READ"
+/\  width (W_MEM_WRITE _ _ _ _) = error "todo: width W_MEM_WRITE"
+;
+
+let precedence_unary (U_pos) = 1
+/\  precedence_unary (U_neg) = 1
+/\  precedence_unary (U_log_neg) = 1
+/\  precedence_unary (U_bit_neg) = 1
+/\  precedence_unary (U_red_and) = 1
+/\  precedence_unary (U_red_nand) = 1
+/\  precedence_unary (U_red_or) = 1
+/\  precedence_unary (U_red_nor) = 1
+/\  precedence_unary (U_red_xor) = 1
+/\  precedence_unary (U_red_xnor_l) = 1
+/\  precedence_unary (U_red_xnor_r) = 1
+;
+
+let precedence_binary (B_add) = 4
+/\  precedence_binary (B_sub) = 4
+/\  precedence_binary (B_mult) = 3
+/\  precedence_binary (B_div) = 3
+/\  precedence_binary (B_mod) = 3
+/\  precedence_binary (B_log_eq) = 7
+/\  precedence_binary (B_log_neq) = 7
+/\  precedence_binary (B_case_eq) = 7
+/\  precedence_binary (B_case_neq) = 7
+/\  precedence_binary (B_log_and) = 11
+/\  precedence_binary (B_log_or) = 12
+/\  precedence_binary (B_exp) = 2
+/\  precedence_binary (B_lt) = 6
+/\  precedence_binary (B_lte) = 6
+/\  precedence_binary (B_gt) = 6
+/\  precedence_binary (B_gte) = 6
+/\  precedence_binary (B_bit_and) = 8
+/\  precedence_binary (B_bit_or) = 10
+/\  precedence_binary (B_bit_xor) = 9
+/\  precedence_binary (B_bit_eq_l) = 9
+/\  precedence_binary (B_bit_eq_r) = 9
+/\  precedence_binary (B_log_shr) = 5
+/\  precedence_binary (B_log_shl) = 5
+/\  precedence_binary (B_shr) = 5
+/\  precedence_binary (B_shl) = 5
+;
+
+forward_declare{expression::wexpr->(expression#int)};
+
+let size2range {sz::int} = [(sz-1,0)];
+
+let x_exp = (Exp_primary (Prim_num X), 1);
+
+let const_exp c = (prim_num c, 1);
+
+let variable_exp sz v = (Exp_primary (prim_hier v (size2range sz)), 1);
+
+let paren_exp a = Prim_mintypmax (Mintypmax_expression a);
+
+let unary_exp op a =
+      let unwrap_unary (Exp_primary p) o =
+            1 <= o => paren_exp (Exp_primary p) | p
+      /\  unwrap_unary exp _ = paren_exp exp
+      in
+      (Exp_unary op (curry unwrap_unary (expression a)), 1)
+;
+
+let binary_exp op a b =
+      let wrap_binary exp n o =
+            (n <= o) => exp | Exp_primary (paren_exp exp)
+      in
+      let p = precedence_binary op in
+      val (a', n) = expression a in
+      val (b', m) = expression b in
+      (Exp_binary (wrap_binary a' p n) op (wrap_binary b' p m), p)
+;
+
+let sign_extend_exp sz a =
+      let is_primary (Exp_primary (Prim_hier _ _)) = T
+      /\  is_primary _ = F
+      in
+      let a' = fst (expression a) in
+      let sz' = width a in
+      let sign = Exp_primary (Prim_mcat (MCAT (prim_cnum (sz-sz')) (CAT [a']))) in
+      //
+      is_primary a' => error "SX is currently supported for variables only." |
+      (Exp_primary (Prim_cat (CAT [sign, a'])), 14)
+;
+// todo: Extend with local variable to hold potential expr in 'a'? Or, gen.
+// sign-extension function with paramaters for sizes?
+
+let zero_extend_exp sz a =
+      let a_exp = fst $ expression a in
+      let zeroes_exp =
+            Exp_primary (Prim_mcat (MCAT (prim_cnum (sz - width a))
+              (CAT [prim_num 0])))
+      in
+      (Exp_primary (Prim_cat (CAT [zeroes_exp, a_exp])), 14)
+;
+
+let conditional_exp c a b =
+      ( Exp_conditional
+         (fst $ expression c)
+         (fst $ expression a)
+         (fst $ expression b)
+      , 13)
+;
+
+let slice_exp is a =
+      (undefined, 14)
+;
+// todo: not sure about the precedence here...
+
+let concat_exp as =
+      (Exp_primary (Prim_cat (CAT (map (fst # expression) as))), 14)
+;
+
+let expression {we::wexpr} =
+      letrec
+          go (W_X _)        = x_exp
+      /\  go (W_CONST _ c)  = const_exp c
+      /\  go (W_VAR sz v)   = variable_exp sz v
+      /\  go (W_AND a b)    = binary_exp B_log_and a b
+      /\  go (W_OR a b)     = binary_exp B_log_or a b
+      /\  go (W_NOT a)      = unary_exp U_bit_neg a
+      /\  go (W_EQ a b)     = binary_exp B_log_eq a b
+      /\  go (W_GR a b)     = binary_exp B_gt a b
+      /\  go (W_ADD a b)    = binary_exp B_add a b
+      /\  go (W_SUB a b)    = binary_exp B_sub a b
+      /\  go (W_MUL a b)    = binary_exp B_mult a b
+      /\  go (W_DIV a b)    = binary_exp B_div a b
+      /\  go (W_MOD a b)    = binary_exp B_mod a b
+      /\  go (W_SHL a b)    = binary_exp B_log_shl a b
+      /\  go (W_SHR a b)    = binary_exp B_log_shr a b
+      /\  go (W_ASHR a b)   = binary_exp B_shr a b
+      /\  go (W_SX sz a)    = sign_extend_exp sz a
+      /\  go (W_ZX sz a)    = zero_extend_exp sz a
+      /\  go (W_ITE c a b)  = conditional_exp c a b
+      /\  go (W_SLICE is w) = slice_exp is w
+      /\  go (W_CAT es)     = concat_exp es
+      // Named op. -------------------------------
+      /\  go (W_NAMED_CONST _ _ c) =
+            warn "NAMED_CONST is treated as CONST" (const_exp c)
+      /\  go (W_EXPLICIT_VAR sz v) =
+            warn "EXPLICIT_VAR is treated as VAR" (variable_exp sz v)
+      /\  go (W_PRED _ a) =
+            warn "PRED is ignored" (go a)
+      /\  go (W_NAMED_SLICE _ is a) =
+             warn "NAMED_SLICE is treated as SLICE" (slice_exp is a)
+      // Not yet supported op. -------------------
+      /\  go (W_UPDATE_NAMED_SLICE _ _ _ _) =
+            error "W_UPDATE_NAMED_SLICE not supported"
+      /\  go (W_MEM_READ _ _ _) =
+            error "W_MEM_READ not supported"
+      /\  go (W_MEM_WRITE _ _ _ _) =
+            error "W_MEM_WRITE not supported"
+      in
+      go we
+;
+
+let assign net_lv exp =
+      NPM_Item (MOGI_cont (Cont_assign [(net_lv, exp)]))
+;
+
+let always var_lv exp =
+      NPM_Item (MOGI_always (Always (Statement_timing
+        (PTC (PTC_event (Event_pstar))
+        (Statement_nonblocking (Nonblocking_assignment var_lv NONE exp))))))
+;
+
+let pretty_update_fn (W_UPDATE_FN lhs rhs) =
+      let net_lv = net_lvalue lhs in
+      let exp = fst $ expression rhs in
+      assign net_lv exp
+/\  pretty_update_fn (W_PHASE_DELAY lhs rhs) =
+      let var_lv = var_lvalue lhs in
+      let exp = fst $ expression rhs in
+      always var_lv exp
+;
+
+// -----------------------------------------------------------------------------
+
+let in_lvalue {id::string} {we::wexpr} =
+      letrec
+          find (W_VAR _ v) = id == v
+      /\  find (W_EXPLICIT_VAR _ v) = id == v
+      /\  find (W_SLICE _ w) = find w
+      /\  find (W_NAMED_SLICE _ _ w) = find w
+      /\  find (W_CAT ws) = any find ws
+      in
+      find we
+;
+
+// Checks if 'id' occurs in the lhs of an 'update_fn', where T=comb & F=delay.
+let in_lhs id (W_UPDATE_FN lhs _)   = in_lvalue id lhs => SOME T | NONE
+/\  in_lhs id (W_PHASE_DELAY lhs _) = in_lvalue id lhs => SOME F | NONE
+;
+
+let in_any_lhs id fs = exhaust (map (in_lhs id) fs);
+
+let declare_net id [] =
+      ND_scalar_id NT_wire F [Net_id (ID id) []]
+/\  declare_net id (r:ds) =
+      ND_vector_id NT_wire NONE F (range r) [Net_id (ID id) (map dimension ds)]
+;
+
+let declare_reg id [] =
+      Reg_decl F NONE [VT_dim (ID id) []]
+/\  declare_reg id (r:ds) =
+      Reg_decl F (SOME (range r)) [VT_dim (ID id) (map dimension ds)]
+;
+
+let pretty_internal_decl {vec::string} {wire::bool} =
+      val (id, dim) = split_name_dim vec in
+      NPM_Item (MOGI_decl (
+        wire =>
+          MOGID_net (declare_net id dim) |
+          MOGID_reg (declare_reg id dim)
+      ))
+;
+
+let port_range [] = NONE
+/\  port_range ((m,l):[]) = SOME (Range (prim_cnum m) (prim_cnum l))
+/\  port_range _ = error "Multi-dim. port decl. is not allowed."
+;
+
+let input_port_decl {vec::string} =
+      val (id, rs) = split_name_rng vec in
+      Input_decl (SOME NT_wire) F (port_range rs) [ID id]
+;
+
+// Gen. port declarations for each "formal" input vec.
+let pretty_decl_inps {f_inps::string list} =
+      map (Port_decl_in # input_port_decl) f_inps
+;
+
+let output_port_decl {vec::string} {wire::bool} =
+      val (id, rs) = split_name_rng vec in
+      let r = port_range rs in
+      wire =>
+        Output_decl_port (SOME NT_wire) F r [ID id] |
+        Output_decl_reg F r [VPI (ID id) NONE]
+;
+
+// Gen. port declarations for each "formal" output vec. as either wire or reg.
+let pretty_decl_outs {f_outs::(string#bool) list} =
+      map (Port_decl_out # curry output_port_decl) f_outs
+;
+
+// -----------------------------------------------------------------------------
+
+let port {vec::string} =
+      val (id,rs) = split_name_rng vec in Exp_primary (prim_hier id rs)
+;
+
+let connect_ports f as =
+      let connect []     = NONE
+      /\  connect (a:[]) = SOME (port a)
+      /\  connect (a:as) = SOME (Exp_primary (Prim_cat (CAT (map port as))))
+      in
+      val (id,_) = split_name_rng f in
+      Port_con_named (ID id) (connect as)
+;
+
+let port_instantiation mi ai {args::(string#(string list))list} =
+      NPM_Item (MOGI_module (Module_instantiation mi
+        [Module_instance ai NONE
+          (empty args =>
+            NONE |
+            SOME (map (curry connect_ports) args))
+        ]))
+;
+// todo: Not sure what the 'range' is used for in module instantiation.
+
+let inst_name name inst = ID ("m"^name^inst);
+
+let pretty_port_instantiation {inst::string} (PINST name _ _ fa_inps fa_outs _ _) =
+      let module = inst_name name inst in
+      let anon   = inst_name "" inst in
+      port_instantiation module anon (fa_inps @ fa_outs)
+;
+
+// -----------------------------------------------------------------------------
+
+forward_declare{pretty_pexlif_h::string->pexlif->(description list)};
+
+let pretty_pexlif_leaf {inst::string} {name::string} {fa_inps::(string#(string list)) list} {fa_outs::(string#(string list)) list} {f_ints::(string list)} {fns::(update_fn list)} =
+      let is_wire i = maybe T (in_any_lhs i fns) id in
+      // Declare inp/out as 'port's.
+      let f_inps = map fst fa_inps in
+      let f_outs = let fs = map fst fa_outs in zip fs (map is_wire fs) in
+      let ports_inp = pretty_decl_inps f_inps in
+      let ports_out = pretty_decl_outs f_outs in
+      let ports = let ps = ports_inp @ ports_out in empty ps => NONE | SOME ps in
+      // Declare internals as 'reg'/'net' types (assume 'net' as default).
+      let decl_int = map2 pretty_internal_decl f_ints (map is_wire f_ints) in
+      // Translate assignments into 'assign'/'always' statements.
+      let statements = map pretty_update_fn fns in
+      //
+      let module = inst_name name inst in
+      let body = decl_int @ statements in
+      [Desc_module (Module_declaration_many module ports body)]
+;
+
+let pretty_pexlif_hier {inst::string} {name::string} {fa_inps::(string#(string list)) list} {fa_outs::(string#(string list)) list} {f_ints::(string list)} {cs::(pexlif list)} =
+      let all_wire xs = replicate (length xs) F in
+      // Declare inp/out as 'port's.
+      let f_inps = map fst fa_inps in
+      let f_outs = map (second (const T)) fa_outs in
+      let ports_inp = pretty_decl_inps f_inps in
+      let ports_out = pretty_decl_outs f_outs in
+      let ports = let ps = ports_inp @ ports_out in empty ps => NONE | SOME ps in
+      // Declare internals as 'net' types (hier. pex. only connects other pex.).
+      let decl_int = map (flip pretty_internal_decl F) f_ints in
+      // Instantiate and pretty children.
+      let child i = sprintf "%d_%s" i inst in
+      let children = concat (ixmap (\c. \i. pretty_pexlif_h (child i) c) cs) in
+      let instant = ixmap (\c. \i. pretty_port_instantiation (child i) c) cs in
+      //
+      let module = inst_name name inst in
+      let body = decl_int @ instant in
+      (Desc_module (Module_declaration_many module ports body)) : children
+;
+
+let pretty_pexlif_h inst (PINST name _ _ fa_inps fa_outs f_ints (P_HIER cs)) =
+      pretty_pexlif_hier inst name fa_inps fa_outs f_ints cs
+/\  pretty_pexlif_h inst (PINST name _ _ fa_inps fa_outs f_ints (P_LEAF fs)) =
+      pretty_pexlif_leaf inst name fa_inps fa_outs f_ints fs
+;
+
+// -----------------------------------------------------------------------------
+
+let pexlif2verilog {pex::pexlif} =
+      render (p_source_text (Source_text (pretty_pexlif_h "" pex)))
+;
+
+// end_abstype pexlif2verilog;
+
+// =============================================================================

@@ -113,6 +113,7 @@ let p_constant_primary (CPrim_num n) = p_number n
 
 forward_declare{p_concatenation::concatenation->doc};
 forward_declare{p_multiple_concatenation::multiple_concatenation->doc};
+forward_declare{p_mintypmax_expression::mintypmax_expression->doc};
 
 let p_primary (Prim_num n) = p_number n
 /\  p_primary (Prim_hier i es') =
@@ -123,6 +124,7 @@ let p_primary (Prim_num n) = p_number n
       p_hierarchical_identifier i <-> p_opt pr es'
 /\  p_primary (Prim_cat c) = p_concatenation c
 /\  p_primary (Prim_mcat mc) = p_multiple_concatenation mc
+/\  p_primary (Prim_mintypmax mtm) = in_paren (p_mintypmax_expression mtm)
 /\  p_primary (Prim_str s) = text s
 ;
 
@@ -381,16 +383,16 @@ let p_net_declaration (ND_scalar_id t s is) =
       <+> p_when s (text "signed")
       <+> p_net_decls ds
       <-> text ";"
-/\  p_net_declaration (ND_vector_id t v s r is) =
+/\  p_net_declaration (ND_vector_id t v' s r is) =
           p_net_type t
-      <+> text (v => "vectored" | "scalared")
+      <+> p_opt (\v. text (v => "vectored" | "scalared")) v'
       <+> p_when s (text "signed")
       <+> p_range r
       <+> p_net_identifiers is
       <-> text ";"
-/\  p_net_declaration (ND_vector_decl t v s r ds) =
+/\  p_net_declaration (ND_vector_decl t v' s r ds) =
           p_net_type t
-      <+> text (v => "vectored" | "scalared")
+      <+> p_opt (\v. text (v => "vectored" | "scalared")) v'
       <+> p_when s (text "signed")
       <+> p_range r
       <+> p_net_decls ds

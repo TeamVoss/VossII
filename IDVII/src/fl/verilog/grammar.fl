@@ -34,7 +34,7 @@ lettype identifier = ID (string);
 // number ::= decimal_number | octal_number | binary_number | hex_number | real_number
 lettype number = X | Z | Num (int);
 
-// todo:
+// todo: ..
 new_type_abbrev unsigned_number = number;
 new_type_abbrev real_number = number;
 
@@ -141,9 +141,7 @@ lettype constant_range_expression =
 //   | expression binary_operator expression
 //   | conditional_expression
 // conditional_expression ::= expression1 ? expression2 : expression3
-// expression1 ::= expression
-// expression2 ::= expression
-// expression3 ::= expression
+// mintypmax_expression ::= expression | expression ":" expression ":" expression
 lettype expression =
     Exp_primary (primary)
   | Exp_unary (unary_operator) (primary)
@@ -157,11 +155,16 @@ andlettype primary =
       ({(expression list)#(range_expression)} opt)
   | Prim_cat (concatenation)
   | Prim_mcat (multiple_concatenation)
+  | Prim_mintypmax (mintypmax_expression)
   | Prim_str (string)
 // See A.8.1
-andlettype concatenation = CAT (expression list)
-// See A.8.1
-andlettype multiple_concatenation = MCAT (constant_expression) (concatenation)
+andlettype concatenation =
+    CAT (expression list)
+andlettype multiple_concatenation =
+    MCAT (constant_expression) (concatenation)
+andlettype mintypmax_expression =
+    Mintypmax_expression (expression)
+  | Mintypmax_minmax (expression) (expression) (expression)
 ;
 
 // range_expression ::=
@@ -172,12 +175,6 @@ andlettype multiple_concatenation = MCAT (constant_expression) (concatenation)
 lettype range_expression =
     Range_exp (expression)
   | Range_m2l (constant_expression) (constant_expression)
-;
-
-// mintypmax_expression ::= expression | expression ":" expression ":" expression
-lettype mintypmax_expression =
-    Mintypmax_expression (expression)
-  | Mintypmax_minmax (expression) (expression) (expression)
 ;
 
 // See A.8.5 Expression left-side values.
@@ -536,8 +533,8 @@ lettype net_identifier = Net_id (identifier) (dimension list);
 lettype net_declaration =
     ND_scalar_id (net_type) (bool) (net_identifier list)
   | ND_scalar_decl (net_type) (bool) (net_decl_assignment list)
-  | ND_vector_id (net_type) (bool) (bool) (range) (net_identifier list)
-  | ND_vector_decl (net_type) (bool) (bool) (range) (net_decl_assignment list)
+  | ND_vector_id (net_type) ({bool} opt) (bool) (range) (net_identifier list)
+  | ND_vector_decl (net_type) ({bool} opt) (bool) (range) (net_decl_assignment list)
 ;
 
 // reg_declaration ::= "reg" [ "signed" ] [ range ] list_of_variable_identifiers ";"
