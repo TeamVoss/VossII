@@ -261,20 +261,20 @@ let binary_exp op a b =
 ;
 
 let unwrap_prim (Exp_primary (Prim_hier (HID NONE (ID i)) rng)) = (i, rng)
-/\  unwrap_prim _ = error "SX/Slice is only supported for variables."
+/\  unwrap_prim _ = error "internal: SX/Slice is only supported for variables."
 ;
 
-let sign_extend_exp sz a =
+let sign_extend_exp sz a = //sz=8,sz'=1
       let a'  = fst (expression a) in
       let sz' = width a in
       let id  = fst (unwrap_prim a') in
-      let rng = [(sz'-1,sz'-1)] in
-      let sign =
+      let rng = sz' > 1 => let x = sz' - 1 in [(x,x)] | [] in
+      let ext =
             Exp_primary (Prim_mcat (MCAT (prim_cnum (sz-sz'))
               (CAT [Exp_primary (prim_hier id rng)])))
       in
       // Check for complicated expressions.
-      (Exp_primary (Prim_cat (CAT [sign, a'])), 14)
+      (Exp_primary (Prim_cat (CAT [ext, a'])), 14)
 ;
 // todo: Extend with local variable to hold potential expr in 'a'? Or, gen.
 // sign-extension function with paramaters for sizes?
@@ -309,6 +309,11 @@ let concat_exp as =
       (Exp_primary (Prim_cat (CAT (map (fst # expression) as))), 14)
 ;
 
+let is_var (W_VAR _ _) = T
+/\  is_var (W_EXPLICIT_VAR _ _) = T
+/\  is_var _ = F
+;
+
 let expression {we::wexpr} =
       letrec
           go (W_X _)        = x_exp
@@ -327,11 +332,16 @@ let expression {we::wexpr} =
       /\  go (W_SHL a b)    = binary_exp B_log_shl a b
       /\  go (W_SHR a b)    = binary_exp B_log_shr a b
       /\  go (W_ASHR a b)   = binary_exp B_shr a b
-      /\  go (W_SX sz a)    = sign_extend_exp sz a
       /\  go (W_ZX sz a)    = zero_extend_exp sz a
       /\  go (W_ITE c a b)  = conditional_exp c a b
-      /\  go (W_SLICE is w) = slice_exp is w
       /\  go (W_CAT es)     = concat_exp es
+      // Restricted op. --------------------------
+      /\  go (W_SX sz a) =
+            is_var a => sign_extend_exp sz a |
+              error "W_SX must be called with a variable"
+      /\  go (W_SLICE is w) =
+            is_var w => slice_exp is w |
+              error "W_SLICE must be called with a variable"
       // Named op. -------------------------------
       /\  go (W_NAMED_CONST _ _ c) =
             warn "NAMED_CONST is treated as CONST" (const_exp c)

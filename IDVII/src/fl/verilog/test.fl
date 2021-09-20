@@ -62,11 +62,8 @@ let buf1 =
     byte_output out.
     byte_internal mid.
     CELL "buf1" [
-      mid <- ZX b,
-      mid <- {a::byte} '<<' {'2::byte},
-      mid <- {a::byte} '+' {'0::byte},
-      mid <- '~' a,
-      out <- '~' mid
+      mid <- ZX {(a~~2)::bit},
+      out <- (b '?' a ':' mid)
     ];
 let buf1_pex = buf1 'a 'b 'out;
 // buf1_pex;
@@ -74,7 +71,7 @@ let ver = pexlif2verilog buf1_pex;
 let fp = fopen "test.v" "w";
 fprintf fp "%s\n" ver;
 fclose fp;
-let p = verilog2pexlif ("-I.") "buf1" ["test.v"] [];
-STE_debug (pexlif2fsm p);
+//let p = verilog2pexlif ("-I.") "buf1" ["test.v"] [];
+//STE_debug (pexlif2fsm p);
 
 // =============================================================================
