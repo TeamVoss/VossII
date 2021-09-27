@@ -44,7 +44,7 @@ let miter pex =
       CELL "draw_hier miter" [
         pex i a,
         go (pex i b),
-        o <- '0xFF '=' ('~' (a '^' b))
+        o <- a '=' b
       ]
 ;
 
