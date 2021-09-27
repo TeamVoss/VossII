@@ -537,6 +537,15 @@ let pretty_pexlif_h inst (PINST name _ _ fa_inps fa_outs f_ints (P_HIER cs)) =
 /\  pretty_pexlif_h inst (PINST name _ _ fa_inps fa_outs f_ints (P_LEAF fs)) =
       pretty_pexlif_leaf inst name fa_inps fa_outs f_ints fs
 ;
+// todo:
+//   1> detect common components by name and then test if name is actually the
+//      real component. Components are written in hfl.fl:
+//      > flip-flops: re_ff, fe_ff, .. (base_.._ff)
+//      > latches: base_ah_latch, base_al_latch,
+//      > basically every "draw_..." pexlif.
+//   ? compare components independent of sizes - like alpha but for sizes ?
+//   2> use bdd to verify correctness of "simple" comb. operations.
+//   3> write pexlif-"normalizer" to test with the random-pexlif generator.
 
 // -----------------------------------------------------------------------------
 

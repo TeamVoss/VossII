@@ -5,73 +5,61 @@ load (DIR^"pretty-pexlif.fl");
 load "ste.fl";
 
 // =============================================================================
-// Sanity checks.
-// =============================================================================
-// let doc1 =
-//   Source_text [Desc_module (Module_declaration_many (ID "test1")
-//     (SOME [ Port_decl_in  (Input_decl NONE F NONE [ID "a", ID "b"])
-//           , Port_decl_out (Output_decl_port NONE F NONE [ID "c"])
-//           ])
-//     [ NPM_Item (MOGI_cont (Cont_assign
-//         [ ( NLV_hier (HID NONE (ID "c")) NONE
-//           , Exp_binary
-//               (Exp_primary (Prim_hier (HID NONE (ID "a")) NONE))
-//               (B_add)
-//               (Exp_primary (Prim_hier (HID NONE (ID "b")) NONE))
-//           )
-//         ]))
-//     ]
-// )];
-// let ex1 = p_source_text doc1;
-// render ex1;
+
+let pex2ver p file =
+      let v  = pexlif2verilog p then
+      let fp = fopen file "w" then
+      fprintf fp "%s\n" v fseq
+      fclose fp;
+;
+
+let pex2pex p top_level_module =
+      let file = "test.v" in
+      pex2ver p file fseq
+      verilog2pexlif "-I." top_level_module [file] []
+;
 
 // -----------------------------------------------------------------------------
-// let doc2 =
-//   Source_text [Desc_module (Module_declaration_many (ID "test2")
-//     (SOME [ Port_decl_in  (Input_decl NONE F NONE [ID "a", ID "b"])
-//           , Port_decl_out (Output_decl_port NONE F NONE [ID "c"])
-//           ])
-//     [ NPM_Item (MOGI_always (Always
-//         (Statement_timing (PTC
-//           (PTC_event (Event_control_exp (Event_pos
-//             (Exp_primary (Prim_hier (HID NONE (ID "a")) NONE)))))
-//           (Statement_if (IEI
-//             ( Exp_unary (U_log_neg) (Prim_hier (HID NONE (ID "b")) NONE)
-//             , (Statement_nonblocking (Nonblocking_assignment
-//               (VLV_hier (HID NONE (ID "c")) NONE)
-//               (NONE)
-//               (Exp_primary (Prim_num (Num 1)))))
-//             )
-//             []
-//             (SOME (Statement_nonblocking (Nonblocking_assignment
-//               (VLV_hier (HID NONE (ID "c")) NONE)
-//               (NONE)
-//               (Exp_primary (Prim_num (Num 0))))))
-//     ))))))]
-// )];
-// let ex2 = p_source_text doc2;
-// render ex2;
-
-// -----------------------------------------------------------------------------
-// todo: remove spaces in names.
 
 TYPE "byte" 8;
-let buf1 =
-    byte_input a.
-    bit_input b.
-    byte_output out.
-    byte_internal mid.
-    CELL "buf1" [
-      mid <- ZX {(a~~2)::bit},
-      out <- (b '?' a ':' mid)
-    ];
-let buf1_pex = buf1 'a 'b 'out;
-// buf1_pex;
-let ver = pexlif2verilog buf1_pex;
-let fp = fopen "test.v" "w";
-fprintf fp "%s\n" ver;
-fclose fp;
-//let p = verilog2pexlif ("-I.") "buf1" ["test.v"] [];
-//STE_debug (pexlif2fsm p);
+
+let t1_num =
+      byte_input    i.
+      byte_output   o.
+      byte_internal t.
+      CELL "test" [
+        t <- i '+' i,
+        o <- t
+      ]
+;
+
+// -----------------------------------------------------------------------------
+
+let miter pex =
+      let go p = pex2pex p "test" in
+      byte_input i.
+      bit_output o.
+      byte_internal a.
+      byte_internal b.
+      CELL "draw_hier miter" [
+        pex i a,
+        go (pex i b),
+        o <- '0xFF '=' ('~' (a '^' b))
+      ]
+;
+
+let p = t1_num 'i 'o;
+let q = pex2pex p "test";
+let m = miter t1_num 'i 'o;
+let vis = STE_debug (pexlif2fsm m);
+
+let N = 10;
+let ant =
+      "i[7:0]" is 0x01 in_cycle 0 followed_by
+                  0x02 in_cycle 2 otherwise
+                  0x00 until N cycles
+;
+let ste = STE "-e" vis [] ant [] [];
 
 // =============================================================================
+// Fin.
