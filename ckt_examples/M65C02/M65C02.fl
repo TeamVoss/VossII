@@ -9,7 +9,7 @@ let p = verilog2pexlif "-I." "M65C02_Core"
       "M65C02_ALU.v",
         "M65C02_BCD.v",
         "M65C02_BIN.v"
-  ] [];
+  ] ["M65C02_Decoder_ROM.coe", "M65C02_uPgm_V3a.coe"];
 
 let ckt = pexlif2fsm p;
 
@@ -18,24 +18,6 @@ let vis = STE_debug ckt;
 // Start the GUI
 vis;
 
-
-let ok = T;
-
-// Load ROM.
-let ROM_ant file rom MAX_TIME =
-    let fp = fopen file "r" then
-    letrec rd addr =
-	let line = fgets fp then
-	line == "" => [] |
-	let loc = sprintf "%s[%d][31:0]" rom addr then
-	let vs = map (\c.c="1") (butlast (explode line)) in
-	(map2 (\n.\v. (T,n,v,0,MAX_TIME)) (md_expand_vector loc) vs):
-	(rd (addr+1))
-    in
-    let lines = rd 0 then
-    (fclose fp) fseq
-    flat lines
-;
 
 // As bv2list truncates its values I need to make sure their length is kept.
 let fixed_bv2list bits sign_ext bv =
@@ -267,8 +249,8 @@ let zero   = res = (replicate 8 F);                 // Expected zero flag.
 let static =
     // Microprogram setup.
     "MC[2:0]"      is "0b100"     in_cycle 0 and  // Microcycle controller.
-    "uPL[31:28]"   is "0b0101"    in_cycle 0 and  // Instruction field.
-    "i3/dRst"      is "0x0"       in_cycle 0 and  // Delayed reset.
+    "uPL[31:28]"   is "0b0101"    in_phase 0 and  // Instruction field.
+    "i4/dRst"      is "0x0"       in_cycle 0 and  // Delayed reset.
     "i1/PSW[5:0]"  is "0b000100"  in_cycle 1 and  // Program status word.
     "OP1[7:0]"     is "0x0"       in_cycle 0 and  // Operand one.
     "OP2[7:0]"     is "0x0"       in_cycle 0 and  // Operand two.
@@ -277,10 +259,7 @@ let static =
     "Rst"  is "0" for N cycles and                  // Reset.
     "Wait" is "0" for N cycles and                  // Memory Wait.
     "Int"  is "0" for N cycles and                  // Interrupt.
-    "xIRQ" is "0" for N cycles and                  // Interrupt Mask.
-    // ROM.
-    ROM_ant "M65C02_uPgm_V3a.coe"    "uP_ROM" N and // Program ROM.
-    ROM_ant "M65C02_Decoder_ROM.coe" "ID_ROM" N     // Instruction ROM.
+    "xIRQ" is "0" for N cycles                      // Interrupt Mask.
 ;
 
 // Shorthands.
@@ -291,8 +270,9 @@ let b_bv = fixed_bv2list 8 T b;
 // 0x196 _ADC_imm, opcode 0x69.
 let ant =
     "A[7:0]"  is a_bv    in_cycle 1 and
-    "BA[8:0]" is "0x196" in_cycle 0 and
+//    "BA[8:0]" is "0x196" in_cycle 0 and
     "DI[7:0]" is "0x69"  in_cycle 0 and
+    "DI[7:0]" is "tmp[7:0]"  in_cycle 1 and // ????????????????????
     "DI[7:0]" is b_bv    in_cycle 4 and
     static
 ;
@@ -303,8 +283,12 @@ let cons =
     "i1/PSW[0]" is [carry]  in_cycle 9 and
     "i1/PSW[1]" is [zero]   in_cycle 9
 ;
+
+let ok = T;
 let ste  = STE "-e" vis [] ant cons [];
 let ok = ok AND get_ste_result ste "strong";
+
+ok;
 
 // -----------------------------------------------------------------------------
 // 0x156 _ADC_dp, opcode 0x65, NA <= OP1.

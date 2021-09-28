@@ -1,7 +1,7 @@
 /*
  *  yosys -- Yosys Open SYnthesis Suite
  *
- *  Copyright (C) 2012  Clifford Wolf <clifford@clifford.at>
+ *  Copyright (C) 2012  Claire Xenia Wolf <claire@yosyshq.com>
  *
  *  Permission to use, copy, modify, and/or distribute this software for any
  *  purpose with or without fee is hereby granted, provided that the above
@@ -122,6 +122,9 @@ struct FlattenWorker
 		for (auto &tpl_proc_it : tpl->processes) {
 			RTLIL::Process *new_proc = module->addProcess(map_name(cell, tpl_proc_it.second), tpl_proc_it.second);
 			map_attributes(cell, new_proc, tpl_proc_it.second->name);
+			for (auto new_proc_sync : new_proc->syncs)
+				for (auto &memwr_action : new_proc_sync->mem_write_actions)
+					memwr_action.memid = memory_map.at(memwr_action.memid).str();
 			auto rewriter = [&](RTLIL::SigSpec &sig) { map_sigspec(wire_map, sig); };
 			new_proc->rewrite_sigspecs(rewriter);
 			design->select(module, new_proc);
@@ -130,10 +133,10 @@ struct FlattenWorker
 		for (auto tpl_cell : tpl->cells()) {
 			RTLIL::Cell *new_cell = module->addCell(map_name(cell, tpl_cell), tpl_cell);
 			map_attributes(cell, new_cell, tpl_cell->name);
-			if (new_cell->type.in(ID($memrd), ID($memwr), ID($meminit))) {
+			if (new_cell->has_memid()) {
 				IdString memid = new_cell->getParam(ID::MEMID).decode_string();
 				new_cell->setParam(ID::MEMID, Const(memory_map.at(memid).str()));
-			} else if (new_cell->type == ID($mem)) {
+			} else if (new_cell->is_mem_cell()) {
 				IdString memid = new_cell->getParam(ID::MEMID).decode_string();
 				new_cell->setParam(ID::MEMID, Const(concat_name(cell, memid).str()));
 			}
@@ -152,15 +155,14 @@ struct FlattenWorker
 
 		// Attach port connections of the flattened cell
 
-		SigMap tpl_sigmap(tpl);
 		pool<SigBit> tpl_driven;
 		for (auto tpl_cell : tpl->cells())
 			for (auto &tpl_conn : tpl_cell->connections())
 				if (tpl_cell->output(tpl_conn.first))
-					for (auto bit : tpl_sigmap(tpl_conn.second))
+					for (auto bit : tpl_conn.second)
 						tpl_driven.insert(bit);
 		for (auto &tpl_conn : tpl->connections())
-			for (auto bit : tpl_sigmap(tpl_conn.first))
+			for (auto bit : tpl_conn.first)
 				tpl_driven.insert(bit);
 
 		SigMap sigmap(module);
@@ -181,16 +183,19 @@ struct FlattenWorker
 
 			RTLIL::Wire *tpl_wire = tpl->wire(port_name);
 			RTLIL::SigSig new_conn;
+			bool is_signed = false;
 			if (tpl_wire->port_output && !tpl_wire->port_input) {
 				new_conn.first = port_it.second;
 				new_conn.second = tpl_wire;
+				is_signed = tpl_wire->is_signed;
 			} else if (!tpl_wire->port_output && tpl_wire->port_input) {
 				new_conn.first = tpl_wire;
 				new_conn.second = port_it.second;
+				is_signed = new_conn.second.is_wire() && new_conn.second.as_wire()->is_signed;
 			} else {
 				SigSpec sig_tpl = tpl_wire, sig_mod = port_it.second;
 				for (int i = 0; i < GetSize(sig_tpl) && i < GetSize(sig_mod); i++) {
-					if (tpl_driven.count(tpl_sigmap(sig_tpl[i]))) {
+					if (tpl_driven.count(sig_tpl[i])) {
 						new_conn.first.append(sig_mod[i]);
 						new_conn.second.append(sig_tpl[i]);
 					} else {
@@ -205,11 +210,11 @@ struct FlattenWorker
 			if (new_conn.second.size() > new_conn.first.size())
 				new_conn.second.remove(new_conn.first.size(), new_conn.second.size() - new_conn.first.size());
 			if (new_conn.second.size() < new_conn.first.size())
-				new_conn.second.append(RTLIL::SigSpec(RTLIL::State::S0, new_conn.first.size() - new_conn.second.size()));
+				new_conn.second.extend_u0(new_conn.first.size(), is_signed);
 			log_assert(new_conn.first.size() == new_conn.second.size());
 
 			if (sigmap(new_conn.first).has_const())
-				log_error("Mismatch in directionality for cell port %s.%s.%s: %s <= %s\n",
+				log_error("Cell port %s.%s.%s is driving constant bits: %s <= %s\n",
 					log_id(module), log_id(cell), log_id(port_it.first), log_signal(new_conn.first), log_signal(new_conn.second));
 
 			module->connect(new_conn);

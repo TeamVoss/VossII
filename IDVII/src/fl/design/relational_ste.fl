@@ -1,21 +1,3 @@
-let wexpr_hw_type_name {bv::wexpr} = "wexpr";
-let wexpr_hw_mk_var {we::wexpr} base = W_VAR 0 base;
-let wexpr_hw_is_arithmetic {e::wexpr} = T;
-let wexpr_hw_size {e::wexpr} = wexpr_size e;
-let wexpr_hw_destr {e::wexpr} = e;
-let wexpr_hw_constr {e::wexpr} = e;
-let wexpr_hw_values {e::wexpr} = error "Not relevant";
-
-let wexpr_hw_type_destr {p::wexpr} =
-	    HW_TYPE wexpr_hw_type_name
-		    wexpr_hw_mk_var 
-		    wexpr_hw_is_arithmetic 
-		    wexpr_hw_size 
-		    wexpr_hw_destr 
-		    wexpr_hw_constr 
-		    wexpr_hw_values
-; 
-add_open_overload hw_type_destr wexpr_hw_type_destr;
 
 begin_abstype;
 

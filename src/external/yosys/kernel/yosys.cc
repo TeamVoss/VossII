@@ -1,7 +1,7 @@
 /*
  *  yosys -- Yosys Open SYnthesis Suite
  *
- *  Copyright (C) 2012  Clifford Wolf <clifford@clifford.at>
+ *  Copyright (C) 2012  Claire Xenia Wolf <claire@yosyshq.com>
  *
  *  Permission to use, copy, modify, and/or distribute this software for any
  *  purpose with or without fee is hereby granted, provided that the above
@@ -67,6 +67,7 @@
 #   define INIT_MODULE initlibyosys
 	extern "C" void INIT_MODULE();
 #endif
+#include <signal.h>
 #endif
 
 #include <limits.h>
@@ -88,6 +89,12 @@ std::set<std::string> yosys_input_files, yosys_output_files;
 bool memhasher_active = false;
 uint32_t memhasher_rng = 123456;
 std::vector<void*> memhasher_store;
+
+std::string yosys_share_dirname;
+std::string yosys_abc_executable;
+
+void init_share_dirname();
+void init_abc_executable_name();
 
 void memhasher_on()
 {
@@ -131,7 +138,7 @@ void yosys_banner()
 	log(" |                                                                            |\n");
 	log(" |  yosys -- Yosys Open SYnthesis Suite                                       |\n");
 	log(" |                                                                            |\n");
-	log(" |  Copyright (C) 2012 - 2020  Claire Wolf <claire@symbioticeda.com>          |\n");
+	log(" |  Copyright (C) 2012 - 2020  Claire Xenia Wolf <claire@yosyshq.com>         |\n");
 	log(" |                                                                            |\n");
 	log(" |  Permission to use, copy, modify, and/or distribute this software for any  |\n");
 	log(" |  purpose with or without fee is hereby granted, provided that the above    |\n");
@@ -523,6 +530,8 @@ void yosys_setup()
 	if(already_setup)
 		return;
 	already_setup = true;
+	init_share_dirname();
+	init_abc_executable_name();
 
 #define X(_id) RTLIL::ID::_id = "\\" # _id;
 #include "kernel/constids.inc"
@@ -532,6 +541,7 @@ void yosys_setup()
 		PyImport_AppendInittab((char*)"libyosys", INIT_MODULE);
 		Py_Initialize();
 		PyRun_SimpleString("import sys");
+		signal(SIGINT, SIG_DFL);
 	#endif
 
 	Pass::init_register();
@@ -789,7 +799,9 @@ std::string proc_self_dirname()
 		path = (char *) realloc((void *) path, buflen);
 	while (buflen > 0 && path[buflen-1] != '/')
 		buflen--;
-	return std::string(path, buflen);
+	std::string str(path, buflen);
+	free(path);
+	return str;
 }
 #elif defined(_WIN32)
 std::string proc_self_dirname()
@@ -825,37 +837,73 @@ std::string proc_self_dirname()
 #endif
 
 #if defined(EMSCRIPTEN) || defined(__wasm)
-std::string proc_share_dirname()
+void init_share_dirname()
 {
-	return "/share/";
+	yosys_share_dirname = "/share/";
 }
 #else
-std::string proc_share_dirname()
+void init_share_dirname()
 {
 	std::string proc_self_path = proc_self_dirname();
 #  if defined(_WIN32) && !defined(YOSYS_WIN32_UNIX_DIR)
 	std::string proc_share_path = proc_self_path + "share\\";
-	if (check_file_exists(proc_share_path, true))
-		return proc_share_path;
+	if (check_file_exists(proc_share_path, true)) {
+		yosys_share_dirname = proc_share_path;
+		return;
+	}
 	proc_share_path = proc_self_path + "..\\share\\";
-	if (check_file_exists(proc_share_path, true))
-		return proc_share_path;
+	if (check_file_exists(proc_share_path, true)) {
+		yosys_share_dirname = proc_share_path;
+		return;
+	}
 #  else
 	std::string proc_share_path = proc_self_path + "share/";
-	if (check_file_exists(proc_share_path, true))
-		return proc_share_path;
+	if (check_file_exists(proc_share_path, true)) {
+		yosys_share_dirname = proc_share_path;
+		return;
+	}
 	proc_share_path = proc_self_path + "../share/" + proc_program_prefix()+ "yosys/";
-	if (check_file_exists(proc_share_path, true))
-		return proc_share_path;
+	if (check_file_exists(proc_share_path, true)) {
+		yosys_share_dirname = proc_share_path;
+		return;
+	}
 #    ifdef YOSYS_DATDIR
 	proc_share_path = YOSYS_DATDIR "/";
-	if (check_file_exists(proc_share_path, true))
-		return proc_share_path;
+	if (check_file_exists(proc_share_path, true)) {
+		yosys_share_dirname = proc_share_path;
+		return;
+	}
 #    endif
 #  endif
-	log_error("proc_share_dirname: unable to determine share/ directory!\n");
 }
 #endif
+
+void init_abc_executable_name()
+{
+#ifdef ABCEXTERNAL
+	std::string exe_file;
+	if (std::getenv("ABC")) {
+		yosys_abc_executable = std::getenv("ABC");
+	} else {
+		yosys_abc_executable = ABCEXTERNAL;
+	}
+#else
+	yosys_abc_executable = proc_self_dirname() + proc_program_prefix()+ "yosys-abc";
+#endif
+#ifdef _WIN32
+#ifndef ABCEXTERNAL
+	if (!check_file_exists(yosys_abc_executable + ".exe") && check_file_exists(proc_self_dirname() + "..\\" + proc_program_prefix() + "yosys-abc.exe"))
+		yosys_abc_executable = proc_self_dirname() + "..\\" + proc_program_prefix() + "yosys-abc";
+#endif
+#endif
+}
+
+std::string proc_share_dirname()
+{
+	if (yosys_share_dirname.empty())
+		log_error("init_share_dirname: unable to determine share/ directory!\n");
+	return yosys_share_dirname;
+}
 
 std::string proc_program_prefix()
 {
@@ -930,7 +978,7 @@ void run_frontend(std::string filename, std::string command, std::string *backen
 		else if (filename_trim.size() > 4 && filename_trim.compare(filename_trim.size()-5, std::string::npos, ".json") == 0)
 			command = "json";
 		else if (filename_trim.size() > 3 && filename_trim.compare(filename_trim.size()-3, std::string::npos, ".il") == 0)
-			command = "ilang";
+			command = "rtlil";
 		else if (filename_trim.size() > 3 && filename_trim.compare(filename_trim.size()-3, std::string::npos, ".ys") == 0)
 			command = "script";
 		else if (filename_trim.size() > 3 && filename_trim.compare(filename_trim.size()-4, std::string::npos, ".tcl") == 0)
@@ -1053,7 +1101,7 @@ void run_backend(std::string filename, std::string command, RTLIL::Design *desig
 		else if (filename.size() > 3 && filename.compare(filename.size()-3, std::string::npos, ".sv") == 0)
 			command = "verilog -sv";
 		else if (filename.size() > 3 && filename.compare(filename.size()-3, std::string::npos, ".il") == 0)
-			command = "ilang";
+			command = "rtlil";
 		else if (filename.size() > 3 && filename.compare(filename.size()-3, std::string::npos, ".cc") == 0)
 			command = "cxxrtl";
 		else if (filename.size() > 4 && filename.compare(filename.size()-4, std::string::npos, ".aig") == 0)
@@ -1065,7 +1113,7 @@ void run_backend(std::string filename, std::string command, RTLIL::Design *desig
 		else if (filename.size() > 5 && filename.compare(filename.size()-5, std::string::npos, ".json") == 0)
 			command = "json";
 		else if (filename == "-")
-			command = "ilang";
+			command = "rtlil";
 		else if (filename.empty())
 			return;
 		else

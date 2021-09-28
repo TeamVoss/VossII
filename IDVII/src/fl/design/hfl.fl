@@ -178,7 +178,7 @@ let _s2_var s =
 overload '' '' _i2_const _s2_var;
 
 begin_abstype;
-cletrec dep (W_X sz) = []
+letrec dep (W_X sz) = []
  /\     dep (W_CONST sz v) = []
  /\     dep (W_NAMED_CONST name sz v) = []
  /\     dep (W_VAR sz b) = [b]
@@ -209,7 +209,7 @@ cletrec dep (W_X sz) = []
 	    (dep mem) union (dep addr) union (dep data)
 ;
 
-cletrec get_wbase_names e = dep e;
+letrec get_wbase_names e = dep e;
 end_abstype get_wbase_names;
 
 let base_compact_wprint inps rhs =
@@ -246,6 +246,15 @@ let base_compact_wprint inps rhs =
 	    let vinps = map (\i. sprintf "i%d" (sassoc i i_map)) inps in
 	    let args = list2str T "(" "," ")" id (qsort node_name_cmp vinps) in
 	    sprintf "%s%s" name args
+     /\    P pri (W_SHL a (W_CONST sz v)) =
+		pri > 4 => sprintf "(%s<<%d)" (P 4 a) v
+			 | sprintf "%s<<%d" (P 4 a) v
+     /\    P pri (W_SHR a (W_CONST sz v)) =
+		pri > 4 => sprintf "(%s>>%d)" (P 4 a) v
+			 | sprintf "%s>>%d" (P 4 a) v
+     /\    P pri (W_ASHR a (W_CONST sz v)) =
+		pri > 4 => sprintf "(%s|>>%d)" (P 4 a) v
+			 | sprintf "%s|>>%d" (P 4 a) v
      /\    P pri (W_GR  (W_CONST sz v) b) =
 		pri > 3 => sprintf "(%s<%s)" (P 3 b) (P 3 (W_CONST sz v))
 			 | sprintf "%s<%s" (P 3 b) (P 3 (W_CONST sz v))
@@ -451,7 +460,7 @@ let tuple2tcl inps e =
 ;
 
 
-clet opt_base_compact_wprint inps rhs =
+let opt_base_compact_wprint inps rhs =
     let special (W_ADD var (W_CONST sz v)) assuming (is_var var AND v < 10) =
 	sprintf "draw_unary_arithm {+%d}" v
      /\ special (W_SUB var (W_CONST sz v)) assuming (is_var var AND v < 10) =
@@ -523,7 +532,7 @@ let is_wide_AND e  =
     (cnt e) >= 2
 ;
 
-clet is_binary (W_EQ  a b)  = T
+let is_binary (W_EQ  a b)  = T
   /\ is_binary (W_GR  a b)  = T
   /\ is_binary (W_AND a b) = T
   /\ is_binary (W_OR  a b)  = T
@@ -538,7 +547,7 @@ clet is_binary (W_EQ  a b)  = T
   /\ is_binary other = F
 ;
 
-clet split_binary (W_EQ  a b)  = W_EQ, a, b
+let split_binary (W_EQ  a b)  = W_EQ, a, b
   /\ split_binary (W_GR  a b)  = W_GR, a, b
   /\ split_binary (W_AND  a b) = W_AND, a, b
   /\ split_binary (W_OR  a b)  = W_OR, a, b
@@ -553,7 +562,7 @@ clet split_binary (W_EQ  a b)  = W_EQ, a, b
   /\ split_binary other = error "Should not happen"
 ;
 
-clet base_assignment make_draw_command lhs rhs =
+let base_assignment make_draw_command lhs rhs =
     let l_sz = wexpr_size lhs in
     let r_sz = wexpr_size rhs in
     l_sz != r_sz =>
@@ -816,9 +825,11 @@ clet base_assignment make_draw_command lhs rhs =
      /\    split lhs rhs = [mk_pinst lhs rhs]
     in
     let subfubs = split lhs rhs then
+    length subfubs = 1 => hd subfubs |
     let outs = map (\n.n,[n]) (get_lhs_vars lhs) in
     let inps = map (\n.n,[n]) (w_depends rhs) in
-    PINST "" [] F inps outs (deref internals) (P_HIER subfubs)
+    let pfn = mk_draw_cmd F rhs in
+    PINST pfn [] F inps outs (deref internals) (P_HIER subfubs)
 ;
 
 // Create a combinational "circuit" in which the outputs L are assigned
@@ -865,14 +876,14 @@ infix 1 <:;
 
 let anon_arg_cnt = ref 0;
 
-clet get_act_args fn a =
+let get_act_args fn a =
     (
 	let we = hw_destr a in
 	let res = base_get_lhs_vars we then
 	([], res)
     ) catch (
 	let cnt = deref anon_arg_cnt then
-	(anon_arg_cnt := (cnt+1)) fseq
+	(anon_arg_cnt := (i_plus cnt 1)) fseq
 	let nm = sprintf "_TmP_%d_%s" cnt fn then
 	let tmp = hw_mk_var a nm then
 	let we = hw_destr a in
@@ -1886,10 +1897,12 @@ let ':' {a:: *a} {b:: *a} = (a,b);
 let '?' c (t,e) = wITE c t e;
 if_then_else_binder '?' ':';
 
+let wTHEN {c::wexpr} ({t::wexpr},{e::wexpr}) = W_ITE c t e;
+
 let IF c = c;
 let ELSE {t:: *a} {e:: *a} = (t,e);
 let bitTHEN c (t,e) = c '?' t ':' e;
-overload tmp_THEN bTHEN bevTHEN bitTHEN;
+overload tmp_THEN bTHEN bevTHEN bitTHEN wTHEN;
 
 let THEN {c:: *b} ({te:: *a # *a}) =
     let res = tmp_THEN c te in
@@ -1920,7 +1933,8 @@ let wEQ {a:: *a} {b:: *a} =
     let res = W_EQ (hw_destr a) (hw_destr b) in
     hw_bit_constr res
 ;
-let '=' = wEQ;
+
+overload '=' wEQ W_EQ;
 infix 5 '=';
 
 let wNEQ {a:: *a} {b:: *a} =
@@ -2312,8 +2326,11 @@ prefix 0 `;
 
 
 let extract_bit v idx =
-        let wbits = hw_destr v in
-        BV_bit (W_SLICE [idx] wbits)
+    let wbits = hw_destr v in
+    let sz = hw_size v in
+    idx >= 0 AND idx < sz => BV_bit (W_SLICE [idx] wbits) |
+    eprintf "Range error: Trying to extract bit %d in vector of size [%d:0]"
+	    idx (sz-1)
 ;
 
 let extract_range v range =
@@ -2466,7 +2483,7 @@ let cond_simplify e =
 
 begin_abstype;
 
-clet draw_fsm reset S0 orig_trans base_inps =
+let draw_fsm reset S0 orig_trans base_inps =
     let reset = Pwexpr (hw_destr reset) in
     let S0n =
 	val (W_NAMED_CONST n _ v) = hw_destr S0 in
@@ -2514,7 +2531,7 @@ clet draw_fsm reset S0 orig_trans base_inps =
     file, states, edges
 ;
 
-clet build_cond w_state conds =
+let build_cond w_state conds =
     letrec build_cond (same_src:rest) =
 	let from_state = fst (hd same_src) then
 	letrec build covered ((_,wcond,to_state):rem) =
@@ -2545,7 +2562,7 @@ clet build_cond w_state conds =
 // Note that this function will create an explicit visualization of the
 // finite state machine that can be seen by clicking on the FSM symbol
 // in the circuit browser.
-clet Moore_FSM name clk state reset_condition transitions =
+let Moore_FSM name clk state reset_condition transitions =
     val (reset,S0) = reset_condition then
     let w_state = hw_destr {state:: *a} in
     let cnv (from_state, cond, to_state) =
@@ -3160,7 +3177,6 @@ let gen_flatten_pexlif stop_pred p =
             in
             let fa_inps' = map tr_io fa_inps in
             let fa_outs' = map tr_io fa_outs in
-            let attrs = ("instance", pref):attrs in
             [(PINST name attrs leaf fa_inps' fa_outs' ints content)]
         |
             val (P_HIER children) = content in
@@ -3203,8 +3219,72 @@ let is_draw_leaf p =
 // A function to flatten a pexlif to basic drawing components.
 let flatten_pexlif p = gen_flatten_pexlif is_draw_leaf p;
 
+let try_assoc key l =
+    (
+	let res = assoc key l then
+	SOME res
+    ) catch
+    NONE
+;
+
+let try_rev_assoc key l =
+    (
+	let res = rev_assoc key l then
+	SOME res
+    ) catch
+    NONE
+;
+
+let rename_internals p =
+    val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER subfubs)) = p in
+    let mapping = ref [] in
+    let insert name =
+	let parts = str_split name "/" in
+	length parts = 1 => name |
+	letrec try i =
+	    let new_name = sprintf "%s%d_%s" BASE_TMP i (last parts) in
+	    has_value (try_rev_assoc new_name (deref mapping)) => try (i+1) |
+	    (mapping := ((name, new_name):(deref mapping))) fseq
+	    new_name
+	in
+	try 1
+    in
+    let ints' = map insert ints then
+    let bit_mapping =
+	let expand_map (f,t) = zip (md_expand_vector f) (md_expand_vector t) in
+	flatmap expand_map (deref mapping)
+    then
+    let map_name old_name =
+	let ores = try_assoc old_name (deref mapping) then
+	has_value ores => [get_value ores] |
+	let old_names = md_expand_vector old_name then
+	let map1 onm =
+	    let ores1 = try_assoc onm bit_mapping then
+	    has_value ores1 => get_value ores1 | onm
+	in
+	let new_names = map map1 old_names then
+	md_merge_vectors new_names
+    in
+    let trans (PINST sname sattrs sleaf sfa_inps sfa_outs sints sch) =
+	let tr_fa (f,as) = (f, flatmap map_name as) in
+	let sfa_inps' = map tr_fa sfa_inps then
+	let sfa_outs' = map tr_fa sfa_outs then
+	(PINST sname sattrs sleaf sfa_inps' sfa_outs' sints sch)
+    in
+    let subfubs' = map trans subfubs then
+    (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER subfubs'))
+;
 
 
+// A function to flatten recursively defined pexlifs
+let flatten_recursive_pexlif recursion_name p =
+    let stop_pred p =
+	val (PINST name _ _ _ _ _ _) = p in
+	NOT (name = recursion_name)
+    in
+    let p' = gen_flatten_pexlif stop_pred p then
+    rename_internals p'
+;
 
 // A function that helps in declaring internal signals
 // Use:
@@ -3272,3 +3352,24 @@ let re_ff_en_reset_mux =
 	base_re_ff_en_reset d en reset clk qtmp,
         q <- (IF (en '&' ('~' reset)) THEN d ELSE qtmp)
 ];
+
+
+let wexpr_hw_type_name {bv::wexpr} = "wexpr";
+let wexpr_hw_mk_var {we::wexpr} base = W_VAR 0 base;
+let wexpr_hw_is_arithmetic {e::wexpr} = T;
+let wexpr_hw_size {e::wexpr} = wexpr_size e;
+let wexpr_hw_destr {e::wexpr} = e;
+let wexpr_hw_constr {e::wexpr} = e;
+let wexpr_hw_values {e::wexpr} = error "Not relevant";
+
+let {wexpr_hw_type_destr :: {wexpr} hw_type} =
+            HW_TYPE wexpr_hw_type_name
+                    wexpr_hw_mk_var
+                    wexpr_hw_is_arithmetic
+                    wexpr_hw_size
+                    wexpr_hw_destr
+                    wexpr_hw_constr
+                    wexpr_hw_values
+;
+add_open_overload hw_type_destr wexpr_hw_type_destr;
+

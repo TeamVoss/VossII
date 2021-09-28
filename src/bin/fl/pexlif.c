@@ -2,15 +2,16 @@
 // Copyright 2020 Carl-Johan Seger
 // SPDX-License-Identifier: Apache-2.0
 //------------------------------------------------------------------------------
-
 /******************************************************************************/
-/*									                                          */
+/*									      */
 /* Original author: Carl-Johan Seger, 2019                                    */
-/*									                                          */
+/*									      */
 /******************************************************************************/
 #include "strings.h"
 #include "graph.h"
 #include "pexlif.h"
+
+extern char             FailBuf[4096];
 
 /******************************************************************************/
 /*                               GLOBAL VARIABLES                             */
@@ -65,6 +66,7 @@ static ustr_mgr        lstrings;
 static rec_mgr         vec_mgr;
 static rec_mgr         rng_mgr;
 // Folding/Un-folding construction.
+static rec_mgr         subst_hash_record_mgr;
 static rec_mgr         vector_list_mgr;
 static rec_mgr_ptr     vector_list_mgr_ptr;
 static rec_mgr         vector_mgr;
@@ -292,11 +294,13 @@ mk_formal_actuals_substitution(hash_record_ptr tbl, g_ptr fa)
     FOR_CONS(fa, li, pair) {
         g_ptr formal = GET_FST(pair);
         g_ptr actuals = GET_SND(pair);
-        /* fprintf(stderr, "Building subst for %s.\n", GET_STRING(formal)); */
         // Expand each actual and collect its vectors.
         unint size = 0;
         vec_list_ptr act_exp = NULL, *tail = &act_exp;
         FOR_CONS(actuals, lj, actual) {
+
+// FIX: Some of the actuals can be constants!
+
             vec_ptr vec =
                 Split_vector_name(&lstrings, vector_mgr_ptr, range_mgr_ptr,
                                   GET_STRING(actual));
@@ -304,17 +308,15 @@ mk_formal_actuals_substitution(hash_record_ptr tbl, g_ptr fa)
                 Expand_vector(vector_list_mgr_ptr, vector_mgr_ptr,
                               range_mgr_ptr, vec);
             /* fprintf(stderr, "> Expanding %s => ", GET_STRING(actual)); */
-            /* EMIT_VEC_LIST(exp); */
+            /* DBG_PRINT_VEC_LIST(exp); */
             // /
             *tail = exp;
             while(exp->next != NULL) { exp = exp->next; size++; }
             tail = &exp->next;
         }
-        /* fprintf(stderr, "> Final exp. list: "); */
-        /* EMIT_VEC_LIST(act_exp); */
         sname_list_ptr x = Show_vectors(sname_list_mgr_ptr, act_exp, FALSE);
         /* fprintf(stderr, "mk_subst: %s => ", GET_STRING(formal)); */
-        /* EMIT_STR_LIST(x); */
+        /* DBG_PRINT_STR_LIST(x); */
         // Expand formal and build a mapping of each vector to its corr. actual.
         string form_str = GET_STRING(formal);
         vec_ptr form_vec =
@@ -323,10 +325,12 @@ mk_formal_actuals_substitution(hash_record_ptr tbl, g_ptr fa)
         vec_list_ptr form_exp =
             Expand_vector(vector_list_mgr_ptr, vector_mgr_ptr, range_mgr_ptr,
                           form_vec);
-        hash_record subst;
-        create_hash(&subst, size, vec_hash, vec_equ);
+	hash_record *substp = new_rec(&subst_hash_record_mgr);
+        create_hash(substp, size, vec_hash, vec_equ);
         while(act_exp != NULL) {
-            insert_hash(&subst, form_exp->vec, act_exp->vec);
+	    vec_ptr k = Copy_vector(vector_mgr_ptr,range_mgr_ptr,form_exp->vec);
+	    vec_ptr v = Copy_vector(vector_mgr_ptr,range_mgr_ptr,act_exp->vec);
+            insert_hash(substp, k, v);
             act_exp  = act_exp->next;
             form_exp = form_exp->next;
         }
@@ -334,7 +338,7 @@ mk_formal_actuals_substitution(hash_record_ptr tbl, g_ptr fa)
         fa_subst_ptr sub = (fa_subst_ptr) new_rec(fa_subst_mgr_ptr);
         sub->formal  = form_str;
         sub->actuals = x;
-        sub->subst   = &subst;
+        sub->subst   = substp;
         string form_sig = Get_vector_signature(&lstrings, form_vec);
         insert_hash(tbl, form_sig, sub);
     }
@@ -355,15 +359,12 @@ subst_formal(hash_record_ptr tbl, g_ptr f)
         Split_vector_name(&lstrings, vector_mgr_ptr, range_mgr_ptr, form_str);
     string  form_sig = Get_vector_signature(&lstrings, form_vec);
     fa_subst_ptr bkt = (fa_subst_ptr) find_hash(tbl, form_sig);
-    /* fprintf(stderr, "> subst formal: %s\n", form_str); */
     if(bkt == NULL) {
         /* fprintf(stderr, "found no match!\n"); */
         return NULL;
     }
     if(str_equ(form_str, bkt->formal)) {
         sname_list_ptr m = bkt->actuals;
-        /* fprintf(stderr, "found identical match: "); */
-        /* EMIT_STR_LIST(m); */
         return m;
     }
     vec_list_ptr form_exp =
@@ -377,7 +378,7 @@ subst_formal(hash_record_ptr tbl, g_ptr f)
             DIE("Bad index");
         }
         vec_list_ptr vlp = (vec_list_ptr) new_rec(vector_list_mgr_ptr);
-        vlp->vec  = val;
+	vlp->vec = Copy_vector(vector_mgr_ptr, range_mgr_ptr, val);
         vlp->next = NULL;
         // /
         *tail = vlp;
@@ -400,9 +401,11 @@ subst_fa_list(hash_record_ptr tbl, g_ptr fa_list)
         FOR_CONS(actuals, j, actual) {
             sname_list_ptr names = subst_formal(tbl, actual);
             for(; names != NULL; names = names->next) {
-                APPEND1(as_tail, Make_STRING_leaf(names->name));
+                APPEND1(as_tail,
+			Make_STRING_leaf(wastrsave(&strings, names->name)));
             }
         }
+	as = Merge_Vectors(as, FALSE);
         INC_REFCNT(formal);
         APPEND1(res_tail, Make_PAIR_ND(formal, as));
     }
@@ -651,6 +654,21 @@ unfold_pexlif(g_ptr p, unint id, string prefix)
         p, &old_name, &old_attrs, &old_leaf, &old_fa_inps, &old_fa_outs,
         &old_inter, &old_cont
     );
+    new_mgr(&subst_hash_record_mgr, sizeof(hash_record));
+    // Create wirename database to ensure no name capture
+    vector_db_ptr vdp = VDB_create();
+    for(g_ptr l = old_fa_inps; !IS_NIL(l); l = GET_CONS_TL(l)) {
+	string f = GET_STRING(GET_FST(GET_CONS_HD(l)));
+	VDB_Insert_vector(vdp, f);
+    }
+    for(g_ptr l = old_fa_outs; !IS_NIL(l); l = GET_CONS_TL(l)) {
+	string f = GET_STRING(GET_FST(GET_CONS_HD(l)));
+	VDB_Insert_vector(vdp, f);
+    }
+    for(g_ptr l = old_inter; !IS_NIL(l); l = GET_CONS_TL(l)) {
+	string f = GET_STRING(GET_CONS_HD(l));
+	VDB_Insert_vector(vdp, f);
+    }
     is_P_HIER(old_cont, &old_children);
     // Pick out the to-be unfolded child and collect other children.
     unint ix = 1;
@@ -673,7 +691,11 @@ unfold_pexlif(g_ptr p, unint id, string prefix)
         unfolded, &un_name, &un_attrs, &un_leaf, &un_fa_inps, &un_fa_outs,
         &un_inter, &un_cont
     );
-    is_P_HIER(un_cont, &un_children);
+    if( !is_P_HIER(un_cont, &un_children) ) {
+	Fail_pr("Cannot unfold a leaf node");
+	return(NULL);
+    }
+
     // Build formal->actuals subst. for input/output/internals. Note that we can
     // build new list of internals while constructing the inter. subst.
     hash_record sub;
@@ -689,12 +711,21 @@ unfold_pexlif(g_ptr p, unint id, string prefix)
         string buf = gen_strtemp(ts, prefix);
         gen_strappend(ts, old);
         string new = wastrsave(&strings, buf);
+	if( VDB_has_name_collision(vdp, new) ) {
+	    string msg = Fail_pr("Name collision for node %s", new);
+	    g_ptr result = Make_Failure(msg);
+	    VDB_destroy(vdp);
+	    dispose_hash(&sub, NULLFCN);
+	    free_mgr(&subst_hash_record_mgr);
+	    return result;
+	}
         g_ptr newg = Make_STRING_leaf(new);
         INC_REFCNT(newg);
         APPEND1(new_inter_tail, newg);
         APPEND1(inter_sub_tail,
                 Make_PAIR_ND(Make_STRING_leaf(old), Make_SINGLETON(newg)));
     }
+    VDB_destroy(vdp);
     free_temp_str_mgr(ts);
     mk_formal_actuals_substitution(&sub, inter_sub);
     APPENDL(new_inter_tail, old_inter);
@@ -728,6 +759,8 @@ unfold_pexlif(g_ptr p, unint id, string prefix)
     // /
     rem_fold_mem();
     rem_adj_mem();
+    dispose_hash(&sub, NULLFCN);
+    free_mgr(&subst_hash_record_mgr);
     return new_pinst;
 }
 
@@ -1359,6 +1392,12 @@ unfold_pexlif_fn(g_ptr redex)
     // /
     EXTRACT_3_ARGS(redex, g_pex, g_id, g_prefix);
     g_ptr unfold = unfold_pexlif(g_pex, GET_INT(g_id), GET_STRING(g_prefix));
+    if( unfold == NULL ) {
+	MAKE_REDEX_FAILURE(redex, FailBuf);
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
     OVERWRITE(redex, unfold);
     // /
     DEC_REF_CNT(l);

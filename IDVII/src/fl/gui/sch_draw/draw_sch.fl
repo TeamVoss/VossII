@@ -464,7 +464,7 @@ let fl_show_rtl canvas dlev tag =
     let srcs = setify (flatmap get_src vecs) then
     srcs = [] => fprintf stderr "No RTL annotation avaiable for %S:\n" vecs |
     let show (file, start_line, start_col, end_line, end_col) = 
-	tcl_eval [sprintf "visualize_rtl %s %s %s %s %s"
+	tcl_eval [sprintf "rtl:visualize %s %s %s %s %s"
 			   file start_line start_col end_line end_col] fseq
 	()
     in
@@ -490,26 +490,26 @@ let fl_get_global_time canvas = deref (canvas2current_time_r canvas);
 export_to_tcl fl_get_global_time;
 
 
-lettype monitor =
-    MONITOR {vis::vfsm} {callback_fun::(ste->int->void)}
+lettype observer =
+    OBSERVER {vis::vfsm} {callback_fun::(ste->int->void)}
 ;
 
-let monitor_list_r = ref {[]:: monitor list};
+let observer_list_r = ref {[]:: observer list};
 
-let add_monitor vfsm call_back_function =
-    let monitor = MONITOR vfsm call_back_function then
-    (monitor_list_r := (monitor:(deref monitor_list_r))) fseq
-    monitor
+let add_observer vfsm call_back_function =
+    let observer = OBSERVER vfsm call_back_function then
+    (observer_list_r := (observer:(deref observer_list_r))) fseq
+    observer
 ;
 
-let delete_monitor monitor =
-    monitor_list_r := (filter (\m. m != monitor) (deref monitor_list_r))
+let delete_observer observer =
+    observer_list_r := (filter (\m. m != observer) (deref observer_list_r))
 ;
 
-let process_monitors vfsm time =
+let process_observers vfsm time =
     let ste = deref (vfsm2ste_r vfsm) then
-    let do (MONITOR vis fn) = vis != vfsm => () | ((fn ste time) catch ()) in
-    foreach do (deref monitor_list_r)
+    let do (OBSERVER vis fn) = vis != vfsm => () | ((fn ste time) catch ()) in
+    foreach do (deref observer_list_r)
 ; 
 
 let fl_set_global_time canvas t =
@@ -518,7 +518,7 @@ let fl_set_global_time canvas t =
     (add_command vfsm cmd) fseq
     let rtime = canvas2current_time_r canvas in
     (rtime := t) fseq
-    (process_monitors vfsm t)
+    (process_observers vfsm t)
 ;
 export_to_tcl fl_set_global_time;
 
@@ -1394,7 +1394,6 @@ let fl_expand_fanin c draw_level levels tag =
     val (final_res, cmds) = visualisation2tcl vis then
     (big_tcl_eval ("create_sch":cmds)) fseq
     (tcl_eval [
-                sprintf "%s delete all" c,
                 sprintf "draw_network %s $%s" c final_res,
                 "update",
                 sprintf "bind %s <Map> {fl_update_colors %s}"  c c,
@@ -1410,10 +1409,10 @@ let fl_undo_expansion c =
     val (final_res, cmds) = visualisation2tcl vis then
     (big_tcl_eval ("create_sch":cmds)) fseq
     (tcl_eval [
-                sprintf "%s delete all" c,
                 sprintf "draw_network %s $%s" c final_res,
                 "update",
                 sprintf "bind %s <Map> {fl_update_colors %s}"  c c,
+		sprintf "fl_update_colors %s"  c,
                 sprintf "set_scrollregion %s" c
               ]) fseq
     ()
@@ -1424,13 +1423,19 @@ let fl_hide_fanin c tag make_it_stop_node =
     (make_it_stop_node => (fl_add_stop_nd c tag) | ()) fseq
     let vis = canvas2vis c then
     let vis = visualize_hide_fanin vis tag (-1) then
+    let cmd =
+	let v = list2str T "[" ", " "]" (sprintf "\"%s\"") (fl_tag2vec c tag) in
+	sprintf "draw_hide vis %s %s %s;" (canvas2tab c) v
+					  (make_it_stop_node => "T" | "F")
+    in
+    (add_command (w2vfsm c) cmd) fseq
     val (final_res, cmds) = visualisation2tcl vis then
     (big_tcl_eval ("create_sch":cmds)) fseq
     (tcl_eval [
-                sprintf "%s delete all" c,
                 sprintf "draw_network %s $%s" c final_res,
                 "update",
                 sprintf "bind %s <Map> {fl_update_colors %s}"  c c,
+		sprintf "fl_update_colors %s"  c,
                 sprintf "set_scrollregion %s" c
               ]) fseq
     ()
@@ -1623,6 +1628,22 @@ let draw_fanin vfsm hierarchy_level levels vecs =
 let draw_inside vfsm hierarchy_level vecs =
     gen_draw_inside vfsm (hierarchy_level-1) vecs
 ;
+
+// Hide a subtree
+//
+// Arguments:
+// vfsm:	    A visualization GUI started with STE_debug.
+// vecs:	    The vector to hide
+// stop:	    Make the node also a global stop node
+//
+let draw_hide {vfsm::vfsm} tab vecs stop =
+    let anons = (fl_vecs2tags tab vecs) then
+    anons = [] => eprintf "Cannot find anon names for %S in %s\n" vecs tab |
+    let anon = hd anons in
+    (tcl_eval [sprintf "cb:hide_fanin %s %s %d" tab anon (stop=>1|0)]) fseq
+    ()
+;
+
 
 // Add the waveforms for the vectors in vecs.
 //

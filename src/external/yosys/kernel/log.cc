@@ -1,7 +1,7 @@
 /*
  *  yosys -- Yosys Open SYnthesis Suite
  *
- *  Copyright (C) 2012  Clifford Wolf <clifford@clifford.at>
+ *  Copyright (C) 2012  Claire Xenia Wolf <claire@yosyshq.com>
  *
  *  Permission to use, copy, modify, and/or distribute this software for any
  *  purpose with or without fee is hereby granted, provided that the above
@@ -19,7 +19,7 @@
 
 #include "kernel/yosys.h"
 #include "libs/sha1/sha1.h"
-#include "backends/ilang/ilang_backend.h"
+#include "backends/rtlil/rtlil_backend.h"
 
 #if !defined(_WIN32) || defined(__MINGW32__)
 #  include <sys/time.h>
@@ -71,7 +71,6 @@ int string_buf_index = -1;
 static struct timeval initial_tv = { 0, 0 };
 static bool next_print_log = false;
 static int log_newline_count = 0;
-static bool check_expected_logs = true;
 static bool display_error_log_msg = true;
 
 static void log_id_cache_clear()
@@ -345,15 +344,14 @@ static void logv_error_with_prefix(const char *prefix,
 
 	log_make_debug = bak_log_make_debug;
 
-	if (log_error_atexit)
-		log_error_atexit();
-
 	for (auto &item : log_expect_error)
 		if (YS_REGEX_NS::regex_search(log_last_error, item.second.pattern))
 			item.second.current_count++;
 
-	if (check_expected_logs)
-		log_check_expected();
+	log_check_expected();
+
+	if (log_error_atexit)
+		log_error_atexit();
 
 	YS_DEBUGTRAP_IF_DEBUGGING;
 
@@ -600,7 +598,7 @@ void log_dump_val_worker(RTLIL::State v) {
 const char *log_signal(const RTLIL::SigSpec &sig, bool autoint)
 {
 	std::stringstream buf;
-	ILANG_BACKEND::dump_sigspec(buf, sig, autoint);
+	RTLIL_BACKEND::dump_sigspec(buf, sig, autoint);
 
 	if (string_buf.size() < 100) {
 		string_buf.push_back(buf.str());
@@ -647,28 +645,26 @@ const char *log_id(RTLIL::IdString str)
 void log_module(RTLIL::Module *module, std::string indent)
 {
 	std::stringstream buf;
-	ILANG_BACKEND::dump_module(buf, indent, module, module->design, false);
+	RTLIL_BACKEND::dump_module(buf, indent, module, module->design, false);
 	log("%s", buf.str().c_str());
 }
 
 void log_cell(RTLIL::Cell *cell, std::string indent)
 {
 	std::stringstream buf;
-	ILANG_BACKEND::dump_cell(buf, indent, cell);
+	RTLIL_BACKEND::dump_cell(buf, indent, cell);
 	log("%s", buf.str().c_str());
 }
 
 void log_wire(RTLIL::Wire *wire, std::string indent)
 {
 	std::stringstream buf;
-	ILANG_BACKEND::dump_wire(buf, indent, wire);
+	RTLIL_BACKEND::dump_wire(buf, indent, wire);
 	log("%s", buf.str().c_str());
 }
 
 void log_check_expected()
 {
-	check_expected_logs = false;
-
 	for (auto &item : log_expect_warning) {
 		if (item.second.current_count == 0) {
 			log_warn_regexes.clear();
@@ -709,6 +705,10 @@ void log_check_expected()
 			log_warn_regexes.clear();
 			log_error("Expected error pattern '%s' not found !\n", item.first.c_str());
 		}
+
+	log_expect_warning.clear();
+	log_expect_log.clear();
+	log_expect_error.clear();
 }
 
 // ---------------------------------------------------

@@ -28,10 +28,13 @@ class vcd_writer {
 		size_t ident;
 		size_t width;
 		chunk_t *curr;
-		size_t prev_off;
+		size_t cache_offset;
+		debug_outline *outline;
+		bool *outline_warm;
 	};
 
 	std::vector<std::string> current_scope;
+	std::map<debug_outline*, bool> outlines;
 	std::vector<variable> variables;
 	std::vector<chunk_t> cache;
 	std::map<chunk_t*, size_t> aliases;
@@ -66,12 +69,25 @@ class vcd_writer {
 		} while (ident != 0);
 	}
 
+	void emit_name(const std::string &name) {
+		for (char c : name) {
+			if (c == ':') {
+				// Due to a bug, GTKWave cannot parse a colon in the variable name, causing the VCD file
+				// to be unreadable. It cannot be escaped either, so replace it with the sideways colon.
+				buffer += "..";
+			} else {
+				buffer += c;
+			}
+		}
+	}
+
 	void emit_var(const variable &var, const std::string &type, const std::string &name,
 	              size_t lsb_at, bool multipart) {
 		assert(!streaming);
 		buffer += "$var " + type + " " + std::to_string(var.width) + " ";
 		emit_ident(var.ident);
-		buffer += " " + name;
+		buffer += " ";
+		emit_name(name);
 		if (multipart || name.back() == ']' || lsb_at != 0) {
 			if (var.width == 1)
 				buffer += " [" + std::to_string(lsb_at) + "]";
@@ -112,16 +128,22 @@ class vcd_writer {
 		buffer += '\n';
 	}
 
-	const variable &register_variable(size_t width, chunk_t *curr, bool constant = false) {
+	void reset_outlines() {
+		for (auto &outline_it : outlines)
+			outline_it.second = /*warm=*/(outline_it.first == nullptr);
+	}
+
+	variable &register_variable(size_t width, chunk_t *curr, bool constant = false, debug_outline *outline = nullptr) {
 		if (aliases.count(curr)) {
 			return variables[aliases[curr]];
 		} else {
+			auto outline_it = outlines.emplace(outline, /*warm=*/(outline == nullptr)).first;
 			const size_t chunks = (width + (sizeof(chunk_t) * 8 - 1)) / (sizeof(chunk_t) * 8);
 			aliases[curr] = variables.size();
 			if (constant) {
-				variables.emplace_back(variable { variables.size(), width, curr, (size_t)-1 });
+				variables.emplace_back(variable { variables.size(), width, curr, (size_t)-1, outline_it->first, &outline_it->second });
 			} else {
-				variables.emplace_back(variable { variables.size(), width, curr, cache.size() });
+				variables.emplace_back(variable { variables.size(), width, curr, cache.size(), outline_it->first, &outline_it->second });
 				cache.insert(cache.end(), &curr[0], &curr[chunks]);
 			}
 			return variables.back();
@@ -129,13 +151,17 @@ class vcd_writer {
 	}
 
 	bool test_variable(const variable &var) {
-		if (var.prev_off == (size_t)-1)
+		if (var.cache_offset == (size_t)-1)
 			return false; // constant
+		if (!*var.outline_warm) {
+			var.outline->eval();
+			*var.outline_warm = true;
+		}
 		const size_t chunks = (var.width + (sizeof(chunk_t) * 8 - 1)) / (sizeof(chunk_t) * 8);
-		if (std::equal(&var.curr[0], &var.curr[chunks], &cache[var.prev_off])) {
+		if (std::equal(&var.curr[0], &var.curr[chunks], &cache[var.cache_offset])) {
 			return false;
 		} else {
-			std::copy(&var.curr[0], &var.curr[chunks], &cache[var.prev_off]);
+			std::copy(&var.curr[0], &var.curr[chunks], &cache[var.cache_offset]);
 			return true;
 		}
 	}
@@ -197,6 +223,10 @@ public:
 				emit_var(register_variable(item.width, item.curr),
 				         "wire", name, item.lsb_at, multipart);
 				break;
+			case debug_item::OUTLINE:
+				emit_var(register_variable(item.width, item.curr, /*constant=*/false, item.outline),
+				         "wire", name, item.lsb_at, multipart);
+				break;
 		}
 	}
 
@@ -211,13 +241,13 @@ public:
 	}
 
 	void add(const debug_items &items) {
-		this->template add(items, [](const std::string &, const debug_item &) {
+		this->add(items, [](const std::string &, const debug_item &) {
 			return true;
 		});
 	}
 
 	void add_without_memories(const debug_items &items) {
-		this->template add(items, [](const std::string &, const debug_item &item) {
+		this->add(items, [](const std::string &, const debug_item &item) {
 			return item.type != debug_item::MEMORY;
 		});
 	}
@@ -228,6 +258,7 @@ public:
 			emit_scope({});
 			emit_enddefinitions();
 		}
+		reset_outlines();
 		emit_time(timestamp);
 		for (auto var : variables)
 			if (test_variable(var) || first_sample) {

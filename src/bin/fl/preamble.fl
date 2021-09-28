@@ -289,6 +289,49 @@ letrec zip l1 l2 =
             (hd l1, hd l2):(zip (tl l1) (tl l2))
 ;
 
+begin_abstype;
+
+let check_same_length ll =
+    letrec all_empty idx (l:ls) =
+	l = [] => all_empty (idx+1) ls | sprintf "|list 1| != |list %d|" idx
+     /\    all_empty idx [] = ""
+    in
+    letrec all_non_empty idx (l:ls) =
+	l = [] => sprintf "|list 1| != |list %d|" idx | all_non_empty (idx+1) ls
+     /\    all_non_empty idx [] = ""
+    in
+    hd ll = [] => all_empty 2 (tl ll)
+		| all_non_empty 2 (tl ll)
+;
+
+// Take three lists of the same length and return a list of tripples
+letrec zip3 l1 l2 l3 =
+    let err = check_same_length [l1,l2,l3] in
+    err != "" => eprintf "zip3 length mismatch: %s\n" err |
+    l1 = [] => [] |
+    (hd l1, hd l2, hd l3):(zip3 (tl l1) (tl l2) (tl l3))
+;
+
+// Take four lists of the same length and return a list of quadruples
+letrec zip4 l1 l2 l3 l4 =
+    let err = check_same_length [l1,l2,l3,l4] in
+    err != "" => eprintf "zip4 length mismatch: %s\n" err |
+    l1 = [] => [] |
+    (hd l1, hd l2, hd l3, hd l4):(zip4 (tl l1) (tl l2) (tl l3) (tl l4))
+;
+
+// Take five lists of the same length and return a list of quintuples
+letrec zip5 l1 l2 l3 l4 l5 =
+    let err = check_same_length [l1,l2,l3,l4,l5] in
+    err != "" => eprintf "zip5 length mismatch: %s\n" err |
+    l1 = [] => [] |
+    (hd l1, hd l2, hd l3, hd l4, hd l5):
+    (zip5 (tl l1) (tl l2) (tl l3) (tl l4) (tl l5))
+;
+
+end_abstype zip3 zip4 zip5;
+
+
 // Take a list of pairs pl and return a pair of lists
 letrec unzip pl = empty pl => ([],[]) |
 		let res = unzip (tl pl) in

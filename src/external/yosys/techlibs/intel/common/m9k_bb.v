@@ -1,7 +1,7 @@
 /*
  *  yosys -- Yosys Open SYnthesis Suite
  *
- *  Copyright (C) 2012  Clifford Wolf <clifford@clifford.at>
+ *  Copyright (C) 2012  Claire Xenia Wolf <claire@yosyshq.com>
  *
  *  Permission to use, copy, modify, and/or distribute this software for any
  *  purpose with or without fee is hereby granted, provided that the above
@@ -32,7 +32,7 @@ module altsyncram(data_a, address_a, wren_a, rden_a, q_a, data_b, address_b,  wr
    parameter outdata_reg_a                 = "UNREGISTERED";
    parameter operation_mode                = "SINGLE_PORT";
    parameter intended_device_family        = "MAX 10 FPGA";
-   parameter outdata_reg_a                 = "UNREGISTERED";
+   parameter outdata_reg_b                 = "UNREGISTERED";
    parameter lpm_type                      = "altsyncram";
    parameter init_type                     = "unused";
    parameter ram_block_type                = "AUTO";

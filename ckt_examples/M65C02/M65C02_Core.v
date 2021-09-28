@@ -596,8 +596,8 @@ M65C02_MPCv4    #(
 
 //  Infer Microprogram ROM and initialize with file created by MCP_Tool
 
-//initial
-//    $readmemb(pM65C02_uPgm, uP_ROM, 0, (pROM_Depth - 1));
+initial
+    $readmemb(pM65C02_uPgm, uP_ROM, 0, (pROM_Depth - 1));
     
 always @(posedge Clk)
 begin
@@ -667,8 +667,8 @@ end
 
 //  Infer Instruction Decode ROM and initialize with file created by MCP_Tool
 
-//initial
-//    $readmemb(pM65C02_IDec, ID_ROM, 0, (pDEC_Depth - 1));
+initial
+    $readmemb(pM65C02_IDec, ID_ROM, 0, (pDEC_Depth - 1));
 
 always @(posedge Clk)
 begin

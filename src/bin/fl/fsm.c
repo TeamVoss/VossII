@@ -2157,7 +2157,14 @@ visualization_anon2real(g_ptr redex)
     push_fsm(vp->fsm);
     string aname = GET_STRING(g_aname);
     if( *aname == 'a' && *(aname+1) == 'n' ) {
-        int idx = atoi(aname+2);
+        uint idx = atoi(aname+2);
+	if( idx >= COUNT_BUF(&(vp->anon_buf)) ) {
+	    MAKE_REDEX_FAILURE(redex, Fail_pr("Anon node %d out of range",idx));
+	    pop_fsm();
+	    DEC_REF_CNT(l);
+	    DEC_REF_CNT(r);
+	    return;
+	}
         ilist_ptr ip = *((ilist_ptr *) M_LOCATE_BUF(&(vp->anon_buf), idx));
         g_ptr nds = ilist2nds(ip);
         g_ptr res = Merge_Vectors(nds, TRUE);
@@ -2366,7 +2373,7 @@ visualize_hide_fanin(g_ptr redex)
     create_hash(&(vp->done), 100, ilist_ptr_hash, ilist_ptr_equ);
     free_buf(&(vp->anon_buf));
     new_buf(&(vp->anon_buf), 100, sizeof(ilist_ptr));
-    // Now do a llimited fanin for all the outputs
+    // Now do a limited fanin for all the outputs
     int ocnt = 0;
     for(sch_list_ptr sl = sch->children; sl != NULL; sl = sl->next) {
 	ilist_ptr il = *((ilist_ptr *)M_LOCATE_BUF(&outputs, ocnt));
@@ -6053,6 +6060,7 @@ do_phase(ste_ptr ste)
 {
     nnode_ptr np;
     int idx = 0;
+    (ste->cur_time)++;
     FOR_BUF(nodesp, nnode_rec, np) {
 	gbv newH, newL;
 	if( idx >3 && np->composite == -1 ) {
@@ -6067,6 +6075,7 @@ do_phase(ste_ptr ste)
 	}
 	idx++;
     }
+    (ste->cur_time)--;
 }
 
 static int
@@ -6763,7 +6772,11 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
         declare_vector(&vinfo_tbl, hier, name, FALSE, NULL, value_list);
     }
     vis_ptr vp = NULL;
+#if 0
     if( !top_level && (leaf || (strstr(name,"draw_") != NULL))){
+#else
+    if( !top_level ){
+#endif
         vp = (vis_ptr) new_rec(vis_rec_mgrp);
         vp->draw_level = draw_level;
         vp->attrs = attrs;
@@ -6916,11 +6929,20 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
             *(res+len) = 0;
             sprintf(buf, "%s_code %d %s", res, nbr_inputs, res+len+1);
             vp->pfn = wastrsave(&strings, buf);
+#if 0
         } else if( strncmp(vp->pfn, "draw_hier ", 10) == 0 ) {
+#else
+        } else if(strncmp(vp->pfn, "draw_hier ", 10) == 0 ||
+		  strncmp(vp->pfn, "draw_", 5) != 0 ) {
+#endif
             tstr_ptr sm = new_temp_str_mgr();
             // Replace draw_hier txt with draw_fub txt inst inputs outputs
             string cmd = gen_strtemp(sm, "draw_fub ");
-            cmd = gen_strappend(sm, vp->pfn + 10);
+	    if( strncmp(vp->pfn, "draw_hier ", 10) == 0 ) {
+		cmd = gen_strappend(sm, vp->pfn + 10);
+	    } else {
+		cmd = gen_strappend(sm, vp->pfn);
+	    }
             string iname = find_instance_name(attrs);
             if( iname == s_no_instance ) {
                 cmd = gen_strappend(sm, " ");
@@ -7270,10 +7292,11 @@ update_node(ste_ptr ste, int idx, gbv Hnew, gbv Lnew, bool force)
 		      "Warning: Antecedent failure at time %d on node %s\n",
 		      ste->cur_time, idx2name(np->idx));
 		    if( RCprint_failures ) {
-			FP(err_fp, "\nCurrent value:");
-			cHL_Print(err_fp, Hnew, Lnew);
-			FP(err_fp, "\nAsserted value:");
-			cHL_Print(err_fp, aH, aL);
+			FP(warning_fp, "Current value:");
+			cHL_Print(warning_fp, Hnew, Lnew);
+			FP(warning_fp, "\nAsserted value:");
+			cHL_Print(warning_fp, aH, aL);
+			FP(warning_fp, "\n\n");
 		    }
 		    nbr_errors_reported++;
 		    if( ste->abort_ASAP ) {
@@ -7473,6 +7496,7 @@ build_limit_tbl(vstate_ptr vp, hash_record *limit_tblp, string sn, sch_ptr sch)
     }
 }
 
+#if 0
 static sch_ptr
 is_input(vstate_ptr vsp, ilist_ptr il)
 {
@@ -7508,16 +7532,13 @@ is_input(vstate_ptr vsp, ilist_ptr il)
     res->children = NULL;
     return res;
 }
+#endif
 
 static sch_ptr
 limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
 		   int draw_level)
 {
     string anon;
-    sch_ptr ires;
-
-    // Top-level inputs are always drawn
-    if( (ires = is_input(vsp, il)) != NULL ) { return ires; }
 
     // Is it aldready drawn
     if( (anon = (string) find_hash(&(vsp->done), il)) != NULL ) {
@@ -7525,6 +7546,7 @@ limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
     }
     // Insert this node since we will draw it.
     int anon_cnt = COUNT_BUF(&(vsp->anon_buf));
+
     push_buf(&(vsp->anon_buf), &il);
     Sprintf(buf, "an%06d", anon_cnt);
     anon = wastrsave(&strings, buf);
@@ -7565,6 +7587,33 @@ limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
 	res->children = s_sl;
 	return res;
     }
+
+    ilist_ptr ifc_ilist;
+    if( has_ifc_nodes(vsp, il, &ifc_ilist, &rem_ilist) ) {
+	if( rem_ilist == NULL ) {
+	    // Just an interface node
+	    g_ptr nds = ilist2nds(il);
+	    g_ptr vecs = Merge_Vectors(nds, TRUE);
+	    string pfn = strtemp("");
+	    strappend("draw_ifc_input ");
+	    char sep = '{';
+	    while( !IS_NIL(vecs) ) {
+		charappend(sep);
+		sep = ' ';
+		charappend('{');
+		strappend(GET_STRING(GET_CONS_HD(vecs)));
+		charappend('}');
+		vecs = GET_CONS_TL(vecs);
+	    }
+	    strappend(" }");
+	    pfn = wastrsave(&strings, pfn);
+	    sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
+	    res->vec = anon;
+	    res->pfn = pfn;
+	    res->children = NULL;
+	    return(res );
+	}
+    }
     if( find_hash(limit_tblp, il) == NULL ) {
 	// An incomplete node  draw_incomplete
 	g_ptr nds = ilist2nds(il);
@@ -7588,6 +7637,7 @@ limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
 	res->children = NULL;
 	return res;
     }
+
     vis_ptr cur_info = NULL;
     int current_type = -99;
     // -3 == dangling signal
@@ -7739,6 +7789,7 @@ limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
 	sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 	res->vec = anon;
 	string pfn = strtemp("draw_concat ");
+	char buf[10];
 	int len = 0;
 	for(sch_list_ptr sl = cur_children; sl != NULL; sl = sl->next) {
 	    len++;
@@ -7800,10 +7851,6 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	   int draw_level)
 {
     string anon;
-//    sch_ptr ires;
-
-    // Top-level inputs are always drawn
-//    if( (ires = is_input(vsp, il)) != NULL ) { return ires; }
 
     // Is it aldready drawn
     if( (anon = (string) find_hash(&(vsp->done), il)) != NULL ) {
@@ -8106,6 +8153,20 @@ create_constant(int sz, int *ccnt, g_ptr ints, string cnst, buffer *chbufp)
     ASSERT( sz == (int) strlen(cnst)-2 );
     string base = mk_fresh_anon_name(ints, ccnt);
     string out  = mk_vector_name(base, sz);
+    string tmp = NULL;
+    if( index(cnst, 'z') != NULL || index(cnst, 'Z') != NULL ) {
+	FP(warning_fp, "z-values not supported. Treated as x!\n");
+	tmp = (string) malloc((strlen(cnst)+1));
+	strcpy(tmp,cnst);
+	string p = tmp;
+	while( *p ) {
+	    if( *p == 'z' || *p == 'Z' ) {
+		*p = 'X';
+	    }
+	    p++;
+	}
+	cnst = tmp;
+    }
     if( index(cnst, 'x') != NULL || index(cnst, 'X') != NULL ) {
 	// A 0,1,x constant
 	g_ptr leaf = Make_NIL();
@@ -8170,6 +8231,7 @@ create_constant(int sz, int *ccnt, g_ptr ints, string cnst, buffer *chbufp)
 			Make_NIL(),
 			mk_P_LEAF(leaf));
 	push_buf(chbufp, &res);
+	if( tmp != NULL ) free(tmp);
 	return out;
     } else {
 	// A 0,1 constant
@@ -8195,6 +8257,7 @@ create_constant(int sz, int *ccnt, g_ptr ints, string cnst, buffer *chbufp)
 						       Make_AINT_leaf(v))))));
 
 	push_buf(chbufp, &res);
+	if( tmp != NULL ) free(tmp);
 	return out;
     }
 }

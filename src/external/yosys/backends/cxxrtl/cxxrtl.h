@@ -36,21 +36,47 @@
 #include <map>
 #include <algorithm>
 #include <memory>
+#include <functional>
 #include <sstream>
 
 #include <backends/cxxrtl/cxxrtl_capi.h>
+
+#ifndef __has_attribute
+#	define __has_attribute(x) 0
+#endif
 
 // CXXRTL essentially uses the C++ compiler as a hygienic macro engine that feeds an instruction selector.
 // It generates a lot of specialized template functions with relatively large bodies that, when inlined
 // into the caller and (for those with loops) unrolled, often expose many new optimization opportunities.
 // Because of this, most of the CXXRTL runtime must be always inlined for best performance.
-#ifndef __has_attribute
-#	define __has_attribute(x) 0
-#endif
 #if __has_attribute(always_inline)
 #define CXXRTL_ALWAYS_INLINE inline __attribute__((__always_inline__))
 #else
 #define CXXRTL_ALWAYS_INLINE inline
+#endif
+// Conversely, some functions in the generated code are extremely large yet very cold, with both of these
+// properties being extreme enough to confuse C++ compilers into spending pathological amounts of time
+// on a futile (the code becomes worse) attempt to optimize the least important parts of code.
+#if __has_attribute(optnone)
+#define CXXRTL_EXTREMELY_COLD __attribute__((__optnone__))
+#elif __has_attribute(optimize)
+#define CXXRTL_EXTREMELY_COLD __attribute__((__optimize__(0)))
+#else
+#define CXXRTL_EXTREMELY_COLD
+#endif
+
+// CXXRTL uses assert() to check for C++ contract violations (which may result in e.g. undefined behavior
+// of the simulation code itself), and CXXRTL_ASSERT to check for RTL contract violations (which may at
+// most result in undefined simulation results).
+//
+// Though by default, CXXRTL_ASSERT() expands to assert(), it may be overridden e.g. when integrating
+// the simulation into another process that should survive violating RTL contracts.
+#ifndef CXXRTL_ASSERT
+#ifndef CXXRTL_NDEBUG
+#define CXXRTL_ASSERT(x) assert(x)
+#else
+#define CXXRTL_ASSERT(x)
+#endif
 #endif
 
 namespace cxxrtl {
@@ -96,8 +122,10 @@ struct value : public expr_base<value<Bits>> {
 	explicit constexpr value(Init ...init) : data{init...} {}
 
 	value(const value<Bits> &) = default;
-	value(value<Bits> &&) = default;
 	value<Bits> &operator=(const value<Bits> &) = default;
+
+	value(value<Bits> &&) = default;
+	value<Bits> &operator=(value<Bits> &&) = default;
 
 	// A (no-op) helper that forces the cast to value<>.
 	CXXRTL_ALWAYS_INLINE
@@ -289,6 +317,14 @@ struct value : public expr_base<value<Bits>> {
 		return sext_cast<NewBits>()(*this);
 	}
 
+	// Bit replication is far more efficient than the equivalent concatenation.
+	template<size_t Count>
+	CXXRTL_ALWAYS_INLINE
+	value<Bits * Count> repeat() const {
+		static_assert(Bits == 1, "repeat() is implemented only for 1-bit values");
+		return *this ? value<Bits * Count>().bit_not() : value<Bits * Count>();
+	}
+
 	// Operations with run-time parameters (offsets, amounts, etc).
 	//
 	// These operations are used for computations.
@@ -452,10 +488,11 @@ struct value : public expr_base<value<Bits>> {
 		bool carry = CarryIn;
 		for (size_t n = 0; n < result.chunks; n++) {
 			result.data[n] = data[n] + (Invert ? ~other.data[n] : other.data[n]) + carry;
+			if (result.chunks - 1 == n)
+				result.data[result.chunks - 1] &= result.msb_mask;
 			carry = (result.data[n] <  data[n]) ||
 			        (result.data[n] == data[n] && carry);
 		}
-		result.data[result.chunks - 1] &= result.msb_mask;
 		return {result, carry};
 	}
 
@@ -642,13 +679,19 @@ struct wire {
 	value<Bits> next;
 
 	wire() = default;
-	constexpr wire(const value<Bits> &init) : curr(init), next(init) {}
+	explicit constexpr wire(const value<Bits> &init) : curr(init), next(init) {}
 	template<typename... Init>
 	explicit constexpr wire(Init ...init) : curr{init...}, next{init...} {}
 
+	// Copying and copy-assigning values is natural. If, however, a value is replaced with a wire,
+	// e.g. because a module is built with a different optimization level, then existing code could
+	// unintentionally copy a wire instead, which would create a subtle but serious bug. To make sure
+	// this doesn't happen, prohibit copying and copy-assigning wires.
 	wire(const wire<Bits> &) = delete;
-	wire(wire<Bits> &&) = default;
 	wire<Bits> &operator=(const wire<Bits> &) = delete;
+
+	wire(wire<Bits> &&) = default;
+	wire<Bits> &operator=(wire<Bits> &&) = default;
 
 	template<class IntegerT>
 	CXXRTL_ALWAYS_INLINE
@@ -690,6 +733,9 @@ struct memory {
 
 	memory(const memory<Width> &) = delete;
 	memory<Width> &operator=(const memory<Width> &) = delete;
+
+	memory(memory<Width> &&) = default;
+	memory<Width> &operator=(memory<Width> &&) = default;
 
 	// The only way to get the compiler to put the initializer in .rodata and do not copy it on stack is to stuff it
 	// into a plain array. You'd think an std::initializer_list would work here, but it doesn't, because you can't
@@ -814,8 +860,11 @@ struct metadata {
 
 typedef std::map<std::string, metadata> metadata_map;
 
-// Helper class to disambiguate values/wires and their aliases.
+// Tag class to disambiguate values/wires and their aliases.
 struct debug_alias {};
+
+// Tag declaration to disambiguate values and debug outlines.
+using debug_outline = ::_cxxrtl_outline;
 
 // This structure is intended for consumption via foreign function interfaces, like Python's ctypes.
 // Because of this it uses a C-style layout that is easy to parse rather than more idiomatic C++.
@@ -823,26 +872,40 @@ struct debug_alias {};
 // To avoid violating strict aliasing rules, this structure has to be a subclass of the one used
 // in the C API, or it would not be possible to cast between the pointers to these.
 struct debug_item : ::cxxrtl_object {
+	// Object types.
 	enum : uint32_t {
-		VALUE  = CXXRTL_VALUE,
-		WIRE   = CXXRTL_WIRE,
-		MEMORY = CXXRTL_MEMORY,
-		ALIAS  = CXXRTL_ALIAS,
+		VALUE   = CXXRTL_VALUE,
+		WIRE    = CXXRTL_WIRE,
+		MEMORY  = CXXRTL_MEMORY,
+		ALIAS   = CXXRTL_ALIAS,
+		OUTLINE = CXXRTL_OUTLINE,
+	};
+
+	// Object flags.
+	enum : uint32_t {
+		INPUT  = CXXRTL_INPUT,
+		OUTPUT = CXXRTL_OUTPUT,
+		INOUT  = CXXRTL_INOUT,
+		DRIVEN_SYNC = CXXRTL_DRIVEN_SYNC,
+		DRIVEN_COMB = CXXRTL_DRIVEN_COMB,
+		UNDRIVEN    = CXXRTL_UNDRIVEN,
 	};
 
 	debug_item(const ::cxxrtl_object &object) : cxxrtl_object(object) {}
 
 	template<size_t Bits>
-	debug_item(value<Bits> &item, size_t lsb_offset = 0) {
+	debug_item(value<Bits> &item, size_t lsb_offset = 0, uint32_t flags_ = 0) {
 		static_assert(sizeof(item) == value<Bits>::chunks * sizeof(chunk_t),
 		              "value<Bits> is not compatible with C layout");
 		type    = VALUE;
+		flags   = flags_;
 		width   = Bits;
 		lsb_at  = lsb_offset;
 		depth   = 1;
 		zero_at = 0;
 		curr    = item.data;
 		next    = item.data;
+		outline = nullptr;
 	}
 
 	template<size_t Bits>
@@ -850,26 +913,30 @@ struct debug_item : ::cxxrtl_object {
 		static_assert(sizeof(item) == value<Bits>::chunks * sizeof(chunk_t),
 		              "value<Bits> is not compatible with C layout");
 		type    = VALUE;
+		flags   = DRIVEN_COMB;
 		width   = Bits;
 		lsb_at  = lsb_offset;
 		depth   = 1;
 		zero_at = 0;
 		curr    = const_cast<chunk_t*>(item.data);
 		next    = nullptr;
+		outline = nullptr;
 	}
 
 	template<size_t Bits>
-	debug_item(wire<Bits> &item, size_t lsb_offset = 0) {
+	debug_item(wire<Bits> &item, size_t lsb_offset = 0, uint32_t flags_ = 0) {
 		static_assert(sizeof(item.curr) == value<Bits>::chunks * sizeof(chunk_t) &&
 		              sizeof(item.next) == value<Bits>::chunks * sizeof(chunk_t),
 		              "wire<Bits> is not compatible with C layout");
 		type    = WIRE;
+		flags   = flags_;
 		width   = Bits;
 		lsb_at  = lsb_offset;
 		depth   = 1;
 		zero_at = 0;
 		curr    = item.curr.data;
 		next    = item.next.data;
+		outline = nullptr;
 	}
 
 	template<size_t Width>
@@ -877,12 +944,14 @@ struct debug_item : ::cxxrtl_object {
 		static_assert(sizeof(item.data[0]) == value<Width>::chunks * sizeof(chunk_t),
 		              "memory<Width> is not compatible with C layout");
 		type    = MEMORY;
+		flags   = 0;
 		width   = Width;
 		lsb_at  = 0;
 		depth   = item.data.size();
 		zero_at = zero_offset;
 		curr    = item.data.empty() ? nullptr : item.data[0].data;
 		next    = nullptr;
+		outline = nullptr;
 	}
 
 	template<size_t Bits>
@@ -890,12 +959,14 @@ struct debug_item : ::cxxrtl_object {
 		static_assert(sizeof(item) == value<Bits>::chunks * sizeof(chunk_t),
 		              "value<Bits> is not compatible with C layout");
 		type    = ALIAS;
+		flags   = DRIVEN_COMB;
 		width   = Bits;
 		lsb_at  = lsb_offset;
 		depth   = 1;
 		zero_at = 0;
 		curr    = const_cast<chunk_t*>(item.data);
 		next    = nullptr;
+		outline = nullptr;
 	}
 
 	template<size_t Bits>
@@ -904,12 +975,45 @@ struct debug_item : ::cxxrtl_object {
 		              sizeof(item.next) == value<Bits>::chunks * sizeof(chunk_t),
 		              "wire<Bits> is not compatible with C layout");
 		type    = ALIAS;
+		flags   = DRIVEN_COMB;
 		width   = Bits;
 		lsb_at  = lsb_offset;
 		depth   = 1;
 		zero_at = 0;
 		curr    = const_cast<chunk_t*>(item.curr.data);
 		next    = nullptr;
+		outline = nullptr;
+	}
+
+	template<size_t Bits>
+	debug_item(debug_outline &group, const value<Bits> &item, size_t lsb_offset = 0) {
+		static_assert(sizeof(item) == value<Bits>::chunks * sizeof(chunk_t),
+		              "value<Bits> is not compatible with C layout");
+		type    = OUTLINE;
+		flags   = DRIVEN_COMB;
+		width   = Bits;
+		lsb_at  = lsb_offset;
+		depth   = 1;
+		zero_at = 0;
+		curr    = const_cast<chunk_t*>(item.data);
+		next    = nullptr;
+		outline = &group;
+	}
+
+	template<size_t Bits, class IntegerT>
+	IntegerT get() const {
+		assert(width == Bits && depth == 1);
+		value<Bits> item;
+		std::copy(curr, curr + value<Bits>::chunks, item.data);
+		return item.template get<IntegerT>();
+	}
+
+	template<size_t Bits, class IntegerT>
+	void set(IntegerT other) const {
+		assert(width == Bits && depth == 1);
+		value<Bits> item;
+		item.template set<IntegerT>(other);
+		std::copy(item.data, item.data + value<Bits>::chunks, next);
 	}
 };
 static_assert(std::is_standard_layout<debug_item>::value, "debug_item is not compatible with C layout");
@@ -947,12 +1051,24 @@ struct debug_items {
 	}
 };
 
+// Tag class to disambiguate module move constructor and module constructor that takes black boxes
+// out of another instance of the module.
+struct adopt {};
+
 struct module {
 	module() {}
 	virtual ~module() {}
 
+	// Modules with black boxes cannot be copied. Although not all designs include black boxes,
+	// delete the copy constructor and copy assignment operator to make sure that any downstream
+	// code that manipulates modules doesn't accidentally depend on their availability.
 	module(const module &) = delete;
 	module &operator=(const module &) = delete;
+
+	module(module &&) = default;
+	module &operator=(module &&) = default;
+
+	virtual void reset() = 0;
 
 	virtual bool eval() = 0;
 	virtual bool commit() = 0;
@@ -974,10 +1090,15 @@ struct module {
 
 } // namespace cxxrtl
 
-// Internal structure used to communicate with the implementation of the C interface.
+// Internal structures used to communicate with the implementation of the C interface.
+
 typedef struct _cxxrtl_toplevel {
 	std::unique_ptr<cxxrtl::module> module;
 } *cxxrtl_toplevel;
+
+typedef struct _cxxrtl_outline {
+	std::function<void()> eval;
+} *cxxrtl_outline;
 
 // Definitions of internal Yosys cells. Other than the functions in this namespace, CXXRTL is fully generic
 // and indepenent of Yosys implementation details.
@@ -1112,49 +1233,49 @@ value<BitsY> xnor_ss(const value<BitsA> &a, const value<BitsB> &b) {
 template<size_t BitsY, size_t BitsA, size_t BitsB>
 CXXRTL_ALWAYS_INLINE
 value<BitsY> shl_uu(const value<BitsA> &a, const value<BitsB> &b) {
-	return a.template zcast<BitsY>().template shl(b);
+	return a.template zcast<BitsY>().shl(b);
 }
 
 template<size_t BitsY, size_t BitsA, size_t BitsB>
 CXXRTL_ALWAYS_INLINE
 value<BitsY> shl_su(const value<BitsA> &a, const value<BitsB> &b) {
-	return a.template scast<BitsY>().template shl(b);
+	return a.template scast<BitsY>().shl(b);
 }
 
 template<size_t BitsY, size_t BitsA, size_t BitsB>
 CXXRTL_ALWAYS_INLINE
 value<BitsY> sshl_uu(const value<BitsA> &a, const value<BitsB> &b) {
-	return a.template zcast<BitsY>().template shl(b);
+	return a.template zcast<BitsY>().shl(b);
 }
 
 template<size_t BitsY, size_t BitsA, size_t BitsB>
 CXXRTL_ALWAYS_INLINE
 value<BitsY> sshl_su(const value<BitsA> &a, const value<BitsB> &b) {
-	return a.template scast<BitsY>().template shl(b);
+	return a.template scast<BitsY>().shl(b);
 }
 
 template<size_t BitsY, size_t BitsA, size_t BitsB>
 CXXRTL_ALWAYS_INLINE
 value<BitsY> shr_uu(const value<BitsA> &a, const value<BitsB> &b) {
-	return a.template shr(b).template zcast<BitsY>();
+	return a.shr(b).template zcast<BitsY>();
 }
 
 template<size_t BitsY, size_t BitsA, size_t BitsB>
 CXXRTL_ALWAYS_INLINE
 value<BitsY> shr_su(const value<BitsA> &a, const value<BitsB> &b) {
-	return a.template shr(b).template scast<BitsY>();
+	return a.shr(b).template scast<BitsY>();
 }
 
 template<size_t BitsY, size_t BitsA, size_t BitsB>
 CXXRTL_ALWAYS_INLINE
 value<BitsY> sshr_uu(const value<BitsA> &a, const value<BitsB> &b) {
-	return a.template shr(b).template zcast<BitsY>();
+	return a.shr(b).template zcast<BitsY>();
 }
 
 template<size_t BitsY, size_t BitsA, size_t BitsB>
 CXXRTL_ALWAYS_INLINE
 value<BitsY> sshr_su(const value<BitsA> &a, const value<BitsB> &b) {
-	return a.template sshr(b).template scast<BitsY>();
+	return a.sshr(b).template scast<BitsY>();
 }
 
 template<size_t BitsY, size_t BitsA, size_t BitsB>

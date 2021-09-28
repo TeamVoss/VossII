@@ -1,7 +1,7 @@
 /*
  *  yosys -- Yosys Open SYnthesis Suite
  *
- *  Copyright (C) 2012  Clifford Wolf <clifford@clifford.at>
+ *  Copyright (C) 2012  Claire Xenia Wolf <claire@yosyshq.com>
  *
  *  Permission to use, copy, modify, and/or distribute this software for any
  *  purpose with or without fee is hereby granted, provided that the above
@@ -19,81 +19,10 @@
 
 #include "kernel/yosys.h"
 #include "kernel/sigtools.h"
+#include "kernel/mem.h"
 
 USING_YOSYS_NAMESPACE
 PRIVATE_NAMESPACE_BEGIN
-
-struct OptMemWorker
-{
-	RTLIL::Design *design;
-	RTLIL::Module *module;
-	SigMap sigmap;
-	bool restart;
-
-	dict<IdString, vector<IdString>> memrd, memwr, meminit;
-	pool<IdString> remove_mem, remove_cells;
-
-	OptMemWorker(RTLIL::Module *module) : design(module->design), module(module), sigmap(module), restart(false)
-	{
-		for (auto &it : module->memories)
-		{
-			memrd[it.first];
-			memwr[it.first];
-			meminit[it.first];
-		}
-
-		for (auto cell : module->cells())
-		{
-			if (cell->type == ID($memrd)) {
-				IdString id = cell->getParam(ID::MEMID).decode_string();
-				memrd.at(id).push_back(cell->name);
-			}
-
-			if (cell->type == ID($memwr)) {
-				IdString id = cell->getParam(ID::MEMID).decode_string();
-				memwr.at(id).push_back(cell->name);
-			}
-
-			if (cell->type == ID($meminit)) {
-				IdString id = cell->getParam(ID::MEMID).decode_string();
-				meminit.at(id).push_back(cell->name);
-			}
-		}
-	}
-
-	~OptMemWorker()
-	{
-		for (auto it : remove_mem)
-		{
-			for (auto cell_name : memrd[it])
-				module->remove(module->cell(cell_name));
-			for (auto cell_name : memwr[it])
-				module->remove(module->cell(cell_name));
-			for (auto cell_name : meminit[it])
-				module->remove(module->cell(cell_name));
-
-			delete module->memories.at(it);
-			module->memories.erase(it);
-		}
-
-		for (auto cell_name : remove_cells)
-			module->remove(module->cell(cell_name));
-	}
-
-	int run(RTLIL::Memory *mem)
-	{
-		if (restart || remove_mem.count(mem->name))
-			return 0;
-
-		if (memwr.at(mem->name).empty() && meminit.at(mem->name).empty()) {
-			log("Removing memory %s.%s with no write ports or init data.\n", log_id(module), log_id(mem));
-			remove_mem.insert(mem->name);
-			return 1;
-		}
-
-		return 0;
-	}
-};
 
 struct OptMemPass : public Pass {
 	OptMemPass() : Pass("opt_mem", "optimize memories") { }
@@ -122,15 +51,35 @@ struct OptMemPass : public Pass {
 
 		int total_count = 0;
 		for (auto module : design->selected_modules()) {
-			while (1) {
-				int cnt = 0;
-				OptMemWorker worker(module);
-				for (auto &it : module->memories)
-					if (module->selected(it.second))
-						cnt += worker.run(it.second);
-				if (!cnt && !worker.restart)
-					break;
-				total_count += cnt;
+			SigMap sigmap(module);
+			FfInitVals initvals(&sigmap, module);
+			for (auto &mem : Mem::get_selected_memories(module)) {
+				bool changed = false;
+				for (auto &port : mem.wr_ports) {
+					if (port.en.is_fully_zero()) {
+						port.removed = true;
+						changed = true;
+						total_count++;
+					}
+				}
+				if (changed) {
+					mem.emit();
+				}
+
+				if (mem.wr_ports.empty() && mem.inits.empty()) {
+					// The whole memory array will contain
+					// only State::Sx, but the embedded read
+					// registers could have reset or init values.
+					// They will probably be optimized away by
+					// opt_dff later.
+					for (int i = 0; i < GetSize(mem.rd_ports); i++) {
+						mem.extract_rdff(i, &initvals);
+						auto &port = mem.rd_ports[i];
+						module->connect(port.data, Const(State::Sx, GetSize(port.data)));
+					}
+					mem.remove();
+					total_count++;
+				}
 			}
 		}
 

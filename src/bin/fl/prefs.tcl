@@ -36,7 +36,7 @@ set voss2_preferences {
         "Reorder the argumanet to ANDs to make bexrs more similar"
 	"bool" "FALSE"}
     {"BEXPR-ADD-REDUNDANT-TERMS" "RC_add_redundant_terms"
-        "Add redundatn terms to make the ternary extensions less pessimistic"
+        "Add redundant terms to make the ternary extensions less pessimistic"
 	"bool" "FALSE"}
     {"BEXPR-MAX-PRINT-DEPTH" "RCmax_bexpr_print_depth"
 	"Maximum size of bexpr to print" "int" "5"}

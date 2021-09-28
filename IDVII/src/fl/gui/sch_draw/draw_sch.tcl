@@ -264,8 +264,8 @@ proc sl:create_stop_node_browser {w p} {
             -command [list sl:delete_stop_nd $p $f.list]
     pack $p.operations -side top -fill x
         pack $p.operations.b -side top
-    sl:update_stop_node_list $w $f.list
-    bind $w.nb <<NotebookTabChanged>> [list sl:update_stop_node_list $w $f.list]
+    sl:update_stop_node_list $w
+    bind $w.nb <<NotebookTabChanged>> [list sl:update_stop_node_list $w]
 }
 
 proc cm:create_commands {w p} {
@@ -326,7 +326,7 @@ proc sl:add_stop_node {w nlb} {
 	set nd [$nlb get $idx]
 	fl_top_level_add_stop_nd $w $nd
     }
-    sl:update_stop_node_list $w $::stop_list_info($w)
+    sl:update_stop_node_list $w
 }
 
 proc sl:delete_stop_nd {w lb} {
@@ -334,10 +334,11 @@ proc sl:delete_stop_nd {w lb} {
 	set nd [$lb get $idx]
 	fl_delete_stop_nd $w $nd
     }
-    sl:update_stop_node_list $w $lb
+    sl:update_stop_node_list $w
 }
 
-proc sl:update_stop_node_list {w lb} {
+proc sl:update_stop_node_list {w} {
+    set lb $::stop_list_info([winfo toplevel $w])
     $lb delete 0 end
     foreach v [fl_get_stop_nodes $w] {
         $lb insert end $v
@@ -1031,6 +1032,7 @@ proc cb:expand_undo {c} {
     unpost_popup $c
     set old_zoom $::cur_zoom_factor($c)
     set_zoom_factor $c 100.0
+    $c delete all
     fl_undo_expansion $c
     set_zoom_factor $c $old_zoom
     catch {cb:restore_attributes $c}
@@ -1077,6 +1079,7 @@ proc cb:expand_fanin {c node amt} {
         # Now expand fanin
 	set old_zoom $::cur_zoom_factor($c)
 	set_zoom_factor $c 100.0
+	$c delete all
         fl_expand_fanin $c $::sch_info(draw_level,$c) $amt $node
 	set_zoom_factor $c $old_zoom
         cb:restore_attributes $c
@@ -1109,7 +1112,11 @@ proc cb:add_stop_node {c node} {
 
 proc cb:hide_fanin {c node make_stop_node} {
     unpost_popup $c
+    set old_zoom $::cur_zoom_factor($c)
+    set_zoom_factor $c 100.0
+    $c delete all
     fl_hide_fanin $c $node $make_stop_node
+    set_zoom_factor $c $old_zoom
     cb:restore_attributes $c
 }
 
@@ -4457,7 +4464,15 @@ proc draw_fsm {name dotfile states edges inps c tag x y} {
 
 set ::rtl_visualizatin_cnt 0
 
-proc visualize_rtl {file start_line start_col end_line end_col} {
+proc rtl:open_editor {file line} {
+    if [info exists ::env(EDITOR)] {"
+	eval exec $::env(EDITOR) $file &
+    } else {
+	exec xterm -e vi +$line $file &"
+    }
+}
+
+proc rtl:visualize {file start_line start_col end_line end_col} {
     if [catch {open $file r} fp] {
         report_error "Cannot open file $file."
         return
@@ -4477,8 +4492,15 @@ proc visualize_rtl {file start_line start_col end_line end_col} {
     catch {destroy $w}
     toplevel $w
 
-    ttk::button $w.b -text Close -command [list destroy $w]
-    pack $w.b -side bottom
+    frame $w.bf
+    ttk::button $w.bf.ed -text "Open in editor" \
+	    -command [list rtl:open_editor $file $start_line]
+    frame $w.bf.sep -width 20
+    ttk::button $w.bf.b -text Close -command [list destroy $w]
+    pack $w.bf -side bottom
+    pack $w.bf.ed -side left
+    pack $w.bf.sep -side left
+    pack $w.bf.b -side left
     ttk::scrollbar $w.yscroll -command [list $w.t yview]
     ttk::scrollbar $w.xscroll -orient horizontal \
 			      -command [list $w.t xview]

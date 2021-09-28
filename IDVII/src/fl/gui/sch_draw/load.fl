@@ -3,7 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
-noX => () | (
-(load (DIR^"types.fl")) fseq
-(load (DIR^"draw_sch.fl")) fseq
-());
+noX => 
+(
+    (eval "let STE_debug = error \"STE_debug not avaliable in -noX mode\";")
+    fseq
+    ()
+)
+|
+(
+    (load (DIR^"types.fl")) fseq
+    (load (DIR^"draw_sch.fl")) fseq
+    ()
+);

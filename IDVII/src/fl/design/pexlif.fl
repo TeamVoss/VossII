@@ -193,18 +193,21 @@ let
 // Extension of the PINST constructor with fingerprints and SHA256 signatures.
 //------------------------------------------------------------------------------
 
-let
-    PINST n a l i o t c =
-        find_fingerprint a != 0 => PINST n a l i o t c | 
-        let f = ("fingerprint", fp_pinst    i o t c) then
-        let s = ("signature",   sha_pinst n i o t c) then
-        PINST n (f : s : a) l i o t c
-;
+//clet
+//    PINST n a l i o t c =
+//        find_fingerprint a != 0 => PINST n a l i o t c | 
+//        let f = ("fingerprint", fp_pinst    i o t c) then
+//        let s = ("signature",   sha_pinst n i o t c) then
+//        PINST n (f : s : a) l i o t c
+//;
+
 
 //------------------------------------------------------------------------------
 // Folding/Unfolding of a PEXLIF.
 //------------------------------------------------------------------------------
 
+// Create a new pexlif in which instances in ids have been collected to
+// a new hiearchy named 'name'.
 // ...
 //  fold_pexlif::PINST->[int]->string->PINST
 let
@@ -215,12 +218,17 @@ let
         PINST n a l i o t (P_HIER ((PINST n' a' l' i' o' t' c'):cs))
 ;
 
+// Crate a new pexlif in which all the instances inside the instance id
+// are lifted up one level in the hierarchy. All the internal wires
+// inside instance id is given a prefix 'pref'.
+// Note that unfold fails if there is a name conflict between the
+// lifted wire names (with prefix) and an already existing wire name.
 // ...
 //  unfold_pexlif::PINST->int->string->PINST
 let
-    unfold_pexlif pex id name =
+    unfold_pexlif pex id pref =
         val (PINST n a l i o t (P_HIER cs)) =
-                unfold_pexlif pex id name
+                unfold_pexlif pex id pref
         in
         let lbl (PINST n a l i o t c) = PINST n a l i o t c in
         PINST n a l i o t (P_HIER (map lbl cs))

@@ -51,7 +51,7 @@
 % Hyperlinks
 \usepackage[colorlinks,hyperindex,plainpages=false,%
 pdftitle={Yosys Manual},%
-pdfauthor={Clifford Wolf},%
+pdfauthor={Claire Xenia Wolf},%
 %pdfkeywords={keyword},%
 pdfpagelabels,%
 pagebackref,%
@@ -74,6 +74,9 @@ bookmarksopen=false%
 \usetikzlibrary{scopes}
 \usetikzlibrary{through}
 \usetikzlibrary{shapes.geometric}
+
+\usepackage{calc}
+\usepackage[nounderscore]{syntax}
 
 \lstset{basicstyle=\ttfamily}
 
@@ -134,7 +137,7 @@ bookmarksopen=false%
 \bf\Huge Yosys Manual
 
 \bigskip
-\large Clifford Wolf
+\large Claire Xenia Wolf
 \end{center}
 
 \vfil\null
@@ -214,6 +217,7 @@ YOSYS       & Yosys Open SYnthesis Suite \\
 \label{commandref}
 \input{command-reference-manual}
 
+\include{CHAPTER_TextRtlil}
 \include{CHAPTER_Appnotes}
 % \include{CHAPTER_StateOfTheArt}
 

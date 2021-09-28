@@ -593,6 +593,16 @@ GC_Unprotect(g_ptr g)
 }
 
 g_ptr
+Make_Failure(string msg)
+{
+    g_ptr ret = Get_node();
+    MAKE_REDEX_FAILURE(ret, msg);
+    SET_LINE_NBR(ret,line_nbr);
+    MAKE_FORCED(ret);
+    return( ret );
+}
+
+g_ptr
 Make_BOOL_leaf(formula f)
 {
     g_ptr ret = Get_node();

@@ -67,8 +67,8 @@ Register_tcl_callback(string name, symbol_tbl_ptr stbl)
     new_rec.type = type;
     push_buf(&tcl_callback_buf, &new_rec);
     fprintf(to_tcl_fp,
-	    "proc %s args { eval __basic_fl_callback Fl%d $args; }\n",
-            name, fn_idx);
+	    "proc %s args { eval __basic_fl_callback Fl%d:%s $args; }\n",
+            name, fn_idx, name);
     fflush(to_tcl_fp);
     return TRUE;
 }
@@ -95,6 +95,7 @@ get_callback_fun(string cmd) {
                 s++;
                 break;
 	    case ' ':
+	    case ':':
 		return(i);
 	    default:
 		return(-1);
