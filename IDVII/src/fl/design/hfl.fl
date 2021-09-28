@@ -286,9 +286,11 @@ let base_compact_wprint inps rhs =
 		pri > 4 => sprintf "(%s|>>%s)" (P 4 a) (P 4 b)
 			 | sprintf "%s|>>%s" (P 4 a) (P 4 b)
      /\    P pri (W_SX sz w) =
-		sprintf "(SX %d %s)" sz (P pri w)
+		pri > 0 => sprintf "(SX %s)" (P pri w)
+			 | sprintf "SX %s" (P pri w)
      /\    P pri (W_ZX sz w) =
-		sprintf "(ZX %d %s)" sz (P pri w)
+		pri > 0 => sprintf "(ZX %s)" (P pri w)
+			 | sprintf "ZX %s" (P pri w)
      /\    P pri (W_ITE c t e) =
 		pri > 1 => sprintf "(%s?%s:%s)" (P 1 c) (P 1 t) (P 1 e)
 			 | sprintf "%s?%s:%s" (P 1 c) (P 1 t) (P 1 e)
@@ -482,6 +484,10 @@ let opt_base_compact_wprint inps rhs =
 	"draw_buffer"
      /\ special (W_NAMED_SLICE name indices var) assuming (is_var var) =
 	sprintf "draw_field %s" name
+     /\ special (W_SX sz (W_VAR ssz name)) = "draw_unary_arithm {SX}"
+     /\ special (W_ZX sz (W_VAR ssz name)) = "draw_unary_arithm {ZX}"
+     /\ special (W_SX sz (W_EXPLICIT_VAR ssz name)) = "draw_unary_arithm {SX}"
+     /\ special (W_ZX sz (W_EXPLICIT_VAR ssz name)) = "draw_unary_arithm {ZX}"
      /\ special op assuming (is_XOR op) = "draw_xor2"
      /\ special op assuming (is_LEQ op) = "draw_binary_arithm {<=}"
      /\ special op assuming (is_binary_base op) = get_binary_draw_cmd op
@@ -828,7 +834,8 @@ let base_assignment make_draw_command lhs rhs =
     length subfubs = 1 => hd subfubs |
     let outs = map (\n.n,[n]) (get_lhs_vars lhs) in
     let inps = map (\n.n,[n]) (w_depends rhs) in
-    let pfn = mk_draw_cmd F rhs in
+//    let pfn = mk_draw_cmd F rhs in
+let pfn = "stmt" in
     PINST pfn [] F inps outs (deref internals) (P_HIER subfubs)
 ;
 

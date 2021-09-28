@@ -6772,7 +6772,7 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
         declare_vector(&vinfo_tbl, hier, name, FALSE, NULL, value_list);
     }
     vis_ptr vp = NULL;
-#if 0
+#if 1
     if( !top_level && (leaf || (strstr(name,"draw_") != NULL))){
 #else
     if( !top_level ){
@@ -6929,7 +6929,7 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
             *(res+len) = 0;
             sprintf(buf, "%s_code %d %s", res, nbr_inputs, res+len+1);
             vp->pfn = wastrsave(&strings, buf);
-#if 0
+#if 1
         } else if( strncmp(vp->pfn, "draw_hier ", 10) == 0 ) {
 #else
         } else if(strncmp(vp->pfn, "draw_hier ", 10) == 0 ||
