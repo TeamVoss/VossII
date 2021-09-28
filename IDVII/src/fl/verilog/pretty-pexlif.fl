@@ -550,7 +550,13 @@ let pretty_pexlif_h inst (PINST name _ _ fa_inps fa_outs f_ints (P_HIER cs)) =
 // -----------------------------------------------------------------------------
 
 let pexlif2verilog {pex::pexlif} =
-      render (p_source_text (Source_text (pretty_pexlif_h "" pex)))
+      val (PINST name _ _ fa_inps fa_outs _ _) = pex in
+      let go n = (n,[n]) in
+      let fa_inps' = map go (md_extract_vectors (flatmap snd fa_inps)) in
+      let fa_outs' = map go (md_extract_vectors (flatmap snd fa_outs)) in
+      let pex' = PINST name [] F fa_inps' fa_outs' [] (P_HIER [pex]) in
+      //
+      render (p_source_text (Source_text (pretty_pexlif_h "" pex')))
 ;
 
 // end_abstype pexlif2verilog;

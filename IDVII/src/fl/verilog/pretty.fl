@@ -345,5 +345,6 @@ let display {l :: int} {r :: int} {end :: string} {d :: doc} =
 ;
 
 let render {d :: doc} = display 100 67 "" d; // 67 = round (100/1.5)
+// todo: print to file pointer
 
 // =============================================================================
