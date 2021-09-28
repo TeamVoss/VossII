@@ -1,26 +1,27 @@
 load (DIR^"grammar.fl");
 load (DIR^"pretty-verilog.fl");
 load (DIR^"pretty-pexlif.fl");
-
+load (DIR^"../design/pexlif.fl");
 load "ste.fl";
+//todo: Seems to be loading the same files multiple times?
 
 // =============================================================================
 
-let pex2ver p file =
+// Pexlif to pexlif "transformation" via verilog.
+//
+// Pexlif -{pretty}-> Verilog -{write}-> File -{yosys+carl}-> Pexlif
+let pex2pex p =
+      val (PINST top _ _ _ _ _ _) = p in
+      let file = "test.v" in
       let v  = pexlif2verilog p then
       let fp = fopen file "w" then
       fprintf fp "%s\n" v fseq
-      fclose fp;
+      fclose fp fseq
+      verilog2pexlif "-I." top [file] []
 ;
 
-let pex2pex p top_level_module =
-      let file = "test.v" in
-      pex2ver p file fseq
-      verilog2pexlif "-I." top_level_module [file] []
-;
-
-// -----------------------------------------------------------------------------
-// Code to create a miter circuit for two pexlifs
+// Creates a miter circuit for two pexlifs.
+//
 //                          Ckt p1
 //                        +------+                     
 //      i_1 ---------*----|   o_1|---------------+----+      +----+        
@@ -41,58 +42,70 @@ let pex2pex p top_level_module =
 //            |           |      | ...       |
 //            +-----------|  o_n |-----------+
 //                        +------+       
-// let mk_miter p1 p2 =
-//     val (PINST n1 a1 l1 fa_inps1 fa_outs1 ints1 chs1) = p1 in
-//     val (PINST n2 a2 l2 fa_inps2 fa_outs2 ints2 chs2) = p2 in
-//     // Check for same inputs/outputs
-//     let inps1 = setify (md_expand_vectors (flatmap snd fa_inps1)) in
-//     let inps2 = setify (md_expand_vectors (flatmap snd fa_inps2)) in
-//     let d = inps1 subtract inps2 in
-//     d != [] => eprintf "Input mismatch: %S in pexlif 1 but not in pexlif 2" d |
-//     let d = inps2 subtract inps1 in
-//     d != [] => eprintf "Input mismatch: %S in pexlif 2 but not in pexlif 1" d |
-//     let outs1 = setify (md_expand_vectors (flatmap snd fa_outs1)) in
-//     let outs2 = setify (md_expand_vectors (flatmap snd fa_outs2)) in
-//     let d = outs1 subtract outs2 in
-//     d != [] => eprintf "Output mismatch: %S in pexlif 1 but not in pexlif 2" d |
-//     let d = outs2 subtract outs1 in
-//     d != [] => eprintf "Output mismatch: %S in pexlif 2 but not in pexlif 1" d |
-//     // Same inputs and outputs
-//     // Now rename the outputs
-//     let p1' =
-// 	let fa_outs1' = map (\(f,as). f,(map (sprintf "P1_%s") as)) fa_outs1 in
-// 	PINST n1 a1 l1 fa_inps1 fa_outs1' ints1 chs1
-//     in
-//     let p2' =
-// 	let fa_outs2' = map (\(f,as). f,(map (sprintf "P2_%s") as)) fa_outs2 in
-// 	PINST n2 a2 l2 fa_inps2 fa_outs2' ints2 chs2
-//     in
-//     val (eq_nd, eqs) =
-// 	let vname = sprintf "_eq[%d:0]" (length outs1 -1) then
-// 	let nds = md_expand_vector vname then
-// 	vname, (map (\n. W_VAR 1 n) nds)
-//     in
-//     let mk_eq out_i eq_i = 
-// 	let o1 = W_VAR 1 ("P1_"^out_i) in
-// 	let o2 = W_VAR 1 ("P2_"^out_i) in
-// 	eq_i <- o1 '=' o2
-//     in
-//     let eq_pexlifs = map2 mk_eq outs1 eqs in
-//     let and_pexlif = (W_VAR 1 "_OK_") <- AND_n eqs then
-//     let pfn = "draw_hier miter" in
-//     let fa_inps = map (\n. n,[n]) (md_extract_vectors inps1) in
-//     let fa_outs = [("_OK_", ["_OK_"])] in
-//     let o1s = map (\n."P1_"^n) outs1 in
-//     let o2s = map (\n."P2_"^n) outs2 in
-//     let ints = eq_nd:(md_extract_vectors (o1s @ o2s)) in
-//     let children = p1' : p2' : and_pexlif : eq_pexlifs in
-//     let mpexlif = PINST pfn [] F fa_inps fa_outs ints (P_HIER children) in
-//     let mant = map (\n. T,n,variable n,0,1) inps1 in
-//     mpexlif, mant
-// ;
+let mk_miter p1 p2 =
+      val (PINST n1 a1 l1 fa_inps1 fa_outs1 ints1 chs1) = p1 in
+      val (PINST n2 a2 l2 fa_inps2 fa_outs2 ints2 chs2) = p2 in
+      // -------------------------------------------
+      // Check for same inputs/outputs.
+      let inps1 = setify (md_expand_vectors (flatmap snd fa_inps1)) in
+      let inps2 = setify (md_expand_vectors (flatmap snd fa_inps2)) in
+      let d = inps1 subtract inps2 in
+      d != [] => eprintf "Input mismatch: %S in pexlif 1 but not in pexlif 2" d |
+      let d = inps2 subtract inps1 in
+      d != [] => eprintf "Input mismatch: %S in pexlif 2 but not in pexlif 1" d |
+      let outs1 = setify (md_expand_vectors (flatmap snd fa_outs1)) in
+      let outs2 = setify (md_expand_vectors (flatmap snd fa_outs2)) in
+      let d = outs1 subtract outs2 in
+      d != [] => eprintf "Output mismatch: %S in pexlif 1 but not in pexlif 2" d |
+      let d = outs2 subtract outs1 in
+      d != [] => eprintf "Output mismatch: %S in pexlif 2 but not in pexlif 1" d |
+      // -------------------------------------------
+      // Same inputs and outputs, now rename the outputs.
+      let p1' =
+        let fa_outs1' = map (\(f,as). f,(map (sprintf "P1_%s") as)) fa_outs1 in
+        PINST n1 a1 l1 fa_inps1 fa_outs1' ints1 chs1
+      in
+      let p2' =
+        let fa_outs2' = map (\(f,as). f,(map (sprintf "P2_%s") as)) fa_outs2 in
+        PINST n2 a2 l2 fa_inps2 fa_outs2' ints2 chs2
+      in
+      val (eq_nd, eqs) =
+        let vname = sprintf "_eq[%d:0]" (i_minus (length outs1) 1) then
+        let nds = md_expand_vector vname then
+        (vname, (map (\n. BV_bit (W_VAR 1 n)) nds))
+      in
+      let mk_eq out_i eq_i = 
+        let o1 = BV_bit (W_VAR 1 ("P1_"^out_i)) in
+        let o2 = BV_bit (W_VAR 1 ("P2_"^out_i)) in
+        eq_i <- o1 '=' o2
+      in
+      let AND_bits {l::bit list} =
+        l = [] => eprintf "AND_bits for empty list" |
+        accumulate (defix '&') l
+      in
+      let eq_pexlifs = map2 mk_eq outs1 eqs in
+      let ok_bit = BV_bit (W_VAR 1 "_OK_") in
+      let and_pexlif = ok_bit <- AND_bits eqs then
+      let pfn = "draw_hier miter" in
+      let fa_inps = map (\n. n,[n]) (md_extract_vectors inps1) in
+      let fa_outs = [("_OK_", ["_OK_"])] in
+      let o1s = map (\n. "P1_"^n) outs1 in
+      let o2s = map (\n. "P2_"^n) outs2 in
+      let ints = eq_nd:(md_extract_vectors (o1s @ o2s)) in
+      let children = p1' : p2' : and_pexlif : eq_pexlifs in
+      let mpexlif = PINST pfn [] F fa_inps fa_outs ints (P_HIER children) in
+      let mant = map (\n. (T,n,variable n,0,1)) inps1 in
+      let mcons = [(T,"_OK_",T,0,1)] in
+      (mpexlif, mant, mcons)
+;
 
-// -----------------------------------------------------------------------------
-// Arith. tests.
+let eq_miter p =
+      let p' = pex2pex p then
+      val (miter,ant,cons) = mk_miter p p' then
+      let vis = STE_debug (pexlif2fsm miter) then
+      let ste = STE "-e -m 10" vis [] ant cons [] then
+      get_ste_result ste "";
+;
 
 TYPE "byte" 8;
 TYPE "word" 16;
@@ -102,6 +115,14 @@ let byte_wrapper f =
       byte_output o.
       CELL "test" [o <- f i]
 ;
+let bit_wrapper f =
+      bit_input  i.
+      bit_output o.
+      CELL "test" [o <- f i]
+;
+
+// -----------------------------------------------------------------------------
+// Arith. tests.
 
 let t_plus  = byte_wrapper (\i. i '+' i);
 let t_minus = byte_wrapper (\i. i '-' i);
@@ -121,11 +142,6 @@ let t_arith =
 // -----------------------------------------------------------------------------
 // Logic tests.
 
-let bit_wrapper f =
-      bit_input  i.
-      bit_output o.
-      CELL "test" [o <- f i]
-;
 let t_neg = bit_wrapper (\i. '~' i);
 let t_and = bit_wrapper (\i. i '&' {'1::bit});
 let t_or  = bit_wrapper (\i. i '|' {'0::bit});
@@ -178,47 +194,28 @@ let t_shift =
 ;
 
 // -----------------------------------------------------------------------------
-// todo: Use Carl's miter once it works.
+// Random pexlifs.
 
-let miter_byte pex =
-      byte_input i.
-      bit_output o.
-      byte_internal a.
-      byte_internal b.
-      CELL "draw_hier miter" [
-        pex i a,
-        pex2pex (pex i b) "test",
-        o <- a '=' b
-      ]
-;
-let test_byte pex =
-      let vis  = STE_debug (pexlif2fsm (miter_byte pex 'i 'o)) in
-      let N    = 2 in
-      let ant  = "i[7:0]" is "a[7:0]" in_cycle 0 otherwise 0 until N cycles in
-      let cons = "o" is 1 in_cycle 0 in
-      let ste  = STE "-e -m 10" vis [] ant cons [] in
-      get_ste_result ste "";
-;
+// letrec
+//     gen_ports _   0 = []
+// /\  gen_ports pre n =
+//       let act v = (v,[v]) in
+//       undefined
+// ;
 
-let miter_bit pex =
-      bit_input    i.
-      bit_output   o.
-      bit_internal a.
-      bit_internal b.
-      CELL "draw_hier miter" [
-        pex i a,
-        pex2pex (pex i b) "test",
-        o <- a '=' b
-      ]
-;
-let test_bit pex =
-      let vis  = STE_debug (pexlif2fsm (miter_bit pex 'i 'o)) in
-      let N    = 2 in
-      let ant  = "i" is "a" in_cycle 0 otherwise 0 until N cycles in
-      let cons = "o" is 1 in_cycle 0 in
-      let ste  = STE "-e -m 10" vis [] ant cons [] in
-      get_ste_result ste "";
-;
+// Generate a "simple" comb. pexlif where 'width' sets the widths of
+// inputs/outputs wise (internal wires can vary in width), 'size' roughly
+// determines the number inputs/outputs and assignments, and 'depth' the size of
+// each assigment.
+// let gen_comp width size depth =
+//       size  <= 0 => eprintf "gen_comp: Given negative size" |
+//       depth <= 0 => eprintf "gen_comp: Given negative depth" |
+//       //
+//       let is = gen_ports "i" (random 1 size) then
+//       let os = gen_ports "o" (random 1 size) then
+//       gen_pinst_leaf "test" is os F size depth
+// ;
+// non_lazy gen_comp;
 
 // =============================================================================
 // Fin.

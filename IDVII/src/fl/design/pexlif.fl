@@ -637,7 +637,7 @@ let gen_pinst_graph
 ;
 non_lazy gen_pinst_graph;
 
-end_abstype gen_pinst gen_pinst_graph;
+end_abstype gen_pinst_leaf gen_pinst gen_pinst_graph;
 
 //------------------------------------------------------------------------------
 
