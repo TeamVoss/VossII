@@ -1,0 +1,9 @@
+load "ste.fl";
+
+let p = verilog2pexlif (sprintf "-I%sb201_verilog" DIR) "top_memory" ["memory.v"] [];
+p fseq 1;
+
+let ckt = (pexlif2fsm p);
+ckt;
+
+//STE_debug ckt;

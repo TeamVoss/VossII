@@ -1,0 +1,36 @@
+load "ste.fl";
+
+TYPE "word" 8;
+
+let add3 =
+    word_input	a b c.
+    word_output out.
+    internal mid.
+    CELL "draw_hier add3" [
+	mid <- a '+' b,
+	out <- mid '+' c
+];
+
+let add6 =
+    word_input	a b c d e f.
+    word_output out.
+    internal s1 s2.
+    CELL "draw_hier add6" [
+	add3 a b c s1,
+	add3 d e f s2,
+	out <- s1 '+' s2
+];
+
+let p = add6 'a 'b 'c 'd 'e 'f 'out;
+
+let p1 = unfold_pexlif p 1 "a/";
+
+p1;
+
+//let vis p = STE_debug (pexlif2fsm p);
+
+let p2 = unfold_pexlif p1 3 "b/";
+
+p2;
+
+//vis p2;
