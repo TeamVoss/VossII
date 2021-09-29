@@ -1,0 +1,690 @@
+// =============================================================================
+// Formal syntax definition of Verilog HDL described using Backus-Naur Form.
+//
+// There are some non-bold symbols in the standard that I suspect are mistakes
+// and marked as bold. For example, the ';' in 'module_or_generate_item'.
+//
+// I do skip a few things/rules, like "attribute_instance", parameters and
+// "macromodule". Also, the rules are given in reverse order to please FL.
+// =============================================================================
+
+// A.9.4 White space -----------------------------------------------------------
+// A.9.3 Identifiers -----------------------------------------------------------
+
+// identifier ::= simple_identifier | escaped_identifier
+lettype identifier = ID (string);
+
+// hierarchical_identifier ::= { identifier [ "[" constant_expression "]" ] "." } identifier
+// Moved to Expressions (A.8.3).
+
+// hierarchical_event_identifier ::= hierarchical_identifier
+// hierarchical_net_identifier ::= hierarchical_identifier
+// hierarchical_variable_identifier ::= hierarchical_identifier
+
+// A.9.2 Comments --------------------------------------------------------------
+// A.9.1 Attributes ------------------------------------------------------------
+
+// =============================================================================
+// A.9 General
+// =============================================================================
+
+// A.8.8 Strings ---------------------------------------------------------------
+// A.8.7 Numbers ---------------------------------------------------------------
+
+// number ::= decimal_number | octal_number | binary_number | hex_number | real_number
+lettype number = X | Z | Num (int);
+
+// todo: ..
+new_type_abbrev unsigned_number = number;
+new_type_abbrev real_number = number;
+
+// A.8.6 Operators -------------------------------------------------------------
+
+// unary_operator ::=
+//     + | - | ! | ~ | & | ~& | | | ~| | ^ | ~^ | ^~
+lettype unary_operator =
+    U_pos | U_neg | U_log_neg | U_bit_neg | U_red_and | U_red_nand
+  | U_red_or | U_red_nor | U_red_xor | U_red_xnor_l | U_red_xnor_r
+;
+
+// binary_operator ::=
+//     +  | -  | * | /  | % | == | != | === | !== | && | || | **
+//   | <  | <= | > | >= | & | |  | ^  | ^~  | ~^  | >> | << | >>> | <<<
+lettype binary_operator =
+    B_add | B_sub | B_mult | B_div | B_mod | B_log_eq | B_log_neq | B_case_eq
+  | B_case_neq | B_log_and | B_log_or | B_exp | B_lt | B_lte | B_gt | B_gte
+  | B_bit_and | B_bit_or | B_bit_xor | B_bit_eq_l | B_bit_eq_r | B_log_shr
+  | B_log_shl | B_shr | B_shl
+;
+
+// A.8.5 Expression left-side values -------------------------------------------
+
+// net_lvalue ::=
+//     hierarchical_net_identifier [ { "[" constant_expression "]" } "[" constant_range_expression "]" ]
+//   | { net_lvalue { "," net_lvalue } }
+// note: Moved to 'expressions' (A.8.3).
+
+// variable_lvalue ::=
+//     hierarchical_variable_identifier [ { "[" expression "]" } "[" range_expression "]" ]
+//   | { variable_lvalue { "," variable_lvalue } }
+// note: Moved to 'expressions' (A.8.3).
+
+// variable_assignment ::= variable_lvalue "=" expression
+// note: Moved to 'Expressions' (A.8.3).
+
+// A.8.4 Primaries -------------------------------------------------------------
+
+// constant_primary ::=
+//     number
+//   | parameter_identifier [ "[" constant_range_expression "]" ]
+//   | specparam_identifier [ "[" constant_range_expression "]" ]
+//   | constant_concatenation
+//   | constant_multiple_concatenation
+//   | constant_function_call
+//   | constant_system_function_call
+//   | "(" constant_mintypmax_expression ")"
+//   | string
+lettype constant_primary =
+    CPrim_num (number)
+  | CPrim_str (string)
+;
+
+// primary ::=
+//     number
+//   | hierarchical_identifier [ { "[" expression "]" } "[" range_expression "]" ]
+//   | concatenation
+//   | multiple_concatenation
+//   | function_call
+//   | system_function_call
+//   | "(" mintypmax_expression ")"
+//   | string
+// Moved to 'Expressions' (A.8.3).
+
+// A.8.3 Expressions -----------------------------------------------------------
+
+// constant_expression ::=
+//     constant_primary
+//   | unary_operator constant_primary
+//   | constant_expression binary_operator constant_expression
+//   | constant_expression ? constant_expression : constant_expression
+// dimension_constant_expression ::= constant_expression
+// msb_constant_expression ::= constant_expression
+// lsb_constant_expression ::= constant_expression
+lettype constant_expression =
+    CExp_primary (constant_primary)
+  | CExp_unary (unary_operator) (constant_primary)
+  | CExp_binary (constant_expression) (binary_operator) (constant_expression)
+  | CExp_conditional
+      (constant_expression)
+      (constant_expression)
+      (constant_expression)
+;
+
+// See A.9.3.
+lettype hierarchical_identifier =
+    HID ({(identifier)#({constant_expression} opt)} opt) (identifier)
+;
+
+// constant_range_expression ::=
+//     constant_expression
+//   | msb_constant_expression : lsb_constant_expression
+//   | constant_base_expression +: width_constant_expression
+//   | constant_base_expression -: width_constant_expression
+lettype constant_range_expression =
+    CRange_value (constant_expression)
+  | CRange_m2l (constant_expression) (constant_expression)
+;
+
+// expression ::=
+//     primary
+//   | unary_operator primary
+//   | expression binary_operator expression
+//   | conditional_expression
+// conditional_expression ::= expression1 ? expression2 : expression3
+// mintypmax_expression ::= expression | expression ":" expression ":" expression
+lettype expression =
+    Exp_primary (primary)
+  | Exp_unary (unary_operator) (primary)
+  | Exp_binary (expression) (binary_operator) (expression)
+  | Exp_conditional (expression) (expression) (expression)
+// See A.8.4
+andlettype primary =
+    Prim_num (number)
+  | Prim_hier
+      (hierarchical_identifier)
+      ({(expression list)#(range_expression)} opt)
+  | Prim_cat (concatenation)
+  | Prim_mcat (multiple_concatenation)
+  | Prim_mintypmax (mintypmax_expression)
+  | Prim_str (string)
+// See A.8.1
+andlettype concatenation =
+    CAT (expression list)
+andlettype multiple_concatenation =
+    MCAT (constant_expression) (concatenation)
+andlettype mintypmax_expression =
+    Mintypmax_expression (expression)
+  | Mintypmax_minmax (expression) (expression) (expression)
+;
+
+// range_expression ::=
+//     expression
+//   | msb_constant_expression ":" lsb_constant_expression
+//   | base_expression "+:" width_constant_expression
+//   | base_expression "-:" width_constant_expression
+lettype range_expression =
+    Range_exp (expression)
+  | Range_m2l (constant_expression) (constant_expression)
+;
+
+// See A.8.5 Expression left-side values.
+lettype net_lvalue =
+    NLV_hier (hierarchical_identifier)
+             ({(constant_expression list)#(constant_range_expression)} opt)
+  | NLV_list (net_lvalue list)
+;
+
+lettype variable_lvalue =
+    VLV_hier (hierarchical_identifier)
+             ({(expression list)#(range_expression)} opt)
+  | VLV_list (variable_lvalue list)
+;
+
+lettype variable_assignment =
+    Variable_assignment (variable_lvalue) (expression)
+;
+
+// A.8.2 Function calls --------------------------------------------------------
+// A.8.1 Concatenations --------------------------------------------------------
+
+// concatenation ::= "{" expression { "," expression } "}"
+// Moved to 'Expressions' (A.8.3).
+
+// multiple_concatenation ::= "{" constant_expression concatenation "}"
+// Moved to 'Expressions' (A.8.3).
+
+// =============================================================================
+// A.8 Expressions
+// =============================================================================
+
+// A.7.5.3 System timing check event definitions -------------------------------
+// A.7.5.2 System timing check command arguments -------------------------------
+// A.7.5.1 System timing check commands ----------------------------------------
+// A.7.5 System timing checks --------------------------------------------------
+// A.7.4 Specify path delays ---------------------------------------------------
+// A.7.3 Specify block terminals -----------------------------------------------
+// A.7.2 Specify path declarations ---------------------------------------------
+// A.7.1 Specify block declaration ---------------------------------------------
+
+// =============================================================================
+// A.7 Specify section
+// =============================================================================
+
+// A.6.9 Task enable statements ------------------------------------------------
+// A.6.8 Looping statements ----------------------------------------------------
+
+// loop_statement ::=
+//     "forever" statement
+//   | "repeat (" expression ")" statement
+//   | "while (" expression ")" statement
+//   | "for (" variable_assignment ";" expression ";" variable_assignment ")" statement
+// note: Moved to 'statement' (A.6.4).
+
+// A.6.7 Case statements -------------------------------------------------------
+// A.6.6 Conditional statements ------------------------------------------------
+
+// if_else_if_statement ::= "if(" expression ")" statement_or_null { "else if(" expression ")" statement_or_null } [ "else" statement_or_null ]
+// note: Moved to 'statement' (A.6.4).
+
+// conditional_statement ::=
+//     "if(" expression ")" statement_or_null [ "else" statement_or_null ]
+//   | if_else_if_statement
+// note: Moved to 'statement' (A.6.4).
+
+// A.6.5 Timing control statements ---------------------------------------------
+
+// event_expression ::=
+//     expression
+//   | "posedge" expression
+//   | "negedge" expression
+//   | event_expression "or" event_expression
+//   | event_expression "," event_expression
+lettype event_expression =
+    Event_exp (expression)
+  | Event_pos (expression)
+  | Event_neg (expression)
+  | Event_or (event_expression) (event_expression)
+  | Event_and (event_expression) (event_expression)
+;
+
+// event_control ::=
+//     "@" hierarchical_event_identifier
+//   | "@(" event_expression ")"
+//   | "@*"
+//   | "@(*)"
+lettype event_control =
+    Event_control_hier (hierarchical_identifier)
+  | Event_control_exp (event_expression)
+  | Event_star
+  | Event_pstar
+;
+
+// See 'Delays' (A.2.2.3).
+lettype delay_value =
+    Delay_value_unum (unsigned_number)
+  | Delay_value_real (real_number)
+  | Delay_value_id (identifier)
+;
+
+// delay_control ::= "#" delay_value | "#(" mintypmax_expression ")"
+lettype delay_control =
+    Delay_control_value (delay_value)
+  | Delay_control_minmax (mintypmax_expression)
+;
+
+// delay_or_event_control ::=
+//     delay_control
+//   | event_control
+//   | "repeat(" expression ")" event_control
+lettype delay_or_event_control =
+    DOEC_delay (delay_control)
+  | DOEC_event (event_control)
+  | DOEC_repeat (expression) (event_control)
+;
+
+// procedural_timing_control ::= delay_control | event_control
+lettype procedural_timing_control = PTC_event (event_control);
+
+// procedural_timing_control_statement ::= procedural_timing_control statement_or_null
+// note: Moved to 'statement' (A.6.4).
+
+// A.6.4 Statements ------------------------------------------------------------
+
+new_type_abbrev cstatement = (expression)#(statement);
+
+// See 'Procedural blocks and assignments' (A.6.2).
+lettype blocking_assignment =
+    Blocking_assignment
+      (variable_lvalue)
+      ({delay_or_event_control} opt)
+      (expression)
+;
+
+// See 'Procedural blocks and assignments' (A.6.2).
+lettype nonblocking_assignment =
+    Nonblocking_assignment
+      (variable_lvalue)
+      ({delay_or_event_control} opt)
+      (expression)
+;
+
+// statement_or_null ::= statement | ";"
+// statement ::=
+//     blocking_assignment ";"
+//   | case_statement
+//   | conditional_statement
+//   | disable_statement
+//   | event_trigger
+//   | loop_statement
+//   | nonblocking_assignment ";"
+//   | par_block
+//   | procedural_continuous_assignments ";"
+//   | procedural_timing_control_statement
+//   | seq_block
+//   | system_task_enable
+//   | task_enable
+//   | wait_statement
+lettype statement =
+    Statement_null
+  | Statement_blocking (blocking_assignment)
+  | Statement_nonblocking (nonblocking_assignment)
+  | Statement_timing (procedural_timing_control_statement)
+  | Statement_if (if_else_if_statement)
+  | Statement_cond (conditional_statement)
+  | Statement_loop (loop_statement)
+andlettype procedural_timing_control_statement =
+    PTC (procedural_timing_control) (statement)
+andlettype if_else_if_statement =
+    IEI (cstatement) (cstatement list) ({statement} opt)
+andlettype conditional_statement =
+    COND_if_else (cstatement) ({statement} opt)
+  | COND_if_else_if (if_else_if_statement)
+andlettype loop_statement =
+    LOOP_forever (statement)
+  | LOOP_repeat (expression) (statement)
+  | LOOP_while (expression) (statement)
+  | LOOP_for (variable_assignment) (expression) (variable_assignment) (statement)
+;
+
+// A.6.3 Parallel and sequential blocks ----------------------------------------
+// A.6.2 Procedural blocks and assignments -------------------------------------
+
+// initial_construct ::= "initial" statement
+lettype initial_construct = Initial (statement);
+
+// always_construct ::= "always" statement
+lettype always_construct = Always (statement);
+
+// blocking_assignment ::= variable_lvalue "=" [ delay_or_event_control ] expression
+// Moved to 'Statements' (A.6.4).
+
+// nonblocking_assignment ::= variable_lvalue "<=" [ delay_or_event_control ] expression
+// Moved to 'Statements' (A.6.4).
+
+// variable_assignment ::= variable_lvalue = expression
+// todo: duplicate?
+
+// A.6.1 Continuous assignment statements --------------------------------------
+
+// continuous_assign ::= "assign" [ drive_strength ] [ delay3 ] list_of_net_assignments ";"
+// list_of_net_assignments ::= net_assignment { "," net_assignment }
+// net_assignment ::= net_lvalue "=" expression
+lettype continuous_assign = Cont_assign (((net_lvalue)#(expression)) list);
+
+// =============================================================================
+// A.6 Behavioral statements
+// =============================================================================
+
+// A.5.4 UDP instantiation -----------------------------------------------------
+
+// udp_instantiation ::= udp_identifier [ drive_strength ] [ delay2 ] udp_instance { "," udp_instance } ";"
+// udp_instance ::= [ name_of_udp_instance ] "(" output_terminal , input_terminal { "," input_terminal } ")"
+// name_of_udp_instance ::= udp_instance_identifier [ range ]
+lettype udp_instantiation =
+    UDP_inst (identifier)
+             (( ({(identifier)#({range} opt)} opt)
+               #(net_lvalue)
+               #(expression list)
+              ) list)
+;
+
+// A.5.3 UDP body --------------------------------------------------------------
+// A.5.2 UDP ports -------------------------------------------------------------
+// A.5.1 UDP declaration -------------------------------------------------------
+
+// =============================================================================
+// A.5 UDP declaration and instantiation
+// =============================================================================
+
+// A.4.2 Generate construct ----------------------------------------------------
+// A.4.1 Module instantiation --------------------------------------------------
+
+// list_of_port_connections ::=
+//     ordered_port_connection { "," ordered_port_connection }
+//   | named_port_connection { "," named_port_connection }
+// ordered_port_connection ::= [ expression ]
+// named_port_connection ::= "." port_identifier "(" [ expression ] ")"
+lettype port_connection =
+    Port_con_ordered ({expression} opt)
+  | Port_con_named (identifier) ({expression} opt)
+;
+// note: 'port_connection list' allows one to mix ordered and named connections,
+// please don't do that.
+
+// module_instance ::= name_of_module_instance "(" [ list_of_port_connections ] ")"
+// name_of_module_instance ::= module_instance_identifier [ range ]
+lettype module_instance =
+    Module_instance (identifier) ({range} opt) ({port_connection list} opt)
+;
+
+// module_instantiation ::= module_identifier module_instance { "," module_instance } ";"
+lettype module_instantiation =
+    Module_instantiation (identifier) (module_instance list)
+;
+
+// =============================================================================
+// A.4 Module instantiation and generate construct
+// =============================================================================
+
+// A.3.4 Primitive gate and switch types ---------------------------------------
+// A.3.3 Primitive terminals ---------------------------------------------------
+
+// input_terminal ::= expression
+// output_terminal ::= net_lvalue
+
+// A.3.2 Primitive strengths ---------------------------------------------------
+// A.3.1 Primitive instantiation and instances ---------------------------------
+
+// =============================================================================
+// A.3 Primitive instances
+// =============================================================================
+
+// A.2.8 Block item declarations -----------------------------------------------
+// A.2.7 Task declarations -----------------------------------------------------
+// A.2.6 Function declarations -------------------------------------------------
+// A.2.5 Declaration ranges ----------------------------------------------------
+
+// dimension ::= "[" dimension_constant_expression ":" dimension_constant_expression "]"
+lettype dimension = Dimension (constant_expression) (constant_expression);
+
+// range ::= "[" msb_constant_expression ":" lsb_constant_expression "]"
+lettype range = Range (constant_expression) (constant_expression);
+
+// A.2.4 Declaration assignments -----------------------------------------------
+
+// net_decl_assignment ::= net_identifier "=" expression
+lettype net_decl_assignment = NDA (identifier) (expression);
+
+// A.2.3 Declaration lists -----------------------------------------------------
+
+// list_of_variable_port_identifiers ::= port_identifier [ = constant_expression ] { , port_identifier [ = constant_expression ] }
+lettype variable_port_identifier = VPI (identifier) ({constant_expression} opt);
+
+// A.2.2.3 Delays --------------------------------------------------------------
+
+// delay3 ::= "#" delay_value | "#(" mintypmax_expression [ , mintypmax_expression [ , mintypmax_expression ] ] ")"
+
+// delay2 ::= "#" delay_value | "#(" mintypmax_expression [ , mintypmax_expression ] ")"
+
+// delay_value ::= unsigned_number | real_number | identifier
+// Moved to 'Timing control statement' (A.6.5).
+
+// A.2.2.2 Strengths -----------------------------------------------------------
+
+// drive_strength ::=
+//     "(" strength0 "," strength1 ")"
+//   | "(" strength1 "," strength0 ")"
+//   | "(" strength0 "," "highz1"  ")"
+//   | "(" strength1 "," "highz0"  ")"
+//   | "(" "highz0"  "," strength1 ")"
+//   | "(" "highz1"  "," strength0 ")"
+// strength0 ::= "supply0" | "strong0" | "pull0" | "weak0"
+// strength1 ::= "supply1" | "strong1" | "pull1" | "weak1"
+// charge_strength ::= "( small )" | "( medium )" | "( large )"
+
+// A.2.2.1 Net and variable types ----------------------------------------------
+
+// variable_type ::=
+//     variable_identifier { dimension }
+//   | variable_identifier "=" constant_expression
+lettype variable_type =
+    VT_dim (identifier) (dimension list)
+  | VT_const (identifier) (constant_expression)
+;
+
+// output_variable_type ::= "integer" | "time"
+lettype output_variable_type =
+    OVT_int
+  | OVT_time
+;
+
+// A.2.2 Declaration data types ------------------------------------------------
+
+// net_type ::=
+//     "supply0" | "supply1" | "tri" | "triand" | "trior" | "tri0"
+//   | "tri1" | "uwire" | "wire" | "wand" | "wor"
+lettype net_type = NT_wire;
+
+// A.2.1.3 Type declarations ---------------------------------------------------
+
+// list_of_net_identifiers ::= net_identifier { dimension } { "," net_identifier { dimension } }
+lettype net_identifier = Net_id (identifier) (dimension list);
+
+// net_declaration ::=
+//     net_type [ "signed" ] [ delay3 ] list_of_net_identifiers ";"
+//   | net_type [ "drive_strength" ] [ "signed" ] [ delay3 ] list_of_net_decl_assignments ";"
+//   | net_type [ "vectored" | "scalared" ] [ "signed" ] range [ delay3 ] list_of_net_identifiers ";"
+//   | net_type [ drive_strength ] [ "vectored" | "scalared" ] [ "signed" ] range [ delay3 ] list_of_net_decl_assignments ";"
+//   | "trireg" [ charge_strength ] [ "signed" ] [ delay3 ] list_of_net_identifiers ";"
+//   | "trireg" [ drive_strength ] [ "signed" ] [ delay3 ] list_of_net_decl_assignments ";"
+//   | "trireg" [ charge_strength ] [ "vectored" | "scalared" ] [ "signed" ] range [ delay3 ] list_of_net_identifiers ;
+//   | "trireg" [ drive_strength ] [ "vectored" | "scalared" ] [ "signed" ] range [ delay3 ] list_of_net_decl_assignments ";"
+// list_of_net_decl_assignments ::= net_decl_assignment { "," net_decl_assignment }
+lettype net_declaration =
+    ND_scalar_id (net_type) (bool) (net_identifier list)
+  | ND_scalar_decl (net_type) (bool) (net_decl_assignment list)
+  | ND_vector_id (net_type) ({bool} opt) (bool) (range) (net_identifier list)
+  | ND_vector_decl (net_type) ({bool} opt) (bool) (range) (net_decl_assignment list)
+;
+
+// reg_declaration ::= "reg" [ "signed" ] [ range ] list_of_variable_identifiers ";"
+// list_of_variable_identifiers ::= variable_type { "," variable_type }
+lettype reg_declaration = Reg_decl (bool) ({range} opt) (variable_type list);
+
+// real_declaration ::= "real" list_of_real_identifiers ;
+lettype real_declaration = Real_decl (variable_type list);
+
+// integer_declaration ::= "integer" list_of_variable_identifiers ;
+lettype integer_declaration = Int_decl (variable_type list);
+
+// A.2.1.2 Port declarations ---------------------------------------------------
+
+// inout_declaration ::= "inout" [ net_type ] [ "signed" ] [ range ] list_of_port_identifiers
+// list_of_port_identifiers ::= port_identifier { "," port_identifier }
+lettype inout_declaration =
+    Inout_decl ({net_type} opt) (bool) ({range} opt) (identifier list)
+;
+
+// input_declaration ::= "input" [ net_type ] [ "signed" ] [ range ] list_of_port_identifiers
+lettype input_declaration =
+    Input_decl ({net_type} opt) (bool) ({range} opt) (identifier list)
+;
+
+// output_declaration ::=
+//     "output" [ net_type ] [ "signed" ] [ range ] list_of_port_identifiers
+//   | "output" "reg" [ "signed" ] [ range ] list_of_variable_port_identifiers
+//   | "output" output_variable_type list_of_variable_port_identifiers
+lettype output_declaration =
+    Output_decl_port ({net_type} opt) (bool) ({range} opt) (identifier list)
+  | Output_decl_reg (bool) ({range} opt) (variable_port_identifier list)
+  | Output_decl_var (output_variable_type) (variable_port_identifier list)
+;
+
+// A.2.1.1 Module parameter declarations ---------------------------------------
+// A.2.1 Declaration types -----------------------------------------------------
+
+// =============================================================================
+// A.2 Declarations
+// =============================================================================
+
+// A.1.5 Configuration source text ---------------------------------------------
+// A.1.4 Module items ----------------------------------------------------------
+
+// module_or_generate_item_declaration ::=
+//     net_declaration
+//   | reg_declaration
+//   | integer_declaration
+//   | real_declaration
+//   | time_declaration
+//   | realtime_declaration
+//   | event_declaration
+//   | genvar_declaration
+//   | task_declaration
+//   | function_declaration
+lettype module_or_generate_item_declaration =
+    MOGID_net (net_declaration)
+  | MOGID_reg (reg_declaration)
+;
+
+// module_or_generate_item ::=
+//     module_or_generate_item_declaration
+//   | local_parameter_declaration ";"
+//   | parameter_override
+//   | continuous_assign
+//   | gate_instantiation
+//   | udp_instantiation
+//   | module_instantiation
+//   | initial_construct
+//   | always_construct
+//   | loop_generate_construct
+//   | conditional_generate_construct
+lettype module_or_generate_item =
+    MOGI_decl (module_or_generate_item_declaration)
+  | MOGI_cont (continuous_assign)
+  | MOGI_udp (udp_instantiation)
+  | MOGI_module (module_instantiation)
+  | MOGI_initial (initial_construct)
+  | MOGI_always (always_construct)
+;
+
+// non_port_module_item ::=
+//    module_or_generate_item
+//  | generate_region
+//  | specify_block
+//  | parameter_declaration ";"
+//  | specparam_declaration
+lettype non_port_module_item =
+    NPM_Item (module_or_generate_item)
+;
+
+// See 'Module parameters and ports' (A.1.3)
+lettype port_declaration =
+    Port_decl_inout (inout_declaration)
+  | Port_decl_in (input_declaration)
+  | Port_decl_out (output_declaration)
+;
+
+// module_item ::= port_declaration ";" | non_port_module_item
+lettype module_item =
+    Module_Port (port_declaration)
+  | Module_Item (non_port_module_item)
+;
+
+// A.1.3 Module parameters and ports -------------------------------------------
+
+// port_reference ::= port_identifier [ "[" constant_range_expression "]" ]
+lettype port_reference =
+    Port_ref_id (identifier) ({constant_range_expression} opt)
+;
+
+// port_expression ::= port_reference | "{" port_reference { "," port_reference } "}"
+lettype port_expression =
+    Port_exp_one (port_reference)
+  | Port_exp_many (port_reference list)
+;
+
+// port ::= [ port_expression ] | "." port_identifier "(" [ port_expression ] ")"
+lettype port =
+    Port_exp ({port_expression} opt)
+  | Port_ref (identifier) ({port_expression} opt)
+;
+
+// port_declaration ::= inout_declaration | input_declaration | output_declaration
+// Moved to 'Module items' (A.1.4).
+
+// A.1.2 Verilog source text ---------------------------------------------------
+
+// module_declaration* ::=
+//     "module" module_identifier list_of_ports ";" { module_item } "endmodule"
+//   | "module" module_identifier [ list_of_port_declarations ] ";" { non_port_module_item } "endmodule"
+// list_of_ports ::= "(" port { "," port } ")"
+// list_of_port_declarations ::= "(" port_declaration { "," port_declaration } ")" | "()"
+lettype module_declaration =
+    Module_declaration_one (identifier) (port list) (module_item list)
+  | Module_declaration_many
+      (identifier)
+      ({port_declaration list} opt)
+      (non_port_module_item list)
+;
+
+// description ::= module_declaration | udp_declaration | config_declaration
+lettype description = Desc_module (module_declaration);
+
+// source_text ::= { description }
+lettype source_text = Source_text (description list);
+
+// A.1.1 Library source text ---------------------------------------------------
+
+// =============================================================================
+// A.1 Source text
+// =============================================================================

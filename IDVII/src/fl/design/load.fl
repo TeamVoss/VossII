@@ -4,6 +4,7 @@
 //-------------------------------------------------------------------
 
 (load (DIR^"/pexlif.fl")) fseq
+(load (DIR^"/isomatch.fl")) fseq
 (load (DIR^"/util.fl")) fseq
 (load (DIR^"/hfl.fl")) fseq
 (load (DIR^"/STE.fl")) fseq
@@ -14,4 +15,3 @@
 (load (DIR^"/miter.fl")) fseq
 (is_defined "USE_OBSOLETE" => load (DIR^"/obsolete.fl") | T) fseq
 ();
-

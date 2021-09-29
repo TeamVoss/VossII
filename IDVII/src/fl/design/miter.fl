@@ -70,16 +70,3 @@ let mk_miter p1 p2 =
     mpexlif, mant
 ;
 
-let BDD_comb_EQ p1 p2 =
-    val (miter_pexlif, ant) = mk_miter p1 p2 then
-    let cons = [(T,"_OK_",T,0,1)] in
-    let ckt = pexlif2fsm miter_pexlif then
-    let ste = STE "" ckt [] ant cons [] then
-    let ok = get_ste_result ste "" then
-    ok => () |
-    let cex = example F (NOT ok) then
-    let ant' = substitute cex ant then
-    let vis = STE_debug ckt then
-    (STE "-e" vis [] ant' cons []) fseq ()
-;
-

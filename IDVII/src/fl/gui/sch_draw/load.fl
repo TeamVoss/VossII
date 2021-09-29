@@ -5,9 +5,9 @@
 
 noX => 
 (
-    (eval "let STE_debug = error \"STE_debug not avaliable in -noX mode\";")
-    fseq
-    ()
+(eval "let STE_debug = error \"STE_debug not avaliable in -noX mode\";") seq
+(eval "let draw_fanin = error \"draw_fanin not avaliable in -noX mode\";") seq
+()
 )
 |
 (

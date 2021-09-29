@@ -75,6 +75,7 @@ extern string s_MEM;
 extern string s_no_instance;
 
 /***** PRIVATE VARIABLES *****/
+static bool	    print_failures;
 static int	    event_id_cnt = 0;
 static int	    undeclared_node_cnt;
 static bool         quit_simulation_early;
@@ -578,6 +579,9 @@ gSTE(g_ptr redex, value_type type)
     EXTRACT_6_ARGS(redex, g_opts, g_fsm, wl, ant, cons, trl);
     string opts = GET_STRING(g_opts);
     bool trace_all = FALSE;
+    print_failures = RCprint_failures;
+    if( strstr(opts, "-s") != NULL )
+	print_failures = FALSE;
     if( strstr(opts, "-e") != NULL )
 	trace_all = TRUE;
     bool abort_ASAP = FALSE;
@@ -752,7 +756,7 @@ gSTE(g_ptr redex, value_type type)
 		    if( c_NEQ(ok, c_ONE) ) {
 			FP(err_fp, "Warning: Consequent failure at time %d", t);
 			FP(err_fp, " on node %s\n", idx2name(idx));
-			if( RCprint_failures ) {
+			if( print_failures ) {
 			    FP(err_fp, "Current value:");
 			    cHL_Print(err_fp, curH, curL);
 			    FP(err_fp, "\nExpected value:");
@@ -7291,7 +7295,7 @@ update_node(ste_ptr ste, int idx, gbv Hnew, gbv Lnew, bool force)
 		    FP(warning_fp,
 		      "Warning: Antecedent failure at time %d on node %s\n",
 		      ste->cur_time, idx2name(np->idx));
-		    if( RCprint_failures ) {
+		    if( print_failures ) {
 			FP(warning_fp, "Current value:");
 			cHL_Print(warning_fp, Hnew, Lnew);
 			FP(warning_fp, "\nAsserted value:");

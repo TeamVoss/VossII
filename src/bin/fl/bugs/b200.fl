@@ -1,36 +1,193 @@
+// isomatching + search and replace.
+
 load "ste.fl";
 
-TYPE "word" 8;
+// =============================================================================
+// Four examples, all put into a larger haystack.
 
-let add3 =
-    word_input	a b c.
-    word_output out.
-    internal mid.
-    CELL "draw_hier add3" [
-	mid <- a '+' b,
-	out <- mid '+' c
+let buf1 =
+    bit_input a.
+    bit_output out.
+    bit_internal mid.
+    CELL "draw_hier buf1" [
+      mid <- '~' a,
+      out <- '~' mid
+    ];
+
+let buf2 =
+    bit_input x.
+    bit_output y.
+    bit_internal mid.
+    CELL "draw_hier buf2" [
+      mid <- '~' x,
+      y <- '~' mid
 ];
 
-let add6 =
-    word_input	a b c d e f.
-    word_output out.
-    internal s1 s2.
-    CELL "draw_hier add6" [
-	add3 a b c s1,
-	add3 d e f s2,
-	out <- s1 '+' s2
+let buf3 =
+    bit_input a.
+    bit_output out.
+    bit_internal oink.
+    CELL "draw_hier buf3" [
+      oink <- '~' a,
+      out <- '~' oink
+    ];
+
+letrec inv_rec n =
+    bit_input    a.
+    bit_output  out.
+    bit_internal mid.
+    CELL "draw_hier inv_rec" (
+      n = 1 => [ out <- '~' a ] |
+      [
+          mid <- '~' a,
+          inv_rec (n-1) mid out
+      ]);
+let buf4 =
+    bit_input    a.
+    bit_output  out.
+    CELL "buf4" [
+        inv_rec 2 a out
+    ];
+
+let bufs =
+    bit_input a b c d e f.
+    bit_output o1 o2 o3 o4 o5 o6 o7.
+    bit_internal mid.
+    CELL "draw_hier bufs" [
+      buf1 a o1,
+      buf2 b o2,
+      buf3 c o3,
+      inv_rec 2 d o4,
+      buf4 e o5,
+      mid <- '~' f,
+      o6 <- '~' mid,
+      o7 <- '~' mid
+    ];
+
+let buf1' = buf1 'i1 'o1;
+let buf2' = buf2 'i1 'o1;
+let buf3' = buf3 'i1 'o1;
+let buf4' = buf4 'i1 'o1;
+let bufs' = bufs 'i1 'i2 'i3 'i4 'i5 'i6 'o1 'o2 'o3 'o4 'o5 'o6 'o7;
+let matches = isomatch buf1' bufs';
+print (pretty_isomatch matches);
+
+// =============================================================================
+// ...
+
+let mux4' = verilog2pexlif "-Iisomatch/tests/mux" "mux4" ["mux4.v"] [];
+let mux2' = verilog2pexlif "-Iisomatch/tests/mux" "mux2" ["mux2.v"] [];
+g_pex fseq p_pex fseq ();
+
+//let wrap p = PINST "box" [] F [] [] [] (P_HIER [p]);
+let matches = isomatch mux2' mux4';
+//print (pretty_isomatch matches);
+
+// =============================================================================
+// ...
+
+let BYTE_SIZE           = 8;
+let ADDR_SIZE           = 20;
+let TIMER_SIZE          = 16;
+let LINES               = 12;            // Number of cache lines
+let BYTES_IN_CACHE_LINE = 8;            // Number of bytes in cache line
+let TAG_SIZE		= ADDR_SIZE-(log2 LINES)-(log2 BYTES_IN_CACHE_LINE);
+
+TYPE "byte" BYTE_SIZE;
+TYPE "cache_line" (BYTE_SIZE*BYTES_IN_CACHE_LINE);;
+TYPE "atag_field" TAG_SIZE;
+TYPE "line_addr" (log2 LINES);
+TYPE "decoded_line_addr" LINES;
+TYPE "byte_addr" (log2 BYTES_IN_CACHE_LINE);
+
+STRUCT "addr" [ ("aTag", "atag_field"),
+		("line", "line_addr"),
+		("byte", "byte_addr")
 ];
 
-let p = add6 'a 'b 'c 'd 'e 'f 'out;
+STRUCT "ext_cache_line" [
+	    ("valid", "bit"),
+	    ("aTag", "atag_field"),
+	    ("data", "cache_line")
+];
 
-let p1 = unfold_pexlif p 1 "a/";
+let cache_line =
+    bit_input		    clk.
+    bit_input		    reset.
+    bit_input		    we.
+    line_addr_input	    line.
+    cache_line_input	    din.
+    atag_field_input	    atag.
+    bit_output		    match.
+    cache_line_output	    dout.
+    bit_input               sel.
+    cache_line_input	    r_dout.
+    bit_input               r_match.
+    //
+    bit_internal	    my_we l_match.
+    ext_cache_line_internal n_cl cl.
+    //
+    CELL ("cache_line") [
+	my_we <- sel '&' we,
+	n_cl-->valid <- (IF reset THEN '0 ELSE (my_we '|' cl-->valid)),
+	n_cl-->aTag  <- (IF my_we THEN atag ELSE cl-->aTag),
+	n_cl-->data  <- (IF my_we THEN din ELSE cl-->data),
+	re_ff clk n_cl cl,
+	l_match <- sel '&' cl-->valid '&' (atag '=' cl-->aTag),
+	match <- (IF sel THEN l_match ELSE r_match),
+	dout <- (IF sel THEN cl-->data ELSE r_dout)
+    ]
+;
 
-p1;
+letrec cache_rec n =
+    bit_input		    clk.
+    bit_input		    reset.
+    bit_input		    we.
+    line_addr_input	    line.
+    cache_line_input	    din.
+    atag_field_input	    atag.
+    bit_output		    match.
+    cache_line_output	    dout.
+    //
+    bit_internal	    my_we sel r_match l_match.
+    ext_cache_line_internal n_cl cl.
+    cache_line_internal	    r_dout.
+    //
+    CELL (sprintf "cache_rec %d" n) (
+    n < 0 => [
+	    dout  <- 'X,
+	    match <- '0
+    ] | [
+	sel <- line '=' ''n,
+	cache_rec (n-1) clk reset we line din atag r_match r_dout,
+        cache_line clk reset we line din atag match dout sel r_dout r_match
+]);
 
-//let vis p = STE_debug (pexlif2fsm p);
+let cache_mem =
+    bit_input			clk.
+    bit_input			reset.
+    bit_input			we.
+    line_addr_input		line.
+    cache_line_input		din.
+    atag_field_input		atag.
+    bit_output			hit.
+    cache_line_output		dout.
+    //
+    CELL "draw_hier CacheMem" [
+	cache_rec (LINES-1) clk reset we line din atag hit dout
+];
 
-let p2 = unfold_pexlif p1 3 "b/";
+let cache_line' = cache_line 'clk 'reset 'we 'line 'din 'atag 'match 'dout 'sel 'r_dout 'r_match;
+let cache_mem' = cache_mem 'clk 'reset 'we 'line 'din 'atag 'hit 'dout;
 
-p2;
+let flat_cache_line' = flatten_pexlif cache_line';
+let flat_cache_mem' = flatten_pexlif cache_mem';
+let matches =
+      let a = flat_cache_line' then
+      let b = flat_cache_mem' then
+      isomatch a b
+;
+//print (pretty_isomatch matches);
 
-//vis p2;
+// =============================================================================
+// Fin.

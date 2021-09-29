@@ -89,17 +89,25 @@ static hash_record_ptr inputs_tbl_ptr;
 static hash_record     outputs_tbl;
 static hash_record_ptr outputs_tbl_ptr;
 
+// Debugging -------------------------------------------------------------------
+#define DEBUG_PEX 0
+#define debug_print(fmt, ...)                                                  \
+        do { if (DEBUG_PEX) fprintf(stderr, "%s:%d:%s: " fmt, __FILE__,        \
+                                __LINE__, __func__, __VA_ARGS__); } while (0)
+#define debug_append(fmt, ...)                                                 \
+        do { if (DEBUG_PEX) fprintf(stderr, "" fmt, __VA_ARGS__); } while (0)
+
 // Forward definitions local functions -----------------------------------------
-static void           new_adj_mem();
-static void           rem_adj_mem();
+static inline void    new_adj_mem();
+static inline void    rem_adj_mem();
 static vec_ptr        split_vector(string name);
 static void           record_vector_signatures(
                           adj_key_ptr *tail, unint index, string name,
                           bool input);
 static void           mk_adj_tables(
                           adj_key_list_ptr *keys, unint *count, g_ptr p);
-static void           new_fold_mem();
-static void           rem_fold_mem();
+static inline void    new_fold_mem();
+static inline void    rem_fold_mem();
 static void           mk_formal_actuals_substitution(
                           hash_record_ptr tbl, g_ptr fa);
 static sname_list_ptr subst_formal(hash_record_ptr tbl, g_ptr f);
@@ -109,7 +117,7 @@ static g_ptr          subst_fa_list(hash_record_ptr tbl, g_ptr fa_list);
 /*                                LOCAL FUNCTIONS                             */
 /******************************************************************************/
 
-static void
+static inline void
 new_adj_mem()
 {
     adj_bkt_mgr_ptr = &adj_bkt_mgr;
@@ -124,7 +132,7 @@ new_adj_mem()
     create_hash(outputs_tbl_ptr, 100, str_hash, str_equ);
 }
 
-static void
+static inline void
 rem_adj_mem()
 {
     free_mgr(adj_bkt_mgr_ptr);
@@ -251,7 +259,7 @@ mk_adj_tables(adj_key_list_ptr *keys, unint *count, g_ptr p)
 
 // -----------------------------------------------------------------------------
 
-static void
+static inline void
 new_fold_mem()
 {
     vector_list_mgr_ptr = &vector_list_mgr;
@@ -266,7 +274,7 @@ new_fold_mem()
     new_mgr(fa_subst_mgr_ptr, sizeof(fa_subst_rec));
 }
 
-static void
+static inline void
 rem_fold_mem()
 {
     free_mgr(vector_list_mgr_ptr);
@@ -285,10 +293,10 @@ static void
 mk_formal_actuals_substitution(hash_record_ptr tbl, g_ptr fa)
 {
     if(tbl == NULL) {
-        DIE("Bad input");
+        DIE("Passed a null hash-table.");
     }
     if(IS_NIL(fa)) {
-        DIE("Bad input");
+        return;
     }
     g_ptr li, lj, pair, actual;
     FOR_CONS(fa, li, pair) {
@@ -475,6 +483,7 @@ get_top_inst(g_ptr p, unint inst)
 g_ptr
 get_top_adjacencies(g_ptr p)
 {
+    debug_print("%p\n", (void *) p);
     new_adj_mem();
     // /
     unint count;
@@ -482,22 +491,37 @@ get_top_adjacencies(g_ptr p)
     mk_adj_tables(&vchild, &count, p);
     g_ptr res = Make_NIL(), res_tail = res;
     for(unint i = 0; vchild != NULL; i++, vchild = vchild->next) {
-        g_ptr lhs = Make_INT_leaf(i);
+        g_ptr index = Make_INT_leaf(i);
         for(adj_key_ptr vfa = vchild->key; vfa != NULL; vfa = vfa->next) {
             vec_ptr vec = vfa->vec;
             string sig = vfa->signature;
-            for(adj_bkt_ptr adj = find_hash(inputs_tbl_ptr, sig); adj != NULL; adj = adj->next) {
-                if(Check_vector_overlap(vec, adj->vec)) {
-                    g_ptr rhs = Make_INT_leaf(adj->index);
-                    g_ptr pair = Make_PAIR_ND(lhs,rhs);
-                    APPEND1(res_tail, pair);
+            if(vfa->input) {
+                for(adj_bkt_ptr adj = find_hash(outputs_tbl_ptr, sig);
+                    adj != NULL;
+                    adj = adj->next)
+                {
+                    if(Check_vector_overlap(vec, adj->vec)) {
+                        APPEND1(res_tail,
+                            Make_PAIR_ND(
+                                Make_INT_leaf(adj->index),
+                                index));
+                        // /
+                        debug_print("%s: %u <- %u\n", sig, i, adj->index);
+                    }
                 }
-            }
-            for(adj_bkt_ptr adj = find_hash(outputs_tbl_ptr, sig); adj != NULL; adj = adj->next) {
-                if(Check_vector_overlap(vec, adj->vec)) {
-                    g_ptr rhs = Make_INT_leaf(adj->index);
-                    g_ptr pair = Make_PAIR_ND(rhs,lhs);
-                    APPEND1(res_tail, pair);
+            } else {
+                for(adj_bkt_ptr adj = find_hash(inputs_tbl_ptr, sig);
+                    adj != NULL;
+                    adj = adj->next)
+                {
+                    if(Check_vector_overlap(vec, adj->vec)) {
+                        APPEND1(res_tail,
+                            Make_PAIR_ND(
+                                index,
+                                Make_INT_leaf(adj->index)));
+                        // /
+                        debug_print("%s: %u -> %u\n", sig, i, adj->index);
+                    }
                 }
             }
         }
@@ -700,6 +724,9 @@ unfold_pexlif(g_ptr p, unint id, string prefix)
     // build new list of internals while constructing the inter. subst.
     hash_record sub;
     create_hash(&sub, 100, str_hash, str_equ);
+    if(IS_NIL(un_fa_inps) || IS_NIL(un_fa_outs)) {
+        DIE("Pexlif to unfold has empty inputs/outputs.");
+    }
     mk_formal_actuals_substitution(&sub, un_fa_inps);
     mk_formal_actuals_substitution(&sub, un_fa_outs);
     g_ptr new_inter = Make_NIL(), new_inter_tail = new_inter;

@@ -1567,6 +1567,28 @@ Fgets(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
+static void
+Fget(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    io_ptr ip = GET_FILE_IO_PTR(r);
+    if((index(ip->mode, 'r') == NULL) && (index(ip->mode, '+') == NULL)) {
+        MAKE_REDEX_FAILURE(redex,
+            Fail_pr("fgetdelim on file not open for reading"));
+    } else {
+        string tmp = strtemp("");
+        size_t size;
+        if(getdelim(&tmp, &size, '\0', ip->fp) != -1) {
+            MAKE_REDEX_STRING(redex, wastrsave(&strings, tmp));
+        } else {
+            MAKE_REDEX_STRING(redex, wastrsave(&strings, ""));
+        }
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
 void
 Io_Install_Functions()
 {
@@ -1594,6 +1616,10 @@ Io_Install_Functions()
     Add_ExtAPI_Function("fgets", "1", FALSE, 
 			GLmake_arrow(GLmake_fp(), GLmake_string()),
 			Fgets);
+
+    Add_ExtAPI_Function("fget", "1", FALSE,
+            GLmake_arrow(GLmake_fp(), GLmake_string()),
+            Fget);
 
 }
 

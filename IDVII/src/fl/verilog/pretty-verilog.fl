@@ -1,0 +1,518 @@
+load (DIR^"grammar.fl");
+load (DIR^"pretty.fl");
+
+// =============================================================================
+// Pretty printing rules for the Verilog grammar.
+// =============================================================================
+
+let hangs {d :: doc} {b :: doc} = hang d 4 b;
+
+let p_opt f s = has_value s => f (get_value s) | nil;
+
+let p_when b s = b => s | nil;
+
+let collect {ds :: (doc list)} = itlist (defix <->) ds nil;
+
+let in_braces {d :: doc} = is_nil d => d | text "[" <-> d <-> text "]";
+
+let in_curly {d :: doc} = is_nil d => d | text "{" <-> d <-> text "}";
+
+let in_paren {d :: doc} = is_nil d => d | text "(" <-> d <-> text ")";
+
+let in_list {ds :: (doc list)} = collect (punctuate (text ", ") ds);
+
+let in_vert_list {ds :: (doc list)} = vcat (punctuate (text ",") ds);
+
+// -----------------------------------------------------------------------------
+
+let p_identifier (ID s) = text s;
+
+forward_declare{p_constant_expression::constant_expression->doc};
+
+let p_hierarchical_identifier (HID (NONE) i) =
+      p_identifier i
+/\  p_hierarchical_identifier (HID (SOME (j, (NONE))) i) =
+      p_identifier j <-> text "." <-> p_identifier i
+/\  p_hierarchical_identifier (HID (SOME (j, (SOME c))) i) =
+            p_identifier j
+        <-> in_braces (p_constant_expression c)
+        <-> text "."
+        <-> p_identifier i
+;
+
+let p_number (Num i) = text (int2str i);
+
+let p_unary_operator (U_pos) = text "+"
+/\  p_unary_operator (U_neg) = text "-"
+/\  p_unary_operator (U_log_neg) = text "!"
+/\  p_unary_operator (U_bit_neg) = text "~"
+/\  p_unary_operator (U_red_and) = text "&"
+/\  p_unary_operator (U_red_nand) = text "~&"
+/\  p_unary_operator (U_red_or) = text "|"
+/\  p_unary_operator (U_red_nor) = text "~|"
+/\  p_unary_operator (U_red_xor) = text "^"
+/\  p_unary_operator (U_red_xnor_l) = text "~^"
+/\  p_unary_operator (U_red_xnor_r) = text "^~"
+;
+
+let p_binary_operator (B_add) = text "+"
+/\  p_binary_operator (B_sub) = text "-"
+/\  p_binary_operator (B_mult) = text "*"
+/\  p_binary_operator (B_div) = text "/"
+/\  p_binary_operator (B_mod) = text "%"
+/\  p_binary_operator (B_log_eq) = text "=="
+/\  p_binary_operator (B_log_neq) = text "!="
+/\  p_binary_operator (B_case_eq) = text "==="
+/\  p_binary_operator (B_case_neq) = text "!=="
+/\  p_binary_operator (B_log_and) = text "&&"
+/\  p_binary_operator (B_log_or) = text "||"
+/\  p_binary_operator (B_exp) = text "**"
+/\  p_binary_operator (B_lt) = text "<"
+/\  p_binary_operator (B_lte) = text "<="
+/\  p_binary_operator (B_gt) = text ">"
+/\  p_binary_operator (B_gte) = text ">="
+/\  p_binary_operator (B_bit_and) = text "&"
+/\  p_binary_operator (B_bit_or) = text "|"
+/\  p_binary_operator (B_bit_xor) = text "^"
+/\  p_binary_operator (B_bit_eq_l) = text "^~"
+/\  p_binary_operator (B_bit_eq_r) = text "~^"
+/\  p_binary_operator (B_log_shr) = text ">>"
+/\  p_binary_operator (B_log_shl) = text "<<"
+/\  p_binary_operator (B_shr) = text ">>>"
+/\  p_binary_operator (B_shl) = text "<<<"
+;
+
+forward_declare{p_constant_range_expression::constant_range_expression->doc};
+
+letrec
+    p_net_lvalue (NLV_hier i (NONE)) = p_hierarchical_identifier i
+/\  p_net_lvalue (NLV_hier i (SOME (cs,cr))) =
+          p_hierarchical_identifier i
+      <-> collect (map (\c. in_braces (p_constant_expression c)) cs)
+      <-> in_braces (p_constant_range_expression cr)
+/\  p_net_lvalue (NLV_list ns) = in_list (map p_net_lvalue ns)
+;
+
+forward_declare{p_range_expression::range_expression->doc};
+forward_declare{p_expression::expression->doc};
+
+let p_variable_lvalue (VLV_hier i (NONE)) = p_hierarchical_identifier i
+/\  p_variable_lvalue (VLV_hier i (SOME (es,r))) =
+          p_hierarchical_identifier i
+      <-> collect (map (\e. in_braces (p_expression e)) es)
+      <-> in_braces (p_range_expression r)
+;
+
+let p_variable_assignment (Variable_assignment vlv e) =
+      p_variable_lvalue vlv <+> p_expression e
+;
+
+let p_constant_primary (CPrim_num n) = p_number n
+/\  p_constant_primary (CPrim_str s) = text s;
+;
+
+forward_declare{p_concatenation::concatenation->doc};
+forward_declare{p_multiple_concatenation::multiple_concatenation->doc};
+forward_declare{p_mintypmax_expression::mintypmax_expression->doc};
+
+let p_primary (Prim_num n) = p_number n
+/\  p_primary (Prim_hier i es') =
+      let pr (es, re) =
+              collect (map (\e. in_braces (p_expression e)) es)
+          <-> in_braces (p_range_expression re)
+      in
+      p_hierarchical_identifier i <-> p_opt pr es'
+/\  p_primary (Prim_cat c) = p_concatenation c
+/\  p_primary (Prim_mcat mc) = p_multiple_concatenation mc
+/\  p_primary (Prim_mintypmax mtm) = in_paren (p_mintypmax_expression mtm)
+/\  p_primary (Prim_str s) = text s
+;
+
+letrec
+    p_constant_expression (CExp_primary c) = p_constant_primary c
+/\  p_constant_expression (CExp_unary op c) =
+      p_unary_operator op <-> p_constant_primary c
+/\  p_constant_expression (CExp_binary e1 op e2) =
+          p_constant_expression e1
+      <+> p_binary_operator op
+      <+> p_constant_expression e2
+/\  p_constant_expression (CExp_conditional e1 e2 e3) =
+          p_constant_expression e1
+      <+> text "?"
+      <+> p_constant_expression e2
+      <+> text ":"
+      <+> p_constant_expression e3
+;
+
+let p_constant_range_expression (CRange_value c) = p_constant_expression c
+/\  p_constant_range_expression (CRange_m2l c1 c2) =
+      p_constant_expression c1 <+> text ":" <+> p_constant_expression c2
+;
+
+letrec
+    p_expression (Exp_primary p) = p_primary p
+/\  p_expression (Exp_unary op p) = p_unary_operator op <-> p_primary p
+/\  p_expression (Exp_binary e1 op e2) =
+          p_expression e1
+      <+> p_binary_operator op
+      <+> p_expression e2
+/\  p_expression (Exp_conditional e1 e2 e3) =
+          p_expression e1
+      <+> text "?"
+      <+> p_expression e2
+      <+> text ":"
+      <+> p_expression e3
+;
+
+let p_range_expression (Range_exp e) = p_expression e
+/\  p_range_expression (Range_m2l c1 c2) =
+      p_constant_expression c1 <-> text ":" <-> p_constant_expression c2
+;
+
+let p_mintypmax_expression (Mintypmax_expression e) = p_expression e
+/\  p_mintypmax_expression (Mintypmax_minmax e1 e2 e3) =
+          p_expression e1
+      <+> text ":"
+      <+> p_expression e2
+      <+> text ":"
+      <+> p_expression e3
+;
+
+let p_concatenation (CAT es) = in_curly (in_list (map p_expression es));
+
+let p_multiple_concatenation (MCAT ce cat) =
+      in_curly (p_constant_expression ce <-> p_concatenation cat)
+;
+
+letrec
+    p_event_expression (Event_exp e) = p_expression e
+/\  p_event_expression (Event_pos e) = text "posedge" <+> p_expression e
+/\  p_event_expression (Event_neg e) = text "negedge" <+> p_expression e
+/\  p_event_expression (Event_or ev1 ev2) =
+      p_event_expression ev1 <+> text "or" <+> p_event_expression ev2
+/\  p_event_expression (Event_and ev1 ev2) =
+      p_event_expression ev1 <+> text "," <+> p_event_expression ev2
+;
+
+let p_event_control (Event_control_hier i) =
+      text "@" <-> p_hierarchical_identifier i
+/\  p_event_control (Event_control_exp ev) =
+      text "@" <-> in_paren (p_event_expression ev)
+/\  p_event_control (Event_star) = text "@*"
+/\  p_event_control (Event_pstar) = text "@(*)"
+;
+
+forward_declare{p_delay_value::delay_value->doc};
+
+let p_delay_control (Delay_control_value dv) = text "#" <-> p_delay_value dv
+/\  p_delay_control (Delay_control_minmax mtm) =
+      text "#" <-> in_paren (p_mintypmax_expression mtm)
+;
+
+let p_delay_or_event_control (DOEC_delay dc) = p_delay_control dc
+/\  p_delay_or_event_control (DOEC_event ec) = p_event_control ec
+/\  p_delay_or_event_control (DOEC_repeat e ec) =
+      text "repeat" <-> in_paren (p_expression e) <+> p_event_control ec
+;
+
+let p_procedural_timing_control (PTC_event ev) = p_event_control ev;
+
+forward_declare{p_statement::statement->doc};
+
+let p_procedural_timing_control_statement (PTC t s) =
+      hangs (p_procedural_timing_control t) (p_statement s)
+;
+
+// Some helpers.
+let p_if  (c,s) =
+      hangs (text "if" <+> in_paren (p_expression c)) (p_statement s)
+;
+let p_eif (c,s) =
+      hangs (text "else if" <+> in_paren (p_expression c)) (p_statement s)
+;
+let p_else s    = hangs (text "else") (p_statement s);
+
+let p_if_else_if_statement (IEI b cs (NONE)) =
+      vcat (p_if b : map p_eif cs)
+/\  p_if_else_if_statement (IEI b cs (SOME e)) =
+      vcat (p_if b : map p_eif cs @ [p_else e])
+;
+
+let p_conditional_statement (COND_if_else b (NONE)) = p_if b
+/\  p_conditional_statement (COND_if_else b (SOME s)) = vcat [p_if b, p_else s]
+/\  p_conditional_statement (COND_if_else_if ieis) =
+      p_if_else_if_statement ieis
+;
+
+let p_loop_statement (LOOP_forever s) =
+      hangs (text "forever") (p_statement s)
+/\  p_loop_statement (LOOP_repeat e s) =
+      hangs (text "repeat" <+> in_paren (p_expression e)) (p_statement s)
+/\  p_loop_statement (LOOP_while e s) =
+      hangs (text "while" <+> in_paren (p_expression e)) (p_statement s)
+/\  p_loop_statement (LOOP_for i e n s) =
+      hangs (text "for" <+> in_paren (
+                  p_variable_assignment i
+              <-> text ";"
+              <+> p_expression e
+              <-> text ";"
+              <+> p_variable_assignment n))
+            (p_statement s)
+;
+
+forward_declare{p_blocking_assignment::blocking_assignment->doc};
+forward_declare{p_nonblocking_assignment::nonblocking_assignment->doc};
+
+let p_statement (Statement_null) = text ";"
+/\  p_statement (Statement_blocking s) = p_blocking_assignment s <-> text ";"
+/\  p_statement (Statement_nonblocking s) = p_nonblocking_assignment s <-> text ";"
+/\  p_statement (Statement_timing s) = p_procedural_timing_control_statement s
+/\  p_statement (Statement_if s) = p_if_else_if_statement s
+/\  p_statement (Statement_cond s) = p_conditional_statement s
+/\  p_statement (Statement_loop s) = p_loop_statement s
+;
+
+let p_initial_construct (Initial s) = text "initial" <+> p_statement s;
+
+let p_always_construct (Always s) = text "always" <+> p_statement s;
+
+let p_blocking_assignment (Blocking_assignment vlv doec' e) =
+          p_variable_lvalue vlv
+      <+> text "="
+      <+> p_opt p_delay_or_event_control doec'
+      <+> p_expression e
+;
+
+let p_nonblocking_assignment (Nonblocking_assignment vlv doec' e) =
+          p_variable_lvalue vlv
+      <+> text "<="
+      <+> p_opt p_delay_or_event_control doec'
+      <+> p_expression e
+;
+let p_continuous_assign (Cont_assign as) =
+      let pr (nlv,e) = p_net_lvalue nlv <+> text "=" <+> p_expression e in
+      text "assign" <+> in_list (map pr as) <-> text ";"
+;
+
+forward_declare{p_range::range->doc};
+
+let p_udp_instantiation (UDP_inst i ds) =
+      let p_instance (n, r') =
+            p_identifier n <-> p_opt p_range r'
+      in
+      let p_terminals o is =
+            in_list (p_net_lvalue o : map p_expression is)
+      in
+      let p_udp (i', o, is) =
+            p_opt p_instance i' <-> in_paren (p_terminals o is)
+      in
+      p_identifier i <+> in_list (map p_udp ds) <-> text ";"
+;
+
+let p_port_connection (Port_con_ordered e') = p_opt p_expression e'
+/\  p_port_connection (Port_con_named i (NONE)) =
+      text "." <-> p_identifier i <-> text "()"
+/\  p_port_connection (Port_con_named i (SOME e)) =
+      text "." <-> p_identifier i <-> in_paren (p_expression e)
+;
+
+let p_module_instance (Module_instance i r' (NONE)) =
+      p_identifier i <-> p_opt p_range r' <-> text "()"
+/\  p_module_instance (Module_instance i r' (SOME l)) =
+          p_identifier i
+      <-> p_opt p_range r'
+      <-> in_paren (in_list (map p_port_connection l))
+;
+
+let p_module_instantiation (Module_instantiation i l) =
+      p_identifier i <+> in_list (map p_module_instance l) <-> text ";"
+;
+
+let p_dimension (Dimension c1 c2) = in_braces (
+          p_constant_expression c1
+      <+> text ":"
+      <+> p_constant_expression c2)
+;
+
+let p_range (Range c1 c2) = in_braces (
+          p_constant_expression c1
+      <+> text ":"
+      <+> p_constant_expression c2)
+;
+
+let p_net_decl_assignment (NDA i e) =
+      p_identifier i <+> text "=" <+> p_expression e
+;
+
+let p_variable_port_identifier (VPI i (NONE)) = p_identifier i
+/\  p_variable_port_identifier (VPI i (SOME c)) =
+      p_identifier i <+> text "=" <+> p_constant_expression c
+;
+
+let p_delay_value (Delay_value_unum unum) = p_number unum
+/\  p_delay_value (Delay_value_real rnum) = p_number rnum
+/\  p_delay_value (Delay_value_id i) = p_identifier i
+;
+
+let p_variable_type (VT_dim i ds) =
+      p_identifier i <-> collect (map p_dimension ds)
+/\  p_variable_type (VT_const i c) =
+      p_identifier i <+> text "=" <+> p_constant_expression c
+;
+
+let p_output_variable_type (OVT_int) = text "integer"
+/\  p_output_variable_type (OVT_time) = text "time"
+;
+
+let p_net_type (NT_wire) = text "wire";
+
+let p_net_identifier (Net_id i ds) =
+      p_identifier i <-> collect (map p_dimension ds)
+;
+
+let p_net_identifiers is = in_list (map p_net_identifier is);
+let p_net_decls ds = in_list (map p_net_decl_assignment ds);
+
+let p_net_declaration (ND_scalar_id t s is) =
+          p_net_type t
+      <+> p_when s (text "signed")
+      <+> p_net_identifiers is
+      <-> text ";"
+/\  p_net_declaration (ND_scalar_decl t s ds) =
+          p_net_type t
+      <+> p_when s (text "signed")
+      <+> p_net_decls ds
+      <-> text ";"
+/\  p_net_declaration (ND_vector_id t v' s r is) =
+          p_net_type t
+      <+> p_opt (\v. text (v => "vectored" | "scalared")) v'
+      <+> p_when s (text "signed")
+      <+> p_range r
+      <+> p_net_identifiers is
+      <-> text ";"
+/\  p_net_declaration (ND_vector_decl t v' s r ds) =
+          p_net_type t
+      <+> p_opt (\v. text (v => "vectored" | "scalared")) v'
+      <+> p_when s (text "signed")
+      <+> p_range r
+      <+> p_net_decls ds
+      <-> text ";"
+;
+
+let p_reg_declaration (Reg_decl s r' is) =
+          text "reg"
+      <+> p_when s (text "signed")
+      <+> p_opt p_range r'
+      <+> in_list (map p_variable_type is)
+      <-> text ";"
+;
+
+let p_real_declaration (Real_decl is) =
+      text "real" <+> in_list (map p_variable_type is)
+;
+
+let p_integer_declaration (Int_decl is) =
+      text "integer" <+> in_list (map p_variable_type is)
+;
+
+let p_inout_declaration (Inout_decl t' s r' is) =
+          text "inout"
+      <+> p_opt p_net_type t'
+      <+> p_when s (text "signed")
+      <+> p_opt p_range r'
+      <+> in_list (map p_identifier is)
+;
+
+let p_input_declaration (Input_decl t' s r' is) =
+          text "input"
+      <+> p_opt p_net_type t'
+      <+> p_when s (text "signed")
+      <+> p_opt p_range r'
+      <+> in_list (map p_identifier is)    
+;
+
+let p_output_declaration (Output_decl_port t' s r' is) =
+          text "output"
+      <+> p_opt p_net_type t'
+      <+> p_when s (text "signed")
+      <+> p_opt p_range r'
+      <+> in_list (map p_identifier is)
+/\  p_output_declaration (Output_decl_reg s r' vs) =
+          text "output"
+      <+> text "reg"
+      <+> p_when s (text "signed")
+      <+> p_opt p_range r'
+      <+> in_list (map p_variable_port_identifier vs)
+/\  p_output_declaration (Output_decl_var t vs) =
+          p_output_variable_type t
+      <+> in_list (map p_variable_port_identifier vs)
+;
+
+let p_module_or_generate_item_declaration (MOGID_net d) = p_net_declaration d
+/\  p_module_or_generate_item_declaration (MOGID_reg d) = p_reg_declaration d
+;
+
+let p_module_or_generate_item (MOGI_decl d) =
+      p_module_or_generate_item_declaration d
+/\  p_module_or_generate_item (MOGI_cont d) = p_continuous_assign d
+/\  p_module_or_generate_item (MOGI_udp d) = p_udp_instantiation d
+/\  p_module_or_generate_item (MOGI_module d) = p_module_instantiation d
+/\  p_module_or_generate_item (MOGI_initial d) = p_initial_construct d
+/\  p_module_or_generate_item (MOGI_always d) = p_always_construct d
+;
+
+let p_non_port_module_item (NPM_Item i) = p_module_or_generate_item i;
+
+forward_declare{p_port_declaration::port_declaration->doc};
+
+let p_module_item (Module_Port d) = p_port_declaration d <-> text ";"
+/\  p_module_item (Module_Item i) = p_non_port_module_item i
+;
+
+let p_port_reference (Port_ref_id i (NONE)) = p_identifier i
+/\  p_port_reference (Port_ref_id i (SOME cr)) =
+      p_identifier i <-> in_braces (p_constant_range_expression cr)
+;
+
+let p_port_expression (Port_exp_one r) = p_port_reference r
+/\  p_port_expression (Port_exp_many rs) =
+      in_curly (in_list (map p_port_reference rs))
+;
+
+let p_port (Port_exp pe') = p_opt p_port_expression pe'
+/\  p_port (Port_ref i (NONE)) = text "." <-> p_identifier i <-> text "()"
+/\  p_port (Port_ref i (SOME pe)) =
+      text "." <-> p_identifier i <-> in_paren (p_port_expression pe)
+;
+
+let p_port_declaration (Port_decl_inout d) = p_inout_declaration d
+/\  p_port_declaration (Port_decl_in d) = p_input_declaration d
+/\  p_port_declaration (Port_decl_out d) = p_output_declaration d
+;
+
+let p_module_declaration (Module_declaration_one i ps ms) =
+      let header = text "module" <+> p_identifier i <+> text "(" in
+      let ports  = in_vert_list (map p_port ps) in
+      let middle = text ");" in
+      let body   = vcat (map p_module_item ms) in
+      let footer = text "endmodule" in
+      vcat [hangs header ports, middle, body, footer]
+/\  p_module_declaration (Module_declaration_many i (NONE) ms) =
+      let header = text "module" <+> p_identifier i <-> text ";" in
+      let body   = vcat (map p_non_port_module_item ms) in
+      let footer = text "endmodule" in
+      vcat [header, body, footer]
+/\  p_module_declaration (Module_declaration_many i (SOME ps) ms) =
+      let header = text "module" <+> p_identifier i <+> text "(" in
+      let ports  = in_vert_list (map p_port_declaration ps) in
+      let middle = text ");" in
+      let body   = vcat (map p_non_port_module_item ms) in
+      let footer = text "endmodule" in
+      vcat [hangs header ports, middle, body, footer]
+;
+
+let p_description (Desc_module m) = p_module_declaration m;
+
+let p_source_text (Source_text ds) = vcat (map p_description ds);
+
+// =============================================================================

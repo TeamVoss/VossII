@@ -72,7 +72,6 @@ typedef struct updates_rec {
 
 typedef struct search_rec *search_ptr;
 typedef struct search_rec {
-    int         mark;
     // Bookkeeping.
     unint       start;
     unint       row;
@@ -86,6 +85,14 @@ typedef struct search_rec {
     mat_ptr     needle;   // AxA
     mat_ptr     haystack; // BxB
 } search_rec;
+
+typedef struct search_mem_rec *search_mem_ptr;
+typedef struct search_mem_rec {
+    search_ptr     search;
+  //search_mem_ptr prev;
+    search_mem_ptr next;
+    unsigned char  flag:1;
+} search_mem_rec;
 
 // Short-hands -----------------------------------------------------------------
 
