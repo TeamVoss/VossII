@@ -1,10 +1,90 @@
-//==========================================================================
-//
-// Flattened CPU + (traditional) CACHE + RAM exammple
-//
-//==========================================================================
+// isomatching + search and replace.
 
 load "ste.fl";
+
+// =============================================================================
+// Four examples, all put into a larger haystack.
+
+let buf1 =
+    bit_input a.
+    bit_output out.
+    bit_internal mid.
+    CELL "draw_hier buf1" [
+      mid <- '~' a,
+      out <- '~' mid
+    ];
+
+let buf2 =
+    bit_input x.
+    bit_output y.
+    bit_internal mid.
+    CELL "draw_hier buf2" [
+      mid <- '~' x,
+      y <- '~' mid
+];
+
+let buf3 =
+    bit_input a.
+    bit_output out.
+    bit_internal oink.
+    CELL "draw_hier buf3" [
+      oink <- '~' a,
+      out <- '~' oink
+    ];
+
+letrec inv_rec n =
+    bit_input    a.
+    bit_output  out.
+    bit_internal mid.
+    CELL "draw_hier inv_rec" (
+      n = 1 => [ out <- '~' a ] |
+      [
+          mid <- '~' a,
+          inv_rec (n-1) mid out
+      ]);
+let buf4 =
+    bit_input    a.
+    bit_output  out.
+    CELL "buf4" [
+        inv_rec 2 a out
+    ];
+
+let bufs =
+    bit_input a b c d e f.
+    bit_output o1 o2 o3 o4 o5 o6 o7.
+    bit_internal mid.
+    CELL "draw_hier bufs" [
+      buf1 a o1,
+      buf2 b o2,
+      buf3 c o3,
+      inv_rec 2 d o4,
+      buf4 e o5,
+      mid <- '~' f,
+      o6 <- '~' mid,
+      o7 <- '~' mid
+    ];
+
+let buf1' = buf1 'i1 'o1;
+let buf2' = buf2 'i1 'o1;
+let buf3' = buf3 'i1 'o1;
+let buf4' = buf4 'i1 'o1;
+let bufs' = bufs 'i1 'i2 'i3 'i4 'i5 'i6 'o1 'o2 'o3 'o4 'o5 'o6 'o7;
+let matches = isomatch buf1' bufs';
+print (pretty_isomatch matches);
+
+// =============================================================================
+// ...
+
+let mux4' = verilog2pexlif "-Iisomatch/tests/mux" "mux4" ["mux4.v"] [];
+let mux2' = verilog2pexlif "-Iisomatch/tests/mux" "mux2" ["mux2.v"] [];
+g_pex fseq p_pex fseq ();
+
+//let wrap p = PINST "box" [] F [] [] [] (P_HIER [p]);
+let matches = isomatch mux2' mux4';
+//print (pretty_isomatch matches);
+
+// =============================================================================
+// ...
 
 let BYTE_SIZE           = 8;
 let ADDR_SIZE           = 20;
@@ -30,8 +110,6 @@ STRUCT "ext_cache_line" [
 	    ("aTag", "atag_field"),
 	    ("data", "cache_line")
 ];
-
-// ===================== Cache ============================
 
 let cache_line =
     bit_input		    clk.
@@ -99,11 +177,17 @@ let cache_mem =
 	cache_rec (LINES-1) clk reset we line din atag hit dout
 ];
 
-let p_CacheLine = cache_line 'clk 'reset 'we 'line 'din 'atag 'match 'dout 'sel 'r_dout 'r_match;
-let p_CacheMem = cache_mem 'clk 'reset 'we 'line 'din 'atag 'hit 'dout;
+let cache_line' = cache_line 'clk 'reset 'we 'line 'din 'atag 'match 'dout 'sel 'r_dout 'r_match;
+let cache_mem' = cache_mem 'clk 'reset 'we 'line 'din 'atag 'hit 'dout;
 
-//let ckt_Cache_Mem = pexlif2fsm p_CacheMem;
-//let vis_CacheMem = STE_debug ckt_Cache_Mem;
-//vis_CacheMem;
+let flat_cache_line' = flatten_pexlif cache_line';
+let flat_cache_mem' = flatten_pexlif cache_mem';
+let matches =
+      let a = flat_cache_line' then
+      let b = flat_cache_mem' then
+      isomatch a b
+;
+//print (pretty_isomatch matches);
 
 // =============================================================================
+// Fin.

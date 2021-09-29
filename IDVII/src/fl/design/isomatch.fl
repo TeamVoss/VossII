@@ -5,6 +5,7 @@
 
 load (DIR^"misc.fl");
 load (DIR^"util.fl");
+load (DIR^"pexlif.fl");
 
 //------------------------------------------------------------------------------
 // Construction of a subst. eq. between two pexlifs.
@@ -248,18 +249,30 @@ let
 // consists of a list of potential substitutions that preserves, at worst,
 // FP-equality with the needle.
 //  isomatch::pexlif->pexlif->((((string#string list) list) list) list)
-let isomatch p (PINST _ _ _ _ _ _ (P_HIER gs)) =
+let isomatch needle haystack =
+        pexlif_get_leaf haystack =>
+            eprintf "isomatch expects a 'boxed' haystack." |
+        // Run isomatch for each child in haystack.
+        val (PINST _ _ _ _ _ _ (P_HIER gs)) = haystack in
         // filter (NOT # empty # snd) $
         pam gs (\g.
             pair (pexlif_get_SHA g) $
             map (map setify) $
             map filter_some $
-            expand p g
+            expand needle g
         )
-/\  isomatch _ _ = error "isomatch expects a 'boxed' haystack."
 ;
 
 end_abstype isomatch;
 
 //------------------------------------------------------------------------------
+// ...
+
+// ...
+let isomatch_and_record needle haystack =
+        let sols = isomatch needle haystack in
+        undefined
+;
+
+//==============================================================================
 // Fin.
