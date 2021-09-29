@@ -10,6 +10,11 @@
 map <silent> @f :!fl --read_input_from_file $fl_inp -use_stdout >& $fl_out & <CR><CR>
 map <silent> @F :!fl --read_input_from_file $fl_inp -use_stdout >& $fl_out & <CR><CR>
 
+" --------- Starting fl in Cephalopode mode ---------
+" Cephalopode fl
+map <silent> @c :!fl -C -d --read_input_from_file $fl_inp -use_stdout >& $fl_out & <CR><CR>
+map <silent> @C :!fl -C -d --read_input_from_file $fl_inp -use_stdout >& $fl_out & <CR><CR>
+
 " --------- Killing fl ---------
 map <silent> @q :! echo 'quit;' >> $fl_inp <CR><CR>
 map <silent> @Q :! echo 'quit;' >> $fl_inp <CR><CR>

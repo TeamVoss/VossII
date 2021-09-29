@@ -7,6 +7,7 @@
 		{ "include": "#lettype" },
 		{ "include": "#lambda" },
 		{ "include": "#val" },
+		{ "include": "#new_type" },
 		{ "include": "#types" },
 		{ "include": "#simple" }
 	],
@@ -40,10 +41,15 @@
 			"endCaptures": {
 				"1": { "name" : "keyword.other.fl" }
 			},
-			"patterns": [{"include": "#inlettype"}, {"include": "#simple"}]
+			"patterns": [
+				{"include": "#keywords"},
+				{"include": "#comments"},
+				{"include": "#inlettype"},
+				{"include": "#simple"}
+			]
 		},
 		"inlettype": {
-			"begin": "(\\S+)",
+			"begin": "([^;\\ \\t\\n\\|]+)",
 			"end": "(\\|)|(\\bandlettype\\b)(.+?)(=)|(?=;)",
 			"name": "support.class.fl",
 			"beginCaptures": {
@@ -76,6 +82,23 @@
 			},
 			"name": "variable.parameter.fl",
 			"patterns": [{"include": "#types_param"}, {"include": "#simple"}]
+		},
+		"new_type": {
+			"begin": "\\b(new_type_abbrev)\\b(.*?)(=)",
+			"end": "(;)",
+			"beginCaptures": {
+				"1" : { "name": "keyword.control.fl" },
+				"2" : { "name": "support.class.fl" },
+				"3" : { "name": "keyword.control.fl" }
+			},
+			"endCaptures": {
+				"1": { "name": "keyword.other.fl" }
+			},
+			"name": "support.class.fl",
+			"patterns": [{
+				"match": "\\#|\\-\\>|\\(|\\)",
+				"name": "keyword.other.fl"
+			}]
 		},
 		"types": {
 			"match": "({)(.+?)(::)(.+?)(})",
@@ -114,7 +137,7 @@
 			"patterns": [
 				{
 					"name": "keyword.control.fl",
-					"match": "\\b(andlettype|add_open_overload|assuming|begin_abstype|binder|binder_with_accumulator|clear_fixities|clet|cletrec|defix|end_abstype|export_to_tcl|forward_declare|free_binder|if_then_else_binder|then_binder|else_binder|infix|infix_unary|infixr|then|in|install_print_function|let|letrec|lettype|list|new_type_abbrev|non_lazy|nonfix|open_overload|overload|postfix|prefix|print_fixities|ref|val)\\b"
+					"match": "\\b(andlettype|add_open_overload|assuming|begin_abstype|binder|binder_with_accumulator|sized_binder_with_accumulator|clear_fixities|clet|cletrec|defix|end_abstype|export_to_tcl|forward_declare|free_binder|if_then_else_binder|then_binder|else_binder|infix|infix_unary|infixr|then|in|install_print_function|let|letrec|lettype|list|new_type_abbrev|non_lazy|nonfix|open_overload|overload|postfix|prefix|print_fixities|ref|val)\\b"
 				},
 				{
 					"name": "keyword.control.fl",
@@ -148,6 +171,14 @@
 							"name": "markup.bold.fl"
 					},
 					{
+						"match": "(?:(?<=\\W)|^)0[xX][0-9A-Fa-f]+",
+						"name": "constant.numeric.fl"
+					},
+					{
+						"match": "(?:(?<=\\W)|^)0b[01]+",
+						"name": "constant.numeric.fl"
+					},
+					{
 							"match": "(?:(?<=\\W)|^)(\\d*\\.?\\d+)([Ee][+-]?\\d+)?",
 							"name": "constant.numeric.fl"
 					},
@@ -155,6 +186,7 @@
 							"match": "(?:(?<=\\W)|^)\\d+(\\.(\\d*)?)",
 							"name": "constant.numeric.fl"
 					}
+
 			]
 		},
 		"functions": {

@@ -33,6 +33,7 @@ bool	    hide_window = FALSE;
 bool	    use_stdin = FALSE;
 bool	    use_stdout = FALSE;
 bool        Interrupt_asap = FALSE;
+bool	    cephalopode_mode = FALSE;
 #if DBG_TRACE_AND_SAVE
 int	    debug_id = -1;
 int	    debug_start_comparing = 0;
@@ -61,6 +62,7 @@ bool	do_parse(bool flush);
 bool	perform_fl_command(string txt);
 void	Start_stdin_parsing();
 
+/* ===================== Local variables defined ===================== */
 #define TCL_CMD_BUF_SZ  16384
 static char             buf[TCL_CMD_BUF_SZ];
 static char             path_buf[PATH_MAX+1];
@@ -72,6 +74,9 @@ static int 		input_file_for_cmds_pid = -1;
 static string 		output_file_for_results = NULL;
 static string 		v_order_file = NULL;
 static string	        new_default_dir = NULL;
+static buffer		tcl_eval_done_buf;
+static buffer		tcl_eval_result_buf;
+static string		s_empty_string;
 
 /* ===================== Local functions defined ===================== */
 static void	busy(bool busy);
@@ -230,6 +235,12 @@ fl_main(int argc, char *argv[])
             use_stdin = TRUE;
             argc--, argv++;
         } else
+        if( (strcmp(argv[1], "-C") == 0) ||
+	    (strcmp(argv[1], "--cephalopode") == 0) )
+	{
+            cephalopode_mode = TRUE;
+            argc--, argv++;
+        } else
         if( (strcmp(argv[1], "-use_stdout") == 0) ||
 	    (strcmp(argv[1], "--use_stdout") == 0) )
 	{
@@ -260,12 +271,6 @@ fl_main(int argc, char *argv[])
             v_order_file = argv[2];
             argc -= 2; argv += 2;
         } else
-#if 0
-        if( strcmp(argv[1], "-c") == 0 ) {
-            compile_to_C_flag = TRUE;
-            argc--, argv++;
-        } else
-#endif
         if( strcmp(argv[1], "-f") == 0 ) {
             start_file = argv[2];
             argc -= 2; argv += 2;
@@ -289,6 +294,9 @@ fl_main(int argc, char *argv[])
 	     "-r takes an integer to initialize the random number generator\n");
     srandom(rand_init);
     Init();
+    new_buf(&tcl_eval_done_buf, 10, sizeof(int));
+    new_buf(&tcl_eval_result_buf, 10, sizeof(string));
+    s_empty_string = wastrsave(&strings, "");
 
     fl_args = argv+1;
 
@@ -491,20 +499,17 @@ fl_main(int argc, char *argv[])
                 case 1: {
                     // Callback to execute (coming from callback_from_tcl_fp)
                     string s = fgets(buf,TCL_CMD_BUF_SZ-1,callback_from_tcl_fp);
-// fprintf(stderr, "<<<<< CGot |%s|\n", buf);
                     buf[strlen(s)-1] = 0;
                     string res;
 		    string start;
 		    int rid = (int) strtol(buf, &start, 10);
-// fprintf(stderr, "2:rid before %d\n", rid);
                     bool ok = Tcl_callback_eval(start, &res);
-// fprintf(stderr, "2:rid after %d\n", rid);
                     if( ok ) {
-// fprintf(stderr, "\n$$$$$$$$$$ SEND $$$ 1%s\n", protect(res));
-                        fprintf(callback_from_tcl_fp_res, "%d 1%s\n", rid, protect(res));
+                        fprintf(callback_from_tcl_fp_res,
+				"%d 1%s\n", rid, protect(res));
                     } else {
-// fprintf(stderr, "\n$$$$$$$ SEND $$$$$$ 0%s\n", protect(res));
-                        fprintf(callback_from_tcl_fp_res, "%d 0%s\n", rid, protect(res));
+                        fprintf(callback_from_tcl_fp_res,
+				"%d 0%s\n", rid, protect(res));
                     }
                     fflush(callback_from_tcl_fp_res);
                 }
@@ -757,6 +762,7 @@ setup_sockets()
     listen(listenfd, 5);
 
     int connfd0 = accept(listenfd, (struct sockaddr*)NULL, NULL);
+    fcntl(connfd0, F_SETFL, O_NONBLOCK);
     sync_to_tcl_fp = fdopen(connfd0, "r+");
     setvbuf(sync_to_tcl_fp, NULL, _IOLBF, 1000);
 
@@ -769,6 +775,7 @@ setup_sockets()
     setvbuf(cmd_from_tcl_fp, NULL, _IOLBF, 1000);
 
     int connfd3 = accept(listenfd, (struct sockaddr*)NULL, NULL);
+    fcntl(connfd3, F_SETFL, O_NONBLOCK);
     callback_from_tcl_fp = fdopen(connfd3, "r+");
     setvbuf(callback_from_tcl_fp, NULL, _IOLBF, 1000);
 
@@ -868,49 +875,51 @@ Info_to_tcl(string cmd)
 bool
 Send_to_tcl(string cmd, string *resp)
 {
-// fprintf(stderr, "TRSEND |%s|\n", cmd);
-    fprintf(sync_to_tcl_fp, "%s\n", protect(cmd));
+    int done = -1;
+    int tcl_eval_depth = COUNT_BUF(&tcl_eval_done_buf);
+    push_buf(&tcl_eval_done_buf, &done);
+    push_buf(&tcl_eval_result_buf, &s_empty_string);
+    fprintf(sync_to_tcl_fp, "%d %s\n", tcl_eval_depth, protect(cmd));
     fflush(sync_to_tcl_fp);
     // Now enter an event loop processing (potential) fl callbacks while
     // waiting for the return result
     while (1) {
-        struct pollfd fds[2];
-        fds[0].fd = fileno(sync_to_tcl_fp);
-        fds[0].events = POLLIN;
-        fds[0].revents = 0;
-        fds[1].fd = fileno(callback_from_tcl_fp);
-        fds[1].events = POLLIN;
-        fds[1].revents = 0;
-        while( poll(fds, 2, -1) < 1 ) {
-	    CHECK_FOR_INTERRUPT;
-	}
-        if( fds[0].revents == POLLIN ) {
-            /* Result available */
-            string s = fgets(buf, TCL_CMD_BUF_SZ-1, sync_to_tcl_fp);
-            bool ok = (*s == '0')? TRUE : FALSE;
+	// Have we (already) gotten the result
+	int ok = *( (int *) M_LOCATE_BUF(&tcl_eval_done_buf, tcl_eval_depth));
+	if( ok != -1 ) {
             if( resp != NULL ) {
-                *resp = unprotect(buf+1);
-// fprintf(stderr, "Result1 --> %s\n", *resp);
-            } else {
-// fprintf(stderr, "Result0 --> %s\n", buf);
-	    }
+                *resp = *((string *)
+			    M_LOCATE_BUF(&tcl_eval_result_buf, tcl_eval_depth));
+            }
+	    pop_buf(&tcl_eval_done_buf, NULL);
+	    pop_buf(&tcl_eval_result_buf, NULL);
             return ok;
-        } else 
-        if( fds[1].revents == POLLIN ) {
-            // Callback to execute (coming from callback_from_tcl_fp)
-            string s = fgets(buf, TCL_CMD_BUF_SZ-1, callback_from_tcl_fp);
+        }
+	// Check for results (might be an earlier tcl_eval's result!)
+	string s;
+	if( (s = fgets(buf, TCL_CMD_BUF_SZ-1, sync_to_tcl_fp)) != NULL ) {
+            bool ok = (*s == '0')? TRUE : FALSE;
+	    string p = buf+1;
+	    int rid = 0;
+	    while( *p && isdigit(*p) ) {
+		rid = 10*rid + *p - '0';
+		p++;
+	    }
+	    p++;
+	    ASSERT(rid <= tcl_eval_depth);
+	    store_buf(&tcl_eval_done_buf, rid, &ok);
+	    string res = unprotect(p);
+	    store_buf(&tcl_eval_result_buf, rid, &res);
+	}
+	if( (s = fgets(buf, TCL_CMD_BUF_SZ-1, callback_from_tcl_fp)) != NULL ) {
             buf[strlen(s)-1] = 0;
             string res;
 	    string start;
 	    int rid = (int) strtol(buf, &start, 10);
-// fprintf(stderr, "++++ Callback rid:%d cmd:|%s|\n", rid, start);
 	    bool ok = Tcl_callback_eval(start, &res);
-// fprintf(stderr, "  --> ok=%s\n", (ok?"yes":"no"));
             if( ok ) {
-// fprintf(stderr, "\n!!!! Answer %d 1 |%s|\n", rid, res);
                 fprintf(callback_from_tcl_fp_res,"%d 1%s\n", rid, protect(res));
             } else {
-// fprintf(stderr, "\n!!!! Answer %d 0 |%s|\n", rid, res);
                 fprintf(callback_from_tcl_fp_res,"%d 0%s\n", rid, protect(res));
             }
             fflush(callback_from_tcl_fp_res);
@@ -1060,10 +1069,10 @@ print_help()
  P("    -I dir			    Search for fl libraries in dir\n");
  P("    -hide-window		    hide the main window while still preserving X functionality\n");
  P("    -noX			    do not use X windows (text only)\n");
+ P("    --noX			    do not use X windows (text only)\n");
  P("    -use_stdin		    read inputs also from stdin\n");
  P("    -use_stdout		    write outputs also to stdout\n");
  P("    --hide-window		    hide the main window while still preserving X functionality\n");
- P("    --noX			    do not use X windows (text only)\n");
  P("    --use_stdin		    read inputs also from stdin\n");
  P("    --use_stdout		    write outputs also to stdout\n");
  P("    --read_input_from_file file read inputs from file\n");
@@ -1072,5 +1081,8 @@ print_help()
  P("    -v file			    save dynamic variable order in file\n");
  P("    -h			    print out this message and quit\n");
  P("    --help			    print out this message and quit\n");
+ P("    -d			    turn off function tracing information\n");
+ P("    -C			    Cephalopode mode\n");
+ P("    -cephalopode		    Cephalopode mode\n");
 
 }

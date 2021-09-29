@@ -737,6 +737,8 @@ typedef struct ext_obj_rec {
 
 
 typedef struct result_rec {
+        g_ptr		expr_init;
+        g_ptr		expr_comb;
         g_ptr		expr;
         impl_arg_ptr	implicit_args;
         g_ptr		super_comb;

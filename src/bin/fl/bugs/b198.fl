@@ -1,0 +1,24 @@
+load "ste.fl";
+
+let test =
+    bit_input i.
+    bit_output o.
+    CELL "test" [
+	o <- '~' i
+];
+
+let p = test 'i 'o;
+let ckt = pexlif2fsm p;
+ckt;
+
+VARS "a b c";
+
+let ant = [
+	    (a, "i", T, 0, 1),
+	    (NOT a, "i", F, 0, 1)
+];
+
+let ste = STE "-e" ckt [] ant [] [];
+ste;
+
+get_trace_val ste "o" 0;

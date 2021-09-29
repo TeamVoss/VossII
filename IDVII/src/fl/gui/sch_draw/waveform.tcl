@@ -23,6 +23,15 @@ static unsigned char zoom_in_bits[] = {
 
 proc wv:view {wins args} { foreach w $wins { eval $w $args } }
 
+proc gui:update_time {root change} {
+    set cur_t $::vstatus(time_shadow,$root)
+    if { $change != 0 } {
+	incr cur_t $change
+	set ::vstatus(time_shadow,$root) $cur_t
+    }
+    set ::vstatus(time,$root) $cur_t
+}
+
 proc wv:create_waveform_viewer {w maxtime} {
     set f $w.f
     catch {destroy $f}
@@ -86,17 +95,19 @@ proc wv:create_waveform_viewer {w maxtime} {
 	    pack $cbc -side left -padx 50
 
 	    ttk::button $mb -text "-" \
-		    -command "incr ::vstatus(time,[w2root $w]) -1" -width 2
+		-command "gui:update_time $root -1" -width 2
 	    pack $mb -side left
 	    ttk::entry $et -width 5 \
 		-background black -foreground red -justify center \
-		-textvariable ::vstatus(time,$root) \
+		-textvariable ::vstatus(time_shadow,$root) \
 		-validate all \
 		-validatecommand {string is integer %P}
 	    pack $et -side left
+	    bind $et <KeyPress-Return> "gui:update_time $root 0"
 	    ttk::button $pb -text "+" \
-		-command "incr ::vstatus(time,[w2root $w]) +1" -width 2
+		-command "gui:update_time $root +1" -width 2
 	    pack $pb -side left
+
 
     # Actual waveform viewer windows
 	ttk::panedwindow $pw -orient horizontal 
@@ -159,13 +170,10 @@ proc wv:create_waveform_viewer {w maxtime} {
 	    pack $ww -side top -fill both -expand yes
 	    bind $ww <Enter> { wv:enter_wv_window %W %x %y %X %Y }
 	    bind $ww <Leave> { wv:leave_wv_window %W %x %y %X %Y }
-	    bind $ww <Shift-KeyPress-Right>  \
-		    { incr ::vstatus(time,[w2root %W]) +2 }
-	    bind $ww <Shift-KeyPress-Left>   \
-		    { incr ::vstatus(time,[w2root %W]) -2 }
-	    bind $ww <KeyPress-Right>  { incr ::vstatus(time,[w2root %W]) +1 }
-	    bind $ww <KeyPress-Left>   { incr ::vstatus(time,[w2root %W]) -1 }
-
+	    bind $ww <Shift-KeyPress-Right>  { gui:update_time [w2root %W] +2 }
+	    bind $ww <Shift-KeyPress-Left>   { gui:update_time [w2root %W] -2 }
+	    bind $ww <KeyPress-Right>	     { gui:update_time [w2root %W] +1 }
+	    bind $ww <KeyPress-Left>	     { gui:update_time [w2root %W] -1 }
 
 	$pw add $nf
 	$pw add $wf
@@ -186,7 +194,7 @@ proc wv:create_waveform_viewer {w maxtime} {
     wv:set_time_pointer $w {}
 
     trace add variable ::vstatus(time,$root) write \
-	    "after idle [list wv:set_time_pointer $w]"
+        "after idle [list wv:set_time_pointer $w]" 
 
     return $f
 }
@@ -320,8 +328,10 @@ proc wv:set_time_pointer {w args} {
     set wt $wf.time_scale
     set ww $wf.waveforms
 
-    set t $::vstatus(time,[w2root $w])
+    set root [w2root $w]
+    set t $::vstatus(time,$root)
     if { $t == "" } { set t 0 }
+    set ::vstatus(time_shadow,$root) $t
     set x1 [expr $t * $::wv_xscale($f)]
     set x2 [expr $x1 + $::wv_xscale($f)]
     set ytop 0

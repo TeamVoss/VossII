@@ -238,20 +238,6 @@ proc make_all_active {} {
 }
 
 
-proc old_i_am_free {} {
-    set ::busy_level [expr $::busy_level-1]
-    if [expr $::busy_level < 0] { 
-	set ::busy_level 0
-    }
-    if { $::busy_level == 0 } {
-	foreach w [wm stackorder .] {
-	    mk_busy $w 0
-	}
-	update
-    }
-}
-
-
 proc draw_bdd_profile {vws} {
     set w [format {.bddw_%d} $::util_window_cnt]
     incr ::util_window_cnt
@@ -297,32 +283,37 @@ proc draw_bdd_profile {vws} {
     $w.c configure -scrollregion [$w.c bbox all]
 }
 
-proc display_dot {dot_pgm} {
-    incr ::dot_displays
-    set w .dot$::dot_displays
-    catch {destroy $w}
-    toplevel $w
-    set c $w.c
-    scrollbar $w.yscroll -command "$c yview"
-    scrollbar $w.xscroll -orient horizontal -command "$c xview"
-    canvas $c -background white \
-            -yscrollcommand "$w.yscroll set" \
-            -xscrollcommand "$w.xscroll set"
-    pack $w.yscroll -side right -fill y
-    pack $w.xscroll -side bottom -fill x
-    pack $c -side top -fill both -expand yes
+proc display_dot {dot_pgm {w ""} {close_fun ""}} {
+    if { $w == "" } {
+	incr ::dot_displays
+	set w .dot$::dot_displays
+	catch {destroy $w}
+	toplevel $w
+	set c $w.c
+	scrollbar $w.yscroll -command "$c yview"
+	scrollbar $w.xscroll -orient horizontal -command "$c xview"
+	canvas $c -background white \
+		-yscrollcommand "$w.yscroll set" \
+		-xscrollcommand "$w.xscroll set"
+	pack $w.yscroll -side right -fill y
+	pack $w.xscroll -side bottom -fill x
+	pack $c -side top -fill both -expand yes
 
-    bind $c <2> "%W scan mark %x %y"
-    bind $c <B2-Motion> "%W scan dragto %x %y"
+	bind $c <2> "%W scan mark %x %y"
+	bind $c <B2-Motion> "%W scan dragto %x %y"
 
-    # Zoom bindings
-    bind $c <ButtonPress-3> "zoom_lock %W %x %y"
-    bind $c <B3-Motion> "zoom_move %W %x %y"
-    bind $c <ButtonRelease-3> "zoom_execute %W %x %y %X %Y {}"
+	# Zoom bindings
+	bind $c <ButtonPress-3> "zoom_lock %W %x %y"
+	bind $c <B3-Motion> "zoom_move %W %x %y"
+	bind $c <ButtonRelease-3> "zoom_execute %W %x %y %X %Y {}"
 
-    # Mouse-wheel bindings for zooming in/out
-    bind $c <Button-4> "zoom_out $c 1.1 %x %y"
-    bind $c <Button-5> "zoom_out $c [expr {1.0/1.1}] %x %y"
+	# Mouse-wheel bindings for zooming in/out
+	bind $c <Button-4> "zoom_out $c 1.1 %x %y"
+	bind $c <Button-5> "zoom_out $c [expr {1.0/1.1}] %x %y"
+    } else {
+	set c $w.c
+	$c delete all
+    }
 
     set ::cur_zoom_factor($w) 100.0
     set ::cur_zoom_factor($c) 100.0
@@ -354,11 +345,27 @@ proc display_dot {dot_pgm} {
     update
     $w.c configure -scrollregion [$w.c bbox all]
     bind $w.c <KeyPress-q> "destroy $w"
+    if { $close_fun != "" } {
+	bind $c <Destroy> [list $close_fun $w]
+    }
     focus $w.c
+    return $w
 }
 
 
 set ::gui_io(wcnt) 0
+
+proc gui_io:restore_defaults {w texts} {
+    set tcnt 0
+    foreach txt $texts {
+	val {label default} $txt
+	set tf "$w.tf$tcnt"
+	incr tcnt
+	set te $tf.e
+	$te delete 0 end
+	$te insert 0 $default
+    }
+}
 
 proc gui_io:get_data {title texts} {
     incr ::gui_io(wcnt)
@@ -385,6 +392,7 @@ proc gui_io:get_data {title texts} {
 	label $tl -text $label -width $sz -anchor w
 	set te $tf.e
 	entry $te 
+	bind $te <KeyPress-Return> [list :gui:return 1 $w $tcnt]
 	$te insert 0 $default
 	pack $tl -side left
 	pack $te -side left -fill x
@@ -394,15 +402,22 @@ proc gui_io:get_data {title texts} {
     pack $w.bf -side bottom -fill x
     label $w.bf.sp1
     button $w.bf.cancel -text Cancel -command ":gui:return 0 $w $tcnt"
+
     label $w.bf.sp2
-    button $w.bf.ok -text Ok -command ":gui:return 1 $w $tcnt"
+    button $w.bf.restore -text Defaults \
+	    -command "gui_io:restore_defaults $w [list $texts]"
+
     label $w.bf.sp3
+    button $w.bf.ok -text Ok -command ":gui:return 1 $w $tcnt"
+
+    label $w.bf.sp4
     pack $w.bf.sp1 -side left -fill x -expand 1
     pack $w.bf.cancel -side left -padx 10
     pack $w.bf.sp2 -side left -fill x -expand 1
-    pack $w.bf.ok -side left -padx 10
+    pack $w.bf.restore -side left -padx 10
     pack $w.bf.sp3 -side left -fill x -expand 1
-    set ::busy_level 0
+    pack $w.bf.ok -side left -padx 10
+    pack $w.bf.sp4 -side left -fill x -expand 1
     i_am_free;
     foreach ww [winfo children .] {
 	catch {tk busy forget $ww}

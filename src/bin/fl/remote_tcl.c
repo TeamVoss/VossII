@@ -106,7 +106,6 @@ get_callback_fun(string cmd) {
 bool
 Tcl_callback_eval(string cmd, string *resp)
 {
-// fprintf(stderr, "Tcl_callback_eval: |%s|\n", cmd);
     ASSERT( tcl_initialized == TCL_MAGIC_NUMBER);
     while( *cmd == ' ' ) cmd++;
     int fun_idx = get_callback_fun(cmd);
@@ -120,10 +119,8 @@ Tcl_callback_eval(string cmd, string *resp)
     // Find callback function
     tcp = (tcl_callback_ptr) M_LOCATE_BUF(&tcl_callback_buf,fun_idx);
     typeExp_ptr type = tcp->type;
-// fprintf(stderr, "Tcl_callback_eval: %s ", tcp->name); PT(type);
     g_ptr redex = tcp->fun;
     SET_REFCNT(redex, MAX_REF_CNT);
-// fprintf(stderr, "Fun: "); PRl(redex,10);
     string p = cmd; 
     while( *p && *p != ' ') p++;
     if( *p ) p++;
@@ -146,7 +143,6 @@ Tcl_callback_eval(string cmd, string *resp)
         if( *p ) p++;
         typeExp_ptr arg_type = type->typelist->type;
         arg_cnt++;
-// fprintf(stderr, "\n    arg %d:|%s| :: ", arg_cnt, arg_s); PT(arg_type);
         g_ptr arg = NULL;
         if( !tcl_to_g_ptr(arg_s, arg_type, &arg) ) {
             Fail_pr("Argument %d is of wrong type in tcl function %s",
@@ -155,14 +151,12 @@ Tcl_callback_eval(string cmd, string *resp)
 	    free_temp_str_mgr(tstrings);
             return FALSE;
         }
-// fprintf(stderr, "    ---> "); PRl(arg,10);
         redex = Make_APPL_ND(redex, arg);
 	type = Get_Real_Type(type->typelist->next->type);
     }
     free_temp_str_mgr(tstrings);
 
     // Then evaluate the function
-// fprintf(stderr, "Evaluate: "); PRl(redex,10);
     redex = Eval(redex);
     if( is_fail(redex) ) {
         *resp = tprintf("%s\nIn fl callback function %s\n", FailBuf, tcp->name);

@@ -224,7 +224,9 @@ let base_is nds vtlist =
 
 let s_is vec vtlist = base_is [vec] vtlist;
 
-let hw_is v vtlist = base_is (base_get_lhs_vars (hw_destr v)) vtlist;
+let hw_is v vtlist =
+    base_is (md_expand_vectors (base_get_lhs_vars (hw_destr v))) vtlist
+;
 
 overload is s_is hw_is;
 infix 2 is;

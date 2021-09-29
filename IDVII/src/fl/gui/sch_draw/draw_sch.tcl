@@ -95,9 +95,8 @@ proc sch:show_values_on_canvas {c} {
 proc sc:inform_time_change {w args} {
     set root [w2root $w]
     set t $::vstatus(time,$root)
-    if { $t == "" } {
-	set t 0
-    }
+    if { $t == "" } { set t 0 }
+    set ::vstatus(time_shadow,$root) $t
     fl_set_global_time $root $t
     foreach c [fl_get_active_sch_tab_windows $root] {
 	sch:show_values_on_canvas $c
@@ -290,8 +289,9 @@ proc cm:create_commands {w p} {
             -command [list cmd:save_cmds $f.txt]
         pack $p.operations.b -side top
     pack $p.operations -side top -fill x
-    cmd:update_cmds $w $f.txt
-    bind $w.nb <<NotebookTabChanged>> +[list cmd:update_cmds $w $f.txt]
+    cmd:update_cmds $w
+    update
+    bind $w.nb <<NotebookTabChanged>> +[list cmd:update_cmds $w]
 }
 
 proc cmd:save_cmds {txt} {
@@ -311,8 +311,10 @@ proc cmd:save_cmds {txt} {
     }
 }
 
-proc cmd:update_cmds {w txt} {
+proc cmd:update_cmds {w} {
+    set txt $::cmd_txt($w)
     $txt delete 1.0 end
+    update
     foreach line [fl_get_sch_commands $w] {
 	$txt insert end $line
 	$txt insert end "\n"
@@ -478,14 +480,14 @@ proc sch:create_time_point {c} {
         frame $tt -relief flat -height 10
             ttk::entry $et -width 5 \
                 -background black -foreground red -justify center \
-		-textvariable ::vstatus(time,$root) \
+		-textvariable ::vstatus(time_shadow,$root) \
 		-validate all \
 		-validatecommand {string is integer %P}
-
+	    bind $et <KeyPress-Return> "gui:update_time $root 0"
             ttk::button $pb -text "+" \
-		-command "incr ::vstatus(time,[w2root $c]) +1" -width 2
+		-command "gui:update_time $root +1" -width 2
             ttk::button $mb -text "-" \
-		-command "incr ::vstatus(time,[w2root $c]) -1" -width 2
+		-command "gui:update_time $root -1" -width 2
         pack $cbc -side left -pady 0 -padx 0
         pack $cb -side left -pady 0 -padx 0
         pack $tt -side left -pady 0 -padx 0 -expand yes
@@ -693,10 +695,10 @@ proc create_circuit_canvas {nb mw} {
     # Ctrl-F to move focus to search box
     bind $c <Control-f> "sch:start_search $w.menu"
 
-    bind $c <Shift-KeyPress-Right>  { incr ::vstatus(time,[w2root %W]) +2 }
-    bind $c <Shift-KeyPress-Left>  { incr ::vstatus(time,[w2root %W]) -2 }
-    bind $c <KeyPress-Right>  { incr ::vstatus(time,[w2root %W]) +1 }
-    bind $c <KeyPress-Left>  { incr ::vstatus(time,[w2root %W]) -1 }
+    bind $c <Shift-KeyPress-Right>  { gui:update_time [w2root %W] +2 }
+    bind $c <Shift-KeyPress-Left>  { gui:update_time [w2root %W] -2 }
+    bind $c <KeyPress-Right>  { gui:update_time [w2root %W] +1 }
+    bind $c <KeyPress-Left>  { gui:update_time [w2root %W] -1 }
 
     $c bind all <Enter> {
 	set tags [%W gettags current]
@@ -3233,7 +3235,7 @@ proc draw_fub {module inst inames onames c tag x y} {
     set rwid [max $twid [expr $iwid + $owid + 5*[letter_sz $c]]]
     set xr [expr $x-5*[min_sep $c]]
     set rht [expr round(([max $inps $outs]+1)*[rect_ht $c])] 
-    set erht [expr $rht+4*[min_txt_sep $c]] 
+    set erht [expr $rht+3*[rect_ht $c]] 
     #
     # Draw box with module name inside and instance name above
     #
@@ -4333,7 +4335,6 @@ proc fsm:display_fsm {sch_c aname fsm_name dot_pgm states edges inps} {
     set root [w2root $sch_c]
     fl_add_fsm $root $c [fl_tag2vec $sch_c $aname]
     bind $c <Destroy> [list fl_remove_fsm $root $c]
-
     focus $w.c
 }
 

@@ -54,8 +54,8 @@ bool           vec_equ(pointer k1, pointer k2);
 typedef enum {TXT, INDEX} vec_type;
 
 typedef struct range_rec {
-	int	           upper;
-	int	           lower;
+	int	       upper;
+	int	       lower;
 	range_ptr      next;
 } range_rec;
 

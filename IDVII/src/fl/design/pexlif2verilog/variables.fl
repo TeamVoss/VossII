@@ -1,0 +1,118 @@
+// This file contains functions for finding
+// and replacing variables in VerilogExpressions
+
+cload (DIR^"ast.fl");
+cload (DIR^"utils.fl");
+
+// ==============================================
+// § Finding variables
+// ==============================================
+
+// Return the variable of a VerilogSimpleLHS
+let vslhs_get_var (VL_Slice _ v) = v
+ /\ vslhs_get_var (VL_Var v) = v;
+
+// Return the (non unique) list of variables in a VerilogLHS
+let vlhs_find_vars (V_LHS parts) = map vslhs_get_var parts;
+
+// Return the (non unique) list of variables in a VerilogExpression
+letrec vexpr_find_vars (VE_Var var) = [var]
+	/\ vexpr_find_vars (VE_Constant const) = []
+	/\ vexpr_find_vars (VE_Binop left op right) =
+		(vexpr_find_vars left) @ (vexpr_find_vars right)
+	/\ vexpr_find_vars (VE_IfThenElse cond if_true if_false) =
+		(vexpr_find_vars cond) @ (vexpr_find_vars if_true) @ (vexpr_find_vars if_false)
+	/\ vexpr_find_vars (VE_Not operand) = vexpr_find_vars operand
+	/\ vexpr_find_vars (VE_Concat vexprs) =
+		flatmap vexpr_find_vars vexprs
+	/\ vexpr_find_vars (VE_Replicate nb expr) = vexpr_find_vars expr
+	/\ vexpr_find_vars (VE_Slice br var) = [var]
+	/\ vexpr_find_vars (VE_OffsetSlice addr _ var) = var:(vexpr_find_vars addr);
+
+// Return the (non-unique) list of variables in a VerilogStatement
+let vs_find_vars (VS_Assign lhs rhs) =
+	(vlhs_find_vars lhs) @ (vexpr_find_vars rhs)
+ /\ vs_find_vars (VS_ModuleInstanciation _ _ _ ins outs) =
+	(flatmap (vexpr_find_vars # snd) ins) @ (flatmap (vlhs_find_vars # snd) outs)
+ /\ vs_find_vars (VS_Write_RAM var addr memory _ data) =
+	var : ((vexpr_find_vars addr) @ (vexpr_find_vars memory) @ (vexpr_find_vars data));
+
+// Return the (non-unique) list of variables in a VerilogStatement list
+let vs_list_find_vars = flatmap vs_find_vars;
+
+
+// ==============================================
+// § Replacing variables
+// ==============================================
+
+// Replace the old variable with new in a VerilogSimpleLHS
+let vslhs_replace_var old new (VL_Slice br v) =
+	VL_Slice br ((v == old) => new | v)
+ /\ vslhs_replace_var old new (VL_Var v) = VL_Var ((v == old) => new | v);
+
+// Replace the old variable with new in a VerilogLHS
+let vlhs_replace_var old new (V_LHS parts) =
+	V_LHS (map (vslhs_replace_var old new) parts);
+
+// Replace the old variable with the new one in a VerilogExpression
+letrec vexpr_replace_var old new (VE_Var var) = VE_Var (var == old => new | var)
+	/\ vexpr_replace_var old new (VE_Constant const) = (VE_Constant const)
+	/\ vexpr_replace_var old new (VE_Binop left op right) =
+		VE_Binop (vexpr_replace_var old new left) op (vexpr_replace_var old new right)
+	/\ vexpr_replace_var old new (VE_IfThenElse cond if_true if_false) =
+		VE_IfThenElse (vexpr_replace_var old new cond)
+		(vexpr_replace_var old new if_true) (vexpr_replace_var old new if_false)
+	/\ vexpr_replace_var old new (VE_Not operand) = VE_Not (vexpr_replace_var old new operand)
+	/\ vexpr_replace_var old new (VE_Concat vexprs) =
+		VE_Concat (map (vexpr_replace_var old new) vexprs)
+	/\ vexpr_replace_var old new (VE_Replicate nb expr) =
+		VE_Replicate nb (vexpr_replace_var old new expr)
+	/\ vexpr_replace_var old new (VE_Slice br var) =
+		VE_Slice br (var == old => new | var)
+	/\ vexpr_replace_var old new (VE_OffsetSlice addr offset var) =
+		VE_OffsetSlice (vexpr_replace_var old new addr) offset (var == old => new | var);
+
+// Applies func on the second argument of a tuple
+let apply_on_snd func (port,expr) = (port, func expr);
+
+// Replace the old variable with the new one in a VerilogStatement
+let vs_replace_var old new (VS_Assign lhs rhs) =
+	VS_Assign (vlhs_replace_var old new lhs) (vexpr_replace_var old new rhs)
+ /\ vs_replace_var old new (VS_ModuleInstanciation name params instance ins outs) =
+	VS_ModuleInstanciation name params instance
+	(map (apply_on_snd (vexpr_replace_var old new)) ins)
+	(map (apply_on_snd (vlhs_replace_var old new)) outs)
+ /\ vs_replace_var old new (VS_Write_RAM var addr memory offset data) =
+	VS_Write_RAM (var == old => var | new)
+		(vexpr_replace_var old new addr)
+		(vexpr_replace_var old new memory)
+		offset
+		(vexpr_replace_var old new data);
+
+// Replace the old variable with the new one in a VerilogStatement list
+let vs_list_replace_var old new = map (vs_replace_var old new);
+
+// We remove a = b if a is not I/O (replace a by b)
+// or if b is not an IO (replace b by a)
+let simplification ios (VS_Assign (V_LHS [VL_Var left]) (VE_Var right)) =
+	(mem left ios)
+		=> (mem right ios => NONE | SOME (right, left))
+		| SOME (left, right)
+ /\ simplification ios _ = NONE;
+
+// Removes redundant variables from statements
+// AKA if a statement is simply "assign a = b;"
+// and a or b are not ios, we can remove it and replace a by b (or vice-versa)
+let remove_redundant ios statements =
+	(SIMPLE_VAR_INLINING) =>
+		letrec runner passed ([]) = passed
+			/\ runner passed (current:next) =
+				let s = simplification ios current in
+				has_value s
+					=>
+						val (old, new) = get_value s in
+						runner (vs_list_replace_var old new passed) (vs_list_replace_var old new next)
+					| runner (current:passed) next
+		// Reversing is not necessary but keeps the order consistent
+		in rev (runner [] statements)
+	| statements;

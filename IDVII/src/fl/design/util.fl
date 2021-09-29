@@ -13,20 +13,58 @@ let is_user_given s =
     NOT (str_is_substr "TmP_" s)
 ;
 
-let pr_indices indices =
-    letrec merge msb cur (idx:rem) =
-	idx = cur-1 => merge msb idx rem |
-	msb > cur => (sprintf "%d:%d" msb cur):(merge idx idx rem) |
-	(int2str msb):(merge idx idx rem)
-     /\    merge msb cur [] =
-	msb > cur => [(sprintf "%d:%d" msb cur)] | [(int2str msb)]
-    in
-    let i0 = hd indices then
-    let ranges = merge i0 i0 (tl indices) then
-    list2str T "[" "," "]" id ranges
+// A type to represent continous bit ranges
+// and individual index bits
+lettype bit_range = BR_SINGLE int | BR_SLICE {msb::int} {lsb::int};
+
+// The size (in bits) of a bit range
+let bit_range_size (BR_SINGLE _) = 1
+ /\ bit_range_size (BR_SLICE msb lsb) = msb - lsb + 1;
+
+// Checks if a bit range contains a specific value
+let bit_range_contains (BR_SINGLE i) j = i == j
+ /\ bit_range_contains (BR_SLICE msb lsb) j =
+	msb > lsb
+		=> (msb >= j AND j >= lsb)
+		|  (lsb >= j AND j >= msb);
+
+// least significant bit position of a bit range
+let bit_range_lsb (BR_SINGLE i) = i
+ /\ bit_range_lsb (BR_SLICE _ lsb) = lsb;
+
+// least significant bit position of a bit range
+let bit_range_msb (BR_SINGLE i) = i
+ /\ bit_range_msb (BR_SLICE msb _) = msb;
+
+// Prints a bit range to a string
+// format: "nb" or "msb:lsb"
+let sprint_bit_range (BR_SINGLE i) = int2str i
+ /\ sprint_bit_range (BR_SLICE msb lsb) = sprintf "%d:%d" msb lsb;
+
+// Groups indices into continous slices
+// Input: non-empty list of ints in decreasing order
+// Outputs list grouping continuous slices
+// Ex: [5,4,3,0] -> [BR_SLICE 5 3, BR_SINGLE 0]
+let group_indices indices =
+	letrec merge msb cur (idx:rem) =
+		idx = cur-1 => merge msb idx rem |
+		msb > cur => (BR_SLICE msb cur):(merge idx idx rem)
+		          |  (BR_SINGLE msb):(merge idx idx rem)
+	   /\  merge msb cur [] =
+		msb > cur => [BR_SLICE msb cur] | [BR_SINGLE msb]
+	in
+	let i0 = hd indices in
+	merge i0 i0 (tl indices)
 ;
 
-    
+// Groups indices by continous ranges and
+// prints the results
+let pr_indices indices =
+	let ranges = group_indices indices in
+    list2str T "[" "," "]" sprint_bit_range ranges
+;
+
+
 let update_fn_get_lhs (W_UPDATE_FN lhs rhs) = lhs
  /\ update_fn_get_lhs (W_PHASE_DELAY lhs rhs) = lhs
 ;
@@ -51,10 +89,6 @@ let pexlif_get_internals (PINST name attrs leaf fa_inps fa_outs ints cont) = int
 let pexlif_get_content (PINST name attrs leaf fa_inps fa_outs ints cont) = cont;
 let content_get_children (P_HIER children) = children;
 let content_get_leaf (P_LEAF fns) = fns;
-let update_fn_get_update_fun_lhs (W_UPDATE_FN lhs rhs) = lhs
- /\ update_fn_get_update_fun_lhs (W_PHASE_DELAY lhs rhs) = lhs;
-let update_fn_get_update_fun_rhs (W_UPDATE_FN lhs rhs) = rhs
- /\ update_fn_get_update_fun_rhs (W_PHASE_DELAY lhs rhs) = rhs;
 
 letrec prim_Ppexlif ind fp (inst,pexlif) =
     val (PINST name attrs leaf inps outs ints body) = pexlif then
@@ -104,33 +138,29 @@ let Emit_pexlif file pexlif =
 ;
 
 let base_get_lhs_vars we =
-    letrec get_names (W_VAR sz b) =
-	    sz = 1 => [b] | md_expand_vector (mk_name sz b)
-     /\    get_names (W_EXPLICIT_VAR sz b) =
-	    md_expand_vector b
-     /\	   get_names (W_SLICE indices (W_VAR sz b)) =
-	    let v = list2str T (b^"[") "," "]" int2str indices then
-	    md_expand_vector v
-     /\	   get_names (W_NAMED_SLICE name indices (W_VAR sz b)) =
-	    let v = list2str T (b^"[") "," "]" int2str indices then
-	    md_expand_vector v
-     /\	   get_names (W_SLICE indices w) =
-	let l = get_names w in
-	let sz = length l in
-	map (\idx. el (sz-idx) l) indices
-     /\	   get_names (W_NAMED_SLICE name indices w) =
-	let l = get_names w in
-	let sz = length l in
-	map (\idx. el (sz-idx) l) indices
-     /\    get_names (W_CAT parts) =
-	    flat (map get_names parts)
-     /\    get_names other =
+    letrec gen_get_names (W_VAR sz b) = sz = 1 => [b] | [(mk_name sz b)]
+     /\    gen_get_names (W_EXPLICIT_VAR sz b) = [b]
+     /\	   gen_get_names (W_SLICE indices (W_VAR sz b)) =
+	    merge_vectors [list2str T (b^"[") "," "]" int2str indices]
+     /\	   gen_get_names (W_NAMED_SLICE name indices (W_VAR sz b)) =
+	    merge_vectors [list2str T (b^"[") "," "]" int2str indices]
+     /\	   gen_get_names (W_SLICE indices w) =
+	let l = md_expand_vectors (gen_get_names w) then
+	let sz = length l then
+	md_merge_vectors (map (\idx. el (sz-idx) l) indices)
+     /\	   gen_get_names (W_NAMED_SLICE name indices w) =
+	let l = md_expand_vectors (gen_get_names w) then
+	let sz = length l then
+	md_merge_vectors (map (\idx. el (sz-idx) l) indices)
+     /\    gen_get_names (W_CAT parts) =
+	    flat (map gen_get_names parts)
+     /\    gen_get_names other =
 	eprintf "Illegal lhs expression\n(%s)" (Pwexpr other)
     in
-    get_names we
+    gen_get_names we
 ;
 
-let get_lhs_vars we = merge_vectors (base_get_lhs_vars we);
+let get_lhs_vars we = (base_get_lhs_vars we);
 
 
 let valid_lhs we =
@@ -396,7 +426,7 @@ cletrec w2bv sub w =
 		    let part = mk_part inside f cur in
 		    part@(collect new_inside idx idx idxs)
 		  /\   collect inside f cur [] =
-		    let part = mk_part inside f cur in 
+		    let part = mk_part inside f cur in
 		    part
 		in
 		let start = sz-1 in
@@ -433,7 +463,7 @@ cletrec w2bv sub w =
     w2bv w
 ;
 
-letrec wexpr2bool sub w = 
+letrec wexpr2bool sub w =
     let sz = wexpr_size w in
     let base = bv2list (w2bv sub w) in
     lastn sz ((replicate sz (hd base))@base)

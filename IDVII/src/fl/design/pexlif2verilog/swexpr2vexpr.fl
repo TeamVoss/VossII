@@ -1,0 +1,245 @@
+// This file contains the function
+// transforming a simple swexpr into a verilog_expression
+//
+// File sections:
+//  - compile simple_wexpr to VerilogLHS
+//  - managing slices
+//  - managing RAM_Writes
+//  - compile simple_expr to VerilogExpression
+
+cload (DIR^"ast.fl");
+cload (DIR^"utils.fl");
+
+
+// ======================================================
+// § Compile simple_wexpr to VerilogLHS
+// ======================================================
+
+
+// Converts a var of into a variable
+let make_var path sz name = VV_Named path sz name;
+
+// Converts a left hand side (lhs) simple_wexpr into a verilog LHS
+// Only accepted constructs : SW_VAR and SW_SLICE _ (SW_VAR)
+//
+// The path argument is used when inlining pexlifs, to avoid variable name collision)
+let swexpr2vlhs_inner path (SW_VAR sz name) = [VL_Var (make_var path sz name)]
+ /\ swexpr2vlhs_inner path (SW_SLICE indices (SW_VAR sz name)) =
+	let var = make_var path sz name in
+	let groups = group_indices indices in
+	(map (\x. VL_Slice x var) groups)
+ /\ swexpr2vlhs_inner path x = eprintf "Invalid LHS : %s" (sprint_swexpr x);
+
+// Converts a left hand side (lhs) simple_wexpr into a verilog LHS
+// Only accepted constructs :
+//  - SW_VAR
+//  - SW_SLICE _ (SW_VAR)
+//  - SW_CAT of either of the preceding
+//
+// The path argument is used when inlining pexlifs, to avoid variable name collision)
+let swexpr2vlhs path (SW_CAT slhs) = V_LHS (flat (map (swexpr2vlhs_inner path) slhs))
+ /\ swexpr2vlhs path x = V_LHS (swexpr2vlhs_inner path x);
+
+// Converts a VerilogSimpleLHS to a more regular VerilogExpression
+let vslhs2vexpr (VL_Var var) = VE_Var var
+ /\ vslhs2vexpr (VL_Slice br var) = VE_Slice br var;
+
+// Converts a VerilogLHS to a more regular VerilogExpression
+let vlhs2vexpr (V_LHS parts) = (length parts == 1)
+	=> vslhs2vexpr (hd parts)
+	| VE_Concat (map vslhs2vexpr parts);
+
+
+// ======================================================
+// § Managing Concats
+// ======================================================
+
+// Regroups similar expression under a replicate operator
+let make_concat ([]) = eprintf "Empty concat"
+	/\ make_concat ([t]) = t
+	/\ make_concat concat =
+		letrec merger ([]) = []
+			/\ merger ((VE_Replicate sz_a a):(VE_Replicate sz_b b):r) assuming (a == b) =
+				merger ((VE_Replicate (sz_a + sz_b) a):r)
+			/\ merger (a:b:r) assuming (a == b) =
+				merger ((VE_Replicate 2 a):r)
+			/\ merger ((VE_Replicate sz a):b:r) assuming (a == b) =
+				merger ((VE_Replicate (sz+1) a):r)
+			/\ merger (a:r) = a:(merger r)
+		in let merged = merger concat in
+		(length merged == 1) => hd merged | VE_Concat merged;
+
+
+// ======================================================
+// § Managing slices
+// ======================================================
+
+
+// Generates a sliced verilog variable
+// - single slice if indexes are a single group
+// - concatenation of slices otherwise
+let slice_variable indexes var =
+	let grouped = group_indices indexes in
+	(length grouped == 1)
+		=> VE_Slice (hd grouped) var
+		|  make_concat (map (\x. VE_Slice x var) grouped);
+
+// Converts a slice of a VerilogSimpleLHS
+// Into a VerilogExpression
+let vslhs_slice2vrhs indices (VL_Var var) = slice_variable indices var
+ /\ vslhs_slice2vrhs indices (VL_Slice bit_range var) =
+	// We need to slice a slice, since the inner slice is continous
+	// we just have to offset the outer indices by the inner lsb
+	let lsb = bit_range_lsb bit_range in
+	slice_variable (map (\x. x + lsb) indices) var;
+
+// Get or create a new slice var to store expression
+// Inputs:
+//   <path: int list> path to the current pexlif, used when inlining to avoid name collisions
+//   <function: VerilogSimpleLHS -> *> function given the new var or slice found
+//   <expression: VerilogExpression> the expression being sliced
+//   <statements (VerilogStatement list)> previous assignements
+// Outputs:
+//   <function applied to the new VerilogSimpleLHS found>
+//   <VerilogStatement list> the new statements
+let get_or_create_slice_var path function expression statements =
+	letrec new_or_existing i ([]) =
+			let new = VL_Var (VV_Slice path (vexpr_size expression) i) in
+			(function new, (VS_Assign (V_LHS [new]) expression):statements)
+		// We only reuse a lhs if it is an variable or a slice,
+		// Not if it is a concatenation (as that would be ugly...)
+		/\ new_or_existing i ((VS_Assign (V_LHS [var_or_slice]) expr):rest)
+			assuming (expr == expression) =
+			(function var_or_slice, statements)
+		/\ new_or_existing i ((VS_Assign (V_LHS [VL_Var (VV_Slice _ _ _)]) _):rest) = new_or_existing (i+1) rest
+		/\ new_or_existing i (head:rest) = new_or_existing i rest
+	in new_or_existing 0 statements;
+
+// Converts a slice, introduces (or reuses) a variable if need be
+// Inputs:
+//   <path: int list> path to the current pexlif, used when inlining to avoid name collisions
+//   <indices (int list)> the indices used in slicing
+//   <expression (VerilogExpression)> the expression being sliced
+//     if it is Variable, it can be sliced directly
+//     else a new assignement is added, and the new variable returned
+//     (unless this assignement aldready exists)
+//   <statements (VerilogStatement list)> previous assignements
+// Returns
+//   <VerilogExpression> the expression to substitute to the slice
+//   <VerilogStatement list> the new list of statements
+let make_slice path indices (VE_Var var) statements =
+	(slice_variable indices var, statements)
+ /\ make_slice path indices expression statements =
+	get_or_create_slice_var path (vslhs_slice2vrhs indices) expression statements;
+
+
+// ======================================================
+// § Managing RAM
+// ======================================================
+
+let mk_constant sz value = VE_Constant (VC_Int sz value);
+
+// returns the VerilogExpression data_sz*(addr+1) - offset
+let offset addr data_sz addr_sz offset=
+	VE_Binop (VE_Binop (mk_constant addr_sz data_sz) V_Mul (
+			VE_Binop addr V_Add (mk_constant addr_sz 1)
+		)
+	) V_Sub (mk_constant addr_sz offset);
+
+// Converts a slice of a VerilogSimpleLHS
+// Into a VerilogExpression
+let read_ram_vexpr addr (MEM addr_sz _ data_sz) (VL_Var var) =
+	VE_OffsetSlice (offset addr data_sz addr_sz (-1)) data_sz var
+ /\ read_ram_vexpr addr (MEM addr_sz _ data_sz) (VL_Slice bit_range var) =
+	// We need to slice a slice, since the inner slice is continous
+	// we just have to offset the outer indices by the inner lsb
+	let lsb = bit_range_lsb bit_range in
+	VE_OffsetSlice (offset addr data_sz addr_sz (lsb-1)) data_sz var;
+
+// Used when reading RAM. This is essentially the same as slice
+// except we read at a variable address. We similarily need a
+// new intermediate slicing variable if slicing a complex expression
+// Inputs:
+//   <path (int list)> path to the current pexlif, used when inlining to avoid name collisions
+//   <addr (VerilogExpression)> the address we are reading at
+//   <mem_info (mem)> the memory details
+//   <ram (VerilogExpression)> the RAM to slice
+//   <statements (VerilogStatement list)> previous statements used to determine
+//     the new variable (looks for one preexisting and if not found, returns a new not-encountered number)
+// Returns:
+//   <VerilogExpression> the expression to substitute to SW_READ_RAM
+//   <VerilogStamtent list> the new version of statements
+let make_ram_slice path addr mem_info (VE_Var var) statements =
+	(read_ram_vexpr addr mem_info (VL_Var var), statements)
+ /\ make_ram_slice path addr mem_info expression statements =
+	get_or_create_slice_var path (read_ram_vexpr addr mem_info) expression statements;
+
+// Returns a new VV_Ram variable (not aldready in statements)
+// Inputs
+//   <path (int list)> path to the current pexlif, used when inlining to avoid name collisions
+//   <int> starting number (should be 0)
+//   <MEM> info about the ram (determines variable size)
+//   <VerilogStatement List> previous statements (used to find aldready used variables)
+letrec new_ram_var path i (MEM addr_sz lines data_sz) ([]) = VV_Ram path (lines*data_sz) i
+    /\ new_ram_var path i info ((VS_Write_RAM _ _ _ _ _):rest) = new_ram_var path (i+1) info rest
+    /\ new_ram_var path i info (t:rest) = new_ram_var path i info rest;
+
+
+// ======================================================
+// § Compile simple_wexpr to VerilogExpression
+// ======================================================
+
+
+// Converts a simple_wexpr to a VerilogExpression
+// Inputs
+//   <path (int list)> path to the current pexlif, used when inlining to avoid name collisions
+//   <statements (VerilogStatement list)> previous statements,
+//     used when allocating variables (to avoid having multiple representing the same quantity)
+//   <w_expression (wexpr)> the wexpr to convert
+// Outputs
+//   <VerilogExpression> the translated expression
+//   <(VerilogNewVariable#VerilogExpression) list> new assignements (if any)
+//   <int> the new free value
+letrec swexpr2vexpr path statements w_expression =
+	let match (SW_X sz) =
+		VE_Constant (VC_X sz), statements
+	/\ match (SW_CONST sz v) =
+		VE_Constant (VC_Int sz v), statements
+	/\ match (SW_VAR sz base) =
+		VE_Var (VV_Named path sz base), statements
+	/\ match (SW_NOT a) =
+		val (new_expr, new_statements) = swexpr2vexpr path statements a in
+		VE_Not new_expr, new_statements
+	/\ match (SW_BINOP left op right) =
+		val (l_expr, l_statements) = swexpr2vexpr path statements left in
+		val (r_expr, r_statements) = swexpr2vexpr path l_statements right in
+		VE_Binop l_expr op r_expr, r_statements
+	/\ match (SW_ITE cond if_true if_false) =
+		val (c_expr, c_statements) = swexpr2vexpr path statements cond in
+		val (t_expr, t_statements) = swexpr2vexpr path c_statements if_true in
+		val (f_expr, f_statements) = swexpr2vexpr path t_statements if_false in
+		VE_IfThenElse c_expr t_expr f_expr, f_statements
+	/\ match (SW_SLICE indices w) =
+		val (new_expr, new_statements) = swexpr2vexpr path statements w in
+		make_slice path indices new_expr new_statements
+	/\ match (SW_CAT parts) =
+		letrec iterator sttmts ([]) = ([], sttmts)
+			/\ iterator sttmts (t:q) =
+				val (new_expr, new_sttmts) = swexpr2vexpr path sttmts t in
+				val (t_expr, t_sttmts) = iterator new_sttmts q in
+				(new_expr:t_expr, t_sttmts)
+			in val (new_expr, new_statements) = iterator statements parts in
+			(make_concat new_expr, new_statements)
+	/\ match (SW_MEM_READ info memory addr) =
+		val (addr_expr, a_statements) = swexpr2vexpr path statements addr in
+		val (mem_expr, m_statements) = swexpr2vexpr path a_statements memory in
+		make_ram_slice path addr_expr info mem_expr statements
+	/\ match (SW_MEM_WRITE (MEM addr_sz _ data_sz) memory addr data) =
+		val (addr_expr, a_statements) = swexpr2vexpr path statements addr in
+		val (mem_expr, m_statements) = swexpr2vexpr path a_statements memory in
+		val (data_expr, d_statements) = swexpr2vexpr path m_statements data in
+		let var = new_ram_var path 0 (MEM addr_sz _ data_sz) statements in
+		(VE_Var var),
+		((VS_Write_RAM var mem_expr (offset addr_expr data_sz addr_sz (-1)) data_sz data_expr):m_statements)
+	in match w_expression
+;

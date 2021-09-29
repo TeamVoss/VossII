@@ -274,7 +274,7 @@ let add_command vfsm cmd =
     let w = vfsm2id vfsm then
     let cmds_r = vfsm2cmds_r vfsm then
     (cmds_r := ((deref cmds_r) @ [cmd])) fseq
-    (tcl_eval [sprintf "cmd:update_cmds %s $::cmd_txt(%s)" w w]) fseq
+    (tcl_eval [sprintf "cmd:update_cmds %s" w]) fseq
     ()
 ;
 
@@ -489,12 +489,36 @@ export_to_tcl fl_is_vector;
 let fl_get_global_time canvas = deref (canvas2current_time_r canvas);
 export_to_tcl fl_get_global_time;
 
+
+lettype monitor =
+    MONITOR {vis::vfsm} {callback_fun::(ste->int->void)}
+;
+
+let monitor_list_r = ref {[]:: monitor list};
+
+let add_monitor vfsm call_back_function =
+    let monitor = MONITOR vfsm call_back_function then
+    (monitor_list_r := (monitor:(deref monitor_list_r))) fseq
+    monitor
+;
+
+let delete_monitor monitor =
+    monitor_list_r := (filter (\m. m != monitor) (deref monitor_list_r))
+;
+
+let process_monitors vfsm time =
+    let ste = deref (vfsm2ste_r vfsm) then
+    let do (MONITOR vis fn) = vis != vfsm => () | ((fn ste time) catch ()) in
+    foreach do (deref monitor_list_r)
+; 
+
 let fl_set_global_time canvas t =
     let vfsm = w2vfsm canvas then
     let cmd = sprintf "draw_set_time vis %d;" t then
     (add_command vfsm cmd) fseq
     let rtime = canvas2current_time_r canvas in
-    (rtime := t) 
+    (rtime := t) fseq
+    (process_monitors vfsm t)
 ;
 export_to_tcl fl_set_global_time;
 
@@ -575,8 +599,9 @@ let fl_wv_get_short w vec t =
 	(alts subtract ["0","1"]) = [] =>
 	    let s = implode vs then
 	    opt_states != [] =>
+		// An ENUM (e.g. state machine)
 		let i = sscanf "%b" s in
-		assoc i opt_states
+		(assoc i opt_states) catch "-"
 	    |
 	    let res = length nds >= 4 =>
 			sprintf "0x%x" (sscanf "%b" s) | (implode vs)
@@ -664,7 +689,7 @@ let fl_get_short_value w vecs compute_alternatives =
 	    opt_states != [] =>
 		// An ENUM (e.g. state machine)
 		let i = sscanf "%b" s in
-		assoc i opt_states
+		(assoc i opt_states) catch "-"
 	    |   
 	    let res = length nds >= 4 =>
 			sprintf "0x%x" (sscanf "%b" s) | (implode vs)
@@ -1016,7 +1041,17 @@ let base_get_complete_value ste vectors t =
 	|
 	"-"
     in
-    let vecs = flatmap split_multi_dim vectors then
+    let vecs =
+	let raw = flatmap split_multi_dim vectors then
+	length raw <= 32 => raw |
+	let title =
+	    "Too many nodes to display. Consider selecting a subrange."
+	in
+	let opts = map (\v. ("Vector: ", v)) vectors in
+	let new_vectors = prompt_for_inputs title opts then
+	new_vectors = [] => [] |  flatmap split_multi_dim new_vectors
+    in
+    vecs = [] => [""] |
     let len = sitlist (\v.\r. max r (strlen v)) vecs 0 in
     let do1 v =
 	let res = process v then
@@ -1238,7 +1273,7 @@ let base_get_waveform w vec show_depend =
 		    opt_states != [] =>
                         // An ENUM (e.g. state machine)
 			let i = sscanf "%b" s in
-			assoc i opt_states
+			(assoc i opt_states) catch "-"
                     |   
                     length nds >= 4 => sprintf "0x%x" (sscanf "%b" s)
                                      | (implode vs) 
@@ -1404,7 +1439,8 @@ export_to_tcl fl_hide_fanin;
 
 let fl_get_sch_commands w =
     let vfsm = w2vfsm w then
-    deref (vfsm2cmds_r vfsm)
+    let res = deref (vfsm2cmds_r vfsm) then
+    res
 ;
 export_to_tcl fl_get_sch_commands;
 

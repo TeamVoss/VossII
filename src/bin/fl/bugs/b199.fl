@@ -1,0 +1,11 @@
+merge_vectors ["a[10,9,8]"];
+md_merge_vectors ["a[10,9,8]"];
+md_merge_vectors ["a[10,9,8,3:0]"];
+merge_vectors ["a[10,9,8,3:0]"];
+md_merge_vectors ["a[10]","a[1]","a[0]"];
+md_merge_vectors ["a[10]","a[9]","a[1]","a[0]"];
+merge_vectors    ["a[10]","a[9]","a[1]","a[0]"];
+merge_vectors ["a[10:9]", "a[1:0]"];
+merge_vectors ["a[10:9,1:0]"];
+md_merge_vectors ["a[10:9]", "a[1:0]"];
+md_merge_vectors ["a[10:9,1:0]"];

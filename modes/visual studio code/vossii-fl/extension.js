@@ -26,7 +26,7 @@ const fl_in = `${config.temporary_files_root}in`;
 const fl_prein = `${config.temporary_files_root}prein`;
 const fl_out = `${config.temporary_files_root}out`;
 
-const no_help = /^(;|\||\/\\|=>|\d+.*|.\d+.*|\/\/.*|andlettype|add_open_overload|assuming|begin_abstype|binder|binder_with_accumulator|clear_fixities|clet|cletrec|defix|end_abstype|export_to_tcl|forward_declare|free_binder|if_then_else_binder|then_binder|else_binder|infix|infix_unary|infixr|then|in|install_print_function|let|letrec|lettype|list|new_type_abbrev|non_lazy|nonfix|open_overload|overload|postfix|prefix|print_fixities|ref|val)$/;
+const no_help = /^(;|\||\/\\|=>|\d+.*|.\d+.*|\/\/.*|andlettype|add_open_overload|assuming|begin_abstype|binder|binder_with_accumulator|sized_binder_with_accumulator|clear_fixities|clet|cletrec|defix|end_abstype|export_to_tcl|forward_declare|free_binder|if_then_else_binder|then_binder|else_binder|infix|infix_unary|infixr|then|in|install_print_function|let|letrec|lettype|list|new_type_abbrev|non_lazy|nonfix|open_overload|overload|postfix|prefix|print_fixities|ref|val)$/;
 const unescaped_quotes = /(?<!\\)"/;
 const word_chars = "a-zA-Z0-9_";
 const operator_chars = "\\-\\+\\*\\/\\\\\\%\\^\\'\\&\\|\\?\\~\\#\\<\\=\\>\\!\\%\\@\\:";
@@ -327,6 +327,7 @@ async function restart_and_eval_file() {
 function activate(context) {
 
 	terminal = vscode.window.createTerminal("fl terminal");
+	terminal.sendText("set +o history"); // avoid spamming bash history
 
 	// commands
 	const functions = [
