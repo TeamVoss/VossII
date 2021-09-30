@@ -233,16 +233,32 @@ let
             // For leaves, we check if there is a valid subst. between them.
             pexlif_get_leaf p AND pexlif_get_leaf g =>
                 let sub' = actualize_leaf p g in
-                maybe [] sub' (\sub. [M_LEAF sub]) |
+                maybe [] sub' (\s. [M_LEAF s]) |
             // For hierarchies, we expand p & g to find every possible match
-            // (expand) and ...
+            // (expand) and check for:
+            //   1) Is every child of 'g' used in the mapping and reported as
+            //      a "simple" (M_LEAF) solution, or
+            //   2) Is any child of 'g' un-matched or reported as a
+            //      "complicated" (M_HIER) solution.
+            // If 1), then a matching at this hier. level is "simple" as well.
+            // Otherwise (2), the solution here is "complicated" and requires
+            // that its matches must be "carved" out of the original haystack.
+            // Any hier. solution must of course have coherent substitutions.
+            let children = length (pexlif_get_children g) in
             let go ms =
-                  let subs = map (\(_,_,m). get_match_sub m) ms in
-                  let sub' = actualize_hier subs p g in
-                  maybe NONE sub' (\sub. SOME (M_HIER sub ms))
+                let get_sub (_,_,m) = get_match_sub m in
+                let report sub =
+                    let is_simple (_,_,(M_HIER _ _)) = F
+                    /\  is_simple (_,_,(M_LEAF _))   = T
+                    in
+                    (length ms == children) AND (all is_simple ms) =>
+                    (M_LEAF sub) |
+                    (M_HIER sub ms)
+                in
+                let sub' = actualize_hier (map get_sub ms) p g in
+                maybe NONE sub' (SOME # report)
             in
-            let results = map go (expand p g) in
-            filter_some results |
+            map_some go (expand p g) |
         // If no signature match if found then p & g cannot possibly match.
         []
 ;
@@ -259,6 +275,7 @@ let isomatch needle haystack =
         let match g ix = map (pair ix)  (explore needle g) in
         concat (ixmap match gs)
 ;
+// todo: Carl wants both needle and haystack to be wrappers.
 
 end_abstype isomatch;
 
@@ -279,7 +296,7 @@ let print_subst = print_list (print_pair id id);
 letrec
     pretty_match fp ind l r (M_LEAF sub) =
         let s = print_subst sub in
-        fprintf fp "%*s%s iso-matches %s with %s\n" ind "" l r s
+        fprintf fp "%*s%s matches %s with %s\n" ind "" l r s
 /\  pretty_match fp ind l r (M_HIER sub ms) =
         let pretty (i,j,m) =
                 let l'   = sprintf "%si%d/" l i in
@@ -302,11 +319,37 @@ end_abstype pretty_match;
 
 begin_abstype;
 
-let replace_with_match =
-      undefined
+let fa_subst_actuals (f,as) sub = (f,map (flip assoc sub) as);
+
+let pex_subst_actuals (PINST name as l fa_inps fa_outs internals content) sub =
+      let fa_inps' = map (flip fa_subst_actuals sub) fa_inps in
+      let fa_outs' = map (flip fa_subst_actuals sub) fa_outs in
+      PINST name as l fa_inps' fa_outs' internals content
 ;
 
-end_abstype replace_with_match;
+let replace p (M_LEAF sub) = pex_subst_actuals p sub
+/\  replace _ (M_HIER _ _) =
+      eprintf "Match found but not complete (haystack > needle)."
+;
+
+// letrec
+//     replace _ p g (M_LEAF sub) =
+//         pex_subst_actuals p sub
+// /\  replace inst p g (M_HIER sub {ms::(int#int#match) list}) =
+//         val (p_is, g_is, ms) = unzip3 ms in
+//         // Connect g indices to SHA signatures since we're going to fold g.
+//         let child_sha ix cs = pexlif_get_SHA (el ix cs) in
+//         val g_cs = pexlif_get_content (content_get_children g) in
+//         let g_ss = map2 child_sha g_is g_cs in
+//         // Fold the haystack.
+//         // todo: one at a time.
+//         let g' = fold_pexlif g g_is inst in
+//         val (PINST n a l i o t (P_HIER (f:os))) = g' in
+//         // 
+//         undefined
+// ;
+
+end_abstype replace;
 
 // =============================================================================
 // Fin.

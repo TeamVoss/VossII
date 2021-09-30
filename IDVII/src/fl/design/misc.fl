@@ -104,6 +104,10 @@ let when m f = maybe NONE m (SOME # f);
 let filter_some = map get_value # filter has_value;
 
 // ...
+//  map_some::(*->opt **)->(* list)->(** list)
+let map_some f = filter_some # map f;
+
+// ...
 //  filter_opt::(*->bool)->((* opt) list)->((* opt) list)
 let filter_opt f = filter (\o. has_value o AND f (get_value o));
 
@@ -145,6 +149,12 @@ letrec
 /\  zip_uneven _      []     = []
 /\  zip_uneven []     _      = []
 ;
+
+// ...
+//
+// let unzip3 [] = ([],[],[])
+// /\  unzip3 ((x,y,z):as) = val (xs,ys,zs) = unzip3 as in (x:xs,y:ys,z:zs)
+// ;
 
 // ...
 //  concat::((a list) list)->(a list)
