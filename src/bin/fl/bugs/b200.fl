@@ -3,6 +3,33 @@
 load "ste.fl";
 
 // =============================================================================
+// Small example.
+
+let ex1 =
+        bit_input a.
+        bit_output b.
+        CELL "draw_hier ex1" [
+            b <- '~' a
+        ]
+;
+
+let target =
+        bit_input i1.
+        bit_input i2.
+        bit_output o1.
+        bit_output o2.
+        CELL "draw_hier target" [
+            ex1 i1 o1,
+            o2 <- '~' i2
+        ]
+;
+
+let ex1' = ex1 'x 'y;
+let target' = target 'i1 'i2 'o1 'o2;
+let matches = isomatch ex1' target';
+foreach (\m. (pretty_match m) fseq (print "\n")) matches;
+
+// =============================================================================
 // Four examples, all put into a larger haystack.
 
 let buf1 =
@@ -69,18 +96,21 @@ let buf2' = buf2 'i1 'o1;
 let buf3' = buf3 'i1 'o1;
 let buf4' = buf4 'i1 'o1;
 let bufs' = bufs 'i1 'i2 'i3 'i4 'i5 'i6 'o1 'o2 'o3 'o4 'o5 'o6 'o7;
-let matches = isomatch buf1' bufs';
-print (pretty_isomatch matches);
+//let matches = isomatch buf1' bufs';
+//foreach (\m. (pretty_match m) fseq (print "\n")) matches;
 
 // =============================================================================
 // ...
 
 let mux4' = verilog2pexlif "-Iisomatch/tests/mux" "mux4" ["mux4.v"] [];
 let mux2' = verilog2pexlif "-Iisomatch/tests/mux" "mux2" ["mux2.v"] [];
-g_pex fseq p_pex fseq ();
 
-//let wrap p = PINST "box" [] F [] [] [] (P_HIER [p]);
-let matches = isomatch mux2' mux4';
+let matches =
+      //let wrap p = PINST "box" [] F [] [] [] (P_HIER [p]) in
+      let a = mux4' then
+      let b = mux2' then
+      undefined //isomatch a b
+;
 //print (pretty_isomatch matches);
 
 // =============================================================================
@@ -185,7 +215,7 @@ let flat_cache_mem' = flatten_pexlif cache_mem';
 let matches =
       let a = flat_cache_line' then
       let b = flat_cache_mem' then
-      isomatch a b
+      undefined //isomatch a b
 ;
 //print (pretty_isomatch matches);
 
