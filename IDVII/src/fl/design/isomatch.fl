@@ -127,7 +127,8 @@ let reorder_nodes xs ns = map (\n. el n xs) ns;
 letrec
     expand_choices []       = []
 /\  expand_choices (xs:[])  = map (\x. [x]) xs
-/\  expand_choices (xs:xss) = flatmap (\x. map (\ys. x:ys) (expand_choices xss)) xs
+/\  expand_choices (xs:xss) =
+        flatmap (\x. map (\ys. x:ys) (expand_choices xss)) xs
 ;
 
 // ...
@@ -156,6 +157,8 @@ lettype match =
 let get_match_sub (M_LEAF s) = s
 /\  get_match_sub (M_HIER s _) = s
 ;
+
+let filter_internals (PINST _ _ _ _ _ t _) = filter (NOT # flip elem t # fst);
 
 forward_declare{explore::pexlif->pexlif->(match list)};
 // Exand a matching of 'p' and 'g' to test whether it's valid pairing or not.
@@ -251,9 +254,10 @@ let
                     let is_simple (_,_,(M_HIER _ _)) = F
                     /\  is_simple (_,_,(M_LEAF _))   = T
                     in
+                    let sub' = filter_internals p sub in
                     (length ms == children) AND (all is_simple ms) =>
-                    (M_LEAF sub) |
-                    (M_HIER sub ms)
+                    (M_LEAF sub') |
+                    (M_HIER sub' ms)
                 in
                 let sub' = actualize_hier (map get_sub ms) p g in
                 maybe NONE sub' (SOME # report)
@@ -319,6 +323,20 @@ end_abstype pretty_match;
 
 begin_abstype;
 
+//  print_pair::(*->string)->(**->string)->(*#**)->string
+let print_pair f g (x,y) = sprintf "%s:%s" (f x) (g y);
+
+//  print_list::(*->string)->(* list)->string
+let print_list = list2str T "[" "," "]";
+
+//  print_subst::((string#string) list)->string
+let print_subst = print_list (print_pair id id);
+
+//  print_subst::((string#(string list)) list)->string
+let print_fa = print_list (print_pair id (print_list id));
+
+// -------------------------------------
+
 let fa_subst_actuals (f,as) sub = (f,map (flip assoc sub) as);
 
 let pex_subst_actuals (PINST name as l fa_inps fa_outs internals content) sub =
@@ -330,6 +348,17 @@ let pex_subst_actuals (PINST name as l fa_inps fa_outs internals content) sub =
 let replace p (M_LEAF sub) = pex_subst_actuals p sub
 /\  replace _ (M_HIER _ _) =
       eprintf "Match found but not complete (haystack > needle)."
+;
+
+let replace_folded p g m =
+      val (PINST n a l i o t (P_HIER [_])) = g in
+      (PINST n a l i o t (P_HIER [(replace p m)]))
+;
+
+let replace_pexlif p g (ix, match) =
+      val (PINST n a l i o t (P_HIER (c:cs))) = fold_pexlif g [ix] "tmp" in
+      let c' = replace_folded p c match in
+      unfold_pexlif (PINST n a l i o t (P_HIER (c':cs))) 1 "tmp"
 ;
 
 // letrec
@@ -349,7 +378,7 @@ let replace p (M_LEAF sub) = pex_subst_actuals p sub
 //         undefined
 // ;
 
-end_abstype replace;
+end_abstype replace replace_pexlif;
 
 // =============================================================================
 // Fin.

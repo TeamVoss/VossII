@@ -30,16 +30,6 @@ let matches = isomatch ex1' target';
 //print "Matches:\n";
 //foreach (\m. (pretty_match m) fseq (print "\n")) matches;
 
-// print "\nOrig";
-// target';
-// foreach (\(ix,m).
-//     let children = content_get_children (pexlif_get_content target') in
-//     let child = el ix children in
-//     (printf "\nReplacing child %d" ix) fseq
-//     (pretty_pexlif (replace_with_match ex1' child m)) fseq
-//     (print "\n")
-// ) matches;
-
 // =============================================================================
 // Four examples, all put into a larger haystack.
 
@@ -108,7 +98,18 @@ let buf3' = buf3 'i1 'o1;
 let buf4' = buf4 'i1 'o1;
 let bufs' = bufs 'i1 'i2 'i3 'i4 'i5 'i6 'o1 'o2 'o3 'o4 'o5 'o6 'o7;
 let matches = isomatch buf1' bufs';
-foreach (\m. (pretty_match m) fseq (print "\n")) matches;
+print "Matches:\n";
+flip foreach matches (\m.
+    (pretty_match m) fseq
+    (print "\n")
+);
+(print "Needle");
+(pretty_pexlif buf1');
+flip foreach matches (\(ix,m).
+    (printf "Replaced %d'th node in haystack with needle" ix) fseq
+    (pretty_pexlif (replace_pexlif buf1' bufs' (ix,m))) fseq
+    (print "\n")
+);
 
 // =============================================================================
 // ...
