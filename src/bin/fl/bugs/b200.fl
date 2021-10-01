@@ -26,9 +26,8 @@ let target =
 
 let ex1' = ex1 'x 'y;
 let target' = target 'i1 'i2 'o1 'o2;
-let matches = isomatch ex1' target';
-//print "Matches:\n";
-//foreach (\m. (pretty_match m) fseq (print "\n")) matches;
+isomatch_and_store ex1' target';
+find_isomatches target';
 
 // =============================================================================
 // Four examples, all put into a larger haystack.
@@ -98,18 +97,6 @@ let buf3' = buf3 'i1 'o1;
 let buf4' = buf4 'i1 'o1;
 let bufs' = bufs 'i1 'i2 'i3 'i4 'i5 'i6 'o1 'o2 'o3 'o4 'o5 'o6 'o7;
 let matches = isomatch buf1' bufs';
-print "Matches:\n";
-flip foreach matches (\m.
-    (pretty_match m) fseq
-    (print "\n")
-);
-(print "Needle");
-(pretty_pexlif buf1');
-flip foreach matches (\(ix,m).
-    (printf "Replaced %d'th node in haystack with needle" ix) fseq
-    (pretty_pexlif (replace_pexlif buf1' bufs' (ix,m))) fseq
-    (print "\n")
-);
 
 // =============================================================================
 // ...
@@ -121,7 +108,7 @@ let matches =
       //let wrap p = PINST "box" [] F [] [] [] (P_HIER [p]) in
       let a = mux4' then
       let b = mux2' then
-      undefined //isomatch a b
+      isomatch a b
 ;
 //print (pretty_isomatch matches);
 
@@ -227,7 +214,7 @@ let flat_cache_mem' = flatten_pexlif cache_mem';
 let matches =
       let a = flat_cache_line' then
       let b = flat_cache_mem' then
-      undefined //isomatch a b
+      isomatch a b
 ;
 //print (pretty_isomatch matches);
 

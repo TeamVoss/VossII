@@ -312,30 +312,15 @@ letrec
         (foreach pretty ms)
 ;
 
-let pretty_match (ix,m) =
-      pretty_match stdout 0 "N/" (sprintf "H/%d/" ix) m fseq ();
-;
+let pretty_match (i,m) = pretty_match stdout 0 "N/" (sprintf "H/%d/" i) m fseq ();
+let pretty_matches ms = foreach pretty_match ms;
 
-end_abstype pretty_match;
+end_abstype pretty_match pretty_matches;
 
 // -----------------------------------------------------------------------------
 // Replace sub-circuits with a given match.
 
 begin_abstype;
-
-//  print_pair::(*->string)->(**->string)->(*#**)->string
-let print_pair f g (x,y) = sprintf "%s:%s" (f x) (g y);
-
-//  print_list::(*->string)->(* list)->string
-let print_list = list2str T "[" "," "]";
-
-//  print_subst::((string#string) list)->string
-let print_subst = print_list (print_pair id id);
-
-//  print_subst::((string#(string list)) list)->string
-let print_fa = print_list (print_pair id (print_list id));
-
-// -------------------------------------
 
 let fa_subst_actuals (f,as) sub = (f,map (flip assoc sub) as);
 
@@ -361,24 +346,110 @@ let replace_pexlif p g (ix, match) =
       unfold_pexlif (PINST n a l i o t (P_HIER (c':cs))) 1 "tmp"
 ;
 
-// letrec
-//     replace _ p g (M_LEAF sub) =
-//         pex_subst_actuals p sub
-// /\  replace inst p g (M_HIER sub {ms::(int#int#match) list}) =
-//         val (p_is, g_is, ms) = unzip3 ms in
-//         // Connect g indices to SHA signatures since we're going to fold g.
-//         let child_sha ix cs = pexlif_get_SHA (el ix cs) in
-//         val g_cs = pexlif_get_content (content_get_children g) in
-//         let g_ss = map2 child_sha g_is g_cs in
-//         // Fold the haystack.
-//         // todo: one at a time.
-//         let g' = fold_pexlif g g_is inst in
-//         val (PINST n a l i o t (P_HIER (f:os))) = g' in
-//         // 
-//         undefined
-// ;
+end_abstype replace_pexlif;
 
-end_abstype replace replace_pexlif;
+//------------------------------------------------------------------------------
+
+begin_abstype;
+
+let pex_file sha = DIR ^ "../../../../isomatches/" ^ sha ^ ".pex";
+let match_file name = DIR ^ "../../../../isomatches/" ^ name ^ ".match";
+let matches_file = DIR ^ "../../../../isomatches/matches";
+
+let sha_or_error pex = 
+        let sha = find_signature (pexlif_get_attrs pex) then
+        string_empty sha =>
+            let name = pexlif_get_name pex in
+            eprintf "'%s' has no SHA signature." name |
+        sha
+;
+
+let store_pexlif pex = pex fseq write_pexlif (pex_file (sha_or_error pex)) pex;
+let load_pexlif sha = read_pexlif (pex_file sha);
+non_lazy load_pexlif;
+
+let store_match name match = match fseq write_match (match_file name) match;
+let load_match name = read_match (match_file name);
+non_lazy load_match;
+
+let load_matches sha =
+        letrec
+            read_line f =
+                let line = fgets f then
+                string_empty line => [] |
+                // Each line consists of two SHA signatures, where each
+                // signature contains 64 characters. Every line indicates a
+                // possible match between the two SHA signaturs' pexlif.
+                let real  = string_butlast line then
+                val [l,r] = str_cluster real 64 then
+                // The file containing a match is named after the two SHA
+                // signatures.
+                let name =
+                    l == sha => l ^ r |
+                    r == sha => r ^ l |
+                    ""
+                in
+                NOT (string_empty name) AND file_exists (match_file name) =>
+                    (l, r, load_match name) : read_line f |
+                read_line f 
+        in
+        let file = fopen matches_file "r+" in
+        let matches = read_line file then
+        (fclose file) fseq (matches)
+;
+non_lazy load_matches;
+
+let store_matches pex1 pex2 match =
+        let sha1 = sha_or_error pex1 then
+        let sha2 = sha_or_error pex2 then
+        // Do not store duplicate matches.
+        any (\(l,r,_). sha2 == r OR sha2 == l) (load_matches sha1) => () |
+        // The file containing a match is named after the two SHA signatures.
+        let name = sha1 ^ sha2 in
+        let file = fopen matches_file "a+" then
+        (fprintf file "%s\n" name) fseq
+        (fclose file) fseq
+        (store_pexlif pex1) fseq
+        (store_match name match) fseq
+        ()
+;
+
+// Search each child of 'haystack' for matches.
+let find_isomatches haystack =
+        pexlif_get_leaf haystack => eprintf "isomatch expects a hier. haystack." |
+        let children = pexlif_get_children haystack in
+        let find_match child =
+                let sha = pexlif_get_SHA child in
+                let go (l,r,match) =
+                        val (p, g) =
+                                l == sha => (r,l) |
+                                r == sha => (l,r) |
+                                ("","")
+                        in
+                        NOT (string_empty p) AND file_exists (pex_file p) =>
+                            (g, load_pexlif p, match) |
+                        error "What?"
+                in
+                map go (load_matches sha)
+        in
+        concatMap find_match children
+;
+
+end_abstype load_pexlif store_pexlif load_matches store_matches find_isomatches;
+
+// Run isomatch and then store any resulting matches.
+let isomatch_and_store needle haystack =
+        pexlif_get_leaf haystack => eprintf "isomatch expects a hier. haystack." |
+        let children = pexlif_get_children haystack in
+        let store_and_tell (ix,match) =
+                let child = el ix children in
+                (printf "matched needle and the %d'th haystack node:\n" ix) fseq
+                (pretty_match (ix,match)) fseq
+                store_matches needle child match
+        in
+        let matches = isomatch needle haystack then
+        foreach store_and_tell matches
+;
 
 // =============================================================================
 // Fin.
