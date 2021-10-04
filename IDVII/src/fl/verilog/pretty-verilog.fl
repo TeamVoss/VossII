@@ -40,7 +40,10 @@ let p_hierarchical_identifier (HID (NONE) i) =
         <-> p_identifier i
 ;
 
-let p_number (Num i) = text (int2str i);
+let p_number (X) = text "X"
+/\  p_number (Z) = text "Z"
+/\  p_number (Num i) = text (int2str i)
+;
 
 let p_unary_operator (U_pos) = text "+"
 /\  p_unary_operator (U_neg) = text "-"

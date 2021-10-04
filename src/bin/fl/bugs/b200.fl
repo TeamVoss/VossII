@@ -35,18 +35,20 @@ let gen_fas max_f max_sz pre_f pre_as =
 non_lazy gen_fas;
 
 let gen_pex seed max_f max_sz max_d =
+        max_f <= 1 => error "gen_pex: max_f < 2" |
         // Just to be sure FL is gen. different pexlifs each time, use a seed.
         (srandom seed) fseq
         // Gen. of the formal/actuals used as either inputs or outputs.
-        val (max_is, max_os) = let x = random 1 max_f in (x, max_f - x) in
-        let fa_is = gen_fas max_is max_sz "i" "i" in
-        let fa_os = gen_fas max_os max_sz "o" "o" in
+        val (max_is, max_os) = let x = random 1 (max_f - 1) in (x, max_f - x) in
+        let fa_is = gen_fas max_is max_sz "in" "in" in
+        let fa_os = gen_fas max_os max_sz "out" "out" in
         // Gen. a random pexlif.
         let sz = random 1 max_sz in
         let d  = random 1 max_d in
         gen_pinst_leaf "test" fa_is fa_os F sz d
 ;
 non_lazy gen_pex;
+// note: requires that max_f > 1
 
 let gen s = pexlif2verilog (gen_pex s 4 2 2);
 non_lazy gen;
