@@ -3,6 +3,55 @@
 load "ste.fl";
 
 // =============================================================================
+// Randomized example.
+
+let gen_vec_size max_sz =
+        let gen_range sz = sprintf "[%d:0]" (sz-1) in
+        one_of_weighted [
+            (4, "")
+          , (1, one_of_weighted [
+                (1, gen_range (min max_sz 4))
+              , (1, gen_range (min max_sz 8))
+              , (1, gen_range (min max_sz 16))
+              , (1, gen_range (min max_sz 32))
+              , (1, gen_range (min max_sz 64))
+              , (1, gen_range (random 2 max_sz))
+              ])
+          ]
+;
+non_lazy gen_vec_size;
+
+let gen_fas max_f max_sz pre_f pre_as =
+        // Gen. the vec. size of each formal.
+        let szs    = map gen_vec_size (replicate (random 1 max_f) max_sz) in
+        let pr v i = v ^ int2str i in
+        let lbl p  = map (curry pr) (ixlabel (replicate (length szs) p)) in
+        // Gen. the formals and actuals (1-to-1 always, since we're testing leafs).
+        let fs  = map2 (defix ^) (lbl pre_f) szs in
+        let ass = map2 (\p. \sz. [p ^ sz]) (lbl pre_as) szs in
+        // /
+        zip fs ass
+;
+non_lazy gen_fas;
+
+let gen_pex seed max_f max_sz max_d =
+        // Just to be sure FL is gen. different pexlifs each time, use a seed.
+        (srandom seed) fseq
+        // Gen. of the formal/actuals used as either inputs or outputs.
+        val (max_is, max_os) = let x = random 1 max_f in (x, max_f - x) in
+        let fa_is = gen_fas max_is max_sz "i" "i" in
+        let fa_os = gen_fas max_os max_sz "o" "o" in
+        // Gen. a random pexlif.
+        let sz = random 1 max_sz in
+        let d  = random 1 max_d in
+        gen_pinst_leaf "test" fa_is fa_os F sz d
+;
+non_lazy gen_pex;
+
+let gen s = pexlif2verilog (gen_pex s 4 2 2);
+non_lazy gen;
+
+// =============================================================================
 // Small example.
 
 let ex1 =
@@ -26,8 +75,8 @@ let target =
 
 let ex1' = ex1 'x 'y;
 let target' = target 'i1 'i2 'o1 'o2;
-isomatch_and_store ex1' target';
-find_isomatches target';
+//isomatch_and_store ex1' target';
+//find_isomatches target';
 
 // =============================================================================
 // Four examples, all put into a larger haystack.
@@ -96,7 +145,7 @@ let buf2' = buf2 'i1 'o1;
 let buf3' = buf3 'i1 'o1;
 let buf4' = buf4 'i1 'o1;
 let bufs' = bufs 'i1 'i2 'i3 'i4 'i5 'i6 'o1 'o2 'o3 'o4 'o5 'o6 'o7;
-let matches = isomatch buf1' bufs';
+//let matches = isomatch buf1' bufs';
 
 // =============================================================================
 // ...
@@ -104,13 +153,9 @@ let matches = isomatch buf1' bufs';
 let mux4' = verilog2pexlif "-Iisomatch/tests/mux" "mux4" ["mux4.v"] [];
 let mux2' = verilog2pexlif "-Iisomatch/tests/mux" "mux2" ["mux2.v"] [];
 
-let matches =
-      //let wrap p = PINST "box" [] F [] [] [] (P_HIER [p]) in
-      let a = mux4' then
-      let b = mux2' then
-      isomatch a b
-;
-//print (pretty_isomatch matches);
+//let wrap p = PINST "box" [] F [] [] [] (P_HIER [p]) in
+//isomatch_and_store mux2' mux4';
+//find_isomatches mux4';
 
 // =============================================================================
 // ...
@@ -208,15 +253,10 @@ let cache_mem =
 
 let cache_line' = cache_line 'clk 'reset 'we 'line 'din 'atag 'match 'dout 'sel 'r_dout 'r_match;
 let cache_mem' = cache_mem 'clk 'reset 'we 'line 'din 'atag 'hit 'dout;
-
 let flat_cache_line' = flatten_pexlif cache_line';
 let flat_cache_mem' = flatten_pexlif cache_mem';
-let matches =
-      let a = flat_cache_line' then
-      let b = flat_cache_mem' then
-      isomatch a b
-;
-//print (pretty_isomatch matches);
+//isomatch_and_store cache_line' cache_mem';
+//find_isomatches cache_mem';
 
 // =============================================================================
 // Fin.

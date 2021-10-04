@@ -7,12 +7,9 @@ load (DIR^"../design/misc.fl");
 // "Pretty-printing" of pexlif's via a translation into Verilog.
 // =============================================================================
 
+begin_abstype;
+
 let warn msg v = print msg fseq v;
-
-// -----------------------------------------------------------------------------
-// ...
-
-// begin_abstype;
 
 let prim_num {i::int} = Exp_primary $ Prim_num $ Num i;
 
@@ -559,6 +556,6 @@ let pexlif2verilog {pex::pexlif} =
       render (p_source_text (Source_text (pretty_pexlif_h "" pex')))
 ;
 
-// end_abstype pexlif2verilog;
+end_abstype pexlif2verilog;
 
 // =============================================================================
