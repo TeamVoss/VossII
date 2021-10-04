@@ -575,14 +575,140 @@ end_abstype gen_pinst_leaf gen_pinst gen_pinst_graph;
 
 // -----------------------------------------------------------------------------
 
-// begin_abstype;
+begin_abstype;
 
-// letrec
-//     normalize_pexlif () =
-//         undefined
-// ;
+forward_declare{normalize_binary::
+    int->(wexpr->wexpr->wexpr)->wexpr->wexpr->
+    (((wexpr#wexpr) list)#(wexpr#(int#int)))
+};
 
-// end_abstype normalize_pexlif;
+letrec
+    normalize_wexpr ix (W_X sz) = ([], W_X sz, ix, sz)
+/\  normalize_wexpr ix (W_CONST sz v) = ([], W_CONST sz v, ix, sz)
+/\  normalize_wexpr ix (W_NAMED_CONST n sz v) = ([], W_NAMED_CONST n sz v, ix, sz)
+/\  normalize_wexpr ix (W_VAR sz b) = ([], W_VAR sz b, ix, sz)
+/\  normalize_wexpr ix (W_EXPLICIT_VAR sz n) = ([], W_EXPLICIT_VAR sz n, ix, sz)
+/\  normalize_wexpr ix (W_AND a b)  = normalize_binary ix W_AND a b
+/\  normalize_wexpr ix (W_OR a b)   = normalize_binary ix W_OR a b
+/\  normalize_wexpr ix (W_NOT a)    =
+        val (ss, a', ix', asz) = normalize_wexpr ix a in
+        (ss, W_NOT a', ix', asz)
+/\  normalize_wexpr ix (W_EQ a b)   = normalize_binary ix W_EQ a b
+/\  normalize_wexpr ix (W_PRED n c) = 
+        val (ss, c', ix', csz) = normalize_wexpr ix c in
+        (ss, W_PRED n c', ix', csz)
+/\  normalize_wexpr ix (W_GR a b)   = normalize_binary ix W_GR a b
+/\  normalize_wexpr ix (W_ADD a b)  = normalize_binary ix W_ADD a b
+/\  normalize_wexpr ix (W_SUB a b)  = normalize_binary ix W_SUB a b
+/\  normalize_wexpr ix (W_MUL a b)  = normalize_binary ix W_MUL a b
+/\  normalize_wexpr ix (W_DIV a b)  = normalize_binary ix W_DIV a b
+/\  normalize_wexpr ix (W_MOD a b)  = normalize_binary ix W_MOD a b
+/\  normalize_wexpr ix (W_SHL a b)  = normalize_binary ix W_SHL a b
+/\  normalize_wexpr ix (W_SHR a b)  = normalize_binary ix W_SHR a b
+/\  normalize_wexpr ix (W_ASHR a b) = normalize_binary ix W_ASHR a b
+/\  normalize_wexpr ix (W_SX sz (W_VAR sz v)) =
+        ([], W_SX sz (W_VAR sz v), ix, sz)
+/\  normalize_wexpr ix (W_SX sz (W_EXPLICIT_VAR sz v)) =
+        ([], W_SX sz (W_VAR sz v), ix, sz)
+// If 'W_SX' is called on anything but a variable we need to split the 'wexpr'
+// and name the intermediate result.
+/\  normalize_wexpr ix (W_SX sz w) =
+        val (ss, w', ix', sz') = normalize_wexpr ix w in
+        let v   = W_VAR sz' (sprintf "norm_sx_%d" ix') in
+        let ss' = (v,w') : ss in
+        (ss', W_SX sz v, ix + 1, sz)        
+/\  normalize_wexpr ix (W_ZX sz a)  =
+        val (ss, a', ix', _) = normalize_wexpr ix a in
+        (ss, W_ZX sz a', ix', sz)
+/\  normalize_wexpr ix (W_ITE c a b) =
+        val (ss,   c', ix',  _)   = normalize_wexpr ix c in
+        val (ss',  a', ix',  asz) = normalize_wexpr ix a in
+        val (ss'', b', ix'', _)   = normalize_wexpr ix b in
+        (ss@ss'@ss'', W_ITE c' a' b', ix'', asz)
+// If 'W_SLICE' or 'W_NAMED_SLICE' is called on anything but a variable we need
+// to split the 'wexpr' and name the intermediate result.
+/\  normalize_wexpr ix (W_SLICE is (W_VAR sz v)) =
+        ([], W_SLICE is (W_VAR sz v), ix, length is)
+/\  normalize_wexpr ix (W_SLICE is (W_EXPLICIT_VAR sz v)) =
+        ([], W_SLICE is (W_EXPLICIT_VAR sz v), ix, length is)
+/\  normalize_wexpr ix (W_SLICE is w) =
+        val (ss, w', ix', sz') = normalize_wexpr ix w in
+        let v   = W_VAR sz' (sprintf "norm_slice_%d" ix') in
+        let ss' = (v,w') : ss in
+        (ss', W_SLICE is v, ix + 1, length is)
+/\  normalize_wexpr ix (W_NAMED_SLICE n is (W_VAR sz v)) =
+        ([], W_NAMED_SLICE n is (W_VAR sz v), ix, length is)
+/\  normalize_wexpr ix (W_NAMED_SLICE n is (W_EXPLICIT_VAR sz v)) =
+        ([], W_NAMED_SLICE n is (W_EXPLICIT_VAR sz v), ix, length is)
+/\  normalize_wexpr ix (W_NAMED_SLICE n is w) =
+        val (ss, w', ix', sz') = normalize_wexpr ix w in
+        let v   = W_VAR sz' (sprintf "norm_slice_%d" ix') in
+        let ss' = (v,w') : ss in
+        (ss', W_NAMED_SLICE n is v, ix + 1, length is)
+/\  normalize_wexpr ix (W_CAT ws) =
+        letrec
+            go []     = ([],[],ix,0)
+        /\  go (a:as) =
+                val (ss, as', ix, szs) = go as in
+                val (ss', a', ix', sz) = normalize_wexpr ix a in
+                (ss'@ss, a':as', ix', sz+szs)
+        in
+        val (ss, ws', ix', sz) = go ws in
+        (ss, W_CAT ws', ix', sz)
+// Not sure what to do with named slices and memory.
+/\  normalize_wexpr ix _ =
+        error "normalize_wexpr: W_UPDATE_NAMED_SLICE/W_MEM_[READ|WRITE]"
+;
+// todo: name clashes?
+// todo: some missing cases.
+
+let normalize_binary {ix::int} {op::wexpr->wexpr->wexpr} {a::wexpr} {b::wexpr} =
+        val (ss,  a', ix',  asz) = normalize_wexpr ix  a in
+        val (ss', b', ix'', _)   = normalize_wexpr ix' b in
+        (ss@ss', op a' b', ix'', asz)
+;
+
+let normalize_update_fn ix (W_UPDATE_FN lhs rhs) =
+        val (ss, rhs', ix', _) = normalize_wexpr ix rhs in
+        let mk (W_VAR sz v, _) = sz == 1 => v | sprintf "%s[%d:0]" v (sz-1) in
+        (W_UPDATE_FN lhs rhs' : map (curry W_UPDATE_FN) ss, ix', map mk ss)
+/\  normalize_update_fn _ (W_PHASE_DELAY _ _) =
+        error "normalize_update_fn: W_PHASE_DELAY"
+;
+
+// Rewrites a pexlif into its "normal" form, where 'normalize' basically means
+// 'supports translation into Verilog'. This "normal" form requires that:
+//    1) Any 'update_fn's LHS is either a name, a sliced name, or a (possibly 
+//       nested) concatenation of such names (*).
+//    2) Slices are contig. on fully indexed arrays (*).
+//    3) Slices are only made on variables.
+//    4) Sign extensions are only made on variables.
+//
+// [*] See 'valid_lhs' in "IDVII/src/fl/verilog/pretty-pexlif/" for a FL def. of
+// what it considers to be valid LHSs.
+//
+// Rewriting can thus introduce additional internal wires.
+letrec
+    normalize_pexlif (PINST name attrs T fa_inps fa_outs internals (P_LEAF fs)) =
+        letrec
+            go []     = ([], 0, [])
+        /\  go (f:fs) =
+                val (gs, ix,  is) = go fs in
+                val (hs, ix', js) = normalize_update_fn ix f in
+                (hs@gs, ix', js@is)
+        in
+        val (fs', _, vs) = go fs in
+        let internals' = internals @ vs in
+        PINST name attrs T fa_inps fa_outs internals' (P_LEAF fs')
+/\  normalize_pexlif (PINST name attrs F fa_inps fa_outs internals (P_HIER cs)) =
+        let cs' = map normalize_pexlif cs in
+        PINST name attrs F fa_inps fa_outs internals (P_HIER cs')
+;
+// todo: normalize indices.
+// todo: what do we do about slices in delays? split size to comb. and use new
+// slice-variable in phase delay?
+
+end_abstype normalize_pexlif;
 
 // -----------------------------------------------------------------------------
 
@@ -653,7 +779,9 @@ letrec
         PINST n as' F is os ts (P_HIER (map draw_hier_pinst cs))
 ;
 
-end_abstype draw_hier_pinst;
+let decorate_pexlif_hiers = draw_hier_pinst;
+
+end_abstype decorate_pexlif_hiers;
 
 //------------------------------------------------------------------------------
 // Fin.
