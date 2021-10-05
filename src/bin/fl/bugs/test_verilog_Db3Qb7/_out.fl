@@ -1,0 +1,39 @@
+forward_declare {Qtest_1::((string#string) list) -> ((string#(string list)) list) -> pexlif};
+
+let Qtest_1 {attrs::(string#string) list} conns =
+    let inps = [ "in1[1:0]" ] in
+    let outs = [ "out1" ] in
+    let ints = md_extract_vectors [ "TmP_0",
+                 "TmP_1[1:0]",
+                 "TmP_2",
+                 "X",
+                 "i1[1:0]" ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _gt 1 "/tmp/voss2_mararon_rp0d9v/test_verilog_Db3Qb7/test.v:13.15-13.31" ["TmP_0"] ["TmP_2"] ["X"] ,
+        _land 33 "/tmp/voss2_mararon_rp0d9v/test_verilog_Db3Qb7/test.v:12.13-12.46" ["i1[1:0]"] ["0b00000000000000000000000000000000", "in1[1]"] ["TmP_1[1:0]"],
+        _lor 1 "/tmp/voss2_mararon_rp0d9v/test_verilog_Db3Qb7/test.v:13.15-13.41" ["out1"] ["TmP_0"] ["in1[1]"],
+        _not 2 "/tmp/voss2_mararon_rp0d9v/test_verilog_Db3Qb7/test.v:12.34-12.45" ["TmP_1[1:0]"] ["in1[1:0]"],
+        _not 1 "/tmp/voss2_mararon_rp0d9v/test_verilog_Db3Qb7/test.v:13.16-13.24" ["TmP_2"] ["i1[1]"]
+    ] in
+    PINST "draw_hier test_1" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let Qtest {attrs::(string#string) list} conns =
+    let inps = [ "in1[1:0]" ] in
+    let outs = [ "out1" ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        Qtest_1 [("instance", "anon_1"), ("src", "/tmp/voss2_mararon_rp0d9v/test_verilog_Db3Qb7/test.v:5.8-5.43")] [
+                ("in1[1:0]",["in1[1:0]"]),
+                ("out1",["out1"])]
+    ] in
+    PINST "draw_hier test" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+

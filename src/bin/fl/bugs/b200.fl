@@ -153,16 +153,25 @@ non_lazy gen_pex;
 let gen s = pexlif2verilog (normalize_pexlif (gen_pex s 4 2 2));
 non_lazy gen;
 
+letrec
+    no_attrs (PINST n _ l i o t (P_HIER cs)) =
+        PINST n [] l i o t (P_HIER (map no_attrs cs))
+/\  no_attrs (PINST n _ l i o t (P_LEAF fs)) =
+        PINST n [] l i o t (P_LEAF fs)
+;
+
 let gen_test s =
-        let pex  = normalize_pexlif (gen_pex s 4 2 2) then
+        (printf "=== Generating example %d\n" s) fseq
+        let pex = normalize_pexlif (gen_pex s 4 2 2) then
+        (pretty_pexlif pex)  fseq
+        // /
+        (printf "=== Generating verilog for example %d:\n" s) fseq
+        (print (pexlif2verilog pex)) fseq
+        (printf "\n=== Reading verilog for example %d back to pexlif:\n" s) fseq
         let pex' = pex2pex pex then
-        let eq   = miter_test pex pex' then
-        eq => print "OK\n" |
-        (print "\nERROR: pex2pex failed with") fseq
-        (pretty_pexlif pex) fseq
-        (print "\nERROR: where it generated") fseq
-        (pretty_pexlif pex') fseq
-        (print "\n")
+        (pretty_pexlif (no_attrs pex')) fseq
+        // /
+        miter_test pex pex' => print "OK\n" | print "ERROR\n"
 ;
 non_lazy gen_test;
 
