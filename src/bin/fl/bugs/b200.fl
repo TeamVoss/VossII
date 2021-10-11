@@ -95,12 +95,20 @@ let mk_miter p1 p2 =
       (mpexlif, mant, mcons)
 ;
 
-let miter_test p g =
+let miter_test T p g =
+      val (miter, ant, cons) = mk_miter p g then
+      let vis = STE_debug (pexlif2fsm miter) then
+      let ste = STE "-e -m 10" vis [] ant cons [] then
+      get_ste_result ste ""
+/\  miter_test F p g =
       val (miter, ant, cons) = mk_miter p g then
       let vis = pexlif2fsm miter then
       let ste = STE "-e -m 10" vis [] ant cons [] then
-      get_ste_result ste "";
+      get_ste_result ste ""
 ;
+
+let miter_debug = miter_test T;
+let miter_run   = miter_test F;
 
 // =============================================================================
 // Randomized example.
@@ -153,6 +161,8 @@ non_lazy gen_pex;
 let gen s = pexlif2verilog (normalize_pexlif (gen_pex s 4 2 2));
 non_lazy gen;
 
+// -----------------------------------------------------------------------------
+
 letrec
     no_attrs (PINST n _ l i o t (P_HIER cs)) =
         PINST n [] l i o t (P_HIER (map no_attrs cs))
@@ -160,20 +170,46 @@ letrec
         PINST n [] l i o t (P_LEAF fs)
 ;
 
-let gen_test s =
-        (printf "=== Generating example %d\n" s) fseq
+let pexlif_test T s =
+        // Print out intermediates when debugging.
         let pex = normalize_pexlif (gen_pex s 4 2 2) then
-        (pretty_pexlif pex)  fseq
-        // /
-        (printf "=== Generating verilog for example %d:\n" s) fseq
-        (print (pexlif2verilog pex)) fseq
-        (printf "\n=== Reading verilog for example %d back to pexlif:\n" s) fseq
-        let pex' = pex2pex pex then
-        (pretty_pexlif (no_attrs pex')) fseq
-        // /
-        miter_test pex pex' => print "OK\n" | print "ERROR\n"
+        let ver = pexlif2verilog pex then
+        let gex = pex2pex pex then
+        //
+        (print  "========================================\n") fseq
+        (printf "(%d) Original" s) fseq
+        (pretty_pexlif pex) fseq
+        (print  "----------------------------------------\n") fseq
+        (printf "(%d) Verilog:\n%s\n" s ver) fseq
+        (printf "----------------------------------------\n") fseq
+        (printf "(%d) Pexlif" s) fseq
+        (pretty_pexlif (no_attrs gex)) fseq
+        //
+        (printf "%s\n" (miter_debug pex gex => "OK" | "ERROR"))
+/\  pexlif_test F s =
+        let pex = normalize_pexlif (gen_pex s 4 2 2) then
+        let gex = pex2pex pex then
+        //
+        (printf "%s\n" (miter_run pex gex => "OK" | "ERROR"))
 ;
-non_lazy gen_test;
+
+let test_debug = pexlif_test T;
+let test_run   = pexlif_test F;
+
+// let gen_test s =
+//         (printf "=== Generating example %d\n" s) fseq
+//         let pex = normalize_pexlif (gen_pex s 4 2 2) then
+//         (pretty_pexlif pex)  fseq
+//         // /
+//         (printf "=== Generating verilog for example %d:\n" s) fseq
+//         (print (pexlif2verilog pex)) fseq
+//         (printf "\n=== Reading verilog for example %d back to pexlif:\n" s) fseq
+//         let pex' = pex2pex pex then
+//         (pretty_pexlif (no_attrs pex')) fseq
+//         // /
+//         miter_test pex pex' => print "OK\n" | print "ERROR\n"
+// ;
+// non_lazy gen_test;
 
 // =============================================================================
 // Small example.

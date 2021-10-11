@@ -12,6 +12,7 @@ let is_user_given s =
     NOT (str_is_substr "_TMP_" s) AND
     NOT (str_is_substr "TmP_" s)
 ;
+// todo: Pexlif's generated randomly doesn't follow this name schema.
 
 // A type to represent continous bit ranges
 // and individual index bits

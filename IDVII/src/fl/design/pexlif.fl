@@ -595,17 +595,6 @@ let normalize_binary {ix::int} {op::wexpr->wexpr->wexpr} {a::wexpr} {b::wexpr} =
         (ss@ss', op a' b', ix'', asz)
 ;
 
-// letrec
-//     split [] = ([], [])
-// /\  split (i:[]) = ([i], [])
-// /\  split (i:j:is) = (i-j == 1) =>
-//         first (\xs. i : xs) (split (j:is)) |
-//         ([i], (j:is))
-// in
-// letrec
-//     cats [] = [[]]
-// /\  cats is = val (l,r) = split is in l : (cats r)
-// in
 let normalize_slice {ix::int} (W_SLICE is v) =
         // Slices are only allowed on certain things, make sure this is it.
         let is_var (W_VAR _ _) = T
