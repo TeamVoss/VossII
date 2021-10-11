@@ -97,7 +97,7 @@ let mk_miter p1 p2 =
 
 let miter_test p g =
       val (miter, ant, cons) = mk_miter p g then
-      let vis = STE_debug (pexlif2fsm miter) then
+      let vis = pexlif2fsm miter then
       let ste = STE "-e -m 10" vis [] ant cons [] then
       get_ste_result ste "";
 ;

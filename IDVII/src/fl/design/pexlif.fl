@@ -577,10 +577,58 @@ end_abstype gen_pinst_leaf gen_pinst gen_pinst_graph;
 
 begin_abstype;
 
-forward_declare{normalize_binary::
-    int->(wexpr->wexpr->wexpr)->wexpr->wexpr->
-    (((wexpr#wexpr) list)#(wexpr#(int#int)))
-};
+// forward_declare{normalize_binary::
+//     int->(wexpr->wexpr->wexpr)->wexpr->wexpr->
+//     (((wexpr#wexpr) list)#(wexpr#(int#int)))
+// };
+
+forward_declare{normalize_wexpr::int->wexpr->(((wexpr#wexpr) list)#(wexpr#(int#int)))};
+
+let normalize_unary {ix::int} {op::wexpr->wexpr} {a::wexpr} =
+        val (ss, a', ix', asz) = normalize_wexpr ix a in
+        (ss, op a', ix', asz)
+;
+
+let normalize_binary {ix::int} {op::wexpr->wexpr->wexpr} {a::wexpr} {b::wexpr} =
+        val (ss,  a', ix',  asz) = normalize_wexpr ix  a in
+        val (ss', b', ix'', _)   = normalize_wexpr ix' b in
+        (ss@ss', op a' b', ix'', asz)
+;
+
+// letrec
+//     split [] = ([], [])
+// /\  split (i:[]) = ([i], [])
+// /\  split (i:j:is) = (i-j == 1) =>
+//         first (\xs. i : xs) (split (j:is)) |
+//         ([i], (j:is))
+// in
+// letrec
+//     cats [] = [[]]
+// /\  cats is = val (l,r) = split is in l : (cats r)
+// in
+let normalize_slice {ix::int} (W_SLICE is v) =
+        // Slices are only allowed on certain things, make sure this is it.
+        let is_var (W_VAR _ _) = T
+        /\  is_var (W_EXPLICIT_VAR _ _) = T
+        /\  is_var _ = F
+        in
+        val (ss,  v',  ix', sz) = normalize_wexpr ix v in
+        val (ss', v'', ix'') = is_var v' => (ss, v', ix') |
+                let var = W_VAR sz (sprintf "norm_slice_%d" ix') in
+                ((var, v') : ss, var, ix' + 1)
+        in
+        // Can't have non-contig. indexing in Verilog, so we split each non-
+        // contig. interval into its own slice and concatenate them all.
+        letrec
+            fill m l = m == l => [m] | m : fill (m-1) l
+        in
+        let slice (BR_SINGLE ix) = W_SLICE [ix] v''
+        /\  slice (BR_SLICE m l) = W_SLICE (fill m l) v''
+        in
+        let ws = map slice (group_indices is) in
+        let w  = length ws == 1 => hd ws | W_CAT ws in
+        (ss', w, ix'', length is)
+;
 
 letrec
     normalize_wexpr ix (W_X sz) = ([], W_X sz, ix, sz)
@@ -590,13 +638,9 @@ letrec
 /\  normalize_wexpr ix (W_EXPLICIT_VAR sz n) = ([], W_EXPLICIT_VAR sz n, ix, sz)
 /\  normalize_wexpr ix (W_AND a b)  = normalize_binary ix W_AND a b
 /\  normalize_wexpr ix (W_OR a b)   = normalize_binary ix W_OR a b
-/\  normalize_wexpr ix (W_NOT a)    =
-        val (ss, a', ix', asz) = normalize_wexpr ix a in
-        (ss, W_NOT a', ix', asz)
+/\  normalize_wexpr ix (W_NOT a)    = normalize_unary  ix W_NOT a
 /\  normalize_wexpr ix (W_EQ a b)   = normalize_binary ix W_EQ a b
-/\  normalize_wexpr ix (W_PRED n c) = 
-        val (ss, c', ix', csz) = normalize_wexpr ix c in
-        (ss, W_PRED n c', ix', csz)
+/\  normalize_wexpr ix (W_PRED n c) = normalize_unary  ix (W_PRED n) c
 /\  normalize_wexpr ix (W_GR a b)   = normalize_binary ix W_GR a b
 /\  normalize_wexpr ix (W_ADD a b)  = normalize_binary ix W_ADD a b
 /\  normalize_wexpr ix (W_SUB a b)  = normalize_binary ix W_SUB a b
@@ -627,24 +671,11 @@ letrec
         (ss@ss'@ss'', W_ITE c' a' b', ix'', asz)
 // If 'W_SLICE' or 'W_NAMED_SLICE' is called on anything but a variable we need
 // to split the 'wexpr' and name the intermediate result.
-/\  normalize_wexpr ix (W_SLICE is (W_VAR sz v)) =
-        ([], W_SLICE is (W_VAR sz v), ix, length is)
-/\  normalize_wexpr ix (W_SLICE is (W_EXPLICIT_VAR sz v)) =
-        ([], W_SLICE is (W_EXPLICIT_VAR sz v), ix, length is)
-/\  normalize_wexpr ix (W_SLICE is w) =
-        val (ss, w', ix', sz') = normalize_wexpr ix w in
-        let v   = W_VAR sz' (sprintf "norm_slice_%d" ix') in
-        let ss' = (v,w') : ss in
-        (ss', W_SLICE is v, ix + 1, length is)
-/\  normalize_wexpr ix (W_NAMED_SLICE n is (W_VAR sz v)) =
-        ([], W_NAMED_SLICE n is (W_VAR sz v), ix, length is)
-/\  normalize_wexpr ix (W_NAMED_SLICE n is (W_EXPLICIT_VAR sz v)) =
-        ([], W_NAMED_SLICE n is (W_EXPLICIT_VAR sz v), ix, length is)
-/\  normalize_wexpr ix (W_NAMED_SLICE n is w) =
-        val (ss, w', ix', sz') = normalize_wexpr ix w in
-        let v   = W_VAR sz' (sprintf "norm_slice_%d" ix') in
-        let ss' = (v,w') : ss in
-        (ss', W_NAMED_SLICE n is v, ix + 1, length is)
+/\  normalize_wexpr ix (W_SLICE is v) =
+        normalize_slice ix (W_SLICE is v)
+/\  normalize_wexpr ix (W_NAMED_SLICE _ is v) =
+        print "NAMED_SLICE is treated as SLICE" fseq
+        normalize_slice ix (W_SLICE is v)
 /\  normalize_wexpr ix (W_CAT ws) =
         letrec
             go []     = ([],[],ix,0)
@@ -661,12 +692,9 @@ letrec
 ;
 // todo: name clashes?
 // todo: some missing cases.
-
-let normalize_binary {ix::int} {op::wexpr->wexpr->wexpr} {a::wexpr} {b::wexpr} =
-        val (ss,  a', ix',  asz) = normalize_wexpr ix  a in
-        val (ss', b', ix'', _)   = normalize_wexpr ix' b in
-        (ss@ss', op a' b', ix'', asz)
-;
+// todo: split non-contig. slices into a concatenation of its contig.
+// sub-slices/indices, for example:
+//   (i2[31:0])[16,25] -> {(i2[31:0])[16],(i2[31:0])[25]}
 
 let normalize_update_fn ix (W_UPDATE_FN lhs rhs) =
         val (ss, rhs', ix', _) = normalize_wexpr ix rhs in
