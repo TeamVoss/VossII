@@ -33,6 +33,7 @@ extern bool		RCprint_failures;
 extern bool		RCverbose_ste_run;
 extern bool		RCprint_time;
 extern bool		RCaccurate_ite_comp;
+extern bool		RCaccurate_hierachy_visualization;
 extern g_ptr		void_nd;
 extern bool		Do_gc_asap;
 extern FILE		*odests_fp;
@@ -144,6 +145,7 @@ static buffer	    *old_top_outsp;
 static ilist_ptr    idx_map_result;
 static ilist_ptr    im_cur;
 static hash_record  idx_list_uniq_tbl;
+static hash_record  bb_tbl;;
 static buffer	    *sim_wheel_bufp;
 //
 static hash_record  *active_weak_tblp;
@@ -365,7 +367,8 @@ static void         op_MEM_READ(ncomp_ptr op);
 static void         op_MEM_WRITE(ncomp_ptr op);
 static bool         traverse_pexlif(hash_record *parent_tblp, g_ptr p,
                                     string hier, bool top_level,
-                                    int draw_level);
+                                    int draw_level, int inst_cnt,
+				    int max_depth);
 static bool         no_fanout(ncomp_ptr cp);
 static int          assign_rank(int depth, ncomp_ptr cp);
 static int          rank_order();
@@ -947,12 +950,10 @@ fl_clean_pexlif_ios(g_ptr redex)
 }
 #endif
 
-static void
-pexlif2fsm(g_ptr redex)
+
+static fsm_ptr
+gen_pexlif2fsm(g_ptr p, g_ptr black_box_list, int max_depth)
 {
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr p = GET_APPLY_RIGHT(redex);
     p = clean_pexlif_ios(p);
     //
     fsm_ptr fsm = create_fsm();
@@ -964,8 +965,15 @@ pexlif2fsm(g_ptr redex)
     new_mgr(&node_comp_pair_rec_mgr, sizeof(node_comp_pair_rec));
     create_hash(&node_comp_pair_tbl, 1000, ni_pair_hash, ni_pair_equ);
     create_hash(&idx_list_uniq_tbl, 100, idx_list_hash, idx_list_equ);
+    create_hash(&bb_tbl, 1000, str_hash, str_equ);
     hash_record parent_tbl;
     create_hash(&parent_tbl, 2, str_hash, str_equ);
+    if( black_box_list != NULL ) {
+	for(g_ptr bbl = black_box_list; !IS_NIL(bbl); bbl = GET_CONS_TL(bbl)) {
+	    string bb_inst = GET_STRING(GET_CONS_HD(bbl));
+	    insert_hash(&bb_tbl, bb_inst, bb_inst);
+	}
+    }
     // Default nodes
     // 0    == constant 0
     // 1    == constant 1
@@ -976,20 +984,68 @@ pexlif2fsm(g_ptr redex)
     declare_vector(&parent_tbl, "", wastrsave(&strings, "!X"),FALSE,NULL,NULL);
     declare_vector(&parent_tbl, "", wastrsave(&strings, "!T"),FALSE,NULL,NULL);
     ihier_buf[0] = 0;
-    if( traverse_pexlif(&parent_tbl, p, "", TRUE, 0) ) {
-        MAKE_REDEX_EXT_OBJ(redex, fsm_oidx, fsm);
+    if( traverse_pexlif(&parent_tbl, p, "", TRUE, 0, 1, max_depth) ) {
         fsm->top_name = get_top_name(p);
         fsm->ranks = rank_order();
         fsm->sha256_sig = compute_sha256_signature(fsm);
     } else {
-        MAKE_REDEX_FAILURE(redex, FailBuf);
+	fsm = NULL;
     }
     free_mgr(&node_comp_pair_rec_mgr);
     dispose_hash(&node_comp_pair_tbl, NULLFCN);
     dispose_hash(&parent_tbl, NULLFCN);
     dispose_hash(&idx_list_uniq_tbl, NULLFCN);
+    dispose_hash(&bb_tbl, NULLFCN);
     free_buf(&attr_buf);
     pop_fsm();
+    return fsm;
+}
+
+static void
+toplevel_pexlif2fsm(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr p = GET_APPLY_RIGHT(redex);
+    fsm_ptr fsm = gen_pexlif2fsm(p, NULL, 1);
+    if( fsm != NULL ) {
+        MAKE_REDEX_EXT_OBJ(redex, fsm_oidx, fsm);
+    } else {
+        MAKE_REDEX_FAILURE(redex, FailBuf);
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+pexlif2fsm(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr p = GET_APPLY_RIGHT(redex);
+    fsm_ptr fsm = gen_pexlif2fsm(p, NULL, -1);
+    if( fsm != NULL ) {
+        MAKE_REDEX_EXT_OBJ(redex, fsm_oidx, fsm);
+    } else {
+        MAKE_REDEX_FAILURE(redex, FailBuf);
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+pexlif2fsm2(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr p, bb_list;
+    EXTRACT_2_ARGS(redex, p, bb_list);
+    fsm_ptr fsm = gen_pexlif2fsm(p, bb_list, -1);
+    if( fsm != NULL ) {
+        MAKE_REDEX_EXT_OBJ(redex, fsm_oidx, fsm);
+    } else {
+        MAKE_REDEX_FAILURE(redex, FailBuf);
+    }
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
@@ -2435,9 +2491,21 @@ Fsm_Install_Functions()
 			GLmake_arrow(pexlif_tp, pexlif_tp),
 			fl_clean_pexlif_ios);
 
+    Add_ExtAPI_Function("toplevel_pexlif2fsm", "1", FALSE,
+			GLmake_arrow(pexlif_tp, fsm_handle_tp),
+			toplevel_pexlif2fsm);
+
     Add_ExtAPI_Function("pexlif2fsm", "1", FALSE,
 			GLmake_arrow(pexlif_tp, fsm_handle_tp),
 			pexlif2fsm);
+
+    Add_ExtAPI_Function("pexlif2fsm2", "11", FALSE,
+			GLmake_arrow(
+			    pexlif_tp, 
+			    GLmake_arrow(
+				GLmake_list(GLmake_string()),
+				fsm_handle_tp)),
+			pexlif2fsm2);
 
     typeExp_ptr weak_tp = GLmake_list(
 			    GLmake_tuple(
@@ -6754,7 +6822,7 @@ op_MEM_WRITE(ncomp_ptr op)
 
 static bool
 traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
-                bool top_level, int draw_level)
+                bool top_level, int draw_level, int inst_cnt, int max_depth)
 {
     hash_record vinfo_tbl;
     create_hash(&vinfo_tbl, 100, str_hash, str_equ);
@@ -6776,11 +6844,10 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
         declare_vector(&vinfo_tbl, hier, name, FALSE, NULL, value_list);
     }
     vis_ptr vp = NULL;
-#if 1
-    if( !top_level && (leaf || (strstr(name,"draw_") != NULL))){
-#else
-    if( !top_level ){
-#endif
+    if( !top_level && 
+	(RCaccurate_hierachy_visualization ||
+	 (leaf || (strstr(name,"draw_") != NULL))))
+    {
         vp = (vis_ptr) new_rec(vis_rec_mgrp);
         vp->draw_level = draw_level;
         vp->attrs = attrs;
@@ -6933,12 +7000,10 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
             *(res+len) = 0;
             sprintf(buf, "%s_code %d %s", res, nbr_inputs, res+len+1);
             vp->pfn = wastrsave(&strings, buf);
-#if 1
-        } else if( strncmp(vp->pfn, "draw_hier ", 10) == 0 ) {
-#else
         } else if(strncmp(vp->pfn, "draw_hier ", 10) == 0 ||
-		  strncmp(vp->pfn, "draw_", 5) != 0 ) {
-#endif
+		  (RCaccurate_hierachy_visualization &&
+		   strncmp(vp->pfn, "draw_", 5) != 0 ))
+	{
             tstr_ptr sm = new_temp_str_mgr();
             // Replace draw_hier txt with draw_fub txt inst inputs outputs
             string cmd = gen_strtemp(sm, "draw_fub ");
@@ -6959,6 +7024,7 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
                 cmd = gen_strappend(sm, iname);
                 cmd = gen_strappend(sm, "} ");
             }
+	    gen_tappend(sm, " %d ", inst_cnt);
             cmd = gen_strappend(sm, "{ ");
             for(g_ptr l = fa_inps; !IS_NIL(l); l = GET_CONS_TL(l)) {
                 g_ptr pair = GET_CONS_HD(l);
@@ -6995,17 +7061,20 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
 
     g_ptr children, fns;
     if( is_P_HIER(content, &children) ) {
-        // Hierarchy
-        int inst = 1;
-        int len = strlen(ihier_buf);
-        char *ep = &(ihier_buf[len]);
-        for(g_ptr cl = children; !IS_NIL(cl); cl = GET_CONS_TL(cl)) {
-            Sprintf(ep, "i%d/", inst++);
-            if( !traverse_pexlif(&vinfo_tbl, GET_CONS_HD(cl), ihier_buf,
-                                 FALSE, draw_level)) {
-                return FALSE;
-            }
-        }
+	// Only process children for non black-box instances
+	if( max_depth != 0 && find_hash(&bb_tbl, ihier_buf) == NULL ) {
+	    // Hierarchy
+	    int inst = 1;
+	    int len = strlen(ihier_buf);
+	    char *ep = &(ihier_buf[len]);
+	    for(g_ptr cl = children; !IS_NIL(cl); cl = GET_CONS_TL(cl)) {
+		Sprintf(ep, "i%d/", inst++);
+		if( !traverse_pexlif(&vinfo_tbl, GET_CONS_HD(cl), ihier_buf,
+				     FALSE, draw_level, inst-1, max_depth-1)) {
+		    return FALSE;
+		}
+	    }
+	}
     } else if( is_P_LEAF(content, &fns) ) {
         // Leaf update function
         temporary_node_cnt = 0;

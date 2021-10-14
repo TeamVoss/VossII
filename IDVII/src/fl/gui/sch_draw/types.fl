@@ -4,6 +4,25 @@
 //-------------------------------------------------------------------
 
 
+lettype justification =
+                        SPEC
+                    |   FOLD {ids::int list} {name::string}
+                    |   UNFOLD {id::int}
+                    |   REPLACE {ids::int list} {tr::transform}
+                    |   FEV {engine::string} {options::(string#string) list}
+                    |   DUPLICATE {id::int}
+                    |   MERGE {ids::int list}
+//
+// ...
+//
+andlettype transform =
+                        TRANSFORM
+                            {spec::pexlif}
+                            {imp::pexlif}
+                            {justification:: justification list}
+;
+
+
 lettype vfsm =
 	    STEV_ENV
 		{id::string}
@@ -17,62 +36,95 @@ lettype vfsm =
 		{canvas_list :: (((string#vis)list) ref)}
 		{fsm_list :: (((string#string)list) ref)}
 		{cmds::(string list) ref}
+	|
+	    IDV_ENV
+                {id::string}
+                {selection_list::(string list) ref}
+                {highlight_list::((string#string) list) ref}
+		{canvas_list :: (((string#vis)list) ref)}
+                {transfr :: ((pexlif#fsm#justification) list) ref}
+		{fsm_list :: (((string#string)list) ref)}
+		{cmds::(string list) ref}
 ;
 
-
-let vfsm2id vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
-    id
+let is_STE_ENV (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = T
+ /\ is_STE_ENV other = F
 ;
 
-let vfsm2fsm vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
-    fsm
+let is_IDV_ENV (IDV_ENV id selr hlr cvsr trfr fsmr cmds) = T
+ /\ is_IDV_ENV other = F
 ;
 
-let vfsm2ste_r vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
-    ster
+let get_current_idv_pexlif (IDV_ENV id selr hlr cvsr trfr fsmr cmds) =
+    val (p,ckt,just) = hd (deref trfr) in
+    p
 ;
 
-let vfsm2wvr vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
-    wvr
+let get_current_idv_fsm (IDV_ENV id selr hlr cvsr trfr fsmr cmds) =
+    val (p,ckt,just) = hd (deref trfr) in
+    ckt
 ;
 
-let vfsm2cur_time_r vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
-    tr
+let get_current_idv_design (IDV_ENV id selr hlr cvsr trfr fsmr cmds) =
+    val (p,ckt,just) = hd (deref trfr) in
+    (p,ckt)
 ;
 
-let vfsm2stop_list_r vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
-    stopr
+let get_idv_transf (IDV_ENV id selr hlr cvsr trfr fsmr cmds) = trfr
+ /\ get_idv_transf other = error "Only IDV_ENV has transformation sequences"
 ;
 
-let vfsm2selection_r vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
-    selr
+let vfsm2id (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = id
+/\  vfsm2id (IDV_ENV id selr hlr cvsr trfr fsmr cmds) = id
 ;
 
-let vfsm2canvases_r vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
-    cvsr
+let vfsm2fsm (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = fsm
+/\  vfsm2fsm idv_env = get_current_idv_fsm idv_env
 ;
 
-let vfsm2fsms_r vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
-    fsmr
+let vfsm2ste_r (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = ster
+/\  vfsm2ste_r (IDV_ENV id selr hlr cvsr trfr fsmr cmds) = error "No STE in IDV_ENV"
 ;
 
-let vfsm2hll_r vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
-    hlr
+let vfsm2wvr (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = wvr
+/\  vfsm2wvr (IDV_ENV id selr hlr cvsr trfr fsmr cmds) = error "No wv in IDV_ENV"
 ;
 
+let vfsm2cur_time_r (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) =
+	tr
+/\  vfsm2cur_time_r (IDV_ENV id selr hlr cvsr trfr fsmr cmds) =
+	error "No cur_t in IDV_ENV"
+;
 
-let vfsm2cmds_r vfsm =
-    val (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = vfsm in
-    cmd
+let vfsm2stop_list_r (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) =
+	stopr
+/\  vfsm2stop_list_r (IDV_ENV id selr hlr cvsr trfr fsmr cmds) =
+	error "No stopr in IDV_ENV"
+;
+
+let vfsm2selection_r (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) =
+	selr
+/\  vfsm2selection_r (IDV_ENV id selr hlr cvsr trfr fsmr cmds) = selr
+;
+
+let vfsm2canvases_r (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) =
+	cvsr
+/\  vfsm2canvases_r (IDV_ENV id selr hlr cvsr trfr fsmr cmds) = cvsr
+;
+
+let vfsm2fsms_r (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) =
+	fsmr
+/\  vfsm2fsms_r (IDV_ENV id selr hlr cvsr trfr fsmr cmds) =
+	fsmr
+;
+
+let vfsm2hll_r (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) =
+	hlr
+/\  vfsm2hll_r (IDV_ENV id selr hlr cvsr trfr fsmr cmds) = hlr
+;
+
+let vfsm2cmds_r (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) =
+	cmd
+/\  vfsm2cmds_r (IDV_ENV id selr hlr cvsr trfr fsmr cmds) = cmds
 ;
 

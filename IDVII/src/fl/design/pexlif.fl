@@ -37,6 +37,12 @@ let pexlif_get_formals (PINST _ _ _ fa_inps fa_outs _ _) =
 let pexlif_get_children (PINST _ _ _ _ _ _ (P_HIER cs)) = cs
 /\  pexlif_get_children _ = []
 ;
+let pexlif_get_inps_actuals (PINST _ _ _ fa_inps fa_outs _ _) =
+        md_extract_vectors (flatmap snd fa_inps)
+;
+let pexlif_get_outs_actuals (PINST _ _ _ fa_inps fa_outs _ _) =
+        md_extract_vectors (flatmap snd fa_outs)
+;
 
 //------------------------------------------------------------------------------
 
@@ -218,14 +224,11 @@ let fold_pexlif pex ids name =
 
 // Crate a new pexlif in which all the instances inside the instance id
 // are lifted up one level in the hierarchy. All the internal wires
-// inside instance id is given a prefix 'pref'.
-// Note that unfold fails if there is a name conflict between the
-// lifted wire names (with prefix) and an already existing wire name.
-// ...
-//  unfold_pexlif::PINST->int->string->PINST
+// inside instance id is given new names (prefix #<number>-).
+//  unfold_pexlif::PINST->int->PINST
 let
-    unfold_pexlif pex id pref =
-        val (PINST n a l i o t (P_HIER cs)) = unfold_pexlif pex id pref in
+    unfold_pexlif pex id =
+        val (PINST n a l i o t (P_HIER cs)) = unfold_pexlif pex id in
         let lbl (PINST n a l i o t c) = PINST n a l i o t c in
         PINST n a l i o t (P_HIER (map lbl cs))
 ;
@@ -719,3 +722,12 @@ end_abstype draw_hier_pinst;
 
 //------------------------------------------------------------------------------
 // Fin.
+
+let wrap_pexlif p =
+    val (PINST _ _ _ l_fa_inps l_fa_outs _ _) = p in
+    let mk_io fa = map (\v. v, [v]) (md_extract_vectors (flatmap snd fa)) in
+    let fa_inps = mk_io l_fa_inps in
+    let fa_outs = mk_io l_fa_outs in
+    (PINST "wrapper" [] F fa_inps fa_outs [] (P_HIER [p]))
+;
+

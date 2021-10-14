@@ -10,7 +10,8 @@ let mk_name sz base = sz = 1 => base | sprintf "%s[%d:0]" base (sz-1);
 let is_user_given s =
     NOT (str_is_substr "__tmp" s) AND
     NOT (str_is_substr "_TMP_" s) AND
-    NOT (str_is_substr "TmP_" s)
+    NOT (str_is_substr "TmP_" s) AND
+    NOT (str_is_substr "_$" s)
 ;
 
 // A type to represent continous bit ranges

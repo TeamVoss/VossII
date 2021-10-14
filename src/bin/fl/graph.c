@@ -1412,7 +1412,7 @@ Mark(g_ptr node)
 
     if( node == NULL ) 
 	return;
-    if( GET_MARK(node) == 1 ) {
+    if( GET_MARK(node) >= 1 ) {
 	SET_REFCNT(node,MAX_REF_CNT);
 	return;
     }

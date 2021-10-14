@@ -11,11 +11,11 @@ set voss2_preferences {
 	"Font used for text widgets" "enum"
 	"-*-courier-bold-r-normal-*-14-*-*-*-*-*-*-* -*-courier-bold-r-normal-*-10-*-*-*-*-*-*-* -*-courier-bold-r-normal-*-12-*-*-*-*-*-*-* -*-courier-bold-r-normal-*-16-*-*-*-*-*-*-* -*-courier-bold-r-normal-*-18-*-*-*-*-*-*-* -*-courier-bold-r-normal-*-20-*-*-*-*-*-*-*"}
 
-    {"Runtime" "" "" "header" ""}
+ {"Runtime" "" "" "header" ""}
     {"RECURSION-CALL-LIMIT" "RCcall_limit"
 	"Maximum recursion limit" "int" "10000"}
 
-    {"BDD" "" "" "header" ""}
+ {"BDD" "" "" "header" ""}
     {"DYNAMIC-ORDERING" "RCdo_dynamic_var_order"
         "Perform dynamic ordering" "bool" "TRUE"}
     {"DYNAMIC-ORDERING-THRESHOLD" "RCdynamic_ordering_threshold"
@@ -31,7 +31,7 @@ set voss2_preferences {
     {"MIN-RECOVERY-IN-DYNAMIC-ORDERING" "RCminimum_reduction"
         "Minimum recovery to continue reordering" "int"  "100"}
 
-    {"Bexprs" "" "" "header" ""}
+ {"Bexprs" "" "" "header" ""}
     {"BEXPR-ORDER-AND-ARGS" "RC_reorder_bexpr_ands"
         "Reorder the argumanet to ANDs to make bexrs more similar"
 	"bool" "FALSE"}
@@ -43,7 +43,7 @@ set voss2_preferences {
     {"BEXPR-SAT-TIME-LIMIT" "RC_BEXPR_SAT_LIMIT"
 	"Maximum time used to make bexpr canonical" "int" "5"}
 
-    {"STE" "" "" "header" ""}
+ {"STE" "" "" "header" ""}
     {"DELAY-MODEL" "RCdel_model"
         "Delay model used for simulation" "enum"
         "UNIT-DELAY MINIMUM-DELAY MAXIMUM-DELAY AVERAGE-DELAY BOUNDED-DELAY"}
@@ -64,7 +64,7 @@ set voss2_preferences {
     {"ACCURATE-ITE-COMP" "RCaccurate_ite_comp"
         "Ignore X on condition if then and else are equal" "bool" "TRUE"}
 
-    {"Verbosity" "" "" "header"  ""}
+ {"Verbosity" "" "" "header"  ""}
     {"VERBOSE_CLOAD_IGNORES" "RCverbose_cload_ignores"
         "Notify when cload does not need to load" "bool"  "FALSE"}
     {"VERBOSE-GARBAGE-COLLECTION" "RCverbose_GC"
@@ -90,7 +90,13 @@ set voss2_preferences {
     {"VERBOSE-IMAGE-PRINT" "RCverbose_image_print"
         "Print out detailed image" "bool"  "FALSE"}
 
-    {"System" "" "" "header"  ""}
+ {"Visualization" "" "" "header" ""}
+    {"ACCURATE-HIERARCHY-VISUALIZATION" "RCaccurate_hierachy_visualization"
+        "Draw every level of hierarchy" "bool"  "FALSE"}
+    {"DRAW-FULL-STATEMENTS" "RCdraw_full_statements"
+	"Always draw the statement as written" "bool" "FALSE"}
+
+ {"System" "" "" "header"  ""}
     {"TMP_FILE_DIR" "RC_TMP_FILE_DIR"
         "Directory in which temporary directory will be created"
         "string" "/tmp"}

@@ -834,7 +834,6 @@ let get_window_result window =
     tcl_eval [sprintf "util:wait_for_button %s" w]
 ;
 
-
 // Create a top-level window with the msg_header text highlighted followed by
 // the content of the msg_file file.
 // Also create a list of buttons, one for each (name,ret_val) pair
@@ -1898,3 +1897,9 @@ install_print_function Pvec_info;
 // Convert a vec_info list to a single string.
 // It is the reverse of md_split_vector.
 let vec_info2str vinfo_list =  list2str T "" "" "" Pvec_info vinfo_list;
+
+// Report an error with a toplevel window.
+let report_error msg =
+    (tcl_eval [sprintf "report_error {%s}" msg]) fseq ()
+;
+non_lazy report_error;

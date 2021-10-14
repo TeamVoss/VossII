@@ -167,6 +167,21 @@ Draw_Graph_Install_Functions()
 /*                          Local functions                                 */
 /****************************************************************************/
 
+static string
+make_string_safe(string s)
+{
+    string res = strtemp("");
+    while(*s) {
+	if( *s == '"' ) {
+	    res = charappend('\\');
+	}
+	res = charappend(*s);
+	s++;
+    }
+    res = charappend(*s);
+    return res;
+}
+
 static int
 draw_graph_rec(FILE *fp, hash_record *hp, int depth, bool do_addr, 
 		g_ptr node)
@@ -267,7 +282,7 @@ draw_graph_rec(FILE *fp, hash_record *hp, int depth, bool do_addr,
 				 res, s, th);
 		    return res;
 		case STRING:
-		    s = GET_STRING(node);
+		    s = make_string_safe(GET_STRING(node));
 		    if( do_addr )
 			fprintf(fp,
 		        "n%u [shape=plaintext, label = \"\\\"%s\\\"%s,%p\"];\n",

@@ -666,7 +666,7 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
 }
 
 g_ptr
-unfold_pexlif(g_ptr p, unint id, string prefix)
+unfold_pexlif(g_ptr p, unint id)
 {
     new_fold_mem();
     new_adj_mem();
@@ -735,17 +735,18 @@ unfold_pexlif(g_ptr p, unint id, string prefix)
     tstr_ptr ts = new_temp_str_mgr();
     FOR_CONS(un_inter, li, item) {
         string old = GET_STRING(item);
-        string buf = gen_strtemp(ts, prefix);
-        gen_strappend(ts, old);
-        string new = wastrsave(&strings, buf);
-	if( VDB_has_name_collision(vdp, new) ) {
-	    string msg = Fail_pr("Name collision for node %s", new);
-	    g_ptr result = Make_Failure(msg);
-	    VDB_destroy(vdp);
-	    dispose_hash(&sub, NULLFCN);
-	    free_mgr(&subst_hash_record_mgr);
-	    return result;
+	string new = old;
+	while( VDB_has_name_collision(vdp, new) ) {
+	    int cnt;
+	    if( sscanf(new, "#%d_", &cnt) != 1 ) {
+		new = wastrsave(&strings, gen_tprintf(ts, "#1_%s", old));
+	    } else {
+		string p = old;
+		while( *p && *p != '_' ) p++;
+		new = wastrsave(&strings, gen_tprintf(ts, "#%d%s", cnt+1, p));
+	    }
 	}
+	VDB_Insert_vector(vdp, new);
         g_ptr newg = Make_STRING_leaf(new);
         INC_REFCNT(newg);
         APPEND1(new_inter_tail, newg);
@@ -1415,10 +1416,10 @@ unfold_pexlif_fn(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr g_pex, g_id, g_prefix;
+    g_ptr g_pex, g_id;
     // /
-    EXTRACT_3_ARGS(redex, g_pex, g_id, g_prefix);
-    g_ptr unfold = unfold_pexlif(g_pex, GET_INT(g_id), GET_STRING(g_prefix));
+    EXTRACT_2_ARGS(redex, g_pex, g_id);
+    g_ptr unfold = unfold_pexlif(g_pex, GET_INT(g_id));
     if( unfold == NULL ) {
 	MAKE_REDEX_FAILURE(redex, FailBuf);
 	DEC_REF_CNT(l);
@@ -1495,15 +1496,9 @@ Pexlif_Install_Functions()
     );
     Add_ExtAPI_Function(
           "unfold_pexlif"
-        , "111"
+        , "11"
         , FALSE
-        , GLmake_arrow(
-              pexlif_tp
-            , GLmake_arrow(
-                  GLmake_int()
-                , GLmake_arrow(
-                      GLmake_string()
-                    , pexlif_tp)))
+        , GLmake_arrow(pexlif_tp, GLmake_arrow(GLmake_int(), pexlif_tp))
         , unfold_pexlif_fn
     );
 }

@@ -992,3 +992,34 @@ proc bbox2fl {bb} {
 }
 
 change_fonts $::voss2_txtfont
+
+
+proc balloon {w help} {
+    bind $w <Any-Enter> "after 300 [list balloon:show %W [list $help]]"
+    bind $w <Any-Leave> "destroy %W.balloon"
+}
+
+proc balloon:remove {w} {
+    catch {destroy $w}
+}
+
+proc balloon:show {w arg} {
+    set top $w.balloon
+    catch {destroy $top}
+    catch {destroy $::last_balloon_window}
+    set ::last_balloon_window $top
+    toplevel $top -bd 1 -bg black
+    wm overrideredirect $top 1
+    if {[string equal [tk windowingsystem] aqua]}  {
+        ::tk::unsupported::MacWindowStyle style $top help none
+    }   
+    pack [message $top.txt -aspect 10000 -bg yellow -fg red \
+        -font $::voss2_help_font -text $arg]
+    set wmx [winfo rootx $w]
+    set wmy [expr [winfo rooty $w]+[winfo height $w]]
+    wm geometry $top [winfo reqwidth $top.txt]x[
+        winfo reqheight $top.txt]+$wmx+$wmy
+    raise $top
+    after 2000 "balloon:remove $top"
+}
+

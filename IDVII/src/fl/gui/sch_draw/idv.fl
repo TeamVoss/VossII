@@ -1,0 +1,305 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+
+let Init_idv_gui = tcl_eval [sprintf "source %sidv.tcl" DIR];
+Init_idv_gui;
+
+let idv_gui_cnt_ref = ref 0;
+let mk_idv_gui_window {dummy::void} =
+    let idx = deref idv_gui_cnt_ref + 1 then
+    (idv_gui_cnt_ref := idx) fseq
+    sprintf ".idv_gui_%d" idx
+;
+non_lazy mk_idv_gui_window;
+
+
+
+let cur_transf_windowsr = ref {[]:: (string#vfsm) list};
+
+let get_new_idv_window {dummy :: void} =
+    let l = length (deref cur_transf_windowsr) then
+    sprintf ".idv_%d" l
+;
+non_lazy get_new_idv_window;
+
+let get_number_of_children (PINST _ _ _ _ _ _ (P_HIER chs)) =
+    length chs
+ /\ get_number_of_children other = 0
+;
+
+
+let add_visualization idv p =
+    let w = vfsm2id idv then
+    val (p,ckt) = get_current_idv_design idv then
+    let outs = outputs ckt then
+    let vis = visualize_fanin ckt [] [] 100 outs 0 then
+    val (tab_window, c) = get_new_sch_canvas w 0 "" then
+    let cmd =
+        let tab = canvas2tab c then
+        let svecs = list2str T "[" "," "]" (sprintf "\"%s\"") outs in
+        sprintf "let %s = draw_fanin vis (%d) %d %s;\n%s;"
+                 tab 0 100 svecs tab
+    in
+    (add_active_sch_tab_window idv c vis cmd) fseq
+    val (final_res, cmds) = visualisation2tcl vis then
+    (big_tcl_eval ("create_sch":cmds)) fseq
+    (tcl_eval [
+                sprintf "%s delete all" c,
+                sprintf "draw_network %s $%s" c final_res,
+                "update",
+                sprintf "set_scrollregion %s" c
+              ]) fseq
+    c
+;
+
+let refresh_idv_canvas canvas cmd =
+    let vfsm = w2vfsm canvas then
+    val (p,ckt) = get_current_idv_design vfsm then
+    let outs = outputs ckt then
+    let vis = visualize_fanin ckt [] [] 100 outs 0 then
+    (add_active_sch_tab_window vfsm canvas vis cmd) fseq
+    val (final_res, cmds) = visualisation2tcl vis then
+    (big_tcl_eval ("create_sch":cmds)) fseq
+    (tcl_eval [
+		sprintf "set old_zoom $::cur_zoom_factor(%s)" canvas,
+		sprintf "set_zoom_factor %s 100.0" canvas,
+                sprintf "%s delete all" canvas,
+                sprintf "draw_network %s $%s" canvas final_res,
+                "update",
+		sprintf "set_zoom_factor %s $old_zoom" canvas,
+                sprintf "set_scrollregion %s" canvas
+              ]) fseq
+    ()
+;
+
+
+let start_new_transform p =
+    let p = remove_wrappers p then
+    let ckt = toplevel_pexlif2fsm p then
+    let w = get_new_idv_window () then
+    (tcl_eval [sprintf "idv:create_idv_gui %s" w]) fseq
+    let idv =
+	IDV_ENV w
+		(ref [])
+		(ref [])
+		(ref [])
+		(ref [(p,ckt,SPEC)])
+		(ref [])
+		(ref [])
+    in
+    (cur_vfsm := (idv:(deref cur_vfsm))) fseq
+    (register_vfsm idv w) fseq
+    (cur_transf_windowsr := ((w,idv):(deref cur_transf_windowsr))) fseq
+    let c = add_visualization idv p then
+    ()
+;
+
+let get_selected_pinsts vfsm =
+    let selection = deref (vfsm2selection_r vfsm) then
+    let all_sels = md_expand_vectors selection in
+    let p = get_current_idv_pexlif vfsm then
+    let children = pexlif_get_children p then
+    let check (PINST _ _ _ _ fa_outs _ _) =
+        let all_outs = flatmap snd fa_outs in
+        ((md_expand_vectors all_outs) intersect all_sels) != []
+    in
+    find_all check children
+;
+
+let add_transform vfsm p tr =
+    let ckt = toplevel_pexlif2fsm p then
+    let trfsr = get_idv_transf vfsm then
+    (trfsr := ((p,ckt,tr):(deref trfsr))) fseq
+    ()
+;
+non_lazy add_transform;
+
+let fl_do_fold canvas name =
+    let name' = "draw_hier "^name then
+    let vfsm = w2vfsm canvas then
+    let il = get_selected_pinsts vfsm then
+    il = [] => () |
+    let p = get_current_idv_pexlif vfsm then
+    let p' = fold_pexlif p il name' then
+    (add_transform vfsm p' (FOLD il name')) fseq
+    let cmd = sprintf "fold vis %s \"%s\";"
+		      (list2str T "[" "," "]" int2str il) name
+    in
+    refresh_idv_canvas canvas cmd
+;
+export_to_tcl fl_do_fold;
+
+let fl_do_unfold canvas =
+    let vfsm = w2vfsm canvas then
+    let il = get_selected_pinsts vfsm then
+    il = [] => () |
+    length il > 1 => 
+	report_error "Can only unfold one instance at a time"
+    |
+    let p = get_current_idv_pexlif vfsm then
+    let p' = unfold_pexlif p (hd il) then
+    (add_transform vfsm p' (UNFOLD (hd il))) fseq
+    let cmd = sprintf "unfold vis %d;" (hd il) in
+    refresh_idv_canvas canvas cmd
+;
+export_to_tcl fl_do_unfold;
+
+let duplicate_instance p id =
+    val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER chs)) = p in
+    let cur_nds = ref
+        (setify (md_expand_vectors ((map fst fa_inps)@(map fst fa_outs)@ints)))
+    in
+    let selected = el id chs in
+    val (PINST dname dattrs dleaf dfa_inps dfa_outs dints dcont) = selected in
+    let driven_nds = md_expand_vectors (flatmap snd dfa_outs) in 
+    let driven_vecs = md_extract_vectors driven_nds in
+    let copies = ref [] in
+    let new_ints = ref [] in
+    let try_assoc key l = (assoc key l) catch key in
+    let rename sub as =
+        md_merge_vectors (map (\a.try_assoc a sub) (md_expand_vectors as))
+    in
+    letrec get_next_names cnt =
+	cnt = 0 => (copies := (selected:(deref copies))) fseq [] |
+	let test = map (sprintf "#%d_%s" cnt) driven_nds in
+	(test intersect (deref cur_nds)) != [] => get_next_names (cnt+1) |
+	(cur_nds := (test @ (deref cur_nds))) fseq
+	let sub = zip driven_nds test in
+	let new_int = md_extract_vectors test then
+	(new_ints := (new_int@(deref new_ints))) fseq
+	let dfa_outs' = map (\(f,as). f, rename sub as) dfa_outs in
+	let copy = PINST dname dattrs dleaf dfa_inps dfa_outs' dints dcont then
+	(copies := (copy:(deref copies))) fseq
+        sub
+    in
+    let process sp =
+        val (PINST lname lattrs lleaf lfa_inps lfa_louts lints lcontent) = sp in
+        let depend_nds = md_expand_vectors (flatmap snd lfa_inps) then
+        let overlap = depend_nds intersect driven_nds in
+        overlap = [] => sp |
+        let sub = get_next_names (length (deref copies)) then
+        let lfa_inps' = map (\(f,as). f, rename sub as) lfa_inps then
+        (PINST lname lattrs lleaf lfa_inps' lfa_louts lints lcontent)
+    in
+    let chs' = map process chs then
+    let all_chs = (deref copies)@chs' then
+    let ints' = ints@(deref new_ints) then
+    PINST name attrs leaf fa_inps fa_outs ints' (P_HIER all_chs)
+;       
+
+
+let fl_do_duplicate canvas =
+    let vfsm = w2vfsm canvas then
+    let il = get_selected_pinsts vfsm then
+    il = [] => () |
+    length il > 1 => 
+	report_error "Can only duplicate one instance at a time"
+    |
+    let p = get_current_idv_pexlif vfsm then
+    let p' = duplicate_instance p (hd il) then
+    (add_transform vfsm p' (DUPLICATE (hd il))) fseq
+    let cmd = sprintf "duplicate vis %d;" (hd il) in
+    refresh_idv_canvas canvas cmd
+;
+export_to_tcl fl_do_duplicate;
+
+
+// Return the instance numbers of all selected instances in the current tab.
+let get_selected_insts {dummy :: void} =
+    let vfsm = get_current_vis () then
+    let sels = deref (vfsm2selection_r vfsm) then
+    let all_sels = md_expand_vectors sels in
+    let p = get_current_idv_pexlif vfsm then
+    val (PINST _ _ _ _ _ _ (P_HIER children)) = p in
+    let check (PINST _ _ _ _ fa_outs _ _) =
+        let all_outs = flatmap snd fa_outs in
+        ((md_expand_vectors all_outs) intersect all_sels) != []
+    in
+    find_all check children
+;
+non_lazy get_selected_insts;
+
+
+let mk_buf inps outs =
+    let vinps = md_merge_vectors inps in
+    let vouts = md_merge_vectors outs in
+    let sz = md_sizes vinps in
+    md_sizes vouts != sz => error "Length mismatch in mk_buf" |
+    let p = (W_VAR sz "o") <- (W_VAR sz "i") in
+    val (PINST name attrs leaf [(fi,_)] [(fo,_)] ints body) = p in
+    PINST name attrs leaf [(fi,vinps)] [(fo,vouts)] ints body
+;
+
+let merge_instances p ids =
+    val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER chs)) = p in
+    let sels = map (\i. el i chs) ids in
+    length sels <= 1 => p |
+    let remain = chs subtract sels in
+    let master = hd sels in
+    let victims = tl sels in
+    // Make sure all victims are the same as the master
+    let not_identical_pexlif p1 p2 =
+	pexlif_get_SHA p1 != pexlif_get_SHA p2 => T |
+	val (PINST _ _ _ fa_inps1 fa_outs1 _ _) = p1 in
+	val (PINST _ _ _ fa_inps2 fa_outs2 _ _) = p2 in
+	let cmp (f1,as1) (f2,as2) = strcmp f1 f2 in
+	let i1 = qsort cmp fa_inps1 in
+	let i2 = qsort cmp fa_inps2 in
+	i1 != i2
+    in
+    let idx = find_first0 (not_identical_pexlif master) victims then
+    idx != 0 => 
+	report_error "Not all selected instances are identical" fseq p
+    |
+    let get_fa_out (PINST _ _ _ _ fa_outs _ _) = fa_outs in
+    let master_sub = get_fa_out master in
+    let mk_sub vp =
+	let v_fa_outs = get_fa_out vp then
+	let mk (vf,vas) =
+	    let mas = assoc vf master_sub in
+	    zip (md_expand_vectors vas) (md_expand_vectors mas) 
+	in
+	flatmap mk v_fa_outs
+    in
+    let subs = flatmap mk_sub victims then
+    let rename a = (assoc a subs) catch a in
+    let rename_fa fa =
+	let rename1 (f,as) =
+	    f, (md_merge_vectors (map rename (md_expand_vectors as)))
+	in
+	map rename1 fa
+    in
+    let rename_pexlif (PINST name attrs leaf fa_inps fa_outs ints body) =
+	let fa_inps' = rename_fa fa_inps in
+	let fa_outs' = rename_fa fa_outs in
+	(PINST name attrs leaf fa_inps' fa_outs' ints body)
+    in
+    // Build new pexlif
+    let chs = map rename_pexlif (master:remain) in
+    let mk_wire (f,as) =
+	let nds = md_expand_vector f in
+	let nds' = map rename nds in
+	nds' = nds => [] |
+	// Must add a buffer since multiple outputs are now driven
+	// by the same signal
+	[mk_buf nds' nds]
+    in
+    let buffers = flatmap mk_wire (fa_outs) then
+    let chs' = buffers@chs then
+    // TODO: Clean up "ints"
+    (PINST name attrs leaf fa_inps fa_outs ints (P_HIER chs'))
+;
+
+
+let fl_do_merge canvas =
+    let vfsm = w2vfsm canvas then
+    let il = get_selected_pinsts vfsm then
+    let p = get_current_idv_pexlif vfsm then
+    let p' = merge_instances p il then
+    (add_transform vfsm p' (MERGE il)) fseq
+    let cmd = sprintf "merge vis %s;" (list2str T "[" "," "]" int2str il) in
+    refresh_idv_canvas canvas cmd
+;
+export_to_tcl fl_do_merge;

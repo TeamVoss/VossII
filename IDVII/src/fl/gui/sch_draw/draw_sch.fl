@@ -75,6 +75,12 @@ let w2vfsm canvas =
 ;
 non_lazy w2vfsm;
 
+let fl_is_IDV_ENV canvas =
+    let vfsm = w2vfsm canvas then
+    is_IDV_ENV vfsm
+;
+export_to_tcl fl_is_IDV_ENV;
+
 let canvas2fsm canvas = vfsm2fsm (w2vfsm canvas);
 let canvas2ste canvas = deref (vfsm2ste_r (w2vfsm canvas));
 let canvas2current_time_r canvas = vfsm2cur_time_r (w2vfsm canvas);
@@ -363,7 +369,33 @@ let gen_draw_fanin vfsm draw_level levels vecs =
 ;
 
 
-let gen_draw_inside vfsm cur_draw_level vecs =
+let gen_draw_inside vfsm cur_draw_level vecs inst_nbr =
+    let w = vfsm2id vfsm then
+    is_IDV_ENV vfsm =>
+	let parent = get_current_idv_pexlif vfsm then
+	let p = el inst_nbr (pexlif_get_children parent) then
+	let ckt = toplevel_pexlif2fsm p in
+	let outs = pexlif_get_outs_actuals p then
+	let vis = visualize_fanin ckt [] [] 100 outs 0 then
+	val (tab_window, c) = get_new_sch_canvas w 0 "" then
+	let cmd =
+	    let tab = canvas2tab c then
+	    let svecs = list2str T "[" "," "]" (sprintf "\"%s\"") outs in
+	    sprintf "let %s = draw_fanin vis (%d) %d %s;\n%s;"
+		     tab 0 100 svecs tab
+	in
+	(add_active_sch_tab_window vfsm c vis cmd) fseq
+	val (final_res, cmds) = visualisation2tcl vis then
+	(big_tcl_eval ("create_sch":cmds)) fseq
+	(tcl_eval [
+		    sprintf "%s delete all" c,
+		    sprintf "draw_network %s $%s" c final_res,
+		    "update",
+		    sprintf "set_scrollregion %s" c
+		  ]) fseq
+	c
+    |
+    // STE_ENV
     let fsm = vfsm2fsm vfsm then 
     let nds = md_expand_vectors vecs then
     let stop_list = deref (vfsm2stop_list_r vfsm) then
@@ -377,7 +409,6 @@ let gen_draw_inside vfsm cur_draw_level vecs =
 	let res = tcl_eval [cmd] then
 	res
     then
-    let w = vfsm2id vfsm then
     let draw_level = cur_draw_level+1 in
     let vis = visualize_fanin fsm stop_list ifc_list 100 vecs draw_level then
     val (tab_window, c) = get_new_sch_canvas w draw_level name then
@@ -431,10 +462,10 @@ let fl_draw_fanin_by_name canvas draw_level levels vecs =
 ;
 export_to_tcl fl_draw_fanin_by_name;
 
-let fl_draw_inside canvas cur_draw_level tag =
+let fl_draw_inside canvas cur_draw_level tag inst_nbr =
     let vfsm = w2vfsm canvas then
     let vecs = fl_tag2vec canvas tag then
-    busy (gen_draw_inside vfsm cur_draw_level vecs)
+    busy (gen_draw_inside vfsm cur_draw_level vecs inst_nbr)
 ;
 export_to_tcl fl_draw_inside;
 
@@ -1135,20 +1166,24 @@ let update_colors vfsm =
 	(do_one_col (map (\v.v,"red") selection))
     in
     (foreach do_one_canvas active_canvases) fseq
-    // Now update the waveform window too
-    let w = deref (vfsm2wvr vfsm) then
-    (tcl_eval [sprintf "wv:restore_original_colors %s" w]) fseq
-    let do_one_col l =
-	l = [] => () | (
-	let color = snd (hd l) then
-	let vecs = md_extract_vectors (map fst l) then
-	let do vec = sprintf "wv:prim_set_name_color %s {%s} %s;" w vec color in
-	let cmds = map do vecs then
-	(tcl_eval cmds) fseq ())
-    in
-    (foreach do_one_col (partition snd highlights)) fseq
-    // Now do selection since it overrides other colors
-    (do_one_col (map (\v.v,"red") selection))
+    NOT (is_IDV_ENV vfsm) =>
+	// Now update the waveform window too
+	let w = deref (vfsm2wvr vfsm) then
+	(tcl_eval [sprintf "wv:restore_original_colors %s" w]) fseq
+	let do_one_col l =
+	    l = [] => () | (
+	    let color = snd (hd l) then
+	    let vecs = md_extract_vectors (map fst l) then
+	    let do v = sprintf "wv:prim_set_name_color %s {%s} %s;" w v color in
+	    let cmds = map do vecs then
+	    (tcl_eval cmds) fseq ())
+	in
+	(foreach do_one_col (partition snd highlights))
+	fseq
+	// Now do selection since it overrides other colors
+	(do_one_col (map (\v.v,"red") selection))
+    |
+	()
  ) gen_catch (\msg. (fprintf stderr "Failure: %s\n" msg)) 
 ;
 non_lazy update_colors;
@@ -1626,7 +1661,7 @@ let draw_fanin vfsm hierarchy_level levels vecs =
 // Returns the name of the canvas for the new fanin drawing.
 //
 let draw_inside vfsm hierarchy_level vecs =
-    gen_draw_inside vfsm (hierarchy_level-1) vecs
+    gen_draw_inside vfsm (hierarchy_level-1) vecs 0
 ;
 
 // Hide a subtree

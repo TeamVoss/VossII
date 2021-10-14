@@ -315,9 +315,12 @@ let base_compact_wprint inps rhs =
 		let post = "" in
 		list2str T pre sep post id rem'
      /\    P pri (W_CAT parts) =
-		let in_one = list2str T "{" "," "}" (P 1) parts then
+		let inps = map (P 1) parts then
+		let ivs = md_merge_vectors inps then
+		length ivs = 1 => hd ivs |
+		let in_one = list2str T "{" "," "}" id ivs then
 		strlen in_one <= 10 => in_one |
-		list2str T "{" ",\n" "}" (P 1) parts
+		list2str T "{" ",\n" "}" id ivs
      /\    P pri (W_MEM_READ info mem addr) =
 	    sprintf "%s[%s]" (P pri mem) (P pri addr)
      /\    P pri (W_MEM_WRITE info mem addr d) =
@@ -522,7 +525,7 @@ let mk_draw_cmd phase_delay rhs =
 ;
 
 
-let BASE_TMP = "_TmP_";
+let BASE_TMP = "_$";
 
 let is_wide_OR e  =
     letrec cnt (W_OR a b) = 1 + cnt a + cnt b
@@ -834,8 +837,13 @@ let base_assignment make_draw_command lhs rhs =
     length subfubs = 1 => hd subfubs |
     let outs = map (\n.n,[n]) (get_lhs_vars lhs) in
     let inps = map (\n.n,[n]) (w_depends rhs) in
-//    let pfn = mk_draw_cmd F rhs in
-let pfn = "stmt" in
+    let dep_vars = get_wbase_names rhs then
+    let pfn =
+	get_vossrc "DRAW-FULL-STATEMENTS" == "YES" =>
+	    sprintf "draw_hfl {%s}" (base_compact_wprint dep_vars rhs)
+	|
+	    ""
+    then
     PINST pfn [] F inps outs (deref internals) (P_HIER subfubs)
 ;
 
@@ -891,7 +899,7 @@ let get_act_args fn a =
     ) catch (
 	let cnt = deref anon_arg_cnt then
 	(anon_arg_cnt := (i_plus cnt 1)) fseq
-	let nm = sprintf "_TmP_%d_%s" cnt fn then
+	let nm = sprintf "%s%d_%s" BASE_TMP cnt fn then
 	let tmp = hw_mk_var a nm then
 	let we = hw_destr a in
 	let asignm = base_assignment T tmp we then
@@ -2646,13 +2654,13 @@ let CASE {out:: *a} {cond_res_list:: (bit # *a) list} {default_value:: *a} =
      /\ var2name (W_EXPLICIT_VAR s b) = [b]
      /\ var2name other = []
     in
-    let ld = W_VAR sz (sprintf "%s_d" BASE_TMP) then
-    let nd = mk_name sz (sprintf "%s_d" BASE_TMP) then
+    let ld = W_VAR sz (sprintf "%sd" BASE_TMP) then
+    let nd = mk_name sz (sprintf "%sd" BASE_TMP) then
     let d_fas = [(nd,[nd])] then
     let default_p = (hw_constr ld) <- default_value then
     letrec select cnt ((c,r):rem) =
-        let bc = sprintf "%s_c%02d" BASE_TMP cnt then
-        let br = sprintf "%s_r%02d" BASE_TMP cnt then
+        let bc = sprintf "%sc%02d" BASE_TMP cnt then
+        let br = sprintf "%sr%02d" BASE_TMP cnt then
         let lc = W_VAR 1 bc then
         let lr = W_VAR sz br then
         val (c_ints, c_act, c_extra) =
@@ -2710,13 +2718,13 @@ let STATE {clk::bit} {state:: *a} {cond_res_list:: (bit # *a) list} =
      /\ var2name (W_EXPLICIT_VAR s b) = [b]
      /\ var2name other = []
     in
-    let ld = W_VAR sz (sprintf "%s_d" BASE_TMP) in
-    let nd = mk_name sz (sprintf "%s_d" BASE_TMP) in
+    let ld = W_VAR sz (sprintf "%sd" BASE_TMP) in
+    let nd = mk_name sz (sprintf "%sd" BASE_TMP) in
     let d_fas = [(nd,[nd])] in
     let default_p = (hw_constr ld) <- state then
     letrec select cnt ((c,r):rem) =
-        let bc = sprintf "%s_c%02d" BASE_TMP cnt in
-        let br = sprintf "%s_r%02d" BASE_TMP cnt in
+        let bc = sprintf "%sc%02d" BASE_TMP cnt in
+        let br = sprintf "%sr%02d" BASE_TMP cnt in
         let lc = W_VAR 1 bc in
         let lr = W_VAR sz br in
         val (c_ints, c_act, c_extra) =
@@ -2777,13 +2785,13 @@ let EN_STATE {clk::bit} {enable::bit} {state:: *a}
      /\ var2name (W_EXPLICIT_VAR s b) = [b]
      /\ var2name other = []
     in
-    let ld = W_VAR sz (sprintf "%s_d" BASE_TMP) in
-    let nd = mk_name sz (sprintf "%s_d" BASE_TMP) in
+    let ld = W_VAR sz (sprintf "%sd" BASE_TMP) in
+    let nd = mk_name sz (sprintf "%sd" BASE_TMP) in
     let d_fas = [(nd,[nd])] in
     let default_p = (hw_constr ld) <- state then
     letrec select cnt ((c,r):rem) =
-        let bc = sprintf "%s_c%02d" BASE_TMP cnt in
-        let br = sprintf "%s_r%02d" BASE_TMP cnt in
+        let bc = sprintf "%sc%02d" BASE_TMP cnt in
+        let br = sprintf "%sr%02d" BASE_TMP cnt in
         let lc = W_VAR 1 bc in
         let lr = W_VAR sz br in
         val (c_ints, c_act, c_extra) =
@@ -3379,4 +3387,35 @@ let {wexpr_hw_type_destr :: {wexpr} hw_type} =
                     wexpr_hw_values
 ;
 add_open_overload hw_type_destr wexpr_hw_type_destr;
+
+
+let is_HIER (P_HIER _) = T
+ /\ is_HIER other = F
+;
+
+let is_wrapper_or_empty (PINST nm _ _ _ _ _ _) =
+    (nm = "_WrApPeR_") OR (nm = "")
+;
+
+let remove_wrappers p =
+    letrec clean p =
+        val (PINST name attrs leaf fa_inps fa_outs ints cont) = p in
+        NOT (is_HIER cont) => p |
+        val (P_HIER chs) = cont in
+        let chs' = map clean chs in
+        let p' = (chs == chs') => p |
+                    (PINST name attrs leaf fa_inps fa_outs ints (P_HIER chs'))
+        in
+        letrec cl1 p =
+            val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER chs)) = p in
+            let idx = find_first0 is_wrapper_or_empty chs in
+            idx = 0 => p |
+            let p' = unfold_pexlif p idx then
+            cl1 p'
+        in
+        cl1 p'
+    in
+    clean p
+;
+
 
