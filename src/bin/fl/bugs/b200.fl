@@ -159,6 +159,7 @@ non_lazy gen_pex;
 // note: requires that max_f > 1
 
 let gen s = pexlif2verilog (normalize_pexlif (gen_pex s 4 2 2));
+// let gen s = pexlif2verilog (gen_pex s 4 2 2);
 non_lazy gen;
 
 // -----------------------------------------------------------------------------
@@ -214,209 +215,209 @@ let test_run   = pexlif_test F;
 // =============================================================================
 // Small example.
 
-let ex1 =
-        bit_input a.
-        bit_output b.
-        CELL "draw_hier ex1" [
-            b <- '~' a
-        ]
-;
+// let ex1 =
+//         bit_input a.
+//         bit_output b.
+//         CELL "draw_hier ex1" [
+//             b <- '~' a
+//         ]
+// ;
 
-let target =
-        bit_input i1.
-        bit_input i2.
-        bit_output o1.
-        bit_output o2.
-        CELL "draw_hier target" [
-            ex1 i1 o1,
-            o2 <- '~' i2
-        ]
-;
+// let target =
+//         bit_input i1.
+//         bit_input i2.
+//         bit_output o1.
+//         bit_output o2.
+//         CELL "draw_hier target" [
+//             ex1 i1 o1,
+//             o2 <- '~' i2
+//         ]
+// ;
 
-let ex1' = ex1 'x 'y;
-let target' = target 'i1 'i2 'o1 'o2;
-//isomatch_and_store ex1' target';
-//find_isomatches target';
+// let ex1' = ex1 'x 'y;
+// let target' = target 'i1 'i2 'o1 'o2;
+// isomatch_and_store ex1' target';
+// find_isomatches target';
 
 // =============================================================================
 // Four examples, all put into a larger haystack.
 
-let buf1 =
-    bit_input a.
-    bit_output out.
-    bit_internal mid.
-    CELL "draw_hier buf1" [
-      mid <- '~' a,
-      out <- '~' mid
-    ];
+// let buf1 =
+//     bit_input a.
+//     bit_output out.
+//     bit_internal mid.
+//     CELL "draw_hier buf1" [
+//       mid <- '~' a,
+//       out <- '~' mid
+//     ];
 
-let buf2 =
-    bit_input x.
-    bit_output y.
-    bit_internal mid.
-    CELL "draw_hier buf2" [
-      mid <- '~' x,
-      y <- '~' mid
-];
+// let buf2 =
+//     bit_input x.
+//     bit_output y.
+//     bit_internal mid.
+//     CELL "draw_hier buf2" [
+//       mid <- '~' x,
+//       y <- '~' mid
+// ];
 
-let buf3 =
-    bit_input a.
-    bit_output out.
-    bit_internal oink.
-    CELL "draw_hier buf3" [
-      oink <- '~' a,
-      out <- '~' oink
-    ];
+// let buf3 =
+//     bit_input a.
+//     bit_output out.
+//     bit_internal oink.
+//     CELL "draw_hier buf3" [
+//       oink <- '~' a,
+//       out <- '~' oink
+//     ];
 
-letrec inv_rec n =
-    bit_input    a.
-    bit_output  out.
-    bit_internal mid.
-    CELL "draw_hier inv_rec" (
-      n = 1 => [ out <- '~' a ] |
-      [
-          mid <- '~' a,
-          inv_rec (n-1) mid out
-      ]);
-let buf4 =
-    bit_input    a.
-    bit_output  out.
-    CELL "buf4" [
-        inv_rec 2 a out
-    ];
+// letrec inv_rec n =
+//     bit_input    a.
+//     bit_output  out.
+//     bit_internal mid.
+//     CELL "draw_hier inv_rec" (
+//       n = 1 => [ out <- '~' a ] |
+//       [
+//           mid <- '~' a,
+//           inv_rec (n-1) mid out
+//       ]);
+// let buf4 =
+//     bit_input    a.
+//     bit_output  out.
+//     CELL "buf4" [
+//         inv_rec 2 a out
+//     ];
 
-let bufs =
-    bit_input a b c d e f.
-    bit_output o1 o2 o3 o4 o5 o6 o7.
-    bit_internal mid.
-    CELL "draw_hier bufs" [
-      buf1 a o1,
-      buf2 b o2,
-      buf3 c o3,
-      inv_rec 2 d o4,
-      buf4 e o5,
-      mid <- '~' f,
-      o6 <- '~' mid,
-      o7 <- '~' mid
-    ];
+// let bufs =
+//     bit_input a b c d e f.
+//     bit_output o1 o2 o3 o4 o5 o6 o7.
+//     bit_internal mid.
+//     CELL "draw_hier bufs" [
+//       buf1 a o1,
+//       buf2 b o2,
+//       buf3 c o3,
+//       inv_rec 2 d o4,
+//       buf4 e o5,
+//       mid <- '~' f,
+//       o6 <- '~' mid,
+//       o7 <- '~' mid
+//     ];
 
-let buf1' = buf1 'i1 'o1;
-let buf2' = buf2 'i1 'o1;
-let buf3' = buf3 'i1 'o1;
-let buf4' = buf4 'i1 'o1;
-let bufs' = bufs 'i1 'i2 'i3 'i4 'i5 'i6 'o1 'o2 'o3 'o4 'o5 'o6 'o7;
-//let matches = isomatch buf1' bufs';
-
-// =============================================================================
-// ...
-
-let mux4' = verilog2pexlif "-Iisomatch/tests/mux" "mux4" ["mux4.v"] [];
-let mux2' = verilog2pexlif "-Iisomatch/tests/mux" "mux2" ["mux2.v"] [];
-
-//let wrap p = PINST "box" [] F [] [] [] (P_HIER [p]) in
-//isomatch_and_store mux2' mux4';
-//find_isomatches mux4';
+// let buf1' = buf1 'i1 'o1;
+// let buf2' = buf2 'i1 'o1;
+// let buf3' = buf3 'i1 'o1;
+// let buf4' = buf4 'i1 'o1;
+// let bufs' = bufs 'i1 'i2 'i3 'i4 'i5 'i6 'o1 'o2 'o3 'o4 'o5 'o6 'o7;
+// let matches = isomatch buf1' bufs';
 
 // =============================================================================
 // ...
 
-let BYTE_SIZE           = 8;
-let ADDR_SIZE           = 20;
-let TIMER_SIZE          = 16;
-let LINES               = 12;            // Number of cache lines
-let BYTES_IN_CACHE_LINE = 8;            // Number of bytes in cache line
-let TAG_SIZE		= ADDR_SIZE-(log2 LINES)-(log2 BYTES_IN_CACHE_LINE);
+// let mux4' = verilog2pexlif "-Iisomatch/tests/mux" "mux4" ["mux4.v"] [];
+// let mux2' = verilog2pexlif "-Iisomatch/tests/mux" "mux2" ["mux2.v"] [];
 
-TYPE "byte" BYTE_SIZE;
-TYPE "cache_line" (BYTE_SIZE*BYTES_IN_CACHE_LINE);;
-TYPE "atag_field" TAG_SIZE;
-TYPE "line_addr" (log2 LINES);
-TYPE "decoded_line_addr" LINES;
-TYPE "byte_addr" (log2 BYTES_IN_CACHE_LINE);
+// let wrap p = PINST "box" [] F [] [] [] (P_HIER [p]) in
+// isomatch_and_store mux2' mux4';
+// find_isomatches mux4';
 
-STRUCT "addr" [ ("aTag", "atag_field"),
-		("line", "line_addr"),
-		("byte", "byte_addr")
-];
+// =============================================================================
+// ...
 
-STRUCT "ext_cache_line" [
-	    ("valid", "bit"),
-	    ("aTag", "atag_field"),
-	    ("data", "cache_line")
-];
+// let BYTE_SIZE           = 8;
+// let ADDR_SIZE           = 20;
+// let TIMER_SIZE          = 16;
+// let LINES               = 12;            // Number of cache lines
+// let BYTES_IN_CACHE_LINE = 8;            // Number of bytes in cache line
+// let TAG_SIZE		= ADDR_SIZE-(log2 LINES)-(log2 BYTES_IN_CACHE_LINE);
 
-let cache_line =
-    bit_input		    clk.
-    bit_input		    reset.
-    bit_input		    we.
-    line_addr_input	    line.
-    cache_line_input	    din.
-    atag_field_input	    atag.
-    bit_output		    match.
-    cache_line_output	    dout.
-    bit_input               sel.
-    cache_line_input	    r_dout.
-    bit_input               r_match.
-    //
-    bit_internal	    my_we l_match.
-    ext_cache_line_internal n_cl cl.
-    //
-    CELL ("cache_line") [
-	my_we <- sel '&' we,
-	n_cl-->valid <- (IF reset THEN '0 ELSE (my_we '|' cl-->valid)),
-	n_cl-->aTag  <- (IF my_we THEN atag ELSE cl-->aTag),
-	n_cl-->data  <- (IF my_we THEN din ELSE cl-->data),
-	re_ff clk n_cl cl,
-	l_match <- sel '&' cl-->valid '&' (atag '=' cl-->aTag),
-	match <- (IF sel THEN l_match ELSE r_match),
-	dout <- (IF sel THEN cl-->data ELSE r_dout)
-    ]
-;
+// TYPE "byte" BYTE_SIZE;
+// TYPE "cache_line" (BYTE_SIZE*BYTES_IN_CACHE_LINE);;
+// TYPE "atag_field" TAG_SIZE;
+// TYPE "line_addr" (log2 LINES);
+// TYPE "decoded_line_addr" LINES;
+// TYPE "byte_addr" (log2 BYTES_IN_CACHE_LINE);
 
-letrec cache_rec n =
-    bit_input		    clk.
-    bit_input		    reset.
-    bit_input		    we.
-    line_addr_input	    line.
-    cache_line_input	    din.
-    atag_field_input	    atag.
-    bit_output		    match.
-    cache_line_output	    dout.
-    //
-    bit_internal	    my_we sel r_match l_match.
-    ext_cache_line_internal n_cl cl.
-    cache_line_internal	    r_dout.
-    //
-    CELL (sprintf "cache_rec %d" n) (
-    n < 0 => [
-	    dout  <- 'X,
-	    match <- '0
-    ] | [
-	sel <- line '=' ''n,
-	cache_rec (n-1) clk reset we line din atag r_match r_dout,
-        cache_line clk reset we line din atag match dout sel r_dout r_match
-]);
+// STRUCT "addr" [ ("aTag", "atag_field"),
+// 		("line", "line_addr"),
+// 		("byte", "byte_addr")
+// ];
 
-let cache_mem =
-    bit_input			clk.
-    bit_input			reset.
-    bit_input			we.
-    line_addr_input		line.
-    cache_line_input		din.
-    atag_field_input		atag.
-    bit_output			hit.
-    cache_line_output		dout.
-    //
-    CELL "draw_hier CacheMem" [
-	cache_rec (LINES-1) clk reset we line din atag hit dout
-];
+// STRUCT "ext_cache_line" [
+// 	    ("valid", "bit"),
+// 	    ("aTag", "atag_field"),
+// 	    ("data", "cache_line")
+// ];
 
-let cache_line' = cache_line 'clk 'reset 'we 'line 'din 'atag 'match 'dout 'sel 'r_dout 'r_match;
-let cache_mem' = cache_mem 'clk 'reset 'we 'line 'din 'atag 'hit 'dout;
-let flat_cache_line' = flatten_pexlif cache_line';
-let flat_cache_mem' = flatten_pexlif cache_mem';
-//isomatch_and_store cache_line' cache_mem';
-//find_isomatches cache_mem';
+// let cache_line =
+//     bit_input		    clk.
+//     bit_input		    reset.
+//     bit_input		    we.
+//     line_addr_input	    line.
+//     cache_line_input	    din.
+//     atag_field_input	    atag.
+//     bit_output		    match.
+//     cache_line_output	    dout.
+//     bit_input               sel.
+//     cache_line_input	    r_dout.
+//     bit_input               r_match.
+//     //
+//     bit_internal	    my_we l_match.
+//     ext_cache_line_internal n_cl cl.
+//     //
+//     CELL ("cache_line") [
+// 	my_we <- sel '&' we,
+// 	n_cl-->valid <- (IF reset THEN '0 ELSE (my_we '|' cl-->valid)),
+// 	n_cl-->aTag  <- (IF my_we THEN atag ELSE cl-->aTag),
+// 	n_cl-->data  <- (IF my_we THEN din ELSE cl-->data),
+// 	re_ff clk n_cl cl,
+// 	l_match <- sel '&' cl-->valid '&' (atag '=' cl-->aTag),
+// 	match <- (IF sel THEN l_match ELSE r_match),
+// 	dout <- (IF sel THEN cl-->data ELSE r_dout)
+//     ]
+// ;
+
+// letrec cache_rec n =
+//     bit_input		    clk.
+//     bit_input		    reset.
+//     bit_input		    we.
+//     line_addr_input	    line.
+//     cache_line_input	    din.
+//     atag_field_input	    atag.
+//     bit_output		    match.
+//     cache_line_output	    dout.
+//     //
+//     bit_internal	    my_we sel r_match l_match.
+//     ext_cache_line_internal n_cl cl.
+//     cache_line_internal	    r_dout.
+//     //
+//     CELL (sprintf "cache_rec %d" n) (
+//     n < 0 => [
+// 	    dout  <- 'X,
+// 	    match <- '0
+//     ] | [
+// 	sel <- line '=' ''n,
+// 	cache_rec (n-1) clk reset we line din atag r_match r_dout,
+//         cache_line clk reset we line din atag match dout sel r_dout r_match
+// ]);
+
+// let cache_mem =
+//     bit_input			clk.
+//     bit_input			reset.
+//     bit_input			we.
+//     line_addr_input		line.
+//     cache_line_input		din.
+//     atag_field_input		atag.
+//     bit_output			hit.
+//     cache_line_output		dout.
+//     //
+//     CELL "draw_hier CacheMem" [
+// 	cache_rec (LINES-1) clk reset we line din atag hit dout
+// ];
+
+// let cache_line' = cache_line 'clk 'reset 'we 'line 'din 'atag 'match 'dout 'sel 'r_dout 'r_match;
+// let cache_mem' = cache_mem 'clk 'reset 'we 'line 'din 'atag 'hit 'dout;
+// let flat_cache_line' = flatten_pexlif cache_line';
+// let flat_cache_mem' = flatten_pexlif cache_mem';
+// isomatch_and_store cache_line' cache_mem';
+// find_isomatches cache_mem';
 
 // =============================================================================
 // Fin.

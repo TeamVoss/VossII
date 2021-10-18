@@ -263,9 +263,9 @@ letrec
         val (i,s) = one_of is in
         s < sz =>
             one_of_weighted
-                [ (1, [W_SX sz i])
-                , (1, [W_ZX sz i])
-                , (2, (i : gen_wexpr_inputs is (sz-s)))] |
+                [ (1, [(printf "W_SX sz=%d s=%d\n" sz s) fseq W_SX sz i])
+                , (1, [(printf "W_ZX sz=%d s=%d\n" sz s) fseq W_ZX sz i])
+                , (2, i : gen_wexpr_inputs is (sz-s))] |
         s > sz =>
             [W_SLICE (slice_at_random sz s) i] |
         [i]
@@ -302,21 +302,18 @@ letrec
         // If complexity 'd' is satisfied and 'ts' distributed, build leaf.
         (length ts == 0) AND (d <= 0) => gen_wexpr_input is sz |
         // If 'd' is satisfied, but some 't' is unused, pick that.
-        (length ts == 1) AND (d <= 0) => gen_wexpr_input ts sz | 
-            // val (x,s) = hd ts in
-            // s < sz => one_of [ W_SX sz x, W_ZX sz x ]  |
-            // s > sz => W_SLICE (slice_at_random sz s) x |
-            // x |
+        (length ts == 1) AND (d <= 0) => gen_wexpr_input ts sz |
+        // todo: make sure t is used?
         // Misc. for unary/binary ops.
         let gen_unary  sz = gen_wexpr is ts sz (d - 1) in
         let gen_binary ts = gen_wexpr is ts sz (d / 2) in
         val (as, bs) = split_at_random ts in
         // Weights for ...
-        let u = (d <= 0) => 1  | 10 in // unary op.
-        let x = (sz > 1) => 10 | 0  in // ext. op.
-        let b = (sz > 1) => 10 | 1  in // binary op.
+        let u = (d <= 0) => 1 | 1 then // unary.
+        let x = (sz > 1) => 1 | 0 then // ext. & ite.
+        let b = (sz > 1) => 1 | 0 then // binary.
         // Pick a valid PINST op.
-        one_of_weighted
+        one_of_weighted (filter (defix < 0 # fst)
             [ (u, W_NOT  (gen_unary sz))
             , (b, W_AND  (gen_binary as) (gen_binary bs))
             , (b, W_OR   (gen_binary as) (gen_binary bs))
@@ -334,27 +331,33 @@ letrec
           //    (x, W_SX sz (gen_unary smaller_sz)))
           // , ( let smaller_sz = random 1 sz in
           //    (x, W_ZX sz (gen_unary smaller_sz)))
-            , ( val (cs, ds)   = split_at 2 ts in
-                val (es, fs)   = split_at_random ds in
-                let gen ts sz  = gen_wexpr is ts sz (d / 3) in
-                (b, W_ITE (gen cs 1) (gen es sz) (gen fs sz)))
+            , (u, val (cs, ds)   = split_at 2 ts in
+                  val (es, fs)   = split_at_random ds in
+                  let gen ts sz  = gen_wexpr is ts sz (d / 3) in
+                  W_ITE (gen cs 1) (gen es sz) (gen fs sz))
           // , ( let larger_sz  = random (sz + 1) ((sz + 1) * 2) in
           //     let slice      = slice_at_random sz larger_sz in
           //     (b, W_SLICE slice (gen_unary larger_sz)))
-            , ( let chunked_sz = segment_at_random sz in
-                let len_sz     = length chunked_sz in
-                let len_ts     = length ts in
-                let chunked_ts =
-                        len_sz <= len_ts => split_into len_sz ts |
-                        (map (\t. [t]) ts) @ (replicate (len_sz - len_ts) [])
-                in
-                let gen ts sz  = gen_wexpr is ts sz (d / len_sz) in
-                (x, W_CAT (map2 gen chunked_ts chunked_sz)))
+             , (x, let sz_l = sz > 1 => random 1 (sz-1) | 1 in
+                   let sz_r = sz-sz_l in
+                   let wl   = gen_wexpr is as sz_l (d / 2) in
+                   let wr   = gen_wexpr is bs sz_r (d / 2) in
+                   W_CAT [wl, wr])
+                 // todo: CAT more than two?
+          // , ( let chunked_sz = segment_at_random sz in
+          //    let len_sz     = length chunked_sz in
+          //    let len_ts     = length ts in
+          //    let chunked_ts =
+          //            len_sz <= len_ts => split_into len_sz ts |
+          //            (map (\t. [t]) ts) @ (replicate (len_sz - len_ts) [])
+          //    in
+          //    let gen ts sz  = gen_wexpr is ts sz (d / len_sz) in
+          //    (x, W_CAT (map2 gen chunked_ts chunked_sz)))
          // , W_PRED ?! ?!
          // , W_NAMED_SLICE ?! ?! ?!
          // , W_UPDATE_NAMED_SLICE ?! ?! ?! ?!
          // , W_MEM_WRITE ?! ?! ?! ?!
-            ]
+            ])
 ;
 non_lazy gen_wexpr;
 
@@ -651,10 +654,10 @@ letrec
 /\  normalize_wexpr ix (W_SHL a b)  = normalize_binary ix W_SHL a b
 /\  normalize_wexpr ix (W_SHR a b)  = normalize_binary ix W_SHR a b
 /\  normalize_wexpr ix (W_ASHR a b) = normalize_binary ix W_ASHR a b
-/\  normalize_wexpr ix (W_SX sz (W_VAR sz v)) =
-        ([], W_SX sz (W_VAR sz v), ix, sz)
-/\  normalize_wexpr ix (W_SX sz (W_EXPLICIT_VAR sz v)) =
-        ([], W_SX sz (W_VAR sz v), ix, sz)
+/\  normalize_wexpr ix (W_SX sz (W_VAR sz_v v)) =
+        ([], W_SX sz (W_VAR sz_v v), ix, sz)
+/\  normalize_wexpr ix (W_SX sz (W_EXPLICIT_VAR sz_v v)) =
+        ([], W_SX sz (W_VAR sz_v v), ix, sz)
 // If 'W_SX' is called on anything but a variable we need to split the 'wexpr'
 // and name the intermediate result.
 /\  normalize_wexpr ix (W_SX sz w) =

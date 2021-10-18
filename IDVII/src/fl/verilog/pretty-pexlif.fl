@@ -259,11 +259,12 @@ let unwrap_prim (Exp_primary (Prim_hier (HID NONE (ID i)) rng)) = (i, rng)
 /\  unwrap_prim _ = error "internal: SX/Slice is only supported for variables."
 ;
 
-let sign_extend_exp sz a = //sz=8,sz'=1
+let sign_extend_exp sz a =
       let a'  = fst (expression a) in
       let sz' = wexpr_size a in
       let id  = fst (unwrap_prim a') in
       let rng = sz' > 1 => let x = sz' - 1 in [(x,x)] | [] in
+      (printf "sign_extend_exp sz=%d sz'=%d\n" sz sz') fseq
       let ext =
             Exp_primary (Prim_mcat (MCAT (prim_cnum (sz-sz'))
               (CAT [Exp_primary (prim_hier id rng)])))
@@ -275,8 +276,9 @@ let sign_extend_exp sz a = //sz=8,sz'=1
 // sign-extension function with paramaters for sizes?
 
 let zero_extend_exp sz a =
-      let a'  = fst $ expression a in
-      let sz' = wexpr_size a in
+      let a'   = fst $ expression a in
+      let sz'  = wexpr_size a in
+      (printf "zero_extend_exp sz=%d sz'=%d\n" sz sz') fseq
       let zero =
             Exp_primary (Prim_mcat (MCAT (prim_cnum (sz-sz'))
               (CAT [prim_num 0])))
