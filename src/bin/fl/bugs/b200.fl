@@ -173,15 +173,17 @@ letrec
 
 let pexlif_test T s =
         // Print out intermediates when debugging.
-        let pex = normalize_pexlif (gen_pex s 4 2 2) then
-        let ver = pexlif2verilog pex then
-        let gex = pex2pex pex then
         //
+        let pex = normalize_pexlif (gen_pex s 4 2 2) then
         (print  "========================================\n") fseq
         (printf "(%d) Original" s) fseq
         (pretty_pexlif pex) fseq
+        // 
+        let ver = pexlif2verilog pex then
         (print  "----------------------------------------\n") fseq
         (printf "(%d) Verilog:\n%s\n" s ver) fseq
+        // 
+        let gex = pex2pex pex then
         (printf "----------------------------------------\n") fseq
         (printf "(%d) Pexlif" s) fseq
         (pretty_pexlif (no_attrs gex)) fseq
@@ -196,6 +198,8 @@ let pexlif_test T s =
 
 let test_debug = pexlif_test T;
 let test_run   = pexlif_test F;
+
+let t1 = test_debug 1;
 
 // let gen_test s =
 //         (printf "=== Generating example %d\n" s) fseq

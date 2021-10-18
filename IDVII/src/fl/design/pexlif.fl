@@ -263,8 +263,8 @@ letrec
         val (i,s) = one_of is in
         s < sz =>
             one_of_weighted
-                [ (1, [(printf "W_SX sz=%d s=%d\n" sz s) fseq W_SX sz i])
-                , (1, [(printf "W_ZX sz=%d s=%d\n" sz s) fseq W_ZX sz i])
+                [ (1, [W_SX sz i])
+                , (1, [W_ZX sz i])
                 , (2, i : gen_wexpr_inputs is (sz-s))] |
         s > sz =>
             [W_SLICE (slice_at_random sz s) i] |
