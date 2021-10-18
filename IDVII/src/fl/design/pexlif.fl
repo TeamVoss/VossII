@@ -236,10 +236,6 @@ let subst_match sub (PINST n a l i1 o1 t c) (PINST _ _ _ i2 o2 _ _) =
 // Generation of a PEXLIF.
 //------------------------------------------------------------------------------
 
-begin_abstype;
-
-let ?! = undefined;
-
 let segment_at_random 1  = [1]
 /\  segment_at_random sz =
         let r = random 1 sz in
@@ -248,13 +244,16 @@ let segment_at_random 1  = [1]
 non_lazy segment_at_random;
 
 let slice_at_random lz hz =
-        let sz  = hz-lz in
-        let lsb = random 0 (hz-sz) in
-        lsb upto (lsb+sz)
+        let lsb = random 0 (hz-lz) in
+        lsb upto (lsb+lz-1)
 ;
 non_lazy slice_at_random;
 // note: old (below) doesn't work as wee need contig. slices.
 //   repeat (hz-lz) remove_one (0 upto hz)
+
+begin_abstype;
+
+let ?! = undefined;
 
 letrec
     gen_wexpr_inputs
@@ -268,7 +267,7 @@ letrec
                 , (1, [W_ZX sz i])
                 , (2, (i : gen_wexpr_inputs is (sz-s)))] |
         s > sz =>
-            [W_SLICE (slice_at_random (sz-1) (s-1)) i] |
+            [W_SLICE (slice_at_random sz s) i] |
         [i]
 ;
 non_lazy gen_wexpr_inputs;
@@ -302,11 +301,12 @@ letrec
         =
         // If complexity 'd' is satisfied and 'ts' distributed, build leaf.
         (length ts == 0) AND (d <= 0) => gen_wexpr_input is sz |
-        (length ts == 1) AND (d <= 0) =>
-            val (x,s) = hd ts in
-            s < sz => one_of [ W_SX sz x, W_ZX sz x ]  |
-            s > sz => W_SLICE (slice_at_random (sz - 1) (s - 1)) x |
-            x |
+        // If 'd' is satisfied, but some 't' is unused, pick that.
+        (length ts == 1) AND (d <= 0) => gen_wexpr_input ts sz | 
+            // val (x,s) = hd ts in
+            // s < sz => one_of [ W_SX sz x, W_ZX sz x ]  |
+            // s > sz => W_SLICE (slice_at_random sz s) x |
+            // x |
         // Misc. for unary/binary ops.
         let gen_unary  sz = gen_wexpr is ts sz (d - 1) in
         let gen_binary ts = gen_wexpr is ts sz (d / 2) in
@@ -339,7 +339,7 @@ letrec
                 let gen ts sz  = gen_wexpr is ts sz (d / 3) in
                 (b, W_ITE (gen cs 1) (gen es sz) (gen fs sz)))
           // , ( let larger_sz  = random (sz + 1) ((sz + 1) * 2) in
-          //     let slice      = slice_at_random (sz - 1) larger_sz in
+          //     let slice      = slice_at_random sz larger_sz in
           //     (b, W_SLICE slice (gen_unary larger_sz)))
             , ( let chunked_sz = segment_at_random sz in
                 let len_sz     = length chunked_sz in
@@ -624,6 +624,8 @@ let normalize_slice {ix::int} (W_SLICE is v) =
         let slice (BR_SINGLE ix) = W_SLICE [ix] v''
         /\  slice (BR_SLICE m l) = W_SLICE (fill m l) v''
         in
+        // Can't have empty slices.
+        length is == 0 => error "Slice without indices" |
         let ws = map slice (group_indices is) in
         let w  = length ws == 1 => hd ws | W_CAT ws in
         (ss', w, ix'', length is)
