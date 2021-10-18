@@ -247,39 +247,49 @@ let segment_at_random 1  = [1]
 ;
 non_lazy segment_at_random;
 
-let slice_at_random lz hz = repeat (hz-lz) remove_one (0 upto hz)
+let slice_at_random lz hz =
+        let sz  = hz-lz in
+        let lsb = random 0 (hz-sz) in
+        lsb upto (lsb+sz)
 ;
 non_lazy slice_at_random;
+// note: old (below) doesn't work as wee need contig. slices.
+//   repeat (hz-lz) remove_one (0 upto hz)
 
 letrec
     gen_wexpr_inputs
         {is :: (wexpr#int) list}
         {sz :: int}
         =
-        let use_var =
-                val (i,s) = one_of is in
-                s < sz => one_of_weighted
-                    [ (1, [W_SX sz i])
-                    , (1, [W_ZX sz i])
-                    , (2, (i : gen_wexpr_inputs is (sz-s)))] |
-                s > sz => [W_SLICE (slice_at_random (sz - 1) (s - 1)) i] |
-                [i]
-        in
-        one_of_weighted
-            [ (1, [W_X sz])
-            , (2, [W_CONST sz (random2 sz)])
-         // , (x, W_NAMED_CONST ?! ?! ?!)
-         // , (x, W_EXPLICIT_VAR ?! ?!)
-         // , (x, W_MEM_READ ?! ?! ?!)
-            , (4, use_var) ]
+        val (i,s) = one_of is in
+        s < sz =>
+            one_of_weighted
+                [ (1, [W_SX sz i])
+                , (1, [W_ZX sz i])
+                , (2, (i : gen_wexpr_inputs is (sz-s)))] |
+        s > sz =>
+            [W_SLICE (slice_at_random (sz-1) (s-1)) i] |
+        [i]
 ;
 non_lazy gen_wexpr_inputs;
+
+let gen_wexpr_const
+        {sz :: int}
+        =
+        [W_CONST sz (random2 sz)]
+;
+non_lazy gen_wexpr_const;
 
 let gen_wexpr_input
         {is :: (wexpr#int) list}
         {sz :: int}
         =
-        let vs = gen_wexpr_inputs is sz in length vs == 1 => hd vs | W_CAT vs
+        let inputs = one_of_weighted
+                [ (1, gen_wexpr_const sz)
+                , (3, gen_wexpr_inputs is sz)
+                ]
+        in
+        length inputs == 1 => hd inputs | W_CAT inputs
 ;
 non_lazy gen_wexpr_input;
 
@@ -320,17 +330,17 @@ letrec
             , (b, W_SHL  (gen_binary as) (gen_binary bs))
             , (b, W_SHR  (gen_binary as) (gen_binary bs))
             , (b, W_ASHR (gen_binary as) (gen_binary bs))
-            , ( let smaller_sz = random 1 sz in
-                (x, W_SX sz (gen_unary smaller_sz)))
-            , ( let smaller_sz = random 1 sz in
-                (x, W_ZX sz (gen_unary smaller_sz)))
+          // , ( let smaller_sz = random 1 sz in
+          //    (x, W_SX sz (gen_unary smaller_sz)))
+          // , ( let smaller_sz = random 1 sz in
+          //    (x, W_ZX sz (gen_unary smaller_sz)))
             , ( val (cs, ds)   = split_at 2 ts in
                 val (es, fs)   = split_at_random ds in
                 let gen ts sz  = gen_wexpr is ts sz (d / 3) in
                 (b, W_ITE (gen cs 1) (gen es sz) (gen fs sz)))
-            // , ( let larger_sz  = random (sz + 1) ((sz + 1) * 2) in
-            //     let slice      = slice_at_random (sz - 1) larger_sz in
-            //     (b, W_SLICE slice (gen_unary larger_sz)))
+          // , ( let larger_sz  = random (sz + 1) ((sz + 1) * 2) in
+          //     let slice      = slice_at_random (sz - 1) larger_sz in
+          //     (b, W_SLICE slice (gen_unary larger_sz)))
             , ( let chunked_sz = segment_at_random sz in
                 let len_sz     = length chunked_sz in
                 let len_ts     = length ts in
