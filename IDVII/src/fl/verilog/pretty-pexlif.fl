@@ -92,7 +92,17 @@ begin_abstype;
 
 let warn msg v = print msg fseq v;
 
+let binary {sz::int} {i::int} = sprintf "%d'b%0*b" sz sz i;
+
+let decimal {sz::int} {i::int} = sprintf "%d'd%0*d" sz sz i;
+
+let hex {sz::int} {i::int} = sprintf "%d'x%0*x" sz sz i;
+
+let prim_str {s::string} = Exp_primary $ Prim_str s;
+
 let prim_num {i::int} = Exp_primary $ Prim_num $ Num i;
+
+let prim_cstr {s::string} = CExp_primary $ CPrim_str s;
 
 let prim_cnum {i::int} = CExp_primary $ CPrim_num $ Num i;
 
@@ -234,7 +244,7 @@ let paren_exp a = Prim_mintypmax (Mintypmax_expression a);
 
 let x_exp = (Exp_primary (Prim_num X), 1);
 
-let const_exp c = (prim_num c, 1);
+let const_exp {sz::int} {c::int} = (prim_str (decimal sz c), 1);
 
 let variable_exp 1  v = (Exp_primary (prim_hier v []), 1)
 /\  variable_exp sz v = (Exp_primary (prim_hier v [(sz-1,0)]), 1)
@@ -279,7 +289,7 @@ let zero_extend_exp sz a =
       let sz'  = wexpr_size a in
       let zero =
             Exp_primary (Prim_mcat (MCAT (prim_cnum (sz-sz'))
-              (CAT [prim_num 0])))
+              (CAT [prim_str (binary 1 0)])))
       in
       (Exp_primary (Prim_cat (CAT [zero, a'])), 14)
 ;
@@ -317,7 +327,7 @@ let is_var (W_VAR _ _) = T
 let expression {we::wexpr} =
       letrec
           go (W_X _)        = x_exp
-      /\  go (W_CONST _ c)  = const_exp c
+      /\  go (W_CONST sz c) = const_exp sz c
       /\  go (W_VAR sz v)   = variable_exp sz v
       /\  go (W_AND a b)    = binary_exp B_bit_and a b // B_log_and
       /\  go (W_OR a b)     = binary_exp B_bit_or a b // B_log_or
@@ -343,8 +353,8 @@ let expression {we::wexpr} =
             is_var w => slice_exp is w |
               error "W_SLICE must be called with a variable"
       // Named op. -------------------------------
-      /\  go (W_NAMED_CONST _ _ c) =
-            warn "NAMED_CONST is treated as CONST" (const_exp c)
+      /\  go (W_NAMED_CONST _ sz c) =
+            warn "NAMED_CONST is treated as CONST" (const_exp sz c)
       /\  go (W_EXPLICIT_VAR sz v) =
             warn "EXPLICIT_VAR is treated as VAR" (variable_exp sz v)
       /\  go (W_PRED _ a) =
