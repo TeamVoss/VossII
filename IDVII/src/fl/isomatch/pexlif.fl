@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
-load (DIR^"misc.fl");
-load (DIR^"util.fl");
+load (DIR^"../design/misc.fl");
+load (DIR^"../design/util.fl");
 load (DIR^"primes.fl");
 
 // Meh...
@@ -299,25 +299,26 @@ letrec
         {sz :: int}
         {d  :: int}
         =
+        //(printf "gen_wexpr sz=%d |ts|=%d d=%d\n" sz (length ts) d) fseq
         // If complexity 'd' is satisfied and 'ts' distributed, build leaf.
-        (length ts == 0) AND (d <= 0) => gen_wexpr_input is sz |
+        (d <= 0) AND (length ts == 0) => gen_wexpr_input is sz |
         // If 'd' is satisfied, but some 't' is unused, pick that.
-        (length ts == 1) AND (d <= 0) => gen_wexpr_input ts sz |
+        (d <= 0) => gen_wexpr_input ts sz |
         // todo: make sure t is used?
         // Misc. for unary/binary ops.
         let gen_unary  sz = gen_wexpr is ts sz (d - 1) in
         let gen_binary ts = gen_wexpr is ts sz (d / 2) in
         val (as, bs) = split_at_random ts in
-        // Weights for ...
-        let u = (d <= 0) => 1 | 1 then // unary.
-        let x = (sz > 1) => 1 | 0 then // ext. & ite.
+        // Weights for ... these don't make sense anymore ...
+        let u = (d <= 0) => 1 | 1 then // unary. & if-then-else.
+        let x = (sz > 1) => 1 | 0 then // ext.
         let b = (sz > 1) => 1 | 0 then // binary.
         // Pick a valid PINST op.
         one_of_weighted (filter (defix < 0 # fst)
             [ (u, W_NOT  (gen_unary sz))
-            , (b, W_AND  (gen_binary as) (gen_binary bs))
-            , (b, W_OR   (gen_binary as) (gen_binary bs))
-            , (b, W_EQ   (gen_binary as) (gen_binary bs))
+            , (u, W_AND  (gen_binary as) (gen_binary bs))
+            , (u, W_OR   (gen_binary as) (gen_binary bs))
+            , (u, W_EQ   (gen_binary as) (gen_binary bs))
             , (b, W_GR   (gen_binary as) (gen_binary bs))
             , (b, W_ADD  (gen_binary as) (gen_binary bs))
             , (b, W_SUB  (gen_binary as) (gen_binary bs))

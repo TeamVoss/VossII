@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
-load (DIR^"misc.fl");
-load (DIR^"util.fl");
+load (DIR^"../design/misc.fl");
+load (DIR^"../design/util.fl");
 load (DIR^"pexlif.fl");
 
 // -----------------------------------------------------------------------------
@@ -276,6 +276,7 @@ let isomatch needle haystack =
         pexlif_get_leaf haystack => eprintf "isomatch expects a hier. haystack." |
         // Run isomatch for each child in haystack.
         val (PINST _ _ _ _ _ _ (P_HIER gs)) = haystack in
+        //val (PINST _ _ _ _ _ _ (P_HIER gs)) = needle in
         let match g ix = map (pair ix)  (explore needle g) in
         concat (ixmap match gs)
 ;

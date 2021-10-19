@@ -258,7 +258,8 @@ let unary_exp op a =
 ;
 
 let binary_exp op a b =
-      let wrap exp n o = n <= o => exp | Exp_primary (paren_exp exp) in
+      //let wrap exp n o = n <= o => exp | Exp_primary (paren_exp exp) in
+      let wrap exp _ _ = Exp_primary (paren_exp exp) in
       let p = precedence_binary op in
       val (a', n) = expression a in
       val (b', m) = expression b in
