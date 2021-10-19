@@ -533,6 +533,8 @@ get_top_adjacencies(g_ptr p)
 
 // -----------------------------------------------------------------------------
 
+#if 1
+
 #define IS_IN(ix, set)                                                         \
     (find_hash(&(set), (ix)) != NULL)
 
@@ -664,6 +666,74 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
     rem_adj_mem();
     return new_pinst;
 }
+
+#else
+g_ptr
+fold_pexlif(g_ptr p, g_ptr ids, string name)
+{
+    g_ptr attrs, fa_inps, fa_outs, ints, cont;
+    string name;
+    bool leaf;
+    if(!is_PINST(p, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
+	DIE("Cannot happen");
+    }
+    g_ptr chs;
+    if( !is_P_HIER(cont, &chs) ) {
+	Fail_pr("fold_pexlif on leaf node");
+	return NULL;
+    }
+    hash_record ids_set;
+    create_hash(&ids_set, 100, int_hash, int_equ);
+    for(; !IS_NIL(ids); ids = M_GET_CONS_TL(ids)) {
+	int id = GET_INT(GET_CONS_HD(ids));
+        insert_check_hash(&ids_set, INT2PTR(id), INT2PTR(1));
+    }
+
+%%%%%%%%%%%%%%%
+
+//// Correct version of fold_pexlif (not terribly efficient).
+//let fold_pexlif p il new_name =
+//    val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER chs)) = p then
+//    let sel (i,sp) = mem i il in
+//    val (sels,rems) = split sel (zip (1 upto (length chs)) chs) in
+//    let selected = map snd sels in
+//    let remain = map snd rems in
+//    let out_producers =
+//        let get_aouts (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd fa_outs in
+//        md_expand_vectors ((map fst fa_inps)@(flatmap get_aouts remain))
+//    in
+//    let out_consumers =
+//        let get_ainps (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd fa_inps in
+//        md_expand_vectors ((map fst fa_outs)@(flatmap get_ainps remain))
+//    in
+//    let in_producers =
+//        let get_aouts (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd fa_outs in
+//        md_expand_vectors (flatmap get_aouts selected)
+//    in
+//    let in_consumers =
+//        let get_ainps (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd fa_inps in
+//        md_expand_vectors (flatmap get_ainps selected)
+//    in
+//    let new_outs = in_producers intersect out_consumers in
+//    let new_inps = in_consumers intersect out_producers in
+//    let new_ints = md_extract_vectors
+//                ((in_producers@in_consumers) subtract (new_outs @ new_inps))
+//    in
+//    let mk_fa l = map (\v. (v,[v])) (md_extract_vectors l) in
+//    let cp = PINST new_name [] F (mk_fa new_inps) (mk_fa new_outs) new_ints
+//                (P_HIER selected)
+//    in
+//    let ints' = md_extract_vectors
+//                    ((out_consumers@out_producers) subtract
+//                     (md_expand_vectors (map fst (fa_inps@fa_outs))))
+//    in
+//    (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER (cp:remain)))
+//;
+
+
+}
+
+#endif
 
 g_ptr
 unfold_pexlif(g_ptr p, unint id)

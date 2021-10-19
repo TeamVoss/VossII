@@ -1313,6 +1313,36 @@ get_visualization_id(g_ptr redex)
 }
 
 static void
+get_visualization_pinst_cnt(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_fsm, g_node, g_level;
+    EXTRACT_3_ARGS(redex, g_fsm, g_node, g_level);
+    fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
+    string node = GET_STRING(g_node);
+    push_fsm(fsm);
+    int idx = name2idx(node);
+    if( idx < 0 ) {
+	pop_fsm();
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	return;
+    }
+    nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
+    vis_ptr vp = get_vis_info_at_level(np->draw_info, GET_INT(g_level));
+    if( vp == NULL ) {
+	pop_fsm();
+	MAKE_REDEX_FAILURE(redex,
+			   Fail_pr("Node %s has no drawing information", node));
+	return;
+    }
+    MAKE_REDEX_INT(redex, vp->pinst_cnt);
+    pop_fsm();
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
 get_visualization_pfn(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
@@ -2632,6 +2662,15 @@ Fsm_Install_Functions()
 					     GLmake_int()))),
 			get_visualization_id);
 
+    Add_ExtAPI_Function("get_visualization_pinst_cnt", "111", FALSE,
+			GLmake_arrow(
+			    fsm_handle_tp,
+			    GLmake_arrow(
+				GLmake_string(),
+				GLmake_arrow(GLmake_int(),
+					     GLmake_int()))),
+			get_visualization_pinst_cnt);
+
     Add_ExtAPI_Function("get_visualization_pfn", "111", FALSE,
 			GLmake_arrow(
 			    fsm_handle_tp,
@@ -3858,7 +3897,9 @@ static void
 mark_vstate_fn(pointer p)
 {
     vstate_ptr vp = (vstate_ptr) p;
+    if( vp->mark == 2 ) { return; }
     vp->mark = 2;
+    mark_fsm_fn((pointer) (vp->fsm));
 }
 
 static void
@@ -3875,6 +3916,7 @@ sweep_vstate_fn(void)
 		dispose_hash(&(vp->ifc_nds), NULLFCN);
 		free_mgr(&(vp->sch_rec_mgr));
 		vp->next = vstate_free_list;
+		vp->fsm = NULL;
 		vstate_free_list = vp;
 		vp->mark = 0;
 		break;
@@ -5601,6 +5643,7 @@ idx_is_user_defined(int idx)
 	    if( strstr(decl->u.name, "__tmp") != NULL ) return FALSE;
 	    if( strstr(decl->u.name, "_TMP_") != NULL ) return FALSE;
 	    if( strstr(decl->u.name, "TmP_") != NULL ) return FALSE;
+	    if( strstr(decl->u.name, "_$") != NULL ) return FALSE;
 	}
 	decl = decl->next;
     }
@@ -6834,8 +6877,8 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
         return FALSE;
     }
     attrs = Make_CONS_ND(
-                         Make_CONS_ND(Make_STRING_leaf(wastrsave(&strings,"module")),
-                                      Make_STRING_leaf(name)), attrs);
+		 Make_CONS_ND(Make_STRING_leaf(wastrsave(&strings,"module")),
+			      Make_STRING_leaf(name)), attrs);
     push_buf(&attr_buf, &attrs);
     // Declare new nodes (internal)
     for(g_ptr l = internals; !IS_NIL(l); l = GET_CONS_TL(l)) {
@@ -6853,6 +6896,7 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
         vp->attrs = attrs;
         draw_level++;
         vp->id = ++visualization_id;
+        vp->pinst_cnt = inst_cnt;
         if( strstr(name, "draw_") == NULL ) {
             string tmp = strtemp("draw_hfl {");
             tmp = strappend(name);
@@ -6892,7 +6936,7 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
             if( List_length(GET_SND(pair)) != 1 ||
                 !STREQ(fname, GET_STRING(GET_CONS_HD(GET_SND(pair)))) ) {
                 FP(warning_fp,
-                   "Actual != formal (%s) for top-level pexlif output. ", fname);
+                   "Actual != formal (%s) for top-level pexlif output. ",fname);
                 FP(warning_fp, "Actual ignored\n");
             }
             push_buf(top_outsp, &fname);
@@ -6952,7 +6996,11 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
             ilist_ptr act_list = NULL;
             while( !IS_NIL(acts) ) {
                 string actual = GET_STRING(GET_CONS_HD(acts));
+#if 0
                 ilist_ptr tmp = map_vector(parent_tblp, hier, actual, TRUE);
+#else
+                ilist_ptr tmp = map_vector(parent_tblp, hier, actual, FALSE);
+#endif
                 if( tmp == NULL ) {
                     string phier = strtemp(hier);
                     string last = rindex(phier, '/');

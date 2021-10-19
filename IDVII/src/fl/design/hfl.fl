@@ -3176,12 +3176,30 @@ let always_ff gclk assignments =
 let <== {lhs:: *a} {rhs:: *a} = (lhs,rhs);
 infix 1 <==;
 
+
+let get_uniq_prefix sp =
+    val (PINST name attrs leaf fa_inps fa_outs ints body) = sp in
+    let nds = md_expand_vectors ((map fst (fa_inps@fa_outs))@ints) in
+    let extract n = NOT (str_is_prefix "_$" n) => [] | [sscanf "_$%d" n] in
+    let cur = qsort (defix -) (flatmap extract nds) then
+    cur = [] => 1 | (last cur + 1)
+;
+
+
+
 // Flatten the pexlif until the stop_pred is satisfied.
 // Intermediate wire names are created on demand and are named
 // i<number>/i<number>/.../<name> where the i<number>s refere to
 // the cardinality of a subfub.
 //
 let gen_flatten_pexlif stop_pred p =
+    let idx0 = get_uniq_prefix p then
+    let nbr = ref idx0 then
+    let mk_pref i =
+	let idx = deref nbr then
+	(nbr := (deref nbr + 1)) fseq
+	sprintf "_$%d" idx
+    in
     letrec do_flat sub pref p =
         let tr n = (assoc n sub) catch n in
         val (PINST name attrs leaf fa_inps fa_outs ints content) = p in
@@ -3204,13 +3222,13 @@ let gen_flatten_pexlif stop_pred p =
             in
             let int_sub = flatmap mk_int_sub ints in
             let sub' = io_sub @ int_sub in
-            let prefs = map (sprintf "%si%d/" pref) (1 upto length children) in
+            let prefs = map mk_pref (1 upto length children) in
             flat (map2 (do_flat sub') prefs children)
     in
     val (PINST name attrs leaf fa_inps fa_outs ints content) = p in
     leaf => p |
     val (P_HIER chs) = content in
-    let prefs = map (sprintf "i%d/") (1 upto length chs) in
+    let prefs = map mk_pref (1 upto length chs) in
     let children = flat (map2 (do_flat []) prefs chs) in
     let wires_used (PINST _ _ _ fa_inps fa_outs _ _) =
         md_expand_vectors (flatmap snd (fa_inps @ fa_outs))

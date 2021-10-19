@@ -81,7 +81,35 @@ let fl_is_IDV_ENV canvas =
 ;
 export_to_tcl fl_is_IDV_ENV;
 
-let canvas2fsm canvas = vfsm2fsm (w2vfsm canvas);
+let get_idv_info_r canvas =
+    let vfsm = w2vfsm canvas in
+    NOT (is_IDV_ENV vfsm) => error "get_idv_info on STE_ENV" |
+    let trfs = deref (vfsm2canvases_r vfsm) in
+    val (TR_SEQ vr trfsr) = dassoc "canvas2trfs" canvas trfs then
+    trfsr
+;
+
+let get_idv_info canvas = deref (get_idv_info_r canvas);
+
+
+let get_idv_current_pexlif canvas = fst (hd (get_idv_info canvas));
+
+let get_idv_current_fsm canvas =
+    val (p,ckt,just) = hd (get_idv_info canvas) then
+    ckt
+;
+
+let canvas2fsm canvas =
+    let vfsm = w2vfsm canvas in
+    is_STE_ENV vfsm => vfsm2fsm vfsm |
+    // IDV_ENV
+    let trfs = deref (vfsm2canvases_r vfsm) in
+    val (TR_SEQ vr trfsr) = dassoc "canvas2trfs" canvas trfs then
+    val (p,ckt,just) = hd (deref trfsr) in
+    ckt
+;
+
+
 let canvas2ste canvas = deref (vfsm2ste_r (w2vfsm canvas));
 let canvas2current_time_r canvas = vfsm2cur_time_r (w2vfsm canvas);
 let canvas2waveform canvas = deref (vfsm2wvr (w2vfsm canvas));
@@ -353,7 +381,7 @@ let gen_draw_fanin vfsm draw_level levels vecs =
 	sprintf "let %s = draw_fanin vis (%d) %d %s;\n%s;"
 		 tab draw_level levels svecs tab
     in
-    (add_active_sch_tab_window vfsm c vis cmd) fseq
+    (add_active_sch_tab_window vfsm c (BASE_VIS vis) cmd) fseq
     val (final_res, cmds) = visualisation2tcl vis then
     (big_tcl_eval ("create_sch":cmds)) fseq
     (cur_canvas := c) fseq
@@ -369,22 +397,25 @@ let gen_draw_fanin vfsm draw_level levels vecs =
 ;
 
 
-let gen_draw_inside vfsm cur_draw_level vecs inst_nbr =
+let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
     let w = vfsm2id vfsm then
     is_IDV_ENV vfsm =>
-	let parent = get_current_idv_pexlif vfsm then
+	let parent = get_idv_current_pexlif canvas then
 	let p = el inst_nbr (pexlif_get_children parent) then
-	let ckt = toplevel_pexlif2fsm p in
-	let outs = pexlif_get_outs_actuals p then
+	let old = update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" "TRUE" then
+	let ckt = toplevel_pexlif2fsm p then
+	(update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" old) fseq
+	let outs = outputs ckt then
 	let vis = visualize_fanin ckt [] [] 100 outs 0 then
 	val (tab_window, c) = get_new_sch_canvas w 0 "" then
 	let cmd =
 	    let tab = canvas2tab c then
 	    let svecs = list2str T "[" "," "]" (sprintf "\"%s\"") outs in
-	    sprintf "let %s = draw_fanin vis (%d) %d %s;\n%s;"
+	    sprintf "OBSOLETE: let %s = draw_fanin vis (%d) %d %s;\n%s;"
 		     tab 0 100 svecs tab
 	in
-	(add_active_sch_tab_window vfsm c vis cmd) fseq
+	let evis = TR_SEQ (ref vis) (ref [(p,ckt,SPEC)]) then
+	(add_active_sch_tab_window vfsm c evis cmd) fseq
 	val (final_res, cmds) = visualisation2tcl vis then
 	(big_tcl_eval ("create_sch":cmds)) fseq
 	(tcl_eval [
@@ -418,7 +449,7 @@ let gen_draw_inside vfsm cur_draw_level vecs inst_nbr =
 	sprintf "let %s = draw_inside vis %d %s;\n%s;" 
 		tab (cur_draw_level+1) svecs tab
     in
-    (add_active_sch_tab_window vfsm c vis cmd) fseq
+    (add_active_sch_tab_window vfsm c (BASE_VIS vis) cmd) fseq
     val (final_res, cmds) = visualisation2tcl vis then
     (big_tcl_eval ("create_sch":cmds)) fseq
     (cur_canvas := c) fseq
@@ -440,14 +471,14 @@ let gen_draw_inside vfsm cur_draw_level vecs inst_nbr =
 // =====================================================================
 
 let fl_tag2vec canvas tag =
-    let vis = canvas2vis canvas then
+    let vis = evis2vis (canvas2vis canvas) then
     visualization_anon2real vis tag
 ;
 export_to_tcl fl_tag2vec;
 
 let fl_vecs2tags canvas vecs =
     str_is_prefix ".c9999999" canvas => ["_"] |
-    let vis = canvas2vis canvas then
+    let vis = evis2vis (canvas2vis canvas) then
     val (fpots,ppots) = visualization_vecs2tags vis T vecs then
     let is_vecs an = (visualization_anon2real vis an) = vecs in
     let res = filter is_vecs fpots then
@@ -465,7 +496,7 @@ export_to_tcl fl_draw_fanin_by_name;
 let fl_draw_inside canvas cur_draw_level tag inst_nbr =
     let vfsm = w2vfsm canvas then
     let vecs = fl_tag2vec canvas tag then
-    busy (gen_draw_inside vfsm cur_draw_level vecs inst_nbr)
+    busy (gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr)
 ;
 export_to_tcl fl_draw_inside;
 
@@ -1145,7 +1176,8 @@ let update_colors vfsm =
     let base_highlights = deref (vfsm2hll_r vfsm) then
     let highlights = map hd (partition fst base_highlights) in
     let active_canvases = deref (vfsm2canvases_r vfsm) then
-    let do_one_canvas (c,vis) =
+    let do_one_canvas (c,evis) =
+	let vis = evis2vis evis in
 	let send color anon =
 	    (tcl_eval [
 		sprintf "cb:prim_set_wire_color %s %s %s" c anon color]) fseq ()
@@ -1261,7 +1293,7 @@ clet get_dependency_color ste t vecs =
 ;
 
 let fl_get_bdd_color c an =
-    let vis   = canvas2vis c then
+    let vis   = evis2vis (canvas2vis c) then
     let ste   = canvas2ste c then
     let t     = deref (canvas2current_time_r c) then
     let vecs  = visualization_anon2real vis an in
@@ -1392,7 +1424,8 @@ let fl_add_stop_nd canvas tag =
     let vecs = fl_tag2vec canvas tag then
     let old = deref stop_list_r then
     (stop_list_r := (vecs union old)) fseq
-    (visualization_set_stop_nodes (canvas2vis canvas) (deref stop_list_r))
+    (visualization_set_stop_nodes (evis2vis (canvas2vis canvas))
+				  (deref stop_list_r))
 ;
 export_to_tcl fl_add_stop_nd;
 
@@ -1409,13 +1442,14 @@ let fl_delete_stop_nd canvas vec =
     let stop_list_r = vfsm2stop_list_r vfsm then
     let old = deref stop_list_r then
     (stop_list_r := (old subtract [vec])) fseq
-    ((visualization_set_stop_nodes (canvas2vis canvas) (deref stop_list_r))
+    ((visualization_set_stop_nodes (evis2vis (canvas2vis canvas))
+				   (deref stop_list_r))
      catch ())
 ;
 export_to_tcl fl_delete_stop_nd;
 
 let fl_expand_fanin c draw_level levels tag =
-    let vis = canvas2vis c then
+    let vis = evis2vis (canvas2vis c) then
     let vis = visualize_expand_fanin vis tag levels draw_level then
     let cmd =
 	let tab = canvas2tab c then
@@ -1439,7 +1473,7 @@ let fl_expand_fanin c draw_level levels tag =
 export_to_tcl fl_expand_fanin;
 
 let fl_undo_expansion c =
-    let vis = canvas2vis c then
+    let vis = evis2vis (canvas2vis c) then
     let vis = visualize_undo vis then
     val (final_res, cmds) = visualisation2tcl vis then
     (big_tcl_eval ("create_sch":cmds)) fseq
@@ -1456,7 +1490,7 @@ export_to_tcl fl_undo_expansion;
 
 let fl_hide_fanin c tag make_it_stop_node =
     (make_it_stop_node => (fl_add_stop_nd c tag) | ()) fseq
-    let vis = canvas2vis c then
+    let vis = evis2vis (canvas2vis c) then
     let vis = visualize_hide_fanin vis tag (-1) then
     let cmd =
 	let v = list2str T "[" ", " "]" (sprintf "\"%s\"") (fl_tag2vec c tag) in
@@ -1661,7 +1695,7 @@ let draw_fanin vfsm hierarchy_level levels vecs =
 // Returns the name of the canvas for the new fanin drawing.
 //
 let draw_inside vfsm hierarchy_level vecs =
-    gen_draw_inside vfsm (hierarchy_level-1) vecs 0
+    gen_draw_inside vfsm "" (hierarchy_level-1) vecs 0
 ;
 
 // Hide a subtree

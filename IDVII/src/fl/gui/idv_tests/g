@@ -1,0 +1,3 @@
+set pagination off
+dir /home/cseger/VossII/src/bin/fl
+r -use_stdout -f example.fl

@@ -1,0 +1,44 @@
+load "ste.fl";
+
+TYPE "word" 10;
+
+let full_adder =
+    bit_input	a b cin.
+    bit_output	sum cout.
+    CELL "draw_hier full_adder" [
+	sum <- a '^' b '^' cin,
+	cout <- a '&' b '|' a '&' cin '|' b '&' cin
+];
+
+letrec ripple_adder =
+    bit_list_input  al bl.
+    bit_input	    cin.
+    bit_list_output ol.
+    bit_output	    cout.
+    bit_internal    mid.
+    CELL "draw_hier ripple_adder" (
+	al = [] => [cout <- cin] |
+	[
+	    full_adder (hd al) (hd bl) cin (hd ol) mid,
+	    ripple_adder (tl al) (tl bl) mid (tl ol) cout
+	]
+);
+
+
+let adder_spec =
+    word_input	a b.
+    bit_input	cin.
+    word_output	o.
+    bit_output	cout.
+    CELL "adder_spec" [
+	ripple_adder (tobits a) (tobits b) cin (tobits o) cout
+];
+
+
+let p = adder_spec 'a 'b 'cin 'o 'cout;
+
+//STE_debug (pexlif2fsm p);
+
+let idv = start_new_transform p;
+idv;
+

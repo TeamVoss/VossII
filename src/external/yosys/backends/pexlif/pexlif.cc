@@ -440,11 +440,11 @@ struct PexlifDumper
 			f << " ";
 			if( a_sz > y_sz ) {
 			    f.flush();
-			    log_error("A size greater than Y size");
+			    log_error("A size (%d) greater than Y size (%d) for celltype %s", a_sz, y_sz, cell->type.substr(1).c_str());
 			}
 			if( b_sz > y_sz ) {
 			    f.flush();
-			    log_error("B size greater than Y size");
+			    log_error("B size (%d) greater than Y size (%d) for celltype %s", b_sz, y_sz, cell->type.substr(1).c_str());
 			}
 			if( a_sz < y_sz ) {
 			    if( a_signed ) {

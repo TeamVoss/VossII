@@ -20,6 +20,12 @@ proc idv:create_idv_gui {w} {
 
 proc idv:create_idv_menu {nb w} {
 
+        button $w.menu.new_transf -image $::icon(new_transf) \
+                -command "idv:new_transf $w"
+        balloon $w.menu.new_transf \
+		"Start new transformation sequence from selected instances"
+        pack $w.menu.new_transf -side left -padx 5
+
         button $w.menu.fold -image $::icon(fold) \
                 -command "idv:fold $w"
         balloon $w.menu.fold "Fold selected instances"
@@ -29,6 +35,11 @@ proc idv:create_idv_menu {nb w} {
                 -command "idv:unfold $w"
         balloon $w.menu.unfold "Unfold selected instance"
         pack $w.menu.unfold -side left -padx 5
+
+        button $w.menu.flatten -image $::icon(flatten) \
+                -command "idv:flatten $w"
+        balloon $w.menu.flatten "Flatten model"
+        pack $w.menu.flatten -side left -padx 5
 
         button $w.menu.duplicate -image $::icon(duplicate) \
                 -command "idv:duplicate $w"
@@ -74,7 +85,10 @@ proc idv:fold {w} {
 
 proc idv:unfold {w} { fl_do_unfold $w.c }
 
+proc idv:flatten {w} { fl_do_flatten $w.c }
+
 proc idv:duplicate {w} { fl_do_duplicate $w.c }
 
 proc idv:merge {w} { fl_do_merge $w.c }
 
+proc idv:new_transf {w} { fl_do_new_tranf $w.c }
