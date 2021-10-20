@@ -233,6 +233,43 @@ let subst_match sub (PINST n a l i1 o1 t c) (PINST _ _ _ i2 o2 _ _) =
 ;
 
 //------------------------------------------------------------------------------
+// Shrinking of a PEXLIF.
+//------------------------------------------------------------------------------
+
+//  shrink_2 :: (a -> [a]) -> (a,a) -> [(a,a)]
+let shrink_2 s (x, y) =
+          map (\a. (a, y)) (s x)
+        @ map (\b. (x, b)) (s y)
+;
+
+//  shrink_list :: (a -> [a]) -> [a] -> [[a]]
+letrec
+    shrink_list _ []     = [[]]
+/\  shrink_list s (x:xs) =
+          [xs]
+        @ map (\as. x : as) (shrink_list s xs)
+        @ map (\a.  a : xs) (s x)
+;
+
+letrec
+    shrink_wexpr (W_X sz)       = [W_X sz]
+/\  shrink_wexpr (W_CONST sz v) = [W_CONST sz v]
+/\  shrink_wexpr (W_VAR sz n)   = [W_VAR sz n]
+/\  shrink_wexpr (W_AND a b) =
+        [a, b] @ map (curry W_AND) (shrink_2 shrink_wexpr (a,b))
+/\  shrink_wexpr (W_OR a b) =
+        [a, b] @ map (curry W_OR) (shrink_2 shrink_wexpr (a,b))
+// W_NAMED_CONST {name::string} {sz::int} {v::int}
+// W_EXPLICIT_VAR {sz::int} {name::string}
+;
+
+let shrink_update_fn (W_UPDATE_FN lhs rhs) = ()
+;
+
+let shrink_pexlif (PINST n as l inp out int (P_LEAF fs)) = ()
+;
+
+//------------------------------------------------------------------------------
 // Generation of a PEXLIF.
 //------------------------------------------------------------------------------
 
@@ -243,6 +280,13 @@ let segment_at_random 1  = [1]
 ;
 non_lazy segment_at_random;
 
+let split_at_random2 [ ] = error "Internal: split_at_random2 [ ]"
+/\  split_at_random2 [_] = error "Internal: split_at_random2 [_]"
+/\  split_at_random2 xs  = split_at (random 2 (length xs)) xs
+;
+non_lazy split_at_random2;
+// note: when, for example, splitting slices we can't have either list.
+
 let slice_at_random lz hz =
         let lsb = random 0 (hz-lz) in
         lsb upto (lsb+lz-1)
@@ -252,8 +296,6 @@ non_lazy slice_at_random;
 //   repeat (hz-lz) remove_one (0 upto hz)
 
 begin_abstype;
-
-let ?! = undefined;
 
 letrec
     gen_wexpr_inputs
@@ -306,10 +348,11 @@ letrec
         (d <= 0) => gen_wexpr_input ts sz |
         // todo: make sure t is used?
         // Misc. for unary/binary ops.
-        let gen_unary sz = gen_wexpr is ts sz (d - 1) in
+        let gen_unary sz     = gen_wexpr is ts sz (d - 1) in
         let gen_binary sz ts = gen_wexpr is ts sz (d / 2) in
+        let v   = random 1 (max 1 (log2 (max 1 sz))) in // rand. val. for const.
+        let ssz = one_of [1,2,4,8,16,32] in // size hidden under ==, >.
         val (as, bs) = split_at_random ts in
-        let v = random 1 (max 1 (log2 (max 1 sz))) in
         // Weights for choices, 1=valid & 0=invalid.
         let as_valid T = 1
         /\  as_valid F = 0
@@ -321,15 +364,15 @@ letrec
         // Pick a valid PINST op.
         one_of_weighted (filter (defix < 0 # fst)
             [ (d_0,  W_NOT  (gen_unary sz))
-            , (d_X,  W_AND  (gen_binary sz as) (gen_binary sz bs))
-            , (d_X,  W_OR   (gen_binary sz as) (gen_binary sz bs))
-            , (sz_1, W_EQ   (gen_binary sz as) (gen_binary sz bs))
-            , (sz_X, W_GR   (gen_binary sz as) (gen_binary sz bs))
-            , (sz_X, W_ADD  (gen_binary sz as) (gen_binary sz bs))
-            , (sz_X, W_SUB  (gen_binary sz as) (gen_binary sz bs))
-            , (sz_X, W_MUL  (gen_binary sz as) (gen_binary sz bs))
-            , (sz_X, W_DIV  (gen_binary sz as) (gen_binary sz bs))
-            , (sz_X, W_MOD  (gen_binary sz as) (gen_binary sz bs))
+            , (d_X,  W_AND  (gen_binary sz as)  (gen_binary sz bs))
+            , (d_X,  W_OR   (gen_binary sz as)  (gen_binary sz bs))
+            , (sz_1, W_EQ   (gen_binary ssz as) (gen_binary ssz bs))
+            , (sz_1, W_GR   (gen_binary ssz as) (gen_binary ssz bs))
+            , (sz_X, W_ADD  (gen_binary sz as)  (gen_binary sz bs))
+            , (sz_X, W_SUB  (gen_binary sz as)  (gen_binary sz bs))
+            , (sz_X, W_MUL  (gen_binary sz as)  (gen_binary sz bs))
+            , (sz_X, W_DIV  (gen_binary sz as)  (gen_binary sz bs))
+            , (sz_X, W_MOD  (gen_binary sz as)  (gen_binary sz bs))
             , (sz_X, W_SHL  (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
             , (sz_X, W_SHR  (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
             , (sz_X, W_ASHR (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
@@ -380,7 +423,7 @@ let extend_wires
         {size :: int}
         =
         let split (x, s) =
-                val (ls, rs) = split_at_random ((s - 1) downto 0) in
+                val (ls, rs) = split_at_random2 ((s - 1) downto 0) in
                 let slice is = (W_SLICE is x, length is) in
                 [slice ls, slice rs]
         in
@@ -425,7 +468,7 @@ let gen_wires
         let random_size x =
                 one_of_weighted
                     [ (1, one_of [1,2,4,8,16,32]),
-                      (1, one_of_weighted hist_sz) ] // todo: increase weight.
+                      (2, one_of_weighted hist_sz) ]
         in
         // Build internal wires for node 'ix' and give it a random size.
         let new_internal i =
