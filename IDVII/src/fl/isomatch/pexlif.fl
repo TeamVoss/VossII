@@ -310,55 +310,44 @@ letrec
         let gen_binary sz ts = gen_wexpr is ts sz (d / 2) in
         val (as, bs) = split_at_random ts in
         let v = random 1 (max 1 (log2 (max 1 sz))) in
-        // Weights for ... these names don't make sense anymore ...
-        let u = (d <= 0) => 1 | 1 then // unary. & if-then-else.
-        let x = (sz > 1) => 1 | 0 then // ext.
-        let b = (sz > 1) => 1 | 0 then // binary.
+        // Weights for choices, 1=valid & 0=invalid.
+        let as_valid T = 1
+        /\  as_valid F = 0
+        in
+        let d_0  = as_valid (d  <= 0) then
+        let d_X  = as_valid (d  >  0) then
+        let sz_1 = as_valid (sz == 1) then
+        let sz_X = as_valid (sz >  1) then
         // Pick a valid PINST op.
         one_of_weighted (filter (defix < 0 # fst)
-            [ (u, W_NOT  (gen_unary sz))
-            , (u, W_AND  (gen_binary sz as) (gen_binary sz bs))
-            , (u, W_OR   (gen_binary sz as) (gen_binary sz bs))
-            , (u, W_EQ   (gen_binary sz as) (gen_binary sz bs))
-            , (b, W_GR   (gen_binary sz as) (gen_binary sz bs))
-            , (b, W_ADD  (gen_binary sz as) (gen_binary sz bs))
-            , (b, W_SUB  (gen_binary sz as) (gen_binary sz bs))
-            , (b, W_MUL  (gen_binary sz as) (gen_binary sz bs))
-            , (b, W_DIV  (gen_binary sz as) (gen_binary sz bs))
-            , (b, W_MOD  (gen_binary sz as) (gen_binary sz bs))
-            , (b, W_SHL  (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
-            , (b, W_SHR  (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
-            , (b, W_ASHR (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
-          // , ( let smaller_sz = random 1 sz in
-          //    (x, W_SX sz (gen_unary smaller_sz)))
-          // , ( let smaller_sz = random 1 sz in
-          //    (x, W_ZX sz (gen_unary smaller_sz)))
-            , (u, val (cs, ds)   = split_at 2 ts in
-                  val (es, fs)   = split_at_random ds in
-                  let gen ts sz  = gen_wexpr is ts sz (d / 3) in
-                  W_ITE (gen cs 1) (gen es sz) (gen fs sz))
-          // , ( let larger_sz  = random (sz + 1) ((sz + 1) * 2) in
-          //     let slice      = slice_at_random sz larger_sz in
-          //     (b, W_SLICE slice (gen_unary larger_sz)))
-             , (x, let sz_l = sz > 1 => random 1 (sz-1) | 1 in
-                   let sz_r = sz-sz_l in
-                   let wl   = gen_wexpr is as sz_l (d / 2) in
-                   let wr   = gen_wexpr is bs sz_r (d / 2) in
-                   W_CAT [wl, wr])
-                 // todo: CAT more than two?
-          // , ( let chunked_sz = segment_at_random sz in
-          //    let len_sz     = length chunked_sz in
-          //    let len_ts     = length ts in
-          //    let chunked_ts =
-          //            len_sz <= len_ts => split_into len_sz ts |
-          //            (map (\t. [t]) ts) @ (replicate (len_sz - len_ts) [])
-          //    in
-          //    let gen ts sz  = gen_wexpr is ts sz (d / len_sz) in
-          //    (x, W_CAT (map2 gen chunked_ts chunked_sz)))
-         // , W_PRED ?! ?!
-         // , W_NAMED_SLICE ?! ?! ?!
-         // , W_UPDATE_NAMED_SLICE ?! ?! ?! ?!
-         // , W_MEM_WRITE ?! ?! ?! ?!
+            [ (d_0,  W_NOT  (gen_unary sz))
+            , (d_X,  W_AND  (gen_binary sz as) (gen_binary sz bs))
+            , (d_X,  W_OR   (gen_binary sz as) (gen_binary sz bs))
+            , (sz_1, W_EQ   (gen_binary sz as) (gen_binary sz bs))
+            , (sz_X, W_GR   (gen_binary sz as) (gen_binary sz bs))
+            , (sz_X, W_ADD  (gen_binary sz as) (gen_binary sz bs))
+            , (sz_X, W_SUB  (gen_binary sz as) (gen_binary sz bs))
+            , (sz_X, W_MUL  (gen_binary sz as) (gen_binary sz bs))
+            , (sz_X, W_DIV  (gen_binary sz as) (gen_binary sz bs))
+            , (sz_X, W_MOD  (gen_binary sz as) (gen_binary sz bs))
+            , (sz_X, W_SHL  (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
+            , (sz_X, W_SHR  (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
+            , (sz_X, W_ASHR (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
+            , (d_X,  val (cs, ds)   = split_at 2 ts in
+                     val (es, fs)   = split_at_random ds in
+                     let gen ts sz  = gen_wexpr is ts sz (d / 3) in
+                     W_ITE (gen cs 1) (gen es sz) (gen fs sz))
+            , (sz_X, let sz_l = sz > 1 => random 1 (sz-1) | 1 in
+                     let sz_r = sz-sz_l in
+                     let wl   = gen_wexpr is as sz_l (d / 2) in
+                     let wr   = gen_wexpr is bs sz_r (d / 2) in
+                     W_CAT [wl, wr])
+          // todo: CAT more than two?
+          // note: Slices are done at leaves to ensure variable args.
+          // , W_PRED ?! ?!
+          // , W_NAMED_SLICE ?! ?! ?!
+          // , W_UPDATE_NAMED_SLICE ?! ?! ?! ?!
+          // , W_MEM_WRITE ?! ?! ?! ?!
             ])
 ;
 non_lazy gen_wexpr;

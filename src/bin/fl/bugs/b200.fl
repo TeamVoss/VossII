@@ -196,18 +196,27 @@ let pexlif_test T s =
         (printf "(%d) Pexlif" s) fseq
         (pretty_pexlif (no_attrs gex)) fseq
         //
-        (printf "%s\n" (miter_debug pex gex => "OK" | "ERROR"))
+        let ok = miter_debug pex gex then
+        (printf "%s\n" (ok => "OK" | "ERROR")) fseq ok
 /\  pexlif_test F s =
         let pex = normalize_pexlif (gen_pex s 4 2 2) then
         let gex = pex2pex pex then
-        //
-        (printf "%s\n" (miter_run pex gex => "OK" | "ERROR"))
+        // Just run the thing.
+        miter_run pex gex
 ;
 
 let test_debug = pexlif_test T;
 let test_run   = pexlif_test F;
-
 let t = test_run;
+
+let test =
+        let go s =
+                (printf "TESTING SEED %d\n" s) fseq
+                (test_run s => print "OK\n" | error "ERROR\n")
+                
+        in
+        foreach go (1 upto 1000)
+;
 
 // update_vossrc "RECURSION-CALL-LIMIT" "100";
 
