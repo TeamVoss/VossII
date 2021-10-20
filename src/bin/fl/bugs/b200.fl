@@ -12,7 +12,7 @@ let pex2pex p =
       let fp = fopen file "w" then
       fprintf fp "%s\n" v fseq
       fclose fp fseq
-      verilog2pexlif "-I." top [file] []
+      verilog2pexlif T "-I." top [file] []
 ;
 
 
@@ -99,7 +99,15 @@ let miter_test T p g =
       val (miter, ant, cons) = mk_miter p g then
       let vis = STE_debug (pexlif2fsm miter) then
       let ste = STE "-e -m 10" vis [] ant cons [] then
-      get_ste_result ste ""
+      let ok = get_ste_result ste "" then
+      ok == T => T |
+      //
+      let dep = depends ant then
+      let sub = full_example F dep (NOT ok) then
+      let ant' = substitute sub ant then
+      let cons' = substitute sub cons then
+      let ste' = STE "-e -m 10" vis [] ant' cons' [] then
+      get_ste_result ste' ""      
 /\  miter_test F p g =
       val (miter, ant, cons) = mk_miter p g then
       let vis = pexlif2fsm miter then
@@ -199,7 +207,9 @@ let pexlif_test T s =
 let test_debug = pexlif_test T;
 let test_run   = pexlif_test F;
 
-let t1 = test_debug 1;
+let t = test_run;
+
+// update_vossrc "RECURSION-CALL-LIMIT" "100";
 
 // let gen_test s =
 //         (printf "=== Generating example %d\n" s) fseq
@@ -246,71 +256,71 @@ let t1 = test_debug 1;
 // =============================================================================
 // Four examples, all put into a larger haystack.
 
-// let buf1 =
-//     bit_input a.
-//     bit_output out.
-//     bit_internal mid.
-//     CELL "draw_hier buf1" [
-//       mid <- '~' a,
-//       out <- '~' mid
-//     ];
+let buf1 =
+    bit_input a.
+    bit_output out.
+    bit_internal mid.
+    CELL "draw_hier buf1" [
+      mid <- '~' a,
+      out <- '~' mid
+    ];
 
-// let buf2 =
-//     bit_input x.
-//     bit_output y.
-//     bit_internal mid.
-//     CELL "draw_hier buf2" [
-//       mid <- '~' x,
-//       y <- '~' mid
-// ];
+let buf2 =
+    bit_input x.
+    bit_output y.
+    bit_internal mid.
+    CELL "draw_hier buf2" [
+      mid <- '~' x,
+      y <- '~' mid
+];
 
-// let buf3 =
-//     bit_input a.
-//     bit_output out.
-//     bit_internal oink.
-//     CELL "draw_hier buf3" [
-//       oink <- '~' a,
-//       out <- '~' oink
-//     ];
+let buf3 =
+    bit_input a.
+    bit_output out.
+    bit_internal oink.
+    CELL "draw_hier buf3" [
+      oink <- '~' a,
+      out <- '~' oink
+    ];
 
-// letrec inv_rec n =
-//     bit_input    a.
-//     bit_output  out.
-//     bit_internal mid.
-//     CELL "draw_hier inv_rec" (
-//       n = 1 => [ out <- '~' a ] |
-//       [
-//           mid <- '~' a,
-//           inv_rec (n-1) mid out
-//       ]);
-// let buf4 =
-//     bit_input    a.
-//     bit_output  out.
-//     CELL "buf4" [
-//         inv_rec 2 a out
-//     ];
+letrec inv_rec n =
+    bit_input    a.
+    bit_output  out.
+    bit_internal mid.
+    CELL "draw_hier inv_rec" (
+      n = 1 => [ out <- '~' a ] |
+      [
+          mid <- '~' a,
+          inv_rec (n-1) mid out
+      ]);
+let buf4 =
+    bit_input    a.
+    bit_output  out.
+    CELL "buf4" [
+        inv_rec 2 a out
+    ];
 
-// let bufs =
-//     bit_input a b c d e f.
-//     bit_output o1 o2 o3 o4 o5 o6 o7.
-//     bit_internal mid.
-//     CELL "draw_hier bufs" [
-//       buf1 a o1,
-//       buf2 b o2,
-//       buf3 c o3,
-//       inv_rec 2 d o4,
-//       buf4 e o5,
-//       mid <- '~' f,
-//       o6 <- '~' mid,
-//       o7 <- '~' mid
-//     ];
+let bufs =
+    bit_input a b c d e f.
+    bit_output o1 o2 o3 o4 o5 o6 o7.
+    bit_internal mid.
+    CELL "draw_hier bufs" [
+      buf1 a o1,
+      buf2 b o2,
+      buf3 c o3,
+      inv_rec 2 d o4,
+      buf4 e o5,
+      mid <- '~' f,
+      o6 <- '~' mid,
+      o7 <- '~' mid
+    ];
 
-// let buf1' = buf1 'i1 'o1;
-// let buf2' = buf2 'i1 'o1;
-// let buf3' = buf3 'i1 'o1;
-// let buf4' = buf4 'i1 'o1;
-// let bufs' = bufs 'i1 'i2 'i3 'i4 'i5 'i6 'o1 'o2 'o3 'o4 'o5 'o6 'o7;
-// let matches = isomatch buf1' bufs';
+let buf1' = buf1 'i1 'o1;
+let buf2' = buf2 'i1 'o1;
+let buf3' = buf3 'i1 'o1;
+let buf4' = buf4 'i1 'o1;
+let bufs' = bufs 'i1 'i2 'i3 'i4 'i5 'i6 'o1 'o2 'o3 'o4 'o5 'o6 'o7;
+let matches = isomatch buf1' bufs';
 
 // =============================================================================
 // ...

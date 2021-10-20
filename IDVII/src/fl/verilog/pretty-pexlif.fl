@@ -94,9 +94,7 @@ let warn msg v = print msg fseq v;
 
 let binary {sz::int} {i::int} = sprintf "%d'b%0*b" sz sz i;
 
-let decimal {sz::int} {i::int} = sprintf "%d'd%0*d" sz sz i;
-
-let hex {sz::int} {i::int} = sprintf "%d'x%0*x" sz sz i;
+let hex {sz::int} {i::int} = sprintf "%d'x%0*x" sz (sz/4) i;
 
 let prim_str {s::string} = Exp_primary $ Prim_str s;
 
@@ -244,7 +242,7 @@ let paren_exp a = Prim_mintypmax (Mintypmax_expression a);
 
 let x_exp = (Exp_primary (Prim_num X), 1);
 
-let const_exp {sz::int} {c::int} = (prim_str (decimal sz c), 1);
+let const_exp {sz::int} {c::int} = (prim_str (binary sz c), 1);
 
 let variable_exp 1  v = (Exp_primary (prim_hier v []), 1)
 /\  variable_exp sz v = (Exp_primary (prim_hier v [(sz-1,0)]), 1)

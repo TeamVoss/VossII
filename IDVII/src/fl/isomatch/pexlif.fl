@@ -275,7 +275,7 @@ non_lazy gen_wexpr_inputs;
 let gen_wexpr_const
         {sz :: int}
         =
-        [W_CONST sz (random2 sz)]
+        W_CONST sz (random2 sz)
 ;
 non_lazy gen_wexpr_const;
 
@@ -284,7 +284,7 @@ let gen_wexpr_input
         {sz :: int}
         =
         let inputs = one_of_weighted
-                [ (1, gen_wexpr_const sz)
+                [ (1, [gen_wexpr_const sz])
                 , (3, gen_wexpr_inputs is sz)
                 ]
         in
@@ -306,28 +306,29 @@ letrec
         (d <= 0) => gen_wexpr_input ts sz |
         // todo: make sure t is used?
         // Misc. for unary/binary ops.
-        let gen_unary  sz = gen_wexpr is ts sz (d - 1) in
-        let gen_binary ts = gen_wexpr is ts sz (d / 2) in
+        let gen_unary sz = gen_wexpr is ts sz (d - 1) in
+        let gen_binary sz ts = gen_wexpr is ts sz (d / 2) in
         val (as, bs) = split_at_random ts in
-        // Weights for ... these don't make sense anymore ...
+        let v = random 1 (max 1 (log2 (max 1 sz))) in
+        // Weights for ... these names don't make sense anymore ...
         let u = (d <= 0) => 1 | 1 then // unary. & if-then-else.
         let x = (sz > 1) => 1 | 0 then // ext.
         let b = (sz > 1) => 1 | 0 then // binary.
         // Pick a valid PINST op.
         one_of_weighted (filter (defix < 0 # fst)
             [ (u, W_NOT  (gen_unary sz))
-            , (u, W_AND  (gen_binary as) (gen_binary bs))
-            , (u, W_OR   (gen_binary as) (gen_binary bs))
-            , (u, W_EQ   (gen_binary as) (gen_binary bs))
-            , (b, W_GR   (gen_binary as) (gen_binary bs))
-            , (b, W_ADD  (gen_binary as) (gen_binary bs))
-            , (b, W_SUB  (gen_binary as) (gen_binary bs))
-            , (b, W_MUL  (gen_binary as) (gen_binary bs))
-            , (b, W_DIV  (gen_binary as) (gen_binary bs))
-            , (b, W_MOD  (gen_binary as) (gen_binary bs))
-            , (b, W_SHL  (gen_binary as) (gen_binary bs))
-            , (b, W_SHR  (gen_binary as) (gen_binary bs))
-            , (b, W_ASHR (gen_binary as) (gen_binary bs))
+            , (u, W_AND  (gen_binary sz as) (gen_binary sz bs))
+            , (u, W_OR   (gen_binary sz as) (gen_binary sz bs))
+            , (u, W_EQ   (gen_binary sz as) (gen_binary sz bs))
+            , (b, W_GR   (gen_binary sz as) (gen_binary sz bs))
+            , (b, W_ADD  (gen_binary sz as) (gen_binary sz bs))
+            , (b, W_SUB  (gen_binary sz as) (gen_binary sz bs))
+            , (b, W_MUL  (gen_binary sz as) (gen_binary sz bs))
+            , (b, W_DIV  (gen_binary sz as) (gen_binary sz bs))
+            , (b, W_MOD  (gen_binary sz as) (gen_binary sz bs))
+            , (b, W_SHL  (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
+            , (b, W_SHR  (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
+            , (b, W_ASHR (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
           // , ( let smaller_sz = random 1 sz in
           //    (x, W_SX sz (gen_unary smaller_sz)))
           // , ( let smaller_sz = random 1 sz in
