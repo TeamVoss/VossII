@@ -2,6 +2,7 @@ load (DIR^"grammar.fl");
 load (DIR^"pretty.fl");
 load (DIR^"pretty-verilog.fl");
 load (DIR^"../design/misc.fl");
+load (DIR^"../design/util.fl");
 
 // =============================================================================
 // "Pretty-printing" of pexlif's via a translation into Verilog.
@@ -51,38 +52,6 @@ let valid_lhs {we::wexpr} =
       /\  rec_top other = F
       in
       rec_top we
-;
-
-// Width of a 'wexpr'.
-letrec
-    wexpr_size (W_X sz) = sz
-/\  wexpr_size (W_CONST sz _) = sz
-/\  wexpr_size (W_NAMED_CONST _ sz _) = sz
-/\  wexpr_size (W_VAR sz _) = sz
-/\  wexpr_size (W_EXPLICIT_VAR sz _) = sz
-/\  wexpr_size (W_AND a _) = wexpr_size a
-/\  wexpr_size (W_OR a _) = wexpr_size a
-/\  wexpr_size (W_NOT a) = wexpr_size a
-/\  wexpr_size (W_EQ a _) = wexpr_size a
-/\  wexpr_size (W_PRED _ c) = print "W_PRED no yet supported" fseq wexpr_size c
-/\  wexpr_size (W_GR a _) = wexpr_size a
-/\  wexpr_size (W_ADD a _) = wexpr_size a
-/\  wexpr_size (W_SUB a _) = wexpr_size a
-/\  wexpr_size (W_MUL a _) = wexpr_size a
-/\  wexpr_size (W_DIV a _) = wexpr_size a
-/\  wexpr_size (W_MOD a _) = wexpr_size a
-/\  wexpr_size (W_SHL a _) = wexpr_size a
-/\  wexpr_size (W_SHR a _) = wexpr_size a
-/\  wexpr_size (W_ASHR a _) = wexpr_size a
-/\  wexpr_size (W_SX sz _) = sz
-/\  wexpr_size (W_ZX sz _) = sz
-/\  wexpr_size (W_ITE _ t e) = wexpr_size t
-/\  wexpr_size (W_SLICE is _) = length is
-/\  wexpr_size (W_NAMED_SLICE _ is _) = length is
-/\  wexpr_size (W_UPDATE_NAMED_SLICE _ _ is _) = length is
-/\  wexpr_size (W_CAT ws) = sum (map wexpr_size ws)
-/\  wexpr_size (W_MEM_READ _ _ _) = error "todo: wexpr_size W_MEM_READ"
-/\  wexpr_size (W_MEM_WRITE _ _ _ _) = error "todo: wexpr_size W_MEM_WRITE"
 ;
 
 // -----------------------------------------------------------------------------

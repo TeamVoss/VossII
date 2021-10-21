@@ -163,7 +163,6 @@ let base_get_lhs_vars we =
 
 let get_lhs_vars we = (base_get_lhs_vars we);
 
-
 let valid_lhs we =
     letrec rec_ok (W_VAR sz b) = T
      /\    rec_ok (W_EXPLICIT_VAR sz b) = T
@@ -355,7 +354,6 @@ cletrec wexpr_is_binary (W_X sz) = F
 	    wexpr_is_binary mem AND wexpr_is_binary addr AND wexpr_is_binary d
 ;
 
-
 let x_var_cnt = ref 0;
 
 let mk_xvars sz =
@@ -480,7 +478,6 @@ let extract_pexlif_hierarchy pexlif hierarchy =
     get indices pexlif
 ;
 
-
 let w_substitute sub we =
     letrec do (W_VAR sz b) =
 	let n = mk_name sz b in
@@ -518,3 +515,36 @@ let w_substitute sub we =
     in
     do we
 ;
+
+letrec
+    w_size (W_X sz) = sz
+/\  w_size (W_CONST sz _) = sz
+/\  w_size (W_NAMED_CONST _ sz _) = sz
+/\  w_size (W_VAR sz _) = sz
+/\  w_size (W_EXPLICIT_VAR sz _) = sz
+/\  w_size (W_AND a _) = w_size a
+/\  w_size (W_OR a _) = w_size a
+/\  w_size (W_NOT a) = w_size a
+/\  w_size (W_EQ a _) = w_size a
+/\  w_size (W_PRED _ c) = w_size c
+/\  w_size (W_GR a _) = w_size a
+/\  w_size (W_ADD a _) = w_size a
+/\  w_size (W_SUB a _) = w_size a
+/\  w_size (W_MUL a _) = w_size a
+/\  w_size (W_DIV a _) = w_size a
+/\  w_size (W_MOD a _) = w_size a
+/\  w_size (W_SHL a _) = w_size a
+/\  w_size (W_SHR a _) = w_size a
+/\  w_size (W_ASHR a _) = w_size a
+/\  w_size (W_SX sz _) = sz
+/\  w_size (W_ZX sz _) = sz
+/\  w_size (W_ITE _ t _) = w_size t
+/\  w_size (W_SLICE is _) = length is
+/\  w_size (W_NAMED_SLICE _ is _) = length is
+/\  w_size (W_UPDATE_NAMED_SLICE _ _ is _) = length is
+/\  w_size (W_CAT ws) = sum (map w_size ws)
+/\  w_size (W_MEM_READ (MEM _ _ sz) _ _) = sz
+/\  w_size (W_MEM_WRITE _ _ _ _) = 0
+;
+
+let w_sizes as = sitlist (defix +) (map w_size as) 0;
