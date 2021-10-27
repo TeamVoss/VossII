@@ -231,14 +231,7 @@ let target =
 
 let ex1' = ex1 'x 'y;
 let target' = target 'i1 'i2 'o1 'o2;
-let iso =
-        printf "Needle%s\n" (pretty_pexlif ex1') fseq
-        printf "Haystack%s\n" (pretty_pexlif target') fseq
-        isomatch ex1' target'
-;
-pretty_matches iso;
-// isomatch_and_store ex1' target';
-// find_isomatches target';
+// pretty_matches (isomatch ex1' target');
 
 // =============================================================================
 // Four examples, all put into a larger haystack.
@@ -307,7 +300,7 @@ let buf2' = buf2 'i1 'o1;
 let buf3' = buf3 'i1 'o1;
 let buf4' = buf4 'i1 'o1;
 let bufs' = bufs 'i1 'i2 'i3 'i4 'i5 'i6 'o1 'o2 'o3 'o4 'o5 'o6 'o7;
-let matches = isomatch buf1' bufs';
+pretty_matches (isomatch buf1' bufs');
 
 // =============================================================================
 // ...

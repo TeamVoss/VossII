@@ -59,7 +59,8 @@ let pretty_matches mss =
         flip foreach mss (\ms.
             flip foreach ms (\(p,g,m).
                 pretty_match p g m
-            )
+            ) fseq
+            print "\n"
         )
 ;
 
@@ -197,6 +198,14 @@ let internal_isomatch p g w =
         (sp) fseq (go sp)
 ;
 
+//  flatten_options::(*#(**#(*** list)) list)->((*#(**#***) list) list)
+letrec
+    flatten_options []             = []
+/\  flatten_options ((i,j,xs):[])  = map (\x. [(i,j,x)]) xs
+/\  flatten_options ((i,j,xs):xss) =
+        flatmap (\x. map (\ys. (i,j,x):ys) (flatten_options xss)) xs
+;
+
 let filter_internals (PINST _ _ _ _ _ t _) = filter (NOT # flip elem t # fst);
 
 forward_declare{explore::pexlif->pexlif->(match list)};
@@ -218,31 +227,23 @@ let expand p g =
         let ps = pexlif_get_children p in
         let gs = pexlif_get_children g in
         concat $ filter (NOT # empty) $ pam ss (\sol.
-            // Find and order the solutions haystack nodes.
-            //  *_matches::(pexlif list)
-            // "ps_order := map fst (tl sol)" but "reorder_nodes ps ps_order == ps"
+            // Solutions start indices at 0, FL expects them to start at 1.
+            let sol' = map (\(i,j). (i+1,j+1)) (tl sol) in
+            // Find and order the solution's haystack nodes.
             let gs_order = map snd (tl sol) in
             let gs' = reorder_nodes gs gs_order in
             // List of needle nodes and their matched haystack nodes.
-            //  matches::((int#int) list)
             //  pairings::((pexlif#pexlif) list)
-            let matches  = zip (1 upto (length ps)) gs_order in
             let pairings = zip ps gs' in
             // List of potential matches for each pairing, empty list if none.
             //  options::((int#int#(match list)) list)
-            let go1 (i,j) (a,b) = (i, j, explore a b) in
-            let options = map2 go1 matches pairings in
+            let go1 (i,j) (a,b) = (i,j,explore a b) in
+            let options = map2 go1 sol' pairings in
             // If any pairing has no solutions, return no match.
             any (\(_,_,xs). empty xs) options => [] |
-            // Every combination of the above potential solutions.
+            // Otherwise, return every combination.
             //  choices::(((int#int#match) list) list)
-            letrec
-                go2 []             = []
-            /\  go2 ((i,j,xs):[])  = map (\x. [(i,j,x)]) xs
-            /\  go2 ((i,j,xs):xss) =
-                  flatmap (\x. map (\ys. (i,j,x):ys) (go2 xss)) xs
-            in
-            go2 options)
+            flatten_options options)
 ;
 
 // Explore two pexlifs to find if they are a potential match.
@@ -334,18 +335,17 @@ let isomatch p g =
             let gs'      = reorder_nodes gs gs_order in
             let pairings = zip ps gs' in
             // /
-            let go1 (i,j) (a,b) = (i, j, explore a b) in
+            let go1 (i,j) (a,b) = (i,j,explore a b) in
             let {options::((int#int#(match list)) list)} =
-                    map2 go1 sol' pairings in
+                    map2 go1 sol' pairings
+            in
             any (\(_,_,xs). empty xs) options => [] |
             // /
-            letrec
-                go2 []             = []
-            /\  go2 ((i,j,xs):[])  = map (\x. [(i,j,x)]) xs
-            /\  go2 ((i,j,xs):xss) =
-                  flatmap (\x. map (\ys. (i,j,x):ys) (go2 xss)) xs
+            let {choices::(((int#(int#match)) list) list)} =
+                    flatten_options options
             in
-            go2 options
+            let valid = coherent # flat # map get_match_sub in
+            filter (valid # map (snd # snd)) choices
         )
 ;
 
