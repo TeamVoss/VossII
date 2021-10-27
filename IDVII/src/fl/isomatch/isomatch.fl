@@ -8,6 +8,65 @@ load (DIR^"../design/util.fl");
 load (DIR^"pexlif.fl");
 
 // -----------------------------------------------------------------------------
+// Pexlif matches, returned by isomatching.
+
+new_type_abbrev subst = (string#string) list;
+
+lettype match =
+    M_LEAF {sub :: subst}
+  | M_HIER {sub :: subst}
+           {matches :: (int#int#match) list}
+;
+// note: M_LEAF could denote bothe alpha-equal leaves and SHA matches.
+
+let get_match_sub (M_LEAF s) = s
+/\  get_match_sub (M_HIER s _) = s
+;
+
+begin_abstype;
+
+//  print_pair::(*->string)->(**->string)->(*#**)->string
+let print_pair f g (x,y) = sprintf "%s:%s" (f x) (g y);
+
+//  print_list::(*->string)->(* list)->string
+let print_list = list2str T "[" "," "]";
+
+//  print_subst::((string#string) list)->string
+let print_subst = print_list (print_pair id id);
+
+letrec
+    pretty_match fp ind l r (M_LEAF sub) =
+        let s = print_subst sub in
+        fprintf fp "%*s%s matches %s with %s\n" ind "" l r s
+/\  pretty_match fp ind l r (M_HIER sub ms) =
+        let pretty (i,j,m) =
+                let l'   = sprintf "%si%d/" l i in
+                let r'   = sprintf "%si%d/" r j in
+                pretty_match fp (ind+4) l' r' m
+        in
+        let s = print_subst sub in
+        (fprintf fp "%*s%s iso-matches %s with %s where\n" ind "" l r s) fseq
+        (foreach pretty ms)
+;
+
+//  pretty_match::(... list)->()
+let pretty_match i j m =
+        pretty_match stdout 0 (sprintf "N/%d/" i) (sprintf "H/%d/" j) m fseq ()
+;
+
+//  pretty_matches::((int#(int#match) list) list)->()
+let pretty_matches mss =
+        flip foreach mss (\ms.
+            flip foreach ms (\(p,g,m).
+                pretty_match p g m
+            )
+        )
+;
+
+end_abstype pretty_match pretty_matches;
+
+// -----------------------------------------------------------------------------
+// Isomatching.
 
 begin_abstype;
 
@@ -75,9 +134,6 @@ let alpha_leaf (P_LEAF fs) (P_LEAF gs) =
         exhaust (map test (permutations gs))
 ;
 
-// -----------------------------------------------------------------------------
-// Construction of a subst. eq. between two pexlifs.
-
 // Given an SHA eq. between 'p' and 'g', construct a formal subst.
 //  actualize_sha::pexlif->pexlif->subst
 let actualize_sha p g = zip (pexlif_get_actuals p) (pexlif_get_actuals g);
@@ -113,8 +169,6 @@ let actualize_hier ss p g =
         predicated (\s. coherent s AND directions p g s) sub' (setify # lift)
 ;
 
-// -----------------------------------------------------------------------------
-
 // Reorder nodes in 'ns' by 'xs'.
 //  reorder_nodes::(int list)->(* list)->(* list)
 let reorder_nodes xs ns = map (\n. el n xs) ns;
@@ -141,21 +195,6 @@ let internal_isomatch p g w =
                 empty xs => [] | (xs : go s)
         in
         (sp) fseq (go sp)
-;
-
-// -----------------------------------------------------------------------------
-
-new_type_abbrev subst = (string#string) list;
-
-lettype match =
-    M_LEAF {sub :: subst}
-  | M_HIER {sub :: subst}
-           {matches :: (int#int#match) list}
-;
-// note: M_LEAF could denote bothe alpha-equal leaves and SHA matches.
-
-let get_match_sub (M_LEAF s) = s
-/\  get_match_sub (M_HIER s _) = s
 ;
 
 let filter_internals (PINST _ _ _ _ _ t _) = filter (NOT # flip elem t # fst);
@@ -265,14 +304,16 @@ let
         []
 ;
 
-let isomatch_old needle haystack =
-        pexlif_get_leaf haystack => eprintf "isomatch expects a hier. haystack." |
-        // Run isomatch for each child in haystack.
-        val (PINST _ _ _ _ _ _ (P_HIER gs)) = haystack in
-        //val (PINST _ _ _ _ _ _ (P_HIER gs)) = needle in
-        let match g ix = map (pair ix)  (explore needle g) in
-        concat (ixmap match gs)
-;
+// let print_pair f g (x,y) = sprintf "(%s:%s)" (f x) (g y);
+// let print_trip f g h (x,y,z) = sprintf "(%s:%s:%s)" (f x) (g y) (h z);
+// let print_list = list2str T "[" "," "]";
+// let print_subst = print_list (print_pair id id);
+// let sMTC (M_LEAF s) = sprintf "LEAF %s" (print_subst s)
+// /\  sMTC (M_HIER _ _) = "HIER";
+// let sSOL = print_list (print_pair int2str int2str);
+// let sOPT = print_list (print_trip int2str int2str (print_list sMTC));
+// let sFP  = shorten_sha # int2str # pexlif_get_FP;
+// let sPAIR = print_pair sFP sFP;
 
 // Isomatch reports ... 
 //  isomatch::pexlif->pexlif->((int#(int#match) list) list)
@@ -286,15 +327,16 @@ let isomatch p g =
         let ps = pexlif_get_children p in
         let gs = pexlif_get_children g in
         concat $ filter (NOT # empty) $ pam ss (\{sol::(int#int) list}.
+            // Solutions start indices at 0, FL expects them to start at 1.
+            let sol' = map (\(i,j). (i+1,j+1)) sol in
             // This is more or less 'expand' but p&g are not part of sol.
-            let gs_order = map snd sol in
-            let gs' = reorder_nodes gs gs_order in
-            // /
-            let matches = zip (1 upto (length ps)) gs_order in
+            let gs_order = map snd sol' in
+            let gs'      = reorder_nodes gs gs_order in
             let pairings = zip ps gs' in
+            // /
             let go1 (i,j) (a,b) = (i, j, explore a b) in
             let {options::((int#int#(match list)) list)} =
-                    map2 go1 matches pairings in
+                    map2 go1 sol' pairings in
             any (\(_,_,xs). empty xs) options => [] |
             // /
             letrec
@@ -307,41 +349,16 @@ let isomatch p g =
         )
 ;
 
+// let isomatch_old needle haystack =
+//         pexlif_get_leaf haystack => eprintf "isomatch expects a hier. haystack." |
+//         // Run isomatch for each child in haystack.
+//         val (PINST _ _ _ _ _ _ (P_HIER gs)) = haystack in
+//         //val (PINST _ _ _ _ _ _ (P_HIER gs)) = needle in
+//         let match g ix = map (pair ix)  (explore needle g) in
+//         concat (ixmap match gs)
+// ;
+
 end_abstype isomatch;
-
-// -----------------------------------------------------------------------------
-// Pretty-print a match for debugging.
-
-begin_abstype;
-
-//  print_pair::(*->string)->(**->string)->(*#**)->string
-let print_pair f g (x,y) = sprintf "%s:%s" (f x) (g y);
-
-//  print_list::(*->string)->(* list)->string
-let print_list = list2str T "[" "," "]";
-
-//  print_subst::((string#string) list)->string
-let print_subst = print_list (print_pair id id);
-
-letrec
-    pretty_match fp ind l r (M_LEAF sub) =
-        let s = print_subst sub in
-        fprintf fp "%*s%s matches %s with %s\n" ind "" l r s
-/\  pretty_match fp ind l r (M_HIER sub ms) =
-        let pretty (i,j,m) =
-                let l'   = sprintf "%si%d/" l i in
-                let r'   = sprintf "%si%d/" r j in
-                pretty_match fp (ind+4) l' r' m
-        in
-        let s = print_subst sub in
-        (fprintf fp "%*s%s iso-matches %s with %s where\n" ind "" l r s) fseq
-        (foreach pretty ms)
-;
-
-let pretty_match (i,m) = pretty_match stdout 0 "N/" (sprintf "H/%d/" i) m fseq ();
-let pretty_matches ms = foreach pretty_match ms;
-
-end_abstype pretty_match pretty_matches;
 
 // -----------------------------------------------------------------------------
 // Replace sub-circuits with a given match.

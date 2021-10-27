@@ -144,8 +144,8 @@ let fp_content (P_LEAF fs) = pm_val 59 (sum (map fp_fn fs))
 /\  fp_content (P_HIER cs) =
         let go (PINST _ a _ i o t _) =
                 ( find_fingerprint a
-                + fp_formal (map fst i)
-                + fp_formal (map fst o)
+                + fp_formal (flatmap snd i)
+                + fp_formal (flatmap snd o)
                 + fp_internal t
                 )
         in
@@ -171,8 +171,8 @@ let sha_content (P_LEAF fs) = sha_set fs
         let go (PINST n a _ i o t _) =
                 ( n
                 , find_signature a
-                , sha256_signature (map fst i)
-                , sha256_signature (map fst o)
+                , sha256_signature (map snd i)
+                , sha256_signature (map snd o)
                 , sha_set t
                 )
         in
