@@ -46,7 +46,7 @@ static int         search_mem_oidx;
 static typeExp_ptr search_mem_tp;
 
 // Debugging -------------------------------------------------------------------
-#define DEBUG_ISO 1
+#define DEBUG_ISO 0
 #define debug_print(fmt, ...)                                                  \
         do { if (DEBUG_ISO) fprintf(stderr, "%s:%d:%s: " fmt, __FILE__,        \
                                 __LINE__, __func__, __VA_ARGS__); } while (0)

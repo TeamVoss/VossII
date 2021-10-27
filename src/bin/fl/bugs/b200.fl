@@ -231,7 +231,12 @@ let target =
 
 let ex1' = ex1 'x 'y;
 let target' = target 'i1 'i2 'o1 'o2;
-let iso = isomatch ex1' target';
+let iso =
+        printf "Needle%s\n" (pretty_pexlif ex1') fseq
+        printf "Haystack%s\n" (pretty_pexlif target') fseq
+        isomatch ex1' target'
+;
+pretty_matches iso;
 // isomatch_and_store ex1' target';
 // find_isomatches target';
 
