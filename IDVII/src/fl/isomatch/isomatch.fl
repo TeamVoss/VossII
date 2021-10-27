@@ -132,9 +132,9 @@ letrec
 ;
 
 // ...
-//  internal_isomatch::pexlif->pexlif->(((int#int) list) list)
-let internal_isomatch p g =
-        let sp = internal_search_create p g in
+//  internal_isomatch::pexlif->pexlif->bool->(((int#int) list) list)
+let internal_isomatch p g w =
+        let sp = internal_search_create p g w in
         letrec
             go s =
                 let xs = internal_search_step s then
@@ -175,37 +175,35 @@ forward_declare{explore::pexlif->pexlif->(match list)};
 //
 //  expand::pexlif->pexlif->(((int#int#match) list) list)
 let expand p g =
-        let ss = internal_isomatch p g in
+        let ss = internal_isomatch p g F in
         let ps = pexlif_get_children p in
         let gs = pexlif_get_children g in
         concat $ filter (NOT # empty) $ pam ss (\sol.
             // Find and order the solutions haystack nodes.
             //  *_matches::(pexlif list)
-            let ps_order = map fst (tl sol) in
+            // "ps_order := map fst (tl sol)" but "reorder_nodes ps ps_order == ps"
             let gs_order = map snd (tl sol) in
-            // note: needle's nodes (ps) are already in order.
-            let ps' = ps in
             let gs' = reorder_nodes gs gs_order in
             // List of needle nodes and their matched haystack nodes.
             //  matches::((int#int) list)
             //  pairings::((pexlif#pexlif) list)
-            let matches  = zip ps_order gs_order in
-            let pairings = zip ps' gs' in
+            let matches  = zip (1 upto (length ps)) gs_order in
+            let pairings = zip ps gs' in
             // List of potential matches for each pairing, empty list if none.
             //  options::((int#int#(match list)) list)
-            let go (i,j) (a,b) = (i, j, explore a b) in
-            let options = map2 go matches pairings in
+            let go1 (i,j) (a,b) = (i, j, explore a b) in
+            let options = map2 go1 matches pairings in
             // If any pairing has no solutions, return no match.
             any (\(_,_,xs). empty xs) options => [] |
             // Every combination of the above potential solutions.
             //  choices::(((int#int#match) list) list)
             letrec
-                go []             = []
-            /\  go ((i,j,xs):[])  = map (\x. [(i,j,x)]) xs
-            /\  go ((i,j,xs):xss) =
-                  flatmap (\x. map (\ys. (i,j,x):ys) (go xss)) xs
+                go2 []             = []
+            /\  go2 ((i,j,xs):[])  = map (\x. [(i,j,x)]) xs
+            /\  go2 ((i,j,xs):xss) =
+                  flatmap (\x. map (\ys. (i,j,x):ys) (go2 xss)) xs
             in
-            go options)
+            go2 options)
 ;
 
 // Explore two pexlifs to find if they are a potential match.
@@ -267,12 +265,7 @@ let
         []
 ;
 
-// Isomatch reports, for each child of the haystack (second argument), every
-// potential matching with the needle (first argument). Where a matching
-// consists of a list of potential substitutions that preserves, at worst,
-// FP-equality with the needle.
-//  isomatch::pexlif->pexlif->((int#match) list)
-let isomatch needle haystack =
+let isomatch_old needle haystack =
         pexlif_get_leaf haystack => eprintf "isomatch expects a hier. haystack." |
         // Run isomatch for each child in haystack.
         val (PINST _ _ _ _ _ _ (P_HIER gs)) = haystack in
@@ -280,7 +273,39 @@ let isomatch needle haystack =
         let match g ix = map (pair ix)  (explore needle g) in
         concat (ixmap match gs)
 ;
-// todo: Carl wants both needle and haystack to be wrappers.
+
+// Isomatch reports ... 
+//  isomatch::pexlif->pexlif->((int#(int#match) list) list)
+let isomatch p g =
+        // We expect both the needle and haystack to be wrapped in at least
+        // one hier. layer, a wrapper which we will ignore during matching.
+        (pexlif_get_leaf p OR pexlif_get_leaf g) =>
+            eprintf "isomatch expects a hier. needle and haystack." |
+        //  ss::(((int#int) list) list) = solutions, each sol. #matches.
+        let ss = internal_isomatch p g T in
+        let ps = pexlif_get_children p in
+        let gs = pexlif_get_children g in
+        concat $ filter (NOT # empty) $ pam ss (\{sol::(int#int) list}.
+            // This is more or less 'expand' but p&g are not part of sol.
+            let gs_order = map snd sol in
+            let gs' = reorder_nodes gs gs_order in
+            // /
+            let matches = zip (1 upto (length ps)) gs_order in
+            let pairings = zip ps gs' in
+            let go1 (i,j) (a,b) = (i, j, explore a b) in
+            let {options::((int#int#(match list)) list)} =
+                    map2 go1 matches pairings in
+            any (\(_,_,xs). empty xs) options => [] |
+            // /
+            letrec
+                go2 []             = []
+            /\  go2 ((i,j,xs):[])  = map (\x. [(i,j,x)]) xs
+            /\  go2 ((i,j,xs):xss) =
+                  flatmap (\x. map (\ys. (i,j,x):ys) (go2 xss)) xs
+            in
+            go2 options
+        )
+;
 
 end_abstype isomatch;
 
@@ -439,18 +464,18 @@ let find_isomatches haystack =
 end_abstype load_pexlif store_pexlif load_matches store_matches find_isomatches;
 
 // Run isomatch and then store any resulting matches.
-let isomatch_and_store needle haystack =
-        pexlif_get_leaf haystack => eprintf "isomatch expects a hier. haystack." |
-        let children = pexlif_get_children haystack in
-        let store_and_tell (ix,match) =
-                let child = el ix children in
-                (printf "matched needle and the %d'th haystack node:\n" ix) fseq
-                (pretty_match (ix,match)) fseq
-                store_matches needle child match
-        in
-        let matches = isomatch needle haystack then
-        foreach store_and_tell matches
-;
+// let isomatch_and_store needle haystack =
+//         pexlif_get_leaf haystack => eprintf "isomatch expects a hier. haystack." |
+//         let children = pexlif_get_children haystack in
+//         let store_and_tell (ix,match) =
+//                 let child = el ix children in
+//                 (printf "matched needle and the %d'th haystack node:\n" ix) fseq
+//                 (pretty_match (ix,match)) fseq
+//                 store_matches needle child match
+//         in
+//         let matches = isomatch needle haystack then
+//         foreach store_and_tell matches
+// ;
 
 // =============================================================================
 // Fin.

@@ -46,7 +46,7 @@ static int         search_mem_oidx;
 static typeExp_ptr search_mem_tp;
 
 // Debugging -------------------------------------------------------------------
-#define DEBUG_ISO 0
+#define DEBUG_ISO 1
 #define debug_print(fmt, ...)                                                  \
         do { if (DEBUG_ISO) fprintf(stderr, "%s:%d:%s: " fmt, __FILE__,        \
                                 __LINE__, __func__, __VA_ARGS__); } while (0)
@@ -57,6 +57,7 @@ static typeExp_ptr search_mem_tp;
 // Matrix.
 static void allocate_matrix(mat_ptr *m, unint R, unint C);
 static void free_matrix(mat_ptr m);
+static void trim_matrix(mat_ptr *m);
 static void matrix_mult(const mat_ptr m, const mat_ptr n, mat_ptr r);
 static void matrix_transpose(const mat_ptr m, mat_ptr r);
 static bool matrix_compare(const mat_ptr m, const mat_ptr n);
@@ -160,7 +161,46 @@ free_matrix(mat_ptr m)
     free_rec(&mat_mgr, (pointer) m);
 }
 
-//------------------------------------------------------------------------------
+static void
+trim_matrix(mat_ptr *m)
+{
+    ASSERT(*m != NULL);
+    ASSERT((*m)->rows > 1);
+    ASSERT((*m)->cols > 1);
+    // /
+    debug_print("%p\n", (void *) m);
+    debug_print("BEFORE: %s\n", sprint_mat(*m));
+    // /
+    mat_ptr n, tmp = *m;
+    unint R = tmp->rows;
+    unint C = tmp->cols;
+    allocate_matrix(&n, R-1, C-1);
+    for(unint i=0; i<R-1; i++) {
+        for(unint j=0; j<C-1; j++) {
+            n->mat[i][j] = tmp->mat[i+1][j+1];
+        }
+    }
+    free_matrix(tmp);
+    *m = n;
+    // /
+    // todo: get this to work.
+    /* unint R = m->rows; */
+    /* unint C = m->cols; */
+    /* for(unint i=1; i<R; i++) { */
+    /*     memmove(m->mat[i-1]+(1-i), m->mat[i]+1, (C-1)*sizeof(bool)); */
+    /* } */
+    /* Realloc(m->mat, (R-1)*sizeof(bool*)); */
+    /* Realloc(m->mat[0], (R-1)*(C-1)*sizeof(bool)); */
+    /* m->rows = R-1; */
+    /* m->cols = C-1; */
+    /* for(unint i=1; i<R-1; i++) { */
+    /*     m->mat[i] = m->mat[0]+i*(C-1); */
+    /* } */
+    // /
+    debug_print("AFTER:  %s\n", sprint_mat(*m));    
+}
+
+// Mat. op. --------------------------------------------------------------------
 
 static void
 matrix_mult(const mat_ptr m, const mat_ptr n, mat_ptr r)
@@ -820,9 +860,10 @@ internal_search_create_fn(g_ptr redex)
     // debug_print("%p\n", (void *) redex);
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr g_needle, g_haystack;
-    EXTRACT_2_ARGS(redex, g_needle, g_haystack);
+    g_ptr g_needle, g_haystack, g_wrapped;
+    EXTRACT_3_ARGS(redex, g_needle, g_haystack, g_wrapped);
     // /
+    bool wrapped = GET_BOOL(g_wrapped);
     unint n_rows = get_top_size(g_needle);
     unint h_rows = get_top_size(g_haystack);
     if(n_rows <= 1) {
@@ -849,6 +890,11 @@ internal_search_create_fn(g_ptr redex)
             fail = TRUE;
         }
         if(!fail) {
+            if(wrapped) {
+                trim_matrix(&needle);
+                trim_matrix(&haystack);
+                trim_matrix(&iso);
+            }
             search_mem_ptr s = create_search_mem(iso, needle, haystack);
             MAKE_REDEX_EXT_OBJ(redex, search_mem_oidx, s);
         } else {
@@ -936,14 +982,16 @@ Iso_Install_Functions()
     );
     Add_ExtAPI_Function(
           "internal_search_create"
-        , "11"
+        , "111"
         , TRUE
           // pex->pex->search
         , GLmake_arrow(
               pexlif_tp
             , GLmake_arrow(
                 pexlif_tp
-              , search_mem_tp))
+              , GLmake_arrow(
+                  GLmake_bool()
+                , search_mem_tp)))
         , internal_search_create_fn
     );
     Add_ExtAPI_Function(

@@ -95,58 +95,58 @@ let mk_miter p1 p2 =
       (mpexlif, mant, mcons)
 ;
 
-let miter_test p g =
-      val (miter, ant, cons) = mk_miter p g then
-      let vis = pexlif2fsm miter then
-      let ste = STE "-e -m 10" vis [] ant cons [] then
-      (get_ste_result ste "") == T
-;
+// let miter_test p g =
+//       val (miter, ant, cons) = mk_miter p g then
+//       let vis = pexlif2fsm miter then
+//       let ste = STE "-e -m 10" vis [] ant cons [] then
+//       (get_ste_result ste "") == T
+// ;
 
-let miter_debug p g =
-      val (miter, ant, cons) = mk_miter p g then
-      let vis = STE_debug (pexlif2fsm miter) then
-      let ste = STE "-e -m 10" vis [] ant cons [] then
-      let ok = get_ste_result ste "" then
-      ok == T => T |
-      //
-      let dep = depends ant then
-      let sub = full_example F dep (NOT ok) then
-      let ant' = substitute sub ant then
-      let cons' = substitute sub cons then
-      let ste' = STE "-e -m 10" vis [] ant' cons' [] then
-      (get_ste_result ste' "") == T
-;
+// let miter_debug p g =
+//       val (miter, ant, cons) = mk_miter p g then
+//       let vis = STE_debug (pexlif2fsm miter) then
+//       let ste = STE "-e -m 10" vis [] ant cons [] then
+//       let ok = get_ste_result ste "" then
+//       ok == T => T |
+//       //
+//       let dep = depends ant then
+//       let sub = full_example F dep (NOT ok) then
+//       let ant' = substitute sub ant then
+//       let cons' = substitute sub cons then
+//       let ste' = STE "-e -m 10" vis [] ant' cons' [] then
+//       (get_ste_result ste' "") == T
+// ;
 
-letrec
-    miter_search_rec p =
-        let g  = pex2pex p then
-        let ok = miter_test p g then
-        ok => NONE |
-        // ...
-        let ps = shrink_pexlif p in
-        empty ps => SOME (p,g) |
-        miter_search_rec (hd ps)
-;
+// letrec
+//     miter_search_rec p =
+//         let g  = pex2pex p then
+//         let ok = miter_test p g then
+//         ok => NONE |
+//         // ...
+//         let ps = shrink_pexlif p in
+//         empty ps => SOME (p,g) |
+//         miter_search_rec (hd ps)
+// ;
 
-let miter_search p =
-        let x = miter_search_rec p then
-        NOT (has_value x) => T |
-        val (a,b) = get_value x in
-        // 'pex2pex' seems to add a lot of attributes, let's trim them.
-        letrec
-            no_attrs (PINST n _ l i o t (P_HIER cs)) =
-                PINST n [] l i o t (P_HIER (map no_attrs cs))
-        /\  no_attrs (PINST n _ l i o t (P_LEAF fs)) =
-                PINST n [] l i o t (P_LEAF fs)
-        in
-        // If we found a counter-example, show it.
-        (print "ERROR w/ pex") fseq
-        (pretty_pexlif (no_attrs a)) fseq
-        (printf "-> Verilog:\n%s\n" (pexlif2verilog a)) fseq
-        (print "-> Pexlif") fseq
-        (pretty_pexlif (no_attrs b)) fseq
-        miter_debug a b
-;
+// let miter_search p =
+//         let x = miter_search_rec p then
+//         NOT (has_value x) => T |
+//         val (a,b) = get_value x in
+//         // 'pex2pex' seems to add a lot of attributes, let's trim them.
+//         letrec
+//             no_attrs (PINST n _ l i o t (P_HIER cs)) =
+//                 PINST n [] l i o t (P_HIER (map no_attrs cs))
+//         /\  no_attrs (PINST n _ l i o t (P_LEAF fs)) =
+//                 PINST n [] l i o t (P_LEAF fs)
+//         in
+//         // If we found a counter-example, show it.
+//         (print "ERROR w/ pex") fseq
+//         (pretty_pexlif (no_attrs a)) fseq
+//         (printf "-> Verilog:\n%s\n" (pexlif2verilog a)) fseq
+//         (print "-> Pexlif") fseq
+//         (pretty_pexlif (no_attrs b)) fseq
+//         miter_debug a b
+// ;
 
 // =============================================================================
 // Randomized example.
@@ -196,41 +196,42 @@ let gen_pex seed max_f max_sz max_d =
 non_lazy gen_pex;
 // note: requires that max_f > 1
 
-let run_tests l h =
-        let go s =
-                let p = normalize_pexlif (gen_pex s 4 2 2) then
-                // ...
-                (printf "TESTING SEED %d\n" s) fseq
-                (miter_search p => print "OK\n" | error "ERROR\n")
+// let run_tests l h =
+//         let go s =
+//                 let p = normalize_pexlif (gen_pex s 4 2 2) then
+//                 // ...
+//                 (printf "TESTING SEED %d\n" s) fseq
+//                 (miter_search p => print "OK\n" | error "ERROR\n")
                 
-        in
-        foreach go (l upto h)
-;
+//         in
+//         foreach go (l upto h)
+// ;
 
 // =============================================================================
 // Small example.
 
-// let ex1 =
-//         bit_input a.
-//         bit_output b.
-//         CELL "draw_hier ex1" [
-//             b <- '~' a
-//         ]
-// ;
+let ex1 =
+        bit_input a.
+        bit_output b.
+        CELL "draw_hier ex1" [
+            b <- '~' a
+        ]
+;
 
-// let target =
-//         bit_input i1.
-//         bit_input i2.
-//         bit_output o1.
-//         bit_output o2.
-//         CELL "draw_hier target" [
-//             ex1 i1 o1,
-//             o2 <- '~' i2
-//         ]
-// ;
+let target =
+        bit_input i1.
+        bit_input i2.
+        bit_output o1.
+        bit_output o2.
+        CELL "draw_hier target" [
+            ex1 i1 o1,
+            o2 <- '~' i2
+        ]
+;
 
-// let ex1' = ex1 'x 'y;
-// let target' = target 'i1 'i2 'o1 'o2;
+let ex1' = ex1 'x 'y;
+let target' = target 'i1 'i2 'o1 'o2;
+let iso = isomatch ex1' target';
 // isomatch_and_store ex1' target';
 // find_isomatches target';
 
