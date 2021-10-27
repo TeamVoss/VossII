@@ -27,22 +27,22 @@ extern g_ptr void_nd;
 /******************************************************************************/
 /*                              PRIVATE VARIABLES                             */
 /******************************************************************************/
-static rec_mgr     mat_mgr;
+static rec_mgr mat_mgr;
 // Iso. mat. construction.
-static rec_mgr     sig_mgr;
+static rec_mgr sig_mgr;
 static rec_mgr_ptr sig_mgr_ptr;
 // Iso matching.
-static rec_mgr     updates_mgr;
-static rec_mgr     result_mgr;
+static rec_mgr updates_mgr;
+static rec_mgr result_mgr;
 // Strict iso. matching.
-static buffer      results_buf;
-static buffer_ptr  results_buf_ptr;
+static buffer results_buf;
+static buffer_ptr results_buf_ptr;
 // Lazy iso. matching.
-static rec_mgr     search_mgr;
-static rec_mgr     search_mem_mgr;
+static rec_mgr search_mgr;
+static rec_mgr search_mem_mgr;
 static search_mem_ptr search_free_list = NULL;
 // Types.
-static int         search_mem_oidx;
+static int search_mem_oidx;
 static typeExp_ptr search_mem_tp;
 
 // Debugging -------------------------------------------------------------------
@@ -69,34 +69,31 @@ static bool mk_iso_list(sig_ptr *s, g_ptr p);
 static bool mk_iso_matrix(mat_ptr m, sig_ptr p, sig_ptr g);
 static bool mk_iso(mat_ptr m, g_ptr p, g_ptr g);
 // Solution checking.
-static bool        is_adjacent(const mat_ptr m, int i, int j);
-static bool        is_single(const mat_ptr iso);
-static bool        is_isomorphism(
-                       const mat_ptr iso, const mat_ptr p, const mat_ptr g);
+static bool is_adjacent(const mat_ptr m, int i, int j);
+static bool is_single(const mat_ptr iso);
+static bool is_isomorphism(
+    const mat_ptr iso, const mat_ptr p, const mat_ptr g);
 static inline bool is_match(
-                       const mat_ptr iso, const mat_ptr p, const mat_ptr g);
+    const mat_ptr iso, const mat_ptr p, const mat_ptr g);
 // Utils for iso. algo.
-static        void trim(
-                mat_ptr iso, mat_ptr p, mat_ptr g, unint r, unint c,
-                updates_ptr *ps);
+static void trim(
+    mat_ptr iso, mat_ptr p, mat_ptr g, unint r, unint c, updates_ptr *ps);
 static inline void undo_trim(mat_ptr iso, updates_ptr ps);
 static inline void pick(mat_ptr iso, mat_ptr cpy, unint r, unint c);
 static inline void undo_pick(mat_ptr iso, mat_ptr cpy, unint r);
 // Strict isomatching.
 static void strict_search(
-                mat_ptr iso, mat_ptr p, mat_ptr g, mat_ptr c, unint row,
-                bool *used);
+    mat_ptr iso, mat_ptr p, mat_ptr g, mat_ptr c, unint row, bool *used);
 static void strict_isomatch(mat_ptr iso, mat_ptr p, mat_ptr g, unint r);
 // Lazy isomatching.
 static search_mem_ptr get_search_mem_rec();
-static void           mark_search_mem_fn(pointer p);
-static void           sweep_search_mem_fn();
-static void           init_search(
-                          search_ptr s, mat_ptr iso, mat_ptr p, mat_ptr g);
-static void           free_search(search_ptr s);
+static void mark_search_mem_fn(pointer p);
+static void sweep_search_mem_fn();
+static void init_search( search_ptr s, mat_ptr iso, mat_ptr p, mat_ptr g);
+static void free_search(search_ptr s);
 static search_mem_ptr create_search_mem(mat_ptr iso, mat_ptr p, mat_ptr g);
-static mat_ptr        lazy_search(search_ptr s);
-static mat_ptr        lazy_isomatch(search_mem_ptr s);
+static mat_ptr lazy_search(search_ptr s);
+static mat_ptr lazy_isomatch(search_mem_ptr s);
 
 /******************************************************************************/
 /*                                LOCAL FUNCTIONS                             */
@@ -140,7 +137,6 @@ allocate_matrix(mat_ptr *m, unint R, unint C)
     ASSERT(*m != NULL);
     // /
     mat_ptr n = (mat_ptr) new_rec(&mat_mgr);
-    n->mark   = 1;
     n->rows   = R;
     n->cols   = C;
     n->mat    = Malloc(R*sizeof(bool*));
@@ -183,6 +179,8 @@ trim_matrix(mat_ptr *m)
     free_matrix(tmp);
     *m = n;
     // /
+    debug_print("AFTER:  %s\n", sprint_mat(*m));    
+}
     // todo: get this to work.
     /* unint R = m->rows; */
     /* unint C = m->cols; */
@@ -196,9 +194,6 @@ trim_matrix(mat_ptr *m)
     /* for(unint i=1; i<R-1; i++) { */
     /*     m->mat[i] = m->mat[0]+i*(C-1); */
     /* } */
-    // /
-    debug_print("AFTER:  %s\n", sprint_mat(*m));    
-}
 
 // Mat. op. --------------------------------------------------------------------
 
@@ -631,12 +626,12 @@ get_search_mem_rec()
     search_mem_ptr sm;
     if(search_free_list != NULL) {
         sm = search_free_list;
-        search_free_list = search_free_list->next;
+        search_free_list = sm->next;
     } else {
         sm = (search_mem_ptr) new_rec(&search_mem_mgr);
         sm->search = (search_ptr) new_rec(&search_mgr);
     }
-    sm->flag = 0;
+    sm->mark = 1;
     sm->next = NULL;
     return sm;
 }
@@ -645,7 +640,8 @@ static void
 mark_search_mem_fn(pointer p)
 {
     search_mem_ptr sm = (search_mem_ptr) p;
-    sm->flag = 1;
+    if (sm->mark == 2) { return; }
+    sm->mark = 2;
 }
 
 static void
@@ -654,13 +650,19 @@ sweep_search_mem_fn()
     search_mem_ptr sm;
     search_free_list = NULL;
     FOR_REC(&search_mem_mgr, search_mem_ptr, sm) {
-        if(sm->flag == 1) {
-            sm->flag = 0;
-        } else {
+        switch(sm->mark) {
+        case 0: break;
+        case 1:
             free_search(sm->search);
-            sm->search = NULL;
-            sm->next   = search_free_list;
+            sm->next = search_free_list;
             search_free_list = sm;
+            sm->mark = 0;
+            break;
+        case 2:
+            sm->mark = 1;
+            break;
+        default:
+            DIE("Should not happen");
         }
     }
 }
@@ -673,25 +675,27 @@ create_search_mem(mat_ptr iso, mat_ptr p, mat_ptr g)
     return sm;
 }
 
-//------------------------------------------------------------------------------
-
 static void
 init_search(search_ptr s, mat_ptr iso, mat_ptr p, mat_ptr g)
 {
+    ASSERT(iso != NULL);
+    ASSERT(p != NULL);
+    ASSERT(g != NULL);
+    // /
     ASSERT(iso->rows == p->rows);
     ASSERT(iso->cols == g->cols);
-    ASSERT(p->rows   == p->cols);
-    ASSERT(g->rows   == g->cols);
+    ASSERT(p->rows == p->cols);
+    ASSERT(g->rows == g->cols);
     // /
-    s->start     = 0;
-    s->row       = 0;
-    s->cols      = Calloc(iso->rows*sizeof(unint));
-    s->set       = Calloc((iso->rows+1)*sizeof(bool));
-    s->used      = Calloc(iso->cols*sizeof(bool));
-    s->changes   = Calloc(iso->rows*sizeof(updates_ptr));
-    s->isomatch  = iso;
-    s->needle    = p;
-    s->haystack  = g;
+    s->start = 0;
+    s->row = 0;
+    s->cols = Calloc(iso->rows*sizeof(unint));
+    s->set = Calloc((iso->rows+1)*sizeof(bool));
+    s->used = Calloc(iso->cols*sizeof(bool));
+    s->changes = Calloc(iso->rows*sizeof(updates_ptr));
+    s->isomatch = iso;
+    s->needle = p;
+    s->haystack = g;
     mat_ptr copy;    
     allocate_matrix(&copy, iso->rows, iso->cols);
     s->copy = copy;
@@ -700,6 +704,8 @@ init_search(search_ptr s, mat_ptr iso, mat_ptr p, mat_ptr g)
 static void
 free_search(search_ptr s)
 {
+    ASSERT(s != NULL);
+    // /
     Free((pointer) s->cols);
     Free((pointer) s->set);
     Free((pointer) s->used);
@@ -767,7 +773,7 @@ lazy_search(search_ptr s)
         // Select next potential match and explore it. If non is found, go back.
         // And if we can't go back (at top) report no more matches.
         debug_append("; iso[%u]: %s", s->row, sprint_row(M, s->row));
-        //
+        // /
         unint next = start;
         while(next < C && (s->used[next] || !M->mat[s->row][next])) { next++; }
         if(next < C) {
@@ -924,9 +930,9 @@ internal_search_step_fn(g_ptr redex)
     } else {
         MAKE_REDEX_NIL(redex);
         g_ptr tail = redex;
-        for(unint i = 0; i < res->rows; i++) {
+        for(unint i = 0; i<res->rows; i++) {
             unint j = 0;
-            while(j < res->cols && !res->mat[i][j]) { j++; }
+            while(j<res->cols && !res->mat[i][j]) { j++; }
             g_ptr nd = Make_PAIR_ND(Make_INT_leaf(i), Make_INT_leaf(j));
             APPEND1(tail, nd);
         }

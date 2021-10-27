@@ -26,8 +26,6 @@ void	    Iso_Install_Functions();
 // Matrix. ---------------------------------------------------------------------
 typedef struct mat_rec *mat_ptr;
 typedef struct mat_rec {
-    int   mark;
-    //
     bool  **mat;
     unint rows;
     unint cols;
@@ -80,7 +78,7 @@ typedef struct search_rec {
     bool        *used;    // B
     updates_ptr *changes; // A
     mat_ptr     copy;     // AxB
-    // Main matrices.
+    // Adj. & Iso. matrices.
     mat_ptr     isomatch; // AxB
     mat_ptr     needle;   // AxA
     mat_ptr     haystack; // BxB
@@ -88,10 +86,10 @@ typedef struct search_rec {
 
 typedef struct search_mem_rec *search_mem_ptr;
 typedef struct search_mem_rec {
-    search_ptr     search;
-  //search_mem_ptr prev;
+    int            mark;
     search_mem_ptr next;
-    unsigned char  flag:1;
+    // /
+    search_ptr     search;
 } search_mem_rec;
 
 // Short-hands -----------------------------------------------------------------
