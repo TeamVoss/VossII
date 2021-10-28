@@ -240,18 +240,21 @@ begin_abstype;
 // note:
 // typeabbrev {*}shr = * -> (* list)
 
-//  shrink_2 :: (a -> [a]) -> (a,a) -> [(a,a)]
-let shrink_2 s (x, y) =
-          map (\a. (a, y)) (s x)
-        @ map (\b. (x, b)) (s y)
+//  shrink_2 ::{a} shr -> {(a,a)} shr
+let shrink_2 s (x,y) =
+        map (\a. (a,y)) (s x) @ map (\b. (x,b)) (s y)
 ;
 
-//  shrink_list :: (a -> [a]) -> [a] -> [[a]]
+//  shrink_3::{a} shr -> {(a,a,a)} shr
+let shrink_3 s (x,y,z) =
+        map (\a. (a,y,z)) (s x) @ map (\(b,c). (x,b,c)) (shrink_2 s (y,z))
+;
+
+//  shrink_list::{a} shr -> {a list} shr
 letrec
-    shrink_list _ []     = [[]]
+    shrink_list _ []     = []
 /\  shrink_list s (x:xs) =
-          map (\as. x : as) (shrink_list s xs)
-        @ map (\a.  a : xs) (s x)
+        map (\a. a:xs) (s x) @ map (\as. x:as) (shrink_list s xs)
 ;
 // todo: It might be a good idea to remove items when shrinking as well, but
 // we would have to be a bit careful since things are sized and we also can't
@@ -260,55 +263,57 @@ letrec
 let wT    = W_CONST 1 1;
 let wF    = W_CONST 1 0;
 let wZ sz = W_CONST sz 0;
+
 let shrink_unary  s op a   = [a] @ map op (s a);
 let shrink_binary s op a b = [a,b] @ map (curry op) (shrink_2 s (a,b));
+let shrink_cmp    s op a b = [wT,wF] @ map (curry op) (shrink_2 s (a,b));
+let shrink_shift  s op a b = [a] @ map (curry op) (shrink_2 s (a,b));
 
-//  shrink_wexpr::{wexpr}shr
-// todo: 
-// W_NAMED_CONST {name::string} {sz::int} {v::int}
-// W_EXPLICIT_VAR {sz::int} {name::string}
-// W_PRED {name::string} {cond::wexpr}
-// W_NAMED_SLICE {name::string} {indices::int list} {w::wexpr}
-// W_UPDATE_NAMED_SLICE {base::wexpr} {name::string} {indices::int list} {new::wexpr}
-// W_MEM_READ {info::mem} {mem::wexpr} {addr::wexpr}
-// W_MEM_WRITE {info::mem} {mem::wexpr} {addr::wexpr} {data::wexpr}
+//  shrink_wexpr::{wexpr} shr
 letrec
-    shrink_wexpr (W_X sz)       = [W_X sz]
-/\  shrink_wexpr (W_CONST sz v) = [W_CONST sz v]
-/\  shrink_wexpr (W_VAR sz n)   = [W_VAR sz n]
-/\  shrink_wexpr (W_AND a b)    = shrink_binary shrink_wexpr W_AND a b
-/\  shrink_wexpr (W_OR a b)     = shrink_binary shrink_wexpr W_OR  a b
-/\  shrink_wexpr (W_NOT a)      = shrink_unary  shrink_wexpr W_NOT a
-/\  shrink_wexpr (W_EQ a b)     =
-        [wT,wF] @ map (curry W_EQ) (shrink_2 shrink_wexpr (a,b))
-/\  shrink_wexpr (W_GR a b)     =
-        [wT,wF] @ map (curry W_GR) (shrink_2 shrink_wexpr (a,b))
-/\  shrink_wexpr (W_ADD a b)    = shrink_binary shrink_wexpr W_ADD a b
-/\  shrink_wexpr (W_SUB a b)    = shrink_binary shrink_wexpr W_SUB a b
-/\  shrink_wexpr (W_MUL a b)    = shrink_binary shrink_wexpr W_MUL a b
-/\  shrink_wexpr (W_DIV a b)    = shrink_binary shrink_wexpr W_DIV a b
-/\  shrink_wexpr (W_MOD a b)    = shrink_binary shrink_wexpr W_MOD a b
+    shrink_wexpr (W_X sz)       = []
+/\  shrink_wexpr (W_CONST sz v) = []
+/\  shrink_wexpr (W_VAR sz n)   = []
+/\  shrink_wexpr (W_AND a b)    = shrink_binary shrink_wexpr W_AND  a b
+/\  shrink_wexpr (W_OR a b)     = shrink_binary shrink_wexpr W_OR   a b
+/\  shrink_wexpr (W_NOT a)      = shrink_unary  shrink_wexpr W_NOT  a
+/\  shrink_wexpr (W_EQ a b)     = shrink_cmp    shrink_wexpr W_EQ   a b
+/\  shrink_wexpr (W_GR a b)     = shrink_cmp    shrink_wexpr W_GR   a b
+/\  shrink_wexpr (W_ADD a b)    = shrink_binary shrink_wexpr W_ADD  a b
+/\  shrink_wexpr (W_SUB a b)    = shrink_binary shrink_wexpr W_SUB  a b
+/\  shrink_wexpr (W_MUL a b)    = shrink_binary shrink_wexpr W_MUL  a b
+/\  shrink_wexpr (W_DIV a b)    = shrink_binary shrink_wexpr W_DIV  a b
+/\  shrink_wexpr (W_MOD a b)    = shrink_binary shrink_wexpr W_MOD  a b
 /\  shrink_wexpr (W_ITE c a b)  = shrink_binary shrink_wexpr (W_ITE c) a b
-/\  shrink_wexpr (W_SHL a b)    =
-        [a] @ map (curry W_SHL)  (shrink_2 shrink_wexpr (a,b))
-/\  shrink_wexpr (W_SHR a b)    =
-        [a] @ map (curry W_SHR)  (shrink_2 shrink_wexpr (a,b))
-/\  shrink_wexpr (W_ASHR a b)   =
-        [a] @ map (curry W_ASHR) (shrink_2 shrink_wexpr (a,b))
-/\  shrink_wexpr (W_SX sz a)    = [wZ sz] @ map (W_SX sz) (shrink_wexpr a)
-/\  shrink_wexpr (W_ZX sz a)    = [wZ sz] @ map (W_ZX sz) (shrink_wexpr a)
+/\  shrink_wexpr (W_SHL a b)    = shrink_shift  shrink_wexpr W_SHL  a b
+/\  shrink_wexpr (W_SHR a b)    = shrink_shift  shrink_wexpr W_SHR  a b
+/\  shrink_wexpr (W_ASHR a b)   = shrink_shift  shrink_wexpr W_ASHR a b
+/\  shrink_wexpr (W_SX sz a)    =
+        [wZ sz] @ map (W_SX sz) (shrink_wexpr a)
+/\  shrink_wexpr (W_ZX sz a)    =
+        [wZ sz] @ map (W_ZX sz) (shrink_wexpr a)
 /\  shrink_wexpr (W_SLICE is a) =
         [wZ (length is)] @ map (W_SLICE is) (shrink_wexpr a)
 /\  shrink_wexpr (W_CAT as)     =
         [wZ (w_sizes as)] @ map W_CAT (shrink_list shrink_wexpr as)
 ;
+// todo: 
+// W_NAMED_CONST {name::string} {sz::int} {v::int}
+// W_EXPLICIT_VAR {sz::int} {name::string}
+// W_PRED {name::string} {cond::wexpr}
+// W_NAMED_SLICE {name::string} {is::int list} {w::wexpr}
+// W_UPDATE_NAMED_SLICE {base::wexpr} {name::string} {is::int list} {new::wexpr}
+// W_MEM_READ {info::mem} {mem::wexpr} {addr::wexpr}
+// W_MEM_WRITE {info::mem} {mem::wexpr} {addr::wexpr} {data::wexpr}
 
 //  shrink_update_fn::{update_fn}shr
-// todo:
-// W_PHASE_DELAY {lhs::wexpr} {rhs::wexpr}
 let shrink_update_fn (W_UPDATE_FN lhs rhs) =
         map (W_UPDATE_FN lhs) (shrink_wexpr rhs)
+/\  shrink_update_fn (W_PHASE_DELAY lhs rhs) =
+        print "'W_PHASE_DELAY's cannot be shrinked at the moment." fseq []
 ;
+// todo:
+// W_PHASE_DELAY {lhs::wexpr} {rhs::wexpr}
 
 //  shrink_content::{update_fn}shr->{pexlif}shr->{content}shr
 let shrink_content _ g (P_HIER cs) = map P_HIER (shrink_list g cs)
@@ -318,9 +323,8 @@ let shrink_content _ g (P_HIER cs) = map P_HIER (shrink_list g cs)
 //  shrink_pexlif::{pexlif}shr
 letrec
     shrink_pexlif (PINST n as l inp out int c) =
-        let f = shrink_update_fn in
-        let g = shrink_pexlif in
-        map (PINST n as l inp out int) (shrink_content f g c)
+        map (PINST n as l inp out int)
+            (shrink_content shrink_update_fn shrink_pexlif c)
 ;
 
 end_abstype shrink_wexpr shrink_pexlif;
