@@ -3,6 +3,9 @@
 
 load "ste.fl";
 
+// -----------------------------------------------------------------------------
+// Miter eq. testing.
+
 // Creates a miter circuit for two pexlifs.
 //
 //                          Ckt p1
@@ -108,9 +111,7 @@ letrec
         letrec
             shrink []     = p
         /\  shrink (s:ss) =
-                pex2pex_miter_test s == T =>
-                    shrink ss |
-                (let ex = pretty_pexlif s then printf "SHRINKED%s\n" ex) fseq
+                pex2pex_miter_test s == T => shrink ss |
                 shrink_miter_failure s
         in
         shrink (shrink_pexlif p)
@@ -137,28 +138,15 @@ let pex2pex_test p =
 //       (get_ste_result ste' "") == T
 // ;
 
-// let miter_search p =
-//         let x = miter_search_rec p then
-//         NOT (has_value x) => T |
-//         val (a,b) = get_value x in
-//         // 'pex2pex' seems to add a lot of attributes, let's trim them.
 //         letrec
 //             no_attrs (PINST n _ l i o t (P_HIER cs)) =
 //                 PINST n [] l i o t (P_HIER (map no_attrs cs))
 //         /\  no_attrs (PINST n _ l i o t (P_LEAF fs)) =
 //                 PINST n [] l i o t (P_LEAF fs)
 //         in
-//         // If we found a counter-example, show it.
-//         (print "ERROR w/ pex") fseq
-//         (pretty_pexlif (no_attrs a)) fseq
-//         (printf "-> Verilog:\n%s\n" (pexlif2verilog a)) fseq
-//         (print "-> Pexlif") fseq
-//         (pretty_pexlif (no_attrs b)) fseq
-//         F
-//         //miter_debug a b
-// ;
 
 // -----------------------------------------------------------------------------
+// Gen. of pexlifs.
 
 let gen_vec_size max_sz =
         let gen_range sz = sprintf "[%d:0]" (sz-1) in
@@ -206,21 +194,56 @@ non_lazy gen_pex;
 // note: requires that max_f > 1
 
 // -----------------------------------------------------------------------------
+// Main.
 
-let run_tests l h =
-        let go s =
-                (printf "TESTING SEED %d\n" s) fseq
-                // /
-                let pex = normalize_pexlif (gen_pex s 4 2 2) then
-                let ok  = pex2pex_test pex then
-                // /
-                NOT (has_value ok) => print "OK\n" |
-                let bad = get_value ok in
-                error (sprintf "ERROR%s\n" (pretty_pexlif bad))
-                
+let test l h =
+        letrec
+            search i =
+                // At end? Return no failure.
+                i >= h => NONE |
+                // Otherwise, test seed 'i'.
+                (printf "TESTING SEED %d\n" i) fseq
+                let pex = normalize_pexlif (gen_pex i 4 2 2) then
+                let bad = pex2pex_test pex then
+                maybe (search (i+1)) bad SOME
         in
-        foreach go (l upto h)
+        search l
 ;
+
+let pr  (SOME p) = pretty_pexlif p;
+let prv (SOME p) = pexlif2verilog p;
+let prp (SOME p) = let g = pex2pex p then pretty_pexlif g;
+
+let debug (SOME p) =
+        // Graphical debug.
+        let g = pex2pex p then
+        val (miter, ant, cons) = mk_miter p g then
+        let vis = STE_debug (pexlif2fsm miter) then
+        let ste = STE "-e -m 10" vis [] ant cons [] then
+        let ok  = get_ste_result ste "" then
+        ok == T => T |
+        // Concrete counterexample.
+        let dep = depends ant then
+        let sub = full_example F dep (NOT ok) then
+        let ant' = substitute sub ant then
+        let cons' = substitute sub cons then
+        let ste' = STE "-e -m 10" vis [] ant' cons' [] then
+        (get_ste_result ste' "") == T
+;
+
+// -----------------------------------------------------------------------------
+// Manual shrinking...
+
+TYPE "bits" 2;
+
+let ex =
+        bits_input a.
+        bits_output b.
+        CELL "test" [
+            b <- a '|>>' '0b01
+        ]
+;
+let pex = SOME (ex 'a 'b);
 
 // -----------------------------------------------------------------------------
 // Fin.
