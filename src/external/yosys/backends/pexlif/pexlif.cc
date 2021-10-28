@@ -741,7 +741,12 @@ struct PexlifDumper
 			RTLIL::SigSpec out = cell->getPort("\\Y");
 			RTLIL::SigSpec a = cell->getPort("\\A");
 			RTLIL::SigSpec b = cell->getPort("\\B");
-			f << "_ashr ";
+			bool a_signed = cell->parameters.count("\\A_SIGNED")>0;
+			if( a_signed ) {
+			    f << "_ashr ";
+			} else {
+			    f << "_shr ";
+			}
 			f << stringf("%d %d %d \"%s\" ", out.size(), a.size(), b.size(), src.c_str());
 			dump_sigspec(f, out);
 			f << " ";
