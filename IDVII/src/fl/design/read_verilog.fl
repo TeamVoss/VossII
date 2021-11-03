@@ -68,11 +68,9 @@ let verilog2pexlif flags top_level_module file_list additional_files =
     let files = list2str T "" " " "" mk_full_name base_names then
     (fprintf sfp "read_verilog %s %s\n" flags files) fseq
     (fprintf sfp "hierarchy -check -top %s\n" top_level_module) fseq
-    (fprintf sfp "proc; opt\n") fseq
+    (fprintf sfp "proc;\n") fseq
     (fprintf sfp "rename -enumerate -pattern TmP_%%\n") fseq
-    (fprintf sfp "opt\n") fseq
     (fprintf sfp "memory -nomap\n") fseq
-    (fprintf sfp "opt\n") fseq
     (fprintf sfp "write_pexlif -noalias -icells -gates -impltf _out.fl\n") fseq
     // Run yosys
     let cmd = sprintf "cd %s; yosys script.ys  > yosys.log 2>&1" tmp_dir then
