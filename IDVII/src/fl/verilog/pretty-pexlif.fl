@@ -205,55 +205,41 @@ let precedence_binary (B_add) = 4
 /\  precedence_binary (B_shl) = 5
 ;
 
-forward_declare{expression::wexpr->(expression#int)};
+let unwrap_prim (Exp_primary (Prim_hier (HID NONE (ID i)) rng)) = (i, rng)
+/\  unwrap_prim _ = error "SX/SLICE is only supported for variables."
+;
+
+forward_declare{pretty_expression::wexpr->(expression#int)};
 
 let paren_exp a = Prim_mintypmax (Mintypmax_expression a);
 
-let x_exp = (Exp_primary (Prim_num X), 1);
+let wrap_exp a prec_a prec_op = // Exp_primary (paren_exp a)
+        prec_a >= prec_op => Exp_primary (paren_exp a) | a
+;
 
-let const_exp {sz::int} {c::int} = (prim_str (binary sz c), 1);
-
+let x_exp             = (Exp_primary (Prim_num X), 1);
+let const_exp    sz c = (prim_str (binary sz c), 1);
 let variable_exp 1  v = (Exp_primary (prim_hier v []), 1)
 /\  variable_exp sz v = (Exp_primary (prim_hier v [(sz-1,0)]), 1)
 ;
 
+//  unary_exp::unary_operator->expression->expression
 let unary_exp op a =
-      let unwrap (Exp_primary p) o = 1 <= o => paren_exp (Exp_primary p) | p
-      /\  unwrap exp _ = paren_exp exp
-      in
-      (Exp_unary op (curry unwrap (expression a)), 1)
+      let p = precedence_unary op in
+      val (a', n) = pretty_expression a in
+      (Exp_unary op (paren_exp a'), p)
 ;
 
+//  unary_exp::binary_operator->expression->expression->expression
 let binary_exp op a b =
-      //let wrap exp n o = n <= o => exp | Exp_primary (paren_exp exp) in
-      let wrap exp _ _ = Exp_primary (paren_exp exp) in
       let p = precedence_binary op in
-      val (a', n) = expression a in
-      val (b', m) = expression b in
-      (Exp_binary (wrap a' p n) op (wrap b' p m), p)
+      val (a', n) = pretty_expression a in
+      val (b', m) = pretty_expression b in
+      (Exp_binary (wrap_exp a' n p) op (wrap_exp b' m p), p)
 ;
-
-let unwrap_prim (Exp_primary (Prim_hier (HID NONE (ID i)) rng)) = (i, rng)
-/\  unwrap_prim _ = error "internal: SX/Slice is only supported for variables."
-;
-
-let sign_extend_exp sz a =
-      let a'  = fst (expression a) in
-      let sz' = wexpr_size a in
-      let id  = fst (unwrap_prim a') in
-      let rng = sz' > 1 => let x = sz' - 1 in [(x,x)] | [] in
-      let ext =
-            Exp_primary (Prim_mcat (MCAT (prim_cnum (sz-sz'))
-              (CAT [Exp_primary (prim_hier id rng)])))
-      in
-      // Check for complicated expressions.
-      (Exp_primary (Prim_cat (CAT [ext, a'])), 14)
-;
-// todo: Extend with local variable to hold potential expr in 'a'? Or, gen.
-// sign-extension function with paramaters for sizes?
 
 let zero_extend_exp sz a =
-      let a'   = fst $ expression a in
+      let a'   = fst $ pretty_expression a in
       let sz'  = wexpr_size a in
       let zero =
             Exp_primary (Prim_mcat (MCAT (prim_cnum (sz-sz'))
@@ -262,43 +248,51 @@ let zero_extend_exp sz a =
       (Exp_primary (Prim_cat (CAT [zero, a'])), 14)
 ;
 
-let conditional_exp c a b =
-      ( Exp_conditional
-         (fst $ expression c)
-         (fst $ expression a)
-         (fst $ expression b)
-      , 13)
-;
-
-let contig_slice [] = error "Empty slice."
-/\  contig_slice is = NOT (valid_slice is) => error "Non-contig. slice." |
-      (hd is, last is)
+let sign_extend_exp sz a =
+      let a'  = fst (pretty_expression a) in
+      let sz' = wexpr_size a in
+      let id  = fst (unwrap_prim a') in
+      let rng = sz' > 1 => let x = sz' - 1 in [(x,x)] | [] in
+      let ext =
+            Exp_primary (Prim_mcat (MCAT (prim_cnum (sz-sz'))
+              (CAT [Exp_primary (prim_hier id rng)])))
+      in
+      (Exp_primary (Prim_cat (CAT [ext, a'])), 14)
 ;
 
 let slice_exp is a =
-      let a'  = fst (expression a) in
+      let contig_slice is =
+              empty is => error "Empty slice." |
+              NOT (valid_slice is) => error "Non-contig. slice." |
+              (hd is, last is)
+      in
+      let a'  = fst (pretty_expression a) in
       let id  = fst (unwrap_prim a') in
       let rng = [contig_slice is] in
-      (Exp_primary (prim_hier id rng), 14)
+      (Exp_primary (prim_hier id rng), 100)
 ;
 // todo: precedence correct?
 
+let conditional_exp c a b =
+      ( Exp_conditional
+         (fst $ pretty_expression c)
+         (fst $ pretty_expression a)
+         (fst $ pretty_expression b)
+      , 13)
+;
+
 let concat_exp as =
-      (Exp_primary (Prim_cat (CAT (map (fst # expression) as))), 14)
+      (Exp_primary (Prim_cat (CAT (map (fst # pretty_expression) as))), 100)
 ;
+// todo: precedence correct?
 
-let is_var (W_VAR _ _) = T
-/\  is_var (W_EXPLICIT_VAR _ _) = T
-/\  is_var _ = F
-;
-
-let expression {we::wexpr} =
+let pretty_expression {we::wexpr} =
       letrec
           go (W_X _)        = x_exp
       /\  go (W_CONST sz c) = const_exp sz c
       /\  go (W_VAR sz v)   = variable_exp sz v
-      /\  go (W_AND a b)    = binary_exp B_bit_and a b // B_log_and
-      /\  go (W_OR a b)     = binary_exp B_bit_or a b // B_log_or
+      /\  go (W_AND a b)    = binary_exp B_bit_and a b
+      /\  go (W_OR a b)     = binary_exp B_bit_or a b
       /\  go (W_NOT a)      = unary_exp U_bit_neg a
       /\  go (W_EQ a b)     = binary_exp B_log_eq a b
       /\  go (W_GR a b)     = binary_exp B_gt a b
@@ -311,16 +305,11 @@ let expression {we::wexpr} =
       /\  go (W_SHR a b)    = binary_exp B_log_shr a b
       /\  go (W_ASHR a b)   = binary_exp B_shr a b
       /\  go (W_ZX sz a)    = zero_extend_exp sz a
+      /\  go (W_SX sz a)    = sign_extend_exp sz a
+      /\  go (W_SLICE is w) = slice_exp is w
       /\  go (W_ITE c a b)  = conditional_exp c a b
       /\  go (W_CAT es)     = concat_exp es
-      // Restricted op. --------------------------
-      /\  go (W_SX sz a) =
-            is_var a => sign_extend_exp sz a |
-              error "W_SX must be called with a variable"
-      /\  go (W_SLICE is w) =
-            is_var w => slice_exp is w |
-              error "W_SLICE must be called with a variable"
-      // Named op. -------------------------------
+      // Ignored op. -----------------------------
       /\  go (W_NAMED_CONST _ sz c) =
             warn "NAMED_CONST is treated as CONST" (const_exp sz c)
       /\  go (W_EXPLICIT_VAR sz v) =
@@ -352,11 +341,11 @@ let always var_lv exp =
 
 let pretty_update_fn (W_UPDATE_FN lhs rhs) =
       let net_lv = net_lvalue lhs in
-      let exp = fst $ expression rhs in
+      let exp = fst $ pretty_expression rhs in
       assign net_lv exp
 /\  pretty_update_fn (W_PHASE_DELAY lhs rhs) =
       let var_lv = var_lvalue lhs in
-      let exp = fst $ expression rhs in
+      let exp = fst $ pretty_expression rhs in
       always var_lv exp
 ;
 

@@ -431,11 +431,14 @@ letrec
             , (sz_X, W_ADD  (gen_binary sz as)  (gen_binary sz bs))
             , (sz_X, W_SUB  (gen_binary sz as)  (gen_binary sz bs))
             , (sz_X, W_MUL  (gen_binary sz as)  (gen_binary sz bs))
-            , (sz_X, W_DIV  (gen_binary sz as)  (gen_binary sz bs))
-            , (sz_X, W_MOD  (gen_binary sz as)  (gen_binary sz bs))
+         // FL and Yosys does different things when dividing by zero.
+         // , (sz_X, W_DIV  (gen_binary sz as)  (gen_binary sz bs))
+         // Yosys treats first argument as a signed value always?
+         // , (sz_X, W_MOD  (gen_binary sz as)  (gen_binary sz bs))
             , (sz_X, W_SHL  (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
             , (sz_X, W_SHR  (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
-            , (sz_X, W_ASHR (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
+         // Declare first arg. as signed to get the correct behaviour.
+         // , (sz_X, W_ASHR (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
             , (d_X,  val (cs, ds)   = split_at 2 ts in
                      val (es, fs)   = split_at_random ds in
                      let gen ts sz  = gen_wexpr is ts sz (d / 3) in
