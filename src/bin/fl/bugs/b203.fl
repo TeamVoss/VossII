@@ -236,14 +236,29 @@ let debug (SOME p) =
 
 TYPE "bits" 2;
 
+// module test (input wire [1 : 0] in1, output wire [1 : 0] out2);
+//     assign out2 = ({{1{in1[1]}}, in1[1]}) % (2'b10);
+// endmodule
+// verilog2pexlif T "-I." "test" ["test2.v"] [];
+
+// let ex =
+//         bits_input a.
+//         bits_output b.
+//         CELL "test" [b <- a '|>>' '0b01];
+
 let ex =
         bits_input a.
         bits_output b.
+        bit_internal t.
         CELL "test" [
-            b <- a '|>>' '0b01
+            t <- {(a~~1)::bit},
+            b <- {(SX t)::bits} '%' '0b10
         ]
 ;
 let pex = SOME (ex 'a 'b);
+
+
+
 
 // -----------------------------------------------------------------------------
 // Fin.
