@@ -1,0 +1,30 @@
+load "ste.fl";
+
+let buf =
+    bit_input	i.
+    bit_output	o.
+    bit_internal m.
+    CELL "draw_hier buf" [
+	m <- '~' i,
+	o <- '~' m
+];
+
+
+let ex = 
+    bit_input clk a b c.
+    bit_output	o.
+    bit_internal    m1 m2 m3.
+    CELL "draw_hier ex" [
+	m1 <- a '&' '~' b,
+	re_ff clk m1 m2,
+	m3 <- m1 '^' (m2 '|' c),
+	buf m3 o
+];
+
+let p = ex 'clk 'a 'b 'c 'o;
+
+//STE_debug (pexlif2fsm p);
+
+let idv = start_new_transform p;
+idv;
+

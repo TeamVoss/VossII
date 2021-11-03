@@ -1,7 +1,7 @@
 /*
  *  yosys -- Yosys Open SYnthesis Suite
  *
- *  Copyright (C) 2012  Clifford Wolf <clifford@clifford.at>
+ *  Copyright (C) 2012  Claire Xenia Wolf <claire@yosyshq.com>
  *
  *  Permission to use, copy, modify, and/or distribute this software for any
  *  purpose with or without fee is hereby granted, provided that the above
@@ -35,7 +35,7 @@ struct EquivPurgeWorker
 	{
 		if (sig.is_wire()) {
 			Wire *wire = sig.as_wire();
-			if (wire->name[0] == '\\') {
+			if (wire->name.isPublic()) {
 				if (!wire->port_output) {
 					log("  Module output: %s (%s)\n", log_signal(wire), log_id(cellname));
 					wire->port_output = true;
@@ -62,7 +62,7 @@ struct EquivPurgeWorker
 	{
 		if (sig.is_wire()) {
 			Wire *wire = sig.as_wire();
-			if (wire->name[0] == '\\') {
+			if (wire->name.isPublic()) {
 				if (!wire->port_output) {
 					log("  Module input: %s\n", log_signal(wire));
 					wire->port_input = true;

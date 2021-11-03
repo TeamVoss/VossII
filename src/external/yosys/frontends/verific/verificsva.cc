@@ -1,7 +1,7 @@
 /*
  *  yosys -- Yosys Open SYnthesis Suite
  *
- *  Copyright (C) 2012  Clifford Wolf <clifford@clifford.at>
+ *  Copyright (C) 2012  Claire Xenia Wolf <claire@yosyshq.com>
  *
  *  Permission to use, copy, modify, and/or distribute this software for any
  *  purpose with or without fee is hereby granted, provided that the above
@@ -1040,8 +1040,14 @@ struct VerificSvaImporter
 
 	[[noreturn]] void parser_error(Instance *inst)
 	{
-		parser_error(stringf("Verific SVA primitive %s (%s) is currently unsupported in this context",
-				inst->View()->Owner()->Name(), inst->Name()), inst->Linefile());
+		std::string msg;
+		if (inst->Type() == PRIM_SVA_MATCH_ITEM_TRIGGER || inst->Type() == PRIM_SVA_MATCH_ITEM_ASSIGN)
+		{
+			msg = "SVA sequences with local variable assignments are currently not supported.\n";
+		}
+
+		parser_error(stringf("%sVerific SVA primitive %s (%s) is currently unsupported in this context",
+				msg.c_str(), inst->View()->Owner()->Name(), inst->Name()), inst->Linefile());
 	}
 
 	dict<Net*, bool, hash_ptr_ops> check_expression_cache;
@@ -1752,6 +1758,11 @@ struct VerificSvaImporter
 						clocking.addDff(NEW_ID, sig_a, sig_a_q, State::S0);
 						clocking.addDff(NEW_ID, sig_en, sig_en_q, State::S0);
 					}
+
+					// accept in disable case
+
+					if (clocking.disable_sig != State::S0)
+						sig_a_q = module->Or(NEW_ID, sig_a_q, clocking.disable_sig);
 
 					// generate fair/live cell
 

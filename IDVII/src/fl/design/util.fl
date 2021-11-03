@@ -10,7 +10,8 @@ let mk_name sz base = sz = 1 => base | sprintf "%s[%d:0]" base (sz-1);
 let is_user_given s =
     NOT (str_is_substr "__tmp" s) AND
     NOT (str_is_substr "_TMP_" s) AND
-    NOT (str_is_substr "TmP_" s)
+    NOT (str_is_substr "TmP_" s) AND
+    NOT (str_is_substr "_$" s)
 ;
 // todo: Pexlif's generated randomly doesn't follow this name schema.
 
@@ -192,7 +193,7 @@ clet cmerge_vectors nl =
     merge_vectors (merge_consts "" nl)
 ;
 
-clet w_depends we =
+let w_depends we =
     let raw_res = ref [] then
     letrec dep (W_X sz) = ()
      /\    dep (W_NAMED_CONST name sz v) = ()
@@ -230,7 +231,7 @@ clet w_depends we =
     length res1 = length res2 => res1 | qsort node_name_cmp res2
 ;
 
-cletrec wexpr_size wexpr =
+letrec wexpr_size wexpr =
     let get_size2 a b =
 	let a_sz = wexpr_size a in
 	let b_sz = wexpr_size b in
@@ -310,7 +311,7 @@ let check_memory a_sz lines d_sz addr mem =
 ;
 
 
-cletrec wexpr_is_binary (W_X sz) = F
+letrec wexpr_is_binary (W_X sz) = F
  /\     wexpr_is_binary (W_NAMED_CONST name sz v) = T
  /\     wexpr_is_binary (W_CONST sz v) = T
  /\     wexpr_is_binary (W_VAR sz b) = T
@@ -363,7 +364,7 @@ let mk_xvars sz =
     bv_variable (mk_name sz base)
 ;
 
-cletrec w2bv sub w =
+letrec w2bv sub w =
     let w2bl w =
 	let sz = wexpr_size w in
 	let base = bv2list (w2bv sub w) in

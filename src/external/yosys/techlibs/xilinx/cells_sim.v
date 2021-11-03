@@ -1,7 +1,7 @@
 /*
  *  yosys -- Yosys Open SYnthesis Suite
  *
- *  Copyright (C) 2012  Clifford Wolf <clifford@clifford.at>
+ *  Copyright (C) 2012  Claire Xenia Wolf <claire@yosyshq.com>
  *
  *  Permission to use, copy, modify, and/or distribute this software for any
  *  purpose with or without fee is hereby granted, provided that the above
@@ -633,6 +633,41 @@ module FDRSE (
       Q <= d;
 endmodule
 
+module FDRSE_1 (
+  output reg Q,
+  (* clkbuf_sink *)
+  (* invertible_pin = "IS_C_INVERTED" *)
+  input C,
+  (* invertible_pin = "IS_CE_INVERTED" *)
+  input CE,
+  (* invertible_pin = "IS_D_INVERTED" *)
+  input D,
+  (* invertible_pin = "IS_R_INVERTED" *)
+  input R,
+  (* invertible_pin = "IS_S_INVERTED" *)
+  input S
+);
+  parameter [0:0] INIT = 1'b0;
+  parameter [0:0] IS_C_INVERTED = 1'b0;
+  parameter [0:0] IS_CE_INVERTED = 1'b0;
+  parameter [0:0] IS_D_INVERTED = 1'b0;
+  parameter [0:0] IS_R_INVERTED = 1'b0;
+  parameter [0:0] IS_S_INVERTED = 1'b0;
+  initial Q <= INIT;
+  wire c = C ^ IS_C_INVERTED;
+  wire ce = CE ^ IS_CE_INVERTED;
+  wire d = D ^ IS_D_INVERTED;
+  wire r = R ^ IS_R_INVERTED;
+  wire s = S ^ IS_S_INVERTED;
+  always @(negedge c)
+    if (r)
+      Q <= 0;
+    else if (s)
+      Q <= 1;
+    else if (ce)
+      Q <= d;
+endmodule
+
 (* abc9_box, lib_whitebox *)
 module FDCE (
   output reg Q,
@@ -823,6 +858,51 @@ module FDCPE (
       qc <= D;
   end
   always @(posedge c, posedge pre) begin
+    if (pre)
+      qp <= 1;
+    else if (CE)
+      qp <= D;
+  end
+  always @* begin
+    if (clr)
+      qs <= 0;
+    else if (pre)
+      qs <= 1;
+  end
+  assign Q = qs ? qp : qc;
+endmodule
+
+module FDCPE_1 (
+  output wire Q,
+  (* clkbuf_sink *)
+  (* invertible_pin = "IS_C_INVERTED" *)
+  input C,
+  input CE,
+  (* invertible_pin = "IS_CLR_INVERTED" *)
+  input CLR,
+  input D,
+  (* invertible_pin = "IS_PRE_INVERTED" *)
+  input PRE
+);
+  parameter [0:0] INIT = 1'b0;
+  parameter [0:0] IS_C_INVERTED = 1'b0;
+  parameter [0:0] IS_CLR_INVERTED = 1'b0;
+  parameter [0:0] IS_PRE_INVERTED = 1'b0;
+  wire c = C ^ IS_C_INVERTED;
+  wire clr = CLR ^ IS_CLR_INVERTED;
+  wire pre = PRE ^ IS_PRE_INVERTED;
+  // Hacky model to avoid simulation-synthesis mismatches.
+  reg qc, qp, qs;
+  initial qc = INIT;
+  initial qp = INIT;
+  initial qs = 0;
+  always @(negedge c, posedge clr) begin
+    if (clr)
+      qc <= 0;
+    else if (CE)
+      qc <= D;
+  end
+  always @(negedge c, posedge pre) begin
     if (pre)
       qp <= 1;
     else if (CE)
@@ -2023,6 +2103,105 @@ module RAM64M8 (
     end
 endmodule
 
+module RAM32X16DR8 (
+  output       DOA,
+  output       DOB,
+  output       DOC,
+  output       DOD,
+  output       DOE,
+  output       DOF,
+  output       DOG,
+  output [1:0] DOH,
+  input  [5:0] ADDRA, ADDRB, ADDRC, ADDRD, ADDRE, ADDRF, ADDRG,
+  input  [4:0] ADDRH,
+  input  [1:0] DIA,
+  input  [1:0] DIB,
+  input  [1:0] DIC,
+  input  [1:0] DID,
+  input  [1:0] DIE,
+  input  [1:0] DIF,
+  input  [1:0] DIG,
+  input  [1:0] DIH,
+  (* clkbuf_sink *)
+  (* invertible_pin = "IS_WCLK_INVERTED" *)
+  input        WCLK,
+  input        WE
+);
+  parameter [0:0] IS_WCLK_INVERTED = 1'b0;
+  reg [63:0] mem_a, mem_b, mem_c, mem_d, mem_e, mem_f, mem_g, mem_h;
+  assign DOA = mem_a[ADDRA];
+  assign DOB = mem_b[ADDRB];
+  assign DOC = mem_c[ADDRC];
+  assign DOD = mem_d[ADDRD];
+  assign DOE = mem_e[ADDRE];
+  assign DOF = mem_f[ADDRF];
+  assign DOG = mem_g[ADDRG];
+  assign DOH = mem_h[2*ADDRH+:2];
+  wire clk = WCLK ^ IS_WCLK_INVERTED;
+  always @(posedge clk)
+    if (WE) begin
+      mem_a[2*ADDRH+:2] <= DIA;
+      mem_b[2*ADDRH+:2] <= DIB;
+      mem_c[2*ADDRH+:2] <= DIC;
+      mem_d[2*ADDRH+:2] <= DID;
+      mem_e[2*ADDRH+:2] <= DIE;
+      mem_f[2*ADDRH+:2] <= DIF;
+      mem_g[2*ADDRH+:2] <= DIG;
+      mem_h[2*ADDRH+:2] <= DIH;
+    end
+endmodule
+
+module RAM64X8SW (
+  output [7:0] O,
+  input [5:0] A,
+  input D,
+  (* clkbuf_sink *)
+  (* invertible_pin = "IS_WCLK_INVERTED" *)
+  input WCLK,
+  input WE,
+  input [2:0] WSEL
+);
+  parameter [63:0] INIT_A = 64'h0000000000000000;
+  parameter [63:0] INIT_B = 64'h0000000000000000;
+  parameter [63:0] INIT_C = 64'h0000000000000000;
+  parameter [63:0] INIT_D = 64'h0000000000000000;
+  parameter [63:0] INIT_E = 64'h0000000000000000;
+  parameter [63:0] INIT_F = 64'h0000000000000000;
+  parameter [63:0] INIT_G = 64'h0000000000000000;
+  parameter [63:0] INIT_H = 64'h0000000000000000;
+  parameter [0:0] IS_WCLK_INVERTED = 1'b0;
+  reg [63:0] mem_a = INIT_A;
+  reg [63:0] mem_b = INIT_B;
+  reg [63:0] mem_c = INIT_C;
+  reg [63:0] mem_d = INIT_D;
+  reg [63:0] mem_e = INIT_E;
+  reg [63:0] mem_f = INIT_F;
+  reg [63:0] mem_g = INIT_G;
+  reg [63:0] mem_h = INIT_H;
+  assign O[7] = mem_a[A];
+  assign O[6] = mem_b[A];
+  assign O[5] = mem_c[A];
+  assign O[4] = mem_d[A];
+  assign O[3] = mem_e[A];
+  assign O[2] = mem_f[A];
+  assign O[1] = mem_g[A];
+  assign O[0] = mem_h[A];
+  wire clk = WCLK ^ IS_WCLK_INVERTED;
+  always @(posedge clk)
+    if (WE) begin
+      case (WSEL)
+      3'b111: mem_a[A] <= D;
+      3'b110: mem_b[A] <= D;
+      3'b101: mem_c[A] <= D;
+      3'b100: mem_d[A] <= D;
+      3'b011: mem_e[A] <= D;
+      3'b010: mem_f[A] <= D;
+      3'b001: mem_g[A] <= D;
+      3'b000: mem_h[A] <= D;
+      endcase
+    end
+endmodule
+
 // ROM.
 
 module ROM16X1 (
@@ -2335,6 +2514,8 @@ parameter integer PREG = 1;
 
 // The multiplier.
 wire signed [35:0] P_MULT;
+wire signed [17:0] A_MULT;
+wire signed [17:0] B_MULT;
 assign P_MULT = A_MULT * B_MULT;
 
 // The cascade output.
@@ -2373,8 +2554,6 @@ always @(posedge CLK) begin
 end
 
 // The register enables.
-wire signed [17:0] A_MULT;
-wire signed [17:0] B_MULT;
 assign A_MULT = (AREG == 1) ? A_REG : A;
 assign B_MULT = (BREG == 1) ? B_REG : B_MUX;
 assign P = (PREG == 1) ? P_REG : P_MULT;
@@ -3014,8 +3193,12 @@ endmodule
 // Virtex 6, Series 7.
 
 `ifdef YOSYS
-(* abc9_box=!(PREG || AREG || ADREG || BREG || CREG || DREG || MREG),
-   lib_whitebox=!(PREG || AREG || ADREG || BREG || CREG || DREG || MREG) *)
+(* abc9_box=!(PREG || AREG || ADREG || BREG || CREG || DREG || MREG)
+`ifdef ALLOW_WHITEBOX_DSP48E1
+   // Do not make DSP48E1 a whitebox for ABC9 even if fully combinatorial, since it is a big complex block
+   , lib_whitebox=!(PREG || AREG || ADREG || BREG || CREG || DREG || MREG || INMODEREG || OPMODEREG || ALUMODEREG || CARRYINREG || CARRYINSELREG)
+`endif
+*)
 `endif
 module DSP48E1 (
     output [29:0] ACOUT,
@@ -3503,11 +3686,15 @@ module DSP48E1 (
                 if (OPMODEr[3:2] != 2'b01) $fatal(1, "OPMODEr[3:2] must be 2'b01 when OPMODEr[1:0] is 2'b01");
 `endif
             end
-            2'b10: begin X = P;
+            2'b10:
+                if (PREG == 1)
+                    X = P;
+                else begin
+                    X = 48'bx;
 `ifndef YOSYS
-                if (PREG != 1) $fatal(1, "PREG must be 1 when OPMODEr[1:0] is 2'b10");
+                    $fatal(1, "PREG must be 1 when OPMODEr[1:0] is 2'b10");
 `endif
-            end
+                end
             2'b11: X = $signed({Ar2, Br2});
             default: X = 48'bx;
         endcase
@@ -3529,20 +3716,36 @@ module DSP48E1 (
         case (OPMODEr[6:4])
             3'b000: Z = 48'b0;
             3'b001: Z = PCIN;
-            3'b010: begin Z = P;
+            3'b010:
+                if (PREG == 1)
+                    Z = P;
+                else begin
+                    Z = 48'bx;
 `ifndef YOSYS
-                if (PREG != 1) $fatal(1, "PREG must be 1 when OPMODEr[6:4] i0s 3'b010");
+                    $fatal(1, "PREG must be 1 when OPMODEr[6:4] is 3'b010");
 `endif
-            end
+                end
             3'b011: Z = Cr;
-            3'b100: begin Z = P;
+            3'b100:
+                if (PREG == 1 && OPMODEr[3:0] === 4'b1000)
+                    Z = P;
+                else begin
+                    Z = 48'bx;
 `ifndef YOSYS
-                if (PREG != 1) $fatal(1, "PREG must be 1 when OPMODEr[6:4] is 3'b100");
-                if (OPMODEr[3:0] != 4'b1000) $fatal(1, "OPMODEr[3:0] must be 4'b1000 when OPMODEr[6:4] i0s 3'b100");
+                    if (PREG != 1) $fatal(1, "PREG must be 1 when OPMODEr[6:4] is 3'b100");
+                    if (OPMODEr[3:0] != 4'b1000) $fatal(1, "OPMODEr[3:0] must be 4'b1000 when OPMODEr[6:4] i0s 3'b100");
 `endif
-            end
+                end
             3'b101: Z = $signed(PCIN[47:17]);
-            3'b110: Z = $signed(P[47:17]);
+            3'b110:
+                if (PREG == 1)
+                    Z = $signed(P[47:17]);
+                else begin
+                    Z = 48'bx;
+`ifndef YOSYS
+                    $fatal(1, "PREG must be 1 when OPMODEr[6:4] is 3'b110");
+`endif
+                end
             default: Z = 48'bx;
         endcase
     end
@@ -3568,10 +3771,34 @@ module DSP48E1 (
             3'b001: cin_muxed = ~PCIN[47];
             3'b010: cin_muxed = CARRYCASCIN;
             3'b011: cin_muxed = PCIN[47];
-            3'b100: cin_muxed = CARRYCASCOUT;
-            3'b101: cin_muxed = ~P[47];
+            3'b100:
+                if (PREG == 1)
+                    cin_muxed = CARRYCASCOUT;
+                else begin
+                    cin_muxed = 1'bx;
+`ifndef YOSYS
+                    $fatal(1, "PREG must be 1 when CARRYINSEL is 3'b100");
+`endif
+                end
+            3'b101:
+                if (PREG == 1)
+                    cin_muxed = ~P[47];
+                else begin
+                    cin_muxed = 1'bx;
+`ifndef YOSYS
+                    $fatal(1, "PREG must be 1 when CARRYINSEL is 3'b101");
+`endif
+                end
             3'b110: cin_muxed = A24_xnor_B17;
-            3'b111: cin_muxed = P[47];
+            3'b111:
+                if (PREG == 1)
+                    cin_muxed = P[47];
+                else begin
+                    cin_muxed = 1'bx;
+`ifndef YOSYS
+                    $fatal(1, "PREG must be 1 when CARRYINSEL is 3'b111");
+`endif
+                end
             default: cin_muxed = 1'bx;
         endcase
     end
@@ -4163,4 +4390,3 @@ module RAMB36E1 (
         if (|DOB_REG) (posedge CLKBWRCLK => (DOPBDOP : 4'bx)) = 882;
     endspecify
 endmodule
-

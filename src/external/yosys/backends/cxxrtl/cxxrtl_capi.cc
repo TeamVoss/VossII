@@ -32,15 +32,32 @@ const cxxrtl::debug_items &cxxrtl_debug_items_from_handle(cxxrtl_handle handle) 
 }
 
 cxxrtl_handle cxxrtl_create(cxxrtl_toplevel design) {
+	return cxxrtl_create_at(design, "");
+}
+
+cxxrtl_handle cxxrtl_create_at(cxxrtl_toplevel design, const char *root) {
+	std::string path = root;
+	if (!path.empty()) {
+		// module::debug_info() accepts either an empty path, or a path ending in space to simplify
+		// the logic in generated code. While this is sketchy at best to expose in the C++ API, this
+		// would be a lot worse in the C API, so don't expose it here.
+		assert(path.back() != ' ');
+		path += ' ';
+	}
+
 	cxxrtl_handle handle = new _cxxrtl_handle;
 	handle->module = std::move(design->module);
-	handle->module->debug_info(handle->objects);
+	handle->module->debug_info(handle->objects, path);
 	delete design;
 	return handle;
 }
 
 void cxxrtl_destroy(cxxrtl_handle handle) {
 	delete handle;
+}
+
+void cxxrtl_reset(cxxrtl_handle handle) {
+	handle->module->reset();
 }
 
 int cxxrtl_eval(cxxrtl_handle handle) {
@@ -68,4 +85,8 @@ void cxxrtl_enum(cxxrtl_handle handle, void *data,
                                   cxxrtl_object *object, size_t parts)) {
 	for (auto &it : handle->objects.table)
 		callback(data, it.first.c_str(), static_cast<cxxrtl_object*>(&it.second[0]), it.second.size());
+}
+
+void cxxrtl_outline_eval(cxxrtl_outline outline) {
+	outline->eval();
 }

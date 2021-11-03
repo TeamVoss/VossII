@@ -18,6 +18,7 @@ image create photo ::img::delete -format GIF -data {
     PUSvqYpuvWQg40FfSVacBa5nN6JYDI3mzRQAOw==
 }
 
+
 # ---------------------------------------------------
 # Constants
 # ---------------------------------------------------
@@ -110,7 +111,8 @@ proc sc:inform_time_change {w args} {
 proc create_ste_debugger {w} {
     catch {destroy $w}
     toplevel $w
-    wm geometry $w 70x40-20+100
+#    wm geometry $w 70x40-20+100
+wm geometry $w -20+100
     set nb $w.nb
     ttk::notebook $nb -width 1200 -height 700
     pack $nb -side top -expand y -fill both
@@ -264,8 +266,8 @@ proc sl:create_stop_node_browser {w p} {
             -command [list sl:delete_stop_nd $p $f.list]
     pack $p.operations -side top -fill x
         pack $p.operations.b -side top
-    sl:update_stop_node_list $w $f.list
-    bind $w.nb <<NotebookTabChanged>> [list sl:update_stop_node_list $w $f.list]
+    sl:update_stop_node_list $w
+    bind $w.nb <<NotebookTabChanged>> [list sl:update_stop_node_list $w]
 }
 
 proc cm:create_commands {w p} {
@@ -312,12 +314,14 @@ proc cmd:save_cmds {txt} {
 }
 
 proc cmd:update_cmds {w} {
-    set txt $::cmd_txt($w)
-    $txt delete 1.0 end
-    update
-    foreach line [fl_get_sch_commands $w] {
-	$txt insert end $line
-	$txt insert end "\n"
+    if [info exists ::cmd_txt($w)] {
+	set txt $::cmd_txt($w)
+	$txt delete 1.0 end
+	update
+	foreach line [fl_get_sch_commands $w] {
+	    $txt insert end $line
+	    $txt insert end "\n"
+	}
     }
 }
 
@@ -326,7 +330,7 @@ proc sl:add_stop_node {w nlb} {
 	set nd [$nlb get $idx]
 	fl_top_level_add_stop_nd $w $nd
     }
-    sl:update_stop_node_list $w $::stop_list_info($w)
+    sl:update_stop_node_list $w
 }
 
 proc sl:delete_stop_nd {w lb} {
@@ -334,10 +338,11 @@ proc sl:delete_stop_nd {w lb} {
 	set nd [$lb get $idx]
 	fl_delete_stop_nd $w $nd
     }
-    sl:update_stop_node_list $w $lb
+    sl:update_stop_node_list $w
 }
 
-proc sl:update_stop_node_list {w lb} {
+proc sl:update_stop_node_list {w} {
+    set lb $::stop_list_info([winfo toplevel $w])
     $lb delete 0 end
     foreach v [fl_get_stop_nodes $w] {
         $lb insert end $v
@@ -645,11 +650,15 @@ proc create_circuit_canvas {nb mw} {
 
     ttk::button $w.menu.detach -image $::icon(detach) \
 	    -command "sch:detach $nb $w"
+    balloon $w.menu.detach "Detach tab/Re-attach window"
     pack $w.menu.detach -side left
     set ::vstatus(inside_notebook,$w) 1
 
-    sch:create_time_point $c
-
+    if [fl_is_IDV_ENV $w] {
+	idv:create_idv_menu $nb $w
+    } else {
+	sch:create_time_point $c
+    }
 
     selection handle . provide_selection STRING
 
@@ -766,54 +775,76 @@ proc cb:sch_canvas_menu {c wx wy sx sy} {
 	return
     }
     set root [w2root $c]
-    $m add command -label "New fanin" \
-	-command "after idle [list fl_draw_fanin_by_tag $c \
-		    $::sch_info(draw_level,$c) 1 $nodes]"
-    $m add command -label "Draw inside" \
-	-command "after idle \
-	    [list fl_draw_inside $c $::sch_info(draw_level,$c) $nodes]"
+    if [fl_is_IDV_ENV $c] {
+	$m add command -label "Show RTL" \
+	    -command "after idle \
+		[list fl_show_rtl $c $::sch_info(draw_level,$c) $nodes]"
+	set mm $m.mark
+	catch {destroy $mm}
+	menu $mm -tearoff 0
+	$m add cascade -label "Mark" -menu $mm
 
-    $m add command -label "Add waveform" -command "sc:add_waveforms $c $nodes"
+	set cols {DarkOrchid1 magenta2 DarkOrange1 green gold3 yellow \
+		  cyan purple brown}
+	set laccs { "1" "2" "3" "4" "5" "6" "7" "8" "9" }
 
-    $m add command -label "Show RTL" \
-	-command "after idle \
-	    [list fl_show_rtl $c $::sch_info(draw_level,$c) $nodes]"
-    
-    set mm $m.mark
-    catch {destroy $mm}
-    menu $mm -tearoff 0
-    $m add cascade -label "Mark" -menu $mm
+	foreach col $cols lacc $laccs {
+	    $mm add command -label "" -background $col \
+		    -command "cb:set_wire_color $c $nodes $col" \
+		    -accelerator $lacc
+	}
+	$mm add command -label "Unmark" \
+	    -command "cb:set_wire_color $c $nodes _OrIgInAlCoLoR_"
+    } else {
+	$m add command -label "New fanin" \
+	    -command "after idle [list fl_draw_fanin_by_tag $c \
+			$::sch_info(draw_level,$c) 1 $nodes]"
+	$m add command -label "Draw inside" \
+	    -command "after idle \
+		[list fl_draw_inside $c $::sch_info(draw_level,$c) $nodes 0]"
 
-    set cols {DarkOrchid1 magenta2 DarkOrange1 green gold3 yellow \
-              cyan purple brown}
-    set laccs { "1" "2" "3" "4" "5" "6" "7" "8" "9" }
+	$m add command -label "Add waveform" \
+		-command "sc:add_waveforms $c $nodes"
 
-    foreach col $cols lacc $laccs {
-        $mm add command -label "" -background $col \
-                -command "cb:set_wire_color $c $nodes $col" \
-                -accelerator $lacc
+	$m add command -label "Show RTL" \
+	    -command "after idle \
+		[list fl_show_rtl $c $::sch_info(draw_level,$c) $nodes]"
+	
+	set mm $m.mark
+	catch {destroy $mm}
+	menu $mm -tearoff 0
+	$m add cascade -label "Mark" -menu $mm
+
+	set cols {DarkOrchid1 magenta2 DarkOrange1 green gold3 yellow \
+		  cyan purple brown}
+	set laccs { "1" "2" "3" "4" "5" "6" "7" "8" "9" }
+
+	foreach col $cols lacc $laccs {
+	    $mm add command -label "" -background $col \
+		    -command "cb:set_wire_color $c $nodes $col" \
+		    -accelerator $lacc
+	}
+	$mm add command -label "Unmark" \
+	    -command "cb:set_wire_color $c $nodes _OrIgInAlCoLoR_"
+
+	set cb [winfo parent $c].menu.tp.show
+	set te [winfo parent $c].menu.tp.time.time
+
+	$m add command -label "Stop here" \
+		-command "cb:hide_fanin $c $nodes 1;"
+
+	$m add command -label "Hide fanin" \
+		-command "cb:hide_fanin $c $nodes 0;"
+
+	set mm $m.expand_fanin
+	catch {destroy $mm}
+	menu $mm -tearoff 0
+	$m add cascade -label "Expand fanin cone" -menu $mm
+	for {set amt 1} {$amt < 10} {incr amt} {
+	    $mm add command -label "by $amt" \
+		    -command [list cb:expand_fanin $c $nodes $amt]
+	}
     }
-    $mm add command -label "Unmark" \
-	-command "cb:set_wire_color $c $nodes _OrIgInAlCoLoR_"
-
-    set cb [winfo parent $c].menu.tp.show
-    set te [winfo parent $c].menu.tp.time.time
-
-    $m add command -label "Stop here" \
-	    -command "cb:hide_fanin $c $nodes 1;"
-
-    $m add command -label "Hide fanin" \
-	    -command "cb:hide_fanin $c $nodes 0;"
-
-    set mm $m.expand_fanin
-    catch {destroy $mm}
-    menu $mm -tearoff 0
-    $m add cascade -label "Expand fanin cone" -menu $mm
-    for {set amt 1} {$amt < 10} {incr amt} {
-	$mm add command -label "by $amt" \
-	    -command [list cb:expand_fanin $c $nodes $amt]
-    }
-
     tk_popup $m $sx $sy
     return
 }
@@ -1031,6 +1062,7 @@ proc cb:expand_undo {c} {
     unpost_popup $c
     set old_zoom $::cur_zoom_factor($c)
     set_zoom_factor $c 100.0
+    $c delete all
     fl_undo_expansion $c
     set_zoom_factor $c $old_zoom
     catch {cb:restore_attributes $c}
@@ -1077,6 +1109,7 @@ proc cb:expand_fanin {c node amt} {
         # Now expand fanin
 	set old_zoom $::cur_zoom_factor($c)
 	set_zoom_factor $c 100.0
+	$c delete all
         fl_expand_fanin $c $::sch_info(draw_level,$c) $amt $node
 	set_zoom_factor $c $old_zoom
         cb:restore_attributes $c
@@ -1109,7 +1142,11 @@ proc cb:add_stop_node {c node} {
 
 proc cb:hide_fanin {c node make_stop_node} {
     unpost_popup $c
+    set old_zoom $::cur_zoom_factor($c)
+    set_zoom_factor $c 100.0
+    $c delete all
     fl_hide_fanin $c $node $make_stop_node
+    set_zoom_factor $c $old_zoom
     cb:restore_attributes $c
 }
 
@@ -3196,7 +3233,7 @@ proc extract_name_draw_fub {module inst args} {
     }
 }
 
-proc sc:double_draw_inside {c levels tag} {
+proc sc:double_draw_inside {c levels inst_nbr tag} {
     if ![info exists ::previous_selection] {
 	set old "_"
     } elseif { $::previous_selection == {} } {
@@ -3205,10 +3242,10 @@ proc sc:double_draw_inside {c levels tag} {
 	set old $::previous_selection
     }
     fl_set_selection $c "SET_SELECTION" $old
-    fl_draw_inside $c $levels $tag
+    fl_draw_inside $c $levels $tag $inst_nbr
 }
 
-proc draw_fub {module inst inames onames c tag x y} {
+proc draw_fub {module inst inst_nbr inames onames c tag x y} {
     global gcolor fc sfont
     if { ![info exists ::sch_info(draw_level,$c)] } {
 	set ::sch_info(draw_level,$c) 0
@@ -3242,7 +3279,8 @@ proc draw_fub {module inst inames onames c tag x y} {
     set dr [$c create rectangle [expr ($xr-$rwid)] [expr ($y+$erht/2)] \
 		$xr [expr ($y-$erht/2)] -outline $gcolor -fill $fc -tags $tag]
     $c bind $dr <Double-1> \
-    "after idle [list sc:double_draw_inside $c $::sch_info(draw_level,$c) $tag]"
+    "after idle [list sc:double_draw_inside $c $::sch_info(draw_level,$c) \
+			$inst_nbr $tag]"
 
     set mid_x [expr ($xr-$rwid/2)]
     set top_y [expr $y-$erht/2]
@@ -3268,7 +3306,7 @@ proc draw_fub {module inst inames onames c tag x y} {
 	    $c bind $f <Double-1> \
 		"after idle \
 		    [list sc:double_draw_inside $c \
-				$::sch_info(draw_level,$c) $tag]"
+				$::sch_info(draw_level,$c) $inst_nbr $tag]"
 	    add_font_tags $c $f _IsTeXt_
 	    $c create line $xl $yl $nx $yl -fill $gcolor
 	    lappend inp_locs [expr round($xl)] [expr round($yl)]
@@ -3291,7 +3329,8 @@ proc draw_fub {module inst inames onames c tag x y} {
 		-font $::sfont($c) -text $fname]
 	$c bind $f <Double-1> \
 	    "after idle \
-		[list sc:double_draw_inside $c $::sch_info(draw_level,$c) $tag]"
+		[list sc:double_draw_inside $c $::sch_info(draw_level,$c) \
+					    $inst_nbr $tag]"
 	add_font_tags $c $f _IsTeXt_
 	set wtag [fl_vecs2tags $c $anames]
 	if [fl_is_vector_name $fname] {
@@ -4457,7 +4496,15 @@ proc draw_fsm {name dotfile states edges inps c tag x y} {
 
 set ::rtl_visualizatin_cnt 0
 
-proc visualize_rtl {file start_line start_col end_line end_col} {
+proc rtl:open_editor {file line} {
+    if [info exists ::env(EDITOR)] {"
+	eval exec $::env(EDITOR) $file &
+    } else {
+	exec xterm -e vi +$line $file &"
+    }
+}
+
+proc rtl:visualize {file start_line start_col end_line end_col} {
     if [catch {open $file r} fp] {
         report_error "Cannot open file $file."
         return
@@ -4477,8 +4524,15 @@ proc visualize_rtl {file start_line start_col end_line end_col} {
     catch {destroy $w}
     toplevel $w
 
-    ttk::button $w.b -text Close -command [list destroy $w]
-    pack $w.b -side bottom
+    frame $w.bf
+    ttk::button $w.bf.ed -text "Open in editor" \
+	    -command [list rtl:open_editor $file $start_line]
+    frame $w.bf.sep -width 20
+    ttk::button $w.bf.b -text Close -command [list destroy $w]
+    pack $w.bf -side bottom
+    pack $w.bf.ed -side left
+    pack $w.bf.sep -side left
+    pack $w.bf.b -side left
     ttk::scrollbar $w.yscroll -command [list $w.t yview]
     ttk::scrollbar $w.xscroll -orient horizontal \
 			      -command [list $w.t xview]

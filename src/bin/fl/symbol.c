@@ -485,18 +485,9 @@ Mark_symbols()
     }
     FOR_REC(&fn_rec_mgr, fn_ptr, fp) {
         if( fp->visible ) {
-            if( fp->expr != NULL ) {
-                Mark(fp->expr);
-                SET_REFCNT(fp->expr, MAX_REF_CNT);
-            }
-            if( fp->expr_init != NULL ) {
-                Mark(fp->expr_init);
-                SET_REFCNT(fp->expr_init, MAX_REF_CNT);
-            }
-            if( fp->expr_comb != NULL ) {
-                Mark(fp->expr_comb);
-                SET_REFCNT(fp->expr_comb, MAX_REF_CNT);
-            }
+	    Mark(fp->expr);
+	    Mark(fp->expr_init);
+	    Mark(fp->expr_comb);
             Mark(fp->super_comb);
         } else {
             fp->expr = NULL;

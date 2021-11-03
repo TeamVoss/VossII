@@ -59,6 +59,7 @@ g_ptr	     reduce(g_ptr root, bool first);
 g_ptr        force(g_ptr node, bool first);
 VOID         G_Init();
 string	     Mk_constructor_name(string constr_name);
+g_ptr	     Make_Failure(string msg);
 g_ptr        Make_TYPE(string name, int arg_cnt);
 g_ptr        Make_arg_list(int cnt, g_ptr expr);
 g_ptr        Make_BOOL_leaf(formula f);

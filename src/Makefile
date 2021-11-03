@@ -236,6 +236,7 @@ $(YOSYS_PATCHED_MAKEFILE):
 
 .yosys: $(YOSYS_PATCHED_MAKEFILE)
 	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f $(YOSYS_PATCHED_MAKEFILE) config-gcc-static
+	echo "========================================================="
 	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f $(YOSYS_PATCHED_MAKEFILE)
 	touch .yosys
 

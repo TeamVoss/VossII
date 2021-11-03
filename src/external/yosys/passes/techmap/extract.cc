@@ -1,7 +1,7 @@
 /*
  *  yosys -- Yosys Open SYnthesis Suite
  *
- *  Copyright (C) 2012  Clifford Wolf <clifford@clifford.at>
+ *  Copyright (C) 2012  Claire Xenia Wolf <claire@yosyshq.com>
  *
  *  Permission to use, copy, modify, and/or distribute this software for any
  *  purpose with or without fee is hereby granted, provided that the above
@@ -74,6 +74,7 @@ public:
 		param_int(ID::CTRL_IN_WIDTH)
 		param_int(ID::CTRL_OUT_WIDTH)
 		param_int(ID::OFFSET)
+		param_int(ID::PORTID)
 		param_int(ID::PRIORITY)
 		param_int(ID::RD_PORTS)
 		param_int(ID::SIZE)
@@ -354,7 +355,7 @@ struct ExtractPass : public Pass {
 		log("\n");
 		log("This pass looks for subcircuits that are isomorphic to any of the modules\n");
 		log("in the given map file and replaces them with instances of this modules. The\n");
-		log("map file can be a Verilog source file (*.v) or an ilang file (*.il).\n");
+		log("map file can be a Verilog source file (*.v) or an RTLIL source file (*.il).\n");
 		log("\n");
 		log("    -map <map_file>\n");
 		log("        use the modules in this file as reference. This option can be used\n");
@@ -409,7 +410,7 @@ struct ExtractPass : public Pass {
 		log("the following options are to be used instead of the -map option.\n");
 		log("\n");
 		log("    -mine <out_file>\n");
-		log("        mine for frequent subcircuits and write them to the given ilang file\n");
+		log("        mine for frequent subcircuits and write them to the given RTLIL file\n");
 		log("\n");
 		log("    -mine_cells_span <min> <max>\n");
 		log("        only mine for subcircuits with the specified number of cells\n");
@@ -578,7 +579,7 @@ struct ExtractPass : public Pass {
 		}
 
 		if (map_filenames.empty() && mine_outfile.empty())
-			log_cmd_error("Missing option -map <verilog_or_ilang_file> or -mine <output_ilang_file>.\n");
+			log_cmd_error("Missing option -map <verilog_or_rtlil_file> or -mine <output_rtlil_file>.\n");
 
 		RTLIL::Design *map = nullptr;
 
@@ -606,7 +607,7 @@ struct ExtractPass : public Pass {
 						delete map;
 						log_cmd_error("Can't open map file `%s'.\n", filename.c_str());
 					}
-					Frontend::frontend_call(map, &f, filename, (filename.size() > 3 && filename.compare(filename.size()-3, std::string::npos, ".il") == 0 ? "ilang" : "verilog"));
+					Frontend::frontend_call(map, &f, filename, (filename.size() > 3 && filename.compare(filename.size()-3, std::string::npos, ".il") == 0 ? "rtlil" : "verilog"));
 					f.close();
 
 					if (filename.size() <= 3 || filename.compare(filename.size()-3, std::string::npos, ".il") != 0) {
@@ -744,7 +745,7 @@ struct ExtractPass : public Pass {
 			f.open(mine_outfile.c_str(), std::ofstream::trunc);
 			if (f.fail())
 				log_error("Can't open output file `%s'.\n", mine_outfile.c_str());
-			Backend::backend_call(map, &f, mine_outfile, "ilang");
+			Backend::backend_call(map, &f, mine_outfile, "rtlil");
 			f.close();
 		}
 

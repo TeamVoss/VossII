@@ -593,6 +593,16 @@ GC_Unprotect(g_ptr g)
 }
 
 g_ptr
+Make_Failure(string msg)
+{
+    g_ptr ret = Get_node();
+    MAKE_REDEX_FAILURE(ret, msg);
+    SET_LINE_NBR(ret,line_nbr);
+    MAKE_FORCED(ret);
+    return( ret );
+}
+
+g_ptr
 Make_BOOL_leaf(formula f)
 {
     g_ptr ret = Get_node();
@@ -1402,7 +1412,7 @@ Mark(g_ptr node)
 
     if( node == NULL ) 
 	return;
-    if( GET_MARK(node) == 1 ) {
+    if( GET_MARK(node) >= 1 ) {
 	SET_REFCNT(node,MAX_REF_CNT);
 	return;
     }

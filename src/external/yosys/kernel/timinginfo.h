@@ -1,7 +1,7 @@
 /*
  *  yosys -- Yosys Open SYnthesis Suite
  *
- *  Copyright (C) 2012  Clifford Wolf <clifford@clifford.at>
+ *  Copyright (C) 2012  Claire Xenia Wolf <claire@yosyshq.com>
  *            (C) 2020  Eddie Hung    <eddie@fpgeh.com>
  *
  *  Permission to use, copy, modify, and/or distribute this software for any
@@ -88,10 +88,10 @@ struct TimingInfo
 				auto src = cell->getPort(ID::SRC);
 				auto dst = cell->getPort(ID::DST);
 				for (const auto &c : src.chunks())
-					if (!c.wire->port_input)
+					if (!c.wire || !c.wire->port_input)
 						log_error("Module '%s' contains specify cell '%s' where SRC '%s' is not a module input.\n", log_id(module), log_id(cell), log_signal(src));
 				for (const auto &c : dst.chunks())
-					if (!c.wire->port_output)
+					if (!c.wire || !c.wire->port_output)
 						log_error("Module '%s' contains specify cell '%s' where DST '%s' is not a module output.\n", log_id(module), log_id(cell), log_signal(dst));
 				int rise_max = cell->getParam(ID::T_RISE_MAX).as_int();
 				int fall_max = cell->getParam(ID::T_FALL_MAX).as_int();

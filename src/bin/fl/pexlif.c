@@ -2,15 +2,16 @@
 // Copyright 2020 Carl-Johan Seger
 // SPDX-License-Identifier: Apache-2.0
 //------------------------------------------------------------------------------
-
 /******************************************************************************/
-/*									                                          */
+/*									      */
 /* Original author: Carl-Johan Seger, 2019                                    */
-/*									                                          */
+/*									      */
 /******************************************************************************/
 #include "strings.h"
 #include "graph.h"
 #include "pexlif.h"
+
+extern char             FailBuf[4096];
 
 /******************************************************************************/
 /*                               GLOBAL VARIABLES                             */
@@ -65,6 +66,7 @@ static ustr_mgr        lstrings;
 static rec_mgr         vec_mgr;
 static rec_mgr         rng_mgr;
 // Folding/Un-folding construction.
+static rec_mgr         subst_hash_record_mgr;
 static rec_mgr         vector_list_mgr;
 static rec_mgr_ptr     vector_list_mgr_ptr;
 static rec_mgr         vector_mgr;
@@ -300,11 +302,13 @@ mk_formal_actuals_substitution(hash_record_ptr tbl, g_ptr fa)
     FOR_CONS(fa, li, pair) {
         g_ptr formal = GET_FST(pair);
         g_ptr actuals = GET_SND(pair);
-        /* fprintf(stderr, "Building subst for %s.\n", GET_STRING(formal)); */
         // Expand each actual and collect its vectors.
         unint size = 0;
         vec_list_ptr act_exp = NULL, *tail = &act_exp;
         FOR_CONS(actuals, lj, actual) {
+
+// FIX: Some of the actuals can be constants!
+
             vec_ptr vec =
                 Split_vector_name(&lstrings, vector_mgr_ptr, range_mgr_ptr,
                                   GET_STRING(actual));
@@ -312,17 +316,15 @@ mk_formal_actuals_substitution(hash_record_ptr tbl, g_ptr fa)
                 Expand_vector(vector_list_mgr_ptr, vector_mgr_ptr,
                               range_mgr_ptr, vec);
             /* fprintf(stderr, "> Expanding %s => ", GET_STRING(actual)); */
-            /* EMIT_VEC_LIST(exp); */
+            /* DBG_PRINT_VEC_LIST(exp); */
             // /
             *tail = exp;
             while(exp->next != NULL) { exp = exp->next; size++; }
             tail = &exp->next;
         }
-        /* fprintf(stderr, "> Final exp. list: "); */
-        /* EMIT_VEC_LIST(act_exp); */
         sname_list_ptr x = Show_vectors(sname_list_mgr_ptr, act_exp, FALSE);
         /* fprintf(stderr, "mk_subst: %s => ", GET_STRING(formal)); */
-        /* EMIT_STR_LIST(x); */
+        /* DBG_PRINT_STR_LIST(x); */
         // Expand formal and build a mapping of each vector to its corr. actual.
         string form_str = GET_STRING(formal);
         vec_ptr form_vec =
@@ -331,10 +333,12 @@ mk_formal_actuals_substitution(hash_record_ptr tbl, g_ptr fa)
         vec_list_ptr form_exp =
             Expand_vector(vector_list_mgr_ptr, vector_mgr_ptr, range_mgr_ptr,
                           form_vec);
-        hash_record subst;
-        create_hash(&subst, size, vec_hash, vec_equ);
+	hash_record *substp = new_rec(&subst_hash_record_mgr);
+        create_hash(substp, size, vec_hash, vec_equ);
         while(act_exp != NULL) {
-            insert_hash(&subst, form_exp->vec, act_exp->vec);
+	    vec_ptr k = Copy_vector(vector_mgr_ptr,range_mgr_ptr,form_exp->vec);
+	    vec_ptr v = Copy_vector(vector_mgr_ptr,range_mgr_ptr,act_exp->vec);
+            insert_hash(substp, k, v);
             act_exp  = act_exp->next;
             form_exp = form_exp->next;
         }
@@ -342,7 +346,7 @@ mk_formal_actuals_substitution(hash_record_ptr tbl, g_ptr fa)
         fa_subst_ptr sub = (fa_subst_ptr) new_rec(fa_subst_mgr_ptr);
         sub->formal  = form_str;
         sub->actuals = x;
-        sub->subst   = &subst;
+        sub->subst   = substp;
         string form_sig = Get_vector_signature(&lstrings, form_vec);
         insert_hash(tbl, form_sig, sub);
     }
@@ -363,15 +367,12 @@ subst_formal(hash_record_ptr tbl, g_ptr f)
         Split_vector_name(&lstrings, vector_mgr_ptr, range_mgr_ptr, form_str);
     string  form_sig = Get_vector_signature(&lstrings, form_vec);
     fa_subst_ptr bkt = (fa_subst_ptr) find_hash(tbl, form_sig);
-    /* fprintf(stderr, "> subst formal: %s\n", form_str); */
     if(bkt == NULL) {
         /* fprintf(stderr, "found no match!\n"); */
         return NULL;
     }
     if(str_equ(form_str, bkt->formal)) {
         sname_list_ptr m = bkt->actuals;
-        /* fprintf(stderr, "found identical match: "); */
-        /* EMIT_STR_LIST(m); */
         return m;
     }
     vec_list_ptr form_exp =
@@ -385,7 +386,7 @@ subst_formal(hash_record_ptr tbl, g_ptr f)
             DIE("Bad index");
         }
         vec_list_ptr vlp = (vec_list_ptr) new_rec(vector_list_mgr_ptr);
-        vlp->vec  = val;
+	vlp->vec = Copy_vector(vector_mgr_ptr, range_mgr_ptr, val);
         vlp->next = NULL;
         // /
         *tail = vlp;
@@ -408,9 +409,11 @@ subst_fa_list(hash_record_ptr tbl, g_ptr fa_list)
         FOR_CONS(actuals, j, actual) {
             sname_list_ptr names = subst_formal(tbl, actual);
             for(; names != NULL; names = names->next) {
-                APPEND1(as_tail, Make_STRING_leaf(names->name));
+                APPEND1(as_tail,
+			Make_STRING_leaf(wastrsave(&strings, names->name)));
             }
         }
+	as = Merge_Vectors(as, FALSE);
         INC_REFCNT(formal);
         APPEND1(res_tail, Make_PAIR_ND(formal, as));
     }
@@ -529,6 +532,8 @@ get_top_adjacencies(g_ptr p)
 }
 
 // -----------------------------------------------------------------------------
+
+#if 1
 
 #define IS_IN(ix, set)                                                         \
     (find_hash(&(set), (ix)) != NULL)
@@ -662,8 +667,76 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
     return new_pinst;
 }
 
+#else
 g_ptr
-unfold_pexlif(g_ptr p, unint id, string prefix)
+fold_pexlif(g_ptr p, g_ptr ids, string name)
+{
+    g_ptr attrs, fa_inps, fa_outs, ints, cont;
+    string name;
+    bool leaf;
+    if(!is_PINST(p, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
+	DIE("Cannot happen");
+    }
+    g_ptr chs;
+    if( !is_P_HIER(cont, &chs) ) {
+	Fail_pr("fold_pexlif on leaf node");
+	return NULL;
+    }
+    hash_record ids_set;
+    create_hash(&ids_set, 100, int_hash, int_equ);
+    for(; !IS_NIL(ids); ids = M_GET_CONS_TL(ids)) {
+	int id = GET_INT(GET_CONS_HD(ids));
+        insert_check_hash(&ids_set, INT2PTR(id), INT2PTR(1));
+    }
+
+%%%%%%%%%%%%%%%
+
+//// Correct version of fold_pexlif (not terribly efficient).
+//let fold_pexlif p il new_name =
+//    val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER chs)) = p then
+//    let sel (i,sp) = mem i il in
+//    val (sels,rems) = split sel (zip (1 upto (length chs)) chs) in
+//    let selected = map snd sels in
+//    let remain = map snd rems in
+//    let out_producers =
+//        let get_aouts (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd fa_outs in
+//        md_expand_vectors ((map fst fa_inps)@(flatmap get_aouts remain))
+//    in
+//    let out_consumers =
+//        let get_ainps (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd fa_inps in
+//        md_expand_vectors ((map fst fa_outs)@(flatmap get_ainps remain))
+//    in
+//    let in_producers =
+//        let get_aouts (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd fa_outs in
+//        md_expand_vectors (flatmap get_aouts selected)
+//    in
+//    let in_consumers =
+//        let get_ainps (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd fa_inps in
+//        md_expand_vectors (flatmap get_ainps selected)
+//    in
+//    let new_outs = in_producers intersect out_consumers in
+//    let new_inps = in_consumers intersect out_producers in
+//    let new_ints = md_extract_vectors
+//                ((in_producers@in_consumers) subtract (new_outs @ new_inps))
+//    in
+//    let mk_fa l = map (\v. (v,[v])) (md_extract_vectors l) in
+//    let cp = PINST new_name [] F (mk_fa new_inps) (mk_fa new_outs) new_ints
+//                (P_HIER selected)
+//    in
+//    let ints' = md_extract_vectors
+//                    ((out_consumers@out_producers) subtract
+//                     (md_expand_vectors (map fst (fa_inps@fa_outs))))
+//    in
+//    (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER (cp:remain)))
+//;
+
+
+}
+
+#endif
+
+g_ptr
+unfold_pexlif(g_ptr p, unint id)
 {
     new_fold_mem();
     new_adj_mem();
@@ -675,6 +748,21 @@ unfold_pexlif(g_ptr p, unint id, string prefix)
         p, &old_name, &old_attrs, &old_leaf, &old_fa_inps, &old_fa_outs,
         &old_inter, &old_cont
     );
+    new_mgr(&subst_hash_record_mgr, sizeof(hash_record));
+    // Create wirename database to ensure no name capture
+    vector_db_ptr vdp = VDB_create();
+    for(g_ptr l = old_fa_inps; !IS_NIL(l); l = GET_CONS_TL(l)) {
+	string f = GET_STRING(GET_FST(GET_CONS_HD(l)));
+	VDB_Insert_vector(vdp, f);
+    }
+    for(g_ptr l = old_fa_outs; !IS_NIL(l); l = GET_CONS_TL(l)) {
+	string f = GET_STRING(GET_FST(GET_CONS_HD(l)));
+	VDB_Insert_vector(vdp, f);
+    }
+    for(g_ptr l = old_inter; !IS_NIL(l); l = GET_CONS_TL(l)) {
+	string f = GET_STRING(GET_CONS_HD(l));
+	VDB_Insert_vector(vdp, f);
+    }
     is_P_HIER(old_cont, &old_children);
     // Pick out the to-be unfolded child and collect other children.
     unint ix = 1;
@@ -697,7 +785,11 @@ unfold_pexlif(g_ptr p, unint id, string prefix)
         unfolded, &un_name, &un_attrs, &un_leaf, &un_fa_inps, &un_fa_outs,
         &un_inter, &un_cont
     );
-    is_P_HIER(un_cont, &un_children);
+    if( !is_P_HIER(un_cont, &un_children) ) {
+	Fail_pr("Cannot unfold a leaf node");
+	return(NULL);
+    }
+
     // Build formal->actuals subst. for input/output/internals. Note that we can
     // build new list of internals while constructing the inter. subst.
     hash_record sub;
@@ -713,15 +805,25 @@ unfold_pexlif(g_ptr p, unint id, string prefix)
     tstr_ptr ts = new_temp_str_mgr();
     FOR_CONS(un_inter, li, item) {
         string old = GET_STRING(item);
-        string buf = gen_strtemp(ts, prefix);
-        gen_strappend(ts, old);
-        string new = wastrsave(&strings, buf);
+	string new = old;
+	while( VDB_has_name_collision(vdp, new) ) {
+	    int cnt;
+	    if( sscanf(new, "#%d_", &cnt) != 1 ) {
+		new = wastrsave(&strings, gen_tprintf(ts, "#1_%s", old));
+	    } else {
+		string p = old;
+		while( *p && *p != '_' ) p++;
+		new = wastrsave(&strings, gen_tprintf(ts, "#%d%s", cnt+1, p));
+	    }
+	}
+	VDB_Insert_vector(vdp, new);
         g_ptr newg = Make_STRING_leaf(new);
         INC_REFCNT(newg);
         APPEND1(new_inter_tail, newg);
         APPEND1(inter_sub_tail,
                 Make_PAIR_ND(Make_STRING_leaf(old), Make_SINGLETON(newg)));
     }
+    VDB_destroy(vdp);
     free_temp_str_mgr(ts);
     mk_formal_actuals_substitution(&sub, inter_sub);
     APPENDL(new_inter_tail, old_inter);
@@ -755,6 +857,8 @@ unfold_pexlif(g_ptr p, unint id, string prefix)
     // /
     rem_fold_mem();
     rem_adj_mem();
+    dispose_hash(&sub, NULLFCN);
+    free_mgr(&subst_hash_record_mgr);
     return new_pinst;
 }
 
@@ -1382,10 +1486,16 @@ unfold_pexlif_fn(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr g_pex, g_id, g_prefix;
+    g_ptr g_pex, g_id;
     // /
-    EXTRACT_3_ARGS(redex, g_pex, g_id, g_prefix);
-    g_ptr unfold = unfold_pexlif(g_pex, GET_INT(g_id), GET_STRING(g_prefix));
+    EXTRACT_2_ARGS(redex, g_pex, g_id);
+    g_ptr unfold = unfold_pexlif(g_pex, GET_INT(g_id));
+    if( unfold == NULL ) {
+	MAKE_REDEX_FAILURE(redex, FailBuf);
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
     OVERWRITE(redex, unfold);
     // /
     DEC_REF_CNT(l);
@@ -1456,15 +1566,9 @@ Pexlif_Install_Functions()
     );
     Add_ExtAPI_Function(
           "unfold_pexlif"
-        , "111"
+        , "11"
         , FALSE
-        , GLmake_arrow(
-              pexlif_tp
-            , GLmake_arrow(
-                  GLmake_int()
-                , GLmake_arrow(
-                      GLmake_string()
-                    , pexlif_tp)))
+        , GLmake_arrow(pexlif_tp, GLmake_arrow(GLmake_int(), pexlif_tp))
         , unfold_pexlif_fn
     );
 }

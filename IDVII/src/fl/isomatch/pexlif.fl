@@ -37,6 +37,12 @@ let pexlif_get_formals (PINST _ _ _ fa_inps fa_outs _ _) =
 let pexlif_get_children (PINST _ _ _ _ _ _ (P_HIER cs)) = cs
 /\  pexlif_get_children _ = []
 ;
+let pexlif_get_inps_actuals (PINST _ _ _ fa_inps fa_outs _ _) =
+        md_extract_vectors (flatmap snd fa_inps)
+;
+let pexlif_get_outs_actuals (PINST _ _ _ fa_inps fa_outs _ _) =
+        md_extract_vectors (flatmap snd fa_outs)
+;
 
 //------------------------------------------------------------------------------
 
@@ -194,9 +200,7 @@ end_abstype fp_pinst sha_pinst;
 //------------------------------------------------------------------------------
 // ...
 //------------------------------------------------------------------------------
-
-// ...
-let PINST n a l i o t c =
+clet PINST n a l i o t c =
         let is_signature s = (s == "FP") OR (s == "SHA") in
         let a' = filter (NOT # is_signature # fst) a in
         let f  = ("FP",  fp_pinst    i o t c) in
@@ -204,8 +208,11 @@ let PINST n a l i o t c =
         PINST n (f : s : a') l i o t c
 ;
 
+
 //------------------------------------------------------------------------------
 
+// Create a new pexlif in which instances in ids have been collected to
+// a new hiearchy named 'name'.
 // ...
 //  fold_pexlif::PINST->[int]->string->PINST
 let fold_pexlif pex ids name =
@@ -215,10 +222,13 @@ let fold_pexlif pex ids name =
         PINST n a l i o t (P_HIER ((PINST n' a' l' i' o' t' c'):cs))
 ;
 
-// ...
-//  unfold_pexlif::PINST->int->string->PINST
-let unfold_pexlif pex id name =
-        val (PINST n a l i o t (P_HIER cs)) = unfold_pexlif pex id name in
+// Crate a new pexlif in which all the instances inside the instance id
+// are lifted up one level in the hierarchy. All the internal wires
+// inside instance id is given new names (prefix #<number>-).
+//  unfold_pexlif::PINST->int->PINST
+let
+    unfold_pexlif pex id =
+        val (PINST n a l i o t (P_HIER cs)) = unfold_pexlif pex id in
         let lbl (PINST n a l i o t c) = PINST n a l i o t c in
         PINST n a l i o t (P_HIER (map lbl cs))
 ;
@@ -914,3 +924,12 @@ end_abstype decorate_pexlif_hiers;
 
 //------------------------------------------------------------------------------
 // Fin.
+
+let wrap_pexlif p =
+    val (PINST _ _ _ l_fa_inps l_fa_outs _ _) = p in
+    let mk_io fa = map (\v. v, [v]) (md_extract_vectors (flatmap snd fa)) in
+    let fa_inps = mk_io l_fa_inps in
+    let fa_outs = mk_io l_fa_outs in
+    (PINST "wrapper" [] F fa_inps fa_outs [] (P_HIER [p]))
+;
+

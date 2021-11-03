@@ -910,6 +910,9 @@ proc old_bgerror {msg} {
 }
 
 proc report_error {msg} {
+    update
+    make_all_active
+    update
     tk_dialog .err_msg ERROR99 $msg error 0 Ok
 }
 

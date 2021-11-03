@@ -1,7 +1,7 @@
 /*
  *  yosys -- Yosys Open SYnthesis Suite
  *
- *  Copyright (C) 2012  Clifford Wolf <clifford@clifford.at>
+ *  Copyright (C) 2012  Claire Xenia Wolf <claire@yosyshq.com>
  *
  *  Permission to use, copy, modify, and/or distribute this software for any
  *  purpose with or without fee is hereby granted, provided that the above
@@ -211,7 +211,7 @@ struct SpliceWorker
 		std::vector<Wire*> mod_wires = module->wires();
 
 		for (auto wire : mod_wires)
-			if ((!no_outputs && wire->port_output) || (do_wires && wire->name[0] == '\\')) {
+			if ((!no_outputs && wire->port_output) || (do_wires && wire->name.isPublic())) {
 				if (!design->selected(module, wire))
 					continue;
 				RTLIL::SigSpec sig = sigmap(wire);

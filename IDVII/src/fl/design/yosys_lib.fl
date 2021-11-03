@@ -31,7 +31,8 @@ let _ZeroExt sz avs =
 ;
 
 let mk_attr src file lineno =
-    [("fl_src", sprintf "%s:%d" file lineno), ("src", src)]
+    src = "" => [("fl_src", sprintf "%s:%d" file lineno)]
+    | [("fl_src", sprintf "%s:%d" file lineno), ("src", src)]
 ;
 
 let _not sz src out inp =
@@ -897,42 +898,521 @@ let _memwr src width abits mem en addr data =
 	    (P_HIER [phase_del,read,neg,a1,a2,or,wr])
 ;
 
+// Assumes only one write port!!!!!!
+let _memwr_v2 src width abits mem en addr data =
+    let attrs = mk_attr src __FILE__ __LINE__ then
+    let lines = (md_size mem)/width in
+    let mem_info = MEM abits lines width in
+    let bits = lines*width in
+    //
+    let f_DATA = mk_name width "DATA" in
+    let DATA = W_VAR width "DATA" in
+    let f_EN = mk_name width "EN" in
+    let EN = W_VAR width "EN" in
+    let f_ADDR = mk_name abits "ADDR" in
+    let ADDR = W_VAR abits "ADDR" in
+    let MEM = W_VAR bits "MEM" in
+    let f_MEM = mk_name bits "MEM" in
+    // Intermediate signals
+    let OLD = W_VAR bits "OLD" in
+    let f_OLD = mk_name bits "OLD" in
+    let OLD_DATA = W_VAR width "OLD_DATA" in
+    let f_OLD_DATA = mk_name width "OLD_DATA" in
+    let f_NEG_EN = mk_name width "NEG_EN" in
+    let NEG_EN = W_VAR width "NEG_EN" in
+    let f_A1 = mk_name width "A1" in
+    let A1 = W_VAR width "A1" in
+    let f_A2 = mk_name width "A2" in
+    let A2 = W_VAR width "A2" in
+    let NEW_DATA = W_VAR width "NEW_DATA" in
+    let f_NEW_DATA = mk_name width "NEW_DATA" in
+    let phase_del =
+	let lf = P_LEAF [W_PHASE_DELAY OLD MEM] in
+	PINST "draw_delay" [] T [(f_MEM, [f_MEM])] [(f_OLD,[f_OLD])] [] lf
+    in
+    let read =
+	let lf = P_LEAF [W_UPDATE_FN OLD_DATA (W_MEM_READ mem_info OLD ADDR)] in
+        PINST "read" [] T [(f_OLD, [f_OLD]), (f_ADDR,[f_ADDR])]
+                          [(f_OLD_DATA,[f_OLD_DATA])] [] lf
+    in
+    let neg =
+	let lf = P_LEAF [W_UPDATE_FN NEG_EN (W_NOT EN)] in
+	PINST "draw_not" [] T [(f_EN,[f_EN])] [(f_NEG_EN,[f_NEG_EN])] [] lf
+    in
+    let a1 =
+	let lf = P_LEAF [W_UPDATE_FN A1 (W_AND EN DATA)] in
+	PINST "draw_and2" [] T [(f_EN,[f_EN]),(f_DATA,[f_DATA])]
+			       [(f_A1,[f_A1])] [] lf
+    in
+    let a2 =
+	let lf = P_LEAF [W_UPDATE_FN A2 (W_AND NEG_EN OLD_DATA)] in
+	PINST "draw_and2" [] T [(f_NEG_EN,[f_NEG_EN]),(f_OLD_DATA,[f_OLD_DATA])]
+			[(f_A2,[f_A2])] [] lf
+    in
+    let or =
+	let lf = P_LEAF [W_UPDATE_FN NEW_DATA (W_OR A1 A2)] in
+	PINST "draw_or2" [] T [(f_A1,[f_A1]),(f_A2,[f_A2])]
+			[(f_NEW_DATA,[f_NEW_DATA])] [] lf
+    in
+    let wr =
+	let lf =
+	    P_LEAF [W_UPDATE_FN MEM (W_MEM_WRITE mem_info OLD ADDR NEW_DATA)]
+	in
+	PINST "write" [] T
+	    [(f_OLD,[f_OLD]),(f_ADDR,[f_ADDR]),(f_NEW_DATA,[f_NEW_DATA])]
+	    [(f_MEM, [f_MEM])] [] lf
+    in
+    let pfn = sprintf "draw_mem_write %d" lines in
+    PINST pfn attrs T
+	    [(f_DATA,data), (f_EN, en), (f_ADDR,addr)]
+	    [(f_MEM, [mem])]
+	    [f_OLD, f_OLD_DATA, f_NEG_EN, f_A1, f_A2, f_NEW_DATA]
+	    (P_HIER [phase_del,read,neg,a1,a2,or,wr])
+;
 
-// 
-// let _mem attrs wr_ports rd_ports lines width offset abits conns =
-//     let attrs = mk_attr src __FILE__ __LINE__ then
-//     wr_ports != 1 => eprintf "_mem with >= 1 write ports(%d)" wr_ports |
-//     rd_ports != 1 => eprintf "_mem with >= 1 read ports(%d)" rd_ports |
-//     let mem_info = MEM abits lines width in
-//     let mk_name base sz = sz = 1 => base | sprintf "%s[%d:0]" base (sz-1) in
-//     let base = assoc "instance" attrs in
-//     let MEM = W_VAR (lines*width) base in
-//     let f_RD_ADDR = mk_name "RD_ADDR" abits then
-//     let f_RD_CLK  = mk_name "RD_CLK" 1 in
-//     let f_RD_DATA = mk_name "RD_DATA" width then
-//     let f_RD_EN   = mk_name "RD_EN" lines then
-//     let f_WR_ADDR = mk_name "WR_ADDR" abits then
-//     let f_WR_CLK  = mk_name "WR_CLK" 1 in
-//     let f_WR_DATA = mk_name "WR_DATA" width then
-//     let f_WR_EN   = mk_name "WR_EN" lines then
-//     let conn f = let a = assoc f conns in (f,a) in
-//     let fa_inps =
-//         map conn [f_RD_ADDR, f_RD_CLK, f_RD_EN,
-//                   f_WR_ADDR, f_WR_CLK, f_WR_DATA, f_WR_EN]
-//     in
-//     let fa_outs = map conn [f_RD_DATA] in
-//     let a_MEM     = sprintf "%s[%d:0][%d:0]" base (lines-1) (width-1) in
-//     let ints = [a_MEM] in
-// 
-//     let f_MEM     = mk_name "mem" (lines*width) in
-//     let p_mem =
-//         PINST "simple_mem" [] T
-// 
-// new_mem <- W_MEM_WRITE info mem waddr data
-// dout <- W_MEM_READ info mem raddr
-// mem <: new_mem
-//     let leaf =
-//     PINST "mem" attrs F fa_inps fa_outs ints leaves
-// 
 
 
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+begin_abstype;
+
+
+let mk_vec sz name = (mk_name sz name, W_VAR sz name);
+
+let mk_mem mem_info name =
+    val (MEM abits lines width) = mem_info in
+    let bits = lines*width in
+    let f = sprintf "%s[%d:0][%d:0]" name (lines-1) (width-1) in
+    let w = W_EXPLICIT_VAR bits f in
+    (f,w)
+;
+
+let prim_mem_read mem_info mem addr data =
+    val (MEM abits lines width) = mem_info in
+    let attrs = mk_attr "" __FILE__ __LINE__ then
+    // Inputs
+    val (f_data, DATA) = mk_vec width "DATA" in
+    val (f_addr, ADDR) = mk_vec abits "DATA" in
+    val (f_M, M)   = mk_mem mem_info "MEM" in
+    let leaf = DATA <- (W_MEM_READ mem_info M ADDR) in
+    let pfn = sprintf "draw_mem_read %d" lines in
+    PINST pfn attrs T [(f_addr,addr), (f_M,[mem])] [(f_data,data)] []
+                    (P_HIER [leaf])
+;
+
+let prim_mem_write mem_info clk_enable clk_polarity
+		   w_clk old_mem w_addr w_din w_en new_mem masked_wdata
+    =
+    val (MEM abits lines width) = mem_info in
+    let attrs = mk_attr "" __FILE__ __LINE__ then
+    // Inputs
+    val (f_M, M) = mk_mem mem_info "M" in
+    val (f_ADDR, ADDR) = mk_vec abits "ADDR" in
+    val (f_DATA, DATA) = mk_vec width "DATA" in
+    val (f_EN, EN) = mk_vec width "EN" in
+    val (f_CLK, CLK) = mk_vec 1 "CLK" in
+    val (f_OCLK, OCLK) = mk_vec 1 "OCLK" in
+    // Output
+    val (f_M_OUT, M_OUT) = mk_mem mem_info "M_OUT" in
+    val (f_MASKED_WDATA, MASKED_WDATA) = mk_vec width "MASKED_WDATA" in
+    // Internal
+    val (f_ACTIVE, ACTIVE) = mk_vec 1 "ACTIVE" in
+    val (f_OLD, OLD) = mk_vec width "OLD" in
+    val (f_INV_EN, INV_EN) = mk_vec width "INV_EN" in
+    val (f_A1, A1) = mk_vec width "A1" in
+    val (f_A2, A2) = mk_vec width "A2" in
+    val (f_TMP, TMP) = mk_mem mem_info "TMP" in
+    let leaves = [
+	OCLK <: CLK,
+	ACTIVE  <- (clk_enable = "0" => W_CONST 1 1 |
+		    clk_polarity = "1" => '~' OCLK '&' CLK |
+					 OCLK '&' '~' CLK),
+        OLD     <- (W_MEM_READ mem_info M ADDR),
+        INV_EN  <- '~' EN,
+        A1      <- INV_EN '&' OLD,
+        A2      <-  EN '&' DATA,
+        MASKED_WDATA <-  A1 '|' A2,
+        TMP     <-  (W_MEM_WRITE mem_info M ADDR DATA),
+        M_OUT <- (IF ACTIVE THEN TMP ELSE M)
+    ] in
+    // Toplevel interfaces
+    let fa_inps = [(f_M, old_mem), (f_ADDR, w_addr), (f_DATA, w_din), 
+		   (f_EN, w_en), (f_CLK, w_clk)]
+    in
+    let fa_outs = [(f_M_OUT, new_mem), (f_MASKED_WDATA, masked_wdata)] in
+    let ints    = [f_OLD,f_INV_EN,f_A1,f_A2,f_TMP,f_ACTIVE,f_OCLK] in
+    let pfn     = "draw_hier prim_mem_write" in
+    PINST pfn attrs F fa_inps fa_outs ints (P_HIER leaves)
+;
+
+let prim_rw_bypass // Parameters
+		   mem_info wr_clk_enable wr_clk_polarity
+		   rd_transparency_mask rd_collision_x_mask
+		   // Signals
+		   inp r_addr wr_clk w_addr w_din out
+    =
+    val (MEM abits lines width) = mem_info in
+    let attrs = mk_attr "" __FILE__ __LINE__ then
+    // Inputs
+    val (f_INP, INP) = mk_vec width "INP" in
+    val (f_CLK, CLK) = mk_vec 1 "CLK" in
+    val (f_RD_ADDR, RD_ADDR) = mk_vec abits "RD_ADDR" in
+    val (f_WR_ADDR, WR_ADDR) = mk_vec abits "WR_ADDR" in
+    val (f_WR_DIN, WR_DIN) = mk_vec width "WR_DIN" in
+    // Output
+    val (f_OUT, OUT) = mk_vec width "OUT" in
+    // Internal
+    val (f_M1, M1) = mk_vec width "M1" in
+    val (f_M2, M2) = mk_vec width "M2" in
+    val (f_ACTIVE,ACTIVE) = mk_vec 1 "ACTIVE" in
+    val (f_CTRL, CTRL) = mk_vec 1 "CTRL" in
+    val (f_OCLK, OCLK) = mk_vec 1 "OCLK" in
+    //
+    let not_trans = rd_transparency_mask = "0" in
+    let not_coll  = rd_collision_x_mask = "0" in
+    let leaves = not_trans AND not_coll => [OUT <- INP] | [
+		M1     <- (not_trans => INP  | WR_DIN),
+		M2     <- (not_coll => M1 | (W_X width)),
+		OUT    <- (IF CTRL THEN M2 ELSE INP),
+		OCLK   <: CLK,
+		ACTIVE <- (wr_clk_enable = "0"   => W_CONST 1 1 |
+			   wr_clk_polarity = "1" => '~' OCLK '&' CLK |
+						    OCLK '&' '~' CLK),
+		CTRL   <- ACTIVE '&' (RD_ADDR '=' WR_ADDR)
+	    ]
+    in
+    // Toplevel interfaces
+    let fa_inps = [(f_INP,[inp]), (f_RD_ADDR, [r_addr]), (f_CLK, [wr_clk]),
+		   (f_WR_ADDR, [w_addr]), (f_WR_DIN, [w_din])]
+    in
+    let fa_outs = [(f_OUT, [out])] in
+    let ints    = [f_M1, f_M2, f_CTRL, f_OCLK, f_ACTIVE] in
+    let pfn     = "draw_hier prim_rw_bypass" in
+    PINST pfn attrs F fa_inps fa_outs ints (P_HIER leaves)
+;
+
+lettype sval_mode = INIT | XS int | BINS (string list);
+
+let sval2wexpr s =
+    let s = str_is_prefix "0b" s => substr s 3 (-1) | s in
+    letrec cnv INIT ("x": vs) = cnv (XS 1) vs
+     /\    cnv INIT (v:vs) = cnv (BINS [v]) vs
+     /\    cnv INIT [] = []
+     /\    cnv (XS cnt) ("x":vs) = cnv (XS (cnt+1)) vs
+     /\    cnv (XS cnt) (v:vs) =
+	(W_X cnt):(cnv (BINS [v]) vs)
+     /\    cnv (XS cnt) [] = [(W_X cnt)]
+     /\    cnv (BINS ds) ("x":vs) =
+	(W_CONST (length ds) (sscanf "%b" (implode (rev ds)))):(cnv (XS 1) vs)
+     /\    cnv (BINS ds) (v:vs) =
+	    cnv (BINS (v:ds)) vs
+     /\    cnv  (BINS ds) [] =
+	[(W_CONST (length ds) (sscanf "%b" (implode (rev ds))))]
+    in
+    let res = cnv INIT (explode s) in
+    length res = 1 => hd res |
+    W_CAT res
+;
+
+let prim_mem_rd_port
+		    // Parameters
+		    mem_info rd_clk_enable rd_clk_polarity
+		    rd_arst_value rd_srst_value
+		    rd_ce_over_srst
+		    wr_clk_enables wr_clk_polarities
+		    rd_transparency_masks rd_collision_x_masks
+		    // Signals
+		    old_M new_M
+		    arst srst
+		    rd_clk rd_en rd_addr
+		    wr_ports
+		    dout
+    =
+    val (MEM abits lines width) = mem_info in
+    let attrs = mk_attr "" __FILE__ __LINE__ then
+    // Inputs
+    val (f_OLD_M, OLD_M)     = mk_mem mem_info "OLD_M" in
+    val (f_NEW_M, NEW_M)     = mk_mem mem_info "NEW_M" in
+    val (f_ARST, ARST)       = mk_vec 1 "ARST" in
+    val (f_SRST, SRST)       = mk_vec 1 "SRST" in
+    val (f_RD_CLK, RD_CLK)   = mk_vec 1 "RD_CLK" in
+    val (f_RD_EN, RD_EN)     = mk_vec 1 "RD_EN" in
+    val (f_RD_ADDR, RD_ADDR) = mk_vec abits "RD_ADDR" in
+    // Outputs
+    val (f_DOUT, DOUT)       = mk_vec width "DOUT" in
+    // Internal
+    val (f_O_RD_CLK, O_RD_CLK) = mk_vec 1 "O_RD_CLK" in
+    val (f_ACTIVE, ACTIVE) = mk_vec 1 "ACTIVE" in
+    val (f_C1, C1) = mk_vec 1 "C1" in
+    val (f_C2, C2) = mk_vec 1 "C2" in
+    val (f_C3, C3) = mk_vec 1 "C3" in
+    val (f_C4, C4) = mk_vec 1 "C4" in
+    val (f_M1, M1) = mk_vec width "M1" in
+    val (f_M2, M2) = mk_vec width "M2" in
+    val (f_M3, M3) = mk_vec width "M3" in
+    val (f_M4, M4) = mk_vec width "M4" in
+    val (f_M5, M5) = mk_vec width "M5" in
+    val (f_OTMP, OTMP)       = mk_vec width "OTMP" in
+    val (f_NRES, NRES) = mk_vec width "NRES" in
+    val (f_ORES, ORES) = mk_vec width "ORES" in
+    //
+    let NOT_CE_OVER_SRST = W_CONST 1 ((rd_ce_over_srst = "1") => 0 | 1) in
+    let CLK_ENABLE = W_CONST 1 ((rd_clk_enable = "1") => 1 | 0) in
+    let common_leaves = [
+	O_RD_CLK   <: RD_CLK,
+	ACTIVE <- (rd_clk_enable = "0"   => W_CONST 1 1 |
+		   rd_clk_polarity = "1" => '~' O_RD_CLK '&' RD_CLK |
+					    O_RD_CLK '&' '~' RD_CLK),
+	C1   <- ARST,
+	C2   <- SRST '&' ACTIVE '&' (RD_EN '|' NOT_CE_OVER_SRST),
+	C3   <- CLK_ENABLE,
+	C4   <- CLK_ENABLE '&' RD_EN '&' ACTIVE,
+	OTMP <: M1,
+	DOUT <- OTMP,
+        M1   <- (IF C1 THEN (sval2wexpr rd_arst_value) ELSE M2),
+        M2   <- (IF C2 THEN (sval2wexpr rd_srst_value) ELSE M3),
+        M3   <- (IF C3 THEN M4 ELSE NRES),
+        M4   <- (IF C4 THEN M5 ELSE ORES),
+        NRES <- (W_MEM_READ mem_info NEW_M RD_ADDR),
+        ORES <- (W_MEM_READ mem_info OLD_M RD_ADDR)
+    ] in
+    let wr_clk_enable_l        = explode wr_clk_enables in
+    let wr_clk_polarity_l      = explode wr_clk_polarities in
+    let rd_transparency_mask_l = explode rd_transparency_masks in
+    let rd_collision_x_mask_l  = explode rd_collision_x_masks in
+    let wparams = wr_ports = [] => [] |
+		  zip4 wr_clk_enable_l
+		       wr_clk_polarity_l
+		       rd_transparency_mask_l
+		       rd_collision_x_mask_l
+    in
+    letrec mk_bypass (wsig:wsigs) (wparam:wparams) (out,OUT) =
+	val (wclk,waddr,wdin) = wsig in
+	val (clk_enable, clk_polarity, trans_mask, coll_x_mask) = wparam in
+        val (cur,CUR) = mk_vec width (sprintf "bp_%d" (length wsigs)) in
+	val (ps, ints) = mk_bypass wsigs wparams (cur,CUR) in
+	let p = prim_rw_bypass mem_info
+			       clk_enable clk_polarity
+			       trans_mask coll_x_mask
+			       cur rd_addr wclk waddr wdin out
+	in
+	let ps' = p:ps in
+	let ints' = cur:ints in
+	(ps',ints')
+     /\   mk_bypass [] [] (out,OUT) = [OUT <- ORES], []
+    in
+    val (bypass_leaves, bypass_ints) = mk_bypass wr_ports wparams (f_M5,M5) in
+    let leaves = common_leaves @ bypass_leaves in
+    //
+    let wr_inps_fa =
+	let get_ports (wclk,waddr,wdin) = 
+	    [(wclk,[wclk]), (waddr,[waddr]), (wdin,[wdin])]
+	in
+	flatmap get_ports wr_ports
+    in
+    let fa_inps = [(f_OLD_M, [old_M]), (f_NEW_M, [new_M]),
+		   (f_ARST, [arst]), (f_SRST, [srst]),
+		   (f_RD_CLK, [rd_clk]), (f_RD_EN, [rd_en]),
+		   (f_RD_ADDR, [rd_addr])] @ wr_inps_fa
+    in
+    let fa_outs = [(f_DOUT, [dout])] in
+    let ints    = [f_O_RD_CLK, f_ACTIVE, f_C1, f_C2, f_C3, f_C4, f_OTMP,
+		   f_M1, f_M2, f_M3, f_M4, f_M5, f_NRES, f_ORES]@bypass_ints
+    in
+    let pfn     = "draw_hier prim_mem_rd_port" in
+    PINST pfn attrs F fa_inps fa_outs ints (P_HIER leaves)
+;
+
+let mk_mem_name mem_info base =
+    val (MEM abits lines width) = mem_info in
+    sprintf "%s[%d:0][%d:0]" base (lines-1) (width-1)
+;
+
+let mk_write_ports mem_info wsigs wparams out =
+    val (MEM abits lines width) = mem_info in
+    letrec mk_wport (wsig:wsigs) (wparam:wparams) out =
+	val (w_clk,w_en,w_addr,w_din) = wsig in
+	val (clk_enable, clk_polarity) = wparam in
+	let cur = mk_mem_name mem_info (sprintf "mid_%d" (length wsigs)) in
+	let m_wdata = mk_name width (sprintf "mwd_%d" (length wsigs)) in
+	val (ps, ints, mwds) = mk_wport wsigs wparams [cur] in
+	let p = prim_mem_write mem_info clk_enable clk_polarity
+			       [w_clk] [cur] [w_addr] [w_din] [w_en]
+			       out [m_wdata]
+	in
+	let ps' = p:ps in
+	let ints' = cur:ints in
+	let mwds' = m_wdata:mwds in
+	(ps',ints', mwds')
+     /\   mk_wport [] [] out = [], [], []
+    in
+    mk_wport wsigs wparams [out]
+;
+
+let splitn sz s = map implode (cluster sz (butfirstn 2 (explode s)));
+let splitv sz n =
+    let merge l = hd (md_merge_vectors l) in
+    map merge (cluster sz (md_expand_vector n))
+;
+
+let _mem_v2 src mem wr_ports rd_ports lines width abits params
+	    rd_clk rd_en rd_arst rd_srst rd_addr rd_data
+	    wr_clk wr_en wr_addr wr_data
+	    init
+    =
+    (wr_ports == 0 OR (init = []) => () |
+	    printf "WANRING: Initial values only supported for ROMs. Ignored")
+    fseq
+    let attrs = mk_attr src __FILE__ __LINE__ in
+    let mem_info = MEM abits lines width in
+    //
+    //
+    let get_param key = (assoc key params) catch "" in
+    let RD_CLK_ENABLE        = get_param "RD_CLK_ENABLE" then
+    let RD_CLK_POLARITY      = get_param "RD_CLK_POLARITY" then
+    let RD_TRANSPARENCY_MASK = get_param "RD_TRANSPARENCY_MASK" then
+    let RD_COLLISION_X_MASK  = get_param "RD_COLLISION_X_MASK" then
+    let RD_CE_OVER_SRST      = get_param "RD_CE_OVER_SRST" then
+    let RD_INIT_VALUE        = get_param "RD_INIT_VALUE" then
+    let RD_ARST_VALUE        = get_param "RD_ARST_VALUE" then
+    let RD_SRST_VALUE        = get_param "RD_SRST_VALUE" then
+    let WR_CLK_ENABLE        = get_param "WR_CLK_ENABLE" then
+    let WR_CLK_POLARITY      = get_param "WR_CLK_POLARITY" then
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // WHAT TO DO WITH THESE?????
+    let WR_WIDE_CONTINUATION = get_param "WR_WIDE_CONTINUATION" then
+    let WR_PRIORITY_MASK     = get_param "WR_PRIORITY_MASK" then
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    //
+    let f_RD_CLK  = mk_name rd_ports "RD_CLK" in
+    let f_RD_EN   = mk_name rd_ports "RD_EN" in
+    let f_RD_ARST = mk_name rd_ports "RD_ARST" in
+    let f_RD_SRST = mk_name rd_ports "RD_SRST" in
+    let f_RD_ADDR = mk_name (rd_ports * abits) "RD_ADDR" in
+    let f_RD_DATA = mk_name (rd_ports * width) "RD_DATA" in
+    let f_WR_CLK  = mk_name wr_ports "WR_CLK" in
+    let f_WR_EN   = mk_name (wr_ports*width) "WR_EN" in
+    let f_WR_ADDR = mk_name (wr_ports*abits) "WR_ADDR" in
+    let f_WR_DATA = mk_name (wr_ports*width) "WR_DATA" in
+    let fa_inps   = [
+		    (f_RD_CLK, rd_clk),
+		    (f_RD_EN, rd_en),
+		    (f_RD_ARST, rd_arst),
+		    (f_RD_SRST, rd_srst),
+		    (f_RD_ADDR, rd_addr)
+		    ] @
+		    (wr_ports = 0 => [] |
+		    [
+		    (f_WR_CLK, wr_clk),
+		    (f_WR_EN, wr_en),
+		    (f_WR_ADDR, wr_addr),
+		    (f_WR_DATA, wr_data) ])
+    in
+    let fa_outs = [(f_RD_DATA, rd_data)] in
+    val (f_OLD_MEM,OLD_MEM) = mk_mem mem_info mem in
+    val (f_NEW_MEM,NEW_MEM) = mk_mem mem_info ("new_"^mem) in
+    // Writing part
+    val (write_pexlifs, write_internals, masked_wdatas) =
+	wr_ports = 0 =>
+	    // ROM
+	    let pfn = sprintf "draw_hier ROM" in
+	    let mk_asignment row v =
+		let LHS =
+		    let name = sprintf "new_%s[%d][%d:0]" mem row (width-1) in
+		    W_EXPLICIT_VAR width name
+		in
+		let RHS = W_CONST width (sscanf "%b" v) in
+		base_assignment T LHS RHS
+	    in
+	    let leaves = map2 mk_asignment (0 upto (length init -1 )) init in
+	    let ints = [] in
+	    let fa_inps = [] in
+	    let fa_outs = [(f_NEW_MEM, [f_NEW_MEM])] in
+	    ([PINST pfn attrs F fa_inps fa_outs ints (P_HIER leaves)], [], [])
+	|
+	    // RAM
+	    let wports =
+		let w_clks = splitv 1 f_WR_CLK in
+		let w_ens  = splitv width f_WR_EN in
+		let w_addrs = splitv abits f_WR_ADDR in
+		let w_dins = splitv width f_WR_DATA in
+		zip4 w_clks w_ens w_addrs w_dins
+	    in
+	    let wparams =
+		let clk_enables = splitn 1 WR_CLK_ENABLE in
+		let clk_polarities = splitn 1 WR_CLK_POLARITY in
+		zip clk_enables clk_polarities
+	    in
+	    mk_write_ports mem_info wports wparams f_NEW_MEM
+    in
+    // Memory storage part
+    let mem_pexlifs = [OLD_MEM <: NEW_MEM] in
+    // Read ports
+    let read_pexlifs =
+	let wrports =
+	    wr_ports = 0 => [] |
+	    let w_clks = splitv 1 f_WR_CLK in
+	    let w_addrs = splitv abits f_WR_ADDR in
+	    let w_dins = masked_wdatas in
+	    zip3 w_clks w_addrs w_dins
+	in
+	// Parameters
+	let rd_clk_enable_l        = splitn 1 RD_CLK_ENABLE in
+	let rd_clk_polarity_l      = splitn 1 RD_CLK_POLARITY in
+	let rd_arst_value_l        = splitn width RD_ARST_VALUE in
+	let rd_srst_value_l        = splitn width RD_SRST_VALUE in
+	let rd_ce_over_srst_l      = splitn 1 RD_CE_OVER_SRST in
+	let wr_clk_enable_l        = splitn 1 WR_CLK_ENABLE in
+	let wr_clk_polarity_l      = splitn 1 WR_CLK_POLARITY in
+	let rd_transparency_mask_l = splitn wr_ports RD_TRANSPARENCY_MASK in
+	let rd_collision_x_mask_l  = splitn wr_ports RD_COLLISION_X_MASK in
+	// Signals
+	let rd_clk_l  = splitv 1 f_RD_CLK in
+	let rd_en_l   = splitv 1 f_RD_EN in
+	let arst_l    = splitv 1 f_RD_ARST in
+	let srst_l    = splitv 1 f_RD_SRST in
+	let rd_addr_l = splitv abits f_RD_ADDR in
+	let dout_l    = splitv width f_RD_DATA in
+	//
+	let mk_rd_port idx =
+		// Parameters for this read port
+		let rd_clk_enable = el idx rd_clk_enable_l in
+		let rd_clk_polarity = el idx rd_clk_polarity_l in
+		let rd_arst_value = el idx rd_arst_value_l in
+		let rd_srst_value = el idx rd_srst_value_l in
+		let rd_ce_over_srst = el idx rd_ce_over_srst_l in
+		let wr_clk_enables = el idx wr_clk_enable_l in
+		let wr_clk_polarity = el idx wr_clk_polarity_l in
+		let rd_transparency_masks = el idx rd_transparency_mask_l in
+		let rd_collision_x_masks = el idx rd_collision_x_mask_l in
+		// Signals for this read port
+		let arst = el idx arst_l in
+		let srst = el idx srst_l in
+		let rd_clk = el idx rd_clk_l in
+		let rd_en = el idx rd_en_l in
+		let rd_addr = el idx rd_addr_l in
+		let dout = el idx dout_l in
+		// Instantiate readport module
+		prim_mem_rd_port mem_info
+			    rd_clk_enable rd_clk_polarity
+			    rd_arst_value rd_srst_value
+			    rd_ce_over_srst
+			    wr_clk_enables wr_clk_polarity
+			    rd_transparency_masks rd_collision_x_masks
+			    // Signals
+			    f_OLD_MEM f_NEW_MEM
+			    arst srst
+			    rd_clk rd_en rd_addr
+			    wrports
+			    dout
+	in
+	map mk_rd_port (1 upto rd_ports)
+    in
+    //
+    let leaves = write_pexlifs @ mem_pexlifs @ read_pexlifs in
+    let ints = f_OLD_MEM:f_NEW_MEM:(write_internals@masked_wdatas) in
+    let pfn = sprintf "draw_hier _mem_v2" in
+    PINST pfn attrs F fa_inps fa_outs ints (P_HIER leaves)
+;
+
+end_abstype  _mem_v2;

@@ -1,7 +1,7 @@
 /*
  *  yosys -- Yosys Open SYnthesis Suite
  *
- *  Copyright (C) 2012  Clifford Wolf <clifford@clifford.at>
+ *  Copyright (C) 2012  Claire Xenia Wolf <claire@yosyshq.com>
  *
  *  Permission to use, copy, modify, and/or distribute this software for any
  *  purpose with or without fee is hereby granted, provided that the above
@@ -59,7 +59,7 @@ struct IntersynthBackend : public Backend {
 		log("        do not generate celltypes and conntypes commands. i.e. just output\n");
 		log("        the netlists. this is used for postsilicon synthesis.\n");
 		log("\n");
-		log("    -lib <verilog_or_ilang_file>\n");
+		log("    -lib <verilog_or_rtlil_file>\n");
 		log("        Use the specified library file for determining whether cell ports are\n");
 		log("        inputs or outputs. This option can be used multiple times to specify\n");
 		log("        more than one library.\n");
@@ -68,7 +68,7 @@ struct IntersynthBackend : public Backend {
 		log("        only write selected modules. modules must be selected entirely or\n");
 		log("        not at all.\n");
 		log("\n");
-		log("http://www.clifford.at/intersynth/\n");
+		log("http://bygone.clairexen.net/intersynth/\n");
 		log("\n");
 	}
 	void execute(std::ostream *&f, std::string filename, std::vector<std::string> args, RTLIL::Design *design) override
@@ -108,7 +108,7 @@ struct IntersynthBackend : public Backend {
 			if (f.fail())
 				log_error("Can't open lib file `%s'.\n", filename.c_str());
 			RTLIL::Design *lib = new RTLIL::Design;
-			Frontend::frontend_call(lib, &f, filename, (filename.size() > 3 && filename.compare(filename.size()-3, std::string::npos, ".il") == 0 ? "ilang" : "verilog"));
+			Frontend::frontend_call(lib, &f, filename, (filename.size() > 3 && filename.compare(filename.size()-3, std::string::npos, ".il") == 0 ? "rtlil" : "verilog"));
 			libs.push_back(lib);
 		}
 

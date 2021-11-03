@@ -38,6 +38,8 @@ static rec_mgr      *vec_list_rec_mgrp;
 static rec_mgr	    merge_list_rec_mgr;
 static rec_mgr	    *merge_list_rec_mgrp;
 
+static rec_mgr	    vector_db_rec_mgr;
+
 /* ----- Forward definitions local functions ----- */
 static void           begin_vector_ops();
 static void           end_vector_ops();
@@ -88,6 +90,7 @@ Strings_Init()
     // Initialization code
     s_TXT = Mk_constructor_name("TXT");
     s_RANGES = Mk_constructor_name("RANGES");
+    new_mgr(&vector_db_rec_mgr, sizeof(vector_db_rec));
 }
 
 vec_ptr
@@ -246,13 +249,15 @@ Merge_Vectors_gen(rec_mgr *vec_list_mgr, vec_list_ptr vecs)
     free_buf(&vec_buf);
     // /
     vec_list_ptr res = NULL, *tail = &res;
-    for(; mlp != NULL; mlp = mlp->next) {
+    merge_list_ptr start = mlp;
+    do {
         vec_list_ptr vlp = (vec_list_ptr) new_rec(vec_list_mgr);
         vlp->vec  = mlp->vec;
         vlp->next = NULL;
         *tail = vlp;
         tail = &vlp->next;
-    }
+	mlp = mlp->next;
+    } while( mlp != start );
     // /
     end_vector_ops();
     return res;
@@ -285,7 +290,10 @@ Check_vector_overlap(vec_ptr v1, vec_ptr v2)
         if(v1->type == TXT && v1->u.name != v2->u.name) {
             return FALSE;
         }
-        if(v1->type == INDEX && !Check_range_overlap(v1->u.ranges, v2->u.ranges)) {
+        if( v1->type == INDEX
+	   &&
+	    !Check_range_overlap(v1->u.ranges, v2->u.ranges))
+	{
             return FALSE;
         }
         v1 = v1->next;
@@ -319,7 +327,7 @@ Show_vectors(rec_mgr *sname_list_mgrp, vec_list_ptr vecs, bool non_contig_vecs)
     /* } else { */
     /*     fprintf(stderr, "Show_vectors for "); */
     /*     for(vec_list_ptr vls = vecs; vls != NULL; vls = vls->next) { */
-    /*         EMIT_VEC(vls->vec); */
+    /*         DBG_PRINT_VEC(vls->vec); */
     /*     } */
     /* } */
     // /
@@ -332,7 +340,7 @@ Show_vectors(rec_mgr *sname_list_mgrp, vec_list_ptr vecs, bool non_contig_vecs)
     }
     free_temp_str_mgr(tstrings);
     /* fprintf(stderr, " => "); */
-    /* EMIT_STR_LIST(names); */
+    /* DBG_PRINT_STR_LIST(names); */
     return names;
 }
 
@@ -343,8 +351,8 @@ range_hash(pointer k, unint n)
 {
     unint hash = 1;
     for(range_ptr r = (range_ptr) k; r != NULL; r = r->next) {
-        hash += ((hash << 5) - hash) + int_hash(&r->upper, n);
-        hash += ((hash << 5) - hash) + int_hash(&r->lower, n);
+        hash += ((hash << 5) - hash) + (r->upper % n);
+        hash += ((hash << 5) - hash) + (r->lower % n);
     }
     return (hash % n);
 }
@@ -368,6 +376,12 @@ range_cmp(pointer k1, pointer k2)
             return -1;
         }
         if(r1->upper > r2->upper) {
+            return 1;
+        }
+        if(r1->lower < r2->lower) {
+            return -1;
+        }
+        if(r1->lower > r2->lower) {
             return 1;
         }
         r1 = r1->next;
@@ -398,47 +412,33 @@ vec_hash(pointer k, unint n)
     return (hash % n);
 }
 
-int
-vec_cmp(pointer k1, pointer k2)
-{
-    vec_ptr v1 = (vec_ptr) k1;
-    vec_ptr v2 = (vec_ptr) k2;
-    while(TRUE) {
-        if(v1 == v2) {
-            return 0;
-        }
-        if(v1 == NULL) {
-            return -1;
-        } 
-        if(v2 == NULL) {
-            return 1;
-        }
-        if(v1->type == TXT) {
-            if(v2->type == TXT) {
-                if(v1->u.name == v2->u.name) {
-                    return 0;
-                }
-                return strcmp(v1->u.name, v2->u.name);
-            } else {
-                return 1;
-            }
-        }
-        if(v2->type == TXT) {
-            return -1;
-        }
-        int cmp = range_cmp(v1->u.ranges, v2->u.ranges);
-        if(cmp != 0) {
-            return cmp;
-        }
-        v1 = v1->next;
-        v2 = v2->next;
-    }
-}
-
 bool
 vec_equ(pointer k1, pointer k2)
 {
-    return vec_cmp(k1, k2) == 0;
+    vec_ptr v1 = (vec_ptr) k1;
+    vec_ptr v2 = (vec_ptr) k2;
+    while(1) {
+	if( v1 == v2 ) return( TRUE );
+	if( v1 == NULL ) return( FALSE );
+	if( v2 == NULL ) return( FALSE );
+	if( v1->type != v2->type ) return( FALSE );
+	if( v1->type == TXT ) {
+	    if( !STREQ(v1->u.name, v2->u.name) ) return( FALSE );
+	} else {
+	    range_ptr r1 = v1->u.ranges;
+	    range_ptr r2 = v2->u.ranges;
+	    while( r1 != NULL ) {
+		if( r2 == NULL ) return(FALSE);
+		if( r1->upper != r2->upper ) return(FALSE);
+		if( r1->lower != r2->lower ) return(FALSE);
+		r1 = r1->next;
+		r2 = r2->next;
+	    }
+	    if( r2 != NULL ) return( FALSE );
+	}
+	v1 = v1->next;
+	v2 = v2->next;
+    }
 }
 
 /********************************************************/
@@ -1428,7 +1428,6 @@ same_range(range_ptr r1, range_ptr r2)
     }
 }
 
-// todo: This one is different from vec_cmp, but why?
 static int
 vec_name_cmp(vec_ptr v1, vec_ptr v2)
 {
@@ -1446,7 +1445,9 @@ vec_name_cmp(vec_ptr v1, vec_ptr v2)
             if(v1->u.name == v2->u.name) {
                 return vec_name_cmp(v1->next, v2->next);
             }
-            return strcmp(v1->u.name, v2->u.name);
+	   int res =  strcmp(v1->u.name, v2->u.name);
+	    if( res != 0 ) { return res; }
+	    return vec_name_cmp(v1->next, v2->next);
         } else {
             // v2->type == INDEX
             return 1;
@@ -1474,7 +1475,6 @@ nn_cmp(const void *pi, const void *pj)
 {
     vec_ptr vi = *((vec_ptr *) pi);
     vec_ptr vj = *((vec_ptr *) pj);
-    //return vec_cmp(vi, vj);
     return( vec_name_cmp(vi, vj) );
 }
 
@@ -1841,3 +1841,157 @@ show_merge_list(rec_mgr *sname_list_mgrp, tstr_ptr tstrings, merge_list_ptr mlp,
     }
     return res;
 }
+
+// =================================================
+
+vector_db_ptr
+VDB_create()
+{
+    vector_db_ptr vdbp = (vector_db_ptr) new_rec(&vector_db_rec_mgr);
+    new_ustrmgr(&(vdbp->ustring_mgr));
+    create_hash(&(vdbp->sig2vec_list), 100, str_hash, str_equ);
+    new_mgr(&(vdbp->vec_rec_mgr), sizeof(vec_rec));
+    new_mgr(&(vdbp->range_rec_mgr), sizeof(range_rec));
+    new_mgr(&(vdbp->vec_list_rec_mgr), sizeof(vec_list_rec));
+    return vdbp;
+}
+
+void
+VDB_destroy(vector_db_ptr vdbp)
+{
+    free_ustrmgr(&(vdbp->ustring_mgr));
+    dispose_hash(&(vdbp->sig2vec_list), NULLFCN);
+    free_mgr(&(vdbp->vec_rec_mgr));
+    free_mgr(&(vdbp->range_rec_mgr));
+    free_mgr(&(vdbp->vec_list_rec_mgr));
+    free_rec(&vector_db_rec_mgr, vdbp);
+}
+
+
+void
+VDB_Insert_vector(vector_db_ptr vdbp, string vec)
+{
+    // Store the current active record managers
+    ustr_mgr *tmp_lstringsp = lstringsp;
+    rec_mgr *tmp_vec_rec_mgrp = vec_rec_mgrp;
+    rec_mgr *tmp_range_rec_mgrp = range_rec_mgrp;
+    // Change to the new managers
+    lstringsp = &(vdbp->ustring_mgr);
+    vec_rec_mgrp = &(vdbp->vec_rec_mgr);
+    range_rec_mgrp = &(vdbp->range_rec_mgr);
+    // Perform all the operations
+    vec_ptr vp = split_name(vec);
+    string key = mk_name_signature(vp);
+    vec_list_ptr cur_vlp = (vec_list_ptr) find_hash(&(vdbp->sig2vec_list), key);
+    vec_list_ptr vlp = new_rec(&(vdbp->vec_list_rec_mgr));
+    vlp->vec = vp;
+    vlp->next = cur_vlp;
+    if( cur_vlp != NULL ) {
+	delete_hash(&(vdbp->sig2vec_list), key);
+    }
+    insert_hash(&(vdbp->sig2vec_list), key, vlp);
+    // Now restore the record managers
+    lstringsp = tmp_lstringsp;
+    vec_rec_mgrp = tmp_vec_rec_mgrp;
+    range_rec_mgrp = tmp_range_rec_mgrp;
+}
+
+static bool
+inside(int lrange, int rrange, int test)
+{
+    if( lrange <= rrange) {
+	return( lrange <= test && test <= rrange );
+    } else {
+	return( rrange <= test && test <= lrange );
+    }
+}
+
+static bool
+colliding(vec_ptr v1, vec_ptr v2)
+{
+    if( v1 == v2 ) return TRUE;
+    if( v1 == NULL || v2 == NULL ) return FALSE;
+    if( v1->type != v2->type ) return FALSE;
+    if( v1->type == TXT ) {
+	return( colliding(v1->next, v2->next) );
+    }
+    range_ptr r1 = v1->u.ranges;
+    range_ptr r2 = v2->u.ranges;
+    while( r1 != NULL ) {
+	for(range_ptr rt = r2; rt != NULL; rt = rt->next) {
+	    if( inside(r1->lower, r1->upper, rt->lower) ||
+		inside(r1->lower, r1->upper, rt->upper) )
+	    {
+		    return( colliding(v1->next, v2->next) );
+	    }
+	} 
+	r1 = r1->next;
+    }
+    return FALSE;
+}
+
+bool
+VDB_has_name_collision(vector_db_ptr vdbp, string vec)
+{
+    // Store the current active record managers
+    ustr_mgr *tmp_lstringsp = lstringsp;
+    rec_mgr *tmp_vec_rec_mgrp = vec_rec_mgrp;
+    rec_mgr *tmp_range_rec_mgrp = range_rec_mgrp;
+    // Change to the new managers
+    lstringsp = &(vdbp->ustring_mgr);
+    vec_rec_mgrp = &(vdbp->vec_rec_mgr);
+    range_rec_mgrp = &(vdbp->range_rec_mgr);
+    // Perform the operations
+    vec_ptr vp = split_name(vec);
+    string key = mk_name_signature(vp);
+    vec_list_ptr cur_vlp = (vec_list_ptr) find_hash(&(vdbp->sig2vec_list), key);
+    while(cur_vlp != NULL ) {
+	if( colliding(vp, cur_vlp->vec) ) {
+	    // Now restore the record managers
+	    lstringsp = tmp_lstringsp;
+	    vec_rec_mgrp = tmp_vec_rec_mgrp;
+	    range_rec_mgrp = tmp_range_rec_mgrp;
+	    return TRUE;
+	}
+	cur_vlp = cur_vlp->next;
+    }
+    // Now restore the record managers
+    lstringsp = tmp_lstringsp;
+    vec_rec_mgrp = tmp_vec_rec_mgrp;
+    range_rec_mgrp = tmp_range_rec_mgrp;
+    return FALSE;
+}
+
+static range_ptr
+copy_range(rec_mgr *range_mgr_ptr, range_ptr old)
+{
+    if( old == NULL ) return NULL;
+    range_ptr res = (range_ptr) new_rec(range_mgr_ptr);
+    res->upper = old->upper;
+    res->lower = old->lower;
+    res->next = copy_range(range_mgr_ptr, old->next);
+    return res;
+}
+
+vec_ptr
+Copy_vector(rec_mgr *vector_mgr_ptr, rec_mgr *range_mgr_ptr, vec_ptr old)
+{
+    if( old == NULL ) return NULL;
+    vec_ptr res = (vec_ptr) new_rec(vector_mgr_ptr);
+    res->type = old->type;
+    if( old->type == TXT ) {
+	res->u.name = old->u.name;
+    } else {
+	res->u.ranges = copy_range(range_mgr_ptr, old->u.ranges);
+    }
+    res->next = Copy_vector(vector_mgr_ptr, range_mgr_ptr, old->next);
+    return res;
+}
+
+#if 1
+void DBG_print_range(range_ptr rp) { DBG_PRINT_RNG(rp); }
+void DBG_print_vec(vec_ptr vp) { DBG_PRINT_VEC(vp); }
+void DBG_print_vec_list(vec_list_ptr vlp) { DBG_PRINT_VEC_LIST(vlp); }
+void DBG_print_merge_list(merge_list_ptr mlp) { DBG_PRINT_MRG_LIST(mlp); }
+void DBG_print_sname_list(sname_list_ptr slp) { DBG_PRINT_STR_LIST(slp); }
+#endif

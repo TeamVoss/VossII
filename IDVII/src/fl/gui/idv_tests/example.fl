@@ -1,0 +1,731 @@
+load "ste.fl";
+
+
+
+//update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" "TRUE";
+//update_vossrc "VERBOSE-GARBAGE-COLLECTION" "TRUE";
+
+
+let extract_instances p ilist =
+    let p' = fold_pexlif p ilist "_TMP_" then
+    val (PINST _ _ _ _ _ _ (P_HIER chs)) = p' in
+    el 1 chs
+;
+
+let rename_interface wrap p subst =
+    val (PINST name attrs leaf fa_inps fa_outs ints content) = p in
+    let exp1 v = md_expand_vector v in
+    let expn l = md_expand_vectors l in
+    let ext_sub = flatmap (\(fv,tv). zip (exp1 fv) (exp1 tv)) subst in
+    let process (fn,as) =
+	let rename a = (assoc a ext_sub) catch a in
+	fn, (md_merge_vectors (map rename (expn as)))
+    in
+    let fa_inps' = map process fa_inps in
+    let fa_outs' = map process fa_outs in
+    let child = (PINST name attrs leaf fa_inps' fa_outs' ints content) in
+    NOT wrap => child |
+    let top_fa_inps =
+	map (\v.v,[v]) (md_extract_vectors (flatmap snd fa_inps'))
+    in
+    let top_fa_outs =
+	map (\v.v,[v]) (md_extract_vectors (flatmap snd fa_outs'))
+    in
+    PINST name attrs leaf top_fa_inps top_fa_outs [] (P_HIER [child])
+;
+
+let set_eq l1 l2 = ((l1 subtract l2) = []) AND ((l2 subtract l1) = []);
+
+let replace_instance p ilist imp =
+    let p' = fold_pexlif p ilist "_TMP_" then
+    val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER (spec:rem))) = p' in
+    // Check interfaces
+    val (PINST _ _ _ fa_inps1 fa_outs1 _ _) = spec in
+    val (PINST _ _ _ fa_inps2 fa_outs2 _ _) = imp in
+    let inps1 = md_extract_vectors (flatmap snd fa_inps1) in
+    let inps2 = md_extract_vectors (flatmap snd fa_inps2) in
+    NOT (set_eq inps1 inps2) => eprintf "Non-matching inputs" |
+    let outs1 = md_extract_vectors (flatmap snd fa_outs1) in
+    let outs2 = md_extract_vectors (flatmap snd fa_outs2) in
+    NOT (set_eq outs1 outs2) => eprintf "Non-matching outputs" |
+    PINST name attrs leaf fa_inps fa_outs ints (P_HIER (imp:rem))
+;
+
+//let Replace_selected p new_inst =
+//    let il = get_selected_insts p then
+//    il = [] => p |
+//    REFRESH (replace_instance p il new_inst)
+//;
+    
+
+// Word width
+//let SZ = 11;
+//let SZ = 5;
+let SZ = 8;
+
+let out = sprintf "res[%d:0]" (SZ-1);
+let dout = sprintf "res[%d:0]" (2*SZ-1);
+
+TYPE "word" SZ;
+TYPE "dword" (2*SZ);
+TYPE "ext_dword" (2*SZ+1);
+
+let ext_dword2dword {v::ext_dword} = {frombits (tl (tobits v))::dword};
+
+let dword2word {d::dword} = {d~~~((SZ-1) downto 0):: word};
+
+let as = md_expand_vector (sprintf "a[%d:0]" (2*SZ-1));
+let bs = md_expand_vector (sprintf "b[%d:0]" (2*SZ-1));
+let ps = md_expand_vector (sprintf "p[%d:0]" (2*SZ-1));
+// Simple BDD ordering
+var_order (interleave [as,bs,ps]);
+
+// =========================================================================
+// The specification: (a*b)%p
+// =========================================================================
+let spec =
+    word_input	a b p.
+    word_output	res.
+    dword_internal  mul tmp.
+    CELL "draw_hier spec" [
+	mul <- (SX a) '*' (SX b),
+	tmp <- mul '%' (SX p),
+	res <- dword2word tmp
+];
+
+//start_new_transform (spec 'a 'b 'p 'res);
+
+
+// Step 1:  Add mod to inputs
+// because:
+//	(x * y) % p == (x % p * y % p) % p
+//  and
+//	(SX x) % p = (SX (x %p)) % p
+//
+let step1 =
+    word_input	a b p.
+    word_output	res.
+    word_internal a' b'.
+    dword_internal  mul tmp.
+    CELL "draw_hier spec" [
+	a' <- a '%' p,
+	b' <- b '%' p,
+	mul <- (SX a') '*' (SX b'),
+	tmp <- mul '%' (SX p),
+	res <- dword2word tmp
+];
+//start_new_transform  (step1 'a 'b 'p 'res);
+
+let mul_spec =
+    dword_input	x y.
+    dword_output o.
+    CELL "mul_spec" [
+	o <- x '*' y
+];
+
+let mul_imp =
+    dword_input	x y.
+    dword_output o.
+    dword_list_internal (2*SZ) psums.
+    CELL "draw_hier mul_imp" (
+	let mk_psum i =
+	    (el i psums) <-  (x '<<' (''(i-1))) '&' (SX (y~~(i-1)))
+	in
+	(map mk_psum (1 -- (2*SZ)))@
+	[o <- accumulate (defix '+') psums]
+);
+//start_new_transform (mul_imp 'x 'y 'o);
+
+// Check for equality
+//BDD_comb_EQ (mul_spec 'x 'y 'o) (mul_imp 'x 'y 'o);
+
+
+// Step2: Expand definition of multiplication
+let step2 =
+    word_input	a b p.
+    word_output	res.
+    word_internal a' b'.
+    dword_internal  mul tmp.
+    CELL "draw_hier spec" [
+	a' <- a '%' p,
+	b' <- b '%' p,
+	mul_imp (SX a') (SX b') mul,
+	tmp <- mul '%' (SX p),
+	res <- dword2word tmp
+];
+let p =  (step2 'a 'b 'p 'res);
+start_new_transform p;
+
+bdd_reorder 1;
+
+bdd_reorder 1;
+
+qqqqq;
+
+let mod_add p a b = (a '+' b) '%' p;
+
+let mod_mul_imp =
+    dword_input	p.
+    dword_input	x y.
+    dword_output o.
+    dword_list_internal (2*SZ) psums.
+    CELL "draw_hier mul_imp" (
+	let mk_psum i =
+	    (el i psums) <-  (x '<<' (''(i-1))) '&' (SX (y~~(i-1)))
+	in
+	(map mk_psum (1 -- (2*SZ)))@
+	[o <- accumulate (mod_add p) psums]
+);
+
+// Step 3: Use mod-p adders
+let step3 =
+    word_input	a b p.
+    word_output	res.
+    word_internal a' b'.
+    dword_internal  mul tmp dp.
+    CELL "draw_hier spec" [
+	a' <- a '%' p,
+	b' <- b '%' p,
+	dp <- SX p,
+	mod_mul_imp dp (SX a') (SX b') mul,
+	tmp <- mul '%' dp,
+	res <- dword2word tmp
+];
+//UPDATE (remove_wrappers (step3 'a 'b 'p 'res)) out;
+
+
+let mod_mod_imp =
+    dword_input	    inp p.
+    dword_output    out.
+    CELL "draw_hier mod_mod_spec" [
+	out <- inp '%' p
+];
+
+
+let p = remove_wrappers (step3 'a 'b 'p 'res);
+//UPDATE p out;
+
+let p = unfold_pexlif p 1 "s1/";
+//UPDATE p out;
+
+let mod_mod_spec = rename_interface T (extract_instances p [18,34]) [
+	("s3/_TmP_1[9:0]", "a[9:0]"),
+	("dp[9:0]", "p[9:0]"),
+	("tmp[9:0]", "out[9:0]")
+];
+//BDD_comb_EQ mod_mod_spec (mod_mod_imp 'a 'p 'out);
+
+let p = replace_instance p [18,64] 
+	(rename_interface F (mod_mod_imp 'a 'p 'out)
+	[
+	    ("a[9:0]", "s1/_TmP_11_TmP_1[9:0]"),
+	    ("p[9:0]", "dp[9:0]"),
+	    ("out[9:0]", "tmp[9:0]")
+	])
+;
+//UPDATE p out;
+
+let p = unfold_pexlif p 1 "";
+//UPDATE p out;
+
+let p = duplicate_instance p 63;
+//UPDATE p out;
+
+
+
+
+//get_selected_insts p;
+
+
+let msb v = hd (tobits v);
+
+let cond_subtract =
+    dword_input	    inp.
+    dword_input	    p.
+    dword_output    res.
+    CELL "draw_hier cond_subtract" [
+	res <- (IF (inp '>=' p) THEN (inp '-' p) ELSE inp)
+];
+//SHOW (cond_subtract 'inp 'p 'res) "res[21:0]";
+
+//let vis = STE_debug (pexlif2fsm (cond_subtract 'inp 'p 'res));
+//let ant =
+//    "inp[9:0]" is 3 in_phase 0 followed_by
+//		  0x1ff in_phase 1 followed_by
+//		  1 in_phase 2 followed_by
+//		  1 in_phase 3
+// and
+//    "p[9:0]" is 1 in_phase 0 followed_by
+//		1 in_phase 1 followed_by
+//		3 in_phase 2 followed_by
+//		0x1ff in_phase 3
+//;
+//STE "-e" vis [] ant [] [];
+
+
+let better_cond_subtract =
+    dword_input	    inp.
+    dword_input	    p.
+    dword_output    res.
+    ext_dword_internal  tmp.
+    CELL "cond_subtract" [
+	tmp <- (ZX inp) '-' (ZX p),
+	res <- (IF (msb tmp) THEN inp ELSE (ext_dword2dword tmp))
+];
+//SHOW (better_cond_subtract 'inp 'p 'res) "res[21:0]";
+
+//BDD_comb_EQ (cond_subtract 'inp 'p 'res) (better_cond_subtract 'inp 'p 'res);
+
+let ckt = pexlif2fsm (cond_subtract 'inp 'p 'res);
+
+// If we know that a and b are mod p, the mod operation
+// can be replaced with a simple conditional subtraction.
+let better_mod_add =
+    dword_input p a b.
+    dword_output psum.
+    dword_internal sum.
+    CELL "draw_hier better_mod_add" [
+	sum <- a '+' b,
+	better_cond_subtract sum p psum
+];
+
+letrec better_Add_mod =
+    dword_input		p.
+    dword_list_input	ts.
+    dword_output	sum.
+    dword_internal	mid.
+    CELL "better_Add_mod" (
+	length ts = 1 => [sum <- (hd ts)] |
+	(better_Add_mod p (tl ts) mid):
+	[better_mod_add p (hd ts) mid sum]
+);
+
+let better_mod_mul_imp =
+    dword_input	p.
+    dword_input	x y.
+    dword_output o.
+    dword_list_internal (2*SZ) psums.
+    CELL "mul_imp" (
+	let mk_psum i =
+	    (el i psums) <-  (x '<<' (''(i-1))) '&' (SX (y~~(i-1)))
+	in
+	(flatten_recursive_pexlif "better_Add_mod"
+				  (better_Add_mod p psums o)):
+	(map mk_psum (1 -- (2*SZ)))
+);
+
+
+// Step 4: Use better mod-p adders
+let step4 =
+    word_input	a b p.
+    word_output	res.
+    word_internal a' b'.
+    dword_internal  mul tmp.
+    CELL "draw_hier spec" [
+	a' <- a '%' p,
+	b' <- b '%' p,
+	better_mod_mul_imp (SX p) (SX a') (SX b') mul,
+	tmp <- mul '%' (SX p),
+	res <- dword2word tmp
+];
+update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" "FALSE";
+//UPDATE (remove_wrappers (step4 'a 'b 'p 'res)) out;
+
+
+//let p1 = step4 'a 'b 'p 'res;
+//let p2 = unfold_pexlif p1 3 "s1/";
+//let p3 = unfold_pexlif p2 1 "s2/";
+//let p4 = unfold_pexlif p3 1 "s3/";
+//SHOW p4 out;
+
+
+
+
+// Select number of bits used for approximate sum
+// Run complete FV until it fails...
+let APPROX_BITS = 2;	// 1, 2, or 3
+
+TYPE "approx" APPROX_BITS;
+
+let approx_value {C::dword} {S::dword} =
+	{(frombits (firstn APPROX_BITS (tobits C)))::approx} '+'
+	{(frombits (firstn APPROX_BITS (tobits S)))::approx} 
+;
+
+
+let CSA3 =
+    dword_input x y z.
+    dword_output c s.
+    CELL "draw_hier CSA3" [
+	s <- x '^' y '^' z,
+	c <- (x '&' y '|' x '&' z '|' y '&' z) '<<' '1
+];
+
+let CSA2 =
+    dword_input x y.
+    dword_output c s.
+    CELL "draw_hier CSA2" [
+	s <- x '^' y,
+	c <- (x '&' y) '<<' '1
+];
+
+let CSA4 =
+    dword_input x y z w.
+    dword_output c s.
+    dword_internal c1 s1.
+    CELL "draw_hier CSA3" [
+	CSA3 x y z c1 s1,
+	CSA3 c1 s1 w c s
+];
+
+let approx_CS_sub_p =
+    dword_input C S p.
+    dword_input minus_p minus_2p.
+    dword_output Co So.
+    //
+    dword_internal rC rS r2C r2S.
+    approx_internal approx2_sum.
+    bit_internal    approx2_neg.
+    approx_internal approx_sum.
+    bit_internal    approx_neg.
+    //
+    CELL "draw_hier approx_CS_sub_p" [
+	CSA3 C S minus_p rC rS,
+	CSA3 C S minus_2p r2C r2S,
+	approx2_sum <- approx_value r2C r2S,
+	approx2_neg <- msb approx2_sum,
+	approx_sum <- approx_value rC rS,
+	approx_neg <- msb approx_sum,
+	CASE Co [
+		(approx_neg  --- C),
+		(approx2_neg --- rC)
+		] r2C,
+	CASE So [
+		(approx_neg  --- S),
+		(approx2_neg --- rS)
+		] r2S
+];
+
+let approx_CSA_mod_p =
+    dword_input aC aS bC bS p.
+    dword_input minus_p minus_2p.
+    dword_output Co So.
+    //
+    dword_internal rC rS r2C r2S c1 s1.
+    approx_internal approx2_sum.
+    bit_internal    approx2_neg.
+    approx_internal approx_sum.
+    bit_internal    approx_neg.
+    //
+    CELL "draw_hier approx_CSA_mod_p" [
+	CSA4 aC aS bC bS c1 s1,
+	CSA3 c1 s1 minus_p rC rS,
+	CSA3 c1 s1 minus_2p r2C r2S,
+	approx2_sum <- approx_value r2C r2S,
+	approx2_neg <- msb approx2_sum,
+	approx_sum <- approx_value rC rS,
+	approx_neg <- msb approx_sum,
+	CASE Co [
+		(approx_neg  --- c1),
+		(approx2_neg --- rC)
+		] r2C,
+	CASE So [
+		(approx_neg  --- s1),
+		(approx2_neg --- rS)
+		] r2S
+];
+
+
+let final_mod_p_adder =
+    dword_input C S.
+    dword_input minus_p minus_2p.
+    dword_output sum.
+    //
+    dword_internal c0 s0 c1 s1 c2 s2 sum0 sum1 sum2.
+    CELL "draw_hier final_mod_p_adder" [
+	CSA2 C S c0 s0,
+	CSA3 C S minus_p c1 s1,
+	CSA3 C S minus_2p c2 s2,
+	sum0 <- c0 '+' s0,
+	sum1 <- c1 '+' s1,
+	sum2 <- c2 '+' s2,
+	sum <- (IF (msb sum1) THEN sum0 ELSE
+		IF (msb sum2) THEN sum1 ELSE sum2)
+];
+
+letrec mod_mul_tree =
+    dword_input	cur_apC cur_apS.
+    dword_input p minus_p minus_2p.
+    bit_list_input  bs.	
+    dword_output    Co So.
+    dword_internal  ppC ppS new_apC new_apS remC remS.
+    CELL "mod_mul_tree" (
+	bs = [] => [
+	    Co <- '0,
+	    So <- '0
+	] | [
+	    ppC <- (SX (hd bs)) '&' cur_apC,
+	    ppS <- (SX (hd bs)) '&' cur_apS,
+	    approx_CS_sub_p (cur_apC '<<' '1) (cur_apS '<<' '1)
+			    p minus_p minus_2p new_apC new_apS,
+	    mod_mul_tree new_apC new_apS p minus_p minus_2p (tl bs) remC remS,
+	    approx_CSA_mod_p ppC ppS remC remS p minus_p minus_2p Co So
+]);
+
+let final_version =
+    word_input	a b p.
+    word_output res.
+    dword_internal C S minus_p minus_2p raw.
+    CELL "final_version" [
+	minus_p  <- '-1 '*' (SX p),
+	minus_2p <- '-2 '*' (SX p),
+	mod_mul_tree (SX a) '0 (SX p) minus_p minus_2p (tobits b) C S,
+	final_mod_p_adder C S minus_p minus_2p raw,
+	res <- dword2word raw
+];
+
+UPDATE (remove_wrappers (final_version 'a 'b 'p 'res)) out;
+
+
+
+
+
+
+
+
+
+
+// =========================================================================
+// Implementation 1: Use mod-p adders in building multiplier
+// =========================================================================
+
+// Specification function for
+//	If a > p subtact p from a.
+// Not a good implementation since it involves two subtractions.
+let cond_sub v = IF (v >= pv) THEN v - pv ELSE v; 
+
+// Same as cond_sub, except only one subtration operation
+// 
+let cond_sub2 v = 
+    let tmp = v - pv in
+    IF (hd (bv2list tmp)) THEN v ELSE tmp
+;
+
+// Verify you can replace cond_sub with cond_sub2
+let vc1 = cond_sub Av == cond_sub2 Av;
+//vc1;
+
+// A function to perform addition mod p (assuming av and bv are less than p)
+let add_mod_p av bv = cond_sub2 (av + bv);
+
+
+// The first implemetation idea
+let imp1_expr av bv =
+    letrec mul_step cur_ap (b:bs) =
+	let partial_prod = IF b THEN cur_ap ELSE '0 in
+	let new_ap = cond_sub2 (cur_ap * '2) in
+	add_mod_p partial_prod (mul_step new_ap bs)
+     /\    mul_step cur_ap [] = '0
+    in
+    mul_step av (rev (bv2list bv))
+;
+
+// Verify implementation is correct
+let vc2 = (spec_expr Av Bv == imp1_expr Av Bv);
+//vc2;
+
+// =========================================================================
+// Implementation 2: Use carry save mod-p addres in building multiplier
+// Note that we need to do both -p and -2p now due to approximation issues
+// =========================================================================
+
+// Select number of bits used for approximate sum
+// Run complete FV until it fails...
+let APPROX_BITS = 2;	// 1, 2, or 3
+
+let minus_2pv = '0 - ('2*pv);
+
+let CSA3 av bv cv =
+    let s = bv_XOR (bv_XOR av bv) cv in
+    let c = bv_OR (bv_OR (bv_AND av bv) (bv_AND av cv)) (bv_AND bv cv) in
+    ('2 *  c ), s
+;
+
+let CSA2 av bv =
+    let s = bv_XOR av bv in
+    let c = bv_AND av bv in
+    (tl c @ [F]), s
+;
+
+let CSA4 av bv cv dv =
+    val (c1,s1) = CSA3 av bv cv in
+    CSA3 c1 s1 dv
+;
+
+let approx_CS_sub_p (C,S) =
+    val (rC,rS) = CSA3 C S (SX ESZ minus_pv) in
+    val (r2C,r2S) = CSA3 C S (SX ESZ minus_2pv) in
+    let approx2_sum =
+	((firstn APPROX_BITS r2C) '+' (firstn APPROX_BITS r2S))
+    in
+    let approx2_neg = hd approx2_sum in
+    let approx_sum =
+	((firstn APPROX_BITS rC) '+' (firstn APPROX_BITS rS))
+    in
+    let approx_neg = hd approx_sum in
+    IF approx_neg THEN (C,S) ELSE
+    IF approx2_neg THEN (rC,rS) ELSE (r2C,r2S)
+;
+
+let approx_CSA_mod_p (aC,aS) (bC,bS) =
+    val (c1,s1) = CSA4 aC aS bC bS in
+    val (rc1,rs1) = CSA3 c1 s1 (SX ESZ minus_pv) in
+    val (rc2,rs2) = CSA3 c1 s1 (SX ESZ minus_2pv) in
+    let approx_sum =
+	((firstn APPROX_BITS rc1) '+' (firstn APPROX_BITS rs1))
+    in
+    let approx_neg = hd approx_sum in
+    let approx2_sum =
+	((firstn APPROX_BITS rc2) '+' (firstn APPROX_BITS rs2))
+    in
+    let approx2_neg = hd approx2_sum in
+    IF approx_neg THEN (c1,s1) ELSE
+    IF approx2_neg THEN (rc1,rs1) ELSE (rc2,rs2)
+;
+
+let final_mod_p_adder C S =
+    val (c0,s0) = CSA2 C S in
+    val (c1,s1) = CSA3 C S (SX ESZ minus_pv) in
+    val (c2,s2) = CSA3 C S (SX ESZ minus_2pv) in
+    let sum0 = c0 '+' s0 in
+    let sum1 = c1 '+' s1 in
+    let sum2 = c2 '+' s2 in
+    IF (hd sum1) THEN sum0 ELSE
+    IF (hd sum2) THEN sum1 ELSE sum2
+;
+
+let imp2_expr av bv =
+    let _zero = int2fbv ESZ 0 in
+    let _one  = int2fbv ESZ 1 in
+    letrec mul_step (cur_apC,cur_apS) (b:bs) =
+	let ppC = map (defix AND b) cur_apC then
+	let ppS = map (defix AND b) cur_apS then
+	let new_ap =
+	    approx_CS_sub_p ((cur_apC '<<' _one),(cur_apS '<<' _one))
+	then
+	approx_CSA_mod_p (ppC,ppS) (mul_step new_ap bs)
+     /\    mul_step cur_ap [] = _zero,_zero
+    in
+    val (C,S) = mul_step ((SX ESZ av),_zero) (rev bv) in
+    // Final full sized carry propagate summation
+    lastn SZ (final_mod_p_adder C S)
+;
+
+let vc3 = (spec_expr Av Bv = imp2_expr Av Bv);
+vc3;
+
+%%%%%%%%%%%%%%%
+
+let two_pv = int2fbv ESZ (2*p);
+let mk_arb2 base_name =
+    let Cnames = md_expand_vector (sprintf "%sC[%d:0]" base_name (SZ)) then
+    let Cv = map variable Cnames then
+    let Snames = md_expand_vector (sprintf "%sS[%d:0]" base_name (SZ)) then
+    let Sv = map variable Snames then
+    let sum = Cv '+' Sv then
+    let _zero  = int2fbv ESZ 0 in
+    let condition = (sum '>=' _zero) AND (sum '<' two_pv) then
+    let sub = param condition then
+    (substitute sub Cv, substitute sub Sv)
+;
+val (aC,aS) = mk_arb2 "a";
+val (bC,bS) = mk_arb2 "b";
+val (C,S) = approx_CSA_mod_p (aC,aS) (bC,bS);
+let sum = C '+' S;
+let _zero  = int2fbv ESZ 0;
+let condition = (sum '>=' _zero) AND (sum '<' two_pv);
+
+condition;
+
+%%%%%%%%%%%%%%%
+
+let imp2_tst i =
+    let tv = ' i in
+    (spec_expr tv Bv = imp2_expr tv Bv)
+;
+
+let imp2_test range =
+    let indices = find_all (\i. NOT (imp2_tst i)) range in
+    map (\idx. el idx range) indices
+;
+
+let imp2_tst2 i j =
+    let av = ' i in
+    let bv = ' j in
+    (spec_expr av bv = imp2_expr av bv)
+;   
+
+
+// =========================================================================
+// Implementation 3: Same as implementation 2 except since the approximation
+// only requires a single bit, replace the adder with an XOR gate
+// =========================================================================
+
+let approx_CS_sub_p (C,S) =
+    val (rC,rS) = CSA3 C S (SX ESZ minus_pv) in
+    val (r2C,r2S) = CSA3 C S (SX ESZ minus_2pv) in
+    let approx2_neg = (hd r2C) XOR (hd r2S) in
+    let approx_neg = (hd rC) XOR (hd rS) in
+    IF approx_neg THEN (C,S) ELSE
+    IF approx2_neg THEN (rC,rS) ELSE (r2C,r2S)
+;
+
+let approx_CSA_mod_p (aC,aS) (bC,bS) =
+    val (c1,s1) = CSA4 aC aS bC bS in
+    val (rc1,rs1) = CSA3 c1 s1 (SX ESZ minus_pv) in
+    val (rc2,rs2) = CSA3 c1 s1 (SX ESZ minus_2pv) in
+    let approx_neg = (hd rc1) XOR (hd rs1) in
+    let approx2_neg = (hd rc2) XOR (hd rs2) in
+    IF approx_neg THEN (c1,s1) ELSE
+    IF approx2_neg THEN (rc1,rs1) ELSE (rc2,rs2)
+;
+
+let imp3_expr av bv =
+    let _zero = int2fbv ESZ 0 in
+    let _one  = int2fbv ESZ 1 in
+    letrec mul_step (cur_apC,cur_apS) (b:bs) =
+	let ppC = map (defix AND b) cur_apC then
+	let ppS = map (defix AND b) cur_apS then
+	let new_ap =
+	    approx_CS_sub_p ((cur_apC '<<' _one),(cur_apS '<<' _one))
+	then
+	approx_CSA_mod_p (ppC,ppS) (mul_step new_ap bs)
+     /\    mul_step cur_ap [] = _zero,_zero
+    in
+    // Since the MSB of b is always F, dont map over it.
+    val (C,S) = mul_step ((SX ESZ av),_zero) (rev (tl bv)) in
+    // Final full sized carry propagate summation
+    lastn SZ (final_mod_p_adder C S)
+;
+
+let vc4 = (spec_expr Av Bv = imp3_expr Av Bv);
+//vc4;
+
+let imp3_tst i =
+    let tv = ' i in
+    (spec_expr tv Bv = imp3_expr tv Bv)
+;
+
+let imp3_test range =
+    let indices = find_all (\i. NOT (imp3_tst i)) range in
+    map (\idx. el idx range) indices
+;
+
+
+let imp3_tst2 i j =
+    let av = ' i in
+    let bv = ' j in
+    (spec_expr av bv = imp3_expr av bv)
+;
+
+

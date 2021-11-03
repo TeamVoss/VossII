@@ -1,7 +1,7 @@
 /*
  *  yosys -- Yosys Open SYnthesis Suite
  *
- *  Copyright (C) 2012  Clifford Wolf <clifford@clifford.at>
+ *  Copyright (C) 2012  Claire Xenia Wolf <claire@yosyshq.com>
  *
  *  Permission to use, copy, modify, and/or distribute this software for any
  *  purpose with or without fee is hereby granted, provided that the above
@@ -111,7 +111,7 @@ struct AigerWriter
 
 		// promote public wires
 		for (auto wire : module->wires())
-			if (wire->name[0] == '\\')
+			if (wire->name.isPublic())
 				sigmap.add(wire);
 
 		// promote input wires

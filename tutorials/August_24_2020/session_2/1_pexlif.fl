@@ -99,7 +99,7 @@ let simple_circuit =
     CELL "draw_hier simple_circuit" [
 	add3 a b out mid,
 	new <- (IF reset THEN '0 ELSE mid),
-	re_ff clk mid out
+	re_ff clk new out
 ];
 
 let p = simple_circuit 'clk 'reset 'a 'b 'out;
