@@ -167,11 +167,11 @@ Mk_output_file_in_tmp_dir(string prefix, FILE **fpp, string *filename)
 }
 
 static string
-read_line(FILE *fp)
+read_line(FILE *fp, bool once)
 {
     while(1) {
 	string s = fgets(buf,TCL_CMD_BUF_SZ-1, fp);
-	if( s != NULL ) { return s; }
+	if( s != NULL || once ) { return s; }
 	if( errno != EWOULDBLOCK ) {
 	    fprintf(stderr, "WHAT??? errno=%d\n", errno);
 	}
@@ -464,7 +464,7 @@ fl_main(int argc, char *argv[])
 	    }
 	  process_more:
             res = 99;
-            for(int i = 0; i < 3; i++) {
+            for(int i = 0; i < source_cnt; i++) {
                 if( res == 99 && fds[i].revents == POLLIN ) {
                     res = i;
 		    break;
@@ -477,13 +477,13 @@ fl_main(int argc, char *argv[])
                     // Command(s) to be executed (coming from cmd_from_tcl_fp)
 		    string cur_start = strtemp("");
 		    // Get number of lines
-		    string s = read_line(cmd_from_tcl_fp);
+		    string s = read_line(cmd_from_tcl_fp, FALSE);
 		    int lines = atoi(s);
 		    tstr_ptr tstrings = new_temp_str_mgr();
 		    int sz = 0;
 		    string res = gen_strtemp(tstrings, "");
 		    for(int i = 0; i < lines; i++) {
-			string s = read_line(cmd_from_tcl_fp);
+			string s = read_line(cmd_from_tcl_fp, FALSE);
 			sz += strlen(s);
 			if( sz >= TCL_CMD_BUF_SZ ) {
 			    Wprintf("Too long command. Ignored.");
@@ -514,7 +514,7 @@ fl_main(int argc, char *argv[])
                 break;
                 case 1: {
                     // Callback to execute (coming from callback_from_tcl_fp)
-                    string s = read_line(callback_from_tcl_fp);
+                    string s = read_line(callback_from_tcl_fp, FALSE);
 		    if( s == NULL ) {
 			break;
 		    }
@@ -537,7 +537,7 @@ fl_main(int argc, char *argv[])
                     // Input from stdin or file
 		    fprintf(to_tcl_fp, "prepare_for_stdin\n");
 		    fflush(to_tcl_fp);
-		    while( read_line(fp) ) {
+		    while( read_line(fp, TRUE) ) {
 			size_t used = strlen(stdin_buf);
 			size_t req  = strlen(buf);
 			// Remove comments if too many...
