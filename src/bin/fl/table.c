@@ -149,8 +149,8 @@ list_to_table(g_ptr redex)
     table_ptr tp = get_table_rec();
     create_hash(&(tp->tbl), n, G_rec_hash, G_rec_equ);
     for(g_ptr lp = list; !IS_NIL(lp); lp = GET_CONS_TL(lp)) {
-	g_ptr key = GET_CONS_HD(lp);
-	g_ptr data = GET_CONS_TL(lp);
+	g_ptr key = GET_CONS_HD(GET_CONS_HD(lp));
+	g_ptr data = GET_CONS_TL(GET_CONS_HD(lp));
 	if( find_hash(&(tp->tbl), key) != NULL ) {
 	    MAKE_REDEX_FAILURE(redex, Fail_pr("list2tbl with duplicate keys"));
 	    return;
