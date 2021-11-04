@@ -121,6 +121,8 @@ scan_fn(pointer pkey, pointer pdata)
 {
     g_ptr key = (g_ptr) pkey;
     g_ptr data = (g_ptr) pdata;
+    INC_REFCNT(key);
+    INC_REFCNT(data);
     APPEND1(scan_tail, Make_CONS_ND(key, data));
 }
 
@@ -150,7 +152,7 @@ list_to_table(g_ptr redex)
 	g_ptr key = GET_CONS_HD(lp);
 	g_ptr data = GET_CONS_TL(lp);
 	if( find_hash(&(tp->tbl), key) != NULL ) {
-	    MAKE_REDEX_FAILURE(redex, Fail_pr("list2tbl with duplicate key"));
+	    MAKE_REDEX_FAILURE(redex, Fail_pr("list2tbl with duplicate keys"));
 	    return;
 	}
 	insert_hash(&(tp->tbl), (pointer) key, (pointer) data);
@@ -284,7 +286,7 @@ Table_Init()
                                    NULL,
                                    table_eq_fn,
                                    NULL,
-                                   NULL,
+				   NULL,
 				   table_sha256_fn);
     table_free_list = NULL;
 }

@@ -1503,7 +1503,7 @@ let get_abstract_depends ste obj = (defix get_abstract_depends) ste obj;
 
 // Compute a SHA-256 signature for the (almost) arbitrary fl object obj.
 // Note that the object is first fully evaluated before the signature is
-// computed. As a result, sha256_signature (\x.x+1) is the same as
-// sha256_signature (\y.y+1), since the lambda expressions are compiled into
+// computed. As a result, sha256_signature (\\x.x+1) is the same as
+// sha256_signature (\\y.y+1), since the lambda expressions are compiled into
 // combinator code as part of the evaluation of the function.
 let sha256_signature obj = (defix sha256_signature) obj;

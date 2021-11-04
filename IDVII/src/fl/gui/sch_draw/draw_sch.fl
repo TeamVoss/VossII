@@ -51,9 +51,20 @@ Create_Dummy_Placement;
 // -------------------------------------------------------------
 
 let cur_canvas = ref "";
-let cur_vfsm = ref {[]:: vfsm list};
+
+let get_current_canvas {dummy::void} = (deref cur_canvas);
+non_lazy get_current_canvas;
+
+let fl_set_current_tab_selected {w::string} {c::string} =
+    let cc = c^".cc.c" then
+    (cur_canvas := cc)
+;
+export_to_tcl fl_set_current_tab_selected;
 
 let w2root w = "."^(el 2 (str_split w "."));
+
+
+let cur_vfsm = ref {[]:: vfsm list};
 
 let w2vfsm_ref = ref {[]:: (string#vfsm) list};
 
@@ -85,7 +96,7 @@ let get_idv_info_r canvas =
     let vfsm = w2vfsm canvas in
     NOT (is_IDV_ENV vfsm) => error "get_idv_info on STE_ENV" |
     let trfs = deref (vfsm2canvases_r vfsm) in
-    val (TR_SEQ vr trfsr) = dassoc "canvas2trfs" canvas trfs then
+    val (TR_SEQ parent sell vr trfsr) = dassoc "canvas2trfs" canvas trfs then
     trfsr
 ;
 
@@ -99,12 +110,20 @@ let get_idv_current_fsm canvas =
     ckt
 ;
 
+let get_idv_parent_info canvas =
+    let vfsm = w2vfsm canvas in
+    NOT (is_IDV_ENV vfsm) => error "get_idv_info on STE_ENV" |
+    let trfs = deref (vfsm2canvases_r vfsm) in
+    val (TR_SEQ parent sell vr trfsr) = dassoc "canvas2trfs" canvas trfs then
+    (parent, sell)
+;
+
 let canvas2fsm canvas =
     let vfsm = w2vfsm canvas in
     is_STE_ENV vfsm => vfsm2fsm vfsm |
     // IDV_ENV
     let trfs = deref (vfsm2canvases_r vfsm) in
-    val (TR_SEQ vr trfsr) = dassoc "canvas2trfs" canvas trfs then
+    val (TR_SEQ parent sell vr trfsr) = dassoc "canvas2trfs" canvas trfs then
     val (p,ckt,just) = hd (deref trfsr) in
     ckt
 ;
@@ -319,8 +338,11 @@ let add_active_sch_tab_window vfsm canvas vis cmd =
     (add_command vfsm cmd)
 ;
 
+forward_declare {idv_finish_transformation:: string->void};
+
 let fl_remove_active_sch_tab_window canvas =
     let vfsm = w2vfsm canvas then
+    (is_STE_ENV vfsm => () | idv_finish_transformation canvas) fseq
     let rcanvas_list = vfsm2canvases_r vfsm then
     let new = filter (\(c,_). c != canvas) (deref rcanvas_list) then
     (rcanvas_list := new)
@@ -384,7 +406,6 @@ let gen_draw_fanin vfsm draw_level levels vecs =
     (add_active_sch_tab_window vfsm c (BASE_VIS vis) cmd) fseq
     val (final_res, cmds) = visualisation2tcl vis then
     (big_tcl_eval ("create_sch":cmds)) fseq
-    (cur_canvas := c) fseq
     (tcl_eval [
                 sprintf "%s delete all" c,
                 sprintf "draw_network %s $%s" c final_res,
@@ -414,7 +435,7 @@ let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
 	    sprintf "OBSOLETE: let %s = draw_fanin vis (%d) %d %s;\n%s;"
 		     tab 0 100 svecs tab
 	in
-	let evis = TR_SEQ (ref vis) (ref [(p,ckt,SPEC)]) then
+	let evis = TR_SEQ canvas [inst_nbr] (ref vis) (ref [(p,ckt,SPEC)]) then
 	(add_active_sch_tab_window vfsm c evis cmd) fseq
 	val (final_res, cmds) = visualisation2tcl vis then
 	(big_tcl_eval ("create_sch":cmds)) fseq
@@ -452,7 +473,6 @@ let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
     (add_active_sch_tab_window vfsm c (BASE_VIS vis) cmd) fseq
     val (final_res, cmds) = visualisation2tcl vis then
     (big_tcl_eval ("create_sch":cmds)) fseq
-    (cur_canvas := c) fseq
     (tcl_eval [
                 sprintf "%s delete all" c,
                 sprintf "draw_network %s $%s" c final_res,
@@ -1242,8 +1262,6 @@ let fl_set_sch_highlight_color c color tag =
 ;
 export_to_tcl fl_set_sch_highlight_color;
 
-let dbg_get_current_canvas {dummy::void} = (deref cur_canvas);
-non_lazy dbg_get_current_canvas;
 
 let get_current_vis {dummy::void} = 
     let cur = deref cur_vfsm then
@@ -1254,7 +1272,6 @@ non_lazy get_current_vis;
 
 
 let fl_update_colors c =
-    (cur_canvas := c) fseq
     let vfsm = w2vfsm c then
     update_colors vfsm
 ;

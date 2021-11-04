@@ -150,8 +150,8 @@ let fp_content (P_LEAF fs) = pm_val 59 (sum (map fp_fn fs))
 /\  fp_content (P_HIER cs) =
         let go (PINST _ a _ i o t _) =
                 ( find_fingerprint a
-                + fp_formal (map fst i)
-                + fp_formal (map fst o)
+                + fp_formal (flatmap snd i)
+                + fp_formal (flatmap snd o)
                 + fp_internal t
                 )
         in
@@ -177,8 +177,8 @@ let sha_content (P_LEAF fs) = sha_set fs
         let go (PINST n a _ i o t _) =
                 ( n
                 , find_signature a
-                , sha256_signature (map fst i)
-                , sha256_signature (map fst o)
+                , sha256_signature (map snd i)
+                , sha256_signature (map snd o)
                 , sha_set t
                 )
         in
@@ -211,6 +211,116 @@ clet PINST n a l i o t c =
 
 //------------------------------------------------------------------------------
 
+
+
+// Correct version of fold_pexlif (not terribly efficient).
+let fold_pexlif p il new_name =
+    val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER chs)) = p then
+    let sel (i,sp) = mem i il in
+    val (sels,rems) = split sel (zip (1 upto (length chs)) chs) in
+    let selected = map snd sels in
+    let remain = map snd rems in
+    let out_producers =
+        let get_aouts (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd fa_outs in
+        md_expand_vectors ((map fst fa_inps)@(flatmap get_aouts remain))
+    in
+    let out_consumers =
+        let get_ainps (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd fa_inps in
+        md_expand_vectors ((map fst fa_outs)@(flatmap get_ainps remain))
+    in
+    let in_producers =
+        let get_aouts (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd fa_outs in
+        md_expand_vectors (flatmap get_aouts selected)
+    in
+    let in_consumers =
+        let get_ainps (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd fa_inps in
+        md_expand_vectors (flatmap get_ainps selected)
+    in
+    let new_outs = in_producers intersect out_consumers in
+    let new_inps = in_consumers intersect out_producers in
+    let new_ints = md_extract_vectors
+                ((in_producers@in_consumers) subtract (new_outs @ new_inps))
+    in
+    let sort_extract l = qsort node_name_cmp (md_extract_vectors l) in
+    let mk_fa l = map (\v. (v,[v])) (sort_extract l) in
+    let cp = PINST new_name [] F (mk_fa new_inps) (mk_fa new_outs) new_ints
+                (P_HIER selected)
+    in
+    let ints' = sort_extract
+                    ((out_consumers@out_producers) subtract
+                     (md_expand_vectors (map fst (fa_inps@fa_outs))))
+    in
+    (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER (cp:remain)))
+;
+
+// Correct version of foldn_pexlif (not terribly efficient).
+let foldn_pexlif p ill new_base_name =
+    let all_sel = flat ill in
+    length (setify all_sel) != length all_sel =>
+	eprintf "Overlapping selection in foldn_pexlif"
+    |
+    val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER chs)) = p then
+    let get_sel il = map (\i. el i chs) il in
+    let selected_l = map get_sel ill then
+    let remain = get_sel ((1 upto (length chs)) subtract all_sel) then
+    let get_ifcs pl =
+	let producers =
+	    let get_aouts (PINST _ _ _ fa_inps fa_outs _ _) =
+		flatmap snd fa_outs
+	    in
+	    md_expand_vectors (flatmap get_aouts pl)
+	in
+	let consumers =
+	    let get_ainps (PINST _ _ _ fa_inps fa_outs _ _) =
+		flatmap snd fa_inps
+	    in
+	    md_expand_vectors (flatmap get_ainps pl)
+	in
+	(producers, consumers)
+    in
+    let ifcs = map get_ifcs selected_l then
+    let rem_producers =
+        let get_aouts (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd fa_outs in
+        md_expand_vectors ((map fst fa_inps)@(flatmap get_aouts remain))
+    in
+    let rem_consumers =
+        let get_ainps (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd fa_inps in
+        md_expand_vectors ((map fst fa_outs)@(flatmap get_ainps remain))
+    in
+    let mk_name i =
+	length ill = 1 => new_base_name | sprintf "%s[%d]" new_base_name i
+    in
+    let mk_group i =
+	let sel = el i selected_l in
+	val (in_producers,in_consumers) = el i ifcs in
+	val (l_prodl,l_consuml) =
+	    unzip (gather ifcs ((1 upto length ifcs) subtract [i]))
+	in
+	let l_prod = flat l_prodl in
+	let l_consum = flat l_consuml in
+	let out_producers = rem_producers@l_prod in
+	let out_consumers = rem_consumers@l_consum in
+	let nouts = in_producers intersect out_consumers in
+	let ninps = in_consumers intersect out_producers in
+	let new_ints = md_extract_vectors
+		    ((in_producers@in_consumers) subtract (nouts @ ninps))
+	in
+	let mk_fa l = map (\v. (v,[v])) (md_extract_vectors l) in
+	let new_name = mk_name i then
+	PINST new_name [] F (mk_fa ninps) (mk_fa nouts) new_ints (P_HIER sel)
+    in
+    let folded_children = map mk_group (1 upto (length ill)) then
+    let all_wires = rem_consumers @ rem_producers @
+		    (flatmap pexlif_get_actuals folded_children)
+    then
+    let ints' =  md_extract_vectors
+	    (all_wires subtract (md_expand_vectors (map fst (fa_inps@fa_outs))))
+    then
+    let chs' = folded_children@remain then
+    (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER chs'))
+;
+
+
 // Create a new pexlif in which instances in ids have been collected to
 // a new hiearchy named 'name'.
 // ...
@@ -218,6 +328,17 @@ clet PINST n a l i o t c =
 let fold_pexlif pex ids name =
         val (PINST n a l i o t (P_HIER ((PINST n' a' l' i' o' t' c'):cs))) =
                 fold_pexlif pex ids name
+        in
+        PINST n a l i o t (P_HIER ((PINST n' a' l' i' o' t' c'):cs))
+;
+
+// Create a new pexlif in which each collection of instances in idsl have
+// been collected to new hiearchies named 'name[<nbr>]'.
+// ...
+//  foldn_pexlif::PINST->[[int]]->string->PINST
+let foldn_pexlif pex idsl new_base_name =
+        val (PINST n a l i o t (P_HIER ((PINST n' a' l' i' o' t' c'):cs))) =
+                foldn_pexlif pex idsl new_base_name
         in
         PINST n a l i o t (P_HIER ((PINST n' a' l' i' o' t' c'):cs))
 ;

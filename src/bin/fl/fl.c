@@ -166,6 +166,18 @@ Mk_output_file_in_tmp_dir(string prefix, FILE **fpp, string *filename)
     return(TRUE);    
 }
 
+static string
+read_line(FILE *fp)
+{
+    while(1) {
+	string s = fgets(buf,TCL_CMD_BUF_SZ-1, fp);
+	if( s != NULL ) { return s; }
+	if( errno != EWOULDBLOCK ) {
+	    fprintf(stderr, "WHAT??? errno=%d\n", errno);
+	}
+    } 
+}
+
 int
 fl_main(int argc, char *argv[])
 {
@@ -450,24 +462,28 @@ fl_main(int argc, char *argv[])
 	    while( (res = poll(fds, source_cnt, -1)) < 1 ) {
 		CHECK_FOR_INTERRUPT;
 	    }
+	  process_more:
             res = 99;
             for(int i = 0; i < 3; i++) {
-                if( res == 99 && fds[i].revents == POLLIN )
+                if( res == 99 && fds[i].revents == POLLIN ) {
                     res = i;
+		    break;
+		}
             }
+	    if( res == 99 ) { goto restart_inp; }
 	    CHECK_FOR_INTERRUPT;
             switch( res ) {
                 case 0: {
                     // Command(s) to be executed (coming from cmd_from_tcl_fp)
 		    string cur_start = strtemp("");
 		    // Get number of lines
-		    string s = fgets(buf,TCL_CMD_BUF_SZ-1, cmd_from_tcl_fp);
+		    string s = read_line(cmd_from_tcl_fp);
 		    int lines = atoi(s);
 		    tstr_ptr tstrings = new_temp_str_mgr();
 		    int sz = 0;
 		    string res = gen_strtemp(tstrings, "");
 		    for(int i = 0; i < lines; i++) {
-			string s = fgets(buf,TCL_CMD_BUF_SZ-1, cmd_from_tcl_fp);
+			string s = read_line(cmd_from_tcl_fp);
 			sz += strlen(s);
 			if( sz >= TCL_CMD_BUF_SZ ) {
 			    Wprintf("Too long command. Ignored.");
@@ -475,7 +491,7 @@ fl_main(int argc, char *argv[])
 				;
 			    fprintf(cmd_from_tcl_fp, "{1 0 0}\n");
 			    fflush(cmd_from_tcl_fp);
-			    goto restart_inp;
+			    goto process_more;
 			}
 			gen_strappend(tstrings, buf);
 		    }
@@ -488,7 +504,7 @@ fl_main(int argc, char *argv[])
 			fprintf(cmd_from_tcl_fp, "{0 0 0}\n");
 			fflush(cmd_from_tcl_fp);
 			parse_buf[0] = 0;
-			goto restart_inp;
+			goto process_more;
 		    }
                     clearerr(cmd_from_tcl_fp);
                     fprintf(cmd_from_tcl_fp, "{1 0 %d}\n",
@@ -498,7 +514,10 @@ fl_main(int argc, char *argv[])
                 break;
                 case 1: {
                     // Callback to execute (coming from callback_from_tcl_fp)
-                    string s = fgets(buf,TCL_CMD_BUF_SZ-1,callback_from_tcl_fp);
+                    string s = read_line(callback_from_tcl_fp);
+		    if( s == NULL ) {
+			break;
+		    }
                     buf[strlen(s)-1] = 0;
                     string res;
 		    string start;
@@ -518,7 +537,7 @@ fl_main(int argc, char *argv[])
                     // Input from stdin or file
 		    fprintf(to_tcl_fp, "prepare_for_stdin\n");
 		    fflush(to_tcl_fp);
-		    while( fgets(buf, TCL_CMD_BUF_SZ-1, fp) ) {
+		    while( read_line(fp) ) {
 			size_t used = strlen(stdin_buf);
 			size_t req  = strlen(buf);
 			// Remove comments if too many...
@@ -547,7 +566,7 @@ fl_main(int argc, char *argv[])
 			string res = strcat(stdin_buf, buf);
 			if( !process_commands(res, TRUE) ) {
 			    stdin_buf[0] = 0;
-			    goto restart_inp;
+			    goto process_more;
 			}
 		    }
                 }
@@ -754,7 +773,7 @@ setup_sockets()
     uint16_t port = ntohs(serv_addr.sin_port);
 
     Sprintf(buf, "wish %s/front_end.tcl %d %d %d %s &",
-	         binary_location, getpid(), addr, port, Voss_tmp_dir);
+		 binary_location, getpid(), addr, port, Voss_tmp_dir);
     if( system(buf) != 0 ) {
         Eprintf("Failed to execute %s/front_end.tcl\n", binary_location);
     }
@@ -767,10 +786,12 @@ setup_sockets()
     setvbuf(sync_to_tcl_fp, NULL, _IOLBF, 1000);
 
     int connfd1 = accept(listenfd, (struct sockaddr*)NULL, NULL);
+    fcntl(connfd1, F_SETFL, O_NONBLOCK);
     to_tcl_fp = fdopen(connfd1, "r+");
     setvbuf(to_tcl_fp, NULL, _IOLBF, 1000);
 
     int connfd2 = accept(listenfd, (struct sockaddr*)NULL, NULL);
+    fcntl(connfd2, F_SETFL, O_NONBLOCK);
     cmd_from_tcl_fp = fdopen(connfd2, "r+");
     setvbuf(cmd_from_tcl_fp, NULL, _IOLBF, 1000);
 
@@ -780,6 +801,7 @@ setup_sockets()
     setvbuf(callback_from_tcl_fp, NULL, _IOLBF, 1000);
 
     int connfd4 = accept(listenfd, (struct sockaddr*)NULL, NULL);
+    fcntl(connfd4, F_SETFL, O_NONBLOCK);
     callback_from_tcl_fp_res = fdopen(connfd4, "w");
     setvbuf(callback_from_tcl_fp_res, NULL, _IOLBF, 1000);
 
@@ -931,11 +953,14 @@ Send_to_tcl(string cmd, string *resp)
 static void
 busy(bool busy)
 {
-    if( busy )
-	fprintf(to_tcl_fp, "i_am_busy\n");
-    else 
-	fprintf(to_tcl_fp, "i_am_free\n");
-    fflush(to_tcl_fp);
+    (void) busy;
+//
+// Crashes wish in some circumstances.
+//    if( busy )
+//	fprintf(to_tcl_fp, "i_am_busy\n");
+//    else 
+//	fprintf(to_tcl_fp, "i_am_free\n");
+//    fflush(to_tcl_fp);
 }
 
 static int
