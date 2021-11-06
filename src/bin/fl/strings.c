@@ -446,6 +446,72 @@ vec_equ(pointer k1, pointer k2)
 /********************************************************/
 
 static void
+tcl2list(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    string src = GET_STRING(r);
+    MAKE_REDEX_NIL(redex);
+    g_ptr tail = redex;
+    string start = strtemp(src);
+    string c = start;
+    int level = 0;
+    while( *c ) {
+	switch( *c ) {
+	    case ' ':
+		if( level == 0 ) {
+		    *c = 0;
+		    string element = wastrsave(&strings, start);
+		    APPEND1(tail, Make_STRING_leaf(element));
+		    c++;
+		    start = c;
+		} else {
+		    c++;
+		}
+		break;
+	    case '\\':
+		c += 2;
+		break;
+	    case '{':
+		if( level == 0 ) {
+		    level++;
+		    c++;
+		    start = c;
+		} else {
+		    level++;
+		    c++;
+		}
+		break;
+	    case '}':
+		if( level > 1 ) {
+		    level--;
+		    c++;
+		} else {
+		    level--;
+		    *c = 0;
+		    string element = wastrsave(&strings, start);
+		    APPEND1(tail, Make_STRING_leaf(element));
+		    c++;
+		    if( *c == ' ' ) {
+			c++;
+		    }
+		    start = c;
+		}
+		break;
+	    default:
+		c++;
+		break;
+	}
+    }
+    if( start != c ) {
+	string element = wastrsave(&strings, start);
+	APPEND1(tail, Make_STRING_leaf(element));
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
 file_fullname(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
@@ -973,6 +1039,11 @@ Strings_Install_Functions()
     typeExp_ptr vec_info_tp = Get_Type("vec_info",NULL,TP_INSERT_PLACE_HOLDER);
 
     // Add builtin functions
+    Add_ExtAPI_Function("tcl2list", "1", FALSE,
+			GLmake_arrow(GLmake_string(),
+				     GLmake_list(GLmake_string())),
+			tcl2list);
+
     Add_ExtAPI_Function("file_fullname", "1", FALSE,
 			GLmake_arrow(GLmake_string(),GLmake_string()),
 			file_fullname);
@@ -1841,6 +1912,7 @@ show_merge_list(rec_mgr *sname_list_mgrp, tstr_ptr tstrings, merge_list_ptr mlp,
     }
     return res;
 }
+
 
 // =================================================
 

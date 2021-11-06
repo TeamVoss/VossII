@@ -34,6 +34,23 @@ proc idv:create_idv_gui {w} {
 	# Canvas for transformations
 	#
         set c $ww.c
+	frame $ww.tf
+	pack $ww.tf -side top -fill x
+	    label $ww.tf.shn_lbl -text "Show model name"
+	    set ::idv(show_model_name) 1
+	    ttk::checkbutton $ww.tf.shn_cb -variable ::idv(show_model_name) \
+		-command "idv:update_transf_canvas $c"
+	    pack $ww.tf.shn_lbl -side left 
+	    pack $ww.tf.shn_cb -side left 
+	    frame $ww.tf.sp -width 10
+	    pack $ww.tf.sp -side left
+	    label $ww.tf.she_lbl -text "Show transformation name"
+	    set ::idv(show_transform_name) 0
+	    ttk::checkbutton $ww.tf.she_cb \
+		-variable ::idv(show_transform_name) \
+		-command "idv:update_transf_canvas $c"
+	    pack $ww.tf.she_lbl -side left 
+	    pack $ww.tf.she_cb -side left 
         scrollbar $ww.yscroll -command "$c yview"
         scrollbar $ww.xscroll -orient horizontal -command "$c xview"
         canvas $c -background white \
@@ -65,21 +82,21 @@ proc idv:create_idv_gui {w} {
 		    -labelanchor w
 	    set dbs [fl_idv_get_db_names $w.c]
 	    ttk::combobox $p.search.lbl.c -textvariable \
-		    ::modelbrowser(db,$p) \
+		    ::modelbrowser(db) \
 		-state readonly \
 		-values $dbs \
 		-font $::voss2_txtfont
-	    set ::modelbrowser(db,$p) [lindex $dbs 0]
+	    set ::modelbrowser(db) [lindex $dbs 0]
 
 	    #
 	    ttk::labelframe $p.search.pat_lbl -relief flat -text "Pattern: " \
 		    -labelanchor w
 	    ttk::combobox $p.search.pat_lbl.c \
-		    -textvariable ::modelbrowser(pattern,$p) \
+		    -textvariable ::modelbrowser(pattern) \
 		    -font $::voss2_txtfont
 	    bind $p.search.pat_lbl.c <KeyPress-Return> \
 		    [list $p.search.refresh invoke]
-	    set ::modelbrowser(pattern,$p) {*}
+	    set ::modelbrowser(pattern) {*}
 	    ttk::button $p.search.refresh -text Refresh \
 		    -command [list idv:update_idv_list $p $p.lf.list]
 	pack $p.search -side top -pady 10 -fill x
@@ -95,26 +112,40 @@ proc idv:create_idv_gui {w} {
 	listbox $f.list -setgrid 1 \
 	    -yscroll "$f.yscroll set" -xscroll "$f.xscroll set" \
 	    -selectmode single -font $::voss2_txtfont
-	bind $f.list <<ListboxSelect>> "idv:show_transformations $w $f.list $ww"
+	bind $f.list <<ListboxSelect>> \
+	    "idv:display_transformations $w $f.list $ww"
 	pack $f.yscroll -side right -fill y
 	pack $f.xscroll -side bottom -fill x
 	pack $f.list -side top -fill both -expand yes
 	pack $f -side top -fill both -expand yes
+	set b $p.buttons
+	frame $b -relief flat
+	    button $b.quit -text Exit -command "destroy $w"
+	    frame $b.sp -relief flat
+	    button $b.new -text "New transform" \
+		    -command "idv:new_toplevel_transf $w $f.list"
+	    pack $b.quit -side left -expand yes
+	    pack $b.sp -side left -expand yes
+	    pack $b.new -side left -expand yes
+	pack $b -side top -fill x
+
+	# Populate listbox (probably need to limit thenumber of models...)
+	idv:update_idv_list $p $p.lf.list
 }
 
-proc idv:show_transformations {w sl ww} {
+proc idv:display_transformations {w sl ww} {
     set idx [$sl curselection]
     if { $idx != "" } {
 	set cur [$sl get [$sl curselection]]
-	set db $::modelbrowser(db,$w)
-	fl_display_transform_tree $ww.c $db $cur
+	set db $::modelbrowser(db)
+	fl_display_transform_tree $ww $db $cur
     }
 }
 
 proc idv:update_idv_list {w lb} {
     $lb delete 0 end
-    set db $::modelbrowser(db,$w)
-    set pat $::modelbrowser(pattern,$w)
+    set db $::modelbrowser(db)
+    set pat $::modelbrowser(pattern)
     if { ![catch {fl_get_idv_models $w.c $db $pat} vecs] } {
 	foreach v $vecs {
 	    $lb insert end $v
@@ -124,44 +155,33 @@ proc idv:update_idv_list {w lb} {
 
 
 proc idv:perform_model_save {w npw version} {
-    set ok [fl_do_name_model $w.c $::idv_prompt_name $version 0]
-    destroy $npw
-    if { $ok == 0 } {
-	vis_toplevel $npw $w {} {} "Override name"
-	    frame $npw.t -relief flat
-        pack $npw.t -side top
-            label $npw.t.l -text \
-		"Model named $::idv_prompt_name already exists. Overwrite it?"
-            pack $npw.t.l -side left
-        frame $npw.b -relief flat
-        pack $npw.b -side top
-            button $npw.b.cancel -text Cancel -command "destroy $npw"
-            frame $npw.b.sep -relief flat
-            button $npw.b.ok -text Ok -command \
-		"fl_do_name_model $w.c $::idv_prompt_name $version 1; \
-		 destroy $npw"
-            pack $npw.b.cancel -side left -fill x
-            pack $npw.b.sep -side left -fill x -expand yes
-            pack $npw.b.ok -side left -fill x
-    } 
+    while { [fl_model_name_used $::idv_prompt_name] } {
+	$npw.error.l configure -text "Name already in use!" -fg red
+    }
+    fl_do_name_model $w.c $::idv_prompt_name $version
 }
 
-proc idv:name_and_save_model {w version} {
+proc idv:name_and_save_model {w version {default ""} } {
     set npw .idv_name_prompt
     catch {destroy $npw}
-    set ::idv_prompt_name ""
+    set ::idv_prompt_name $default
 
     vis_toplevel $npw $w {} {} "Name current $version model"
         frame $npw.t -relief flat
-        pack $npw.t -side top
+        pack $npw.t -side top -fill x
             label $npw.t.l -text "Name of $version model: "
             ttk::entry $npw.t.e -textvariable ::idv_prompt_name -width 20
             bind $npw.t.e <KeyPress-Return> \
 		"idv:perform_model_save $w $npw $version"
             pack $npw.t.l -side left
             pack $npw.t.e -side left -fill x -expand yes
+        frame $npw.error -relief flat
+        pack $npw.error -side top -fill x
+	    label $npw.error.l -text ""
+	    pack $npw.error.l -side left -fill x
+
         frame $npw.b -relief flat
-        pack $npw.b -side top
+        pack $npw.b -side top -fill x
             button $npw.b.cancel -text Cancel -command "destroy $npw"
             frame $npw.b.sep -relief flat
             button $npw.b.ok -text Ok -command \
@@ -261,11 +281,29 @@ proc idv:merge {w} { fl_do_merge $w.c }
 
 proc idv:new_transf {w} { fl_do_new_tranf $w.c }
 
-proc idv:perform_name_transf {w op} {
+proc idv:new_toplevel_transf {w sl} {
+    set idx [$sl curselection]
+    if { $idx != "" } {
+        set cur [$sl get [$sl curselection]]
+        set db $::modelbrowser(db)
+	fl_do_new_toplevel_tranf $w $db $cur
+    }
+}   
+
+proc idv:perform_name_transf {w c op} {
     set ::idv(transf_op) $op
-    if { $op != "Cancel" && $::idv(transf_name) == "" } {
-	$w.errors.l configure -text "Error: Must provide a name for the model" \
+    if { $op == "Cancel" } {
+	destroy $w
+    }
+    if { $::idv(transf_name) == "" } {
+	$w.errors.l configure \
+	    -text "Error: Must provide a name for the transformation" \
 			-fg red
+    } elseif { [fl_is_toplevel_transform $c] \
+		&& $::idv(model_name) == "" } {
+	$w.errors.l configure \
+	    -text "Error: Must provide a name for toplevel models" -fg red
+    
     } else {
 	destroy $w
     }
@@ -276,6 +314,8 @@ proc idv:name_transform_and_use {c} {
     catch {destroy $w}
     i_am_busy
     vis_toplevel $w $c {} {} "Name transform"
+    set toplevel_transf [fl_is_toplevel_transform $c]
+    set ::idv(model_name) ""
     #
     frame $w.namef
     set ::idv(transf_name) ""
@@ -285,31 +325,71 @@ proc idv:name_transform_and_use {c} {
 	pack $w.namef.l -side left
 	pack $w.namef.e -side left -fill x -expand yes
     #
+    frame $w.model_name
+    pack $w.model_name -side top -fill x -expand yes
+	if { $toplevel_transf } {
+	    label $w.model_name.l -text "Name of final model: "
+	} else {
+	    label $w.model_name.l -text "Optional name of final model: "
+	}
+	entry $w.model_name.e -textvariable ::idv(model_name)
+	pack $w.model_name.l -side left
+	pack $w.model_name.e -side left -fill x -expand yes
+
     frame $w.buttons
     pack $w.buttons -side top -fill x
 	button $w.buttons.cancel -text Cancel \
-	    -command "idv:perform_name_transf $w Cancel"
+	    -command "idv:perform_name_transf $w $c Cancel"
 	pack $w.buttons.cancel -side left -padx 10
 	button $w.buttons.save -text Save \
-	    -command "idv:perform_name_transf $w Save"
+	    -command "idv:perform_name_transf $w $c Save"
 	pack $w.buttons.save -side left -padx 10
-	button $w.buttons.appl1 -text "Save & Apply Once" \
-	    -command "idv:perform_name_transf $w SaveAndApplyOnce"
-	pack $w.buttons.appl1 -side left -padx 10
-	button $w.buttons.appln -text "Save & Apply Everywhere" \
-	    -command "idv:perform_name_transf $w SaveAndApplyEverywhere"
-	pack $w.buttons.appln -side left -padx 10
+	# Only if started from a transformation window
+	if { $toplevel_transf == 0 } {
+	    button $w.buttons.appl1 -text "Save & Apply Once" \
+		-command "idv:perform_name_transf $w $c SaveAndApplyOnce"
+	    pack $w.buttons.appl1 -side left -padx 10
+	    button $w.buttons.appln -text "Save & Apply Everywhere" \
+		-command "idv:perform_name_transf $w $c SaveAndApplyEverywhere"
+	    pack $w.buttons.appln -side left -padx 10
+	}
     frame $w.errors
-	label $w.errors.l -text ""
+	label $w.errors.l -text "" -width 300
 	pack $w.errors.l -side top -fill x
     pack $w.errors -side top
 
     tkwait window $w
     i_am_free
-    if { $::idv(transf_name) == "" } {
-	set ::idv(transf_name) dummy
+    if { $::idv(model_name) == "" } {
+	set ::idv(model_name) "."
     }
-    return [list $::idv(transf_op) $::idv(transf_name)]
+    return [list $::idv(transf_op) $::idv(transf_name) $::idv(model_name)]
 }
 
+proc idv:update_transf_canvas {c} {
+    foreach node [array names ::idv_transf_node_map] {
+	if { $::idv(show_model_name) } {
+	    $c itemconfigure $::dot_node2text_tag($c,$node) \
+		    -text " $::idv_transf_node_map($node)" -anchor w
+	} else {
+	    $c itemconfigure $::dot_node2text_tag($c,$node) \
+		    -text ""
+	}
+    }
+    foreach edge [array names ::idv_transf_edge_map] {
+	if { $::idv(show_transform_name) } {
+	    $c itemconfigure $::dot_edge2text_tag($c,$edge) \
+		    -text $::idv_transf_edge_map($edge) -anchor w
+	} else {
+	    $c itemconfigure $::dot_edge2text_tag($c,$edge) -text ""
+	}
+    }
+
+}
+
+proc idv:show_transformations {dot_file w} {
+    set c $w.c
+    display_dot $dot_file $w
+    idv:update_transf_canvas $c
+}
 

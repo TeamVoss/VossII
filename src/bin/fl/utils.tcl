@@ -329,13 +329,28 @@ proc display_dot {dot_pgm {w ""} {close_fun ""}} {
     close $fp
     update idletasks
 
-    ;# Create add _IsTeXt_ tag to enable scaling of text
+    ;# Create maps from node/edge name to tag of drawn symbol
+    catch {unset ::dot_node2circle_tag}
+    catch {unset ::dot_node2text_tag}
+    catch {unset ::dot_edge2line_tag}
+    catch {unset ::dot_edge2text_tag}
     foreach t [$c find all] {
         if ![catch {$c itemcget $t -text} txt] {
             set tag [$c gettags $t]
+            $c itemconfigure $tag -font $::base_mfont
             $c addtag "_IsTeXt_" withtag $tag
+            if [regexp "0node.*" $tag] {
+                set rtag "1[string range $tag 1 end]"
+                set ::dot_node2circle_tag($c,$txt) $rtag
+                set ::dot_node2text_tag($c,$txt) $tag
+            } elseif [regexp "0edge.*" $tag] {
+                set rtag "1[string range $tag 1 end]"
+                lappend ::dot_edge2line_tag($c,$txt) $rtag
+                lappend ::dot_edge2text_tag($c,$txt) $tag
+            }
         }
     }
+
     val {lx ly ux uy} [$w.c bbox all]
     set wid [expr $ux-$lx]
     if [expr $wid > 800] { set wid 800 }
