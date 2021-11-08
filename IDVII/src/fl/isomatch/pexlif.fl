@@ -5,6 +5,7 @@
 
 load (DIR^"../design/misc.fl");
 load (DIR^"../design/util.fl");
+load (DIR^"../design/hfl.fl");
 load (DIR^"primes.fl");
 
 // Meh...
@@ -441,9 +442,10 @@ letrec
             , (sz_X, W_ADD  (gen_binary sz as)  (gen_binary sz bs))
             , (sz_X, W_SUB  (gen_binary sz as)  (gen_binary sz bs))
             , (sz_X, W_MUL  (gen_binary sz as)  (gen_binary sz bs))
-         // FL and Yosys does different things when dividing by zero.
-         // , (sz_X, W_DIV  (gen_binary sz as)  (gen_binary sz bs))
-         // Yosys treats first argument as a signed value always?
+            // note: Yosys OPT phase simplifies division by zero to constant X,
+            // which simulation doesn't catch.
+            , (sz_X, W_DIV  (gen_binary sz as)  (gen_binary sz bs))
+            // Yosys treats first argument as a signed value always?
          // , (sz_X, W_MOD  (gen_binary sz as)  (gen_binary sz bs))
             , (sz_X, W_SHL  (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
             , (sz_X, W_SHR  (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
@@ -702,115 +704,153 @@ begin_abstype;
 //     (((wexpr#wexpr) list)#(wexpr#(int#int)))
 // };
 
-forward_declare{normalize_wexpr::int->wexpr->(((wexpr#wexpr) list)#(wexpr#(int#int)))};
+forward_declare{normalize_wexpr::int->wexpr->(((bool#wexpr#wexpr) list)#(wexpr#(int#int)))};
 
+//  mk_draw_cmd::bool->wexpr->string
+//  mk_draw_cmd phase_delay rhs = ...
+
+let BASE_TMP_S = sprintf "s%s" BASE_TMP;
+
+let IS_BASE n = str_is_prefix BASE_TMP n OR str_is_prefix BASE_TMP_S n;
+
+let NEW_VAR s sz cnt = W_VAR sz (sprintf "%s%d" (s => BASE_TMP_S | BASE_TMP) cnt);
+
+//  normalize_unary::name->unary_op->arg->((signed?,lhs,rhs)#lhs#name#size)
 let normalize_unary {ix::int} {op::wexpr->wexpr} {a::wexpr} =
-        val (ss, a', ix', asz) = normalize_wexpr ix a in
-        (ss, op a', ix', asz)
+        val (ass, a', aix, asz) = normalize_wexpr ix a in
+        let v = NEW_VAR F asz aix in
+        ((F, v, op a'):ass, v, aix+1, asz)
 ;
 
-let normalize_binary {ix::int} {op::wexpr->wexpr->wexpr} {a::wexpr} {b::wexpr} =
-        val (ss,  a', ix',  asz) = normalize_wexpr ix  a in
-        val (ss', b', ix'', _)   = normalize_wexpr ix' b in
-        (ss@ss', op a' b', ix'', asz)
+//  normalize_binary::name->signed?->binary_op->arg1->arg2->((signed?,lhs,rhs)#lhs#name#size)
+let normalize_binary {ix::int} {s::bool} {op::wexpr->wexpr->wexpr} {a::wexpr} {b::wexpr} =
+        val (ass, a', aix, asz) = normalize_wexpr ix  a in
+        val (bss, b', bix, _)   = normalize_wexpr aix b in
+        let v = NEW_VAR s asz bix in
+        ((s, v, op a' b'):(bss@ass), v, bix+1, asz)
 ;
 
-let normalize_slice {ix::int} (W_SLICE is v) =
-        // Slices are only allowed on certain things, make sure this is it.
-        let is_var (W_VAR _ _) = T
-        /\  is_var (W_EXPLICIT_VAR _ _) = T
-        /\  is_var _ = F
-        in
-        val (ss,  v',  ix', sz) = normalize_wexpr ix v in
-        val (ss', v'', ix'') = is_var v' => (ss, v', ix') |
-                let var = W_VAR sz (sprintf "norm_slice_%d" ix') in
-                ((var, v') : ss, var, ix' + 1)
-        in
-        // Can't have non-contig. indexing in Verilog, so we split each non-
-        // contig. interval into its own slice and concatenate them all.
-        letrec
-            fill m l = m == l => [m] | m : fill (m-1) l
-        in
-        let slice (BR_SINGLE ix) = W_SLICE [ix] v''
-        /\  slice (BR_SLICE m l) = W_SLICE (fill m l) v''
-        in
-        // Can't have empty slices.
+let normalize_slice {ix::int} {is::int list} {a::wexpr} =
+        val (ass, a', aix, asz) = normalize_wexpr ix a in
+        // Can't have slices on anything but variables.
+        NOT (is_var a') => error "Slice not on variable." |
+        // Can't have empty slices (0-width wire).
         length is == 0 => error "Slice without indices" |
+        // Can't have non-contig. indexing in Verilog so each non-contig.
+        // interval is split into its own slice and then concatenated together.
+        let slice (BR_SINGLE ix) = W_SLICE [ix] a'
+        /\  slice (BR_SLICE m l) = W_SLICE (m downto l) a'
+        in
         let ws = map slice (group_indices is) in
         let w  = length ws == 1 => hd ws | W_CAT ws in
-        (ss', w, ix'', length is)
+        let v  = NEW_VAR F asz aix in
+        ((F, v, w):ass, v, aix+1, length is)
+;
+
+let normalize_arith {ix::int} {s::bool} {op::wexpr->wexpr->wexpr} {a::wexpr} {b::wexpr} =
+        val (ass, a', aix, asz) = normalize_wexpr ix  a in
+        val (bss, b', bix, _)   = normalize_wexpr aix b in
+        // Can't have constant zero for the second argument for any "arith" op.
+        // since Yosys turns that into X.
+        letrec
+            is_zero (W_CONST _ 0) = T
+        /\  is_zero (W_NAMED_CONST _ _ 0) = T
+        /\  is_zero (W_PRED _ a) = is_zero a
+        /\  is_zero (W_ZX _ a) = is_zero a
+        /\  is_zero (W_CAT as) = all is_zero as
+        /\  is_zero _ = F
+        in
+        let op = is_zero b => (\a. \b. W_X asz) | op in
+        let v  = NEW_VAR s asz bix in
+        ((s, v, op a' b'):(bss@ass), v, bix+1, asz)
+;
+// note: Like Yosys' "read_verilog" without constant progagation, "is_zero" only
+// checks for expressions that "obviously" is zero.
+// note: "W_SX" should normalize to a variable extension and cannot be zero.
+
+let normalize_ext {ix::int} {op::int->wexpr->wexpr} {sz::int} {a::wexpr} =
+        val (ass, a', aix, _) = normalize_wexpr ix a in
+        let v = NEW_VAR F sz aix in
+        ((F, v, op sz a'):ass, v, aix+1, sz)
 ;
 
 letrec
-    normalize_wexpr ix (W_X sz) = ([], W_X sz, ix, sz)
-/\  normalize_wexpr ix (W_CONST sz v) = ([], W_CONST sz v, ix, sz)
-/\  normalize_wexpr ix (W_NAMED_CONST n sz v) = ([], W_NAMED_CONST n sz v, ix, sz)
-/\  normalize_wexpr ix (W_VAR sz b) = ([], W_VAR sz b, ix, sz)
-/\  normalize_wexpr ix (W_EXPLICIT_VAR sz n) = ([], W_EXPLICIT_VAR sz n, ix, sz)
-/\  normalize_wexpr ix (W_AND a b)  = normalize_binary ix W_AND a b
-/\  normalize_wexpr ix (W_OR a b)   = normalize_binary ix W_OR a b
-/\  normalize_wexpr ix (W_NOT a)    = normalize_unary  ix W_NOT a
-/\  normalize_wexpr ix (W_EQ a b)   = normalize_binary ix W_EQ a b
-/\  normalize_wexpr ix (W_PRED n c) = normalize_unary  ix (W_PRED n) c
-/\  normalize_wexpr ix (W_GR a b)   = normalize_binary ix W_GR a b
-/\  normalize_wexpr ix (W_ADD a b)  = normalize_binary ix W_ADD a b
-/\  normalize_wexpr ix (W_SUB a b)  = normalize_binary ix W_SUB a b
-/\  normalize_wexpr ix (W_MUL a b)  = normalize_binary ix W_MUL a b
-/\  normalize_wexpr ix (W_DIV a b)  = normalize_binary ix W_DIV a b
-/\  normalize_wexpr ix (W_MOD a b)  = normalize_binary ix W_MOD a b
-/\  normalize_wexpr ix (W_SHL a b)  = normalize_binary ix W_SHL a b
-/\  normalize_wexpr ix (W_SHR a b)  = normalize_binary ix W_SHR a b
-/\  normalize_wexpr ix (W_ASHR a b) = normalize_binary ix W_ASHR a b
-/\  normalize_wexpr ix (W_SX sz (W_VAR sz_v v)) =
-        ([], W_SX sz (W_VAR sz_v v), ix, sz)
-/\  normalize_wexpr ix (W_SX sz (W_EXPLICIT_VAR sz_v v)) =
-        ([], W_SX sz (W_VAR sz_v v), ix, sz)
-// If 'W_SX' is called on anything but a variable we need to split the 'wexpr'
-// and name the intermediate result.
-/\  normalize_wexpr ix (W_SX sz w) =
-        val (ss, w', ix', sz') = normalize_wexpr ix w in
-        let v   = W_VAR sz' (sprintf "norm_sx_%d" ix') in
-        let ss' = (v,w') : ss in
-        (ss', W_SX sz v, ix + 1, sz)        
-/\  normalize_wexpr ix (W_ZX sz a)  =
-        val (ss, a', ix', _) = normalize_wexpr ix a in
-        (ss, W_ZX sz a', ix', sz)
+    normalize_wexpr ix (W_X sz) =
+        ([], W_X sz, ix, sz)
+/\  normalize_wexpr ix (W_CONST sz v) =
+        ([], W_CONST sz v, ix, sz)
+/\  normalize_wexpr ix (W_NAMED_CONST n sz v) =
+        ([], W_NAMED_CONST n sz v, ix, sz)
+/\  normalize_wexpr ix (W_VAR sz b) =
+        ([], W_VAR sz b, ix, sz)
+/\  normalize_wexpr ix (W_EXPLICIT_VAR sz n) =
+        ([], W_EXPLICIT_VAR sz n, ix, sz)
+/\  normalize_wexpr ix (W_AND a b) = normalize_binary ix F W_AND a b
+/\  normalize_wexpr ix (W_OR a b) = normalize_binary ix F W_OR a b
+/\  normalize_wexpr ix (W_NOT a) = normalize_unary ix W_NOT a
+/\  normalize_wexpr ix (W_EQ a b) = normalize_binary ix F W_EQ a b
+/\  normalize_wexpr ix (W_PRED n c) = normalize_unary ix (W_PRED n) c
+/\  normalize_wexpr ix (W_GR a b) = normalize_binary ix F W_GR a b
+/\  normalize_wexpr ix (W_ADD a b) = normalize_binary ix F W_ADD a b
+/\  normalize_wexpr ix (W_SUB a b) = normalize_binary ix F W_SUB a b
+/\  normalize_wexpr ix (W_MUL a b) = normalize_binary ix F W_MUL a b
+/\  normalize_wexpr ix (W_DIV a b) = normalize_arith ix F W_DIV a b
+/\  normalize_wexpr ix (W_MOD a b) = normalize_arith ix T W_MOD a b
+/\  normalize_wexpr ix (W_SHL a b) = normalize_binary ix F W_SHL a b
+/\  normalize_wexpr ix (W_SHR a b) = normalize_binary ix F W_SHR a b
+/\  normalize_wexpr ix (W_ASHR a b) = normalize_binary ix T W_ASHR a b
+/\  normalize_wexpr ix (W_SX sz a) = normalize_ext ix W_SX sz a
+/\  normalize_wexpr ix (W_ZX sz a) = normalize_ext ix W_ZX sz a
 /\  normalize_wexpr ix (W_ITE c a b) =
-        val (ss,   c', ix',  _)   = normalize_wexpr ix c in
-        val (ss',  a', ix',  asz) = normalize_wexpr ix a in
-        val (ss'', b', ix'', _)   = normalize_wexpr ix b in
-        (ss@ss'@ss'', W_ITE c' a' b', ix'', asz)
-// If 'W_SLICE' or 'W_NAMED_SLICE' is called on anything but a variable we need
-// to split the 'wexpr' and name the intermediate result.
+        val (css, c', cix, _)   = normalize_wexpr ix  c in
+        val (ass, a', aix, asz) = normalize_wexpr cix a in
+        val (bss, b', bix, _)   = normalize_wexpr aix b in
+        let v = NEW_VAR F asz bix in
+        ((F, v, W_ITE c' a' b'):(bss@ass@css), v, bix+1, asz)
 /\  normalize_wexpr ix (W_SLICE is v) =
-        normalize_slice ix (W_SLICE is v)
+        normalize_slice ix is v
 /\  normalize_wexpr ix (W_NAMED_SLICE _ is v) =
-        print "NAMED_SLICE is treated as SLICE" fseq
-        normalize_slice ix (W_SLICE is v)
-/\  normalize_wexpr ix (W_CAT ws) =
+        print "normalize: W_NAMED_SLICE is treated as W_SLICE" fseq
+        normalize_slice ix is v
+/\  normalize_wexpr ix (W_CAT as) =
         letrec
-            go []     = ([],[],ix,0)
-        /\  go (a:as) =
-                val (ss, as', ix, szs) = go as in
-                val (ss', a', ix', sz) = normalize_wexpr ix a in
-                (ss'@ss, a':as', ix', sz+szs)
+            norm [] = ([],[],ix,0)
+        /\  norm (a:as) =
+                val (asss, as', asix, assz) = norm as in
+                val (ass,  a',  aix,  asz)  = normalize_wexpr asix a in
+                (ass@asss, a':as', aix, asz+assz)
         in
-        val (ss, ws', ix', sz) = go ws in
-        (ss, W_CAT ws', ix', sz)
+        val (asss, as', asix, assz) = norm as in
+        let v = NEW_VAR F assz asix in
+        ((F, v, W_CAT as'):asss, v, asix+1, assz)
 // Not sure what to do with named slices and memory.
 /\  normalize_wexpr ix _ =
-        error "normalize_wexpr: W_UPDATE_NAMED_SLICE/W_MEM_[READ|WRITE]"
+        error "normalize: W_MEM_[READ|WRITE] not yet supported"
 ;
-// todo: name clashes?
-// todo: some missing cases.
-// todo: split non-contig. slices into a concatenation of its contig.
-// sub-slices/indices, for example:
-//   (i2[31:0])[16,25] -> {(i2[31:0])[16],(i2[31:0])[25]}
 
-let normalize_update_fn ix (W_UPDATE_FN lhs rhs) =
-        val (ss, rhs', ix', _) = normalize_wexpr ix rhs in
-        let mk (W_VAR sz v, _) = sz == 1 => v | sprintf "%s[%d:0]" v (sz-1) in
-        (W_UPDATE_FN lhs rhs' : map (curry W_UPDATE_FN) ss, ix', map mk ss)
+let normalize_update_fn {ix::int} (W_UPDATE_FN lhs rhs) =
+        val (rss, rhs', rix, _) = normalize_wexpr ix rhs in
+        // Move last variable assignment to lhs, if any.
+        let is_signed (s, _, _) = s in
+        let ss =
+                // Can't or don't need to remove last assignment.
+                NOT (is_var rhs') => ((F,lhs,rhs'):rss) |
+                // Can't replace last var. with "lhs" if it's signed.
+                (length rss > 0) AND (is_signed (hd rss)) => ((F,lhs,rhs'):rss) |
+                // /
+                val ((_,_,x):xs) = rss in ((F,lhs,x):xs)
+        in
+        // Internal wires created during "normalize_wexpr" are prefixed by "_$".
+        let is_base (_, W_VAR _ n, _) = IS_BASE n in
+        let decl (_, W_VAR 1  n, _) = n
+        /\  decl (_, W_VAR sz n, _) = sprintf "%s[%d:0]" n (sz-1)
+        in
+        let internals xs = map decl (filter is_base xs) in
+        // Every (lhs,rhs) pair produced by 'normalize_wexpr' is an sep. update.
+        let mk_fn (_, lhs, rhs) = W_UPDATE_FN lhs rhs in
+        let updates xs = map mk_fn xs in
+        // /
+        (updates ss, internals ss, rix)
 /\  normalize_update_fn _ (W_PHASE_DELAY _ _) =
         error "normalize_update_fn: W_PHASE_DELAY"
 ;
@@ -822,26 +862,39 @@ let normalize_update_fn ix (W_UPDATE_FN lhs rhs) =
 //    2) Slices are contig. on fully indexed arrays (*).
 //    3) Slices are only made on variables.
 //    4) Sign extensions are only made on variables.
+//    5) Division is replaced by X when the RHS is a constant zero.
 //
 // [*] See 'valid_lhs' in "IDVII/src/fl/verilog/pretty-pexlif/" for a FL def. of
 // what it considers to be valid LHSs.
 //
 // Rewriting can thus introduce additional internal wires.
 letrec
-    normalize_pexlif (PINST name attrs T fa_inps fa_outs internals (P_LEAF fs)) =
+    normalize_pexlif (PINST name attrs T inps outs internals (P_LEAF fs)) =
+        // Normalize all update-functions.
         letrec
-            go []     = ([], 0, [])
-        /\  go (f:fs) =
-                val (gs, ix,  is) = go fs in
-                val (hs, ix', js) = normalize_update_fn ix f in
-                (hs@gs, ix', js@is)
+            norm [] = ([],[],0)
+        /\  norm (f:fs) =
+                val (gs, gs_is, gs_ix) = norm fs in
+                val (g,  g_is,  g_ix)  = normalize_update_fn gs_ix f in
+                (g@gs, g_is@gs_is, g_ix)
         in
-        val (fs', _, vs) = go fs in
-        let internals' = internals @ vs in
-        PINST name attrs T fa_inps fa_outs internals' (P_LEAF fs')
-/\  normalize_pexlif (PINST name attrs F fa_inps fa_outs internals (P_HIER cs)) =
-        let cs' = map normalize_pexlif cs in
-        PINST name attrs F fa_inps fa_outs internals (P_HIER cs')
+        val (fs', nis, _) = norm fs in
+        let {internals'::string list} = internals @ nis in
+        // If there's only one update, simply wrap that up.
+        length fs' == 1 =>
+            PINST name attrs T inps outs internals' (P_LEAF fs') |
+        // If there's more than one, wrap each in a descriptive hier.
+        let act f = (f,[f]) in
+        let wrap (W_UPDATE_FN lhs rhs) =
+                let {n::string} = mk_draw_cmd F rhs in
+                let {xs::string list} = get_wbase_names rhs in
+                let {ys::string list} = get_wbase_names lhs in
+                PINST n [] T (map act xs) (map act ys) [] (P_LEAF
+                    [W_UPDATE_FN lhs rhs])
+        in
+        PINST "" attrs T inps outs internals' (P_HIER (map wrap fs'))
+/\  normalize_pexlif (PINST name attrs F inps outs internals (P_HIER cs)) =
+        PINST name attrs F inps outs internals (P_HIER (map normalize_pexlif cs))
 ;
 // todo: normalize indices.
 // todo: what do we do about slices in delays? split size to comb. and use new

@@ -245,18 +245,24 @@ TYPE "bits" 2;
 //         bits_input a.
 //         bits_output b.
 //         CELL "test" [b <- a '|>>' '0b01];
+// let ex =
+//         bits_input a.
+//         bits_output b.
+//         bit_internal t.
+//         CELL "test" [
+//             t <- {(a~~1)::bit},
+//             b <- {(SX t)::bits} '%' '0b10
+//         ]
+// ;
 
 let ex =
         bits_input a.
-        bits_output b.
-        bit_internal t.
+        bits_output c.
         CELL "test" [
-            t <- {(a~~1)::bit},
-            b <- {(SX t)::bits} '%' '0b10
-        ]
-;
-let pex = SOME (ex 'a 'b);
-
+            c <- a '/' {('0b00)::bits}
+        ];
+let pex = SOME (ex 'a 'c);
+let norm (SOME p) = normalize_pexlif p;
 
 
 

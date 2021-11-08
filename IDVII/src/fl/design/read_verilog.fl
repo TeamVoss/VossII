@@ -32,8 +32,10 @@ let find_file search_paths name =
 //
 // Compile Verilog to VossII's internal pexlif type.
 //
-// Usage: read_verilog flags top_level_module file_list
+// Usage: read_verilog no_popup flags top_level_module file_list
 // where
+//  no_popup     = bool flag for displaying yosys report on completion
+//
 //	flags		 = yosys read_verilog flags (see yosys documentation)
 //			   Common one is: -I<path> to add search path
 //
