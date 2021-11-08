@@ -264,7 +264,5 @@ let ex =
 let pex = SOME (ex 'a 'c);
 let norm (SOME p) = normalize_pexlif p;
 
-
-
 // -----------------------------------------------------------------------------
 // Fin.

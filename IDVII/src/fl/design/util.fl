@@ -193,7 +193,7 @@ clet cmerge_vectors nl =
     merge_vectors (merge_consts "" nl)
 ;
 
-let w_depends we =
+let w_get_names we =
     let raw_res = ref [] then
     letrec dep (W_X sz) = ()
      /\    dep (W_NAMED_CONST name sz v) = ()
@@ -216,7 +216,7 @@ let w_depends we =
      /\    dep (W_SX sz w) = (dep w)
      /\    dep (W_ZX sz w) = (dep w)
      /\    dep (W_NOT a)   = dep a
-     /\    dep (W_ITE c t e) = (dep c) fseq(dep t) fseq(dep e)
+     /\    dep (W_ITE c t e) = (dep c) fseq (dep t) fseq (dep e)
      /\    dep (W_SLICE indices w) = dep w
      /\    dep (W_NAMED_SLICE name indices w) = dep w
      /\    dep (W_UPDATE_NAMED_SLICE b name indices w) = (dep b) fseq (dep w)
@@ -225,8 +225,11 @@ let w_depends we =
      /\    dep (W_MEM_WRITE info mem addr data) =
             (dep mem) fseq (dep addr) fseq (dep data)
     in
-    (dep we) fseq
-    let res1 = setify (rev (deref raw_res)) then
+    (dep we) fseq setify (rev (deref raw_res))
+;
+
+let w_depends we =
+    let res1 = w_get_names we then
     let res2 = extract_vectors res1 then
     length res1 = length res2 => res1 | qsort node_name_cmp res2
 ;
@@ -288,6 +291,8 @@ letrec wexpr_size wexpr =
     in
     wsz wexpr
 ;
+
+let wexpr_sizes as = sitlist (defix +) (map wexpr_size as) 0;
 
 let check_memory a_sz lines d_sz addr mem =
 	let mem_sz = wexpr_size mem in
@@ -516,36 +521,3 @@ let w_substitute sub we =
     in
     do we
 ;
-
-letrec
-    w_size (W_X sz) = sz
-/\  w_size (W_CONST sz _) = sz
-/\  w_size (W_NAMED_CONST _ sz _) = sz
-/\  w_size (W_VAR sz _) = sz
-/\  w_size (W_EXPLICIT_VAR sz _) = sz
-/\  w_size (W_AND a _) = w_size a
-/\  w_size (W_OR a _) = w_size a
-/\  w_size (W_NOT a) = w_size a
-/\  w_size (W_EQ a _) = w_size a
-/\  w_size (W_PRED _ c) = w_size c
-/\  w_size (W_GR a _) = w_size a
-/\  w_size (W_ADD a _) = w_size a
-/\  w_size (W_SUB a _) = w_size a
-/\  w_size (W_MUL a _) = w_size a
-/\  w_size (W_DIV a _) = w_size a
-/\  w_size (W_MOD a _) = w_size a
-/\  w_size (W_SHL a _) = w_size a
-/\  w_size (W_SHR a _) = w_size a
-/\  w_size (W_ASHR a _) = w_size a
-/\  w_size (W_SX sz _) = sz
-/\  w_size (W_ZX sz _) = sz
-/\  w_size (W_ITE _ t _) = w_size t
-/\  w_size (W_SLICE is _) = length is
-/\  w_size (W_NAMED_SLICE _ is _) = length is
-/\  w_size (W_UPDATE_NAMED_SLICE _ _ is _) = length is
-/\  w_size (W_CAT ws) = sum (map w_size ws)
-/\  w_size (W_MEM_READ (MEM _ _ sz) _ _) = sz
-/\  w_size (W_MEM_WRITE _ _ _ _) = 0
-;
-
-let w_sizes as = sitlist (defix +) (map w_size as) 0;

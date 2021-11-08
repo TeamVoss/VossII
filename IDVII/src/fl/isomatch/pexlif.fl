@@ -427,7 +427,7 @@ letrec
 /\  shrink_wexpr (W_SLICE is a) =
         [wZ (length is)] @ map (W_SLICE is) (shrink_wexpr a)
 /\  shrink_wexpr (W_CAT as)     =
-        [wZ (w_sizes as)] @ map W_CAT (shrink_list shrink_wexpr as)
+        [wZ (wexpr_sizes as)] @ map W_CAT (shrink_list shrink_wexpr as)
 ;
 // todo: 
 // W_NAMED_CONST {name::string} {sz::int} {v::int}
@@ -827,14 +827,9 @@ begin_abstype;
 
 forward_declare{normalize_wexpr::int->wexpr->(((bool#wexpr#wexpr) list)#(wexpr#(int#int)))};
 
-//  mk_draw_cmd::bool->wexpr->string
-//  mk_draw_cmd phase_delay rhs = ...
-
-let BASE_TMP_S = sprintf "s%s" BASE_TMP;
-
-let IS_BASE n = str_is_prefix BASE_TMP n OR str_is_prefix BASE_TMP_S n;
-
-let NEW_VAR s sz cnt = W_VAR sz (sprintf "%s%d" (s => BASE_TMP_S | BASE_TMP) cnt);
+let BASE_STMP = sprintf "%ss" BASE_TMP;
+let IS_BASE n = str_is_prefix BASE_TMP n OR str_is_prefix BASE_STMP n;
+let NEW_VAR s sz cnt = W_VAR sz (sprintf "%s%d" (s => BASE_STMP | BASE_TMP) cnt);
 
 //  normalize_unary::name->unary_op->arg->((signed?,lhs,rhs)#lhs#name#size)
 let normalize_unary {ix::int} {op::wexpr->wexpr} {a::wexpr} =
@@ -864,7 +859,7 @@ let normalize_slice {ix::int} {is::int list} {a::wexpr} =
         in
         let ws = map slice (group_indices is) in
         let w  = length ws == 1 => hd ws | W_CAT ws in
-        let v  = NEW_VAR F asz aix in
+        let v  = NEW_VAR F (length is) aix in
         ((F, v, w):ass, v, aix+1, length is)
 ;
 
@@ -963,10 +958,8 @@ let normalize_update_fn {ix::int} (W_UPDATE_FN lhs rhs) =
         in
         // Internal wires created during "normalize_wexpr" are prefixed by "_$".
         let is_base (_, W_VAR _ n, _) = IS_BASE n in
-        let decl (_, W_VAR 1  n, _) = n
-        /\  decl (_, W_VAR sz n, _) = sprintf "%s[%d:0]" n (sz-1)
-        in
-        let internals xs = map decl (filter is_base xs) in
+        let pr_name (_, W_VAR s n, _) = mk_name s n in
+        let internals xs = map pr_name (filter is_base xs) in
         // Every (lhs,rhs) pair produced by 'normalize_wexpr' is an sep. update.
         let mk_fn (_, lhs, rhs) = W_UPDATE_FN lhs rhs in
         let updates xs = map mk_fn xs in
@@ -1008,12 +1001,12 @@ letrec
         let act f = (f,[f]) in
         let wrap (W_UPDATE_FN lhs rhs) =
                 let {n::string} = mk_draw_cmd F rhs in
-                let {xs::string list} = get_wbase_names rhs in
-                let {ys::string list} = get_wbase_names lhs in
+                let {xs::string list} = w_get_names rhs in
+                let {ys::string list} = w_get_names lhs in
                 PINST n [] T (map act xs) (map act ys) [] (P_LEAF
                     [W_UPDATE_FN lhs rhs])
         in
-        PINST "" attrs T inps outs internals' (P_HIER (map wrap fs'))
+        PINST name attrs T inps outs internals' (P_HIER (map wrap fs'))
 /\  normalize_pexlif (PINST name attrs F inps outs internals (P_HIER cs)) =
         PINST name attrs F inps outs internals (P_HIER (map normalize_pexlif cs))
 ;
