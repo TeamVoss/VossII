@@ -18,8 +18,9 @@ lettype justification =
 //
 andlettype transform =
                         TRANSFORM
-                            {spec::pexlif}
-                            {imp::pexlif}
+                            {name::string}
+                            {spec::string}	// SHA256 name
+                            {imp::string}	// SHA256 name
                             {justification:: justification list}
 ;
 
@@ -28,6 +29,8 @@ lettype evis =
 		    {vw::vis}
 	|
 	    TR_SEQ 
+		    {parent::string}
+		    {selection::int list}
 		    {vis:: vis ref}
 		    {transforms:: ((pexlif#fsm#justification) list) ref}
 ;
@@ -56,7 +59,7 @@ lettype vfsm =
 ;
 
 let evis2vis (BASE_VIS vis) = vis
- /\ evis2vis (TR_SEQ vr trlr) = deref vr
+ /\ evis2vis (TR_SEQ _ _ vr trlr) = deref vr
 ;
 
 let is_STE_ENV (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = T

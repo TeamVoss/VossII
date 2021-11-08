@@ -92,6 +92,13 @@ my_exec(g_ptr redex)
 }
 
 static void
+do_pid(g_ptr redex)
+{
+    int pid = getpid();
+    MAKE_REDEX_INT(redex, pid);
+}
+
+static void
 noX_mode(g_ptr redex)
 {
     if( gui_mode ) {
@@ -159,6 +166,8 @@ System_Install_Functions()
 			my_exec);
 
     Add_ExtAPI_Function("noX", "", FALSE, GLmake_bool(), noX_mode);
+
+    Add_ExtAPI_Function("pid", "", FALSE, GLmake_int(), do_pid);
 
     Add_ExtAPI_Function("ARGS", "", FALSE, GLmake_list(GLmake_string()), ARGS);
 

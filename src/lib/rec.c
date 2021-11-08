@@ -32,6 +32,7 @@ aligned_new_mgr(rec_mgr_ptr mp, unint size, unint alignment)
     BACK_BLK_PTR(mp->first_blk) = NULL;
     mp->free_rec = NULL;
     mp->allocated = 0;
+    mp->live = 0;
     mp->pure = TRUE;
     mp->initialized = REC_MAGIC_NBR;
 }

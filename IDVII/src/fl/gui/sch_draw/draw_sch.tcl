@@ -108,13 +108,19 @@ proc sc:inform_time_change {w args} {
     }
 }
 
+proc sc:inform_canvas_change {w} {
+    set nb $w.nb
+    set cur_sel [$nb select]
+    fl_set_current_tab_selected $w $cur_sel
+}
+
 proc create_ste_debugger {w} {
     catch {destroy $w}
     toplevel $w
-#    wm geometry $w 70x40-20+100
-wm geometry $w -20+100
+    wm geometry $w -20+100
     set nb $w.nb
     ttk::notebook $nb -width 1200 -height 700
+    bind $nb <<NotebookTabChanged>> [list sc:inform_canvas_change $w]
     pack $nb -side top -expand y -fill both
     set ::sch_window_cnt($w) 0
     set root [w2root $w]
@@ -267,7 +273,7 @@ proc sl:create_stop_node_browser {w p} {
     pack $p.operations -side top -fill x
         pack $p.operations.b -side top
     sl:update_stop_node_list $w
-    bind $w.nb <<NotebookTabChanged>> [list sl:update_stop_node_list $w]
+    bind $w.nb <<NotebookTabChanged>> +[list sl:update_stop_node_list $w]
 }
 
 proc cm:create_commands {w p} {
@@ -605,8 +611,8 @@ proc sch:detach {nb tw} {
 }
 
 proc sch:destroy_canvas {nb tw} {
-    destroy $tw
     fl_remove_active_sch_tab_window $tw.cc.c
+    destroy $tw
 }
 
 proc sc:enter_sch_window  {ww x y X Y} {
@@ -888,9 +894,9 @@ proc add_font_tags {c tag type_tag} {
 proc add_value_field {c aname x y {special_tag ""}} {
     global mfont sfont
     if { $special_tag != "" } {
-	set ttag "$aname $special_tag"
+	set ttag "$aname $special_tag _WiRe_"
     } else {
-	set ttag $aname
+	set ttag "$aname _WiRe_"
     }
     set t [$c create text $x [expr $y-[min_sep $c]/2] \
 		-tags $ttag -text {} -anchor sw -justify left \
@@ -1032,13 +1038,16 @@ proc selection_execute {c wx wy sx sy shift} {
 	set tags {}
 	set wtags {}
 	foreach tag $rtags {
+	    set aname [get_anon_name [$c gettags $tag]]
 	    if [is_wire $c $tag] {
-		eval lappend wtags [get_anon_name [$c gettags $tag]]
+		eval lappend wtags $aname
 	    } else {
-		eval lappend tags [get_anon_name [$c gettags $tag]]
+		eval lappend tags $aname
 	    }
 	}
-	if {$tags == {}} { set tags $wtags }
+	if { ![fl_is_IDV_ENV $c] } {
+	    if {$tags == {}} { set tags $wtags }
+	}
 	set sel_tags [get_anon_name [lsort -unique $tags]]
     }
     if { $sel_tags == {} } {
@@ -1060,12 +1069,16 @@ proc selection_execute {c wx wy sx sy shift} {
 
 proc cb:expand_undo {c} {
     unpost_popup $c
-    set old_zoom $::cur_zoom_factor($c)
-    set_zoom_factor $c 100.0
-    $c delete all
-    fl_undo_expansion $c
-    set_zoom_factor $c $old_zoom
-    catch {cb:restore_attributes $c}
+    if [fl_is_IDV_ENV $c] {
+	fl_do_idv_undo $c
+    } else {
+	set old_zoom $::cur_zoom_factor($c)
+	set_zoom_factor $c 100.0
+	$c delete all
+	fl_undo_expansion $c
+	set_zoom_factor $c $old_zoom
+	catch {cb:restore_attributes $c}
+    }
 }
 
 
@@ -1899,7 +1912,7 @@ proc draw_concat {n c tag x y} {
     set y2 [expr $y+$ht/2]
     set x1 [expr round($x-[min_sep $c]/3)]
     $c create rectangle  $x1 $y1 $x $y2 \
-	    -outline $gcolor -fill $fc -tags $tag
+	    -outline $gcolor -fill $fc -tags "$tag _WiRe_"
     set cy $y1
     set inp_locs {}
     for {set i 1} {$i <= $n} {incr i} {
@@ -1917,7 +1930,8 @@ proc draw_split {c tag x y} {
     set y1 [expr $y-$ht/2]
     set y2 [expr $y+$ht/2]
     set x1 [expr $x-[min_sep $c]/3]
-    $c create rectangle  $x1 $y1 $x $y2 -outline $gcolor -fill $fc -tags $tag
+    $c create rectangle  $x1 $y1 $x $y2 -outline $gcolor -fill $fc \
+	    -tags "$tag _WiRe_"
     set inp_locs {}
     set cy [expr $y1 + [min_sep $c]]
     lappend inp_locs [expr round($x1)] [expr round($cy)]
@@ -2800,7 +2814,7 @@ proc draw_output1 {txt c tag x y} {
     set xt [expr round($x+[min_sep $c])] 
     set t [$c create text $xt $y -anchor w -justify left \
             -font $mfont($c) -text $short_name \
-            -tags $tag -fill $gcolor]
+            -tags "$tag _WiRe_" -fill $gcolor]
     add_font_tags $c $t _IsTeXt_
     add_font_tags $c $t {$txt}
     lappend inp_locs $x $y
@@ -2985,7 +2999,7 @@ proc draw_repeat_nd {c tag x y} {
 				[expr ($y+[ptr_ht $c])] \
 				$xl [expr ($y-[ptr_ht $c])] \
 				-fill black -outline $gcolor \
-				-tags $tag]
+				-tags "$tag _WiRe_"]
     $c addtag RePeAt withtag $rect
     return [list [list $xl $y] [list $x $y]]
 }
