@@ -846,6 +846,13 @@ let normalize_binary {ix::int} {s::bool} {op::wexpr->wexpr->wexpr} {a::wexpr} {b
         ((s, v, op a' b'):(bss@ass), v, bix+1, asz)
 ;
 
+let normalize_cmp {ix::int} {op::wexpr->wexpr->wexpr} {a::wexpr} {b::wexpr} =
+        val (ass, a', aix, _) = normalize_wexpr ix  a in
+        val (bss, b', bix, _) = normalize_wexpr aix b in
+        let v = NEW_VAR F 1 bix in
+        ((F, v, op a' b'):(bss@ass), v, bix+1, 1)
+;
+
 let normalize_slice {ix::int} {is::int list} {a::wexpr} =
         val (ass, a', aix, asz) = normalize_wexpr ix a in
         // Can't have slices on anything but variables.
@@ -904,9 +911,9 @@ letrec
 /\  normalize_wexpr ix (W_AND a b) = normalize_binary ix F W_AND a b
 /\  normalize_wexpr ix (W_OR a b) = normalize_binary ix F W_OR a b
 /\  normalize_wexpr ix (W_NOT a) = normalize_unary ix W_NOT a
-/\  normalize_wexpr ix (W_EQ a b) = normalize_binary ix F W_EQ a b
+/\  normalize_wexpr ix (W_EQ a b) = normalize_cmp ix W_EQ a b
 /\  normalize_wexpr ix (W_PRED n c) = normalize_unary ix (W_PRED n) c
-/\  normalize_wexpr ix (W_GR a b) = normalize_binary ix F W_GR a b
+/\  normalize_wexpr ix (W_GR a b) = normalize_cmp ix W_GR a b
 /\  normalize_wexpr ix (W_ADD a b) = normalize_binary ix F W_ADD a b
 /\  normalize_wexpr ix (W_SUB a b) = normalize_binary ix F W_SUB a b
 /\  normalize_wexpr ix (W_MUL a b) = normalize_binary ix F W_MUL a b
