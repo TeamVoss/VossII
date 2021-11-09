@@ -29,68 +29,89 @@ load "ste.fl";
 //            +-----------|  o_n |-----------+
 //                        +------+       
 let mk_miter p1 p2 =
-      val (PINST n1 a1 l1 fa_inps1 fa_outs1 ints1 chs1) = p1 in
-      val (PINST n2 a2 l2 fa_inps2 fa_outs2 ints2 chs2) = p2 in
-      // -------------------------------------------
-      // Check for same inputs/outputs.
-      let inps1 = setify (md_expand_vectors (flatmap snd fa_inps1)) in
-      let inps2 = setify (md_expand_vectors (flatmap snd fa_inps2)) in
-      let d = inps1 subtract inps2 in
-      d != [] => eprintf "Input mismatch: %S in pexlif 1 but not in pexlif 2" d |
-      let d = inps2 subtract inps1 in
-      d != [] => eprintf "Input mismatch: %S in pexlif 2 but not in pexlif 1" d |
-      let outs1 = setify (md_expand_vectors (flatmap snd fa_outs1)) in
-      let outs2 = setify (md_expand_vectors (flatmap snd fa_outs2)) in
-      let d = outs1 subtract outs2 in
-      d != [] => eprintf "Output mismatch: %S in pexlif 1 but not in pexlif 2" d |
-      let d = outs2 subtract outs1 in
-      d != [] => eprintf "Output mismatch: %S in pexlif 2 but not in pexlif 1" d |
-      // -------------------------------------------
-      // Same inputs and outputs, now rename the outputs.
-      let p1' =
-        let fa_outs1' = map (\(f,as). f,(map (sprintf "P1_%s") as)) fa_outs1 in
-        PINST n1 a1 l1 fa_inps1 fa_outs1' ints1 chs1
-      in
-      let p2' =
-        let fa_outs2' = map (\(f,as). f,(map (sprintf "P2_%s") as)) fa_outs2 in
-        PINST n2 a2 l2 fa_inps2 fa_outs2' ints2 chs2
-      in
-      val (eq_nd, eqs) =
-        let vname = sprintf "_eq[%d:0]" (i_minus (length outs1) 1) then
-        let nds = md_expand_vector vname then
-        (vname, (map (\n. BV_bit (W_VAR 1 n)) nds))
-      in
-      let mk_eq out_i eq_i = 
-        let o1 = BV_bit (W_VAR 1 ("P1_"^out_i)) in
-        let o2 = BV_bit (W_VAR 1 ("P2_"^out_i)) in
-        eq_i <- o1 '=' o2
-      in
-      let AND_bits {l::bit list} =
-        l = [] => eprintf "AND_bits for empty list" |
-        accumulate (defix '&') l
-      in
-      let eq_pexlifs = map2 mk_eq outs1 eqs in
-      let ok_bit = BV_bit (W_VAR 1 "_OK_") in
-      let and_pexlif = ok_bit <- AND_bits eqs then
-      let pfn = "draw_hier miter" in
-      let fa_inps = map (\n. n,[n]) (md_extract_vectors inps1) in
-      let fa_outs = [("_OK_", ["_OK_"])] in
-      let o1s = map (\n. "P1_"^n) outs1 in
-      let o2s = map (\n. "P2_"^n) outs2 in
-      let ints = eq_nd:(md_extract_vectors (o1s @ o2s)) in
-      let children = p1' : p2' : and_pexlif : eq_pexlifs in
-      let mpexlif = PINST pfn [] F fa_inps fa_outs ints (P_HIER children) in
-      let mant = map (\n. (T,n,variable n,0,1)) inps1 in
-      let mcons = [(T,"_OK_",T,0,1)] in
-      (mpexlif, mant, mcons)
+        val (PINST n1 a1 l1 fa_inps1 fa_outs1 ints1 chs1) = p1 in
+        val (PINST n2 a2 l2 fa_inps2 fa_outs2 ints2 chs2) = p2 in
+        // Check that 'p1' & 'p2' inputs are identical.
+        let inps1 = md_expand_vectors (flatmap snd fa_inps1) in
+        let inps2 = md_expand_vectors (flatmap snd fa_inps2) in
+        let d = inps1 subtract inps2 in
+        d != [] => eprintf "Input mismatch: %S in p1 but not in p2" d |
+        let d = inps2 subtract inps1 in
+        d != [] => eprintf "Input mismatch: %S in p2 but not in p1" d |
+        // Check that 'p1' & 'p2' outputs are identical.
+        let outs1 = md_expand_vectors (flatmap snd fa_outs1) in
+        let outs2 = md_expand_vectors (flatmap snd fa_outs2) in
+        let d = outs1 subtract outs2 in
+        d != [] => eprintf "Output mismatch: %S in p1 but not in p2" d |
+        let d = outs2 subtract outs1 in
+        d != [] => eprintf "Output mismatch: %S in p2 but not in p1" d |
+        // Same inputs and outputs, now rename the outputs 'P[1|2]_%s'.
+        let rename i = second (map (sprintf "P%d_%s" i)) in
+        let p1' =
+                let fa_outs1' = map (rename 1) fa_outs1 in
+                PINST n1 a1 l1 fa_inps1 fa_outs1' ints1 chs1
+        in
+        let p2' =
+                let fa_outs2' = map (rename 2) fa_outs2 in
+                PINST n2 a2 l2 fa_inps2 fa_outs2' ints2 chs2
+        in
+        // Ordered, pair-wise comparison of each output from 'p1' and 'p2'.
+        val (eq_nd, eqs) =
+                let vname = sprintf "_eq[%d:0]" (i_minus (length outs1) 1) then
+                let nds = md_expand_vector vname then
+                (vname, (map (\n. BV_bit (W_VAR 1 n)) nds))
+        in
+        let mk_eq out_i eq_i = 
+                let o1 = BV_bit (W_VAR 1 ("P1_"^out_i)) in
+                let o2 = BV_bit (W_VAR 1 ("P2_"^out_i)) in
+                eq_i <- o1 '=' o2
+        in
+        let eq_pexlifs = map2 mk_eq outs1 eqs then
+        // Finally, check that each comparison is true.
+        let AND_bits {l::bit list} =
+                l = [] => eprintf "AND_bits for empty list" | accumulate (defix '&') l
+        in
+        let ok_bit = BV_bit (W_VAR 1 "_OK_") in
+        let and_pexlif = ok_bit <- AND_bits eqs then
+        // Construct pexlif from 'p1', 'p2', and new equality/and gates.
+        let fa_inps = map (\n. n,[n]) (md_extract_vectors inps1) in
+        let fa_outs = [("_OK_", ["_OK_"])] in
+        let o1s = map (\n. "P1_"^n) outs1 in
+        let o2s = map (\n. "P2_"^n) outs2 in
+        let ints = eq_nd : (md_extract_vectors (o1s @ o2s)) in
+        let children = p1' : p2' : and_pexlif : eq_pexlifs in
+        let mpexlif = PINST "draw_hier miter" [] F fa_inps fa_outs ints (P_HIER children) then
+        // We expect the equality to hold for any input.
+        let mant = map (\n. (T,n,variable n,0,1)) inps1 in
+        let mcons = [(T,"_OK_",T,0,1)] in
+        (mpexlif, mant, mcons)
 ;
 
 let miter_test p g =
-      val (miter, ant, cons) = mk_miter p g then
-      let vis = pexlif2fsm miter then
-      let ste = STE "-e -m 10" vis [] ant cons [] then
-      let ok  = get_ste_result ste "" then
-      ok // <- beware symbolic boolean!
+        // Simulate miter test as usual.
+        val (miter, ant, cons) = mk_miter p g then
+        let vis = pexlif2fsm miter then
+        let ste = STE "-e -m 10" vis [] ant cons [] then
+        let ok  = get_ste_result ste "" then // <- beware symbolic boolean!
+        ok == T => T |
+        // If 'ok' is not 'T', is it because some values are 'X'? That is, if
+        // '_eq[?] = X' for some '_eq[?] <- o1 '=' o2', and 'o1' and 'o2' are
+        // both 'X', then 'p' and 'g' could still be equal.
+        let eqs = butfirstn 3 (content_get_children (pexlif_get_content miter)) in
+        let x_or_eq (PINST _ _ _ [(_,[i1]), (_,[i2])] [(_,[eq])] _ _) =
+                // If 'eq[?] = T' then all is fine.
+                val (eq_high, eq_low) = get_trace_val ste eq 1 in
+                (eq_high == T OR eq_low == T) => T |
+                // If not, check if 'i1' & 'i2' are both 'X'.
+                val (i1_high, i1_low) = get_trace_val ste i1 1 in
+                val (i2_high, i2_low) = get_trace_val ste i2 1 in
+                (i1_high == i2_high) AND (i1_low == i2_low) => T |
+                // Otherwise, something truly failed.
+                F
+        in
+        all x_or_eq eqs => print "X?\n" fseq T |
+        // /
+        ok
 ;
 
 // -----------------------------------------------------------------------------
@@ -234,7 +255,7 @@ let debug (SOME p) =
 // -----------------------------------------------------------------------------
 // Manual shrinking...
 
-TYPE "bits" 2;
+// TYPE "bits" 2;
 
 // module test (input wire [1 : 0] in1, output wire [1 : 0] out2);
 //     assign out2 = ({{1{in1[1]}}, in1[1]}) % (2'b10);
@@ -256,12 +277,13 @@ TYPE "bits" 2;
 // ;
 
 let ex =
-        bits_input a.
-        bits_output c.
+        bit_input a.
+        bit_input b.
+        bit_output c.
         CELL "test" [
-            c <- a '/' {('0b00)::bits}
+            c <- a '=' b
         ];
-let pex = SOME (ex 'a 'c);
+let pex = SOME (ex 'a 'b 'c);
 let norm (SOME p) = normalize_pexlif p;
 
 // -----------------------------------------------------------------------------
