@@ -1,0 +1,69 @@
+load "ste.fl";
+
+
+let db = "DB";
+let name = "spec";
+
+open_idv_db db F;
+
+let mnames = get_db_mnames db;
+mnames;
+let p_sha = assoc name mnames;
+p_sha;
+let p = idv_load_pexlif db p_sha;
+//p;
+
+let vertices = ref [];
+let edges = ref [];
+let done = ref [];
+
+let name0 = name;
+let p0 = p;
+
+
+let name = name0;
+let p = p0;
+
+
+let idx = find_first0 (\pp. fst pp == p) (deref done);
+idx;
+idx != 0; // => snd (el idx (deref done)) |
+let vertex_name = sprintf "n%d" (length (deref done));
+vertex_name;
+
+let dc = 
+    let pre = sprintf "%s [shape=oval, style=filled, fillcolor=yellow"
+		      vertex_name
+    in
+    name != "-" =>
+	sprintf "%s, fixedsize=true, label = \"%s\"]\n" pre name
+    |
+	sprintf "%s]\n" pre
+;
+dc;
+
+(vertices := (dc:(deref vertices)));
+
+(done := ((deref done)@[(p,vertex_name)]));
+
+let next_states = get_transform_fanout p;
+map fst next_states;
+
+
+let p_fp = pexlif_get_FP p;
+p_fp;
+
+let all_dbs = (deref cur_idv_rw_transform_db)@
+	      (deref cur_idv_readonly_transform_dbs)
+;
+length all_dbs;
+
+val (sname,fname,mnames,tbl) = hd all_dbs;
+sname;
+fname;
+mnames;
+
+111111111111;
+tbl;
+
+tbl2list tbl;

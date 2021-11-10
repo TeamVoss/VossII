@@ -1,0 +1,5 @@
+load "ste.fl";
+
+//system "/bin/rm -rf DB";
+IDV "DB" [];
+

@@ -1,6 +1,6 @@
 load "ste.fl";
 
-TYPE "word" 10;
+TYPE "word" 8;
 
 let full_adder =
     bit_input	a b cin.
@@ -10,18 +10,23 @@ let full_adder =
 	cout <- a '&' b '|' a '&' cin '|' b '&' cin
 ];
 
+letrec map5 fn (a:as) (b:bs) (c:cs) (d:ds) (e:es) =
+	    (fn a b c d e):(map5 fn as bs cs ds es)
+ /\    map5 fn [] [] [] [] [] = []
+ /\    map5 fn _ _ _ _ _ = error "List length mismatch in map5"
+;
+
 letrec ripple_adder =
-    bit_list_input  al bl.
-    bit_input	    cin.
-    bit_list_output ol.
-    bit_output	    cout.
-    bit_internal    mid.
+    word_input			    a b.
+    bit_input			    cin.
+    word_output			    out.
+    bit_output			    cout.
+    //
+    bit_list_internal (hw_size a)   mids.
     CELL "draw_hier ripple_adder" (
-	al = [] => [cout <- cin] |
-	[
-	    full_adder (hd al) (hd bl) cin (hd ol) mid,
-	    ripple_adder (tl al) (tl bl) mid (tl ol) cout
-	]
+	(cout<- (hd mids)) :
+	(map5 full_adder (tobits a) (tobits b) ((tl mids)@[cin])
+			(tobits out) mids)
 );
 
 
@@ -31,14 +36,17 @@ let adder_spec =
     word_output	o.
     bit_output	cout.
     CELL "adder_spec" [
-	ripple_adder (tobits a) (tobits b) cin (tobits o) cout
+	ripple_adder a b cin o cout
 ];
 
 
 let p = adder_spec 'a 'b 'cin 'o 'cout;
+p fseq 1;
 
+write_pexlif "adder_spec.pexlif" p;
 //STE_debug (pexlif2fsm p);
 
 //system "/bin/rm -rf DB";
-IDV "DB" [];
+//IDV "DB" [];
 
+quit;

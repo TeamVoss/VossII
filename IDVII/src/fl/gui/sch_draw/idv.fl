@@ -52,6 +52,17 @@ let cur_idv_readonly_transform_dbs =
 ;
 
 
+let find_next_anon_name {dummy::void} =
+    val (sname,fname,mnames,tbl) = get_rw_db () then
+    let anons = map fst (filter (\p. str_is_prefix "anon_" (fst p)) mnames) in
+    let next = 
+	anons = [] => 1 |
+	let indices = qsort (defix -) (map (sscanf "anon_%d") anons) in
+	(last indices) + 1
+    in
+    sprintf "anon_%d" next
+;
+
 //
 // Much too simplistic and (fatally) not guaranteed to be valid!
 //
@@ -121,7 +132,7 @@ let load_idv_db sname fname =
     (sname, fname, mnames, list2tbl sig_trfs)
 ;
 
-let fl_save_idv_db {w::string} =
+let fl_save_idv_db {cmd::string} =
     let dbl = deref cur_idv_rw_transform_db then
     dbl = [] => () |
     val (sname,fname,mnames, tbl) = hd dbl then
@@ -132,7 +143,8 @@ let fl_save_idv_db {w::string} =
 	system (sprintf "/bin/mv -f %s %s.bkp" db_file db_file) fseq ()
     ) fseq
     (write_idv_trfm_info db_file data) fseq 
-    // Remove lock file
+    cmd != "exit" => () |
+    // If exit, remove lock file and clean up
     let cmd = sprintf "/bin/rm -f %s/lock" fname in
     (system cmd) fseq
     (cur_idv_rw_transform_db := [])
@@ -354,6 +366,21 @@ let fl_is_toplevel_transform canvas =
 export_to_tcl fl_is_toplevel_transform;
 
 
+let unfold_all_labeled p lbl =
+    letrec do1 p =
+	val (PINST nm attrs lf fa_inps fa_outs ints (P_HIER chs)) = p in
+	let idx = find_first0 (\p. pexlif_get_name p = lbl) chs in
+	idx = 0 => p |
+	let p' = unfold_pexlif p idx then
+	do1 p'
+    in
+    do1 p
+;
+
+let rename_name (PINST _ attrs lf fa_inps fa_outs ints body) new_name =
+    PINST new_name attrs lf fa_inps fa_outs ints body
+;
+
 let idv_finish_transformation canvas =
     let vfsm = w2vfsm canvas in
     let trfs = get_idv_info canvas then
@@ -362,13 +389,21 @@ let idv_finish_transformation canvas =
     let resl = tcl2list (tcl_eval ["idv:name_transform_and_use "^canvas]) then
     let op = el 1 resl in
     let transform_name = el 2 resl in
-    let model_name = el 3 resl in
+    let tent_model_name = el 3 resl in
     op = "Cancel" => () |
     let imp = fst (hd trfs) in
     let spec = fst (last trfs) in
     let imp_sha  = idv_save_pexlif imp then
     let spec_sha = idv_save_pexlif spec then
     let spec_fp = pexlif_get_FP spec then
+    // Name the implementation pexlif
+    let model_name =
+	tent_model_name = "." => find_next_anon_name () | tent_model_name
+    then
+    val (sname,fname,mnames,tbl) = get_rw_db () then
+    let mnames' = (model_name,imp_sha):mnames then
+    (cur_idv_rw_transform_db := [(sname,fname,mnames', tbl)]) fseq
+    // Now save the transformation
     let tr = TRANSFORM transform_name spec_sha imp_sha just then
     (record_transformation spec_fp tr) fseq
     op = "Save" => () |
@@ -392,7 +427,34 @@ let idv_finish_transformation canvas =
 	eprintf "Parent circuit has changed. Cannot apply the transformation"
     |
     op = "SaveAndApplyEverywhere" =>
-	(fprintf stderr "Save & Apply Everywhere\n")
+	val (parent,sell) = get_idv_parent_info canvas then
+	let tab = tcl_eval [sprintf "nb:c2tab %s %s" (vfsm2id vfsm) parent] then
+	let pp = get_idv_current_pexlif parent then
+	let matches = isomatch spec pp then
+	let groups = map (map (fst # snd)) matches then
+	let nbr_groups = length groups then
+	let lbl = "_#*&_&*#_" in
+	let pp' = foldn_pexlif pp groups lbl then
+	let imps =
+	    letrec do_sub (cp:cps) (m:ms) =
+		let matches = map (snd # snd) m then
+		let subs = map get_match_sub  matches then
+		let cp_sub = get_value (actualize_hier subs imp cp) then
+		let cp' = rename_name (pex_subst_actuals imp cp_sub) lbl then
+		cp' : (do_sub cps ms)
+	     /\   do_sub [] [] = []
+	    in
+	    do_sub (firstn nbr_groups (pexlif_get_children pp')) matches
+	then
+	val (PINST n attrs lf fa_inps fa_outs ints (P_HIER children)) = pp' then
+	let children' = imps@(butfirstn nbr_groups children) then
+	let tmp = PINST n attrs lf fa_inps fa_outs ints (P_HIER children') then
+	let res = unfold_all_labeled tmp lbl then
+	(add_transform parent res (REPLACE sell tr)) fseq
+	let cmd = sprintf "replace_all vis %s \"%s\";"
+			  (list2str T "[" "," "]" int2str sell) transform_name
+	in
+	refresh_idv_canvas parent cmd
     |
     eprintf "Illegal operation '%s'\n" op
 ;
@@ -632,7 +694,7 @@ let fl_do_new_tranf canvas =
     let il = get_selected_pinsts canvas then
     let parent = get_idv_current_pexlif canvas then
     // This code relies on fold_pexlif putting the new instance first!!!!
-    let p' = fold_pexlif parent il "_TMP_" then
+    let p' = fold_pexlif parent il "_TMP1_" then
     val (PINST _ _ _ _ _ _ (P_HIER chs)) = p' in
     let p = el 1 chs then
     //
@@ -660,16 +722,6 @@ let fl_do_new_tranf canvas =
 ;
 export_to_tcl fl_do_new_tranf;
 
-let find_next_anon_name mnames =
-    let anons = map fst (filter (\p. str_is_prefix "anon_" (fst p)) mnames) in
-    let next = 
-	anons = [] => 1 |
-	let indices = qsort (defix -) (map (sscanf "anon_%d") anons) in
-	(last indices) + 1
-    in
-    sprintf "anon_%d" next
-;
-
 let fl_model_name_used name =
     val (sname,fname,mnames,tbl) = get_rw_db () then
     let idx = find_first0 (\p. fst p = name) mnames then
@@ -681,7 +733,7 @@ let fl_do_name_model canvas name version =
     val (sname,fname,mnames,tbl) = get_rw_db () then
     let idx = find_first0 (\p. fst p = name) mnames then
     (idx != 0) => eprintf "Model %s already exists" name |
-    let name = (name != ".") => name | find_next_anon_name mnames then
+    let name = (name != ".") => name | find_next_anon_name () then
     let trfs = get_idv_info canvas then
     let p = fst (version = "specification" => (last trfs) | (hd trfs)) then
     let p_sha  = idv_save_pexlif p then
@@ -711,7 +763,7 @@ let get_transform_fanout p =
     then
     let get_fanout (sname,fname,mnames,tbl) =
 	let get_info (TRANSFORM name sha_spec sha_imp just) =
-	    let id = sprintf "  %s:%s" sname name in
+	    let id = sprintf " %s:%s" sname name in
 	    let dest = (rev_assoc sha_imp mnames) catch "-" in
 	    (id, dest, (idv_load_pexlif sname sha_imp))
 	in
@@ -721,7 +773,7 @@ let get_transform_fanout p =
 ;
 
 
-let fl_do_new_toplevel_tranf {w::string} db name =
+let fl_do_new_toplevel_transf {w::string} db name =
     (CHECK_FOR_RW_DB ()) fseq
     let mnames = get_db_mnames db then
     let p_sha = assoc name mnames then
@@ -732,7 +784,7 @@ let fl_do_new_toplevel_tranf {w::string} db name =
     (tcl_eval [sprintf "idv:name_and_save_model %s specification %s" w name])
     fseq ()
 ;
-export_to_tcl fl_do_new_toplevel_tranf;
+export_to_tcl fl_do_new_toplevel_transf;
 
 
 let fl_display_transform_tree canvas db name =
@@ -748,8 +800,9 @@ let fl_display_transform_tree canvas db name =
 	let idx = find_first0 (\pp. fst pp == p) (deref done) then
 	idx != 0 => snd (el idx (deref done)) |
 	let vertex_name = sprintf "n%d" (length (deref done)) then
-	(vertex_map := ((vertex_name,name):(deref vertex_map))) fseq
-	let dc = sprintf "%s [shape=box, width=0.10, height=0.10, fillcolor=yellow, fixedsize=shape, label = \"%s\"]\n"
+	let ext_name = sprintf "%s:%s" db name in
+	(vertex_map := ((vertex_name,ext_name):(deref vertex_map))) fseq
+	let dc = sprintf "%s [shape=box, width=0.20, height=0.10, fillcolor=yellow, fixedsize=shape, label = \"%s\"]\n"
 			vertex_name vertex_name
 	then
 	(vertices := (dc:(deref vertices))) fseq
@@ -797,6 +850,40 @@ let fl_display_transform_tree canvas db name =
     ()
 ;
 export_to_tcl fl_display_transform_tree;
+
+let fl_import_model w filename =
+    let p = read_pexlif filename then
+    let tent_name = pexlif_get_name p then
+    let name = 
+	NOT (fl_model_name_used tent_name) => tent_name |
+	tcl_eval ["idv:ask_for_model_name "^w]
+    then
+    val (sname,fname,mnames,tbl) = get_rw_db () then
+    let p_sha  = idv_save_pexlif p then
+    let mnames' = (name,p_sha):mnames then
+    (cur_idv_rw_transform_db := [(sname,fname,mnames', tbl)]) fseq
+    (tcl_eval ["idv:update_idv_list"]) fseq
+    ()
+;
+export_to_tcl fl_import_model;
+
+//let fl_do_fev canvas filename =
+//    let vfsm = w2vfsm canvas then
+//    let w = vfsm2id vfsm then
+//    let il = get_selected_pinsts canvas then
+//    let parent = get_idv_current_pexlif canvas then
+//    // This code relies on fold_pexlif putting the new instance first!!!!
+//    let p' = fold_pexlif parent il "_TMP_" then
+//    val (PINST _ _ _ _ _ _ (P_HIER chs)) = p' in
+//    let spec = el 1 chs then
+//    let imp = read_pexlif filename then
+//    val (pmiter,ant) = mk_miter spec imp then
+//    
+
+
+
+
+
 
 //let fl_do_replacement canvas =
 //    let vfsm = w2vfsm canvas then

@@ -358,25 +358,25 @@ let isomatch p g =
 //         concat (ixmap match gs)
 // ;
 
-end_abstype isomatch;
+end_abstype actualize_hier isomatch;
 
 // -----------------------------------------------------------------------------
 // Replace sub-circuits with a given match.
 
 // begin_abstype;
 
-// let fa_subst_actuals (f,as) sub = (f,map (flip assoc sub) as);
+let fa_subst_actuals (f,as) sub = (f,map (flip assoc sub) as);
 
-// let pex_subst_actuals (PINST name as l fa_inps fa_outs internals content) sub =
-//       let fa_inps' = map (flip fa_subst_actuals sub) fa_inps in
-//       let fa_outs' = map (flip fa_subst_actuals sub) fa_outs in
-//       PINST name as l fa_inps' fa_outs' internals content
-// ;
+let pex_subst_actuals (PINST name as l fa_inps fa_outs internals content) sub =
+      let fa_inps' = map (flip fa_subst_actuals sub) fa_inps in
+      let fa_outs' = map (flip fa_subst_actuals sub) fa_outs in
+      PINST name as l fa_inps' fa_outs' internals content
+;
 
-// let replace p (M_LEAF sub) = pex_subst_actuals p sub
-// /\  replace _ (M_HIER _ _) =
-//       eprintf "Match found but not complete (haystack > needle)."
-// ;
+//let replace p (M_LEAF sub) = pex_subst_actuals p sub
+///\  replace _ (M_HIER _ _) =
+//      eprintf "Match found but not complete (haystack > needle)."
+//;
 
 // let replace_folded p g m =
 //       val (PINST n a l i o t (P_HIER [_])) = g in

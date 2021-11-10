@@ -330,7 +330,7 @@ proc display_dot {dot_pgm {w ""} {close_fun ""}} {
     update idletasks
 
     ;# Create maps from node/edge name to tag of drawn symbol
-    catch {unset ::dot_node2circle_tag}
+    catch {unset ::dot_node2node_fig_tag}
     catch {unset ::dot_node2text_tag}
     catch {unset ::dot_edge2line_tag}
     catch {unset ::dot_edge2text_tag}
@@ -341,7 +341,7 @@ proc display_dot {dot_pgm {w ""} {close_fun ""}} {
             $c addtag "_IsTeXt_" withtag $tag
             if [regexp "0node.*" $tag] {
                 set rtag "1[string range $tag 1 end]"
-                set ::dot_node2circle_tag($c,$txt) $rtag
+                set ::dot_node2node_fig_tag($c,$txt) $rtag
                 set ::dot_node2text_tag($c,$txt) $tag
             } elseif [regexp "0edge.*" $tag] {
                 set rtag "1[string range $tag 1 end]"

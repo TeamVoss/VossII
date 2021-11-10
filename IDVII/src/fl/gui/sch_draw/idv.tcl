@@ -13,11 +13,11 @@ proc idv:create_idv_gui {w} {
     wm geometry $w -20+100
     set nb $w.nb
     ttk::notebook $nb -width 1200 -height 700
-    bind $nb <<NotebookTabChanged>> [list sc:inform_canvas_change $w]
+    bind $nb <<NotebookTabChanged>> [list idv:inform_canvas_change $w]
     pack $nb -side top -expand y -fill both
     set ::sch_window_cnt($w) 0
     bindtags $w top_level_idv_window
-    bind top_level_idv_window <Destroy> [list fl_save_idv_db $w]
+    bind top_level_idv_window <Destroy> [list fl_save_idv_db exit]
     $nb add [frame $nb.idv] -text "IDV Home"
 
     # Now make the front page
@@ -30,6 +30,7 @@ proc idv:create_idv_gui {w} {
         frame $pw.tr_dag
         $pw add $pw.tr_dag
 	set ww $pw.tr_dag
+	set ::idv(front_page) $ww
 	#
 	# Canvas for transformations
 	#
@@ -75,6 +76,7 @@ proc idv:create_idv_gui {w} {
 	# Model browser
 	#
 	set p $pw.model_browser
+	set ::idv(model_browser) $p
 	ttk::labelframe $p.search -text "Search:"
 	    #
 	    ttk::labelframe $p.search.lbl -relief flat -text \
@@ -98,7 +100,7 @@ proc idv:create_idv_gui {w} {
 		    [list $p.search.refresh invoke]
 	    set ::modelbrowser(pattern) {*}
 	    ttk::button $p.search.refresh -text Refresh \
-		    -command [list idv:update_idv_list $p $p.lf.list]
+		    -command idv:update_idv_list
 	pack $p.search -side top -pady 10 -fill x
 	    pack $p.search.lbl -side top -fill x
 		pack $p.search.lbl.c -side left -fill x -expand yes
@@ -106,14 +108,14 @@ proc idv:create_idv_gui {w} {
 		pack $p.search.pat_lbl.c -side left -fill x -expand yes
 	    pack $p.search.refresh -side top -fill x
 	set f $p.lf
+	set ::idv(front_page_listbox) $f.list
 	frame $f -relief flat
 	scrollbar $f.yscroll -command "$f.list yview"
 	scrollbar $f.xscroll -orient horizontal -command "$f.list xview"
 	listbox $f.list -setgrid 1 \
 	    -yscroll "$f.yscroll set" -xscroll "$f.xscroll set" \
 	    -selectmode single -font $::voss2_txtfont
-	bind $f.list <<ListboxSelect>> \
-	    "idv:display_transformations $w $f.list $ww"
+	bind $f.list <<ListboxSelect>> "idv:display_transformations"
 	pack $f.yscroll -side right -fill y
 	pack $f.xscroll -side bottom -fill x
 	pack $f.list -side top -fill both -expand yes
@@ -121,28 +123,50 @@ proc idv:create_idv_gui {w} {
 	set b $p.buttons
 	frame $b -relief flat
 	    button $b.quit -text Exit -command "destroy $w"
-	    frame $b.sp -relief flat
+	    frame $b.sp1 -relief flat
+	    button $b.save -text Save -command "fl_save_idv_db save"
+	    frame $b.sp2 -relief flat
+	    button $b.import -text "Import model" \
+		    -command "idv:import_model $w"
+	    frame $b.sp3 -relief flat
 	    button $b.new -text "New transform" \
 		    -command "idv:new_toplevel_transf $w $f.list"
 	    pack $b.quit -side left -expand yes
-	    pack $b.sp -side left -expand yes
+	    pack $b.sp1 -side left -expand yes
+	    pack $b.save -side left -expand yes
+	    pack $b.sp2 -side left -expand yes
+	    pack $b.import -side left -expand yes
+	    pack $b.sp3 -side left -expand yes
 	    pack $b.new -side left -expand yes
 	pack $b -side top -fill x
 
 	# Populate listbox (probably need to limit thenumber of models...)
-	idv:update_idv_list $p $p.lf.list
+	idv:update_idv_list
 }
 
-proc idv:display_transformations {w sl ww} {
+proc idv:inform_canvas_change {w} {
+    set nb $w.nb
+    set cur_idx [$nb index [$nb select]]
+    if { $cur_idx == 0 } {
+	after idle idv:display_transformations
+    }
+}
+
+
+proc idv:display_transformations {} {
+    if { ![info exists ::idv(front_page_listbox)] } { return } 
+    set sl $::idv(front_page_listbox)
     set idx [$sl curselection]
     if { $idx != "" } {
 	set cur [$sl get [$sl curselection]]
 	set db $::modelbrowser(db)
-	fl_display_transform_tree $ww $db $cur
+	fl_display_transform_tree $::idv(front_page) $db $cur
     }
 }
 
-proc idv:update_idv_list {w lb} {
+proc idv:update_idv_list {} {
+    set w $::idv(model_browser)
+    set lb $w.lf.list
     $lb delete 0 end
     set db $::modelbrowser(db)
     set pat $::modelbrowser(pattern)
@@ -155,10 +179,14 @@ proc idv:update_idv_list {w lb} {
 
 
 proc idv:perform_model_save {w npw version} {
-    while { [fl_model_name_used $::idv_prompt_name] } {
+    if { $::idv_prompt_name == "" } {
+	$npw.error.l configure -text "Must provide a name." -fg red
+    } elseif { [fl_model_name_used $::idv_prompt_name] } {
 	$npw.error.l configure -text "Name already in use!" -fg red
+    } else {
+	fl_do_name_model $w.c $::idv_prompt_name $version
+	destroy $npw
     }
-    fl_do_name_model $w.c $::idv_prompt_name $version
 }
 
 proc idv:name_and_save_model {w version {default ""} } {
@@ -189,8 +217,6 @@ proc idv:name_and_save_model {w version {default ""} } {
             pack $npw.b.cancel -side left -fill x
             pack $npw.b.sep -side left -fill x -expand yes
             pack $npw.b.ok -side left -fill x
-
-
 }
 
 proc idv:create_idv_menu {nb w} {
@@ -238,7 +264,7 @@ proc idv:create_idv_menu {nb w} {
 
         button $w.menu.fev -image $::icon(fev) \
                 -command "idv:fev $w"
-        balloon $w.menu.fev "Run FEV"
+        balloon $w.menu.fev "Replace with new design that has been FEV-ed"
         pack $w.menu.fev -side left -padx 5
 
 }
@@ -281,12 +307,24 @@ proc idv:merge {w} { fl_do_merge $w.c }
 
 proc idv:new_transf {w} { fl_do_new_tranf $w.c }
 
+proc idv:fev {w} {
+    set types {
+        {{pexlif}      {.pexlif}        }
+        {{All Files}        *             }
+    }
+    set file [tk_getOpenFile -filetypes $types -defaultextension ".pexlif" \
+                                 -title "Pexlif file to load"]
+    if {$file ne ""} {
+	fl_do_fev $w.c $file
+    }
+}
+
 proc idv:new_toplevel_transf {w sl} {
     set idx [$sl curselection]
     if { $idx != "" } {
         set cur [$sl get [$sl curselection]]
         set db $::modelbrowser(db)
-	fl_do_new_toplevel_tranf $w $db $cur
+	fl_do_new_toplevel_transf $w $db $cur
     }
 }   
 
@@ -294,13 +332,14 @@ proc idv:perform_name_transf {w c op} {
     set ::idv(transf_op) $op
     if { $op == "Cancel" } {
 	destroy $w
+	return
     }
     if { $::idv(transf_name) == "" } {
 	$w.errors.l configure \
 	    -text "Error: Must provide a name for the transformation" \
 			-fg red
     } elseif { [fl_is_toplevel_transform $c] \
-		&& $::idv(model_name) == "" } {
+		&& $::idv(imp_name) == "" } {
 	$w.errors.l configure \
 	    -text "Error: Must provide a name for toplevel models" -fg red
     
@@ -315,29 +354,40 @@ proc idv:name_transform_and_use {c} {
     i_am_busy
     vis_toplevel $w $c {} {} "Name transform"
     set toplevel_transf [fl_is_toplevel_transform $c]
-    set ::idv(model_name) ""
+    set ::idv(spec_name) ""
+    set ::idv(imp_name) ""
+    #
+    if { $toplevel_transf == 0 } {
+	frame $w.spec_name
+	pack $w.spec_name -side top -fill x
+	    label $w.spec_name.l -text "Optional name of specification: "
+	    entry $w.spec_name.e -textvariable ::idv(spec_name) -width 30
+	    pack $w.spec_name.e -side right
+	    pack $w.spec_name.l -side left -fill x -anchor w
+    }
     #
     frame $w.namef
     set ::idv(transf_name) ""
-    pack $w.namef -side top -fill x -expand yes
+    pack $w.namef -side top -fill x
 	label $w.namef.l -text "Name of transformation: "
-	entry $w.namef.e -textvariable ::idv(transf_name)
-	pack $w.namef.l -side left
-	pack $w.namef.e -side left -fill x -expand yes
+	entry $w.namef.e -textvariable ::idv(transf_name) -width 30
+	pack $w.namef.e -side right
+	pack $w.namef.l -side left -fill x -anchor w
+
     #
-    frame $w.model_name
-    pack $w.model_name -side top -fill x -expand yes
+    frame $w.imp_name
+    pack $w.imp_name -side top -fill x
 	if { $toplevel_transf } {
-	    label $w.model_name.l -text "Name of final model: "
+	    label $w.imp_name.l -text "Name of final model: "
 	} else {
-	    label $w.model_name.l -text "Optional name of final model: "
+	    label $w.imp_name.l -text "Optional name of final model: "
 	}
-	entry $w.model_name.e -textvariable ::idv(model_name)
-	pack $w.model_name.l -side left
-	pack $w.model_name.e -side left -fill x -expand yes
+	entry $w.imp_name.e -textvariable ::idv(imp_name) -width 30
+	pack $w.imp_name.e -side right
+	pack $w.imp_name.l -side left -fill x -anchor w
 
     frame $w.buttons
-    pack $w.buttons -side top -fill x
+    pack $w.buttons -side top
 	button $w.buttons.cancel -text Cancel \
 	    -command "idv:perform_name_transf $w $c Cancel"
 	pack $w.buttons.cancel -side left -padx 10
@@ -354,23 +404,27 @@ proc idv:name_transform_and_use {c} {
 	    pack $w.buttons.appln -side left -padx 10
 	}
     frame $w.errors
-	label $w.errors.l -text "" -width 300
+	label $w.errors.l -text ""
 	pack $w.errors.l -side top -fill x
     pack $w.errors -side top
 
     tkwait window $w
     i_am_free
-    if { $::idv(model_name) == "" } {
-	set ::idv(model_name) "."
+    if { $::idv(spec_name) == "" } {
+	set ::idv(spec_name) "."
     }
-    return [list $::idv(transf_op) $::idv(transf_name) $::idv(model_name)]
+    if { $::idv(imp_name) == "" } {
+	set ::idv(imp_name) "."
+    }
+    return [list $::idv(transf_op) $::idv(transf_name) $::idv(imp_name)]
 }
 
 proc idv:update_transf_canvas {c} {
     foreach node [array names ::idv_transf_node_map] {
 	if { $::idv(show_model_name) } {
+	    regexp {([^:]*):(.*)} $::idv_transf_node_map($node) -> db model_name
 	    $c itemconfigure $::dot_node2text_tag($c,$node) \
-		    -text " $::idv_transf_node_map($node)" -anchor w
+		    -text " $model_name" -anchor w
 	} else {
 	    $c itemconfigure $::dot_node2text_tag($c,$node) \
 		    -text ""
@@ -378,8 +432,9 @@ proc idv:update_transf_canvas {c} {
     }
     foreach edge [array names ::idv_transf_edge_map] {
 	if { $::idv(show_transform_name) } {
+	    regexp {([^:]*):(.*)} $::idv_transf_edge_map($edge) -> db edge_name
 	    $c itemconfigure $::dot_edge2text_tag($c,$edge) \
-		    -text $::idv_transf_edge_map($edge) -anchor w
+		    -text $edge_name -anchor w
 	} else {
 	    $c itemconfigure $::dot_edge2text_tag($c,$edge) -text ""
 	}
@@ -387,9 +442,70 @@ proc idv:update_transf_canvas {c} {
 
 }
 
+proc idv:show_model_menu {c node x y} {
+    set m $c.sm
+    catch {destroy $m}
+    menu $m -tearoff 0
+    set full_name  $::idv_transf_node_map($node)
+    set matches [regexp {([^:]*):(.*)} $full_name -> db model_name]
+    $m add command -label "Rename model" \
+	-command "fl_do_rename_model $c $db $model_name"
+    $m add command -label "New transformation" \
+	-command "fl_do_new_toplevel_transf [winfo toplevel $c] $db $model_name"
+    tk_popup $m $x $y
+}
+
 proc idv:show_transformations {dot_file w} {
     set c $w.c
     display_dot $dot_file $w
     idv:update_transf_canvas $c
+
+    foreach node [array names ::idv_transf_node_map] {
+	set fig_tag $::dot_node2node_fig_tag($c,$node)
+	$c bind $fig_tag <ButtonPress-3> \
+	    "idv:show_model_menu $c $node %X %Y; break"
+	$c itemconfigure $fig_tag -fill yellow
+	set txt_tag $::dot_node2text_tag($c,$node)
+	$c bind $txt_tag <ButtonPress-3> \
+	    "idv:show_model_menu $c $node %X %Y; break"
+    }
 }
 
+proc idv:import_model {w} {
+    set types {
+        {{pexlif}      {.pexlif}        }
+        {{All Files}        *             }
+    }
+    set file [tk_getOpenFile -filetypes $types -defaultextension ".pexlif" \
+                                 -title "Pexlif file to load"]
+    if {$file ne ""} {
+	fl_import_model $w $file
+    }
+}
+
+proc idv:ask_for_model_name {w} {
+    set npw .idv_name_prompt
+    catch {destroy $npw}
+    set ::idv_prompt_name ""
+
+    vis_toplevel $npw $w {} {} "Name model"
+        frame $npw.t -relief flat
+        pack $npw.t -side top -fill x
+            label $npw.t.l -text "Name of model: "
+            ttk::entry $npw.t.e -textvariable ::idv_prompt_name -width 20
+            bind $npw.t.e <KeyPress-Return> "destroy $npw"
+            pack $npw.t.l -side left
+            pack $npw.t.e -side left -fill x -expand yes
+        frame $npw.error -relief flat
+        pack $npw.error -side top -fill x
+            label $npw.error.l -text ""
+            pack $npw.error.l -side left -fill x
+
+        frame $npw.b -relief flat
+        pack $npw.b -side top -fill x
+            button $npw.b.ok -text Ok -command "destroy $npw"
+            pack $npw.b.ok -side left -fill x
+
+    tkwait window $npw
+    return $::idv_prompt_name
+}
