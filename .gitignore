@@ -15,5 +15,6 @@ y.tab.c
 /src/bin/fl/abi_version.h
 /bin/
 /vosslib/
+/isomatches/
 .yosys*
 TAGS

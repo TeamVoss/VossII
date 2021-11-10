@@ -1,0 +1,6 @@
+read_verilog -I. /tmp/voss2_mararon_rp0d9v/test_verilog_Db3Qb7/test.v
+hierarchy -check -top test
+proc; opt
+rename -enumerate -pattern TmP_%
+opt
+write_pexlif -noalias -icells -gates -impltf _out.fl

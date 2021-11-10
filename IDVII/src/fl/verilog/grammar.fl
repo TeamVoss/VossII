@@ -31,12 +31,82 @@ lettype identifier = ID (string);
 // A.8.8 Strings ---------------------------------------------------------------
 // A.8.7 Numbers ---------------------------------------------------------------
 
-// number ::= decimal_number | octal_number | binary_number | hex_number | real_number
-lettype number = X | Z | Num (int);
+// Note:
+// > "An 'x' represents the unknown value in hexadecimal, octal, and binary
+// constants. An 'x' shall set 4 bits to unknown in the hexadecimal base, 3 bits
+// in the octal base, and 1 bit in the binary base. Similarly, a 'z' ..."
+//
+// > For simplicity, I do not seperate binary/octla/decimal/positive-decimal/hex
+// values as Verilog does. They are all subsets of hex values anyways, just be
+// sure to construct legal values.
+//
+// x_digit       ::= x | X
+// z_digit       ::= z | Z | ?
+// binary_digit  ::= x_digit | z_digit | 0 | 1
+// octal_digit   ::= x_digit | z_digit | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
+// decimal_digit ::=                     0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+// hex_digit     ::= x_digit | z_digit | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+//                                     | a | b | c | d | e | f
+//                                     | A | B | C | D | E | F
+lettype value = VAL (string);
 
-// todo: ..
-new_type_abbrev unsigned_number = number;
-new_type_abbrev real_number = number;
+// unsigned_number ::= decimal_digit { _ | decimal_digit }
+lettype unsigned_number = UNUM (int);
+
+// size ::= non_zero_unsigned_number
+// non_zero_unsigned_number ::= non_zero_decimal_digit { _ | decimal_digit}
+// non_zero_decimal_digit ::= 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+lettype size = SIZE (int);
+
+// decimal_number ::=
+//     unsigned_number
+//   | [ size ] decimal_base unsigned_number
+//   | [ size ] decimal_base x_digit { _ }
+//   | [ size ] decimal_base z_digit { _ }
+lettype decimal_number = DEC (unsigned_number);
+
+// binary_number ::= [ size ] binary_base binary_value
+// binary_base   ::= '[s|S]b | '[s|S]B
+// binary_value  ::= binary_digit { _ | binary_digit }
+lettype binary_number = BIN ({size} opt) (bool) (value);
+
+// octal_number ::= [ size ] octal_base octal_value
+// octal_base   ::= '[s|S]o | '[s|S]O
+// octal_value  ::= octal_digit { _ | octal_digit }
+lettype octal_number = OCT ({size} opt) (bool) (value);
+
+// hex_number ::= [ size ] hex_base hex_value
+// hex_base   ::= '[s|S]h | '[s|S]H
+// hex_value  ::= hex_digit { _ | hex_digit }
+lettype hex_number = HEX ({size} opt) (bool) (value);
+
+// real_number ::=
+//     unsigned_number "." unsigned_number
+//   | unsigned_number [ "." unsigned_number ] exp [ sign ] unsigned_number
+// exp ::= e | E
+// sign ::= + | -
+lettype real_number =
+    REAL (unsigned_number) (unsigned_number)
+  | REAL_exp
+      (unsigned_number)
+      ({unsigned_number} opt)
+      ({bool} opt)
+      (unsigned_number)
+;
+
+// number ::=
+//     decimal_number
+//   | octal_number
+//   | binary_number
+//   | hex_number
+//   | real_number
+lettype number =
+    NUM_bin (binary_number)
+  | NUM_oct (octal_number)
+  | NUM_dec (decimal_number)
+  | NUM_hex (hex_number)
+  | NUM_real (real_number)
+;
 
 // A.8.6 Operators -------------------------------------------------------------
 

@@ -40,7 +40,54 @@ let p_hierarchical_identifier (HID (NONE) i) =
         <-> p_identifier i
 ;
 
-let p_number (Num i) = text (int2str i);
+let p_value (VAL s) = text s;
+
+let p_unsigned_number (UNUM u) = text (int2str u);
+
+let p_size (SIZE i) = text (int2str i);
+
+let p_binary_number (BIN s' u v) =
+            p_opt p_size s'
+        <-> text "'"
+        <-> p_when (NOT u) (text "s")
+        <-> text "b"
+        <-> p_value v
+;
+
+let p_octal_number (OCT s' u v) =
+            p_opt p_size s'
+        <-> text "'"
+        <-> p_when (NOT u) (text "s")
+        <-> text "o"
+        <-> p_value v
+;
+
+let p_decimal_number (DEC u) = p_unsigned_number u;
+
+let p_hex_number (HEX s' u v) =
+            p_opt p_size s'
+        <-> text "'"
+        <-> p_when (NOT u) (text "s")
+        <-> text "h"
+        <-> p_value v
+;
+
+let p_real_number (REAL a b) =
+        p_unsigned_number a <-> text "." <-> p_unsigned_number b
+/\  p_real_number (REAL_exp a b' s' c) =
+            p_unsigned_number a
+        <-> p_opt (\b. text "." <-> p_unsigned_number b) b'
+        <-> text "E"
+        <-> p_opt (\s. s => text "+" | text "-") s'
+        <-> p_unsigned_number c
+;
+
+let p_number (NUM_bin b) = p_binary_number b
+/\  p_number (NUM_oct o) = p_octal_number o
+/\  p_number (NUM_dec d) = p_decimal_number d
+/\  p_number (NUM_hex h) = p_hex_number h
+/\  p_number (NUM_real r) = p_real_number r
+;
 
 let p_unary_operator (U_pos) = text "+"
 /\  p_unary_operator (U_neg) = text "-"
@@ -349,8 +396,8 @@ let p_variable_port_identifier (VPI i (NONE)) = p_identifier i
       p_identifier i <+> text "=" <+> p_constant_expression c
 ;
 
-let p_delay_value (Delay_value_unum unum) = p_number unum
-/\  p_delay_value (Delay_value_real rnum) = p_number rnum
+let p_delay_value (Delay_value_unum unum) = p_unsigned_number unum
+/\  p_delay_value (Delay_value_real rnum) = p_real_number rnum
 /\  p_delay_value (Delay_value_id i) = p_identifier i
 ;
 

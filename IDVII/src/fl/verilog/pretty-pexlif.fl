@@ -2,33 +2,99 @@ load (DIR^"grammar.fl");
 load (DIR^"pretty.fl");
 load (DIR^"pretty-verilog.fl");
 load (DIR^"../design/misc.fl");
+load (DIR^"../design/util.fl");
 
 // =============================================================================
 // "Pretty-printing" of pexlif's via a translation into Verilog.
 // =============================================================================
 
-let warn msg v = print msg fseq v;
+// According to the verilog standard, a simple identifier shall be any sequence
+// of letters, digits, dollar signs ($), and underscore characters (_).
+let valid_ident s =
+      let c = ord s in
+      ((c >= 65) AND (c <= 90)) OR // A-Z
+      ((c >= 97) AND (c <= 122)) OR // a-z
+      ((c >= 48) AND (c <= 57)) OR // 0-9
+      (c == 36) OR // $
+      (c == 95) // _
+;
+
+// Positive index.
+let valid_index i = i >= 0;
+
+// Contig. MSB to LSB slice.
+letrec
+    valid_slice [] = T
+/\  valid_slice (i:[]) = valid_index i
+/\  valid_slice (i:j:is) = (valid_index i) AND (i-j==1) AND (valid_slice (j:is))
+;
+
+// Valid LHS for both 'net_lvalue' and 'variable_lvalue'.
+let valid_lhs {we::wexpr} =
+      let is_var (W_VAR _ _) = T
+      /\  is_var (W_EXPLICIT_VAR _ _) = T
+      /\  is_var other = F
+      in
+      letrec
+          rec_ix (W_SLICE [i] w) = (valid_index i) AND (rec_ix w)
+      /\  rec_ix (W_SLICE is w) = (valid_slice is) AND (is_var w)
+      /\  rec_ix (W_NAMED_SLICE _ [i] w) = (valid_index i) AND (rec_ix w)
+      /\  rec_ix (W_NAMED_SLICE _ is w) = (valid_slice is) AND (is_var w)
+      in
+      letrec
+          rec_top (W_VAR _ _) = T
+      /\  rec_top (W_EXPLICIT_VAR _ _) = T
+      /\  rec_top (W_SLICE [i] w) = (valid_index i) AND (rec_ix w)
+      /\  rec_top (W_SLICE is w) = (valid_slice is) AND (is_var w)
+      /\  rec_top (W_NAMED_SLICE _ [i] w) = (valid_index i) AND (rec_ix w)
+      /\  rec_top (W_NAMED_SLICE _ is w) = (valid_slice is) AND (is_var w)
+      /\  rec_top (W_CAT parts) = all rec_top parts
+      /\  rec_top other = F
+      in
+      rec_top we
+;
+
+let valid_division {l::wexpr} {r::wexpr} =
+        undefined
+;
 
 // -----------------------------------------------------------------------------
 // ...
 
-// begin_abstype;
+begin_abstype;
 
-let prim_num {i::int} = Exp_primary $ Prim_num $ Num i;
+let warn msg v = print msg fseq v;
 
-let prim_cnum {i::int} = CExp_primary $ CPrim_num $ Num i;
+let prim_str  {s::string} = Exp_primary (Prim_str s);
+let prim_cstr {s::string} = CExp_primary (CPrim_str s);
 
-let range (a,b) = Range (prim_cnum a) (prim_cnum b);
+let as_bin {sz::int} {i::int} = sprintf "%d'b%0*b" sz sz i;
+let as_oct {sz::int} {i::int} = sprintf "%d'o%0*o" sz (sz/3) i;
+let as_hex {sz::int} {i::int} = sprintf "%d'x%0*x" sz (sz/4) i;
 
-let dimension (a,b) = Dimension (prim_cnum a) (prim_cnum b);
+// let prim_num {i::int} = Exp_primary $ Prim_num $ Num i;
+let prim_num n = Exp_primary (Prim_num n);
+let bin sz s v = prim_num $ NUM_bin $
+        BIN (SOME (SIZE sz)) (NOT s) (VAL $ as_bin sz v);
+let oct sz s v = prim_num $ NUM_oct $
+        OCT (SOME (SIZE sz)) (NOT s) (VAL $ as_oct sz v);
+let hex sz s v = prim_num $ NUM_hex $
+        HEX (SOME (SIZE sz)) (NOT s) (VAL $ as_hex sz v);
+let undef sz   = prim_num $ NUM_bin $ BIN (SOME (SIZE sz)) T (VAL "x");
+let dec v      = prim_num $ NUM_dec $ DEC $ UNUM v;
 
-let index_exp (a,b) =
-      a == b => prim_num a | error "internal: index not dot."
-;
+// let prim_cnum {i::int} = CExp_primary $ CPrim_num $ Num i;
+let prim_const_num (Exp_primary (Prim_num n)) = CExp_primary (CPrim_num n);
+let cbin sz s v = prim_const_num (bin sz s v);
+let coct sz s v = prim_const_num (oct sz s v);
+let chex sz s v = prim_const_num (hex sz s v);
+let cundef sz   = prim_const_num (undef sz);
+let cdec v      = prim_const_num (dec v);
 
-let range_exp (a,b) =
-      a == b => Range_exp (prim_num a) | Range_m2l (prim_cnum a) (prim_cnum b)
-;
+let range (a,b)     = Range (cdec a) (cdec b);
+let dimension (a,b) = Dimension (cdec a) (cdec b);
+let index_exp (a,b) = a == b => dec a | error "internal: index not dot.";
+let range_exp (a,b) = a == b => Range_exp (dec a) | Range_m2l (cdec a) (cdec b);
 
 // Wrapped ID in a flat hierarchy.
 let hier i = HID NONE (ID i);
@@ -76,57 +142,6 @@ let split_name_dim {vec::string} =
 // todo: My simple Google-fu skills tell me that Verilog-people tend to swap the
 // msb & lsb when declaring an array's range. Not sure why though..
 
-// A simple identifier shall be any sequence of letters, digits,
-// dollar signs ($), and underscore characters (_).
-let valid_ident s =
-      let c = ord s in
-      ((c >= 65) AND (c <= 90)) OR // A-Z
-      ((c >= 97) AND (c <= 122)) OR // a-z
-      ((c >= 48) AND (c <= 57)) OR // 0-9
-      (c == 36) OR // $
-      (c == 95) // _
-;
-
-// Positive index.
-let valid_index i = i >= 0;
-
-// Contig. MSB to LSB slice.
-letrec
-    valid_slice [] = T
-/\  valid_slice (i:[]) = valid_index i
-/\  valid_slice (i:j:is) = (valid_index i) AND (i-j==1) AND (valid_slice (j:is))
-;
-
-let contig_slice [] = error "Empty slice."
-/\  contig_slice is = NOT (valid_slice is) => error "Non-contig. slice." |
-      (hd is, last is)
-;
-
-// Valid LHS for both 'net_lvalue' and 'variable_lvalue'.
-let valid_lhs {we::wexpr} =
-      let is_var (W_VAR _ _) = T
-      /\  is_var (W_EXPLICIT_VAR _ _) = T
-      /\  is_var other = F
-      in
-      letrec
-          rec_ix (W_SLICE [i] w) = (valid_index i) AND (rec_ix w)
-      /\  rec_ix (W_SLICE is w) = (valid_slice is) AND (is_var w)
-      /\  rec_ix (W_NAMED_SLICE _ [i] w) = (valid_index i) AND (rec_ix w)
-      /\  rec_ix (W_NAMED_SLICE _ is w) = (valid_slice is) AND (is_var w)
-      in
-      letrec
-          rec_top (W_VAR _ _) = T
-      /\  rec_top (W_EXPLICIT_VAR _ _) = T
-      /\  rec_top (W_SLICE [i] w) = (valid_index i) AND (rec_ix w)
-      /\  rec_top (W_SLICE is w) = (valid_slice is) AND (is_var w)
-      /\  rec_top (W_NAMED_SLICE _ [i] w) = (valid_index i) AND (rec_ix w)
-      /\  rec_top (W_NAMED_SLICE _ is w) = (valid_slice is) AND (is_var w)
-      /\  rec_top (W_CAT parts) = all rec_top parts
-      /\  rec_top other = F
-      in
-      rec_top we
-;
-
 // Generic construction of a 'X_lvalue'.
 let gen_lvalue {we::wexpr} hier_f index_f slice_f cat_f =
       let to_hier v _  (NONE)   = hier_f v (NONE)
@@ -147,51 +162,19 @@ let gen_lvalue {we::wexpr} hier_f index_f slice_f cat_f =
 // note: 'net_lvalue' is used as the LHS of a 'assign' statement.
 let net_lvalue {we::wexpr} =
       let to_hier v d = NLV_hier (hier v) d in
-      let to_slice is = CRange_m2l (prim_cnum (hd is)) (prim_cnum (last is)) in
-      gen_lvalue we to_hier prim_cnum to_slice NLV_list
+      let to_slice is = CRange_m2l (cdec (hd is)) (cdec (last is)) in
+      gen_lvalue we to_hier cdec to_slice NLV_list
 ;
 
 // note: 'var_lvalue' is used as the LHS of non-blocking assignments in a
 // 'always' statement.
 let var_lvalue {we::wexpr} =
       let to_hier v d = VLV_hier (hier v) d in
-      let to_slice is = Range_m2l (prim_cnum (hd is)) (prim_cnum (last is)) in
-      gen_lvalue we to_hier prim_num to_slice VLV_list
+      let to_slice is = Range_m2l (cdec (hd is)) (cdec (last is)) in
+      gen_lvalue we to_hier dec to_slice VLV_list
 ;
 
 // -----------------------------------------------------------------------------
-
-// Width of a 'wexpr'.
-letrec
-    width (W_X sz) = sz
-/\  width (W_CONST sz _) = sz
-/\  width (W_NAMED_CONST _ sz _) = sz
-/\  width (W_VAR sz _) = sz
-/\  width (W_EXPLICIT_VAR sz _) = sz
-/\  width (W_AND a _) = width a
-/\  width (W_OR a _) = width a
-/\  width (W_NOT a) = width a
-/\  width (W_EQ a _) = width a
-/\  width (W_PRED _ c) = print "W_PRED no yet supported" fseq width c
-/\  width (W_GR a _) = width a
-/\  width (W_ADD a _) = width a
-/\  width (W_SUB a _) = width a
-/\  width (W_MUL a _) = width a
-/\  width (W_DIV a _) = width a
-/\  width (W_MOD a _) = width a
-/\  width (W_SHL a _) = width a
-/\  width (W_SHR a _) = width a
-/\  width (W_ASHR a _) = width a
-/\  width (W_SX sz _) = sz
-/\  width (W_ZX sz _) = sz
-/\  width (W_ITE _ t e) = width t
-/\  width (W_SLICE is _) = length is
-/\  width (W_NAMED_SLICE _ is _) = length is
-/\  width (W_UPDATE_NAMED_SLICE _ _ is _) = length is
-/\  width (W_CAT ws) = sum (map width ws)
-/\  width (W_MEM_READ _ _ _) = error "todo: width W_MEM_READ"
-/\  width (W_MEM_WRITE _ _ _ _) = error "todo: width W_MEM_WRITE"
-;
 
 let precedence_unary (U_pos) = 1
 /\  precedence_unary (U_neg) = 1
@@ -233,94 +216,92 @@ let precedence_binary (B_add) = 4
 /\  precedence_binary (B_shl) = 5
 ;
 
-forward_declare{expression::wexpr->(expression#int)};
+let unwrap_prim (Exp_primary (Prim_hier (HID NONE (ID i)) rng)) = (i, rng)
+/\  unwrap_prim _ = error "SX/SLICE is only supported for variables."
+;
+
+forward_declare{pretty_expression::wexpr->(expression#int)};
 
 let paren_exp a = Prim_mintypmax (Mintypmax_expression a);
 
-let x_exp = (Exp_primary (Prim_num X), 1);
+let wrap_exp a ap p = ap >= p => Exp_primary (paren_exp a) | a;
 
-let const_exp c = (prim_num c, 1);
+let const_exp sz c = (prim_str (as_bin sz c), 1);
 
 let variable_exp 1  v = (Exp_primary (prim_hier v []), 1)
 /\  variable_exp sz v = (Exp_primary (prim_hier v [(sz-1,0)]), 1)
 ;
 
+//  unary_exp::unary_operator->expression->expression
 let unary_exp op a =
-      let unwrap (Exp_primary p) o = 1 <= o => paren_exp (Exp_primary p) | p
-      /\  unwrap exp _ = paren_exp exp
-      in
-      (Exp_unary op (curry unwrap (expression a)), 1)
+      let p = precedence_unary op in
+      val (a', n) = pretty_expression a in
+      (Exp_unary op (paren_exp a'), p)
 ;
 
+//  unary_exp::binary_operator->expression->expression->expression
 let binary_exp op a b =
-      let wrap exp n o = n <= o => exp | Exp_primary (paren_exp exp) in
       let p = precedence_binary op in
-      val (a', n) = expression a in
-      val (b', m) = expression b in
-      (Exp_binary (wrap a' p n) op (wrap b' p m), p)
+      val (a', n) = pretty_expression a in
+      val (b', m) = pretty_expression b in
+      (Exp_binary (wrap_exp a' n p) op (wrap_exp b' m p), p)
 ;
-
-let unwrap_prim (Exp_primary (Prim_hier (HID NONE (ID i)) rng)) = (i, rng)
-/\  unwrap_prim _ = error "internal: SX/Slice is only supported for variables."
-;
-
-let sign_extend_exp sz a = //sz=8,sz'=1
-      let a'  = fst (expression a) in
-      let sz' = width a in
-      let id  = fst (unwrap_prim a') in
-      let rng = sz' > 1 => let x = sz' - 1 in [(x,x)] | [] in
-      let ext =
-            Exp_primary (Prim_mcat (MCAT (prim_cnum (sz-sz'))
-              (CAT [Exp_primary (prim_hier id rng)])))
-      in
-      // Check for complicated expressions.
-      (Exp_primary (Prim_cat (CAT [ext, a'])), 14)
-;
-// todo: Extend with local variable to hold potential expr in 'a'? Or, gen.
-// sign-extension function with paramaters for sizes?
 
 let zero_extend_exp sz a =
-      let a'  = fst $ expression a in
-      let sz' = width a in
+      let a'   = fst $ pretty_expression a in
+      let sz'  = wexpr_size a in
       let zero =
-            Exp_primary (Prim_mcat (MCAT (prim_cnum (sz-sz'))
-              (CAT [prim_num 0])))
+            Exp_primary (Prim_mcat (MCAT (cdec (sz-sz'))
+              (CAT [prim_str (as_bin 1 0)])))
       in
       (Exp_primary (Prim_cat (CAT [zero, a'])), 14)
 ;
 
-let conditional_exp c a b =
-      ( Exp_conditional
-         (fst $ expression c)
-         (fst $ expression a)
-         (fst $ expression b)
-      , 13)
+let sign_extend_exp sz a =
+      let a'  = fst (pretty_expression a) in
+      let sz' = wexpr_size a in
+      let id  = fst (unwrap_prim a') in
+      let rng = sz' > 1 => let x = sz' - 1 in [(x,x)] | [] in
+      let ext =
+            Exp_primary (Prim_mcat (MCAT (cdec (sz-sz'))
+              (CAT [Exp_primary (prim_hier id rng)])))
+      in
+      (Exp_primary (Prim_cat (CAT [ext, a'])), 14)
 ;
 
 let slice_exp is a =
-      let a'  = fst (expression a) in
+      let contig_slice is =
+              empty is => error "Empty slice." |
+              NOT (valid_slice is) => error "Non-contig. slice." |
+              (hd is, last is)
+      in
+      let a'  = fst (pretty_expression a) in
       let id  = fst (unwrap_prim a') in
       let rng = [contig_slice is] in
-      (Exp_primary (prim_hier id rng), 14)
+      (Exp_primary (prim_hier id rng), 100)
 ;
 // todo: precedence correct?
 
+let conditional_exp c a b =
+      ( Exp_conditional
+         (fst $ pretty_expression c)
+         (fst $ pretty_expression a)
+         (fst $ pretty_expression b)
+      , 13)
+;
+
 let concat_exp as =
-      (Exp_primary (Prim_cat (CAT (map (fst # expression) as))), 14)
+      (Exp_primary (Prim_cat (CAT (map (fst # pretty_expression) as))), 100)
 ;
+// todo: precedence correct?
 
-let is_var (W_VAR _ _) = T
-/\  is_var (W_EXPLICIT_VAR _ _) = T
-/\  is_var _ = F
-;
-
-let expression {we::wexpr} =
+let pretty_expression {we::wexpr} =
       letrec
-          go (W_X _)        = x_exp
-      /\  go (W_CONST _ c)  = const_exp c
+          go (W_X sz)       = (undef sz, 1)
+      /\  go (W_CONST sz c) = const_exp sz c
       /\  go (W_VAR sz v)   = variable_exp sz v
-      /\  go (W_AND a b)    = binary_exp B_log_and a b
-      /\  go (W_OR a b)     = binary_exp B_log_or a b
+      /\  go (W_AND a b)    = binary_exp B_bit_and a b
+      /\  go (W_OR a b)     = binary_exp B_bit_or a b
       /\  go (W_NOT a)      = unary_exp U_bit_neg a
       /\  go (W_EQ a b)     = binary_exp B_log_eq a b
       /\  go (W_GR a b)     = binary_exp B_gt a b
@@ -333,18 +314,13 @@ let expression {we::wexpr} =
       /\  go (W_SHR a b)    = binary_exp B_log_shr a b
       /\  go (W_ASHR a b)   = binary_exp B_shr a b
       /\  go (W_ZX sz a)    = zero_extend_exp sz a
+      /\  go (W_SX sz a)    = sign_extend_exp sz a
+      /\  go (W_SLICE is w) = slice_exp is w
       /\  go (W_ITE c a b)  = conditional_exp c a b
       /\  go (W_CAT es)     = concat_exp es
-      // Restricted op. --------------------------
-      /\  go (W_SX sz a) =
-            is_var a => sign_extend_exp sz a |
-              error "W_SX must be called with a variable"
-      /\  go (W_SLICE is w) =
-            is_var w => slice_exp is w |
-              error "W_SLICE must be called with a variable"
-      // Named op. -------------------------------
-      /\  go (W_NAMED_CONST _ _ c) =
-            warn "NAMED_CONST is treated as CONST" (const_exp c)
+      // Ignored op. -----------------------------
+      /\  go (W_NAMED_CONST _ sz c) =
+            warn "NAMED_CONST is treated as CONST" (const_exp sz c)
       /\  go (W_EXPLICIT_VAR sz v) =
             warn "EXPLICIT_VAR is treated as VAR" (variable_exp sz v)
       /\  go (W_PRED _ a) =
@@ -374,11 +350,11 @@ let always var_lv exp =
 
 let pretty_update_fn (W_UPDATE_FN lhs rhs) =
       let net_lv = net_lvalue lhs in
-      let exp = fst $ expression rhs in
+      let exp = fst $ pretty_expression rhs in
       assign net_lv exp
 /\  pretty_update_fn (W_PHASE_DELAY lhs rhs) =
       let var_lv = var_lvalue lhs in
-      let exp = fst $ expression rhs in
+      let exp = fst $ pretty_expression rhs in
       always var_lv exp
 ;
 
@@ -424,7 +400,7 @@ let pretty_internal_decl {vec::string} {wire::bool} =
 ;
 
 let port_range [] = NONE
-/\  port_range ((m,l):[]) = SOME (Range (prim_cnum m) (prim_cnum l))
+/\  port_range ((m,l):[]) = SOME (Range (cdec m) (cdec l))
 /\  port_range _ = error "Multi-dim. port decl. is not allowed."
 ;
 
@@ -555,10 +531,11 @@ let pexlif2verilog {pex::pexlif} =
       let fa_inps' = map go (md_extract_vectors (flatmap snd fa_inps)) in
       let fa_outs' = map go (md_extract_vectors (flatmap snd fa_outs)) in
       let pex' = PINST name [] F fa_inps' fa_outs' [] (P_HIER [pex]) in
-      //
+      // /
       render (p_source_text (Source_text (pretty_pexlif_h "" pex')))
 ;
+// todo: I forgot why we wrap the pexlif.
 
-// end_abstype pexlif2verilog;
+end_abstype pexlif2verilog;
 
 // =============================================================================

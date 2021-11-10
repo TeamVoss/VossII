@@ -1,0 +1,36 @@
+// shrinking pexlifs.
+
+load "ste.fl";
+
+// -----------------------------------------------------------------------------
+
+let ex1 =
+        bit_input a.
+        bit_input b.
+        bit_output c.
+        CELL "draw_hier ex1" [
+            c <- '~' (a '&' b)
+        ]
+;
+let pex1 = ex1 'a 'b 'c;
+
+let ex2 = 
+        bit_input a.
+        bit_input b.
+        bit_output c.
+        bit_internal m.
+        CELL "draw_hier ex2" [
+            m <- ('~' a) '&' b,
+            c <- '~' (m '&' b)
+        ]
+;
+let pex2 = ex2 'a 'b 'c;
+
+let shrink pex = 
+        (printf "Orig%s\n" (pretty_pexlif pex)) fseq
+        (flip foreach (shrink_pexlif pex) (\p.
+            printf "Shrunk%s\n" (pretty_pexlif p)))
+;
+
+// -----------------------------------------------------------------------------
+// Fin.

@@ -193,29 +193,5 @@ let t_shift =
       ]
 ;
 
-// -----------------------------------------------------------------------------
-// Random pexlifs.
-
-// letrec
-//     gen_ports _   0 = []
-// /\  gen_ports pre n =
-//       let act v = (v,[v]) in
-//       undefined
-// ;
-
-// Generate a "simple" comb. pexlif where 'width' sets the widths of
-// inputs/outputs wise (internal wires can vary in width), 'size' roughly
-// determines the number inputs/outputs and assignments, and 'depth' the size of
-// each assigment.
-// let gen_comp width size depth =
-//       size  <= 0 => eprintf "gen_comp: Given negative size" |
-//       depth <= 0 => eprintf "gen_comp: Given negative depth" |
-//       //
-//       let is = gen_ports "i" (random 1 size) then
-//       let os = gen_ports "o" (random 1 size) then
-//       gen_pinst_leaf "test" is os F size depth
-// ;
-// non_lazy gen_comp;
-
 // =============================================================================
 // Fin.

@@ -13,6 +13,7 @@ let is_user_given s =
     NOT (str_is_substr "TmP_" s) AND
     NOT (str_is_substr "_$" s)
 ;
+// todo: Pexlif's generated randomly doesn't follow this name schema.
 
 // A type to represent continous bit ranges
 // and individual index bits
@@ -163,7 +164,6 @@ let base_get_lhs_vars we =
 
 let get_lhs_vars we = (base_get_lhs_vars we);
 
-
 let valid_lhs we =
     letrec rec_ok (W_VAR sz b) = T
      /\    rec_ok (W_EXPLICIT_VAR sz b) = T
@@ -193,7 +193,7 @@ clet cmerge_vectors nl =
     merge_vectors (merge_consts "" nl)
 ;
 
-let w_depends we =
+let w_get_names we =
     let raw_res = ref [] then
     letrec dep (W_X sz) = ()
      /\    dep (W_NAMED_CONST name sz v) = ()
@@ -216,7 +216,7 @@ let w_depends we =
      /\    dep (W_SX sz w) = (dep w)
      /\    dep (W_ZX sz w) = (dep w)
      /\    dep (W_NOT a)   = dep a
-     /\    dep (W_ITE c t e) = (dep c) fseq(dep t) fseq(dep e)
+     /\    dep (W_ITE c t e) = (dep c) fseq (dep t) fseq (dep e)
      /\    dep (W_SLICE indices w) = dep w
      /\    dep (W_NAMED_SLICE name indices w) = dep w
      /\    dep (W_UPDATE_NAMED_SLICE b name indices w) = (dep b) fseq (dep w)
@@ -225,8 +225,11 @@ let w_depends we =
      /\    dep (W_MEM_WRITE info mem addr data) =
             (dep mem) fseq (dep addr) fseq (dep data)
     in
-    (dep we) fseq
-    let res1 = setify (rev (deref raw_res)) then
+    (dep we) fseq setify (rev (deref raw_res))
+;
+
+let w_depends we =
+    let res1 = w_get_names we then
     let res2 = extract_vectors res1 then
     length res1 = length res2 => res1 | qsort node_name_cmp res2
 ;
@@ -288,6 +291,8 @@ letrec wexpr_size wexpr =
     in
     wsz wexpr
 ;
+
+let wexpr_sizes as = sitlist (defix +) (map wexpr_size as) 0;
 
 let check_memory a_sz lines d_sz addr mem =
 	let mem_sz = wexpr_size mem in
@@ -354,7 +359,6 @@ letrec wexpr_is_binary (W_X sz) = F
  /\     wexpr_is_binary (W_MEM_WRITE info mem addr d) =
 	    wexpr_is_binary mem AND wexpr_is_binary addr AND wexpr_is_binary d
 ;
-
 
 let x_var_cnt = ref 0;
 
@@ -479,7 +483,6 @@ let extract_pexlif_hierarchy pexlif hierarchy =
     in
     get indices pexlif
 ;
-
 
 let w_substitute sub we =
     letrec do (W_VAR sz b) =

@@ -1,0 +1,192 @@
+
+ /----------------------------------------------------------------------------\
+ |                                                                            |
+ |  yosys -- Yosys Open SYnthesis Suite                                       |
+ |                                                                            |
+ |  Copyright (C) 2012 - 2020  Claire Wolf <claire@symbioticeda.com>          |
+ |                                                                            |
+ |  Permission to use, copy, modify, and/or distribute this software for any  |
+ |  purpose with or without fee is hereby granted, provided that the above    |
+ |  copyright notice and this permission notice appear in all copies.         |
+ |                                                                            |
+ |  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES  |
+ |  WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF          |
+ |  MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR   |
+ |  ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    |
+ |  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN     |
+ |  ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF   |
+ |  OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.            |
+ |                                                                            |
+ \----------------------------------------------------------------------------/
+
+ Yosys 0.9+3468 (git sha1 8fe5b3c, g++ 10.2.0 -Os)
+
+
+-- Executing script file `script.ys' --
+
+1. Executing Verilog-2005 frontend: /tmp/voss2_mararon_rp0d9v/test_verilog_Db3Qb7/test.v
+Parsing Verilog input from `/tmp/voss2_mararon_rp0d9v/test_verilog_Db3Qb7/test.v' to AST representation.
+Generating RTLIL representation for module `\test'.
+Generating RTLIL representation for module `\test_1'.
+/tmp/voss2_mararon_rp0d9v/test_verilog_Db3Qb7/test.v:13: Warning: Identifier `\X' is implicitly declared.
+Successfully finished Verilog frontend.
+
+2. Executing HIERARCHY pass (managing design hierarchy).
+
+2.1. Analyzing design hierarchy..
+Top module:  \test
+Used module:     \test_1
+
+2.2. Analyzing design hierarchy..
+Top module:  \test
+Used module:     \test_1
+Removed 0 unused modules.
+
+3. Executing PROC pass (convert processes to netlists).
+
+3.1. Executing PROC_CLEAN pass (remove empty switches from decision trees).
+Cleaned up 0 empty switches.
+
+3.2. Executing PROC_RMDEAD pass (remove dead branches from decision trees).
+Removed a total of 0 dead cases.
+
+3.3. Executing PROC_PRUNE pass (remove redundant assignments in processes).
+Removed 0 redundant assignments.
+Promoted 0 assignments to connections.
+
+3.4. Executing PROC_INIT pass (extract init attributes).
+
+3.5. Executing PROC_ARST pass (detect async resets in processes).
+
+3.6. Executing PROC_MUX pass (convert decision trees to multiplexers).
+
+3.7. Executing PROC_DLATCH pass (convert process syncs to latches).
+
+3.8. Executing PROC_DFF pass (convert process syncs to FFs).
+
+3.9. Executing PROC_CLEAN pass (remove empty switches from decision trees).
+Cleaned up 0 empty switches.
+
+4. Executing OPT pass (performing simple optimizations).
+
+4.1. Executing OPT_EXPR pass (perform const folding).
+Optimizing module test_1.
+Optimizing module test.
+
+4.2. Executing OPT_MERGE pass (detect identical cells).
+Finding identical cells in module `\test_1'.
+Finding identical cells in module `\test'.
+Removed a total of 0 cells.
+
+4.3. Executing OPT_MUXTREE pass (detect dead branches in mux trees).
+Running muxtree optimizer on module \test_1..
+  Creating internal representation of mux trees.
+  No muxes found in this module.
+Running muxtree optimizer on module \test..
+  Creating internal representation of mux trees.
+  No muxes found in this module.
+Removed 0 multiplexer ports.
+
+4.4. Executing OPT_REDUCE pass (consolidate $*mux and $reduce_* inputs).
+  Optimizing cells in module \test_1.
+  Optimizing cells in module \test.
+Performed a total of 0 changes.
+
+4.5. Executing OPT_MERGE pass (detect identical cells).
+Finding identical cells in module `\test_1'.
+Finding identical cells in module `\test'.
+Removed a total of 0 cells.
+
+4.6. Executing OPT_DFF pass (perform DFF optimizations).
+
+4.7. Executing OPT_CLEAN pass (remove unused cells and wires).
+Finding unused cells or wires in module \test_1..
+Finding unused cells or wires in module \test..
+Removed 0 unused cells and 2 unused wires.
+<suppressed ~1 debug messages>
+
+4.8. Executing OPT_EXPR pass (perform const folding).
+Optimizing module test.
+Optimizing module test_1.
+
+4.9. Rerunning OPT passes. (Maybe there is more to do..)
+
+4.10. Executing OPT_MUXTREE pass (detect dead branches in mux trees).
+Running muxtree optimizer on module \test..
+  Creating internal representation of mux trees.
+  No muxes found in this module.
+Running muxtree optimizer on module \test_1..
+  Creating internal representation of mux trees.
+  No muxes found in this module.
+Removed 0 multiplexer ports.
+
+4.11. Executing OPT_REDUCE pass (consolidate $*mux and $reduce_* inputs).
+  Optimizing cells in module \test.
+  Optimizing cells in module \test_1.
+Performed a total of 0 changes.
+
+4.12. Executing OPT_MERGE pass (detect identical cells).
+Finding identical cells in module `\test'.
+Finding identical cells in module `\test_1'.
+Removed a total of 0 cells.
+
+4.13. Executing OPT_DFF pass (perform DFF optimizations).
+
+4.14. Executing OPT_CLEAN pass (remove unused cells and wires).
+Finding unused cells or wires in module \test..
+Finding unused cells or wires in module \test_1..
+
+4.15. Executing OPT_EXPR pass (perform const folding).
+Optimizing module test.
+Optimizing module test_1.
+
+4.16. Finished OPT passes. (There is nothing left to do.)
+
+5. Executing OPT pass (performing simple optimizations).
+
+5.1. Executing OPT_EXPR pass (perform const folding).
+Optimizing module test.
+Optimizing module test_1.
+
+5.2. Executing OPT_MERGE pass (detect identical cells).
+Finding identical cells in module `\test'.
+Finding identical cells in module `\test_1'.
+Removed a total of 0 cells.
+
+5.3. Executing OPT_MUXTREE pass (detect dead branches in mux trees).
+Running muxtree optimizer on module \test..
+  Creating internal representation of mux trees.
+  No muxes found in this module.
+Running muxtree optimizer on module \test_1..
+  Creating internal representation of mux trees.
+  No muxes found in this module.
+Removed 0 multiplexer ports.
+
+5.4. Executing OPT_REDUCE pass (consolidate $*mux and $reduce_* inputs).
+  Optimizing cells in module \test.
+  Optimizing cells in module \test_1.
+Performed a total of 0 changes.
+
+5.5. Executing OPT_MERGE pass (detect identical cells).
+Finding identical cells in module `\test'.
+Finding identical cells in module `\test_1'.
+Removed a total of 0 cells.
+
+5.6. Executing OPT_DFF pass (perform DFF optimizations).
+
+5.7. Executing OPT_CLEAN pass (remove unused cells and wires).
+Finding unused cells or wires in module \test..
+Finding unused cells or wires in module \test_1..
+
+5.8. Executing OPT_EXPR pass (perform const folding).
+Optimizing module test.
+Optimizing module test_1.
+
+5.9. Finished OPT passes. (There is nothing left to do.)
+
+6. Executing pexlif backend.
+
+Warnings: 1 unique messages, 1 total
+End of script. Logfile hash: a11db92842, CPU: user 0.01s system 0.00s, MEM: 8.32 MB peak
+Yosys 0.9+3468 (git sha1 8fe5b3c, g++ 10.2.0 -Os)
+Time spent: 36% 5x opt_expr (0 sec), 29% 5x opt_merge (0 sec), ...

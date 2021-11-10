@@ -32,8 +32,10 @@ let find_file search_paths name =
 //
 // Compile Verilog to VossII's internal pexlif type.
 //
-// Usage: read_verilog flags top_level_module file_list
+// Usage: read_verilog no_popup flags top_level_module file_list
 // where
+//  no_popup     = bool flag for displaying yosys report on completion
+//
 //	flags		 = yosys read_verilog flags (see yosys documentation)
 //			   Common one is: -I<path> to add search path
 //
@@ -44,7 +46,7 @@ let find_file search_paths name =
 //	additional_files = list of files needed but not verilog files
 //			   For example, files only included by .v files.
 //
-let verilog2pexlif flags top_level_module file_list additional_files =
+let verilog2pexlif no_popup flags top_level_module file_list additional_files =
     // Create tmp directory and copy all files to it
     let tmp_dir = mktempd (sprintf "%s_verilog" top_level_module) then
     let paths = find_search_path flags then
@@ -75,7 +77,7 @@ let verilog2pexlif flags top_level_module file_list additional_files =
     // Run yosys
     let cmd = sprintf "cd %s; yosys script.ys  > yosys.log 2>&1" tmp_dir then
     (system cmd) != 0 =>
-	noX =>
+	noX OR no_popup =>
 	    eprintf "yosys failed. See %s/yosys.log for datails" tmp_dir
 	|
 	    ((report_result_in_file "Yosys failed."
@@ -83,7 +85,7 @@ let verilog2pexlif flags top_level_module file_list additional_files =
 	     eprintf "yosys failed. See %s/yosys.log for datails" tmp_dir)
     |
     (
-    noX =>
+    noX OR no_popup =>
 	fprintf stderr "-W- Check %s/yosys.log for Verilog warnings!\n" tmp_dir
     |
 	((report_result_in_file "Yosys results:" 

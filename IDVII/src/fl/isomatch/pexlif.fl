@@ -3,8 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
-load (DIR^"misc.fl");
-load (DIR^"util.fl");
+load (DIR^"../design/misc.fl");
+load (DIR^"../design/util.fl");
+load (DIR^"../design/hfl.fl");
 load (DIR^"primes.fl");
 
 // Meh...
@@ -354,72 +355,6 @@ let
         PINST n a l i o t (P_HIER (map lbl cs))
 ;
 
-//------------------------------------------------------------------------------
-
-// ...
-let store_pexlif pex =
-        let sha  = find_signature (pexlif_get_attrs pex) then
-        let sha' = string_empty sha => "bad" | sha then
-        (pex) fseq (write_pexlif ("pexlif_examples/" ^ sha' ^ ".pex") pex)
-;
-
-// ...
-let load_pexlif sha = read_pexlif ("pexlif_examples/" ^ sha ^ ".pex");
-non_lazy load_pexlif;
-
-begin_abstype;
-
-lettype wrapper = WRAPPER ((string#string) list);
-
-let read_subst name =
-        let file = "pexlif_examples/" ^ name ^ ".match" in
-        val (WRAPPER sub) = ((read_wrapper file) catch (WRAPPER [])) then sub
-;
-
-let write_subst name {sub::((string#string) list)} =
-        let file = "pexlif_examples/" ^ name ^ ".match" in
-        let {w::wrapper} = WRAPPER sub in write_wrapper file w
-;
-
-let load_matches sha flip =
-        let file = fopen ("pexlif_examples/matches") "r" then
-        letrec
-            read_line f =
-                let line = fgets f then
-                string_empty line => [] |
-                // /
-                let real  = string_butlast line then
-                val [l,r] = str_cluster real 64 then
-                val (x,y) = flip => (r,l) | (l,r) then
-                x != sha => read_line f |
-                // /
-                let name = l ^ r in
-                let sub  = read_subst name then
-                (y,sub) : read_line f
-        in
-        let matches = read_line file then
-        (fclose file) fseq (matches)
-;
-non_lazy load_matches;
-
-let fetch_matches sha = load_matches sha F;
-non_lazy fetch_matches;
-
-let rev_fetch_matches sha = load_matches sha T;
-non_lazy rev_fetch_matches;
-
-let store_match {sha1::string} {sha2::string} {sub::((string#string) list)} =
-        (elem sha2 $ map fst $ fetch_matches sha1) => () |
-        // /
-        let name = sha1 ^ sha2 in
-        let file = fopen ("pexlif_examples/matches") "a" then
-        (fprintf file "%s\n" name) fseq
-        (fclose file) fseq
-        (write_subst name sub) fseq
-        ()
-;
-
-end_abstype store_match fetch_matches rev_fetch_matches;
 
 //------------------------------------------------------------------------------
 
@@ -430,12 +365,105 @@ let subst_match sub (PINST n a l i1 o1 t c) (PINST _ _ _ i2 o2 _ _) =
 ;
 
 //------------------------------------------------------------------------------
-// Generation of a PEXLIF.
+// Shrinking a PEXLIF.
 //------------------------------------------------------------------------------
 
 begin_abstype;
+// note:
+// typeabbrev {*}shr = * -> (* list)
 
-let ?! = undefined;
+//  shrink_2 ::{a} shr -> {(a,a)} shr
+let shrink_2 s (x,y) =
+        map (\a. (a,y)) (s x) @ map (\b. (x,b)) (s y)
+;
+
+//  shrink_3::{a} shr -> {(a,a,a)} shr
+let shrink_3 s (x,y,z) =
+        map (\a. (a,y,z)) (s x) @ map (\(b,c). (x,b,c)) (shrink_2 s (y,z))
+;
+
+//  shrink_list::{a} shr -> {a list} shr
+letrec
+    shrink_list _ []     = []
+/\  shrink_list s (x:xs) =
+        map (\a. a:xs) (s x) @ map (\as. x:as) (shrink_list s xs)
+;
+// todo: It might be a good idea to remove items when shrinking as well, but
+// we would have to be a bit careful since things are sized and we also can't
+// remove drivers.
+
+let wT    = W_CONST 1 1;
+let wF    = W_CONST 1 0;
+let wZ sz = W_CONST sz 0;
+
+let shrink_unary  s op a   = [a] @ map op (s a);
+let shrink_binary s op a b = [a,b] @ map (curry op) (shrink_2 s (a,b));
+let shrink_cmp    s op a b = [wT,wF] @ map (curry op) (shrink_2 s (a,b));
+let shrink_shift  s op a b = [a] @ map (curry op) (shrink_2 s (a,b));
+
+//  shrink_wexpr::{wexpr} shr
+letrec
+    shrink_wexpr (W_X sz)       = []
+/\  shrink_wexpr (W_CONST sz v) = []
+/\  shrink_wexpr (W_VAR sz n)   = []
+/\  shrink_wexpr (W_AND a b)    = shrink_binary shrink_wexpr W_AND  a b
+/\  shrink_wexpr (W_OR a b)     = shrink_binary shrink_wexpr W_OR   a b
+/\  shrink_wexpr (W_NOT a)      = shrink_unary  shrink_wexpr W_NOT  a
+/\  shrink_wexpr (W_EQ a b)     = shrink_cmp    shrink_wexpr W_EQ   a b
+/\  shrink_wexpr (W_GR a b)     = shrink_cmp    shrink_wexpr W_GR   a b
+/\  shrink_wexpr (W_ADD a b)    = shrink_binary shrink_wexpr W_ADD  a b
+/\  shrink_wexpr (W_SUB a b)    = shrink_binary shrink_wexpr W_SUB  a b
+/\  shrink_wexpr (W_MUL a b)    = shrink_binary shrink_wexpr W_MUL  a b
+/\  shrink_wexpr (W_DIV a b)    = shrink_binary shrink_wexpr W_DIV  a b
+/\  shrink_wexpr (W_MOD a b)    = shrink_binary shrink_wexpr W_MOD  a b
+/\  shrink_wexpr (W_ITE c a b)  = shrink_binary shrink_wexpr (W_ITE c) a b
+/\  shrink_wexpr (W_SHL a b)    = shrink_shift  shrink_wexpr W_SHL  a b
+/\  shrink_wexpr (W_SHR a b)    = shrink_shift  shrink_wexpr W_SHR  a b
+/\  shrink_wexpr (W_ASHR a b)   = shrink_shift  shrink_wexpr W_ASHR a b
+/\  shrink_wexpr (W_SX sz a)    =
+        [wZ sz] @ map (W_SX sz) (shrink_wexpr a)
+/\  shrink_wexpr (W_ZX sz a)    =
+        [wZ sz] @ map (W_ZX sz) (shrink_wexpr a)
+/\  shrink_wexpr (W_SLICE is a) =
+        [wZ (length is)] @ map (W_SLICE is) (shrink_wexpr a)
+/\  shrink_wexpr (W_CAT as)     =
+        [wZ (wexpr_sizes as)] @ map W_CAT (shrink_list shrink_wexpr as)
+;
+// todo: 
+// W_NAMED_CONST {name::string} {sz::int} {v::int}
+// W_EXPLICIT_VAR {sz::int} {name::string}
+// W_PRED {name::string} {cond::wexpr}
+// W_NAMED_SLICE {name::string} {is::int list} {w::wexpr}
+// W_UPDATE_NAMED_SLICE {base::wexpr} {name::string} {is::int list} {new::wexpr}
+// W_MEM_READ {info::mem} {mem::wexpr} {addr::wexpr}
+// W_MEM_WRITE {info::mem} {mem::wexpr} {addr::wexpr} {data::wexpr}
+
+//  shrink_update_fn::{update_fn}shr
+let shrink_update_fn (W_UPDATE_FN lhs rhs) =
+        map (W_UPDATE_FN lhs) (shrink_wexpr rhs)
+/\  shrink_update_fn (W_PHASE_DELAY lhs rhs) =
+        print "'W_PHASE_DELAY's cannot be shrinked at the moment." fseq []
+;
+// todo:
+// W_PHASE_DELAY {lhs::wexpr} {rhs::wexpr}
+
+//  shrink_content::{update_fn}shr->{pexlif}shr->{content}shr
+let shrink_content _ g (P_HIER cs) = map P_HIER (shrink_list g cs)
+/\  shrink_content f _ (P_LEAF fs) = map P_LEAF (shrink_list f fs)
+;
+
+//  shrink_pexlif::{pexlif}shr
+letrec
+    shrink_pexlif (PINST n as l inp out int c) =
+        map (PINST n as l inp out int)
+            (shrink_content shrink_update_fn shrink_pexlif c)
+;
+
+end_abstype shrink_wexpr shrink_pexlif;
+
+//------------------------------------------------------------------------------
+// Generation of a PEXLIF.
+//------------------------------------------------------------------------------
 
 let segment_at_random 1  = [1]
 /\  segment_at_random sz =
@@ -444,39 +472,57 @@ let segment_at_random 1  = [1]
 ;
 non_lazy segment_at_random;
 
-let slice_at_random lz hz = repeat (hz-lz) remove_one (0 upto hz)
+let split_at_random2 [ ] = error "Internal: split_at_random2 [ ]"
+/\  split_at_random2 [_] = error "Internal: split_at_random2 [_]"
+/\  split_at_random2 xs  = split_at (random 2 (length xs)) xs
+;
+non_lazy split_at_random2;
+// note: when, for example, splitting slices we can't have either list.
+
+let slice_at_random lz hz =
+        let lsb = random 0 (hz-lz) in
+        lsb upto (lsb+lz-1)
 ;
 non_lazy slice_at_random;
+// note: old (below) doesn't work as wee need contig. slices.
+//   repeat (hz-lz) remove_one (0 upto hz)
+
+begin_abstype;
 
 letrec
     gen_wexpr_inputs
         {is :: (wexpr#int) list}
         {sz :: int}
         =
-        let use_var =
-                val (i,s) = one_of is in
-                s < sz => one_of_weighted
-                    [ (1, [W_SX sz i])
-                    , (1, [W_ZX sz i])
-                    , (2, (i : gen_wexpr_inputs is (sz-s)))] |
-                s > sz => [W_SLICE (slice_at_random (sz - 1) (s - 1)) i] |
-                [i]
-        in
-        one_of_weighted
-            [ (1, [W_X sz])
-            , (2, [W_CONST sz (random2 sz)])
-         // , (x, W_NAMED_CONST ?! ?! ?!)
-         // , (x, W_EXPLICIT_VAR ?! ?!)
-         // , (x, W_MEM_READ ?! ?! ?!)
-            , (4, use_var) ]
+        val (i,s) = one_of is in
+        s < sz =>
+            one_of_weighted
+                [ (1, [W_SX sz i])
+                , (1, [W_ZX sz i])
+                , (2, i : gen_wexpr_inputs is (sz-s))] |
+        s > sz =>
+            [W_SLICE (slice_at_random sz s) i] |
+        [i]
 ;
 non_lazy gen_wexpr_inputs;
+
+let gen_wexpr_const
+        {sz :: int}
+        =
+        W_CONST sz (random2 sz)
+;
+non_lazy gen_wexpr_const;
 
 let gen_wexpr_input
         {is :: (wexpr#int) list}
         {sz :: int}
         =
-        let vs = gen_wexpr_inputs is sz in length vs == 1 => hd vs | W_CAT vs
+        let inputs = one_of_weighted
+                [ (1, [gen_wexpr_const sz])
+                , (3, gen_wexpr_inputs is sz)
+                ]
+        in
+        length inputs == 1 => hd inputs | W_CAT inputs
 ;
 non_lazy gen_wexpr_input;
 
@@ -487,61 +533,61 @@ letrec
         {sz :: int}
         {d  :: int}
         =
+        //(printf "gen_wexpr sz=%d |ts|=%d d=%d\n" sz (length ts) d) fseq
         // If complexity 'd' is satisfied and 'ts' distributed, build leaf.
-        (length ts == 0) AND (d <= 0) => gen_wexpr_input is sz |
-        (length ts == 1) AND (d <= 0) =>
-            val (x,s) = hd ts in
-            s < sz => one_of [ W_SX sz x, W_ZX sz x ]  |
-            s > sz => W_SLICE (slice_at_random (sz - 1) (s - 1)) x |
-            x |
+        (d <= 0) AND (length ts == 0) => gen_wexpr_input is sz |
+        // If 'd' is satisfied, but some 't' is unused, pick that.
+        (d <= 0) => gen_wexpr_input ts sz |
+        // todo: make sure t is used?
         // Misc. for unary/binary ops.
-        let gen_unary  sz = gen_wexpr is ts sz (d - 1) in
-        let gen_binary ts = gen_wexpr is ts sz (d / 2) in
+        let gen_unary sz     = gen_wexpr is ts sz (d - 1) in
+        let gen_binary sz ts = gen_wexpr is ts sz (d / 2) in
+        let v   = random 1 (max 1 (log2 (max 1 sz))) in // rand. val. for const.
+        let ssz = one_of [1,2,4,8,16,32] in // size hidden under ==, >.
         val (as, bs) = split_at_random ts in
-        // Weights for ...
-        let u = (d <= 0) => 1  | 10 in // unary op.
-        let x = (sz > 1) => 10 | 0  in // ext. op.
-        let b = (sz > 1) => 10 | 1  in // binary op.
+        // Weights for choices, 1=valid & 0=invalid.
+        let as_valid T = 1
+        /\  as_valid F = 0
+        in
+        let d_0  = as_valid (d  <= 0) then
+        let d_X  = as_valid (d  >  0) then
+        let sz_1 = as_valid (sz == 1) then
+        let sz_X = as_valid (sz >  1) then
         // Pick a valid PINST op.
-        one_of_weighted
-            [ (u, W_NOT  (gen_unary sz))
-            , (b, W_AND  (gen_binary as) (gen_binary bs))
-            , (b, W_OR   (gen_binary as) (gen_binary bs))
-            , (b, W_EQ   (gen_binary as) (gen_binary bs))
-            , (b, W_GR   (gen_binary as) (gen_binary bs))
-            , (b, W_ADD  (gen_binary as) (gen_binary bs))
-            , (b, W_SUB  (gen_binary as) (gen_binary bs))
-            , (b, W_MUL  (gen_binary as) (gen_binary bs))
-            , (b, W_DIV  (gen_binary as) (gen_binary bs))
-            , (b, W_MOD  (gen_binary as) (gen_binary bs))
-            , (b, W_SHL  (gen_binary as) (gen_binary bs))
-            , (b, W_SHR  (gen_binary as) (gen_binary bs))
-            , (b, W_ASHR (gen_binary as) (gen_binary bs))
-            , ( let smaller_sz = random 1 sz in
-                (x, W_SX sz (gen_unary smaller_sz)))
-            , ( let smaller_sz = random 1 sz in
-                (x, W_ZX sz (gen_unary smaller_sz)))
-            , ( val (cs, ds)   = split_at 2 ts in
-                val (es, fs)   = split_at_random ds in
-                let gen ts sz  = gen_wexpr is ts sz (d / 3) in
-                (b, W_ITE (gen cs 1) (gen es sz) (gen fs sz)))
-            // , ( let larger_sz  = random (sz + 1) ((sz + 1) * 2) in
-            //     let slice      = slice_at_random (sz - 1) larger_sz in
-            //     (b, W_SLICE slice (gen_unary larger_sz)))
-            , ( let chunked_sz = segment_at_random sz in
-                let len_sz     = length chunked_sz in
-                let len_ts     = length ts in
-                let chunked_ts =
-                        len_sz <= len_ts => split_into len_sz ts |
-                        (map (\t. [t]) ts) @ (replicate (len_sz - len_ts) [])
-                in
-                let gen ts sz  = gen_wexpr is ts sz (d / len_sz) in
-                (x, W_CAT (map2 gen chunked_ts chunked_sz)))
-         // , W_PRED ?! ?!
-         // , W_NAMED_SLICE ?! ?! ?!
-         // , W_UPDATE_NAMED_SLICE ?! ?! ?! ?!
-         // , W_MEM_WRITE ?! ?! ?! ?!
-            ]
+        one_of_weighted (filter (defix < 0 # fst)
+            [ (d_0,  W_NOT  (gen_unary sz))
+            , (d_X,  W_AND  (gen_binary sz as)  (gen_binary sz bs))
+            , (d_X,  W_OR   (gen_binary sz as)  (gen_binary sz bs))
+            , (sz_1, W_EQ   (gen_binary ssz as) (gen_binary ssz bs))
+            , (sz_1, W_GR   (gen_binary ssz as) (gen_binary ssz bs))
+            , (sz_X, W_ADD  (gen_binary sz as)  (gen_binary sz bs))
+            , (sz_X, W_SUB  (gen_binary sz as)  (gen_binary sz bs))
+            , (sz_X, W_MUL  (gen_binary sz as)  (gen_binary sz bs))
+            // note: Yosys OPT phase simplifies division by zero to constant X,
+            // which simulation doesn't catch.
+            , (sz_X, W_DIV  (gen_binary sz as)  (gen_binary sz bs))
+            // Yosys treats first argument as a signed value always?
+         // , (sz_X, W_MOD  (gen_binary sz as)  (gen_binary sz bs))
+            , (sz_X, W_SHL  (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
+            , (sz_X, W_SHR  (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
+         // Declare first arg. as signed to get the correct behaviour.
+         // , (sz_X, W_ASHR (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
+            , (d_X,  val (cs, ds)   = split_at 2 ts in
+                     val (es, fs)   = split_at_random ds in
+                     let gen ts sz  = gen_wexpr is ts sz (d / 3) in
+                     W_ITE (gen cs 1) (gen es sz) (gen fs sz))
+            , (sz_X, let sz_l = sz > 1 => random 1 (sz-1) | 1 in
+                     let sz_r = sz-sz_l in
+                     let wl   = gen_wexpr is as sz_l (d / 2) in
+                     let wr   = gen_wexpr is bs sz_r (d / 2) in
+                     W_CAT [wl, wr])
+          // todo: CAT more than two?
+          // note: Slices are done at leaves to ensure variable args.
+          // , W_PRED ?! ?!
+          // , W_NAMED_SLICE ?! ?! ?!
+          // , W_UPDATE_NAMED_SLICE ?! ?! ?! ?!
+          // , W_MEM_WRITE ?! ?! ?! ?!
+            ])
 ;
 non_lazy gen_wexpr;
 
@@ -573,7 +619,7 @@ let extend_wires
         {size :: int}
         =
         let split (x, s) =
-                val (ls, rs) = split_at_random ((s - 1) downto 0) in
+                val (ls, rs) = split_at_random2 ((s - 1) downto 0) in
                 let slice is = (W_SLICE is x, length is) in
                 [slice ls, slice rs]
         in
@@ -618,7 +664,7 @@ let gen_wires
         let random_size x =
                 one_of_weighted
                     [ (1, one_of [1,2,4,8,16,32]),
-                      (1, one_of_weighted hist_sz) ] // todo: increase weight.
+                      (2, one_of_weighted hist_sz) ]
         in
         // Build internal wires for node 'ix' and give it a random size.
         let new_internal i =
@@ -770,7 +816,214 @@ non_lazy gen_pinst_graph;
 
 end_abstype gen_pinst_leaf gen_pinst gen_pinst_graph;
 
-//------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+
+begin_abstype;
+
+// forward_declare{normalize_binary::
+//     int->(wexpr->wexpr->wexpr)->wexpr->wexpr->
+//     (((wexpr#wexpr) list)#(wexpr#(int#int)))
+// };
+
+forward_declare{normalize_wexpr::int->wexpr->(((bool#wexpr#wexpr) list)#(wexpr#(int#int)))};
+
+let BASE_STMP = sprintf "%ss" BASE_TMP;
+let IS_BASE n = str_is_prefix BASE_TMP n OR str_is_prefix BASE_STMP n;
+let NEW_VAR s sz cnt = W_VAR sz (sprintf "%s%d" (s => BASE_STMP | BASE_TMP) cnt);
+
+//  normalize_unary::name->unary_op->arg->((signed?,lhs,rhs)#lhs#name#size)
+let normalize_unary {ix::int} {op::wexpr->wexpr} {a::wexpr} =
+        val (ass, a', aix, asz) = normalize_wexpr ix a in
+        let v = NEW_VAR F asz aix in
+        ((F, v, op a'):ass, v, aix+1, asz)
+;
+
+//  normalize_binary::name->signed?->binary_op->arg1->arg2->((signed?,lhs,rhs)#lhs#name#size)
+let normalize_binary {ix::int} {s::bool} {op::wexpr->wexpr->wexpr} {a::wexpr} {b::wexpr} =
+        val (ass, a', aix, asz) = normalize_wexpr ix  a in
+        val (bss, b', bix, _)   = normalize_wexpr aix b in
+        let v = NEW_VAR s asz bix in
+        ((s, v, op a' b'):(bss@ass), v, bix+1, asz)
+;
+
+let normalize_cmp {ix::int} {op::wexpr->wexpr->wexpr} {a::wexpr} {b::wexpr} =
+        val (ass, a', aix, _) = normalize_wexpr ix  a in
+        val (bss, b', bix, _) = normalize_wexpr aix b in
+        let v = NEW_VAR F 1 bix in
+        ((F, v, op a' b'):(bss@ass), v, bix+1, 1)
+;
+
+let normalize_slice {ix::int} {is::int list} {a::wexpr} =
+        val (ass, a', aix, asz) = normalize_wexpr ix a in
+        // Can't have slices on anything but variables.
+        NOT (is_var a') => error "Slice not on variable." |
+        // Can't have empty slices (0-width wire).
+        length is == 0 => error "Slice without indices" |
+        // Can't have non-contig. indexing in Verilog so each non-contig.
+        // interval is split into its own slice and then concatenated together.
+        let slice (BR_SINGLE ix) = W_SLICE [ix] a'
+        /\  slice (BR_SLICE m l) = W_SLICE (m downto l) a'
+        in
+        let ws = map slice (group_indices is) in
+        let w  = length ws == 1 => hd ws | W_CAT ws in
+        let v  = NEW_VAR F (length is) aix in
+        ((F, v, w):ass, v, aix+1, length is)
+;
+
+let normalize_arith {ix::int} {s::bool} {op::wexpr->wexpr->wexpr} {a::wexpr} {b::wexpr} =
+        val (ass, a', aix, asz) = normalize_wexpr ix  a in
+        val (bss, b', bix, _)   = normalize_wexpr aix b in
+        // Can't have constant zero for the second argument for any "arith" op.
+        // since Yosys turns that into X.
+        letrec
+            is_zero (W_CONST _ 0) = T
+        /\  is_zero (W_NAMED_CONST _ _ 0) = T
+        /\  is_zero (W_PRED _ a) = is_zero a
+        /\  is_zero (W_ZX _ a) = is_zero a
+        /\  is_zero (W_CAT as) = all is_zero as
+        /\  is_zero _ = F
+        in
+        let op = is_zero b => (\a. \b. W_X asz) | op in
+        let v  = NEW_VAR s asz bix in
+        ((s, v, op a' b'):(bss@ass), v, bix+1, asz)
+;
+// note: Like Yosys' "read_verilog" without constant progagation, "is_zero" only
+// checks for expressions that "obviously" is zero.
+// note: "W_SX" should normalize to a variable extension and cannot be zero.
+
+let normalize_ext {ix::int} {op::int->wexpr->wexpr} {sz::int} {a::wexpr} =
+        val (ass, a', aix, _) = normalize_wexpr ix a in
+        let v = NEW_VAR F sz aix in
+        ((F, v, op sz a'):ass, v, aix+1, sz)
+;
+
+letrec
+    normalize_wexpr ix (W_X sz) =
+        ([], W_X sz, ix, sz)
+/\  normalize_wexpr ix (W_CONST sz v) =
+        ([], W_CONST sz v, ix, sz)
+/\  normalize_wexpr ix (W_NAMED_CONST n sz v) =
+        ([], W_NAMED_CONST n sz v, ix, sz)
+/\  normalize_wexpr ix (W_VAR sz b) =
+        ([], W_VAR sz b, ix, sz)
+/\  normalize_wexpr ix (W_EXPLICIT_VAR sz n) =
+        ([], W_EXPLICIT_VAR sz n, ix, sz)
+/\  normalize_wexpr ix (W_AND a b) = normalize_binary ix F W_AND a b
+/\  normalize_wexpr ix (W_OR a b) = normalize_binary ix F W_OR a b
+/\  normalize_wexpr ix (W_NOT a) = normalize_unary ix W_NOT a
+/\  normalize_wexpr ix (W_EQ a b) = normalize_cmp ix W_EQ a b
+/\  normalize_wexpr ix (W_PRED n c) = normalize_unary ix (W_PRED n) c
+/\  normalize_wexpr ix (W_GR a b) = normalize_cmp ix W_GR a b
+/\  normalize_wexpr ix (W_ADD a b) = normalize_binary ix F W_ADD a b
+/\  normalize_wexpr ix (W_SUB a b) = normalize_binary ix F W_SUB a b
+/\  normalize_wexpr ix (W_MUL a b) = normalize_binary ix F W_MUL a b
+/\  normalize_wexpr ix (W_DIV a b) = normalize_arith ix F W_DIV a b
+/\  normalize_wexpr ix (W_MOD a b) = normalize_arith ix T W_MOD a b
+/\  normalize_wexpr ix (W_SHL a b) = normalize_binary ix F W_SHL a b
+/\  normalize_wexpr ix (W_SHR a b) = normalize_binary ix F W_SHR a b
+/\  normalize_wexpr ix (W_ASHR a b) = normalize_binary ix T W_ASHR a b
+/\  normalize_wexpr ix (W_SX sz a) = normalize_ext ix W_SX sz a
+/\  normalize_wexpr ix (W_ZX sz a) = normalize_ext ix W_ZX sz a
+/\  normalize_wexpr ix (W_ITE c a b) =
+        val (css, c', cix, _)   = normalize_wexpr ix  c in
+        val (ass, a', aix, asz) = normalize_wexpr cix a in
+        val (bss, b', bix, _)   = normalize_wexpr aix b in
+        let v = NEW_VAR F asz bix in
+        ((F, v, W_ITE c' a' b'):(bss@ass@css), v, bix+1, asz)
+/\  normalize_wexpr ix (W_SLICE is v) =
+        normalize_slice ix is v
+/\  normalize_wexpr ix (W_NAMED_SLICE _ is v) =
+        print "normalize: W_NAMED_SLICE is treated as W_SLICE" fseq
+        normalize_slice ix is v
+/\  normalize_wexpr ix (W_CAT as) =
+        letrec
+            norm [] = ([],[],ix,0)
+        /\  norm (a:as) =
+                val (asss, as', asix, assz) = norm as in
+                val (ass,  a',  aix,  asz)  = normalize_wexpr asix a in
+                (ass@asss, a':as', aix, asz+assz)
+        in
+        val (asss, as', asix, assz) = norm as in
+        let v = NEW_VAR F assz asix in
+        ((F, v, W_CAT as'):asss, v, asix+1, assz)
+// Not sure what to do with named slices and memory.
+/\  normalize_wexpr ix _ =
+        error "normalize: W_MEM_[READ|WRITE] not yet supported"
+;
+
+let normalize_update_fn {ix::int} (W_UPDATE_FN lhs rhs) =
+        val (rss, rhs', rix, _) = normalize_wexpr ix rhs in
+        // Move last variable assignment to lhs, if any.
+        let is_signed (s, _, _) = s in
+        let ss =
+                // Can't or don't need to remove last assignment.
+                NOT (is_var rhs') => ((F,lhs,rhs'):rss) |
+                // Can't replace last var. with "lhs" if it's signed.
+                (length rss > 0) AND (is_signed (hd rss)) => ((F,lhs,rhs'):rss) |
+                // /
+                val ((_,_,x):xs) = rss in ((F,lhs,x):xs)
+        in
+        // Internal wires created during "normalize_wexpr" are prefixed by "_$".
+        let is_base (_, W_VAR _ n, _) = IS_BASE n in
+        let pr_name (_, W_VAR s n, _) = mk_name s n in
+        let internals xs = map pr_name (filter is_base xs) in
+        // Every (lhs,rhs) pair produced by 'normalize_wexpr' is an sep. update.
+        let mk_fn (_, lhs, rhs) = W_UPDATE_FN lhs rhs in
+        let updates xs = map mk_fn xs in
+        // /
+        (updates ss, internals ss, rix)
+/\  normalize_update_fn _ (W_PHASE_DELAY _ _) =
+        error "normalize_update_fn: W_PHASE_DELAY"
+;
+
+// Rewrites a pexlif into its "normal" form, where 'normalize' basically means
+// 'supports translation into Verilog'. This "normal" form requires that:
+//    1) Any 'update_fn's LHS is either a name, a sliced name, or a (possibly 
+//       nested) concatenation of such names (*).
+//    2) Slices are contig. on fully indexed arrays (*).
+//    3) Slices are only made on variables.
+//    4) Sign extensions are only made on variables.
+//    5) Division is replaced by X when the RHS is a constant zero.
+//
+// [*] See 'valid_lhs' in "IDVII/src/fl/verilog/pretty-pexlif/" for a FL def. of
+// what it considers to be valid LHSs.
+//
+// Rewriting can thus introduce additional internal wires.
+letrec
+    normalize_pexlif (PINST name attrs T inps outs internals (P_LEAF fs)) =
+        // Normalize all update-functions.
+        letrec
+            norm [] = ([],[],0)
+        /\  norm (f:fs) =
+                val (gs, gs_is, gs_ix) = norm fs in
+                val (g,  g_is,  g_ix)  = normalize_update_fn gs_ix f in
+                (g@gs, g_is@gs_is, g_ix)
+        in
+        val (fs', nis, _) = norm fs in
+        let {internals'::string list} = internals @ nis in
+        // If there's only one update, simply wrap that up.
+        length fs' == 1 =>
+            PINST name attrs T inps outs internals' (P_LEAF fs') |
+        // If there's more than one, wrap each in a descriptive hier.
+        let act f = (f,[f]) in
+        let wrap (W_UPDATE_FN lhs rhs) =
+                let {n::string} = mk_draw_cmd F rhs in
+                let {xs::string list} = w_get_names rhs in
+                let {ys::string list} = w_get_names lhs in
+                PINST n [] T (map act xs) (map act ys) [] (P_LEAF
+                    [W_UPDATE_FN lhs rhs])
+        in
+        PINST name attrs T inps outs internals' (P_HIER (map wrap fs'))
+/\  normalize_pexlif (PINST name attrs F inps outs internals (P_HIER cs)) =
+        PINST name attrs F inps outs internals (P_HIER (map normalize_pexlif cs))
+;
+// todo: normalize indices.
+// todo: what do we do about slices in delays? split size to comb. and use new
+// slice-variable in phase delay?
+
+end_abstype normalize_pexlif;
+
+// -----------------------------------------------------------------------------
 
 begin_abstype;
 
@@ -839,7 +1092,9 @@ letrec
         PINST n as' F is os ts (P_HIER (map draw_hier_pinst cs))
 ;
 
-end_abstype draw_hier_pinst;
+let decorate_pexlif_hiers = draw_hier_pinst;
+
+end_abstype decorate_pexlif_hiers;
 
 //------------------------------------------------------------------------------
 // Fin.
