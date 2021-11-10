@@ -74,6 +74,7 @@ let verilog2pexlif no_popup flags top_level_module file_list additional_files =
     (fprintf sfp "rename -enumerate -pattern TmP_%%\n") fseq
     (fprintf sfp "memory -nomap\n") fseq
     (fprintf sfp "write_pexlif -noalias -icells -gates -impltf _out.fl\n") fseq
+    (fclose sfp) fseq
     // Run yosys
     let cmd = sprintf "cd %s; yosys script.ys  > yosys.log 2>&1" tmp_dir then
     (system cmd) != 0 =>
