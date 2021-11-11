@@ -40,6 +40,8 @@ let p_hierarchical_identifier (HID (NONE) i) =
         <-> p_identifier i
 ;
 
+let p_system_function_identifier (SYSID n) = text ("$" ^ n);
+
 let p_value (VAL s) = text s;
 
 let p_unsigned_number (UNUM u) = text (int2str u);
@@ -154,8 +156,13 @@ let p_variable_assignment (Variable_assignment vlv e) =
       p_variable_lvalue vlv <+> p_expression e
 ;
 
+let p_system_function_call (SYSCALL i es') =
+          p_system_function_identifier i
+      <-> p_opt (\es. in_list (map p_expression es)) es'
+;
+
 let p_constant_primary (CPrim_num n) = p_number n
-/\  p_constant_primary (CPrim_str s) = text s;
+/\  p_constant_primary (CPrim_str s) = text s
 ;
 
 forward_declare{p_concatenation::concatenation->doc};
@@ -171,6 +178,7 @@ let p_primary (Prim_num n) = p_number n
       p_hierarchical_identifier i <-> p_opt pr es'
 /\  p_primary (Prim_cat c) = p_concatenation c
 /\  p_primary (Prim_mcat mc) = p_multiple_concatenation mc
+/\  p_primary (Prim_syscall sc) = p_system_function_call sc
 /\  p_primary (Prim_mintypmax mtm) = in_paren (p_mintypmax_expression mtm)
 /\  p_primary (Prim_str s) = text s
 ;

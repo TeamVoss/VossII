@@ -232,14 +232,12 @@ let variable_exp 1  v = (Exp_primary (prim_hier v []), 1)
 /\  variable_exp sz v = (Exp_primary (prim_hier v [(sz-1,0)]), 1)
 ;
 
-//  unary_exp::unary_operator->expression->expression
 let unary_exp op a =
       let p = precedence_unary op in
       val (a', n) = pretty_expression a in
       (Exp_unary op (paren_exp a'), p)
 ;
 
-//  unary_exp::binary_operator->expression->expression->expression
 let binary_exp op a b =
       let p = precedence_binary op in
       val (a', n) = pretty_expression a in
@@ -378,16 +376,20 @@ let in_lhs id (W_UPDATE_FN lhs _)   = in_lvalue id lhs => SOME T | NONE
 
 let in_any_lhs id fs = exhaust (map (in_lhs id) fs);
 
+let is_signed = str_is_prefix "_$s";
+
 let declare_net id [] =
-      ND_scalar_id NT_wire F [Net_id (ID id) []]
+      ND_scalar_id NT_wire (is_signed id) [Net_id (ID id) []]
 /\  declare_net id (r:ds) =
-      ND_vector_id NT_wire NONE F (range r) [Net_id (ID id) (map dimension ds)]
+      ND_vector_id NT_wire NONE (is_signed id) (range r)
+        [Net_id (ID id) (map dimension ds)]
 ;
 
 let declare_reg id [] =
-      Reg_decl F NONE [VT_dim (ID id) []]
+      Reg_decl (is_signed id) NONE [VT_dim (ID id) []]
 /\  declare_reg id (r:ds) =
-      Reg_decl F (SOME (range r)) [VT_dim (ID id) (map dimension ds)]
+      Reg_decl (is_signed id) (SOME (range r))
+        [VT_dim (ID id) (map dimension ds)]
 ;
 
 let pretty_internal_decl {vec::string} {wire::bool} =

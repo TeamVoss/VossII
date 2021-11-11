@@ -21,6 +21,9 @@ lettype identifier = ID (string);
 // hierarchical_net_identifier ::= hierarchical_identifier
 // hierarchical_variable_identifier ::= hierarchical_identifier
 
+// system_function_identifier ::= $[ a-zA-Z0-9_$ ]{ [ a-zA-Z0-9_$ ] }
+lettype system_function_identifier = SYSID (string);
+
 // A.9.2 Comments --------------------------------------------------------------
 // A.9.1 Attributes ------------------------------------------------------------
 
@@ -225,6 +228,7 @@ andlettype primary =
       ({(expression list)#(range_expression)} opt)
   | Prim_cat (concatenation)
   | Prim_mcat (multiple_concatenation)
+  | Prim_syscall (system_function_call)
   | Prim_mintypmax (mintypmax_expression)
   | Prim_str (string)
 // See A.8.1
@@ -232,6 +236,9 @@ andlettype concatenation =
     CAT (expression list)
 andlettype multiple_concatenation =
     MCAT (constant_expression) (concatenation)
+// See A.8.2
+andlettype system_function_call =
+    SYSCALL (system_function_identifier) ({(expression list)} opt)
 andlettype mintypmax_expression =
     Mintypmax_expression (expression)
   | Mintypmax_minmax (expression) (expression) (expression)
@@ -265,6 +272,11 @@ lettype variable_assignment =
 ;
 
 // A.8.2 Function calls --------------------------------------------------------
+
+// system_function_call ::= system_function_identifier
+//   [ "(" expression { "," expression } ")" ]
+// Moved to 'Expressions' (A.8.3).
+
 // A.8.1 Concatenations --------------------------------------------------------
 
 // concatenation ::= "{" expression { "," expression } "}"
