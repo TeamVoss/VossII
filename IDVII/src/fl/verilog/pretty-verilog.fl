@@ -158,7 +158,7 @@ let p_variable_assignment (Variable_assignment vlv e) =
 
 let p_system_function_call (SYSCALL i es') =
           p_system_function_identifier i
-      <-> p_opt (\es. in_list (map p_expression es)) es'
+      <-> p_opt (\es. in_paren (in_list (map p_expression es))) es'
 ;
 
 let p_constant_primary (CPrim_num n) = p_number n
@@ -224,8 +224,8 @@ let p_range_expression (Range_exp e) = p_expression e
       p_constant_expression c1 <-> text ":" <-> p_constant_expression c2
 ;
 
-let p_mintypmax_expression (Mintypmax_expression e) = p_expression e
-/\  p_mintypmax_expression (Mintypmax_minmax e1 e2 e3) =
+let p_mintypmax_expression (MTM_expression e) = p_expression e
+/\  p_mintypmax_expression (MTM_minmax e1 e2 e3) =
           p_expression e1
       <+> text ":"
       <+> p_expression e2

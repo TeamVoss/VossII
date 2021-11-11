@@ -21,7 +21,7 @@ lettype identifier = ID (string);
 // hierarchical_net_identifier ::= hierarchical_identifier
 // hierarchical_variable_identifier ::= hierarchical_identifier
 
-// system_function_identifier ::= $[ a-zA-Z0-9_$ ]{ [ a-zA-Z0-9_$ ] }
+// system_function_identifier ::= "$"[ a-zA-Z0-9_$ ]{ [ a-zA-Z0-9_$ ] }
 lettype system_function_identifier = SYSID (string);
 
 // A.9.2 Comments --------------------------------------------------------------
@@ -240,8 +240,8 @@ andlettype multiple_concatenation =
 andlettype system_function_call =
     SYSCALL (system_function_identifier) ({(expression list)} opt)
 andlettype mintypmax_expression =
-    Mintypmax_expression (expression)
-  | Mintypmax_minmax (expression) (expression) (expression)
+    MTM_expression (expression)
+  | MTM_minmax (expression) (expression) (expression)
 ;
 
 // range_expression ::=

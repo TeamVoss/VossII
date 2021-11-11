@@ -54,10 +54,6 @@ let valid_lhs {we::wexpr} =
       rec_top we
 ;
 
-let valid_division {l::wexpr} {r::wexpr} =
-        undefined
-;
-
 // -----------------------------------------------------------------------------
 // ...
 
@@ -216,15 +212,7 @@ let precedence_binary (B_add) = 4
 /\  precedence_binary (B_shl) = 5
 ;
 
-let unwrap_prim (Exp_primary (Prim_hier (HID NONE (ID i)) rng)) = (i, rng)
-/\  unwrap_prim _ = error "SX/SLICE is only supported for variables."
-;
-
 forward_declare{pretty_expression::wexpr->(expression#int)};
-
-let paren_exp a = Prim_mintypmax (Mintypmax_expression a);
-
-let wrap_exp a ap p = ap >= p => Exp_primary (paren_exp a) | a;
 
 let const_exp sz c = (prim_str (as_bin sz c), 1);
 
@@ -232,10 +220,16 @@ let variable_exp 1  v = (Exp_primary (prim_hier v []), 1)
 /\  variable_exp sz v = (Exp_primary (prim_hier v [(sz-1,0)]), 1)
 ;
 
+let paren_exp a = Prim_mintypmax (MTM_expression a);
+
+let wrap_prim a ap p = ap >= p => paren_exp (Exp_primary a) | a;
+
+let wrap_exp a ap p = ap >= p => Exp_primary (paren_exp a) | a;
+
 let unary_exp op a =
       let p = precedence_unary op in
-      val (a', n) = pretty_expression a in
-      (Exp_unary op (paren_exp a'), p)
+      val (Exp_primary a', n) = pretty_expression a in
+      (Exp_unary op a', p)
 ;
 
 let binary_exp op a b =
@@ -255,6 +249,10 @@ let zero_extend_exp sz a =
       (Exp_primary (Prim_cat (CAT [zero, a'])), 14)
 ;
 
+let unwrap_prim (Exp_primary (Prim_hier (HID NONE (ID i)) rng)) = (i, rng)
+/\  unwrap_prim _ = error "SX/SLICE is only supported for variables."
+;
+
 let sign_extend_exp sz a =
       let a'  = fst (pretty_expression a) in
       let sz' = wexpr_size a in
@@ -269,9 +267,9 @@ let sign_extend_exp sz a =
 
 let slice_exp is a =
       let contig_slice is =
-              empty is => error "Empty slice." |
-              NOT (valid_slice is) => error "Non-contig. slice." |
-              (hd is, last is)
+            empty is => error "Empty slice." |
+            NOT (valid_slice is) => error "Non-contig. slice." |
+            (hd is, last is)
       in
       let a'  = fst (pretty_expression a) in
       let id  = fst (unwrap_prim a') in
@@ -280,11 +278,103 @@ let slice_exp is a =
 ;
 // todo: precedence correct?
 
+let syscall_signed e = Prim_syscall (SYSCALL (SYSID "signed") (SOME [e]));
+
+let syscall_unsigned e = Prim_syscall (SYSCALL (SYSID "unsigned") (SOME [e]));
+
+// See 5.5.1 Rules for expression types
+// > Based_numbers are unsigned, except where the s notation is used in the base
+// specifier
+// > Decimal numbers are signed.
+let is_num_signed (NUM_bin (BIN _ s _)) = s
+/\  is_num_signed (NUM_oct (OCT _ s _)) = s
+/\  is_num_signed (NUM_dec _) = T
+/\  is_num_signed (NUM_hex (HEX _ s _)) = s
+/\  is_num_signed (NUM_real _) = F // reals are real, not unsigned/signed.
+;
+
+// note: This really depends on the def. of the system function, but as I only
+// support "$signed" and "$unsigned" its much easier to simply check its name.
+let is_syscall_signed (SYSCALL (SYSID "signed") _) = T
+/\  is_syscall_signed _ = F
+;
+
+forward_declare{is_exp_signed::expression->bool};
+
+// > Bit-select results are unsigned, regardless of the operands.
+// > Part-select results are unsigned, regardless of the operands even if the
+// part-select specifies the entire vector.
+// > Concatenate results are unsigned, regardless of the operands.
+let is_prim_signed (Prim_num n) = is_num_signed n
+/\  is_prim_signed (Prim_hier _ _) = F
+/\  is_prim_signed (Prim_cat _) = F
+/\  is_prim_signed (Prim_mcat _) = F
+/\  is_prim_signed (Prim_syscall f) = is_syscall_signed f
+/\  is_prim_signed (Prim_mintypmax (MTM_expression e)) = is_exp_signed e
+/\  is_prim_signed (Prim_mintypmax (MTM_minmax e _ _)) = is_exp_signed e
+/\  is_prim_signed (Prim_str _) = F
+;
+
+// > Expression type depends only on the operands. It does not depend on the
+// left-hand side (if any).
+// > Comparison results (1, 0) are unsigned, regardless of the operands.
+// > The sign and size of any self-determined operand are determined by the
+// operand itself and independent of the remainder of the expression.
+// > For nonself-determined operands, the following rules apply:
+//   - If any operand is unsigned, the result is unsigned, regardless of the
+//     operator.
+//   - If all operands are signed, the result will be signed, regardless of
+//     operator, except when specified otherwise (?).
+let is_exp_signed (Exp_primary p) = is_prim_signed p
+/\  is_exp_signed (Exp_unary U_pos a) = is_prim_signed a
+/\  is_exp_signed (Exp_unary U_neg a) = is_prim_signed a
+/\  is_exp_signed (Exp_unary U_log_neg a) = is_prim_signed a
+/\  is_exp_signed (Exp_unary U_bit_neg a) = is_prim_signed a
+/\  is_exp_signed (Exp_unary _ _) = F
+/\  is_exp_signed (Exp_binary a B_add b) = is_exp_signed a AND is_exp_signed b
+/\  is_exp_signed (Exp_binary a B_sub b) = is_exp_signed a AND is_exp_signed b
+/\  is_exp_signed (Exp_binary a B_mult b) = is_exp_signed a AND is_exp_signed b
+/\  is_exp_signed (Exp_binary a B_div _) = is_exp_signed a
+/\  is_exp_signed (Exp_binary a B_mod _) = is_exp_signed a
+/\  is_exp_signed (Exp_binary a B_log_and b) = is_exp_signed a AND is_exp_signed b
+/\  is_exp_signed (Exp_binary a B_log_or b) = is_exp_signed a AND is_exp_signed b
+/\  is_exp_signed (Exp_binary a B_exp _) = is_exp_signed a
+/\  is_exp_signed (Exp_binary a B_bit_and b) = is_exp_signed a AND is_exp_signed b
+/\  is_exp_signed (Exp_binary a B_bit_or b) = is_exp_signed a AND is_exp_signed b
+/\  is_exp_signed (Exp_binary a B_bit_xor b) = is_exp_signed a AND is_exp_signed b
+/\  is_exp_signed (Exp_binary a B_log_shr _) = is_exp_signed a
+/\  is_exp_signed (Exp_binary a B_log_shl _) = is_exp_signed a
+/\  is_exp_signed (Exp_binary a B_shr _) = is_exp_signed a
+/\  is_exp_signed (Exp_binary a B_shl _) = is_exp_signed a
+/\  is_exp_signed (Exp_binary _ _ _) = F
+/\  is_exp_signed (Exp_conditional _ a _) = is_exp_signed a
+;
+
+let ashr_exp a b =
+      let p = precedence_binary B_shr in
+      val (a', n) = pretty_expression a in
+      val (b', m) = pretty_expression b in
+      let sa = is_exp_signed a' => wrap_exp a' n p |
+            Exp_primary (syscall_signed a')
+      in
+      (Exp_binary sa B_shr (wrap_exp b' m p), p)
+;
+
+let mod_exp a b =
+      let p = precedence_binary B_mod in
+      val (a', n) = pretty_expression a in
+      val (b', m) = pretty_expression b in
+      let sa = is_exp_signed a' => wrap_exp a' n p |
+            Exp_primary (syscall_signed a')
+      in
+      (Exp_binary sa B_mod (wrap_exp b' m p), p)
+;
+
 let conditional_exp c a b =
-      ( Exp_conditional
-         (fst $ pretty_expression c)
-         (fst $ pretty_expression a)
-         (fst $ pretty_expression b)
+      (Exp_conditional
+        (fst $ pretty_expression c)
+        (fst $ pretty_expression a)
+        (fst $ pretty_expression b)
       , 13)
 ;
 
@@ -307,10 +397,10 @@ let pretty_expression {we::wexpr} =
       /\  go (W_SUB a b)    = binary_exp B_sub a b
       /\  go (W_MUL a b)    = binary_exp B_mult a b
       /\  go (W_DIV a b)    = binary_exp B_div a b
-      /\  go (W_MOD a b)    = binary_exp B_mod a b
+      /\  go (W_MOD a b)    = mod_exp a b
       /\  go (W_SHL a b)    = binary_exp B_log_shl a b
       /\  go (W_SHR a b)    = binary_exp B_log_shr a b
-      /\  go (W_ASHR a b)   = binary_exp B_shr a b
+      /\  go (W_ASHR a b)   = ashr_exp a b
       /\  go (W_ZX sz a)    = zero_extend_exp sz a
       /\  go (W_SX sz a)    = sign_extend_exp sz a
       /\  go (W_SLICE is w) = slice_exp is w
@@ -333,6 +423,7 @@ let pretty_expression {we::wexpr} =
       /\  go (W_MEM_WRITE _ _ _ _) =
             error "W_MEM_WRITE not supported"
       in
+      // todo: Used to do more here, could inline 'go' now.
       go we
 ;
 
