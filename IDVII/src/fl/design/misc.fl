@@ -280,8 +280,8 @@ letrec
 // String.
 
 // Drops the first 'n' characters from the string 's'.
-//  string_butfirstn::string->int->string
-let string_butfirstn s n = el (n+1) (iterate (string_tl) s);
+//  string_butfirstn::int->string->string
+let string_butfirstn n s = el (n+1) (iterate (string_tl) s);
 
 // Short-hand for 'string_tl'.
 //  string_butfirst::string->string
