@@ -201,6 +201,7 @@ end_abstype fp_pinst sha_pinst;
 //------------------------------------------------------------------------------
 // ...
 //------------------------------------------------------------------------------
+
 clet PINST n a l i o t c =
         let is_signature s = (s == "FP") OR (s == "SHA") in
         let a' = filter (NOT # is_signature # fst) a in
@@ -209,10 +210,7 @@ clet PINST n a l i o t c =
         PINST n (f : s : a') l i o t c
 ;
 
-
 //------------------------------------------------------------------------------
-
-
 
 // Correct version of fold_pexlif (not terribly efficient).
 let fold_pexlif p il new_name =
@@ -321,7 +319,6 @@ let foldn_pexlif p ill new_base_name =
     (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER chs'))
 ;
 
-
 // Create a new pexlif in which instances in ids have been collected to
 // a new hiearchy named 'name'.
 // ...
@@ -354,7 +351,6 @@ let
         let lbl (PINST n a l i o t c) = PINST n a l i o t c in
         PINST n a l i o t (P_HIER (map lbl cs))
 ;
-
 
 //------------------------------------------------------------------------------
 
@@ -567,11 +563,11 @@ letrec
             // which simulation doesn't catch.
             , (sz_X, W_DIV  (gen_binary sz as)  (gen_binary sz bs))
             // Yosys treats first argument as a signed value always?
-         // , (sz_X, W_MOD  (gen_binary sz as)  (gen_binary sz bs))
+            , (sz_X, W_MOD  (gen_binary sz as)  (gen_binary sz bs))
             , (sz_X, W_SHL  (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
             , (sz_X, W_SHR  (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
          // Declare first arg. as signed to get the correct behaviour.
-         // , (sz_X, W_ASHR (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
+            , (sz_X, W_ASHR (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
             , (d_X,  val (cs, ds)   = split_at 2 ts in
                      val (es, fs)   = split_at_random ds in
                      let gen ts sz  = gen_wexpr is ts sz (d / 3) in
@@ -827,29 +823,33 @@ begin_abstype;
 
 forward_declare{normalize_wexpr::int->wexpr->(((bool#wexpr#wexpr) list)#(wexpr#(int#int)))};
 
-let BASE_STMP = sprintf "%ss" BASE_TMP;
-let IS_BASE n = str_is_prefix BASE_TMP n OR str_is_prefix BASE_STMP n;
-let NEW_VAR s sz cnt = W_VAR sz (sprintf "%s%d" (s => BASE_STMP | BASE_TMP) cnt);
+let BASE_SIGNED_TMP = sprintf "%ss" BASE_TMP;
 
-//  normalize_unary::name->unary_op->arg->((signed?,lhs,rhs)#lhs#name#size)
+let NEW_VAR sz cnt = W_VAR sz (sprintf "%s%d" BASE_TMP cnt);
+let NEW_SIGNED_VAR sz cnt = W_VAR sz (sprintf "%s%d" BASE_SIGNED_TMP cnt);
+
+let is_base   = str_is_prefix BASE_TMP;
+let is_signed = str_is_prefix BASE_SIGNED_TMP;
+
+let SIGN_VAR n = sprintf "%s%s" BASE_SIGNED_TMP (string_butfirstn 2 n);
+
 let normalize_unary {ix::int} {op::wexpr->wexpr} {a::wexpr} =
         val (ass, a', aix, asz) = normalize_wexpr ix a in
-        let v = NEW_VAR F asz aix in
+        let v = NEW_VAR asz aix in
         ((F, v, op a'):ass, v, aix+1, asz)
 ;
 
-//  normalize_binary::name->signed?->binary_op->arg1->arg2->((signed?,lhs,rhs)#lhs#name#size)
-let normalize_binary {ix::int} {s::bool} {op::wexpr->wexpr->wexpr} {a::wexpr} {b::wexpr} =
+let normalize_binary {ix::int} {op::wexpr->wexpr->wexpr} {a::wexpr} {b::wexpr} =
         val (ass, a', aix, asz) = normalize_wexpr ix  a in
         val (bss, b', bix, _)   = normalize_wexpr aix b in
-        let v = NEW_VAR s asz bix in
-        ((s, v, op a' b'):(bss@ass), v, bix+1, asz)
+        let v = NEW_VAR asz bix in
+        ((F, v, op a' b'):(bss@ass), v, bix+1, asz)
 ;
 
 let normalize_cmp {ix::int} {op::wexpr->wexpr->wexpr} {a::wexpr} {b::wexpr} =
         val (ass, a', aix, _) = normalize_wexpr ix  a in
         val (bss, b', bix, _) = normalize_wexpr aix b in
-        let v = NEW_VAR F 1 bix in
+        let v = NEW_VAR 1 bix in
         ((F, v, op a' b'):(bss@ass), v, bix+1, 1)
 ;
 
@@ -866,34 +866,69 @@ let normalize_slice {ix::int} {is::int list} {a::wexpr} =
         in
         let ws = map slice (group_indices is) in
         let w  = length ws == 1 => hd ws | W_CAT ws in
-        let v  = NEW_VAR F (length is) aix in
+        let v  = NEW_VAR (length is) aix in
         ((F, v, w):ass, v, aix+1, length is)
 ;
 
-let normalize_arith {ix::int} {s::bool} {op::wexpr->wexpr->wexpr} {a::wexpr} {b::wexpr} =
-        val (ass, a', aix, asz) = normalize_wexpr ix  a in
-        val (bss, b', bix, _)   = normalize_wexpr aix b in
-        // Can't have constant zero for the second argument for any "arith" op.
-        // since Yosys turns that into X.
-        letrec
-            is_zero (W_CONST _ 0) = T
-        /\  is_zero (W_NAMED_CONST _ _ 0) = T
-        /\  is_zero (W_PRED _ a) = is_zero a
-        /\  is_zero (W_ZX _ a) = is_zero a
-        /\  is_zero (W_CAT as) = all is_zero as
-        /\  is_zero _ = F
-        in
-        let op = is_zero b => (\a. \b. W_X asz) | op in
-        let v  = NEW_VAR s asz bix in
-        ((s, v, op a' b'):(bss@ass), v, bix+1, asz)
+letrec is_zero (W_CONST _ 0) = T
+/\ is_zero (W_NAMED_CONST _ _ 0) = T
+/\ is_zero _ = F
 ;
 // note: Like Yosys' "read_verilog" without constant progagation, "is_zero" only
-// checks for expressions that "obviously" is zero.
-// note: "W_SX" should normalize to a variable extension and cannot be zero.
+// checks for expressions that "obviously" is zero. Since normalization splits
+// expressions, we only really need to check for constant zeros.
+
+let normalize_div {ix::int} {a::wexpr} {b::wexpr} =
+        val (ass, a', aix, asz) = normalize_wexpr ix  a in
+        val (bss, b', bix, _)   = normalize_wexpr aix b in
+        // If second argument of a div is zero, the expression is X.
+        is_zero b => (bss@ass, W_X asz, bix, asz) |
+        // If not, perform div as usual.
+        let v = NEW_VAR asz bix in
+        ((F, v, W_DIV a' b'):(bss@ass), v, bix+1, asz)
+;
+
+let is_var (W_VAR _ _) = T
+/\  is_var (W_EXPLICIT_VAR _ _) = T
+/\  is_var _ = F
+;
+
+// let sign_top (ss, W_X s, ix, sz) = (ss, W_X s, ix, sz)
+// /\  sign_top (ss, W_CONST s a, ix, sz) = (ss, W_CONST s a, ix sz)
+// /\  sign_top (ss, W_NAMED_CONST n s a, ix, sz) = (ss, W_NAMED_CONST n s a, ix, sz)
+// /\  sign_top (ss, W_EXPLICIT_VAR s n, ix, sz) =
+//         let v = NEW_SIGNED_VAR sz ix in
+//         ((T, v, W_EXPLICIT_VAR s n):ss, v, ix+1, sz)
+// /\  sign_top (ss, W_VAR s n, ix, sz) =
+//         // If signed already, do nothing.
+//         is_signed n => (ss, W_VAR s n, ix, sz) |
+//         // If not, sign if it's an auto-generated var.
+//         is_base n AND NOT (empty ss) =>
+//             val ((F, _, w):xs) = ss in
+//             let v = NEW_SIGNED_VAR sz ix in
+//             ((T, v, w):xs, v, ix+1, sz) |
+//         // Otherwise (user given var.), copy to signed var.
+//         let v = NEW_SIGNED_VAR sz ix in
+//         ((T, v, W_VAR s n):ss, v, ix+1, sz)
+// ;
+
+let normalize_mod {ix::int} {a::wexpr} {b::wexpr} =
+        val (ass, a', aix, asz) = normalize_wexpr ix  a in
+        val (bss, b', bix, _)   = normalize_wexpr aix b in
+        // If second argument of a div is zero, the expression is X.
+        is_zero b => (bss@ass, W_X asz, bix, asz) |
+        // If not, perform div as usual.
+        let v = NEW_VAR asz bix in
+        ((T, v, W_MOD a' b'):(bss@ass), v, bix+1, asz)
+;
+
+let normalize_ashr {ix::int} {a::wexpr} {b::wexpr} =
+        normalize_binary ix W_ASHR a b
+;
 
 let normalize_ext {ix::int} {op::int->wexpr->wexpr} {sz::int} {a::wexpr} =
         val (ass, a', aix, _) = normalize_wexpr ix a in
-        let v = NEW_VAR F sz aix in
+        let v = NEW_VAR sz aix in
         ((F, v, op sz a'):ass, v, aix+1, sz)
 ;
 
@@ -908,27 +943,27 @@ letrec
         ([], W_VAR sz b, ix, sz)
 /\  normalize_wexpr ix (W_EXPLICIT_VAR sz n) =
         ([], W_EXPLICIT_VAR sz n, ix, sz)
-/\  normalize_wexpr ix (W_AND a b) = normalize_binary ix F W_AND a b
-/\  normalize_wexpr ix (W_OR a b) = normalize_binary ix F W_OR a b
+/\  normalize_wexpr ix (W_AND a b) = normalize_binary ix W_AND a b
+/\  normalize_wexpr ix (W_OR a b) = normalize_binary ix W_OR a b
 /\  normalize_wexpr ix (W_NOT a) = normalize_unary ix W_NOT a
 /\  normalize_wexpr ix (W_EQ a b) = normalize_cmp ix W_EQ a b
 /\  normalize_wexpr ix (W_PRED n c) = normalize_unary ix (W_PRED n) c
 /\  normalize_wexpr ix (W_GR a b) = normalize_cmp ix W_GR a b
-/\  normalize_wexpr ix (W_ADD a b) = normalize_binary ix F W_ADD a b
-/\  normalize_wexpr ix (W_SUB a b) = normalize_binary ix F W_SUB a b
-/\  normalize_wexpr ix (W_MUL a b) = normalize_binary ix F W_MUL a b
-/\  normalize_wexpr ix (W_DIV a b) = normalize_arith ix F W_DIV a b
-/\  normalize_wexpr ix (W_MOD a b) = normalize_arith ix T W_MOD a b
-/\  normalize_wexpr ix (W_SHL a b) = normalize_binary ix F W_SHL a b
-/\  normalize_wexpr ix (W_SHR a b) = normalize_binary ix F W_SHR a b
-/\  normalize_wexpr ix (W_ASHR a b) = normalize_binary ix T W_ASHR a b
+/\  normalize_wexpr ix (W_ADD a b) = normalize_binary ix W_ADD a b
+/\  normalize_wexpr ix (W_SUB a b) = normalize_binary ix W_SUB a b
+/\  normalize_wexpr ix (W_MUL a b) = normalize_binary ix W_MUL a b
+/\  normalize_wexpr ix (W_DIV a b) = normalize_div ix a b
+/\  normalize_wexpr ix (W_MOD a b) = normalize_mod ix a b
+/\  normalize_wexpr ix (W_SHL a b) = normalize_binary ix W_SHL a b
+/\  normalize_wexpr ix (W_SHR a b) = normalize_binary ix W_SHR a b
+/\  normalize_wexpr ix (W_ASHR a b) = normalize_ashr ix a b
 /\  normalize_wexpr ix (W_SX sz a) = normalize_ext ix W_SX sz a
 /\  normalize_wexpr ix (W_ZX sz a) = normalize_ext ix W_ZX sz a
 /\  normalize_wexpr ix (W_ITE c a b) =
         val (css, c', cix, _)   = normalize_wexpr ix  c in
         val (ass, a', aix, asz) = normalize_wexpr cix a in
         val (bss, b', bix, _)   = normalize_wexpr aix b in
-        let v = NEW_VAR F asz bix in
+        let v = NEW_VAR asz bix in
         ((F, v, W_ITE c' a' b'):(bss@ass@css), v, bix+1, asz)
 /\  normalize_wexpr ix (W_SLICE is v) =
         normalize_slice ix is v
@@ -944,7 +979,7 @@ letrec
                 (ass@asss, a':as', aix, asz+assz)
         in
         val (asss, as', asix, assz) = norm as in
-        let v = NEW_VAR F assz asix in
+        let v = NEW_VAR assz asix in
         ((F, v, W_CAT as'):asss, v, asix+1, assz)
 // Not sure what to do with named slices and memory.
 /\  normalize_wexpr ix _ =
@@ -964,9 +999,9 @@ let normalize_update_fn {ix::int} (W_UPDATE_FN lhs rhs) =
                 val ((_,_,x):xs) = rss in ((F,lhs,x):xs)
         in
         // Internal wires created during "normalize_wexpr" are prefixed by "_$".
-        let is_base (_, W_VAR _ n, _) = IS_BASE n in
-        let pr_name (_, W_VAR s n, _) = mk_name s n in
-        let internals xs = map pr_name (filter is_base xs) in
+        let is_base_h (_, W_VAR _ n, _) = is_base n in
+        let mk_name_h (_, W_VAR s n, _) = mk_name s n in
+        let internals xs = map mk_name_h (filter is_base_h xs) in
         // Every (lhs,rhs) pair produced by 'normalize_wexpr' is an sep. update.
         let mk_fn (_, lhs, rhs) = W_UPDATE_FN lhs rhs in
         let updates xs = map mk_fn xs in
