@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
-load (DIR^"../design/misc.fl");
-load (DIR^"../design/util.fl");
-load (DIR^"../design/hfl.fl");
-load (DIR^"primes.fl");
+cload (DIR^"../design/misc.fl");
+cload (DIR^"../design/util.fl");
+cload (DIR^"../design/hfl.fl");
+cload (DIR^"primes.fl");
 
 // Meh...
 //  shorten_sha::string->string

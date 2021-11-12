@@ -960,6 +960,30 @@ string_trim(g_ptr redex)
 {
     g_ptr l    = GET_APPLY_LEFT(redex);
     g_ptr r    = GET_APPLY_RIGHT(redex);
+    g_ptr g_s;
+    EXTRACT_1_ARG(redex, g_s);
+    string s = GET_STRING(g_s); 
+    string tmp = strtemp(s);
+    string f = tmp;
+    while( *f && (isspace(*f) || (*f == 10)) ) { f++; }
+    if( *f == 0 ) {
+	MAKE_REDEX_STRING(redex, wastrsave(&strings, ""));
+    } else {
+	string t = tmp + strlen(tmp)-1;
+	while( t > f && (isspace(*t) || (*t == 10))) { t--; }
+	*t = 0;
+	MAKE_REDEX_STRING(redex, wastrsave(&strings, f));
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+    return;
+}
+
+static void
+string_gen_trim(g_ptr redex)
+{
+    g_ptr l    = GET_APPLY_LEFT(redex);
+    g_ptr r    = GET_APPLY_RIGHT(redex);
     g_ptr g_l, g_r, g_s;
     EXTRACT_3_ARGS(redex, g_l, g_r, g_s);
     string s = GET_STRING(g_s); 
@@ -1163,12 +1187,16 @@ Strings_Install_Functions()
 							    GLmake_string()))),
 			string_substr);
 
-    Add_ExtAPI_Function("trim", "111", FALSE,
+    Add_ExtAPI_Function("gen_trim", "111", FALSE,
 			GLmake_arrow(GLmake_string(),
 				     GLmake_arrow(GLmake_string(),
 						  GLmake_arrow(
 							    GLmake_string(),
 							    GLmake_string()))),
+			string_gen_trim);
+
+    Add_ExtAPI_Function("trim", "1", FALSE,
+			GLmake_arrow(GLmake_string(), GLmake_string()),
 			string_trim);
 
     Add_ExtAPI_Function("str_cluster", "11", FALSE,

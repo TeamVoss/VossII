@@ -13,6 +13,7 @@ lettype justification =
                     |   FEV {engine::string} {options::(string#string) list}
                     |   DUPLICATE {id::int}
                     |   MERGE {ids::int list}
+		    |	RENAME_WIRES {sub:: (string#string) list}
 //
 // ...
 //

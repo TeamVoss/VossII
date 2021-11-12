@@ -931,8 +931,8 @@ let substr s loc cnt = defix substr s loc cnt;
 
 // Given a string s and a prefix and suffix string, return the string
 // between the prefix and suffix strings.
-// Usage: trim pref suff s;
-let trim pref suff s = defix trim pref suff s;
+// Usage: gen_trim pref suff s;
+let gen_trim pref suff s = defix gen_trim pref suff s;
 
 
 // Split a string into substrings of length sz.

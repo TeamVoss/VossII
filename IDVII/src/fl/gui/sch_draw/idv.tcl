@@ -146,9 +146,12 @@ proc idv:create_idv_gui {w} {
 
 proc idv:inform_canvas_change {w} {
     set nb $w.nb
-    set cur_idx [$nb index [$nb select]]
+    set cur_sel [$nb select]
+    set cur_idx [$nb index $cur_sel]
     if { $cur_idx == 0 } {
 	after idle idv:display_transformations
+    } else {
+	fl_set_current_tab_selected $w $cur_sel 
     }
 }
 
@@ -262,8 +265,13 @@ proc idv:create_idv_menu {nb w} {
         balloon $w.menu.merge "Merge selected identical instances"
         pack $w.menu.merge -side left -padx 5
 
+        button $w.menu.rename_w -image $::icon(rename_wires) \
+                -command "idv:do_rename_wires $w"
+        balloon $w.menu.rename_w "Rename selected wires"
+        pack $w.menu.rename_w -side left -padx 5
+
         button $w.menu.fev -image $::icon(fev) \
-                -command "idv:fev $w"
+                -command "idv:do_fev $w"
         balloon $w.menu.fev "Replace with new design that has been FEV-ed"
         pack $w.menu.fev -side left -padx 5
 
@@ -306,18 +314,6 @@ proc idv:duplicate {w} { fl_do_duplicate $w.c }
 proc idv:merge {w} { fl_do_merge $w.c }
 
 proc idv:new_transf {w} { fl_do_new_tranf $w.c }
-
-proc idv:fev {w} {
-    set types {
-        {{pexlif}      {.pexlif}        }
-        {{All Files}        *             }
-    }
-    set file [tk_getOpenFile -filetypes $types -defaultextension ".pexlif" \
-                                 -title "Pexlif file to load"]
-    if {$file ne ""} {
-	fl_do_fev $w.c $file
-    }
-}
 
 proc idv:new_toplevel_transf {w sl} {
     set idx [$sl curselection]
@@ -424,7 +420,7 @@ proc idv:update_transf_canvas {c} {
 	if { $::idv(show_model_name) } {
 	    regexp {([^:]*):(.*)} $::idv_transf_node_map($node) -> db model_name
 	    $c itemconfigure $::dot_node2text_tag($c,$node) \
-		    -text " $model_name" -anchor w
+		    -text " $model_name" -anchor c
 	} else {
 	    $c itemconfigure $::dot_node2text_tag($c,$node) \
 		    -text ""
@@ -448,10 +444,10 @@ proc idv:show_model_menu {c node x y} {
     menu $m -tearoff 0
     set full_name  $::idv_transf_node_map($node)
     set matches [regexp {([^:]*):(.*)} $full_name -> db model_name]
-    $m add command -label "Rename model" \
-	-command "fl_do_rename_model $c $db $model_name"
+;#    $m add command -label "Rename model" \
+;#	-command "fl_do_rename_model $c $db $model_name"
     $m add command -label "New transformation" \
-	-command "fl_do_new_toplevel_transf [winfo toplevel $c] $db $model_name"
+	-command "fl_do_new_toplevel_transf [winfo toplevel $c] $db [list $model_name]"
     tk_popup $m $x $y
 }
 
@@ -464,7 +460,7 @@ proc idv:show_transformations {dot_file w} {
 	set fig_tag $::dot_node2node_fig_tag($c,$node)
 	$c bind $fig_tag <ButtonPress-3> \
 	    "idv:show_model_menu $c $node %X %Y; break"
-	$c itemconfigure $fig_tag -fill yellow
+	$c itemconfigure $fig_tag -outline white
 	set txt_tag $::dot_node2text_tag($c,$node)
 	$c bind $txt_tag <ButtonPress-3> \
 	    "idv:show_model_menu $c $node %X %Y; break"
@@ -477,7 +473,7 @@ proc idv:import_model {w} {
         {{All Files}        *             }
     }
     set file [tk_getOpenFile -filetypes $types -defaultextension ".pexlif" \
-                                 -title "Pexlif file to load"]
+                                 -title "Pexlif file to load" -parent $w]
     if {$file ne ""} {
 	fl_import_model $w $file
     }
@@ -509,3 +505,124 @@ proc idv:ask_for_model_name {w} {
     tkwait window $npw
     return $::idv_prompt_name
 }
+
+proc idv:make_template {w c type} {
+    set file $::idv(fev_template_file)
+    set base [file rootname $file]
+    set ext [file extension $file]
+    if { $file != "" } {
+	switch $type {
+	    case verilog    { set file "$base.v" }
+	    case hfl	    { set file "$base.fl" }
+	    default	    {}
+	}
+	if { [file exists $file] } {
+	    set reply [tk_messageBox -message "File exists. Overwrite?" \
+				     -type yesno -parent $w]
+	    if { $reply != "yes" } { return }
+	}
+	fl_make_template $c $type $file $base
+	set ::idv(fev_imp_file) "$base.pexlif"
+    }
+}
+
+proc idv:do_bdd_var_order {} {
+    set pexlif_file $::idv(fev_imp_file) 
+    fl_bdd_var_order $pexlif_file
+}
+
+proc idv:do_verify {w canvas type} {
+    set pexlif_file $::idv(fev_imp_file) 
+    if { ![file exists $pexlif_file] } { return; }
+    set res [fl_do_verify $canvas $pexlif_file $type]
+    if { $res == "ok" } {
+	destroy $w
+	set ::idv(fev_template_file) ""
+	set ::idv(fev_imp_file) ""
+    } elseif { $res == "cex" } {
+	tk_messageBox \
+	    -message "Verification failed.\nCounterexample simulated." \
+	    -type ok -parent $w
+    } else {
+	tk_messageBox \
+	    -message "Verification failed.\n$res." -type ok -parent $w
+    }
+}
+
+proc idv:do_fev {ww} {
+    set w .fev
+    catch {destroy $w}
+    vis_toplevel $w $ww {} {} "IDV FEV"
+
+    frame $w.f1 -relief flat 
+    pack $w.f1 -side top -fill x -pady 10
+        label $w.f1.l -text FEV -font $::voss2_txtfont6
+        button $w.f1.cancel -text Cancel -command "destroy $w"
+        pack $w.f1.cancel -side right -padx 10
+        pack $w.f1.l -side left -fill x
+
+
+    labelframe $w.f2 -relief groove -text Template
+    pack $w.f2 -side top -fill x -pady 10
+	label $w.f2.l -text "Make template in:" -width 20 -justify left \
+	    -anchor w
+	entry $w.f2.e -textvariable ::idv(fev_template_file) -width 30
+	button $w.f2.dir -image $::icon(folder) -command idv:fev_template_file
+	button $w.f2.verilog -text "Verilog" \
+	    -command "idv:make_template $w $ww.c verilog"
+	button $w.f2.hfl -text "HFL" \
+	    -command "idv:make_template $w $ww.c hfl"
+	pack $w.f2.l -side left -anchor w
+	pack $w.f2.e -side left -fill x -expand yes
+	pack $w.f2.dir -side left
+	pack $w.f2.verilog -side left -padx 5
+	pack $w.f2.hfl -side left -padx 5
+
+    labelframe $w.f3 -relief groove -text Implementation
+    pack $w.f3 -side top -fill x -pady 10
+	label $w.f3.l -text "Load pexlif:" -width 20 -justify left \
+	    -anchor w
+	entry $w.f3.e -textvariable ::idv(fev_imp_file) -width 30
+	button $w.f3.dir -image $::icon(folder) -command "idv:fev_pexlif $w"
+	pack $w.f3.l -side left -anchor w -anchor w
+	pack $w.f3.e -side left -fill x -expand yes
+	pack $w.f3.dir -side left
+
+    labelframe $w.f4 -relief groove -text Verify
+    pack $w.f4 -side top -fill x -pady 10
+	labelframe $w.f4.bdd -relief groove -text BDD
+	    button $w.f4.bdd.order -text "Variable ordering" \
+		-command idv:do_bdd_var_order
+	    button $w.f4.bdd.verify -text "Verify" \
+		-command "idv:do_verify $w $ww.c BDD"
+	labelframe $w.f4.sat -relief groove -text SAT
+	    button $w.f4.sat.verify -text "Verify" \
+		-command "idv:do_verify $w $ww.c SAT"
+	pack $w.f4.bdd -side left -padx 10 -fill x -expand yes
+	pack $w.f4.sat -side left -padx 10 -fill x -expand yes
+	    pack $w.f4.bdd.order -side left -padx 5
+	    pack $w.f4.bdd.verify -side left -padx 5 -fill x -expand yes
+	    pack $w.f4.sat.verify -side left -padx 5 -fill x -expand yes
+
+}
+
+proc idv:fev_template_file {} {
+    set types {
+        {{All Files}        *             }
+    }
+    set file [tk_getSaveFile -filetypes $types \
+                                 -title "Pexlif file to load"]
+    set ::idv(fev_template_file) $file
+}
+
+proc idv:fev_pexlif {w} {
+    set types {
+        {{pexlif}      {.pexlif}        }
+        {{All Files}        *             }
+    }
+    set file [tk_getOpenFile -filetypes $types -defaultextension ".pexlif" \
+                                 -title "Pexlif file to load" -parent $w]
+    set ::idv(fev_imp_file) $file
+}
+
+proc idv:do_rename_wires {w} { fl_rename_wires $w.c }
