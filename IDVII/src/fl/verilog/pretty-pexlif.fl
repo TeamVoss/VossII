@@ -558,26 +558,111 @@ let pretty_port_instantiation {inst::string} (PINST name _ _ fa_inps fa_outs _ _
 
 // -----------------------------------------------------------------------------
 
-let premade_ff_re clk p q =
+let premade_ff_re name clk p q =
       val (p_id, p_rs) = split_name_rng p in
       val (q_id, q_rs) = split_name_rng q in
       let var_lv =
             VLV_hier (hier q_id) (empty q_rs => NONE |
-                SOME (map index_exp (tl q_rs), range_exp (hd q_rs))
-            )
+              SOME (map index_exp (tl q_rs), range_exp (hd q_rs)))
       in
-      Desc_module (Module_declaration_many (ID "draw_ff_re")
-        (SOME [
+      Desc_module (Module_declaration_many name (SOME [
           Port_decl_in (Input_decl (SOME NT_wire) F NONE [ID clk])
         , Port_decl_in (Input_decl (SOME NT_wire) F (port_range p_rs) [ID p_id])
         , Port_decl_out (Output_decl_reg F (port_range q_rs) [VPI (ID q_id) NONE])
         ])
-        [NPM_Item (MOGI_always (Always
-          (Statement_timing (PTC
-            (PTC_event (Event_control_exp (Event_pos
-              (Exp_primary (prim_hier clk [])))))
-            (Statement_nonblocking (Nonblocking_assignment var_lv NONE
+        [NPM_Item (MOGI_always (Always (Statement_timing (PTC
+          (PTC_event (Event_control_exp (Event_pos
+            (Exp_primary (prim_hier clk [])))))
+          (Statement_nonblocking (Nonblocking_assignment var_lv NONE
+            (Exp_primary (prim_hier p_id p_rs))))))))
+        ])
+;
+
+let premade_ff_re_reset name clk re p q =
+      val (p_id, p_rs) = split_name_rng p in
+      val (q_id, q_rs) = split_name_rng q in
+      let var_lv =
+            VLV_hier (hier q_id) (empty q_rs => NONE |
+              SOME (map index_exp (tl q_rs), range_exp (hd q_rs)))
+      in
+      Desc_module (Module_declaration_many name (SOME [
+          Port_decl_in (Input_decl (SOME NT_wire) F NONE [ID clk, ID re])
+        , Port_decl_in (Input_decl (SOME NT_wire) F (port_range p_rs) [ID p_id])
+        , Port_decl_out (Output_decl_reg F (port_range q_rs) [VPI (ID q_id) NONE])
+        ])
+        [NPM_Item (MOGI_always (Always (Statement_timing (PTC
+          (PTC_event (Event_control_exp (Event_or
+            (Event_pos (Exp_primary (prim_hier clk [])))
+            (Event_pos (Exp_primary (prim_hier re []))))))
+          (Statement_cond (COND_if_else
+            ( (Exp_binary
+                (Exp_primary (prim_hier re []))
+                (B_log_eq)
+                (Exp_primary (Prim_num (NUM_dec (DEC (UNUM 1))))))
+            , (Statement_nonblocking (Nonblocking_assignment var_lv NONE
+                (Exp_primary (Prim_num (NUM_dec (DEC (UNUM 0))))))))
+            (SOME (Statement_nonblocking (Nonblocking_assignment var_lv NONE
               (Exp_primary (prim_hier p_id p_rs))))))))
+          )))
+        ])
+;
+
+let premade_ff_re_with_en name clk en p q =
+      val (p_id, p_rs) = split_name_rng p in
+      val (q_id, q_rs) = split_name_rng q in
+      let var_lv =
+            VLV_hier (hier q_id) (empty q_rs => NONE |
+              SOME (map index_exp (tl q_rs), range_exp (hd q_rs)))
+      in
+      Desc_module (Module_declaration_many name (SOME [
+          Port_decl_in (Input_decl (SOME NT_wire) F NONE [ID clk, ID en])
+        , Port_decl_in (Input_decl (SOME NT_wire) F (port_range p_rs) [ID p_id])
+        , Port_decl_out (Output_decl_reg F (port_range q_rs) [VPI (ID q_id) NONE])
+        ])
+        [NPM_Item (MOGI_always (Always (Statement_timing (PTC
+          (PTC_event (Event_control_exp (Event_pos
+            (Exp_primary (prim_hier clk [])))))
+          (Statement_cond (COND_if_else
+            ( (Exp_binary
+                (Exp_primary (prim_hier en []))
+                (B_log_eq)
+                (Exp_primary (Prim_num (NUM_dec (DEC (UNUM 1))))))
+            , (Statement_nonblocking (Nonblocking_assignment var_lv NONE
+                (Exp_primary (prim_hier p_id p_rs)))))
+            (NONE)))))))
+        ])
+;
+
+let premade_ff_re_with_en_reset name clk en re p q =
+      val (p_id, p_rs) = split_name_rng p in
+      val (q_id, q_rs) = split_name_rng q in
+      let var_lv =
+            VLV_hier (hier q_id) (empty q_rs => NONE |
+              SOME (map index_exp (tl q_rs), range_exp (hd q_rs)))
+      in
+      Desc_module (Module_declaration_many name (SOME [
+          Port_decl_in (Input_decl (SOME NT_wire) F NONE [ID clk, ID re, ID en])
+        , Port_decl_in (Input_decl (SOME NT_wire) F (port_range p_rs) [ID p_id])
+        , Port_decl_out (Output_decl_reg F (port_range q_rs) [VPI (ID q_id) NONE])
+        ])
+        [NPM_Item (MOGI_always (Always (Statement_timing (PTC
+          (PTC_event (Event_control_exp (Event_or
+            (Event_pos (Exp_primary (prim_hier clk [])))
+            (Event_pos (Exp_primary (prim_hier re []))))))
+          (Statement_cond (COND_if_else_if (IEI
+            ( (Exp_binary
+                (Exp_primary (prim_hier re []))
+                (B_log_eq)
+                (Exp_primary (Prim_num (NUM_dec (DEC (UNUM 1))))))
+            , (Statement_nonblocking (Nonblocking_assignment var_lv NONE
+                (Exp_primary (Prim_num (NUM_dec (DEC (UNUM 0))))))))
+            [( (Exp_binary
+                 (Exp_primary (prim_hier en []))
+                 (B_log_eq)
+                 (Exp_primary (Prim_num (NUM_dec (DEC (UNUM 1))))))
+             , (Statement_nonblocking (Nonblocking_assignment var_lv NONE
+                 (Exp_primary (prim_hier p_id p_rs)))))]
+            (NONE))))))))
         ])
 ;
 
@@ -624,7 +709,23 @@ let pretty_pexlif_hier {inst::string} name fa_inps fa_outs f_ints {cs::(pexlif l
 let pretty_pexlif_h inst (PINST name _ _ fa_inps fa_outs _ _) assuming (name == "draw_ff_re") =
       val ((p,_):(clk,_):[]) = fa_inps in
       val ((q,_):[]) = fa_outs in
-      [premade_ff_re clk p q]
+      let module = inst_name name inst in
+      [premade_ff_re module clk p q]
+/\  pretty_pexlif_h inst (PINST name _ _ fa_inps fa_outs _ _) assuming (name == "draw_ff_re_reset") =
+      val ((p,_):(re,_):(clk,_):[]) = fa_inps in
+      val ((q,_):[]) = fa_outs in
+      let module = inst_name name inst in
+      [premade_ff_re_reset module clk re p q]
+/\  pretty_pexlif_h inst (PINST name _ _ fa_inps fa_outs _ _) assuming (name == "draw_ff_re_with_en") =
+      val ((p,_):(en,_):(clk,_):[]) = fa_inps in
+      val ((q,_):[]) = fa_outs in
+      let module = inst_name name inst in
+      [premade_ff_re_with_en module clk en p q]
+/\  pretty_pexlif_h inst (PINST name _ _ fa_inps fa_outs _ _) assuming (name == "draw_ff_re_with_en_reset") =
+      val ((p,_):(en,_):(re,_):(clk,_):[]) = fa_inps in
+      val ((q,_):[]) = fa_outs in
+      let module = inst_name name inst in
+      [premade_ff_re_with_en_reset module clk en re p q]
 /\  pretty_pexlif_h inst (PINST name _ _ fa_inps fa_outs f_ints (P_HIER cs)) =
       pretty_pexlif_hier inst name fa_inps fa_outs f_ints cs
 /\  pretty_pexlif_h inst (PINST name _ _ fa_inps fa_outs f_ints (P_LEAF fs)) =

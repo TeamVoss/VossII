@@ -223,14 +223,16 @@ TYPE "bits" 2;
 
 let ex =
     bit_input clk.
+    bit_input re.
+    bit_input en.
     bits_input a.
     bits_output b.
     CELL "test" [
-        re_ff clk a b
+        re_ff_en_reset clk en re a b
     ]
 ;
 
-let p = ex 'clk 'a 'b;
+let p = ex 'clk 're 'en 'a 'b;
 //let p = gen_pex 49 4 2 2;
 let g = shrink_miter_failure p;
 
