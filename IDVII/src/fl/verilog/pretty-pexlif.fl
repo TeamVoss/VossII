@@ -538,10 +538,7 @@ let connect_ports f as =
 let port_instantiation mi ai {args::(string#(string list))list} =
       NPM_Item (MOGI_module (Module_instantiation mi
         [Module_instance ai NONE
-          (empty args =>
-            NONE |
-            SOME (map (curry connect_ports) args))
-        ]))
+          (empty args => NONE | SOME (map (curry connect_ports) args))]))
 ;
 // todo: Not sure what the 'range' is used for in module instantiation.
 
@@ -561,9 +558,32 @@ let pretty_port_instantiation {inst::string} (PINST name _ _ fa_inps fa_outs _ _
 
 // -----------------------------------------------------------------------------
 
+let premade_ff_re clk p q =
+      val (p_id, p_rs) = split_name_rng p in
+      val (q_id, q_rs) = split_name_rng q in
+      let var_lv =
+            VLV_hier (hier q_id) (empty q_rs => NONE |
+                SOME (map index_exp (tl q_rs), range_exp (hd q_rs))
+            )
+      in
+      Desc_module (Module_declaration_many (ID "draw_ff_re")
+        (SOME [
+          Port_decl_in (Input_decl (SOME NT_wire) F NONE [ID clk])
+        , Port_decl_in (Input_decl (SOME NT_wire) F (port_range p_rs) [ID p_id])
+        , Port_decl_out (Output_decl_reg F (port_range q_rs) [VPI (ID q_id) NONE])
+        ])
+        [NPM_Item (MOGI_always (Always
+          (Statement_timing (PTC
+            (PTC_event (Event_control_exp (Event_pos
+              (Exp_primary (prim_hier clk [])))))
+            (Statement_nonblocking (Nonblocking_assignment var_lv NONE
+              (Exp_primary (prim_hier p_id p_rs))))))))
+        ])
+;
+
 forward_declare{pretty_pexlif_h::string->pexlif->(description list)};
 
-let pretty_pexlif_leaf {inst::string} {name::string} {fa_inps::(string#(string list)) list} {fa_outs::(string#(string list)) list} {f_ints::(string list)} {fns::(update_fn list)} =
+let pretty_pexlif_leaf {inst::string} name fa_inps fa_outs f_ints {fns::(update_fn list)} =
       let is_wire i = maybe T (in_any_lhs i fns) id in
       // Declare inp/out as 'port's.
       let f_inps = map fst fa_inps in
@@ -581,7 +601,7 @@ let pretty_pexlif_leaf {inst::string} {name::string} {fa_inps::(string#(string l
       [Desc_module (Module_declaration_many module ports body)]
 ;
 
-let pretty_pexlif_hier {inst::string} {name::string} {fa_inps::(string#(string list)) list} {fa_outs::(string#(string list)) list} {f_ints::(string list)} {cs::(pexlif list)} =
+let pretty_pexlif_hier {inst::string} name fa_inps fa_outs f_ints {cs::(pexlif list)} =
       let all_wire xs = replicate (length xs) F in
       // Declare inp/out as 'port's.
       let f_inps = map fst fa_inps in
@@ -601,7 +621,11 @@ let pretty_pexlif_hier {inst::string} {name::string} {fa_inps::(string#(string l
       (Desc_module (Module_declaration_many module ports body)) : children
 ;
 
-let pretty_pexlif_h inst (PINST name _ _ fa_inps fa_outs f_ints (P_HIER cs)) =
+let pretty_pexlif_h inst (PINST name _ _ fa_inps fa_outs _ _) assuming (name == "draw_ff_re") =
+      val ((p,_):(clk,_):[]) = fa_inps in
+      val ((q,_):[]) = fa_outs in
+      [premade_ff_re clk p q]
+/\  pretty_pexlif_h inst (PINST name _ _ fa_inps fa_outs f_ints (P_HIER cs)) =
       pretty_pexlif_hier inst name fa_inps fa_outs f_ints cs
 /\  pretty_pexlif_h inst (PINST name _ _ fa_inps fa_outs f_ints (P_LEAF fs)) =
       pretty_pexlif_leaf inst name fa_inps fa_outs f_ints fs

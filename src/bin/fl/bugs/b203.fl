@@ -151,16 +151,20 @@ let miter_test p g =
         // (F, F) is top, or overconstrained.
         let eqs = butfirstn 3 (pexlif_get_children miter) in
         let xeq (PINST n _ _ [(_,[i1]), (_,[i2])] [(_,[eq])] _ _) =
+                // todo: check that (val AND eq_high) depends on X?
                 val (eq_high, eq_low) = get_trace_val ste eq 0 in
-                // If eq is T or F, return that value.
-                (eq_high AND (NOT eq_low)) => T |
-                ((NOT eq_high) AND eq_low) => F |
+                // If eq is T, F or overconstrained, return that value.
+                (printf "eq:(%B,%B)\n" eq_high eq_low) fseq
+                (eq_high == T AND eq_low == F) => T |
+                (eq_high == F AND eq_low == T) => F |
+                (eq_high == F AND eq_low == F) => F |
                 // If eq is X, check that both i1 and i2 are also X.
-                (eq_high AND eq_low) => 
-                  val (i1_high, i1_low) = get_trace_val ste i1 0 in
-                  val (i2_high, i2_low) = get_trace_val ste i2 0 in
-                  (i1_high AND i1_low) AND (i2_high AND i2_low) => T | F
-                |
+                val (i1_high, i1_low) = get_trace_val ste i1 0 in
+                val (i2_high, i2_low) = get_trace_val ste i2 0 in
+                (printf "i1:(%B,%B)\n" i1_high i1_low) fseq
+                (printf "i2:(%B,%B)\n" i2_high i2_low) fseq
+                (i1_high == T AND i1_low == T) =>
+                  (i2_high == T AND i2_low == T) |
                 // Otherwise fail.
                 F
         in
@@ -218,13 +222,16 @@ let test l h =
 TYPE "bits" 2;
 
 let ex =
-        bits_input a.
-        bits_output b.
-        CELL "test" [b <- a '%' '0b01]
+    bit_input clk.
+    bits_input a.
+    bits_output b.
+    CELL "test" [
+        re_ff clk a b
+    ]
 ;
 
-//let p = ex 'a 'b;
-let p = gen_pex 49 4 2 2;
+let p = ex 'clk 'a 'b;
+//let p = gen_pex 49 4 2 2;
 let g = shrink_miter_failure p;
 
 let p' = normalize_pexlif p;
