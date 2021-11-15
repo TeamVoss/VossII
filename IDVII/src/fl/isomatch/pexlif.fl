@@ -943,6 +943,18 @@ letrec
         ([], W_VAR sz b, ix, sz)
 /\  normalize_wexpr ix (W_EXPLICIT_VAR sz n) =
         ([], W_EXPLICIT_VAR sz n, ix, sz)
+// Keep nand/nor/... gates intact.
+/\  normalize_wexpr ix (W_NOT (W_EQ a b)) =
+        normalize_binary ix (\x. \y. W_NOT (W_EQ x y)) a b
+/\  normalize_wexpr ix (W_NOT (W_AND a b)) =
+        normalize_binary ix (\x. \y. W_NOT (W_AND x y)) a b
+/\  normalize_wexpr ix (W_NOT (W_OR a b)) =
+        normalize_binary ix (\x. \y. W_NOT (W_OR x y)) a b
+/\  normalize_wexpr ix (W_OR (W_AND (W_NOT a) b) (W_AND c (W_NOT d))) assuming ((a == c) AND (b == d)) =
+        normalize_binary ix (\x. \y. (W_OR (W_AND (W_NOT x) y) (W_AND x (W_NOT y)))) a b
+/\  normalize_wexpr ix (W_OR (W_AND a (W_NOT b)) (W_AND (W_NOT c) d)) assuming ((a == c) AND (b == d)) =
+        normalize_binary ix (\x. \y. (W_OR (W_AND x (W_NOT y)) (W_AND (W_NOT x) y))) a b
+// Smaller gates.
 /\  normalize_wexpr ix (W_AND a b) = normalize_binary ix W_AND a b
 /\  normalize_wexpr ix (W_OR a b) = normalize_binary ix W_OR a b
 /\  normalize_wexpr ix (W_NOT a) = normalize_unary ix W_NOT a
