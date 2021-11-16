@@ -4,6 +4,54 @@
 load "ste.fl";
 
 // -----------------------------------------------------------------------------
+// Gen. of pexlifs.
+
+let gen_vec_size max_sz =
+        let gen_range sz = sprintf "[%d:0]" (sz-1) in
+        one_of_weighted [
+            (4, "")
+          , (1, one_of_weighted [
+                (1, gen_range (min max_sz 4))
+              , (1, gen_range (min max_sz 8))
+              , (1, gen_range (min max_sz 16))
+              , (1, gen_range (min max_sz 32))
+              , (1, gen_range (min max_sz 64))
+              , (1, gen_range (random 2 max_sz))
+              ])
+          ]
+;
+non_lazy gen_vec_size;
+
+let gen_fas max_f max_sz pre_f pre_as =
+        // Gen. the vec. size of each formal.
+        let szs    = map gen_vec_size (replicate (random 1 max_f) max_sz) in
+        let pr v i = v ^ int2str i in
+        let lbl p  = map (curry pr) (ixlabel (replicate (length szs) p)) in
+        // Gen. the formals and actuals (1-to-1 always, since we're testing leafs).
+        let fs  = map2 (defix ^) (lbl pre_f) szs in
+        let ass = map2 (\p. \sz. [p ^ sz]) (lbl pre_as) szs in
+        // /
+        zip fs ass
+;
+non_lazy gen_fas;
+
+let gen_pex seed max_f max_sz max_d =
+        max_f < 2 => error "gen_pex: max_f < 2" |
+        // Just to be sure FL is gen. different pexlifs each time, use a seed.
+        (srandom seed) fseq
+        // Gen. of the formal/actuals used as either inputs or outputs.
+        val (max_is, max_os) = let x = random 1 (max_f - 1) in (x, max_f - x) in
+        let fa_is = gen_fas max_is max_sz "in" "in" in
+        let fa_os = gen_fas max_os max_sz "out" "out" in
+        // Gen. a random pexlif.
+        let sz = random 1 max_sz in
+        let d  = random 1 max_d in
+        gen_pinst_leaf "test" fa_is fa_os F sz d
+;
+non_lazy gen_pex;
+// note: requires that max_f > 1
+
+// -----------------------------------------------------------------------------
 // Miter eq. testing.
 
 // Creates a miter circuit for two pexlifs.
@@ -94,27 +142,37 @@ let miter_test p g =
         let ste = STE "-e -m 10" vis [] ant cons [] then
         let ok  = get_ste_result ste "" then // <- beware symbolic boolean!
         ok == T => T |
-        // If 'ok' is not 'T', is it because some values are 'X'? That is, if
-        // '_eq[?] = X' for some '_eq[?] <- o1 '=' o2', and 'o1' and 'o2' are
-        // both 'X', then 'p' and 'g' could still be equal.
-        let eqs = butfirstn 3 (content_get_children (pexlif_get_content miter)) in
-        let x_or_eq (PINST _ _ _ [(_,[i1]), (_,[i2])] [(_,[eq])] _ _) =
-                // If 'eq[?] = T' then all is fine.
-                val (eq_high, eq_low) = get_trace_val ste eq 1 in
-                (eq_high == T OR eq_low == T) => T |
-                // If not, check if 'i1' & 'i2' are both 'X'.
-                val (i1_high, i1_low) = get_trace_val ste i1 1 in
-                val (i2_high, i2_low) = get_trace_val ste i2 1 in
-                (i1_high == i2_high) AND (i1_low == i2_low) => T |
-                // Otherwise, something truly failed.
+        // If 'ok' is not T, is it because of an equality over X? We don't gen.
+        // X exp. normally, so they should only appear if some exp. simplifies
+        // to X, i.e. a % 0. These are fine as long as Yosys agrees.
+        // note: that get_trace_val returns a tuple: (H, L), where H and L are
+        // the high and low rail values of the node. The encoding used is (T, T)
+        // is X (unknown/should’t matter), (T, F) is one, (F, T) is zero, and
+        // (F, F) is top, or overconstrained.
+        let eqs = butfirstn 3 (pexlif_get_children miter) in
+        let xeq (PINST n _ _ [(_,[i1]), (_,[i2])] [(_,[eq])] _ _) =
+                // todo: check that (val AND eq_high) depends on X?
+                val (eq_high, eq_low) = get_trace_val ste eq 0 in
+                // If eq is T, F or overconstrained, return that value.
+                (printf "eq:(%B,%B)\n" eq_high eq_low) fseq
+                (eq_high == T AND eq_low == F) => T |
+                (eq_high == F AND eq_low == T) => F |
+                (eq_high == F AND eq_low == F) => F |
+                // If eq is X, check that both i1 and i2 are also X.
+                val (i1_high, i1_low) = get_trace_val ste i1 0 in
+                val (i2_high, i2_low) = get_trace_val ste i2 0 in
+                (printf "i1:(%B,%B)\n" i1_high i1_low) fseq
+                (printf "i2:(%B,%B)\n" i2_high i2_low) fseq
+                (i1_high == T AND i1_low == T) =>
+                  (i2_high == T AND i2_low == T) |
+                // Otherwise fail.
                 F
         in
-        all x_or_eq eqs => print "X?\n" fseq T |
-        // /
-        ok
+        all xeq eqs == T => print "gen. X exp. passed.\n" fseq T | ok
 ;
 
 // -----------------------------------------------------------------------------
+// Main.
 
 let pex2pex p =
       let pex = pexlif_get_name p in
@@ -144,79 +202,6 @@ let pex2pex_test p =
         SOME (shrink_miter_failure p)
 ;
 
-// let miter_debug p g =
-//       val (miter, ant, cons) = mk_miter p g then
-//       let vis = STE_debug (pexlif2fsm miter) then
-//       let ste = STE "-e -m 10" vis [] ant cons [] then
-//       let ok  = get_ste_result ste "" then
-//       ok == T => T |
-//       //
-//       let dep = depends ant then
-//       let sub = full_example F dep (NOT ok) then
-//       let ant' = substitute sub ant then
-//       let cons' = substitute sub cons then
-//       let ste' = STE "-e -m 10" vis [] ant' cons' [] then
-//       (get_ste_result ste' "") == T
-// ;
-
-//         letrec
-//             no_attrs (PINST n _ l i o t (P_HIER cs)) =
-//                 PINST n [] l i o t (P_HIER (map no_attrs cs))
-//         /\  no_attrs (PINST n _ l i o t (P_LEAF fs)) =
-//                 PINST n [] l i o t (P_LEAF fs)
-//         in
-
-// -----------------------------------------------------------------------------
-// Gen. of pexlifs.
-
-let gen_vec_size max_sz =
-        let gen_range sz = sprintf "[%d:0]" (sz-1) in
-        one_of_weighted [
-            (4, "")
-          , (1, one_of_weighted [
-                (1, gen_range (min max_sz 4))
-              , (1, gen_range (min max_sz 8))
-              , (1, gen_range (min max_sz 16))
-              , (1, gen_range (min max_sz 32))
-              , (1, gen_range (min max_sz 64))
-              , (1, gen_range (random 2 max_sz))
-              ])
-          ]
-;
-non_lazy gen_vec_size;
-
-let gen_fas max_f max_sz pre_f pre_as =
-        // Gen. the vec. size of each formal.
-        let szs    = map gen_vec_size (replicate (random 1 max_f) max_sz) in
-        let pr v i = v ^ int2str i in
-        let lbl p  = map (curry pr) (ixlabel (replicate (length szs) p)) in
-        // Gen. the formals and actuals (1-to-1 always, since we're testing leafs).
-        let fs  = map2 (defix ^) (lbl pre_f) szs in
-        let ass = map2 (\p. \sz. [p ^ sz]) (lbl pre_as) szs in
-        // /
-        zip fs ass
-;
-non_lazy gen_fas;
-
-let gen_pex seed max_f max_sz max_d =
-        max_f < 2 => error "gen_pex: max_f < 2" |
-        // Just to be sure FL is gen. different pexlifs each time, use a seed.
-        (srandom seed) fseq
-        // Gen. of the formal/actuals used as either inputs or outputs.
-        val (max_is, max_os) = let x = random 1 (max_f - 1) in (x, max_f - x) in
-        let fa_is = gen_fas max_is max_sz "in" "in" in
-        let fa_os = gen_fas max_os max_sz "out" "out" in
-        // Gen. a random pexlif.
-        let sz = random 1 max_sz in
-        let d  = random 1 max_d in
-        gen_pinst_leaf "test" fa_is fa_os F sz d
-;
-non_lazy gen_pex;
-// note: requires that max_f > 1
-
-// -----------------------------------------------------------------------------
-// Main.
-
 let test l h =
         letrec
             search i =
@@ -231,11 +216,34 @@ let test l h =
         search l
 ;
 
-let pr  (SOME p) = pretty_pexlif p;
-let prv (SOME p) = pexlif2verilog p;
-let prp (SOME p) = let g = pex2pex p then pretty_pexlif g;
+// -----------------------------------------------------------------------------
+// Manual testing of erroring pexlifs.
 
-let debug (SOME p) =
+TYPE "bits" 2;
+
+let ex =
+    bit_input clk.
+    bit_input re.
+    bit_input en.
+    bits_input a.
+    bits_output b.
+    CELL "test" [
+        re_ff_en_reset clk en re a b
+    ]
+;
+
+let p = ex 'clk 're 'en 'a 'b;
+//let p = gen_pex 49 4 2 2;
+let g = shrink_miter_failure p;
+
+let p' = normalize_pexlif p;
+let g' = normalize_pexlif g;
+
+let pr p = pretty_pexlif p;
+let prv p = pexlif2verilog p;
+let prp p = let g = pex2pex p then pretty_pexlif g;
+
+let debug p =
         // Graphical debug.
         let g = pex2pex p then
         val (miter, ant, cons) = mk_miter p g then
@@ -251,11 +259,6 @@ let debug (SOME p) =
         let ste' = STE "-e -m 10" vis [] ant' cons' [] then
         (get_ste_result ste' "") == T
 ;
-
-// -----------------------------------------------------------------------------
-// Manual shrinking...
-
-// TYPE "bits" 2;
 
 // module test (input wire [1 : 0] in1, output wire [1 : 0] out2);
 //     assign out2 = ({{1{in1[1]}}, in1[1]}) % (2'b10);
@@ -275,16 +278,15 @@ let debug (SOME p) =
 //             b <- {(SX t)::bits} '%' '0b10
 //         ]
 // ;
-
-let ex =
-        bit_input a.
-        bit_input b.
-        bit_output c.
-        CELL "test" [
-            c <- a '=' b
-        ];
-let pex = SOME (ex 'a 'b 'c);
-let norm (SOME p) = normalize_pexlif p;
+// let ex =
+//         bit_input a.
+//         bit_input b.
+//         bit_output c.
+//         CELL "test" [
+//             c <- a '=' b
+//         ];
+// let pex = SOME (ex 'a 'b 'c);
+// let norm (SOME p) = normalize_pexlif p;
 
 // -----------------------------------------------------------------------------
 // Fin.
