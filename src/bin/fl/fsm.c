@@ -5791,7 +5791,7 @@ vec_size(vec_ptr vec)
 	// Indices
 	int sum = 0;
 	for(range_ptr rp = vec->u.ranges; rp != NULL; rp = rp->next) {
-	    sum += abs(rp->upper-rp->lower+1)*rem;
+	    sum += (abs(rp->upper-rp->lower)+1)*rem;
 	}
 	return sum;
     }

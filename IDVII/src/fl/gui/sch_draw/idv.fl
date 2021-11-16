@@ -973,8 +973,25 @@ let fl_do_verify canvas {file::string} {type::string} =
 ;
 export_to_tcl fl_do_verify;
 
-let rename_pexlif_wires sub p =
-    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER children)) = p then
+let compress_formals fas =
+    let sub = 
+	let mk1 (f, as) = zip (md_expand_vector f) (md_expand_vectors as) in
+	flatmap mk1 fas
+    then
+    let fs = merge_vectors (map fst fas) in
+    let mk f =
+	let fs = md_expand_vector f in
+	let as = map (\f. assoc f sub) fs then
+	f, (merge_vectors as)
+    in
+    map mk fs
+;
+    
+
+letrec rename_pexlif_wires
+	    sub
+	    (PINST name attrs lf fa_inps fa_outs ints (P_HIER children))
+    = 
     let in_use = md_expand_vectors ((map fst (fa_inps @ fa_outs))@ints) in
     let from = map fst sub then
     let to   = map snd sub then
@@ -999,8 +1016,8 @@ let rename_pexlif_wires sub p =
 	in
 	mk f' (md_expand_vectors as)
     in
-    let fa_inps' = flatmap trf fa_inps in
-    let fa_outs' = flatmap trf fa_outs in
+    let fa_inps' = compress_formals (flatmap trf fa_inps) in
+    let fa_outs' = compress_formals (flatmap trf fa_outs) in
     let ints' = md_extract_vectors (map (\n.(assoc n sub) catch n)
 					(md_expand_vectors ints))
     then
@@ -1010,13 +1027,30 @@ let rename_pexlif_wires sub p =
 	then
 	(f,as')
     in
+    let mk_sub (f,as) =
+	let fs = md_expand_vector f then
+	let as = md_expand_vectors as then
+	let tr f a =
+	    (
+		let new = assoc a sub then
+		[(f,new)]
+	    ) catch []
+	in
+	flat (map2 tr fs as)
+    in
     let process_child (PINST cn ca cl cfa_inps cfa_outs cints cbody) =
-	PINST cn ca cl (map tra cfa_inps) (map tra cfa_outs) cints cbody
+	let cfa_inps' = map tra cfa_inps then
+	let cfa_outs' = map tra cfa_outs then
+	let cp = PINST cn ca cl cfa_inps' cfa_outs' cints cbody then
+	let sub' = flatmap mk_sub (cfa_inps@cfa_outs) then
+	(rename_pexlif_wires sub' cp) gen_catch (\msg.
+(fprintf stderr "Fail: %s\n\n" msg) fseq  cp)
     in
     let children' = map process_child children then
     PINST name attrs lf fa_inps' fa_outs' ints' (P_HIER children')
+ /\    rename_pexlif_wires sub other = other
 ;
-    
+
 
 let fl_rename_wires canvas =
     let vfsm = w2vfsm canvas in
