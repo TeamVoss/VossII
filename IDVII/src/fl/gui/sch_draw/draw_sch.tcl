@@ -698,6 +698,13 @@ proc create_circuit_canvas {nb mw} {
     bind $c <Shift-B1-Motion> "selection_move %W %x %y 1"
     bind $c <Shift-ButtonRelease-1>  "selection_execute %W %x %y %X %Y 1"
 
+    bind $c <Control-ButtonPress-1> "selection_lock %W %x %y 2"
+    bind $c <Control-B1-Motion> "selection_move %W %x %y 2"
+    bind $c <Control-ButtonRelease-1>  "selection_execute %W %x %y %X %Y 2"
+    bind $c <Control-Shift-ButtonPress-1> "selection_lock %W %x %y 3"
+    bind $c <Control-Shift-B1-Motion> "selection_move %W %x %y 3"
+    bind $c <Control-Shift-ButtonRelease-1> "selection_execute %W %x %y %X %Y 3"
+
     # Zoom bindings
     bind $c <ButtonPress-3> "zoom_lock %W %x %y"
     bind $c <B3-Motion> "zoom_move %W %x %y"
@@ -708,7 +715,7 @@ proc create_circuit_canvas {nb mw} {
     bind $c <Button-5> "zoom_out $c [expr {1.0/1.1}] %x %y"
 
     # Ctrl-F to move focus to search box
-    bind $c <Control-f> "sch:start_search $w.menu"
+#    bind $c <Control-f> "sch:start_search $w.menu"
 
     bind $c <Shift-KeyPress-Right>  { gui:update_time [w2root %W] +2 }
     bind $c <Shift-KeyPress-Left>  { gui:update_time [w2root %W] -2 }
@@ -1047,6 +1054,8 @@ proc selection_execute {c wx wy sx sy shift} {
 	}
 	if { ![fl_is_IDV_ENV $c] } {
 	    if {$tags == {}} { set tags $wtags }
+	} elseif { $shift >= 2 } {
+	    set tags $wtags
 	}
 	set sel_tags [get_anon_name [lsort -unique $tags]]
     }
@@ -1060,7 +1069,7 @@ proc selection_execute {c wx wy sx sy shift} {
 	}
     }
     set ::previous_selection [fl_get_anon_selected $c]
-    if $shift {
+    if { [expr ($shift == 1) || ($shift == 3)] }  {
 	fl_set_selection $c "MODIFY_SELECTION" $nodes
     } else {
 	fl_set_selection $c "SET_SELECTION" $nodes
@@ -3934,12 +3943,27 @@ proc draw_delay {c tag x y} { return [draw_box_pat 1 {Delta} {} $c $tag $x $y] }
 proc draw_buffer {c tag x y} { return [draw_buf_pat "" "" $c $tag $x $y] }
 proc draw_inverter {c tag x y} { return [draw_buf_pat "" "Y" $c $tag $x $y] }
 proc draw_not {c tag x y} { return [draw_buf_pat "" "Y" $c $tag $x $y] }
+
 proc draw_and2 {c tag x y} {return [draw_and_pat 0 {"" ""} "" $c $tag $x $y]}
 proc draw_or2 {c tag x y} {return [draw_or_pat 0 {"" ""} "" "" $c $tag $x $y]}
 proc draw_xor2 {c tag x y} {return [draw_or_pat 0 {"" ""} "" "Y" $c $tag $x $y]}
 proc draw_xnor2 {c tag x y} {return [draw_or_pat 0 {"" ""} "Y" "Y" $c $tag $x $y]}
 proc draw_nand2 {c tag x y} {return [draw_and_pat 0 {"" ""} "1" $c $tag $x $y]}
 proc draw_nor2 {c tag x y} {return [draw_or_pat 0 {"" ""} "1" "" $c $tag $x $y]}
+
+proc draw_and3 {c tag x y} {return [draw_and_pat 0 {"" "" ""} "" $c $tag $x $y]}
+proc draw_or3 {c tag x y} {return [draw_or_pat 0 {"" "" ""} "" "" $c $tag $x $y]}
+proc draw_xor3 {c tag x y} {return [draw_or_pat 0 {"" "" ""} "" "Y" $c $tag $x $y]}
+proc draw_xnor3 {c tag x y} {return [draw_or_pat 0 {"" "" ""} "Y" "Y" $c $tag $x $y]}
+proc draw_nand3 {c tag x y} {return [draw_and_pat 0 {"" "" ""} "1" $c $tag $x $y]}
+proc draw_nor3 {c tag x y} {return [draw_or_pat 0 {"" "" ""} "1" "" $c $tag $x $y]}
+
+proc draw_and4 {c tag x y} {return [draw_and_pat 0 {"" "" "" ""} "" $c $tag $x $y]}
+proc draw_or4 {c tag x y} {return [draw_or_pat 0 {"" "" "" ""} "" "" $c $tag $x $y]}
+proc draw_xor4 {c tag x y} {return [draw_or_pat 0 {"" "" "" ""} "" "Y" $c $tag $x $y]}
+proc draw_xnor4 {c tag x y} {return [draw_or_pat 0 {"" "" "" ""} "Y" "Y" $c $tag $x $y]}
+proc draw_nand4 {c tag x y} {return [draw_and_pat 0 {"" "" "" ""} "1" $c $tag $x $y]}
+proc draw_nor4 {c tag x y} {return [draw_or_pat 0 {"" "" "" ""} "1" "" $c $tag $x $y]}
 
 
 proc wr_lbl {neg txt c x y tag} {

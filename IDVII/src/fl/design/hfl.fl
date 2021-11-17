@@ -161,22 +161,6 @@ nonfix '-;
 overload '- '- neg_make_const_or_var;
 free_binder '-;
 
-let _i2_const i =
-    let sz = hw_size {undefined:: *r} in
-    let w = W_CONST sz i in
-    {hw_constr w:: *r}
-;
-
-let _s2_var s =
-    let sz = hw_size {undefined:: *r} in
-    let nsz = md_size s in
-    (sz != nsz) => eprintf "Size mismatch in '' (%d != %d) for %s" sz nsz s |
-    let w = W_EXPLICIT_VAR sz s in
-    {hw_constr w:: *r}
-;
-
-overload '' '' _i2_const _s2_var;
-
 begin_abstype;
 letrec dep (W_X sz) = []
  /\     dep (W_CONST sz v) = []
@@ -1475,6 +1459,23 @@ let core_TYPE name size is_arithmetic value_list =
 let TYPE name size = (core_TYPE name size T "") fseq ();
 
 TYPE "bit" 1;
+
+let _i2_const i =
+    let sz = hw_size {undefined:: *r} in
+    let w = W_CONST sz i in
+    {hw_constr w:: *r}
+;
+
+let _s2_var s =
+    let sz = hw_size {undefined:: *r} in
+    let nsz = md_size s in
+    (sz != nsz) => eprintf "Size mismatch in '' (%d != %d) for %s" sz nsz s |
+    let w = W_EXPLICIT_VAR sz s in
+    {hw_constr w:: *r}
+;
+
+overload '' '' _i2_const _s2_var;
+
 
 let ENUM_0 name name_list =
     name_list = [] => error "ENUM must have at least one element" |

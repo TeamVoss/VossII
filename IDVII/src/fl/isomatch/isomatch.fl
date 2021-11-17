@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
-load (DIR^"../design/misc.fl");
-load (DIR^"../design/util.fl");
-load (DIR^"pexlif.fl");
+cload (DIR^"../design/misc.fl");
+cload (DIR^"../design/util.fl");
+cload (DIR^"pexlif.fl");
 
 // -----------------------------------------------------------------------------
 // Pexlif matches, returned by isomatching.

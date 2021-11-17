@@ -2,10 +2,11 @@ load "ste.fl";
 
 TYPE "word" 8;
 
+
 let full_adder =
     bit_input	a b cin.
     bit_output	sum cout.
-    CELL "draw_hier full_adder" [
+    CELL "full_adder" [
 	sum <- a '^' b '^' cin,
 	cout <- a '&' b '|' a '&' cin '|' b '&' cin
 ];
@@ -16,7 +17,99 @@ letrec map5 fn (a:as) (b:bs) (c:cs) (d:ds) (e:es) =
  /\    map5 fn _ _ _ _ _ = error "List length mismatch in map5"
 ;
 
-letrec ripple_adder =
+
+letrec c_row fn =
+    bit_list_input  as bs.
+    bit_input	    cin.
+    bit_list_output outs.
+    bit_output	    cout.
+    internal mid.
+    CELL "draw_hier c_row" (
+	(as = []) => [cout <- cin] |
+	[
+	    c_row fn (tl as) (tl bs) cin (tl outs) mid,
+	    fn (hd as) (hd bs) mid (hd outs) cout
+	]
+);
+
+let toplevel =
+    word_input			    a b.
+    bit_input			    cin.
+    word_output			    out.
+    bit_output			    cout.
+    CELL "draw_hier toplevel" [
+	c_row full_adder (tobits a) (tobits b) cin (tobits out) cout
+];
+
+let p = toplevel 'a 'b 'cin 'out 'cout;
+
+
+wtime (p fseq ());
+
+write_pexlif "mary2.pexlif" p;
+
+%%%%%%%%%%%%%%%%
+
+
+
+
+let spec_adder =
+    word_input	a b.
+    word_output out.
+    CELL "spec_adder" [
+	out <- a '+' b
+];
+
+// 
+letrec row fn (a:as) (b:bs) cin =
+    val (out0,mid) = fn a b cin in
+    val (outs, cout) = row fn as bs mid in
+    (out0:outs, cout)
+ /\    row fn [] [] cin = ([],cin)
+;
+
+
+
+
+
+
+letrec row2 fn =
+    bit_list_input  as bs.
+    bit_input	    cin.
+    output	    pair_out.
+    list_inter
+    CELL "row2" (
+	as = [] => [pair_out <- ([], cin)] |
+	(outs, cout) <-
+	
+);
+
+
+
+
+let func_full_adder a b cin =
+    ((a '^' b '^' cin), (a '&' b '|' a '&' cin '|' b '&' cin))
+;
+
+let ripple_adder =
+    word_input			    a b.
+    bit_input			    cin.
+    word_output			    out.
+    bit_output			    cout.
+    CELL "radder" [
+	(out,cout) <- 
+	    val (outl,cout) = row func_full_adder (tobits a) (tobits b) cin in
+	    (frombits outl), cout
+];
+
+let p = (ripple_adder 'a 'b 'cin 'out 'cout);
+
+p fseq ();
+
+Emit_pexlif "mary" p;
+
+
+let ripple_adder2 =
     word_input			    a b.
     bit_input			    cin.
     word_output			    out.
@@ -28,6 +121,7 @@ letrec ripple_adder =
 	(map5 full_adder (tobits a) (tobits b) ((tl mids)@[cin])
 			(tobits out) mids)
 );
+
 
 
 let adder_spec =

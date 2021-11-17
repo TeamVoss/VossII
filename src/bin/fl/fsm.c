@@ -2185,8 +2185,8 @@ visualization_vecs2tags(g_ptr redex)
 
     ilist_ptr	*ipp;
     int anon = 0;
-    bool exact_found = FALSE;
     FOR_BUF(&(vp->anon_buf), ilist_ptr, ipp) {
+	bool exact_found = FALSE;
 	bool used = FALSE;
 	if( ilist_ptr_equ(*ipp, full_list) ) {
 	    exact_found = TRUE;
@@ -2221,6 +2221,7 @@ visualization_vecs2tags(g_ptr redex)
 	}
 	anon++;
     }
+#if 0
     if( !exact_found ) {
 	int anon_cnt = COUNT_BUF(&(vp->anon_buf));
 	push_buf(&(vp->anon_buf), &full_list);
@@ -2230,6 +2231,7 @@ visualization_vecs2tags(g_ptr redex)
 	SET_CONS_TL(ftail, Make_NIL());
 	ftail = GET_CONS_TL(ftail);
     }
+#endif
     dispose_hash(&idx_tbl, NULLFCN);
     pop_fsm();
     DEC_REF_CNT(l);
@@ -5789,7 +5791,7 @@ vec_size(vec_ptr vec)
 	// Indices
 	int sum = 0;
 	for(range_ptr rp = vec->u.ranges; rp != NULL; rp = rp->next) {
-	    sum += abs(rp->upper-rp->lower+1)*rem;
+	    sum += (abs(rp->upper-rp->lower)+1)*rem;
 	}
 	return sum;
     }

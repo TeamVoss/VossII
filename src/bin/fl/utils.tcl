@@ -72,11 +72,13 @@ proc process_is_alive {process_id} {
     }
     if { [llength $rl] != 2 } { return 0 }
     set status [lindex $rl 1]
-    if { $status == "R" } { return 1 }
-    if { $status == "S" } { return 1 }
-    if { $status == "D" } { return 1 }
-    if { $status == "T" } { return 1 }
-    return 0
+    switch $status {
+	R	-
+	S	-
+	D	-
+	T	{ return 1; }
+	default { return 0; }
+    }
 }
 
 proc watch_process {pid {action "destroy ."} } {

@@ -5,6 +5,13 @@
 let Init_idv_gui = tcl_eval [sprintf "source %sidv.tcl" DIR];
 Init_idv_gui;
 
+let EDIT_cmd file =
+    let cmd = "/usr/bin/X11/xterm -sb -sl 20000 -j -rw -ls -bg white "^
+	      "-fg black -fn 7x14 -geometry 80x40 -e /usr/bin/vi "
+    in
+    sprintf "%s %s &" cmd file
+;
+
 let idv_gui_cnt_ref = ref 0;
 let mk_idv_gui_window {dummy::void} =
     let idx = deref idv_gui_cnt_ref + 1 then
@@ -51,6 +58,10 @@ let cur_idv_readonly_transform_dbs =
 	     ) list}
 ;
 
+let get_selected_wires vfsm =
+    let selection = qsort node_name_cmp (deref (vfsm2selection_r vfsm)) then
+    setify (md_expand_vectors selection)
+;
 
 let find_next_anon_name {dummy::void} =
     val (sname,fname,mnames,tbl) = get_rw_db () then
@@ -802,7 +813,7 @@ let fl_display_transform_tree canvas db name =
 	let vertex_name = sprintf "n%d" (length (deref done)) then
 	let ext_name = sprintf "%s:%s" db name in
 	(vertex_map := ((vertex_name,ext_name):(deref vertex_map))) fseq
-	let dc = sprintf "%s [shape=box, width=0.20, height=0.10, fillcolor=yellow, fixedsize=shape, label = \"%s\"]\n"
+	let dc = sprintf "%s [shape=box, width=1.50, height=0.10, fixedsize=shape, label = \"%s\"]\n"
 			vertex_name vertex_name
 	then
 	(vertices := (dc:(deref vertices))) fseq
@@ -867,22 +878,224 @@ let fl_import_model w filename =
 ;
 export_to_tcl fl_import_model;
 
-//let fl_do_fev canvas filename =
-//    let vfsm = w2vfsm canvas then
-//    let w = vfsm2id vfsm then
-//    let il = get_selected_pinsts canvas then
-//    let parent = get_idv_current_pexlif canvas then
-//    // This code relies on fold_pexlif putting the new instance first!!!!
-//    let p' = fold_pexlif parent il "_TMP_" then
-//    val (PINST _ _ _ _ _ _ (P_HIER chs)) = p' in
-//    let spec = el 1 chs then
-//    let imp = read_pexlif filename then
-//    val (pmiter,ant) = mk_miter spec imp then
-//    
+let clean_name s =
+    let tr c =
+	c = " " => "_" |
+	c = "{" => "_" |
+	c = "}" => "_" | c
+    in
+    implode (map tr (explode s))
+;
+
+let generate_hfl_template fp p basename =
+    val (PINST name attrs lf fa_inps fa_outs ints body) = p in
+    (fprintf fp "load \"ste.fl\";\n") fseq
+    let name' = clean_name basename then
+    let inps = map fst fa_inps in
+    let outs = map fst fa_outs in
+    let ios = inps @ outs in
+    let szs = qsort (defix -) (setify (map md_size ios)) in
+    let declare sz = 
+	sz = 1 => () |
+	fprintf fp "TYPE \"bv%d\" %d;\n" sz sz
+    in
+    (foreach declare szs) fseq
+    (fprintf fp "\nlet %s =\n" name') fseq
+    let rcnt = ref 1 in
+    let emit_io io v =
+	let sz = md_size v in
+	let type = sz = 1 => "bit" | sprintf "bv%d" sz in
+	let idx = deref rcnt then
+	(rcnt := idx+1) fseq
+	let base = sprintf "%s%d" (io = "input" => "i" | "o") idx then
+	(fprintf fp "    %s_%s   %s.  // %s\n" type io base v)
+    in
+    (foreach (emit_io "input") inps) fseq
+    (rcnt := 1) fseq
+    (foreach (emit_io "output") outs) fseq
+    (fprintf fp "    CELL \"%s\" [\n\n    // Your code\n\n];\n" basename) fseq
+    (fprintf fp "\n\nlet p = %s" name') fseq
+    let emit_tv v =
+	let sz = md_size v in
+	let type = sz = 1 => "bit" | sprintf "bv%d" sz in
+	(fprintf fp "\n\t\t{(_s2_var \"%s\")::%s}" v type)
+    in
+    (foreach emit_tv (ios)) fseq
+    (fprintf fp "\n;\np fseq ();\n") fseq
+    (fprintf fp "write_pexlif \"%s.pexlif\" p;\n" name') fseq
+    (fprintf fp "quit;\n")
+;
+
+let fl_make_template canvas type file basename =
+    let vfsm = w2vfsm canvas then
+    let p = get_idv_current_pexlif canvas then
+    (
+	type = "hfl" =>
+	    let fp = fopen file "w" then
+	    (generate_hfl_template fp p basename) fseq
+	    (fclose fp)
+	|
+	type = "verilog" =>
+	    val (PINST nm attrs lf fa_inps fa_outs ints body) = p in
+	    let p' = PINST nm attrs lf fa_inps fa_outs [] (P_HIER []) in
+	    let fp = fopen file "w" then
+	    (fprintf fp "%s" (pexlif2verilog p')) fseq
+	    (fclose fp)
+	|
+	eprintf "Unknown template type (%s)" type
+    ) fseq
+    (system (sprintf "/usr/bin/X11/xterm -sb -sl 20000 -j -rw -ls -bg white -fg black -fn 7x14 -geometry 80x40 -e /usr/bin/vi %s &" file)) fseq
+    ()
+;
+export_to_tcl fl_make_template;
+
+let fl_bdd_var_order {canvas::string} {file::string} =
+    ()
+;
+export_to_tcl fl_bdd_var_order;
 
 
+let fl_do_verify canvas {file::string} {type::string} =
+    (
+	let vfsm = w2vfsm canvas then
+	let spec = get_idv_current_pexlif canvas then
+	let imp = remove_wrappers (read_pexlif file) then
+	let ok = type = "BDD" => ((BDD_comb_EQ spec imp) == T) |
+		 type = "SAT" => ((SAT_comb_EQ spec imp) == bT) |
+		 eprintf "Unknown engine (%s)" type
+	then
+	NOT ok => "ok" |
+	(add_transform canvas imp (FEV type [])) fseq
+	let cmd = sprintf "flatten vis;" in
+	(refresh_idv_canvas canvas cmd) fseq
+	"cex"
+    ) gen_catch (\msg. msg)
+;
+export_to_tcl fl_do_verify;
+
+let compress_formals fas =
+    let sub = 
+	let mk1 (f, as) = zip (md_expand_vector f) (md_expand_vectors as) in
+	flatmap mk1 fas
+    then
+    let fs = merge_vectors (map fst fas) in
+    let mk f =
+	let fs = md_expand_vector f in
+	let as = map (\f. assoc f sub) fs then
+	f, (merge_vectors as)
+    in
+    map mk fs
+;
+    
+
+letrec rename_pexlif_wires
+	    sub
+	    (PINST name attrs lf fa_inps fa_outs ints (P_HIER children))
+    = 
+    let in_use = md_expand_vectors ((map fst (fa_inps @ fa_outs))@ints) in
+    let from = map fst sub then
+    let to   = map snd sub then
+    (length to != length (setify to)) => eprintf "Duplicate new names" |
+    ((in_use subtract from) intersect to) != [] =>
+	eprintf "Name clash(es) in renaming wires (%S)"
+		((in_use subtract from) intersect to)
+    |
+    let trf (f,as) =
+	let fnds = md_expand_vector f then
+	let fnds' = map (\f. (assoc f sub) catch f) fnds then
+	let f' = md_merge_vectors fnds' then
+	length f' = 1 => [((hd f'),as)] |
+	letrec mk (f:fs) as =
+	    let len = md_size f in
+	    let p_as = firstn len as in
+	    (f,md_merge_vectors p_as):
+	    (mk fs (butfirstn len as))
+	 /\    mk [] as = 
+	    as != [] => error "WHAT???" |
+	    []
+	in
+	mk f' (md_expand_vectors as)
+    in
+    let fa_inps' = compress_formals (flatmap trf fa_inps) in
+    let fa_outs' = compress_formals (flatmap trf fa_outs) in
+    let ints' = md_extract_vectors (map (\n.(assoc n sub) catch n)
+					(md_expand_vectors ints))
+    then
+    let tra (f,as) =
+	let as' = md_merge_vectors (map (\n.(assoc n sub) catch n)
+					(md_expand_vectors as))
+	then
+	(f,as')
+    in
+    let mk_sub (f,as) =
+	let fs = md_expand_vector f then
+	let as = md_expand_vectors as then
+	let tr f a =
+	    (
+		let new = assoc a sub then
+		[(f,new)]
+	    ) catch []
+	in
+	flat (map2 tr fs as)
+    in
+    let process_child (PINST cn ca cl cfa_inps cfa_outs cints cbody) =
+	let cfa_inps' = map tra cfa_inps then
+	let cfa_outs' = map tra cfa_outs then
+	let cp = PINST cn ca cl cfa_inps' cfa_outs' cints cbody then
+	let sub' = flatmap mk_sub (cfa_inps@cfa_outs) then
+	(rename_pexlif_wires sub' cp) gen_catch (\msg.
+(fprintf stderr "Fail: %s\n\n" msg) fseq  cp)
+    in
+    let children' = map process_child children then
+    PINST name attrs lf fa_inps' fa_outs' ints' (P_HIER children')
+ /\    rename_pexlif_wires sub other = other
+;
 
 
+let fl_rename_wires canvas =
+    let vfsm = w2vfsm canvas in
+    let p = get_idv_current_pexlif canvas then
+    let selected_wires = get_selected_wires vfsm then
+    let mlen = itlist (\s.\m. max m (strlen s)) selected_wires 0 then
+    let fp = mktemp "rename_wires" then
+    let filename = stream2filename fp then
+    (foreach (fprintf fp "%-*s -> \n" mlen) selected_wires) fseq
+    (fclose fp) fseq
+    letrec try dummy =
+	let pid = tcl_eval [sprintf "exec %s" (EDIT_cmd filename)] then
+	(tcl_eval ["set ::done_edit 0",
+		   sprintf "watch_process %s {set ::done_edit 1}" pid]) fseq
+	(tcl_eval ["tkwait variable ::done_edit"]) fseq
+	let fp = fopen filename "r" then
+	letrec read fp =
+	    let line = fgets fp then
+	    line = "" => [] |
+	    (string_butlast line):(read fp)
+	in
+	let lines = read fp then
+	let mk_sub i l =
+	    let sl = str_split l "->" then
+	    length sl != 2 =>
+		let msg = sprintf "Syntax error around line %d\n``%s''\n" i l in
+		(report_error msg) fseq
+		error "FAIL"
+	    |
+	    val [raw_old,raw_new] = sl then
+	    let old = trim raw_old then
+	    let new = trim raw_new then
+	    (old,new)
+	in
+	let sub = (map2 mk_sub (1 upto (length lines)) lines) catch [] in
+	sub == [] => (try ()) |
+	(sub,(rename_pexlif_wires sub p)) gen_catch
+	(\msg. (report_error msg) fseq (try ()))
+    in
+    val (sub, p') = try () then
+    (add_transform canvas p' (RENAME_WIRES sub)) fseq
+    let cmd = sprintf "rename_wires vis ...;"  in
+    refresh_idv_canvas canvas cmd
+;
+export_to_tcl fl_rename_wires;
 
 
 //let fl_do_replacement canvas =
