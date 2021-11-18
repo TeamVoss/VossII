@@ -2,7 +2,7 @@ update_vossrc "RECURSION-CALL-LIMIT" "50000";
 
 load "ste.fl";
 
-let p = verilog2pexlif "" "DCACHE" ["DCACHE.v",
+let p = verilog2pexlif F "" "DCACHE" ["DCACHE.v",
 				    "ALIGNER.v",
 				    "CACHE_LOGIK.v"
 				   ] [];

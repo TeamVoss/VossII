@@ -8,7 +8,7 @@ update_vossrc "RECURSION-CALL-LIMIT" "50000";
 
 load "ste.fl";
 
-let p = verilog2pexlif "" "M32632" [
+let p = verilog2pexlif F "" "M32632" [
 				    "M32632.v",
 				    "STEUERUNG.v",
 				    "ICACHE.v",

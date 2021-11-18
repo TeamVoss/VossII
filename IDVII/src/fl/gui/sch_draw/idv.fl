@@ -769,16 +769,18 @@ export_to_tcl fl_get_idv_models;
 
 let get_transform_fanout p =
     let p_fp = pexlif_get_FP p then
+    let p_SHA = pexlif_get_SHA p then
     let all_dbs = (deref cur_idv_rw_transform_db)@
 		  (deref cur_idv_readonly_transform_dbs)
     then
     let get_fanout (sname,fname,mnames,tbl) =
 	let get_info (TRANSFORM name sha_spec sha_imp just) =
+	    p_SHA != sha_spec => [] |
 	    let id = sprintf " %s:%s" sname name in
 	    let dest = (rev_assoc sha_imp mnames) catch "-" in
-	    (id, dest, (idv_load_pexlif sname sha_imp))
+	    [(id, dest, (idv_load_pexlif sname sha_imp))]
 	in
-	map get_info (tbl_member tbl p_fp => tbl_get tbl p_fp | [])
+	flatmap get_info (tbl_member tbl p_fp => tbl_get tbl p_fp | [])
     in
     flatmap get_fanout all_dbs
 ;
@@ -813,8 +815,10 @@ let fl_display_transform_tree canvas db name =
 	let vertex_name = sprintf "n%d" (length (deref done)) then
 	let ext_name = sprintf "%s:%s" db name in
 	(vertex_map := ((vertex_name,ext_name):(deref vertex_map))) fseq
-	let dc = sprintf "%s [shape=box, width=1.50, height=0.10, fixedsize=shape, label = \"%s\"]\n"
-			vertex_name vertex_name
+	let sz = float2str (int2float (1+strlen ext_name)*0.1) then
+	let dc = sprintf
+      "%s [shape=box, width=%s, height=0.10, fixedsize=shape, label = \"%s\"]\n"
+			vertex_name sz vertex_name
 	then
 	(vertices := (dc:(deref vertices))) fseq
 	(done := ((deref done)@[(p,vertex_name)])) fseq

@@ -1,0 +1,31 @@
+load "ste.fl";
+
+let p = PINST "top" [] F
+		[("a[1:0]", ["a[1:0]"])]
+		[("o[1:0]", ["o[1:0]"])]
+		[]
+	(P_HIER [
+	    (PINST "mid" [] F 
+		[("b[1]",["a[1]"]), ("b[0]",["a[0]"])]
+		[("x[1:0]",["o[1:0]"])]
+		[]
+		(P_HIER [
+		    PINST "lf" [] T
+			[("i1",["b[1]"]), ("i2",["b[0]"])]
+			[("o[1:0]",["x[1:0]"])]
+			[]
+			(P_LEAF [
+			    W_UPDATE_FN (W_VAR 2 "o")
+					(W_CAT [
+					    W_VAR 1 "i1",
+					    W_VAR 1 "i2"])]
+			)
+		    ]
+		)
+	    )
+	])
+;
+
+p;
+
+unfold_pexlif p 1;

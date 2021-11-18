@@ -1486,14 +1486,13 @@ let ENUM_0 name name_list =
     in
     NOT (core_TYPE name sz F value_list) => () |
     letrec add_item cnt (n:ns) =
-	let exist = is_defined n then
         let cmd1 =
             sprintf "let %s_%s = hw_%s_constr (W_NAMED_CONST \"%s\" %d %d);"
 		    name n name n sz cnt
         then
 	let cmd2 =
-	    exist => sprintf "overload %s = %s %s_%s;" n n name n
-		   | sprintf "let %s = %s_%s;" n name n
+	    (is_defined n) => sprintf "overload %s = %s %s_%s;" n n name n
+			    | sprintf "let %s = %s_%s;" n name n
 	then
 	let cmds = [cmd1,cmd2] in
 	NOT (eval_fl_code cmds) => eprintf "Failed to evaluate: %S" cmds |
@@ -1503,8 +1502,9 @@ let ENUM_0 name name_list =
 		     n name sz cnt)
         then
 	let cmd2 =
-	    exist => sprintf "overload is_%s = is_%s %s_is_%s;" n n name n
-		   | sprintf "let is_%s = %s_is_%s;" n name n
+	    (is_defined ("is_"^n))
+		   => sprintf "overload is_%s = is_%s %s_is_%s;" n n name n
+		   |  sprintf "let is_%s = %s_is_%s;" n name n
 	then
 	let cmds = [cmd1,cmd2] in
         NOT (eval_fl_code cmds) => eprintf "Failed to evaluate: %S" cmds |
@@ -1524,7 +1524,6 @@ let ENUM_1 name name_encoding_list =
     in
     NOT (core_TYPE name sz F value_list) => () |
     letrec add_item ((n,cnt):ns) =
-	let exist = is_defined n then
         let cmd1 =
             sprintf "let %s_%s = hw_%s_constr (W_NAMED_CONST \"%s\" %d %d);"
 		    name n name n sz cnt
@@ -1541,8 +1540,9 @@ let ENUM_1 name name_encoding_list =
 		     n name sz cnt)
         then
 	let cmd2 =
-	    exist => sprintf "overload is_%s = is_%s %s_is_%s;" n n name n
-		   | sprintf "let is_%s = %s_is_%s;" n name n
+	    (is_defined ("is_"^n))
+		   => sprintf "overload is_%s = is_%s %s_is_%s;" n n name n
+		   |  sprintf "let is_%s = %s_is_%s;" n name n
 	then
 	let cmds = [cmd1,cmd2] in
         NOT (eval_fl_code cmds) => eprintf "Failed to evaluate: %S" cmds |

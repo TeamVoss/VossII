@@ -1,6 +1,6 @@
 load "ste.fl";
 
-let p = verilog2pexlif "" "SP_FPU" ["SP_FPU.v"] [];
+let p = verilog2pexlif F "" "SP_FPU" ["SP_FPU.v"] [];
 time (p fseq 1);
 
 let ckt = pexlif2fsm p;

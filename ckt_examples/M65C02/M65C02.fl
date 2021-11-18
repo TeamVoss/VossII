@@ -1,7 +1,7 @@
 load "ste.fl";
 
 // Load design.
-let p = verilog2pexlif "-I." "M65C02_Core"
+let p = verilog2pexlif F "-I." "M65C02_Core"
   [
     "M65C02_Core.v",
       "M65C02_MPCv4.v",
