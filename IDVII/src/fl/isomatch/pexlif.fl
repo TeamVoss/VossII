@@ -203,11 +203,14 @@ end_abstype fp_pinst sha_pinst;
 //------------------------------------------------------------------------------
 
 clet PINST n a l i o t c =
+    is_defined "USE_IDV_VERSIONS" =>
         let is_signature s = (s == "FP") OR (s == "SHA") in
         let a' = filter (NOT # is_signature # fst) a in
         let f  = ("FP",  fp_pinst    i o t c) in
         let s  = ("SHA", sha_pinst n i o t c) in
         PINST n (f : s : a') l i o t c
+    |
+        PINST n a l i o t c
 ;
 
 //------------------------------------------------------------------------------
