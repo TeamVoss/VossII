@@ -1,0 +1,145 @@
+// =============================================================================
+// A pretty printing tutorial.
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// The pretty printing combinators.
+
+load (DIR^"../../IDVII/src/fl/verilog/pretty.fl");
+// The above pretty printing library provides a collection of pretty printer
+// combinators, following the pretty printer library Hughes originally wrote for
+// Haskell. In fact, the original paper
+//  > "http://www.cse.chalmers.se/~rjmh/Papers/pretty.html"
+// works quite well as a larger tutorial on these pretty printing combinators
+// and their laws as well.
+
+// At its base is the 'Doc' type, the abstract type of documents, which actually
+// represents a _set_ of layouts. The "best" of which is chosen by 'render' when
+// displaying the document as a string.
+render;
+
+// The construction of documents is done through the aformentioned combinators.
+// Simplest of all is 'nil' which constructs an empty document, that is, a
+// document with no height and width. Note that 'nil' is the identity for many
+// of the following combinators.
+render nil;
+
+// 'text' builds a document of height 1 containing a literal string and length
+// equal to its 'strlen'. When concatenated, 'text' satisfies the laws:
+//  > text s <-> text t = text (s ++ t)
+//  > text "" <-> x = x, if x non-empty
+// The side condition on the last law is necessary because 'text ""' has a
+// height of 1, while a 'nil' document has no height.
+render (text "Hello.");
+
+// 'nest', as the name implies, nests (or indents) a document by a given number
+// of positions (which may also be negative). 'nest' satisfies the laws:
+//  > nest 0 x = x
+//  > nest k (nest k' x) = nest (k + k') x
+//  > nest k (x <-> y) = nest k x <-> nest k y
+//  > nest k (x $-$ y) = nest k x $-$ nest k y
+//  > nest k nil = nil
+//  > x <-> nest k y = x <-> y, if x non-empty
+// As before, the side condition on the last law is necessary because of 'nil'.
+render (nest 4 (text "Hi!"));
+
+// Documents can be combined via the combinators:
+//  - '<->', or its list version 'hcat', which puts two documents besides each
+//    other. Note that '<->' is associative with identity 'nil'.
+//  - '<+>', or its list version 'hsep', which also puts two documents besides
+//    each other but seperated by one position. '<+>' is alos associative with
+//    identity 'nil.
+//  - '$-$', or its list version 'vcat', that puts a document above another,
+//    except if the last line of the first document is shorter by at least one
+//    position than the indentation of the first line of then second document,
+//    then these two lines are overlapped. '$-$' is associated with identity
+//    'nil', but also satisfies the law
+//     > (x $-$ y) <-> z = x $-$ (y <-> z), if y non-empty.
+//  - '$+$, or its list version 'sep', behaves like '$-$' without overlap.
+render (text "Hello" <+> text "world" <-> text "!");
+render (text "One" $-$ nest 4 (text "line"));
+render (text "Two" $+$ nest 4 (text "lines"));
+
+// A common operations is to "hang" some document of the another "header"
+// document, this is captured by 'hand', a short-hand defined as:
+//  > 'hang p k q = sep [p, nest k q]'.
+render (
+  hang (text "This list rules:") 4
+    (sep [ text "1: nest k (nest k' x) = nest (k + k') x"
+         , text "2: (x $-$ y) <-> z = x $-$ (y <-> z), if y non-empty."
+         , text "3: text s <-> text t = text (s ++ t)"])
+);
+
+// Another common operation is to punctutate a list of documents with another,
+// this is captured by 'punctuate', another short-hand defined as:
+//  > 'punctuate p [d1, ... dn] = [d1 <> p, d2 <> p, ... dn-1 <> p, dn]'.
+render (hsep (punctuate (text "no!") [text "yes?", text "maybe?", text "ok"]));
+
+// -----------------------------------------------------------------------------
+// Translating types into documens: Binary numbers from verilog.
+
+// binary_number ::= [ size ] binary_base binary_value
+// binary_base   ::= '[s|S]b | '[s|S]B
+// binary_value  ::= binary_digit { _ | binary_digit }
+// binary_digit  ::= x_digit | z_digit | 0 | 1
+new_type_abbrev signed = bool;
+new_type_abbrev sized  = {int} opt;
+lettype bval = X | Z | Val (int);
+lettype bin  = Bin (sized) (signed) (bval);
+// Note that 'bin' is simplified by assuming an 'int' only consists of zeroes
+// and ones, and that values are _just_ X, Z, or numbers and not a combination.
+
+let pr_int = text # int2str;
+
+let pr_opt _ (NONE) = nil
+/\  pr_opt f (SOME x) = f x
+;
+
+let pr_bval X = text "x"
+/\  pr_bval Z = text "z"
+/\  pr_bval (Val i) = pr_int i
+;
+
+let pretty_bin (Bin sized signed value) =
+          pr_opt pr_int sized
+      <-> text "'"
+      <-> (signed => text "s" | nil)
+      <-> text "b"
+      <-> pr_bval value
+;
+
+render (pretty_bin (Bin (SOME 8) (F) (Val 10100010)));
+
+// -----------------------------------------------------------------------------
+// Translating types into documens: Binary trees.
+
+lettype tree = Leaf (int) | Branch (tree) (int) (tree);
+
+letrec
+   pretty_tree (Leaf i) = pr_int i
+/\ pretty_tree (Branch p i q) =
+         pr_int i
+     $+$ text "+-" <+> pretty_tree p
+     $+$ text "`-" <+> pretty_tree q
+;
+
+let tree_ex = Branch (Leaf 2) 4 (Branch (Branch (Leaf 7) 6 (Leaf 5)) 8 (Leaf 10));
+
+render (pretty_tree tree_ex);
+
+// Note that, when pretty_tree is expressed in this way, its a bit annoying to
+// display a spine that runs alongside the first sub-tree in a branch since the
+// rule:
+//   > (x $-$ y) <-> z = x $-$ (y <-> z), if y non-empty.
+// means that we cannot put two N high documents next to each other aligned at
+// each head, instead the last line of the first document is aligned with the
+// first line of the second document.
+let x = vcat (replicate 3 (text "#")) in render (nest 1 (hcat [x,x,x]));
+
+// -----------------------------------------------------------------------------
+// Translating types into documens: Verilog.
+
+// See IDVII/../verilog/grammar.fl and IDVII/../verilog/pretty-verilog.fl.
+
+// -----------------------------------------------------------------------------
+// The end.
