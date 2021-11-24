@@ -2,34 +2,34 @@
 // This file provides a FL version of pretty-print by J. Hughes & S. P.Jones.
 // =============================================================================
 
-// faster string type for length and concatenation.
-// todo: use a list of strings instead concat.
-new_type_abbrev str = (int)#(string->string);
+// A string and its length.
+new_type_abbrev str = (int)#(string);
 
-let str {s :: string} = let l = strlen s then (l, defix ^ s);
-
-let indent {n :: int} = implode (replicate n " ");
-
-// -----------------------------------------------------------------------------
-
-// layout document.
+// Layout document.
 lettype doc =
     Nil                   // text ""
   | NilAbove (doc)        // text "" $$ x
   | TxtBeside (str) (doc) // text s <> x
   | Nest (int) (doc)      // next k x
   | Union (doc) (doc)     // union x y
-  | Beside (doc) (bool) (doc)
-  | Above (doc) (bool) (doc)
+  | Beside (doc) (bool) (doc) // vertical composition.
+  | Above (doc) (bool) (doc)  // horizontal composition
   | Empty                 // empty document
   ;
 
-// document which has been reduced (no top-level 'Above' or 'Beside').
+// Document which has been reduced (no top-level 'Above' or 'Beside').
 new_type_abbrev rdoc = doc;
 
+// Test to see whether a document is empty (as in 'Nil', not the error 'Empty').
 let is_nil (Nil) = T
 /\  is_nil _     = F
 ;
+
+// Pack a string and its 'strlen' into a 'str' type.
+let str {s :: string} = let l = strlen s then (l, s);
+
+// "Standard" indentation string.
+let indent {n :: int} = implode (replicate n " ");
 
 // -----------------------------------------------------------------------------
 
@@ -75,6 +75,7 @@ let beside Nil _ q   = q
 // -----------------------------------------------------------------------------
 // Reduction of documents.
 
+// Reduction of a document, called internally to ensure proper indentation.
 letrec
     besideNil _ Nil        = Nil
 /\  besideNil b (Nest _ p) = besideNil b p
@@ -101,6 +102,7 @@ letrec
       besideRed (reduce (Beside p b' q')) b q
 ;
 
+// Reduction of a document, called internally to ensure proper nesting.
 letrec
     aboveNil _ _ (Nil)      = Nil
 /\  aboveNil b k (Nest i q) = let j = k + i then aboveNil b j q
@@ -134,7 +136,7 @@ letrec
 /\  aboveRed p b q = aboveNest p b 0 (reduce q)
 ;
 
-//  reduce::doc->rdoc
+// Reduction of a document, called internally to eliminate 'Nil' snippets.
 letrec
     reduce (Beside p b q) = besideRed p b (reduce q)
 /\  reduce (Above  p b q) = aboveRed  p b (reduce q)
@@ -309,42 +311,56 @@ let best {w0 :: int} {r0 :: int} {d :: doc} = nice w0 r0 d;
 
 let newline = "\n";
 
-forward_declare{lay::int->string->doc->string};
+forward_declare{lay::int->string->doc->stream->void};
 
-let layL {k :: int} {end :: string} {d :: doc} =
-    letrec
-        go _ (Empty)             = error "layL Empty"
-    /\  go _ (Nil)               = end
-    /\  go k (NilAbove p)        = newline ^ lay k end p
-    /\  go k (TxtBeside (i,s) p) = let j = k + i then s (go j p)
-    /\  go k (Nest _ p)          = go k p
-    /\  go _ (Union _ _)         = error "layL Union"
-    /\  go _ (Beside _ _ _)      = error "layL Beside"
-    /\  go _ (Above _ _ _)       = error "layL Above"
-    in
-    go k d
-;
+let fprint {fp :: stream} {s :: string} = fprintf fp "%s" s;
 
-let lay {k :: int} {end :: string} {d :: doc} =
+let layL {k :: int} {end :: string} {d :: doc} {fp :: stream} =
       letrec
-          go _ (Empty)             = error "lay Empty"
-      /\  go _ (Nil)               = end
-      /\  go k (NilAbove p)        = newline ^ go k p
+          go _ (Nil) =
+            (fprint fp end) fseq ()
+      /\  go k (NilAbove p) =
+            (fprint fp newline) fseq (lay k end p fp)
       /\  go k (TxtBeside (i,s) p) =
-            let j = k + i then indent k ^ s (layL j end p)
-      /\  go k (Nest i p)          = let j = k + i then go j p
-      /\  go _ (Union _ _)         = error "lay Union"
-      /\  go _ (Beside _ _ _)      = error "lay Beside"
-      /\  go _ (Above _ _ _)       = error "lay Above"
+            let j = k + i then (fprint fp s) fseq (go j p)
+      /\  go k (Nest _ p) =
+            go k p
+      /\  go _ (Empty)        = error "layL Empty"
+      /\  go _ (Union _ _)    = error "layL Union"
+      /\  go _ (Beside _ _ _) = error "layL Beside"
+      /\  go _ (Above _ _ _)  = error "layL Above"
       in
       go k d
 ;
 
-let display {l :: int} {r :: int} {end :: string} {d :: doc} =
-      lay 0 end (best l r (reduce d))
+let lay {k :: int} {end :: string} {d :: doc} {fp :: stream} =
+      letrec
+          go _ (Nil) =
+            (fprint fp end) fseq ()
+      /\  go k (NilAbove p) =
+            (fprint fp newline) fseq (go k p)
+      /\  go k (TxtBeside (i,s) p) =
+            let j = k + i then (fprint fp (indent k ^ s)) fseq (layL j end p fp)
+      /\  go k (Nest i p) =
+            let j = k + i then go j p
+      /\  go _ (Empty)        = error "lay Empty"
+      /\  go _ (Union _ _)    = error "lay Union"
+      /\  go _ (Beside _ _ _) = error "lay Beside"
+      /\  go _ (Above _ _ _)  = error "lay Above"
+      in
+      go k d
 ;
 
-let render {d :: doc} = display 100 67 "" d; // 67 = round (100/1.5)
-// todo: print to file pointer
+let display {l :: int} {r :: int} {end :: string} {fp :: stream} {d :: doc} =
+      lay 0 end (best l r (reduce d)) fp
+;
+
+let frender {fp :: stream} {d :: doc} = display 100 67 "" fp d;
+// note: magic numbers are
+//   100 = line width, arbitrary choice.
+//   67 = round (100/1.5) = line width/ribbons per line, as suggested by paper.
+//   "" = text associated Nil (an empty doc.), arbitrary choice.
+
+let render {d :: doc} = frender stdout d;
 
 // =============================================================================

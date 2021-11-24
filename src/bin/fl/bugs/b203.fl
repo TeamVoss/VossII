@@ -150,23 +150,15 @@ let miter_test p g =
         // is X (unknown/should’t matter), (T, F) is one, (F, T) is zero, and
         // (F, F) is top, or overconstrained.
         let eqs = butfirstn 3 (pexlif_get_children miter) in
-        let xeq (PINST n _ _ [(_,[i1]), (_,[i2])] [(_,[eq])] _ _) =
-                // todo: check that (val AND eq_high) depends on X?
-                val (eq_high, eq_low) = get_trace_val ste eq 0 in
-                // If eq is T, F or overconstrained, return that value.
-                (printf "eq:(%B,%B)\n" eq_high eq_low) fseq
-                (eq_high == T AND eq_low == F) => T |
-                (eq_high == F AND eq_low == T) => F |
-                (eq_high == F AND eq_low == F) => F |
-                // If eq is X, check that both i1 and i2 are also X.
-                val (i1_high, i1_low) = get_trace_val ste i1 0 in
-                val (i2_high, i2_low) = get_trace_val ste i2 0 in
-                (printf "i1:(%B,%B)\n" i1_high i1_low) fseq
-                (printf "i2:(%B,%B)\n" i2_high i2_low) fseq
-                (i1_high == T AND i1_low == T) =>
-                  (i2_high == T AND i2_low == T) |
-                // Otherwise fail.
-                F
+        let xeq (PINST n _ _ [(_,[out1]), (_,[out2])] _ _ _) =
+                // check that out2 follows the spec. out1.
+                let out1_dr = get_trace_val ste out1 0 in
+                let out2_dr = get_trace_val ste out2 0 in
+                (out1_dr = out2_dr) AND
+                // /
+                let out1_dr_next = get_trace_val ste out1 1 in
+                let out2_dr_next = get_trace_val ste out2 1 in
+                (out1_dr_next = out2_dr_next)
         in
         all xeq eqs == T => print "gen. X exp. passed.\n" fseq T | ok
 ;
@@ -174,11 +166,17 @@ let miter_test p g =
 // -----------------------------------------------------------------------------
 // Main.
 
-let pex2pex p =
-      let pex = pexlif_get_name p in
-      let ver = pexlif2verilog p then
+let debug_p2v p =
       let fp  = fopen "test.v" "w" then
-      (fprintf fp "%s\n" ver) fseq
+      (pexlif2verilog fp p) fseq
+      (fclose fp) fseq
+      ()      
+;
+
+let pex2pex p =
+      let pex = pexlif_get_name p then
+      let fp  = fopen "test.v" "w" then
+      (pexlif2verilog fp p) fseq
       (fclose fp) fseq
       (verilog2pexlif T "-I." pex ["test.v"] [])
 ;
@@ -219,20 +217,32 @@ let test l h =
 // -----------------------------------------------------------------------------
 // Manual testing of erroring pexlifs.
 
+// let ex =
+//     bit_input clk.
+//     bit_input re.
+//     bit_input en.
+//     bits_input a.
+//     bits_output b.
+//     CELL "test" [
+//         re_ff_en_reset clk en re a b
+//     ]
+// ;
+// let p = ex 'clk 're 'en 'a 'b;
+
+let err = normalize_pexlif (gen_pex 9 4 2 2);
+
 TYPE "bits" 2;
 
 let ex =
     bit_input clk.
-    bit_input re.
-    bit_input en.
     bits_input a.
     bits_output b.
     CELL "test" [
-        re_ff_en_reset clk en re a b
+        re_ff clk a b
     ]
 ;
+let p = ex 'clk 'a 'b;
 
-let p = ex 'clk 're 'en 'a 'b;
 //let p = gen_pex 49 4 2 2;
 let g = shrink_miter_failure p;
 
@@ -248,7 +258,7 @@ let debug p =
         let g = pex2pex p then
         val (miter, ant, cons) = mk_miter p g then
         let vis = STE_debug (pexlif2fsm miter) then
-        let ste = STE "-e -m 10" vis [] ant cons [] then
+        let ste = STE "" vis [] ant cons [] then // "-e -m 10"
         let ok  = get_ste_result ste "" then
         ok == T => T |
         // Concrete counterexample.
@@ -256,37 +266,28 @@ let debug p =
         let sub = full_example F dep (NOT ok) then
         let ant' = substitute sub ant then
         let cons' = substitute sub cons then
-        let ste' = STE "-e -m 10" vis [] ant' cons' [] then
+        let ste' = STE "" vis [] ant' cons' [] then // "-e -m 10"
         (get_ste_result ste' "") == T
 ;
 
-// module test (input wire [1 : 0] in1, output wire [1 : 0] out2);
-//     assign out2 = ({{1{in1[1]}}, in1[1]}) % (2'b10);
-// endmodule
-// verilog2pexlif T "-I." "test" ["test2.v"] [];
-
-// let ex =
-//         bits_input a.
-//         bits_output b.
-//         CELL "test" [b <- a '|>>' '0b01];
-// let ex =
-//         bits_input a.
-//         bits_output b.
-//         bit_internal t.
-//         CELL "test" [
-//             t <- {(a~~1)::bit},
-//             b <- {(SX t)::bits} '%' '0b10
-//         ]
-// ;
-// let ex =
-//         bit_input a.
-//         bit_input b.
-//         bit_output c.
-//         CELL "test" [
-//             c <- a '=' b
-//         ];
-// let pex = SOME (ex 'a 'b 'c);
-// let norm (SOME p) = normalize_pexlif p;
+let debug_seq p =
+        // Graphical debug.
+        let g = pex2pex p then
+        val (miter, ant_now, cons) = mk_miter p g then
+        let ant_next = map (\(w,n,v,f,t). (w,n,v,f+1,t+1)) (bdd_current2next ant_now) then
+        let ant = ant_now @ ant_next then
+        let vis = STE_debug (pexlif2fsm miter) then
+        let ste = STE "" vis [] ant cons [] then // "-e -m 10"
+        let ok  = get_ste_result ste "" then
+        ok == T => T |
+        // Concrete counterexample.
+        let dep = depends ant then
+        let sub = full_example F dep (NOT ok) then
+        let ant' = substitute sub ant then
+        let cons' = substitute sub cons then
+        let ste' = STE "" vis [] ant' cons' [] then // "-e -m 10"
+        (get_ste_result ste' "") == T
+;
 
 // -----------------------------------------------------------------------------
 // Fin.

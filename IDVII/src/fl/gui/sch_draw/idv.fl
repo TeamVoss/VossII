@@ -943,7 +943,7 @@ let fl_make_template canvas type file basename =
 	    val (PINST nm attrs lf fa_inps fa_outs ints body) = p in
 	    let p' = PINST nm attrs lf fa_inps fa_outs [] (P_HIER []) in
 	    let fp = fopen file "w" then
-	    (fprintf fp "%s" (pexlif2verilog p')) fseq
+	    (pexlif2verilog fp p') fseq
 	    (fclose fp)
 	|
 	eprintf "Unknown template type (%s)" type
