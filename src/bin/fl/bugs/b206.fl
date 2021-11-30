@@ -1,0 +1,4 @@
+
+let p = read_pexlif (DIR^"cephalopode.pexlif");
+
+p fseq 1;
