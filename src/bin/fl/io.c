@@ -1280,7 +1280,12 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		    }
 		    fgetc(fp);	// Eat newline
 		    *p = 0;
-		    MAKE_REDEX_AINT(g, Arbi_FromString(tmp, 10));
+		    arbi_T ai = Arbi_FromString(tmp, 10);
+		    if( ai == NULL ) {
+			fprintf(stderr, "Failing int string: %s\n", tmp);
+			RD_FAIL("INT_reading");
+		    }
+		    MAKE_REDEX_AINT(g, ai);
 		    break;
 		}
 	    case TAG_STRING:

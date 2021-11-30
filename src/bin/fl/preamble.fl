@@ -668,6 +668,9 @@ end_abstype print_vectors enumerate_examples;
 begin_abstype;
 let loaded_files_ref = ref {[]::string list};
 
+let get_cloaded_files {dummy::void} = deref loaded_files_ref;
+non_lazy get_cloaded_files;
+
 // Load the fl file 'filename' if it has not been loaded before.
 // Usage: cload filename;
 let cload filename =
@@ -700,7 +703,7 @@ let cload filename =
     (loaded_files_ref := (full_name:(deref loaded_files_ref)))
 ;
 non_lazy cload;
-end_abstype cload;
+end_abstype get_cloaded_files cload;
 
 // Replace all current state variables (not ending in _n) with their
 // corresponding next-state variables in all the BDDs in fs.

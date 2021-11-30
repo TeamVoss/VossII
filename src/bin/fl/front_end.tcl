@@ -39,7 +39,7 @@ tk scaling 1.0
 set ::result_id 0
 
 set my_pid [pid]
-watch_process $fl_pid [list exec kill -9 $my_pid]
+util:watch_process $fl_pid 300 [list exec kill -9 $my_pid]
 
 set x_selection         ""
 
@@ -1874,4 +1874,4 @@ proc sg:capture {w} {
 # hierarchy of windows are open.
 # This is a workaround. Should fix change_fonts (and other) procs.
 set old_limit [interp recursionlimit {}]
-interp recursionlimit {} [expr {$old_limit + 5000}]
+interp recursionlimit {} [expr {$old_limit + 50000}]

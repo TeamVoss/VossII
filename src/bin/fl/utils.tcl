@@ -65,31 +65,6 @@ proc change_fonts {new_font} {
 }
 
 
-# NOTE: This is OS dependent!!!!
-proc process_is_alive {process_id} {
-    if [catch {set rl [split [exec ps -o s $process_id] "\n"]}] {
-        return 0
-    }
-    if { [llength $rl] != 2 } { return 0 }
-    set status [lindex $rl 1]
-    switch $status {
-	R	-
-	S	-
-	D	-
-	T	{ return 1; }
-	default { return 0; }
-    }
-}
-
-proc watch_process {pid {action "destroy ."} } {
-    if [process_is_alive $pid] {
-        after 200 [list watch_process $pid $action]
-    } else {
-        eval uplevel #0 $action
-        update idletasks
-    }
-}
-
 
 
 # Useful procedure that allows syntaxx like: val {v1 v2 v3} $list
@@ -166,6 +141,117 @@ proc util:report_result_in_file {msg file return_alts} {
     close $fp
     append header $msg "\n" "--------------------------------------------------------------------------------" "\n"
     util:report_result $header $txt $return_alts
+}
+
+# NOTE: This is OS dependent!!!!
+proc util:process_is_alive {process_id} {
+    if [catch {set rl [split [exec ps -o s $process_id] "\n"]}] {
+        return 0
+    }
+    if { [llength $rl] != 2 } { return 0 }
+    set status [lindex $rl 1]
+    switch $status {
+	R	-
+	S	-
+	D	-
+	T	{ return 1; }
+	default { return 0; }
+    }
+}
+
+proc util:watch_process {pid {delay 50} {action "destroy ."} } {
+    if [util:process_is_alive $pid] {
+        after $delay [list util:watch_process $pid $delay $action]
+    } else {
+        eval uplevel #0 $action
+        update idletasks
+    }
+}
+
+proc util:process_bg_data {fp w} {
+    set status [catch { gets $fp new_output } res]
+    if { $status != 0 } {
+        set ::bg(error_msg) $res
+        set ::process_bg_status fail
+    } elseif { $res >= 0 } {
+	append ::bg(output) $new_output "\n"
+        if { $w != "-" } {
+            $w.t insert end $new_output
+            $w.t insert end "\n"
+            $w.t see end 
+            update idletasks
+        }
+    } elseif { [chan eof $fp] } {
+	chan event $fp readable {}
+        set ::process_bg_status ok
+    } elseif { ![chan blocked $fp] } {
+        WriteStdErr "Should never happen!\n"
+        set ::process_bg_status fatal_error
+    } 
+} 
+
+proc util:bg_exec {cmd display_output after_cmd {parent_window .}} {
+    set w "-"
+    if { $display_output } {
+        set w .bg_display
+        catch {destroy $w}
+        set px [winfo x $parent_window]
+        set py [winfo y $parent_window]
+        toplevel $w
+        wm geometry $w +$px+$py
+        scrollbar $w.yscroll -command "$w.t yview"
+        scrollbar $w.xscroll -orient horizontal -command "$w.t xview"
+        text $w.t -bg AntiqueWhite2 -fg black -width 80 -height 40 \
+            -yscrollcommand "$w.yscroll set" \
+            -xscrollcommand "$w.xscroll set"
+        pack $w.yscroll -side right -fill y
+        pack $w.xscroll -side bottom -fill x
+        pack $w.t -side top -fill both -expand yes
+    }
+    set ::bg(error_msg) "_"
+    set ::bg(output) " "
+    set ::process_bg_status ""
+    set fp [open "| $cmd |& cat -" r]
+    chan configure $fp -blocking no
+    chan event $fp readable [list util:process_bg_data $fp $w]
+    tkwait variable ::process_bg_status
+    if { $after_cmd != "" } {
+        {*}$after_cmd $w $::process_bg_status "$::bg(error_msg)" "$::bg(output)"
+    }
+    return $w
+}
+
+proc util:after_try_program {title choices w status err_msg output} {
+    if { $status == "ok" && [regexp {===SuCcEsS===} $output]} {
+        set ::util_bg(result) ok
+    } else {
+        frame $w.after -relief flat -height 30
+        pack $w.after -before $w.xscroll -side bottom -fill x
+        label $w.after.l -text $title
+        pack $w.after.l -side left -padx 20
+        foreach choice $choices {
+            val {txt retval} $choice
+            button $w.after.b$retval -text $txt \
+                -command "set ::util_bg(result) $retval"
+            pack $w.after.b$retval -side left -padx 10
+        }
+        update
+	tkwait variable ::util_bg(result)
+    }
+}
+
+
+# Run the shell program (with arguments) in args
+# If it fails, put up a choice window with title 'title' and
+# alternatives 'choices' ({button_text return_value} list)
+#
+proc util:try_program {parent_window title choices args} {
+    set ::util_bg(result) ""
+    set w [util:bg_exec $args 1 \
+		[list util:after_try_program "$title" $choices] \
+		$parent_window]
+    destroy $w
+    return $::util_bg(result)
 }
 
 
@@ -1039,4 +1125,5 @@ proc balloon:show {w arg} {
     raise $top
     after 2000 "balloon:remove $top"
 }
+
 

@@ -249,8 +249,8 @@ typedef struct g_rec {
 #define SET_CONS_HD(np, v)      SET_LEFT(np, (ui) v)
 #define M_GET_CONS_TL(np)       ((g_ptr) GET_RIGHT(np))
 #define SET_CONS_TL(np, v)      SET_RIGHT(np, (ui) v)
-#define IS_NIL(p)               (IS_CONS(p)                      \
-                                && (M_GET_CONS_HD(p) == NULL)     \
+#define IS_NIL(p)               (IS_CONS(p)				       \
+                                && (M_GET_CONS_HD(p) == NULL)		       \
                                 && (M_GET_CONS_TL(p) == NULL))
 
 #define FOR_CONS(list,li,data)                                                 \
@@ -260,7 +260,7 @@ typedef struct g_rec {
 
 #define APPEND1(tail,np)                                                       \
     SET_CONS_HD((tail),(np));	                                               \
-	SET_CONS_TL((tail), Make_NIL());                                           \
+	SET_CONS_TL((tail), Make_NIL());                                       \
 	(tail) = GET_CONS_TL((tail));
 
 #define APPENDL(tail,nlp)                                                      \

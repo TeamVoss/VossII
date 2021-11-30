@@ -2333,13 +2333,6 @@ let al_latch =
 	base_al_latch d clk out
 ];
 
-let ` {i::int} =
-    let sz = hw_size {undefined:: *r} in
-    let w = W_CONST sz i in
-    {hw_constr w:: *r}
-;
-prefix 0 `;
-
 
 let extract_bit v idx =
     let wbits = hw_destr v in
@@ -3437,4 +3430,5 @@ let remove_wrappers p =
     clean p
 ;
 
+let ` typed_result = hw_destr typed_result;
 

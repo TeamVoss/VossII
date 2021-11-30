@@ -185,6 +185,8 @@ fl_main(int argc, char *argv[])
     string	rand_str;
     int		rand_init;
     FILE *	input_file_for_cmds_fp = NULL;
+    bool	exit_on_failure = FALSE;
+    bool	unbuf_stdout = FALSE;
 
     // Unlimit stacksize
     struct rlimit rlim = {RLIM_INFINITY, RLIM_INFINITY};
@@ -253,6 +255,12 @@ fl_main(int argc, char *argv[])
             cephalopode_mode = TRUE;
             argc--, argv++;
         } else
+        if( (strcmp(argv[1], "-unbuf_stdout") == 0) ||
+	    (strcmp(argv[1], "--unbuf_stdout") == 0) )
+	{
+            unbuf_stdout = TRUE;
+            argc--, argv++;
+        } else
         if( (strcmp(argv[1], "-use_stdout") == 0) ||
 	    (strcmp(argv[1], "--use_stdout") == 0) )
 	{
@@ -286,11 +294,18 @@ fl_main(int argc, char *argv[])
         if( strcmp(argv[1], "-f") == 0 ) {
             start_file = argv[2];
             argc -= 2; argv += 2;
+        } else
+        if( strcmp(argv[1], "-F") == 0 ) {
+	    exit_on_failure = TRUE;
+            start_file = argv[2];
+            argc -= 2; argv += 2;
         } else {
             fprintf(stderr, "Unknown option %s\n", argv[1]);
             exit(-1);
         }
     }
+
+    if( unbuf_stdout ) { setbuf(stdout, NULL); }
 
     LG_TBL_SIZE = 18;
     if( size_str != NULL && !str2int(size_str, &LG_TBL_SIZE) )
@@ -421,14 +436,22 @@ fl_main(int argc, char *argv[])
         }
 
         if( start_file != NULL ) {
-            string cmd = strtemp("(_load ");
+            string cmd = strtemp("((_load ");
             charappend('"');
             strappend(start_file);
             charappend('"');
-	    strappend(" F) fseq ();");
+	    strappend(" F) fseq ())");
+	    if( exit_on_failure ) {
+		strappend(" catch (exit 1)");
+	    }
+            charappend(';');
 	    busy(TRUE);
 	    bool ok;
-	    if( call_setjmp(cmd, &ok) != 0 ) { }
+	    if( call_setjmp(cmd, &ok) != 0 ) {
+		if( exit_on_failure ) {
+		    exit(1);
+		}
+	    }
 	    busy(FALSE);
         }
 
@@ -593,7 +616,11 @@ fl_main(int argc, char *argv[])
 	    }
 	    fprintf(fp, "(_load \"%s/preamble.fl\" F) fseq ();\n",
 			binary_location);
-	    fprintf(fp, "(_load \"%s\" F) fseq ();\n", start_file);
+	    fprintf(fp, "((_load \"%s\" F) fseq ())", start_file);
+	    if( exit_on_failure ) {
+		fprintf(fp, " catch (exit 1)");
+	    }
+	    fprintf(fp, ";\n");
 	    fclose(fp);
 	    switch( setjmp(toplevel_eval_env) ) {
 		case 0:

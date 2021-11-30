@@ -7,11 +7,12 @@
 # Constants
 # ---------------------------------------------------
 
-proc idv:create_idv_gui {w} {
+proc idv:create_idv_gui {w rw_db} {
     catch {destroy $w}
     toplevel $w
     wm geometry $w -20+100
     set nb $w.nb
+    set ::idv(code_dir) "$rw_db/code"
     ttk::notebook $nb -width 1200 -height 700
     bind $nb <<NotebookTabChanged>> [list idv:inform_canvas_change $w]
     pack $nb -side top -expand y -fill both
@@ -506,7 +507,43 @@ proc idv:ask_for_model_name {w} {
     return $::idv_prompt_name
 }
 
+proc idv:edit_and_load {w file load_file pexlif_file} {
+    set ew .editor
+    while 1 {
+        catch {destroy $ew}
+        toplevel $ew -container 1 -width 580 -height 564
+        set x [winfo x $w]
+        set y [winfo y $w]
+        wm geometry $ew +$x+$y
+        update idletasks
+        set wid [expr [winfo id $ew]]
+        set edit "/usr/bin/X11/xterm -into $wid -sb -sl 20000 -j \
+                  -rw -ls -bg white -fg black -fn 7x14 -geometry 80x40 \
+                  -e /usr/bin/vi $file"
+        # Edit the file
+        util:bg_exec $edit 0 {} $w
+        # Try compile the model
+        set res [util:try_program $w "Loading failed" \
+                                  {{Cancel cancel} {{Re-edit} again}} \
+                                  fl -noX -unbuf_stdout -F $load_file]
+        switch $res {
+            ok  {
+                    destroy $ew;
+                    return $pexlif_file;
+                }
+            cancel {
+                    destroy $ew;
+                    return ""
+                }
+            again {}
+        }
+    }
+}
+
+
+
 proc idv:make_template {w c type} {
+    set ::idv(fev_imp_file) ""
     set file $::idv(fev_template_file)
     set base [file rootname $file]
     set ext [file extension $file]
@@ -516,13 +553,25 @@ proc idv:make_template {w c type} {
 	    case hfl	    { set file "$base.fl" }
 	    default	    {}
 	}
-	if { [file exists $file] } {
-	    set reply [tk_messageBox -message "File exists. Overwrite?" \
-				     -type yesno -parent $w]
-	    if { $reply != "yes" } { return }
+	if { ![regexp {^/.*} $file] && ![regexp {\.\./.*} $file] } {
+	    set file "$::idv(code_dir)/$file"
 	}
-	fl_make_template $c $type $file $base
-	set ::idv(fev_imp_file) "$base.pexlif"
+	set create_file 1
+	if { [file exists $file] } {
+	    set reply [tk_messageBox \
+			    -message "File exists. Overwrite it?:" \
+			    -icon question -default no -type yesnocancel \
+			    -parent $w]
+	    switch $reply {
+		yes	{ set_create_file 1;  }
+		no	{ set create_file 0; }
+		cancel  {return}
+	    }
+	}
+	val {pexlif_file load_file} \
+		[fl_make_template $c $type $file $base $create_file]
+	set ::idv(fev_imp_file) \
+		[idv:edit_and_load $w $file $load_file $pexlif_file]
     }
 }
 
@@ -567,7 +616,8 @@ proc idv:do_fev {ww} {
 	label $w.f2.l -text "Make template in:" -width 20 -justify left \
 	    -anchor w
 	entry $w.f2.e -textvariable ::idv(fev_template_file) -width 30
-	button $w.f2.dir -image $::icon(folder) -command idv:fev_template_file
+	button $w.f2.dir -image $::icon(folder) \
+	    -command "idv:fev_template_file $::idv(code_dir)"
 	button $w.f2.verilog -text "Verilog" \
 	    -command "idv:make_template $w $ww.c verilog"
 	button $w.f2.hfl -text "HFL" \
@@ -606,12 +656,12 @@ proc idv:do_fev {ww} {
 
 }
 
-proc idv:fev_template_file {} {
+proc idv:fev_template_file {code_dir} {
     set types {
         {{All Files}        *             }
     }
     set file [tk_getSaveFile -filetypes $types \
-                                 -title "Pexlif file to load"]
+		-initialdir $code_dir -title "Template file to load"]
     set ::idv(fev_template_file) $file
 }
 
@@ -626,3 +676,6 @@ proc idv:fev_pexlif {w} {
 }
 
 proc idv:do_rename_wires {w} { fl_rename_wires $w.c }
+
+proc done_edit_proc {args} { }
+

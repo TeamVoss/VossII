@@ -9,7 +9,7 @@ let EDIT_cmd file =
     let cmd = "/usr/bin/X11/xterm -sb -sl 20000 -j -rw -ls -bg white "^
 	      "-fg black -fn 7x14 -geometry 80x40 -e /usr/bin/vi "
     in
-    sprintf "%s %s &" cmd file
+    sprintf "%s %s" cmd file
 ;
 
 let idv_gui_cnt_ref = ref 0;
@@ -177,6 +177,7 @@ let open_idv_db dir readonly =
     NOT (file_exists full_name) =>
 	readonly => eprintf "%s is not a readable IDV database" dir |
 	(do_cmd (sprintf "mkdir %s" dir)) fseq
+	(do_cmd (sprintf "mkdir %s/code" dir)) fseq
 	(do_cmd (sprintf "mkdir %s/pexlifs" dir)) fseq
 	let fp = fopen (sprintf "%s/lock" full_name) "w" then
 	(fprintf fp "%s|%d" my_host my_pid) fseq
@@ -189,6 +190,7 @@ let open_idv_db dir readonly =
 	eprintf "IDV database corrupted. Missing %s\n" file
     in
     (check_file "pexlifs") fseq
+    (check_file "code") fseq
     readonly =>
 	let db_info = load_idv_db dir full_name then 
 	let cur_dbs = deref cur_idv_readonly_transform_dbs then
@@ -350,7 +352,7 @@ let IDV rw_database read_only_dbs =
     (foreach (\db. open_idv_db db T) read_only_dbs) fseq
     // Start GUI
     let w = get_new_idv_window () then
-    (tcl_eval [sprintf "idv:create_idv_gui %s" w]) fseq
+    (tcl_eval [sprintf "idv:create_idv_gui %s %s" w rw_database]) fseq
     let vfsm = IDV_ENV w (ref []) (ref []) (ref []) (ref []) (ref []) in
     (cur_vfsm := (vfsm:(deref cur_vfsm))) fseq
     (register_vfsm vfsm w) fseq
@@ -891,7 +893,7 @@ let clean_name s =
     implode (map tr (explode s))
 ;
 
-let generate_hfl_template fp p basename =
+let generate_hfl_template fp p basename pexlif_file =
     val (PINST name attrs lf fa_inps fa_outs ints body) = p in
     (fprintf fp "load \"ste.fl\";\n") fseq
     let name' = clean_name basename then
@@ -926,30 +928,49 @@ let generate_hfl_template fp p basename =
     in
     (foreach emit_tv (ios)) fseq
     (fprintf fp "\n;\np fseq ();\n") fseq
-    (fprintf fp "write_pexlif \"%s.pexlif\" p;\n" name') fseq
+    (fprintf fp "write_pexlif \"%s\" p;\n" pexlif_file) fseq
+    (fprintf fp "===SuCcEsS===\n") fseq
     (fprintf fp "quit;\n")
 ;
 
-let fl_make_template canvas type file basename =
+
+let fl_make_template canvas type file basename create =
     let vfsm = w2vfsm canvas then
+    let pexlif_file = sprintf "%s/pexlifs/%s.pexlif"
+			      (get_idv_db_dir ()) (clean_name basename)
+    then
     let p = get_idv_current_pexlif canvas then
-    (
+    let load_file =
 	type = "hfl" =>
-	    let fp = fopen file "w" then
-	    (generate_hfl_template fp p basename) fseq
-	    (fclose fp)
+	    (create = 0 => () |
+		let fp = fopen file "w" then
+		(generate_hfl_template fp p basename pexlif_file) fseq
+		(fclose fp)
+	    ) fseq
+	    file
 	|
 	type = "verilog" =>
 	    val (PINST nm attrs lf fa_inps fa_outs ints body) = p in
-	    let p' = PINST nm attrs lf fa_inps fa_outs [] (P_HIER []) in
-	    let fp = fopen file "w" then
-	    (fprintf fp "%s" (pexlif2verilog p')) fseq
-	    (fclose fp)
+	    let fp = mktemp "verilog_reader" then 
+	    let load_file = stream2filename fp then
+	    (fprintf fp "load \"ste.fl\";\n") fseq
+	    (fprintf fp "let p = verilog2pexlif F -I. \"%s\" [\"%s\"] [];\n"
+			nm file) fseq
+	    (fprintf fp "p fseq (write_pexlif \"%s\" p);\n" pexlif_file) fseq
+	    (fprintf fp "===SuCcEsS===\n") fseq
+	    (fprintf fp "quit;\n") fseq
+	    (fclose fp) fseq
+	    (create = 0 => () |
+		let p' = PINST nm attrs lf fa_inps fa_outs [] (P_HIER []) in
+		let fp = fopen file "w" then
+		(fprintf fp "%s" (pexlif2verilog p')) fseq
+		(fclose fp)
+	    ) fseq
+	    load_file
 	|
 	eprintf "Unknown template type (%s)" type
-    ) fseq
-    (system (sprintf "/usr/bin/X11/xterm -sb -sl 20000 -j -rw -ls -bg white -fg black -fn 7x14 -geometry 80x40 -e /usr/bin/vi %s &" file)) fseq
-    ()
+    then
+    [pexlif_file, load_file]
 ;
 export_to_tcl fl_make_template;
 
@@ -968,11 +989,11 @@ let fl_do_verify canvas {file::string} {type::string} =
 		 type = "SAT" => ((SAT_comb_EQ spec imp) == bT) |
 		 eprintf "Unknown engine (%s)" type
 	then
-	NOT ok => "ok" |
+	NOT ok => "cex" |
 	(add_transform canvas imp (FEV type [])) fseq
 	let cmd = sprintf "flatten vis;" in
 	(refresh_idv_canvas canvas cmd) fseq
-	"cex"
+	"ok"
     ) gen_catch (\msg. msg)
 ;
 export_to_tcl fl_do_verify;
@@ -1066,9 +1087,10 @@ let fl_rename_wires canvas =
     (foreach (fprintf fp "%-*s -> \n" mlen) selected_wires) fseq
     (fclose fp) fseq
     letrec try dummy =
-	let pid = tcl_eval [sprintf "exec %s" (EDIT_cmd filename)] then
+	let pid = tcl_eval [sprintf "exec %s &" (EDIT_cmd filename)] then
 	(tcl_eval ["set ::done_edit 0",
-		   sprintf "watch_process %s {set ::done_edit 1}" pid]) fseq
+		   sprintf "util:watch_process %s 50 {set ::done_edit 1}"
+			    pid]) fseq
 	(tcl_eval ["tkwait variable ::done_edit"]) fseq
 	let fp = fopen filename "r" then
 	letrec read fp =
