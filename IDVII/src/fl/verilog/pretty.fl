@@ -352,7 +352,7 @@ let lay {k :: int} {end :: string} {d :: doc} {fp :: stream} =
 ;
 
 let display {l :: int} {r :: int} {end :: string} {fp :: stream} {d :: doc} =
-      lay 0 end (best l r (reduce d)) fp
+      let d' = best l r (reduce d) then lay 0 end d' fp
 ;
 
 let frender {fp :: stream} {d :: doc} = display 100 67 "" fp d;
