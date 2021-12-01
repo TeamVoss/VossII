@@ -55,7 +55,9 @@ render (nest 4 (text "Hi!"));
 //    then these two lines are overlapped. '$-$' is associated with identity
 //    'nil', but also satisfies the law
 //     > (x $-$ y) <-> z = x $-$ (y <-> z), if y non-empty.
-//  - '$+$, or its list version 'sep', behaves like '$-$' without overlap.
+//  - '$+$, or its list version 'sep' (not quite true, as it could introduce
+//     overlap if it deems it "best" to do so), behaves like '$-$' without
+//     overlap.
 render (text "Hello" <+> text "world" <-> text "!");
 render (text "One" $-$ nest 4 (text "line"));
 render (text "Two" $+$ nest 4 (text "lines"));
@@ -111,7 +113,7 @@ let pretty_bin (Bin sized signed value) =
 render (pretty_bin (Bin (SOME 8) (F) (Val 10100010)));
 
 // -----------------------------------------------------------------------------
-// Translating types into documens: Binary trees.
+// Translating binary trees into documens.
 
 lettype tree = Leaf (int) | Branch (tree) (int) (tree);
 
@@ -137,7 +139,92 @@ render (pretty_tree tree_ex);
 let x = vcat (replicate 3 (text "#")) in render (nest 1 (hcat [x,x,x]));
 
 // -----------------------------------------------------------------------------
-// Translating types into documens: Verilog.
+// Translating Pexlifs into documents:
+
+let commas = punctuate (text ",");
+
+let pretty_list ds = text "[" <-> hcat (commas ds) <-> text "]";
+
+let pretty_table ds = text "{" <-> vcat (commas ds) <-> text "}";
+
+let pretty_attrs ss =
+      let pr (x,y) = text x <+> text "=" <+> text y in
+      pretty_list (map pr ss)
+;
+
+let pretty_fas fs =
+      let pr (f,as) = text f <+> pretty_list (map text as) in
+      pretty_list (map pr fs)
+;
+
+// This is certainly cheating, but I would just end copying it otherwise..
+let pretty_wexpr we = text (Pwexpr we);
+
+let pretty_update_fn (W_UPDATE_FN lhs rhs) =
+      pretty_wexpr lhs <+> text ":=" <+> pretty_wexpr rhs
+/\  pretty_update_fn (W_PHASE_DELAY lhs rhs) =
+      pretty_wexpr lhs <+> text "<=" <+> pretty_wexpr rhs
+;
+
+
+letrec
+    pretty_pinst (PINST n as l xs ys zs c) =
+      let pr (P_LEAF fs) = pretty_table (map pretty_update_fn fs)
+      /\  pr (P_HIER cs) = pretty_table (map pretty_pinst cs)
+      in
+      hang
+        // Header
+        (    text "PINST"
+         <+> text n
+         <+> pretty_attrs as
+         <+> (l => text "leaf:" | text "hier.:")
+        )
+        // Indentation of body.
+        4
+        // Body.
+        (vcat [ (empty xs => nil | (text "in:" <+> pretty_fas xs))
+             , (empty ys => nil | (text "out:" <+> pretty_fas ys))
+             , (empty zs => nil | (text "local:" <+> pretty_list (map text zs)))
+             , pr c
+             ])
+;
+
+load "ste.fl";
+
+TYPE "byte" 8;
+
+let tst1 =
+      byte_input a b.
+      byte_output c.
+      byte_internal tmp.
+      CELL "tst1" [
+        tmp <- a '*' b,
+        c <- a '+' tmp
+      ];
+
+let tst2 =
+      bit_input clk reset en.
+      byte_input a b.
+      byte_output o.
+      byte_internal ad bd tmp t1 t2.
+      CELL "tst2" [
+        re_ff_en clk '1 a ad,
+        re_ff_en clk en b bd,
+        tmp <- ad '+' bd,
+        re_ff_en ('~' clk) ('~' en) tmp o,
+        always_ff (posedge clk) [
+          t1 <== (IF reset THEN '0 ELSE (IF en THEN tmp ELSE t1)),
+          t2 <== t1,
+          o <== t2
+        ]];
+
+let pex = tst1 'a 'b 'c;
+//let pex = tst2 'clk 'reset 'en 'a 'b 'o; // todo: string too long!
+
+render (pretty_pinst pex);
+
+// -----------------------------------------------------------------------------
+// Translating Verilog into documents:
 
 // See IDVII/../verilog/grammar.fl and IDVII/../verilog/pretty-verilog.fl.
 
