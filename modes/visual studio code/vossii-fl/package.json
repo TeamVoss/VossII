@@ -2,7 +2,7 @@
 	"name": "vossii-fl",
 	"displayName": "Voss II fl",
 	"description": "Language support for Voss II functional language fl",
-	"version": "1.2.0",
+	"version": "1.3.0",
 	"license": "Apache-2.0",
 	"publisher": "teamvoss",
 	"repository": {
@@ -19,7 +19,7 @@
 	"main": "extension.js",
 	"activationEvents": [
 		"onLanguage:fl",
-		"onLanguage:jl",
+		"onLanguage:bifrost",
 		"onCommand:fl.start",
 		"onCommand:fl.restart_and_eval_file"
 	],
@@ -32,10 +32,10 @@
 				"configuration": "./fl-language-configuration.json"
 			},
 			{
-				"id": "jl",
-				"aliases": ["jl", "jl"],
-				"extensions": [".prog", ".intf"],
-				"configuration": "./jl-language-configuration.json"
+				"id": "bifrost",
+				"aliases": ["bifrost", "bifrost"],
+				"extensions": [".prog", ".inc"],
+				"configuration": "./bifrost-language-configuration.json"
 			}
 		],
 		"grammars": [
@@ -45,9 +45,9 @@
 				"path": "./syntaxes/fl.tmLanguage.json"
 			},
 			{
-				"language": "jl",
-				"scopeName": "source.jl",
-				"path": "./syntaxes/jl.tmLanguage.json"
+				"language": "bifrost",
+				"scopeName": "source.bifrost",
+				"path": "./syntaxes/bifrost.tmLanguage.json"
 			}
 		],
 		"commands": [

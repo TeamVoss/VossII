@@ -1,0 +1,201 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "bifrost",
+	"fileTypes": [".prog", ".inc"],
+	"patterns": [
+		{ "include": "#name" },
+		{ "include": "#vars" },
+		{ "include": "#method" },
+		{ "include": "#macro" },
+		{ "include": "#subroutine" },
+		{ "include": "#label" },
+		{ "include": "#goto" },
+		{ "include": "#type" },
+		{ "include": "#fields" },
+		{ "include": "#typevar" },
+		{ "include": "#typedef" },
+		{ "include": "#attr" },
+		{ "include": "#do" },
+		{ "include": "#keywords" },
+		{ "include": "#operators" },
+		{ "include": "#numbers" },
+		{ "include": "#strings" },
+		{ "include": "#comments_multi" },
+		{ "include": "#comments" }
+	],
+	"repository": {
+		"name" : {
+			"match": "(name)\\s+([A-Za-z_][A-Za-z_0-9]*)(;)",
+			"captures": {
+				"1": { "name": "keyword.control.bifrost" },
+				"2": { "name": "constant.character.escape.bifrost" },
+				"3": { "name": "keyword.other.bifrost" }
+			}
+		},
+		"vars" : {
+			"match": "\\b(var)\\s+([A-Za-z_][A-Za-z_0-9]*|\\?)\\s+((?:[A-Za-z_][A-Za-z_0-9]*\\s*,\\s*)*)([A-Za-z_][A-Za-z_0-9]*)\\s*(;)",
+			"captures": {
+				"1": { "name": "keyword.control.bifrost" },
+				"2": { "name": "support.class.bifrost" },
+				"3": {
+					"name": "variable.parameter.bifrost",
+					"patterns": [
+						{"match" : ",", "name":"keyword.other.bifrost"}
+					]
+				},
+				"4": { "name": "variable.parameter.bifrost"},
+				"5": { "name": "keyword.other.bifrost" }
+			}
+		},
+		"method" : {
+			"match": "\\b(method)\\s+([A-Za-z_][A-Za-z_0-9]*)\\s*(:)\\s*((?:\\(\\))|(?:[A-Za-z_][A-Za-z_0-9]*)|\\?|(?:\\((?:(?:[A-Za-z_][A-Za-z_0-9]*|\\?)\\s*,\\s*)*(?:[A-Za-z_][A-Za-z_0-9]*|\\?)\\s*\\)))\\s*(->)\\s*((?:\\(\\))|(?:[A-Za-z_][A-Za-z_0-9]*)|\\?|(?:\\((?:(?:[A-Za-z_][A-Za-z_0-9]*|\\?)\\s*,\\s*)*(?:[A-Za-z_][A-Za-z_0-9]*|\\?)\\s*\\)))\\s*(;)",
+			"captures": {
+				"1": { "name": "keyword.control.bifrost" },
+				"2": { "name": "constant.character.escape.bifrost" },
+				"3": { "name": "keyword.other.bifrost" },
+				"4": {
+					"name": "support.class.bifrost",
+					"patterns": [
+						{"match" : "[,\\(\\)]", "name":"keyword.other.bifrost"}
+					]
+				},
+				"5": { "name": "keyword.other.bifrost" },
+				"6": {
+					"name": "support.class.bifrost",
+					"patterns": [
+						{"match" : "[,\\(\\)]", "name":"keyword.other.bifrost"}
+					]
+				},
+				"7": { "name": "keyword.other.bifrost" }
+			}
+		},
+		"macro" : {
+			"match": "\\b(define)\\s+([A-Za-z_][A-Za-z_0-9]*)\\s*(.*?)(=)",
+			"captures": {
+				"1": { "name": "keyword.control.bifrost" },
+				"2": { "name": "constant.character.escape.bifrost" },
+				"3": { "name": "variable.parameter.bifrost" },
+				"4": { "name": "keyword.other.bifrost" }
+			}
+		},
+		"subroutine" : {
+			"match": "\\b(subroutine(?:\\s+inline)?)\\b\\s*([A-Za-z_][A-Za-z_0-9]*)\\s*(:)",
+			"captures": {
+				"1": { "name": "keyword.control.bifrost" },
+				"2": { "name": "constant.character.escape.bifrost" },
+				"3": { "name": "keyword.other.bifrost" }
+			}
+		},
+		"label" : {
+			"match": "\\b(label)\\b\\s*([A-Za-z_][A-Za-z_0-9]*)\\s*(:)",
+			"captures": {
+				"1": { "name": "keyword.control.bifrost" },
+				"2": { "name": "support.function.bifrost" },
+				"3": { "name": "keyword.other.bifrost" }
+			}
+		},
+		"goto" : {
+			"match": "\\b(goto)\\s*([A-Za-z_][A-Za-z_0-9]*)\\s*(;)",
+			"captures": {
+				"1": { "name": "keyword.control.bifrost" },
+				"2": { "name": "support.function.bifrost" },
+				"3": { "name": "keyword.other.bifrost" }
+			}
+		},
+		"type" : {
+			"match": "\\b(type)\\b\\s*([A-Za-z_][A-Za-z_0-9]*)",
+			"captures": {
+				"1": { "name": "keyword.control.bifrost" },
+				"2": { "name": "support.class.bifrost" }
+			}
+		},
+		"fields" : {
+			"match": "\\b(actiontype|fields)\\b\\s*([A-Za-z_][A-Za-z_0-9]*)\\s*(=)",
+			"captures": {
+				"1": { "name": "keyword.control.bifrost" },
+				"2": { "name": "support.class.bifrost" },
+				"3": { "name": "keyword.other.bifrost" }
+			}
+		},
+		"typevar" : {
+			"match": "([A-Za-z_][A-Za-z_0-9]*|\"[A-Za-z_][A-Za-z_0-9]*\")\\s*(:)\\s*([A-Za-z_][A-Za-z_0-9]*)",
+			"captures": {
+				"1": { "name": "variable.parameter.bifrost" },
+				"2": { "name": "keyword.other.bifrost" },
+				"3": { "name": "support.class.bifrost" }
+			}
+		},
+		"typedef" : {
+			"match": "(\\()\\s*(\".*?\")\\s*(::)(.*?)(\\))",
+			"captures": {
+				"1": { "name": "keyword.other.bifrost" },
+				"2": { "name": "string.quoted.double.bifrost" },
+				"3": { "name": "keyword.other.bifrost" },
+				"4": { "name": "support.class.bifrost" },
+				"5": { "name": "keyword.other.bifrost" }
+			}
+		},
+		"do" : {
+			"match": "(do|call)\\s+([A-Za-z_][A-Za-z_0-9]*)",
+			"captures": {
+				"1": { "name": "keyword.control.bifrost" },
+				"2": { "name": "constant.character.escape.bifrost" }
+			}
+		},
+		"attr" : {
+			"match": "(\\-\\->)([A-Za-z_][A-Za-z_0-9]*|\"[A-Za-z_][A-Za-z_0-9]*\")",
+			"captures": {
+				"1": { "name": "keyword.other.bifrost" },
+				"2": { "name": "variable.parameter.bifrost" }
+			}
+		},
+		"keywords": {
+			"match": "\\bif\\b|\\bthen\\b|#include\\b|\\belse\\b|--%<--|\\bdefine\\b|\\btype\\b|\\bfields\\b|\\bstate\\b|\\baction\\b|\\bactiontype\\b|\\breturn\\b|\\breading\\b|\\bwriting\\b|\\bfor\\b|\\bwhile\\b|\\bprovided by\\b|\\bvia\\b|\\bprotocol\\b|\\balias\\b|\\bcall\\b|\\binline\\b",
+			"name":"keyword.control.bifrost"
+		},
+		"operators": {
+			"match": "[;,\\(\\){}+\\-\\*&^\\|=!><~\\[\\]]",
+			"name":"keyword.other.bifrost"
+		},
+		"numbers": {
+			"patterns": [
+				{
+					"match": "(?:(?<=\\W)|^)0[xX][0-9A-Fa-f]+",
+					"name": "constant.numeric.bifrost"
+				},
+				{
+					"match": "(?:(?<=\\W)|^)0b[01]+",
+					"name": "constant.numeric.bifrost"
+				},
+				{
+					"match": "(?:(?<=\\W)|^)(\\d+)",
+					"name": "constant.numeric.fl"
+				}
+			]
+		},
+		"strings": {
+			"name": "string.quoted.double.bifrost",
+			"begin": "\"",
+			"end": "\""
+		},
+		"comments": {
+			"name": "comment.line.bifrost",
+			"begin": "//",
+			"end": "\n",
+			"patterns": [{
+				"name": "invalid.illegal.bifrost",
+				"match": "\\b(TODO|FIXME)\\b"
+			}]
+		},
+		"comments_multi": {
+			"name": "comment.line.bifrost",
+			"begin": "/\\*",
+			"end": "\\*/",
+			"patterns": [{
+				"name": "invalid.illegal.bifrost",
+				"match": "\\b(TODO|FIXME)\\b"
+			}]
+		}
+	},
+	"scopeName": "source.bifrost"
+}
