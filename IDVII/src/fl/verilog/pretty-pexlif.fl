@@ -744,16 +744,16 @@ let pretty_pexlif_h inst (PINST name _ _ fa_inps fa_outs _ _) assuming (name == 
 
 // -----------------------------------------------------------------------------
 
-let pexlif2verilog {pex::pexlif} =
+let pexlif2verilog {fp::stream} {pex::pexlif} =
       val (PINST name _ _ fa_inps fa_outs _ _) = pex in
       let go n = (n,[n]) in
       let fa_inps' = map go (md_extract_vectors (flatmap snd fa_inps)) in
       let fa_outs' = map go (md_extract_vectors (flatmap snd fa_outs)) in
       let pex' = PINST name [] F fa_inps' fa_outs' [] (P_HIER [pex]) in
       // /
-      render (p_source_text (Source_text (pretty_pexlif_h "" pex')))
+      frender fp (p_source_text (Source_text (pretty_pexlif_h "" pex')))
 ;
-// todo: I forgot why we wrap the pexlif.
+// todo: I forgot why we wrap the pexlif.. Can we get rid of the extra layer?
 
 end_abstype pexlif2verilog;
 

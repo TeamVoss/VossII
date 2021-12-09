@@ -963,7 +963,7 @@ let fl_make_template canvas type file basename create =
 	    (create = 0 => () |
 		let p' = PINST nm attrs lf fa_inps fa_outs [] (P_HIER []) in
 		let fp = fopen file "w" then
-		(fprintf fp "%s" (pexlif2verilog p')) fseq
+		(pexlif2verilog fp p') fseq
 		(fclose fp)
 	    ) fseq
 	    load_file
