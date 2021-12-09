@@ -1,8 +1,9 @@
-load (DIR^"grammar.fl");
-load (DIR^"pretty.fl");
-load (DIR^"pretty-verilog.fl");
-load (DIR^"../design/misc.fl");
-load (DIR^"../design/util.fl");
+(cload (DIR^"grammar.fl")) fseq
+(cload (DIR^"pretty.fl")) fseq
+(cload (DIR^"pretty-verilog.fl")) fseq
+(cload (DIR^"../design/misc.fl")) fseq
+(cload (DIR^"../design/util.fl")) fseq
+();
 
 // =============================================================================
 // "Pretty-printing" of pexlif's via a translation into Verilog.

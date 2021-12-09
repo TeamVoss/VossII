@@ -14,6 +14,8 @@ set voss2_preferences {
  {"Runtime" "" "" "header" ""}
     {"RECURSION-CALL-LIMIT" "RCcall_limit"
 	"Maximum recursion limit" "int" "10000"}
+    {"STORE-SIGNATURE" "RCstore_signature"
+	"Store a SHA256 signature for each symbol" "bool" "FALSE"}
 
  {"BDD" "" "" "header" ""}
     {"DYNAMIC-ORDERING" "RCdo_dynamic_var_order"
@@ -74,7 +76,7 @@ set voss2_preferences {
     {"MAXIMUM-NUMBER-ERRORS-REPORTED" "RCmax_nbr_errors"
         "Limit number of error messages for a single command" "int" "5"}
     {"VERBOSE-EVAL-COMMAND" "RCverbose_eval_command"
-	"Treat 'eval' as top-level input w.r.t. output" "bool" "TRUE"}
+	"Treat 'eval' as top-level input w.r.t. output" "bool" "FALSE"}
     {"PRINT_ALIASES" "RCprint_aliases_flag"
         "Print aliases in addition to base node name" "bool" "TRUE"}
     {"PRINT-FORMAT" "RCpr_str"

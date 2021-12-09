@@ -131,6 +131,12 @@ Fopen(g_ptr *rootp, g_ptr **spp, int *depthp)
         writable = TRUE;
         mode = wastrsave(&strings, "w");
     } else
+    if( strcmp(name, "stdinfo") == 0 ) {
+        fp = stdout;
+        is_pipe = FALSE;
+        writable = TRUE;
+        mode = wastrsave(&strings, "w");
+    } else
     if( *mode == '|' ) {
         fp = popen(name, (mode+1));
         if( *(mode+1) == 'w' )
@@ -238,6 +244,18 @@ Fclose(g_ptr *rootp, g_ptr **spp, int *depthp)
 	g_ptr l = GET_APPLY_LEFT(redex);
 	g_ptr r = GET_APPLY_RIGHT(redex);
 	Fail_pr("Cannot close stderr.");
+        make_redex_failure(redex);
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	*spp = *spp + 1;
+	*depthp = *depthp - 1;
+	*rootp = redex;
+        return( TRUE );
+    } else
+    if( strcmp(ip->name, "stdinfo") == 0 ) {
+	g_ptr l = GET_APPLY_LEFT(redex);
+	g_ptr r = GET_APPLY_RIGHT(redex);
+	Fail_pr("Cannot close stdinfo.");
         make_redex_failure(redex);
 	DEC_REF_CNT(l);
 	DEC_REF_CNT(r);
@@ -866,6 +884,9 @@ Printf(g_ptr *rootp, g_ptr **spp, int *depthp)
             } else
             if( strcmp(ip->name, "stderr") == 0 ) {
                 FP(err_fp, "%s", res);
+            } else
+            if( strcmp(ip->name, "stdinfo") == 0 ) {
+                FP(warning_fp, "%s", res);
             } else {
                 fprintf(ip->fp, "%s", res);
                 fflush(ip->fp);

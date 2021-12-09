@@ -426,7 +426,7 @@ stmt		: expr
 			Install_PrinterFn(res);
 			Free_result_ptr(res);
 		    }
-		    FP(stdout_fp, "\n");
+		    if( !file_load ) FP(stdout_fp, "\n");
 		}
 		| decl
 		{

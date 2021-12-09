@@ -9,6 +9,7 @@
 /*									*/
 /************************************************************************/
 #include <limits.h>
+#include <time.h>
 #include "system.h"
 #include "graph.h"
 
@@ -124,6 +125,28 @@ ARGS(g_ptr redex)
 }
 
 static void
+etime(g_ptr redex)
+{
+    g_ptr expr;
+    EXTRACT_1_ARG(redex, expr);
+    struct timespec start, end;
+    clock_gettime(CLOCK_REALTIME, &start);
+    INC_REFCNT(expr);
+    g_ptr res = force(expr, FALSE);
+    clock_gettime(CLOCK_REALTIME, &end);
+ 
+    // time_spent = end - start
+    double time_spent = (end.tv_sec - start.tv_sec) +
+                        (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+    sprintf(buf, "%.9f", time_spent);
+    if( is_fail(res) ) {
+	MAKE_REDEX_FAILURE(redex, FailBuf);
+    } else {
+	MAKE_REDEX_PAIR(redex, res, Make_STRING_leaf(wastrsave(&strings, buf)));
+    }
+}
+
+static void
 wtime(g_ptr redex)
 {
     g_ptr expr;
@@ -176,6 +199,10 @@ System_Install_Functions()
     Add_ExtAPI_Function("wtime", "-", FALSE,
 		GLmake_arrow(tv1, GLmake_tuple(tv1,GLmake_string())),
 		wtime);
+
+    Add_ExtAPI_Function("etime", "-", FALSE,
+		GLmake_arrow(tv1, GLmake_tuple(tv1,GLmake_string())),
+		etime);
 
     Add_ExtAPI_Function("get_stack_trace", "1", FALSE,
 			 GLmake_arrow(GLmake_void(),

@@ -1,5 +1,6 @@
-load (DIR^"grammar.fl");
-load (DIR^"pretty.fl");
+(cload (DIR^"grammar.fl")) fseq
+(cload (DIR^"pretty.fl")) fseq
+();
 
 // =============================================================================
 // Pretty printing rules for the Verilog grammar.

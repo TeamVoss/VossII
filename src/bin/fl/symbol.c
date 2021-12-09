@@ -462,6 +462,7 @@ Init_symbol()
     dummy->expr           = NULL;
     dummy->expr_init      = NULL;
     dummy->expr_comb      = NULL;
+    dummy->signature      = NULL;
     dummy->super_comb     = NULL;
     dummy->overload       = FALSE;
     dummy->open_overload  = FALSE;
@@ -615,6 +616,7 @@ Add_Destructors(string name, typeExp_ptr new_type,
         tmp->start_line_nbr = start_line;
         tmp->end_line_nbr   = line_nbr;
         tmp->expr          = Make_0inp_Primitive(P_I);
+	tmp->signature	   = Get_SHA256_signature(tmp->expr);
         tmp->expr_init     = cephalopode_mode? Reflect_expr(tmp->expr) : NULL;
         tmp->expr_comb     = cephalopode_mode? Reflect_expr(tmp->expr) : NULL;
         tmp->super_comb    = Make_0inp_Primitive(P_I);
@@ -654,6 +656,7 @@ Add_Destructors(string name, typeExp_ptr new_type,
         save_fun->start_line_nbr = start_line;
         save_fun->end_line_nbr   = line_nbr;
         save_fun->expr           = save_expr;
+	save_fun->signature	 = Get_SHA256_signature(save_expr);
         save_fun->expr_init      = cephalopode_mode?
 					Reflect_expr(save_fun->expr) : NULL;
         save_fun->expr_comb      = cephalopode_mode?
@@ -685,6 +688,7 @@ Add_Destructors(string name, typeExp_ptr new_type,
         load_fun->start_line_nbr = start_line;
         load_fun->end_line_nbr   = line_nbr;
         load_fun->expr           = load_expr;
+	load_fun->signature	 = Get_SHA256_signature(load_expr);
         load_fun->expr_init      = cephalopode_mode?
 					Reflect_expr(load_fun->expr) : NULL;
         load_fun->expr_comb      = cephalopode_mode?
@@ -727,7 +731,7 @@ Add_To_OverloadList(string name, typeExp_ptr type, oll_ptr l,
     }
     fn = Find_Overload_Choice(fn, type);
     if( fn == NULL ) {
-        FP(err_fp, "=== No function %s of type %s", name, Type2String(type));
+        FP(err_fp, "=== No function %s of type %s\n", name, Type2String(type));
         if( file_load )     
             FP(err_fp, "around line %d in file %s\n", start_line, file);
         else
@@ -764,6 +768,7 @@ InsertOverloadDef(string name, bool open_overload, oll_ptr alts,
     ret->non_lazy       = FALSE;
     ret->forward        = FALSE;
     ret->expr           = NULL;
+    ret->signature      = NULL;
     ret->expr_init      = NULL;
     ret->expr_comb      = NULL;
     ret->type           = Get_common_type(type, alts);
@@ -822,6 +827,7 @@ Make_forward_declare(string name, typeExp_ptr type, symbol_tbl_ptr stbl,
     ret->non_lazy       = FALSE;
     ret->name           = name;
     ret->expr           = expr;
+    ret->signature	= Get_SHA256_signature(expr);
     ret->expr_init      = cephalopode_mode? Reflect_expr(ret->expr) : NULL;
     ret->expr_comb      = cephalopode_mode? Reflect_expr(ret->expr) : NULL;
     ret->super_comb     = err;
@@ -908,6 +914,7 @@ New_fn_def(string name, result_ptr res, symbol_tbl_ptr stbl, bool print,
     ret->name           = name;
     ret->expr_init      = res->expr_init;
     ret->expr_comb      = res->expr_comb;
+    ret->signature	= res->signature;
     ret->expr           = res->expr;
     ret->super_comb     = res->super_comb;
     ret->overload       = FALSE;
@@ -1312,6 +1319,7 @@ Add_ExtAPI_Function(string name, string strictness,
     ret->forward        = FALSE;
     ret->name           = name;
     ret->expr           = expr;
+    ret->signature	= Get_SHA256_signature(expr);
     ret->expr_init      = cephalopode_mode? Reflect_expr(ret->expr) : NULL;
     ret->expr_comb      = cephalopode_mode? Reflect_expr(ret->expr) : NULL;
     ret->super_comb     = NULL;
@@ -1415,6 +1423,114 @@ PrintAllFuns(symbol_tbl_ptr stbl)
 /********************************************************/
 /*          EXPORTED EXTAPI FUNCTIONS                   */
 /********************************************************/
+
+static void
+get_args(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    string name = GET_STRING(r);
+    fn_ptr fp = Find_Function_Def(symb_tbl, name);
+    if( fp == NULL ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot find function %s", name));
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
+    if( fp->overload ) {
+	MAKE_REDEX_FAILURE(redex,Fail_pr("%s is overloaded", name));
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
+    if( fp->implicit_args ) {
+	MAKE_REDEX_FAILURE(redex,Fail_pr("%s has implicit arguments", name));
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
+    MAKE_REDEX_NIL(redex);
+    g_ptr tail = redex;
+    typeExp_ptr type = fp->type;
+    arg_names_ptr ap = fp->arg_names;
+    while( type->typeOp == arrow_tp ) {
+	typeExp_ptr arg_type = type->typelist->type;
+	if( ap != NULL ) {
+	    g_ptr p = Make_PAIR_ND(Make_STRING_leaf(ap->name),
+				   Make_STRING_leaf(Type2String(arg_type)));
+	    APPEND1(tail,p);
+	    ap = ap->next;
+	} else {
+	    MAKE_REDEX_FAILURE(redex, Fail_pr("%s has unnamed argument", name));
+	    DEC_REF_CNT(l);
+	    DEC_REF_CNT(r);
+	    return;
+	}
+	type = Get_Real_Type(type->typelist->next->type);
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+get_return_type(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    string name = GET_STRING(r);
+    fn_ptr fp = Find_Function_Def(symb_tbl, name);
+    if( fp == NULL ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot find function %s", name));
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
+    if( fp->overload ) {
+	MAKE_REDEX_FAILURE(redex,Fail_pr("%s is overloaded", name));
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
+    if( fp->implicit_args ) {
+	MAKE_REDEX_FAILURE(redex,Fail_pr("%s has implicit arguments", name));
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
+    typeExp_ptr type = fp->type;
+    while( type->typeOp == arrow_tp ) {
+	type = Get_Real_Type(type->typelist->next->type);
+    }
+    MAKE_REDEX_STRING(redex, Type2String(type));
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+get_symbol_signature(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    string name = GET_STRING(r);
+    fn_ptr fp = Find_Function_Def(symb_tbl, name);
+    if( fp == NULL ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot find function %s", name));
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
+    if( fp->overload ) {
+	MAKE_REDEX_FAILURE(redex,Fail_pr("%s is overloaded", name));
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
+    MAKE_REDEX_STRING(redex, fp->signature);
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+
 
 static void
 is_defined(g_ptr redex)
@@ -1614,6 +1730,21 @@ void
 Symbols_Install_Functions()
 {
     typeExp_ptr term = Get_Type("term", NULL, TP_INSERT_PLACE_HOLDER);
+    Add_ExtAPI_Function("get_args", "1", TRUE,
+                        GLmake_arrow(
+			    GLmake_string(),
+			    GLmake_list(GLmake_tuple(
+					    GLmake_string(),
+					    GLmake_string()))),
+                        get_args);
+
+    Add_ExtAPI_Function("get_return_type", "1", TRUE,
+                        GLmake_arrow(GLmake_string(), GLmake_string()),
+                        get_return_type);
+    Add_ExtAPI_Function("get_symbol_signature", "1", TRUE,
+                        GLmake_arrow(GLmake_string(), GLmake_string()),
+                        get_symbol_signature);
+
     Add_ExtAPI_Function("get_definition", "1", TRUE,
                         GLmake_arrow(GLmake_string(), term),
                         get_definition);

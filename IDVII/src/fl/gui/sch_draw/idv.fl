@@ -2,7 +2,7 @@
 // Copyright 2020 Carl-Johan Seger
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
-let Init_idv_gui = tcl_eval [sprintf "source %sidv.tcl" DIR];
+let Init_idv_gui = (tcl_eval [sprintf "source %sidv.tcl" DIR]) fseq ();
 Init_idv_gui;
 
 let EDIT_cmd file =
@@ -212,7 +212,7 @@ let open_idv_db dir readonly =
 	lhost == my_host AND lpid_alive =>
 	    eprintf "IDV_DB %s is owned by running process %s" full_name lpid
 	| 
-	(fprintf stdout "-I-: removing lockfile since owner no longer alive\n")
+	(fprintf stdinfo "-I-: removing lockfile since owner no longer alive\n")
 	fseq
 	(do_cmd (sprintf "/bin/rm -f %s" lockfile)) 
     ) fseq

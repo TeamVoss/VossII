@@ -4,14 +4,14 @@
 //-------------------------------------------------------------------
 
 let Init_sch_draw =
-  tcl_eval [
+  (tcl_eval [
    sprintf "set ::imagedir %s%s" DIR "images",
    sprintf
      "load %s../../../../schematic_draw_module.so"
      DIR,
    sprintf "source %s/draw_sch.tcl" DIR,
    sprintf "source %s/waveform.tcl" DIR
-  ]
+  ]) fseq ()
 ;
 Init_sch_draw;
 

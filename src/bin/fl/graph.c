@@ -1239,6 +1239,7 @@ Compile(symbol_tbl_ptr stbl, g_ptr onode, typeExp_ptr type, bool delayed)
 #ifdef CHECK_REF_CNTS
     check_ref_cnts(node);
 #endif
+    rp->signature = Get_SHA256_signature(node);
     rp->expr_comb = cephalopode_mode? Reflect_expr(node) : NULL;
 
     /* Link in used definitions */
@@ -5680,7 +5681,7 @@ Reflect_expr(g_ptr node)
 		    return( mkConstr1(
 				s_LEAF,
 			        mkConstr1(s_INT,
-					   Make_INT_leaf(GET_INT(node)))) );
+					   Make_AINT_leaf(GET_AINT(node)))) );
 		case STRING:
 		    return( mkConstr1(
 				s_LEAF,

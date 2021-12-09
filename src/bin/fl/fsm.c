@@ -4958,7 +4958,9 @@ compute_sha256_signature(fsm_ptr fsm)
         if( cp->outs != NULL ) SHA256_printf(sha, "]");
         SHA256_printf(sha, "\n");
     }
-    return( Get_SHA256_hash(sha) );
+    string res = Get_SHA256_hash(sha);
+    End_SHA256(sha);
+    return( res );
 }
 
 

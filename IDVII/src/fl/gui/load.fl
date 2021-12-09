@@ -3,5 +3,5 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
-(load (DIR^"sch_draw/load.fl")) fseq
+(cload (DIR^"sch_draw/load.fl")) fseq
 ();

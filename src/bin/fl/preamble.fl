@@ -109,6 +109,7 @@ let quit = exit 0;
 
 let stdout = fopen "stdout" "w";
 let stderr = fopen "stderr" "w";
+let stdinfo = fopen "stdinfo" "w";
 
 export_to_tcl update_vossrc;
 export_to_tcl get_vossrc;
@@ -1906,3 +1907,6 @@ let report_error msg =
     (tcl_eval [sprintf "report_error {%s}" msg]) fseq ()
 ;
 non_lazy report_error;
+
+// The id of the user invoking fl.
+let USER = tcl_eval ["set ::env(USER)"];
