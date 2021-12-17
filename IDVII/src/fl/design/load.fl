@@ -3,12 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
-// New (should be its own load?
-(cload (DIR^"../isomatch//pexlif.fl")) fseq
-(cload (DIR^"../isomatch/isomatch.fl")) fseq
-(cload (DIR^"../verilog/pretty-pexlif.fl")) fseq
-// Old
+(cload (DIR^"/misc.fl")) fseq
 (cload (DIR^"/util.fl")) fseq
+(cload (DIR^"/primes.fl")) fseq
+(cload (DIR^"/pexlif.fl")) fseq
+(cload (DIR^"../verilog/pretty-pexlif.fl")) fseq
 (cload (DIR^"/hfl.fl")) fseq
 (cload (DIR^"/STE.fl")) fseq
 (cload (DIR^"/monitor.fl")) fseq
@@ -16,5 +15,7 @@
 (cload (DIR^"/read_verilog.fl")) fseq
 (cload (DIR^"/relational_ste.fl")) fseq
 (cload (DIR^"/miter.fl")) fseq
+(cload (DIR^"../isomatch/isomatch.fl")) fseq
+(cload (DIR^"/normalize_pexlif.fl")) fseq
 (is_defined "USE_OBSOLETE" => cload (DIR^"/obsolete.fl") | ()) fseq
 ();

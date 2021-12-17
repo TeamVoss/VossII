@@ -91,6 +91,13 @@ proc idv:create_idv_gui {w rw_db} {
 		-font $::voss2_txtfont
 	    set ::modelbrowser(db) [lindex $dbs 0]
 
+	    ttk::labelframe $p.search.visible -relief flat -text \
+		    "Model class: " \
+		    -labelanchor w
+	    tk_optionMenu $p.search.visible.ch ::modelbrowser(visible) \
+		    Imported "User given" All
+	    set ::modelbrowser(visible) Imported
+
 	    #
 	    ttk::labelframe $p.search.pat_lbl -relief flat -text "Pattern: " \
 		    -labelanchor w
@@ -105,6 +112,8 @@ proc idv:create_idv_gui {w rw_db} {
 	pack $p.search -side top -pady 10 -fill x
 	    pack $p.search.lbl -side top -fill x
 		pack $p.search.lbl.c -side left -fill x -expand yes
+	    pack $p.search.visible -side top -fill x
+		pack $p.search.visible.ch -side left -fill x -expand yes
 	    pack $p.search.pat_lbl -side top -fill x
 		pack $p.search.pat_lbl.c -side left -fill x -expand yes
 	    pack $p.search.refresh -side top -fill x
@@ -174,7 +183,8 @@ proc idv:update_idv_list {} {
     $lb delete 0 end
     set db $::modelbrowser(db)
     set pat $::modelbrowser(pattern)
-    if { ![catch {fl_get_idv_models $w.c $db $pat} vecs] } {
+    set vis $::modelbrowser(visible)
+    if { ![catch {fl_get_idv_models $w.c $db $vis $pat} vecs] } {
 	foreach v $vecs {
 	    $lb insert end $v
 	}
@@ -240,6 +250,12 @@ proc idv:create_idv_menu {nb w} {
         balloon $w.menu.new_transf \
 		"Start new transformation sequence from selected instances"
         pack $w.menu.new_transf -side left -padx 5
+
+        button $w.menu.db_replace -image $::icon(db_replace) \
+                -command "idv:db_replace $w"
+        balloon $w.menu.db_replace \
+		"Find and apply a database transformation"
+        pack $w.menu.db_replace -side left -padx 5
 
         button $w.menu.fold -image $::icon(fold) \
                 -command "idv:fold $w"
@@ -316,6 +332,8 @@ proc idv:merge {w} { fl_do_merge $w.c }
 
 proc idv:new_transf {w} { fl_do_new_tranf $w.c }
 
+proc idv:db_replace {w} { fl_do_replacement $w.c }
+
 proc idv:new_toplevel_transf {w sl} {
     set idx [$sl curselection]
     if { $idx != "" } {
@@ -324,6 +342,51 @@ proc idv:new_toplevel_transf {w sl} {
 	fl_do_new_toplevel_transf $w $db $cur
     }
 }   
+
+proc idv:return_select_replacement {w op} {
+    set ::idv(replacement_command) $op
+    set slb $w.lf.list
+    if { $op == "Cancel" } { 
+	set ::idv(replacement_idx) -1
+    } else {
+	set ::idv(replacement_idx) [$slb curselection]
+    }
+    destroy $w
+}
+
+proc idv:select_replacement {c alts} {
+    set w .select_transf
+    catch {destroy $w}
+    vis_toplevel $w $c {} {} "Select transform"
+    set f $w.lf
+    frame $f -relief flat
+    scrollbar $f.yscroll -command "$f.list yview"
+    scrollbar $f.xscroll -orient horizontal -command "$f.list xview"
+    listbox $f.list -setgrid 1 \
+	-yscroll "$f.yscroll set" -xscroll "$f.xscroll set" \
+	-selectmode single -font $::voss2_txtfont
+    pack $f.yscroll -side right -fill y
+    pack $f.xscroll -side bottom -fill x
+    pack $f.list -side top -fill both -expand yes
+    pack $f -side top -fill both -expand yes
+
+    set b $w.buttons
+    frame $b
+    pack $b -side top
+	button $b.cancel -text Cancel \
+	    -command "idv:return_select_replacement $w Cancel"
+	pack $b.cancel -side left -padx 10
+	button $b.appl1 -text "Apply Once" \
+	    -command "idv:return_select_replacement $w ApplyOnce"
+	pack $b.appl1 -side left -padx 10
+	button $b.appln -text "Apply Everywhere" \
+	    -command "idv:return_select_replacement $w ApplyEverywhere"
+	pack $b.appln -side left -padx 10
+    #
+    tkwait window $w
+    return [list $::idv(replacement_command) $::idv(replacement_idx)]
+}
+
 
 proc idv:perform_name_transf {w c op} {
     set ::idv(transf_op) $op
@@ -345,49 +408,37 @@ proc idv:perform_name_transf {w c op} {
     }
 }
 
-proc idv:name_transform_and_use {c} {
+proc idv:name_transform_and_use {c tr_name model_name} {
     set w .idv_name
     catch {destroy $w}
     i_am_busy
-    vis_toplevel $w $c {} {} "Name transform"
+    vis_toplevel $w $c {} {} "Name and apply transform"
     set toplevel_transf [fl_is_toplevel_transform $c]
-    set ::idv(spec_name) ""
-    set ::idv(imp_name) ""
-    #
-    if { $toplevel_transf == 0 } {
-	frame $w.spec_name
-	pack $w.spec_name -side top -fill x
-	    label $w.spec_name.l -text "Optional name of specification: "
-	    entry $w.spec_name.e -textvariable ::idv(spec_name) -width 30
-	    pack $w.spec_name.e -side right
-	    pack $w.spec_name.l -side left -fill x -anchor w
-    }
+    set ::idv(transf_name) $tr_name
+    set ::idv(imp_name) $model_name
     #
     frame $w.namef
-    set ::idv(transf_name) ""
     pack $w.namef -side top -fill x
 	label $w.namef.l -text "Name of transformation: "
 	entry $w.namef.e -textvariable ::idv(transf_name) -width 30
 	pack $w.namef.e -side right
 	pack $w.namef.l -side left -fill x -anchor w
-
     #
     frame $w.imp_name
     pack $w.imp_name -side top -fill x
-	if { $toplevel_transf } {
-	    label $w.imp_name.l -text "Name of final model: "
-	} else {
-	    label $w.imp_name.l -text "Optional name of final model: "
-	}
+	label $w.imp_name.l -text "Name of final model: "
 	entry $w.imp_name.e -textvariable ::idv(imp_name) -width 30
 	pack $w.imp_name.e -side right
 	pack $w.imp_name.l -side left -fill x -anchor w
-
+    #
     frame $w.buttons
     pack $w.buttons -side top
 	button $w.buttons.cancel -text Cancel \
 	    -command "idv:perform_name_transf $w $c Cancel"
 	pack $w.buttons.cancel -side left -padx 10
+	button $w.buttons.discard -text Discard \
+	    -command "idv:perform_name_transf $w $c Discard"
+	pack $w.buttons.discard -side left -padx 10
 	button $w.buttons.save -text Save \
 	    -command "idv:perform_name_transf $w $c Save"
 	pack $w.buttons.save -side left -padx 10
@@ -404,15 +455,8 @@ proc idv:name_transform_and_use {c} {
 	label $w.errors.l -text ""
 	pack $w.errors.l -side top -fill x
     pack $w.errors -side top
-
     tkwait window $w
     i_am_free
-    if { $::idv(spec_name) == "" } {
-	set ::idv(spec_name) "."
-    }
-    if { $::idv(imp_name) == "" } {
-	set ::idv(imp_name) "."
-    }
     return [list $::idv(transf_op) $::idv(transf_name) $::idv(imp_name)]
 }
 

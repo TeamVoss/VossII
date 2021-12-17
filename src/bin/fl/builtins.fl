@@ -1533,3 +1533,5 @@ let get_return_type fn = (defix get_return_type) fn;
 // This function fails if the argument is an overloaded (implicitly or
 let get_symbol_signature fn = (defix get_symbol_signature) fn;
 
+// The id of the user invoking fl.
+let USER = (defix USER);

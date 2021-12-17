@@ -1,0 +1,16 @@
+load "idv.fl";
+
+TYPE "word" 8;
+
+let adder3 = 
+    word_input a b c.
+    word_output o.
+    CELL "adder3" [
+	o <- a '+' b '+' c
+];
+
+let p = adder3 'a 'b 'c 'o;
+
+p fseq (write_pexlif "spec_add.pexlif" p) fseq ();
+
+quit;

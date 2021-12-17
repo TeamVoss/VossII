@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
-
 lettype *a hw_type =
     HW_TYPE
 	{hw_type_name:: *a -> string}
@@ -3182,7 +3181,6 @@ let get_uniq_prefix sp =
 ;
 
 
-
 // Flatten the pexlif until the stop_pred is satisfied.
 // Intermediate wire names are created on demand and are named
 // i<number>/i<number>/.../<name> where the i<number>s refere to
@@ -3235,7 +3233,10 @@ let gen_flatten_pexlif stop_pred p =
             (md_expand_vectors ints)
     in
     let ints' = ints@(md_extract_vectors (all subtract declared)) in
-    (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER children))
+    let res =
+	(PINST name attrs leaf fa_inps fa_outs ints' (P_HIER children))
+    then
+    res
 ;
 
 // A simple stop-predicate for flatten_pexlif that can be used to

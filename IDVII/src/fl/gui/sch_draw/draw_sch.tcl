@@ -611,8 +611,9 @@ proc sch:detach {nb tw} {
 }
 
 proc sch:destroy_canvas {nb tw} {
-    fl_remove_active_sch_tab_window $tw.cc.c
-    destroy $tw
+    if [fl_remove_active_sch_tab_window $tw.cc.c] {
+	destroy $tw
+    }
 }
 
 proc sc:enter_sch_window  {ww x y X Y} {

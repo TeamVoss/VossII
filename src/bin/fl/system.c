@@ -178,6 +178,12 @@ get_cur_eval_cond(g_ptr redex)
     MAKE_REDEX_BOOL(redex, Get_cur_eval_cond());
 }
 
+static void
+get_USER(g_ptr redex)
+{
+    MAKE_REDEX_STRING(redex, wastrsave(&strings, getenv("USER")));
+}
+
 void
 System_Install_Functions()
 {
@@ -212,6 +218,10 @@ System_Install_Functions()
     Add_ExtAPI_Function("get_cur_eval_cond", "1", FALSE,
 			GLmake_arrow(GLmake_void(), GLmake_bool()),
 			get_cur_eval_cond);
+
+    Add_ExtAPI_Function("USER", "", FALSE,
+			GLmake_string(),
+			get_USER);
 }
 
 /********************************************************/
