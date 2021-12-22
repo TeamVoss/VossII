@@ -31,7 +31,7 @@ letrec
 ;
 
 // Valid LHS for both 'net_lvalue' and 'variable_lvalue'.
-let valid_lhs {we::wexpr} =
+let vvalid_lhs {we::wexpr} =
       let is_var (W_VAR _ _) = T
       /\  is_var (W_EXPLICIT_VAR _ _) = T
       /\  is_var other = F
@@ -153,7 +153,7 @@ let gen_lvalue {we::wexpr} hier_f index_f slice_f cat_f =
       /\  go (W_NAMED_SLICE _ is w) js _ = go w js (SOME (slice_f is))
       /\  go (W_CAT ws) js r' = cat_f (map (\w. go w js r') ws)
       in
-      valid_lhs we => go we [] NONE | error "gen_lvalue: Invalid LHS."
+      vvalid_lhs we => go we [] NONE | error "gen_lvalue: Invalid LHS."
 ;
 
 // note: 'net_lvalue' is used as the LHS of a 'assign' statement.

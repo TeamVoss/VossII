@@ -61,6 +61,8 @@ set voss2_preferences {
         "Print high-low expression for failing nodes" "bool" "TRUE"}
     {"PRINT-TIME" "RCprint_time"
         "Print time points during simulation" "bool" "TRUE"}
+    {"PRINT-TIME-MOD" "RCprint_time_mod"
+        "Print time points only mod this number during simulation" "int" "1"}
     {"STEP-LIMIT" "RCStep_limit"
         "Maximum number of simulation steps" "int" "100"}
     {"ACCURATE-ITE-COMP" "RCaccurate_ite_comp"
