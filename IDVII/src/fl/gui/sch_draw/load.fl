@@ -5,7 +5,7 @@
 
 noX => 
 (
-(eval "let STE_debug = error \"STE_debug not avaliable in -noX mode\";") seq
+(eval "let STE_debug ckt = ckt; fprintf stdinfo \"WARNING: STE_debug not fully functional in -noX mode\";") seq
 (eval "let draw_fanin = error \"draw_fanin not avaliable in -noX mode\";") seq
 ()
 )
