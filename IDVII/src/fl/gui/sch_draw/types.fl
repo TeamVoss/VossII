@@ -10,10 +10,12 @@ lettype justification =
                     |   UNFOLD {id::int}
                     |   FLATTEN
                     |   REPLACE {ids::int list} {tr::transform}
+                    |   REPLACE_ALL {tr::transform}
                     |   FEV {engine::string} {options::(string#string) list}
                     |   DUPLICATE {id::int}
                     |   MERGE {ids::int list}
 		    |	RENAME_WIRES {sub:: (string#string) list}
+		    |	MK_THM
 //
 // ...
 //

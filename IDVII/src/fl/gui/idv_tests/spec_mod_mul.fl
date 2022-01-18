@@ -1,0 +1,18 @@
+load "idv.fl";
+
+//let N = 128;
+let N = 16;
+TYPE "word" N;
+
+let modmul = 
+    word_input a b p.
+    word_output o.
+    CELL "modmul" [
+	o <- (a '*' b) '%' p
+];
+
+let p = modmul 'a 'b 'p 'o;
+
+p fseq (write_pexlif "spec_mod_mul.pexlif" p) fseq ();
+
+quit;

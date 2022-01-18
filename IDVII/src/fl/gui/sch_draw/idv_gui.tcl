@@ -383,6 +383,11 @@ proc idv:select_replacement {c alts} {
 	    -command "idv:return_select_replacement $w ApplyEverywhere"
 	pack $b.appln -side left -padx 10
     #
+    foreach nm $alts {
+	$f.list insert end $nm
+    }
+
+
     tkwait window $w
     return [list $::idv(replacement_command) $::idv(replacement_idx)]
 }
@@ -589,7 +594,7 @@ proc idv:edit_and_load {w file load_file pexlif_file} {
 proc idv:make_template {w c type} {
     set ::idv(fev_imp_file) ""
     set file $::idv(fev_template_file)
-    set base [file rootname $file]
+    set base [file tail [file rootname $file]]
     set ext [file extension $file]
     if { $file != "" } {
 	switch $type {
@@ -661,7 +666,7 @@ proc idv:do_fev {ww} {
 	    -anchor w
 	entry $w.f2.e -textvariable ::idv(fev_template_file) -width 30
 	button $w.f2.dir -image $::icon(folder) \
-	    -command "idv:fev_template_file $::idv(code_dir)"
+	    -command "idv:fev_template_file $::idv(code_dir) $w $ww.c"
 	button $w.f2.verilog -text "Verilog" \
 	    -command "idv:make_template $w $ww.c verilog"
 	button $w.f2.hfl -text "HFL" \
@@ -700,13 +705,21 @@ proc idv:do_fev {ww} {
 
 }
 
-proc idv:fev_template_file {code_dir} {
+proc idv:fev_template_file {code_dir w c} {
     set types {
         {{All Files}        *             }
     }
     set file [tk_getSaveFile -filetypes $types \
-		-initialdir $code_dir -title "Template file to load"]
+		-initialdir $code_dir -title "Template file to load" \
+	        -confirmoverwrite 0]
     set ::idv(fev_template_file) $file
+    if [file exists $file] {
+	if { [file extension $file] == ".fl" } {
+	    idv:make_template $w $c hfl
+	} elseif { [file extension $file] == ".v" } {
+	    idv:make_template $w $c verilog
+	}
+    }
 }
 
 proc idv:fev_pexlif {w} {

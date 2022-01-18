@@ -1,4 +1,6 @@
 set pagination off
 dir /home/cseger/VossII/src/bin/fl
 break visualization_vecs2tags
-r --use_stdin --use_stdout -f idv_adder.fl
+r --use_stdin --use_stdout -f bug.fl
+break vec2indices
+c

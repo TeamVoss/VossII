@@ -237,6 +237,14 @@ Merge_Vectors(g_ptr nds, bool non_contig_vecs)
     return res;
 }
 
+g_ptr
+Extract_Vectors(g_ptr nds, bool non_contig_vecs)
+{
+    g_ptr res = Get_node();
+    extract_vectors_fl(nds, res, non_contig_vecs, TRUE);
+    return res;
+}
+
 vec_list_ptr
 Merge_Vectors_gen(rec_mgr *vec_list_mgr, vec_list_ptr vecs)
 {

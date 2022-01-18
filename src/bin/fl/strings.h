@@ -32,6 +32,7 @@ vec_list_ptr   Expand_vector(
                    rec_mgr *range_mgr, vec_ptr vec);
 vec_list_ptr   Merge_Vectors_gen(rec_mgr *vec_list_mgr, vec_list_ptr vecs);
 g_ptr	       Merge_Vectors(g_ptr nds, bool non_contig_vecs);
+g_ptr	       Extract_Vectors(g_ptr nds, bool non_contig_vecs);
 bool           Check_vector_overlap(vec_ptr v1, vec_ptr v2);
 bool           Check_range_overlap(range_ptr r1, range_ptr r2);
 sname_list_ptr Show_vector(

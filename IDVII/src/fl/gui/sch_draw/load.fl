@@ -13,6 +13,6 @@ noX =>
 (
     (cload (DIR^"types.fl")) fseq
     (cload (DIR^"draw_sch.fl")) fseq
-    (cload (DIR^"idv.fl")) fseq
+    (cload (DIR^"idv_gui.fl")) fseq
     ()
 );

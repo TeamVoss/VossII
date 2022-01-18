@@ -5602,7 +5602,16 @@ declare_vector(hash_record *vtblp, string hier, string name,
     string full_vname = strtemp(hier);
     strappend(sig);
     full_vname = wastrsave(&strings, full_vname);
-    insert_hash(all_name_tblp, full_vname, ip);
+
+    vec_info_ptr cip = (vec_info_ptr) new_rec(vec_info_rec_mgrp);
+    *cip = *ip;
+    oip = find_hash(all_name_tblp, full_vname);
+    if( oip == NULL ) {
+	insert_hash(all_name_tblp, full_vname, cip);
+    } else {
+	while( oip->next ) { oip = oip->next; }
+	oip->next = cip;
+    }
     return( ip->map );
 }
 

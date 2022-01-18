@@ -139,6 +139,51 @@ let Emit_pexlif file pexlif =
     (printf "Saved ASCI version of pexlif in %s\n" file)
 ;
 
+let E_update_fn fp (W_UPDATE_FN lhs rhs) =
+    fprintf fp "(W_UPDATE_FN %s %s)" (DBGwexpr lhs) (DBGwexpr rhs)
+ /\ E_update_fn fp (W_PHASE_DELAY lhs rhs) =
+    fprintf fp "(W_PHASE_DELAY %s %s)" (DBGwexpr lhs) (DBGwexpr rhs)
+;
+
+letrec E_print_pexlif ind fp pexlif =
+    val (PINST name attrs leaf inps outs ints body) = pexlif then
+    let sattrs = list2str T "[" "," "]"
+            (\(a,v). sprintf "(\"%s\",\"%s\")" a v) attrs
+    in
+    let sleaf = leaf => "T" | "F" then
+    (fprintf fp "\n%*s(PINST \"%s\" %s %s\n" ind "" name sattrs sleaf)
+    fseq
+    let sinp  = list2str T "[" "," "]"
+		    (\(f,a). sprintf "(\"%s\",%S)" f (map (sprintf "\"%s\"") a))
+		    inps
+    in
+    (fprintf fp "%*s  %s\n" ind "" sinp) fseq
+    let sout  = list2str T "[" "," "]"
+		    (\(f,a). sprintf "(\"%s\",%S)" f (map (sprintf "\"%s\"") a))
+		    outs
+    in
+    (fprintf fp "%*s  %s\n" ind "" sout) fseq
+    let sints = list2str T "[" "," "]" (sprintf "\"%s\"") ints then
+    (fprintf fp "%*s  %s\n" ind "" sints) fseq
+    let p_content ind fp (P_HIER children) =
+	let p1 fp p = E_print_pexlif (ind+3) fp p in
+	list2fp fp T "(P_HIER [" "," "])\n" p1 children
+     /\ p_content ind fp (P_LEAF fns) =
+	list2fp fp T "(P_LEAF [" ", " "])\n" E_update_fn fns
+    in
+    (p_content (ind+1) fp body) fseq
+    (fprintf fp "%*s)\n" ind "")
+;
+
+// Same as Emit_pexlif except that the text can be loaded into fl
+// to create the saved pexlif.
+let Emit_ASCII_pexlif file pexlif =
+    let fp = fopen file "w" then
+    (E_print_pexlif 0 fp pexlif) fseq
+    (fclose fp) fseq
+    (printf "Saved ASCI version of pexlif in %s\n" file)
+;
+
 let base_get_lhs_vars we =
     letrec gen_get_names (W_VAR sz b) = sz = 1 => [b] | [(mk_name sz b)]
      /\    gen_get_names (W_EXPLICIT_VAR sz b) = [b]

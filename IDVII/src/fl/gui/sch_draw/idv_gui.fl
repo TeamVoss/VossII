@@ -2,7 +2,7 @@
 // Copyright 2020 Carl-Johan Seger
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
-let Init_idv_gui = (tcl_eval [sprintf "source %sidv.tcl" DIR]) fseq ();
+let Init_idv_gui = (tcl_eval [sprintf "source %sidv_gui.tcl" DIR]) fseq ();
 Init_idv_gui;
 
 let EDIT_cmd file =
@@ -45,6 +45,11 @@ let db_fname (IDV_RW_DB sname fname mnames tbl) = fname;
 let db_mnames (IDV_RW_DB sname fname mnames tbl) = mnames;
 
 let db_tbl (IDV_RW_DB sname fname mnames tbl) = tbl;
+
+let DBG_get_tbl_entries {dummy::void} =
+    tbl2list (db_tbl (hd (deref cur_idv_rw_transform_db)))
+;
+non_lazy DBG_get_tbl_entries;
 
 let get_idv_db name =
     let dbs = (deref cur_idv_rw_transform_db)@
@@ -126,6 +131,7 @@ let update_rw_transform_tbl tbl' =
     in
     (cur_idv_rw_transform_db := [(IDV_RW_DB sname fname mnames tbl')])
 ;
+non_lazy update_rw_transform_tbl;
 
 let get_rw_db {dummy::void} =
     let cur_tbls = deref cur_idv_rw_transform_db then
@@ -1120,7 +1126,14 @@ let fl_do_verify canvas {file::string} {type::string} =
 		 eprintf "Unknown engine (%s)" type
 	then
 	NOT ok => "cex" |
-	(add_transform canvas imp (FEV type [])) fseq
+	let just = FEV type [] in
+	(add_transform canvas imp just) fseq
+	let signature = pexlif_get_FP spec then
+	let transform_name = find_next_anon_transform_name signature then
+	let imp_sha  = idv_save_pexlif imp then
+	let spec_sha = idv_save_pexlif spec then
+	let tr = TRANSFORM transform_name spec_sha imp_sha [just] then
+	(record_transformation signature tr) fseq
 	let cmd = sprintf "flatten vis;" in
 	(refresh_idv_canvas canvas cmd) fseq
 	"ok"
@@ -1253,93 +1266,6 @@ let fl_rename_wires canvas =
 export_to_tcl fl_rename_wires;
 
 
-let fl_do_replacement canvas =
-    let vfsm = w2vfsm canvas then
-    let w = vfsm2id vfsm then
-    let il = get_selected_pinsts canvas then
-    let parent = get_idv_current_pexlif canvas then
-    // This code relies on fold_pexlif putting the new instance first!!!!
-    let p' = fold_pexlif parent il "_TMP_" then
-    val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER (p:ps))) = p' in
-    let signature = pexlif_get_FP p then
-    let dbs = (deref cur_idv_rw_transform_db)@
-	      (deref cur_idv_readonly_transform_dbs)
-    in
-    let get_alts db =
-	let tbl = db_tbl db then
-	NOT (tbl_member tbl signature) => [] |
-	map (\t. (db,t)) (tbl_get tbl signature)
-    in
-    let alts = flatmap get_alts dbs then
-    let tr_names = map (\(db,(TRANSFORM name _ _ _)). name) alts then
-    let pre = sprintf "idv:select_replacement %s {" canvas in
-    let cmd = list2str T pre " " "}" id tr_names then
-    val [op, sidx] = tcl2list (tcl_eval [cmd]) then
-    op = "Cancel" => () |
-    val (db,(TRANSFORM name sha_spec sha_imp just)) =
-	el (sscanf "%d" sidx) alts
-    then
-    let spec = idv_load_pexlif (db_fname db) sha_spec then
-    let imp  = idv_load_pexlif (db_fname db) sha_imp then
-    op = "ApplyOnce" =>
-	val (parent,sell) = get_idv_parent_info canvas then
-	let pp = get_idv_current_pexlif parent then
-	let pp' = fold_pexlif pp sell "_TMP_" then
-	val (PINST nm attrs leaf fa_inps fa_outs ints (P_HIER (c:cs))) = pp' in
-// NEEDs to be genealized
-	c == spec =>
-// ^^^^^^^^^^^^^^^^^^^^^^
-	(
-	    let p' = PINST nm attrs leaf fa_inps fa_outs ints
-			    (P_HIER (imp:cs))
-	    then
-	    let p'' = unfold_pexlif p' 1 then
-	    let cmd = sprintf "replace vis %s \"%s\";"
-			  (list2str T "[" "," "]" int2str sell) name
-	    in
-	    (refresh_idv_canvas parent cmd)
-	)
-	|
-	eprintf "Parent circuit has changed. Cannot apply the transformation"
-    |
-    op = "ApplyEverywhere" =>
-	val (parent,sell) = get_idv_parent_info canvas then
-	let pp = get_idv_current_pexlif parent then
-	let matches = isomatch spec pp then
-	let groups = map (map (fst # snd)) matches then
-	let nbr_groups = length groups then
-	let lbl = "_#*&_&*#_" in
-	let pp' = foldn_pexlif pp groups lbl then
-	let imps =
-	    letrec do_sub (cp:cps) (m:ms) =
-		let matches = map (snd # snd) m then
-		let subs = map get_match_sub  matches then
-		let opt_cp_sub = actualize_hier subs imp cp then
-		let cp' =
-		    has_value opt_cp_sub =>
-			let cp_sub = get_value opt_cp_sub then
-			rename_name (pex_subst_actuals imp cp_sub) lbl
-		    |
-			rename_name cp lbl
-		then
-		cp' : (do_sub cps ms)
-	     /\   do_sub [] [] = []
-	    in
-	    do_sub (firstn nbr_groups (pexlif_get_children pp')) matches
-	then
-	val (PINST n attrs lf fa_inps fa_outs ints (P_HIER children)) = pp' then
-	let children' = imps@(butfirstn nbr_groups children) then
-	let tmp = PINST n attrs lf fa_inps fa_outs ints (P_HIER children') then
-	let res = unfold_all_labeled tmp lbl then
-	let cmd = sprintf "replace_all vis %s \"%s\";"
-			  (list2str T "[" "," "]" int2str sell) name
-	in
-	(refresh_idv_canvas parent cmd)
-    |
-    eprintf "Illegal operation '%s'\n" op
-;
-export_to_tcl fl_do_replacement;
-
 
 let fl_do_new_tranf canvas =
     let vfsm = w2vfsm canvas in
@@ -1426,3 +1352,210 @@ let fl_do_new_tranf canvas =
     |
     eprintf "Illegal operation '%s'\n" op
 ;
+
+let get_input_order p =
+    let MAX_DEPTH = 100 in
+    let ckt = toplevel_pexlif2fsm (flatten_pexlif p) then
+    let vinps = inputs ckt in
+    let inps = md_expand_vectors vinps in
+    let res = ref [] then
+    letrec tr depth path nd =
+	mem nd inps => (res := ((nd,path):(deref res))) |
+	depth > MAX_DEPTH => () |
+	let pfn = get_visualization_pfn ckt nd 0 in
+	let vfanins = get_visualization_fanins ckt nd 0 in
+	let id_vfanins = zip (1 upto length vfanins) vfanins in
+	let do (i,(vfi,nds)) =
+	    let do1 fi = tr (depth+1) ((int2str i):pfn:path) fi in
+	    foreach do1 nds
+	in
+	foreach do id_vfanins
+    in
+    let id_vouts =
+	let vouts = outputs ckt in
+	zip (1 upto length vouts) vouts
+    in
+    let do (i,vo) =
+	let do1 o = tr 1 [(sprintf "o%d" i)] o in
+	foreach do1 (md_expand_vector vo)
+    in
+    (foreach do id_vouts) fseq
+    let do l = (fst (hd l)), (setify (map snd l)) in
+    let inps = map do (partition fst (deref res)) then
+    let sel l =
+	let vs = md_extract_vectors (map fst l) then
+	let sig = snd (hd l) in
+	map (\v. v, sig) vs
+    in
+    flatmap sel (partition snd inps)
+;
+
+let set_equal s1 s2 =
+    ((s1 subtract s2) = []) AND ((s2 subtract s1) = [])
+;
+
+let check_eq_by_sim p1 p2 =
+    let ckt1 = pexlif2fsm (wrap_pexlif p1) then
+    let ckt2 = pexlif2fsm (wrap_pexlif p2) then
+    let inps1 = md_expand_vectors (inputs ckt1) in
+    let inps2 = md_expand_vectors (inputs ckt2) in
+    let outs1 = md_expand_vectors (outputs ckt1) in
+    let outs2 = md_expand_vectors (outputs ckt2) in
+    NOT (set_equal inps1 inps2) => F |
+    NOT (set_equal outs1 outs2) => F |
+    let ant = map (\n.bT,n, bvariable n, 0, 1) inps1 then
+    let trl = map (\n.n,0,1) outs1 then
+    let ste1 = bSTE "-s" ckt1 [] ant [] trl then
+    let ste2 = bSTE "-s" ckt2 [] ant [] trl then
+    let tst n r = 
+	r AND ((bget_trace_val ste1 n 0) == (bget_trace_val ste2 n 0))
+    in
+    itlist tst outs1 T
+;
+
+// Try by simply swapping actuals.
+let simple_get_specialized_imp spec imp p =
+    val (PINST nm1 attr1 lf1 in1 out1 int1 sckt1) = spec in
+    val (PINST nm2 attr2 lf2 in2 out2 int2 sckt2) = p in
+    length in1 != length in2 => NONE |
+    length out1 != length out2 => NONE |
+    let in1'  = map2 (\(f1,_).\(f2,a2). f1,a2) in1 in2 then
+    let out1' = map2 (\(f1,_).\(f2,a2). f1,a2) out1 out2 then
+    let p1' = PINST nm1 attr1 lf1 in1' out1' int1 sckt1 then
+    let ok = check_eq_by_sim p p1' then
+    NOT ok => NONE |
+    val (PINST nm attr lf fa_inps fa_outs ints sckt) = imp in
+    let imp' = PINST nm attr lf in1' out1' ints sckt then
+    SOME imp'
+;
+
+// Find a substitution that makes spec == p.
+// If such is found, return imp after applying the same substitution.
+let get_specialized_imp spec imp p =
+    let ores = simple_get_specialized_imp spec imp p then
+    has_value ores => ores |
+    val (PINST nm1 attr1 lf1 in1 out1 int1 sckt1) = spec in
+    val (PINST nm2 attr2 lf2 in2 out2 int2 sckt2) = p in
+    length out1 != length out2 => NONE |
+    let spec' = wrap_pexlif spec in
+    let p'    = wrap_pexlif p in
+    let iorder1 = get_input_order spec' then
+    let iorder2 = get_input_order p' then
+    let get_info (v,sig) = (md_size v,sig) in
+    NOT (set_equal (map get_info iorder1) (map get_info iorder2)) => NONE |
+    let mk_sub (spec_v,spec_sig) =
+	let p_v = rev_assoc spec_sig iorder2 in
+	zip (md_expand_vector spec_v) (md_expand_vector p_v)
+    in
+    let name_sub = flatmap mk_sub iorder1 then
+    let translate (f,as) =
+	let as' = map (\n. assoc n name_sub) (md_expand_vectors as) then
+	f, (md_extract_vectors as')
+    in
+    let in1'  = map translate in1 in
+    let out1' = map2 (\(f1,_).\(f2,a2). f1,a2) out1 out2 then
+    let spec'' = PINST nm1 attr1 lf1 in1' out1' int1 sckt1 then
+    NOT (check_eq_by_sim spec'' p') => NONE |
+    val (PINST nm attr lf fa_inps fa_outs ints sckt) = imp in
+    let fa_inps' = map translate fa_inps in
+    let fa_outs' = map2 (\(f1,_).\(f2,a2). f1,a2) out1 out2 then
+    let imp' = (PINST nm attr lf fa_inps' fa_outs' ints sckt) then
+    SOME imp'
+;
+
+let replace_all parent spec imp =
+    let raw_matches = internal_isomatch spec parent T then
+    // Adjust for incorrect base...
+    let matches = map (map (\(i,j).i+1,j+1)) raw_matches then
+    let groups = map (map snd) matches then
+    let nbr_groups = length groups then
+    let lbl = "_#*&_&*#_" in
+    let parent' = foldn_pexlif parent groups lbl then
+    let children' = pexlif_get_children parent' then
+    let to_be_replaced = firstn nbr_groups children' then
+    let remain = butfirstn nbr_groups children' then
+    let repl1 p =
+	let imp' = get_specialized_imp spec imp p then
+	has_value imp' => pexlif_rename (get_value imp') lbl | p
+    in
+    let replacements = map repl1 to_be_replaced then
+    let children' = replacements @ remain then
+    val (PINST n attrs lf fa_inps fa_outs ints (P_HIER children)) = parent' then
+    let tmp = PINST n attrs lf fa_inps fa_outs ints (P_HIER children') then
+    unfold_all_labeled tmp lbl
+;
+
+let dbg_spec = ref {(error "N/A") :: pexlif};
+let dbg_imp = ref {(error "N/A") :: pexlif};
+let dbg_parent = ref {(error "N/A") :: pexlif};
+
+let fl_do_replacement canvas =
+    let vfsm = w2vfsm canvas then
+    let w = vfsm2id vfsm then
+    let sell = get_selected_pinsts canvas then
+    let parent = get_idv_current_pexlif canvas then
+    // This code relies on fold_pexlif putting the new instance first!!!!
+    let p' = fold_pexlif parent sell "_TMP_" then
+    val (PINST nm attrs leaf fa_inps fa_outs ints (P_HIER (p:ps))) = p' in
+    let signature = pexlif_get_FP p then
+    let dbs = (deref cur_idv_rw_transform_db)@
+	      (deref cur_idv_readonly_transform_dbs)
+    then
+    let get_alts db =
+	let tbl = db_tbl db then
+	NOT (tbl_member tbl signature) => [] |
+	map (\t. (db,t)) (tbl_get tbl signature)
+    then
+    let alts = flatmap get_alts dbs then
+    let tr_names = map (\(db,(TRANSFORM name _ _ _)). name) alts then
+    let pre = sprintf "idv:select_replacement %s {" canvas in
+    let cmd = list2str T pre " " "}" id tr_names then
+    val [op, sidx] = tcl2list (tcl_eval [cmd]) then
+    op = "Cancel" => () |
+    let idx = (sscanf "%d" sidx)+1 then
+    val (db,tr) = el idx alts then
+    val (TRANSFORM name sha_spec sha_imp just) = tr then
+    let spec = idv_load_pexlif (db_sname db) sha_spec then
+    let imp  = idv_load_pexlif (db_sname db) sha_imp then
+    op = "ApplyOnce" =>
+	let o_imp' = get_specialized_imp spec imp p then
+	has_value o_imp' =>
+	(
+	    let imp' = get_value o_imp' then
+	    let p' =
+		PINST nm attrs leaf fa_inps fa_outs ints (P_HIER (imp' : ps))
+	    then
+	    let p'' = unfold_pexlif p' 1 then
+	    (add_transform canvas p'' (REPLACE sell tr)) fseq
+	    let cmd = sprintf "replace vis %s \"%s\";"
+			  (list2str T "[" "," "]" int2str sell) name
+	    in
+	    (refresh_idv_canvas canvas cmd)
+	)
+	|
+	eprintf "Transformation spec not an exact match in %s" op
+    |
+    op = "ApplyEverywhere" =>
+(dbg_imp := imp) fseq
+(dbg_spec := spec) fseq
+(dbg_parent := parent) fseq
+	let res = replace_all parent spec imp then
+	(add_transform canvas res (REPLACE_ALL tr)) fseq
+	let cmd = sprintf "replace_all vis %s \"%s\";"
+			  (list2str T "[" "," "]" int2str sell) name
+	in
+	(refresh_idv_canvas canvas cmd)
+    |
+    eprintf "Illegal operation '%s'\n" op
+;
+export_to_tcl fl_do_replacement;
+
+let make_theorem transform_name spec imp =
+    spec fseq imp fseq
+    let signature = pexlif_get_FP spec then
+    let imp_sha  = idv_save_pexlif imp then
+    let spec_sha = idv_save_pexlif spec then
+    let tr = TRANSFORM transform_name spec_sha imp_sha [MK_THM] then
+    (record_transformation signature tr)
+;
+

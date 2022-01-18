@@ -722,8 +722,12 @@ unfold_pexlif(g_ptr p, unint id)
         p, &old_name, &old_attrs, &old_leaf, &old_fa_inps, &old_fa_outs,
         &old_inter, &old_cont
     );
-    new_mgr(&subst_hash_record_mgr, sizeof(hash_record));
+    if( !is_P_HIER(old_cont, &old_children) ) {
+	Fail_pr("Cannot unfold a leaf node");
+	return(NULL);
+    }
     // Create wirename database to ensure no name capture
+    new_mgr(&subst_hash_record_mgr, sizeof(hash_record));
     vector_db_ptr vdp = VDB_create();
     for(g_ptr l = old_fa_inps; !IS_NIL(l); l = GET_CONS_TL(l)) {
 	string f = GET_STRING(GET_FST(GET_CONS_HD(l)));
@@ -736,11 +740,6 @@ unfold_pexlif(g_ptr p, unint id)
     for(g_ptr l = old_inter; !IS_NIL(l); l = GET_CONS_TL(l)) {
 	string f = GET_STRING(GET_CONS_HD(l));
 	VDB_Insert_vector(vdp, f);
-    }
-    if( !is_P_HIER(old_cont, &old_children) ) {
-	Fail_pr("Cannot unfold a leaf node");
-	VDB_destroy(vdp);
-	return(NULL);
     }
     // Pick out the to-be unfolded child and collect other children.
     unint ix = 1;
@@ -769,6 +768,7 @@ unfold_pexlif(g_ptr p, unint id)
     if( !is_P_HIER(un_cont, &un_children) ) {
 	Fail_pr("Cannot unfold a leaf node");
 	VDB_destroy(vdp);
+	free_mgr(&subst_hash_record_mgr);
 	return(NULL);
     }
 
@@ -778,10 +778,12 @@ unfold_pexlif(g_ptr p, unint id)
     create_hash(&sub, 100, str_hash, str_equ);
     if( !mk_formal_actuals_substitution(&sub, un_fa_inps) ) {
 	VDB_destroy(vdp);
+	free_mgr(&subst_hash_record_mgr);
 	return(NULL);
     }
     if( !mk_formal_actuals_substitution(&sub, un_fa_outs) ) {
 	VDB_destroy(vdp);
+	free_mgr(&subst_hash_record_mgr);
 	return(NULL);
     }
     g_ptr inter_sub = Make_NIL();
@@ -837,6 +839,7 @@ unfold_pexlif(g_ptr p, unint id)
     INC_REFCNT(old_leaf);
     INC_REFCNT(old_fa_inps);
     INC_REFCNT(old_fa_outs);
+    old_inter = Extract_Vectors(old_inter, TRUE);
     g_ptr new_pinst =
         mk_PINST(old_name, Make_NIL(), old_leaf, old_fa_inps, old_fa_outs,
                  old_inter, mk_P_HIER(new_children));
