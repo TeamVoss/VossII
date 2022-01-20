@@ -273,7 +273,7 @@ letrec itlist f l x = empty l => x | f (hd l) (itlist f (tl l) x);
 
 // Merge the elements in the list l by repeatedly applying the function fn
 // Usage: accumulate fn l;
-letrec accumulate fn l = itlist fn (tl l) (hd l);
+let accumulate fn l = itlist fn (butlast l) (last l);
 
 // Reverse iteration list
 letrec rev_itlist f l x = empty l => x | rev_itlist f (tl l) (f (hd l) x);
@@ -1752,7 +1752,7 @@ letrec DBGwexpr (W_X sz) =
  /\    DBGwexpr (W_NOT a) =
 	    sprintf "(W_NOT %s)" (DBGwexpr a)
  /\    DBGwexpr (W_PRED name cond) =
-	    sprintf "(W_PRED %s %s)" name (DBGwexpr cond)
+	    sprintf "(W_PRED \"%s\" %s)" name (DBGwexpr cond)
  /\    DBGwexpr (W_EQ  a b) =
 	    sprintf "(W_EQ %s %s)" (DBGwexpr a) (DBGwexpr b)
  /\    DBGwexpr (W_GR  a b) =
@@ -1774,9 +1774,9 @@ letrec DBGwexpr (W_X sz) =
  /\    DBGwexpr (W_ASHR a b) =
 	    sprintf "(W_ASHR %s %s)" (DBGwexpr a) (DBGwexpr b)
  /\    DBGwexpr (W_SX sz w) =
-	    sprintf "(SX %d %s)" sz (DBGwexpr w)
+	    sprintf "(W_SX %d %s)" sz (DBGwexpr w)
  /\    DBGwexpr (W_ZX sz w) =
-	    sprintf "(ZX %d %s)" sz (DBGwexpr w)
+	    sprintf "(W_ZX %d %s)" sz (DBGwexpr w)
  /\    DBGwexpr (W_ITE c t e) =
             sprintf "(W_ITE %s %s %s)" (DBGwexpr c) (DBGwexpr t) (DBGwexpr e)
  /\    DBGwexpr (W_SLICE indices w) =
@@ -1944,3 +1944,19 @@ let report_error msg =
     (tcl_eval [sprintf "report_error {%s}" msg]) fseq ()
 ;
 non_lazy report_error;
+
+// Not a great way of making a temporary file for tcl, but ok since
+// fl is single threaded.
+let fl_mktemp base = 
+    let fp = mktemp base then
+    let name = stream2filename fp then
+    (fclose fp) fseq
+    name
+;
+export_to_tcl fl_mktemp;
+
+let fl_mktempd base = 
+    let dir = mktempd base then
+    dir
+;
+export_to_tcl fl_mktempd;

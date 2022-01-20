@@ -13,7 +13,7 @@ let at_cycle vec cyc =
 ;
 infix 9 at_cycle;
 
-let ASSERT {name::string} {b::bit} =
+let rel_ASSERT {name::string} {b::bit} =
     let we = hw_destr b in
     (name, we)
 ;
@@ -105,5 +105,5 @@ let rels2STE {ckt::pexlif} assumes asserts =
     (pexlif2fsm ckt'), assume_ants, assert_cons
 ;
 
-end_abstype at_phase at_cycle ASSERT rels2STE;
+end_abstype at_phase at_cycle rel_ASSERT rels2STE;
 

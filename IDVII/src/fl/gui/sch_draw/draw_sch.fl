@@ -1819,20 +1819,30 @@ let draw_show_values {vis::vfsm} c show =
 ;
 
 
-
 // Try to verify two combinational pexlifs are equal by building
 // a miter circuit and simulating the circuit.
 let BDD_comb_EQ p1 p2 =
     val (miter_pexlif, ant) = mk_miter p1 p2 then
     let cons = [(T,"_OK_",T,0,1)] in
     let ckt = pexlif2fsm miter_pexlif then
-    let ste = STE "-s" ckt [] ant cons [] then
-    let ok = get_ste_result ste "" then
+    val (assumes,asserts) = split (str_is_prefix "i1/") (assertions ckt) then
+    let trl = map (\n. n,0,1) (assumes@asserts) then
+    let old_pref = update_vossrc "NOTIFY-CHECK-FAILURES" "NO" then
+    let ste = STE "-s" ckt [] ant cons trl then
+    (update_vossrc "NOTIFY-CHECK-FAILURES" old_pref) fseq
+    let base_ok = get_ste_result ste "" then
+    let a_c =
+	itlist (\a.\r. r AND ((get_trace_val ste a 0) = (T,F))) assumes T
+    then
+    let c_c =
+	itlist (\a.\r. r AND ((get_trace_val ste a 0) = (T,F))) asserts T
+    then
+    let ok = NOT a_c OR (c_c AND base_ok) then
     ok == T => T |
     let cex = example F (NOT ok) then
     let ant' = substitute cex ant then
     let vis = STE_debug ckt then
-    let tab_1 = draw_fanin vis (0) 100 ["_OK_"] then
+    let tab_1 = draw_fanin vis (0) 100 ("_OK_":asserts) then
     tab_1 fseq
     (STE "-e" vis [] ant' cons []) fseq
     ok

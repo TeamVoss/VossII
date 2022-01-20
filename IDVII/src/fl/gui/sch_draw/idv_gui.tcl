@@ -243,6 +243,8 @@ proc idv:create_idv_menu {nb w} {
             -command "idv:name_and_save_model $w implementation"
         $m add command -label "Name initial model" \
             -command "idv:name_and_save_model $w specification"
+        $m add command -label "Write out Verilog model" \
+            -command "idv:write_verilog $w"
 
 
         button $w.menu.new_transf -image $::icon(new_transf) \
@@ -382,6 +384,9 @@ proc idv:select_replacement {c alts} {
 	button $b.appln -text "Apply Everywhere" \
 	    -command "idv:return_select_replacement $w ApplyEverywhere"
 	pack $b.appln -side left -padx 10
+	button $b.repappln -text "Repeatedly Apply Everywhere" \
+	    -command "idv:return_select_replacement $w RepeatApplyEverywhere"
+	pack $b.repappln -side left -padx 10
     #
     foreach nm $alts {
 	$f.list insert end $nm
@@ -612,7 +617,7 @@ proc idv:make_template {w c type} {
 			    -icon question -default no -type yesnocancel \
 			    -parent $w]
 	    switch $reply {
-		yes	{ set_create_file 1;  }
+		yes	{ set create_file 1;  }
 		no	{ set create_file 0; }
 		cancel  {return}
 	    }
@@ -736,3 +741,15 @@ proc idv:do_rename_wires {w} { fl_rename_wires $w.c }
 
 proc done_edit_proc {args} { }
 
+proc idv:write_verilog {w} {
+    set types {
+        {{Verilog}      {.v}        }
+        {{All Files}     *          }
+    }
+    set file [tk_getSaveFile -filetypes $types \
+	    -initialdir $::idv(code_dir) -title "Name file to write Verilog" \
+	    -confirmoverwrite 1]
+    if { $file != "" } {
+	fl_save_verilog $w.c $file
+    }
+}

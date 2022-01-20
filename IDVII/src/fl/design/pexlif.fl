@@ -308,8 +308,9 @@ let foldn_pexlif p ill new_base_name =
 	PINST new_name [] F (mk_fa ninps) (mk_fa nouts) new_ints (P_HIER sel)
     in
     let folded_children = map mk_group (1 upto (length ill)) then
-    let all_wires = rem_consumers @ rem_producers @
-		    (flatmap pexlif_get_actuals folded_children)
+    let all_wires = md_expand_vectors (
+			rem_consumers @ rem_producers @
+			(flatmap pexlif_get_actuals folded_children))
     then
     let ints' =  md_extract_vectors
 	    (all_wires subtract (md_expand_vectors (map fst (fa_inps@fa_outs))))

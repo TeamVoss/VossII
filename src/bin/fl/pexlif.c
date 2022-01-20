@@ -360,9 +360,12 @@ subst_formal(hash_record_ptr tbl, g_ptr gf)
     while( fl != NULL ) {
 	string f = fl->name;
 	string repl = find_hash(tbl, f);
-	ASSERT( repl != NULL );
 	sname_list_ptr sp = new_rec(sname_list_mgr_ptr);
-	sp->name = repl;
+	if( repl == NULL ) {
+	    sp->name = f;
+	} else {
+	    sp->name = repl;
+	}
 	sp->next = NULL;
 	*res_tl = sp;
 	res_tl = &sp->next;
@@ -797,7 +800,7 @@ unfold_pexlif(g_ptr p, unint id)
 	    if( sscanf(new, "#%d_", &cnt) != 1 ) {
 		new = wastrsave(&strings, gen_tprintf(ts, "#1_%s", old));
 	    } else {
-		string p = old;
+		string p = new;
 		while( *p && *p != '_' ) p++;
 		new = wastrsave(&strings, gen_tprintf(ts, "#%d%s", cnt+1, p));
 	    }

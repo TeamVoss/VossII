@@ -1091,6 +1091,36 @@ nodes(g_ptr redex)
 }
 
 static void
+assertions(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_fsm;
+    EXTRACT_1_ARG(redex, g_fsm);
+    fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
+    push_fsm(fsm);
+    buffer res_buf;
+    new_buf(&res_buf, COUNT_BUF(&(fsm->nodes)), sizeof(string));
+    nnode_ptr np;
+    FOR_BUF(&(fsm->nodes), nnode_rec, np) {
+	int start = np->vec->map->from;
+	string nname = get_real_name(np->vec, np->idx-start+1);
+	if( *nname != '!' && strstr(nname, "assert__") != NULL ) {
+	    nname = wastrsave(&strings, nname);
+	    push_buf(&res_buf, &nname);
+	}
+    }
+    qsort(START_BUF(&res_buf), COUNT_BUF(&res_buf), sizeof(string), nn_cmp);
+    MAKE_REDEX_NIL(redex);
+    g_ptr tail = redex;
+    string *spp;
+    FOR_BUF(&res_buf, string, spp) { APPEND1(tail, Make_STRING_leaf(*spp)); }
+    pop_fsm();
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
 edges(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
@@ -1149,7 +1179,13 @@ vectors(g_ptr redex)
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
     string *spp;
-    FOR_BUF(&res_buf, string, spp) { APPEND1(tail, Make_STRING_leaf(*spp)); }
+    string cur = "";
+    FOR_BUF(&res_buf, string, spp) {
+	if( strcmp(*spp, cur) != 0 ) {
+	    APPEND1(tail, Make_STRING_leaf(*spp));
+	    cur = *spp;
+	}
+    }
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -2619,6 +2655,11 @@ Fsm_Install_Functions()
 			GLmake_arrow(fsm_handle_tp,
 				     GLmake_list(GLmake_string())),
 			nodes);
+
+    Add_ExtAPI_Function("assertions", "1", FALSE,
+			GLmake_arrow(fsm_handle_tp,
+				     GLmake_list(GLmake_string())),
+			assertions);
 
     Add_ExtAPI_Function("edges", "1", FALSE,
 			GLmake_arrow(
@@ -5751,14 +5792,20 @@ map_vector(hash_record *vtblp, string hier, string name, bool ignore_missing)
     string sig = get_vector_signature(vp);
     vec_info_ptr oip = (vec_info_ptr) find_hash(vtblp,sig);
     if( oip == NULL ) {
-        if( !ignore_missing ) {
+	bool is_assertion = ( strncmp(name, "assert__", 8) == 0 );
+        if( !ignore_missing && !is_assertion ) {
             FP(warning_fp, "Undeclared signal %s in %s.\n", name, hier);
             report_source_locations(warning_fp);
         }
-        sprintf(tmp_name_buf, "TmP__%d_%s", undeclared_node_cnt, name);
-        undeclared_node_cnt++;
-        string new_name = wastrsave(&strings, tmp_name_buf);
-        if( !ignore_missing ) {
+	string new_name;
+	if( is_assertion ) {
+	    new_name = name;
+	} else {
+	    sprintf(tmp_name_buf, "TmP__%d_%s", undeclared_node_cnt, name);
+	    undeclared_node_cnt++;
+	    new_name = wastrsave(&strings, tmp_name_buf);
+	}
+        if( !ignore_missing && !is_assertion ) {
             FP(warning_fp, "Replaced %s with %s\n\n", name, new_name);
         }
         name = new_name;

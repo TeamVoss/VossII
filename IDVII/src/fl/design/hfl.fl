@@ -2510,20 +2510,20 @@ let draw_fsm reset S0 orig_trans base_inps =
     let r_states = setify (S0n:(flatmap get_state trans)) then
     let cmp (s1,v1) (s2,v2) = v1-v2 in
     let states = qsort cmp r_states then
-    let fp = mktemp "fsm_draw" then
-    let file = stream2filename fp then
-    (fprintf fp "digraph finite_state_machine {\n") fseq
-    (fprintf fp "rankdir=LR;\n") fseq
-    (fprintf fp "size=\"8,5\"\n") fseq
-    (fprintf fp "dummy_inp [shape = point];\n") fseq
+    let res = ref [] in
+    let append s = (res := (s:(deref res))) in
+    (append (sprintf "digraph finite_state_machine {\n")) fseq
+    (append (sprintf "rankdir=LR;\n")) fseq
+    (append (sprintf "size=\"8,5\"\n")) fseq
+    (append (sprintf "dummy_inp [shape = point];\n")) fseq
     let mk_state (name,v) =
-        fprintf fp "%s [shape = circle, fixedsize=true, label = \"S%d\"]\n"
-			name v
+        append (sprintf "%s [shape = circle, fixedsize=true, label = \"S%d\"]\n"
+			name v)
     in
     (foreach mk_state states) fseq
     let ptrans = partition fst trans in
     let emit_edge ((f,fv),on',(t,tv)) =
-        fprintf fp "%s -> %s [ label = \"%s\" ];\n" f t on'
+        append (sprintf "%s -> %s [ label = \"%s\" ];\n" f t on')
     in
     letrec mk_edges done ((f,on',t):rem) =
 	let cond = W_AND on' (W_NOT done) in
@@ -2536,9 +2536,9 @@ let draw_fsm reset S0 orig_trans base_inps =
     in
     let edges = flatmap (mk_edges (W_CONST 1 0)) ptrans then
     (emit_edge (("dummy_inp",0), reset, S0n)) fseq
-    (fprintf fp "}\n") fseq
-    (fclose fp) fseq
-    file, states, edges
+    (append (sprintf "}\n")) fseq
+    let code = accumulate (defix ^) (rev (deref res)) then
+    code, states, edges
 ;
 
 let build_cond w_state conds =
@@ -2614,7 +2614,7 @@ let Moore_FSM name clk state reset_condition transitions =
 	comb2
     ] then
     let base_inps = map (\(f,a). hd (str_split f "[")) fa_inps then
-    val (fsm_file,states,edges) = draw_fsm reset S0 transitions base_inps then
+    val (code,states,edges) = draw_fsm reset S0 transitions base_inps then
     let pr (f,a) = sprintf "{%s}" f in
     let s_fa_inps = list2str T "{" " " "}" pr fa_inps then
     let ps (n,v) = sprintf "{S%d %s}" v n in
@@ -2622,8 +2622,8 @@ let Moore_FSM name clk state reset_condition transitions =
     let pe (s_on, f_on) = sprintf "{%s {%s}}" s_on f_on in
     let s_edges = list2str T "{" " " "}" pe edges then
     let pfn =
-	sprintf "draw_fsm {%s} %s %s %s %s"
-		name fsm_file s_states s_edges s_fa_inps
+	sprintf "draw_fsm {%s} {%s} %s %s %s"
+		name code s_states s_edges s_fa_inps
     then
     let res = PINST pfn [] T fa_inps fa_outs ints body then
     res
@@ -3504,3 +3504,27 @@ let pcompile fn =
     ()
 ;
 free_binder pcompile;
+
+
+let ASSERT {name::string} {expr::bit} =
+    let oa = ord "a" in
+    let oz = ord "z" in
+    let oA = ord "A" in
+    let oZ = ord "Z" in
+    let o0 = ord "0" in
+    let o9 = ord "9" in
+    let tr c =
+	let o = ord c in
+	oa <= o AND o <= oz => c |
+	oA <= o AND o <= oZ => c |
+	o0 <= o AND o <= o9 => c |
+	"_"
+    in
+    let clean_name = implode (map tr (explode name)) in
+    let assert_wire = sprintf "assert__%s" clean_name then
+    let name' = sprintf "{%s}" name then
+    let pred = hw_bit_constr (W_PRED name' (hw_destr expr)) then
+    let lhs = hw_bit_constr (W_VAR 1 assert_wire) in
+    lhs <- pred
+;
+

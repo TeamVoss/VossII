@@ -3,12 +3,20 @@ load "idv.fl";
 //let N = 128;
 let N = 16;
 TYPE "word" N;
+TYPE "dword" (2*N);
+
+let dwor2word {v::dword} = {frombits (lastn N (tobits v))::word};
 
 let modmul = 
     word_input a b p.
     word_output o.
+    dword_internal za zb zp zo.
     CELL "modmul" [
-	o <- (a '*' b) '%' p
+	za <- ZX a,
+	zb <- ZX b,
+	zp <- ZX p,
+	zo <- (za '*' zb) '%' zp,
+	o <- dwor2word zo
 ];
 
 let p = modmul 'a 'b 'p 'o;

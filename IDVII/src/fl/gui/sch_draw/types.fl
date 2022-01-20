@@ -10,7 +10,7 @@ lettype justification =
                     |   UNFOLD {id::int}
                     |   FLATTEN
                     |   REPLACE {ids::int list} {tr::transform}
-                    |   REPLACE_ALL {tr::transform}
+                    |   REPLACE_ALL {repeatedly::bool} {tr::transform}
                     |   FEV {engine::string} {options::(string#string) list}
                     |   DUPLICATE {id::int}
                     |   MERGE {ids::int list}

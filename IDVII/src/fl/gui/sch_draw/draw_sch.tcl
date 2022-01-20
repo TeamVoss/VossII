@@ -4425,8 +4425,12 @@ proc mk_fsm_circle {c x y tag dotfile rad} {
 			  -outline $gcolor -fill $fc]
 }
 
-proc draw_fsm {name dotfile states edges inps c tag x y} {
+proc draw_fsm {name code states edges inps c tag x y} {
     global gcolor fc mfont
+    set dotfile [fl_mktemp "fsm_dot"]
+    set fp [open $dotfile w]
+    puts $fp $code
+    close $fp
     $c bind $dotfile <ButtonPress-1> \
 		  "fsm:display_fsm $c $tag $name $dotfile [list $states] \
 			       [list $edges] [list $inps]"
