@@ -223,14 +223,16 @@ let variable_exp 1  v = (Exp_primary (prim_hier v []), 1)
 
 let paren_exp a = Prim_mintypmax (MTM_expression a);
 
-let wrap_prim a ap p = ap >= p => paren_exp (Exp_primary a) | a;
-
 let wrap_exp a ap p = ap >= p => Exp_primary (paren_exp a) | a;
+
+let wrap_prim (Exp_primary a) ap p = ap >= p => paren_exp (Exp_primary a) | a
+/\  wrap_prim a _ _ = paren_exp a
+;
 
 let unary_exp op a =
       let p = precedence_unary op in
-      val (Exp_primary a', n) = pretty_expression a in
-      (Exp_unary op a', p)
+      val (a', n) = pretty_expression a in
+      (Exp_unary op (wrap_prim a' n p), p)
 ;
 
 let binary_exp op a b =

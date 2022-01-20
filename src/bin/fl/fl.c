@@ -163,7 +163,7 @@ Mk_output_file_in_tmp_dir(string prefix, FILE **fpp, string *filename)
     setbuf(fp, NULL);
     *fpp = fp;
     *filename = name;
-    return(TRUE);    
+    return(TRUE);
 }
 
 static string
@@ -175,7 +175,7 @@ read_line(FILE *fp, bool once)
 	if( errno != EWOULDBLOCK ) {
 	    fprintf(stderr, "WHAT??? errno=%d\n", errno);
 	}
-    } 
+    }
 }
 
 int
@@ -340,7 +340,13 @@ fl_main(int argc, char *argv[])
     }
     Set_default_break_handler();
 
-    Sprintf(buf, "/tmp/voss2_%s_XXXXXX", getenv("USER"));
+    char * user = getenv("USER");
+    if (user == NULL) {
+        // By default, sprintf "%s" NULL prints "(none)"
+        // Which leads to invalid file paths
+        user = "_nouser_";
+    }
+    Sprintf(buf, "/tmp/voss2_%s_XXXXXX", user);
     char *res = mkdtemp(buf);
     if( res == NULL ) {
 	Eprintf("Cannot create temporary directory from %s\n", buf);
@@ -985,7 +991,7 @@ busy(bool busy)
 // Crashes wish in some circumstances.
 //    if( busy )
 //	fprintf(to_tcl_fp, "i_am_busy\n");
-//    else 
+//    else
 //	fprintf(to_tcl_fp, "i_am_free\n");
 //    fflush(to_tcl_fp);
 }
@@ -1033,7 +1039,7 @@ process_commands(string bufp, bool verbose)
 			{
 			    p++;
 			}
-		    } 
+		    }
 		}
 		break;
 	    case '\\':
@@ -1064,7 +1070,7 @@ process_commands(string bufp, bool verbose)
 		    bool ok;
 		    if( verbose ) {
 			string nb = cur_start;
-			while( *nb && isspace(*nb) ) nb++; 
+			while( *nb && isspace(*nb) ) nb++;
 			if( strncmp(nb, "set_file_name \"", 15) == 0 ) {
 			    string pcmd = protect(nb);
 			    fprintf(to_tcl_fp, "WriteInfo {%s}\n", pcmd);
@@ -1095,7 +1101,7 @@ process_commands(string bufp, bool verbose)
 		    break;
 		}
 	    default:
-		p++; 
+		p++;
 		break;
 	}
     }
