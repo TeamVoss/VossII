@@ -1,0 +1,20 @@
+load "idv.fl";
+
+//let N = 128;
+let N = 4;
+TYPE "word" N;
+
+let mod = 
+    word_input a p.
+    word_output o.
+    CELL "mod" [
+        ASSERT "a in range" (a '<' ''(2**(hw_size a -1))),
+        ASSERT "p in range" (('0 '<' p) '&' ((p '<' ''(2**(hw_size a -1))))),
+	o <- a '%' p
+];
+
+let p = mod 'a 'p 'o;
+
+p fseq (write_pexlif "spec_mod.pexlif" p) fseq ();
+
+quit;

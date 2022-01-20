@@ -603,9 +603,10 @@ proc idv:make_template {w c type} {
     set ext [file extension $file]
     if { $file != "" } {
 	switch $type {
-	    case verilog    { set file "$base.v" }
-	    case hfl	    { set file "$base.fl" }
-	    default	    {}
+	    verilog	{ set file "$base.v" }
+	    hfl		{ set file "$base.fl" }
+	    synthesis	{ set file "$base.v" }
+	    default	{}
 	}
 	if { ![regexp {^/.*} $file] && ![regexp {\.\./.*} $file] } {
 	    set file "$::idv(code_dir)/$file"
@@ -676,11 +677,14 @@ proc idv:do_fev {ww} {
 	    -command "idv:make_template $w $ww.c verilog"
 	button $w.f2.hfl -text "HFL" \
 	    -command "idv:make_template $w $ww.c hfl"
+	button $w.f2.synth -text "Synthesis" \
+	    -command "idv:make_template $w $ww.c synthesis"
 	pack $w.f2.l -side left -anchor w
 	pack $w.f2.e -side left -fill x -expand yes
 	pack $w.f2.dir -side left
 	pack $w.f2.verilog -side left -padx 5
 	pack $w.f2.hfl -side left -padx 5
+	pack $w.f2.synth -side left -padx 5
 
     labelframe $w.f3 -relief groove -text Implementation
     pack $w.f3 -side top -fill x -pady 10
@@ -750,6 +754,7 @@ proc idv:write_verilog {w} {
 	    -initialdir $::idv(code_dir) -title "Name file to write Verilog" \
 	    -confirmoverwrite 1]
     if { $file != "" } {
-	fl_save_verilog $w.c $file
+	set name [file rootname [file tail $file]]
+	fl_save_verilog $w.c $name $file
     }
 }

@@ -1081,6 +1081,49 @@ let generate_hfl_template fp p basename pexlif_file =
     (fprintf fp "quit;\n")
 ;
 
+let make_anon_names top_name p =
+    letrec mk_anon inst (PINST nm attrs lf fa_inps fa_outs ints (P_HIER chs)) =
+	let nm' = inst in
+	letrec do i (c:cs) =
+	    let inst' = sprintf "%s_%d" inst i in
+	    let c' = mk_anon inst' c then
+	    c' : (do (i+1) cs)
+	 /\   do i [] = []
+	in
+	let chs' = do 1 chs then
+	PINST nm' attrs lf fa_inps fa_outs ints (P_HIER chs')
+     /\   mk_anon inst (PINST nm attrs lf fa_inps fa_outs ints leaf) =
+	PINST inst attrs lf fa_inps fa_outs ints leaf
+    in
+    mk_anon top_name p
+;
+
+let save_verilog file name p =
+    let p' = make_anon_names name p then
+    let fp = fopen file "w" then
+    (pexlif2verilog fp p') fseq
+    (fclose fp) fseq
+    let fp = mktemp "ed_clean" then
+    let cmd_file = stream2filename fp then
+    (fprintf fp "1,$s/#/_qQ_/g\nwq\n") fseq
+    (fclose fp) fseq
+    let cmd = sprintf "/bin/ed %s < %s" file cmd_file then
+    (system cmd) fseq
+    (fprintf stdinfo "Finished saving Verilog file %s\n" file)
+;
+
+let create_verilog_load_file basename file pexlif_file =
+    let fp = mktemp "verilog_reader" then 
+    let load_file = stream2filename fp then
+    (fprintf fp "load \"ste.fl\";\n") fseq
+    (fprintf fp "let p = verilog2pexlif F \"-I.\" \"%s\" [\"%s\"] [];\n"
+		basename file) fseq
+    (fprintf fp "p fseq (write_pexlif \"%s\" p);\n" pexlif_file) fseq
+    (fprintf fp "\"===SuCcEsS===\";\n") fseq
+    (fprintf fp "quit;\n") fseq
+    (fclose fp) fseq
+    load_file
+;
 
 let fl_make_template canvas type file basename create =
     let vfsm = w2vfsm canvas then
@@ -1099,22 +1142,22 @@ let fl_make_template canvas type file basename create =
 	|
 	type = "verilog" =>
 	    val (PINST nm attrs lf fa_inps fa_outs ints body) = p in
-	    let fp = mktemp "verilog_reader" then 
-	    let load_file = stream2filename fp then
-	    (fprintf fp "load \"ste.fl\";\n") fseq
-	    (fprintf fp "let p = verilog2pexlif F -I. \"%s\" [\"%s\"] [];\n"
-			nm file) fseq
-	    (fprintf fp "p fseq (write_pexlif \"%s\" p);\n" pexlif_file) fseq
-	    (fprintf fp "\"===SuCcEsS===\";\n") fseq
-	    (fprintf fp "quit;\n") fseq
-	    (fclose fp) fseq
+	    let load_file =
+		create_verilog_load_file basename file pexlif_file
+	    then
 	    (create = 0 => () |
-		let p' = PINST nm attrs lf fa_inps fa_outs [] (P_HIER []) in
-		let fp = fopen file "w" then
-		(pexlif2verilog fp p') fseq
-		(fclose fp)
+	      let p' = PINST basename attrs lf fa_inps fa_outs [] (P_HIER []) in
+	      let fp = fopen file "w" then
+	      (pexlif2verilog fp p') fseq
+	      (fclose fp)
 	    ) fseq
 	    load_file
+	|
+	type = "synthesis" =>
+	    (save_verilog file basename p) fseq
+	    let cmd = sprintf "yosys -o %s -S %s" file file then
+	    (system cmd) fseq
+	    create_verilog_load_file basename file pexlif_file
 	|
 	eprintf "Unknown template type (%s)" type
     then
@@ -1593,11 +1636,10 @@ let make_theorem transform_name spec imp =
     (record_transformation signature tr)
 ;
 
-let fl_save_verilog canvas file =
+let fl_save_verilog canvas name file =
     let vfsm = w2vfsm canvas in
     let p = get_idv_current_pexlif canvas then
-    let fp = fopen file "w" then
-    (pexlif2verilog fp p) fseq
-    (fclose fp)
+    save_verilog file name p
 ;
 export_to_tcl fl_save_verilog;
+

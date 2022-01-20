@@ -1,0 +1,24 @@
+load "ste.fl";
+TYPE "bv16" 16;
+TYPE "bv32" 32;
+
+let zx_imply_range_property =
+    bv16_input   i1.  // a[15:0]
+    bv32_output   o1.  // za[31:0]
+    CELL "zx_imply_range_property" [
+    o1 <- ZX i1,
+    ASSERT "in_range" (o1 '<' ''(2**16))
+];
+
+
+let p = zx_imply_range_property
+                {(_s2_var "a[15:0]")::bv16}
+                {(_s2_var "za[31:0]")::bv32}
+;
+p fseq ();
+
+let pp = wrap_pexlif p;
+
+pp;
+
+unfold_pexlif pp 1;

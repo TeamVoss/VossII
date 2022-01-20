@@ -1,0 +1,9 @@
+load "idv.fl";
+
+set_font font_large;
+
+// Workaround problem with Verilog writer.
+(update_vossrc "RECURSION-CALL-LIMIT" "1000000") fseq ();
+
+IDV "DB_collatz" [];
+

@@ -3528,3 +3528,21 @@ let ASSERT {name::string} {expr::bit} =
     lhs <- pred
 ;
 
+// Create a balanced tree of 'op' functions.
+// op needs to be of type *a->*a->*a.
+letrec reduce_tree op =
+    list_input  il.
+    output      o.
+    internal    m1 m2.
+    CELL "draw_hier reduce_tree" (
+        let l = length il in
+        l = 1 => [o <- (hd il)] |
+        let high = firstn (l/2) il in
+        let low  = butfirstn (l/2) il in
+	[
+            reduce_tree op high m1,
+            reduce_tree op low m2,
+            o <- op m1 m2
+	]
+);
+

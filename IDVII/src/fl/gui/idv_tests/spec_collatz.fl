@@ -1,0 +1,44 @@
+load "ste.fl";
+
+TYPE "word" 16;
+
+let collatz = 
+    bit_input clk.
+    bit_input start.
+    word_input t0.
+    bit_output done.
+    word_output out.
+    //
+    word_internal length.
+    word_internal t newt new_length.
+    bit_internal eq1 new_done.
+    bit_internal is_even is_odd.
+    CELL "draw_hier collatz_dd" [
+	re_ff clk newt t,
+	eq1 <- (t '=' '1), 
+	is_even <- ((t '%' '2) '=' '0), 
+	is_odd <- '~' is_even,
+	CASE newt [
+	    start --- t0,
+	    eq1 --- t,
+	    is_odd --- ('3 '*' t '+' '1),
+	    is_even --- (t '/' '2)
+	] t,
+	CASE new_length [
+	    start --- '0,
+	    eq1   --- length
+	] (length '+' '1),
+	CASE new_done [
+	    start --- '0,
+	    eq1   --- '1
+	] done,
+	re_ff clk new_done done,
+	re_ff clk new_length length,
+	re_ff_en clk eq1 length out
+];
+
+let p = collatz 'clk 'start 't0 'done 'out;
+
+p fseq (write_pexlif "spec_collatz.pexlif" p) fseq ();
+
+quit;
