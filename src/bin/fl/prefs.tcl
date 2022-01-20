@@ -14,6 +14,8 @@ set voss2_preferences {
  {"Runtime" "" "" "header" ""}
     {"RECURSION-CALL-LIMIT" "RCcall_limit"
 	"Maximum recursion limit" "int" "10000"}
+    {"STORE-SIGNATURE" "RCstore_signature"
+	"Store a SHA256 signature for each symbol" "bool" "FALSE"}
 
  {"BDD" "" "" "header" ""}
     {"DYNAMIC-ORDERING" "RCdo_dynamic_var_order"
@@ -59,6 +61,8 @@ set voss2_preferences {
         "Print high-low expression for failing nodes" "bool" "TRUE"}
     {"PRINT-TIME" "RCprint_time"
         "Print time points during simulation" "bool" "TRUE"}
+    {"PRINT-TIME-MOD" "RCprint_time_mod"
+        "Print time points only mod this number during simulation" "int" "1"}
     {"STEP-LIMIT" "RCStep_limit"
         "Maximum number of simulation steps" "int" "100"}
     {"ACCURATE-ITE-COMP" "RCaccurate_ite_comp"
@@ -74,7 +78,7 @@ set voss2_preferences {
     {"MAXIMUM-NUMBER-ERRORS-REPORTED" "RCmax_nbr_errors"
         "Limit number of error messages for a single command" "int" "5"}
     {"VERBOSE-EVAL-COMMAND" "RCverbose_eval_command"
-	"Treat 'eval' as top-level input w.r.t. output" "bool" "TRUE"}
+	"Treat 'eval' as top-level input w.r.t. output" "bool" "FALSE"}
     {"PRINT_ALIASES" "RCprint_aliases_flag"
         "Print aliases in addition to base node name" "bool" "TRUE"}
     {"PRINT-FORMAT" "RCpr_str"

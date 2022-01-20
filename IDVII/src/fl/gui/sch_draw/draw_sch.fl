@@ -4,14 +4,14 @@
 //-------------------------------------------------------------------
 
 let Init_sch_draw =
-  tcl_eval [
+  (tcl_eval [
    sprintf "set ::imagedir %s%s" DIR "images",
    sprintf
      "load %s../../../../schematic_draw_module.so"
      DIR,
    sprintf "source %s/draw_sch.tcl" DIR,
    sprintf "source %s/waveform.tcl" DIR
-  ]
+  ]) fseq ()
 ;
 Init_sch_draw;
 
@@ -338,14 +338,16 @@ let add_active_sch_tab_window vfsm canvas vis cmd =
     (add_command vfsm cmd)
 ;
 
-forward_declare {idv_finish_transformation:: string->void};
+forward_declare {idv_finish_transformation:: string->bool};
 
 let fl_remove_active_sch_tab_window canvas =
     let vfsm = w2vfsm canvas then
-    (is_STE_ENV vfsm => () | idv_finish_transformation canvas) fseq
+    let commit = is_STE_ENV vfsm => T | idv_finish_transformation canvas then
+    NOT commit => F |
     let rcanvas_list = vfsm2canvases_r vfsm then
     let new = filter (\(c,_). c != canvas) (deref rcanvas_list) then
-    (rcanvas_list := new)
+    (rcanvas_list := new) fseq
+    T
 ;
 export_to_tcl fl_remove_active_sch_tab_window;
 

@@ -83,7 +83,7 @@ letrec Gfp fn cur =
 
 letrec Lfp fn cur =
     let new = cur AND (fn cur) in
-    IF (new == cur) THEN cur ELSE Gfp fn new
+    IF (new == cur) THEN cur ELSE Lfp fn new
 ;
 
 

@@ -25,6 +25,12 @@ andlettype transform =
                             {justification:: justification list}
 ;
 
+let get_transform_name (TRANSFORM name spec imp just) = name;
+let get_transform_spec (TRANSFORM name spec imp just) = spec;
+let get_transform_imp (TRANSFORM name spec imp just) = imp;
+let get_transform_just (TRANSFORM name spec imp just) = just;
+
+
 lettype evis =
 	    BASE_VIS
 		    {vw::vis}

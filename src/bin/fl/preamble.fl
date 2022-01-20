@@ -109,6 +109,7 @@ let quit = exit 0;
 
 let stdout = fopen "stdout" "w";
 let stderr = fopen "stderr" "w";
+let stdinfo = fopen "stdinfo" "w";
 
 export_to_tcl update_vossrc;
 export_to_tcl get_vossrc;
@@ -208,22 +209,59 @@ letrec map2 fn l1 l2 =
 // It is an error if the lengths of the lists are not the same.
 //
 letrec map3 fn l1 l2 l3 =
-    empty l1 => empty l2 =>
-			    empty l3 => [] |
-			    error "list3 longer than lists 1 and 2 in map3"
-			  |
-			    error "list2 longer than list1 in map3"
-	     |
-	        empty l2 =>
-			    error "list1 longer than list2 in map3"
-		|
-		empty l3 =>
-			    error "list3 shorter than lists 1 and 2 in map3"
-    |
+    let empties = map empty [l1,l2,l3] in
+    let idx = find_first0 (\e. e != (hd empties)) empties then
+    idx != 0 => eprintf "Length mismatch in map3. |l1| != |l%d|" idx |
+    (hd empties) => [] |
     val (a:as) = l1 in
     val (b:bs) = l2 in
     val (c:cs) = l3 in
     (fn a b c):(map3 fn as bs cs)
+;
+
+// Similar to map, map2 and map3 except operating over four lists.
+// It is an error if the lengths of the lists are not the same.
+letrec map4 fn l1 l2 l3 l4 =
+    let empties = map empty [l1,l2,l3, l4] in
+    let idx = find_first0 (\e. e != (hd empties)) empties then
+    idx != 0 => eprintf "Length mismatch in map4. |l1| != |l%d|" idx |
+    (hd empties) => [] |
+    val (a:as) = l1 in
+    val (b:bs) = l2 in
+    val (c:cs) = l3 in
+    val (d:ds) = l4 in
+    (fn a b c d):(map4 fn as bs cs ds)
+;
+
+// Similar to map, map2 etc. except operating over five lists.
+// It is an error if the lengths of the lists are not the same.
+letrec map5 fn l1 l2 l3 l4 l5 =
+    let empties = map empty [l1,l2,l3, l4, l5] in
+    let idx = find_first0 (\e. e != (hd empties)) empties then
+    idx != 0 => eprintf "Length mismatch in map5. |l1| != |l%d|" idx |
+    (hd empties) => [] |
+    val (a:as) = l1 in
+    val (b:bs) = l2 in
+    val (c:cs) = l3 in
+    val (d:ds) = l4 in
+    val (e:es) = l5 in
+    (fn a b c d e):(map5 fn as bs cs ds es)
+;
+
+// Similar to map, map2 etc. except operating over six lists.
+// It is an error if the lengths of the lists are not the same.
+letrec map6 fn l1 l2 l3 l4 l5 l6 =
+    let empties = map empty [l1,l2,l3, l4, l5, l6] in
+    let idx = find_first0 (\e. e != (hd empties)) empties then
+    idx != 0 => eprintf "Length mismatch in map6. |l1| != |l%d|" idx |
+    (hd empties) => [] |
+    val (a:as) = l1 in
+    val (b:bs) = l2 in
+    val (c:cs) = l3 in
+    val (d:ds) = l4 in
+    val (e:es) = l5 in
+    val (f:fs) = l6 in
+    (fn a b c d e f):(map6 fn as bs cs ds es fs)
 ;
 
 // Apply f to every element of list and join the results together.
@@ -668,6 +706,9 @@ end_abstype print_vectors enumerate_examples;
 begin_abstype;
 let loaded_files_ref = ref {[]::string list};
 
+let get_cloaded_files {dummy::void} = deref loaded_files_ref;
+non_lazy get_cloaded_files;
+
 // Load the fl file 'filename' if it has not been loaded before.
 // Usage: cload filename;
 let cload filename =
@@ -700,7 +741,7 @@ let cload filename =
     (loaded_files_ref := (full_name:(deref loaded_files_ref)))
 ;
 non_lazy cload;
-end_abstype cload;
+end_abstype get_cloaded_files cload;
 
 // Replace all current state variables (not ending in _n) with their
 // corresponding next-state variables in all the BDDs in fs.

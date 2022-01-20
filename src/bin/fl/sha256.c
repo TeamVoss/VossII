@@ -22,6 +22,7 @@
 /************************************************************************/
 #include "sha256.h"
 #include "graph.h"
+#include "symbol.h"
 
 /* ------------- Global variables ------------- */
 
@@ -276,6 +277,7 @@ sha256_signature(g_ptr redex)
     } else {
 	MAKE_REDEX_FAILURE(redex, FailBuf);
     }
+    End_SHA256(sha);
     start_envp = old_start_envp;
     dispose_hash(&g_tbl, NULLFCN);
     DEC_REF_CNT(l);
@@ -312,6 +314,40 @@ Begin_SHA256()
     SHA256_init (ctx);
     return ctx;
 }
+
+void
+End_SHA256(SHA256_ptr ctx)
+{
+    ctx->in_use = FALSE;
+    free_rec(&sha256_rec_mgr, ctx);
+}
+
+string
+Get_SHA256_signature(g_ptr node)
+{
+    SHA256_ptr sha = Begin_SHA256();
+    hash_record  g_tbl;
+    create_hash(&g_tbl, 1000, ptr_hash, ptr_equ);
+    int	g_cnt = 1;
+    jmp_buf	tc_start_env;
+    jmp_buf	*old_start_envp = start_envp;
+    start_envp = &tc_start_env;
+    string sig;
+    if( setjmp(*start_envp) == 0 ) {
+	SHA256_traverse_graph(&g_cnt, &g_tbl, sha, node);
+	sig = Get_SHA256_hash(sha);
+    } else {
+	char buf[10];
+	sprintf(buf, "%p", node);
+	sig = wastrsave(&strings, buf);
+    }
+    End_SHA256(sha);
+    start_envp = old_start_envp;
+    dispose_hash(&g_tbl, NULLFCN);
+    return sig;
+}
+
+
 
 #define SHA_BUF_SIZE	    4096
 static char fbuf[SHA_BUF_SIZE];
@@ -469,9 +505,8 @@ SHA256_traverse_graph(int *g_cntp, hash_record *g_tblp,
 		    return res;
 		case USERDEF:
 		{
-		    s = Get_userdef_name(node);
-		    int version = GET_VERSION(node);
-		    SHA256_printf(sha, "%d=UD %s %d", res, s, version);
+		    fn_ptr fn = GET_USERDEF(node);
+		    SHA256_printf(sha, "%d=UD %s", res, fn->signature);
 		    return res;
 		}
 		default:

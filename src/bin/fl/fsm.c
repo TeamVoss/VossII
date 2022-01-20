@@ -32,6 +32,7 @@ extern int		RCStep_limit;
 extern bool		RCprint_failures;
 extern bool		RCverbose_ste_run;
 extern bool		RCprint_time;
+extern bool		RCprint_time_mod;
 extern bool		RCaccurate_ite_comp;
 extern bool		RCaccurate_hierachy_visualization;
 extern g_ptr		void_nd;
@@ -721,7 +722,8 @@ gSTE(g_ptr redex, value_type type)
 		Sprintf(buf, "simulation_update %d", t);
 		Info_to_tcl(buf);
 	    } else {
-		FP(sim_fp, "Time: %d\n", t);
+		if( (t % RCprint_time_mod) == 0 )
+		    FP(sim_fp, "Time: %d\n", t);
 	    }
 	}
 	process_event(event_bufp, t);
@@ -4958,7 +4960,9 @@ compute_sha256_signature(fsm_ptr fsm)
         if( cp->outs != NULL ) SHA256_printf(sha, "]");
         SHA256_printf(sha, "\n");
     }
-    return( Get_SHA256_hash(sha) );
+    string res = Get_SHA256_hash(sha);
+    End_SHA256(sha);
+    return( res );
 }
 
 

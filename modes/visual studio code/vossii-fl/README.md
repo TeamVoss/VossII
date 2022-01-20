@@ -2,14 +2,14 @@
 
 This extension adds language support for [Voss II](https://github.com/TeamVoss/VossII)'s functional language fl to Visual Studio Code.
 
-Tested for VossII version 1.0 (built on [2021-05-29](https://github.com/TeamVoss/VossII/tree/b0f5b42fed868729a238039cf53f143ebcbbb54c)).
+Tested for VossII version 1.0 (built on [2021-11-22](https://github.com/TeamVoss/VossII/commit/6607e740c0396776fc5a6c39db60c774a10b50b9)).
 
 ## Features
 
 Features include:
 
 - Basic syntaxic highlighting for fl (tested in Dark+ and Light+ themes)
-- Basic syntaxic highlighting for jl (Jeremy's small language used to compile assembly like code to hfl)
+- Basic syntaxic highlighting for bifrost (Jeremy's language used to compile assembly like code to hfl)
 - Commands to send files/lines/selections to an fl interpreter with
 	predefined shortcuts
 - Tooltips generated from fl's help texts

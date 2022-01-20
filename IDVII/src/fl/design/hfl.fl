@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
-
 lettype *a hw_type =
     HW_TYPE
 	{hw_type_name:: *a -> string}
@@ -1336,6 +1335,8 @@ sized_binder_with_accumulator list_internal CELL;
 
 let hw_types_decl_ref = ref {[]::(string#int) list};
 
+let is_hw_type name = mem name (map fst (deref hw_types_decl_ref));
+
 let get_hw_type_size name =
     assoc name (deref hw_types_decl_ref)
 ;
@@ -2333,13 +2334,6 @@ let al_latch =
 	base_al_latch d clk out
 ];
 
-let ` {i::int} =
-    let sz = hw_size {undefined:: *r} in
-    let w = W_CONST sz i in
-    {hw_constr w:: *r}
-;
-prefix 0 `;
-
 
 let extract_bit v idx =
     let wbits = hw_destr v in
@@ -3187,7 +3181,6 @@ let get_uniq_prefix sp =
 ;
 
 
-
 // Flatten the pexlif until the stop_pred is satisfied.
 // Intermediate wire names are created on demand and are named
 // i<number>/i<number>/.../<name> where the i<number>s refere to
@@ -3240,7 +3233,10 @@ let gen_flatten_pexlif stop_pred p =
             (md_expand_vectors ints)
     in
     let ints' = ints@(md_extract_vectors (all subtract declared)) in
-    (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER children))
+    let res =
+	(PINST name attrs leaf fa_inps fa_outs ints' (P_HIER children))
+    then
+    res
 ;
 
 // A simple stop-predicate for flatten_pexlif that can be used to
@@ -3437,4 +3433,74 @@ let remove_wrappers p =
     clean p
 ;
 
+let ` typed_result = hw_destr typed_result;
 
+
+let pexlif_compile_dir = ref {(error "No pexlif cache directory"):: string};
+
+let set_pexlif_cache dir =
+    (file_exists dir => () |
+	let cmd = sprintf "mkdir -p %s" dir then
+	system cmd != 0 =>
+	    eprintf "Cannot create pexlif cache directory (%s)" dir
+	|
+	()
+    ) fseq
+    (pexlif_compile_dir := dir);
+;
+
+set_pexlif_cache (sprintf "/tmp/%s/Pexlif_Cache" USER);
+
+let _pExLiF_ = ref {(error "no pexlif") :: pexlif};
+
+let pcompile fn =
+    let pdir = (deref pexlif_compile_dir) in
+    let rtype = get_return_type fn then
+    rtype != "pexlif" =>
+	(fprintf stderr "Return type not pexlif (%s). pcompile aborted\n" rtype)
+	fseq ()
+    |
+    let args = get_args fn then
+    let idx = find_first0 (\(a,tp). NOT (is_hw_type tp)) args in
+    idx != 0 =>
+	val (arg,tp) = el idx args in
+	(fprintf stderr
+	     "Argument %s not a simple hw_type (%s). pcompile for %s aborted\n"
+	      arg tp fn
+	) fseq ()
+    |
+    let pre = sprintf "let foo = %s " fn in
+    let post = " then (_pExLiF_ := foo);" in
+    let cmd = list2str T pre " " post (sprintf "'%s") (map fst args) then
+    let pexlif_expr = (eval cmd) fseq (deref _pExLiF_) in
+    let sig = get_symbol_signature fn then
+    let pexlif_file = sprintf "%s/%s.pexlif" pdir sig in
+    let exists = file_exists pexlif_file then
+    let p =
+	exists =>
+	    // Load from file
+	    (fprintf stdinfo "-- Loading pre-compiled version of %s --\n" fn)
+	    seq
+	    read_pexlif pexlif_file
+	|
+	    (fprintf stdinfo "-- Compiling %s --\n" fn) fseq
+	    let p = pexlif_expr then
+	    (write_pexlif pexlif_file p) fseq
+	    p
+    then
+    (_pExLiF_ := p) fseq
+    let get_base (f,a) = hd (str_split f "[") in
+    let f_inps = setify (map get_base (pexlif_get_fa_inps p)) in
+    let pre = (sprintf "begin_abstype; let p = deref _pExLiF_; p fseq ();\n") ^
+	      (sprintf "let %s =\n" fn)
+    in
+    let mk_arg (name,tp) =
+	mem name f_inps => sprintf "    %s_input %s.\n" tp name
+			 | sprintf "    %s_output %s.\n" tp name
+    in
+    let post = sprintf "  CELL \"\" [p];\nend_abstype %s;\n" fn in
+    let cmd = list2str T pre "" post mk_arg args then
+    (eval cmd) fseq
+    ()
+;
+free_binder pcompile;

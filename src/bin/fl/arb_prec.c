@@ -149,7 +149,11 @@ Arbi_sweep(void)
 arbi_T
 Arbi_FromString(char *s, int base)
 {
-    return(arbi_collect(arbi__FromString(s, base)));
+    if( *s == '-' ) {
+	return(arbi_collect(arbi__neg(arbi__FromString(s+1, base))));
+    } else {
+	return(arbi_collect(arbi__FromString(s, base)));
+    }
 }
 
 char *

@@ -586,6 +586,14 @@ Type2String(typeExp_ptr type)
     Print_Type(type, FILE_fp, TRUE, TRUE);
     fclose(odests_fp);
     odests_fp = NULL;
+    int len = strlen(type_buf);
+    if( len > 1 ) {
+	string p = type_buf+len-1;
+	while( p > type_buf && (*p == '\n' || *p == ' ') ) {
+	    *p = 0;
+	    p--;
+	}
+    }
     return( wastrsave(&strings, type_buf) );
 }
 

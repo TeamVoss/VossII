@@ -7,11 +7,12 @@
 # Constants
 # ---------------------------------------------------
 
-proc idv:create_idv_gui {w} {
+proc idv:create_idv_gui {w rw_db} {
     catch {destroy $w}
     toplevel $w
     wm geometry $w -20+100
     set nb $w.nb
+    set ::idv(code_dir) "$rw_db/code"
     ttk::notebook $nb -width 1200 -height 700
     bind $nb <<NotebookTabChanged>> [list idv:inform_canvas_change $w]
     pack $nb -side top -expand y -fill both
@@ -90,6 +91,13 @@ proc idv:create_idv_gui {w} {
 		-font $::voss2_txtfont
 	    set ::modelbrowser(db) [lindex $dbs 0]
 
+	    ttk::labelframe $p.search.visible -relief flat -text \
+		    "Model class: " \
+		    -labelanchor w
+	    tk_optionMenu $p.search.visible.ch ::modelbrowser(visible) \
+		    Imported "User given" All
+	    set ::modelbrowser(visible) Imported
+
 	    #
 	    ttk::labelframe $p.search.pat_lbl -relief flat -text "Pattern: " \
 		    -labelanchor w
@@ -104,6 +112,8 @@ proc idv:create_idv_gui {w} {
 	pack $p.search -side top -pady 10 -fill x
 	    pack $p.search.lbl -side top -fill x
 		pack $p.search.lbl.c -side left -fill x -expand yes
+	    pack $p.search.visible -side top -fill x
+		pack $p.search.visible.ch -side left -fill x -expand yes
 	    pack $p.search.pat_lbl -side top -fill x
 		pack $p.search.pat_lbl.c -side left -fill x -expand yes
 	    pack $p.search.refresh -side top -fill x
@@ -173,7 +183,8 @@ proc idv:update_idv_list {} {
     $lb delete 0 end
     set db $::modelbrowser(db)
     set pat $::modelbrowser(pattern)
-    if { ![catch {fl_get_idv_models $w.c $db $pat} vecs] } {
+    set vis $::modelbrowser(visible)
+    if { ![catch {fl_get_idv_models $w.c $db $vis $pat} vecs] } {
 	foreach v $vecs {
 	    $lb insert end $v
 	}
@@ -239,6 +250,12 @@ proc idv:create_idv_menu {nb w} {
         balloon $w.menu.new_transf \
 		"Start new transformation sequence from selected instances"
         pack $w.menu.new_transf -side left -padx 5
+
+        button $w.menu.db_replace -image $::icon(db_replace) \
+                -command "idv:db_replace $w"
+        balloon $w.menu.db_replace \
+		"Find and apply a database transformation"
+        pack $w.menu.db_replace -side left -padx 5
 
         button $w.menu.fold -image $::icon(fold) \
                 -command "idv:fold $w"
@@ -315,6 +332,8 @@ proc idv:merge {w} { fl_do_merge $w.c }
 
 proc idv:new_transf {w} { fl_do_new_tranf $w.c }
 
+proc idv:db_replace {w} { fl_do_replacement $w.c }
+
 proc idv:new_toplevel_transf {w sl} {
     set idx [$sl curselection]
     if { $idx != "" } {
@@ -323,6 +342,51 @@ proc idv:new_toplevel_transf {w sl} {
 	fl_do_new_toplevel_transf $w $db $cur
     }
 }   
+
+proc idv:return_select_replacement {w op} {
+    set ::idv(replacement_command) $op
+    set slb $w.lf.list
+    if { $op == "Cancel" } { 
+	set ::idv(replacement_idx) -1
+    } else {
+	set ::idv(replacement_idx) [$slb curselection]
+    }
+    destroy $w
+}
+
+proc idv:select_replacement {c alts} {
+    set w .select_transf
+    catch {destroy $w}
+    vis_toplevel $w $c {} {} "Select transform"
+    set f $w.lf
+    frame $f -relief flat
+    scrollbar $f.yscroll -command "$f.list yview"
+    scrollbar $f.xscroll -orient horizontal -command "$f.list xview"
+    listbox $f.list -setgrid 1 \
+	-yscroll "$f.yscroll set" -xscroll "$f.xscroll set" \
+	-selectmode single -font $::voss2_txtfont
+    pack $f.yscroll -side right -fill y
+    pack $f.xscroll -side bottom -fill x
+    pack $f.list -side top -fill both -expand yes
+    pack $f -side top -fill both -expand yes
+
+    set b $w.buttons
+    frame $b
+    pack $b -side top
+	button $b.cancel -text Cancel \
+	    -command "idv:return_select_replacement $w Cancel"
+	pack $b.cancel -side left -padx 10
+	button $b.appl1 -text "Apply Once" \
+	    -command "idv:return_select_replacement $w ApplyOnce"
+	pack $b.appl1 -side left -padx 10
+	button $b.appln -text "Apply Everywhere" \
+	    -command "idv:return_select_replacement $w ApplyEverywhere"
+	pack $b.appln -side left -padx 10
+    #
+    tkwait window $w
+    return [list $::idv(replacement_command) $::idv(replacement_idx)]
+}
+
 
 proc idv:perform_name_transf {w c op} {
     set ::idv(transf_op) $op
@@ -344,49 +408,37 @@ proc idv:perform_name_transf {w c op} {
     }
 }
 
-proc idv:name_transform_and_use {c} {
+proc idv:name_transform_and_use {c tr_name model_name} {
     set w .idv_name
     catch {destroy $w}
     i_am_busy
-    vis_toplevel $w $c {} {} "Name transform"
+    vis_toplevel $w $c {} {} "Name and apply transform"
     set toplevel_transf [fl_is_toplevel_transform $c]
-    set ::idv(spec_name) ""
-    set ::idv(imp_name) ""
-    #
-    if { $toplevel_transf == 0 } {
-	frame $w.spec_name
-	pack $w.spec_name -side top -fill x
-	    label $w.spec_name.l -text "Optional name of specification: "
-	    entry $w.spec_name.e -textvariable ::idv(spec_name) -width 30
-	    pack $w.spec_name.e -side right
-	    pack $w.spec_name.l -side left -fill x -anchor w
-    }
+    set ::idv(transf_name) $tr_name
+    set ::idv(imp_name) $model_name
     #
     frame $w.namef
-    set ::idv(transf_name) ""
     pack $w.namef -side top -fill x
 	label $w.namef.l -text "Name of transformation: "
 	entry $w.namef.e -textvariable ::idv(transf_name) -width 30
 	pack $w.namef.e -side right
 	pack $w.namef.l -side left -fill x -anchor w
-
     #
     frame $w.imp_name
     pack $w.imp_name -side top -fill x
-	if { $toplevel_transf } {
-	    label $w.imp_name.l -text "Name of final model: "
-	} else {
-	    label $w.imp_name.l -text "Optional name of final model: "
-	}
+	label $w.imp_name.l -text "Name of final model: "
 	entry $w.imp_name.e -textvariable ::idv(imp_name) -width 30
 	pack $w.imp_name.e -side right
 	pack $w.imp_name.l -side left -fill x -anchor w
-
+    #
     frame $w.buttons
     pack $w.buttons -side top
 	button $w.buttons.cancel -text Cancel \
 	    -command "idv:perform_name_transf $w $c Cancel"
 	pack $w.buttons.cancel -side left -padx 10
+	button $w.buttons.discard -text Discard \
+	    -command "idv:perform_name_transf $w $c Discard"
+	pack $w.buttons.discard -side left -padx 10
 	button $w.buttons.save -text Save \
 	    -command "idv:perform_name_transf $w $c Save"
 	pack $w.buttons.save -side left -padx 10
@@ -403,15 +455,8 @@ proc idv:name_transform_and_use {c} {
 	label $w.errors.l -text ""
 	pack $w.errors.l -side top -fill x
     pack $w.errors -side top
-
     tkwait window $w
     i_am_free
-    if { $::idv(spec_name) == "" } {
-	set ::idv(spec_name) "."
-    }
-    if { $::idv(imp_name) == "" } {
-	set ::idv(imp_name) "."
-    }
     return [list $::idv(transf_op) $::idv(transf_name) $::idv(imp_name)]
 }
 
@@ -506,7 +551,43 @@ proc idv:ask_for_model_name {w} {
     return $::idv_prompt_name
 }
 
+proc idv:edit_and_load {w file load_file pexlif_file} {
+    set ew .editor
+    while 1 {
+        catch {destroy $ew}
+        toplevel $ew -container 1 -width 580 -height 564
+        set x [winfo x $w]
+        set y [winfo y $w]
+        wm geometry $ew +$x+$y
+        update idletasks
+        set wid [expr [winfo id $ew]]
+        set edit "/usr/bin/X11/xterm -into $wid -sb -sl 20000 -j \
+                  -rw -ls -bg white -fg black -fn 7x14 -geometry 80x40 \
+                  -e /usr/bin/vi $file"
+        # Edit the file
+        util:bg_exec $edit 0 {} $w
+        # Try compile the model
+        set res [util:try_program $w "Loading failed" \
+                                  {{Cancel cancel} {{Re-edit} again}} \
+                                  fl -noX -unbuf_stdout -F $load_file]
+        switch $res {
+            ok  {
+                    destroy $ew;
+                    return $pexlif_file;
+                }
+            cancel {
+                    destroy $ew;
+                    return ""
+                }
+            again {}
+        }
+    }
+}
+
+
+
 proc idv:make_template {w c type} {
+    set ::idv(fev_imp_file) ""
     set file $::idv(fev_template_file)
     set base [file rootname $file]
     set ext [file extension $file]
@@ -516,13 +597,25 @@ proc idv:make_template {w c type} {
 	    case hfl	    { set file "$base.fl" }
 	    default	    {}
 	}
-	if { [file exists $file] } {
-	    set reply [tk_messageBox -message "File exists. Overwrite?" \
-				     -type yesno -parent $w]
-	    if { $reply != "yes" } { return }
+	if { ![regexp {^/.*} $file] && ![regexp {\.\./.*} $file] } {
+	    set file "$::idv(code_dir)/$file"
 	}
-	fl_make_template $c $type $file $base
-	set ::idv(fev_imp_file) "$base.pexlif"
+	set create_file 1
+	if { [file exists $file] } {
+	    set reply [tk_messageBox \
+			    -message "File exists. Overwrite it?:" \
+			    -icon question -default no -type yesnocancel \
+			    -parent $w]
+	    switch $reply {
+		yes	{ set_create_file 1;  }
+		no	{ set create_file 0; }
+		cancel  {return}
+	    }
+	}
+	val {pexlif_file load_file} \
+		[fl_make_template $c $type $file $base $create_file]
+	set ::idv(fev_imp_file) \
+		[idv:edit_and_load $w $file $load_file $pexlif_file]
     }
 }
 
@@ -567,7 +660,8 @@ proc idv:do_fev {ww} {
 	label $w.f2.l -text "Make template in:" -width 20 -justify left \
 	    -anchor w
 	entry $w.f2.e -textvariable ::idv(fev_template_file) -width 30
-	button $w.f2.dir -image $::icon(folder) -command idv:fev_template_file
+	button $w.f2.dir -image $::icon(folder) \
+	    -command "idv:fev_template_file $::idv(code_dir)"
 	button $w.f2.verilog -text "Verilog" \
 	    -command "idv:make_template $w $ww.c verilog"
 	button $w.f2.hfl -text "HFL" \
@@ -606,12 +700,12 @@ proc idv:do_fev {ww} {
 
 }
 
-proc idv:fev_template_file {} {
+proc idv:fev_template_file {code_dir} {
     set types {
         {{All Files}        *             }
     }
     set file [tk_getSaveFile -filetypes $types \
-                                 -title "Pexlif file to load"]
+		-initialdir $code_dir -title "Template file to load"]
     set ::idv(fev_template_file) $file
 }
 
@@ -626,3 +720,6 @@ proc idv:fev_pexlif {w} {
 }
 
 proc idv:do_rename_wires {w} { fl_rename_wires $w.c }
+
+proc done_edit_proc {args} { }
+

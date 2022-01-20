@@ -19,7 +19,7 @@
 
 See the extension's [README](./vossii-fl/README.md) for a detailed list of features. These include :
 
-- syntax coloring
-- command to send code to fl
+- syntax coloring for fl and bifrost
+- commands to send code to the fl interpretor (line/paragraph/file)
 - help tooltip when hovering over functions/operators
 - go to definition

@@ -122,6 +122,7 @@ typedef struct fn_rec {
         oll_ptr		    overload_list;
 	impl_arg_ptr	    implicit_args;
 	arg_names_ptr	    arg_names;
+        string		    signature;
         fn_ptr		    next;
 } fn_rec;
 

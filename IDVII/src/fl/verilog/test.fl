@@ -1,8 +1,9 @@
-load (DIR^"grammar.fl");
-load (DIR^"pretty-verilog.fl");
-load (DIR^"pretty-pexlif.fl");
-load (DIR^"../design/pexlif.fl");
-load "ste.fl";
+(cload (DIR^"grammar.fl")) fseq
+(cload (DIR^"pretty-verilog.fl")) fseq
+(cload (DIR^"pretty-pexlif.fl")) fseq
+(cload (DIR^"../design/pexlif.fl")) fseq
+(cload "ste.fl") fseq
+();
 //todo: Seems to be loading the same files multiple times?
 
 // =============================================================================

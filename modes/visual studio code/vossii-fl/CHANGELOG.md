@@ -2,6 +2,11 @@
 
 All notable changes to the "vossii-fl" extension will be documented in this file.
 
+## Version 1.3.0 - 2021-11-22
+
+- Rename jl to official name bifrost
+- Update bifrost syntax coloring
+
 ## Version 1.2.0 - 2021-07-18
 
 - Added support for Jeremy's language

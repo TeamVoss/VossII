@@ -249,6 +249,11 @@ let implode cl = defix implode cl;
 // Convert the integer i to a string.
 let int2str i = defix int2str i;
 
+
+// Load the file name filename. If verbose is F make the loading quiet.
+// Otherwise, print out a statement saying "--- Loading...."
+let _load filename verbose = (defix _load) filename verbose;
+
 // Load a file into fl's interpreter.
 // Note that the DIR keyword can be used to prepend the directory the
 // current file being loaded resides in. Thus, if file foo.fl is in
@@ -350,6 +355,11 @@ let tl l = defix tl l;
 // Evaluate e and return the pair (e',t), where e' is the result of
 // fully evaluating e and t is the time it takes to evaluate e.
 let time e = defix time e;
+
+// Evaluate e and return the pair (e',t), where e' is the result of
+// fully evaluating e and t is the time it takes to evaluate e.
+// The resolution is in ns (real value).
+let etime e = defix etime e;
 
 // Update the value of the vossrc (option) key and set its
 // new value to v. The function returns the old value.
@@ -1507,3 +1517,21 @@ let get_abstract_depends ste obj = (defix get_abstract_depends) ste obj;
 // sha256_signature (\\y.y+1), since the lambda expressions are compiled into
 // combinator code as part of the evaluation of the function.
 let sha256_signature obj = (defix sha256_signature) obj;
+
+
+// Return a list of (name,type) for all arguments of the function fn.
+// This function fails if the argument is an overloaded (implicitly or
+// explicitly) function.
+let get_args fn = (defix get_args) fn;
+
+// Return the type of the result of a function.
+// This function fails if the argument is an overloaded (implicitly or
+// explicitly) function.
+let get_return_type fn = (defix get_return_type) fn;
+
+// Return the SHA256 signature of the function fn.
+// This function fails if the argument is an overloaded (implicitly or
+let get_symbol_signature fn = (defix get_symbol_signature) fn;
+
+// The id of the user invoking fl.
+let USER = (defix USER);
