@@ -253,10 +253,17 @@ let fold_pexlif p il new_name =
 
 // Correct version of foldn_pexlif (not terribly efficient).
 let foldn_pexlif p ill new_base_name =
+(fprintf stderr "ill: %S\n" (map (\l. list2str T "[" "," "] " int2str l) ill)) fseq
     let all_sel = flat ill in
-    length (setify all_sel) != length all_sel =>
-	eprintf "Overlapping selection in foldn_pexlif"
-    |
+    letrec select used (sel:sels) =
+	let overlap = sel intersect used then
+	overlap == [] => sel:(select (sel@used) sels) |
+	(fprintf stdinfo "Overlapping selection in foldn_pexlif (%S)\n"
+		(map int2str overlap)) fseq
+	select used sels
+     /\    select used [] = []
+    in
+    let ill = select [] ill then
     val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER chs)) = p then
     let get_sel il = map (\i. el i chs) il in
     let selected_l = map get_sel ill then

@@ -48,6 +48,16 @@ let Create_Dummy_Placement =
 ;
 Create_Dummy_Placement;
 
+let accurate_toplevel_pexlif2fsm p =
+    let old1 = update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" "TRUE" then
+    let old2 = update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" "FALSE" then
+    let res = toplevel_pexlif2fsm p then
+    (update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" old1) fseq
+    (update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" old2) fseq
+    res
+;
+
+
 // -------------------------------------------------------------
 
 let cur_canvas = ref "";
@@ -379,10 +389,11 @@ let fl_record_waveform_movement w idx dir =
 ;
 export_to_tcl fl_record_waveform_movement;
 
-let get_new_sch_canvas w draw_level name =
+let get_new_sch_canvas w draw_level name instance_hier =
     let rname = name = "" => "" | sprintf " {%s}" name in
     let tw_c =
-	tcl_eval [sprintf "get_new_sch_canvas %s %d%s" w draw_level rname]
+	tcl_eval [sprintf "get_new_sch_canvas %s %d {%s}%s" w draw_level
+			  instance_hier rname]
     then
     val [tab_w, canvas] = str_split tw_c " " then
     (tab_w, canvas)
@@ -398,7 +409,7 @@ let gen_draw_fanin vfsm draw_level levels vecs =
     let fsm = vfsm2fsm vfsm then 
     let w = vfsm2id vfsm then
     let vis = visualize_fanin fsm stop_list [] levels vecs draw_level then
-    val (tab_window, c) = get_new_sch_canvas w draw_level "" then
+    val (tab_window, c) = get_new_sch_canvas w draw_level "" "" then
     let cmd =	
 	let tab = canvas2tab c then
 	let svecs = list2str T "[" "," "]" (sprintf "\"%s\"") vecs in
@@ -419,24 +430,38 @@ let gen_draw_fanin vfsm draw_level levels vecs =
     c
 ;
 
+let create_instance_model hier p =
+    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER chs)) = p in
+    let top_rename (f,as) = (hier^f), as in
+    let fa_inps' = map top_rename fa_inps then
+    let fa_outs' = map top_rename fa_outs then
+    let ints' = map (\v. hier^v) ints then
+    let child_rename (PINST cnm cattrs clf cfa_inps cfa_outs cints cbody) =
+	let rename v = str_is_prefix "0" v => v | hier^v in
+	let ch_rename (f,as) = (f, (map rename as)) in
+	let cfa_inps' = map ch_rename cfa_inps then
+	let cfa_outs' = map ch_rename cfa_outs then
+	PINST cnm cattrs clf cfa_inps' cfa_outs' cints cbody
+    in
+    let chs' = map child_rename chs then
+    (PINST name attrs lf fa_inps' fa_outs' ints'(P_HIER chs'))
+;
 
 let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
     let w = vfsm2id vfsm then
     is_IDV_ENV vfsm =>
 	let parent = get_idv_current_pexlif canvas then
-	let p = el inst_nbr (pexlif_get_children parent) then
-	let old = update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" "TRUE" then
-	let ckt = toplevel_pexlif2fsm p then
-	(update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" old) fseq
+	let phier =
+	    tcl_eval [sprintf "set ::sch_info(instance_hier,%s)" canvas]
+	then
+	let hier = sprintf "%si%d/" phier inst_nbr then
+	let p0 = el inst_nbr (pexlif_get_children parent) then
+	let p = create_instance_model hier p0 then
+	let ckt = accurate_toplevel_pexlif2fsm p then
 	let outs = outputs ckt then
 	let vis = visualize_fanin ckt [] [] 100 outs 0 then
-	val (tab_window, c) = get_new_sch_canvas w 0 "" then
-	let cmd =
-	    let tab = canvas2tab c then
-	    let svecs = list2str T "[" "," "]" (sprintf "\"%s\"") outs in
-	    sprintf "OBSOLETE: let %s = draw_fanin vis (%d) %d %s;\n%s;"
-		     tab 0 100 svecs tab
-	in
+	val (tab_window, c) = get_new_sch_canvas w 0 "" hier then
+	let cmd = "OBSOLETE" in
 	let evis = TR_SEQ canvas [inst_nbr] (ref vis) (ref [(p,ckt,SPEC)]) then
 	(add_active_sch_tab_window vfsm c evis cmd) fseq
 	val (final_res, cmds) = visualisation2tcl vis then
@@ -465,7 +490,7 @@ let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
     then
     let draw_level = cur_draw_level+1 in
     let vis = visualize_fanin fsm stop_list ifc_list 100 vecs draw_level then
-    val (tab_window, c) = get_new_sch_canvas w draw_level name then
+    val (tab_window, c) = get_new_sch_canvas w draw_level name "" then
     let cmd =	
 	let tab = canvas2tab c then
 	let svecs = list2str T "[" "," "]" (sprintf "\"%s\"") vecs in
@@ -1839,7 +1864,8 @@ let BDD_comb_EQ p1 p2 =
     then
     let ok = NOT a_c OR (c_c AND base_ok) then
     ok == T => T |
-    let cex = example F (NOT ok) then
+    let vars = depends ant in
+    let cex = full_example F vars (NOT ok) then
     let ant' = substitute cex ant then
     let vis = STE_debug ckt then
     let tab_1 = draw_fanin vis (0) 100 ("_OK_":asserts) then

@@ -1,4 +1,5 @@
 *.swp
+*.pexlif
 *.o
 *.so
 *.a

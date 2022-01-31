@@ -23,6 +23,7 @@ extern bool		gui_mode;
 extern bool		use_stdout;
 extern char		FailBuf[4096];
 extern bool		RCverbose_fsm_print;
+extern bool		RC_print_warnings_toplevel_fa_mismatch;
 extern bool		RCnotify_traj_failures;
 extern bool		RCnotify_check_failures;
 extern bool		RCnotify_OK_A_failures;
@@ -1530,7 +1531,7 @@ fanin(g_ptr redex)
     int idx = name2idx(node);
     if( idx < 0 ) {
 	pop_fsm();
-	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	MAKE_REDEX_FAILURE(redex, FailBuf);
 	return;
     }
     MAKE_REDEX_NIL(redex);
@@ -5755,16 +5756,13 @@ name2idx(string name)
     vec_ptr vp = split_vector_name(vec_rec_mgrp, range_rec_mgrp, name);
     string sig = get_vector_signature(vp);
     vec_info_ptr ip = (vec_info_ptr) find_hash(all_name_tblp, sig);
-    if( ip == NULL ) {
-	Fail_pr("Cannot find node %s", name);
-	return -1;
+    while( ip != NULL ) {
+	int res = find_node_index(ip->declaration, vp, ip->map->from);
+	if( res >= 0 ) return res;
+	ip = ip->next;
     }
-    int res = find_node_index(ip->declaration, vp, ip->map->from);
-    if( res < 0 ) {
-	Fail_pr("Cannot find node %s", name);
-	return -1;
-    }
-    return res;
+    Fail_pr("Cannot find node named '%s'", name);
+    return -1;
 }
 
 static ilist_ptr
@@ -6977,8 +6975,10 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
             nbr_inputs++;
             g_ptr pair = GET_CONS_HD(l);
             string fname = GET_STRING(GET_FST(pair));
-            if( List_length(GET_SND(pair)) != 1 ||
-                !STREQ(fname, GET_STRING(GET_CONS_HD(GET_SND(pair)))) ) {
+            if( RC_print_warnings_toplevel_fa_mismatch &&
+		(List_length(GET_SND(pair)) != 1 ||
+                 !STREQ(fname, GET_STRING(GET_CONS_HD(GET_SND(pair))))) )
+	    {
                 FP(warning_fp,
                    "Actual != formal (%s) for top-level pexlif input. ", fname);
                 FP(warning_fp, "Actual ignored\n");
@@ -6995,8 +6995,10 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
         for(g_ptr l = fa_outs; !IS_NIL(l); l = GET_CONS_TL(l)) {
             g_ptr pair = GET_CONS_HD(l);
             string fname = GET_STRING(GET_FST(pair));
-            if( List_length(GET_SND(pair)) != 1 ||
-                !STREQ(fname, GET_STRING(GET_CONS_HD(GET_SND(pair)))) ) {
+            if( RC_print_warnings_toplevel_fa_mismatch &&
+		(List_length(GET_SND(pair)) != 1 ||
+                 !STREQ(fname, GET_STRING(GET_CONS_HD(GET_SND(pair))))) )
+	    {
                 FP(warning_fp,
                    "Actual != formal (%s) for top-level pexlif output. ",fname);
                 FP(warning_fp, "Actual ignored\n");

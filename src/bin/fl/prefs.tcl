@@ -89,6 +89,8 @@ set voss2_preferences {
 	"Maximum number of stack trace entries printed" "int" "40"}
     {"VERBOSE-FSM-PRINT" "RCverbose_fsm_print"
         "Print out detailed structure of fsm" "bool"  "FALSE"}
+    {"VERBOSE-TOPLEVEL-FA-MISMATCH" "RC_print_warnings_toplevel_fa_mismatch"
+        "Print warning messages for toplevel formal/actual mismatches" "bool"  "TRUE"}
     {"VERBOSE-STE-RUN" "RCverbose_ste_run"
         "Print out every time a traced node change during STE" "bool"  "FALSE"}
     {"VERBOSE-IMAGE-PRINT" "RCverbose_image_print"

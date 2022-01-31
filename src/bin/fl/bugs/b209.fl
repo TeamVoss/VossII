@@ -1,0 +1,14 @@
+let p =
+    PINST "abc" [] F [("a[3]",["a[3]"])] [("a[4]",["a[4]"])] [] (P_HIER [
+	PINST "draw_inverter" [] F [("i",["a[3]"])] [("o",["a[4]"])] [] 
+	    (P_LEAF [(W_UPDATE_FN (W_VAR 1 "o") (W_NOT (W_VAR 1 "i")))])
+    ])
+;
+
+update_vossrc "VERBOSE-FSM-PRINT" "YES";
+
+let ckt = pexlif2fsm p;
+ckt;
+
+fanin ckt "a[4]";
+

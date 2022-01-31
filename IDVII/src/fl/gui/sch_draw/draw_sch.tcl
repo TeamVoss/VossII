@@ -407,7 +407,7 @@ proc nb:tab2c {w name} {
     error "No tab named $name in notebook under $w"
 }
 
-proc get_new_sch_canvas {w draw_level {name ""}} {
+proc get_new_sch_canvas {w draw_level instance_hier {name ""}} {
     set nb $w.nb
     incr ::sch_window_cnt($w)
     set cc [format {%s.c%d} $nb $::sch_window_cnt($w)]
@@ -425,6 +425,7 @@ proc get_new_sch_canvas {w draw_level {name ""}} {
     $nb select $cc
     set ::sch_info(draw_level,$c) $draw_level
     update
+    set ::sch_info(instance_hier,$c) $instance_hier
     return [list $cc $c]
 }
 
@@ -790,6 +791,9 @@ proc cb:sch_canvas_menu {c wx wy sx sy} {
     }
     set root [w2root $c]
     if [fl_is_IDV_ENV $c] {
+	$m add command -label "Draw inside" \
+	    -command "after idle [list sc:draw_inside $c $nodes]"
+
 	$m add command -label "Show RTL" \
 	    -command "after idle \
 		[list fl_show_rtl $c $::sch_info(draw_level,$c) $nodes]"
@@ -3257,6 +3261,13 @@ proc extract_name_draw_fub {module inst args} {
     }
 }
 
+proc sc:draw_inside {c tag} {
+    if ![info exists ::tag2inst_nbr($c,$tag)] { return }
+    set inst_nbr $::tag2inst_nbr($c,$tag)
+    set draw_level $::sch_info(draw_level,$c)
+    fl_draw_inside $c $draw_level $tag $inst_nbr
+}
+
 proc sc:double_draw_inside {c levels inst_nbr tag} {
     if ![info exists ::previous_selection] {
 	set old "_"
@@ -3271,6 +3282,7 @@ proc sc:double_draw_inside {c levels inst_nbr tag} {
 
 proc draw_fub {module inst inst_nbr inames onames c tag x y} {
     global gcolor fc sfont
+    set ::tag2inst_nbr($c,$tag) $inst_nbr
     if { ![info exists ::sch_info(draw_level,$c)] } {
 	set ::sch_info(draw_level,$c) 0
     }
@@ -3302,9 +3314,6 @@ proc draw_fub {module inst inst_nbr inames onames c tag x y} {
     #
     set dr [$c create rectangle [expr ($xr-$rwid)] [expr ($y+$erht/2)] \
 		$xr [expr ($y-$erht/2)] -outline $gcolor -fill $fc -tags $tag]
-    $c bind $dr <Double-1> \
-    "after idle [list sc:double_draw_inside $c $::sch_info(draw_level,$c) \
-			$inst_nbr $tag]"
 
     set mid_x [expr ($xr-$rwid/2)]
     set top_y [expr $y-$erht/2]
@@ -3327,10 +3336,6 @@ proc draw_fub {module inst inst_nbr inames onames c tag x y} {
 	    val {fname anames} [lindex $inames $i]
 	    set f [$c create text $nx $yl -anchor w -justify left \
 		    -font $::mfont($c) -text $fname]
-	    $c bind $f <Double-1> \
-		"after idle \
-		    [list sc:double_draw_inside $c \
-				$::sch_info(draw_level,$c) $inst_nbr $tag]"
 	    add_font_tags $c $f _IsTeXt_
 	    $c create line $xl $yl $nx $yl -fill $gcolor
 	    lappend inp_locs [expr round($xl)] [expr round($yl)]
@@ -3351,10 +3356,6 @@ proc draw_fub {module inst inst_nbr inames onames c tag x y} {
 	val {fname anames} [lindex $onames $i]
 	set f [$c create text $xl $yl -anchor e -justify right \
 		-font $::sfont($c) -text $fname]
-	$c bind $f <Double-1> \
-	    "after idle \
-		[list sc:double_draw_inside $c $::sch_info(draw_level,$c) \
-					    $inst_nbr $tag]"
 	add_font_tags $c $f _IsTeXt_
 	set wtag [fl_vecs2tags $c $anames]
 	if [fl_is_vector_name $fname] {
