@@ -413,7 +413,7 @@ let refresh_idv_canvas canvas cmd =
     let vfsm = w2vfsm canvas then
     let canvas_list = deref (vfsm2canvases_r vfsm) then
     let evis = snd (find (\p. fst p = canvas) canvas_list) then
-    val (TR_SEQ parent sell rvis rtrf) = evis then
+    val (TR_SEQ parent inside sell rvis rtrf) = evis then
     let trf = get_idv_info canvas then
     val (p,ckt,_) = hd trf in
     let outs = outputs ckt then
@@ -447,7 +447,7 @@ let start_new_transform p start_new w =
     let vis = visualize_fanin ckt [] [] 100 (outs@props) 0 then
     val (tab_window, c) = get_new_sch_canvas w 0 "" "" then
     let cmd = "DUMMY" in
-    let evis = TR_SEQ "" [] (ref vis) (ref [(p,ckt,SPEC)]) then
+    let evis = TR_SEQ "" F [] (ref vis) (ref [(p,ckt,SPEC)]) then
     (add_active_sch_tab_window vfsm c evis cmd) fseq
     val (final_res, cmds) = visualisation2tcl vis then
     (big_tcl_eval ("create_sch":cmds)) fseq
@@ -485,7 +485,7 @@ let add_transform canvas p tr =
 non_lazy add_transform;
 
 let fl_is_toplevel_transform canvas =
-    val (parent,sell) = get_idv_parent_info canvas then
+    val (parent,inside,sell) = get_idv_parent_info canvas then
     parent == ""
 ;
 export_to_tcl fl_is_toplevel_transform;
@@ -507,6 +507,7 @@ let rename_name (PINST _ attrs lf fa_inps fa_outs ints body) new_name =
 ;
 
 let idv_finish_transformation canvas =
+    val (parent,inside, sell) = get_idv_parent_info canvas then
     let vfsm = w2vfsm canvas in
     let trfs = get_idv_info canvas then
     let just = map (\(p,ckt,j).j) (butlast trfs) then
@@ -516,8 +517,8 @@ let idv_finish_transformation canvas =
     let spec_sig = pexlif_get_FP spec then
     let tr_name = find_next_anon_transform_name spec_sig then
     let model_name = find_next_anon_name () then
-    let cmd = sprintf "idv:name_transform_and_use %s %s %s"
-		       canvas tr_name model_name
+    let cmd = sprintf "idv:name_transform_and_use %s %s %s %s"
+		       (inside => "1" | "0") canvas tr_name model_name
     then
     let resl = tcl2list (tcl_eval [cmd]) then
     let op = el 1 resl in
@@ -535,7 +536,22 @@ let idv_finish_transformation canvas =
     (record_transformation spec_sig tr) fseq
     op = "Save" => T |
     op = "SaveAndApplyOnce" =>
-	val (parent,sell) = get_idv_parent_info canvas then
+	inside =>
+	    let pp = get_idv_current_pexlif parent then
+	    val (PINST nm attrs leaf fa_inps fa_outs ints (P_HIER (cs))) = pp in
+	    length sell != 1 =>
+		error "FATAL: inside does not have single selection (%d)"
+		      (length sell)
+	    |
+	    let sel = hd sell then
+	    let cs' = (firstn (sel-1) cs)@[imp]@(butfirstn sel cs) then
+	    let p' = PINST nm attrs leaf fa_inps fa_outs ints (P_HIER cs') then
+	    (add_transform parent p' (REPLACE sell tr)) fseq
+	    let cmd = sprintf "replace vis %s \"%s\";"
+			  (list2str T "[" "," "]" int2str sell) transform_name
+	    in
+	    (refresh_idv_canvas parent cmd) fseq T
+	|
 	let pp = get_idv_current_pexlif parent then
 	let pp' = fold_pexlif pp sell "_TMP_" then
 	val (PINST nm attrs leaf fa_inps fa_outs ints (P_HIER (c:cs))) = pp' in
@@ -555,7 +571,6 @@ let idv_finish_transformation canvas =
 	eprintf "Parent circuit has changed. Cannot apply the transformation"
     |
     op = "SaveAndApplyEverywhere" =>
-	val (parent,sell) = get_idv_parent_info canvas then
 	let pp = get_idv_current_pexlif parent then
 	let matches = isomatch spec pp then
 	let groups = map (map (fst # snd)) matches then
@@ -653,7 +668,7 @@ let fl_do_idv_undo canvas =
     let vfsm = w2vfsm canvas then
     let canvas_list = deref (vfsm2canvases_r vfsm) then
     let evis = snd (find (\p. fst p = canvas) canvas_list) then
-    val (TR_SEQ parent sell rvis rtrf) = evis then
+    val (TR_SEQ parent inside sell rvis rtrf) = evis then
     let outs = outputs ckt then
     let props = assertions ckt then
     let vis = visualize_fanin ckt [] [] 100 (outs@props) 0 then
@@ -843,7 +858,7 @@ let fl_do_new_tranf canvas =
 	sprintf "OBSOLETE: let %s = draw_fanin vis (%d) %d %s;\n%s;"
 		 tab 0 100 svecs tab
     in
-    let evis = TR_SEQ canvas il (ref vis) (ref [(p,ckt,SPEC)]) then
+    let evis = TR_SEQ canvas F il (ref vis) (ref [(p,ckt,SPEC)]) then
     (add_active_sch_tab_window vfsm c evis cmd) fseq
     val (final_res, cmds) = visualisation2tcl vis then
     (big_tcl_eval ("create_sch":cmds)) fseq
@@ -1095,14 +1110,7 @@ let save_verilog file name p =
     let p' = make_anon_names name p then
     let fp = fopen file "w" then
     (pexlif2verilog fp p') fseq
-    (fclose fp) fseq
-    let fp = mktemp "ed_clean" then
-    let cmd_file = stream2filename fp then
-    (fprintf fp "1,$s/#/_qQ_/g\nwq\n") fseq
-    (fclose fp) fseq
-    let cmd = sprintf "/bin/ed %s < %s" file cmd_file then
-    (system cmd) fseq
-    (fprintf stdinfo "Finished saving Verilog file %s\n" file)
+    (fclose fp)
 ;
 
 let create_verilog_load_file basename file pexlif_file =
@@ -1117,6 +1125,12 @@ let create_verilog_load_file basename file pexlif_file =
     (fclose fp) fseq
     load_file
 ;
+
+let fl_run_fl_loader file =
+    let cmd = sprintf "fl -noX -unbuf_stdout -F %s" file then
+    system cmd
+;
+export_to_tcl fl_run_fl_loader;
 
 let fl_make_template canvas type file basename create =
     let vfsm = w2vfsm canvas then
@@ -1162,6 +1176,59 @@ let fl_bdd_var_order {canvas::string} {file::string} =
     ()
 ;
 export_to_tcl fl_bdd_var_order;
+
+
+// Try to verify two combinational pexlifs are equal by building
+// a miter circuit and simulating the circuit.
+let BDD_comb_EQ p1 p2 =
+    val (miter_pexlif, ant) = mk_miter p1 p2 then
+    let cons = [(T,"_OK_",T,0,1)] in
+    let ckt = pexlif2fsm miter_pexlif then
+    val (assumes,asserts) = split (str_is_prefix "i1/") (assertions ckt) then
+    let trl = map (\n. n,0,1) (assumes@asserts) then
+    let old_pref = update_vossrc "NOTIFY-CHECK-FAILURES" "NO" then
+    let ste = STE "-s" ckt [] ant cons trl then
+    (update_vossrc "NOTIFY-CHECK-FAILURES" old_pref) fseq
+    let base_ok = get_ste_result ste "" then
+    let a_c =
+	itlist (\a.\r. r AND ((get_trace_val ste a 0) = (T,F))) assumes T
+    then
+    let c_c =
+	itlist (\a.\r. r AND ((get_trace_val ste a 0) = (T,F))) asserts T
+    then
+    let ok = NOT a_c OR (c_c AND base_ok) then
+    ok == T => T |
+    let vars = depends ant in
+    let cex = full_example F vars (NOT ok) then
+    let ant' = substitute cex ant then
+    let vis = STE_debug ckt then
+    let tab_1 = draw_fanin vis (0) 100 ("_OK_":asserts) then
+    tab_1 fseq
+    (STE "-e" vis [] ant' cons []) fseq
+    ok
+;
+
+// Try to verify two combinational pexlifs are equal by building
+// a miter circuit and simulating the circuit.
+let SAT_comb_EQ p1 p2 =
+    val (miter_pexlif, ant) = mk_miter p1 p2 then
+    let bant = map (\(w,n,v,f,t).bT,n,bdd2bexpr v,f,t) ant in
+    let bcons = [(bT,"_OK_",bT,0,1)] in
+    let ckt = pexlif2fsm miter_pexlif then
+    let ste = bSTE "-s" ckt [] bant bcons [] then
+    let ok = bget_ste_result ste "" then
+    ok == bT => bT |
+    let bcex = bget_model [bNOT ok] 10 then
+    bcex = [] => bT |
+    let cex = bexpr2bdd bcex then
+    let ant' = substitute cex ant then
+    let vis = STE_debug ckt then
+    let tab_1 = draw_fanin vis (0) 100 ["_OK_"] then
+    tab_1 fseq
+    (STE "-e" vis [] ant' (bexpr2bdd bcons) []) fseq
+    ok
+;
+
 
 
 let fl_do_verify canvas {file::string} {type::string} =

@@ -29,7 +29,7 @@ let is_nil (Nil) = T
 let str {s :: string} = let l = strlen s then (l, s);
 
 // "Standard" indentation string.
-let indent {n :: int} = implode (replicate n " ");
+clet indent {n :: int} = implode (replicate n " ");
 
 // -----------------------------------------------------------------------------
 
@@ -317,38 +317,38 @@ let fprint {fp :: stream} {s :: string} = fprintf fp "%s" s;
 
 let layL {k :: int} {end :: string} {d :: doc} {fp :: stream} =
       letrec
-          go _ (Nil) =
-            (fprint fp end) fseq ()
-      /\  go k (NilAbove p) =
+          go1 _ (Nil) =
+            (fprint fp end)
+      /\  go1 k (NilAbove p) =
             (fprint fp newline) fseq (lay k end p fp)
-      /\  go k (TxtBeside (i,s) p) =
-            let j = k + i then (fprint fp s) fseq (go j p)
-      /\  go k (Nest _ p) =
-            go k p
-      /\  go _ (Empty)        = error "layL Empty"
-      /\  go _ (Union _ _)    = error "layL Union"
-      /\  go _ (Beside _ _ _) = error "layL Beside"
-      /\  go _ (Above _ _ _)  = error "layL Above"
+      /\  go1 k (TxtBeside (i,s) p) =
+            let j = k + i then (fprint fp s) fseq (go1 j p)
+      /\  go1 k (Nest _ p) =
+            go1 k p
+      /\  go1 _ (Empty)        = error "layL Empty"
+      /\  go1 _ (Union _ _)    = error "layL Union"
+      /\  go1 _ (Beside _ _ _) = error "layL Beside"
+      /\  go1 _ (Above _ _ _)  = error "layL Above"
       in
-      go k d
+      go1 k d
 ;
 
 let lay {k :: int} {end :: string} {d :: doc} {fp :: stream} =
       letrec
-          go _ (Nil) =
-            (fprint fp end) fseq ()
-      /\  go k (NilAbove p) =
-            (fprint fp newline) fseq (go k p)
-      /\  go k (TxtBeside (i,s) p) =
+          go2 _ (Nil) =
+            (fprint fp end)
+      /\  go2 k (NilAbove p) =
+            (fprint fp newline) fseq (go2 k p)
+      /\  go2 k (TxtBeside (i,s) p) =
             let j = k + i then (fprint fp (indent k ^ s)) fseq (layL j end p fp)
-      /\  go k (Nest i p) =
-            let j = k + i then go j p
-      /\  go _ (Empty)        = error "lay Empty"
-      /\  go _ (Union _ _)    = error "lay Union"
-      /\  go _ (Beside _ _ _) = error "lay Beside"
-      /\  go _ (Above _ _ _)  = error "lay Above"
+      /\  go2 k (Nest i p) =
+            let j = k + i then go2 j p
+      /\  go2 _ (Empty)        = error "lay Empty"
+      /\  go2 _ (Union _ _)    = error "lay Union"
+      /\  go2 _ (Beside _ _ _) = error "lay Beside"
+      /\  go2 _ (Above _ _ _)  = error "lay Above"
       in
-      go k d
+      go2 k d
 ;
 
 let display {l :: int} {r :: int} {end :: string} {fp :: stream} {d :: doc} =

@@ -106,7 +106,9 @@ let get_idv_info_r canvas =
     let vfsm = w2vfsm canvas in
     NOT (is_IDV_ENV vfsm) => error "get_idv_info on STE_ENV" |
     let trfs = deref (vfsm2canvases_r vfsm) in
-    val (TR_SEQ parent sell vr trfsr) = dassoc "canvas2trfs" canvas trfs then
+    val (TR_SEQ parent inside sell vr trfsr) =
+	    dassoc "canvas2trfs" canvas trfs
+    then
     trfsr
 ;
 
@@ -124,8 +126,10 @@ let get_idv_parent_info canvas =
     let vfsm = w2vfsm canvas in
     NOT (is_IDV_ENV vfsm) => error "get_idv_info on STE_ENV" |
     let trfs = deref (vfsm2canvases_r vfsm) in
-    val (TR_SEQ parent sell vr trfsr) = dassoc "canvas2trfs" canvas trfs then
-    (parent, sell)
+    val (TR_SEQ parent inside sell vr trfsr) =
+	    dassoc "canvas2trfs" canvas trfs
+    then
+    (parent, inside, sell)
 ;
 
 let canvas2fsm canvas =
@@ -133,7 +137,9 @@ let canvas2fsm canvas =
     is_STE_ENV vfsm => vfsm2fsm vfsm |
     // IDV_ENV
     let trfs = deref (vfsm2canvases_r vfsm) in
-    val (TR_SEQ parent sell vr trfsr) = dassoc "canvas2trfs" canvas trfs then
+    val (TR_SEQ parent inside sell vr trfsr) =
+	dassoc "canvas2trfs" canvas trfs
+    then
     val (p,ckt,just) = hd (deref trfsr) in
     ckt
 ;
@@ -430,22 +436,22 @@ let gen_draw_fanin vfsm draw_level levels vecs =
     c
 ;
 
-let create_instance_model hier p =
-    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER chs)) = p in
-    let top_rename (f,as) = (hier^f), as in
-    let fa_inps' = map top_rename fa_inps then
-    let fa_outs' = map top_rename fa_outs then
-    let ints' = map (\v. hier^v) ints then
-    let child_rename (PINST cnm cattrs clf cfa_inps cfa_outs cints cbody) =
-	let rename v = str_is_prefix "0" v => v | hier^v in
-	let ch_rename (f,as) = (f, (map rename as)) in
-	let cfa_inps' = map ch_rename cfa_inps then
-	let cfa_outs' = map ch_rename cfa_outs then
-	PINST cnm cattrs clf cfa_inps' cfa_outs' cints cbody
-    in
-    let chs' = map child_rename chs then
-    (PINST name attrs lf fa_inps' fa_outs' ints'(P_HIER chs'))
-;
+//let create_instance_model hier p =
+//    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER chs)) = p in
+//    let top_rename (f,as) = (hier^f), as in
+//    let fa_inps' = map top_rename fa_inps then
+//    let fa_outs' = map top_rename fa_outs then
+//    let ints' = map (\v. hier^v) ints then
+//    let child_rename (PINST cnm cattrs clf cfa_inps cfa_outs cints cbody) =
+//	let rename v = str_is_prefix "0" v => v | hier^v in
+//	let ch_rename (f,as) = (f, (map rename as)) in
+//	let cfa_inps' = map ch_rename cfa_inps then
+//	let cfa_outs' = map ch_rename cfa_outs then
+//	PINST cnm cattrs clf cfa_inps' cfa_outs' cints cbody
+//    in
+//    let chs' = map child_rename chs then
+//    (PINST name attrs lf fa_inps' fa_outs' ints'(P_HIER chs'))
+//;
 
 let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
     let w = vfsm2id vfsm then
@@ -455,14 +461,15 @@ let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
 	    tcl_eval [sprintf "set ::sch_info(instance_hier,%s)" canvas]
 	then
 	let hier = sprintf "%si%d/" phier inst_nbr then
-	let p0 = el inst_nbr (pexlif_get_children parent) then
-	let p = create_instance_model hier p0 then
+	let p = el inst_nbr (pexlif_get_children parent) then
 	let ckt = accurate_toplevel_pexlif2fsm p then
 	let outs = outputs ckt then
 	let vis = visualize_fanin ckt [] [] 100 outs 0 then
 	val (tab_window, c) = get_new_sch_canvas w 0 "" hier then
 	let cmd = "OBSOLETE" in
-	let evis = TR_SEQ canvas [inst_nbr] (ref vis) (ref [(p,ckt,SPEC)]) then
+	let evis =
+	    TR_SEQ canvas T [inst_nbr] (ref vis) (ref [(p,ckt,SPEC)])
+	then
 	(add_active_sch_tab_window vfsm c evis cmd) fseq
 	val (final_res, cmds) = visualisation2tcl vis then
 	(big_tcl_eval ("create_sch":cmds)) fseq
@@ -1841,57 +1848,5 @@ let draw_show_values {vis::vfsm} c show =
 	sprintf "sch:toggle_show_value_buttons %s [winfo parent %s].menu" c c,
 	"update"]
     ) fseq ())
-;
-
-
-// Try to verify two combinational pexlifs are equal by building
-// a miter circuit and simulating the circuit.
-let BDD_comb_EQ p1 p2 =
-    val (miter_pexlif, ant) = mk_miter p1 p2 then
-    let cons = [(T,"_OK_",T,0,1)] in
-    let ckt = pexlif2fsm miter_pexlif then
-    val (assumes,asserts) = split (str_is_prefix "i1/") (assertions ckt) then
-    let trl = map (\n. n,0,1) (assumes@asserts) then
-    let old_pref = update_vossrc "NOTIFY-CHECK-FAILURES" "NO" then
-    let ste = STE "-s" ckt [] ant cons trl then
-    (update_vossrc "NOTIFY-CHECK-FAILURES" old_pref) fseq
-    let base_ok = get_ste_result ste "" then
-    let a_c =
-	itlist (\a.\r. r AND ((get_trace_val ste a 0) = (T,F))) assumes T
-    then
-    let c_c =
-	itlist (\a.\r. r AND ((get_trace_val ste a 0) = (T,F))) asserts T
-    then
-    let ok = NOT a_c OR (c_c AND base_ok) then
-    ok == T => T |
-    let vars = depends ant in
-    let cex = full_example F vars (NOT ok) then
-    let ant' = substitute cex ant then
-    let vis = STE_debug ckt then
-    let tab_1 = draw_fanin vis (0) 100 ("_OK_":asserts) then
-    tab_1 fseq
-    (STE "-e" vis [] ant' cons []) fseq
-    ok
-;
-
-// Try to verify two combinational pexlifs are equal by building
-// a miter circuit and simulating the circuit.
-let SAT_comb_EQ p1 p2 =
-    val (miter_pexlif, ant) = mk_miter p1 p2 then
-    let bant = map (\(w,n,v,f,t).bT,n,bdd2bexpr v,f,t) ant in
-    let bcons = [(bT,"_OK_",bT,0,1)] in
-    let ckt = pexlif2fsm miter_pexlif then
-    let ste = bSTE "-s" ckt [] bant bcons [] then
-    let ok = bget_ste_result ste "" then
-    ok == bT => bT |
-    let bcex = bget_model [bNOT ok] 10 then
-    bcex = [] => bT |
-    let cex = bexpr2bdd bcex then
-    let ant' = substitute cex ant then
-    let vis = STE_debug ckt then
-    let tab_1 = draw_fanin vis (0) 100 ["_OK_"] then
-    tab_1 fseq
-    (STE "-e" vis [] ant' (bexpr2bdd bcons) []) fseq
-    ok
 ;
 

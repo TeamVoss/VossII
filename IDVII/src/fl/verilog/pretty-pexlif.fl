@@ -747,15 +747,16 @@ let pretty_pexlif_h inst (PINST name _ _ fa_inps fa_outs _ _) assuming (name == 
 // -----------------------------------------------------------------------------
 
 let pexlif2verilog {fp::stream} {pex::pexlif} =
-      val (PINST name _ _ fa_inps fa_outs _ _) = pex in
-      let go n = (n,[n]) in
-      let fa_inps' = map go (md_extract_vectors (flatmap snd fa_inps)) in
-      let fa_outs' = map go (md_extract_vectors (flatmap snd fa_outs)) in
-      let pex' = PINST name [] F fa_inps' fa_outs' [] (P_HIER [pex]) in
-      // /
-      frender fp (p_source_text (Source_text (pretty_pexlif_h "" pex')))
+    val (PINST name _ _ fa_inps fa_outs _ _) = pex in
+    let non_matching_io (f,as) = (length as != 1) OR (f != (hd as)) in
+    let idx = find_first0 non_matching_io (fa_inps @ fa_outs) then
+    let pex' = idx = 0 => pex | wrap_pexlif pex then
+    let descriptions = pretty_pexlif_h "" pex' then
+    let do1 d =
+	(frender fp (p_source_text (Source_text [d]))) fseq (fprintf fp "\n\n")
+    in
+    foreach do1 descriptions
 ;
-// todo: I forgot why we wrap the pexlif.. Can we get rid of the extra layer?
 
 end_abstype pexlif2verilog;
 

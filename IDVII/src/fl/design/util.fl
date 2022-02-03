@@ -7,12 +7,8 @@
 let mk_name sz base = sz = 1 => base | sprintf "%s[%d:0]" base (sz-1);
 
 // Function to determine if a node is a user given or automatically created.
-let is_user_given s =
-    NOT (str_is_substr "__tmp" s) AND
-    NOT (str_is_substr "_TMP_" s) AND
-    NOT (str_is_substr "TmP_" s) AND
-    NOT (str_is_substr "_$" s)
-;
+let is_user_given s = NOT (str_is_substr "_$" s);
+
 // todo: Pexlif's generated randomly doesn't follow this name schema.
 
 // A type to represent continous bit ranges

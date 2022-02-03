@@ -418,7 +418,7 @@ proc idv:perform_name_transf {w c op} {
     }
 }
 
-proc idv:name_transform_and_use {c tr_name model_name} {
+proc idv:name_transform_and_use {inside c tr_name model_name} {
     set w .idv_name
     catch {destroy $w}
     i_am_busy
@@ -454,12 +454,18 @@ proc idv:name_transform_and_use {c tr_name model_name} {
 	pack $w.buttons.save -side left -padx 10
 	# Only if started from a transformation window
 	if { $toplevel_transf == 0 } {
-	    button $w.buttons.appl1 -text "Save & Apply Once" \
-		-command "idv:perform_name_transf $w $c SaveAndApplyOnce"
-	    pack $w.buttons.appl1 -side left -padx 10
-	    button $w.buttons.appln -text "Save & Apply Everywhere" \
-		-command "idv:perform_name_transf $w $c SaveAndApplyEverywhere"
-	    pack $w.buttons.appln -side left -padx 10
+	    if { $inside == "1" } {
+		button $w.buttons.appl1 -text "Save & Apply" \
+		 -command "idv:perform_name_transf $w $c SaveAndApplyOnce"
+		pack $w.buttons.appl1 -side left -padx 10
+	    } else {
+		button $w.buttons.appl1 -text "Save & Apply Once" \
+		 -command "idv:perform_name_transf $w $c SaveAndApplyOnce"
+		pack $w.buttons.appl1 -side left -padx 10
+		button $w.buttons.appln -text "Save & Apply Everywhere" \
+		 -command "idv:perform_name_transf $w $c SaveAndApplyEverywhere"
+		pack $w.buttons.appln -side left -padx 10
+	    }
 	}
     frame $w.errors
 	label $w.errors.l -text ""
@@ -561,36 +567,41 @@ proc idv:ask_for_model_name {w} {
     return $::idv_prompt_name
 }
 
-proc idv:edit_and_load {w file load_file pexlif_file} {
+proc idv:edit_and_load {w file load_file pexlif_file type} {
     set ew .editor
     while 1 {
         catch {destroy $ew}
-        toplevel $ew -container 1 -width 580 -height 564
-        set x [winfo x $w]
-        set y [winfo y $w]
-        wm geometry $ew +$x+$y
-        update idletasks
-        set wid [expr [winfo id $ew]]
-        set edit "/usr/bin/X11/xterm -into $wid -sb -sl 20000 -j \
-                  -rw -ls -bg white -fg black -fn 7x14 -geometry 80x40 \
-                  -e /usr/bin/vi $file"
-        # Edit the file
-        util:bg_exec $edit 0 {} $w
-        # Try compile the model
-        set res [util:try_program $w "Loading failed" \
-                                  {{Cancel cancel} {{Re-edit} again}} \
-                                  fl -noX -unbuf_stdout -F $load_file]
-        switch $res {
-            ok  {
-                    destroy $ew;
-                    return $pexlif_file;
-                }
-            cancel {
-                    destroy $ew;
-                    return ""
-                }
-            again {}
-        }
+	if { $type != "synthesis" } {
+	    toplevel $ew -container 1 -width 580 -height 564
+	    set x [winfo x $w]
+	    set y [winfo y $w]
+	    wm geometry $ew +$x+$y
+	    update idletasks
+	    set wid [expr [winfo id $ew]]
+	    set edit "/usr/bin/X11/xterm -into $wid -sb -sl 20000 -j \
+		      -rw -ls -bg white -fg black -fn 7x14 -geometry 80x40 \
+		      -e /usr/bin/vi $file"
+	    # Edit the file
+	    util:bg_exec $edit 0 {} $w
+	    # Try compile the model
+	    set res [util:try_program $w "Loading failed" \
+				      {{Cancel cancel} {{Re-edit} again}} \
+				      fl -noX -unbuf_stdout -F $load_file]
+	    switch $res {
+		ok  {
+			destroy $ew;
+			return $pexlif_file;
+		    }
+		cancel {
+			destroy $ew;
+			return ""
+		    }
+		again {}
+	    }
+	} else {
+	    fl_run_fl_loader $load_file
+	    return $pexlif_file;
+	}
     }
 }
 
@@ -626,7 +637,7 @@ proc idv:make_template {w c type} {
 	val {pexlif_file load_file} \
 		[fl_make_template $c $type $file $base $create_file]
 	set ::idv(fev_imp_file) \
-		[idv:edit_and_load $w $file $load_file $pexlif_file]
+		[idv:edit_and_load $w $file $load_file $pexlif_file $type]
     }
 }
 

@@ -510,6 +510,21 @@ let mk_draw_cmd phase_delay rhs =
 
 let BASE_TMP = "_$";
 
+let BASE_TMP_len = strlen BASE_TMP;
+let o0 = ord "0";
+let o9 = ord "9";
+
+let strip_BASE_TMP s =
+    NOT (str_is_prefix BASE_TMP s) => s |
+    let rem = substr s (BASE_TMP_len+1) (-1) in
+    letrec skip_dig (c:cs) =
+	let oc = ord c in
+	(o0 <= oc) AND (oc <= o9) => skip_dig cs | implode (c:cs)
+     /\    skip_dig [] = ""
+    in
+    skip_dig (explode rem)
+;
+
 let is_wide_OR e  =
     letrec cnt (W_OR a b) = 1 + cnt a + cnt b
      /\    cnt other = 0
@@ -3172,14 +3187,62 @@ let <== {lhs:: *a} {rhs:: *a} = (lhs,rhs);
 infix 1 <==;
 
 
-let get_uniq_prefix sp =
-    val (PINST name attrs leaf fa_inps fa_outs ints body) = sp in
-    let nds = md_expand_vectors ((map fst (fa_inps@fa_outs))@ints) in
-    let extract n = NOT (str_is_prefix "_$" n) => [] | [sscanf "_$%d" n] in
-    let cur = qsort (defix -) (flatmap extract nds) then
-    cur = [] => 1 | (last cur + 1)
+let try_assoc key l =
+    (
+	let res = assoc key l then
+	SOME res
+    ) catch
+    NONE
 ;
 
+let try_rev_assoc key l =
+    (
+	let res = rev_assoc key l then
+	SOME res
+    ) catch
+    NONE
+;
+
+let rename_internals p =
+    val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER subfubs)) = p in
+    let mapping = ref [] in
+    let insert name =
+	let base = last (str_split name "/") in
+	let base = strip_BASE_TMP base in
+	letrec try i =
+	    let new_name = sprintf "%s%d%s" BASE_TMP i base in
+	    has_value (try_rev_assoc new_name (deref mapping)) => try (i+1) |
+	    (mapping := ((name, new_name):(deref mapping))) fseq
+	    new_name
+	in
+	try 1
+    in
+    let ints' = map insert ints then
+    let bit_mapping =
+	let expand_map (f,t) = zip (md_expand_vector f) (md_expand_vector t) in
+	flatmap expand_map (deref mapping)
+    then
+    let map_name old_name =
+	str_is_prefix "0b" old_name => [old_name] |
+	let ores = try_assoc old_name (deref mapping) then
+	has_value ores => [get_value ores] |
+	let old_names = md_expand_vector old_name then
+	let map1 onm =
+	    let ores1 = try_assoc onm bit_mapping then
+	    has_value ores1 => get_value ores1 | onm
+	in
+	let new_names = map map1 old_names then
+	md_merge_vectors new_names
+    in
+    let trans (PINST sname sattrs sleaf sfa_inps sfa_outs sints sch) =
+	let tr_fa (f,as) = (f, flatmap map_name as) in
+	let sfa_inps' = map tr_fa sfa_inps then
+	let sfa_outs' = map tr_fa sfa_outs then
+	(PINST sname sattrs sleaf sfa_inps' sfa_outs' sints sch)
+    in
+    let subfubs' = map trans subfubs then
+    (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER subfubs'))
+;
 
 // Flatten the pexlif until the stop_pred is satisfied.
 // Intermediate wire names are created on demand and are named
@@ -3187,13 +3250,7 @@ let get_uniq_prefix sp =
 // the cardinality of a subfub.
 //
 let gen_flatten_pexlif stop_pred p =
-    let idx0 = get_uniq_prefix p then
-    let nbr = ref idx0 then
-    let mk_pref i =
-	let idx = deref nbr then
-	(nbr := (deref nbr + 1)) fseq
-	sprintf "_$%d" idx
-    in
+    let mk_pref pref i = sprintf "%si%d/" pref i in
     letrec do_flat sub pref p =
         let tr n = (assoc n sub) catch n in
         val (PINST name attrs leaf fa_inps fa_outs ints content) = p in
@@ -3216,13 +3273,13 @@ let gen_flatten_pexlif stop_pred p =
             in
             let int_sub = flatmap mk_int_sub ints in
             let sub' = io_sub @ int_sub in
-            let prefs = map mk_pref (1 upto length children) in
+            let prefs = map (mk_pref pref) (1 upto length children) in
             flat (map2 (do_flat sub') prefs children)
     in
     val (PINST name attrs leaf fa_inps fa_outs ints content) = p in
     leaf => p |
     val (P_HIER chs) = content in
-    let prefs = map mk_pref (1 upto length chs) in
+    let prefs = map (mk_pref "") (1 upto length chs) in
     let children = flat (map2 (do_flat []) prefs chs) in
     let wires_used (PINST _ _ _ fa_inps fa_outs _ _) =
         md_expand_vectors (flatmap snd (fa_inps @ fa_outs))
@@ -3236,7 +3293,8 @@ let gen_flatten_pexlif stop_pred p =
     let res =
 	(PINST name attrs leaf fa_inps fa_outs ints' (P_HIER children))
     then
-    res
+    let final = rename_internals res then
+    final
 ;
 
 // A simple stop-predicate for flatten_pexlif that can be used to
@@ -3248,64 +3306,6 @@ let is_draw_leaf p =
 
 // A function to flatten a pexlif to basic drawing components.
 let flatten_pexlif p = gen_flatten_pexlif is_draw_leaf p;
-
-let try_assoc key l =
-    (
-	let res = assoc key l then
-	SOME res
-    ) catch
-    NONE
-;
-
-let try_rev_assoc key l =
-    (
-	let res = rev_assoc key l then
-	SOME res
-    ) catch
-    NONE
-;
-
-let rename_internals p =
-    val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER subfubs)) = p in
-    let mapping = ref [] in
-    let insert name =
-	let parts = str_split name "/" in
-	length parts = 1 => name |
-	letrec try i =
-	    let new_name = sprintf "%s%d_%s" BASE_TMP i (last parts) in
-	    has_value (try_rev_assoc new_name (deref mapping)) => try (i+1) |
-	    (mapping := ((name, new_name):(deref mapping))) fseq
-	    new_name
-	in
-	try 1
-    in
-    let ints' = map insert ints then
-    let bit_mapping =
-	let expand_map (f,t) = zip (md_expand_vector f) (md_expand_vector t) in
-	flatmap expand_map (deref mapping)
-    then
-    let map_name old_name =
-	let ores = try_assoc old_name (deref mapping) then
-	has_value ores => [get_value ores] |
-	let old_names = md_expand_vector old_name then
-	let map1 onm =
-	    let ores1 = try_assoc onm bit_mapping then
-	    has_value ores1 => get_value ores1 | onm
-	in
-	let new_names = map map1 old_names then
-	md_merge_vectors new_names
-    in
-    let trans (PINST sname sattrs sleaf sfa_inps sfa_outs sints sch) =
-	let tr_fa (f,as) = (f, flatmap map_name as) in
-	let sfa_inps' = map tr_fa sfa_inps then
-	let sfa_outs' = map tr_fa sfa_outs then
-	(PINST sname sattrs sleaf sfa_inps' sfa_outs' sints sch)
-    in
-    let subfubs' = map trans subfubs then
-    (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER subfubs'))
-;
-
-
 // A function to flatten recursively defined pexlifs
 let flatten_recursive_pexlif recursion_name p =
     let stop_pred p =

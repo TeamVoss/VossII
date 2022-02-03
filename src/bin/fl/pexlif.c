@@ -7,6 +7,7 @@
 /* Original author: Carl-Johan Seger, 2019                                    */
 /*									      */
 /******************************************************************************/
+#include <ctype.h>
 #include "strings.h"
 #include "graph.h"
 #include "pexlif.h"
@@ -797,12 +798,12 @@ unfold_pexlif(g_ptr p, unint id)
 	string new = old;
 	while( VDB_has_name_collision(vdp, new) ) {
 	    int cnt;
-	    if( sscanf(new, "#%d_", &cnt) != 1 ) {
-		new = wastrsave(&strings, gen_tprintf(ts, "#1_%s", old));
+	    if( sscanf(new, "_$%d_", &cnt) != 1 ) {
+		new = wastrsave(&strings, gen_tprintf(ts, "_$1%s", old));
 	    } else {
-		string p = new;
-		while( *p && *p != '_' ) p++;
-		new = wastrsave(&strings, gen_tprintf(ts, "#%d%s", cnt+1, p));
+		string p = new+2;
+		while( *p && isdigit(*p) ) p++;
+		new = wastrsave(&strings, gen_tprintf(ts, "_$%d%s", cnt+1, p));
 	    }
 	}
 	VDB_Insert_vector(vdp, new);

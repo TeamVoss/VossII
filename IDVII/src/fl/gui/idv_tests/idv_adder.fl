@@ -1,5 +1,7 @@
 load "idv.fl";
 
+update_vossrc "MAX-ENTRIES-IN-STACK-TRACE-TO-PRINT" "400";
+
 //system "/bin/rm -rf DB";
 IDV "DB_adder" [];
 

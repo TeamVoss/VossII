@@ -5697,10 +5697,8 @@ idx_is_user_defined(int idx)
     vec_ptr decl = np->vec->declaration;
     while( decl != NULL ) {
 	if( decl->type != INDEX ) {
-	    if( strstr(decl->u.name, "__tmp") != NULL ) return FALSE;
-	    if( strstr(decl->u.name, "_TMP_") != NULL ) return FALSE;
-	    if( strstr(decl->u.name, "TmP_") != NULL ) return FALSE;
-	    if( strstr(decl->u.name, "_$") != NULL ) return FALSE;
+	    string n = decl->u.name;
+	    if( *n == '_' && *(n+1) == '$' ) return FALSE;
 	}
 	decl = decl->next;
     }
@@ -5799,7 +5797,7 @@ map_vector(hash_record *vtblp, string hier, string name, bool ignore_missing)
 	if( is_assertion ) {
 	    new_name = name;
 	} else {
-	    sprintf(tmp_name_buf, "TmP__%d_%s", undeclared_node_cnt, name);
+	    sprintf(tmp_name_buf, "_$%d_%s", undeclared_node_cnt, name);
 	    undeclared_node_cnt++;
 	    new_name = wastrsave(&strings, tmp_name_buf);
 	}
@@ -8303,7 +8301,7 @@ mk_fresh_anon_name(g_ptr internals, int *cur_cntp)
     int cur_cnt = *cur_cntp;
     while( found ) {
 	cur_cnt++;
-	Sprintf(buf, "TmP__%d", cur_cnt);
+	Sprintf(buf, "_$%d", cur_cnt);
 	int len = strlen(buf);
 	found = FALSE;
 	for(g_ptr cur = internals; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
