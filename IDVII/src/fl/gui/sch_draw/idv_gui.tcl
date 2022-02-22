@@ -243,6 +243,8 @@ proc idv:create_idv_menu {nb w} {
             -command "idv:name_and_save_model $w implementation"
         $m add command -label "Name initial model" \
             -command "idv:name_and_save_model $w specification"
+        $m add command -label "Write out pexlif model" \
+            -command "idv:write_pexlif $w"
         $m add command -label "Write out Verilog model" \
             -command "idv:write_verilog $w"
 
@@ -584,9 +586,10 @@ proc idv:edit_and_load {w file load_file pexlif_file type} {
 	    # Edit the file
 	    util:bg_exec $edit 0 {} $w
 	    # Try compile the model
+	    set tmp_dir [fl_mktempd "loading"]
 	    set res [util:try_program $w "Loading failed" \
-				      {{Cancel cancel} {{Re-edit} again}} \
-				      fl -noX -unbuf_stdout -F $load_file]
+			      {{Cancel cancel} {{Re-edit} again}} \
+			      fl -noX -unbuf_stdout -T $tmp_dir -F $load_file]
 	    switch $res {
 		ok  {
 			destroy $ew;
@@ -616,7 +619,7 @@ proc idv:make_template {w c type} {
 	switch $type {
 	    verilog	{ set file "$base.v" }
 	    hfl		{ set file "$base.fl" }
-	    synthesis	{ set file "$base.v" }
+	    synthesis	{ set file "$base" }
 	    default	{}
 	}
 	if { ![regexp {^/.*} $file] && ![regexp {\.\./.*} $file] } {
@@ -767,5 +770,19 @@ proc idv:write_verilog {w} {
     if { $file != "" } {
 	set name [file rootname [file tail $file]]
 	fl_save_verilog $w.c $name $file
+    }
+}
+
+proc idv:write_pexlif {w} {
+    set types {
+        {{pexlif}      {.fl}        }
+        {{All Files}     *          }
+    }
+    set file [tk_getSaveFile -filetypes $types \
+	    -initialdir $::idv(code_dir) -title "Name file to write pexlif" \
+	    -confirmoverwrite 1]
+    if { $file != "" } {
+	set name [file rootname [file tail $file]]
+	fl_save_pexlif $w.c $file
     }
 }

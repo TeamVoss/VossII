@@ -4208,6 +4208,14 @@ proc draw_dffsre {pclk pset pclr pen c tag x y} {
 	    [list Dlabel $elabel ClkInLabel $slabel $clabel] $c $tag $x $y]
 }
 
+proc draw_dffsr {pclk pset pclr c tag x y} {
+    if { $pclk == 1 }  { set edge RisingEdge } else { set edge FallingEdge }
+    if { $pclr == 1 }  { set clabel Rlabel } else { set clabel negRlabel }
+    if { $pset == 1 }  { set slabel Slabel } else { set slabel negSlabel }
+    return [draw_box_pat 5 $edge \
+	    [list Dlabel ClkInLabel $slabel $clabel] $c $tag $x $y]
+}
+
 
 proc draw_ff_re_with_en_reset {c tag x y} {
     return [draw_box_pat 4 {RisingEdge} {Dlabel Elabel Rlabel ClkInLabel} $c $tag $x $y]
@@ -4591,4 +4599,21 @@ proc rtl:visualize {file start_line start_col end_line end_col} {
     pack $w.yscroll -side right -fill y
     pack $w.xscroll -side bottom -fill x
     pack $w.t -side right -expand yes -fill both
+}
+
+proc draw_stdcell {name pfn c tag x y} {
+    set stag _StDcElL
+    set res [eval $pfn $c $stag $x $y]
+    val {lx ly ux uy} [$c bbox $stag&&!_IsDePeNdEnCy_]
+    $c addtag $tag withtag $stag
+    $c dtag $stag
+    set bx $lx ;# [expr $lx+[min_sep $c]]
+    set by $ly ;# [expr $ly+2*[min_sep $c]]
+    set tx $ux ;# [expr $ux-3*[min_sep $c]]
+    set ty $uy ;# [expr $uy-2*[min_sep $c]]
+    $c create rectangle  $bx $by $tx $ty -outline green -fill "" -tag $tag
+    set t [$c create text $bx $by -text $name -anchor sw -justify left \
+		-font $::sfont($c) -fill green -tag $tag]
+    add_font_tags $c $t _IsTeXt_
+    return $res
 }

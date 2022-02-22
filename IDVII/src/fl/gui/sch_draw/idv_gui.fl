@@ -691,26 +691,24 @@ let fl_do_idv_undo canvas =
 export_to_tcl fl_do_idv_undo;
 
 
-
-
 let duplicate_instance p id =
     val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER chs)) = p in
     let cur_nds = ref
         (setify (md_expand_vectors ((map fst fa_inps)@(map fst fa_outs)@ints)))
     in
-    let selected = el id chs in
+    val ([selected],remain) = separate chs [id] then
     val (PINST dname dattrs dleaf dfa_inps dfa_outs dints dcont) = selected in
-    let driven_nds = md_expand_vectors (flatmap snd dfa_outs) in 
+    let driven_nds = exp_trim (flatmap snd dfa_outs) in 
     let driven_vecs = md_extract_vectors driven_nds in
     let copies = ref [] in
     let new_ints = ref [] in
-    let try_assoc key l = (assoc key l) catch key in
+    let try_assoc l key = (assoc key l) catch key in
     let rename sub as =
-        md_merge_vectors (map (\a.try_assoc a sub) (md_expand_vectors as))
+	md_merge_vectors (map (try_assoc sub) (md_expand_vectors as))
     in
     letrec get_next_names cnt =
-	cnt = 0 => (copies := (selected:(deref copies))) fseq [] |
-	let test = map (sprintf "#%d_%s" cnt) driven_nds in
+	let new_name n = sprintf "%s%d%s" BASE_TMP cnt (strip_BASE_TMP n) in
+	let test = map new_name driven_nds then
 	(test intersect (deref cur_nds)) != [] => get_next_names (cnt+1) |
 	(cur_nds := (test @ (deref cur_nds))) fseq
 	let sub = zip driven_nds test in
@@ -730,11 +728,12 @@ let duplicate_instance p id =
         let lfa_inps' = map (\(f,as). f, rename sub as) lfa_inps then
         (PINST lname lattrs lleaf lfa_inps' lfa_louts lints lcontent)
     in
-    let chs' = map process chs then
-    let all_chs = (deref copies)@chs' then
+    let remain' = map process remain then
+    let od = (driven_nds intersect (map fst fa_outs) = []) => [] | [selected] in
+    let all_chs = od@((deref copies)@remain') then
     let ints' = ints@(deref new_ints) then
     PINST name attrs leaf fa_inps fa_outs ints' (P_HIER all_chs)
-;       
+;
 
 
 let fl_do_duplicate canvas =
@@ -903,7 +902,7 @@ let fl_get_idv_models {canvas::string} db visible pat =
 	visible  = "Imported" => get_models db T |
 	eprintf "Unknwn visible argument (%s)" visible
     then
-    filter (str_match pat) relevant
+    qsort strcmp (filter (str_match pat) relevant)
 ;
 export_to_tcl fl_get_idv_models;
 
@@ -934,7 +933,7 @@ let fl_do_new_toplevel_transf {w::string} db name =
     (start_new_transform p F w) fseq
     (tcl_eval ["update"]) fseq
     is_rw_db db => () |
-    (tcl_eval [sprintf "idv:name_and_save_model %s specification %s" w name])
+    (tcl_eval [sprintf "idv:name_and_save_model %s specification {%s}" w name])
     fseq ()
 ;
 export_to_tcl fl_do_new_toplevel_transf;
@@ -1025,6 +1024,14 @@ letrec convert_to_idv_format p =
     cnv p
 ;
 
+let import_model name p =
+    p fseq
+    val (IDV_RW_DB sname fname mnames tbl) = get_rw_db () then
+    let p_sha  = idv_save_pexlif p then
+    (add_model_in_rw_db T name p_sha) fseq
+    ()
+;
+
 let fl_import_model w filename =
     let p = convert_to_idv_format (remove_wrappers (read_pexlif filename)) then
     let tent_name = pexlif_get_name p then
@@ -1032,9 +1039,7 @@ let fl_import_model w filename =
 	NOT (fl_model_name_used tent_name) => tent_name |
 	tcl_eval ["idv:ask_for_model_name "^w]
     then
-    val (IDV_RW_DB sname fname mnames tbl) = get_rw_db () then
-    let p_sha  = idv_save_pexlif p then
-    (add_model_in_rw_db T name p_sha) fseq
+    (import_model name p) fseq
     (tcl_eval ["idv:update_idv_list"]) fseq
     ()
 ;
@@ -1126,6 +1131,50 @@ let create_verilog_load_file basename file pexlif_file =
     load_file
 ;
 
+let do_osu018_synthesis file bname pexlif_file p =
+    let lib_dir = DIR^"../../../../lib/osu018_stdcells/" then
+    // Rename Verilog hierarchy to sane names
+    // Toplevel name is `bname`
+    let p' = make_anon_names bname p then
+    val (PINST nm attrs lf fa_inps fa_outs ints body) = p' then
+    let ios = map fst (fa_inps @ fa_outs) then
+    // Write out a Verilog version of the pexlif
+    let fp = fopen (file^".v") "w" then
+    let io_sub = safe_pexlif2verilog fp p' then
+    (fclose fp) seq
+    // Create a yosys synthesis script for this Verilog file
+    let fp = mktemp "yosys_script" then
+    let yosys_file = stream2filename fp then
+    (fprintf fp "read_verilog %s.v\n" file) seq
+    (fprintf fp "hierarchy -top %s\n" bname) seq
+    (fprintf fp "flatten\n") seq
+    (fprintf fp "synth -top %s\n" bname) seq
+    (fprintf fp "dfflibmap -liberty %sosu018_stdcells.lib\n" lib_dir) seq
+    (fprintf fp "abc -liberty %s/osu018_stdcells.lib\n" lib_dir) seq
+    (fprintf fp "clean\n") seq
+    (fprintf fp "write_pexlif -noalias -icells -gates ") seq
+    (fprintf fp "-impltf %s.fl\n" file) seq
+    (fclose fp) seq
+    // Now run Yosys to synthesize and map the design to the osu018 library
+    let cmd = sprintf "yosys -s %s" yosys_file then
+    (system cmd) != 0 => eprintf "yosys -s %s failed\n" yosys_file |
+    // Now append the loading commands
+    let fp = fopen (file^"_load.fl") "w" then
+    (fprintf fp "cload \"osu018_stdcells.fl\";\n") seq
+    (fprintf fp "load \"%s.fl\";\n" file) seq
+    (fprintf fp "\n\nlet p = Q%s [(\"instance\", \"%s\")]" bname bname) seq
+    let pr1 fp (f,as) = list2fp fp T (sprintf "(\"%s\", [" f) ", " "])"
+				(\fp.\a. fprintf fp "\"%s\"" a) as
+    in
+    (list2fp fp T "\n\t[" ",\n\t" "\n\t];\n" pr1 io_sub) fseq
+    (fprintf fp "\np fseq ();\n") seq
+    (fprintf fp "write_pexlif \"%s\" p;\n" pexlif_file) seq
+    (fprintf fp "\"===SuCcEsS===\";\n") seq
+    (fprintf fp "quit;\n") seq
+    (fclose fp) seq
+    (file^"_load.fl")
+;
+
 let fl_run_fl_loader file =
     let cmd = sprintf "fl -noX -unbuf_stdout -F %s" file then
     system cmd
@@ -1161,10 +1210,7 @@ let fl_make_template canvas type file basename create =
 	    load_file
 	|
 	type = "synthesis" =>
-	    (save_verilog file basename p) fseq
-	    let cmd = sprintf "yosys -o %s -S %s" file file then
-	    (system cmd) fseq
-	    create_verilog_load_file basename file pexlif_file
+	    do_osu018_synthesis file basename pexlif_file p
 	|
 	eprintf "Unknown template type (%s)" type
     then
@@ -1691,4 +1737,10 @@ let fl_save_verilog canvas name file =
     save_verilog file name p
 ;
 export_to_tcl fl_save_verilog;
+
+let fl_save_pexlif canvas file =
+    let p = get_idv_current_pexlif canvas then
+    Emit_ASCII_pexlif file p
+;
+export_to_tcl fl_save_pexlif;
 

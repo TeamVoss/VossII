@@ -1,0 +1,9 @@
+# Script to convert verilog to pexlif for stdcells.
+read_verilog non_udp_cells.v
+hierarchy -check -top dummy
+proc
+rename -enumerate -pattern _$%
+memory -nomap
+opt_clean -purge
+write_pexlif -noalias -icells -gates -impltf non_udp_cells.fl
+

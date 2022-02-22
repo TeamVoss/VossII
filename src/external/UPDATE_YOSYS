@@ -1,6 +1,6 @@
 #
 /bin/rm -rf yosys
 mkdir yosys
-rsync -q -avru --exclude=.git --exclude=.github --exclude=abc /media/sf_SharedFolder/Yosys_Distribution/yosys/ /home/cseger/VossII/src/external/yosys/
+rsync -q -avru --exclude=.git --exclude=.github /media/sf_SharedFolder/Yosys_Distribution/yosys/ /home/cseger/VossII/src/external/yosys/
 cp -r yosys_pexlif_backend/pexlif yosys/backends
 patch -p0 yosys/Makefile -o yosys/Makefile_VossII < yosys_makefile_pexlif_backend.patch

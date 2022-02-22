@@ -1207,6 +1207,53 @@ gather(g_ptr redex)
     return;
 }
 
+static void
+separate(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr list, indices;
+    EXTRACT_2_ARGS(redex, list, indices);
+    buffer buf;
+    new_buf(&buf, 100, sizeof(g_ptr));
+    while( !IS_NIL(list) ) {
+	g_ptr e = GET_CONS_HD(list);
+	push_buf(&buf, (pointer) &e);
+	list = GET_CONS_TL(list);
+    }
+    g_ptr sel = Make_NIL();
+    g_ptr sel_tl = sel;
+    while( !IS_NIL(indices) ) {
+	int idx = GET_INT(GET_CONS_HD(indices));
+	g_ptr e = *((g_ptr *) M_LOCATE_BUF(&buf, idx-1));
+	if( e != NULL ) {
+	    SET_CONS_HD(sel_tl, e);
+	    INC_REFCNT(e);
+	    SET_CONS_TL(sel_tl, Make_NIL());
+	    sel_tl = GET_CONS_TL(sel_tl);
+	    g_ptr null = NULL;
+	    store_buf(&buf,idx-1, &null);
+	}
+	indices = GET_CONS_TL(indices);
+    }
+    g_ptr unsel = Make_NIL();
+    g_ptr unsel_tl = unsel;
+    g_ptr *gp;
+    FOR_BUF(&buf, g_ptr, gp) {
+	if( *gp != NULL ) {
+	    SET_CONS_HD(unsel_tl, *gp);
+	    INC_REFCNT(*gp);
+	    SET_CONS_TL(unsel_tl, Make_NIL());
+	    unsel_tl = GET_CONS_TL(unsel_tl);
+	}
+    }
+    free_buf(&buf);
+    MAKE_REDEX_PAIR(redex, sel, unsel);
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+    return;
+}
+
 void
 List_ops_Install_Functions()
 {
@@ -1377,6 +1424,15 @@ List_ops_Install_Functions()
 			    GLmake_arrow(GLmake_list(GLmake_int()),
 					 GLmake_list(tv1))),
                         gather);
+
+    Add_ExtAPI_Function("separate", "21", FALSE,
+                        GLmake_arrow(
+			    GLmake_list(tv1),
+			    GLmake_arrow(GLmake_list(GLmake_int()),
+					 GLmake_tuple(
+					    GLmake_list(tv1),
+					    GLmake_list(tv1)))),
+                        separate);
 
 }
 

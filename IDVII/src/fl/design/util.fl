@@ -562,3 +562,28 @@ let w_substitute sub we =
     in
     do we
 ;
+
+// Same as md_expand_vector except it handles constants (0b[0-9]*) correctly.
+clet cmd_expand_vector v =
+    str_is_prefix "0b" v => map (sprintf "0b%s") (tl (tl (explode v))) |
+    md_expand_vector v
+;
+
+// Same as md_expand_vectors except it handles constants (0b[0-9]*) correctly.
+clet cmd_expand_vectors vs = flatmap cmd_expand_vector vs;
+
+// Same as md_merge_vectors except it handles constants (0b[0-9]*) correctly.
+clet cmd_merge_vectors ns =
+    let vs = md_merge_vectors ns then
+    letrec merge_const cur (v:vs) =
+        str_is_prefix "0b" v => merge_const (v:cur) vs |
+        cur = [] => v:(merge_const [] vs) |
+        let cv = list2str F "0b" "" "" (\s. substr s 3 (-1)) (rev cur) in
+        cv:v:(merge_const [] vs)
+     /\    merge_const cur [] =
+        cur = [] => [] |
+        [list2str F "0b" "" "" (\s. substr s 3 (-1)) (rev cur)]
+    in
+    merge_const [] vs
+;
+

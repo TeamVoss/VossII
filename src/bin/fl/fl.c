@@ -74,6 +74,7 @@ static int 		input_file_for_cmds_pid = -1;
 static string 		output_file_for_results = NULL;
 static string 		v_order_file = NULL;
 static string	        new_default_dir = NULL;
+static string	        new_temp_dir = NULL;
 static buffer		tcl_eval_done_buf;
 static buffer		tcl_eval_result_buf;
 static string		s_empty_string;
@@ -275,6 +276,10 @@ fl_main(int argc, char *argv[])
             hide_window = TRUE;
             argc--, argv++;
         } else
+	if( strcmp(argv[1], "-T") == 0 ) {
+            new_temp_dir = argv[2];
+            argc -= 2; argv += 2;
+	} else
         if( strcmp(argv[1], "-I") == 0 ) {
             new_default_dir = argv[2];
             argc -= 2; argv += 2;
@@ -346,13 +351,18 @@ fl_main(int argc, char *argv[])
         // Which leads to invalid file paths
         user = "_nouser_";
     }
-    Sprintf(buf, "/tmp/voss2_%s_XXXXXX", user);
-    char *res = mkdtemp(buf);
-    if( res == NULL ) {
-	Eprintf("Cannot create temporary directory from %s\n", buf);
+    if( new_temp_dir == NULL ) {
+	Sprintf(buf, "/tmp/voss2_%s_XXXXXX", user);
+	char *res = mkdtemp(buf);
+	if( res == NULL ) {
+	    Eprintf("Cannot create temporary directory from %s\n", buf);
+	}
+	Voss_tmp_dir = (char *) Malloc(strlen(res)+1);
+	strcpy(Voss_tmp_dir, res);
+    } else {
+	Voss_tmp_dir = (char *) Malloc(strlen(new_temp_dir)+1);
+	strcpy(Voss_tmp_dir, new_temp_dir);
     }
-    Voss_tmp_dir = (char *) Malloc(strlen(res)+1);
-    strcpy(Voss_tmp_dir, res);
 
     // Initialize built-in functions
     Install_BuiltIns();
@@ -680,7 +690,7 @@ Exit(int status)
 	unlink(input_file_for_cmds);
     }
     // Clean up and remove temp files
-    if( Voss_tmp_dir != NULL ) {
+    if( (new_temp_dir == NULL) && (Voss_tmp_dir != NULL) ) {
         Sprintf(buf, "/bin/rm -rf %s", Voss_tmp_dir);
         int i = system(buf);
 	(void) i;

@@ -932,7 +932,8 @@ void AstNode::detectSignWidthWorker(int &width_hint, bool &sign_hint, bool *foun
 		if (children.at(0)->type != AST_CONSTANT)
 			log_file_error(filename, location.first_line, "Static cast with non constant expression!\n");
 		children.at(1)->detectSignWidthWorker(width_hint, sign_hint);
-		width_hint = children.at(0)->bitsAsConst().as_int();
+		this_width = children.at(0)->bitsAsConst().as_int();
+		width_hint = max(width_hint, this_width);
 		if (width_hint <= 0)
 			log_file_error(filename, location.first_line, "Static cast with zero or negative size!\n");
 		break;
@@ -1087,6 +1088,11 @@ void AstNode::detectSignWidthWorker(int &width_hint, bool &sign_hint, bool *foun
 			}
 			break;
 		}
+		if (str == "\\$size" || str == "\\$bits" || str == "\\$high" || str == "\\$low" || str == "\\$left" || str == "\\$right") {
+			width_hint = 32;
+			sign_hint = true;
+			break;
+		}
 		if (current_scope.count(str))
 		{
 			// This width detection is needed for function calls which are
@@ -1126,8 +1132,9 @@ void AstNode::detectSignWidthWorker(int &width_hint, bool &sign_hint, bool *foun
 
 	// everything should have been handled above -> print error if not.
 	default:
+		AstNode *current_scope_ast = current_ast_mod == nullptr ? current_ast : current_ast_mod;
 		for (auto f : log_files)
-			current_ast_mod->dumpAst(f, "verilog-ast> ");
+			current_scope_ast->dumpAst(f, "verilog-ast> ");
 		log_file_error(filename, location.first_line, "Don't know how to detect sign and width for %s node!\n", type2str(type).c_str());
 	}
 
@@ -1524,13 +1531,20 @@ RTLIL::SigSpec AstNode::genRTLIL(int width_hint, bool sign_hint)
 	// changing the size of signal can be done directly using RTLIL::SigSpec
 	case AST_CAST_SIZE: {
 			RTLIL::SigSpec size = children[0]->genRTLIL();
-			RTLIL::SigSpec sig = children[1]->genRTLIL();
 			if (!size.is_fully_const())
 				log_file_error(filename, location.first_line, "Static cast with non constant expression!\n");
 			int width = size.as_int();
 			if (width <= 0)
 				log_file_error(filename, location.first_line, "Static cast with zero or negative size!\n");
-			sig.extend_u0(width, sign_hint);
+			// determine the *signedness* of the expression
+			int sub_width_hint = -1;
+			bool sub_sign_hint = true;
+			children[1]->detectSignWidth(sub_width_hint, sub_sign_hint);
+			// generate the signal given the *cast's* size and the
+			// *expression's* signedness
+			RTLIL::SigSpec sig = children[1]->genWidthRTLIL(width, sub_sign_hint);
+			// context may effect this node's signedness, but not that of the
+			// casted expression
 			is_signed = sign_hint;
 			return sig;
 		}
@@ -1917,21 +1931,15 @@ RTLIL::SigSpec AstNode::genRTLIL(int width_hint, bool sign_hint)
 					continue;
 				}
 				if (child->type == AST_PARASET) {
-					int extra_const_flags = 0;
 					IdString paraname = child->str.empty() ? stringf("$%d", ++para_counter) : child->str;
-					if (child->children[0]->type == AST_REALVALUE) {
+					const AstNode *value = child->children[0];
+					if (value->type == AST_REALVALUE)
 						log_file_warning(filename, location.first_line, "Replacing floating point parameter %s.%s = %f with string.\n",
-								log_id(cell), log_id(paraname), child->children[0]->realvalue);
-						extra_const_flags = RTLIL::CONST_FLAG_REAL;
-						auto strnode = AstNode::mkconst_str(stringf("%f", child->children[0]->realvalue));
-						strnode->cloneInto(child->children[0]);
-						delete strnode;
-					}
-					if (child->children[0]->type != AST_CONSTANT)
+								log_id(cell), log_id(paraname), value->realvalue);
+					else if (value->type != AST_CONSTANT)
 						log_file_error(filename, location.first_line, "Parameter %s.%s with non-constant value!\n",
 								log_id(cell), log_id(paraname));
-					cell->parameters[paraname] = child->children[0]->asParaConst();
-					cell->parameters[paraname].flags |= extra_const_flags;
+					cell->parameters[paraname] = value->asParaConst();
 					continue;
 				}
 				if (child->type == AST_ARGUMENT) {
@@ -1948,7 +1956,12 @@ RTLIL::SigSpec AstNode::genRTLIL(int width_hint, bool sign_hint)
 						if (sig.is_wire()) {
 							// if the resulting SigSpec is a wire, its
 							// signedness should match that of the AstNode
-							log_assert(arg->is_signed == sig.as_wire()->is_signed);
+							if (arg->type == AST_IDENTIFIER && arg->id2ast && arg->id2ast->is_signed && !arg->is_signed)
+								// fully-sliced signed wire will be resolved
+								// once the module becomes available
+								log_assert(attributes.count(ID::reprocess_after));
+							else
+								log_assert(arg->is_signed == sig.as_wire()->is_signed);
 						} else if (arg->is_signed) {
 							// non-trivial signed nodes are indirected through
 							// signed wires to enable sign extension

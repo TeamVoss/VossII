@@ -916,7 +916,7 @@ DBG_pexlif(g_ptr pexlif)
     Flush(stdout_fp);
 }
 
-static void
+void
 dbg_print_sch_rec(sch_ptr sch, int indent)
 {
     if( sch->children == NULL ) {
@@ -5651,8 +5651,12 @@ declare_vector(hash_record *vtblp, string hier, string name,
     if( oip == NULL ) {
 	insert_hash(all_name_tblp, full_vname, cip);
     } else {
+
+
 	while( oip->next ) { oip = oip->next; }
 	oip->next = cip;
+
+
     }
     return( ip->map );
 }
@@ -5721,31 +5725,28 @@ ilist_is_user_defined(ilist_ptr il)
 static ilist_ptr
 vec2indices(string name)
 {
-    vec_ptr vp = split_vector_name(vec_rec_mgrp, range_rec_mgrp, name);
-    string sig = get_vector_signature(vp);
+    vec_ptr vp0 = split_vector_name(vec_rec_mgrp, range_rec_mgrp, name);
+    string sig = get_vector_signature(vp0);
     vec_info_ptr ip = (vec_info_ptr) find_hash(all_name_tblp, sig);
-    if( ip == NULL ) {
-	Fail_pr("Cannot find vector %s", name);
-	return NULL;
+    while( ip != NULL ) {
+	vec_ptr dp = ip->declaration;
+	// Ignore the hierarchy prefix
+	vec_ptr vp = vp0->next;
+	dp = dp->next;
+	//
+	if( is_full_range(dp, vp) ) {
+	    return( ilist_copy(ip->map) );
+	}
+	idx_map_result = NULL;
+	im_cur = NULL;
+	if( setjmp(node_map_jmp_env) == 0 ) {
+	    map_node(dp, vp, ip->map, 0);
+	    return( idx_map_result );
+	} 
+	ip = ip->next;
     }
-    vec_ptr dp = ip->declaration;
-    // Ignore the hierarchy prefix
-    vp = vp->next;
-    dp = dp->next;
-    //
-    if( is_full_range(dp, vp) ) {
-	return( ilist_copy(ip->map) );
-    }
-    idx_map_result = NULL;
-    im_cur = NULL;
-    if( setjmp(node_map_jmp_env) == 0 ) {
-	map_node(dp, vp, ip->map, 0);
-    } else {
-	FP(err_fp, "Cannot map %s\n%s\n", name, FailBuf);
-	report_source_locations(err_fp);
-	Rprintf("");
-    }
-    return( idx_map_result );
+    Fail_pr("Cannot find vector %s", name);
+    return NULL;
 }
 
 static int

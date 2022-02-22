@@ -385,6 +385,46 @@ let _dffsre p_clk p_set p_clr p_en sz src q clr set en clk d =
 	    (deref fa_inps_r) (deref fa_outs_r) (deref ints_r) subs
 ;
 
+let _dffsr p_clk p_set p_clr sz src q clr set clk d =
+    let attrs = mk_attr src __FILE__ __LINE__ then
+    let fa_inps_r = ref [] then
+    let fa_outs_r = ref [] then
+    let ints_r    = ref [] then
+    let Q	  = mk_ifc_signal fa_outs_r sz "Q" q then
+    let CLR	  = mk_ifc_signal fa_inps_r sz "CLR" clr then
+    let SET	  = mk_ifc_signal fa_inps_r sz "SET" set then
+    let CLK	  = mk_ifc_signal fa_inps_r 1 "CLK" clk then
+    let D	  = mk_ifc_signal fa_inps_r sz "D" d then
+    let dQ	  = mk_int_signal ints_r sz "Q_##_" then
+    let dCLK	  = mk_int_signal ints_r 1 "CLK_##_" then
+    let dD	  = mk_int_signal ints_r sz "D_##_" then
+    let dCLR	  = mk_int_signal ints_r sz "CLR_##_" then
+    let dSET	  = mk_int_signal ints_r sz "SET_##_" then
+    let clk_del	  = W_PHASE_DELAY dCLK CLK then
+    let d_del	  = W_PHASE_DELAY dD D then
+    let q_del	  = W_PHASE_DELAY dQ Q then
+    let clr_del   = W_PHASE_DELAY dCLR CLR then
+    let set_del   = W_PHASE_DELAY dSET SET then
+    let ZERO	  = W_CONST sz 0 then
+    let ONE	  = W_CONST sz (2**sz-1) then
+    let clk_cond  = p_clk=> W_AND (W_NOT dCLK) CLK | W_AND dCLK (W_NOT CLK) then
+    let clr_cond  = p_clr=> W_AND (W_NOT dCLR) CLR | W_AND dCLR (W_NOT CLR) then
+    let set_cond  = p_set=> W_AND (W_NOT dSET) SET | W_AND dSET (W_NOT SET) then
+    let mux	  = W_UPDATE_FN Q
+			(W_AND (W_NOT clr_cond)
+			       (W_OR set_cond 
+				    (W_ITE clk_cond dD dQ)))
+    then 
+    let subs	  = P_LEAF [clk_del,d_del,q_del,clr_del,set_del,mux] then
+    let pfn = sprintf "draw_dffsr %s %s %s"
+		      (p_clk  => "1" | "0")
+		      (p_clr => "1" | "0")
+		      (p_set => "1" | "0")
+    then
+    PINST pfn attrs T
+	    (deref fa_inps_r) (deref fa_outs_r) (deref ints_r) subs
+;
+
 let mk_rtl op name attrs sz out inp1 inp2 =
     let f_out = mk_name sz "Y" in
     let Y = W_VAR sz "Y" in

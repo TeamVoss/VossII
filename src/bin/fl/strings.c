@@ -1064,6 +1064,23 @@ string_str_cluster(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
+static void
+get_vector_signature(g_ptr redex)
+{
+    g_ptr l    = GET_APPLY_LEFT(redex);
+    g_ptr r    = GET_APPLY_RIGHT(redex);
+    g_ptr g_s;
+    EXTRACT_1_ARG(redex, g_s);
+    string s = GET_STRING(g_s);
+    begin_vector_ops();
+    vec_ptr vp = split_name(s);
+    string res = mk_name_signature(vp);
+    MAKE_REDEX_STRING(redex, wastrsave(&strings, res));
+    end_vector_ops();
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
 void
 Strings_Install_Functions()
 {
@@ -1206,6 +1223,10 @@ Strings_Install_Functions()
     Add_ExtAPI_Function("trim", "1", FALSE,
 			GLmake_arrow(GLmake_string(), GLmake_string()),
 			string_trim);
+
+    Add_ExtAPI_Function("get_vector_signature", "1", FALSE,
+			GLmake_arrow(GLmake_string(), GLmake_string()),
+			get_vector_signature);
 
     Add_ExtAPI_Function("str_cluster", "11", FALSE,
 			GLmake_arrow(GLmake_string(),

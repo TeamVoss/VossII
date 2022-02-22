@@ -1,0 +1,537 @@
+let QAND2X1 {attrs::(string#string) list} conns =
+    let inps = [ "A",
+                 "B" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _and 1 "non_udp_cells.v:50.7-50.17" ["Y"] ["A"] ["B"] 
+    ] in
+    PINST "draw_stdcell AND2X1 draw_and2"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QAND2X2 {attrs::(string#string) list} conns =
+    let inps = [ "A",
+                 "B" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _and 1 "non_udp_cells.v:76.7-76.17" ["Y"] ["A"] ["B"] 
+    ] in
+    PINST "draw_stdcell AND2X2 draw_and2"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QAOI21X1 {attrs::(string#string) list} conns =
+    let inps = [ "A",
+                 "B",
+                 "C" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ "I0_out",
+                 "I1_out" ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _not 1 "non_udp_cells.v:0.0-0.0" ["Y"] ["I1_out"],
+        _or 1 "non_udp_cells.v:104.6-104.27" ["I1_out"] ["I0_out"] ["C"] ,
+        _and 1 "non_udp_cells.v:103.7-103.22" ["I0_out"] ["A"] ["B"] 
+    ] in
+    PINST "draw_stdcell OAI21X1 {draw_and_or_gate 3 {{+ + {}} { {} {} +}} 1}" 
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QAOI22X1 {attrs::(string#string) list} conns =
+    let inps = [ "A",
+                 "B",
+                 "C",
+                 "D" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ "I0_out",
+                 "I1_out",
+                 "I2_out" ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _not 1 "non_udp_cells.v:0.0-0.0" ["Y"] ["I2_out"],
+        _or 1 "non_udp_cells.v:138.6-138.32" ["I2_out"] ["I0_out"] ["I1_out"] ,
+        _and 1 "non_udp_cells.v:137.7-137.22" ["I1_out"] ["C"] ["D"] ,
+        _and 1 "non_udp_cells.v:136.7-136.22" ["I0_out"] ["A"] ["B"] 
+    ] in
+    PINST "draw_stdcell OAI21X1 {draw_and_or_gate 4 {{+ + {} {}} { {} {} + +}} 1}" 
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QBUFX2 {attrs::(string#string) list} conns =
+    let inps = [ "A" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _buf 1 "non_udp_cells.v:168.8-168.9" ["Y"] ["A"]
+    ] in
+    PINST "draw_stdcell BUFX2 draw_buffer"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QBUFX4 {attrs::(string#string) list} conns =
+    let inps = [ "A" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _buf 1 "non_udp_cells.v:190.8-190.9" ["Y"] ["A"]
+    ] in
+    PINST "draw_stdcell BUFX4 draw_buffer"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QCLKBUF1 {attrs::(string#string) list} conns =
+    let inps = [ "A" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _buf 1 "non_udp_cells.v:212.8-212.9" ["Y"] ["A"]
+    ] in
+    PINST "draw_stdcell CLKBUF1 draw_buffer"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QCLKBUF2 {attrs::(string#string) list} conns =
+    let inps = [ "A" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _buf 1 "non_udp_cells.v:234.8-234.9" ["Y"] ["A"]
+    ] in
+    PINST "draw_stdcell CLKBUF2 draw_buffer"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QCLKBUF3 {attrs::(string#string) list} conns =
+    let inps = [ "A" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _buf 1 "non_udp_cells.v:256.8-256.9" ["Y"] ["A"]
+    ] in
+    PINST "draw_stdcell CLKBUF3 draw_buffer"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QFAX1 {attrs::(string#string) list} conns =
+    let inps = [ "A",
+                 "B",
+                 "C" ] in
+    let outs = [ "YC",
+                 "YS" ] in
+    let ints = md_extract_vectors [ "I0_out",
+                 "I1_out",
+                 "I3_out",
+                 "I5_out",
+                 "_$3" ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _or 1 "non_udp_cells.v:286.6-286.36" ["_$3"] ["I0_out"] ["I1_out"] ,
+        _and 1 "non_udp_cells.v:285.7-285.22" ["I3_out"] ["C"] ["A"] ,
+        _and 1 "non_udp_cells.v:284.7-284.22" ["I1_out"] ["B"] ["C"] ,
+        _and 1 "non_udp_cells.v:283.7-283.22" ["I0_out"] ["A"] ["B"] ,
+        _xor 1 "non_udp_cells.v:288.7-288.23" ["YS"] ["I5_out"] ["C"] ,
+        _xor 1 "non_udp_cells.v:287.7-287.22" ["I5_out"] ["A"] ["B"] ,
+        _or 1 "non_udp_cells.v:286.6-286.36" ["YC"] ["_$3"] ["I3_out"] 
+    ] in
+    PINST "draw_stdcell FAX1 {draw_hfl_code 3 full_adder}" 
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QHAX1 {attrs::(string#string) list} conns =
+    let inps = [ "A",
+                 "B" ] in
+    let outs = [ "YC",
+                 "YS" ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _xor 1 "non_udp_cells.v:328.7-328.18" ["YS"] ["A"] ["B"] ,
+        _and 1 "non_udp_cells.v:327.7-327.18" ["YC"] ["A"] ["B"] 
+    ] in
+    PINST "draw_stdcell HAX1 {draw_hfl_code 3 half_adder}" 
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QINVX1 {attrs::(string#string) list} conns =
+    let inps = [ "A" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _not 1 "non_udp_cells.v:0.0-0.0" ["Y"] ["A"]
+    ] in
+    PINST "draw_stdcell INVX1 draw_inverter"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QINVX2 {attrs::(string#string) list} conns =
+    let inps = [ "A" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _not 1 "non_udp_cells.v:0.0-0.0" ["Y"] ["A"]
+    ] in
+    PINST "draw_stdcell INVX2 draw_inverter"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QINVX4 {attrs::(string#string) list} conns =
+    let inps = [ "A" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _not 1 "non_udp_cells.v:0.0-0.0" ["Y"] ["A"]
+    ] in
+    PINST "draw_stdcell INVX4 draw_inverter"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QINVX8 {attrs::(string#string) list} conns =
+    let inps = [ "A" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _not 1 "non_udp_cells.v:0.0-0.0" ["Y"] ["A"]
+    ] in
+    PINST "draw_stdcell INVX8 draw_inverter"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QNAND2X1 {attrs::(string#string) list} conns =
+    let inps = [ "A",
+                 "B" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ "I0_out" ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _not 1 "non_udp_cells.v:0.0-0.0" ["Y"] ["I0_out"],
+        _and 1 "non_udp_cells.v:449.7-449.22" ["I0_out"] ["A"] ["B"] 
+    ] in
+    PINST "draw_stdcell NAND2X1 draw_nand2"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QNAND3X1 {attrs::(string#string) list} conns =
+    let inps = [ "A",
+                 "B",
+                 "C" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ "I1_out",
+                 "_$2" ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _not 1 "non_udp_cells.v:0.0-0.0" ["Y"] ["I1_out"],
+        _and 1 "non_udp_cells.v:477.7-477.25" ["I1_out"] ["_$2"] ["C"] ,
+        _and 1 "non_udp_cells.v:477.7-477.25" ["_$2"] ["A"] ["B"] 
+    ] in
+    PINST "draw_stdcell NAND3X1 draw_nand3"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QNOR2X1 {attrs::(string#string) list} conns =
+    let inps = [ "A",
+                 "B" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ "I0_out" ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _not 1 "non_udp_cells.v:0.0-0.0" ["Y"] ["I0_out"],
+        _or 1 "non_udp_cells.v:507.6-507.22" ["I0_out"] ["A"] ["B"] 
+    ] in
+    PINST "draw_stdcell NOR2X1 draw_nor2"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QNOR3X1 {attrs::(string#string) list} conns =
+    let inps = [ "A", "B", "C" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ "I1_out", "_$2" ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _not 1 "non_udp_cells.v:0.0-0.0" ["Y"] ["I1_out"],
+        _or 1 "non_udp_cells.v:535.6-535.25" ["I1_out"] ["_$2"] ["C"] ,
+        _or 1 "non_udp_cells.v:535.6-535.25" ["_$2"] ["A"] ["B"] 
+    ] in
+    PINST "draw_stdcell NOR3X1 draw_nor3"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QOAI21X1 {attrs::(string#string) list} conns =
+    let inps = [ "A", "B", "C" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ "I0_out", "I1_out" ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _not 1 "non_udp_cells.v:0.0-0.0" ["Y"] ["I1_out"],
+        _and 1 "non_udp_cells.v:567.7-567.27" ["I1_out"] ["I0_out"] ["C"] ,
+        _or 1 "non_udp_cells.v:566.6-566.22" ["I0_out"] ["A"] ["B"] 
+    ] in
+    PINST "draw_stdcell OAI21X1 {draw_or_and_gate 3 {{+ + {}} { {} {} +}} 1}" 
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QOAI22X1 {attrs::(string#string) list} conns =
+    let inps = [ "A",
+                 "B",
+                 "C",
+                 "D" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ "I0_out", "I1_out", "I2_out" ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _not 1 "non_udp_cells.v:0.0-0.0" ["Y"] ["I2_out"],
+        _and 1 "non_udp_cells.v:601.7-601.32" ["I2_out"] ["I0_out"] ["I1_out"] ,
+        _or 1 "non_udp_cells.v:600.6-600.22" ["I1_out"] ["C"] ["D"] ,
+        _or 1 "non_udp_cells.v:599.6-599.22" ["I0_out"] ["A"] ["B"] 
+    ] in
+    PINST "draw_stdcell OAI22X1 {draw_or_and_gate 4 {{+ + {} {}} { {} {} + +}} 1}" 
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QOR2X1 {attrs::(string#string) list} conns =
+    let inps = [ "A",
+                 "B" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _or 1 "non_udp_cells.v:634.6-634.17" ["Y"] ["A"] ["B"] 
+    ] in
+    PINST "draw_stdcell OR2X1 draw_or2"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QOR2X2 {attrs::(string#string) list} conns =
+    let inps = [ "A",
+                 "B" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _or 1 "non_udp_cells.v:660.6-660.17" ["Y"] ["A"] ["B"] 
+    ] in
+    PINST "draw_stdcell OR2X2 draw_or2"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QTBUFX1 {attrs::(string#string) list} conns =
+    let inps = [ "A",
+                 "EN" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ "I0_out" ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _not 1 "non_udp_cells.v:0.0-0.0" ["I0_out"] ["A"],
+        _mux 1 "non_udp_cells.v:0.0-0.0" ["Y"] ["0bz"] ["I0_out"] ["EN"]
+    ] in
+    PINST "draw_stdcell TBUFX1 {draw_hfl_code 2 neg_tri_buf}" 
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QTBUFX2 {attrs::(string#string) list} conns =
+    let inps = [ "A",
+                 "EN" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ "I0_out" ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _not 1 "non_udp_cells.v:0.0-0.0" ["I0_out"] ["A"],
+        _mux 1 "non_udp_cells.v:0.0-0.0" ["Y"] ["0bz"] ["I0_out"] ["EN"]
+    ] in
+    PINST "draw_stdcell TBUFX2 {draw_hfl_code 2 neg_tri_buf}" 
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QXNOR2X1 {attrs::(string#string) list} conns =
+    let inps = [ "A",
+                 "B" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ "I0_out" ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _not 1 "non_udp_cells.v:0.0-0.0" ["Y"] ["I0_out"],
+        _xor 1 "non_udp_cells.v:744.7-744.22" ["I0_out"] ["A"] ["B"] 
+    ] in
+    PINST "draw_stdcell XNOR2X1 draw_xnor2"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QXOR2X1 {attrs::(string#string) list} conns =
+    let inps = [ "A",
+                 "B" ] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _xor 1 "non_udp_cells.v:771.7-771.17" ["Y"] ["A"] ["B"] 
+    ] in
+    PINST "draw_stdcell XOR2X1 draw_xor2"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+// Handcrafted models since Verilog using primitive UDP cannot be compiled.
+
+let QDFFNEGX1 {attrs::(string#string) list} conns =
+    let inps = [ "CLK",
+                 "D" ] in
+    let outs = [ "Q" ] in
+    let ints = md_extract_vectors ["NCLK"] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+	_not 1 "osu018_stdcells.fl:457.0-457.10" ["NCLK"] ["CLK"],
+	_dff 1 "osu018_stdcells.fl:458.0-458.10" ["Q"] ["NCLK"] ["D"]
+    ] in
+    PINST "draw_hier DFFNEGX1" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+let QDFFPOSX1 {attrs::(string#string) list} conns =
+    let inps = [ "CLK", "D" ] in
+    let outs = [ "Q" ] in
+    let ints = md_extract_vectors [] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+	_dff 1 "osu018_stdcells.fl:458.0-458.10" ["Q"] ["CLK"] ["D"]
+    ] in
+    PINST "draw_hier DFFPOSX1" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+let QDFFSR {attrs::(string#string) list} conns =
+    let inps = [ "CLK", "D", "R", "S" ] in
+    let outs = [ "Q" ] in
+    let ints = md_extract_vectors [] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+	_dffsr T F F 1 "osu018_stdcells.fl:485.0-485.10" ["Q"]
+		["R"] ["S"] ["CLK"] ["D"]
+    ] in
+    PINST "draw_hier DFFSR" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+let QLATCH {attrs::(string#string) list} conns =
+    let inps = [ "CLK", "D"] in
+    let outs = [ "Q" ] in
+    let ints = md_extract_vectors [] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+	_dlatch 1 "osu018_stdcells.fl:499.0-499.10" ["Q"] ["CLK"] ["D"]
+    ] in
+    PINST "draw_hier LATCH" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let QMUX2X1 {attrs::(string#string) list} conns =
+    let inps = [ "A", "B", "S"] in
+    let outs = [ "Y" ] in
+    let ints = md_extract_vectors ["MID"] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+	_mux 1 "osu018_stdcells.fl:513.0-513.10" ["MID"] ["B"] ["A"] ["S"],
+	_not 1 "osu018_stdcells.fl:514.0-514.10" ["Y"] ["MID"]  
+    ] in
+    PINST "draw_stdcell MUX2X1 draw_imux2"
+	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+

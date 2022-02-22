@@ -1185,6 +1185,12 @@ struct PexlifBackend : public Backend {
 				config.true_out = args[++argidx];
 				continue;
 			}
+			if (args[argidx] == "-preamble_file" && argidx+1 < args.size()) {
+				*f << stringf("cload \"");
+				*f << args[++argidx];
+				*f << stringf("\";\n");
+				continue;
+			}
 			if (args[argidx] == "-false" && argidx+2 < args.size()) {
 				config.false_type = args[++argidx];
 				config.false_out = args[++argidx];

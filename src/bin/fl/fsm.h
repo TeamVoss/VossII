@@ -13,12 +13,18 @@
 /* --- Forward declarations that need to be exported to earlier .h files --- */
 typedef struct ilist_rec    *ilist_ptr;
 typedef struct vec_info_rec *vec_info_ptr;
+typedef struct sch_rec	    *sch_ptr;
 
 /* ----- Function prototypes for public functions ----- */
 string get_real_name(vec_info_ptr ip, int idx);
 //
 void Fsm_Init();
 void Fsm_Install_Functions();
+
+#ifdef DEBUG
+void	    dbg_print_ilist(string msg, ilist_ptr ip);
+void	    dbg_print_sch_rec(sch_ptr sch, int indent);
+#endif
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */
@@ -248,7 +254,6 @@ typedef struct state_rec {
     buffer	values;
 } state_rec;
 
-typedef struct sch_rec		*sch_ptr;
 typedef struct sch_list_rec	*sch_list_ptr;
 
 typedef struct sch_list_rec {

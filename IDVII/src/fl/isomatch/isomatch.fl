@@ -365,9 +365,14 @@ let filter_overlapping_matches ms =
 ;
 
 let pex_subst_actuals (PINST name as l fa_inps fa_outs internals content) sub =
-    let fa_subst_actuals (f,as) sub = (f,map (flip assoc sub) as) in
-    let fa_inps' = map (flip fa_subst_actuals sub) fa_inps in
-    let fa_outs' = map (flip fa_subst_actuals sub) fa_outs in
+    let try_trans a = (assoc a sub)
+		      catch
+		      (eprintf "Cannot translate %s in %S\n" a
+			       (map (\(f,t).sprintf "%s-%s" f t) sub))
+    in
+    let fa_subst_actuals (f,as) = f, map try_trans as in
+    let fa_inps' = map fa_subst_actuals fa_inps in
+    let fa_outs' = map fa_subst_actuals fa_outs in
     PINST name as l fa_inps' fa_outs' internals content
 ;
 

@@ -65,7 +65,7 @@ let warn msg v = print msg fseq v;
 let prim_str  {s::string} = Exp_primary (Prim_str s);
 let prim_cstr {s::string} = CExp_primary (CPrim_str s);
 
-let as_bin {sz::int} {i::int} = sprintf "%d'b%0*b" sz sz i;
+let as_bin {sz::int} {i::int} = sprintf "%0*b" sz i;
 let as_oct {sz::int} {i::int} = sprintf "%d'o%0*o" sz (sz/3) i;
 let as_hex {sz::int} {i::int} = sprintf "%d'x%0*x" sz (sz/4) i;
 
@@ -526,7 +526,14 @@ let pretty_decl_outs {f_outs::(string#bool) list} =
 // -----------------------------------------------------------------------------
 
 let port {vec::string} =
-      val (id,rs) = split_name_rng vec in Exp_primary (prim_hier id rs)
+    str_is_prefix "0b" vec =>
+	// Constant
+	let sz = strlen vec - 2 in
+	let i = sscanf "0b%b" vec in
+	bin sz F i
+    |
+	// Named signal
+	val (id,rs) = split_name_rng vec in Exp_primary (prim_hier id rs)
 ;
 
 let connect_ports f as =
@@ -746,11 +753,90 @@ let pretty_pexlif_h inst (PINST name _ _ fa_inps fa_outs _ _) assuming (name == 
 
 // -----------------------------------------------------------------------------
 
+
+// Modify the node wire names so that they all are valid according to
+// the Verilog standard.
+// Returns the new pexlif and a connection list for the top-level
+// to make the new pexlif equivalent to the original.
+let make_verilog_safe p =
+    letrec clean (PINST nm attrs lf fa_inps fa_outs ints (P_HIER chs)) =
+        letrec mk_int_sub i (v:vs) =
+            let sz = md_size v then
+            let new = sz = 1 => sprintf "m%d" i |
+                                sprintf "m%d[%d:0]" i (sz-1)
+            in
+            ((v,new):(zip (md_expand_vector v) (md_expand_vector new)))
+            @ (mk_int_sub (i+1) vs)
+         /\   mk_int_sub i [] = []
+        in
+        let int_sub = mk_int_sub 1 (md_extract_vectors ints) then
+        letrec mk_inp_sub i ((f,as):rem) =
+            let sz = md_size f then
+            let new = sz = 1 => sprintf "i%d" i |
+                                sprintf "i%d[%d:0]" i (sz-1)
+            in
+            ((f,new):(zip (md_expand_vector f) (md_expand_vector new)))
+            @ (mk_inp_sub (i+1) rem)
+         /\   mk_inp_sub i [] = []
+        in
+        let inp_sub = mk_inp_sub 1 fa_inps then
+        letrec mk_out_sub i ((f,as):rem) =
+            let sz = md_size f then
+            let new = sz = 1 => sprintf "o%d" i |
+                                sprintf "o%d[%d:0]" i (sz-1)
+            in
+            ((f,new):(zip (md_expand_vector f) (md_expand_vector new)))
+            @ (mk_out_sub (i+1) rem)
+         /\   mk_out_sub i [] = []
+        in
+        let out_sub = mk_out_sub 1 fa_outs then
+        let fa_inps' = map (\(f,as). assoc f inp_sub, as) fa_inps then
+        let fa_outs' = map (\(f,as). assoc f out_sub, as) fa_outs then
+        let ints' = map (\v. assoc v int_sub) ints then
+        let sub = inp_sub @ out_sub @ int_sub then
+        let try_assoc n = (assoc n sub) catch n in
+        let rename (PINST lnm lattrs llf lfa_inps lfa_outs linst lbody) =
+            let tr a =
+                [(assoc a sub)] catch
+                (md_merge_vectors (map try_assoc (md_expand_vector a)))
+            in
+            let tr_fa (f,as) = (f, flatmap tr as) in
+            let lfa_inps' = map tr_fa lfa_inps then
+            let lfa_outs' = map tr_fa lfa_outs then
+            PINST lnm lattrs llf lfa_inps' lfa_outs' linst lbody
+        in
+        let chs' = map (\p. rename (clean p)) chs then
+        PINST nm attrs lf fa_inps' fa_outs' ints' (P_HIER chs')
+     /\    clean other = other
+    in
+    val (PINST nm attrs lf fa_inps fa_outs ints body) = clean p then
+    let sub = (fa_inps @ fa_outs) then
+    let fa_inps' = map (\(f,as).f,[f]) fa_inps in
+    let fa_outs' = map (\(f,as).f,[f]) fa_outs in
+    let final = (PINST nm attrs lf fa_inps' fa_outs' ints body) then
+    (final, sub)
+;
+
+let safe_pexlif2verilog {fp::stream} {pex::pexlif} =
+    val (pex',sub) = make_verilog_safe pex then
+    let descriptions = pretty_pexlif_h "" pex' then
+    let do1 d =
+	(frender fp (p_source_text (Source_text [d]))) fseq (fprintf fp "\n\n")
+    in
+    (foreach do1 descriptions) fseq
+    sub
+;
+
 let pexlif2verilog {fp::stream} {pex::pexlif} =
-    val (PINST name _ _ fa_inps fa_outs _ _) = pex in
+    val (PINST name attrs lf fa_inps fa_outs ints body) = pex in
     let non_matching_io (f,as) = (length as != 1) OR (f != (hd as)) in
     let idx = find_first0 non_matching_io (fa_inps @ fa_outs) then
-    let pex' = idx = 0 => pex | wrap_pexlif pex then
+    let pex' = idx = 0 => pex |
+	let mk_io fa = map (\v. v, [v]) (md_extract_vectors (flatmap snd fa)) in
+	let fa_inps' = mk_io fa_inps in
+	let fa_outs' = mk_io fa_outs in
+	PINST name attrs F fa_inps' fa_outs' [] (P_HIER [pex])
+    then
     let descriptions = pretty_pexlif_h "" pex' then
     let do1 d =
 	(frender fp (p_source_text (Source_text [d]))) fseq (fprintf fp "\n\n")
@@ -758,6 +844,6 @@ let pexlif2verilog {fp::stream} {pex::pexlif} =
     foreach do1 descriptions
 ;
 
-end_abstype pexlif2verilog;
+end_abstype safe_pexlif2verilog pexlif2verilog;
 
 // =============================================================================

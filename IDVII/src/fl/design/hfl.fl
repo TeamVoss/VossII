@@ -507,24 +507,6 @@ let mk_draw_cmd phase_delay rhs =
     NOT phase_delay => base | sprintf "draw_phase_delay_on_output {%s}" base
 ;
 
-
-let BASE_TMP = "_$";
-
-let BASE_TMP_len = strlen BASE_TMP;
-let o0 = ord "0";
-let o9 = ord "9";
-
-let strip_BASE_TMP s =
-    NOT (str_is_prefix BASE_TMP s) => s |
-    let rem = substr s (BASE_TMP_len+1) (-1) in
-    letrec skip_dig (c:cs) =
-	let oc = ord c in
-	(o0 <= oc) AND (oc <= o9) => skip_dig cs | implode (c:cs)
-     /\    skip_dig [] = ""
-    in
-    skip_dig (explode rem)
-;
-
 let is_wide_OR e  =
     letrec cnt (W_OR a b) = 1 + cnt a + cnt b
      /\    cnt other = 0
@@ -1476,6 +1458,24 @@ let TYPE name size = (core_TYPE name size T "") fseq ();
 
 TYPE "bit" 1;
 
+let wexpr_hw_type_name {bv::wexpr} = "wexpr";
+let wexpr_hw_mk_var {we::wexpr} base = W_VAR 0 base;
+let wexpr_hw_is_arithmetic {e::wexpr} = T;
+let wexpr_hw_size {e::wexpr} = wexpr_size e;
+let wexpr_hw_destr {e::wexpr} = e;
+let wexpr_hw_constr {e::wexpr} = e;
+let wexpr_hw_values {e::wexpr} = error "Not relevant";
+let {wexpr_hw_type_destr :: {wexpr} hw_type} =
+            HW_TYPE wexpr_hw_type_name
+                    wexpr_hw_mk_var
+                    wexpr_hw_is_arithmetic
+                    wexpr_hw_size
+                    wexpr_hw_destr
+                    wexpr_hw_constr
+                    wexpr_hw_values
+;
+add_open_overload hw_type_destr wexpr_hw_type_destr;
+
 let _i2_const i =
     let sz = hw_size {undefined:: *r} in
     let w = W_CONST sz i in
@@ -1492,6 +1492,276 @@ let _s2_var s =
 
 overload '' '' _i2_const _s2_var;
 
+
+let wNOT {a:: *a} =
+    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
+    in
+    let res = W_NOT (hw_destr a) in
+    {hw_constr res:: *a}
+;
+let '~' a = wNOT a;
+
+let wAND {a:: *a} {b:: *a} =
+    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
+    in
+    let res = W_AND (hw_destr a) (hw_destr b) in
+    {hw_constr res:: *a}
+;
+let '&' = wAND;
+infix 4 '&';
+
+let wITE {c::bit} {t:: *a} {e:: *a} =
+    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
+    in
+    let res = W_ITE (hw_bit_destr c) (hw_destr t) (hw_destr e) in
+    {hw_constr res :: *a}
+;
+let ':' {a:: *a} {b:: *a} = (a,b);
+let '?' c (t,e) = wITE c t e;
+if_then_else_binder '?' ':';
+
+let wTHEN {c::wexpr} ({t::wexpr},{e::wexpr}) = W_ITE c t e;
+
+let IF c = c;
+let ELSE {t:: *a} {e:: *a} = (t,e);
+let bitTHEN c (t,e) = c '?' t ':' e;
+overload tmp_THEN bTHEN bevTHEN bitTHEN wTHEN;
+
+let THEN {c:: *b} ({te:: *a # *a}) =
+    let res = tmp_THEN c te in
+    {res :: *a}
+;
+if_then_else_binder THEN ELSE;
+
+let wOR {a:: *a} {b:: *a} =
+    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
+    in
+    let res = W_OR (hw_destr a) (hw_destr b) in
+    {hw_constr res:: *a}
+;
+let '|' = wOR;
+infix 3 '|';
+
+let wXOR a b = wOR (wAND (wNOT a) b) (wAND a (wNOT b));
+let '^' = wXOR;
+infix 4 '^';
+
+let wEQ {a:: *a} {b:: *a} =
+    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
+    in
+    let res = W_EQ (hw_destr a) (hw_destr b) in
+    hw_bit_constr res
+;
+
+overload '=' wEQ W_EQ;
+infix 5 '=';
+
+let wNEQ {a:: *a} {b:: *a} =
+    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
+    in
+    let res = W_NOT (W_EQ (hw_destr a) (hw_destr b)) in
+    {hw_bit_constr res:: bit}
+;
+let '!=' = wNEQ;
+infix 5 '!=';
+
+let wGR {a:: *a} {b:: *a} =
+    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
+    in
+    NOT (hw_is_arithmetic a) =>
+	eprintf "Cannot perform > on vectors of type %s\n" (hw_type_name a)
+    |
+    let res = W_GR (hw_destr a) (hw_destr b) in
+    {hw_bit_constr res:: bit}
+;
+let '>' = wGR;
+infix 5 '>';
+
+let wLT {a:: *a} {b:: *a} = wGR b a;
+let '<' = wLT;
+infix 5 '<';
+
+let wGEQ {a:: *a} {b:: *a} = wNOT (wGR b a);
+let '>=' = wGEQ;
+infix 5 '>=';
+
+let wLEQ {a:: *a} {b:: *a} = wNOT (wGR a b);
+let '<=' = wLEQ;
+infix 5 '<=';
+
+let wADD {a:: *a} {b:: *a} =
+    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
+    in
+    NOT (hw_is_arithmetic a) =>
+	eprintf "Cannot perform + on vectors of type %s\n" (hw_type_name a)
+    |
+    let res = W_ADD (hw_destr a) (hw_destr b) in
+    {hw_constr res:: *a}
+;
+let '+' = wADD;
+infix 7 '+';
+
+let wDIV {a:: *a} {b:: *a} =
+    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
+    in
+    NOT (hw_is_arithmetic a) =>
+	eprintf "Cannot perform / on vectors of type %s\n" (hw_type_name a)
+    |
+    let res = W_DIV (hw_destr a) (hw_destr b) in
+    {hw_constr res:: *a}
+;
+let '/' = wDIV;
+infix 8 '/';
+
+let wMUL {a:: *a} {b:: *a} =
+    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
+    in
+    NOT (hw_is_arithmetic a) =>
+	eprintf "Cannot perform * on vectors of type %s\n" (hw_type_name a)
+    |
+    let res = W_MUL (hw_destr a) (hw_destr b) in
+    {hw_constr res:: *a}
+;
+
+let '*' = wMUL;
+infix 8 '*';
+
+let wSUB {a:: *a} {b:: *a} =
+    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
+    in
+    NOT (hw_is_arithmetic a) =>
+	eprintf "Cannot perform - on vectors of type %s\n" (hw_type_name a)
+    |
+    let res = W_SUB (hw_destr a) (hw_destr b) in
+    {hw_constr res:: *a}
+;
+let '-' = wSUB;
+infix 7 '-';
+
+let wMOD {a:: *a} {b:: *a} =
+    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
+    in
+    NOT (hw_is_arithmetic a) =>
+	eprintf "Cannot perform %% on vectors of type %s\n" (hw_type_name a)
+    |
+    let res = W_MOD (hw_destr a) (hw_destr b) in
+    {hw_constr res:: *a}
+;
+let '%' = wMOD;
+infix 8 '%';
+
+let wSHL {a:: *a} {b:: *a} =
+    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
+    in
+    NOT (hw_is_arithmetic a) =>
+	eprintf "Cannot perform << on vectors of type %s\n" (hw_type_name a)
+    |
+    NOT (hw_is_arithmetic b) =>
+	eprintf "Cannot perform << on vectors of type %s\n" (hw_type_name b)
+    |
+    let res = W_SHL (hw_destr a) (hw_destr b) in
+    {hw_constr res:: *a}
+;
+let '<<' = wSHL;
+infix 9 '<<';	    // Fixity???????
+
+let wSHR {a:: *a} {b:: *a} =
+    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
+    in
+    NOT (hw_is_arithmetic a) =>
+	eprintf "Cannot perform >> on vectors of type %s\n" (hw_type_name a)
+    |
+    NOT (hw_is_arithmetic b) =>
+	eprintf "Cannot perform >> on vectors of type %s\n" (hw_type_name b)
+    |
+    let res = W_SHR (hw_destr a) (hw_destr b) in
+    {hw_constr res:: *a}
+;
+let '>>' = wSHR;
+infix 9 '>>';	    // Fixity???????
+
+let wASHR {a:: *a} {b:: *a} =
+    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
+    in
+    NOT (hw_is_arithmetic a) =>
+	eprintf "Cannot perform |>> on vectors of type %s\n" (hw_type_name a)
+    |
+    NOT (hw_is_arithmetic b) =>
+	eprintf "Cannot perform |>> on vectors of type %s\n" (hw_type_name b)
+    |
+    let res = W_ASHR (hw_destr a) (hw_destr b) in
+    {hw_constr res:: *a}
+;
+let '|>>' = wASHR;
+infix 9 '|>>';	    // Fixity???????
+
+let ZX {inp:: *a} =
+    val (HW_TYPE ihw_type_name ihw_mk_var ihw_is_arithmetic
+		 ihw_size ihw_destr ihw_constr ihw_values) =
+	{hw_type_destr :: {*q} hw_type}
+    in
+    val (HW_TYPE ohw_type_name ohw_mk_var ohw_is_arithmetic
+		 ohw_size ohw_destr ohw_constr ohw_values) =
+	{hw_type_destr :: {*b} hw_type}
+    in
+    let sz_in = ihw_size inp in
+    let sz_out = ohw_size {undefined :: *b} in
+    (sz_in > sz_out)
+        => eprintf "ZX can't extend into smaller type (%d bits into %d bits)" sz_in sz_out
+        |
+    let w_out = W_ZX sz_out (ihw_destr inp) in
+    let out = ohw_constr w_out in
+    {out :: *b}
+;
+
+let SX {inp:: *a} =
+    val (HW_TYPE ihw_type_name ihw_mk_var ihw_is_arithmetic
+		 ihw_size ihw_destr ihw_constr ihw_values) =
+	{hw_type_destr :: {*q} hw_type}
+    in
+    val (HW_TYPE ohw_type_name ohw_mk_var ohw_is_arithmetic
+		 ohw_size ohw_destr ohw_constr ohw_values) =
+	{hw_type_destr :: {*b} hw_type}
+    in
+    let sz_in = ihw_size inp in
+    let sz_out = ohw_size {undefined :: *b} in
+    (sz_in > sz_out)
+        => eprintf "SX can't extend into smaller type (%d bits into %d bits)" sz_in sz_out
+        |
+    let w_out = W_SX sz_out (ihw_destr inp) in
+    let out = ohw_constr w_out in
+    {out :: *b}
+;
 
 let ENUM_0 name name_list =
     name_list = [] => error "ENUM must have at least one element" |
@@ -1893,277 +2163,6 @@ let hw_unsplit l =
 	let wE = W_CAT wEs in
 	hw_constr wE
     )
-;
-
-
-let wNOT {a:: *a} =
-    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
-	{hw_type_destr :: {*a} hw_type}
-    in
-    let res = W_NOT (hw_destr a) in
-    {hw_constr res:: *a}
-;
-let '~' a = wNOT a;
-
-let wAND {a:: *a} {b:: *a} =
-    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
-	{hw_type_destr :: {*a} hw_type}
-    in
-    let res = W_AND (hw_destr a) (hw_destr b) in
-    {hw_constr res:: *a}
-;
-let '&' = wAND;
-infix 4 '&';
-
-let wITE {c::bit} {t:: *a} {e:: *a} =
-    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
-	{hw_type_destr :: {*a} hw_type}
-    in
-    let res = W_ITE (hw_bit_destr c) (hw_destr t) (hw_destr e) in
-    {hw_constr res :: *a}
-;
-let ':' {a:: *a} {b:: *a} = (a,b);
-let '?' c (t,e) = wITE c t e;
-if_then_else_binder '?' ':';
-
-let wTHEN {c::wexpr} ({t::wexpr},{e::wexpr}) = W_ITE c t e;
-
-let IF c = c;
-let ELSE {t:: *a} {e:: *a} = (t,e);
-let bitTHEN c (t,e) = c '?' t ':' e;
-overload tmp_THEN bTHEN bevTHEN bitTHEN wTHEN;
-
-let THEN {c:: *b} ({te:: *a # *a}) =
-    let res = tmp_THEN c te in
-    {res :: *a}
-;
-if_then_else_binder THEN ELSE;
-
-let wOR {a:: *a} {b:: *a} =
-    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
-	{hw_type_destr :: {*a} hw_type}
-    in
-    let res = W_OR (hw_destr a) (hw_destr b) in
-    {hw_constr res:: *a}
-;
-let '|' = wOR;
-infix 3 '|';
-
-let wXOR a b = wOR (wAND (wNOT a) b) (wAND a (wNOT b));
-let '^' = wXOR;
-infix 4 '^';
-
-let wEQ {a:: *a} {b:: *a} =
-    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
-	{hw_type_destr :: {*a} hw_type}
-    in
-    let res = W_EQ (hw_destr a) (hw_destr b) in
-    hw_bit_constr res
-;
-
-overload '=' wEQ W_EQ;
-infix 5 '=';
-
-let wNEQ {a:: *a} {b:: *a} =
-    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
-	{hw_type_destr :: {*a} hw_type}
-    in
-    let res = W_NOT (W_EQ (hw_destr a) (hw_destr b)) in
-    {hw_bit_constr res:: bit}
-;
-let '!=' = wNEQ;
-infix 5 '!=';
-
-let wGR {a:: *a} {b:: *a} =
-    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
-	{hw_type_destr :: {*a} hw_type}
-    in
-    NOT (hw_is_arithmetic a) =>
-	eprintf "Cannot perform > on vectors of type %s\n" (hw_type_name a)
-    |
-    let res = W_GR (hw_destr a) (hw_destr b) in
-    {hw_bit_constr res:: bit}
-;
-let '>' = wGR;
-infix 5 '>';
-
-let wLT {a:: *a} {b:: *a} = wGR b a;
-let '<' = wLT;
-infix 5 '<';
-
-let wGEQ {a:: *a} {b:: *a} = wNOT (wGR b a);
-let '>=' = wGEQ;
-infix 5 '>=';
-
-let wLEQ {a:: *a} {b:: *a} = wNOT (wGR a b);
-let '<=' = wLEQ;
-infix 5 '<=';
-
-let wADD {a:: *a} {b:: *a} =
-    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
-	{hw_type_destr :: {*a} hw_type}
-    in
-    NOT (hw_is_arithmetic a) =>
-	eprintf "Cannot perform + on vectors of type %s\n" (hw_type_name a)
-    |
-    let res = W_ADD (hw_destr a) (hw_destr b) in
-    {hw_constr res:: *a}
-;
-let '+' = wADD;
-infix 7 '+';
-
-let wDIV {a:: *a} {b:: *a} =
-    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
-	{hw_type_destr :: {*a} hw_type}
-    in
-    NOT (hw_is_arithmetic a) =>
-	eprintf "Cannot perform / on vectors of type %s\n" (hw_type_name a)
-    |
-    let res = W_DIV (hw_destr a) (hw_destr b) in
-    {hw_constr res:: *a}
-;
-let '/' = wDIV;
-infix 8 '/';
-
-let wMUL {a:: *a} {b:: *a} =
-    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
-	{hw_type_destr :: {*a} hw_type}
-    in
-    NOT (hw_is_arithmetic a) =>
-	eprintf "Cannot perform * on vectors of type %s\n" (hw_type_name a)
-    |
-    let res = W_MUL (hw_destr a) (hw_destr b) in
-    {hw_constr res:: *a}
-;
-
-let '*' = wMUL;
-infix 8 '*';
-
-let wSUB {a:: *a} {b:: *a} =
-    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
-	{hw_type_destr :: {*a} hw_type}
-    in
-    NOT (hw_is_arithmetic a) =>
-	eprintf "Cannot perform - on vectors of type %s\n" (hw_type_name a)
-    |
-    let res = W_SUB (hw_destr a) (hw_destr b) in
-    {hw_constr res:: *a}
-;
-let '-' = wSUB;
-infix 7 '-';
-
-let wMOD {a:: *a} {b:: *a} =
-    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
-	{hw_type_destr :: {*a} hw_type}
-    in
-    NOT (hw_is_arithmetic a) =>
-	eprintf "Cannot perform %% on vectors of type %s\n" (hw_type_name a)
-    |
-    let res = W_MOD (hw_destr a) (hw_destr b) in
-    {hw_constr res:: *a}
-;
-let '%' = wMOD;
-infix 8 '%';
-
-let wSHL {a:: *a} {b:: *a} =
-    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
-	{hw_type_destr :: {*a} hw_type}
-    in
-    NOT (hw_is_arithmetic a) =>
-	eprintf "Cannot perform << on vectors of type %s\n" (hw_type_name a)
-    |
-    NOT (hw_is_arithmetic b) =>
-	eprintf "Cannot perform << on vectors of type %s\n" (hw_type_name b)
-    |
-    let res = W_SHL (hw_destr a) (hw_destr b) in
-    {hw_constr res:: *a}
-;
-let '<<' = wSHL;
-infix 9 '<<';	    // Fixity???????
-
-let wSHR {a:: *a} {b:: *a} =
-    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
-	{hw_type_destr :: {*a} hw_type}
-    in
-    NOT (hw_is_arithmetic a) =>
-	eprintf "Cannot perform >> on vectors of type %s\n" (hw_type_name a)
-    |
-    NOT (hw_is_arithmetic b) =>
-	eprintf "Cannot perform >> on vectors of type %s\n" (hw_type_name b)
-    |
-    let res = W_SHR (hw_destr a) (hw_destr b) in
-    {hw_constr res:: *a}
-;
-let '>>' = wSHR;
-infix 9 '>>';	    // Fixity???????
-
-let wASHR {a:: *a} {b:: *a} =
-    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
-	{hw_type_destr :: {*a} hw_type}
-    in
-    NOT (hw_is_arithmetic a) =>
-	eprintf "Cannot perform |>> on vectors of type %s\n" (hw_type_name a)
-    |
-    NOT (hw_is_arithmetic b) =>
-	eprintf "Cannot perform |>> on vectors of type %s\n" (hw_type_name b)
-    |
-    let res = W_ASHR (hw_destr a) (hw_destr b) in
-    {hw_constr res:: *a}
-;
-let '|>>' = wASHR;
-infix 9 '|>>';	    // Fixity???????
-
-let ZX {inp:: *a} =
-    val (HW_TYPE ihw_type_name ihw_mk_var ihw_is_arithmetic
-		 ihw_size ihw_destr ihw_constr ihw_values) =
-	{hw_type_destr :: {*q} hw_type}
-    in
-    val (HW_TYPE ohw_type_name ohw_mk_var ohw_is_arithmetic
-		 ohw_size ohw_destr ohw_constr ohw_values) =
-	{hw_type_destr :: {*b} hw_type}
-    in
-    let sz_in = ihw_size inp in
-    let sz_out = ohw_size {undefined :: *b} in
-    (sz_in > sz_out)
-        => eprintf "ZX can't extend into smaller type (%d bits into %d bits)" sz_in sz_out
-        |
-    let w_out = W_ZX sz_out (ihw_destr inp) in
-    let out = ohw_constr w_out in
-    {out :: *b}
-;
-
-let SX {inp:: *a} =
-    val (HW_TYPE ihw_type_name ihw_mk_var ihw_is_arithmetic
-		 ihw_size ihw_destr ihw_constr ihw_values) =
-	{hw_type_destr :: {*q} hw_type}
-    in
-    val (HW_TYPE ohw_type_name ohw_mk_var ohw_is_arithmetic
-		 ohw_size ohw_destr ohw_constr ohw_values) =
-	{hw_type_destr :: {*b} hw_type}
-    in
-    let sz_in = ihw_size inp in
-    let sz_out = ohw_size {undefined :: *b} in
-    (sz_in > sz_out)
-        => eprintf "SX can't extend into smaller type (%d bits into %d bits)" sz_in sz_out
-        |
-    let w_out = W_SX sz_out (ihw_destr inp) in
-    let out = ohw_constr w_out in
-    {out :: *b}
 ;
 
 //
@@ -3186,140 +3185,9 @@ let always_ff gclk assignments =
 let <== {lhs:: *a} {rhs:: *a} = (lhs,rhs);
 infix 1 <==;
 
-
-let try_assoc key l =
-    (
-	let res = assoc key l then
-	SOME res
-    ) catch
-    NONE
-;
-
-let try_rev_assoc key l =
-    (
-	let res = rev_assoc key l then
-	SOME res
-    ) catch
-    NONE
-;
-
-let rename_internals p =
-    val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER subfubs)) = p in
-    let mapping = ref [] in
-    let insert name =
-	let base = last (str_split name "/") in
-	let base = strip_BASE_TMP base in
-	letrec try i =
-	    let new_name = sprintf "%s%d%s" BASE_TMP i base in
-	    has_value (try_rev_assoc new_name (deref mapping)) => try (i+1) |
-	    (mapping := ((name, new_name):(deref mapping))) fseq
-	    new_name
-	in
-	try 1
-    in
-    let ints' = map insert ints then
-    let bit_mapping =
-	let expand_map (f,t) = zip (md_expand_vector f) (md_expand_vector t) in
-	flatmap expand_map (deref mapping)
-    then
-    let map_name old_name =
-	str_is_prefix "0b" old_name => [old_name] |
-	let ores = try_assoc old_name (deref mapping) then
-	has_value ores => [get_value ores] |
-	let old_names = md_expand_vector old_name then
-	let map1 onm =
-	    let ores1 = try_assoc onm bit_mapping then
-	    has_value ores1 => get_value ores1 | onm
-	in
-	let new_names = map map1 old_names then
-	md_merge_vectors new_names
-    in
-    let trans (PINST sname sattrs sleaf sfa_inps sfa_outs sints sch) =
-	let tr_fa (f,as) = (f, flatmap map_name as) in
-	let sfa_inps' = map tr_fa sfa_inps then
-	let sfa_outs' = map tr_fa sfa_outs then
-	(PINST sname sattrs sleaf sfa_inps' sfa_outs' sints sch)
-    in
-    let subfubs' = map trans subfubs then
-    (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER subfubs'))
-;
-
-// Flatten the pexlif until the stop_pred is satisfied.
-// Intermediate wire names are created on demand and are named
-// i<number>/i<number>/.../<name> where the i<number>s refere to
-// the cardinality of a subfub.
-//
-let gen_flatten_pexlif stop_pred p =
-    let mk_pref pref i = sprintf "%si%d/" pref i in
-    letrec do_flat sub pref p =
-        let tr n = (assoc n sub) catch n in
-        val (PINST name attrs leaf fa_inps fa_outs ints content) = p in
-        leaf OR stop_pred p =>
-            let tr_io (f,as) =
-                let as' = md_merge_vectors (map tr (md_expand_vectors as)) in
-                (f,as')
-            in
-            let fa_inps' = map tr_io fa_inps in
-            let fa_outs' = map tr_io fa_outs in
-            [(PINST name attrs leaf fa_inps' fa_outs' ints content)]
-        |
-            val (P_HIER children) = content in
-            let mk_io_sub (f,as) =
-                zip (md_expand_vector f) (map tr (md_expand_vectors as))
-            in
-            let io_sub = flatmap mk_io_sub (fa_inps @ fa_outs) in
-            let mk_int_sub f =
-                map (\n. n, sprintf "%s%s" pref n) (md_expand_vector f)
-            in
-            let int_sub = flatmap mk_int_sub ints in
-            let sub' = io_sub @ int_sub in
-            let prefs = map (mk_pref pref) (1 upto length children) in
-            flat (map2 (do_flat sub') prefs children)
-    in
-    val (PINST name attrs leaf fa_inps fa_outs ints content) = p in
-    leaf => p |
-    val (P_HIER chs) = content in
-    let prefs = map (mk_pref "") (1 upto length chs) in
-    let children = flat (map2 (do_flat []) prefs chs) in
-    let wires_used (PINST _ _ _ fa_inps fa_outs _ _) =
-        md_expand_vectors (flatmap snd (fa_inps @ fa_outs))
-    in
-    let all = setify (flatmap wires_used children) in
-    let declared =
-            (md_expand_vectors (map fst (fa_inps @ fa_outs))) @
-            (md_expand_vectors ints)
-    in
-    let ints' = ints@(md_extract_vectors (all subtract declared)) in
-    let res =
-	(PINST name attrs leaf fa_inps fa_outs ints' (P_HIER children))
-    then
-    let final = rename_internals res then
-    final
-;
-
-// A simple stop-predicate for flatten_pexlif that can be used to
-// flatten hierarchical pexlifs down to basic drawing components.
-let is_draw_leaf p =
-    val (PINST name _ _ _ _ _ _) = p in
-    (str_is_prefix "draw_" name) AND NOT (str_is_prefix "draw_hier" name)
-;
-
-// A function to flatten a pexlif to basic drawing components.
-let flatten_pexlif p = gen_flatten_pexlif is_draw_leaf p;
-// A function to flatten recursively defined pexlifs
-let flatten_recursive_pexlif recursion_name p =
-    let stop_pred p =
-	val (PINST name _ _ _ _ _ _) = p in
-	NOT (name = recursion_name)
-    in
-    let p' = gen_flatten_pexlif stop_pred p then
-    rename_internals p'
-;
-
 // A function that helps in declaring internal signals
 // Use:
 //    find_free_vars [:  expr :];
-
 let find_free_vars expr =
    letrec findfree bound (APPLY e1 e2) =
         (findfree bound e1) union (findfree bound e2)
@@ -3383,25 +3251,6 @@ let re_ff_en_reset_mux =
         q <- (IF (en '&' ('~' reset)) THEN d ELSE qtmp)
 ];
 
-
-let wexpr_hw_type_name {bv::wexpr} = "wexpr";
-let wexpr_hw_mk_var {we::wexpr} base = W_VAR 0 base;
-let wexpr_hw_is_arithmetic {e::wexpr} = T;
-let wexpr_hw_size {e::wexpr} = wexpr_size e;
-let wexpr_hw_destr {e::wexpr} = e;
-let wexpr_hw_constr {e::wexpr} = e;
-let wexpr_hw_values {e::wexpr} = error "Not relevant";
-
-let {wexpr_hw_type_destr :: {wexpr} hw_type} =
-            HW_TYPE wexpr_hw_type_name
-                    wexpr_hw_mk_var
-                    wexpr_hw_is_arithmetic
-                    wexpr_hw_size
-                    wexpr_hw_destr
-                    wexpr_hw_constr
-                    wexpr_hw_values
-;
-add_open_overload hw_type_destr wexpr_hw_type_destr;
 
 
 let is_HIER (P_HIER _) = T

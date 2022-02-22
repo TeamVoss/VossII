@@ -860,7 +860,7 @@ struct Smt2Worker
 			log_error("Unsupported cell type %s for cell %s.%s -- please run `dffunmap` before `write_smt2`.\n",
 					log_id(cell->type), log_id(module), log_id(cell));
 		}
-		if (cell->type.in(ID($adff), ID($adffe), ID($dffsr), ID($dffsre)) || cell->type.str().substr(0, 5) == "$_DFF") {
+		if (cell->type.in(ID($adff), ID($adffe), ID($aldff), ID($aldffe), ID($dffsr), ID($dffsre)) || cell->type.str().substr(0, 5) == "$_DFF" || cell->type.str().substr(0, 7) == "$_ALDFF") {
 			log_error("Unsupported cell type %s for cell %s.%s -- please run `async2sync; dffunmap` or `clk2fflogic` before `write_smt2`.\n",
 					log_id(cell->type), log_id(module), log_id(cell));
 		}
@@ -1530,6 +1530,11 @@ struct Smt2Backend : public Backend {
 		dict<std::string, std::string> solver_options;
 
 		log_header(design, "Executing SMT2 backend.\n");
+
+		log_push();
+		Pass::call(design, "bmuxmap");
+		Pass::call(design, "demuxmap");
+		log_pop();
 
 		size_t argidx;
 		for (argidx = 1; argidx < args.size(); argidx++)
