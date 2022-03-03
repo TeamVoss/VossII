@@ -309,50 +309,9 @@ let best {w0 :: int} {r0 :: int} {d :: doc} = nice w0 r0 d;
 
 // -----------------------------------------------------------------------------
 
-let newline = "\n";
-
-forward_declare{lay::int->string->doc->stream->void};
-
-let fprint {fp :: stream} {s :: string} = fprintf fp "%s" s;
-
-let layL {k :: int} {end :: string} {d :: doc} {fp :: stream} =
-      letrec
-          go1 _ (Nil) =
-            (fprint fp end)
-      /\  go1 k (NilAbove p) =
-            (fprint fp newline) fseq (lay k end p fp)
-      /\  go1 k (TxtBeside (i,s) p) =
-            let j = k + i then (fprint fp s) fseq (go1 j p)
-      /\  go1 k (Nest _ p) =
-            go1 k p
-      /\  go1 _ (Empty)        = error "layL Empty"
-      /\  go1 _ (Union _ _)    = error "layL Union"
-      /\  go1 _ (Beside _ _ _) = error "layL Beside"
-      /\  go1 _ (Above _ _ _)  = error "layL Above"
-      in
-      go1 k d
-;
-
-let lay {k :: int} {end :: string} {d :: doc} {fp :: stream} =
-      letrec
-          go2 _ (Nil) =
-            (fprint fp end)
-      /\  go2 k (NilAbove p) =
-            (fprint fp newline) fseq (go2 k p)
-      /\  go2 k (TxtBeside (i,s) p) =
-            let j = k + i then (fprint fp (indent k ^ s)) fseq (layL j end p fp)
-      /\  go2 k (Nest i p) =
-            let j = k + i then go2 j p
-      /\  go2 _ (Empty)        = error "lay Empty"
-      /\  go2 _ (Union _ _)    = error "lay Union"
-      /\  go2 _ (Beside _ _ _) = error "lay Beside"
-      /\  go2 _ (Above _ _ _)  = error "lay Above"
-      in
-      go2 k d
-;
-
 let display {l :: int} {r :: int} {end :: string} {fp :: stream} {d :: doc} =
-      let d' = best l r (reduce d) then lay 0 end d' fp
+    let d' = best l r (reduce d) then
+    do_layout 0 end d' fp
 ;
 
 let frender {fp :: stream} {d :: doc} = display 100 67 "" fp d;

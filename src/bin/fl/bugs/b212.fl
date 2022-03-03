@@ -1,0 +1,43 @@
+load "idv.fl";
+
+
+let p =
+    PINST "a" [] F 
+      [("A[1:0]",["A[1:0]"]),("B[1:0]",["B[1:0]"])]
+      [("Y[1:0]",["Y[1:0]"])]
+      []
+      (P_HIER [
+	    (PINST "draw_xor2" [] T
+	      [("A",["A[1]"]),("B",["B[1]"])]
+	      [("Y",["Y[1]"])]
+	      []
+		(P_LEAF [(W_UPDATE_FN (W_VAR 1 "Y")
+			    (W_OR (W_AND (W_NOT (W_VAR 1 "A")) (W_VAR 1 "B"))
+				  (W_AND (W_VAR 1 "A") (W_NOT (W_VAR 1 "B"))))
+			)]
+		)
+	    ),
+	    (PINST "draw_xor2" [] T
+	      [("A",["A[0]"]),("B",["B[0]"])]
+	      [("Y",["Y[0]"])]
+	      []
+		(P_LEAF [(W_UPDATE_FN (W_VAR 1 "Y")
+			    (W_OR (W_AND (W_NOT (W_VAR 1 "A")) (W_VAR 1 "B"))
+				  (W_AND (W_VAR 1 "A") (W_NOT (W_VAR 1 "B"))))
+			)]
+		)
+	    )]
+      )
+;
+
+
+p fseq 1;
+
+let save_verilog file name p =
+    let fp = fopen file "w" then
+    (pexlif2verilog fp p) fseq
+    (fclose fp)
+;
+
+save_verilog "_q.v" "adder3" p;
+

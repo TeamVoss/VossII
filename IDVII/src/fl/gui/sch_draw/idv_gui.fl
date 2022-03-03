@@ -1005,7 +1005,7 @@ let fl_display_transform_tree canvas dbname name =
 ;
 export_to_tcl fl_display_transform_tree;
 
-letrec convert_to_idv_format p =
+cletrec convert_to_idv_format p =
     letrec cnv (PINST nm attrs lf fa_inps fa_outs ints (P_HIER ps)) =
 	let ps' = map cnv ps then
 	let get_assert_nd (PINST _ _ _ _ outs _ _) =
@@ -1017,7 +1017,10 @@ letrec convert_to_idv_format p =
 	in
 	let assertion_nds = flatmap get_assert_nd ps' then
 	let ints' = ints @ assertion_nds then
-	PINST nm attrs lf fa_inps fa_outs ints' (P_HIER ps')
+	let nm' =
+	    str_is_prefix "draw_" nm => nm | sprintf "draw_hier {%s}" nm
+	then
+	PINST nm' attrs lf fa_inps fa_outs ints' (P_HIER ps')
      /\    cnv (PINST nm attrs lf fa_inps fa_outs ints leaf) =
 	PINST nm attrs lf fa_inps fa_outs ints leaf
     in
@@ -1033,11 +1036,13 @@ let import_model name p =
 ;
 
 let fl_import_model w filename =
-    let p = convert_to_idv_format (remove_wrappers (read_pexlif filename)) then
+    let p = read_pexlif filename then
+    let p = remove_wrappers p then
+    let p = convert_to_idv_format p then
     let tent_name = pexlif_get_name p then
     let name = 
-	NOT (fl_model_name_used tent_name) => tent_name |
-	tcl_eval ["idv:ask_for_model_name "^w]
+	(tent_name != "") AND (NOT (fl_model_name_used tent_name))
+	=> tent_name | tcl_eval ["idv:ask_for_model_name "^w]
     then
     (import_model name p) fseq
     (tcl_eval ["idv:update_idv_list"]) fseq
@@ -1104,18 +1109,15 @@ let make_anon_names top_name p =
 	 /\   do i [] = []
 	in
 	let chs' = do 1 chs then
-	PINST nm' attrs lf fa_inps fa_outs ints (P_HIER chs')
+	let nm'' =
+	    (str_is_prefix "draw_" nm) AND NOT (str_is_prefix "draw_hier" nm) =>
+	    nm | nm'
+	in
+	PINST nm'' attrs lf fa_inps fa_outs ints (P_HIER chs')
      /\   mk_anon inst (PINST nm attrs lf fa_inps fa_outs ints leaf) =
 	PINST inst attrs lf fa_inps fa_outs ints leaf
     in
     mk_anon top_name p
-;
-
-let save_verilog file name p =
-    let p' = make_anon_names name p then
-    let fp = fopen file "w" then
-    (pexlif2verilog fp p') fseq
-    (fclose fp)
 ;
 
 let create_verilog_load_file basename file pexlif_file =
@@ -1140,7 +1142,7 @@ let do_osu018_synthesis file bname pexlif_file p =
     let ios = map fst (fa_inps @ fa_outs) then
     // Write out a Verilog version of the pexlif
     let fp = fopen (file^".v") "w" then
-    let io_sub = safe_pexlif2verilog fp p' then
+    let io_sub = safe_pexlif2verilog F fp p' then
     (fclose fp) seq
     // Create a yosys synthesis script for this Verilog file
     let fp = mktemp "yosys_script" then
@@ -1152,8 +1154,11 @@ let do_osu018_synthesis file bname pexlif_file p =
     (fprintf fp "dfflibmap -liberty %sosu018_stdcells.lib\n" lib_dir) seq
     (fprintf fp "abc -liberty %s/osu018_stdcells.lib\n" lib_dir) seq
     (fprintf fp "clean\n") seq
+    (fprintf fp "autoname\n") seq
+    (fprintf fp "clean -purge\n") seq
     (fprintf fp "write_pexlif -noalias -icells -gates ") seq
     (fprintf fp "-impltf %s.fl\n" file) seq
+(fprintf fp "write_verilog -noattr -renameprefix TmP %s_DBG.v\n" file) seq
     (fclose fp) seq
     // Now run Yosys to synthesize and map the design to the osu018 library
     let cmd = sprintf "yosys -s %s" yosys_file then
@@ -1204,7 +1209,7 @@ let fl_make_template canvas type file basename create =
 	    (create = 0 => () |
 	      let p' = PINST basename attrs lf fa_inps fa_outs [] (P_HIER []) in
 	      let fp = fopen file "w" then
-	      (pexlif2verilog fp p') fseq
+	      (pexlif2verilog F fp p') fseq
 	      (fclose fp)
 	    ) fseq
 	    load_file
@@ -1275,6 +1280,50 @@ let SAT_comb_EQ p1 p2 =
     ok
 ;
 
+let make_symb_random vars vec_size =
+    letrec build (v:vs) =
+        (variable v) => (build vs) | (build vs)
+     /\    build [] = int2bv (random2 vec_size)
+    in
+    build vars
+;
+
+// Try to verify two combinational pexlifs are equal by building
+// a miter circuit and simulating the circuit.
+let Sim_comb_EQ effort p1 p2 =
+    val (miter_pexlif, ant) = mk_miter p1 p2 then
+    let choice_vars = md_expand_vector (sprintf "ch[%d:0]" (effort-1)) in
+    let vs = depends ant in
+    let sz = length vs in
+    let rand_vec = fixed_bv2list (sz+1) T (make_symb_random choice_vars sz) then
+    let sub = zip vs (tl rand_vec) then
+    let ant = substitute sub ant then
+    let cons = [(T,"_OK_",T,0,1)] in
+    let ckt = pexlif2fsm miter_pexlif then
+    val (assumes,asserts) = split (str_is_prefix "i1/") (assertions ckt) then
+    let trl = map (\n. n,0,1) (assumes@asserts) then
+    let old_pref = update_vossrc "NOTIFY-CHECK-FAILURES" "NO" then
+    let ste = STE "-s" ckt [] ant cons trl then
+    (update_vossrc "NOTIFY-CHECK-FAILURES" old_pref) fseq
+    let base_ok = get_ste_result ste "" then
+    let a_c =
+	itlist (\a.\r. r AND ((get_trace_val ste a 0) = (T,F))) assumes T
+    then
+    let c_c =
+	itlist (\a.\r. r AND ((get_trace_val ste a 0) = (T,F))) asserts T
+    then
+    let ok = NOT a_c OR (c_c AND base_ok) then
+    ok == T => T |
+    let vars = depends ant in
+    let cex = full_example F vars (NOT ok) then
+    let ant' = substitute cex ant then
+    let vis = STE_debug ckt then
+    let tab_1 = draw_fanin vis (0) 100 ("_OK_":asserts) then
+    tab_1 fseq
+    (STE "-e" vis [] ant' cons []) fseq
+    ok
+;
+
 
 
 let fl_do_verify canvas {file::string} {type::string} =
@@ -1284,8 +1333,11 @@ let fl_do_verify canvas {file::string} {type::string} =
 	let imp =
 	    convert_to_idv_format (remove_wrappers (read_pexlif file))
 	then
-	let ok = type = "BDD" => ((BDD_comb_EQ spec imp) == T) |
-		 type = "SAT" => ((SAT_comb_EQ spec imp) == bT) |
+	let ok = type = "BDD"	     => ((BDD_comb_EQ spec imp) == T) |
+		 type = "SAT"	     => ((SAT_comb_EQ spec imp) == bT) |
+		 type = "Sim_Light"  => ((Sim_comb_EQ 5 spec imp) == T) |
+		 type = "Sim_Medium" => ((Sim_comb_EQ 8 spec imp) == T) |
+		 type = "Sim_Heavy"  => ((Sim_comb_EQ 12 spec imp) == T) |
 		 eprintf "Unknown engine (%s)" type
 	then
 	NOT ok => "cex" |
@@ -1731,10 +1783,16 @@ let make_theorem transform_name spec imp =
     (record_transformation signature tr)
 ;
 
-let fl_save_verilog canvas name file =
+;
+
+let fl_save_verilog canvas name file only_netlist =
     let vfsm = w2vfsm canvas in
     let p = get_idv_current_pexlif canvas then
-    save_verilog file name p
+    let netlist = only_netlist = "1" then
+    let p' = netlist => p | make_anon_names name p then
+    let fp = fopen file "w" then
+    (pexlif2verilog netlist fp p') fseq
+    (fclose fp)
 ;
 export_to_tcl fl_save_verilog;
 

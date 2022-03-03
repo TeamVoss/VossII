@@ -1,0 +1,4 @@
+load "idv.fl";
+
+IDV "DBmod_mul2" ["/home/cseger/VossII/IDVII/src/fl/gui/idv_tests/library/DB_arithm"];
+

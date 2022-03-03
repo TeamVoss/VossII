@@ -246,8 +246,9 @@ proc idv:create_idv_menu {nb w} {
         $m add command -label "Write out pexlif model" \
             -command "idv:write_pexlif $w"
         $m add command -label "Write out Verilog model" \
-            -command "idv:write_verilog $w"
-
+            -command "idv:write_verilog $w 0"
+        $m add command -label "Write out Verilog netlist" \
+            -command "idv:write_verilog $w 1"
 
         button $w.menu.new_transf -image $::icon(new_transf) \
                 -command "idv:new_transf $w"
@@ -710,21 +711,35 @@ proc idv:do_fev {ww} {
 	pack $w.f3.e -side left -fill x -expand yes
 	pack $w.f3.dir -side left
 
-    labelframe $w.f4 -relief groove -text Verify
+    labelframe $w.f4 -relief groove -text Check
     pack $w.f4 -side top -fill x -pady 10
-	labelframe $w.f4.bdd -relief groove -text BDD
-	    button $w.f4.bdd.order -text "Variable ordering" \
+	labelframe $w.f4.sim -relief groove -text Simulation
+	    button $w.f4.sim.light -text "Light" \
+		-command "idv:do_verify $w $ww.c Sim_Light"
+	    button $w.f4.sim.medium -text "Medium" \
+		-command "idv:do_verify $w $ww.c Sim_Medium"
+	    button $w.f4.sim.heavy -text "Heavy" \
+		-command "idv:do_verify $w $ww.c Sim_Heavy"
+	pack $w.f4.sim -side left -padx 10 -fill x -expand yes
+	    pack $w.f4.sim.light -side left -padx 5 -fill x -expand yes
+	    pack $w.f4.sim.medium -side left -padx 5 -fill x -expand yes
+	    pack $w.f4.sim.heavy -side left -padx 5 -fill x -expand yes
+
+    labelframe $w.f5 -relief groove -text Verify
+    pack $w.f5 -side top -fill x -pady 10
+	labelframe $w.f5.bdd -relief groove -text BDD
+	    button $w.f5.bdd.order -text "Variable ordering" \
 		-command idv:do_bdd_var_order
-	    button $w.f4.bdd.verify -text "Verify" \
+	    button $w.f5.bdd.verify -text "Verify" \
 		-command "idv:do_verify $w $ww.c BDD"
-	labelframe $w.f4.sat -relief groove -text SAT
-	    button $w.f4.sat.verify -text "Verify" \
+	labelframe $w.f5.sat -relief groove -text SAT
+	    button $w.f5.sat.verify -text "Verify" \
 		-command "idv:do_verify $w $ww.c SAT"
-	pack $w.f4.bdd -side left -padx 10 -fill x -expand yes
-	pack $w.f4.sat -side left -padx 10 -fill x -expand yes
-	    pack $w.f4.bdd.order -side left -padx 5
-	    pack $w.f4.bdd.verify -side left -padx 5 -fill x -expand yes
-	    pack $w.f4.sat.verify -side left -padx 5 -fill x -expand yes
+	pack $w.f5.bdd -side left -padx 10 -fill x -expand yes
+	pack $w.f5.sat -side left -padx 10 -fill x -expand yes
+	    pack $w.f5.bdd.order -side left -padx 5
+	    pack $w.f5.bdd.verify -side left -padx 5 -fill x -expand yes
+	    pack $w.f5.sat.verify -side left -padx 5 -fill x -expand yes
 
 }
 
@@ -759,7 +774,7 @@ proc idv:do_rename_wires {w} { fl_rename_wires $w.c }
 
 proc done_edit_proc {args} { }
 
-proc idv:write_verilog {w} {
+proc idv:write_verilog {w only_netlist} {
     set types {
         {{Verilog}      {.v}        }
         {{All Files}     *          }
@@ -769,7 +784,7 @@ proc idv:write_verilog {w} {
 	    -confirmoverwrite 1]
     if { $file != "" } {
 	set name [file rootname [file tail $file]]
-	fl_save_verilog $w.c $name $file
+	fl_save_verilog $w.c $name $file $only_netlist
     }
 }
 

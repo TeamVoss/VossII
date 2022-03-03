@@ -59,6 +59,12 @@ static int	save_graph_rec(FILE *fp, g_ptr np);
 /*                           Main functions                                 */
 /****************************************************************************/
 
+FILE *
+Get_fp(io_ptr ip)
+{
+    return( ip->fp );
+}
+
 /*                                                                  */
 /* Function to open a file or a pipeline to a command.              */
 /* mode is one of:                                                  */

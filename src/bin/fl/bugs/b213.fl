@@ -1,0 +1,36 @@
+load "idv.fl";
+
+let accurate_toplevel_pexlif2fsm p =
+    let old1 = update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" "TRUE" then
+    let old2 = update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" "FALSE" then
+    let res = toplevel_pexlif2fsm p then
+    (update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" old1) fseq
+    (update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" old2) fseq
+    res
+;
+
+
+let p = (PINST "_TMP_" [("FP","604413248174"),("SHA","ae3e7364bf0642b7b1ad8e8a83298c0a5e287eee540f74c7a5fc5589dbc909b7")] F
+  [("_$6s[15:0]",["_$6s[15:0]"]),("_$7c[15:1]",["_$7c[15:1]"])]
+  [("o[15:0]",["o[15:0]"])]
+  ["_$7c[0]"]
+(P_HIER [
+    (PINST "draw_input 0" [("FP","1421549"),("SHA","0780f871fd8ad539607bd87226454cb2606a1893d083cb5bb3423d63cae9de91")] T
+      []
+      [("_tmp",["_$7c[0]"])]
+      []
+(P_LEAF [(W_UPDATE_FN (W_VAR 1 "_tmp") (W_CONST 1 0b0))])
+    )
+,
+    (PINST "draw_binary_arithm {+}" [("FP","1905232512"),("SHA","3d6d0db9e368380a9a0f74414be65ab9928e7a866ef174d9c3b371154f30c62e")] T
+      [("s[15:0]",["_$6s[15:0]"]),("c[15:0]",["_$7c[15:0]"])]
+      [("_tmp[15:0]",["o[15:0]"])]
+      []
+(P_LEAF [(W_UPDATE_FN (W_VAR 16 "_tmp") (W_ADD (W_VAR 16 "s") (W_VAR 16 "c")))])
+    )
+])
+);
+
+p;
+
+accurate_toplevel_pexlif2fsm p;

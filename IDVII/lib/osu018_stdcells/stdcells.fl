@@ -45,7 +45,7 @@ let QAOI21X1 {attrs::(string#string) list} conns =
         _or 1 "non_udp_cells.v:104.6-104.27" ["I1_out"] ["I0_out"] ["C"] ,
         _and 1 "non_udp_cells.v:103.7-103.22" ["I0_out"] ["A"] ["B"] 
     ] in
-    PINST "draw_stdcell OAI21X1 {draw_and_or_gate 3 {{+ + {}} { {} {} +}} 1}" 
+    PINST "draw_stdcell AOI21X1 {draw_and_or_gate 3 {{+ + {}} { {} {} +}} 1}" 
 	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
 ;
 
@@ -68,7 +68,7 @@ let QAOI22X1 {attrs::(string#string) list} conns =
         _and 1 "non_udp_cells.v:137.7-137.22" ["I1_out"] ["C"] ["D"] ,
         _and 1 "non_udp_cells.v:136.7-136.22" ["I0_out"] ["A"] ["B"] 
     ] in
-    PINST "draw_stdcell OAI21X1 {draw_and_or_gate 4 {{+ + {} {}} { {} {} + +}} 1}" 
+    PINST "draw_stdcell AOI22X1 {draw_and_or_gate 4 {{+ + {} {}} { {} {} + +}} 1}" 
 	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
 ;
 
@@ -475,7 +475,7 @@ let QDFFNEGX1 {attrs::(string#string) list} conns =
 	_not 1 "osu018_stdcells.fl:457.0-457.10" ["NCLK"] ["CLK"],
 	_dff 1 "osu018_stdcells.fl:458.0-458.10" ["Q"] ["NCLK"] ["D"]
     ] in
-    PINST "draw_hier DFFNEGX1" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+    PINST "draw_stdcell DFFNEGX1 draw_ff_fe" attrs F _fa_inps _fa_outs ints (P_HIER _body)
 ;
 
 let QDFFPOSX1 {attrs::(string#string) list} conns =
@@ -488,7 +488,7 @@ let QDFFPOSX1 {attrs::(string#string) list} conns =
     let _body = [
 	_dff 1 "osu018_stdcells.fl:458.0-458.10" ["Q"] ["CLK"] ["D"]
     ] in
-    PINST "draw_hier DFFPOSX1" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+    PINST "draw_stdcell DFFPOSX1 draw_ff_re" attrs F _fa_inps _fa_outs ints (P_HIER _body)
 ;
 
 let QDFFSR {attrs::(string#string) list} conns =
@@ -502,7 +502,7 @@ let QDFFSR {attrs::(string#string) list} conns =
 	_dffsr T F F 1 "osu018_stdcells.fl:485.0-485.10" ["Q"]
 		["R"] ["S"] ["CLK"] ["D"]
     ] in
-    PINST "draw_hier DFFSR" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+    PINST "draw_stdcell DFFSR {draw_dffsr 1 0 0}" attrs F _fa_inps _fa_outs ints (P_HIER _body)
 ;
 
 let QLATCH {attrs::(string#string) list} conns =
@@ -515,7 +515,7 @@ let QLATCH {attrs::(string#string) list} conns =
     let _body = [
 	_dlatch 1 "osu018_stdcells.fl:499.0-499.10" ["Q"] ["CLK"] ["D"]
     ] in
-    PINST "draw_hier LATCH" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+    PINST "draw_stdcell LATCH draw_pos_d_latch" attrs F _fa_inps _fa_outs ints (P_HIER _body)
 ;
 
 

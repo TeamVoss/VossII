@@ -1,0 +1,21 @@
+load "idv.fl";
+
+//let N = 128;
+let N = 16;
+TYPE "word" N;
+
+let mod_mul2 =
+    word_input a b n.
+    word_output o.
+    CELL "mul_mod" [
+        ASSERT "a in range" (a '<' ''(2**(hw_size a/2))),
+        ASSERT "b in range" (b '<' ''(2**(hw_size a/2))),
+        ASSERT "n in range" (('0 '<' n) '&' (n '<' ''(2**(hw_size a/2)))),
+        o <- (a '*' b) '%' n
+];
+
+let p = mod_mul2 'a 'b 'n 'o;
+
+p fseq (write_pexlif "spec_mod_mul2.pexlif" p) fseq ();
+
+quit;

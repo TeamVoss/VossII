@@ -1,0 +1,42 @@
+load "idv.fl";
+
+TYPE "word" 4;
+
+let adder3 = 
+    word_input a b c.
+    word_output o.
+    CELL "draw_hier adder3" [
+	o <- a '+' b '+' c
+];
+
+
+let max =
+    word_input	a b.
+    word_output	out.
+    CELL "draw_hier max" [
+	out <- (IF (a '>=' b) THEN a ELSE b)
+];
+
+let top =
+    bit_input	clk.
+    word_input	a b c d e f g h i.
+    word_output	res.
+    word_internal s1 s2 s3 ss1 ss2 ss3 m1 m2.
+    CELL "draw_hier top" [
+	adder3 a b c s1,
+	adder3 d e f s2,
+	adder3 g h i s3,
+	re_ff clk s1 ss1,
+	re_ff clk s2 ss2,
+	re_ff clk s3 ss3,
+	max ss1 ss2 m1,
+	max ss1 ss3 m2,
+	max m1 m2 res
+];
+
+
+let p = top 'clk 'a 'b 'c 'd 'e 'f 'g 'h 'i 'res;
+
+p fseq (write_pexlif "spec_test.pexlif" p) fseq ();
+
+quit;

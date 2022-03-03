@@ -1,0 +1,22 @@
+load "idv.fl";
+
+let N = 16;
+TYPE "word" N;
+TYPE "addr" (bits_needed N);
+
+letrec ff_rec cnt (b:bs) = IF {b::bit} THEN ''cnt ELSE ff_rec (cnt+1) bs
+ /\    ff_rec cnt [] = '0
+;
+
+let find_first =
+    input   di.
+    output  loc.
+    CELL "find_first" [
+	loc <- ff_rec 1 (rev (tobits di))
+];
+
+let p = find_first {'a::word} {'o::addr};
+
+p fseq (write_pexlif "spec_find_first.pexlif" p) fseq ();
+
+quit;

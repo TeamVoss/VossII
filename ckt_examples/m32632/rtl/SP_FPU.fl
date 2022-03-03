@@ -10,3 +10,6 @@ let vis = STE_debug ckt;
 vis;
 
 random_simulation vis [("BCLK","01")] [] 100;
+
+let lats = setify (map (get_latch_type ckt) (nodes ckt));
+

@@ -1,0 +1,41 @@
+load "ste.fl";
+
+TYPE "word" 16;
+
+let CSA =
+    bit_input   x y z.
+    bit_output  c s.
+    CELL "CSA" [
+        s <- x '^' y '^' z,
+        c <- x '&' y '|' x '&' z '|' y '&' z
+];
+
+
+let csa =
+    word_input   i1.  // a[7:0]
+    word_input   i2.  // b[7:0]
+    word_input   i3.  // c[7:0]
+    word_output   o1.  // o[7:0]
+    word_internal    cm c s.
+    bit_internal    dummy.
+    CELL "csa" ((
+        map5 CSA (tobits i1) (tobits i2) (tobits i3)
+                 (dummy:(butlast (tobits c)))
+                 (tobits s)
+        )@
+        [
+        (last (tobits c)) <- '0,
+        o1 <- s '+' c
+        ]
+);
+
+let p = csa
+		{(_s2_var "a[7:0]")::word}
+		{(_s2_var "b[7:0]")::word}
+		{(_s2_var "c[7:0]")::word}
+		{(_s2_var "o[7:0]")::word}
+;
+p fseq ();
+write_pexlif "/home/cseger/VossII/IDVII/src/fl/gui/idv_tests/DB_adder/pexlifs/csa.pexlif" p;
+"===SuCcEsS===";
+quit;

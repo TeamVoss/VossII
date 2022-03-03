@@ -1,0 +1,16 @@
+load "idv.fl";
+
+TYPE "word" 16;
+
+let adder9 = 
+    word_input a b c d e f g h i.
+    word_output o.
+    CELL "adder9" [
+	o <- a '+' b '+' c '+' d '+' e '+' f '+' g '+' h '+' i
+];
+
+let p = adder9 'a 'b 'c 'd 'e 'f 'g 'h 'i 'o;
+
+p fseq (write_pexlif "spec_big_add.pexlif" p) fseq ();
+
+quit;

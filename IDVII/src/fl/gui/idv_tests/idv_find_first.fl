@@ -1,0 +1,9 @@
+set_font font_large;
+
+load "idv.fl";
+
+// Workaround problem with Verilog writer.
+(update_vossrc "RECURSION-CALL-LIMIT" "1000000") fseq ();
+
+IDV "DB_find_first" [];
+

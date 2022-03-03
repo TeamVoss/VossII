@@ -67,6 +67,7 @@ Init()
     Image_Init();
     Iso_Init();
     Pexlif_Init();
+    Doc_Init();
 
     // Now install builtin functions
     Symbols_Install_Functions();
@@ -89,5 +90,6 @@ Init()
     Image_Install_Functions();
     Iso_Install_Functions();
     Pexlif_Install_Functions();
+    Doc_Install_Functions();
 }
 

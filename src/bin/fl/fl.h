@@ -197,6 +197,7 @@ typedef struct impl_arg_rec	*impl_arg_ptr;
 #include    "plugin_loader.h"
 #include    "iso.h"
 #include    "pexlif.h"
+#include    "doc.h"
 
 /* Include function prototypes */
 #undef EXPORT_FORWARD_DECL

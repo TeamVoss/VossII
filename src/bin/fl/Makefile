@@ -31,7 +31,7 @@ OBJ = new_bdd.o error.o arb_prec.o file_ops.o initialize.o symbol_tbl.o \
 	draw_graph.o debug.o symbol.o strings.o int_ops.o list_ops.o \
 	system.o float.o bv.o bev.o fsm.o sha256.o table.o image.o \
 	plugin.o plugin_loader.o plugin_checker.o plugin_errlog.o \
-	iso.o pexlif.o
+	iso.o pexlif.o doc.o
 
 fl: $(OBJ) $(LIB)
 	$(CX) $(CFLAGS) $(INC) $(LINKFLAG) -o fl $(OBJ) $(LIB) \
@@ -92,6 +92,7 @@ float.o:	    float.h graph.h typecheck.h fl.h
 bv.o:		    bv.h graph.h typecheck.h fl.h
 bev.o:		    bev.h graph.h typecheck.h fl.h
 fsm.o:		    fsm.h pexlif.h graph.h typecheck.h fl.h
+doc.o:		    doc.h graph.h typecheck.h fl.h
 sha256.o:	    sha256.h graph.h typecheck.h fl.h
 image.o:	    image.h graph.h typecheck.h fl.h
 plugin.o:	    plugin.h strings.h typecheck.h abi_version.h

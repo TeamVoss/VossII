@@ -102,6 +102,7 @@ formula	    Load_get_bool_from_idx(int idx);
 bexpr	    Load_get_bexpr_from_idx(int idx);
 string	    Load_get_string_from_idx(int idx);
 int	    Load_get_fsm_from_idx(int idx);
+FILE	    *Get_fp(io_ptr ip);
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */

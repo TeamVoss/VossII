@@ -1,0 +1,6 @@
+load "idv.fl";
+
+update_vossrc "MAX-ENTRIES-IN-STACK-TRACE-TO-PRINT" "400";
+
+IDV "DB_test" [];
+

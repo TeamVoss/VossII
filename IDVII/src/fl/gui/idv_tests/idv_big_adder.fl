@@ -1,0 +1,8 @@
+load "idv.fl";
+
+IDV "DB_big_adder"
+    [
+	"/home/cseger/VossII/IDVII/src/fl/gui/idv_tests/library/DB_arithm"
+    ]
+;
+
