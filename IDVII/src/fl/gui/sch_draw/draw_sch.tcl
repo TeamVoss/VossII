@@ -975,7 +975,9 @@ proc cb:post_extended_value {c aname x y sep_window} {
                           [format {Value for %s at time %d} \
 				  [clean_name [fl_tag2vec $c $aname]] $time]
     } else {
-	post_popup $c [fl_get_long_value $c $aname] $x $y 1
+	if { $aname != "" } {
+	    post_popup $c [fl_get_long_value $c $aname] $x $y 1
+	}
     }
 }
 
@@ -1208,9 +1210,11 @@ proc record_orig_color {c item} {
 proc cb:prim_set_wire_color {c name color} {
     global gcolor fc
     if ![winfo exists $c] { return }
-    set items [$c find withtag "$name&&!_IsTeXt_&&!_IsDePeNdEnCy_"]
+    set items [$c find withtag \
+		    "$name&&!_IsTeXt_&&!_IsDePeNdEnCy_&&!_IsStDcElL_"]
     set cname [clean_name $name]
-    eval lappend items [$c find withtag "$cname&&!_IsTeXt_&&!_IsDePeNdEnCy_"]
+    eval lappend items [$c find withtag \
+		    "$cname&&!_IsTeXt_&&!_IsDePeNdEnCy_&&!_IsStDcElL_"]
     foreach item $items {
 	if [do_not_change_color $c $item] { continue; }
 	if { [$c type $item] == "line" && ![is_WiRe $c $item] } { continue; }
@@ -4440,7 +4444,7 @@ proc draw_fsm {name code states edges inps c tag x y} {
     set fp [open $dotfile w]
     puts $fp $code
     close $fp
-    $c bind $dotfile <ButtonPress-1> \
+    $c bind $dotfile <Double-1> \
 		  "fsm:display_fsm $c $tag $name $dotfile [list $states] \
 			       [list $edges] [list $inps]"
     set inputs [llength $inps]
@@ -4611,9 +4615,35 @@ proc draw_stdcell {name pfn c tag x y} {
     set by $ly ;# [expr $ly+2*[min_sep $c]]
     set tx $ux ;# [expr $ux-3*[min_sep $c]]
     set ty $uy ;# [expr $uy-2*[min_sep $c]]
-    $c create rectangle  $bx $by $tx $ty -outline green -fill "" -tag $tag
+    $c create rectangle  $bx $by $tx $ty -outline green -fill "" \
+	-tag "$tag _IsStDcElL_"
     set t [$c create text $bx $by -text $name -anchor sw -justify left \
 		-font $::sfont($c) -fill green -tag $tag]
     add_font_tags $c $t _IsTeXt_
     return $res
+}
+
+proc draw_lat_leq {c tag x y} {
+    global gcolor mfont fc
+    add_value_field $c $tag $x $y
+    set xl [expr $x-2*[rtl_rad $c]]
+    set yl [expr $y+[rtl_rad $c]]
+    set yt [expr $y-[rtl_rad $c]]
+    set t [$c create oval  $xl $yl $x $yt -outline $gcolor -fill $fc \
+                -tags [list _Is_Hierarchical_ $tag]]
+    set xl  [expr round($x-1.5*[rtl_rad $c])]
+    set xr  [expr round($x-0.5*[rtl_rad $c])]
+    set yt  [expr round($y-0.5*[rtl_rad $c]-0.5*[min_sep $c])]
+    set yb1 [expr round($y+0.5*[rtl_rad $c]-0.5*[min_sep $c])]
+    set yb2 [expr round($y+0.5*[rtl_rad $c]+0.5*[min_sep $c])]
+    $c create line $xr $yt $xl $yt $xl $yb1 $xr $yb1 \
+		-tags [list _Is_Hierarchical_ $tag]]
+    $c create line $xr $yb2 $xl $yb2 \
+		-tags [list _Is_Hierarchical_ $tag]]
+
+    set xi [expr round($x-[rtl_rad $c]-0.866*[rtl_rad $c])]
+    set y1 [expr round($y-[rtl_rad $c]/2)]
+    set y2 [expr round($y+[rtl_rad $c]/2)]
+    lappend inp_locs $xi $y1 $xi $y2
+    return [list $inp_locs [list $x $y]]
 }

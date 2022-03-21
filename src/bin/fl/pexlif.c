@@ -29,6 +29,7 @@ string s_W_NAMED_CONST;
 string s_W_VAR;
 string s_W_EXPLICIT_VAR;
 string s_W_AND;
+string s_W_LAT_LEQ;
 string s_W_OR;
 string s_W_NOT;
 string s_W_PRED;
@@ -1509,6 +1510,7 @@ Pexlif_Init()
     s_W_VAR                = Mk_constructor_name("W_VAR");
     s_W_EXPLICIT_VAR       = Mk_constructor_name("W_EXPLICIT_VAR");
     s_W_AND                = Mk_constructor_name("W_AND");
+    s_W_LAT_LEQ            = Mk_constructor_name("W_LAT_LEQ");
     s_W_OR                 = Mk_constructor_name("W_OR");
     s_W_NOT                = Mk_constructor_name("W_NOT");
     s_W_PRED               = Mk_constructor_name("W_PRED");

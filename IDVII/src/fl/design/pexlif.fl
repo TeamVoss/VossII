@@ -124,6 +124,7 @@ letrec
                                 + pm_val 44 (fp_w b)
 /\  fp_w (W_MEM_WRITE m a b d)  = pm_val 45 (fp_mem m) + pm_val 46 (fp_w a)
                                 + pm_val 47 (fp_w b) + pm_val 48 (fp_w d)
+/\  fp_w (W_LAT_LEQ a b)        = pm_val 49 (fp_w a + fp_w b)
 ;
 
 // Gen. a fingerprint for 'UPDATE_FN'.
@@ -414,6 +415,7 @@ letrec
 /\  shrink_wexpr (W_CONST sz v) = []
 /\  shrink_wexpr (W_VAR sz n)   = []
 /\  shrink_wexpr (W_AND a b)    = shrink_binary shrink_wexpr W_AND  a b
+/\  shrink_wexpr (W_LAT_LEQ a b) = shrink_binary shrink_wexpr W_LAT_LEQ  a b
 /\  shrink_wexpr (W_OR a b)     = shrink_binary shrink_wexpr W_OR   a b
 /\  shrink_wexpr (W_NOT a)      = shrink_unary  shrink_wexpr W_NOT  a
 /\  shrink_wexpr (W_EQ a b)     = shrink_cmp    shrink_wexpr W_EQ   a b
@@ -565,6 +567,7 @@ letrec
             [ (d_0,  W_NOT  (gen_unary sz))
             , (d_X,  W_AND  (gen_binary sz as)  (gen_binary sz bs))
             , (d_X,  W_OR   (gen_binary sz as)  (gen_binary sz bs))
+            , (d_X,  W_LAT_LEQ  (gen_binary sz as)  (gen_binary sz bs))
             , (sz_1, W_EQ   (gen_binary ssz as) (gen_binary ssz bs))
             , (sz_1, W_GR   (gen_binary ssz as) (gen_binary ssz bs))
             , (sz_X, W_ADD  (gen_binary sz as)  (gen_binary sz bs))
@@ -839,6 +842,7 @@ let collect_names wexpr =
         /\  collect (W_VAR sz s) = [(s, sz)]
         /\  collect (W_EXPLICIT_VAR sz s) = [(s, sz)]
         /\  collect (W_AND a b) = collect a @ collect b
+        /\  collect (W_LAT_LEQ a b) = collect a @ collect b
         /\  collect (W_OR a b) = collect a @ collect b
         /\  collect (W_NOT a) = collect a
         /\  collect (W_EQ a b) = collect a @ collect b

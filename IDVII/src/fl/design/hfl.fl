@@ -167,6 +167,7 @@ letrec dep (W_X sz) = []
  /\     dep (W_VAR sz b) = [b]
  /\     dep (W_EXPLICIT_VAR sz b) = [b]
  /\     dep (W_AND a b) = (dep a) union (dep b)
+ /\     dep (W_LAT_LEQ a b) = (dep a) union (dep b)
  /\     dep (W_OR  a b) = (dep a) union (dep b)
  /\     dep (W_EQ  a b) = (dep a) union (dep b)
  /\     dep (W_PRED name cond) = dep cond
@@ -212,6 +213,9 @@ let base_compact_wprint inps rhs =
      /\    P pri (W_AND a b) =
 		pri > 5 => sprintf "(%s&%s)" (P 5 a) (P 5 b)
 			 | sprintf "%s&%s" (P 5 a) (P 5 b)
+     /\    P pri (W_LAT_LEQ a b) =
+		pri > 2 => sprintf "(%s [<=] %s)" (P 2 a) (P 2 b)
+			 | sprintf "%s [<=] %s" (P 2 a) (P 2 b)
      /\    P pri (W_OR  a b) =
 		pri > 4 => sprintf "(%s|%s)" (P 4 a) (P 4 b)
 			 | sprintf "%s|%s" (P 4 a) (P 4 b)
@@ -358,12 +362,16 @@ clet is_var (W_VAR _ _) = T
   /\ is_var (W_EXPLICIT_VAR _ _) = T
   /\ is_var _ = F;
 
+clet is_simple_var (W_VAR _ _) = T
+  /\ is_simple_var _ = F;
+
 clet is_vars l = itlist (\v.\r. is_var v AND r) l T;
 
 let is_binary_base (W_EQ  a b)  = (is_var a) AND (is_var b)
  /\ is_binary_base (W_NOT (W_EQ a b))  = (is_var a) AND (is_var b)
  /\ is_binary_base (W_GR  a b)  = (is_var a) AND (is_var b)
  /\ is_binary_base (W_AND a b)  = (is_var a) AND (is_var b)
+ /\ is_binary_base (W_LAT_LEQ a b) = (is_var a) AND (is_var b)
  /\ is_binary_base (W_NOT (W_AND a b))  = (is_var a) AND (is_var b)
  /\ is_binary_base (W_OR  a b)  = (is_var a) AND (is_var b)
  /\ is_binary_base (W_NOT (W_OR a b))  = (is_var a) AND (is_var b)
@@ -382,6 +390,7 @@ let get_binary_draw_cmd (W_EQ  a b)  = "draw_binary_arithm {=}"
  /\ get_binary_draw_cmd (W_NOT (W_EQ a b))  = "draw_binary_arithm {!=}"
  /\ get_binary_draw_cmd (W_GR  a b)  = "draw_binary_arithm {>}"
  /\ get_binary_draw_cmd (W_AND  a b) = "draw_and2"
+ /\ get_binary_draw_cmd (W_LAT_LEQ  a b) = "draw_lat_leq"
  /\ get_binary_draw_cmd (W_NOT (W_AND  a b)) = "draw_nand2"
  /\ get_binary_draw_cmd (W_OR  a b)  = "draw_or2"
  /\ get_binary_draw_cmd (W_NOT (W_OR  a b))  = "draw_nor2"
@@ -494,12 +503,9 @@ let mk_draw_cmd phase_delay rhs =
     inps = [] =>
 	let special (W_NAMED_CONST name sz v) =
 		sprintf "draw_hfl {%s}" name
-	 /\ special (W_UPDATE_NAMED_SLICE base name indices w) =
-		let s = inp2tcl [] (W_UPDATE_NAMED_SLICE base name indices w) in
-		sprintf "draw_hfl {%s}" s
 	 /\ special rhs =
 		let body = inp2tcl inps rhs then
-		sprintf "draw_input %s" body
+		sprintf "draw_hfl {%s}" body
 	in
 	special rhs
     |
@@ -524,6 +530,7 @@ let is_wide_AND e  =
 let is_binary (W_EQ  a b)  = T
   /\ is_binary (W_GR  a b)  = T
   /\ is_binary (W_AND a b) = T
+  /\ is_binary (W_LAT_LEQ a b) = T
   /\ is_binary (W_OR  a b)  = T
   /\ is_binary (W_ADD a b)  = T
   /\ is_binary (W_SUB a b)  = T
@@ -539,6 +546,7 @@ let is_binary (W_EQ  a b)  = T
 let split_binary (W_EQ  a b)  = W_EQ, a, b
   /\ split_binary (W_GR  a b)  = W_GR, a, b
   /\ split_binary (W_AND  a b) = W_AND, a, b
+  /\ split_binary (W_LAT_LEQ  a b) = W_LAT_LEQ, a, b
   /\ split_binary (W_OR  a b)  = W_OR, a, b
   /\ split_binary (W_ADD a b)  = W_ADD, a, b
   /\ split_binary (W_SUB a b)  = W_SUB, a, b
@@ -811,6 +819,51 @@ let base_assignment make_draw_command lhs rhs =
 	    in
 	    let p = mk_pinst_w_order lhs (W_ITE c' a' b') [b',a',c'] then
 	    p0@p1@p2@[p]
+     /\    split lhs (W_SX sz e) =
+	    val (e',p0) = is_var e => (e,[]) |
+		let mid = mk_tmp (wexpr_size e) then
+		let p0 = split mid e then
+		(mid, p0)
+	    in
+	    let p = mk_pinst lhs (W_SX sz e') in
+	    p0@[p]
+     /\    split lhs (W_ZX sz e) =
+	    val (e',p0) = is_var e => (e,[]) |
+		let mid = mk_tmp (wexpr_size e) then
+		let p0 = split mid e then
+		(mid, p0)
+	    in
+	    let p = mk_pinst lhs (W_ZX sz e') in
+	    p0@[p]
+     /\    split lhs (W_SLICE indices e) =
+	    val (e',p0) = is_var e => (e,[]) |
+		let mid = mk_tmp (wexpr_size e) then
+		let p0 = split mid e then
+		(mid, p0)
+	    in
+	    let p = mk_pinst lhs (W_SLICE indices e') in
+	    p0@[p]
+     /\    split lhs (W_NAMED_SLICE name indices e) =
+	    val (e',p0) = is_var e => (e,[]) |
+		let mid = mk_tmp (wexpr_size e) then
+		let p0 = split mid e then
+		(mid, p0)
+	    in
+	    let p = mk_pinst lhs (W_NAMED_SLICE name indices e') in
+	    p0@[p]
+     /\    split lhs (W_UPDATE_NAMED_SLICE b name indices n) =
+	    val (b',p1) = is_simple_var b => (b,[]) |
+		let mid = mk_tmp (wexpr_size b) then
+		let p1 = split mid b then
+		(mid, p1)
+	    in
+	    val (n',p2) = is_simple_var n => (n,[]) |
+		let mid = mk_tmp (wexpr_size n) then
+		let p2 = split mid n then
+		(mid, p2)
+	    in
+	    let p = mk_pinst lhs (W_UPDATE_NAMED_SLICE b' name indices n') then
+	    p1@p2@[p]
      /\    split lhs rhs = [mk_pinst lhs rhs]
     in
     let subfubs = split lhs rhs then
@@ -1550,6 +1603,9 @@ let wOR {a:: *a} {b:: *a} =
 let '|' = wOR;
 infix 3 '|';
 
+let '<#=' a b = W_LAT_LEQ a b;
+infix 2 '<#=';
+
 let wXOR a b = wOR (wAND (wNOT a) b) (wAND a (wNOT b));
 let '^' = wXOR;
 infix 4 '^';
@@ -1565,6 +1621,7 @@ let wEQ {a:: *a} {b:: *a} =
 
 overload '=' wEQ W_EQ;
 infix 5 '=';
+
 
 let wNEQ {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
@@ -2206,35 +2263,27 @@ let base_re_ff =
 	MUX TmP_en TmP_d_o TmP_q_o q
 ];
 
-let base_re_ff_reset =
-    input	d.
-    bit_input	reset.
-    bit_input	clk.
-    output	q.
-    internal TmP_d_o TmP_clk_o TmP_q_o TmP_len TmP_tmp TmP_zero.
-    CELL "draw_ff_re_reset" [
-	TmP_d_o <: d,
-	TmP_q_o <: q,
-	TmP_clk_o <: clk,
-	TmP_zero <- '0,
-	TmP_len <- reset '|' '~'TmP_clk_o '&' clk,
-	MUX reset TmP_zero TmP_d_o TmP_tmp,
-	MUX TmP_len TmP_tmp TmP_q_o q
-];
-
 let base_re_ff_en =
     input	d.
     bit_input	en.
     bit_input	clk.
     output	q.
-    internal TmP_d_o TmP_clk_o TmP_q_o TmP_en_o TmP_len.
+    internal	mid.
     CELL "draw_ff_re_with_en" [
-	TmP_d_o <: d,
-	TmP_q_o <: q,
-	TmP_en_o <: en,
-	TmP_clk_o <: clk,
-	TmP_len <- TmP_en_o '&' '~'TmP_clk_o '&' clk,
-	MUX TmP_len TmP_d_o TmP_q_o q
+	MUX en d q mid,
+	base_re_ff mid clk q
+];
+
+let base_re_ff_reset =
+    input	d.
+    bit_input	reset.
+    bit_input	clk.
+    output	q.
+    internal	mid cur.
+    CELL "draw_ff_re_reset" [
+	MUX reset '0 d mid,
+	base_re_ff mid clk cur,
+	MUX reset '0 cur q
 ];
 
 let base_re_ff_en_reset =
@@ -2243,16 +2292,12 @@ let base_re_ff_en_reset =
     bit_input	reset.
     bit_input	clk.
     output	q.
-    internal TmP_d_o TmP_clk_o TmP_q_o TmP_len TmP_tmp TmP_zero TmP_en_o.
+    internal	tmp mid cur.
     CELL "draw_ff_re_with_en_reset" [
-	TmP_d_o <: d,
-	TmP_q_o <: q,
-	TmP_clk_o <: clk,
-	TmP_en_o <: en,
-	TmP_zero <- '0,
-	TmP_len <- reset '|' TmP_en_o '&' '~'TmP_clk_o '&' clk,
-	MUX reset TmP_zero TmP_d_o TmP_tmp,
-	MUX TmP_len TmP_tmp TmP_q_o q
+	MUX en d q tmp,
+	MUX reset '0 tmp mid,
+	base_re_ff mid clk cur,
+	MUX reset '0 cur q
 ];
 
 // A rising edge D flip-flop.

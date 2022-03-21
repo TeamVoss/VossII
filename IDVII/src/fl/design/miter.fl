@@ -1,28 +1,28 @@
 
 // Code to create a miter circuit for two pexlifs
-//                          Ckt p1
+//                          Ckt spec
 //                        +------+                     
 //      i_1 ---------*----|   o_1|---------------+----+      +----+        
-//                   |    |      |               | == |------|    |           
+//                   |    |      |               | <= |------|    |           
 //                   |    |      |    +----------+----+      |    |    
 //      i_2 -------*-|----|   o_2|----|----------+----+      |    |
-//                 | |    |      |    |          | == |------| A  |
+//                 | |    |      |    |          | <= |------| A  |
 //      ...        | |    |      |    |  +-------+----+      | N  |----- eq
 //                 | |    |      |... |  |       ...         | D  |      
 //      i_m --*----|-|----|   o_n|----|--|-------+----+      |    |
-//            |    | |    |      |    |  |       | == |------|    | 
+//            |    | |    |      |    |  |       | <= |------|    | 
 //            |    | |    |      |    |  |   +---+----+      +----+
 //            |    | |    +------+    |  |   |                
-//            |    | |     Ckt p2     |  |   |                
+//            |    | |     Ckt imp    |  |   |                
 //            |    | |    +------+    |  |   |
 //            |    | +----|  o_1 |----*  |   |
 //            |    +------|  o_2 |-------*   |
 //            |           |      | ...       |
 //            +-----------|  o_n |-----------+
 //                        +------+       
-let mk_miter p1 p2 =
-    val (PINST n1 a1 l1 fa_inps1 fa_outs1 ints1 chs1) = p1 in
-    val (PINST n2 a2 l2 fa_inps2 fa_outs2 ints2 chs2) = p2 in
+let mk_miter spec imp =
+    val (PINST n1 a1 l1 fa_inps1 fa_outs1 ints1 chs1) = spec in
+    val (PINST n2 a2 l2 fa_inps2 fa_outs2 ints2 chs2) = imp in
     // Check for same inputs/outputs
     let inps1 = setify (md_expand_vectors (flatmap snd fa_inps1)) in
     let inps2 = setify (md_expand_vectors (flatmap snd fa_inps2)) in
@@ -38,11 +38,11 @@ let mk_miter p1 p2 =
     d != [] => eprintf "Output mismatch: %S in pexlif 2 but not in pexlif 1" d |
     // Same inputs and outputs
     // Now rename the outputs
-    let p1' =
+    let spec' =
 	let fa_outs1' = map (\(f,as). f,(map (sprintf "P1_%s") as)) fa_outs1 in
 	PINST n1 a1 l1 fa_inps1 fa_outs1' ints1 chs1
     in
-    let p2' =
+    let imp' =
 	let fa_outs2' = map (\(f,as). f,(map (sprintf "P2_%s") as)) fa_outs2 in
 	PINST n2 a2 l2 fa_inps2 fa_outs2' ints2 chs2
     in
@@ -54,7 +54,7 @@ let mk_miter p1 p2 =
     let mk_eq out_i eq_i = 
 	let o1 = W_VAR 1 ("P1_"^out_i) in
 	let o2 = W_VAR 1 ("P2_"^out_i) in
-	eq_i <- o1 '=' o2
+	eq_i <- (o2 '<#=' o1)
     in
     let eq_pexlifs = map2 mk_eq outs1 eqs in
     let and_pexlif = (W_VAR 1 "_OK_") <- AND_n eqs then
@@ -64,7 +64,7 @@ let mk_miter p1 p2 =
     let o1s = map (\n."P1_"^n) outs1 in
     let o2s = map (\n."P2_"^n) outs2 in
     let ints = eq_nd:(md_extract_vectors (o1s @ o2s)) in
-    let children = p1' : p2' : and_pexlif : eq_pexlifs in
+    let children = spec' : imp' : and_pexlif : eq_pexlifs in
     let mpexlif = PINST pfn [] F fa_inps fa_outs ints (P_HIER children) in
     let mant = map (\n. T,n,variable n,0,1) inps1 in
     mpexlif, mant

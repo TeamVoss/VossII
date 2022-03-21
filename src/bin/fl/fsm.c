@@ -51,6 +51,7 @@ extern string s_W_NAMED_CONST;
 extern string s_W_VAR;
 extern string s_W_EXPLICIT_VAR;
 extern string s_W_AND;
+extern string s_W_LAT_LEQ;
 extern string s_W_OR;
 extern string s_W_NOT;
 extern string s_W_PRED;
@@ -347,6 +348,7 @@ static void         op_X(ncomp_ptr op);
 static void         op_CONST(ncomp_ptr op);
 static void         op_VAR(ncomp_ptr op);
 static void         op_AND(ncomp_ptr op);
+static void         op_LAT_LEQ(ncomp_ptr op);
 static void         op_OR(ncomp_ptr op);
 static void         op_NOT(ncomp_ptr op);
 static void         op_EQ(ncomp_ptr op);
@@ -4670,6 +4672,9 @@ write_composite_buffer(FILE *fp, buffer *compositesp)
 	    write_int(fp, cp->arg.mem.data_size, FALSE);
 	    write_int(fp, cp->arg.mem.lines, FALSE);
 	}
+	else if( op == op_LAT_LEQ ) {
+	    write_int(fp, 24, FALSE);
+	}
 	else {
 	    DIE("Should not happen!");
 	}
@@ -4742,6 +4747,7 @@ read_composite_buffer(FILE *fp, buffer *compositesp)
 		cr.arg.mem.lines = read_int(fp, FALSE);
 		break;
 	    }
+	    case 24: cr.op = op_LAT_LEQ; break;
 	    default:
 		DIE("Should never happen!");
 	}
@@ -4849,6 +4855,7 @@ op2str(ncomp_ptr cp)
     }
     else if( op == op_VAR ) return( strtemp("op_VAR") );
     else if( op == op_AND ) return( strtemp("op_AND") );
+    else if( op == op_LAT_LEQ ) return( strtemp("op_LAT_LEQ") );
     else if( op == op_OR ) return( strtemp("op_OR") );
     else if( op == op_NOT ) return( strtemp("op_NOT") );
     else if( op == op_EQ ) return( strtemp("op_EQ") );
@@ -6568,6 +6575,7 @@ do_wl_op(ste_ptr ste, ncomp_ptr op)
 	    additional += update_node(ste, idx, newH, newL);
 	}
     }
+    if( Do_gc_asap ) Garbage_collect();
     return additional;
 }
 
@@ -6608,6 +6616,19 @@ op_VAR(ncomp_ptr op)
     FROM_MSB_TO_LSB(op->size,i) {
 	OUT_H(i) = INP_H(i);
 	OUT_L(i) = INP_L(i);
+    }
+}
+
+static void
+op_LAT_LEQ(ncomp_ptr op)
+{
+    FROM_MSB_TO_LSB(op->size,i) {
+	gbv aH = INP_H(i);
+	gbv aL = INP_L(i);
+	gbv bH = INP_H(i+op->size);
+	gbv bL = INP_L(i+op->size);
+	OUT_H(i) = c_AND(c_OR(bH, c_NOT(aH)), c_OR(bL, c_NOT(aL)));
+	OUT_L(i) = c_NOT(OUT_H(i));
     }
 }
 
@@ -6808,6 +6829,9 @@ reset_tmps(int cnt)
 {
     resize_buf(&tmps_buf, 2*cnt);
     gbv_tmps = FAST_LOC_BUF(&tmps_buf, 0);
+    for(int i = 0; i < 2*cnt; i++) {
+	*(gbv_tmps+i) = c_ONE;
+    }
 }
 
 #if 0
@@ -6852,6 +6876,7 @@ op_DIV(ncomp_ptr op)
 	OUT_H(i) = *(Q+2*i);
 	OUT_L(i) = *(Q+2*i+1);
     }
+    reset_tmps(0);
 }
 
 static void
@@ -6883,6 +6908,7 @@ op_MOD(ncomp_ptr op)
 	OUT_H(i) = *(R+2*i);
 	OUT_L(i) = *(R+2*i+1);
     }
+    reset_tmps(0);
 }
 
 static void
@@ -6908,6 +6934,7 @@ op_SHL(ncomp_ptr op)
 	OUT_H(i) = *(cur+2*i);
 	OUT_L(i) = *(cur+2*i+1);
     }
+    reset_tmps(0);
 }
 
 static void
@@ -6933,6 +6960,7 @@ op_SHR(ncomp_ptr op)
 	OUT_H(i) = *(cur+2*i);
 	OUT_L(i) = *(cur+2*i+1);
     }
+    reset_tmps(0);
 }
 
 static void
@@ -6958,6 +6986,7 @@ op_ASHR(ncomp_ptr op)
 	OUT_H(i) = *(cur+2*i);
 	OUT_L(i) = *(cur+2*i+1);
     }
+    reset_tmps(0);
 }
 
 static void
@@ -8694,6 +8723,10 @@ is_binary_wexpr(g_ptr node, wl_op *opp, g_ptr *ap, g_ptr *bp)
     }
     if( STREQ(tp, s_W_ASHR) ) {
 		*opp = op_ASHR;
+		return TRUE;
+    }
+    if( STREQ(tp, s_W_LAT_LEQ) ) {
+		*opp = op_LAT_LEQ;
 		return TRUE;
     }
     return FALSE;

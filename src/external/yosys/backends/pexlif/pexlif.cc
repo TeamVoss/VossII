@@ -567,13 +567,38 @@ struct PexlifDumper
 			continue;
 		    }
 
-		    if (cell->type == "$dlatch") {
+		    if (cell->type == "$dlatch")
+		    {
 			RTLIL::SigSpec out = cell->getPort("\\Q");
-			f << "_dlatch ";
+			f << "_dlatch T ";
 			f << stringf("%d \"%s\" ", out.size(), src.c_str());
 			dump_sigspec(f, out);
 			f << " ";
 			dump_sigspec(f, cell->getPort("\\EN"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\D"));
+			continue;
+		    }
+
+		    if ((cell->type == "$_DLATCH_P_")) {
+			RTLIL::SigSpec out = cell->getPort("\\Q");
+			f << "_dlatch T ";
+			f << stringf("%d \"%s\" ", out.size(), src.c_str());
+			dump_sigspec(f, out);
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\E"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\D"));
+			continue;
+		    }
+
+		    if ((cell->type == "$_DLATCH_N_")) {
+			RTLIL::SigSpec out = cell->getPort("\\Q");
+			f << "_dlatch F ";
+			f << stringf("%d \"%s\" ", out.size(), src.c_str());
+			dump_sigspec(f, out);
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\E"));
 			f << " ";
 			dump_sigspec(f, cell->getPort("\\D"));
 			continue;

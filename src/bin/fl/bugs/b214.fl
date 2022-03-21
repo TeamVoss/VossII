@@ -20,14 +20,16 @@ let D_clk = "i1/i1/TmP_clk_o";
 let D_inp = "i1/i1/TmP_d_o";
 let D_q   = "i1/i1/TmP_q_o";
 
-let ant = [(T,"clk",T,0,1),(T,D_clk,F,0,1)];
+//let ant = [(T,"clk",T,0,1),(T,D_clk,F,0,1)];
+//let ant = [(T,"clk",T,1,2),(T,D_clk,F,0,1)];
+let ant = [(T,"clk",T,0,1),(T,D_clk,F,-1,0)];
 
-//let vis = STE_debug ckt;
-//vis;
-//let ste = STE "-e" vis [] ant [] [];
+let vis = STE_debug ckt;
+vis;
+let ste = STE "-e" vis [] ant [] [];
 
-let ste = STE "-e" ckt [] ant [] [];
-ste;
+//let ste = STE "-e" ckt [] ant [] [];
+//ste;
 
 get_trace ste "clk";
 get_trace ste D_clk;

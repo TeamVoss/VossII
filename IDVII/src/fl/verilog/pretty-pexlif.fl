@@ -410,21 +410,33 @@ let pretty_expression {we::wexpr} =
       /\  go (W_ITE c a b)  = conditional_exp c a b
       /\  go (W_CAT es)     = concat_exp es
       // Ignored op. -----------------------------
-      /\  go (W_NAMED_CONST _ sz c) =
-            warn "NAMED_CONST is treated as CONST" (const_exp sz c)
+      /\  go (W_NAMED_CONST _ sz c) = (const_exp sz c)
       /\  go (W_EXPLICIT_VAR sz v) =
             warn "EXPLICIT_VAR is treated as VAR" (variable_exp sz v)
       /\  go (W_PRED _ a) =
             warn "PRED is ignored" (go a)
-      /\  go (W_NAMED_SLICE _ is a) =
-             warn "NAMED_SLICE is treated as SLICE" (slice_exp is a)
+      /\  go (W_NAMED_SLICE _ is a) = (slice_exp is a)
       // Not yet supported op. -------------------
+      /\  go (W_UPDATE_NAMED_SLICE (W_VAR b_sz b) name indices (W_VAR n_sz n)) =
+	let bv = W_VAR b_sz b in
+	let nv = W_VAR n_sz n in
+	// Rather inefficient version (expands everythings to bits)
+	letrec mk_cat_list idx nidx =
+	    idx < 0 => [] |
+	    mem idx indices =>
+		(W_SLICE [nidx] nv):(mk_cat_list (idx-1) (nidx-1))
+	    |
+		(W_SLICE [idx] bv):(mk_cat_list (idx-1) nidx)
+	in
+	concat_exp (mk_cat_list (b_sz-1) (n_sz-1))
       /\  go (W_UPDATE_NAMED_SLICE _ _ _ _) =
-            error "W_UPDATE_NAMED_SLICE not supported"
+            error "non-simple W_UPDATE_NAMED_SLICE not supported"
       /\  go (W_MEM_READ _ _ _) =
             error "W_MEM_READ not supported"
       /\  go (W_MEM_WRITE _ _ _ _) =
             error "W_MEM_WRITE not supported"
+      /\  go (W_LAT_LEQ a b) =
+            error "W_LAT_LEQ not supported"
       in
       // todo: Used to do more here, could inline 'go' now.
       go we
@@ -591,6 +603,57 @@ let premade_ff_re name clk p q =
         ])
 ;
 
+let premade_ah_latch name en p q =
+      val (p_id, p_rs) = split_name_rng p in
+      val (q_id, q_rs) = split_name_rng q in
+      let var_lv =
+            VLV_hier (hier q_id) (empty q_rs => NONE |
+              SOME (map index_exp (tl q_rs), range_exp (hd q_rs)))
+      in
+      Desc_module (Module_declaration_many name (SOME [
+          Port_decl_in (Input_decl (SOME NT_wire) F NONE [ID en])
+        , Port_decl_in (Input_decl (SOME NT_wire) F (port_range p_rs) [ID p_id])
+        , Port_decl_out (Output_decl_reg F (port_range q_rs) [VPI (ID q_id) NONE])
+        ])
+        [NPM_Item (MOGI_always (Always (Statement_timing
+	    (PTC
+	      (PTC_event (Event_pstar))
+	      (Statement_cond (COND_if_else_if 
+		(IEI
+		    ( (Exp_primary (prim_hier en []))
+		    , (Statement_nonblocking (Nonblocking_assignment var_lv NONE
+			(Exp_primary (prim_hier p_id p_rs)))))
+		    []
+		    NONE
+		)))))))])
+;
+
+let premade_al_latch name en p q =
+      val (p_id, p_rs) = split_name_rng p in
+      val (q_id, q_rs) = split_name_rng q in
+      let var_lv =
+            VLV_hier (hier q_id) (empty q_rs => NONE |
+              SOME (map index_exp (tl q_rs), range_exp (hd q_rs)))
+      in
+      Desc_module (Module_declaration_many name (SOME [
+          Port_decl_in (Input_decl (SOME NT_wire) F NONE [ID en])
+        , Port_decl_in (Input_decl (SOME NT_wire) F (port_range p_rs) [ID p_id])
+        , Port_decl_out (Output_decl_reg F (port_range q_rs) [VPI (ID q_id) NONE])
+        ])
+        [NPM_Item (MOGI_always (Always (Statement_timing
+	    (PTC
+	      (PTC_event (Event_pstar))
+	      (Statement_cond (COND_if_else_if 
+		(IEI
+		    ( (Exp_unary U_log_neg (prim_hier en []))
+		    , (Statement_nonblocking (Nonblocking_assignment var_lv NONE
+			(Exp_primary (prim_hier p_id p_rs)))))
+		    []
+		    NONE
+		)))))))])
+;
+
+
 let premade_ff_re_reset name clk re p q =
       val (p_id, p_rs) = split_name_rng p in
       val (q_id, q_rs) = split_name_rng q in
@@ -675,7 +738,8 @@ let premade_ff_re_with_en_reset name clk en re p q =
                  (Exp_primary (Prim_num (NUM_dec (DEC (UNUM 1))))))
              , (Statement_nonblocking (Nonblocking_assignment var_lv NONE
                  (Exp_primary (prim_hier p_id p_rs)))))]
-            (NONE))))))))
+            (NONE))))
+))))
         ])
 ;
 
@@ -734,6 +798,20 @@ let pretty_pexlif_hier netlist{inst::string} name fa_inps fa_outs f_ints
 let pretty_pexlif_h netlist inst (PINST name _ _ fa_inps fa_outs _ _)
     assuming (netlist AND (str_is_prefix "draw_stdcell " name)) =
 	[]
+/\  pretty_pexlif_h netlist inst (PINST name _ _ fa_inps fa_outs _ _)
+    assuming (name == "draw_ah_latch")
+    =
+      val [(p,_),(clk,_)] = fa_inps in
+      val [(q,_)] = fa_outs in
+      let module = inst_name name inst in
+      [premade_ah_latch module clk p q]
+/\  pretty_pexlif_h netlist inst (PINST name _ _ fa_inps fa_outs _ _)
+    assuming (name == "draw_al_latch")
+    =
+      val [(p,_),(clk,_)] = fa_inps in
+      val [(q,_)] = fa_outs in
+      let module = inst_name name inst in
+      [premade_al_latch module clk p q]
 /\  pretty_pexlif_h netlist inst (PINST name _ _ fa_inps fa_outs _ _)
     assuming (name == "draw_ff_re")
     =

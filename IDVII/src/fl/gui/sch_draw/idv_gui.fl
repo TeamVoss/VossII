@@ -2,6 +2,7 @@
 // Copyright 2020 Carl-Johan Seger
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
+
 let Init_idv_gui = (tcl_eval [sprintf "source %sidv_gui.tcl" DIR]) fseq ();
 Init_idv_gui;
 
@@ -1133,7 +1134,7 @@ let create_verilog_load_file basename file pexlif_file =
     load_file
 ;
 
-let do_osu018_synthesis file bname pexlif_file p =
+let do_osu018_synthesis file bname pexlif_file p synth_args =
     let lib_dir = DIR^"../../../../lib/osu018_stdcells/" then
     // Rename Verilog hierarchy to sane names
     // Toplevel name is `bname`
@@ -1141,15 +1142,19 @@ let do_osu018_synthesis file bname pexlif_file p =
     val (PINST nm attrs lf fa_inps fa_outs ints body) = p' then
     let ios = map fst (fa_inps @ fa_outs) then
     // Write out a Verilog version of the pexlif
-    let fp = fopen (file^".v") "w" then
+    let fp = mktemp "pre_verilog" then
+    let pre_v_file = stream2filename fp then
     let io_sub = safe_pexlif2verilog F fp p' then
     (fclose fp) seq
+    let edit_file = sprintf "%s/verilog_filter.sed" DIR then
+    let cmd = sprintf "sed -f %s < %s > %s.v" edit_file pre_v_file file then
+    (system cmd) != 0 => eprintf "System command |%s| failed\n" cmd |
     // Create a yosys synthesis script for this Verilog file
     let fp = mktemp "yosys_script" then
     let yosys_file = stream2filename fp then
     (fprintf fp "read_verilog %s.v\n" file) seq
     (fprintf fp "hierarchy -top %s\n" bname) seq
-    (fprintf fp "flatten\n") seq
+    ((mem "Flat" synth_args) => (fprintf fp "flatten\n") | ()) seq
     (fprintf fp "synth -top %s\n" bname) seq
     (fprintf fp "dfflibmap -liberty %sosu018_stdcells.lib\n" lib_dir) seq
     (fprintf fp "abc -liberty %s/osu018_stdcells.lib\n" lib_dir) seq
@@ -1186,7 +1191,7 @@ let fl_run_fl_loader file =
 ;
 export_to_tcl fl_run_fl_loader;
 
-let fl_make_template canvas type file basename create =
+let fl_make_template canvas type file basename create {synth_args::string list} =
     let vfsm = w2vfsm canvas then
     let pexlif_file = sprintf "%s/pexlifs/%s.pexlif"
 			      (get_idv_db_dir ()) (clean_name basename)
@@ -1215,12 +1220,13 @@ let fl_make_template canvas type file basename create =
 	    load_file
 	|
 	type = "synthesis" =>
-	    do_osu018_synthesis file basename pexlif_file p
+	    do_osu018_synthesis file basename pexlif_file p synth_args
 	|
 	eprintf "Unknown template type (%s)" type
     then
     [pexlif_file, load_file]
 ;
+
 export_to_tcl fl_make_template;
 
 let fl_bdd_var_order {canvas::string} {file::string} =
@@ -1228,36 +1234,200 @@ let fl_bdd_var_order {canvas::string} {file::string} =
 ;
 export_to_tcl fl_bdd_var_order;
 
+//let dbg_ant = ref {[]::((bool#string#bool#int#int) list) list};
+//let dbg_ckt = ref {(error "nope")::fsm};
+//
+//// Try to verify two combinational pexlifs are equal by building
+//// a miter circuit and simulating the circuit.
+//// This code works for combinational circuits and state-matching sequential
+//// circuits.
+//// More general sequential equivalence is still left to figure out....
+//let BDD_EQ p1 p2 =
+//    val (miter_pexlif, ant) = mk_miter p1 p2 then
+//    let cons = [(T,"_OK_",T,0,1)] in
+//    let ckt = pexlif2fsm miter_pexlif then
+//(dbg_ckt := ckt) fseq
+//    val (assumes,asserts) = split (str_is_prefix "i1/") (assertions ckt) then
+//    let phdels = filter (is_phase_delay ckt) (nodes ckt) then
+//    let trl = map (\n. n,0,2) (assumes@asserts@phdels) then
+//    let vars_cnt = ref 0 in
+//    letrec gradual_STE binary_only ant remain =
+//(fprintf stderr "\n================\n binary_only: %B\n" binary_only) fseq
+//(fprintf stderr "remain: %S\n" (md_extract_vectors remain)) fseq
+//(dbg_ant := (ant:(deref dbg_ant))) fseq
+//        let old_pref = update_vossrc "NOTIFY-CHECK-FAILURES" "NO" then
+//        let ste = STE "-s" ckt [] ant cons trl then
+//        (update_vossrc "NOTIFY-CHECK-FAILURES" old_pref) fseq
+//        let base_ok = get_ste_result ste "" then
+//        let a_c =
+//            itlist (\a.\r. r AND ((get_trace_val ste a 0) = (T,F))) assumes T
+//        then
+//        let c_c =
+//            itlist (\a.\r. r AND ((get_trace_val ste a 0) = (T,F))) asserts T
+//        then
+//        let ok = NOT a_c OR (c_c AND base_ok) then
+//        ok == T => T |
+//        let rvals = map (\ph. ph,get_trace_val ste ph 1) remain in
+//        let process l =
+//	    val (_,H,L) = hd l in
+//            (H == NOT L) OR (NOT binary_only AND (NOT ((H,L) == (T,T)))) =>
+//		let nd = sprintf "_%d_" (deref vars_cnt) then
+//		(vars_cnt := (deref vars_cnt + 1)) fseq
+//                map (\(pn,_). (T,pn, variable nd,-1,0)) l
+//            |
+//            []
+//        in
+//        let ph_ant = flatmap process (partition snd rvals) then
+//        let added = map (\(w,n,v,f,t).n) ph_ant then
+//(fprintf stderr "added: %S\n" (md_extract_vectors added)) fseq
+//        (added = []) AND NOT binary_only =>
+//            let vars = depends ant in
+//            let cex = full_example F vars (NOT ok) then
+//            let ant' = substitute cex ant then
+//            let vis = STE_debug ckt then
+//            let tab_1 = draw_fanin vis (0) 100 ("_OK_":asserts) then
+//            tab_1 fseq
+//            let ste = STE "-e" vis [] ant' cons [] then
+//            ok
+//        |
+//        let remain' = remain subtract added then
+//        let ant' = ph_ant@ant then
+//	let binary_only' = binary_only AND (added != []) in
+//        gradual_STE binary_only' ant' remain'
+//    in
+//    gradual_STE T ant phdels
+//;
 
-// Try to verify two combinational pexlifs are equal by building
-// a miter circuit and simulating the circuit.
-let BDD_comb_EQ p1 p2 =
-    val (miter_pexlif, ant) = mk_miter p1 p2 then
-    let cons = [(T,"_OK_",T,0,1)] in
-    let ckt = pexlif2fsm miter_pexlif then
-    val (assumes,asserts) = split (str_is_prefix "i1/") (assertions ckt) then
-    let trl = map (\n. n,0,1) (assumes@asserts) then
+
+// Function to compute a unique parametric representation
+let unique_param pvec =
+    // Make all variables current and extract the parametric vars
+    let c_pvec = bdd_next2current pvec then
+    let pvars = depends c_pvec then
+    // Now recursively make the pvec canonical
+    letrec clean i (v:vs) cond =
+        let nv = bdd_current2next (variable ("$"^(int2str i))) then
+        let H = Quant_thereis pvars (cond AND v) then
+        let L = Quant_thereis pvars (cond AND NOT v) then
+        let bit = nv => H | NOT L then
+        let cond' = cond AND (bit = v) then
+        // Try to simplify cond' if no further dependencies are needed
+        let pv = (pvars intersect (depends [cond'])) subtract (depends vs) then
+        let cond'' = Quant_thereis pv cond' then
+        bit:(clean (i+1) vs cond'')
+     /\    clean i [] cond = [] in
+    clean 1 c_pvec T
+;
+
+let mk_HLs_unique HLs =
+    let p2l (H,L) = [H,L] in
+    let l = flatmap p2l HLs then
+    let l' = unique_param l then
+    let l2p [H,L] = (H,L) in
+    map l2p (cluster 2 l')
+;
+
+let check_eq ckt ant cons assumes asserts trl =
     let old_pref = update_vossrc "NOTIFY-CHECK-FAILURES" "NO" then
-    let ste = STE "-s" ckt [] ant cons trl then
+    let ste = STE "" ckt [] ant cons trl then
     (update_vossrc "NOTIFY-CHECK-FAILURES" old_pref) fseq
     let base_ok = get_ste_result ste "" then
     let a_c =
 	itlist (\a.\r. r AND ((get_trace_val ste a 0) = (T,F))) assumes T
     then
-    let c_c =
+    let c_c = 
 	itlist (\a.\r. r AND ((get_trace_val ste a 0) = (T,F))) asserts T
     then
     let ok = NOT a_c OR (c_c AND base_ok) then
-    ok == T => T |
+    ok == T => T,[] |
     let vars = depends ant in
-    let cex = full_example F vars (NOT ok) then
-    let ant' = substitute cex ant then
+    let cex = full_example F vars (NOT ok) then 
+    (ok,cex)
+;
+
+let BDD_EQ p1 p2 =
+    val (miter_pexlif, ant) = mk_miter p1 p2 then 
+    let cons = [(T,"_OK_",T,0,1)] in
+    let ckt = pexlif2fsm miter_pexlif then
+    val (assumes,asserts) = split (str_is_prefix "i1/") (assertions ckt) then
+    let phdels = setify (filter (is_phase_delay ckt) (nodes ckt)) then
+    let trl = map (\n. n,0,2) (assumes@asserts@phdels) then
+    phdels = [] =>
+	//
+	// Combinational circuits
+	//
+	val (ok,cex) = check_eq ckt ant cons assumes asserts trl then
+	ok == T => T |
+	let ant' = substitute cex ant then
+	let vis = STE_debug ckt then
+	let tab_1 = draw_fanin vis (0) 100 ("_OK_":asserts) then
+	tab_1 fseq
+	let ste = STE "-e" vis [] ant' [] [] then
+	ok
+    |
+    //
+    // Sequential circuit.
+    //
+    // Perform reachability analysis for phase delays
+    let init_state = map (\n.(T,T)) phdels then
+    let state_sequence = ref [init_state] in
+    let next_state_fns = ref [] in
+    letrec reach idx HLs =
+	(fprintf stdinfo "Sequential BDD_EQ Iteration %d\n" idx) fseq
+	let mk_ant nd (H,L) = ((H = NOT L), nd, H, -1, 0) in
+	let ph_ant = map2 mk_ant phdels HLs then
+	let full_ant = ant @ ph_ant in
+        let ste = STE "" ckt [] full_ant [] trl then
+	let newHLs = map (\nd. get_trace_val ste nd 1) phdels then
+	(next_state_fns := (newHLs : (deref next_state_fns))) fseq
+	let HLs' = mk_HLs_unique ((variable "__1") => HLs | newHLs) then
+	(state_sequence := (HLs' : (deref state_sequence))) fseq
+	(HLs' == HLs) => ph_ant | reach (idx+1) HLs'
+    in
+    let ph_ant = reach 1 (map (\n.(T,T)) phdels) then
+    let total_ant = ant @ ph_ant then
+    // First try for every state (including partial X states).
+    val (ok, cex) = check_eq ckt total_ant cons assumes asserts trl then
+    ok == T => T |
+    // Try the same verificataion but assuming binary inputs & state
+    let bcond = itlist (\ft.\r. (fst ft) AND r) ph_ant T then
+    let bsub = param bcond then
+    let total_ant' = substitute bsub total_ant then
+    val (ok, cex) = check_eq ckt total_ant' cons assumes asserts trl then
+    ok == T => T |
+    // Failed. Now build the shortest sequence that shows the failure
+    let cex_state = substitute cex (hd (deref state_sequence)) then
+    letrec find_last_possible cnt (HL:rem) =
+	(HL = cex_state) == F => cnt | find_last_possible (cnt+1) rem
+    /\     find_last_possible cnt _ = cnt
+    in
+    let start = (find_last_possible 0 (deref state_sequence))-1 then
+    let rel_next_funs = butfirstn start (deref next_state_fns) then
+    let rel_states = butfirstn start (deref state_sequence) then
+    let cex_state = substitute cex (hd rel_states) then
+    let avars = depends ant in
+    letrec mk_cex t (nfn:nfns) (st:sts) cur =
+	let cond = (cur = nfn) then
+	let vars = (depends cond) union avars in
+	let cex = full_example F vars cond then
+	let new_state = substitute cex st then
+	let delay (w,n,v,_,_) = (w,n,v,t-1,t) in
+	let ant' = map delay (substitute cex ant) then
+	(ant')@(mk_cex (t-1) nfns sts new_state)
+     /\   mk_cex t [] _ cur = []
+    in
+    let etime = length rel_states in
+    let cex_ant =
+	(substitute cex (map (\(w,n,v,_,_). w,n,v,etime,etime+1) ant)) @
+	mk_cex etime rel_next_funs rel_states cex_state
+    then
     let vis = STE_debug ckt then
     let tab_1 = draw_fanin vis (0) 100 ("_OK_":asserts) then
     tab_1 fseq
-    (STE "-e" vis [] ant' cons []) fseq
+    let ste = STE "-e" vis [] cex_ant [] [] then
     ok
 ;
+
 
 // Try to verify two combinational pexlifs are equal by building
 // a miter circuit and simulating the circuit.
@@ -1333,8 +1503,9 @@ let fl_do_verify canvas {file::string} {type::string} =
 	let imp =
 	    convert_to_idv_format (remove_wrappers (read_pexlif file))
 	then
-	let ok = type = "BDD"	     => ((BDD_comb_EQ spec imp) == T) |
+	let ok = type = "BDD"	     => ((BDD_EQ spec imp) == T) |
 		 type = "SAT"	     => ((SAT_comb_EQ spec imp) == bT) |
+		 type = "Sim_None"   => T |
 		 type = "Sim_Light"  => ((Sim_comb_EQ 5 spec imp) == T) |
 		 type = "Sim_Medium" => ((Sim_comb_EQ 8 spec imp) == T) |
 		 type = "Sim_Heavy"  => ((Sim_comb_EQ 12 spec imp) == T) |
@@ -1394,7 +1565,7 @@ letrec rename_pexlif_wires
 	    (f,md_merge_vectors p_as):
 	    (mk fs (butfirstn len as))
 	 /\    mk [] as = 
-	    as != [] => error "WHAT???" |
+	    as != [] => error "WHAT? Should not be possible" |
 	    []
 	in
 	mk f' (md_expand_vectors as)
@@ -1501,34 +1672,50 @@ let Pdraw_tree dt =
 ;
 install_print_function Pdraw_tree;    
 
+let build_vfanin_tbl ckt =
+    let vec_vis_fanin ckt vecs =
+        let nds = md_expand_vectors vecs in
+        let get_pfn nd = (get_visualization_id ckt nd 0),
+                         (get_visualization_pfn ckt nd 0),
+                         nd
+        in
+        let p = partition fst (map get_pfn nds) then
+        let process l =
+            val ((id,pfn,nd):rem) = l in
+            let vec = md_extract_vectors (map (\(id,pfn,nd).nd) l) in
+            let fi = get_visualization_fanins ckt nd 0 in
+            let vfi = md_merge_vectors (flatmap snd fi) then
+            map (\v. (v, pfn, vfi)) vec
+        in
+        flatmap process p
+    in
+    list2tbl (vec_vis_fanin ckt (visualization_nodes ckt 0))
+;
+
 let get_io_order p =
     let MAX_DEPTH = 100 in
-    let ckt = accurate_toplevel_pexlif2fsm (flatten_pexlif p) then
+    let ckt = accurate_toplevel_pexlif2fsm p then
+    let vfi_tbl = build_vfanin_tbl ckt then
     let vinps = inputs ckt in
     let inps = md_expand_vectors vinps in
     let res = ref [] then
-    letrec tr depth path nd =
-	mem nd inps => ((res := ((nd,path):(deref res))) seq DT_INP) |
-	depth > MAX_DEPTH => DT_CYCLE |
-	let pfn = get_visualization_pfn ckt nd 0 in
-	let vfanins = get_visualization_fanins ckt nd 0 in
+    letrec tr seen path vec =
+	mem vec vinps => ((res := ((vec,path):(deref res))) seq DT_INP) |
+	mem vec seen => DT_CYCLE |
+	val (pfn,vfanins) = tbl_get vfi_tbl vec then
 	(vfanins = []) AND (str_is_substr "draw_input" pfn) => DT_CONST |
 	let id_vfanins = zip (1 upto length vfanins) vfanins in
-	let do (i,(vfi,nds)) =
-	    let do1 fi = tr (depth+1) ((int2str i):pfn:path) fi in
-	    map do1 nds
-	in
-	DT_BR pfn (flatmap do id_vfanins)
+	let do (i,vfi) = tr (vec:seen) ((int2str i):pfn:path) vfi in
+	DT_BR pfn (map do id_vfanins)
     in
     let id_vouts =
 	let vouts = outputs ckt in
 	zip (1 upto length vouts) vouts
     in
-    let do (i,vo) =
-	let do1 o = tr 1 [(sprintf "o%d" i)] o in
-	vo, (setify (map do1 (md_expand_vector vo)))
-    in
+    let do (i,vo) = vo, (tr [] [(sprintf "o%d" i)] vo) in
+(fprintf stderr "Start of do\n") fseq
     let omaps = map do id_vouts then
+(fprintf stderr "Done omaps\n") fseq
     let do l = (fst (hd l)), (setify (map snd l)) in
     let inps = map do (partition fst (deref res)) then
     let sel l =
@@ -1802,3 +1989,63 @@ let fl_save_pexlif canvas file =
 ;
 export_to_tcl fl_save_pexlif;
 
+let has_phase_delay_inside p =
+    letrec check (PINST _ _ _ _ _ _ (P_HIER chs)) =
+	let idx = find_first0 check chs in
+	idx != 0
+     /\ check (PINST _ _ _ _ _ _ (P_LEAF fns)) =
+	let is_phase_del (W_PHASE_DELAY l r) = T
+	 /\ is_phase_del other = F
+	in
+	let idx = find_first0 is_phase_del fns in
+	idx != 0
+    in
+    check p
+;
+
+let has_unmapped p =
+    letrec check (PINST nm _ _ _ _ _ (P_HIER chs)) =
+	str_is_substr "draw_stdcell" nm => F |
+	let idx = find_first0 check chs in
+	idx != 0
+     /\ check (PINST _ _ _ _ _ _ (P_LEAF fns)) = T
+    in
+    check p
+;
+
+let fl_do_selection_command canvas cmd =
+    let vfsm = w2vfsm canvas then
+    let active_canvases = deref (vfsm2canvases_r vfsm) then
+    let rselection = vfsm2selection_r vfsm then
+    let p = get_idv_current_pexlif canvas then
+    val (PINST nm attrs leaf fa_inps fa_outs ints (P_HIER chs)) = p then
+    let new_selection =
+	cmd = "all" =>
+	    md_extract_vectors ((map fst (fa_inps @ fa_outs))@ints)
+	|
+	cmd = "combinational" => 
+	    val (seqs, comb) = split has_phase_delay_inside chs in
+	    md_extract_vectors (flatmap pexlif_get_outs_actuals comb)
+	|
+	cmd = "stateholding" => 
+	    val (seqs, comb) = split has_phase_delay_inside chs in
+	    md_extract_vectors (flatmap pexlif_get_outs_actuals seqs)
+	|
+	cmd = "mapped" =>
+	    val (unmapped,mapped) = split has_unmapped chs in
+	    md_extract_vectors (flatmap pexlif_get_outs_actuals mapped)
+	|
+	cmd = "unmapped" =>
+	    val (unmapped,mapped) = split has_unmapped chs in
+	    md_extract_vectors (flatmap pexlif_get_outs_actuals unmapped)
+	|
+	cmd = "invert" =>
+	    let all = md_expand_vectors ((map fst (fa_inps @ fa_outs))@ints) in
+	    let cur = md_expand_vectors (deref rselection) in
+	    md_extract_vectors (all subtract cur)
+	|
+	eprintf "Unknown selection command (%s)\n" cmd
+    then
+    fl_set_selection canvas "SET_SELECTION" new_selection
+;
+export_to_tcl fl_do_selection_command;

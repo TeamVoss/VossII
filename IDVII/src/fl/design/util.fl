@@ -141,10 +141,15 @@ let E_update_fn fp (W_UPDATE_FN lhs rhs) =
     fprintf fp "(W_PHASE_DELAY %s %s)" (DBGwexpr lhs) (DBGwexpr rhs)
 ;
 
+
 letrec E_print_pexlif ind fp pexlif =
+    let safe v =
+	let tr c = c = "\"" => "\\\"" | c in
+	implode (map tr (explode v))
+    in
     val (PINST name attrs leaf inps outs ints body) = pexlif then
     let sattrs = list2str T "[" "," "]"
-            (\(a,v). sprintf "(\"%s\",\"%s\")" a v) attrs
+            (\(a,v). sprintf "(\"%s\",\"%s\")" a (safe v)) attrs
     in
     let sleaf = leaf => "T" | "F" then
     (fprintf fp "\n%*s(PINST \"%s\" %s %s\n" ind "" name sattrs sleaf)
@@ -242,6 +247,7 @@ let w_get_names we =
      /\    dep (W_VAR sz b) = (raw_res := ((mk_name sz b):(deref raw_res)))
      /\    dep (W_EXPLICIT_VAR sz n) = (raw_res := (n:(deref raw_res)))
      /\    dep (W_AND a b) = (dep a) fseq (dep b)
+     /\    dep (W_LAT_LEQ a b) = (dep a) fseq (dep b)
      /\    dep (W_OR  a b) = (dep a) fseq (dep b)
      /\    dep (W_PRED name cond) = (dep cond)
      /\    dep (W_EQ  a b) = (dep a) fseq (dep b)
@@ -291,6 +297,7 @@ letrec wexpr_size wexpr =
      /\ wsz (W_VAR sz b) = sz
      /\ wsz (W_EXPLICIT_VAR sz b) = sz
      /\ wsz (W_AND a b) = get_size2 a b
+     /\ wsz (W_LAT_LEQ a b) = get_size2 a b
      /\ wsz (W_OR a b) = get_size2 a b
      /\ wsz (W_NOT a) = wexpr_size a
      /\ wsz (W_PRED name cond) = 1
@@ -364,6 +371,8 @@ letrec wexpr_is_binary (W_X sz) = F
  /\     wexpr_is_binary (W_EXPLICIT_VAR sz n) = T
  /\     wexpr_is_binary (W_AND a b) =
 	    (wexpr_is_binary a) AND (wexpr_is_binary b)
+ /\     wexpr_is_binary (W_LAT_LEQ a b) =
+	    (wexpr_is_binary a) AND (wexpr_is_binary b)
  /\     wexpr_is_binary (W_OR a b) = (wexpr_is_binary a) AND (wexpr_is_binary b)
  /\     wexpr_is_binary (W_NOT a) = (wexpr_is_binary a)
  /\     wexpr_is_binary (W_PRED name cond) = wexpr_is_binary cond
@@ -427,6 +436,7 @@ letrec w2bv sub w =
      /\ w2bv (W_VAR sz b) = substitute sub (bv_variable (mk_name sz b))
      /\ w2bv (W_EXPLICIT_VAR sz n) = substitute sub (bv_variable n)
      /\ w2bv (W_AND a b) = bv_AND (w2bv sub a) (w2bv sub b)
+     /\ w2bv (W_LAT_LEQ a b) = error "W_LAT_LEQ cannot be converted"
      /\ w2bv (W_OR a b) = bv_OR (w2bv sub a) (w2bv sub b)
      /\ w2bv (W_NOT a) = bv_NOT (w2bv sub a)
      /\ w2bv (W_PRED name cond) = w2bv sub cond
@@ -532,6 +542,7 @@ let w_substitute sub we =
      /\     do (W_EXPLICIT_VAR sz n) =
 	(assoc n sub) catch (W_EXPLICIT_VAR sz n)
      /\     do (W_AND a b) = W_AND (do a) (do b)
+     /\     do (W_LAT_LEQ a b) = W_LAT_LEQ (do a) (do b)
      /\     do (W_OR a b)  = W_OR (do a) (do b)
      /\     do (W_NOT a)   = W_NOT (do a)
      /\     do (W_PRED name cond) = W_PRED name (do cond)

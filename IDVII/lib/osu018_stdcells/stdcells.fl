@@ -464,8 +464,7 @@ let QXOR2X1 {attrs::(string#string) list} conns =
 // Handcrafted models since Verilog using primitive UDP cannot be compiled.
 
 let QDFFNEGX1 {attrs::(string#string) list} conns =
-    let inps = [ "CLK",
-                 "D" ] in
+    let inps = [ "D", "CLK"] in
     let outs = [ "Q" ] in
     let ints = md_extract_vectors ["NCLK"] in
     let _mk_fa f = (f, ((assoc f conns) catch [f])) in
@@ -479,7 +478,7 @@ let QDFFNEGX1 {attrs::(string#string) list} conns =
 ;
 
 let QDFFPOSX1 {attrs::(string#string) list} conns =
-    let inps = [ "CLK", "D" ] in
+    let inps = [ "D", "CLK"] in
     let outs = [ "Q" ] in
     let ints = md_extract_vectors [] in
     let _mk_fa f = (f, ((assoc f conns) catch [f])) in
@@ -492,7 +491,7 @@ let QDFFPOSX1 {attrs::(string#string) list} conns =
 ;
 
 let QDFFSR {attrs::(string#string) list} conns =
-    let inps = [ "CLK", "D", "R", "S" ] in
+    let inps = ["D", "CLK", "S", "R"] in
     let outs = [ "Q" ] in
     let ints = md_extract_vectors [] in
     let _mk_fa f = (f, ((assoc f conns) catch [f])) in
@@ -506,14 +505,14 @@ let QDFFSR {attrs::(string#string) list} conns =
 ;
 
 let QLATCH {attrs::(string#string) list} conns =
-    let inps = [ "CLK", "D"] in
+    let inps = ["D", "CLK"] in
     let outs = [ "Q" ] in
     let ints = md_extract_vectors [] in
     let _mk_fa f = (f, ((assoc f conns) catch [f])) in
     let _fa_inps = map _mk_fa inps in
     let _fa_outs = map _mk_fa outs in
     let _body = [
-	_dlatch 1 "osu018_stdcells.fl:499.0-499.10" ["Q"] ["CLK"] ["D"]
+	_dlatch T 1 "osu018_stdcells.fl:499.0-499.10" ["Q"] ["CLK"] ["D"]
     ] in
     PINST "draw_stdcell LATCH draw_pos_d_latch" attrs F _fa_inps _fa_outs ints (P_HIER _body)
 ;

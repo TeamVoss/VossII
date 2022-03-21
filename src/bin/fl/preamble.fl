@@ -1674,6 +1674,7 @@ lettype wexpr =
         |   W_CAT {parts::wexpr list}
         |   W_MEM_READ {info::mem} {mem::wexpr} {addr::wexpr}
         |   W_MEM_WRITE {info::mem} {mem::wexpr} {addr::wexpr} {data::wexpr}
+        |   W_LAT_LEQ {a::wexpr} {b::wexpr} // Lattice less-or-equal
 ;
 
 begin_abstype;
@@ -1702,6 +1703,7 @@ letrec Pwexpr (W_X sz) = sprintf "X[%d:0]" (sz-1)
  /\    Pwexpr (W_VAR sz base) = mk_name sz base
  /\    Pwexpr (W_EXPLICIT_VAR sz name) = name
  /\    Pwexpr (W_AND a b) = sprintf "(%s & %s)" (Pwexpr a) (Pwexpr b)
+ /\    Pwexpr (W_LAT_LEQ a b) = sprintf "(%s [<=] %s)" (Pwexpr a) (Pwexpr b)
  /\    Pwexpr (W_OR  a b) = sprintf "(%s | %s)" (Pwexpr a) (Pwexpr b)
  /\    Pwexpr (W_NOT a) = sprintf "~(%s)" (Pwexpr a)
  /\    Pwexpr (W_PRED name cond) = sprintf "(%s)" (Pwexpr cond)
@@ -1747,6 +1749,8 @@ letrec DBGwexpr (W_X sz) =
 	    sprintf "(W_EXPLICIT_VAR %d \"%s\")" sz name
  /\    DBGwexpr (W_AND a b) =
 	    sprintf "(W_AND %s %s)" (DBGwexpr a) (DBGwexpr b)
+ /\    DBGwexpr (W_LAT_LEQ a b) =
+	    sprintf "(W_LAT_LEQ %s %s)" (DBGwexpr a) (DBGwexpr b)
  /\    DBGwexpr (W_OR  a b) =
 	    sprintf "(W_OR %s %s)" (DBGwexpr a) (DBGwexpr b)
  /\    DBGwexpr (W_NOT a) =
@@ -1780,14 +1784,14 @@ letrec DBGwexpr (W_X sz) =
  /\    DBGwexpr (W_ITE c t e) =
             sprintf "(W_ITE %s %s %s)" (DBGwexpr c) (DBGwexpr t) (DBGwexpr e)
  /\    DBGwexpr (W_SLICE indices w) =
-            let vec = pr_indices indices then
+            let vec = list2str T "[" "," "]" int2str indices then
             sprintf "(W_SLICE %s %s)" vec (DBGwexpr w)
  /\    DBGwexpr (W_NAMED_SLICE name indices w) =
-            let vec = pr_indices indices then
-            sprintf "(W_NAMED_SLICE %s %s %s)" name vec (DBGwexpr w)
+            let vec = list2str T "[" "," "]" int2str indices then
+            sprintf "(W_NAMED_SLICE \"%s\" %s %s)" name vec (DBGwexpr w)
  /\    DBGwexpr (W_UPDATE_NAMED_SLICE base name indices w) =
-            let vec = pr_indices indices then
-            sprintf "(W_UPDATE_NAMED_SLICE %s %s %s %s)"
+            let vec = list2str T "[" "," "]" int2str indices then
+            sprintf "(W_UPDATE_NAMED_SLICE %s \"%s\" %s %s)"
 		    (DBGwexpr base) name vec (DBGwexpr w)
  /\    DBGwexpr (W_CAT parts) =
             list2str T "(W_CAT [" ", " "])" DBGwexpr parts

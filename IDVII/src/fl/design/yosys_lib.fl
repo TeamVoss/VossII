@@ -99,7 +99,7 @@ let _dff sz src out clk d =
     PINST "draw_dff" attrs T fa_inps fa_outs ints subs
 ;
 
-let _dlatch sz src out clk d =
+let _dlatch polarity sz src out clk d =
     let attrs = mk_attr src __FILE__ __LINE__ then
     let f_out = mk_name sz "Q" in
     let Q = W_VAR sz "Q" in
@@ -113,9 +113,10 @@ let _dlatch sz src out clk d =
     let fa_inps = [(f_D, d), (f_clk, clk)] in
     let fa_outs = [(f_out, out)] in
     let y_del = W_PHASE_DELAY dQ Q in
-    let mux = W_UPDATE_FN Q (W_ITE EN D dQ) in
+    let mux = W_UPDATE_FN Q (polarity => (W_ITE EN D dQ) | (W_ITE EN dQ D)) in
     let subs = P_LEAF [y_del, mux] in
-    PINST "draw_pos_d_latch" attrs T fa_inps fa_outs ints subs
+    let pfn = polarity => "draw_pos_d_latch" | "draw_neg_d_latch" in
+    PINST pfn attrs T fa_inps fa_outs ints subs
 ;
 
 let _adff sz src out arst clk d =

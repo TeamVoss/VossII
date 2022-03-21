@@ -141,6 +141,7 @@ letrec
         normalize_binary ix (\x. \y. (W_OR (W_AND x (W_NOT y)) (W_AND (W_NOT x) y))) a b
 // Smaller gates.
 /\  normalize_wexpr ix (W_AND a b) = normalize_binary ix W_AND a b
+/\  normalize_wexpr ix (W_LAT_LEQ a b) = normalize_binary ix W_LAT_LEQ a b
 /\  normalize_wexpr ix (W_OR a b) = normalize_binary ix W_OR a b
 /\  normalize_wexpr ix (W_NOT a) = normalize_unary ix W_NOT a
 /\  normalize_wexpr ix (W_EQ a b) = normalize_cmp ix W_EQ a b

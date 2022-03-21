@@ -250,6 +250,21 @@ proc idv:create_idv_menu {nb w} {
         $m add command -label "Write out Verilog netlist" \
             -command "idv:write_verilog $w 1"
 
+	ttk::menubutton $w.menu.select -text Select -menu $w.menu.select.menu
+        pack $w.menu.select -side left -padx 5
+	set m $w.menu.select.menu
+	menu $m
+        $m add command -label "Select all" \
+            -command "idv:selection_command $w all"
+        $m add command -label "All combinational" \
+            -command "idv:selection_command $w combinational"
+        $m add command -label "All state holding" \
+            -command "idv:selection_command $w stateholding"
+        $m add command -label "All unmapped" \
+            -command "idv:selection_command $w unmapped"
+        $m add command -label "Invert selection" \
+            -command "idv:selection_command $w invert"
+
         button $w.menu.new_transf -image $::icon(new_transf) \
                 -command "idv:new_transf $w"
         balloon $w.menu.new_transf \
@@ -609,11 +624,16 @@ proc idv:edit_and_load {w file load_file pexlif_file type} {
     }
 }
 
-
-
-proc idv:make_template {w c type} {
+proc idv:make_template {w c type args} {
     set ::idv(fev_imp_file) ""
-    set file $::idv(fev_template_file)
+    if { $type == "synthesis" } {
+	if { [catch {expr [llength [glob -dir $::idv(code_dir) "_synth*"]]+1} cnt] } {
+	set cnt 1
+    }
+	set file [format {%s/_synth_%d} $::idv(code_dir) $cnt]
+    } else {
+	set file $::idv(fev_template_file)
+    }
     set base [file tail [file rootname $file]]
     set ext [file extension $file]
     if { $file != "" } {
@@ -639,7 +659,7 @@ proc idv:make_template {w c type} {
 	    }
 	}
 	val {pexlif_file load_file} \
-		[fl_make_template $c $type $file $base $create_file]
+	    [fl_make_template $c $type $file $base $create_file [list $args]]
 	set ::idv(fev_imp_file) \
 		[idv:edit_and_load $w $file $load_file $pexlif_file $type]
     }
@@ -681,7 +701,7 @@ proc idv:do_fev {ww} {
         pack $w.f1.l -side left -fill x
 
 
-    labelframe $w.f2 -relief groove -text Template
+    labelframe $w.f2 -relief groove -text Manual
     pack $w.f2 -side top -fill x -pady 10
 	label $w.f2.l -text "Make template in:" -width 20 -justify left \
 	    -anchor w
@@ -690,16 +710,26 @@ proc idv:do_fev {ww} {
 	    -command "idv:fev_template_file $::idv(code_dir) $w $ww.c"
 	button $w.f2.verilog -text "Verilog" \
 	    -command "idv:make_template $w $ww.c verilog"
-	button $w.f2.hfl -text "HFL" \
-	    -command "idv:make_template $w $ww.c hfl"
-	button $w.f2.synth -text "Synthesis" \
-	    -command "idv:make_template $w $ww.c synthesis"
+	button $w.f2.hfl -text "HFL" -command "idv:make_template $w $ww.c hfl"
 	pack $w.f2.l -side left -anchor w
 	pack $w.f2.e -side left -fill x -expand yes
 	pack $w.f2.dir -side left
 	pack $w.f2.verilog -side left -padx 5
 	pack $w.f2.hfl -side left -padx 5
-	pack $w.f2.synth -side left -padx 5
+
+    labelframe $w.f2b -relief groove -text Synthesis
+    pack $w.f2b -side top -fill x -pady 10
+	ttk::labelframe $w.f2b.lbl -relief flat -text \
+		"Synthesis type: " \
+		-labelanchor w
+	tk_optionMenu $w.f2b.type ::idv(synthesis_type) \
+		Flat Hierarchical
+	set ::idv(synthesis_type) Flat
+	button $w.f2b.synth -text "Synthesize" -command \
+	    "idv:make_template $w $ww.c synthesis $::idv(synthesis_type)"
+	pack $w.f2b.lbl -side left -padx 5
+	pack $w.f2b.type -side left -padx 5
+	pack $w.f2b.synth -side right -padx 5
 
     labelframe $w.f3 -relief groove -text Implementation
     pack $w.f3 -side top -fill x -pady 10
@@ -714,6 +744,8 @@ proc idv:do_fev {ww} {
     labelframe $w.f4 -relief groove -text Check
     pack $w.f4 -side top -fill x -pady 10
 	labelframe $w.f4.sim -relief groove -text Simulation
+	    button $w.f4.sim.none -text "None" \
+		-command "idv:do_verify $w $ww.c Sim_None"
 	    button $w.f4.sim.light -text "Light" \
 		-command "idv:do_verify $w $ww.c Sim_Light"
 	    button $w.f4.sim.medium -text "Medium" \
@@ -721,6 +753,7 @@ proc idv:do_fev {ww} {
 	    button $w.f4.sim.heavy -text "Heavy" \
 		-command "idv:do_verify $w $ww.c Sim_Heavy"
 	pack $w.f4.sim -side left -padx 10 -fill x -expand yes
+	    pack $w.f4.sim.none -side left -padx 5 -fill x -expand yes
 	    pack $w.f4.sim.light -side left -padx 5 -fill x -expand yes
 	    pack $w.f4.sim.medium -side left -padx 5 -fill x -expand yes
 	    pack $w.f4.sim.heavy -side left -padx 5 -fill x -expand yes
@@ -800,4 +833,8 @@ proc idv:write_pexlif {w} {
 	set name [file rootname [file tail $file]]
 	fl_save_pexlif $w.c $file
     }
+}
+
+proc idv:selection_command {w cmd} {
+    fl_do_selection_command $w.c $cmd
 }
