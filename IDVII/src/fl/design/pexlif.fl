@@ -331,6 +331,19 @@ let foldn_pexlif p ill new_base_name =
     (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER chs'))
 ;
 
+// Gather all child pints that has an attribute satisfying the predicate
+// and fold them into a group named 'new_name';
+let fold_by_label p attribute_predicate new_name =
+    val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER chs)) = p then
+    let select (idx,(PINST _ lattrs _ _ _ _ _)) =
+	(find_first0 attribute_predicate lattrs) != 0
+    in
+    let il = map fst (filter select (zip (1 upto (length chs)) chs)) in
+    il = [] => p |
+    fold_pexlif p il new_name
+;
+
+
 // Create a new pexlif in which instances in ids have been collected to
 // a new hiearchy named 'name'.
 // ...
