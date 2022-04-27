@@ -41,6 +41,9 @@ fl-mode makes the following commands available to the user.
 * `fl-send-smart`
     - Sends the current selection to the currently running fl session.
       If nothing is selected, instead sends the current line.
+* `fl-send-phrase`
+	- Sends the phrase around point to the currently running fl
+      session, then moves point to the line following that phrase.
 * `fl-clear`
     - Clears the fl output buffer.
 * `fl-describe`
@@ -65,6 +68,7 @@ By default, the following key mappings are installed:
 * `C-f C-f`: evaluate the current selection or line.
 * `C-f C-b`: evaluate the current buffer.
 * `C-f C-e`: evaluate an interactively entered expression.
+* `C-f C-n`: evaluate the phrase surrounding point.
 * `C-f C-s`: start an fl session.
 * `C-f C-q`: gracefully terminate an fl session.
 * `C-f C-k`: forcefully kill an fl session.
