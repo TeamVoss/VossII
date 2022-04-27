@@ -66,7 +66,7 @@ let CSA_property i1 i2 i3 c s =
 	       i3 at_cycle 0
     in
     let sum2 = c at_cycle 0 '+' s at_cycle 0 in
-    ASSERT "csa_sum" (sum1 '=' sum2)
+    rel_ASSERT "csa_sum" (sum1 '=' sum2)
 ;
 
 var_order (interleave (map md_expand_vector ["a[31:0]","b[31:0]","c[31:0]"]));
