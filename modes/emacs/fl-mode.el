@@ -33,7 +33,7 @@
 (defvar fl-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map "\C-f\C-f" 'fl-send-smart)
-	(define-key map "\C-f\C-n" 'fl-send-phrase)
+    (define-key map "\C-f\C-n" 'fl-send-phrase)
     (define-key map "\C-f\C-b" 'fl-send-buffer)
     (define-key map "\C-f\C-e" 'fl-send)
     (define-key map "\C-f\C-s" 'fl-start)
@@ -266,9 +266,9 @@
   "Return t if point on a `;' that is indeed the end of a phrase.
 ie ignores commented or quoted `;'"
   (let ((synt (syntax-ppss)))
-	(and (not (nth 3 synt))
-		 (not (nth 4 synt))
-		 (eq ?\; (char-after)))))
+    (and (not (nth 3 synt))
+         (not (nth 4 synt))
+         (eq ?\; (char-after)))))
 
 (defun fl-send-phrase ()
   "Send the phrase surrounding point to fl.
@@ -276,24 +276,24 @@ Inspired by tuareg mode.  TODO: For the moment does not work as
 expected if several phrases on a single line."
   (interactive)
   (let (begin end)
-	(save-excursion
-	  (if (looking-at-p "[^;]*;[[:blank:]]*$")
-		  (move-beginning-of-line nil))
-	  (while (not (or (point-at-end-of-phrase)
-					  (bobp)))
-		(backward-char))
-	  (move-beginning-of-line (if (bobp) 1 2))
-	  (while (looking-at-p "[[:blank:]]*$\\|//.*")
-		(forward-line))
-	  (setq begin (point))
-	  (while (not (point-at-end-of-phrase))
-		(forward-char))
-	  (forward-char)
-	  (setq end (point))
-	  (fl-send (buffer-substring-no-properties begin end))
-	  (message "Phrase sent to fl"))
-	(goto-char end)
-	(forward-line)))
+    (save-excursion
+      (if (looking-at-p "[^;]*;[[:blank:]]*$")
+          (move-beginning-of-line nil))
+      (while (not (or (point-at-end-of-phrase)
+                      (bobp)))
+        (backward-char))
+      (move-beginning-of-line (if (bobp) 1 2))
+      (while (looking-at-p "[[:blank:]]*$\\|//.*")
+        (forward-line))
+      (setq begin (point))
+      (while (not (point-at-end-of-phrase))
+        (forward-char))
+      (forward-char)
+      (setq end (point))
+      (fl-send (buffer-substring-no-properties begin end))
+      (message "Phrase sent to fl"))
+    (goto-char end)
+    (forward-line)))
 
 (defun fl-send (s)
   "Sends the given line to fl."
