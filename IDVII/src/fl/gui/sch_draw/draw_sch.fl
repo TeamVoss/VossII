@@ -199,6 +199,13 @@ let STE_debug fsm =
     res
 ;
 
+let VIS fl_function_name =
+    let p = flfun2pexlif fl_function_name then
+    let ckt = pexlif2fsm p then
+    STE_debug ckt
+;
+free_binder VIS;
+
 let fl_destroy_vfsm w =
     let raw = deref cur_vfsm then
     let rem = filter (\vfsm. vfsm2id vfsm != w) raw then

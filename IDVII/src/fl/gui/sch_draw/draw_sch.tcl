@@ -4216,7 +4216,7 @@ proc draw_dffsr {pclk pset pclr c tag x y} {
     if { $pclk == 1 }  { set edge RisingEdge } else { set edge FallingEdge }
     if { $pclr == 1 }  { set clabel Rlabel } else { set clabel negRlabel }
     if { $pset == 1 }  { set slabel Slabel } else { set slabel negSlabel }
-    return [draw_box_pat 5 $edge \
+    return [draw_box_pat 4 $edge \
 	    [list Dlabel ClkInLabel $slabel $clabel] $c $tag $x $y]
 }
 

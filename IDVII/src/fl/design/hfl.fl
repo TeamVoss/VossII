@@ -559,7 +559,7 @@ let split_binary (W_EQ  a b)  = W_EQ, a, b
   /\ split_binary other = error "Should not happen"
 ;
 
-let base_assignment make_draw_command lhs rhs =
+let base_assignment lhs rhs =
     let l_sz = wexpr_size lhs in
     let r_sz = wexpr_size rhs in
     l_sz != r_sz =>
@@ -577,7 +577,7 @@ let base_assignment make_draw_command lhs rhs =
         let lhs' = W_VAR sz "_tmp" in
         let outs = [(mk_name sz "_tmp", driven)] in
         let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
-        let pfn = make_draw_command => mk_draw_cmd F rhs | "" in
+        let pfn = mk_draw_cmd F rhs in
         PINST pfn [] T inps outs [] body
     in
     let mk_pinst_w_order lhs rhs inps =
@@ -587,7 +587,7 @@ let base_assignment make_draw_command lhs rhs =
         let lhs' = W_VAR sz "_tmp" in
         let outs = [(mk_name sz "_tmp", driven)] in
         let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
-        let pfn = make_draw_command => mk_draw_cmd F rhs | "" in
+        let pfn = mk_draw_cmd F rhs in
         PINST pfn [] T inps outs [] body
     in
     let id_cnt_ref = ref 1 then
@@ -664,9 +664,7 @@ let base_assignment make_draw_command lhs rhs =
 		    let outs = [(mk_name sz "_tmp", driven)] in
 		    let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
 		    let n = length dep_vars in
-		    let pfn = make_draw_command =>
-				sprintf "draw_explicit_or_n %d" n | ""
-		    in
+		    let pfn = sprintf "draw_explicit_or_n %d" n in
 		    PINST pfn [] T inps outs [] body
 		in
 		p:ps
@@ -693,9 +691,7 @@ let base_assignment make_draw_command lhs rhs =
 		    let outs = [(mk_name sz "_tmp", driven)] in
 		    let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
 		    let n = length dep_vars in
-		    let pfn = make_draw_command =>
-				sprintf "draw_explicit_nor_n %d" n | ""
-		    in
+		    let pfn = sprintf "draw_explicit_nor_n %d" n in
 		    PINST pfn [] T inps outs [] body
 		in
 		p:ps
@@ -722,9 +718,7 @@ let base_assignment make_draw_command lhs rhs =
 		    let outs = [(mk_name sz "_tmp", driven)] in
 		    let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
 		    let n = length dep_vars in
-		    let pfn = make_draw_command =>
-				sprintf "draw_explicit_and_n %d" n | ""
-		    in
+		    let pfn = sprintf "draw_explicit_and_n %d" n in
 		    PINST pfn [] T inps outs [] body
 		in
 		p:ps
@@ -751,9 +745,7 @@ let base_assignment make_draw_command lhs rhs =
 		    let outs = [(mk_name sz "_tmp", driven)] in
 		    let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
 		    let n = length dep_vars in
-		    let pfn = make_draw_command =>
-				sprintf "draw_explicit_nand_n %d" n | ""
-		    in
+		    let pfn = sprintf "draw_explicit_nand_n %d" n in
 		    PINST pfn [] T inps outs [] body
 		in
 		p:ps
@@ -888,7 +880,7 @@ let base_assignment make_draw_command lhs rhs =
 let <- L R =
     let lhs = hw_destr {L:: *a} in
     let rhs = hw_destr {R:: *a} in
-    base_assignment T lhs rhs
+    base_assignment lhs rhs
 ;
 infix 0 <-;
 
@@ -935,7 +927,7 @@ let get_act_args fn a =
 	let nm = sprintf "%s%d_%s" BASE_TMP cnt fn then
 	let tmp = hw_mk_var a nm then
 	let we = hw_destr a in
-	let asignm = base_assignment T tmp we then
+	let asignm = base_assignment tmp we then
 	let vs = get_lhs_vars tmp then
 	([asignm], vs)
     )
@@ -3399,6 +3391,24 @@ let pcompile fn =
 ;
 free_binder pcompile;
 
+let flfun2pexlif fn =
+    let pdir = (deref pexlif_compile_dir) in
+    let rtype = get_return_type fn then
+    rtype != "pexlif" =>
+	eprintf "Return type not pexlif (%s). VIS aborted\n" rtype
+    |
+    let args = get_args fn then
+    let idx = find_first0 (\(a,tp). NOT (is_hw_type tp)) args in
+    idx != 0 =>
+	val (arg,tp) = el idx args in
+	eprintf "Argument %s not a simple hw_type (%s). VIS for %s aborted\n"
+	      arg tp fn
+    |
+    let pre = sprintf "let foo = %s " fn in
+    let post = " then (_pExLiF_ := foo);" in
+    let cmd = list2str T pre " " post (sprintf "'%s") (map fst args) then
+    (eval cmd) fseq (deref _pExLiF_)
+;
 
 let ASSERT {name::string} {expr::bit} =
     let oa = ord "a" in

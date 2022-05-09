@@ -106,8 +106,9 @@ typedef struct fn_rec {
         string		    file_name;
 	int		    ADT_level;
         int		    start_line_nbr:29;
-        int		    end_line_nbr:30;
+        int		    end_line_nbr:29;
         bool		    visible:1;
+        bool		    in_use:1;
         bool		    non_lazy:1;
         bool		    forward:1;
         bool		    overload:1;

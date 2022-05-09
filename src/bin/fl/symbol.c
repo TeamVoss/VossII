@@ -452,6 +452,7 @@ Init_symbol()
     symb_tbl->def_list = dummy;
     update_stbl(symb_tbl, dummy);
     dummy->visible        = TRUE;
+    dummy->in_use         = TRUE;
     dummy->file_name      = wastrsave(&strings, "_dummy_");;
     dummy->start_line_nbr = 1;
     dummy->end_line_nbr   = 1;
@@ -476,16 +477,16 @@ void
 Mark_symbols()
 {
     fn_ptr      fp;
-    // Make sure all visible overload versions are visible
+    // Make sure all overload versions in_use are marked as in_use
     FOR_REC(&fn_rec_mgr, fn_ptr, fp) {
-        if( fp->visible && fp->overload_list != NULL ) {
+        if( fp->in_use && fp->overload_list != NULL ) {
             for(oll_ptr ol = fp->overload_list; ol != NULL; ol = ol->next) {
-                ol->fn->visible = TRUE;
+                ol->fn->in_use = TRUE;
             }
         }
     }
     FOR_REC(&fn_rec_mgr, fn_ptr, fp) {
-        if( fp->visible ) {
+        if( fp->in_use ) {
 	    Mark(fp->expr);
 	    Mark(fp->expr_init);
 	    Mark(fp->expr_comb);
@@ -609,6 +610,7 @@ Add_Destructors(string name, typeExp_ptr new_type,
         tmp                = (fn_ptr) get_fn_rec();
         tmp->ADT_level     = ADT_level;
         tmp->visible       = TRUE;
+	tmp->in_use        = TRUE;
         tmp->non_lazy      = FALSE;
         tmp->forward       = FALSE;
         tmp->name          = dest_name;
@@ -648,7 +650,8 @@ Add_Destructors(string name, typeExp_ptr new_type,
         fn_ptr  save_fun;
         save_fun = (fn_ptr) get_fn_rec();
         save_fun->visible        = TRUE;
-        save_fun->ADT_level          = ADT_level;
+	save_fun->in_use         = TRUE;
+        save_fun->ADT_level      = ADT_level;
         save_fun->non_lazy       = FALSE;
         save_fun->forward        = FALSE;
         save_fun->name           = save_fun_name;
@@ -679,8 +682,9 @@ Add_Destructors(string name, typeExp_ptr new_type,
         typeExp_ptr load_type = GLmake_arrow(GLmake_string(), new_type);
         fn_ptr  load_fun;
         load_fun = (fn_ptr) get_fn_rec();
-        load_fun->ADT_level          = ADT_level;
+        load_fun->ADT_level      = ADT_level;
         load_fun->visible        = TRUE;
+	load_fun->in_use         = TRUE;
         load_fun->non_lazy       = FALSE;
         load_fun->forward        = FALSE;
         load_fun->name           = load_fun_name;
@@ -765,6 +769,7 @@ InsertOverloadDef(string name, bool open_overload, oll_ptr alts,
     ret->comments       = NULL;
     ret->arg_names      = NULL;
     ret->visible        = TRUE;
+    ret->in_use         = TRUE;
     ret->non_lazy       = FALSE;
     ret->forward        = FALSE;
     ret->expr           = NULL;
@@ -819,6 +824,7 @@ Make_forward_declare(string name, typeExp_ptr type, symbol_tbl_ptr stbl,
     ret->ADT_level      = ADT_level;
     ret->forward        = TRUE;
     ret->visible        = TRUE;
+    ret->in_use         = TRUE;
     ret->file_name      = file;
     ret->start_line_nbr = start_line;
     ret->end_line_nbr   = line_nbr;
@@ -902,6 +908,7 @@ New_fn_def(string name, result_ptr res, symbol_tbl_ptr stbl, bool print,
     }
     //
     ret->visible        = TRUE;
+    ret->in_use         = TRUE;
     ret->file_name      = file;
     ret->start_line_nbr = start_line;
     ret->end_line_nbr   = line_nbr;
@@ -954,45 +961,58 @@ End_ADT(symbol_tbl_ptr stbl, var_list_ptr vlp)
     }
     ADT_level--;
     pop_buf(&ADT_buf, (pointer) &last);
-    dispose_hash(stbl->tbl_ptr, NULLFCN);
-    create_hash(stbl->tbl_ptr, 100, str_hash, str_equ);
-    fn_ptr flp = stbl->def_list;
     hash_record keep_tbl;
     create_hash(&keep_tbl, 100, str_hash, str_equ);
     while( vlp != NULL ) {
         vp = vlp;
-        if( find_hash(&keep_tbl, (pointer) vp->name) == NULL ) {
-            insert_hash(&keep_tbl, (pointer) vp->name, (pointer) vp->name);
-        }
+	if( find_hash(stbl->tbl_ptr, vlp->name) == NULL ) {
+	    FP(err_fp,
+	     "Error: end_abstype exports %s which is not defined\n", vlp->name);
+	    while( vlp != NULL ) {
+		vp = vlp;
+		vlp = vlp->next;
+		free_rec(&var_list_rec_mgr, (pointer) vp);
+	    }
+	    ADT_level = 1;
+	    return stbl;
+	} else {
+	    if( find_hash(&keep_tbl, (pointer) vp->name) == NULL ) {
+		insert_hash(&keep_tbl, (pointer) vp->name, (pointer) vp->name);
+	    }
+	}
         vlp = vp->next;
         free_rec(&var_list_rec_mgr, (pointer) vp);
     }
+    dispose_hash(stbl->tbl_ptr, NULLFCN);
+    create_hash(stbl->tbl_ptr, 100, str_hash, str_equ);
+    fn_ptr flp = stbl->def_list;
+
 
     while( flp != last ) {
         if( find_hash(&keep_tbl, (pointer) flp->name) != NULL ) {
             flp->visible = TRUE;
             flp->ADT_level = ADT_level;
             insert_hash(stbl->tbl_ptr, (pointer) flp->name, (pointer) flp);
-        }
+        } else {
+	    flp->visible = FALSE;
+	}
         /* Type constructor status is bounded inside ADT */
         if( find_hash( &Constructor_Table, (pointer) flp->name ) != NULL )
             delete_hash(&Constructor_Table, (pointer) flp->name);
         flp = flp->next;
     }
-    while( flp != NULL ) {
-        string name = flp->name;
-        if( find_hash(&keep_tbl, (pointer) name) == NULL ||
-            flp->ADT_level != ADT_level )
-        {
-            if( flp->visible &&
-                find_hash(stbl->tbl_ptr, (pointer) name) == NULL)
-            {
-                insert_hash(stbl->tbl_ptr, (pointer) name, (pointer) flp);
-            }
-        }
-        flp = flp->next;
-    }
     dispose_hash(&keep_tbl, NULLFCN);
+
+    // Now add all the non-hidden visble functions back into the hash symb. tbl.
+    while( flp != NULL ) {
+	if( flp->visible ) {
+	    string name = flp->name;
+	    if( find_hash(stbl->tbl_ptr, (pointer) name) == NULL) {
+                insert_hash(stbl->tbl_ptr, (pointer) name, (pointer) flp);
+	    }
+	}
+	flp = flp->next;
+    }
     return(stbl);
 }
 
@@ -1310,6 +1330,7 @@ Add_ExtAPI_Function(string name, string strictness,
     fn_ptr ret = (fn_ptr) get_fn_rec();
     ret->ADT_level      = ADT_level;
     ret->visible        = TRUE;
+    ret->in_use         = TRUE;
     ret->file_name      = wastrsave(&strings, "builtin");
     ret->start_line_nbr = 0;
     ret->end_line_nbr   = 0;
@@ -2176,6 +2197,7 @@ update_stbl(symbol_tbl_ptr stbl, fn_ptr fp)
 {
     string name = fp->name;
     fn_ptr last = (fn_ptr) find_hash(stbl->tbl_ptr,(pointer) name);
+    if( last == fp ) { return; }
     if(last != NULL && last != fp ) {
         delete_hash(stbl->tbl_ptr, (pointer) name);
     }

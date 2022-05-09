@@ -117,6 +117,12 @@ export_to_tcl help;
 export_to_tcl get_matching_functions;
 
 
+// AND all elements in list l.
+let AND_list l = sitlist (defix AND) l T;
+
+// OR all elements in list l.
+let OR_list l = sitlist (defix OR) l F;
+
 // Identity function
 let id a = a;
 
@@ -264,6 +270,10 @@ letrec map6 fn l1 l2 l3 l4 l5 l6 =
     (fn a b c d e f):(map6 fn as bs cs ds es fs)
 ;
 
+// Apply fn to every element in l except fn is called with two arguments:
+// and index of element e in the list and the element e itself.
+let map_index fn l = map2 fn (1 upto (length l)) l;
+
 // Apply f to every element of list and join the results together.
 // Computes: f (el 1 l) (f (el 2 l) (f (el 3 l) (... (f (last l) x))...)))
 // NOTE: This is the lazy version. See sitlist for a strict version (and often
@@ -368,7 +378,6 @@ letrec zip5 l1 l2 l3 l4 l5 =
 ;
 
 end_abstype zip3 zip4 zip5;
-
 
 // Take a list of pairs pl and return a pair of lists
 letrec unzip pl = empty pl => ([],[]) |
@@ -500,7 +509,7 @@ let bv_small_exp {p::bv} =
     ('6000000+p*('60000+p*('300+p)))/ '60000
 ;
 
-let bvabs bv = bv < (int2bv 0) => ('0 - bv) | bv;
+let bv_abs bv = bv < (int2bv 0) => ('0 - bv) | bv;
 
 // Return an approximation to: 100*exp(n/d)
 // Is accurate within 3% at least for -6.0 <= n/d <= 12.0
@@ -508,8 +517,8 @@ let bv_exp {n::bv} {d::bv} =
     n = '0 => int2bv 100 |
     n = d  => int2bv (round (100.0*exp(1.0))) |
     n = ('0 - '1*d)  => int2bv (round (100.0*exp(-1.0))) |
-    let n' = bvabs n in
-    let d' = bvabs d in
+    let n' = bv_abs n in
+    let d' = bv_abs d in
     let sign = n/n' * d/d' in
     let m = n' / d' in
     let r = n' % d' in
@@ -1155,7 +1164,7 @@ let find_smallest info vars =
 ;
 
 
-letrec AND_list l =
+letrec qAND_list l =
     l = [] => T |
     let l = setify l then
     let ll = length l in
@@ -1176,7 +1185,7 @@ letrec AND_list l =
     let rem_indices = (1 upto ll) subtract [idx1,idx2] in
     let rem = map (\i. el i l) rem_indices then
     let new_l = f:rem then
-    AND_list new_l
+    qAND_list new_l
 ;
 
 letrec OR_list l =
@@ -1208,7 +1217,7 @@ let merge_funs info indices =
     val (EQ_INFO cnt main_list v2is v2cnts) = info in
     val (idx:rem_indices) = indices then
     val (r_funs, r_deps) = unzip (map (\i. assoc i main_list) indices) then
-//    let new_fun = AND_list (map deref r_funs) then
+//    let new_fun = qAND_list (map deref r_funs) then
     let new_fun = itlist (\rf.\r. deref rf AND r) r_funs T then
     let new_dep = setify (flatmap deref r_deps) then
     val (rf1:rfs) = r_funs then
@@ -1369,7 +1378,7 @@ let bevabs {bev::bev} =
     let neg = (int2bev 0) - bev in
     bev_OR (bev_AND is_neg neg) (bev_AND (bev_NOT is_neg) bev)
 ;
-overload {abs :: *a -> *a} iabs fabs bvabs bevabs;
+overload {abs :: *a -> *a} iabs fabs bv_abs bevabs;
 
 
 // Transpose a list with n elements that each are an m-element list to

@@ -9,6 +9,7 @@
 (cload (DIR^"/pexlif.fl")) fseq
 (cload (DIR^"../verilog/pretty-pexlif.fl")) fseq
 (cload (DIR^"/hfl.fl")) fseq
+(cload (DIR^"/simplify.fl")) fseq
 (cload (DIR^"/STE.fl")) fseq
 (cload (DIR^"/monitor.fl")) fseq
 (cload (DIR^"/yosys_lib.fl")) fseq
