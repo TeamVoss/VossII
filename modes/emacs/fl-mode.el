@@ -11,7 +11,7 @@
   (when fl-autostart-repl (fl-start))
   (setq major-mode 'fl-mode)
   (setq mode-name "fl")
-  (run-hooks 'fl-mode-hooks)
+  (run-mode-hooks 'fl-mode-hook)
 )
 
 (defun fl-repl-mode ()
@@ -49,7 +49,7 @@
   )
   "Keymap for fl-mode."
 )
-(defvar fl-mode-hooks nil)
+(defvar fl-mode-hook nil)
 
 
 ;;;;; Internal bookkeeping vars
