@@ -377,7 +377,7 @@ let p_module_instance (Module_instance i r' (NONE)) =
 /\  p_module_instance (Module_instance i r' (SOME l)) =
           p_identifier i
       <-> p_opt p_range r'
-      <-> in_paren (in_list (map p_port_connection l))
+      <-> in_paren (in_vert_list (map p_port_connection l))
 ;
 
 let p_module_instantiation (Module_instantiation i l) =
