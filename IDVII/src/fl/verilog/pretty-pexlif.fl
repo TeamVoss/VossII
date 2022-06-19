@@ -743,7 +743,7 @@ let premade_ff_re_with_en_reset name clk en re p q =
         ])
 ;
 
-forward_declare{pretty_pexlif_h::bool->string->pexlif->((description#identifier) list)};
+forward_declare{pretty_pexlif_h::bool->string->pexlif->((description#identifier#(identifier list)) list)};
 
 let pretty_pexlif_leaf {inst::string} name fa_inps fa_outs f_ints {fns::(update_fn list)} =
       let is_wire i = maybe T (in_any_lhs i fns) id in
@@ -763,7 +763,7 @@ let pretty_pexlif_leaf {inst::string} name fa_inps fa_outs f_ints {fns::(update_
       //
       let module = inst_name name inst in
       let body = decl_int @ statements in
-      [(Desc_module (Module_declaration_many module ports body), module)]
+      [(Desc_module (Module_declaration_many module ports body), module, [])]
 ;
 
 let pretty_pexlif_hier netlist{inst::string} name fa_inps fa_outs f_ints
@@ -789,10 +789,16 @@ let pretty_pexlif_hier netlist{inst::string} name fa_inps fa_outs f_ints
       let instant =
 	ixmap (\c. \i. pport_instantiation netlist (child i) c) cs
       in
+	  // Get direct children names
+	  let extract_name {p::pexlif} i =
+	  	  val (PINST name _ _ _ _ _ _) = p in
+		  inst_name name (child i)
+	  in
+	  let direct_children = ixmap (extract_name) cs in
       //
       let module = inst_name name inst in
       let body = decl_int @ instant in
-      (Desc_module (Module_declaration_many module ports body), module) : children
+      (Desc_module (Module_declaration_many module ports body), module, direct_children) : children
 ;
 
 let pretty_pexlif_h netlist inst (PINST name _ _ fa_inps fa_outs _ _)
@@ -804,42 +810,42 @@ let pretty_pexlif_h netlist inst (PINST name _ _ fa_inps fa_outs _ _)
       val [(p,_),(clk,_)] = fa_inps in
       val [(q,_)] = fa_outs in
       let module = inst_name name inst in
-      [(premade_ah_latch module clk p q, module)]
+      [(premade_ah_latch module clk p q, module, [])]
 /\  pretty_pexlif_h netlist inst (PINST name _ _ fa_inps fa_outs _ _)
     assuming (name == "draw_al_latch")
     =
       val [(p,_),(clk,_)] = fa_inps in
       val [(q,_)] = fa_outs in
       let module = inst_name name inst in
-      [(premade_al_latch module clk p q, module)]
+      [(premade_al_latch module clk p q, module, [])]
 /\  pretty_pexlif_h netlist inst (PINST name _ _ fa_inps fa_outs _ _)
     assuming (name == "draw_ff_re")
     =
       val [(p,_),(clk,_)] = fa_inps in
       val [(q,_)] = fa_outs in
       let module = inst_name name inst in
-      [(premade_ff_re module clk p q, module)]
+      [(premade_ff_re module clk p q, module, [])]
 /\  pretty_pexlif_h netlist inst (PINST name _ _ fa_inps fa_outs _ _)
     assuming (name == "draw_ff_re_reset")
     =
       val ((p,_):(re,_):(clk,_):[]) = fa_inps in
       val ((q,_):[]) = fa_outs in
       let module = inst_name name inst in
-      [(premade_ff_re_reset module clk re p q, module)]
+      [(premade_ff_re_reset module clk re p q, module, [])]
 /\  pretty_pexlif_h netlist inst (PINST name _ _ fa_inps fa_outs _ _)
     assuming (name == "draw_ff_re_with_en")
     =
       val ((p,_):(en,_):(clk,_):[]) = fa_inps in
       val ((q,_):[]) = fa_outs in
       let module = inst_name name inst in
-      [(premade_ff_re_with_en module clk en p q, module)]
+      [(premade_ff_re_with_en module clk en p q, module, [])]
 /\  pretty_pexlif_h netlist inst (PINST name _ _ fa_inps fa_outs _ _)
     assuming (name == "draw_ff_re_with_en_reset")
     =
       val ((p,_):(en,_):(re,_):(clk,_):[]) = fa_inps in
       val ((q,_):[]) = fa_outs in
       let module = inst_name name inst in
-      [(premade_ff_re_with_en_reset module clk en re p q, module)]
+      [(premade_ff_re_with_en_reset module clk en re p q, module, [])]
 /\  pretty_pexlif_h netlist inst
     (PINST name _ _ fa_inps fa_outs f_ints (P_HIER cs))
     =
@@ -930,7 +936,7 @@ let safe_pexlif2verilog netlist {fp::stream} {pex::pexlif} =
     let descriptions = pretty_pexlif_h netlist "" pex' then
     // let do1 d =
 	// (frender fp (p_source_text (Source_text [d]))) fseq (fprintf fp "\n\n")
-    let do1 (d, ID (inst)) =
+    let do1 (d, ID (inst), l) =
 		(frender fp (p_source_text (Source_text [d]))) fseq
 		(fprintf fp "\n\n")
     in
@@ -954,7 +960,7 @@ let pexlif2verilog netlist {fp::stream} {pex::pexlif} =
 		PINST name attrs F fa_inps' fa_outs' [] (P_HIER [pex])
     then
     let descriptions = pretty_pexlif_h netlist "" pex' then
-    let do1 (d, ID (inst)) =
+    let do1 (d, ID (inst), l) =
 		(frender fp (p_source_text (Source_text [d]))) fseq
 		(fprintf fp "\n\n")
     in
@@ -973,11 +979,14 @@ let separated_pexlif2verilog netlist {path::string} {pex::pexlif} =
 		PINST name attrs F fa_inps' fa_outs' [] (P_HIER [pex])
     then
     let descriptions = pretty_pexlif_h netlist "" pex' then
-    let do1 (d, ID (inst)) =
+    let do1 (d, ID (inst), l) =
 		let file = sprintf "%s%s.v" path inst in
 		let fp = fopen file "w" in
+		(sitlist (\ins. \ig. val (ID s) = ins in
+				(fprintf fp "`include \"%s.v\"\n" s)) l ()) fseq
+		(fprintf fp "\n") fseq
 		(frender fp (p_source_text (Source_text [d]))) fseq
-		(fprintf fp "\n\n") fseq
+		(fprintf fp "\n") fseq
 		(fclose fp)
     in
     foreach do1 descriptions
