@@ -5,7 +5,7 @@ load "ste.fl";
 // For details of the arguments, see the help system.
 
 // A small example (~5k lines of Verilog).
-let p = verilog2pexlif ("-I"^DIR^"M65C02") "M65C02_Core" [
+let p = verilog2pexlif F ("-I"^DIR^"M65C02") "M65C02_Core" [
 						"M65C02_Core.v",
 						"M65C02_MPCv4.v",
 						"M65C02_AddrGen.v",
@@ -16,7 +16,7 @@ let p = verilog2pexlif ("-I"^DIR^"M65C02") "M65C02_Core" [
 STE_debug (pexlif2fsm p);
 
 // A larger example:
-let p = verilog2pexlif ("-I"^DIR^"or1200_hp") "or1200_top" [
+let p = verilog2pexlif F ("-I"^DIR^"or1200_hp") "or1200_top" [
 	    "rf_sub.v",
 	    "or1200_alu.v",
 	    "or1200_cfgr.v",

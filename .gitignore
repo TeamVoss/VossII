@@ -19,3 +19,4 @@ y.tab.c
 /isomatches/
 .yosys*
 TAGS
+src/external/yosys/abc/abc-default
