@@ -1,0 +1,22 @@
+
+let abba = 12;
+
+forward_declare {inc:: int->int};
+
+let foo x y =
+    inc x * inc y
+;
+
+let inc x = x+1;
+
+inc 12;
+
+rvariable "a";
+
+begin_abstype;
+
+let oink x = x+99;
+
+end_abstype oink;
+
+inc 1;

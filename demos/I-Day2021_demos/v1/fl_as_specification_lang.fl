@@ -1,0 +1,67 @@
+// ===================================================================
+// DEMO OF fl AS SPECIFICATION LANGUAGE
+// ===================================================================
+
+set_font font_larger;
+
+// Symbolic IF-THEN-ELSE
+
+let c = variable "c";
+
+IF c THEN '3 ELSE ('5 + ('16*(bv_variable "x[1:0]")));
+
+// Factorial: recursive definition
+
+letrec fac {n::bv} = IF (n = '0) THEN '1 ELSE n * fac (n - '1);
+
+// Choose defined naively.
+
+let choose n k = fac n / (fac (n-k) * fac k);
+
+// Examples
+
+choose '5 '2;
+bv2int it;
+
+choose '12 '4;
+bv2int it;
+
+// Fun testing function
+
+let test n = map (\i. bv2int (choose (''n) (''i))) (0--n);
+
+test 1;
+test 2;
+test 3;
+test 4;
+test 5;
+
+// -------------------
+// Symbolic evaluation
+
+let N = bv_constrained_variable "n[7:0]" (\v. v >= '1 AND v <= '20);
+N;
+bv_examples 100 N;
+
+let K = bv_constrained_variable "k[7:0]" (\v. v >= '0 AND v <= N);
+
+// Evaluate the choose function with symbolic inputs.
+let res = choose N K;
+
+bdd_size res;
+
+bv_examples 40 res;
+
+
+res > '10000000;
+res > '1000000;
+res > '100000;
+
+let sub = param (res > '100000);
+
+substitute sub (res > '100000);
+
+
+bv_examples 20 (substitute sub N);
+bv_examples 20 (substitute sub K);
+

@@ -7,7 +7,7 @@
 lettype justification =
                         SPEC
                     |   FOLD {ids::int list} {name::string}
-                    |   UNFOLD {id::int}
+                    |   UNFOLD {id::int list}
                     |   FLATTEN
                     |   REPLACE {ids::int list} {tr::transform}
                     |   REPLACE_ALL {repeatedly::bool} {tr::transform}

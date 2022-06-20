@@ -70,7 +70,7 @@ clet prop2pexlif nwe =
     in
     let wsub = map mk_sub timed_inps in
     let we' = w_substitute wsub we in
-    let comb = base_assignment (W_VAR 1 ok) we' in
+    let comb = base_assignment T (W_VAR 1 ok) we' in
     let monitor = PINST (sprintf "draw_hier %s" name) [] F
 			fa_inps fa_outs internals (P_HIER (comb:delays))
     in

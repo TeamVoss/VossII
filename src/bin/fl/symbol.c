@@ -843,6 +843,7 @@ Make_forward_declare(string name, typeExp_ptr type, symbol_tbl_ptr stbl,
     ret->type           = type;
     ret->implicit_args  = NULL;
     ret->next           = stbl->def_list;
+    stbl->def_list	= ret;
     update_stbl(stbl, ret);
     // Prepare to pick up new comments
     cur_doc_comments = NULL;
@@ -986,7 +987,6 @@ End_ADT(symbol_tbl_ptr stbl, var_list_ptr vlp)
     dispose_hash(stbl->tbl_ptr, NULLFCN);
     create_hash(stbl->tbl_ptr, 100, str_hash, str_equ);
     fn_ptr flp = stbl->def_list;
-
 
     while( flp != last ) {
         if( find_hash(&keep_tbl, (pointer) flp->name) != NULL ) {

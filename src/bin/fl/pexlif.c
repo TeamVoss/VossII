@@ -748,7 +748,7 @@ unfold_pexlif(g_ptr p, unint id)
     }
     // Pick out the to-be unfolded child and collect other children.
     unint ix = 1;
-    g_ptr orig_children = Make_NIL(), orig_children_tail = orig_children;
+    g_ptr children = Make_NIL(), children_tail = children;
     g_ptr unfolded = NULL;
     g_ptr li, item;
     FOR_CONS(old_children, li, item) {
@@ -756,7 +756,7 @@ unfold_pexlif(g_ptr p, unint id)
             unfolded = item;
         } else {
             INC_REFCNT(item);
-            APPEND1(orig_children_tail, item);
+            APPEND1(children_tail, item);
         }
         ix++;
     }
@@ -821,7 +821,6 @@ unfold_pexlif(g_ptr p, unint id)
     }
 
     // Apply subst. to each grandchild's actuals.
-    g_ptr new_children = Make_NIL(), new_children_tail = new_children;
     FOR_CONS(un_children, li, item) {
         g_ptr g_name, g_leaf, g_attrs, g_fa_inps, g_fa_outs, g_inter, g_cont;
         destr_PINST(item, &g_name, &g_attrs, &g_leaf, &g_fa_inps, &g_fa_outs,
@@ -836,9 +835,8 @@ unfold_pexlif(g_ptr p, unint id)
         g_ptr n_pinst =
             mk_PINST(g_name, g_attrs, g_leaf, n_fa_inps, n_fa_outs, g_inter,
                      g_cont);
-        APPEND1(new_children_tail, n_pinst);
+        APPEND1(children_tail, n_pinst);
     }
-    APPENDL(new_children_tail, orig_children);
     // Finally, construct new pexlif.
     INC_REFCNT(old_name);
     INC_REFCNT(old_leaf);
@@ -847,7 +845,7 @@ unfold_pexlif(g_ptr p, unint id)
     old_inter = Extract_Vectors(old_inter, TRUE);
     g_ptr new_pinst =
         mk_PINST(old_name, Make_NIL(), old_leaf, old_fa_inps, old_fa_outs,
-                 old_inter, mk_P_HIER(new_children));
+                 old_inter, mk_P_HIER(children));
     // /
     rem_fold_mem();
     rem_adj_mem();

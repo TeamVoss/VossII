@@ -1,0 +1,188 @@
+// ============================================================================
+// DEMO OF WIGGLING, SCALAR SIMULATION, SYMBOLIC SIMULATION and STE verification
+// =============================================================================
+
+set_font font_larger;
+cload "ste.fl";
+
+// Specification
+cletrec fac {n::bv} = (n = '0) => '1 | n * fac (n - '1);
+clet choose n k = fac n / (fac (n-k) * fac k);
+
+
+load "imp1.fl";
+
+let ckt = pexlif2fsm p; ckt;
+
+inputs ckt;
+
+outputs ckt;
+
+fanin ckt "done";
+
+
+let vis = STE_debug ckt; vis;
+
+add_waveform vis ["clk"];
+add_waveform vis ["reset"];
+add_waveform vis ["start"];
+add_waveform vis ["N[31:0]"];
+add_waveform vis ["K[31:0]"];
+add_waveform vis ["done"];
+add_waveform vis ["out[31:0]"];
+
+
+// Attempt 1:
+
+let ant = 
+    "clk" is_clock 70
+  and
+    "start" is 1 in_cycle 2 followed_by
+	       1 for 40 cycles otherwise 0 until 70 cycles
+  and
+    "N[31:0]" is 7 in_cycle 3
+  and 
+    "K[31:0]" is 2 in_cycle 3
+;
+STE "-e" vis [] ant [] [];
+
+
+
+// Attempt 2: Add reset!
+
+let ant = 
+    "clk" is_clock 70
+  and
+    "reset" is 1 for 1 cycle otherwise 0 until 70 cycles
+  and
+    "start" is 1 in_cycle 2 followed_by
+	       1 for 40 cycles otherwise 0 until 70 cycles
+  and
+    "N[31:0]" is 7 in_cycle 3
+  and 
+    "K[31:0]" is 2 in_cycle 3
+;
+STE "-e" vis [] ant [] [];
+
+
+// Attempt 3: Rigth timing for N and K
+let ant = 
+    "clk" is_clock 70
+  and
+    "reset" is 1 for 1 cycle otherwise 0 until 70 cycles
+  and
+    "start" is 1 in_cycle 2 followed_by
+	       1 for 40 cycles otherwise 0 until 70 cycles
+  and
+    "N[31:0]" is 7 in_cycle 2
+  and 
+    "K[31:0]" is 2 in_cycle 2
+;
+STE "-e" vis [] ant [] [];
+
+sprintf "0x%x" (bv2int (choose '7 '2));
+
+
+// Attempt 4: Check the result
+let ant = 
+    "clk" is_clock 70
+  and
+    "reset" is 1 for 1 cycle otherwise 0 until 70 cycles
+  and
+    "start" is 1 in_cycle 2 followed_by
+	       1 for 40 cycles otherwise 0 until 70 cycles
+  and
+    "N[31:0]" is 7 in_cycle 2
+  and 
+    "K[31:0]" is 2 in_cycle 2
+;
+let cons =
+    "out[31:0]" is (choose '7 '2) in_cycle 40
+;
+let sres = STE "-e" vis [] ant cons []; sres;
+get_ste_result sres "strong";
+
+
+// Attempt 5: Use symbolic inputs
+
+let N = bv_constrained_variable "n[7:0]" (\v. '1 <= v AND v <= '30);
+let K = bv_constrained_variable "k[7:0]" (\v. '0 <= v AND v <= N);
+
+let ant = 
+    "clk" is_clock 70
+  and
+    "reset" is 1 for 1 cycle otherwise 0 until 70 cycles
+  and
+    "start" is 1 in_cycle 2 followed_by
+	       1 for 40 cycles otherwise 0 until 70 cycles
+  and
+    "N[31:0]" is N in_cycle 2
+  and 
+    "K[31:0]" is K in_cycle 2
+;
+let cons =
+    "out[31:0]" is (choose N K) in_cycle 40
+;
+
+let sres = STE "-e" vis [] ant cons []; sres;
+let ok = get_ste_result sres "strong"; ok;
+
+NOT ok;
+
+// Examine the failure set (NOT ok)
+
+forcing (NOT ok);
+
+let cex = forcing (NOT ok);
+let N' = substitute cex N;
+let K' = substitute cex K;
+bv2int N';
+bv2int K';
+
+let cex = full_example F (depends (N,K)) (NOT ok);
+
+let N' = substitute cex N;
+let K' = substitute cex K;
+bv2int N';
+bv2int K';
+
+let ant' = substitute cex ant;
+let cons' = substitute cex cons;
+STE "-e" vis [] ant' cons' [];
+
+
+
+// Modified design
+load "imp2.fl";
+
+let ckt = pexlif2fsm p; ckt;
+let vis = STE_debug ckt; vis;
+
+let tab_1 = draw_fanin vis (0) 100 ["done","out[31:0]"];
+tab_1;
+add_waveform vis ["clk"];
+add_waveform vis ["start"];
+add_waveform vis ["state[1:0]"];
+add_waveform vis ["cnt[31:0]"];
+add_waveform vis ["done"];
+add_waveform vis ["out[31:0]"];
+
+
+let ant = 
+    "clk" is_clock 70
+  and
+    "reset" is 1 for 1 cycle otherwise 0 until 70 cycles
+  and
+    "start" is 1 in_cycle 2 followed_by
+	       1 for 40 cycles otherwise 0 until 70 cycles
+  and
+    "N[31:0]" is N in_cycle 2
+  and 
+    "K[31:0]" is K in_cycle 2
+;
+let cons =
+    "out[31:0]" is (choose N K) in_cycle 40
+;
+let sres = STE "-e" vis [] ant cons []; sres;
+let ok = get_ste_result sres "strong"; ok;
+

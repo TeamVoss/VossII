@@ -559,7 +559,22 @@ let split_binary (W_EQ  a b)  = W_EQ, a, b
   /\ split_binary other = error "Should not happen"
 ;
 
-let base_assignment lhs rhs =
+(cload (DIR^"/simplify.fl")) fseq ();
+
+cletrec get_cases (W_ITE c1 t1 (W_ITE c2 t2 e2)) =
+	    (c1,t1):(get_cases (W_ITE c2 t2 e2))
+  /\    get_cases (W_ITE c t e) = [(c,t),((W_CONST 1 1), e)]
+  /\    get_cases other = [((W_CONST 1 1), other)]
+;
+
+clet is_case e = (length (get_cases e)) > 2;
+
+forward_declare {w_CASE :: wexpr ->
+			   ((wexpr#wexpr) list) ->
+			   wexpr ->
+			   pexlif};
+
+let base_assignment do_split lhs rhs =
     let l_sz = wexpr_size lhs in
     let r_sz = wexpr_size rhs in
     l_sz != r_sz =>
@@ -569,6 +584,7 @@ let base_assignment lhs rhs =
     NOT (valid_lhs lhs) =>
 	eprintf "%s is not a valid lhs expression" (Pwexpr lhs)
     |
+    let rhs = const_prop rhs in
     let mk_pinst {lhs::wexpr} {rhs::wexpr} =
         let dep_vars = (w_depends rhs) in
         let inps = map (\n.n,[n]) dep_vars in
@@ -580,6 +596,8 @@ let base_assignment lhs rhs =
         let pfn = mk_draw_cmd F rhs in
         PINST pfn [] T inps outs [] body
     in
+    NOT do_split => mk_pinst lhs rhs |
+    //
     let mk_pinst_w_order lhs rhs inps =
 	let inps = map (\n.n,[n]) (flatmap w_depends (rev inps)) in
         let driven = base_get_lhs_vars lhs in
@@ -793,6 +811,33 @@ let base_assignment lhs rhs =
 	    in
 	    let p = mk_pinst lhs (constr a' b') then
 	    p1@p2@[p]
+     /\    split lhs e assuming (is_case e) =
+	    let raw_cases = get_cases e then
+	    let p_cases = butlastn 1 raw_cases then
+	    let c_default = snd (last raw_cases) then
+	    let mk_cond (c,e) =
+		val (c',p0) = is_var c => (c,[]) |
+			      let mid = mk_tmp (wexpr_size c) then
+			      let p0 = split mid c then
+			      (mid, p0)
+		then
+		val (e',p1) = is_var e => (e,[]) |
+			      let mid = mk_tmp (wexpr_size e) then
+			      let p1 = split mid e then
+			      (mid, p1)
+		then
+		(p0@p1), (c',e')
+	    in
+	    let c_cases = map mk_cond p_cases then
+	    let ps = flatmap fst c_cases then
+	    let cases = map snd c_cases then
+	    val (default,pd) = is_var c_default => (c_default,[]) |
+			      let mid = mk_tmp (wexpr_size c_default) then
+			      let p0 = split mid c_default then
+			      (mid, p0)
+	    then
+	    let p = w_CASE lhs cases default then
+	    pd@[p]@ps
      /\    split lhs (W_ITE c a b) =
 	    val (c',p0) = is_var c => (c,[]) |
 		let mid = mk_tmp (wexpr_size c) then
@@ -872,6 +917,64 @@ let base_assignment lhs rhs =
     PINST pfn [] F inps outs (deref internals) (P_HIER subfubs)
 ;
 
+let w_CASE w_out cond_res_list w_default_value =
+    let sz = wexpr_size w_default_value then
+    let n = length cond_res_list then
+    let n_out = hd (w_depends w_out) then
+    let fa_outs = [(n_out,[n_out])] then
+    let var2name (W_VAR s b) = [mk_name s b]
+     /\ var2name (W_EXPLICIT_VAR s b) = [b]
+     /\ var2name other = []
+    in
+    let ld = W_VAR sz (sprintf "%sd" BASE_TMP) then
+    let nd = mk_name sz (sprintf "%sd" BASE_TMP) then
+    let d_fas = [(nd,[nd])] then
+    let default_p = base_assignment T ld w_default_value then
+    letrec select cnt ((c,r):rem) =
+        let bc = sprintf "%sc%02d" BASE_TMP cnt then
+        let br = sprintf "%sr%02d" BASE_TMP cnt then
+        let lc = W_VAR 1 bc then
+        let lr = W_VAR sz br then
+        val (c_ints, c_act, c_extra) =
+	    let v = var2name c then
+	    v = [] =>
+		let en = mk_name 1 bc then
+		let p = base_assignment T lc c then
+		([en], en, [p])
+	    |
+	    ([], hd v, [])
+        in
+        val (r_ints, r_act, r_extra) =
+	    let v = var2name r then
+	    v = [] =>
+		let en = mk_name sz br then
+		let p = base_assignment T lr r then
+		([en], en, [p])
+	    |
+	    ([], hd v, [])
+        in
+        val (fas, e, ints, extras) = select (cnt+1) rem then
+        let fas = (mk_name 1 bc, [c_act]):(mk_name sz br, [r_act]):fas then
+        let e = W_ITE lc lr e then
+        let ints = c_ints@r_ints@ints then
+        let extras = c_extra@r_extra@extras then
+        (fas, e, ints, extras)
+     /\    select cnt [] = [], ld, [], []
+    in
+    val (fas, rhs, ints, extras) = select 1 cond_res_list then
+    let ints = nd:ints then
+    let body = base_assignment F w_out rhs then
+    let pfn = sprintf "draw_CASE %d" n then
+    let mux = PINST pfn [] T (fas@d_fas) fa_outs [] (P_HIER [body]) then
+    let children = default_p:mux:extras then
+    let get_acts (PINST _ _ _ ifa _ _ _) = flatmap snd ifa then
+    let inps = (setify (flatmap get_acts children)) subtract ints then
+    let fa_inps = map (\v.v,[v]) inps then
+    PINST "CASE" [] F fa_inps fa_outs ints (P_HIER children)
+;
+
+
+
 // Create a combinational "circuit" in which the outputs L are assigned
 // the values computed by the expression R.
 // E.g.,
@@ -880,9 +983,16 @@ let base_assignment lhs rhs =
 let <- L R =
     let lhs = hw_destr {L:: *a} in
     let rhs = hw_destr {R:: *a} in
-    base_assignment lhs rhs
+    base_assignment T lhs rhs
 ;
 infix 0 <-;
+
+let <<-- L R =
+    let lhs = hw_destr {L:: *a} in
+    let rhs = hw_destr {R:: *a} in
+    base_assignment F lhs rhs
+;
+infix 0 <<--;
 
 let base_phase_delay lhs rhs =
     let l_sz = wexpr_size lhs in
@@ -927,7 +1037,7 @@ let get_act_args fn a =
 	let nm = sprintf "%s%d_%s" BASE_TMP cnt fn then
 	let tmp = hw_mk_var a nm then
 	let we = hw_destr a in
-	let asignm = base_assignment tmp we then
+	let asignm = base_assignment T tmp we then
 	let vs = get_lhs_vars tmp then
 	([asignm], vs)
     )
@@ -2682,67 +2792,12 @@ let Moore_FSM name clk state reset_condition transitions =
 
 end_abstype Moore_FSM;
 
-
-//let Hier_FSM name clk state (reset,S0) transitions children =
-//    Moore_FSM name clk state (reset,S0) transitions =
-
-
 let CASE {out:: *a} {cond_res_list:: (bit # *a) list} {default_value:: *a} =
-    let sz = hw_size default_value then
-    let n = length cond_res_list then
     let w_out = hw_destr out then
-    let w_default_value = hw_destr default_value then
-    let n_out = hd (w_depends w_out) then
-    let fa_outs = [(n_out,[n_out])] then
     let cnv (cond,res) = hw_bit_destr cond, hw_destr res then
-    let w_crl = map cnv cond_res_list then
-    let var2name (W_VAR s b) = [mk_name s b]
-     /\ var2name (W_EXPLICIT_VAR s b) = [b]
-     /\ var2name other = []
-    in
-    let ld = W_VAR sz (sprintf "%sd" BASE_TMP) then
-    let nd = mk_name sz (sprintf "%sd" BASE_TMP) then
-    let d_fas = [(nd,[nd])] then
-    let default_p = (hw_constr ld) <- default_value then
-    letrec select cnt ((c,r):rem) =
-        let bc = sprintf "%sc%02d" BASE_TMP cnt then
-        let br = sprintf "%sr%02d" BASE_TMP cnt then
-        let lc = W_VAR 1 bc then
-        let lr = W_VAR sz br then
-        val (c_ints, c_act, c_extra) =
-	    let v = var2name c then
-	    v = [] =>
-		let en = mk_name 1 bc then
-		([en], en, [((hw_bit_constr lc) <- (hw_bit_constr c))])
-	    |
-	    ([], hd v, [])
-        in
-        val (r_ints, r_act, r_extra) =
-	    let v = var2name r then
-	    v = [] =>
-		let en = mk_name sz br then
-		([en], en, [((hw_bit_constr lr) <- (hw_bit_constr r))])
-	    |
-	    ([], hd v, [])
-        in
-        val (fas, e, ints, extras) = select (cnt+1) rem then
-        let fas = (mk_name 1 bc, [c_act]):(mk_name sz br, [r_act]):fas then
-        let e = W_ITE lc lr e then
-        let ints = c_ints@r_ints@ints then
-        let extras = c_extra@r_extra@extras then
-        (fas, e, ints, extras)
-     /\    select cnt [] = [], ld, [], []
-    in
-    val (fas, rhs, ints, extras) = select 1 w_crl then
-    let ints = nd:ints then
-    let body = out <- (hw_constr rhs) then
-    let pfn = sprintf "draw_CASE %d" n then
-    let mux = PINST pfn [] T (fas@d_fas) fa_outs [] (P_HIER [body]) then
-    let children = default_p:mux:extras then
-    let get_acts (PINST _ _ _ ifa _ _ _) = flatmap snd ifa then
-    let inps = (setify (flatmap get_acts children)) subtract ints then
-    let fa_inps = map (\v.v,[v]) inps then
-    PINST "CASE" [] F fa_inps fa_outs ints (P_HIER children)
+    let w_cond_res_list = map cnv cond_res_list then
+    let w_default_value = hw_destr default_value then
+    w_CASE w_out w_cond_res_list w_default_value
 ;
 
 let STATE {clk::bit} {state:: *a} {cond_res_list:: (bit # *a) list} =
@@ -3365,11 +3420,11 @@ let pcompile fn =
     let p =
 	exists =>
 	    // Load from file
-	    (fprintf stdinfo "-- Loading pre-compiled version of %s --\n" fn)
+	    (fprintf stderr "-- Loading pre-compiled version of %s --\n" fn)
 	    seq
 	    read_pexlif pexlif_file
 	|
-	    (fprintf stdinfo "-- Compiling %s --\n" fn) fseq
+	    (fprintf stderr "-- Compiling %s --\n" fn) fseq
 	    let p = pexlif_expr then
 	    (write_pexlif pexlif_file p) fseq
 	    p

@@ -1,0 +1,88 @@
+// ===================================================================
+// DEMO OF fl AS IMPLEMENTATION LANGUAGE
+// ===================================================================
+
+set_font font_larger;
+
+// Boolean variables
+
+let a = variable "a";
+let b = variable "b";
+let c = variable "c";
+
+// Boolean expressions are trivial to create
+// Internally, they are represented as (Ordered) Binary Decision Diagrams (BDDs)
+
+let ex1 = NOT (a AND b);
+let ex2 = NOT a OR NOT b;
+let ex3 = NOT a OR NOT (b AND c);
+
+// There are two types of equality:
+// 1) Same Boolean function (identity)
+
+ex1 == ex2;
+ex1 == ex3;
+
+// 2) Under which condition is lhs the same as rhs.
+
+ex1 = ex2;
+ex1 = ex3;
+NOT (ex1 = ex3);
+
+// Combining Boolean expressions with higher order functions is powerful
+// Let's define a greatest fix point function.
+// Gfp takes any bool->bool function and a starting set (as a BDD)
+// and computes the largest set (as a BDD) cur can reach by some iterations
+// of the function fn.
+
+letrec Gfp fn cur =
+    let new = cur OR (fn cur) in
+    IF (new == cur) THEN cur ELSE Gfp fn new
+;
+
+letrec Lfp fn cur =
+    let new = cur AND (fn cur) in
+    IF (new == cur) THEN cur ELSE Lfp fn new
+;
+
+// Define a datatype
+lettype trans_rel = TRANS_REL 
+			{state  :: bv}
+			{state' :: bv}
+			{rel    :: bool}
+;
+
+let build_transition_relation trans =
+    let sz = itlist (\(f,t).\r. max (max f t) r) trans 0 in
+    let state = bv_variable (sprintf "s[%d:0]" sz) in
+    let state' = bdd_current2next state in
+    let mk_trans (f,t) = (state = int2bv f) AND (state' = int2bv t) in
+    let rel = OR_list (map mk_trans trans) in
+    TRANS_REL state state' rel
+;
+
+let TR = build_transition_relation [
+    (1, 2), (1, 4),
+    (2, 3), (2, 4),
+    (3, 4),
+    (4, 3),
+    (5, 1), (5, 3)
+];
+
+// Using the Gfp function we can now define a reachable functions
+let reachable (TRANS_REL s s' rel) initial_set =
+    let s0 = OR_list (map (\i. s = int2bv i) initial_set) in
+    let next cur =
+        let restricted_rel = cur AND rel in
+        bdd_next2current (Quant_thereis (depends s) restricted_rel)
+    in
+    Gfp next s0
+;
+
+// For example:
+
+let reach = reachable TR [1];
+reach;
+
+enumerate_examples 20 (depends reach) reach;
+

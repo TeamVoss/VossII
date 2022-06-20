@@ -1,0 +1,21 @@
+let oink = 12;
+
+begin_abstype;
+
+let split x = x+x;
+
+let foo x = split x;
+
+end_abstype foo;
+
+let xx = 22;
+
+begin_abstype;
+
+let inc x = x+1;
+
+let bar x = (inc x);
+
+end_abstype bar;
+
+split (\x.x % 2 = 0) [1,2,3,4,5];

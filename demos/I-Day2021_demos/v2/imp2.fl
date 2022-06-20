@@ -1,0 +1,74 @@
+cload "ste.fl";
+
+TYPE "word" 32;
+
+let slice =
+    bit_input	clk.
+    bit_input	reset.
+    bit_input	en.
+    word_input	reset_value.
+    word_input	prev.
+    word_output	out.
+    word_internal   tmp.
+    CELL "draw_hier slice" [
+	tmp <- (IF reset THEN reset_value ELSE (out '+' prev)),
+	re_ff_en clk en tmp out
+];
+
+let pascal =
+    bit_input		clk reset en.
+    word_list_output	vector.    
+    CELL "draw_hier pascal" (
+	let reset_values = '1 : '1 : (replicate (length vector-2) '0) in
+	map3 (slice clk reset en) reset_values ('0:(butlast vector)) vector
+);
+
+ENUM "state" ["INIT", "ITERATING", "LATCH", "DONE"];
+
+let selct_output =
+    word_input	    K.
+    word_list_input vector.
+    word_output	    out.
+    CELL "draw_hier select" [
+	CASE out (
+	    map2 (\i.\v. (K '=' ''i) --- v) (0 upto (length vector-1)) vector
+	) 'X
+];
+
+let imp max_N =
+    bit_input	    clk.
+    bit_input	    reset.
+    bit_input	    start.
+    word_input	    N.
+    word_input	    K.
+    //
+    bit_output	    done.
+    word_output	    out.
+    //
+    word_internal		cnt sK tmp.
+    word_list_internal max_N	vector.
+    state_internal		state.
+    CELL "draw_hier choose_imp" [
+	re_ff_en clk (is_INIT state) K sK,
+	(Moore_FSM "ctrl" clk state
+	    (reset --- INIT)
+	    [
+		INIT	    --- (start '&' (N '=' '1))	--- LATCH,
+		INIT	    --- (start '&' (N '!=' '1))	--- ITERATING,
+		ITERATING   --- (cnt '>' '1)		--- ITERATING,
+		ITERATING   --- (cnt '<=' '1)		--- LATCH,
+		LATCH	    ---	'1			--- DONE,
+		DONE	    --- ('~' start)		--- INIT
+	    ]
+	),
+	STATE clk cnt [
+	    (is_INIT state)		--- (N '-' '1),
+	    (is_ITERATING state)	--- (cnt '-' '1)
+	],
+	pascal clk (is_INIT state) (is_INIT state '|' is_ITERATING state) vector,
+	done <- is_DONE state,
+	selct_output sK vector tmp,
+	re_ff_en clk (is_LATCH state) tmp out
+];
+
+let p = imp 31 'clk 'reset 'start 'N 'K 'done 'out;

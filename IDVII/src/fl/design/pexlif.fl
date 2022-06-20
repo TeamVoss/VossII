@@ -212,14 +212,60 @@ let PINST n a l i o t c =
 
 //------------------------------------------------------------------------------
 let not_const n = NOT (str_is_prefix "0b" n);
-let exp_trim vs = md_expand_vectors (filter not_const vs);
+let exp_trim vs = filter not_const vs;
 let exp_trim1 v = exp_trim [v];
+
+let vec_intersect vl1 vl2 =
+    let mk l =
+	let b = fst (hd l) then
+	let v = md_extract_vectors (map snd l) then
+	(b,v)
+    in
+    let direct = vl1 intersect vl2 then
+    let bl1 = map (\v. get_vector_signature v, v) (vl1 subtract direct) then
+    let p1 = map mk (partition fst bl1) then
+    let bl2 = map (\v. get_vector_signature v, v) (vl2 subtract direct) then
+    let p2 = map mk (partition fst bl2) then
+    let base_intersection = (map fst p1) intersect (map fst p2) then
+    let find_intersection b =
+	let nds1 = md_expand_vectors (assoc b p1) then
+	let nds2 = md_expand_vectors (assoc b p2) then
+	let nds = nds1 intersect nds2 then
+	md_extract_vectors nds
+    in
+    let rem = flatmap find_intersection base_intersection then
+    md_extract_vectors (direct @ rem)
+;
+infix 7 vec_intersect;
+
+let vec_subtract vl1 vl2 =
+    let mk l =
+	let b = fst (hd l) then
+	let v = md_extract_vectors (map snd l) then
+	(b,v)
+    in
+    let bl1 = map (\v. get_vector_signature v, v) vl1 then
+    let p1 = map mk (partition fst bl1) then
+    let bl2 = map (\v. get_vector_signature v, v) vl2 then
+    let p2 = map mk (partition fst bl2) then
+    let do_subtract b =
+	let v1s = assoc b p1 then
+	let v2s = (assoc b p2) catch [] then
+	let in_both = v1s intersect v2s then
+	let nds1 = md_expand_vectors (v1s subtract in_both) in
+	let nds2 = md_expand_vectors (v2s subtract in_both) in
+	md_extract_vectors (nds1 subtract nds2)
+    in
+    let rem = flatmap do_subtract (map fst p1) then
+    md_extract_vectors rem
+;
+infix 7 vec_subtract;
 
 
 // Correct version of fold_pexlif (not terribly efficient).
 let fold_pexlif p il new_name =
     val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER chs)) = p then
-    let sel (i,sp) = mem i il in
+    let sel (i,sp) = mem i (setify il) in
     val (sels,rems) = split sel (zip (1 upto (length chs)) chs) in
     let selected = map snd sels in
     let remain = map snd rems in
@@ -239,19 +285,18 @@ let fold_pexlif p il new_name =
         let get_ainps (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd fa_inps in
         exp_trim (flatmap get_ainps selected)
     in
-    let sort_extract l = qsort node_name_cmp (md_extract_vectors l) in
-    let new_outs = in_producers intersect out_consumers in
-    let new_inps = in_consumers intersect out_producers in
+    let sort l = qsort node_name_cmp l in
+    let new_outs = in_producers vec_intersect out_consumers in
+    let new_inps = in_consumers vec_intersect out_producers in
     let new_ints =
-	sort_extract ((in_producers@in_consumers) subtract
-		      (new_outs @ new_inps))
+	sort ((in_producers@in_consumers) vec_subtract (new_outs @ new_inps))
     in
-    let mk_fa l = map (\v. (v,[v])) (sort_extract l) in
+    let mk_fa l = map (\v. (v,[v])) (sort l) in
     let cp = PINST new_name [] F (mk_fa new_inps) (mk_fa new_outs) new_ints
                 (P_HIER selected)
     in
-    let ints' = sort_extract
-                    ((out_consumers@out_producers) subtract
+    let ints' = sort
+                    ((out_consumers@out_producers) vec_subtract
                      (exp_trim (map fst (fa_inps@fa_outs))))
     in
     (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER (cp:remain)))
@@ -310,10 +355,10 @@ let foldn_pexlif p ill new_base_name =
 	let l_consum = flat l_consuml in
 	let out_producers = rem_producers@l_prod in
 	let out_consumers = rem_consumers@l_consum in
-	let nouts = in_producers intersect out_consumers in
-	let ninps = in_consumers intersect out_producers in
+	let nouts = in_producers vec_intersect out_consumers in
+	let ninps = in_consumers vec_intersect out_producers in
 	let new_ints = md_extract_vectors
-		    ((in_producers@in_consumers) subtract (nouts @ ninps))
+		    ((in_producers@in_consumers) vec_subtract (nouts @ ninps))
 	in
 	let mk_fa l = map (\v. (v,[v])) (md_extract_vectors l) in
 	let new_name = mk_name i then
@@ -325,7 +370,7 @@ let foldn_pexlif p ill new_base_name =
 			(flatmap pexlif_get_actuals folded_children))
     then
     let ints' =  md_extract_vectors
-	    (all_wires subtract (exp_trim (map fst (fa_inps@fa_outs))))
+	    (all_wires vec_subtract (exp_trim (map fst (fa_inps@fa_outs))))
     then
     let chs' = folded_children@remain then
     (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER chs'))

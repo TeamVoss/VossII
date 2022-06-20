@@ -4780,6 +4780,7 @@ reduce_list(g_ptr redex, int levels)
     }
     g_ptr cur = traverse_left(redex);
     if( is_fail(cur) ) { return(redex); }
+    unint depth = 0;
     while( GET_TYPE(cur) == CONS_ND && !IS_NIL(cur) ) {
 	if( levels > 1 ) {
 	    g_ptr hd = reduce_list(GET_CONS_HD(cur), levels-1);
@@ -4788,7 +4789,14 @@ reduce_list(g_ptr redex, int levels)
 		return( redex );
 	    }
 	}
+	if( depth >= (unint) RCcall_limit ) {
+	    Fail_pr("\n");
+	    Rprintf(
+       "Recursion limit reached while forcing list (RECURSION-CALL-LIMIT=%d)\n",
+		    RCcall_limit);
+	}
 	cur = traverse_left(GET_CONS_TL(cur));
+	depth++;
 	if( is_fail(cur) ) {
 	    OVERWRITE(redex, cur);
 	    return( redex );

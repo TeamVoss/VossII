@@ -1363,7 +1363,7 @@ let _mem_v2 src mem wr_ports rd_ports lines width abits params
 		    W_EXPLICIT_VAR width name
 		in
 		let RHS = W_CONST width (sscanf "%b" v) in
-		base_assignment LHS RHS
+		base_assignment T LHS RHS
 	    in
 	    let leaves = map2 mk_asignment (0 upto (length init -1 )) init in
 	    let ints = [] in

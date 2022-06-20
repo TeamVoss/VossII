@@ -637,13 +637,13 @@ let fl_do_unfold canvas =
     let vfsm = w2vfsm canvas then
     let il = get_selected_pinsts canvas then
     il = [] => () |
-    length il > 1 => 
-	report_error "Can only unfold one instance at a time"
-    |
+    // Process the unfolds in reverse order
+    // Relies on unfold1 i does not change children 1--(i-1).
+    let il = qsort (\i1.\i2. i2-i1) (setify il) then
     let p = get_idv_current_pexlif canvas then
-    let p' = unfold_pexlif p (hd il) then
-    (add_transform canvas p' (UNFOLD (hd il))) fseq
-    let cmd = sprintf "unfold vis %d;" (hd il) in
+    let p' = itlist (\i.\p. unfold_pexlif p i) il p then
+    (add_transform canvas p' (UNFOLD il)) fseq
+    let cmd = sprintf "unfold vis %S;" (map int2str il) in
     refresh_idv_canvas canvas cmd
 ;
 export_to_tcl fl_do_unfold;

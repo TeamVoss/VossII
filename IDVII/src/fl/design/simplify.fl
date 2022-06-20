@@ -1,0 +1,526 @@
+begin_abstype;
+
+let is_wide_OR e  =
+    letrec cnt (W_OR a b) = 1 + cnt a + cnt b
+     /\    cnt other = 0
+    in
+    (cnt e) >= 2
+;
+
+let is_wide_AND e  =
+    letrec cnt (W_AND a b) = 1 + cnt a + cnt b
+     /\    cnt other = 0
+    in
+    (cnt e) >= 2
+;
+
+let  is_binary (W_EQ  a b)  = T
+  /\ is_binary (W_GR  a b)  = T
+  /\ is_binary (W_AND a b) = T
+  /\ is_binary (W_LAT_LEQ a b) = T
+  /\ is_binary (W_OR  a b)  = T
+  /\ is_binary (W_ADD a b)  = T
+  /\ is_binary (W_SUB a b)  = T
+  /\ is_binary (W_MUL a b)  = T
+  /\ is_binary (W_DIV a b)  = T
+  /\ is_binary (W_MOD a b)  = T
+  /\ is_binary (W_SHL a b)  = T
+  /\ is_binary (W_SHR a b)  = T
+  /\ is_binary (W_ASHR a b) = T
+  /\ is_binary other = F
+;
+
+let  split_binary (W_EQ  a b)  = W_EQ, a, b
+  /\ split_binary (W_GR  a b)  = W_GR, a, b
+  /\ split_binary (W_AND  a b) = W_AND, a, b
+  /\ split_binary (W_LAT_LEQ  a b) = W_LAT_LEQ, a, b
+  /\ split_binary (W_OR  a b)  = W_OR, a, b
+  /\ split_binary (W_ADD a b)  = W_ADD, a, b
+  /\ split_binary (W_SUB a b)  = W_SUB, a, b
+  /\ split_binary (W_MUL a b)  = W_MUL, a, b
+  /\ split_binary (W_DIV a b)  = W_DIV, a, b
+  /\ split_binary (W_MOD a b)  = W_MOD, a, b
+  /\ split_binary (W_SHL a b)  = W_SHL, a, b
+  /\ split_binary (W_SHR a b)  = W_SHR, a, b
+  /\ split_binary (W_ASHR a b) = W_ASHR, a, b
+  /\ split_binary other = error "Should not happen"
+;
+
+let mk_pinst phase_delay {lhs::wexpr} {rhs::wexpr} =
+    let dep_vars = (w_depends rhs) in
+    let inps = map (\n.n,[n]) dep_vars in
+    let driven = base_get_lhs_vars lhs in
+    let sz = md_sizes driven in
+    let lhs' = W_VAR sz "_tmp" in
+    let outs = [(mk_name sz "_tmp", driven)] in
+    let core = phase_delay => W_PHASE_DELAY lhs' rhs | W_UPDATE_FN lhs' rhs in
+    let body = P_LEAF [core] in
+    let pfn = mk_draw_cmd F rhs in
+    PINST pfn [] T inps outs [] body
+;
+
+let mk_pinst_w_order lhs rhs inps =
+    let inps = map (\n.n,[n]) (flatmap w_depends (rev inps)) in
+    let driven = base_get_lhs_vars lhs in
+    let sz = md_sizes driven in
+    let lhs' = W_VAR sz "_tmp" in
+    let outs = [(mk_name sz "_tmp", driven)] in
+    let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
+    let pfn = mk_draw_cmd F rhs in
+    PINST pfn [] T inps outs [] body
+;
+
+let record_internals_ref = ref {[]:: string list};
+
+let reset_internals {dummy :: void} = record_internals_ref := [];
+non_lazy reset_internals;
+
+let get_internals {dummy :: void} = deref record_internals_ref;
+non_lazy get_internals;
+
+let mk_tmp lhs prefs sz =
+    let vs = md_extract_vectors (base_get_lhs_vars lhs) in
+    let spref = list2str T "_" "_" " " int2str (rev prefs) in
+    let base = list2str T "\\" "," spref id vs in
+    let v = sz = 1 => base | sprintf "%s[%d:0]" base (sz-1) then
+    (record_internals_ref := (v:(deref record_internals_ref))) fseq
+    W_VAR sz base
+;
+
+letrec split pref lhs (W_ADD (W_CONST sz v) a) assuming (v < 10)  =
+	val (a',p1) = is_var a => (a,[]) |
+	    let mid = mk_tmp lhs (2:pref) (wexpr_size a) then
+	    let p1 = split (2:pref) mid a then
+	    (mid, p1)
+	in
+	let p = mk_pinst F lhs (W_ADD (W_CONST sz v) a') then
+	p1@[p]
+ /\    split pref lhs (W_ADD a (W_CONST sz v)) assuming (v < 10)  =
+	val (a',p1) = is_var a => (a,[]) |
+	    let mid = mk_tmp lhs (1:pref) (wexpr_size a) then
+	    let p1 = split (1:pref) mid a then
+	    (mid, p1)
+	in
+	let p = mk_pinst F lhs (W_ADD a' (W_CONST sz v)) then
+	p1@[p]
+ /\    split pref lhs (W_SUB a (W_CONST sz v)) assuming (v < 10)  =
+	val (a',p1) = is_var a => (a,[]) |
+	    let mid = mk_tmp lhs (2:pref) (wexpr_size a) then
+	    let p1 = split (2:pref) mid a then
+	    (mid, p1)
+	in
+	let p = mk_pinst F lhs (W_SUB a' (W_CONST sz v)) then
+	p1@[p]
+ /\    split pref lhs (W_GR a (W_CONST sz v)) assuming (v < 10)  =
+	val (a',p1) = is_var a => (a,[]) |
+	    let mid = mk_tmp lhs (1:pref) (wexpr_size a) then
+	    let p1 = split (1:pref) mid a then
+	    (mid, p1)
+	in
+	let p = mk_pinst F lhs (W_GR a' (W_CONST sz v)) then
+	p1@[p]
+ /\    split pref lhs (W_GR (W_CONST sz v) a) assuming (v < 10)  =
+	val (a',p1) = is_var a => (a,[]) |
+	    let mid = mk_tmp lhs (2:pref) (wexpr_size a) then
+	    let p1 = split (2:pref) mid a then
+	    (mid, p1)
+	in
+	let p = mk_pinst F lhs (W_GR (W_CONST sz v) a') then
+	p1@[p]
+ /\    split pref lhs op assuming (is_wide_OR op) =
+	    letrec split_OR (W_OR a b) = split_OR a @ split_OR b
+	     /\    split_OR other = [other]
+	    in
+	    let raw_as = split_OR op then
+	    let mk1 i a =
+		is_var a => (a,[]) |
+		let mid = mk_tmp lhs (i:pref) (wexpr_size a) then
+		let p1 = split (i:pref) mid a then
+		(mid, p1)
+	    in
+	    val (as, pl) = unzip (map_index mk1 raw_as) then
+	    let ps = flat pl then
+	    let p =
+		let rhs = accumulate W_OR as in
+		let dep_vars = md_extract_vectors (w_depends rhs) in
+		let inps = map (\n.n,[n]) dep_vars in
+		let driven = base_get_lhs_vars lhs in
+		let sz = md_sizes driven in
+		let lhs' = W_VAR sz "_tmp" in
+		let outs = [(mk_name sz "_tmp", driven)] in
+		let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
+		let n = length dep_vars in
+		let pfn = sprintf "draw_explicit_or_n %d" n in
+		PINST pfn [] T inps outs [] body
+	    in
+	    p:ps
+ /\    split pref lhs (W_NOT op) assuming (is_wide_OR op) =
+	    letrec split_OR (W_OR a b) = split_OR a @ split_OR b
+	     /\    split_OR other = [other]
+	    in
+	    let raw_as = split_OR op then
+	    let mk1 i a =
+		is_var a => (a,[]) |
+		let mid = mk_tmp lhs (i:pref) (wexpr_size a) then
+		let p1 = split (i:pref) mid a then
+		(mid, p1)
+	    in
+	    val (as, pl) = unzip (map_index mk1 raw_as) then
+	    let ps = flat pl then
+	    let p =
+		let rhs = W_NOT (accumulate W_OR as) in
+		let dep_vars = md_extract_vectors (w_depends rhs) in
+		let inps = map (\n.n,[n]) dep_vars in
+		let driven = base_get_lhs_vars lhs in
+		let sz = md_sizes driven in
+		let lhs' = W_VAR sz "_tmp" in
+		let outs = [(mk_name sz "_tmp", driven)] in
+		let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
+		let n = length dep_vars in
+		let pfn = sprintf "draw_explicit_nor_n %d" n in
+		PINST pfn [] T inps outs [] body
+	    in
+	    p:ps
+ /\    split pref lhs op assuming (is_wide_AND op) =
+	    letrec split_AND (W_AND a b) = split_AND a @ split_AND b
+	     /\    split_AND other = [other]
+	    in
+	    let raw_as = split_AND op then
+	    let mk1 i a =
+		is_var a => (a,[]) |
+		let mid = mk_tmp lhs (i:pref) (wexpr_size a) then
+		let p1 = split (i:pref) mid a then
+		(mid, p1)
+	    in
+	    val (as, pl) = unzip (map_index mk1 raw_as) then
+	    let ps = flat pl then
+	    let p =
+		let rhs = accumulate W_AND as in
+		let dep_vars = md_extract_vectors (w_depends rhs) in
+		let inps = map (\n.n,[n]) dep_vars in
+		let driven = base_get_lhs_vars lhs in
+		let sz = md_sizes driven in
+		let lhs' = W_VAR sz "_tmp" in
+		let outs = [(mk_name sz "_tmp", driven)] in
+		let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
+		let n = length dep_vars in
+		let pfn = sprintf "draw_explicit_and_n %d" n in
+		PINST pfn [] T inps outs [] body
+	    in
+	    p:ps
+ /\    split pref lhs (W_NOT op) assuming (is_wide_AND op) =
+	    letrec split_AND (W_AND a b) = split_AND a @ split_AND b
+	     /\    split_AND other = [other]
+	    in
+	    let raw_as = split_AND op then
+	    let mk1 i a =
+		is_var a => (a,[]) |
+		let mid = mk_tmp lhs (i:pref) (wexpr_size a) then
+		let p1 = split (i:pref) mid a then
+		(mid, p1)
+	    in
+	    val (as, pl) = unzip (map_index mk1 raw_as) then
+	    let ps = flat pl then
+	    let p =
+		let rhs = W_NOT (accumulate W_AND as) in
+		let dep_vars = md_extract_vectors (w_depends rhs) in
+		let inps = map (\n.n,[n]) dep_vars in
+		let driven = base_get_lhs_vars lhs in
+		let sz = md_sizes driven in
+		let lhs' = W_VAR sz "_tmp" in
+		let outs = [(mk_name sz "_tmp", driven)] in
+		let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
+		let n = length dep_vars in
+		let pfn = sprintf "draw_explicit_nand_n %d" n in
+		PINST pfn [] T inps outs [] body
+	    in
+	    p:ps
+ /\    split pref lhs op assuming (is_LEQ op) =
+	val [a,b] = dest_LEQ op in
+	val (a',p1) = is_var a => (a,[]) |
+	    let mid = mk_tmp lhs (1:pref) (wexpr_size a) then
+	    let p1 = split (1:pref) mid a then
+	    (mid, p1)
+	in
+	val (b',p2) = is_var b => (b,[]) |
+	    let mid = mk_tmp lhs (2:pref) (wexpr_size b) then
+	    let p1 = split (2:pref) mid b then
+	    (mid, p1)
+	in
+	let op' = W_NOT (W_GR a' b') in
+	let p = mk_pinst F lhs op' then
+	p1@p2@[p]
+ /\    split pref lhs op assuming (is_XOR op) =
+	val [a,b] = dest_XOR op in
+	val (a',p1) = is_var a => (a,[]) |
+	    let mid = mk_tmp lhs (1:pref) (wexpr_size a) then
+	    let p1 = split (1:pref) mid a then
+	    (mid, p1)
+	in
+	val (b',p2) = is_var b => (b,[]) |
+	    let mid = mk_tmp lhs (2:pref) (wexpr_size b) then
+	    let p1 = split (2:pref) mid b then
+	    (mid, p1)
+	in
+	let op' = W_OR (W_AND (W_NOT a') b') (W_AND a' (W_NOT b')) in
+	let p = mk_pinst F lhs op' then
+	p1@p2@[p]
+ /\    split pref lhs op assuming (is_binary op) =
+	val (constr, a, b) = split_binary op then
+	val (a',p1) = is_var a => (a,[]) |
+	    let mid = mk_tmp lhs (1:pref) (wexpr_size a) then
+	    let p1 = split (1:pref) mid a then
+	    (mid, p1)
+	in
+	val (b',p2) = is_var b => (b,[]) |
+	    let mid = mk_tmp lhs (2:pref) (wexpr_size b) then
+	    let p1 = split (2:pref) mid b then
+	    (mid, p1)
+	in
+	let p = mk_pinst F lhs (constr a' b') then
+	p1@p2@[p]
+ /\    split pref lhs (W_ITE c a b) =
+	val (c',p0) = is_var c => (c,[]) |
+	    let mid = mk_tmp lhs (1:pref) (wexpr_size c) then
+	    let p0 = split (1:pref) mid c then
+	    (mid, p0)
+	in
+	val (a',p1) = is_var a => (a,[]) |
+	    let mid = mk_tmp lhs (2:pref) (wexpr_size a) then
+	    let p1 = split (2:pref) mid a then
+	    (mid, p1)
+	in
+	val (b',p2) = is_var b => (b,[]) |
+	    let mid = mk_tmp lhs (3:pref) (wexpr_size b) then
+	    let p1 = split (3:pref) mid b then
+	    (mid, p1)
+	in
+	let p = mk_pinst_w_order lhs (W_ITE c' a' b') [b',a',c'] then
+	p0@p1@p2@[p]
+ /\    split pref lhs (W_SX sz e) =
+	val (e',p0) = is_var e => (e,[]) |
+	    let mid = mk_tmp lhs (1:pref) (wexpr_size e) then
+	    let p0 = split (1:pref) mid e then
+	    (mid, p0)
+	in
+	let p = mk_pinst F lhs (W_SX sz e') in
+	p0@[p]
+ /\    split pref lhs (W_ZX sz e) =
+	val (e',p0) = is_var e => (e,[]) |
+	    let mid = mk_tmp lhs (1:pref) (wexpr_size e) then
+	    let p0 = split (1:pref) mid e then
+	    (mid, p0)
+	in
+	let p = mk_pinst F lhs (W_ZX sz e') in
+	p0@[p]
+ /\    split pref lhs (W_SLICE indices e) =
+	val (e',p0) = is_var e => (e,[]) |
+	    let mid = mk_tmp lhs (1:pref) (wexpr_size e) then
+	    let p0 = split (1:pref) mid e then
+	    (mid, p0)
+	in
+	let p = mk_pinst F lhs (W_SLICE indices e') in
+	p0@[p]
+ /\    split pref lhs (W_NAMED_SLICE name indices e) =
+	val (e',p0) = is_var e => (e,[]) |
+	    let mid = mk_tmp lhs (1:pref) (wexpr_size e) then
+	    let p0 = split (1:pref) mid e then
+	    (mid, p0)
+	in
+	let p = mk_pinst F lhs (W_NAMED_SLICE name indices e') in
+	p0@[p]
+ /\    split pref lhs (W_UPDATE_NAMED_SLICE b name indices n) =
+	val (b',p1) = is_simple_var b => (b,[]) |
+	    let mid = mk_tmp lhs (1:pref) (wexpr_size b) then
+	    let p1 = split (1:pref) mid b then
+	    (mid, p1)
+	in
+	val (n',p2) = is_simple_var n => (n,[]) |
+	    let mid = mk_tmp lhs (2:pref) (wexpr_size n) then
+	    let p2 = split (2:pref) mid n then
+	    (mid, p2)
+	in
+	let p = mk_pinst F lhs (W_UPDATE_NAMED_SLICE b' name indices n') then
+	p1@p2@[p]
+ /\    split pref lhs rhs = [mk_pinst F lhs rhs]
+;
+
+
+let split_complex p =
+    letrec p_split (PINST nm attrs lf fainps faouts ints (P_HIER chs)) =
+	val (nintsl,chsl) = unzip (map p_split chs) in
+	let ints' = (flat nintsl)@ints in
+	let chs' = flat chsl in
+	[],[(PINST nm attrs lf fainps faouts ints' (P_HIER chs'))]
+     /\    p_split (PINST nm attrs lf fainps faouts ints (P_LEAF fns)) =
+	let new_ints  = ref [] then
+	let u_split (W_UPDATE_FN lhs rhs) =
+	    (reset_internals ()) fseq
+	    let ps = split [0] lhs rhs then
+	    let ints = get_internals () then
+	    (new_ints := (ints@(deref new_ints))) fseq
+	    ps
+	 /\ u_split (W_PHASE_DELAY lhs rhs) =
+	    is_var rhs => [mk_pinst T lhs rhs] |
+	    let driven = base_get_lhs_vars lhs then
+	    let sz = md_sizes driven then
+	    (reset_internals ()) fseq
+	    let tmp = mk_tmp lhs [0] sz then
+	    let ps = split [0] tmp rhs then
+	    let ints = get_internals () then
+	    (new_ints := (ints@(deref new_ints))) fseq
+	    let ph_del = mk_pinst T lhs tmp then
+	    ps@[ph_del]
+	in
+	let chs = flatmap u_split fns then
+	let ints = ints @ (deref new_ints) then
+	(ints, chs)
+    in
+    val (ints, chs) = p_split p then
+    length chs != 1 OR ints != [] => p | hd chs
+;
+
+let do_shr sz v1 v2 = v1 >= 0 => v1/(2**v2) | ((2**sz+v1)/(2**v2));
+let do_ashr v1 v2 = v1 >= 0 => v1 / (2**v2) | -1*((-1*v1)/(2**v2));
+
+let perform_binary constr e1 e2 =
+    val (W_CONST sz1 v1) = e1 in
+    val (W_CONST sz2 v2) = e2 in
+    sz1 != sz2 => eprintf "Size mismatch in perform_binary (%d!=%d)" sz1 sz2 |
+    let sz = sz1 in
+    let  do (W_EQ  e1 e2)  = W_CONST 1 ((v1 = v2) => 1 | 0)
+      /\ do (W_GR  e1 e2)  = W_CONST 1 (v1 > v2 => 1 | 0)
+      /\ do (W_AND  e1 e2) = W_CONST sz (v1 intAND v2)
+      /\ do (W_OR  e1 e2)  = W_CONST sz (v1 intOR v2)
+      /\ do (W_ADD e1 e2)  = W_CONST sz (v1 + v2)
+      /\ do (W_SUB e1 e2)  = W_CONST sz (v1 - v2)
+      /\ do (W_MUL e1 e2)  = W_CONST sz (v1 * v2)
+      /\ do (W_DIV e1 e2)  = W_CONST sz (v1 / v2)
+      /\ do (W_MOD e1 e2)  = W_CONST sz (v1 % v2)
+      /\ do (W_SHL e1 e2)  = W_CONST sz (v1 * (2**v2))
+      /\ do (W_SHR e1 e2)  = W_CONST sz (do_shr sz v1 v2)
+      /\ do (W_ASHR e1 e2) = W_CONST sz (do_ashr v1 v2)
+      /\ do (W_LAT_LEQ e1 e2) = W_CONST 1 (v1 = v2 => 1 | 0)
+    in
+    do (constr e1 e2)
+;
+
+let is_CONST (W_CONST sz v) = T
+ /\ is_CONST (W_NAMED_CONST name sz v) = T
+ /\ is_CONST ohter = F
+;
+
+let get_const (W_CONST sz v) = sz,v
+ /\ get_const (W_NAMED_CONST name sz v) = sz,v
+ /\ get_const other = error "Should not happen!"
+;
+
+let const_eq a b =
+    is_CONST a AND is_CONST b =>
+	val (asz,av) = get_const a in
+	val (bsz,bv) = get_const b in
+	asz != bsz => eprintf "Size mismatch (%d != %d) in const_eq" asz bsz |
+	av = bv
+    |
+    a == b
+;
+
+
+letrec const_prop e assuming (is_binary e) =
+	val (constr, a1, a2) = split_binary e in
+	let  c1 = const_prop a1 in
+	let  c2 = const_prop a2 in
+	is_CONST c1 AND is_CONST c2 => perform_binary constr c1 c2 |
+	constr c1 c2
+ /\    const_prop (W_NOT e) =
+	let c = const_prop e in
+	is_CONST c =>
+	    val (sz,v) = get_const c in
+	    W_CONST sz (intNOT v)
+	|
+	    W_NOT c
+ /\    const_prop (W_SX sz e) =
+	let c = const_prop e in
+	is_CONST c =>
+	    val (osz,v) = get_const c in
+	    (W_CONST sz v)
+	|
+	W_SX sz c
+ /\    const_prop (W_ZX sz e) =
+	let c = const_prop e in
+	is_CONST c =>
+	    val (osz,v) = get_const c in
+	    (W_CONST sz (2**osz+v))
+	|
+	W_ZX sz c
+ /\    const_prop (W_ITE c t e) =
+	let cc = const_prop c in
+	is_CONST cc =>
+	    val (osz,v) = get_const cc in
+	    v == 1 => const_prop t |
+	    v == 0 => const_prop e |
+	    eprintf "W_ITE with illegal condition (%d)" v
+	|
+	let ct = const_prop t in
+	let ce = const_prop e in
+	const_eq ct ce => ct |
+	W_ITE cc ct ce
+ /\    const_prop (W_SLICE indices e) =
+	let ce = const_prop e in
+	is_CONST ce =>
+	    val (osz,ov) = get_const ce in
+	    let bits = explode (sprintf "%*b" osz ov) in
+	    let sels = gather bits indices in
+	    let sz = length sels in
+	    let base = sscanf "%b" (implode sels) in
+	    hd sels = "0" => W_CONST sz base | W_CONST sz (base-2**sz)
+	|
+	(W_SLICE indices ce)
+ /\    const_prop (W_NAMED_SLICE name indices e) =
+	let ce = const_prop e in
+	is_CONST ce =>
+	    val (osz,ov) = get_const ce in
+	    let bits = explode (sprintf "%*b" osz ov) in
+	    let sels = gather bits indices in
+	    let sz = length sels in
+	    let base = sscanf "%b" (implode sels) in
+	    hd sels = "0" => W_CONST sz base | W_CONST sz (base-2**sz)
+	|
+	(W_NAMED_SLICE name indices ce)
+ /\    const_prop (W_UPDATE_NAMED_SLICE b name indices n) =
+	let cb = const_prop b in
+	let cn = const_prop n in
+	is_CONST cb AND is_CONST cn =>
+	    val (bsz,bv) = get_const cb in
+	    val (nsz,nv) = get_const cn in
+	    let bbits = explode (sprintf "%*b" bsz bv) in
+	    let nbits = explode (sprintf "%*b" nsz nv) in
+	    let sub = zip indices nbits in
+	    letrec process i (b:bs) =
+		let next = (assoc i sub) catch b in
+		next:(process (i-1) bs)
+	     /\    process i [] = []
+	    in
+	    let result = process (bsz-1) bbits in
+	    let base = sscanf "%b" (implode result) in
+	    hd result = "0" => W_CONST bsz base | W_CONST bsz (base-2**bsz)
+	|
+	W_UPDATE_NAMED_SLICE cb name indices cn
+ /\    const_prop (W_CAT parts) =
+	let cparts = map const_prop parts in
+	letrec merge ((W_CONST sz1 v1):(W_CONST sz2 v2):rem) =
+	    merge ((W_CONST (sz1+sz2) (v1*(2**sz2)+v2)):rem)
+	 /\    merge (r:rem) = r:(merge rem)
+	 /\    merge [] = []
+	in
+	let parts' = merge cparts in
+	let cnv [(W_CONST sz v)] = (W_CONST sz v)
+	 /\ cnv other = W_CAT other
+	in
+	cnv parts'
+ /\    const_prop other = other
+;
+
+
+ 
+end_abstype split_complex const_prop;

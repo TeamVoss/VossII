@@ -766,6 +766,69 @@ let pretty_pexlif_leaf {inst::string} name fa_inps fa_outs f_ints {fns::(update_
       [(Desc_module (Module_declaration_many module ports body), module, [])]
 ;
 
+let module_store_ref =
+    ref {(tbl_create 100)::{int,((pexlif#string) list)} tbl}
+;
+
+let find_insert_module p =
+    let sig = pexlif_get_FP p then
+    let needle = wrap_pexlif p then
+    let cur_tbl = deref module_store_ref then
+    let first = NOT (tbl_member cur_tbl sig) then
+    let candidates = first => [] | tbl_get cur_tbl sig then
+    letrec search ((c,module_name):rem) =
+        let raw_matches = isomatch needle c in
+        raw_matches = [] => search rem |
+        val (ni, hi, match) = hd (hd raw_matches) then
+        let sub = get_match_sub match then
+        val (PINST _ _ _ _ _ _ (P_HIER [mp])) = c then
+        val (PINST _ _ _ fa_inps fa_outs _ _) = mp then
+        let mk_io (f,as) =
+            let tr a = rev_assoc a sub in
+            let as' = map tr as then
+            length as' = 1 => sprintf ".%s(%s)" f (hd as') |
+            list2str T (sprintf ".%s({" f) "," "})" id as'
+        in
+        let args = list2str T "(" ", " ")" mk_io (fa_inps @ fa_outs) then
+        [(module_name, args)]
+     /\    search [] = []
+    in
+    let found = search candidates then
+    found != [] => hd found |
+    let module_name = sprintf "module_%d_%d" sig (length candidates) then
+    let candidates' = (needle,module_name):candidates then
+    let tbl' = first => cur_tbl | tbl_delete cur_tbl sig then
+    let tbl'' = tbl_insert tbl' sig candidates' then
+    (module_store_ref := tbl'') fseq
+    let mk_io (f,as) =
+        length as = 1 => sprintf ".%s(%s)" f (hd as) |
+        list2str T (sprintf ".%s({" f) "," "})" id as
+    in  
+    val (PINST _ _ _ fa_inps fa_outs _ _) = p then
+    let args = list2str T "(" ", " ")" mk_io (fa_inps @ fa_outs) then
+    (module_name, args)
+;
+
+
+children =
+      letrec partition_module (n:ns) =
+	let needle = wrap_pexlif n in
+	let dummy_parent = PINST "" [] F [] [] [] (P_HIER ns) in
+	let raw_matches = isomatch needle dummy_parent in
+	let get_match ml =
+	    val (_, (hi, match)) = hd ml in
+	    (hi, get_match_sub match)
+	in
+	let matches = map get_match raw_matches in
+	let all_like_n = (n, matches) in
+	let remain = gather ns ((1 upto (length ns)) subtract (map fst matches))
+	in
+	all_like_n : (partition_module remain)
+	 /\   partition_module [] = []
+      in
+    partition_module children
+;
+
 let pretty_pexlif_hier netlist{inst::string} name fa_inps fa_outs f_ints
 		       {cs::(pexlif list)}
       =

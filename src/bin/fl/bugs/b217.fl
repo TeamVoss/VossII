@@ -1,0 +1,30 @@
+load "idv.fl";
+
+let tst =
+    bit_input a b.
+    bit_output o.
+    bit_internal m.
+    CELL "tst" [
+	m <- '~' (a '&' b),
+	o <- '~' m
+];
+
+let q =
+    bit_input a b c d.
+    bit_output o.
+    bit_internal m1 m2 m3.
+    CELL "q" [
+	tst a b m1,
+	tst m1 c m2,
+	tst m2 d o
+];
+
+let p = (q 'a 'b 'c 'd 'o);
+
+p fseq ();
+
+write_pexlif "b217.pexlif" p;
+
+["a", "m1", "c"] vec_intersect ["a", "c", "d", "o"];
+
+IDV "DB217" [];
