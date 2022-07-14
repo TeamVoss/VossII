@@ -3,6 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
+
+let fa_actualize fa_ios1 fa_ios2 sub =
+    let vsub1 = vec_zip (map fst fa_ios1) (flatmap snd fa_ios1) in
+    let vsub2 = vec_zip (map fst fa_ios2) (flatmap snd fa_ios2) in
+    let tr (f,t) = (vec_zip (vec_assoc f vsub1) (vec_assoc t vsub2)) catch [] in
+    flatmap tr sub
+;
+
+
 // -----------------------------------------------------------------------------
 // Pexlif matches, returned by isomatching.
 
@@ -91,9 +100,15 @@ let directed f1 f2 s = all (\(u,t). elem u f1 <==> elem t f2) s;
 letrec
     alpha (W_X _)       (W_X _)       = SOME []
 /\  alpha (W_CONST _ _) (W_CONST _ _) = SOME []
-/\  alpha (W_VAR _ n)   (W_VAR _ m)   = SOME [(n,m)]
-/\  alpha (W_NAMED_CONST n _ _) (W_NAMED_CONST m _ _) = SOME [(n,m)]
-/\  alpha (W_EXPLICIT_VAR _ n)  (W_EXPLICIT_VAR _ m)  = SOME [(n,m)]
+/\  alpha (W_NAMED_CONST n _ _) (W_NAMED_CONST m _ _) = SOME []
+/\  alpha (W_VAR sz1 n)   (W_VAR sz2 m)   =
+    sz1 != sz2 => NONE |
+    let v1 = (sz1 = 1) => n | sprintf "%s[%d:0]" n (sz1-1) in
+    let v2 = (sz2 = 1) => m | sprintf "%s[%d:0]" m (sz2-1) in
+    (SOME [(v1,v2)])
+/\  alpha (W_EXPLICIT_VAR sz1 n)  (W_EXPLICIT_VAR sz2 m)  =
+    sz1 != sz2 => NONE |
+    (SOME [(n,m)])
 /\  alpha (W_AND a b)   (W_AND x y)   = alpha a x @@ alpha b y
 /\  alpha (W_OR a b)    (W_OR x y)    = alpha a x @@ alpha b y
 /\  alpha (W_NOT a)     (W_NOT x)     = alpha a x
@@ -133,7 +148,12 @@ let alpha_leaf (P_LEAF fs) (P_LEAF gs) =
 
 // Given an SHA eq. between 'p' and 'g', construct a formal subst.
 //  actualize_sha::pexlif->pexlif->subst
-let actualize_sha p g = zip (pexlif_get_actuals p) (pexlif_get_actuals g);
+let actualize_sha p g =
+    let p_as = pexlif_get_actuals p then
+    let g_as = pexlif_get_actuals g then
+    vec_zip p_as g_as
+;
+
 
 // Check that a subst. hasn't changed the direction of any wires.
 //  directions::pexlif->pexlif->subst->bool
@@ -153,7 +173,8 @@ let actualize_leaf p g =
         val (PINST _ _ _ i2 o2 _ l2) = g in
         let lift = fa_actualize (i1 @ o1) (i2 @ o2) in
         let sub' = alpha_leaf l1 l2 in
-        predicated (\s. directions p g s) sub' (setify # lift)
+        let res = predicated (\s. directions p g s) sub' (setify # lift) in
+	res
 ;
 
 // Given a list of subst. of actuals for their children, find formal subst.
@@ -163,7 +184,18 @@ let actualize_hier ss p g =
         val (PINST _ _ _ i2 o2 _ _) = g in
         let lift = fa_actualize (i1 @ o1) (i2 @ o2) in
         let sub' = SOME (concat ss) in
-        predicated (\s. coherent s AND directions p g s) sub' (setify # lift)
+        let res = predicated (\s. coherent s AND directions p g s) sub' (setify # lift) in
+	res
+;
+
+// Given a list of matches....
+let actualize_match_list p g matches =
+    let cnv (i,j,(M_LEAF sub)) =
+	    (i, j, (M_LEAF (get_value (actualize_hier [sub] p g))))
+     /\ cnv (i,j,(M_HIER sub mats)) =
+	    (i,j,(M_HIER (get_value (actualize_hier [sub] p g)) mats))
+    in
+    (map cnv matches) catch []
 ;
 
 // Reorder nodes in 'ns' by 'xs'.
@@ -205,6 +237,7 @@ letrec
 let filter_internals (PINST _ _ _ _ _ t _) = filter (NOT # flip elem t # fst);
 
 forward_declare{explore::pexlif->pexlif->(match list)};
+
 // Exand a matching of 'p' and 'g' to test whether it's valid pairing or not.
 //
 // expand(P, G, T)
@@ -233,13 +266,22 @@ let expand p g =
             let pairings = zip ps gs' in
             // List of potential matches for each pairing, empty list if none.
             //  options::((int#int#(match list)) list)
-            let go1 (i,j) (a,b) = (i,j,explore a b) in
+            let go1 (i,j) (a,b) =
+		let matches = explore a b in
+		(i,j,matches)
+	    in
             let options = map2 go1 sol' pairings in
             // If any pairing has no solutions, return no match.
             any (\(_,_,xs). empty xs) options => [] |
             // Otherwise, return every combination.
             //  choices::(((int#int#match) list) list)
-            flatten_options options)
+	    let raw_res = flatten_options options then
+raw_res)
+//            filter (\l. NOT (empty l)) (map (actualize_match_list p g) raw_res))
+;
+
+let is_leaf (PINST nm attrs lf fa_inps fa_outs ints (P_LEAF fns)) = T
+ /\ is_leaf other = F
 ;
 
 // Explore two pexlifs to find if they are a potential match.
@@ -268,7 +310,7 @@ let
         // to find out whether they actually match or not.
         pexlif_get_FP p == pexlif_get_FP g =>
             // For leaves, we check if there is a valid subst. between them.
-            pexlif_get_leaf p AND pexlif_get_leaf g =>
+            is_leaf p AND is_leaf g =>
                 let sub' = actualize_leaf p g in
                 maybe [] sub' (\s. [M_LEAF s]) |
             // For hierarchies, we expand p & g to find every possible match

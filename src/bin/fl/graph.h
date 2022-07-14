@@ -76,7 +76,7 @@ g_ptr        Make_0inp_Primitive(int pr_fn);
 g_ptr        Make_1inp_Primitive(int pr_fn, g_ptr arg1);
 g_ptr        Make_2inp_Primitive(int pr_fn, g_ptr arg1, g_ptr arg2);
 g_ptr        Make_3inp_Primitive(int pr_fn, g_ptr arg1, g_ptr arg2, g_ptr arg3);
-g_ptr	     Make_Debug_Primitive(string name);
+g_ptr	     Make_Debug_Primitive(string name, string file, int line);
 g_ptr        Make_CONS_ND(g_ptr expr1, g_ptr expr2);
 g_ptr        Make_APPL_ND(g_ptr expr1, g_ptr expr2);
 g_ptr        Make_Lambda(string var, g_ptr expr);

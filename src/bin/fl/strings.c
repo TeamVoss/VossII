@@ -1511,6 +1511,21 @@ mk_name_signature(vec_ptr vp)
     return( uStrsave(lstringsp, name) );
 }
 
+static string
+get_base_name(vec_ptr vp)
+{
+    string name = strtemp("");
+    if( vp->type != TXT ) {
+	return( uStrsave(lstringsp, name) );
+    }
+    name = strtemp(vp->u.name);
+    string sq = index(name, '[');
+    if( sq != NULL ) {
+	*sq = 0;
+    }
+    return( uStrsave(lstringsp, name) );
+}
+
 // -----------------------------------------------------------------------------
 
 static void
@@ -2010,7 +2025,7 @@ VDB_Insert_vector(vector_db_ptr vdbp, string vec)
     range_rec_mgrp = &(vdbp->range_rec_mgr);
     // Perform all the operations
     vec_ptr vp = split_name(vec);
-    string key = mk_name_signature(vp);
+    string key = get_base_name(vp);
     vec_list_ptr cur_vlp = (vec_list_ptr) find_hash(&(vdbp->sig2vec_list), key);
     vec_list_ptr vlp = new_rec(&(vdbp->vec_list_rec_mgr));
     vlp->vec = vp;
@@ -2042,6 +2057,15 @@ colliding(vec_ptr v1, vec_ptr v2)
     if( v1 == NULL || v2 == NULL ) return FALSE;
     if( v1->type != v2->type ) return FALSE;
     if( v1->type == TXT ) {
+	// Make sure a and a[2] are viewed as colliding!
+	string name1 = v1->u.name;
+	string name2 = v2->u.name;
+	int len1 = strlen(name1);
+	int len2 = strlen(name2);
+	int len = (len1 <= len2)? len1 : len2;
+	if( strncmp(name1,name2,len) == 0 ) {	
+	    return TRUE;
+	}
 	return( colliding(v1->next, v2->next) );
     }
     range_ptr r1 = v1->u.ranges;
@@ -2072,7 +2096,7 @@ VDB_has_name_collision(vector_db_ptr vdbp, string vec)
     range_rec_mgrp = &(vdbp->range_rec_mgr);
     // Perform the operations
     vec_ptr vp = split_name(vec);
-    string key = mk_name_signature(vp);
+    string key = get_base_name(vp);
     vec_list_ptr cur_vlp = (vec_list_ptr) find_hash(&(vdbp->sig2vec_list), key);
     while(cur_vlp != NULL ) {
 	if( colliding(vp, cur_vlp->vec) ) {

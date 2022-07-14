@@ -3,5 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 let USE_IDV_VERSIONS = 1;
+fprintf stdinfo "-- Loading idv.fl .";
+cload (DIR^"vector_names.fl");
 cload (DIR^"../IDVII/src/fl/design/load.fl");
+fprintf stdinfo ".";
 cload (DIR^"../IDVII/src/fl/gui/sch_draw/load.fl");
+fprintf stdinfo " done --\n";

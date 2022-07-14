@@ -724,7 +724,7 @@ Make_Printf_Primitive(int pr_fn, string pat)
 }
 
 g_ptr
-Make_Debug_Primitive(string name)
+Make_Debug_Primitive(string name, string file, int line)
 {
     g_ptr fn_node;
     fn_node = Get_node();
@@ -732,7 +732,8 @@ Make_Debug_Primitive(string name)
     SET_LEAF_TYPE(fn_node, PRIM_FN);
     SET_PRIM_FN(fn_node, P_DEBUG);
     SET_LINE_NBR(fn_node,line_nbr);
-    string res = wastrsave(&strings, name);
+    sprintf(buf, "%s at line %d in file %s", name, line, file);
+    string res = wastrsave(&strings, buf);
     SET_DEBUG_STRING(fn_node, res);
     return( fn_node );
 }

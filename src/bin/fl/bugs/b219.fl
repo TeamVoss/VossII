@@ -1,0 +1,72 @@
+load "idv.fl";
+
+ENUM "bcnt" ["INIT", "PRE_PROC", "PROCESS", "CLEAN_UP"];
+MUTEX_ENUM "ucnt" ["INIT", "PRE_PROC", "PROCESS", "CLEAN_UP"];
+
+
+let simple =
+    ucnt_input	state.
+    bit_output	o1 o2 o3 o4.
+    CELL "simple" [
+	o1 <- is_INIT state,
+	o2 <- is_PRE_PROC state,
+	o3 <- is_PROCESS state,
+	o4 <- is_CLEAN_UP state
+];
+
+let p = simple 'state 'o1 'o2 'o3 'o4;
+p;
+
+let ckt = pexlif2fsm p;
+ckt;
+
+
+let e1 =
+    bit_input	clk reset.
+    bit_input	start rdy.
+    bit_output	done. 
+    bcnt_internal   state. 
+    CELL "e1" [
+	Moore_FSM "fsm1" clk state
+	    (reset --- INIT) [
+		INIT --- start --- PRE_PROC,
+		PRE_PROC --- '~' start --- PROCESS,
+		PROCESS  --- rdy --- CLEAN_UP
+	],
+	done <- is_CLEAN_UP state
+];
+
+let v1 = VIS e1;
+v1;
+
+let e2 =
+    bit_input	clk reset.
+    bit_input	start rdy.
+    bit_output	done. 
+    ucnt_internal   state. 
+    CELL "e1" [
+	Moore_FSM "fsm1" clk state
+	    (reset --- INIT) [
+		INIT --- start --- PRE_PROC,
+		PRE_PROC --- '~' start --- PROCESS,
+		PROCESS  --- rdy --- CLEAN_UP
+	],
+	done <- is_CLEAN_UP state
+];
+
+let v2 = VIS e2;
+v2;
+
+let ant =
+    "clk" is_clock 20
+  and
+    "reset" is 1 in_cycle 0 otherwise 0 until 20 cycles
+  and
+    "start" is 1 in_cycle 2 otherwise 0 until 20 cycles
+  and
+    "rdy" is 1 in_cycle 3 for 2 cycles otherwise 0 until 20 cycles
+;
+
+STE "-e" v1 [] ant [] [];
+
+STE "-e" v2 [] ant [] [];

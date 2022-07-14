@@ -1,0 +1,47 @@
+load "idv.fl";
+
+
+let needle = (PINST "wrapper" [] F
+  []
+  [("a1[5:0]",["a1[5:0]"])]
+  ["t"]
+(P_HIER [
+    (PINST "draw_hfl {0}" [] F
+      []
+      [("_tmp[5:0]",["t","a1[4:0]"])]
+      []
+    (P_HIER [
+        (PINST "abc" [] T
+         []
+         [("o[5:0]", ["_tmp[5:0]"])]
+         []
+         (P_LEAF [(W_UPDATE_FN (W_VAR 6 "o") (W_CONST 6 0b000000))]))
+    ])
+    )
+])
+);
+
+let c = (PINST "wrapper" [] F
+  []
+  [("d[5:0]",["d[5:0]"])]
+  []
+(P_HIER [
+    (PINST "draw_hfl {0}" [] F
+      []
+      [("_tmp[5:0]",["d[5:0]"])]
+      []
+    (P_HIER [
+        (PINST "abc" [] T
+         []
+         [("moo[5:0]", ["_tmp[5:0]"])]
+         []
+         (P_LEAF [(W_UPDATE_FN (W_VAR 6 "moo") (W_CONST 6 0b000000))]))
+    ])
+    )
+])
+);
+
+
+let raw_matches = isomatch needle c;
+raw_matches;
+

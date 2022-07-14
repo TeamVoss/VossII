@@ -1915,14 +1915,16 @@ let SX {inp:: *a} =
     let sz_in = ihw_size inp in
     let sz_out = ohw_size {undefined :: *b} in
     (sz_in > sz_out)
-        => eprintf "SX can't extend into smaller type (%d bits into %d bits)" sz_in sz_out
+        => eprintf "SX can't extend into smaller type (%d bits into %d bits)"
+		   sz_in sz_out
         |
     let w_out = W_SX sz_out (ihw_destr inp) in
     let out = ohw_constr w_out in
     {out :: *b}
 ;
 
-let ENUM_0 name name_list =
+// Binary encoded enum
+let ENUM_binary name name_list =
     name_list = [] => error "ENUM must have at least one element" |
     let sz = bits_needed ((length name_list)-1) in
     let value_list =
@@ -1944,7 +1946,7 @@ let ENUM_0 name name_list =
         let cmd1 =
            (sprintf "let %s_is_%s i = hw_bit_constr " name n)^
 	   (sprintf "(W_PRED \"is_%s\" (W_EQ (hw_%s_destr i) (W_CONST %d %d)));"
-		     n name sz cnt)
+		    n  name sz cnt)
         then
 	let cmd2 =
 	    (is_defined ("is_"^n))
@@ -1959,7 +1961,7 @@ let ENUM_0 name name_list =
     add_item 0 name_list
 ;
 
-let ENUM_1 name name_encoding_list =
+let ENUM_custom name name_encoding_list =
     name_encoding_list = [] => error "ENUM must have at least one element" |
     let max_code = itlist (\(n,ec).\r. max ec r) name_encoding_list 0 then
     let sz = bits_needed max_code in
@@ -1982,7 +1984,7 @@ let ENUM_1 name name_encoding_list =
         let cmd1 =
            (sprintf "let %s_is_%s i = hw_bit_constr " name n)^
 	   (sprintf "(W_PRED \"is_%s\" (W_EQ (hw_%s_destr i) (W_CONST %d %d)));"
-		     n name sz cnt)
+		    n name sz cnt)
         then
 	let cmd2 =
 	    (is_defined ("is_"^n))
@@ -1997,7 +1999,45 @@ let ENUM_1 name name_encoding_list =
     add_item name_encoding_list
 ;
 
-overload ENUM ENUM_0 ENUM_1;
+overload ENUM ENUM_binary ENUM_custom;
+
+// Unary encoded enum
+let MUTEX_ENUM name name_list =
+    name_list = [] => error "MUTEX_ENUM must have at least one element" |
+    let sz = length name_list in
+    let value_list =
+	let mk (i,n) = sprintf "{%d %s}" (2**i) n in
+	list2str T "{" "" "}" mk (zip (0 upto (length name_list-1)) name_list)
+    in
+    NOT (core_TYPE name sz F value_list) => () |
+    letrec add_item cnt (n:ns) =
+        let cmd1 =
+            sprintf "let %s_%s = hw_%s_constr (W_NAMED_CONST \"%s\" %d %d);"
+		    name n name n sz (2**cnt)
+        then
+	let cmd2 =
+	    (is_defined n) => sprintf "overload %s = %s %s_%s;" n n name n
+			    | sprintf "let %s = %s_%s;" n name n
+	then
+	let cmds = [cmd1,cmd2] in
+	NOT (eval_fl_code cmds) => eprintf "Failed to evaluate: %S" cmds |
+        let cmd1 =
+           (sprintf "let %s_is_%s i = hw_bit_constr " name n)^
+	   (sprintf "(W_PRED \"is_%s\" (W_SLICE [%d] (hw_%s_destr i)));"
+		    n cnt name)
+        then
+	let cmd2 =
+	    (is_defined ("is_"^n))
+		   => sprintf "overload is_%s = is_%s %s_is_%s;" n n name n
+		   |  sprintf "let is_%s = %s_is_%s;" n name n
+	then
+	let cmds = [cmd1,cmd2] in
+        NOT (eval_fl_code cmds) => eprintf "Failed to evaluate: %S" cmds |
+        add_item (cnt+1) ns
+     /\    add_item cnt [] = ()
+    in
+    add_item 0 name_list
+;
 
 let --> obj field_fn = field_fn obj;
 infix 9 -->;
@@ -2536,6 +2576,7 @@ let tobits {t:: *a} =
     in
     let sz = hw_size t in
     let w = hw_destr t in
+    sz = 1 => [hw_bit_constr w] |
     map (\i. hw_bit_constr (W_SLICE [i] w)) ((sz-1) downto 0)
 ;
 
@@ -3420,11 +3461,11 @@ let pcompile fn =
     let p =
 	exists =>
 	    // Load from file
-	    (fprintf stderr "-- Loading pre-compiled version of %s --\n" fn)
+	    (fprintf stdinfo "-- Loading pre-compiled version of %s --\n" fn)
 	    seq
 	    read_pexlif pexlif_file
 	|
-	    (fprintf stderr "-- Compiling %s --\n" fn) fseq
+	    (fprintf stdinfo "-- Compiling %s --\n" fn) fseq
 	    let p = pexlif_expr then
 	    (write_pexlif pexlif_file p) fseq
 	    p

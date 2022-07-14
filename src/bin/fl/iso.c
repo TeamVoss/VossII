@@ -46,12 +46,18 @@ static int search_mem_oidx;
 static typeExp_ptr search_mem_tp;
 
 // Debugging -------------------------------------------------------------------
-#define DEBUG_ISO 0
-#define debug_print(fmt, ...)                                                  \
-        do { if (DEBUG_ISO) fprintf(stderr, "%s:%d:%s: " fmt, __FILE__,        \
-                                __LINE__, __func__, __VA_ARGS__); } while (0)
-#define debug_append(fmt, ...)                                                 \
-        do { if (DEBUG_ISO) fprintf(stderr, "" fmt, __VA_ARGS__); } while (0)
+#if 0
+#define DEBUG_ISO 1
+#endif
+
+#ifdef DEBUG_ISO
+#define debug_print(fmt, ...) fprintf(stderr, "%s:%d:%s: " fmt, __FILE__,     \
+                                __LINE__, __func__, __VA_ARGS__);
+#define debug_append(fmt, ...) fprintf(stderr, "" fmt, __VA_ARGS__); 
+#else
+#define debug_print(fmt, ...)	
+#define debug_append(fmt, ...)	
+#endif
 
 // Forward definitions local functions -----------------------------------------
 // Matrix.
@@ -134,7 +140,6 @@ sprint_mat(mat_ptr m)
 static void
 allocate_matrix(mat_ptr *m, unint R, unint C)
 {
-    ASSERT(*m != NULL);
     // /
     mat_ptr n = (mat_ptr) new_rec(&mat_mgr);
     n->rows   = R;
@@ -292,7 +297,7 @@ mk_adj(mat_ptr m, g_ptr p)
 static bool
 mk_iso_list(sig_ptr *sigs, g_ptr p)
 {
-    // debug_print("%p, %p\n", (void *) sigs, (void *) p);
+    debug_print("%p, %p\n", (void *) sigs, (void *) p);
     g_ptr attrs, fa_inps, fa_outs, inter, cont, children, fns;
     string name;
     bool leaf;
@@ -305,7 +310,7 @@ mk_iso_list(sig_ptr *sigs, g_ptr p)
         return FALSE;
     }
     if(is_P_HIER(cont, &children)) {
-        // debug_print("%s\n", "Pexlif & child signatures:");
+        debug_print("%s\n", "Pexlif & child signatures:");
         string sha = NULL;
         unint fp = 0;
         // Record fp/sha attributes for parent.
@@ -330,7 +335,7 @@ mk_iso_list(sig_ptr *sigs, g_ptr p)
         sig->next = NULL;
         *sigs = sig;
         sig_ptr *sig_tail = &sig->next;
-        // debug_print("> %u, %s\n", fp, sha);
+        debug_print("> %u, %s\n", fp, sha);
         // Record fp/sha attributes for children.
         g_ptr child, tmp;
         FOR_CONS(children, tmp, child) {
@@ -359,7 +364,7 @@ mk_iso_list(sig_ptr *sigs, g_ptr p)
             sig->next = NULL;
             *sig_tail = sig;
             sig_tail = &sig->next;
-            // debug_print("> %u, %s\n", fp, sha);
+            debug_print("> %u, %s\n", fp, sha);
         }
         return TRUE;
     }
@@ -817,7 +822,7 @@ lazy_isomatch(search_mem_ptr s)
 static void
 strict_isomatch_fn(g_ptr redex)
 {
-    // debug_print("%p\n", (void *) redex);
+    debug_print("%p\n", (void *) redex);
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_p, g_g;
@@ -863,7 +868,7 @@ strict_isomatch_fn(g_ptr redex)
 static void
 internal_search_create_fn(g_ptr redex)
 {
-    // debug_print("%p\n", (void *) redex);
+    debug_print("--- Calling internal_search_create_fn %p\n", (void *) redex);
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_needle, g_haystack, g_wrapped;
@@ -912,12 +917,13 @@ internal_search_create_fn(g_ptr redex)
     // /
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    debug_print("--- Done internal_search_create_fn %p\n", (void *) redex);
 }
 
 static void
 internal_search_step_fn(g_ptr redex)
 {
-    // debug_print("%p\n", (void *) redex);
+    debug_print("%p\n", (void *) redex);
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_search;
@@ -1024,6 +1030,7 @@ _DuMMy_iso()
     (void)matrix_compare(NULL, NULL);
     (void)matrix_compare_weak(NULL, NULL);
     (void)is_adjacent(NULL, 0, 0);
+    (void)sprint_mat(NULL);
 }
 
 /******************************************************************************/

@@ -92,12 +92,18 @@ static hash_record     outputs_tbl;
 static hash_record_ptr outputs_tbl_ptr;
 
 // Debugging -------------------------------------------------------------------
-#define DEBUG_PEX 0
-#define debug_print(fmt, ...)                                                  \
-        do { if (DEBUG_PEX) fprintf(stderr, "%s:%d:%s: " fmt, __FILE__,        \
-                                __LINE__, __func__, __VA_ARGS__); } while (0)
-#define debug_append(fmt, ...)                                                 \
-        do { if (DEBUG_PEX) fprintf(stderr, "" fmt, __VA_ARGS__); } while (0)
+#if 0
+#define DEBUG_PEX 1
+#endif
+
+#ifdef DEBUG_PEX
+#define debug_print(fmt, ...) fprintf(stderr, "%s:%d:%s: " fmt, __FILE__,     \
+                                __LINE__, __func__, __VA_ARGS__);
+#define debug_append(fmt, ...) fprintf(stderr, "" fmt, __VA_ARGS__); 
+#else
+#define debug_print(fmt, ...)	
+#define debug_append(fmt, ...)	
+#endif
 
 // Forward definitions local functions -----------------------------------------
 static inline void    new_adj_mem();
@@ -166,6 +172,7 @@ record_vector_signatures(adj_key_ptr *tail, unint index, string name, bool input
 {
     vec_ptr vec = split_vector(name);
     string key = Get_vector_signature(&lstrings, vec);
+    debug_print("##### record_vector_signatures: %d %s %s\n", index, key, name);
     // Record signature as we'll need it later again.
     adj_key_ptr n = (adj_key_ptr) new_rec(adj_key_mgr_ptr);
     n->name = name;
@@ -187,8 +194,11 @@ record_vector_signatures(adj_key_ptr *tail, unint index, string name, bool input
         b->index = index;
         b->vec = vec;
         b->next = NULL;
+	debug_print("Initial insert %s in %s table\n",
+		    key,(input?"input":"output"));
         insert_hash(tbl, key, b);
     } else {
+	debug_print("Append %s in %s table\n", key, (input?"input":"output"));
         // todo: why not record as head since order does not matter? 
         while(bkt->next != NULL) {
             bkt = bkt->next;

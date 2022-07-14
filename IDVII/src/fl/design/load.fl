@@ -4,18 +4,32 @@
 //-------------------------------------------------------------------
 
 (cload (DIR^"/misc.fl")) fseq
+fprintf stdinfo ".";
 (cload (DIR^"/util.fl")) fseq
+fprintf stdinfo ".";
 (cload (DIR^"/primes.fl")) fseq
+fprintf stdinfo ".";
 (cload (DIR^"/pexlif.fl")) fseq
+fprintf stdinfo ".";
 (cload (DIR^"../verilog/pretty-pexlif.fl")) fseq
+fprintf stdinfo ".";
 (cload (DIR^"/hfl.fl")) fseq
+fprintf stdinfo ".";
 (cload (DIR^"/STE.fl")) fseq
+fprintf stdinfo ".";
 (cload (DIR^"/monitor.fl")) fseq
+fprintf stdinfo ".";
 (cload (DIR^"/yosys_lib.fl")) fseq
+fprintf stdinfo ".";
 (cload (DIR^"/read_verilog.fl")) fseq
+fprintf stdinfo ".";
 (cload (DIR^"/relational_ste.fl")) fseq
+fprintf stdinfo ".";
 (cload (DIR^"/miter.fl")) fseq
+fprintf stdinfo ".";
 (cload (DIR^"../isomatch/isomatch.fl")) fseq
+fprintf stdinfo ".";
 (cload (DIR^"/normalize_pexlif.fl")) fseq
+fprintf stdinfo ".";
 (is_defined "USE_OBSOLETE" => cload (DIR^"/obsolete.fl") | ()) fseq
 ();

@@ -19,6 +19,11 @@ let find_fingerprint = s2int # find_attr "FP" "0";
 //  find_signature::(string#string list)->string
 let find_signature = find_attr "SHA" "";
 
+// Predicate for hierarchical pexlif
+let pexlif_is_hier (PINST nm attrs lf fa_inps fa_outs ints (P_HIER cs)) = T
+ /\ pexlif_is_hier oter = F
+;
+
 let pexlif_get_FP  = find_fingerprint # pexlif_get_attrs;
 let pexlif_get_SHA = find_signature   # pexlif_get_attrs;
 let pexlif_get_size (PINST _ _ _ _ _ _ (P_HIER cs)) = 1 + length cs
@@ -199,7 +204,8 @@ end_abstype fp_pinst sha_pinst;
 //------------------------------------------------------------------------------
 
 let PINST n a l i o t c =
-    is_defined "USE_IDV_VERSIONS" =>
+//    is_defined "USE_IDV_VERSIONS" =>
+T =>
         let is_signature s = (s == "FP") OR (s == "SHA") in
         let a' = filter (NOT # is_signature # fst) a in
         let f  = ("FP",  fp_pinst    i o t c) in

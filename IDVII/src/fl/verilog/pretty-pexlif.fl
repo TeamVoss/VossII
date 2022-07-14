@@ -60,7 +60,7 @@ let vvalid_lhs {we::wexpr} =
 
 begin_abstype;
 
-let warn msg v = print msg fseq v;
+let warn msg v = (fprintf stdinfo "%s\n" msg) fseq v;
 
 let prim_str  {s::string} = Exp_primary (Prim_str s);
 let prim_cstr {s::string} = CExp_primary (CPrim_str s);
@@ -549,12 +549,12 @@ let port {vec::string} =
 ;
 
 let connect_ports f as =
-      let connect []     = NONE
-      /\  connect (a:[]) = SOME (port a)
-      /\  connect (a:as) = SOME (Exp_primary (Prim_cat (CAT (map port (a:as)))))
-      in
-      val (id,_) = split_name_rng f in
-      Port_con_named (ID id) (connect as)
+    let connect []     = NONE
+    /\  connect [a]    = SOME (port a)
+    /\  connect (a:as) = SOME (Exp_primary (Prim_cat (CAT (map port (a:as)))))
+    in
+    val (id,_) = split_name_rng f in
+    Port_con_named (ID id) (connect as)
 ;
 
 let port_instantiation mi ai {args::(string#(string list))list} =
@@ -743,9 +743,136 @@ let premade_ff_re_with_en_reset name clk en re p q =
         ])
 ;
 
-forward_declare{pretty_pexlif_h::bool->string->pexlif->((description#identifier#(identifier list)) list)};
+forward_declare{pretty_pexlif_h::bool->string->pexlif->(description list)};
 
-let pretty_pexlif_leaf {inst::string} name fa_inps fa_outs f_ints {fns::(update_fn list)} =
+let module_name_store_ref = ref {[]::string list};
+
+let find_insert_module_name name =
+    let extract_name s =
+	let s' = 
+	    str_is_prefix "draw_hier" s => el 2 (tcl2list s) |
+	    str_is_prefix "draw_" s => "" | s
+	in
+	let n1 = s' = "" => "m" | s' in
+	let n2 = string_replace n1 " " "_" in
+	string_filter n2 valid_ident
+    in
+    let pot_name = extract_name name then
+    let cur = deref module_name_store_ref then
+    letrec try i n =
+	NOT (mem n cur) => n |
+	let n' = sprintf "%s_%d" pot_name i then
+	try (i+1) n'
+    in
+    let name = try 1 pot_name then
+    (module_name_store_ref := (name:cur)) fseq
+    name
+;
+
+
+let module_store_tbl_ref =
+    ref {(tbl_create 100)::{int,((pexlif#string) list)} tbl}
+;
+let module_store_descr_list_ref = ref {[]:: (string#description) list};
+
+let verilog_reserved_words = [
+	"always", "end", "ifnone", "or", "rpmos", "tranif1", "and", "endcase",
+	"initial", "output", "rtran", "tri", "assign", "endmodule", "inout",
+	"parameter", "rtranif0", "tri0", "begin", "endfunction", "input",
+	"pmos", "rtranif1", "tri1", "buf", "endprimitive", "integer", "posedge",
+	"scalared", "triand", "bufif0", "endspecify", "join", "primitive",
+	"small", "trior", "bufif1", "endtable", "large", "pull0", "specify",
+	"trireg", "case", "endtask", "macromodule", "pull1", "specparam",
+	"vectored", "casex", "event", "medium", "pullup", "strong0", "wait",
+	"casez", "for", "module", "pulldown", "strong1", "wand", "cmos",
+	"force", "nand", "rcmos", "supply0", "weak0", "deassign", "forever",
+	"negedge", "real", "supply1", "weak1", "default", "for", "nmos",
+	"realtime", "table", "while", "defparam", "function", "nor", "reg",
+	"task", "wire", "disable", "highz0", "not", "release", "time", "wor",
+	"edge", "highz1", "notif0", "repeat", "tran", "xnor", "else", "if",
+	"notif1", "rnmos", "tranif0", "xor"
+];
+
+
+let pexlif2verilog_start {dummy::void} =
+    (module_store_tbl_ref := tbl_create 100) fseq
+    (module_store_descr_list_ref := []) fseq
+    (module_name_store_ref := verilog_reserved_words)
+;
+non_lazy pexlif2verilog_start;
+
+let pexlif2verilog_end {dummy::void} = (deref module_store_descr_list_ref);
+non_lazy pexlif2verilog_end;
+
+
+// Since we have not loaded isomatch.fl!
+forward_declare {isomatch :: pexlif->pexlif->(((int#(int#match)) list) list)};
+forward_declare {get_match_sub :: match -> ((string#string) list)};
+
+
+let DBG_p = ref {(error "not yet"):: pexlif};
+let DBG_needle = ref {(error "not yet"):: pexlif};
+let DBG_c = ref {(error "not yet"):: pexlif};
+
+let find_insert_module netlist p i =
+    p fseq
+(DBG_p := p) fseq
+    val (PINST name attrs lf fa_inps fa_outs ints body) = p then
+    let p_ios = fa_inps@fa_outs then
+    let instance_name = sprintf "inst_%d" i then
+    let sig = pexlif_get_FP p then
+    let needle = wrap_pexlif p then
+(DBG_needle := needle) fseq
+    let cur_tbl = deref module_store_tbl_ref then
+    let candidates = (tbl_get cur_tbl sig) catch [] then
+    letrec search ((c,module_name):rem) =
+(DBG_c := c) fseq
+        let raw_matches = isomatch needle c then
+        raw_matches = [] => search rem |
+	length raw_matches > 1 => eprintf "More than one raw_matches!" |
+        val (ni, hi, match) = hd (hd raw_matches) then
+        let sub = get_match_sub match then
+	val (PINST _ _ _ _ _ _ (P_HIER mi)) = c in
+	val (PINST _ _ _ c_fa_inps c_fa_outs _ _) = hd mi in
+	let c_ios = c_fa_inps @ c_fa_outs in
+	// Convert formal in needle to actuals in instance
+        let mk_io (f_n,as) =
+	    let as' = flatmap (\v. vec_rev_assoc v sub) as then
+	    connect_ports f_n as'
+	in
+	let res = NPM_Item (MOGI_module (Module_instantiation (ID module_name)
+			[Module_instance (ID instance_name) NONE
+			  (empty c_ios => NONE | SOME (map mk_io c_ios))]))
+	then
+        [res]
+     /\    search [] = []
+    in
+    let found = search candidates then
+    found != [] => hd found |
+    let module_name = find_insert_module_name name then
+    let descr = hd (pretty_pexlif_h netlist module_name p) then
+    // Migth have updated the table during the hierarchy conversion.
+    // Thus, read in the table entry again.
+    let cur_tbl = deref module_store_tbl_ref then
+    let first = NOT (tbl_member cur_tbl sig) then
+    let candidates = first => [] | tbl_get cur_tbl sig then
+    let candidates' = (needle,module_name):candidates then
+    let tbl' = first => cur_tbl | tbl_delete cur_tbl sig then
+    let tbl'' = tbl_insert tbl' sig candidates' then
+    (module_store_tbl_ref := tbl'') fseq
+    (module_store_descr_list_ref :=
+	((module_name, descr):(deref module_store_descr_list_ref))) fseq
+    let mk_io (f,as) = connect_ports f as in
+    let res = NPM_Item (MOGI_module (Module_instantiation (ID module_name)
+		    [Module_instance (ID instance_name) NONE
+		      (empty p_ios => NONE | SOME (map mk_io p_ios))]))
+    then
+    res
+;
+
+
+let pretty_pexlif_leaf {module_name::string} p =
+      val (PINST name _ _ fa_inps fa_outs f_ints (P_LEAF fns)) = p in
       let is_wire i = maybe T (in_any_lhs i fns) id in
       // Declare inp/out as 'port's.
       let f_inps = map fst fa_inps in
@@ -761,77 +888,13 @@ let pretty_pexlif_leaf {inst::string} name fa_inps fa_outs f_ints {fns::(update_
       // Translate assignments into 'assign'/'always' statements.
       let statements = map pretty_update_fn fns in
       //
-      let module = inst_name name inst in
       let body = decl_int @ statements in
-      [(Desc_module (Module_declaration_many module ports body), module, [])]
-;
-
-let module_store_ref =
-    ref {(tbl_create 100)::{int,((pexlif#string) list)} tbl}
-;
-
-let find_insert_module p =
-    let sig = pexlif_get_FP p then
-    let needle = wrap_pexlif p then
-    let cur_tbl = deref module_store_ref then
-    let first = NOT (tbl_member cur_tbl sig) then
-    let candidates = first => [] | tbl_get cur_tbl sig then
-    letrec search ((c,module_name):rem) =
-        let raw_matches = isomatch needle c in
-        raw_matches = [] => search rem |
-        val (ni, hi, match) = hd (hd raw_matches) then
-        let sub = get_match_sub match then
-        val (PINST _ _ _ _ _ _ (P_HIER [mp])) = c then
-        val (PINST _ _ _ fa_inps fa_outs _ _) = mp then
-        let mk_io (f,as) =
-            let tr a = rev_assoc a sub in
-            let as' = map tr as then
-            length as' = 1 => sprintf ".%s(%s)" f (hd as') |
-            list2str T (sprintf ".%s({" f) "," "})" id as'
-        in
-        let args = list2str T "(" ", " ")" mk_io (fa_inps @ fa_outs) then
-        [(module_name, args)]
-     /\    search [] = []
-    in
-    let found = search candidates then
-    found != [] => hd found |
-    let module_name = sprintf "module_%d_%d" sig (length candidates) then
-    let candidates' = (needle,module_name):candidates then
-    let tbl' = first => cur_tbl | tbl_delete cur_tbl sig then
-    let tbl'' = tbl_insert tbl' sig candidates' then
-    (module_store_ref := tbl'') fseq
-    let mk_io (f,as) =
-        length as = 1 => sprintf ".%s(%s)" f (hd as) |
-        list2str T (sprintf ".%s({" f) "," "})" id as
-    in  
-    val (PINST _ _ _ fa_inps fa_outs _ _) = p then
-    let args = list2str T "(" ", " ")" mk_io (fa_inps @ fa_outs) then
-    (module_name, args)
+      [Desc_module (Module_declaration_many (ID module_name) ports body)]
 ;
 
 
-children =
-      letrec partition_module (n:ns) =
-	let needle = wrap_pexlif n in
-	let dummy_parent = PINST "" [] F [] [] [] (P_HIER ns) in
-	let raw_matches = isomatch needle dummy_parent in
-	let get_match ml =
-	    val (_, (hi, match)) = hd ml in
-	    (hi, get_match_sub match)
-	in
-	let matches = map get_match raw_matches in
-	let all_like_n = (n, matches) in
-	let remain = gather ns ((1 upto (length ns)) subtract (map fst matches))
-	in
-	all_like_n : (partition_module remain)
-	 /\   partition_module [] = []
-      in
-    partition_module children
-;
-
-let pretty_pexlif_hier netlist{inst::string} name fa_inps fa_outs f_ints
-		       {cs::(pexlif list)}
-      =
+let pretty_pexlif_hier netlist {module_name::string} p =
+      val (PINST name _ _ fa_inps fa_outs f_ints (P_HIER cs)) = p in
       let all_wire xs = replicate (length xs) F in
       // Declare inp/out as 'port's.
       let f_inps = map fst fa_inps in
@@ -845,79 +908,57 @@ let pretty_pexlif_hier netlist{inst::string} name fa_inps fa_outs f_ints
       // Declare internals as 'net' types (hier. pex. only connects other pex.).
       let decl_int = map (flip pretty_internal_decl T) f_ints in
       // Instantiate and pretty children.
-      let child i = sprintf "%s_%d" inst i in
-      let children =
-	concat (ixmap (\c. \i. pretty_pexlif_h netlist (child i) c) cs)
-      in
-      let instant =
-	ixmap (\c. \i. pport_instantiation netlist (child i) c) cs
-      in
-	  // Get direct children names
-	  let extract_name {p::pexlif} i =
-	  	  val (PINST name _ _ _ _ _ _) = p in
-		  inst_name name (child i)
-	  in
-	  let direct_children = ixmap (extract_name) cs in
-      //
-      let module = inst_name name inst in
-      let body = decl_int @ instant in
-      (Desc_module (Module_declaration_many module ports body), module, direct_children) : children
+      // If a module has not been translated, it will happen behind the scene
+      let instantiations = ixmap (find_insert_module netlist) cs in
+      let body = decl_int @ instantiations in
+      (Desc_module (Module_declaration_many (ID module_name) ports body))
 ;
 
-let pretty_pexlif_h netlist inst (PINST name _ _ fa_inps fa_outs _ _)
-    assuming (netlist AND (str_is_prefix "draw_stdcell " name)) =
-	[]
-/\  pretty_pexlif_h netlist inst (PINST name _ _ fa_inps fa_outs _ _)
-    assuming (name == "draw_ah_latch")
+let pretty_pexlif_h netlist module (PINST name _ _ fa_inps fa_outs _ _)
+	assuming (netlist AND (str_is_prefix "draw_stdcell " name))
+    =
+      []
+/\  pretty_pexlif_h netlist module (PINST name _ _ fa_inps fa_outs _ _)
+	assuming (name == "draw_ah_latch")
     =
       val [(p,_),(clk,_)] = fa_inps in
       val [(q,_)] = fa_outs in
-      let module = inst_name name inst in
-      [(premade_ah_latch module clk p q, module, [])]
-/\  pretty_pexlif_h netlist inst (PINST name _ _ fa_inps fa_outs _ _)
-    assuming (name == "draw_al_latch")
+      [premade_ah_latch (ID module) clk p q]
+/\  pretty_pexlif_h netlist module (PINST name _ _ fa_inps fa_outs _ _)
+	assuming (name == "draw_al_latch")
     =
       val [(p,_),(clk,_)] = fa_inps in
       val [(q,_)] = fa_outs in
-      let module = inst_name name inst in
-      [(premade_al_latch module clk p q, module, [])]
-/\  pretty_pexlif_h netlist inst (PINST name _ _ fa_inps fa_outs _ _)
-    assuming (name == "draw_ff_re")
+      [premade_al_latch (ID module) clk p q]
+/\  pretty_pexlif_h netlist module (PINST name _ _ fa_inps fa_outs _ _)
+	assuming (name == "draw_ff_re")
     =
       val [(p,_),(clk,_)] = fa_inps in
       val [(q,_)] = fa_outs in
-      let module = inst_name name inst in
-      [(premade_ff_re module clk p q, module, [])]
-/\  pretty_pexlif_h netlist inst (PINST name _ _ fa_inps fa_outs _ _)
-    assuming (name == "draw_ff_re_reset")
+      [premade_ff_re (ID module) clk p q]
+/\  pretty_pexlif_h netlist module (PINST name _ _ fa_inps fa_outs _ _)
+	assuming (name == "draw_ff_re_reset")
     =
       val ((p,_):(re,_):(clk,_):[]) = fa_inps in
       val ((q,_):[]) = fa_outs in
-      let module = inst_name name inst in
-      [(premade_ff_re_reset module clk re p q, module, [])]
-/\  pretty_pexlif_h netlist inst (PINST name _ _ fa_inps fa_outs _ _)
-    assuming (name == "draw_ff_re_with_en")
+      [premade_ff_re_reset (ID module) clk re p q]
+/\  pretty_pexlif_h netlist module (PINST name _ _ fa_inps fa_outs _ _)
+	assuming (name == "draw_ff_re_with_en")
     =
       val ((p,_):(en,_):(clk,_):[]) = fa_inps in
       val ((q,_):[]) = fa_outs in
-      let module = inst_name name inst in
-      [(premade_ff_re_with_en module clk en p q, module, [])]
-/\  pretty_pexlif_h netlist inst (PINST name _ _ fa_inps fa_outs _ _)
-    assuming (name == "draw_ff_re_with_en_reset")
+      [premade_ff_re_with_en (ID module) clk en p q]
+/\  pretty_pexlif_h netlist module (PINST name _ _ fa_inps fa_outs _ _)
+	assuming (name == "draw_ff_re_with_en_reset")
     =
       val ((p,_):(en,_):(re,_):(clk,_):[]) = fa_inps in
       val ((q,_):[]) = fa_outs in
-      let module = inst_name name inst in
-      [(premade_ff_re_with_en_reset module clk en re p q, module, [])]
-/\  pretty_pexlif_h netlist inst
-    (PINST name _ _ fa_inps fa_outs f_ints (P_HIER cs))
-    =
-      pretty_pexlif_hier netlist inst name fa_inps fa_outs f_ints cs
-/\  pretty_pexlif_h netlist inst
-    (PINST name _ _ fa_inps fa_outs f_ints (P_LEAF fs))
-    =
-      pretty_pexlif_leaf inst name fa_inps fa_outs f_ints fs
+      [premade_ff_re_with_en_reset (ID module) clk en re p q]
+/\  pretty_pexlif_h netlist module p assuming (pexlif_is_hier p) =
+      [pretty_pexlif_hier netlist module p]
+/\  pretty_pexlif_h netlist module p = pretty_pexlif_leaf module p
 ;
+
 // todo:
 //   1> detect common components by name and then test if name is actually the
 //      real component. Components are written in hfl.fl:
@@ -996,63 +1037,67 @@ let make_verilog_safe p =
 
 let safe_pexlif2verilog netlist {fp::stream} {pex::pexlif} =
     val (pex',sub) = make_verilog_safe pex then
-    let descriptions = pretty_pexlif_h netlist "" pex' then
-    // let do1 d =
-	// (frender fp (p_source_text (Source_text [d]))) fseq (fprintf fp "\n\n")
-    let do1 (d, ID (inst), l) =
-		(frender fp (p_source_text (Source_text [d]))) fseq
-		(fprintf fp "\n\n")
+    (pexlif2verilog_start ()) fseq
+    (pretty_pexlif_h netlist "" pex') fseq
+    let results = pexlif2verilog_end () then
+    let do1 (module_name, descr) =
+	(frender fp (p_source_text (Source_text [descr]))) fseq
+	(fprintf fp "\n\n")
     in
-    (foreach do1 descriptions) fseq
+    (foreach do1 results) fseq
     sub
 ;
 
 // Write out a Verliog version of pex to the stream fp.
-// If netlist if T then stop at standard cells and only emit a netlist.
-// [path] is a path to the directory where the verilog files will be written,
-// including the final `/`
+// If netlist is T then stop at standard cells and only emit a netlist.
 let pexlif2verilog netlist {fp::stream} {pex::pexlif} =
-    val (PINST name attrs lf fa_inps fa_outs ints body) = pex in
+    val (PINST name attrs lf fa_inps fa_outs ints body) = pex then
     let non_matching_io (f,as) = (length as != 1) OR (f != (hd as)) in
     let idx = find_first0 non_matching_io (fa_inps @ fa_outs) then
-    let pex' = idx = 0 =>
-		pex |
-		let mk_io fa = map (\v. v, [v]) (md_extract_vectors (flatmap snd fa)) in
-		let fa_inps' = mk_io fa_inps in
-		let fa_outs' = mk_io fa_outs in
-		PINST name attrs F fa_inps' fa_outs' [] (P_HIER [pex])
+    let pex' =
+	idx = 0 => pex |
+	let mk_io fa = map (\v. v, [v]) (md_extract_vectors (flatmap snd fa)) in
+	let fa_inps' = mk_io fa_inps in
+	let fa_outs' = mk_io fa_outs in
+	PINST name attrs F fa_inps' fa_outs' [] (P_HIER [pex])
     then
-    let descriptions = pretty_pexlif_h netlist "" pex' then
-    let do1 (d, ID (inst), l) =
-		(frender fp (p_source_text (Source_text [d]))) fseq
-		(fprintf fp "\n\n")
+    (pexlif2verilog_start ()) fseq
+    (find_insert_module netlist pex' 1) fseq
+    let results = pexlif2verilog_end () then
+    let do1 (module_name, descr) =
+	(frender fp (p_source_text (Source_text [descr]))) fseq
+	(fprintf fp "\n\n")
     in
-    foreach do1 descriptions
+    (foreach do1 results)
 ;
 
+// Write out a Verliog version of pex in the directory 'path'.
+// If netlist is T then stop at standard cells and only emit a netlist.
+// [path] is a path to the directory where the verilog files will be written,
+// including the final `/`
 let separated_pexlif2verilog netlist {path::string} {pex::pexlif} =
-    val (PINST name attrs lf fa_inps fa_outs ints body) = pex in
+    val (PINST name attrs lf fa_inps fa_outs ints body) = pex then
     let non_matching_io (f,as) = (length as != 1) OR (f != (hd as)) in
     let idx = find_first0 non_matching_io (fa_inps @ fa_outs) then
-    let pex' = idx = 0 =>
-		pex |
-		let mk_io fa = map (\v. v, [v]) (md_extract_vectors (flatmap snd fa)) in
-		let fa_inps' = mk_io fa_inps in
-		let fa_outs' = mk_io fa_outs in
-		PINST name attrs F fa_inps' fa_outs' [] (P_HIER [pex])
+    let pex' =
+	idx = 0 =>
+	pex |
+	let mk_io fa = map (\v. v, [v]) (md_extract_vectors (flatmap snd fa)) in
+	let fa_inps' = mk_io fa_inps in
+	let fa_outs' = mk_io fa_outs in
+	PINST name attrs F fa_inps' fa_outs' [] (P_HIER [pex])
     then
-    let descriptions = pretty_pexlif_h netlist "" pex' then
-    let do1 (d, ID (inst), l) =
-		let file = sprintf "%s%s.v" path inst in
-		let fp = fopen file "w" in
-		(sitlist (\ins. \ig. val (ID s) = ins in
-				(fprintf fp "`include \"%s.v\"\n" s)) l ()) fseq
-		(fprintf fp "\n") fseq
-		(frender fp (p_source_text (Source_text [d]))) fseq
-		(fprintf fp "\n") fseq
-		(fclose fp)
+    (pexlif2verilog_start ()) fseq
+    (pretty_pexlif_h netlist "" pex') fseq
+    let results = pexlif2verilog_end () then
+    let do1 (module_name, descr) =
+	let file = sprintf "%s%s.v" path module_name in
+	let fp = fopen file "w" in
+	(frender fp (p_source_text (Source_text [descr]))) fseq
+	(fprintf fp "\n") fseq
+	(fclose fp)
     in
-    foreach do1 descriptions
+    (foreach do1 results)
 ;
 
 end_abstype safe_pexlif2verilog pexlif2verilog separated_pexlif2verilog;

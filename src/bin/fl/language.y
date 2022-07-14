@@ -788,7 +788,8 @@ decl		: LET fn_defs
 			$$.line = $1.line;
 			$$.var  = $2.var;
 			if( debug_on ) {
-			    g_ptr dbg = Make_Debug_Primitive($2.var);
+			    g_ptr dbg = Make_Debug_Primitive($2.var,
+							     $1.file, $1.line);
 			    $$.expr = Add_args($2.cnt,
 					       Make_APPL_ND(dbg, $2.expr));
 			} else {
@@ -808,7 +809,8 @@ decl		: LET fn_defs
 			$$.line = $1.line;
 			$$.var  = $2.var;
 			if( debug_on ) {
-			    g_ptr dbg = Make_Debug_Primitive($2.var);
+			    g_ptr dbg = Make_Debug_Primitive($2.var,
+							     $1.file, $1.line);
 			    $$.expr = Make_1inp_Primitive(P_Y,
 				    Make_Lambda($2.var,
 					Add_args($2.cnt,
@@ -833,7 +835,8 @@ cache_decl	: C_LET fn_defs
 
 			res = $2.expr;
 			if( debug_on ) {
-			    g_ptr dbg = Make_Debug_Primitive($2.var);
+			    g_ptr dbg = Make_Debug_Primitive($2.var,
+							     $1.file, $1.line);
 			    res = Make_APPL_ND(dbg, res);
 			}
 			if( $2.cnt > 0 ) {
@@ -864,7 +867,8 @@ cache_decl	: C_LET fn_defs
 
 			res = $2.expr;
 			if( debug_on ) {
-			    g_ptr dbg = Make_Debug_Primitive($2.var);
+			    g_ptr dbg = Make_Debug_Primitive($2.var,
+							     $1.file, $1.line);
 			    res = Make_APPL_ND(dbg, res);
 			}
 			if( $2.cnt > 0 ) {
