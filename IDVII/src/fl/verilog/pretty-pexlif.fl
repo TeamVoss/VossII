@@ -805,11 +805,6 @@ let pexlif2verilog_end {dummy::void} = (deref module_store_descr_list_ref);
 non_lazy pexlif2verilog_end;
 
 
-// Since we have not loaded isomatch.fl!
-forward_declare {isomatch :: pexlif->pexlif->(((int#(int#match)) list) list)};
-forward_declare {get_match_sub :: match -> ((string#string) list)};
-
-
 let DBG_p = ref {(error "not yet"):: pexlif};
 let DBG_needle = ref {(error "not yet"):: pexlif};
 let DBG_c = ref {(error "not yet"):: pexlif};

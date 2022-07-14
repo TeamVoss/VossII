@@ -11,6 +11,8 @@ fprintf stdinfo ".";
 fprintf stdinfo ".";
 (cload (DIR^"/pexlif.fl")) fseq
 fprintf stdinfo ".";
+(cload (DIR^"../isomatch/isomatch.fl")) fseq
+fprintf stdinfo ".";
 (cload (DIR^"../verilog/pretty-pexlif.fl")) fseq
 fprintf stdinfo ".";
 (cload (DIR^"/hfl.fl")) fseq
@@ -26,8 +28,6 @@ fprintf stdinfo ".";
 (cload (DIR^"/relational_ste.fl")) fseq
 fprintf stdinfo ".";
 (cload (DIR^"/miter.fl")) fseq
-fprintf stdinfo ".";
-(cload (DIR^"../isomatch/isomatch.fl")) fseq
 fprintf stdinfo ".";
 (cload (DIR^"/normalize_pexlif.fl")) fseq
 fprintf stdinfo ".";

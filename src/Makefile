@@ -39,6 +39,8 @@ DOC_DIR := $(ROOT_DIR)/doc
 MINISAT_DIR := $(SRC_DIR)/external/minisat
 # Yosys installation directory
 YOSYS_DIR := $(SRC_DIR)/external/yosys
+# Yosys patch directory
+YOSYS_PATCH_DIR := $(SRC_DIR)/external/yosys_Voss_patches
 # circuit-isomatch installation directory
 CKT_ISO_MATCH_DIR := $(SRC_DIR)/external/circuit-isomatch/src
 # Visualization installation directory
@@ -240,7 +242,10 @@ $(YOSYS_PATCHED_MAKEFILE):
 	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f $(YOSYS_PATCHED_MAKEFILE)
 	touch .yosys
 
-.yosys_pexlif: $(YOSYS_DIR)/backends/pexlif/pexlif.cc
+.yosys_pexlif: $(YOSYS_PATCH_DIR)/backends/pexlif/pexlif.cc \
+	       $(YOSYS_PATCH_DIR)/frontends/ast/genrtlil.cc 
+	cp $(YOSYS_PATCH_DIR)/backends/pexlif/pexlif.cc $(YOSYS_DIR)/backends/pexlif/pexlif.cc
+	cp $(YOSYS_PATCH_DIR)/frontends/ast/genrtlil.cc $(YOSYS_DIR)/frontends/ast/genrtlil.cc
 	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f $(YOSYS_PATCHED_MAKEFILE)
 	touch .yosys_pexlif
 
