@@ -65,7 +65,7 @@ Then, from the root of the VossII repository (assuming you've already
 cloned it), run:
 
 ```shell
-make -C src install
+make -C src install_all
 ```
 
 This will build Voss II and install it _into the repository root directory_.
