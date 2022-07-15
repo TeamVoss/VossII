@@ -1,0 +1,118 @@
+// Compute the intersection of two lists of vectors.
+// The result is equivalent to
+//	md_extract_vectors
+//	    ((md_expand_vectors vl1) intersect (md_expand_vectors vl1))
+// but (hopefully) a lot faster.
+//
+let vec_intersect vl1 vl2 =
+    let mk l =
+        let b = fst (hd l) then
+        let v = md_extract_vectors (map snd l) then
+        (b,v)
+    in
+    let direct = vl1 intersect vl2 then
+    let bl1 = map (\v. get_vector_signature v, v) (vl1 subtract direct) then
+    let p1 = map mk (partition fst bl1) then
+    let bl2 = map (\v. get_vector_signature v, v) (vl2 subtract direct) then
+    let p2 = map mk (partition fst bl2) then
+    let base_intersection = (map fst p1) intersect (map fst p2) then
+    let find_intersection b =
+        let nds1 = md_expand_vectors (assoc b p1) then
+        let nds2 = md_expand_vectors (assoc b p2) then
+        let nds = nds1 intersect nds2 then
+        md_extract_vectors nds
+    in
+    let rem = flatmap find_intersection base_intersection then
+    md_extract_vectors (direct @ rem)
+;
+infix 7 vec_intersect;
+
+// Compute the subtraction of a list of vectors from another list of vectors.
+// The result is equivalent to
+//	md_extract_vectors
+//	    ((md_expand_vectors vl1) subtract (md_expand_vectors vl1))
+// but (hopefully) a lot faster.
+//
+let vec_subtract vl1 vl2 =
+    let mk l =
+        let b = fst (hd l) then
+        let v = md_extract_vectors (map snd l) then
+        (b,v)
+    in
+    let bl1 = map (\v. get_vector_signature v, v) vl1 then
+    let p1 = map mk (partition fst bl1) then
+    let bl2 = map (\v. get_vector_signature v, v) vl2 then
+    let p2 = map mk (partition fst bl2) then
+    let do_subtract b =
+        let v1s = assoc b p1 then
+        let v2s = (assoc b p2) catch [] then
+        let in_both = v1s intersect v2s then
+        let nds1 = md_expand_vectors (v1s subtract in_both) in
+        let nds2 = md_expand_vectors (v2s subtract in_both) in
+        md_extract_vectors (nds1 subtract nds2)
+    in
+    let rem = flatmap do_subtract (map fst p1) then
+    md_extract_vectors rem
+;
+infix 7 vec_subtract;
+
+// Compute the zip of two lists of vectors.
+// Note that the the individual vectors do not need to match, although
+// the total length must of course be equal.
+let vec_zip as bs =
+    letrec do_zip (pv:pvs) (gv:gvs) =
+        let psz = md_size pv in
+        let gsz = md_size gv in
+        (psz = gsz) => (pv,gv):(do_zip pvs gvs) |
+        let use = min psz gsz in
+        let ps = md_expand_vector pv in
+        let gs = md_expand_vector gv in
+        let p1 = hd (md_merge_vectors (firstn use ps)) in
+        let g1 = hd (md_merge_vectors (firstn use gs)) in
+        let prem = md_merge_vectors (butfirstn use ps) in
+        let grem = md_merge_vectors (butfirstn use gs) in
+        (p1,g1):(do_zip (prem@pvs) (grem@gvs))
+     /\   do_zip [] [] = []
+     /\   do_zip pvs gvs =
+            eprintf "length mismatch in vec_zip |%S| != |%S|" as bs
+    in
+    do_zip as bs
+;
+
+
+clet get_signatures vs =
+    let p = partition fst (map (\v. get_vector_signature v, v) vs) in
+    let mk1 l =
+	let sig = fst (hd l) in
+	sig,(map snd l)
+    in
+    map mk1 p
+;
+
+// 
+let vec_assoc {vec::string} {vsub::(string#string) list} =
+    [(assoc vec vsub)] gen_catch (\msg.
+    NOT (str_is_substr "failed to find element" msg) => error msg |
+    (
+    let sigs = get_signatures (map fst vsub) in
+    let vsig = get_vector_signature vec in
+    let pots = assoc vsig sigs in
+    let pot_res = map (\v. assoc v vsub) pots in
+    let exp_from = md_expand_vectors pots in
+    let exp_to   = md_expand_vectors pot_res in
+    let sub = zip exp_from exp_to in
+    let res = map (\n. assoc n sub) (md_expand_vector vec) then
+    md_merge_vectors res
+    ) gen_catch
+    (\msg.  eprintf "vec_assoc: Failed to find: %s in %S\n%s"
+		    vec (map (\(f,t).sprintf "(%s->%s)" f t) vsub) msg)
+);
+
+// 
+let vec_rev_assoc {vec::string} {vsub::(string#string) list} =
+    [(rev_assoc vec vsub)] gen_catch (\msg.
+    NOT (str_is_substr "failed to find element" msg) => error msg |
+    let r_vsub = map (\(f,t).t,f) vsub in
+    vec_assoc vec r_vsub
+);
+

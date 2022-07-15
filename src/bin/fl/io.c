@@ -15,7 +15,6 @@
 extern g_ptr    void_nd;
 extern str_mgr  strings;
 extern char     FailBuf[4096];
-extern bool	debug_on;
 extern string	Voss_tmp_dir;
 extern int	RCmax_stack_trace_entries;
 extern buffer	ext_obj_buf;

@@ -11,7 +11,7 @@
 #include "error.h"
 
 /***** REFERENCED GLOBAL VARIABLES *****/
-extern bool		debug_on;
+extern bool		RCadd_debug_info;
 extern jmp_buf		*start_envp;
 extern bool		file_load;
 extern FILE		*yyin;
@@ -163,7 +163,7 @@ Fail_pr (const string format, ...)
     res = strtemp("---  ");
     res = strappend(fbuf);
     res = charappend('\n');
-    if( debug_on && strstr(res, "Stack trace:\n") == 0 ) {
+    if( RCadd_debug_info && strstr(res, "Stack trace:\n") == 0 ) {
 	strappend(Get_stack_trace(RCmax_stack_trace_entries));
     }
     strncpy(FailBuf, res, 4096-1);

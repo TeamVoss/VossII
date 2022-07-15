@@ -20,7 +20,6 @@
 
 /* ======================== Global variables ======================== */
 string      Voss_tmp_dir = NULL;
-bool        debug_on = TRUE;
 char        *prompt = ": ";
 bool        compile_to_C_flag = FALSE;
 FILE        *v_order_fp = NULL;
@@ -57,6 +56,7 @@ extern int		LG_TBL_SIZE;
 extern old_yyin_ptr	cur_file;
 extern bool		file_load;
 extern string		binary_location;
+extern bool		RCadd_debug_info;
 
 bool	do_parse(bool flush);
 bool	perform_fl_command(string txt);
@@ -241,7 +241,7 @@ fl_main(int argc, char *argv[])
         } else
         if( strcmp(argv[1], "-d") == 0 ) {
 	    // Turn off function tracing information
-            debug_on = FALSE;
+            RCadd_debug_info = FALSE;
             argc--, argv++;
         } else
         if( (strcmp(argv[1], "-use_stdin") == 0) ||

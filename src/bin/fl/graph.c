@@ -16,7 +16,7 @@
 extern bool		cephalopode_mode;
 extern bool		compile_to_C_flag;
 extern bool		transitive_visibility;
-extern bool		debug_on;
+extern bool		RCadd_debug_info;
 extern bool		Do_gc_asap;
 extern bool		Interrupt_asap;
 extern bool		print_warnings;
@@ -2220,7 +2220,7 @@ Get_stack_trace(int max_entries)
     char    ibuf[16];
     string *namep;
     string res;
-    if( debug_on ) {
+    if( RCadd_debug_info ) {
 	tstr_ptr ts = new_temp_str_mgr();
 	res = gen_strtemp(ts, "Stack trace:\n");
 	int cnt = COUNT_BUF(&fn_trace_buf);

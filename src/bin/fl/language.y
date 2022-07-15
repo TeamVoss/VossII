@@ -10,7 +10,7 @@ int Dbg_en = 0;
 
 /* --------------- External references --------------- */
 extern bool	file_load;
-extern bool	debug_on;
+extern bool	RCadd_debug_info;
 extern char	*space_const;
 extern char	*prompt;
 extern str_mgr	strings;
@@ -787,7 +787,7 @@ decl		: LET fn_defs
 			$$.file = $1.file;
 			$$.line = $1.line;
 			$$.var  = $2.var;
-			if( debug_on ) {
+			if( RCadd_debug_info ) {
 			    g_ptr dbg = Make_Debug_Primitive($2.var,
 							     $1.file, $1.line);
 			    $$.expr = Add_args($2.cnt,
@@ -808,7 +808,7 @@ decl		: LET fn_defs
 			$$.file = $1.file;
 			$$.line = $1.line;
 			$$.var  = $2.var;
-			if( debug_on ) {
+			if( RCadd_debug_info ) {
 			    g_ptr dbg = Make_Debug_Primitive($2.var,
 							     $1.file, $1.line);
 			    $$.expr = Make_1inp_Primitive(P_Y,
@@ -834,7 +834,7 @@ cache_decl	: C_LET fn_defs
 			g_ptr	res;
 
 			res = $2.expr;
-			if( debug_on ) {
+			if( RCadd_debug_info ) {
 			    g_ptr dbg = Make_Debug_Primitive($2.var,
 							     $1.file, $1.line);
 			    res = Make_APPL_ND(dbg, res);
@@ -866,7 +866,7 @@ cache_decl	: C_LET fn_defs
 			g_ptr	res;
 
 			res = $2.expr;
-			if( debug_on ) {
+			if( RCadd_debug_info ) {
 			    g_ptr dbg = Make_Debug_Primitive($2.var,
 							     $1.file, $1.line);
 			    res = Make_APPL_ND(dbg, res);

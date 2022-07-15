@@ -69,6 +69,8 @@ set voss2_preferences {
         "Ignore X on condition if then and else are equal" "bool" "TRUE"}
 
  {"Verbosity" "" "" "header"  ""}
+    {"ADD-DEBUG-INFO" "RCadd_debug_info"
+        "Include file & line number in functions for stack traces" "bool"  "TRUE"}
     {"VERBOSE_CLOAD_IGNORES" "RCverbose_cload_ignores"
         "Notify when cload does not need to load" "bool"  "FALSE"}
     {"VERBOSE-GARBAGE-COLLECTION" "RCverbose_GC"

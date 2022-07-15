@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
+let __old_debug_on__ = update_vossrc "ADD-DEBUG-INFO" "FALSE";
+__old_debug_on__ fseq ();
+
 // Dummy
 let ___z = 0;
 
@@ -1535,3 +1538,5 @@ let get_symbol_signature fn = (defix get_symbol_signature) fn;
 
 // The id of the user invoking fl.
 let USER = (defix USER);
+
+(update_vossrc "ADD-DEBUG-INFO" __old_debug_on__) fseq ();
