@@ -400,7 +400,7 @@ draw_graph_rec(FILE *fp, hash_record *hp, int depth, bool do_addr,
 				return res;
 			    }
 			    default:
-				Sprintf(txt, "%s", Get_pfn_name(node));
+				Sprintf(txt, "%s", Get_pfn_name(node, TRUE));
 				break;
 			}
 			if( do_addr )

@@ -446,7 +446,7 @@ SHA256_traverse_graph(int *g_cntp, hash_record *g_tblp,
 		    {
 			switch ( GET_PRIM_FN(node) ) {
 			    case P_EXTAPI_FN:
-				SHA256_printf(sha, "%d=EFN(%s)",
+				SHA256_printf(sha, "%d=EFN(%s)\n",
 						res,
 						Get_ExtAPI_Function_Name(
 							GET_EXTAPI_FN(node)));
@@ -479,8 +479,8 @@ SHA256_traverse_graph(int *g_cntp, hash_record *g_tblp,
 				return res;
 			    }
 			    default:
-				SHA256_printf(sha, "%d=PFN %s", res, 
-						Get_pfn_name(node));
+				SHA256_printf(sha, "%d=PFN %s\n", res, 
+						Get_pfn_name(node, FALSE));
 				return res;
 			}
 		    }
@@ -501,12 +501,12 @@ SHA256_traverse_graph(int *g_cntp, hash_record *g_tblp,
 		    }
 		case VAR:
 		    s = GET_VAR(node);
-		    SHA256_printf(sha, "%d=VAR %s", res, s);
+		    SHA256_printf(sha, "%d=VAR %s\n", res, s);
 		    return res;
 		case USERDEF:
 		{
 		    fn_ptr fn = GET_USERDEF(node);
-		    SHA256_printf(sha, "%d=UD %s", res, fn->signature);
+		    SHA256_printf(sha, "%d=UD %s\n", res, fn->signature);
 		    return res;
 		}
 		default:

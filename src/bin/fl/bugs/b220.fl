@@ -1,0 +1,13 @@
+
+begin_abstype;
+
+let foo x y = 2*x + 2*y;
+
+let bar x = foo x x;
+
+let foo x y = x+y;
+
+end_abstype foo bar;
+
+foo 1 1;
+bar 1;

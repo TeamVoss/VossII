@@ -26,7 +26,7 @@ vec_ptr	       Split_vector_name(
                    ustr_mgr *string_mgrp, rec_mgr *vector_mgrp,
                    rec_mgr *range_mgrp, string vec);
 string         Get_vector_signature(ustr_mgr *string_mgrp, vec_ptr vp);
-int	           Get_Vector_Size(string vec);
+int	       Get_Vector_Size(string vec);
 vec_list_ptr   Expand_vector(
                    rec_mgr *vector_list_mgr, rec_mgr *vector_mgr,
                    rec_mgr *range_mgr, vec_ptr vec);

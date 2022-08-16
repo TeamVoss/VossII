@@ -74,11 +74,15 @@ overload {>= :: *a -> *a -> bool} i_ge f_ge bv_geq bev_geq;
 infix 5 >=;
 
 let gen_str2int s =
-    str_is_prefix "0x" s => sscanf "0x%x" s |
-    str_is_prefix "0b" s => sscanf "0b%b" s |
+    val (neg,s) = 
+	let s0 = string_hd s in
+	s0 = "-" => (-1, string_tl s) | (1, s)
+    in
+    str_is_prefix "0x" s => neg*(sscanf "0x%x" s) |
+    str_is_prefix "0b" s => neg*(sscanf "0b%b" s) |
     let s0 = string_hd s in
     let os = ord s0 in
-    (ord "0" <= os) AND (os <= ord "9") => sscanf "%d" s |
+    (ord "0" <= os) AND (os <= ord "9") => neg*(sscanf "%d" s) |
     eprintf "%s is not a valid integer" s
 ;
 
@@ -1476,7 +1480,12 @@ let prim_fns = [
 clet primfn2name i = 
     (assoc i prim_fns) catch (sprintf "<PFN %d>" i)
 ;
-end_abstype primfn2name;
+clet name2primfn name =
+    (rev_assoc name prim_fns)
+    gen_catch
+    (eprintf "No primitive function named '%s'\n" name)
+;
+end_abstype primfn2name name2primfn;
 
 let Pleaftype (INT i) = sprintf "%d" i
  /\ Pleaftype (STRING s) = sprintf "\"%s\"" s

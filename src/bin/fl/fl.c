@@ -174,7 +174,8 @@ read_line(FILE *fp, bool once)
 	string s = fgets(buf,TCL_CMD_BUF_SZ-1, fp);
 	if( s != NULL || once ) { return s; }
 	if( errno != EWOULDBLOCK ) {
-	    fprintf(stderr, "WHAT??? errno=%d\n", errno);
+	    buf[0] = 0;
+	    return buf;
 	}
     }
 }

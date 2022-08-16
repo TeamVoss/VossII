@@ -118,17 +118,24 @@ typedef struct fa_subst_rec {
     hash_record_ptr subst;
 } fa_subst_rec;
 
-#define DEST_GET(n)									                           \
-	ASSERT( GET_TYPE(node) == CONS_ND );			                           \
-	(n)  = GET_SND(node);							                           \
+typedef struct signature_rec {
+	string		name;
+	string		signature;
+	g_ptr		fa_inps;
+	g_ptr		fa_outs;
+} signature_rec;
+
+#define DEST_GET(n)							       \
+	ASSERT( GET_TYPE(node) == CONS_ND );				       \
+	(n)  = GET_SND(node);						       \
 	node = GET_FST(node);
 
 #define IS_CONSTRUCTOR(name,nd)                                                \
     (IS_LEAF(nd) && IS_STRING(nd) && STREQ(GET_STRING(nd), s_##name))
 
-#define EXTRACT(n)												               \
-	if( GET_TYPE(node) != CONS_ND ) { return FALSE; }			               \
-	(n)  = GET_SND(node);										               \
+#define EXTRACT(n)						               \
+	if( GET_TYPE(node) != CONS_ND ) { return FALSE; }	               \
+	(n)  = GET_SND(node);					               \
 	node = GET_FST(node);
 
 #define FORMAL_OF_CONS(fa)                                                     \

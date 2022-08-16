@@ -1,0 +1,357 @@
+
+//------------------------------------------------------------------------------
+// Generation of a PEXLIF.
+//------------------------------------------------------------------------------
+
+let segment_at_random 1  = [1]
+/\  segment_at_random sz =
+        let r = random 1 sz in
+        ((sz / r) + (sz % r)) : (replicate ((sz / r) - 1) r)
+;
+non_lazy segment_at_random;
+
+let split_at_random2 [ ] = error "Internal: split_at_random2 [ ]"
+/\  split_at_random2 [_] = error "Internal: split_at_random2 [_]"
+/\  split_at_random2 xs  = split_at (random 2 (length xs)) xs
+;
+non_lazy split_at_random2;
+// note: when, for example, splitting slices we can't have either list.
+
+let slice_at_random lz hz =
+        let lsb = random 0 (hz-lz) in
+        lsb upto (lsb+lz-1)
+;
+non_lazy slice_at_random;
+// note: old (below) doesn't work as wee need contig. slices.
+//   repeat (hz-lz) remove_one (0 upto hz)
+
+begin_abstype;
+
+letrec
+    gen_wexpr_inputs
+        {is :: (wexpr#int) list}
+        {sz :: int}
+        =
+        val (i,s) = one_of is in
+        s < sz =>
+            one_of_weighted
+                [ (1, [W_SX sz i])
+                , (1, [W_ZX sz i])
+                , (2, i : gen_wexpr_inputs is (sz-s))] |
+        s > sz =>
+            [W_SLICE (slice_at_random sz s) i] |
+        [i]
+;
+non_lazy gen_wexpr_inputs;
+
+let gen_wexpr_const
+        {sz :: int}
+        =
+        W_CONST sz (random2 sz)
+;
+non_lazy gen_wexpr_const;
+
+let gen_wexpr_input
+        {is :: (wexpr#int) list}
+        {sz :: int}
+        =
+        let inputs = one_of_weighted
+                [ (1, [gen_wexpr_const sz])
+                , (3, gen_wexpr_inputs is sz)
+                ]
+        in
+        length inputs == 1 => hd inputs | W_CAT inputs
+;
+non_lazy gen_wexpr_input;
+
+letrec
+    gen_wexpr
+        {is :: (wexpr#int) list}
+        {ts :: (wexpr#int) list}
+        {sz :: int}
+        {d  :: int}
+        =
+        //(printf "gen_wexpr sz=%d |ts|=%d d=%d\n" sz (length ts) d) fseq
+        // If complexity 'd' is satisfied and 'ts' distributed, build leaf.
+        (d <= 0) AND (length ts == 0) => gen_wexpr_input is sz |
+        // If 'd' is satisfied, but some 't' is unused, pick that.
+        (d <= 0) => gen_wexpr_input ts sz |
+        // todo: make sure t is used?
+        // Misc. for unary/binary ops.
+        let gen_unary sz     = gen_wexpr is ts sz (d - 1) in
+        let gen_binary sz ts = gen_wexpr is ts sz (d / 2) in
+        let v   = random 1 (max 1 (log2 (max 1 sz))) in // rand. val. for const.
+        let ssz = one_of [1,2,4,8,16,32] in // size hidden under ==, >.
+        val (as, bs) = split_at_random ts in
+        // Weights for choices, 1=valid & 0=invalid.
+        let as_valid T = 1
+        /\  as_valid F = 0
+        in
+        let d_0  = as_valid (d  <= 0) then
+        let d_X  = as_valid (d  >  0) then
+        let sz_1 = as_valid (sz == 1) then
+        let sz_X = as_valid (sz >  1) then
+        // Pick a valid PINST op.
+        one_of_weighted (filter (defix < 0 # fst)
+            [ (d_0,  W_NOT  (gen_unary sz))
+            , (d_X,  W_AND  (gen_binary sz as)  (gen_binary sz bs))
+            , (d_X,  W_OR   (gen_binary sz as)  (gen_binary sz bs))
+            , (d_X,  W_LAT_LEQ  (gen_binary sz as)  (gen_binary sz bs))
+            , (sz_1, W_EQ   (gen_binary ssz as) (gen_binary ssz bs))
+            , (sz_1, W_GR   (gen_binary ssz as) (gen_binary ssz bs))
+            , (sz_X, W_ADD  (gen_binary sz as)  (gen_binary sz bs))
+            , (sz_X, W_SUB  (gen_binary sz as)  (gen_binary sz bs))
+            , (sz_X, W_MUL  (gen_binary sz as)  (gen_binary sz bs))
+            // note: Yosys OPT phase simplifies division by zero to constant X,
+            // which simulation doesn't catch.
+            , (sz_X, W_DIV  (gen_binary sz as)  (gen_binary sz bs))
+            // Yosys treats first argument as a signed value always?
+            , (sz_X, W_MOD  (gen_binary sz as)  (gen_binary sz bs))
+            , (sz_X, W_SHL  (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
+            , (sz_X, W_SHR  (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
+         // Declare first arg. as signed to get the correct behaviour.
+            , (sz_X, W_ASHR (gen_wexpr is ts sz (d - 1)) (W_CONST sz v))
+            , (d_X,  val (cs, ds)   = split_at 2 ts in
+                     val (es, fs)   = split_at_random ds in
+                     let gen ts sz  = gen_wexpr is ts sz (d / 3) in
+                     W_ITE (gen cs 1) (gen es sz) (gen fs sz))
+            , (sz_X, let sz_l = sz > 1 => random 1 (sz-1) | 1 in
+                     let sz_r = sz-sz_l in
+                     let wl   = gen_wexpr is as sz_l (d / 2) in
+                     let wr   = gen_wexpr is bs sz_r (d / 2) in
+                     W_CAT [wl, wr])
+          // todo: CAT more than two?
+          // note: Slices are done at leaves to ensure variable args.
+          // , W_PRED ?! ?!
+          // , W_NAMED_SLICE ?! ?! ?!
+          // , W_UPDATE_NAMED_SLICE ?! ?! ?! ?!
+          // , W_MEM_WRITE ?! ?! ?! ?!
+            ])
+;
+non_lazy gen_wexpr;
+
+let gen_update_fn
+        {is    :: (wexpr#int) list} // Global inputs
+        {ts    :: (wexpr#int) list} // Internals connected to this wire
+        {(o,s) :: (wexpr#int)}      // Wire to be assigned
+        {delay :: bool}             // phase-delay or update-fn?
+        {d     :: int}              // Complexity of assignment
+        =
+        (delay => W_PHASE_DELAY | W_UPDATE_FN) o (gen_wexpr is ts s d)
+;
+non_lazy gen_update_fn;
+
+let gen_update_fn_internals
+        {sc    :: (bool list) list} // Connection schema for internals.
+        {is    :: (wexpr#int) list}
+        {ts    :: (wexpr#int) list} // Internals to assign (ordered as in 'sc').
+        {delay :: bool}
+        {d     :: int}
+        =
+        let inputs = map (map fst # filter snd # zip ts) sc in
+        map (\(t,i). gen_update_fn is (el i inputs) t delay d) (ixlabel ts)
+;
+non_lazy gen_update_fn_internals;
+
+let extend_wires
+        {xs   :: (wexpr#int) list}
+        {size :: int}
+        =
+        let split (x, s) =
+                val (ls, rs) = split_at_random2 ((s - 1) downto 0) in
+                let slice is = (W_SLICE is x, length is) in
+                [slice ls, slice rs]
+        in
+        let extend (x, s) =
+                let b2i b = b => 1 | 0 in
+                let p = (x, s) in
+                one_of_weighted
+                    [ (1,            [p])
+                    , (b2i (s >= 1), [p, p])
+                    , (b2i (s != 1), (split p)) ]
+        in
+        letrec
+            pad [] = error "pad called with empty list"
+        /\  pad xs = length xs >= size => xs | pad $ concat $ map extend xs
+        in
+        pad xs
+;
+non_lazy extend_wires;
+
+let gen_update_fn_outputs
+        {is    :: (wexpr#int) list}
+        {ts    :: (wexpr#int) list} // Internals to drive outputs.
+        {os    :: (wexpr#int) list} // Outputs to be assigned.
+        {delay :: bool}
+        {d     :: int}
+        =
+        // If there aren't enough inputs to drive each output, then we must
+        // first extend them by splitting/copying/... their wires.
+        let l_os = length os in
+        let xs'  = extend_wires ts l_os in
+        map2 (\ts. \o. gen_update_fn is ts o delay d) (split_into l_os xs') os
+;
+non_lazy gen_update_fn_outputs;
+
+let gen_wires
+        {pre   :: string}
+        {sizes :: int list}
+        {num   :: int}
+        =
+        // When selecting a size, prefer known sizes over the random choice.
+        let hist_sz = map swap (hist sizes) in
+        let random_size x =
+                one_of_weighted
+                    [ (1, one_of [1,2,4,8,16,32]),
+                      (2, one_of_weighted hist_sz) ]
+        in
+        // Build internal wires for node 'ix' and give it a random size.
+        let new_internal i =
+                let sz   = random_size i in
+                let name = pre ^ (int2str i) in
+                (W_VAR sz name, sz)
+        in
+        map new_internal (1 upto num)
+;
+non_lazy gen_wires;
+
+let gen_pinst_update_fn_leaf
+        {sc    :: (bool list) list}
+        {is    :: (wexpr#int) list}
+        {ts    :: (wexpr#int) list}
+        {os    :: (wexpr#int) list}
+        {delay :: bool}
+        {d     :: int}
+        =
+        // note: nodes without outgoing edges are connected to outputs.
+        let ts_o  = map snd $ filter fst $ zip (map (NOT # any id) sc) ts in
+        let fns_t = gen_update_fn_internals sc is ts delay d in
+        let fns_o = gen_update_fn_outputs is ts_o os delay d in
+        P_LEAF (fns_t @ fns_o)
+;
+non_lazy gen_pinst_update_fn_leaf;
+
+let gen_DAG_with_threshold n p =
+        letrec
+            map_from _ []     _ = []
+        /\  map_from f (x:xs) 0 = f x : map_from f xs 0
+        /\  map_from f (x:xs) i = x   : map_from f xs (i-1)
+        in
+        let flip F = randomf 32 > p in
+        let empty  = replicate n (replicate n F) in
+        let marked = ixmap (map_from flip) empty in
+        marked
+;
+non_lazy gen_DAG_with_threshold;
+
+let gen_DAG n =
+        gen_DAG_with_threshold n
+            (fdiv (fmul 2.0 (log (int2float n))) (int2float n))
+;
+non_lazy gen_DAG;
+
+let formal_to_wire f =
+        let sz = md_size f in
+        let n  = sz == 1 => f | hd (str_split f "[") in
+        (W_VAR sz n, sz)
+;
+
+let wire_to_formal (W_VAR sz n, _) =
+        sz == 1 => n | sprintf "%s[%d:0]" n (sz-1);
+;
+
+let gen_pinst_leaf
+        {name  :: string}
+        {fa_is :: (string#(string list)) list}
+        {fa_os :: (string#(string list)) list}
+        {delay :: bool}
+        {size  :: int}
+        {d     :: int}
+        =
+        // Build wexpr variables for each formal.
+        let is = map (formal_to_wire # fst) fa_is in
+        let os = map (formal_to_wire # fst) fa_os in
+        // Generate DAG that dictates body of PINST and then fill it with
+        // semi-random, combinatorial update-functions.
+        let sc   = gen_DAG size in
+        let ts   = gen_wires "i" (map snd (is @ os)) (length sc) in
+        let leaf = gen_pinst_update_fn_leaf sc is ts os delay d in
+        // ...
+        PINST name [] T fa_is fa_os (map wire_to_formal ts) leaf
+;
+non_lazy gen_pinst_leaf;
+
+let gen_pinst
+        {fa_is :: (string#(string list)) list}
+        {fa_os :: (string#(string list)) list}
+        {size  :: int}
+        {d     :: int}
+        =
+        // Split inputs between comb. & seq. parts of PINST, with the biggest
+        // of the two going towards comb. logic to ensure it can drive updates.
+        let ord (as, bs) = length as >= length bs => (as, bs) | (bs, as) in
+        val (fa_is_c, fa_is_s) = ord $ split_at_random fa_is in
+        val (fa_os_c, fa_os_s) = ord $ split_at_random fa_os in
+        // Connect comb. & seq. parts via internals and build additional
+        // internals wires to make up for inputs directed to comb. logic.
+        let sizes  = map (md_size # fst) $ (fa_is @ fa_os) in
+        let var_cs = gen_wires "ct" sizes (max 1 (length fa_is_c)) in
+        let var_sc = gen_wires "st" sizes (max 1 (length fa_is_s)) in
+        // ..
+        let actual v = (v, [v]) in
+        let f_cs = map (actual # wire_to_formal) var_cs in // comb. -> seq.
+        let f_sc = map (actual # wire_to_formal) var_sc in // seq.  -> comb.
+        // ...
+        let c = gen_pinst_leaf "comb" (fa_is_c @ f_sc) (fa_os_c @ f_cs) F size d in
+        let s = gen_pinst_leaf "seq"  (fa_is_s @ f_cs) (fa_os_s @ f_sc) T size d in
+        // ...
+        PINST "node" [] F fa_is fa_os (map fst (f_cs @ f_sc)) (P_HIER [c, s])
+;
+non_lazy gen_pinst;
+
+let gen_pinst_hier
+        {sc    :: (bool list) list}
+        {fa_is :: (string#(string list)) list}
+        {f_ts  :: string list}
+        {fa_os :: (string#(string list)) list}
+        {size  :: int}
+        {d     :: int}
+        =
+        let size'    = size / length sc in
+        let actual v = (v, [v]) in
+        // note: nodes whitout outgoing edges are connected to outputs.
+        let ts_i  = map (map fst # filter snd # zip f_ts) sc in
+        let ts_ip = map (\i. empty i => some_of fa_is | map actual i) ts_i in
+        let ns_t  = map2 (\is. \o. gen_pinst is [o] size' d) ts_ip
+                  $ map actual f_ts
+        in
+        // ...
+        let l_os  = length fa_os in
+        let ts_o  = map (actual # snd)
+                  $ filter fst $ zip (map (NOT # any id) sc) f_ts
+        in
+        let ns_o  = map2 (\o. \is. gen_pinst is [o] size' d) fa_os
+                  $ split_into l_os ts_o
+        in
+        P_HIER (ns_t @ ns_o)
+;        
+non_lazy gen_pinst_hier;
+
+let gen_pinst_graph
+        {fa_is :: (string#(string list)) list}
+        {fa_os :: (string#(string list)) list}
+        {size  :: int}
+        {d     :: int}
+        =
+        let sizes = map (md_size # fst) (fa_is @ fa_os) in
+        let sc    = gen_DAG size in
+        let ts    = gen_wires "w" sizes (length sc) in
+        let hier  =
+                gen_pinst_hier sc fa_is (map wire_to_formal ts) fa_os size d
+        in
+        PINST "graph" [] F fa_is fa_os (map wire_to_formal ts) hier
+;
+non_lazy gen_pinst_graph;
+
+end_abstype gen_pinst_leaf gen_pinst gen_pinst_graph;
+

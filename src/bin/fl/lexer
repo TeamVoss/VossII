@@ -54,7 +54,8 @@ old_yyin_ptr	        cur_file = NULL;
 string		        cur_file_name = "stdin";
 jmp_buf			*start_envp;
 
-static bool reading_external_parse_inps = FALSE;
+static bool		reading_external_parse_inps = FALSE;
+static int		pre_ext_parse_line_nbr;
 static rec_mgr		yyin_rec_mgr;
 static int 		print_prompt = 1;
 static char		pbuf[64];
@@ -173,6 +174,7 @@ static hash_record      symbword_tbl;
 <<EOF>>				    {
 					if( reading_external_parse_inps ) {
 					    yypop_buffer_state();
+					    line_nbr = pre_ext_parse_line_nbr;
 					    reading_external_parse_inps = FALSE;
 					} else {
 					    yyterminate();
@@ -527,6 +529,7 @@ end_extern_parsing(string cmd)
 	return;
     }
     reading_external_parse_inps = TRUE;
+    pre_ext_parse_line_nbr = line_nbr;
     yypush_buffer_state(yy_create_buffer(res_fid, YY_BUF_SIZE));
 }
 

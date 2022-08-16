@@ -21,6 +21,7 @@ void		Symbols_Install_Functions();
 void		Mark_symbols();
 g_ptr		Get_Fun_Expr(fn_ptr fp);
 string		Get_tmp_type_string(typeExp_ptr type);
+string		Get_Fun_Signature(fn_ptr fp);
 typeExp_ptr	Get_Fun_Type(fn_ptr fp);
 fn_ptr		Find_Function_Def(symbol_tbl_ptr stbl, string name);
 g_ptr		Find_Function(symbol_tbl_ptr stbl, g_ptr node);

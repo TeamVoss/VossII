@@ -83,6 +83,98 @@ List_GC()
     }
 }
 
+int
+Graph_cmp(const void *p1, const void *p2)
+{
+    g_ptr n1 = (g_ptr) p1;
+    g_ptr n2 = (g_ptr) p2;
+    int res, tp1,tp2;
+  g_cmp_restart:
+    if( n1 == n2 ) return(0);
+    if( n1 == NULL) return(-1);
+    if( n2 == NULL) return(1);
+    tp1 = GET_TYPE(n1);
+    tp2 = GET_TYPE(n2);
+    if( tp1 != tp2 ) { return (tp1-tp2); }
+    switch( tp1 ) {
+	case LAMBDA_ND:
+	    DIE("Should never find LAMBDA_NDs during Graph_cmp");
+	case APPLY_ND:
+	    {
+		res = Graph_cmp(GET_APPLY_LEFT(n1), GET_APPLY_LEFT(n2));
+		if( res != 0 ) { return res; }
+		n1 = GET_APPLY_RIGHT(n1);
+		n2 = GET_APPLY_RIGHT(n2);
+		goto g_cmp_restart;
+	    }
+	case CONS_ND:
+	    {
+		res = Graph_cmp(GET_CONS_HD(n1), GET_CONS_HD(n2));
+		if( res != 0 ) { return res; }
+		n1 = GET_CONS_TL(n1);
+		n2 = GET_CONS_TL(n2);
+		goto g_cmp_restart;
+	    }
+	case LEAF:
+	    {
+		tp1 = GET_LEAF_TYPE(n1);
+		tp2 = GET_LEAF_TYPE(n2);
+		if( tp1 != tp2 ) { return (tp1-tp2); }
+		switch( tp1 ) {
+		    case INT:
+			return( Arbi_cmp(GET_AINT(n1), GET_AINT(n2)) );
+		    case STRING:
+			return( strcmp(GET_STRING(n1), GET_STRING(n2)) );
+		    case BOOL:
+			return( ((int) GET_BOOL(n1)) - ((int) GET_BOOL(n2)) );
+		    case BEXPR:
+			return( PTR2INT(GET_BEXPR(n1))-PTR2INT(GET_BEXPR(n2)) );
+		    case PRIM_FN:
+                        switch ( GET_PRIM_FN(n1) ) {
+                            case P_EXTAPI_FN:
+				return( ((int) GET_EXTAPI_FN(n1)) -
+					((int) GET_EXTAPI_FN(n2)) );
+                            case P_SSCANF:
+                            case P_PRINTF:
+                            case P_SPRINTF:
+                            case P_EPRINTF:
+                            case P_FPRINTF:
+				return( strcmp(GET_PRINTF_STRING(n1),
+					       GET_PRINTF_STRING(n2)) );
+                            case P_REF_VAR: {
+                                int rv1 = GET_REF_VAR(n1);
+				n1 = Get_RefVar(rv1);
+                                int rv2 = GET_REF_VAR(n2);
+				n2 = Get_RefVar(rv2);
+				goto g_cmp_restart;
+                            }
+                            default:
+				return( GET_PRIM_FN(n1) - GET_PRIM_FN(n2) );
+                        }
+		    case EXT_OBJ:
+		    {
+			unint class1 = GET_EXT_OBJ_CLASS(n1);
+			unint class2 = GET_EXT_OBJ_CLASS(n2);
+			if( class1 != class2 ) { return (class1 - class2); }
+			return ( PTR2INT(GET_EXT_OBJ(n1)) -
+				 PTR2INT(GET_EXT_OBJ(n2)) );
+		    }
+		    case VAR:
+			return( strcmp(GET_VAR(n1),GET_VAR(n2)) );
+		    case USERDEF:
+		    {
+			fn_ptr fn1 = GET_USERDEF(n1);
+			fn_ptr fn2 = GET_USERDEF(n2);
+			return( strcmp(Get_Fun_Signature(fn1),
+				       Get_Fun_Signature(fn2)) );
+		    }
+		}
+	    }
+	default:
+	    DIE("Should never happen!");
+    }
+}
+
 
 /********************************************************/
 /*	    EXPORTED EXTAPI FUNCTIONS    		*/
@@ -1254,6 +1346,20 @@ separate(g_ptr redex)
     return;
 }
 
+static void
+gcmp(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr n1, n2;
+    EXTRACT_2_ARGS(redex, n1, n2);
+    int res = Graph_cmp(n1, n2);
+    MAKE_REDEX_INT(redex, res);
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+    return;
+}
+
 void
 List_ops_Install_Functions()
 {
@@ -1434,6 +1540,10 @@ List_ops_Install_Functions()
 					    GLmake_list(tv1)))),
                         separate);
 
+    Add_ExtAPI_Function("gcmp", "11", FALSE,
+			GLmake_arrow(tv1, GLmake_arrow(tv1, GLmake_int())),
+                        gcmp);
+
 }
 
 
@@ -1457,4 +1567,3 @@ get_assoc_tbl_record()
     res->free_list = NULL;
     return res;
 }
-

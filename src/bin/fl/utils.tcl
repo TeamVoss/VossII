@@ -235,7 +235,7 @@ proc util:after_try_program {title choices w status err_msg output} {
                 -command "set ::util_bg(result) $retval"
             pack $w.after.b$retval -side left -padx 10
         }
-        update
+#        update
 	tkwait variable ::util_bg(result)
     }
 }
@@ -299,7 +299,7 @@ proc i_am_busy {} {
 	    mk_busy $w 1
 	}
     }
-    update
+#    update
 }
 
 proc i_am_free {} {
@@ -315,7 +315,7 @@ proc i_am_free {} {
 	    set ::busy_level($w) 0
 	}
     }
-    update
+#    update
 }
 
 proc make_all_active {} {
@@ -525,7 +525,7 @@ proc gui_io:get_data {title texts} {
     foreach ww [winfo children .] {
 	catch {tk busy forget $ww}
     }
-    update
+#    update
     tkwait window $w
 }
 
@@ -723,13 +723,13 @@ proc post_popup {c text_item x y {keep_formatting 0}} {
                                 -fill yellow -outline yellow \
 				-tag pOpUp_TxT]
     $c lower $r2 $r1
-    update
+#    update
 }
 
 
 proc unpost_popup {c} {
     catch {$c delete pOpUp_TxT}
-    update
+#    update
 }
 
 

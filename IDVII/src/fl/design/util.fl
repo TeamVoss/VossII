@@ -90,14 +90,15 @@ let content_get_leaf (P_LEAF fns) = fns;
 
 letrec prim_Ppexlif ind fp (inst,pexlif) =
     val (PINST name attrs leaf inps outs ints body) = pexlif then
-    let pattr a v = (a == "FP") OR (a == "SHA") =>
-            (substr v 1 4) ^ ".." | v
+    (fprintf fp "%s:\n%*s(PINST \"%s\" " inst ind "" name) fseq
+
+    let pattr a v = ((a == "FP") OR (a == "SHA")) AND (strlen v > 6)
+	    => (substr v 1 4) ^ ".." | v
     in
-    let sattrs = list2str T "[" "," "]"
-            (\(a,v). sprintf "%s->%s" a (pattr a v)) attrs
-    in
-    let sleaf = leaf => "T" | "F" then
-    (fprintf fp "%s:\n%*s(PINST \"%s\" %s %s\n" inst ind "" name sattrs sleaf)
+    (list2fp fp T "[" "," "]" (\fp.\(a,v). fprintf fp "%s->%s" a (pattr a v))
+	     attrs)
+    fseq
+    (fprintf fp " %s\n" (leaf => "T" | "F"))
     fseq
     let sinp  = list2str T "[" "," "]" (\(f,a). sprintf "(%s,%S)" f a) inps in
     (fprintf fp "%*s  %s\n" ind "" sinp) fseq

@@ -16,6 +16,7 @@
 void	    List_ops_Init();
 void	    List_ops_Install_Functions();
 void	    List_GC();
+int	    Graph_cmp(const void *p1, const void *p2);
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */

@@ -116,7 +116,7 @@ g_ptr	     Gen_map(g_ptr (*fun)(g_ptr), g_ptr node, bool read_only);
 g_ptr	     Gen_map2(string parent_op, g_ptr (*fun)(g_ptr,g_ptr),
 		      g_ptr l, g_ptr r, bool read_only);
 formula	     Is_equal(g_ptr l1, g_ptr l2, bool identical);
-string	     Get_pfn_name(g_ptr np);
+string	     Get_pfn_name(g_ptr np, bool verbose_debug);
 string	     Get_stack_trace(int max_entries);
 g_ptr	     Get_fl_stack_trace();
 void	     DPR(g_ptr node);

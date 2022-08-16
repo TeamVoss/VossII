@@ -1560,7 +1560,7 @@ Print_leaf(g_ptr node, odests fp)
 #endif
 	    break;
 	case PRIM_FN:
-	    FP(fp, "%s", Get_pfn_name(node)); break;
+	    FP(fp, "%s", Get_pfn_name(node, TRUE)); break;
 	    break;
 	case VAR:
 	    FP(fp, "V_%s", GET_VAR(node));
@@ -2136,12 +2136,16 @@ gen_map_rec(gmap_info_ptr ip, g_ptr node)
 }
 
 string
-Get_pfn_name(g_ptr np)
+Get_pfn_name(g_ptr np, bool verbose_debug)
 {
     int pfn = GET_PRIM_FN(np);
     switch ( pfn ) {
 	case P_DEBUG:
-	    Sprintf(pfn2str_buf, "<%s>", GET_DEBUG_STRING(np));
+	    if( verbose_debug ) {
+		Sprintf(pfn2str_buf, "<%s>", GET_DEBUG_STRING(np));
+	    } else {
+		Sprintf(pfn2str_buf, "P_DEBUG");
+	    }
 	    return pfn2str_buf;
 	case P_PRINTF:
 	    Sprintf(pfn2str_buf, " (printf \"%s\"\n)", GET_PRINTF_STRING(np));
@@ -2691,7 +2695,7 @@ do_trace_dbg(int pfn, g_ptr root)
 		Get_ExtAPI_Function_Name(GET_EXTAPI_FN(root)));
 	    } else {
 		fprintf(stderr, "%d %s\n",
-			force_cnt, Get_pfn_name(root));
+			force_cnt, Get_pfn_name(root, TRUE));
 	    }
 	}
 #ifdef DO_GRAPH_COMPARISON
@@ -6082,7 +6086,7 @@ DPR(g_ptr node)
 			fprintf(stderr, " (P_FAIL \"%s\")\n",
 					GET_FAIL_STRING(node));
 		    } else {
-			fprintf(stderr, " (%s)\n", Get_pfn_name(node));
+			fprintf(stderr, " (%s)\n", Get_pfn_name(node, TRUE));
 		    }
 		    return;
 		case VAR:

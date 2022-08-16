@@ -493,7 +493,8 @@ let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
     let nds = md_expand_vectors vecs then
     let stop_list = deref (vfsm2stop_list_r vfsm) then
     let ifc_list =
-	flatmap snd (get_visualization_fanins fsm (hd nds) cur_draw_level)
+	(flatmap snd (get_visualization_fanins fsm (hd nds) cur_draw_level))
+	subtract nds
     then
     let name =
 	let pfn = get_visualization_pfn fsm (hd nds) cur_draw_level then

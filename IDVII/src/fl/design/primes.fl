@@ -1008,15 +1008,17 @@ let list_of_primes = [
 
 // Length of 'list_of_primes'.
 //  prime_count::int
-let prime_count = length list_of_primes;
+let prime_count = 2**(log2 (length list_of_primes))-1;
 
 // Max. value for fingerprints (should fit a 63-bit arbii).
 //  prime_roof::int
 let prime_roof = ipow 2 62 - 1;
 
-// Multiply a value 'v' by the 'n'th prime (modulo 10,000), fitted to 64bits.
+// Multiply a value 'v' by the 'n'th prime (modulo 8192), fitted to 64bits.
 //  prime_mult::int->int->int
-let prime_mult n v = (v * el (n % prime_count + 1) list_of_primes) % prime_roof;
+let prime_mult n v =
+    (v * el ((n intAND prime_count) + 1) list_of_primes) intAND prime_roof
+;
 
 //------------------------------------------------------------------------------
 // Fin.

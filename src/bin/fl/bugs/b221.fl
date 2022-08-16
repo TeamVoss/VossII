@@ -1,0 +1,84 @@
+load "ste.fl";
+
+//update_vossrc "DRAW-FULL-STATEMENTS" "YES";
+//update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" "YES";
+//update_vossrc "VERBOSE-FSM-PRINT" "YES";
+
+TYPE "byte" 8;
+
+let tst =
+    bit_input	clk.
+    bit_input	reset.
+    bit_input	inc.
+    byte_output	addr.
+    byte_output	out.
+    CELL "draw_hier tst" [
+        STATE clk addr [
+            reset   --- '1,
+            inc --- (addr '+' '1)
+        ],
+	re_ff clk (addr '-' '1) out
+];
+
+let tst =
+    bit_input	clk.
+    bit_input	reset.
+    bit_input	inc.
+    byte_output	addr.
+    byte_output	out.
+    CELL "draw_hier tst" (
+	let sig = get_symbol_signature "tst" then
+	let pdir = (deref pexlif_compile_dir) in
+	let pexlif_file = sprintf "%s/%s.pexlif" pdir sig in
+	let exists = file_exists pexlif_file then
+	exists =>
+	    (fprintf stdinfo "-- Loading pre-compiled version of tst--\n") fseq
+	    [read_pexlif pexlif_file]
+	|
+	    (fprintf stdinfo "-- Compiling tst--\n") fseq
+	    let p = tst 'clk 'reset 'inc 'addr 'out then
+	    (write_pexlif pexlif_file p) fseq
+	    [p]
+);
+
+
+
+let p = tst 'clk 'reset 'inc 'addr 'out;
+
+p fseq 1;
+
+//Emit_ASCII_pexlif "_Z1" p;
+
+let ckt = pexlif2fsm p;
+ckt;
+
+let v = STE_debug ckt;
+//v;
+
+
+let ant =
+    "clk" is_clock 20
+  and
+    "reset" is 1 in_cycle 1 otherwise 0 until 20 cycles
+  and
+    "inc" is 0 for 2 cycles followed_by
+	     1 for 1 cycle followed_by 
+	     1 for 1 cycle followed_by 
+	     0 for 1 cycle followed_by 
+	     0 for 1 cycle followed_by 
+	     0 for 1 cycle followed_by 
+	     1 for 1 cycle followed_by 
+	     1 for 1 cycle followed_by 
+	     1 for 1 cycle 
+	    otherwise 0 until 20 cycles
+;
+
+
+//STE "-e" v [] ant [] [];
+
+//let pp = re_ff 'clk {'new_state:: byte} 'state;
+//let ckt = pexlif2fsm pp;
+//ckt;
+
+
+//STE_debug ckt;

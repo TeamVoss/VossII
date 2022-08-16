@@ -926,10 +926,6 @@ let w_CASE w_out cond_res_list w_default_value =
      /\ var2name (W_EXPLICIT_VAR s b) = [b]
      /\ var2name other = []
     in
-    let ld = W_VAR sz (sprintf "%sd" BASE_TMP) then
-    let nd = mk_name sz (sprintf "%sd" BASE_TMP) then
-    let d_fas = [(nd,[nd])] then
-    let default_p = base_assignment T ld w_default_value then
     letrec select cnt ((c,r):rem) =
         let bc = sprintf "%sc%02d" BASE_TMP cnt then
         let br = sprintf "%sr%02d" BASE_TMP cnt then
@@ -959,14 +955,26 @@ let w_CASE w_out cond_res_list w_default_value =
         let ints = c_ints@r_ints@ints then
         let extras = c_extra@r_extra@extras then
         (fas, e, ints, extras)
-     /\    select cnt [] = [], ld, [], []
+     /\    select cnt [] =
+        let bd = sprintf "%sd%02d" BASE_TMP cnt then
+        let ld = W_VAR sz bd then
+        val (d_ints, d_act, d_extra) =
+	    let v = var2name w_default_value then
+	    v = [] =>
+		let en = mk_name sz bd then
+		let p = base_assignment T ld w_default_value then
+		([en], en, [p])
+	    |
+	    ([], hd v, [])
+        in
+	let fas = [(mk_name sz bd, [d_act])] in
+	(fas, ld, d_ints, d_extra)
     in
     val (fas, rhs, ints, extras) = select 1 cond_res_list then
-    let ints = nd:ints then
     let body = base_assignment F w_out rhs then
     let pfn = sprintf "draw_CASE %d" n then
-    let mux = PINST pfn [] T (fas@d_fas) fa_outs [] (P_HIER [body]) then
-    let children = default_p:mux:extras then
+    let mux = PINST pfn [] T fas fa_outs [] (P_HIER [body]) then
+    let children = mux:extras then
     let get_acts (PINST _ _ _ ifa _ _ _) = flatmap snd ifa then
     let inps = (setify (flatmap get_acts children)) subtract ints then
     let fa_inps = map (\v.v,[v]) inps then
@@ -2391,7 +2399,10 @@ let MUX =
 	out <- (IF c THEN a ELSE b)
 ];
 
-// Needed to make the drawing function happy....
+
+begin_abstype;
+// ---------------------------------------------------
+// Needed to make the drawing functions happy....
 let base_re_ff =
     input d.
     bit_input clk.
@@ -2442,60 +2453,95 @@ let base_re_ff_en_reset =
 	MUX reset '0 cur q
 ];
 
+//
 // A rising edge D flip-flop.
-let re_ff =
-    bit_input	clk.
-    input	d.
-    output	q.
-    CELL "" [
-	base_re_ff d clk q
-];
+// 
+let re_ff clk d q = base_re_ff d clk q;
 
 // A rising edge D flip-flop with asynchronous reset (active high).
-let re_ff_reset =
-    bit_input	clk.
-    bit_input	reset.
-    input	d.
-    output	q.
-    CELL "" [
-	base_re_ff_reset d reset clk q
-];
+let re_ff_reset clk reset d q = base_re_ff_reset d reset clk q;
 
 // A rising edge D flip-flop with enable.
-let re_ff_en =
-    bit_input	clk.
-    bit_input	en.
-    input	d.
-    output	q.
-    CELL "" [
-	base_re_ff_en d en clk q
-];
+let re_ff_en clk en d q = base_re_ff_en d en clk q;
 
 // A rising edge D flip-flop with enable and asynchronous reset (active high).
-let re_ff_en_reset =
-    bit_input	clk.
-    bit_input	en.
-    bit_input	reset.
-    input	d.
-    output	q.
-    CELL "" [
-	base_re_ff_en_reset d en reset clk q
-];
+let re_ff_en_reset clk en reset d q = base_re_ff_en_reset d en reset clk q;
 
-// A falling edge D flip-flop.
-let fe_ff =
-    bit_input clk.
+end_abstype re_ff re_ff_reset re_ff_en re_ff_en_reset;
+
+begin_abstype;
+// ---------------------------------------------------
+// Needed to make the drawing functions happy....
+let base_fe_ff =
     input d.
+    bit_input clk.
     output q.
     internal TmP_d_o TmP_clk_o TmP_q_o TmP_en.
-    CELL "fe_ff" [
+    CELL "draw_ff_fe" [
 	TmP_d_o <: d,
 	TmP_q_o <: q,
 	TmP_clk_o <: clk,
-	TmP_en <- TmP_clk_o '&' '~'clk,
+	TmP_en <- TmP_clk_o '&' '~' clk,
 	MUX TmP_en TmP_d_o TmP_q_o q
 ];
 
+let base_fe_ff_en =
+    input	d.
+    bit_input	en.
+    bit_input	clk.
+    output	q.
+    internal	mid.
+    CELL "draw_ff_fe_with_en" [
+	MUX en d q mid,
+	base_fe_ff mid clk q
+];
+
+let base_fe_ff_reset =
+    input	d.
+    bit_input	reset.
+    bit_input	clk.
+    output	q.
+    internal	mid cur.
+    CELL "draw_ff_fe_reset" [
+	MUX reset '0 d mid,
+	base_fe_ff mid clk cur,
+	MUX reset '0 cur q
+];
+
+let base_fe_ff_en_reset =
+    input	d.
+    bit_input	en.
+    bit_input	reset.
+    bit_input	clk.
+    output	q.
+    internal	tmp mid cur.
+    CELL "draw_ff_fe_with_en_reset" [
+	MUX en d q tmp,
+	MUX reset '0 tmp mid,
+	base_fe_ff mid clk cur,
+	MUX reset '0 cur q
+];
+
+//
+// A falling edge D flip-flop.
+// 
+let fe_ff clk d q = base_fe_ff d clk q;
+
+// A falling edge D flip-flop with asynchronous reset (active high).
+let fe_ff_reset clk reset d q = base_fe_ff_reset d reset clk q;
+
+// A falling edge D flip-flop with enable.
+let fe_ff_en clk en d q = base_fe_ff_en d en clk q;
+
+// A falling edge D flip-flop with enable and asynchronous reset (active high).
+let fe_ff_en_reset clk en reset d q = base_fe_ff_en_reset d en reset clk q;
+
+end_abstype fe_ff fe_ff_reset fe_ff_en fe_ff_en_reset;
+
+
+begin_abstype;
+// ---------------------------------------------------
+// Needed to make the drawing functions happy....
 let base_ah_latch =
     input	d.
     bit_input	clk.
@@ -2505,15 +2551,6 @@ let base_ah_latch =
     CELL "draw_ah_latch" [
 	TmP_q_o <: q,
 	MUX clk d TmP_q_o q
-];
-
-// An active high transparent latch.
-let ah_latch =
-    bit_input clk.
-    input d.
-    output out.
-    CELL "ah_latch" [
-	base_ah_latch d clk out
 ];
 
 let base_al_latch =
@@ -2526,14 +2563,13 @@ let base_al_latch =
 	MUX clk TmP_q_o d q
 ];
 
+// An active high transparent latch.
+let ah_latch en d out = base_ah_latch d en out;
+
 // An active low transparent latch.
-let al_latch =
-    bit_input clk.
-    input d.
-    output out.
-    CELL "al_latch" [
-	base_al_latch d clk out
-];
+let al_latch en d out = base_al_latch d en out;
+
+end_abstype ah_latch al_latch;
 
 
 let extract_bit v idx =
@@ -2896,14 +2932,15 @@ let STATE {clk::bit} {state:: *a} {cond_res_list:: (bit # *a) list} =
     val (fas, rhs, ints, extras) = select 1 w_crl then
     let ints = n_new_state:nd:ints in
     let body = new_state <- (hw_constr rhs) then
-    let pfn = sprintf "draw_CASE %d" n then
+//    let pfn = sprintf "draw_CASE %d" n then
+    let pfn = sprintf "draw_hier CASE" then
     let mux = PINST pfn [] T (fas@d_fas) fa_outs [] (P_HIER [body]) in
     let ff = re_ff clk new_state state then
     let children = ff:default_p:mux:extras in
     let get_acts (PINST _ _ _ ifa _ _ _) = flatmap snd ifa in
     let inps = (setify (flatmap get_acts children)) subtract ints then
     let fa_inps = (map (\v.v,[v]) inps) then
-    PINST "STATE" [] F fa_inps fa_states ints (P_HIER children)
+    PINST "draw_hier STATE" [] F fa_inps fa_states ints (P_HIER children)
 ;
 
 let EN_STATE {clk::bit} {enable::bit} {state:: *a}
@@ -3367,7 +3404,7 @@ let re_ff_en_mux =
     output	q.
     internal    qtmp.
     CELL "draw_hier re_ff_en_mux" [
-	base_re_ff_en d en clk qtmp,
+	re_ff_en clk en d qtmp,
         q <- (IF en THEN d ELSE qtmp)
 ];
 
@@ -3380,7 +3417,7 @@ let re_ff_en_reset_mux =
     output	q.
     internal    qtmp.
     CELL "draw_hier re_ff_en_reset_mux" [
-	base_re_ff_en_reset d en reset clk qtmp,
+	re_ff_en_reset clk en reset d qtmp,
         q <- (IF (en '&' ('~' reset)) THEN d ELSE qtmp)
 ];
 
@@ -3437,6 +3474,7 @@ let _pExLiF_ = ref {(error "no pexlif") :: pexlif};
 
 let pcompile fn =
     let pdir = (deref pexlif_compile_dir) in
+    // Make sure it is a pexlif generating function with simple hw-types inputs
     let rtype = get_return_type fn then
     rtype != "pexlif" =>
 	(fprintf stderr "Return type not pexlif (%s). pcompile aborted\n" rtype)
@@ -3451,6 +3489,7 @@ let pcompile fn =
 	      arg tp fn
 	) fseq ()
     |
+    //
     let pre = sprintf "let foo = %s " fn in
     let post = " then (_pExLiF_ := foo);" in
     let cmd = list2str T pre " " post (sprintf "'%s") (map fst args) then
@@ -3480,7 +3519,7 @@ let pcompile fn =
 	mem name f_inps => sprintf "    %s_input %s.\n" tp name
 			 | sprintf "    %s_output %s.\n" tp name
     in
-    let post = sprintf "  CELL \"\" [p];\nend_abstype %s;\n" fn in
+    let post = sprintf "  CELL \"draw_hier compile\" [p];\nend_abstype %s;\n" fn in
     let cmd = list2str T pre "" post mk_arg args then
     (eval cmd) fseq
     ()

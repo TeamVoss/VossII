@@ -518,6 +518,13 @@ Get_Fun_Type(fn_ptr fp)
     return( fp->type );
 }
 
+string
+Get_Fun_Signature(fn_ptr fp)
+{
+    if( fp == NULL ) { return NULL; }
+    return( fp->signature );
+}
+
 
 impl_arg_ptr
 Gather_overloaded_calls(symbol_tbl_ptr stbl, g_ptr node)
@@ -993,6 +1000,8 @@ End_ADT(symbol_tbl_ptr stbl, var_list_ptr vlp)
             flp->visible = TRUE;
             flp->ADT_level = ADT_level;
             insert_hash(stbl->tbl_ptr, (pointer) flp->name, (pointer) flp);
+	    // Only keep the last definition of a function inside ADT
+	    delete_hash(&keep_tbl, (pointer) flp->name);
         } else {
 	    flp->visible = FALSE;
 	}
