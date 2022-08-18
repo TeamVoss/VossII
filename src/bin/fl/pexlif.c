@@ -2115,7 +2115,7 @@ unfold_pexlif(g_ptr p, unint id)
     destr_PINST(unfolded, &un_name, &un_attrs, &un_leaf,
 			  &un_fa_inps, &un_fa_outs, &un_inter, &un_cont);
     if( !is_P_HIER(un_cont, &un_children) ) {
-	Fail_pr("Cannot unfold a leaf node");
+	Fail_pr("Cannot unfold a sub-leaf node");
 	VDB_destroy(vdp);
 	free_mgr(&subst_hash_record_mgr);
 	return(NULL);

@@ -7337,71 +7337,80 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
     }
 
     if( vp != NULL ) {
-        string match;
+        string match, pfn;
+	tstr_ptr sm = new_temp_str_mgr();
         if( (match = strstr(vp->pfn, "draw_hfl ")) != NULL ) {
-            // Replace draw_hfl txt with draw_hfl_code txt nbr_inps
+            // Replace draw_hfl txt with draw_hfl_code nbr_inps inst txt
             int len = match-vp->pfn+8;
             string res = strtemp(vp->pfn);
             *(res+len) = 0;
-            sprintf(buf, "%s_code %d %s", res, nbr_inputs, res+len+1);
-            vp->pfn = wastrsave(&strings, buf);
+	    if( (strlen(res)+20+strlen(res+len+1)) > 4000 ) {
+		sprintf(buf, "%s_code %d %d {...}", res, inst_cnt, nbr_inputs);
+	    } else {
+		sprintf(buf, "%s_code %d %d %s",
+			     res, nbr_inputs, inst_cnt, res+len+1);
+	    }
+            pfn = gen_strtemp(sm, buf);
         } else if(strncmp(vp->pfn, "draw_hier ", 10) == 0 ||
 		  (RCaccurate_hierachy_visualization &&
 		   strncmp(vp->pfn, "draw_", 5) != 0 ))
 	{
-            tstr_ptr sm = new_temp_str_mgr();
             // Replace draw_hier txt with draw_fub txt inst inputs outputs
-            string cmd = gen_strtemp(sm, "draw_fub ");
+            gen_strtemp(sm, "draw_fub ");
 	    if( strncmp(vp->pfn, "draw_hier ", 10) == 0 ) {
-		cmd = gen_strappend(sm, vp->pfn + 10);
+		gen_strappend(sm, vp->pfn + 10);
 	    } else {
-		cmd = gen_strappend(sm, vp->pfn);
+		gen_strappend(sm, vp->pfn);
 	    }
             string iname = find_instance_name(attrs);
             if( iname == s_no_instance ) {
-                cmd = gen_strappend(sm, " ");
-                cmd = gen_strappend(sm, hier);
-                cmd = gen_strappend(sm, " ");
+                gen_strappend(sm, " ");
+                gen_strappend(sm, hier);
+                gen_strappend(sm, " ");
             } else {
-                cmd = gen_strappend(sm, " {");
-                cmd = gen_strappend(sm, hier);
-                cmd = gen_strappend(sm, ": ");
-                cmd = gen_strappend(sm, iname);
-                cmd = gen_strappend(sm, "} ");
+                gen_strappend(sm, " {");
+                gen_strappend(sm, hier);
+                gen_strappend(sm, ": ");
+                gen_strappend(sm, iname);
+                gen_strappend(sm, "} ");
             }
 	    gen_tappend(sm, " %d ", inst_cnt);
-            cmd = gen_strappend(sm, "{ ");
+            gen_strappend(sm, "{ ");
             for(g_ptr l = fa_inps; !IS_NIL(l); l = GET_CONS_TL(l)) {
                 g_ptr pair = GET_CONS_HD(l);
                 string fname = GET_STRING(GET_FST(pair));
-                cmd = gen_strappend(sm, "{{");
-                cmd = gen_strappend(sm, fname);
+                gen_strappend(sm, "{{");
+                gen_strappend(sm, fname);
                 // Don't need the actuals for inputs
-                cmd = gen_strappend(sm, "} {");
-                cmd = gen_strappend(sm, "}} ");
+                gen_strappend(sm, "} {");
+                gen_strappend(sm, "}} ");
             }
-            cmd = gen_strappend(sm, "} { ");
+            gen_strappend(sm, "} { ");
             for(vis_io_ptr vlp = vp->fa_outs; vlp != NULL; vlp = vlp->next) {
-                cmd = gen_strappend(sm, "{{");
-                cmd = gen_strappend(sm, vlp->f_vec);
-                cmd = gen_strappend(sm, "} {");
+                gen_strappend(sm, "{{");
+                gen_strappend(sm, vlp->f_vec);
+                gen_strappend(sm, "} {");
                 g_ptr nds = ilist2nds(vlp->acts);
                 g_ptr avecs = Merge_Vectors(nds, TRUE);
                 for(g_ptr ap = avecs; !IS_NIL(ap); ap = GET_CONS_TL(ap)) {
                     string actual = GET_STRING(GET_CONS_HD(ap));
-                    cmd = gen_strappend(sm, "{");
-                    cmd = gen_strappend(sm, actual);
-                    cmd = gen_strappend(sm, "} ");
+                    gen_strappend(sm, "{");
+                    gen_strappend(sm, actual);
+                    gen_strappend(sm, "} ");
                 }
                 DEC_REF_CNT(nds);
                 DEC_REF_CNT(avecs);
-                cmd = gen_strappend(sm, "}} ");
+                gen_strappend(sm, "}} ");
             }
-            cmd = gen_strappend(sm, "}");
-            // Replace draw_hier txt with draw_hfl_code txt nbr_inps
-            vp->pfn = wastrsave(&strings, cmd);
-            free_temp_str_mgr(sm);
-        }
+            pfn = gen_strappend(sm, "}");
+        } else {
+            pfn = gen_strtemp(sm, vp->pfn);
+	}
+	// Finally prepend "add_inst <inst_nbr> " to pfn
+	sprintf(buf, "add_inst %d ", inst_cnt);
+	pfn = gen_strprepend(sm, buf);
+	vp->pfn = wastrsave(&strings, pfn);
+	free_temp_str_mgr(sm);
     }
 
     g_ptr children, fns;

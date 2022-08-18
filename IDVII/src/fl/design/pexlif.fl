@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
-// Meh...
 //  shorten_sha::string->string
 let shorten_sha sha = "\"" ^ substr sha 1 4 ^ "..\"";
 
@@ -44,6 +43,10 @@ let pexlif_get_inps_actuals (PINST _ _ _ fa_inps fa_outs _ _) =
 let pexlif_get_outs_actuals (PINST _ _ _ fa_inps fa_outs _ _) =
         md_extract_vectors (flatmap snd fa_outs)
 ;
+let pexlif_get_name (PINST nm _ _ _ _ _ _) = nm;
+let is__WrApPeR_ (PINST nm _ _ _ _ _ (P_HIER _)) = (nm = "_WrApPeR_")
+ /\ is__WrApPeR_ _ = F
+;
 
 //------------------------------------------------------------------------------
 // ...
@@ -51,12 +54,48 @@ let pexlif_get_outs_actuals (PINST _ _ _ fa_inps fa_outs _ _) =
 
 // Re-define PINST so that we always compute a signature (FP) and
 // a SHA256 (SHA) signatures and store them in the attribute list.
+// Also, every (non-toplevel) wrapper PINST is unfolded.
 let PINST n a l i o t c =
-    let is_signature s = (s == "FP") OR (s == "SHA") in
-    let a' = filter (NOT # is_signature # fst) a in
-    let f  = ("FP",  fp_pinst    i o t c) in
-    let s  = ("SHA", sha_pinst n i o t c) in
-    PINST n (f : s : a') l i o t c
+    let mk_pinst n a l i o t c =
+	let is_signature s = (s == "FP") OR (s == "SHA") in
+	let a' = filter (NOT # is_signature # fst) a in
+	let f  = ("FP",  fp_pinst    i o t c) in
+	let s  = ("SHA", sha_pinst n i o t c) in
+	let process_assertions (P_HIER ps) =
+            let get_assert_nd (PINST _ _ _ _ outs _ _) =
+                length outs != 1 => [] |
+                val (f,as) = hd outs then
+                md_size f != 1 => [] |
+                let a = hd as in
+                str_is_substr "assert__" a => as | []
+	    in
+            flatmap get_assert_nd ps
+	 /\ process_assertions _ =  []
+	in
+	let assert_nds = process_assertions c then
+	(length (setify assert_nds) != length assert_nds) =>
+	    let ap = partition id assert_nds in
+	    let idx = find_first0 (\l.length l > 1) ap in
+	    eprintf "Duplicatated assertion (%s)" (hd (el idx ap))
+	|
+	let t' = setify (assert_nds @ t) in
+	PINST n (f : s : a') l i o t' c
+    in
+    let get_wrappers (P_HIER chs) = find_all is__WrApPeR_ chs
+     /\ get_wrappers _ = []
+    in
+    let wrappers = get_wrappers c in
+    wrappers = [] =>
+	mk_pinst n a l i o t c
+    |
+	// Lift all wrapper pexlifs by unfolding them
+	// Process the unfolds in reverse order
+	// Relies on unfold1 i does not change children 1--(i-1).
+	let wrappers = qsort (\i1.\i2. i1-i2) (setify wrappers) then
+	let p = PINST n a l i o t c then
+	let p' = itlist (\i.\p. unfold_pexlif p i) wrappers p then
+	val (PINST n a l i o t c) = p' then
+	mk_pinst n a l i o t c
 ;
 
 

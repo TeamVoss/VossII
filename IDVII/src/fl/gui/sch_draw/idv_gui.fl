@@ -439,7 +439,6 @@ let refresh_idv_canvas canvas cmd =
 
 
 let start_new_transform p start_new w =
-    let p = start_new => remove_wrappers p | p then
     let ckt = accurate_toplevel_pexlif2fsm p then
     let outs = outputs ckt then
     let props = assertions ckt then
@@ -1006,27 +1005,28 @@ let fl_display_transform_tree canvas dbname name =
 ;
 export_to_tcl fl_display_transform_tree;
 
-cletrec convert_to_idv_format p =
-    letrec cnv (PINST nm attrs lf fa_inps fa_outs ints (P_HIER ps)) =
-	let ps' = map cnv ps then
-	let get_assert_nd (PINST _ _ _ _ outs _ _) =
-	    length outs != 1 => [] |
-	    val (f,as) = hd outs then
-	    md_size f != 1 => [] |
-	    let a = hd as in
-	    str_is_substr "assert__" a => as | []
-	in
-	let assertion_nds = flatmap get_assert_nd ps' then
-	let ints' = ints @ assertion_nds then
-	let nm' =
-	    str_is_prefix "draw_" nm => nm | sprintf "draw_hier {%s}" nm
-	then
-	PINST nm' attrs lf fa_inps fa_outs ints' (P_HIER ps')
-     /\    cnv (PINST nm attrs lf fa_inps fa_outs ints leaf) =
-	PINST nm attrs lf fa_inps fa_outs ints leaf
-    in
-    cnv p
-;
+//cletrec convert_to_idv_format p =
+//    letrec cnv p =
+//	let do1 (PINST nm attrs lf fa_inps fa_outs ints (P_HIER ps)) =
+//	    let ps' = map cnv ps then
+//	    let get_assert_nd (PINST _ _ _ _ outs _ _) =
+//		length outs != 1 => [] |
+//		val (f,as) = hd outs then
+//		md_size f != 1 => [] |
+//		let a = hd as in
+//		str_is_substr "assert__" a => as | []
+//	    in
+//	    let assertion_nds = flatmap get_assert_nd ps' then
+//	    (assertion_nds = []) AND (ps' == ps) => p |
+//	    let ints' = ints @ assertion_nds then
+//	    PINST nm attrs lf fa_inps fa_outs ints' (P_HIER ps')
+//	 /\    do1 (PINST nm attrs lf fa_inps fa_outs ints leaf) =
+//	    PINST nm attrs lf fa_inps fa_outs ints leaf
+//	in
+//	do1 p
+//    in
+//    cnv p
+//;
 
 let import_model name p =
     p fseq
@@ -1038,8 +1038,6 @@ let import_model name p =
 
 let fl_import_model w filename =
     let p = read_pexlif filename then
-    let p = remove_wrappers p then
-    let p = convert_to_idv_format p then
     let tent_name = pexlif_get_name p then
     let name = 
 	(tent_name != "") AND (NOT (fl_model_name_used tent_name))
@@ -1500,9 +1498,7 @@ let fl_do_verify canvas {file::string} {type::string} =
     (
 	let vfsm = w2vfsm canvas then
 	let spec = get_idv_current_pexlif canvas then
-	let imp =
-	    convert_to_idv_format (remove_wrappers (read_pexlif file))
-	then
+	let imp = read_pexlif file then
 	let ok = type = "BDD"	     => ((BDD_EQ spec imp) == T) |
 		 type = "SAT"	     => ((SAT_comb_EQ spec imp) == bT) |
 		 type = "Sim_None"   => T |
@@ -1822,17 +1818,9 @@ let simple_get_specialized_imp spec imp p =
     SOME imp'
 ;
 
-let dbg_spec = ref {(error "No pexlif")::pexlif};
-let dbg_imp = ref {(error "No pexlif")::pexlif};
-let dbg_p = ref {(error "No pexlif")::pexlif};
-let dbg_isub = ref [("","")];
-
 // Find a substitution that makes spec == p.
 // If such is found, return imp after applying the same substitution.
 let get_specialized_imp spec imp p =
-(dbg_spec := spec) fseq
-(dbg_imp := imp) fseq
-(dbg_p := p) fseq
     let ores = simple_get_specialized_imp spec imp p then
     has_value ores => ores |
     val (PINST nm1 attr1 lf1 in1 out1 int1 sckt1) = spec in
@@ -1854,15 +1842,12 @@ let get_specialized_imp spec imp p =
 	zip (md_expand_vector spec_v) (md_expand_vector p_v)
     in
     let isub = flatmap mk_sub iorder1 then
-(dbg_isub := isub) fseq
     let spec'' = pexlif_ifc_substitute (osub@isub) spec then
     NOT (check_eq_by_sim spec'' p') => NONE |
     let imp' = pexlif_ifc_substitute (osub@isub) imp then
     SOME imp'
 ;
 
-let dbg_tmp = ref {(error "No pexlif")::pexlif};
-let dbg_parent' = ref {(error "No pexlif")::pexlif};
 
 let replace_all parent spec imp =
     let raw_matches = isomatch spec parent then
@@ -1871,7 +1856,6 @@ let replace_all parent spec imp =
     let nbr_groups = length groups then
     let lbl = "_#*&_&*#_" in
     let parent' = foldn_pexlif parent groups lbl then
-(dbg_parent' := parent') fseq
     let children' = pexlif_get_children parent' then
     let to_be_replaced = firstn nbr_groups children' then
     let remain = butfirstn nbr_groups children' then
@@ -1883,7 +1867,6 @@ let replace_all parent spec imp =
     let children' = replacements @ remain then
     val (PINST n attrs lf fa_inps fa_outs ints (P_HIER children)) = parent' then
     let tmp = PINST n attrs lf fa_inps fa_outs ints (P_HIER children') then
-(dbg_tmp := tmp) fseq
     unfold_all_labeled tmp lbl
 ;
 

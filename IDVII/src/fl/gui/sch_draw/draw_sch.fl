@@ -496,16 +496,23 @@ let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
 	(flatmap snd (get_visualization_fanins fsm (hd nds) cur_draw_level))
 	subtract nds
     then
+    let phier= tcl_eval [sprintf "set ::sch_info(instance_hier,%s)" canvas] then
+    let hier = sprintf "%si%d/" phier inst_nbr then
     let name =
 	let pfn = get_visualization_pfn fsm (hd nds) cur_draw_level then
-	NOT (str_is_prefix "draw_fub" pfn) => "N/A" |
-	let cmd = "extract_name_"^pfn then
-	let res = tcl_eval [cmd] then
-	res
+	str_is_prefix "draw_fub" pfn =>
+	    let cmd = "extract_name_"^pfn then
+	    tcl_eval [cmd]
+	|
+	str_is_prefix "draw_hfl_code" pfn =>
+	    let cmd = "extract_name_"^pfn then
+	    tcl_eval [cmd]
+	| 
+	"N/A"
     then
     let draw_level = cur_draw_level+1 in
     let vis = visualize_fanin fsm stop_list ifc_list 100 vecs draw_level then
-    val (tab_window, c) = get_new_sch_canvas w draw_level name "" then
+    val (tab_window, c) = get_new_sch_canvas w draw_level hier hier then
     let cmd =	
 	let tab = canvas2tab c then
 	let svecs = list2str T "[" "," "]" (sprintf "\"%s\"") vecs in

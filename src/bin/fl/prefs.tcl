@@ -100,9 +100,9 @@ set voss2_preferences {
 
  {"Visualization" "" "" "header" ""}
     {"ACCURATE-HIERARCHY-VISUALIZATION" "RCaccurate_hierachy_visualization"
-        "Draw every level of hierarchy" "bool"  "FALSE"}
+        "Draw every level of hierarchy" "bool"  "TRUE"}
     {"DRAW-FULL-STATEMENTS" "RCdraw_full_statements"
-	"Always draw the statement as written" "bool" "FALSE"}
+	"Always draw the statement as written" "bool" "TRUE"}
 
  {"System" "" "" "header"  ""}
     {"TMP_FILE_DIR" "RC_TMP_FILE_DIR"

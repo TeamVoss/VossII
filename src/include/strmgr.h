@@ -57,6 +57,7 @@ tstr_ptr        new_temp_str_mgr();
 void            free_temp_str_mgr(tstr_ptr tp);
 string          gen_strtemp(tstr_ptr tp, string s);
 string          gen_strappend(tstr_ptr tp, string s);
+string		gen_strprepend(tstr_ptr tp, string s);
 string          gen_charappend(tstr_ptr tp, char c);
 
 #endif /* _STRMGR_H */

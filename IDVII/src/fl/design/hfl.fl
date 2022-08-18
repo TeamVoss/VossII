@@ -909,10 +909,10 @@ let base_assignment do_split lhs rhs =
     let inps = map (\n.n,[n]) (w_depends rhs) in
     let dep_vars = get_wbase_names rhs then
     let pfn =
-	get_vossrc "DRAW-FULL-STATEMENTS" == "YES" =>
-	    sprintf "draw_hfl {%s}" (base_compact_wprint dep_vars rhs)
-	|
-	    ""
+//	get_vossrc "DRAW-FULL-STATEMENTS" == "YES" =>
+//	    sprintf "draw_hfl {%s}" (base_compact_wprint dep_vars rhs)
+//	|
+	    "_WrApPeR_"
     then
     PINST pfn [] F inps outs (deref internals) (P_HIER subfubs)
 ;
@@ -978,7 +978,7 @@ let w_CASE w_out cond_res_list w_default_value =
     let get_acts (PINST _ _ _ ifa _ _ _) = flatmap snd ifa then
     let inps = (setify (flatmap get_acts children)) subtract ints then
     let fa_inps = map (\v.v,[v]) inps then
-    PINST "CASE" [] F fa_inps fa_outs ints (P_HIER children)
+    PINST "_WrApPeR_" [] F fa_inps fa_outs ints (P_HIER children)
 ;
 
 
@@ -2932,15 +2932,14 @@ let STATE {clk::bit} {state:: *a} {cond_res_list:: (bit # *a) list} =
     val (fas, rhs, ints, extras) = select 1 w_crl then
     let ints = n_new_state:nd:ints in
     let body = new_state <- (hw_constr rhs) then
-//    let pfn = sprintf "draw_CASE %d" n then
-    let pfn = sprintf "draw_hier CASE" then
+    let pfn = sprintf "draw_CASE %d" n then
     let mux = PINST pfn [] T (fas@d_fas) fa_outs [] (P_HIER [body]) in
     let ff = re_ff clk new_state state then
     let children = ff:default_p:mux:extras in
     let get_acts (PINST _ _ _ ifa _ _ _) = flatmap snd ifa in
     let inps = (setify (flatmap get_acts children)) subtract ints then
     let fa_inps = (map (\v.v,[v]) inps) then
-    PINST "draw_hier STATE" [] F fa_inps fa_states ints (P_HIER children)
+    PINST "_WrApPeR_" [] F fa_inps fa_states ints (P_HIER children)
 ;
 
 let EN_STATE {clk::bit} {enable::bit} {state:: *a}
@@ -3007,7 +3006,7 @@ let EN_STATE {clk::bit} {enable::bit} {state:: *a}
     let get_acts (PINST _ _ _ ifa _ _ _) = flatmap snd ifa in
     let inps = (setify (flatmap get_acts children)) subtract ints then
     let fa_inps = (map (\v.v,[v]) inps) then
-    PINST "STATE" [] F fa_inps fa_states ints (P_HIER children)
+    PINST "_WrApPeR_" [] F fa_inps fa_states ints (P_HIER children)
 ;
 
 let SELECT =
@@ -3191,7 +3190,9 @@ let ROM name lines addr out = (
     in
     let keeper = mk_keep (lines-1) then
     let lf = P_LEAF ((W_UPDATE_FN w_out (read (lines-1))):keeper) then
-    let bd = PINST "" [] F [(s_addr,[s_addr])] [(s_out,[s_out])] [s_mem] lf then
+    let bd =
+	PINST "read" [] F [(s_addr,[s_addr])] [(s_out,[s_out])] [s_mem] lf
+    then
     CELL (sprintf "draw_rom %s %d" name lines) [bd]
 ) addr out;
 
@@ -3220,7 +3221,7 @@ let RAM name lines {raddr:: *a} {waddr:: *a} {din:: *d} {we::bit} {out:: *d} =
     in
     let rlf = P_LEAF [W_UPDATE_FN W_out (read (lines-1))] then
     let rd =
-      PINST "" [] F [(s_raddr,[s_raddr]),(s_mem,[s_mem])]
+      PINST "read" [] F [(s_raddr,[s_raddr]),(s_mem,[s_mem])]
                     [(s_out,[s_out])] [] rlf
     then
     //
@@ -3238,7 +3239,7 @@ let RAM name lines {raddr:: *a} {waddr:: *a} {din:: *d} {we::bit} {out:: *d} =
     let wlf = P_LEAF [W_PHASE_DELAY old (W_ITE W_we new old)] then
     let wr =
       let inps = [(s_we,[s_we]), (s_din, [s_din]), (s_waddr,[s_waddr])] in
-      PINST "" [] F inps [(s_mem,[s_mem])] [] wlf
+      PINST "write" [] F inps [(s_mem,[s_mem])] [] wlf
     then
     let pfn = sprintf "draw_ram %s %d" name lines then
     let fa_inps = [
@@ -3470,7 +3471,21 @@ let set_pexlif_cache dir =
 
 set_pexlif_cache (sprintf "/tmp/%s/Pexlif_Cache" USER);
 
-let _pExLiF_ = ref {(error "no pexlif") :: pexlif};
+let mk_fas_for_simple_actuals name e =
+    let sz = hw_size e in
+    let var2name (W_VAR s b) = [mk_name s b]
+     /\ var2name (W_EXPLICIT_VAR s b) = [b]
+     /\ var2name other = []
+    in
+    (mk_name sz name), (var2name (hw_destr e))
+;
+
+let only_simple conns = (find_first0 (\(f,as). as = []) conns) = 0;
+
+clet pcompile_read_pexlif fn pexlif_file =
+    (fprintf stdinfo "-- Loading pre-compiled version of %s--\n" fn) fseq
+    read_pexlif pexlif_file
+;
 
 let pcompile fn =
     let pdir = (deref pexlif_compile_dir) in
@@ -3489,42 +3504,58 @@ let pcompile fn =
 	      arg tp fn
 	) fseq ()
     |
-    //
-    let pre = sprintf "let foo = %s " fn in
-    let post = " then (_pExLiF_ := foo);" in
-    let cmd = list2str T pre " " post (sprintf "'%s") (map fst args) then
-    let pexlif_expr = (eval cmd) fseq (deref _pExLiF_) in
-    let sig = get_symbol_signature fn then
-    let pexlif_file = sprintf "%s/%s.pexlif" pdir sig in
-    let exists = file_exists pexlif_file then
-    let p =
-	exists =>
-	    // Load from file
-	    (fprintf stdinfo "-- Loading pre-compiled version of %s --\n" fn)
-	    seq
-	    read_pexlif pexlif_file
-	|
-	    (fprintf stdinfo "-- Compiling %s --\n" fn) fseq
-	    let p = pexlif_expr then
-	    (write_pexlif pexlif_file p) fseq
-	    p
-    then
-    (_pExLiF_ := p) fseq
-    let get_base (f,a) = hd (str_split f "[") in
-    let f_inps = setify (map get_base (pexlif_get_fa_inps p)) in
-    let pre = (sprintf "begin_abstype; let p = deref _pExLiF_; p fseq ();\n") ^
-	      (sprintf "let %s =\n" fn)
+    // Now re-define the function to load/store a compiled version
+    let mk_top_arg (nm,tp) = sprintf "{%s :: %s}" nm tp in
+    let top = list2str T (sprintf "let %s " fn) " " " =\n" mk_top_arg args in
+    let mid1 =
+      (sprintf "\tlet sig = get_symbol_signature \"%s\" in\n" fn)^
+      (sprintf "\tlet pdir = (deref pexlif_compile_dir) in\n")^
+      (sprintf "\tlet pexlif_file = sprintf \"%%s/%%s.pexlif\" pdir sig in\n")^
+      (sprintf "\tlet exists = file_exists pexlif_file in\n")
     in
-    let mk_arg (name,tp) =
-	mem name f_inps => sprintf "    %s_input %s.\n" tp name
-			 | sprintf "    %s_output %s.\n" tp name
+    let mk_conn (nm,tp) = sprintf "mk_fas_for_simple_actuals \"%s\" %s" nm nm in
+    let mid2 =
+	list2str T "\tlet conns = [\n\t\t" ",\n\t\t" "]\n\tin\n" mk_conn args
     in
-    let post = sprintf "  CELL \"draw_hier compile\" [p];\nend_abstype %s;\n" fn in
-    let cmd = list2str T pre "" post mk_arg args then
-    (eval cmd) fseq
-    ()
+    let case1 =
+	let pre =
+	  (sprintf "\tNOT (only_simple conns) =>\n")^
+	  (sprintf "\t    (fprintf stdinfo \"-- Building %s--\\n\") fseq\n" fn)^
+	  (sprintf "\t    %s " fn)
+	in
+	let mk_arg (nm,tp) = nm in
+	list2str T pre " " "\n\t|\n" mk_arg args
+    in
+    let case2 = 
+      (sprintf "\texists =>\n")^
+      (sprintf "\t  val (PINST nm attrs lf fa_inps fa_outs ints body) =\n")^
+      (sprintf "\t       pcompile_read_pexlif \"%s\" pexlif_file\n" fn)^
+      (sprintf "\t  then\n")^
+      (sprintf "\t  let fa_inps' = map (\\(f,as). f, assoc f conns) fa_inps in\n")^
+      (sprintf "\t  let fa_outs' = map (\\(f,as). f, assoc f conns) fa_outs in\n")^
+      (sprintf "\t  (PINST nm attrs lf fa_inps' fa_outs' ints body)\n")^
+      (sprintf "\t|\n")
+    in
+    let case3 =
+      let pre =
+        (sprintf "\t  (fprintf stdinfo \"-- Compiling %s--\\n\") fseq\n" fn)^
+        (sprintf "\t  let p = %s " fn)
+      in
+      let mk (nm,tp) = sprintf "'%s" nm in
+      (list2str T pre " " " then\n" mk args)^
+      (sprintf "\t  (write_pexlif pexlif_file p) fseq\n")^
+      (sprintf "\t  val (PINST nm attrs lf fa_inps fa_outs ints body) = p in\n")^
+      (sprintf "\t  let fa_inps' = map (\\(f,as). f, assoc f conns) fa_inps in\n")^
+      (sprintf "\t  let fa_outs' = map (\\(f,as). f, assoc f conns) fa_outs in\n")^
+      (sprintf "\t  (PINST nm attrs lf fa_inps' fa_outs' ints body)\n")
+    in
+    let cmd = top^mid1^mid2^case1^case2^case3^";\n" in
+    (eval cmd) fseq ()
 ;
 free_binder pcompile;
+
+
+let _pExLiF_ = ref {(error "No pexlif") :: pexlif};
 
 let flfun2pexlif fn =
     let pdir = (deref pexlif_compile_dir) in

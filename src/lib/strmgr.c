@@ -161,6 +161,24 @@ gen_strappend(tstr_ptr tp, string s)
 }
 
 string
+gen_strprepend(tstr_ptr tp, string s)
+{
+    ASSERT(tp->initialized == STRMGR_MAGIC_NBR);
+    int len;
+    len = strlen(s);
+    if( len + tp->tmp_cnt > STR_BLOCK_SIZE ) {
+	// If prepending will overflow the string, make it a no-op.
+	string_too_long_warning();
+	return(tp->tmp_buf);
+    }
+    memmove(tp->tmp_buf+len,tp->tmp_buf, tp->tmp_cnt+1);
+    memmove(tp->tmp_buf, s, len);
+    tp->cur_tmp += len;
+    tp->tmp_cnt += len;
+    return(tp->tmp_buf);
+}
+
+string
 gen_charappend(tstr_ptr tp, char c)
 {
     ASSERT(tp->initialized == STRMGR_MAGIC_NBR);

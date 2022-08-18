@@ -1218,6 +1218,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		MAKE_REDEX_FAILURE(redex,
 				   Fail_pr("Syntax error in %s on line %d",
 					   str_file_name, i+1));
+		fclose(fp);
 		free_buf(&bool_results);
 		free_buf(&bexpr_results);
 #if 0
@@ -1442,6 +1443,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		RD_FAIL("UNKNOWN_TAG");
 	}
     }
+    fclose(fp);
     g_ptr result = *((g_ptr *) FAST_LOC_BUF(&gbuf,0));
     OVERWRITE(redex, result);
     free_buf(&bool_results);
@@ -1459,6 +1461,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
   rd_fail:
     MAKE_REDEX_FAILURE(redex,
 	Fail_pr("Syntax error at line %d in %s", line+1, graph_file_name));
+    fclose(fp);
     free_buf(&bool_results);
     free_buf(&bexpr_results);
 #if 0
@@ -1468,8 +1471,8 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
     free_buf(&gbuf);
     Sprintf(buf, "/bin/rm -rf %s", dir);
     {
-    int i = system(buf);
-    (void) i;
+	int i = system(buf);
+	(void) i;
     }
     return( FALSE );
 }

@@ -17,34 +17,20 @@ let tst =
             reset   --- '1,
             inc --- (addr '+' '1)
         ],
+	ASSERT "inc_reset_mutex" ('~' (reset '&' inc)),
 	re_ff clk (addr '-' '1) out
 ];
 
-let tst =
-    bit_input	clk.
-    bit_input	reset.
-    bit_input	inc.
-    byte_output	addr.
-    byte_output	out.
-    CELL "draw_hier tst" (
-	let sig = get_symbol_signature "tst" then
-	let pdir = (deref pexlif_compile_dir) in
-	let pexlif_file = sprintf "%s/%s.pexlif" pdir sig in
-	let exists = file_exists pexlif_file then
-	exists =>
-	    (fprintf stdinfo "-- Loading pre-compiled version of tst--\n") fseq
-	    [read_pexlif pexlif_file]
-	|
-	    (fprintf stdinfo "-- Compiling tst--\n") fseq
-	    let p = tst 'clk 'reset 'inc 'addr 'out then
-	    (write_pexlif pexlif_file p) fseq
-	    [p]
-);
+pcompile tst;
 
 
+let p = tst 'clk 'rrreset 'inc 'addr 'out;
+p fseq 1;
 
-let p = tst 'clk 'reset 'inc 'addr 'out;
+let p = tst 'clk 'rrreset 'inc 'addr 'out;
+p fseq 1;
 
+let p = tst 'clk '0 'inc 'addr 'out;
 p fseq 1;
 
 //Emit_ASCII_pexlif "_Z1" p;
@@ -53,7 +39,7 @@ let ckt = pexlif2fsm p;
 ckt;
 
 let v = STE_debug ckt;
-//v;
+v;
 
 
 let ant =

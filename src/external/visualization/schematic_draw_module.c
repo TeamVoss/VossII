@@ -382,7 +382,7 @@ draw_network(ClientData clientData, Tcl_Interp *interp,
     //Print_network("After Find_drivers", tree);
 
     // Move drivers to left-most (according to bin number)
-    int max_cnt = 500;
+    int max_cnt = 50;
     while( (max_cnt > 0) && (Move_driver_leftmost(tree) > 0) ) {
 	Break_loops(tree);
 	Find_drivers(tree);

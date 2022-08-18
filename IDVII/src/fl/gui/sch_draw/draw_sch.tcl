@@ -33,6 +33,7 @@ set gcolor	"black"		;# line color
 set selectc	"orange"	;# Selected nodes color
 set fc		"white"		;# fill color
 set value_col	"blue"		;# Value color
+set inst_col	"green"		;# Instance number color
 
 set hdl_src_cnt	0		;# Window counter for iHDL windows
 
@@ -412,7 +413,8 @@ proc get_new_sch_canvas {w draw_level instance_hier {name ""}} {
     incr ::sch_window_cnt($w)
     set cc [format {%s.c%d} $nb $::sch_window_cnt($w)]
     if { $name == "" } {
-	set name "Ckt $::sch_window_cnt($w)"
+	set name "C$::sch_window_cnt($w):"
+	set instance_hier $name
     }
     $nb add [frame $cc] -text $name
     update
@@ -818,8 +820,7 @@ proc cb:sch_canvas_menu {c wx wy sx sy} {
 	    -command "after idle [list fl_draw_fanin_by_tag $c \
 			$::sch_info(draw_level,$c) 1 $nodes]"
 	$m add command -label "Draw inside" \
-	    -command "after idle \
-		[list fl_draw_inside $c $::sch_info(draw_level,$c) $nodes 0]"
+	    -command "after idle [list sc:draw_inside $c $nodes]"
 
 	$m add command -label "Add waveform" \
 		-command "sc:add_waveforms $c $nodes"
@@ -1489,6 +1490,23 @@ proc popup_node_name {c node x y} {
     post_popup $c [fl_tag2vec $c $node] $x $y
 }
 
+proc add_inst {inst_nbr args} {
+    set argcnt [llength $args]
+    set cmd [lrange $args 0 [expr $argcnt-5]]
+    set c [lindex $args [expr $argcnt-4]]
+    set tag [lindex $args [expr $argcnt-3]]
+    set x [lindex $args [expr $argcnt-2]]
+    set y [lindex $args [expr $argcnt-1]]
+    val {lx ly ux uy} [get_width_height $cmd]
+    set ii [$c create text [expr $x+$lx] [expr $y-$ly] \
+	  -anchor nw -justify left -font $::sfont($c) -fill $::inst_col \
+	  -text "i$inst_nbr"]
+    add_font_tags $c $ii _IsTeXt_
+    set ::tag2inst_nbr($c,$tag) $inst_nbr
+    lappend cmd $c $tag $x $y
+    eval $cmd
+}
+
 proc vec_draw {vec_size args} {
     global gcolor mfont
 
@@ -1957,11 +1975,11 @@ proc draw_split {c tag x y} {
 }
 
 proc draw_field {name c tag x y} {
-    draw_hfl_code 1 ">$name" $c $tag $x $y
+    draw_hfl_code 1 -1 ">$name" $c $tag $x $y
 }
 
 proc draw_predicate {name inps c tag x y} {
-    draw_hfl_code $inps $name $c $tag $x $y
+    draw_hfl_code $inps -1 $name $c $tag $x $y
 }
 
 proc draw_binary_arithm {symbol c tag x y} {
@@ -2109,7 +2127,7 @@ proc draw_mem_with_reset {n c tag x y} {
 }
 
 proc draw_mem_init {wid content c tag x y} {
-    draw_hfl_code 0 "ROM" $c $tag $x $y
+    draw_hfl_code 0 -1 "ROM" $c $tag $x $y
 }
 
 proc draw_mem_read {n c tag x y} {
@@ -3253,6 +3271,13 @@ proc get_width {c x y cur_max txt} {
     return $cur_max
 }
 
+proc extract_name_draw_hfl_code {inputs inst_nbr type args} {
+    if { $inst_nbr == "-1" } {
+	return "N/A"
+    }
+    return "i$inst_nbr"
+}
+
 proc extract_name_draw_fub {module inst args} {
     if {$inst == "" || $inst == $module } {
 	return $module
@@ -3853,9 +3878,12 @@ proc draw_phase_delay_on_output {pfn c tag x y} {
     return [list $inp_locs [list $orig_x $orig_y]]
 }
 
-proc draw_hfl_code {inputs type c tag x y} {
+proc draw_hfl_code {inputs inst_nbr type c tag x y} {
     global gcolor fc mfont sfont
  
+    if { $inst_nbr != -1 } {
+	set ::tag2inst_nbr($c,$tag) $inst_nbr
+    }
     set orig_x $x
     set orig_y $y
     set xt [expr $x-[min_txt_sep $c]]
