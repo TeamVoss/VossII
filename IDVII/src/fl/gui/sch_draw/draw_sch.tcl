@@ -3315,6 +3315,9 @@ proc draw_fub {module inst inst_nbr inames onames c tag x y} {
     if { ![info exists ::sch_info(draw_level,$c)] } {
 	set ::sch_info(draw_level,$c) 0
     }
+    if [regexp {^i[0-9][0-9]*} $inst] {
+	set inst ""
+    }
     #
     set inps [llength $inames]
     set outs [llength $onames]

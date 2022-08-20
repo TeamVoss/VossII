@@ -2176,6 +2176,7 @@ unfold_pexlif(g_ptr p, unint id)
         INC_REFCNT(g_attrs);
         INC_REFCNT(g_inter);
         INC_REFCNT(g_cont);
+	g_attrs = G_append(g_attrs, un_attrs);
         g_ptr n_pinst =
             mk_PINST(g_name, g_attrs, g_leaf, n_fa_inps, n_fa_outs, g_inter,
                      g_cont);
@@ -2188,7 +2189,7 @@ unfold_pexlif(g_ptr p, unint id)
     INC_REFCNT(old_fa_outs);
     old_inter = Extract_Vectors(old_inter, TRUE);
     g_ptr new_pinst =
-        mk_PINST(old_name, Make_NIL(), old_leaf, old_fa_inps, old_fa_outs,
+        mk_PINST(old_name, old_attrs, old_leaf, old_fa_inps, old_fa_outs,
                  old_inter, mk_P_HIER(children));
     // /
     rem_fold_mem();
@@ -2935,6 +2936,15 @@ signature_rec_cmp(const void *p1, const void *p2)
     return 0;
 }
 
+
+static int
+g_cmp(const void *pi, const void *pj)
+{
+    g_ptr *i = (g_ptr *) pi;
+    g_ptr *j = (g_ptr *) pj;
+    return( Graph_cmp(*i, *j) );
+}
+
 static void
 sha_pinst(g_ptr redex)
 {
@@ -2970,7 +2980,7 @@ sha_pinst(g_ptr redex)
 	    push_buf(&fn_buf, (pointer) &fn);
 	    fns = GET_CONS_TL(fns);
 	}
-	qsort(START_BUF(&fn_buf), COUNT_BUF(&fn_buf), sizeof(g_ptr), Graph_cmp);
+	qsort(START_BUF(&fn_buf), COUNT_BUF(&fn_buf), sizeof(g_ptr), g_cmp);
 	g_ptr *gpp;
 	int fn_cnt = 1;
 	FOR_BUF(&fn_buf, g_ptr, gpp) {

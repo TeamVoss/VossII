@@ -32,6 +32,8 @@ static g_ptr		comparison_fun;
 
 /* ----- Forward definitions local functions ----- */
 static assoc_tbl_ptr	get_assoc_tbl_record();
+static bool		is_shared_list(g_ptr l);
+static g_ptr		copy_list(g_ptr l);
 
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
@@ -83,11 +85,25 @@ List_GC()
     }
 }
 
-int
-Graph_cmp(const void *p1, const void *p2)
+g_ptr
+G_append(g_ptr list1, g_ptr list2)
 {
-    g_ptr n1 = (g_ptr) p1;
-    g_ptr n2 = (g_ptr) p2;
+    if( IS_NIL(list1) ) { return list2; }
+    bool shared = is_shared_list(list1);
+    if( shared ) { list1 = copy_list(list1); }
+    g_ptr cur = list1;
+    g_ptr prev = cur;
+    while( !IS_NIL(cur) ) {
+	prev = cur;
+	cur = GET_CONS_TL(cur);
+    }
+    SET_CONS_TL(prev,list2);
+    return( list1 );
+}
+
+int
+Graph_cmp(g_ptr n1, g_ptr n2)
+{
     int res, tp1,tp2;
   g_cmp_restart:
     if( n1 == n2 ) return(0);

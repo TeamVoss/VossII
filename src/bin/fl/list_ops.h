@@ -16,7 +16,8 @@
 void	    List_ops_Init();
 void	    List_ops_Install_Functions();
 void	    List_GC();
-int	    Graph_cmp(const void *p1, const void *p2);
+g_ptr	    G_append(g_ptr list1, g_ptr list2);
+int	    Graph_cmp(g_ptr n1, g_ptr n2);
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */

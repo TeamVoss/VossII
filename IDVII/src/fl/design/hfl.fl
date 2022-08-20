@@ -3616,3 +3616,8 @@ letrec reduce_tree op =
 	]
 );
 
+let ::: name p =
+    val (PINST nm attrs lf fa_inps fa_outs ints body) = p in
+    PINST nm (("Label",name):attrs) lf fa_inps fa_outs ints body
+;
+infix 0 :::;

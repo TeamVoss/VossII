@@ -6,22 +6,32 @@ load "ste.fl";
 
 TYPE "byte" 8;
 
+let foo =
+    bit_input a.
+    bit_output b.
+    CELL "foo"
+    [
+    b <- a
+];
+
 let tst =
     bit_input	clk.
     bit_input	reset.
     bit_input	inc.
     byte_output	addr.
     byte_output	out.
+    bit_internal nclk.
     CELL "draw_hier tst" [
-        STATE clk addr [
+        "#####a#####"::: STATE clk addr [
             reset   --- '1,
             inc --- (addr '+' '1)
         ],
-	ASSERT "inc_reset_mutex" ('~' (reset '&' inc)),
-	re_ff clk (addr '-' '1) out
+	"#####b#####"::: ASSERT "inc_reset_mutex" ('~' (reset '&' inc)),
+	foo clk nclk,
+	"#####c#####"::: re_ff nclk (addr '-' '1) out
 ];
 
-pcompile tst;
+//pcompile tst;
 
 
 let p = tst 'clk 'rrreset 'inc 'addr 'out;
@@ -32,6 +42,8 @@ p fseq 1;
 
 let p = tst 'clk '0 'inc 'addr 'out;
 p fseq 1;
+
+p;
 
 //Emit_ASCII_pexlif "_Z1" p;
 
