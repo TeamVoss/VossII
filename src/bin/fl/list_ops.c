@@ -184,6 +184,8 @@ Graph_cmp(g_ptr n1, g_ptr n2)
 			return( strcmp(Get_Fun_Signature(fn1),
 				       Get_Fun_Signature(fn2)) );
 		    }
+		    default:
+			DIE("Not possible");
 		}
 	    }
 	default:

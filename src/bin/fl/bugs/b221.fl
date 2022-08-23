@@ -27,7 +27,7 @@ let tst =
             inc --- (addr '+' '1)
         ],
 	"#####b#####"::: ASSERT "inc_reset_mutex" ('~' (reset '&' inc)),
-	foo clk nclk,
+	"@@@@@@@@@ ABC @@@@@@@@@@@"::: foo clk nclk,
 	"#####c#####"::: re_ff nclk (addr '-' '1) out
 ];
 

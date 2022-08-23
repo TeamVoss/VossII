@@ -616,6 +616,26 @@ struct PexlifDumper
 			continue;
 		    }
 
+		    if( cell->type == "$aldff") {
+			RTLIL::SigSpec out = cell->getPort("\\Q");
+			f << "_aldff ";
+			if( cell->hasParam(ID::CLK_POLARITY) && !cell->getParam(ID::CLK_POLARITY).as_bool() )   { f << "F "; } else { f << "T "; }
+			if( cell->hasParam(ID::ALOAD_POLARITY) && !cell->getParam(ID::ALOAD_POLARITY).as_bool() ) { f << "F "; } else { f << "T "; }
+			f << stringf("%d \"%s\" ", out.size(), src.c_str());
+			f << " ";
+			dump_sigspec(f, out);
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\ALOAD"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\AD"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\CLK"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\D"));
+			continue;
+		    }
+
+
 		    if( cell->type == "$adffe") {
 			RTLIL::SigSpec out = cell->getPort("\\Q");
 			f << "_adffe ";

@@ -299,10 +299,11 @@ proc i_am_busy {} {
 	    mk_busy $w 1
 	}
     }
-#    update
+    update
 }
 
 proc i_am_free {} {
+    update
     foreach w [wm stackorder .] {
 	if [info exists ::busy_level($w)] {
 	    incr ::busy_level($w) -1
@@ -315,7 +316,7 @@ proc i_am_free {} {
 	    set ::busy_level($w) 0
 	}
     }
-#    update
+    update
 }
 
 proc make_all_active {} {

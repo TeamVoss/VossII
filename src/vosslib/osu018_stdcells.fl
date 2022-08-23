@@ -1,0 +1,11 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+(cload (DIR^"../IDVII/src/fl/design/misc.fl")) fseq
+(cload (DIR^"../IDVII/src/fl/design/util.fl")) fseq
+(cload (DIR^"../IDVII/src/fl/design/primes.fl")) fseq
+(cload (DIR^"../IDVII/src/fl/design/pexlif.fl")) fseq
+(cload (DIR^"../IDVII/src/fl/design/hfl.fl")) fseq
+(cload (DIR^"../IDVII/src/fl/design/yosys_lib.fl")) fseq
+(cload (DIR^"../IDVII/lib/osu018_stdcells/stdcells.fl"));

@@ -307,6 +307,10 @@ static int size_packed_struct(AstNode *snode, int base_offset)
 		if (node->type == AST_STRUCT || node->type == AST_UNION) {
 			// embedded struct or union
 			width = size_packed_struct(node, base_offset + offset);
+			// set range of struct
+			node->range_right = base_offset + offset;
+			node->range_left = base_offset + offset + width - 1;
+			node->range_valid = true;
 		}
 		else {
 			log_assert(node->type == AST_STRUCT_ITEM);
@@ -493,13 +497,11 @@ static void add_members_to_scope(AstNode *snode, std::string name)
 	// in case later referenced in assignments
 	log_assert(snode->type==AST_STRUCT || snode->type==AST_UNION);
 	for (auto *node : snode->children) {
+		auto member_name = name + "." + node->str;
+		current_scope[member_name] = node;
 		if (node->type != AST_STRUCT_ITEM) {
 			// embedded struct or union
 			add_members_to_scope(node, name + "." + node->str);
-		}
-		else {
-			auto member_name = name + "." + node->str;
-			current_scope[member_name] = node;
 		}
 	}
 }
@@ -740,6 +742,16 @@ static void mark_auto_nosync(AstNode *block, const AstNode *wire)
 	log_assert(wire->type == AST_WIRE);
 	block->attributes[auto_nosync_prefix + wire->str] = AstNode::mkconst_int(1,
 			false);
+}
+
+// block names can be prefixed with an explicit scope during elaboration
+static bool is_autonamed_block(const std::string &str) {
+	size_t last_dot = str.rfind('.');
+	// unprefixed names: autonamed if the first char is a dollar sign
+	if (last_dot == std::string::npos)
+		return str.at(0) == '$'; // e.g., `$fordecl_block$1`
+	// prefixed names: autonamed if the final chunk begins with a dollar sign
+	return str.rfind(".$") == last_dot; // e.g., `\foo.bar.$fordecl_block$1`
 }
 
 // check a procedural block for auto-nosync markings, remove them, and add
@@ -1228,7 +1240,7 @@ bool AstNode::simplify(bool const_fold, bool at_zero, bool in_lvalue, int stage,
 
 				// create the indirection wire
 				std::stringstream sstr;
-				sstr << "$indirect$" << ref->name.c_str() << "$" << filename << ":" << location.first_line << "$" << (autoidx++);
+				sstr << "$indirect$" << ref->name.c_str() << "$" << RTLIL::encode_filename(filename) << ":" << location.first_line << "$" << (autoidx++);
 				std::string tmp_str = sstr.str();
 				add_wire_for_ref(ref, tmp_str);
 
@@ -1341,6 +1353,16 @@ bool AstNode::simplify(bool const_fold, bool at_zero, bool in_lvalue, int stage,
 
 	case AST_PARAMETER:
 	case AST_LOCALPARAM:
+		// if parameter is implicit type which is the typename of a struct or union,
+		// save information about struct in wiretype attribute
+		if (children[0]->type == AST_IDENTIFIER && current_scope.count(children[0]->str) > 0) {
+			auto item_node = current_scope[children[0]->str];
+			if (item_node->type == AST_STRUCT || item_node->type == AST_UNION) {
+				attributes[ID::wiretype] = item_node->clone();
+				size_packed_struct(attributes[ID::wiretype], 0);
+				add_members_to_scope(attributes[ID::wiretype], str);
+			}
+		}
 		while (!children[0]->basic_prep && children[0]->simplify(false, false, false, stage, -1, false, true) == true)
 			did_something = true;
 		children[0]->detectSignWidth(width_hint, sign_hint);
@@ -1509,6 +1531,7 @@ bool AstNode::simplify(bool const_fold, bool at_zero, bool in_lvalue, int stage,
 		detectSignWidth(width_hint, sign_hint);
 		while (children[0]->simplify(const_fold, at_zero, in_lvalue, stage, width_hint, sign_hint, in_param)) { }
 		if (children[0]->type == AST_CONSTANT && children[0]->bits_only_01()) {
+			children[0]->is_signed = sign_hint;
 			RTLIL::Const case_expr = children[0]->bitsAsConst(width_hint, sign_hint);
 			std::vector<AstNode*> new_children;
 			new_children.push_back(children[0]);
@@ -2018,7 +2041,7 @@ bool AstNode::simplify(bool const_fold, bool at_zero, bool in_lvalue, int stage,
 		if (name_has_dot(str, sname)) {
 			if (current_scope.count(str) > 0) {
 				auto item_node = current_scope[str];
-				if (item_node->type == AST_STRUCT_ITEM) {
+				if (item_node->type == AST_STRUCT_ITEM || item_node->type == AST_STRUCT) {
 					// structure member, rewrite this node to reference the packed struct wire
 					auto range = make_struct_member_range(this, item_node);
 					newNode = new AstNode(AST_IDENTIFIER, range);
@@ -2104,7 +2127,7 @@ bool AstNode::simplify(bool const_fold, bool at_zero, bool in_lvalue, int stage,
 			std::swap(data_range_left, data_range_right);
 
 		std::stringstream sstr;
-		sstr << "$mem2bits$" << str << "$" << filename << ":" << location.first_line << "$" << (autoidx++);
+		sstr << "$mem2bits$" << str << "$" << RTLIL::encode_filename(filename) << ":" << location.first_line << "$" << (autoidx++);
 		std::string wire_id = sstr.str();
 
 		AstNode *wire = new AstNode(AST_WIRE, new AstNode(AST_RANGE, mkconst_int(data_range_left, true), mkconst_int(data_range_right, true)));
@@ -2343,7 +2366,7 @@ bool AstNode::simplify(bool const_fold, bool at_zero, bool in_lvalue, int stage,
 
 		// if this is an autonamed block is in an always_comb
 		if (current_always && current_always->attributes.count(ID::always_comb)
-				&& str.at(0) == '$')
+				&& is_autonamed_block(str))
 			// track local variables in this block so we can consider adding
 			// nosync once the block has been fully elaborated
 			for (AstNode *child : children)
@@ -2691,18 +2714,30 @@ bool AstNode::simplify(bool const_fold, bool at_zero, bool in_lvalue, int stage,
 			// mask and shift operations, disabled for now
 
 			AstNode *wire_mask = new AstNode(AST_WIRE, new AstNode(AST_RANGE, mkconst_int(source_width-1, true), mkconst_int(0, true)));
-			wire_mask->str = stringf("$bitselwrite$mask$%s:%d$%d", filename.c_str(), location.first_line, autoidx++);
+			wire_mask->str = stringf("$bitselwrite$mask$%s:%d$%d", RTLIL::encode_filename(filename).c_str(), location.first_line, autoidx++);
 			wire_mask->attributes[ID::nosync] = AstNode::mkconst_int(1, false);
 			wire_mask->is_logic = true;
 			while (wire_mask->simplify(true, false, false, 1, -1, false, false)) { }
 			current_ast_mod->children.push_back(wire_mask);
 
 			AstNode *wire_data = new AstNode(AST_WIRE, new AstNode(AST_RANGE, mkconst_int(source_width-1, true), mkconst_int(0, true)));
-			wire_data->str = stringf("$bitselwrite$data$%s:%d$%d", filename.c_str(), location.first_line, autoidx++);
+			wire_data->str = stringf("$bitselwrite$data$%s:%d$%d", RTLIL::encode_filename(filename).c_str(), location.first_line, autoidx++);
 			wire_data->attributes[ID::nosync] = AstNode::mkconst_int(1, false);
 			wire_data->is_logic = true;
 			while (wire_data->simplify(true, false, false, 1, -1, false, false)) { }
 			current_ast_mod->children.push_back(wire_data);
+
+			int shamt_width_hint = -1;
+			bool shamt_sign_hint = true;
+			shift_expr->detectSignWidth(shamt_width_hint, shamt_sign_hint);
+
+			AstNode *wire_sel = new AstNode(AST_WIRE, new AstNode(AST_RANGE, mkconst_int(shamt_width_hint-1, true), mkconst_int(0, true)));
+			wire_sel->str = stringf("$bitselwrite$sel$%s:%d$%d", RTLIL::encode_filename(filename).c_str(), location.first_line, autoidx++);
+			wire_sel->attributes[ID::nosync] = AstNode::mkconst_int(1, false);
+			wire_sel->is_logic = true;
+			wire_sel->is_signed = shamt_sign_hint;
+			while (wire_sel->simplify(true, false, false, 1, -1, false, false)) { }
+			current_ast_mod->children.push_back(wire_sel);
 
 			did_something = true;
 			newNode = new AstNode(AST_BLOCK);
@@ -2720,39 +2755,44 @@ bool AstNode::simplify(bool const_fold, bool at_zero, bool in_lvalue, int stage,
 			ref_data->id2ast = wire_data;
 			ref_data->was_checked = true;
 
+			AstNode *ref_sel = new AstNode(AST_IDENTIFIER);
+			ref_sel->str = wire_sel->str;
+			ref_sel->id2ast = wire_sel;
+			ref_sel->was_checked = true;
+
 			AstNode *old_data = lvalue->clone();
 			if (type == AST_ASSIGN_LE)
 				old_data->lookahead = true;
 
-			AstNode *shamt = shift_expr;
+			AstNode *s = new AstNode(AST_ASSIGN_EQ, ref_sel->clone(), shift_expr);
+			newNode->children.push_back(s);
 
-			int shamt_width_hint = 0;
-			bool shamt_sign_hint = true;
-			shamt->detectSignWidth(shamt_width_hint, shamt_sign_hint);
+			AstNode *shamt = ref_sel;
 
+			// convert to signed while preserving the sign and value
+			shamt = new AstNode(AST_CAST_SIZE, mkconst_int(shamt_width_hint + 1, true), shamt);
+			shamt = new AstNode(AST_TO_SIGNED, shamt);
+
+			// offset the shift amount by the lower bound of the dimension
 			int start_bit = children[0]->id2ast->range_right;
-			bool use_shift = shamt_sign_hint;
+			shamt = new AstNode(AST_SUB, shamt, mkconst_int(start_bit, true));
 
-			if (start_bit != 0) {
-				shamt = new AstNode(AST_SUB, shamt, mkconst_int(start_bit, true));
-				use_shift = true;
-			}
+			// reflect the shift amount if the dimension is swapped
+			if (children[0]->id2ast->range_swapped)
+				shamt = new AstNode(AST_SUB, mkconst_int(source_width - result_width, true), shamt);
+
+			// AST_SHIFT uses negative amounts for shifting left
+			shamt = new AstNode(AST_NEG, shamt);
 
 			AstNode *t;
 
 			t = mkconst_bits(std::vector<RTLIL::State>(result_width, State::S1), false);
-			if (use_shift)
-				t = new AstNode(AST_SHIFT, t, new AstNode(AST_NEG, shamt->clone()));
-			else
-				t = new AstNode(AST_SHIFT_LEFT, t, shamt->clone());
+			t = new AstNode(AST_SHIFT, t, shamt->clone());
 			t = new AstNode(AST_ASSIGN_EQ, ref_mask->clone(), t);
 			newNode->children.push_back(t);
 
 			t = new AstNode(AST_BIT_AND, mkconst_bits(std::vector<RTLIL::State>(result_width, State::S1), false), children[1]->clone());
-			if (use_shift)
-				t = new AstNode(AST_SHIFT, t, new AstNode(AST_NEG, shamt));
-			else
-				t = new AstNode(AST_SHIFT_LEFT, t, shamt);
+			t = new AstNode(AST_SHIFT, t, shamt);
 			t = new AstNode(AST_ASSIGN_EQ, ref_data->clone(), t);
 			newNode->children.push_back(t);
 
@@ -2769,7 +2809,7 @@ skip_dynamic_range_lvalue_expansion:;
 	if (stage > 1 && (type == AST_ASSERT || type == AST_ASSUME || type == AST_LIVE || type == AST_FAIR || type == AST_COVER) && current_block != NULL)
 	{
 		std::stringstream sstr;
-		sstr << "$formal$" << filename << ":" << location.first_line << "$" << (autoidx++);
+		sstr << "$formal$" << RTLIL::encode_filename(filename) << ":" << location.first_line << "$" << (autoidx++);
 		std::string id_check = sstr.str() + "_CHECK", id_en = sstr.str() + "_EN";
 
 		AstNode *wire_check = new AstNode(AST_WIRE);
@@ -2878,7 +2918,7 @@ skip_dynamic_range_lvalue_expansion:;
 			newNode = new AstNode(AST_BLOCK);
 
 			AstNode *wire_tmp = new AstNode(AST_WIRE, new AstNode(AST_RANGE, mkconst_int(width_hint-1, true), mkconst_int(0, true)));
-			wire_tmp->str = stringf("$splitcmplxassign$%s:%d$%d", filename.c_str(), location.first_line, autoidx++);
+			wire_tmp->str = stringf("$splitcmplxassign$%s:%d$%d", RTLIL::encode_filename(filename).c_str(), location.first_line, autoidx++);
 			current_ast_mod->children.push_back(wire_tmp);
 			current_scope[wire_tmp->str] = wire_tmp;
 			wire_tmp->attributes[ID::nosync] = AstNode::mkconst_int(1, false);
@@ -2916,7 +2956,7 @@ skip_dynamic_range_lvalue_expansion:;
 			(children[0]->children.size() == 1 || children[0]->children.size() == 2) && children[0]->children[0]->type == AST_RANGE)
 	{
 		std::stringstream sstr;
-		sstr << "$memwr$" << children[0]->str << "$" << filename << ":" << location.first_line << "$" << (autoidx++);
+		sstr << "$memwr$" << children[0]->str << "$" << RTLIL::encode_filename(filename) << ":" << location.first_line << "$" << (autoidx++);
 		std::string id_addr = sstr.str() + "_ADDR", id_data = sstr.str() + "_DATA", id_en = sstr.str() + "_EN";
 
 		int mem_width, mem_size, addr_bits;
@@ -3188,8 +3228,9 @@ skip_dynamic_range_lvalue_expansion:;
 					AstNode *reg = new AstNode(AST_WIRE, new AstNode(AST_RANGE,
 							mkconst_int(width_hint-1, true), mkconst_int(0, true)));
 
-					reg->str = stringf("$past$%s:%d$%d$%d", filename.c_str(), location.first_line, myidx, i);
+					reg->str = stringf("$past$%s:%d$%d$%d", RTLIL::encode_filename(filename).c_str(), location.first_line, myidx, i);
 					reg->is_reg = true;
+					reg->is_signed = sign_hint;
 
 					current_ast_mod->children.push_back(reg);
 
@@ -3409,7 +3450,7 @@ skip_dynamic_range_lvalue_expansion:;
 				else {
 					result = width * mem_depth;
 				}
-				newNode = mkconst_int(result, false);
+				newNode = mkconst_int(result, true);
 				goto apply_newNode;
 			}
 
@@ -3692,7 +3733,7 @@ skip_dynamic_range_lvalue_expansion:;
 
 
 		std::stringstream sstr;
-		sstr << str << "$func$" << filename << ":" << location.first_line << "$" << (autoidx++) << '.';
+		sstr << str << "$func$" << RTLIL::encode_filename(filename) << ":" << location.first_line << "$" << (autoidx++) << '.';
 		std::string prefix = sstr.str();
 
 		AstNode *decl = current_scope[str];
@@ -4545,7 +4586,7 @@ static void mark_memories_assign_lhs_complex(dict<AstNode*, pool<std::string>> &
 	if (that->type == AST_IDENTIFIER && that->id2ast && that->id2ast->type == AST_MEMORY) {
 		AstNode *mem = that->id2ast;
 		if (!(mem2reg_candidates[mem] & AstNode::MEM2REG_FL_CMPLX_LHS))
-			mem2reg_places[mem].insert(stringf("%s:%d", that->filename.c_str(), that->location.first_line));
+			mem2reg_places[mem].insert(stringf("%s:%d", RTLIL::encode_filename(that->filename).c_str(), that->location.first_line));
 		mem2reg_candidates[mem] |= AstNode::MEM2REG_FL_CMPLX_LHS;
 	}
 }
@@ -4573,14 +4614,14 @@ void AstNode::mem2reg_as_needed_pass1(dict<AstNode*, pool<std::string>> &mem2reg
 			// activate mem2reg if this is assigned in an async proc
 			if (flags & AstNode::MEM2REG_FL_ASYNC) {
 				if (!(mem2reg_candidates[mem] & AstNode::MEM2REG_FL_SET_ASYNC))
-					mem2reg_places[mem].insert(stringf("%s:%d", filename.c_str(), location.first_line));
+					mem2reg_places[mem].insert(stringf("%s:%d", RTLIL::encode_filename(filename).c_str(), location.first_line));
 				mem2reg_candidates[mem] |= AstNode::MEM2REG_FL_SET_ASYNC;
 			}
 
 			// remember if this is assigned blocking (=)
 			if (type == AST_ASSIGN_EQ) {
 				if (!(proc_flags[mem] & AstNode::MEM2REG_FL_EQ1))
-					mem2reg_places[mem].insert(stringf("%s:%d", filename.c_str(), location.first_line));
+					mem2reg_places[mem].insert(stringf("%s:%d", RTLIL::encode_filename(filename).c_str(), location.first_line));
 				proc_flags[mem] |= AstNode::MEM2REG_FL_EQ1;
 			}
 
@@ -4597,11 +4638,11 @@ void AstNode::mem2reg_as_needed_pass1(dict<AstNode*, pool<std::string>> &mem2reg
 			// remember where this is
 			if (flags & MEM2REG_FL_INIT) {
 				if (!(mem2reg_candidates[mem] & AstNode::MEM2REG_FL_SET_INIT))
-					mem2reg_places[mem].insert(stringf("%s:%d", filename.c_str(), location.first_line));
+					mem2reg_places[mem].insert(stringf("%s:%d", RTLIL::encode_filename(filename).c_str(), location.first_line));
 				mem2reg_candidates[mem] |= AstNode::MEM2REG_FL_SET_INIT;
 			} else {
 				if (!(mem2reg_candidates[mem] & AstNode::MEM2REG_FL_SET_ELSE))
-					mem2reg_places[mem].insert(stringf("%s:%d", filename.c_str(), location.first_line));
+					mem2reg_places[mem].insert(stringf("%s:%d", RTLIL::encode_filename(filename).c_str(), location.first_line));
 				mem2reg_candidates[mem] |= AstNode::MEM2REG_FL_SET_ELSE;
 			}
 		}
@@ -4615,7 +4656,7 @@ void AstNode::mem2reg_as_needed_pass1(dict<AstNode*, pool<std::string>> &mem2reg
 
 		// flag if used after blocking assignment (in same proc)
 		if ((proc_flags[mem] & AstNode::MEM2REG_FL_EQ1) && !(mem2reg_candidates[mem] & AstNode::MEM2REG_FL_EQ2)) {
-			mem2reg_places[mem].insert(stringf("%s:%d", filename.c_str(), location.first_line));
+			mem2reg_places[mem].insert(stringf("%s:%d", RTLIL::encode_filename(filename).c_str(), location.first_line));
 			mem2reg_candidates[mem] |= AstNode::MEM2REG_FL_EQ2;
 		}
 	}
@@ -4805,7 +4846,7 @@ bool AstNode::mem2reg_as_needed_pass2(pool<AstNode*> &mem2reg_set, AstNode *mod,
 			children[0]->children[0]->children[0]->type != AST_CONSTANT)
 	{
 		std::stringstream sstr;
-		sstr << "$mem2reg_wr$" << children[0]->str << "$" << filename << ":" << location.first_line << "$" << (autoidx++);
+		sstr << "$mem2reg_wr$" << children[0]->str << "$" << RTLIL::encode_filename(filename) << ":" << location.first_line << "$" << (autoidx++);
 		std::string id_addr = sstr.str() + "_ADDR", id_data = sstr.str() + "_DATA";
 
 		int mem_width, mem_size, addr_bits;
@@ -4921,7 +4962,7 @@ bool AstNode::mem2reg_as_needed_pass2(pool<AstNode*> &mem2reg_set, AstNode *mod,
 		else
 		{
 			std::stringstream sstr;
-			sstr << "$mem2reg_rd$" << str << "$" << filename << ":" << location.first_line << "$" << (autoidx++);
+			sstr << "$mem2reg_rd$" << str << "$" << RTLIL::encode_filename(filename) << ":" << location.first_line << "$" << (autoidx++);
 			std::string id_addr = sstr.str() + "_ADDR", id_data = sstr.str() + "_DATA";
 
 			int mem_width, mem_size, addr_bits;
@@ -5134,6 +5175,8 @@ bool AstNode::replace_variables(std::map<std::string, AstNode::varinfo_t> &varia
 			width = min(std::abs(children.at(0)->range_left - children.at(0)->range_right) + 1, width);
 		}
 		offset -= variables.at(str).offset;
+		if (variables.at(str).range_swapped)
+			offset = -offset;
 		std::vector<RTLIL::State> &var_bits = variables.at(str).val.bits;
 		std::vector<RTLIL::State> new_bits(var_bits.begin() + offset, var_bits.begin() + offset + width);
 		AstNode *newNode = mkconst_bits(new_bits, variables.at(str).is_signed);
@@ -5191,7 +5234,8 @@ AstNode *AstNode::eval_const_function(AstNode *fcall, bool must_succeed)
 				log_file_error(filename, location.first_line, "Incompatible re-declaration of constant function wire %s.\n", stmt->str.c_str());
 			}
 			variable.val = RTLIL::Const(RTLIL::State::Sx, width);
-			variable.offset = min(stmt->range_left, stmt->range_right);
+			variable.offset = stmt->range_swapped ? stmt->range_left : stmt->range_right;
+			variable.range_swapped = stmt->range_swapped;
 			variable.is_signed = stmt->is_signed;
 			variable.explicitly_sized = stmt->children.size() &&
 				stmt->children.back()->type == AST_RANGE;
@@ -5276,8 +5320,12 @@ AstNode *AstNode::eval_const_function(AstNode *fcall, bool must_succeed)
 				int width = std::abs(range->range_left - range->range_right) + 1;
 				varinfo_t &v = variables[stmt->children.at(0)->str];
 				RTLIL::Const r = stmt->children.at(1)->bitsAsConst(v.val.bits.size());
-				for (int i = 0; i < width; i++)
-					v.val.bits.at(i+offset-v.offset) = r.bits.at(i);
+				for (int i = 0; i < width; i++) {
+					int index = i + offset - v.offset;
+					if (v.range_swapped)
+						index = -index;
+					v.val.bits.at(index) = r.bits.at(i);
+				}
 			}
 
 			delete block->children.front();

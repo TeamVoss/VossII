@@ -198,7 +198,7 @@ end_abstype get_wbase_names;
 
 let base_compact_wprint inps rhs =
     let i_map = zip inps (1 upto (length inps)) in
-    letrec P pri (W_X sz) = sprintf "X\\[%d:0\\]" (sz-1)
+    letrec P pri (W_X sz) = sprintf "X[%d:0]" (sz-1)
      /\    P pri (W_CONST sz v) =
 	    v < 16 => int2str v |
 	    sz < 5 OR ((sz % 4) != 0) => sprintf "0b%0*b" sz v
@@ -318,7 +318,7 @@ let base_compact_wprint inps rhs =
 
 let inp2tcl inps rhs =
     let i_map = zip inps (1 upto (length inps)) in
-    letrec P ic pri (W_X sz) = sprintf "X\\[%d:0\\]" (sz-1)
+    letrec P ic pri (W_X sz) = sprintf "X[%d:0]" (sz-1)
      /\    P ic pri (W_CONST sz v) =
 	    v < 16 => int2str v |
 	    sz < 5 OR ((sz % 4) != 0) => sprintf "0b%0*b" sz v
@@ -502,7 +502,13 @@ let mk_draw_cmd phase_delay rhs =
     let inps = get_wbase_names rhs then
     inps = [] =>
 	let special (W_NAMED_CONST name sz v) =
-		sprintf "draw_hfl {%s}" name
+		sprintf "draw_constant {%s}" name
+	 /\ special (W_X sz) =
+		sprintf "draw_constant {X[%d:0]}" (sz-1)
+	 /\ special (W_CONST sz v) =
+	    v < 16 => sprintf "draw_constant %d" v |
+	    sz < 5 OR ((sz % 4) != 0) => sprintf "draw_constant 0b%0*b" sz v
+				       | sprintf "draw_constant 0x%x" v
 	 /\ special rhs =
 		let body = inp2tcl inps rhs then
 		sprintf "draw_hfl {%s}" body
@@ -993,14 +999,14 @@ let <- L R =
     let rhs = hw_destr {R:: *a} in
     base_assignment T lhs rhs
 ;
-infix 0 <-;
+infixr 0 <-;
 
 let <<-- L R =
     let lhs = hw_destr {L:: *a} in
     let rhs = hw_destr {R:: *a} in
     base_assignment F lhs rhs
 ;
-infix 0 <<--;
+infixr 0 <<--;
 
 let base_phase_delay lhs rhs =
     let l_sz = wexpr_size lhs in
@@ -3620,4 +3626,4 @@ let ::: name p =
     val (PINST nm attrs lf fa_inps fa_outs ints body) = p in
     PINST nm (("Label",name):attrs) lf fa_inps fa_outs ints body
 ;
-infix 0 :::;
+infixr 0 :::;

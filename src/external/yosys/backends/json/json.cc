@@ -52,8 +52,23 @@ struct JsonWriter
 		string newstr = "\"";
 		for (char c : str) {
 			if (c == '\\')
+				newstr += "\\\\";
+			else if (c == '"')
+				newstr += "\\\"";
+			else if (c == '\b')
+				newstr += "\\b";
+			else if (c == '\f')
+				newstr += "\\f";
+			else if (c == '\n')
+				newstr += "\\n";
+			else if (c == '\r')
+				newstr += "\\r";
+			else if (c == '\t')
+				newstr += "\\t";
+			else if (c < 0x20)
+				newstr += stringf("\\u%04X", c);
+			else
 				newstr += c;
-			newstr += c;
 		}
 		return newstr + "\"";
 	}
@@ -379,6 +394,7 @@ struct JsonBackend : public Backend {
 		log("      \"bits\": <bit_vector>\n");
 		log("      \"offset\": <the lowest bit index in use, if non-0>\n");
 		log("      \"upto\": <1 if the port bit indexing is MSB-first>\n");
+		log("      \"signed\": <1 if the port is signed>\n");
 		log("    }\n");
 		log("\n");
 		log("The \"offset\" and \"upto\" fields are skipped if their value would be 0.");
@@ -428,6 +444,7 @@ struct JsonBackend : public Backend {
 		log("      \"bits\": <bit_vector>\n");
 		log("      \"offset\": <the lowest bit index in use, if non-0>\n");
 		log("      \"upto\": <1 if the port bit indexing is MSB-first>\n");
+		log("      \"signed\": <1 if the port is signed>\n");
 		log("    }\n");
 		log("\n");
 		log("The \"hide_name\" fields are set to 1 when the name of this cell or net is\n");

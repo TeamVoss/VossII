@@ -155,6 +155,9 @@ void prep_hier(RTLIL::Design *design, bool dff_mode)
 		r.first->second = new Design;
 	Design *unmap_design = r.first->second;
 
+	// Keep track of derived versions of modules that we haven't used, to prevent these being used for unwanted techmaps later on.
+	pool<IdString> unused_derived;
+
 	for (auto module : design->selected_modules())
 		for (auto cell : module->cells()) {
 			auto inst_module = design->module(cell->type);
@@ -167,12 +170,9 @@ void prep_hier(RTLIL::Design *design, bool dff_mode)
 				derived_module = inst_module;
 			}
 			else {
-				// Check potential for any one of those three
-				//   (since its value may depend on a parameter, but not its existence)
-				if (!inst_module->has_attribute(ID::abc9_flop) && !inst_module->has_attribute(ID::abc9_box) && !inst_module->get_bool_attribute(ID::abc9_bypass))
-					continue;
 				derived_type = inst_module->derive(design, cell->parameters);
 				derived_module = design->module(derived_type);
+				unused_derived.insert(derived_type);
 			}
 
 			if (derived_module->get_bool_attribute(ID::abc9_flop)) {
@@ -180,13 +180,23 @@ void prep_hier(RTLIL::Design *design, bool dff_mode)
 					continue;
 			}
 			else {
-				if (!derived_module->get_bool_attribute(ID::abc9_box) && !derived_module->get_bool_attribute(ID::abc9_bypass)) {
+				bool has_timing = false;
+				for (auto derived_cell : derived_module->cells()) {
+					if (derived_cell->type.in(ID($specify2), ID($specify3), ID($specrule))) {
+						// If the module contains timing; then we potentially care about deriving its content too,
+						// as timings (or associated port widths) could be dependent on parameters.
+						has_timing = true;
+						break;
+					}
+				}
+				if (!derived_module->get_bool_attribute(ID::abc9_box) && !derived_module->get_bool_attribute(ID::abc9_bypass) && !has_timing) {
 					if (unmap_design->module(derived_type)) {
 						// If derived_type is present in unmap_design, it means that it was processed previously, but found to be incompatible -- e.g. if
 						// it contained a non-zero initial state. In this case, continue to replace the cell type/parameters so that it has the same properties
 						// as a compatible type, yet will be safely unmapped later
 						cell->type = derived_type;
 						cell->parameters.clear();
+						unused_derived.erase(derived_type);
 					}
 					continue;
 				}
@@ -245,7 +255,11 @@ void prep_hier(RTLIL::Design *design, bool dff_mode)
 
 			cell->type = derived_type;
 			cell->parameters.clear();
+			unused_derived.erase(derived_type);
 		}
+	for (auto unused : unused_derived) {
+		design->remove(design->module(unused));
+	}
 }
 
 void prep_bypass(RTLIL::Design *design)

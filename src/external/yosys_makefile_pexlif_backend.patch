@@ -1,5 +1,5 @@
---- Makefile    2022-02-03 17:00:45.864633700 +0100
-+++ Makefile_VossII     2022-02-03 17:44:37.497000998 +0100
+--- Makefile	2022-08-22 08:55:49.725922500 +0200
++++ Makefile_VossII	2022-08-22 09:29:43.393000000 +0200
 @@ -10,10 +10,10 @@
  # CONFIG := msys2-64
  
@@ -13,16 +13,16 @@
  ENABLE_READLINE := 1
  ENABLE_EDITLINE := 0
  ENABLE_GHDL := 0
-@@ -142,7 +142,7 @@
+@@ -155,7 +155,7 @@
  # is just a symlink to your actual ABC working directory, as 'make mrproper'
  # will remove the 'abc' directory and you do not want to accidentally
  # delete your work on ABC..
--ABCREV = f6fa2dd
+-ABCREV = 20f970f
 +ABCREV = default
  ABCPULL = 1
  ABCURL ?= https://github.com/YosysHQ/abc
- ABCMKARGS = CC="$(CXX)" CXX="$(CXX)" ABC_USE_LIBSTDCXX=1 VERBOSE=$(Q)
-@@ -668,6 +668,7 @@
+ ABCMKARGS = CC="$(CXX)" CXX="$(CXX)" ABC_USE_LIBSTDCXX=1 ABC_USE_NAMESPACE=abc VERBOSE=$(Q)
+@@ -700,6 +700,7 @@
  
  include $(YOSYS_SRC)/backends/verilog/Makefile.inc
  include $(YOSYS_SRC)/backends/rtlil/Makefile.inc

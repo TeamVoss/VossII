@@ -671,6 +671,14 @@ Convert modules into blackbox modules (remove contents and set the blackbox
 module attribute).
 \end{lstlisting}
 
+\section{bmuxmap -- transform \$bmux cells to trees of \$mux cells}
+\label{cmd:bmuxmap}
+\begin{lstlisting}[numbers=left,frame=single]
+    bmuxmap [selection]
+
+This pass transforms $bmux cells to trees of $mux cells.
+\end{lstlisting}
+
 \section{bugpoint -- minimize testcases}
 \label{cmd:bugpoint}
 \begin{lstlisting}[numbers=left,frame=single]
@@ -1131,6 +1139,14 @@ selected wires, thus 'deleting' module ports.
     deminout [options] [selection]
 
 "Demote" inout ports to input or output ports, if possible.
+\end{lstlisting}
+
+\section{demuxmap -- transform \$demux cells to \$eq + \$mux cells}
+\label{cmd:demuxmap}
+\begin{lstlisting}[numbers=left,frame=single]
+    demuxmap [selection]
+
+This pass transforms $demux cells to a bunch of equality comparisons.
 \end{lstlisting}
 
 \section{design -- save, restore and reset current design}
@@ -2206,6 +2222,133 @@ one-hot encoding and binary encoding is supported.
             .map <old_bitpattern> <new_bitpattern>
 \end{lstlisting}
 
+\section{fst2tb -- generate testbench out of fst file}
+\label{cmd:fst2tb}
+\begin{lstlisting}[numbers=left,frame=single]
+    fst2tb [options] [top-level]
+
+This command generates testbench for the circuit using the given top-level module
+and simulus signal from FST file
+
+    -tb <name>
+        generated testbench name.
+        files <name>.v and <name>.txt are created as result.
+
+    -r <filename>
+        read simulation FST file
+
+    -clock <portname>
+        name of top-level clock input
+
+    -clockn <portname>
+        name of top-level clock input (inverse polarity)
+
+    -scope <name>
+        scope of simulation top model
+
+    -start <time>
+        start co-simulation in arbitary time (default 0)
+
+    -stop <time>
+        stop co-simulation in arbitary time (default END)
+
+    -n <integer>
+        number of clock cycles to simulate (default: 20)
+\end{lstlisting}
+
+\section{gatemate\_foldinv -- fold inverters into Gatemate LUT trees}
+\label{cmd:gatemate_foldinv}
+\begin{lstlisting}[numbers=left,frame=single]
+    gatemate_foldinv [selection]
+
+
+This pass searches for $__CC_NOT cells and folds them into CC_LUT2, CC_L2T4
+and CC_L2T5 cells as created by LUT tree mapping.
+\end{lstlisting}
+
+\section{glift -- create GLIFT models and optimization problems}
+\label{cmd:glift}
+\begin{lstlisting}[numbers=left,frame=single]
+    glift <command> [options] [selection]
+
+Augments the current or specified module with gate-level information flow tracking
+(GLIFT) logic using the "constructive mapping" approach. Also can set up QBF-SAT
+optimization problems in order to optimize GLIFT models or trade off precision and
+complexity.
+
+
+Commands:
+
+  -create-precise-model
+    Replaces the current or specified module with one that has corresponding "taint"
+    inputs, outputs, and internal nets along with precise taint tracking logic.
+    For example, precise taint tracking logic for an AND gate is:
+
+      y_t = a & b_t | b & a_t | a_t & b_t
+
+
+  -create-imprecise-model
+    Replaces the current or specified module with one that has corresponding "taint"
+    inputs, outputs, and internal nets along with imprecise "All OR" taint tracking
+    logic:
+
+      y_t = a_t | b_t
+
+
+  -create-instrumented-model
+    Replaces the current or specified module with one that has corresponding "taint"
+    inputs, outputs, and internal nets along with 4 varying-precision versions of taint
+    tracking logic. Which version of taint tracking logic is used for a given gate is
+    determined by a MUX selected by an $anyconst cell.  By default, unless the
+    `-no-cost-model` option is provided, an additional wire named `__glift_weight` with
+    the `keep` and `minimize` attributes is added to the module along with pmuxes and
+    adders to calculate a rough estimate of the number of logic gates in the GLIFT model
+    given an assignment for the $anyconst cells. The four versions of taint tracking logic
+    for an AND gate are:
+      y_t = a & b_t | b & a_t | a_t & b_t           (like `-create-precise-model`)
+      y_t = a_t | a & b_t
+      y_t = b_t | b & a_t
+      y_t = a_t | b_t                               (like `-create-imprecise-model`)
+
+
+Options:
+
+  -taint-constants
+    Constant values in the design are labeled as tainted.
+    (default: label constants as un-tainted)
+
+  -keep-outputs
+    Do not remove module outputs. Taint tracking outputs will appear in the module ports
+    alongside the orignal outputs.
+    (default: original module outputs are removed)
+
+  -simple-cost-model
+    Do not model logic area. Instead model the number of non-zero assignments to $anyconsts.
+    Taint tracking logic versions vary in their size, but all reduced-precision versions are
+    significantly smaller than the fully-precise version. A non-zero $anyconst assignment means
+    that reduced-precision taint tracking logic was chosen for some gate.
+    Only applicable in combination with `-create-instrumented-model`.
+    (default: use a complex model and give that wire the "keep" and "minimize" attributes)
+
+  -no-cost-model
+    Do not model taint tracking logic area and do not create a `__glift_weight` wire.
+    Only applicable in combination with `-create-instrumented-model`.
+    (default: model area and give that wire the "keep" and "minimize" attributes)
+
+  -instrument-more
+    Allow choice from more versions of (even simpler) taint tracking logic. A total
+    of 8 versions of taint tracking logic will be added per gate, including the 4
+    versions from `-create-instrumented-model` and these additional versions:
+
+      y_t = a_t
+      y_t = b_t
+      y_t = 1
+      y_t = 0
+
+    Only applicable in combination with `-create-instrumented-model`.
+    (default: do not add more versions of taint tracking logic.
+\end{lstlisting}
+
 \section{greenpak4\_dffinv -- merge greenpak4 inverters and DFF/latches}
 \label{cmd:greenpak4_dffinv}
 \begin{lstlisting}[numbers=left,frame=single]
@@ -2245,6 +2388,9 @@ resolves positional module parameters, unrolls array instances, and more.
     -simcheck
         like -check, but also throw an error if blackbox modules are
         instantiated, and throw an error if the design has no top module.
+
+    -smtcheck
+        like -simcheck, but allow smtlib2_module modules.
 
     -purge_lib
         by default the hierarchy command will not remove library (blackbox)
@@ -2420,7 +2566,7 @@ the resulting cells to more sophisticated PAD cells.
     -inpad <celltype> <in_port>[:<ext_port>]
         Map module input ports to the given cell type with the
         given output port name. if a 2nd portname is given, the
-        signal is passed through the pad call, using the 2nd
+        signal is passed through the pad cell, using the 2nd
         portname as the port facing the module port.
 
     -outpad <celltype> <out_port>[:<ext_port>]
@@ -2457,6 +2603,28 @@ the resulting cells to more sophisticated PAD cells.
         buffers using -widthparam to set the word size on the cell.)
 
 Tristate PADS (-toutpad, -tinoutpad) always operate in -bits mode.
+\end{lstlisting}
+
+\section{jny -- write design and metadata}
+\label{cmd:jny}
+\begin{lstlisting}[numbers=left,frame=single]
+    jny [options] [selection]
+
+Write JSON netlist metadata for the current design
+
+    -o <filename>
+        write to the specified file.
+
+    -no-connections
+        Don't include connection information in the netlist output.
+
+    -no-attributes
+        Don't include attributed information in the netlist output.
+
+    -no-properties
+        Don't include property information in the netlist output.
+
+See 'help write_jny' for a description of the JSON format used.
 \end{lstlisting}
 
 \section{json -- write design in JSON format}
@@ -2589,14 +2757,15 @@ is used then the $macc cell is mapped to $add, $sub, etc. cells instead.
 \section{memory -- translate memories to basic cells}
 \label{cmd:memory}
 \begin{lstlisting}[numbers=left,frame=single]
-    memory [-nomap] [-nordff] [-nowiden] [-nosat] [-memx] [-bram <bram_rules>] [selection]
+    memory [-norom] [-nomap] [-nordff] [-nowiden] [-nosat] [-memx] [-no-rw-check] [-bram <bram_rules>] [selection]
 
 This pass calls all the other memory_* passes in a useful order:
 
     opt_mem
     opt_mem_priority
     opt_mem_feedback
-    memory_dff                          (skipped if called with -nordff or -memx)
+    memory_bmux2rom                     (skipped if called with -norom)
+    memory_dff [-no-rw-check]           (skipped if called with -nordff or -memx)
     opt_clean
     memory_share [-nowiden] [-nosat]
     opt_mem_widen
@@ -2608,6 +2777,14 @@ This pass calls all the other memory_* passes in a useful order:
 
 This converts memories to word-wide DFFs and address decoders
 or multiport memory blocks if called with the -nomap option.
+\end{lstlisting}
+
+\section{memory\_bmux2rom -- convert muxes to ROMs}
+\label{cmd:memory_bmux2rom}
+\begin{lstlisting}[numbers=left,frame=single]
+    memory_bmux2rom [options] [selection]
+
+This pass converts $bmux cells with constant A input to ROMs.
 \end{lstlisting}
 
 \section{memory\_bram -- map memories to block rams}
@@ -2723,11 +2900,45 @@ memory cells.
 \section{memory\_dff -- merge input/output DFFs into memory read ports}
 \label{cmd:memory_dff}
 \begin{lstlisting}[numbers=left,frame=single]
-    memory_dff [options] [selection]
+    memory_dff [-no-rw-check] [selection]
 
 This pass detects DFFs at memory read ports and merges them into the memory port.
 I.e. it consumes an asynchronous memory port and the flip-flops at its
 interface and yields a synchronous memory port.
+
+    -no-rw-check
+        marks all recognized read ports as "return don't-care value on
+        read/write collision" (same result as setting the no_rw_check
+        attribute on all memories).
+\end{lstlisting}
+
+\section{memory\_libmap -- map memories to cells}
+\label{cmd:memory_libmap}
+\begin{lstlisting}[numbers=left,frame=single]
+    memory_libmap -lib <library_file> [-D <condition>] [selection]
+
+This pass takes a description of available RAM cell types and maps
+all selected memories to one of them, or leaves them  to be mapped to FFs.
+
+  -lib <library_file>
+    Selects a library file containing RAM cell definitions. This option
+    can be passed more than once to select multiple libraries.
+    See passes/memory/memlib.md for description of the library format.
+
+  -D <condition>
+    Enables a condition that can be checked within the library file
+    to eg. select between slightly different hardware variants.
+    This option can be passed any number of times.
+
+  -logic-cost-rom <num>
+  -logic-cost-ram <num>
+    Sets the cost of a single bit for memory lowered to soft logic.
+
+  -no-auto-distributed
+  -no-auto-block
+  -no-auto-huge
+    Disables automatic mapping of given kind of RAMs.  Manual mapping
+    (using ram_style or other attributes) is still supported.
 \end{lstlisting}
 
 \section{memory\_map -- translate multiport memories to basic cells}
@@ -2749,6 +2960,12 @@ pass to word-wide DFFs and address decoders.
 
     -iattr
         for -attr, ignore case of <value>.
+
+    -rom-only
+        only perform conversion for ROMs (memories with no write ports).
+
+    -keepdc
+        when mapping ROMs, keep x-bits shared across read ports.
 \end{lstlisting}
 
 \section{memory\_memx -- emulate vlog sim behavior for mem ports}
@@ -3115,6 +3332,15 @@ It also performs some simple expression rewriting.
         replaced by 'a'. the -keepdc option disables all such optimizations.
 \end{lstlisting}
 
+\section{opt\_ffinv -- push inverters through FFs}
+\label{cmd:opt_ffinv}
+\begin{lstlisting}[numbers=left,frame=single]
+    opt_ffinv [selection]
+
+This pass pushes inverters to the other side of a FF when they can be merged
+into LUTs on the other side.
+\end{lstlisting}
+
 \section{opt\_lut -- optimize LUT cells}
 \label{cmd:opt_lut}
 \begin{lstlisting}[numbers=left,frame=single]
@@ -3201,6 +3427,9 @@ are then merged to one cell.
 
     -share_all
         Operate on all cell types, not just built-in types.
+
+    -keepdc
+        Do not merge flipflops with don't-care bits in their initial value.
 \end{lstlisting}
 
 \section{opt\_muxtree -- eliminate dead trees in multiplexer trees}
@@ -3437,6 +3666,7 @@ This pass calls all the other proc_* passes in the most common order.
     proc_prune
     proc_init
     proc_arst
+    proc_rom
     proc_mux
     proc_dlatch
     proc_dff
@@ -3451,6 +3681,9 @@ The following options are supported:
 
     -nomux
         Will omit the proc_mux pass.
+
+    -norom
+        Will omit the proc_rom pass.
 
     -global_arst [!]<netname>
         This option is passed through to proc_arst.
@@ -3556,6 +3789,14 @@ a later assignment to the same signal and removes them.
     proc_rmdead [selection]
 
 This pass identifies unreachable branches in decision trees and removes them.
+\end{lstlisting}
+
+\section{proc\_rom -- convert switches to ROMs}
+\label{cmd:proc_rom}
+\begin{lstlisting}[numbers=left,frame=single]
+    proc_rom [selection]
+
+This pass converts switches into read-only memories when appropriate.
 \end{lstlisting}
 
 \section{qbfsat -- solve a 2QBF-SAT problem in the circuit}
@@ -3769,6 +4010,9 @@ Read cells from liberty file as modules into current design.
 
     -lib
         only create empty blackbox modules
+
+    -wb
+        mark imported cells as whiteboxes
 
     -nooverwrite
         ignore re-definitions of modules. (the default behavior is to
@@ -4001,10 +4245,12 @@ Assign names auto-generated from the src attribute to all selected wires and
 cells with private names.
 
 
-    rename -wire [selection]
+    rename -wire [selection] [-suffix <suffix>]
 
 Assign auto-generated names based on the wires they drive to all selected
 cells with private names. Ignores cells driving privatly named wires.
+By default, the cell is named after the wire with the cell type as suffix.
+The -suffix option can be used to set the suffix to the given string instead.
 
 
     rename -enumerate [-pattern <pattern>] [selection]
@@ -4340,15 +4586,16 @@ described here.
     -unset <name>
         do not modify the current selection. instead remove a previously saved
         selection under the given name (see @<name> below).
+
     -assert-none
         do not modify the current selection. instead assert that the given
-        selection is empty. i.e. produce an error if any object matching the
-        selection is found.
+        selection is empty. i.e. produce an error if any object or module
+        matching the selection is found.
 
     -assert-any
         do not modify the current selection. instead assert that the given
-        selection is non-empty. i.e. produce an error if no object matching
-        the selection is found.
+        selection is non-empty. i.e. produce an error if no object or module
+        matching the selection is found.
 
     -assert-count N
         do not modify the current selection. instead assert that the given
@@ -4815,11 +5062,27 @@ This command simulates the circuit using the given top-level module.
     -vcd <filename>
         write the simulation results to the given VCD file
 
+    -fst <filename>
+        write the simulation results to the given FST file
+
+    -aiw <filename>
+        write the simulation results to an AIGER witness file
+        (requires a *.aim file via -map)
+
+    -x
+        ignore constant x outputs in simulation file.
+
+    -date
+        include date and full version info in output.
+
     -clock <portname>
         name of top-level clock input
 
     -clockn <portname>
         name of top-level clock input (inverse polarity)
+
+    -multiclock
+        mark that witness file is multiclock.
 
     -reset <portname>
         name of top-level reset input (active high)
@@ -4837,13 +5100,47 @@ This command simulates the circuit using the given top-level module.
         include the specified timescale declaration in the vcd
 
     -n <integer>
-        number of cycles to simulate (default: 20)
+        number of clock cycles to simulate (default: 20)
 
     -a
-        include all nets in VCD output, not just those with public names
+        use all nets in VCD/FST operations, not just those with public names
 
     -w
         writeback mode: use final simulation state as new init state
+
+    -r
+        read simulation results file (file formats supported: FST, VCD, AIW and WIT)
+		 VCD support requires vcd2fst external tool to be present
+
+    -map <filename>
+        read file with port and latch symbols, needed for AIGER witness input
+
+    -scope <name>
+        scope of simulation top model
+
+    -at <time>
+        sets start and stop time
+
+    -start <time>
+        start co-simulation in arbitary time (default 0)
+
+    -stop <time>
+        stop co-simulation in arbitary time (default END)
+
+    -sim
+        simulation with stimulus from FST (default)
+
+    -sim-cmp
+        co-simulation expect exact match
+
+    -sim-gold
+        co-simulation, x in simulation can match any value in FST
+
+    -sim-gate
+        co-simulation, x in FST can match any value in simulation
+
+    -q
+        disable per-cycle/sample log message
 
     -d
         enable debug output
@@ -5049,6 +5346,11 @@ on partly selected designs.
     -flowmap
         use FlowMap LUT techmapping instead of ABC
 
+    -no-rw-check
+        marks all recognized read ports as "return don't-care value on
+        read/write collision" (same result as setting the no_rw_check
+        attribute on all memories).
+
 
 The following commands are executed by this synthesis command:
 
@@ -5197,6 +5499,9 @@ This command runs synthesis for Anlogic FPGAs.
     -nolutram
         do not use EG_LOGIC_DRAM16X4 cells in output netlist
 
+    -nobram
+        do not use EG_PHY_BRAM or EG_PHY_BRAM32K cells in output netlist
+
 
 The following commands are executed by this synthesis command:
 
@@ -5213,10 +5518,9 @@ The following commands are executed by this synthesis command:
     coarse:
         synth -run coarse
 
-    map_lutram:    (skip if -nolutram)
-        memory_bram -rules +/anlogic/lutrams.txt
-        techmap -map +/anlogic/lutrams_map.v
-        setundef -zero -params t:EG_LOGIC_DRAM16X4
+    map_ram:
+        memory_libmap -lib +/anlogic/lutrams.txt -lib +/anlogic/brams.txt [-no-auto-block] [-no-auto-distributed]    (-no-auto-block if -nobram, -no-auto-distributed if -nolutram)
+        techmap -map +/anlogic/lutrams_map.v -map +/anlogic/brams_map.v
 
     map_ffram:
         opt -fast -mux_undef -undriven -fine
@@ -5480,6 +5784,11 @@ This command runs synthesis for ECP5 FPGAs.
     -nodsp
         do not map multipliers to MULT18X18D
 
+    -no-rw-check
+        marks all recognized read ports as "return don't-care value on
+        read/write collision" (same result as setting the no_rw_check
+        attribute on all memories).
+
 
 The following commands are executed by this synthesis command:
 
@@ -5509,20 +5818,16 @@ The following commands are executed by this synthesis command:
         chtype -set $mul t:$__soft_mul    (unless -nodsp)
         alumacc
         opt
-        memory -nomap
+        memory -nomap [-no-rw-check]
         opt_clean
 
-    map_bram:    (skip if -nobram)
-        memory_bram -rules +/ecp5/brams.txt
-        techmap -map +/ecp5/brams_map.v
-
-    map_lutram:    (skip if -nolutram)
-        memory_bram -rules +/ecp5/lutrams.txt
-        techmap -map +/ecp5/lutrams_map.v
+    map_ram:
+        memory_libmap -lib +/ecp5/lutrams.txt -lib +/ecp5/brams.txt [-no-auto-block] [-no-auto-distributed]    (-no-auto-block if -nobram, -no-auto-distributed if -nolutram)
+        techmap -map +/ecp5/lutrams_map.v -map +/ecp5/brams_map.v
 
     map_ffram:
         opt -fast -mux_undef -undriven -fine
-        memory_map -iattr -attr !ram_block -attr !rom_block -attr logic_block -attr syn_ramstyle=auto -attr syn_ramstyle=registers -attr syn_romstyle=auto -attr syn_romstyle=logic
+        memory_map
         opt -undriven -fine
 
     map_gates:
@@ -5618,9 +5923,10 @@ The following commands are executed by this synthesis command:
 
     coarse:
         synth -run coarse
-        memory_bram -rules +/efinix/brams.txt
+
+    map_ram:
+        memory_libmap -lib +/efinix/brams.txt
         techmap -map +/efinix/brams_map.v
-        setundef -zero -params t:EFX_RAM_5K
 
     map_ffram:
         opt -fast -mux_undef -undriven -fine
@@ -5703,6 +6009,9 @@ This command runs synthesis for Cologne Chip AG GateMate FPGAs.
     -nomx8, -nomx4
         do not use CC_MX{8,4} multiplexer cells in output netlist.
 
+    -luttree
+        use new LUT tree mapping approach (EXPERIMENTAL).
+
     -dff
         run 'abc' with -dff option
 
@@ -5752,8 +6061,7 @@ The following commands are executed by this synthesis command:
         opt_clean
 
     map_bram:    (skip if '-nobram')
-        memory_bram -rules +/gatemate/brams.txt
-        setundef -zero -params t:$__CC_BRAM_CASCADE t:$__CC_BRAM_40K_SDP t:$__CC_BRAM_20K_SDP t:$__CC_BRAM_20K_TDP t:$__CC_BRAM_40K_TDP 
+        memory_libmap -lib +/gatemate/brams.txt
         techmap -map +/gatemate/brams_map.v
 
     map_ffram:
@@ -5783,7 +6091,11 @@ The following commands are executed by this synthesis command:
         techmap -map +/gatemate/mux_map.v
 
     map_luts:
-        abc  -dress -lut 4
+        abc  -genlib +/gatemate/lut_tree_cells.genlib    (with -luttree)
+        techmap -map +/gatemate/lut_tree_map.v    (with -luttree)
+        gatemate_foldinv    (with -luttree)
+        techmap -map +/gatemate/inv_map.v    (with -luttree)
+        abc  -dress -lut 4    (without -luttree)
         clean
 
     map_cells:
@@ -5859,6 +6171,11 @@ This command runs synthesis for Gowin FPGAs. This work is experimental.
     -abc9
         use new ABC9 flow (EXPERIMENTAL)
 
+    -no-rw-check
+        marks all recognized read ports as "return don't-care value on
+        read/write collision" (same result as setting the no_rw_check
+        attribute on all memories).
+
 
 The following commands are executed by this synthesis command:
 
@@ -5873,16 +6190,11 @@ The following commands are executed by this synthesis command:
         deminout
 
     coarse:
-        synth -run coarse
+        synth -run coarse [-no-rw-check]
 
-    map_bram:    (skip if -nobram)
-        memory_bram -rules +/gowin/brams.txt
-        techmap -map +/gowin/brams_map.v
-
-    map_lutram:    (skip if -nolutram)
-        memory_bram -rules +/gowin/lutrams.txt
-        techmap -map +/gowin/lutrams_map.v
-        setundef -params -zero t:RAM16S4
+    map_ram:
+        memory_libmap -lib +/gowin/lutrams.txt -lib +/gowin/brams.txt [-no-auto-block] [-no-auto-distributed]    (-no-auto-block if -nobram, -no-auto-distributed if -nolutram)
+        techmap -map +/gowin/lutrams_map.v -map +/gowin/brams_map.v
 
     map_ffram:
         opt -fast -mux_undef -undriven -fine
@@ -6066,6 +6378,9 @@ This command runs synthesis for iCE40 FPGAs.
     -nobram
         do not use SB_RAM40_4K* cells in output netlist
 
+    -spram
+        enable automatic inference of SB_SPRAM256KA
+
     -dsp
         use iCE40 UltraPlus DSP cells for large arithmetic
 
@@ -6084,6 +6399,11 @@ This command runs synthesis for iCE40 FPGAs.
 
     -flowmap
         use FlowMap LUT techmapping instead of abc (EXPERIMENTAL)
+
+    -no-rw-check
+        marks all recognized read ports as "return don't-care value on
+        read/write collision" (same result as setting the no_rw_check
+        attribute on all memories).
 
 
 The following commands are executed by this synthesis command:
@@ -6112,7 +6432,7 @@ The following commands are executed by this synthesis command:
         techmap -map +/cmp2lut.v -D LUT_WIDTH=4
         opt_expr
         opt_clean
-        memory_dff
+        memory_dff [-no-rw-check]
         wreduce t:$mul
         techmap -map +/mul2dsp.v -map +/ice40/dsp_map.v -D DSP_A_MAXWIDTH=16 -D DSP_B_MAXWIDTH=16 -D DSP_A_MINWIDTH=2 -D DSP_B_MINWIDTH=2 -D DSP_Y_MINWIDTH=11 -D DSP_NAME=$__MUL16X16    (if -dsp)
         select a:mul2dsp                  (if -dsp)
@@ -6124,17 +6444,17 @@ The following commands are executed by this synthesis command:
         chtype -set $mul t:$__soft_mul    (if -dsp)
         alumacc
         opt
-        memory -nomap
+        memory -nomap [-no-rw-check]
         opt_clean
 
-    map_bram:    (skip if -nobram)
-        memory_bram -rules +/ice40/brams.txt
-        techmap -map +/ice40/brams_map.v
+    map_ram:
+        memory_libmap -lib +/ice40/brams.txt -lib +/ice40/spram.txt -no-auto-huge [-no-auto-huge] [-no-auto-block]    (-no-auto-huge unless -spram, -no-auto-block if -nobram)
+        techmap -map +/ice40/brams_map.v -map +/ice40/spram_map.v
         ice40_braminit
 
     map_ffram:
         opt -fast -mux_undef -undriven -fine
-        memory_map -iattr -attr !ram_block -attr !rom_block -attr logic_block -attr syn_ramstyle=auto -attr syn_ramstyle=registers -attr syn_romstyle=auto -attr syn_romstyle=logic
+        memory_map
         opt -undriven -fine
 
     map_gates:
@@ -6452,6 +6772,12 @@ This command runs synthesis for MachXO2 FPGAs.
         from label is synonymous to 'begin', and empty to label is
         synonymous to the end of the command list.
 
+    -nobram
+        do not use block RAM cells in output netlist
+
+    -nolutram
+        do not use LUT RAM cells in output netlist
+
     -noflatten
         do not flatten design before synthesis
 
@@ -6477,6 +6803,10 @@ The following commands are executed by this synthesis command:
 
     coarse:
         synth -run coarse
+
+    map_ram:
+        memory_libmap -lib +/machxo2/lutrams.txt -lib +/machxo2/brams.txt [-no-auto-block] [-no-auto-distributed]    (-no-auto-block if -nobram, -no-auto-distributed if -nolutram)
+        techmap -map +/machxo2/lutrams_map.v -map +/machxo2/brams_map.v
 
     fine:
         memory_map
@@ -6613,24 +6943,13 @@ The following commands are executed by this synthesis command:
         memory -nomap
         opt_clean
 
-    map_lram:    (skip if -nolram)
-        memory_bram -rules +/nexus/lrams.txt
-        setundef -zero -params t:$__NX_PDPSC512K
-        techmap -map +/nexus/lrams_map.v
-
-    map_bram:    (skip if -nobram)
-        memory_bram -rules +/nexus/brams.txt
-        setundef -zero -params t:$__NX_PDP16K
-        techmap -map +/nexus/brams_map.v
-
-    map_lutram:    (skip if -nolutram)
-        memory_bram -rules +/nexus/lutrams.txt
-        setundef -zero -params t:$__NEXUS_DPR16X4
-        techmap -map +/nexus/lutrams_map.v
+    map_ram:
+        memory_libmap -lib +/nexus/lutrams.txt -lib +/nexus/brams.txt -lib +/nexus/lrams.txt -no-auto-huge [-no-auto-block] [-no-auto-distributed]    (-no-auto-block if -nobram, -no-auto-distributed if -nolutram)
+        techmap -map +/nexus/lutrams_map.v -map +/nexus/brams_map.v -map +/nexus/lrams_map.v
 
     map_ffram:
         opt -fast -mux_undef -undriven -fine
-        memory_map -iattr -attr !ram_block -attr !rom_block -attr logic_block -attr syn_ramstyle=auto -attr syn_ramstyle=registers -attr syn_romstyle=auto -attr syn_romstyle=logic
+        memory_map
         opt -undriven -fine
 
     map_gates:
@@ -6781,6 +7100,7 @@ The following commands are executed by this synthesis command:
         write_blif -attr -param -auto-top 
 
     verilog:
+        write_verilog -noattr -nohex <file-name>
 \end{lstlisting}
 
 \section{synth\_sf2 -- synthesis for SmartFusion2 and IGLOO2 FPGAs}
@@ -7020,17 +7340,10 @@ The following commands are executed by this synthesis command:
         memory -nomap
         opt_clean
 
-    map_uram:    (only if '-uram')
-        memory_bram -rules +/xilinx/{family}_urams.txt
-        techmap -map +/xilinx/{family}_urams_map.v
-
-    map_bram:    (skip if '-nobram')
-        memory_bram -rules +/xilinx/{family}_brams.txt
-        techmap -map +/xilinx/{family}_brams_map.v
-
-    map_lutram:    (skip if '-nolutram')
-        memory_bram -rules +/xilinx/lut[46]_lutrams.txt
-        techmap -map +/xilinx/lutrams_map.v
+    map_memory:
+        memory_libmap [...]
+        techmap -map +/xilinx/lutrams_<family>_map.v
+        techmap -map +/xilinx/brams_<family>_map.v
 
     map_ffram:
         opt -fast -full
@@ -7097,6 +7410,10 @@ in order to avoid a name collision with the built in commands.
 
 If any arguments are specified, these arguments are provided to the script via
 the standard $argc and $argv variables.
+
+Note, tcl will not recieve the output of any yosys command. If the output
+of the tcl commands are needed, use the yosys command 'tee' to redirect yosys's
+output to a temporary file.
 \end{lstlisting}
 
 \section{techmap -- generic technology mapper}
@@ -7451,6 +7768,11 @@ This pass transforms $mux cells with 'z' inputs to tristate buffers.
     -logic
         convert tri-state buffers that do not drive output ports
         to non-tristate logic. this option implies -merge.
+
+    -formal
+        convert all tri-state buffers to non-tristate logic and
+        add a formal assertion that no two buffers are driving the
+        same net simultaneously. this option implies -merge.
 \end{lstlisting}
 
 \section{uniquify -- create unique copies of modules}
@@ -7495,29 +7817,36 @@ Like -sv, but define FORMAL instead of SYNTHESIS.
 Load the specified VHDL files into Verific.
 
 
-    verific {-f|-F} <command-file>
+    verific {-f|-F} [-vlog95|-vlog2k|-sv2005|-sv2009|
+                     -sv2012|-sv|-formal] <command-file>
 
 Load and execute the specified command file.
+Override verilog parsing mode can be set.
+The macros YOSYS, SYNTHESIS/FORMAL, and VERIFIC are defined implicitly.
 
-Command file parser supports following commands:
-    +define    - defines macro
-    -u         - upper case all identifier (makes Verilog parser case insensitive)
-    -v         - register library name (file)
-    -y         - register library name (directory)
-    +incdir    - specify include dir
-    +libext    - specify library extension
-    +liborder  - add library in ordered list
-    +librescan - unresolved modules will be always searched starting with the first
-                 library specified by -y/-v options.
-    -f/-file   - nested -f option
-    -F         - nested -F option
+Command file parser supports following commands in file:
+    +define+<MACRO>=<VALUE> - defines macro
+    -u                      - upper case all identifier (makes Verilog parser
+                              case insensitive)
+    -v <filepath>           - register library name (file)
+    -y <filepath>           - register library name (directory)
+    +incdir+<filepath>      - specify include dir
+    +libext+<filepath>      - specify library extension
+    +liborder+<id>          - add library in ordered list
+    +librescan              - unresolved modules will be always searched
+                              starting with the first library specified
+                              by -y/-v options.
+    -f/-file <filepath>     - nested -f option
+    -F <filepath>           - nested -F option (relative path)
+    parse files:
+        <filepath>
+        +systemverilogext+<filepath>
+        +verilog1995ext+<filepath>
+        +verilog2001ext+<filepath>
 
-    parse mode:
+    analysis mode:
         -ams
-        +systemverilogext
         +v2k
-        +verilog1995ext
-        +verilog2001ext
         -sverilog
 
 
@@ -7542,6 +7871,11 @@ Add Verilog include directories.
 
 Add Verilog library directories. Verific will search in this directories to
 find undefined modules.
+
+
+    verific -vlog-libext <extension>..
+
+Add Verilog library extensions, used when searching in library directories.
 
 
     verific -vlog-define <macro>[=<value>]..
@@ -7599,6 +7933,9 @@ Import options:
   -v, -vv
     Verbose log messages. (-vv is even more verbose than -v.)
 
+  -pp <filename>
+    Pretty print design after elaboration to specified file.
+
 The following additional import options are useful for debugging the Verific
 bindings (for Yosys and/or Verific developers):
 
@@ -7637,50 +7974,6 @@ Pretty print options:
 
   -vhdl
     Save output for VHDL design units.
-
-
-    verific -app <application>..
-
-Execute YosysHQ formal application on loaded Verilog files.
-
-Application options:
-
-    -module <module>
-        Run formal application only on specified module.
-
-    -blacklist <filename[:lineno]>
-        Do not run application on modules from files that match the filename
-        or filename and line number if provided in such format.
-        Parameter can also contain comma separated list of file locations.
-
-    -blfile <file>
-        Do not run application on locations specified in file, they can represent filename
-        or filename and location in file.
-
-Applications:
-
-  WARNING: Applications only available in commercial build.
-
-
-    verific -template <name> <top_module>..
-
-Generate template for specified top module of loaded design.
-
-Template options:
-
-  -out
-    Specifies output file for generated template, by default output is stdout
-
-  -chparam name value 
-    Generate template using this parameter value. Otherwise default parameter
-    values will be used for templat generate functionality. This option
-    can be specified multiple times to override multiple parameters.
-    String values must be passed in double quotes (").
-
-Templates:
-
-  WARNING: Templates only available in commercial build.
-
 
 
     verific -cfg [<name> [<value>]]
@@ -7763,6 +8056,9 @@ Options:
         Do not change the width of memory address ports. Use this options in
         flows that use the 'memory_memx' pass.
 
+    -mux_undef
+        remove 'undef' inputs from $mux, $pmux and $_MUX_ cells
+
     -keepdc
         Do not optimize explicit don't-care values.
 \end{lstlisting}
@@ -7797,6 +8093,9 @@ invariant constraints.
 
     -vmap <filename>
         like -map, but more verbose
+
+    -no-startoffset
+        make indexes zero based, enable using map files with smt solvers.
 
     -I, -O, -B, -L
         If the design contains no input/output/assert/flip-flop then create one
@@ -8193,6 +8492,8 @@ Inside a script the input file can also can a here-document:
 Write a FIRRTL netlist of the current design.
 The following commands are executed by this command:
         pmuxtree
+        bmuxmap
+        demuxmap
 \end{lstlisting}
 
 \section{write\_ilang -- (deprecated) alias of write\_rtlil}
@@ -8223,6 +8524,26 @@ a tool for Coarse-Grain Example-Driven Interconnect Synthesis.
         not at all.
 
 http://bygone.clairexen.net/intersynth/
+\end{lstlisting}
+
+\section{write\_jny -- generate design metadata}
+\label{cmd:write_jny}
+\begin{lstlisting}[numbers=left,frame=single]
+    jny [options] [selection]
+
+Write JSON netlist metadata for the current design
+
+    -no-connections
+        Don't include connection information in the netlist output.
+
+    -no-attributes
+        Don't include attributed information in the netlist output.
+
+    -no-properties
+        Don't include property information in the netlist output.
+
+The JSON schema for JNY output files is located in the "jny.schema.json" file
+which is located at "https://raw.githubusercontent.com/YosysHQ/yosys/master/misc/jny.schema.json"
 \end{lstlisting}
 
 \section{write\_json -- write design to a JSON file}
@@ -8284,6 +8605,7 @@ Where <port_details> is:
       "bits": <bit_vector>
       "offset": <the lowest bit index in use, if non-0>
       "upto": <1 if the port bit indexing is MSB-first>
+      "signed": <1 if the port is signed>
     }
 
 The "offset" and "upto" fields are skipped if their value would be 0.They don't affect connection semantics, and are only used to preserve originalHDL bit indexing.And <cell_details> is:
@@ -8330,6 +8652,7 @@ And <net_details> is:
       "bits": <bit_vector>
       "offset": <the lowest bit index in use, if non-0>
       "upto": <1 if the port bit indexing is MSB-first>
+      "signed": <1 if the port is signed>
     }
 
 The "hide_name" fields are set to 1 when the name of this cell or net is

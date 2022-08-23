@@ -1497,12 +1497,14 @@ proc add_inst {inst_nbr args} {
     set tag [lindex $args [expr $argcnt-3]]
     set x [lindex $args [expr $argcnt-2]]
     set y [lindex $args [expr $argcnt-1]]
-    val {lx ly ux uy} [get_width_height $cmd]
-    set ii [$c create text [expr $x+$lx] [expr $y-$ly] \
-	  -anchor nw -justify left -font $::sfont($c) -fill $::inst_col \
-	  -text "i$inst_nbr"]
-    add_font_tags $c $ii _IsTeXt_
-    set ::tag2inst_nbr($c,$tag) $inst_nbr
+    if { ![regexp {draw_constant } $cmd] } {
+	val {lx ly ux uy} [get_width_height $cmd]
+	set ii [$c create text [expr $x+$lx] [expr $y-$ly] \
+	      -anchor nw -justify left -font $::sfont($c) -fill $::inst_col \
+	      -text "i$inst_nbr"]
+	add_font_tags $c $ii _IsTeXt_
+	set ::tag2inst_nbr($c,$tag) $inst_nbr
+    }
     lappend cmd $c $tag $x $y
     eval $cmd
 }
@@ -4019,6 +4021,7 @@ proc wr_lbl {neg txt c x y tag} {
 }
 
 proc Dlabel {c x y tag}	    { wr_lbl 0 D $c $x $y $tag }
+proc Alabel {c x y tag}	    { wr_lbl 0 A $c $x $y $tag }
 proc Elabel {c x y tag}	    { wr_lbl 0 E $c $x $y $tag }
 proc Rlabel {c x y tag}	    { wr_lbl 0 R $c $x $y $tag }
 proc RClabel {c x y tag}    { wr_lbl 0 cR $c $x $y $tag }
@@ -4105,6 +4108,14 @@ proc FallingEdge {c x y tag} {
 		[expr 4*$s] -fill $gcolor \
 		-tags [list $tag _DoNotChangeColor_]]
     $c move $f1 [expr $x-4*$s] [expr $y-1*$s]
+}
+
+proc TwoEdges {type1 typ2 c x y tag} {
+    set s [expr [rect_wid $c]/20]
+    set y1 [expr $y-8*$s]
+    eval $type1 $c $x $y1 $tag
+    set y2 [expr $y+8*$s]
+    eval $type2 $c $x $y1 $tag
 }
 
 proc re_order_inps {res new_order} {
@@ -4195,6 +4206,13 @@ proc draw_adff {c tag x y} {
     return [draw_box_pat 3 {RisingEdge} {Dlabel ClkInLabel Rlabel} $c $tag $x $y]
 }
 
+proc draw_aldff {pclk pald c tag x y} {
+    if { $pclk == 1 } { set c_edge RisingEdge } else { set c_edge FallingEdge }
+    if { $pald == 1 } { set a_edge RisingEdge } else { set a_edge FallingEdge }
+    set edge "TwoEdges $a_edge $c_edge"
+    return [draw_box_pat 4 $edge \
+		     [list Alabel ClkInLabel $Dlabel ClkInLabel] $c $tag $x $y]
+}
 
 proc draw_adffe {pclk pen prst c tag x y} {
     if { $pclk == 1 } { set edge RisingEdge } else { set edge FallingEdge }

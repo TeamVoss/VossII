@@ -163,6 +163,48 @@ let mk_int_signal int_r sz name =
     Wvar
 ;
 
+let _aldff p_clk p_aload sz src q aload ad clk d =
+    let attrs = mk_attr src __FILE__ __LINE__ then
+    let fa_inps_r = ref [] then
+    let fa_outs_r = ref [] then
+    let ints_r    = ref [] then
+    // Signal declarations (inputs in reverse order for drawing)
+    let Q	  = mk_ifc_signal fa_outs_r sz "Q" q then
+    let CLK	  = mk_ifc_signal fa_inps_r 1 "CLK" clk then
+    let D	  = mk_ifc_signal fa_inps_r sz "D" d then
+    let ALOAD	  = mk_ifc_signal fa_inps_r 1 "ALOAD" aload then
+    let AD	  = mk_ifc_signal fa_inps_r sz "AD" ad then
+    //
+    let dQ	  = mk_int_signal ints_r sz "Q_##_" then
+    let dALOAD	  = mk_int_signal ints_r 1 "ALOAD_##_" then
+    let dAD	  = mk_int_signal ints_r sz "AD_##_" then
+    let dCLK	  = mk_int_signal ints_r 1 "CLK_##_" then
+    let dD	  = mk_int_signal ints_r sz "D_##_" then
+    // Expressions
+    let clk_cond  = p_clk => W_AND (W_NOT dCLK) CLK
+			   | W_AND dCLK (W_NOT CLK)
+    then
+    let aload_cond  = p_aload => W_AND (W_NOT dALOAD) ALOAD
+			       | W_AND dALOAD (W_NOT ALOAD)
+    then
+    // Components
+    let clk_del	  = W_PHASE_DELAY dCLK CLK then
+    let aload_del = W_PHASE_DELAY dALOAD ALOAD then
+    let ad_del	  = W_PHASE_DELAY dAD AD then
+    let d_del	  = W_PHASE_DELAY dD D then
+    let q_del	  = W_PHASE_DELAY dQ Q then
+    let mux	  = W_UPDATE_FN Q (W_ITE aload_cond dAD (W_ITE clk_cond dD dQ))
+    then
+    // Final assembly
+    let subs	   = P_LEAF [clk_del, aload_del, d_del, ad_del, q_del, mux] then
+    let pfn = sprintf "draw_aldff %s %s"
+		      (p_clk  => "1" | "0")
+		      (p_aload => "1" | "0")
+    then
+    PINST pfn attrs T
+	    (deref fa_inps_r) (deref fa_outs_r) (deref ints_r) subs
+;
+
 let _adffe p_clk p_en p_arst sz src q arst en clk d =
     let attrs = mk_attr src __FILE__ __LINE__ then
     let fa_inps_r = ref [] then
@@ -1235,7 +1277,7 @@ let prim_mem_rd_port
 	let p = prim_rw_bypass mem_info
 			       clk_enable clk_polarity
 			       trans_mask coll_x_mask
-			       cur rd_addr wclk waddr wdin out
+			       cur f_RD_ADDR wclk waddr wdin out
 	in
 	let ps' = p:ps in
 	let ints' = cur:ints in
@@ -1290,7 +1332,12 @@ let mk_write_ports mem_info wsigs wparams out =
     mk_wport wsigs wparams [out]
 ;
 
-let splitn sz s = map implode (cluster sz (butfirstn 2 (explode s)));
+let splitn sz s =
+    s = "" => [] |
+    (map implode (cluster sz (butfirstn 2 (explode s))))
+    gen_catch (\msg.
+	eprintf "splitn %d |%s| failed\n%s\n" sz s msg)
+;
 let splitv sz n =
     let merge l = hd (md_merge_vectors l) in
     map merge (cluster sz (md_expand_vector n))
@@ -1304,11 +1351,11 @@ let _mem_v2 src mem wr_ports rd_ports lines width abits params
     (wr_ports == 0 OR (init = []) => () |
 	    printf "WANRING: Initial values only supported for ROMs. Ignored")
     fseq
-    let attrs = mk_attr src __FILE__ __LINE__ in
-    let mem_info = MEM abits lines width in
+    let attrs = mk_attr src __FILE__ __LINE__ then
+    let mem_info = MEM abits lines width then
     //
     //
-    let get_param key = (assoc key params) catch "" in
+    let get_param key = (assoc key params) catch "" then
     let RD_CLK_ENABLE        = get_param "RD_CLK_ENABLE" then
     let RD_CLK_POLARITY      = get_param "RD_CLK_POLARITY" then
     let RD_TRANSPARENCY_MASK = get_param "RD_TRANSPARENCY_MASK" then
@@ -1325,16 +1372,16 @@ let _mem_v2 src mem wr_ports rd_ports lines width abits params
     let WR_PRIORITY_MASK     = get_param "WR_PRIORITY_MASK" then
     // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     //
-    let f_RD_CLK  = mk_name rd_ports "RD_CLK" in
-    let f_RD_EN   = mk_name rd_ports "RD_EN" in
-    let f_RD_ARST = mk_name rd_ports "RD_ARST" in
-    let f_RD_SRST = mk_name rd_ports "RD_SRST" in
-    let f_RD_ADDR = mk_name (rd_ports * abits) "RD_ADDR" in
-    let f_RD_DATA = mk_name (rd_ports * width) "RD_DATA" in
-    let f_WR_CLK  = mk_name wr_ports "WR_CLK" in
-    let f_WR_EN   = mk_name (wr_ports*width) "WR_EN" in
-    let f_WR_ADDR = mk_name (wr_ports*abits) "WR_ADDR" in
-    let f_WR_DATA = mk_name (wr_ports*width) "WR_DATA" in
+    let f_RD_CLK  = mk_name rd_ports "RD_CLK" then
+    let f_RD_EN   = mk_name rd_ports "RD_EN" then
+    let f_RD_ARST = mk_name rd_ports "RD_ARST" then
+    let f_RD_SRST = mk_name rd_ports "RD_SRST" then
+    let f_RD_ADDR = mk_name (rd_ports * abits) "RD_ADDR" then
+    let f_RD_DATA = mk_name (rd_ports * width) "RD_DATA" then
+    let f_WR_CLK  = mk_name wr_ports "WR_CLK" then
+    let f_WR_EN   = mk_name (wr_ports*width) "WR_EN" then
+    let f_WR_ADDR = mk_name (wr_ports*abits) "WR_ADDR" then
+    let f_WR_DATA = mk_name (wr_ports*width) "WR_DATA" then
     let fa_inps   = [
 		    (f_RD_CLK, rd_clk),
 		    (f_RD_EN, rd_en),
@@ -1348,91 +1395,99 @@ let _mem_v2 src mem wr_ports rd_ports lines width abits params
 		    (f_WR_EN, wr_en),
 		    (f_WR_ADDR, wr_addr),
 		    (f_WR_DATA, wr_data) ])
-    in
-    let fa_outs = [(f_RD_DATA, rd_data)] in
-    val (f_OLD_MEM,OLD_MEM) = mk_mem mem_info mem in
-    val (f_NEW_MEM,NEW_MEM) = mk_mem mem_info ("new_"^mem) in
+    then
+    let fa_outs = [(f_RD_DATA, rd_data)] then
+    val (f_OLD_MEM,OLD_MEM) = mk_mem mem_info mem then
+    val (f_NEW_MEM,NEW_MEM) = mk_mem mem_info ("new_"^mem) then
     // Writing part
     val (write_pexlifs, write_internals, masked_wdatas) =
 	wr_ports = 0 =>
 	    // ROM
-	    let pfn = sprintf "draw_hier ROM" in
+	    let pfn = sprintf "draw_hier ROM" then
 	    let mk_asignment row v =
 		let LHS =
-		    let name = sprintf "new_%s[%d][%d:0]" mem row (width-1) in
+		    let name = sprintf "new_%s[%d][%d:0]" mem row (width-1) then
 		    W_EXPLICIT_VAR width name
-		in
-		let RHS = W_CONST width (sscanf "%b" v) in
+		then
+		let RHS = W_CONST width (sscanf "%b" v) then
 		base_assignment T LHS RHS
-	    in
-	    let leaves = map2 mk_asignment (0 upto (length init -1 )) init in
-	    let ints = [] in
-	    let fa_inps = [] in
-	    let fa_outs = [(f_NEW_MEM, [f_NEW_MEM])] in
+	    then
+	    let leaves = map2 mk_asignment (0 upto (length init -1 )) init then
+	    let ints = [] then
+	    let fa_inps = [] then
+	    let fa_outs = [(f_NEW_MEM, [f_NEW_MEM])] then
 	    ([PINST pfn attrs F fa_inps fa_outs ints (P_HIER leaves)], [], [])
 	|
 	    // RAM
 	    let wports =
-		let w_clks = splitv 1 f_WR_CLK in
-		let w_ens  = splitv width f_WR_EN in
-		let w_addrs = splitv abits f_WR_ADDR in
-		let w_dins = splitv width f_WR_DATA in
+		let w_clks = splitv 1 f_WR_CLK then
+		let w_ens  = splitv width f_WR_EN then
+		let w_addrs = splitv abits f_WR_ADDR then
+		let w_dins = splitv width f_WR_DATA then
 		zip4 w_clks w_ens w_addrs w_dins
-	    in
+	    then
 	    let wparams =
-		let clk_enables = splitn 1 WR_CLK_ENABLE in
-		let clk_polarities = splitn 1 WR_CLK_POLARITY in
+		let clk_enables = splitn 1 WR_CLK_ENABLE then
+		let clk_polarities = splitn 1 WR_CLK_POLARITY then
 		zip clk_enables clk_polarities
-	    in
+	    then
 	    mk_write_ports mem_info wports wparams f_NEW_MEM
-    in
+    then
     // Memory storage part
-    let mem_pexlifs = [OLD_MEM <: NEW_MEM] in
+    let mem_pexlifs = [OLD_MEM <: NEW_MEM] then
     // Read ports
     let read_pexlifs =
 	let wrports =
 	    wr_ports = 0 => [] |
-	    let w_clks = splitv 1 f_WR_CLK in
-	    let w_addrs = splitv abits f_WR_ADDR in
-	    let w_dins = masked_wdatas in
+	    let w_clks = splitv 1 f_WR_CLK then
+	    let w_addrs = splitv abits f_WR_ADDR then
+	    let w_dins = masked_wdatas then
 	    zip3 w_clks w_addrs w_dins
-	in
+	then
 	// Parameters
-	let rd_clk_enable_l        = splitn 1 RD_CLK_ENABLE in
-	let rd_clk_polarity_l      = splitn 1 RD_CLK_POLARITY in
-	let rd_arst_value_l        = splitn width RD_ARST_VALUE in
-	let rd_srst_value_l        = splitn width RD_SRST_VALUE in
-	let rd_ce_over_srst_l      = splitn 1 RD_CE_OVER_SRST in
-	let wr_clk_enable_l        = splitn 1 WR_CLK_ENABLE in
-	let wr_clk_polarity_l      = splitn 1 WR_CLK_POLARITY in
-	let rd_transparency_mask_l = splitn wr_ports RD_TRANSPARENCY_MASK in
-	let rd_collision_x_mask_l  = splitn wr_ports RD_COLLISION_X_MASK in
+	let rd_clk_enable_l        = splitn 1 RD_CLK_ENABLE then
+	let rd_clk_polarity_l      = splitn 1 RD_CLK_POLARITY then
+	let rd_arst_value_l        = splitn width RD_ARST_VALUE then
+	let rd_srst_value_l        = splitn width RD_SRST_VALUE then
+	let rd_ce_over_srst_l      = splitn 1 RD_CE_OVER_SRST then
+	let wr_clk_enable_l        = splitn 1 WR_CLK_ENABLE then
+	let wr_clk_polarity_l      = splitn 1 WR_CLK_POLARITY then
+	let rd_transparency_mask_l = splitn wr_ports RD_TRANSPARENCY_MASK then
+	let rd_collision_x_mask_l  = splitn wr_ports RD_COLLISION_X_MASK then
 	// Signals
-	let rd_clk_l  = splitv 1 f_RD_CLK in
-	let rd_en_l   = splitv 1 f_RD_EN in
-	let arst_l    = splitv 1 f_RD_ARST in
-	let srst_l    = splitv 1 f_RD_SRST in
-	let rd_addr_l = splitv abits f_RD_ADDR in
-	let dout_l    = splitv width f_RD_DATA in
+	let rd_clk_l  = splitv 1 f_RD_CLK then
+	let rd_en_l   = splitv 1 f_RD_EN then
+	let arst_l    = splitv 1 f_RD_ARST then
+	let srst_l    = splitv 1 f_RD_SRST then
+	let rd_addr_l = splitv abits f_RD_ADDR then
+	let dout_l    = splitv width f_RD_DATA then
 	//
 	let mk_rd_port idx =
 		// Parameters for this read port
-		let rd_clk_enable = el idx rd_clk_enable_l in
-		let rd_clk_polarity = el idx rd_clk_polarity_l in
-		let rd_arst_value = el idx rd_arst_value_l in
-		let rd_srst_value = el idx rd_srst_value_l in
-		let rd_ce_over_srst = el idx rd_ce_over_srst_l in
-		let wr_clk_enables = el idx wr_clk_enable_l in
-		let wr_clk_polarity = el idx wr_clk_polarity_l in
-		let rd_transparency_masks = el idx rd_transparency_mask_l in
-		let rd_collision_x_masks = el idx rd_collision_x_mask_l in
+		let rd_clk_enable = el idx rd_clk_enable_l then
+		let rd_clk_polarity = el idx rd_clk_polarity_l then
+		let rd_arst_value = el idx rd_arst_value_l then
+		let rd_srst_value = el idx rd_srst_value_l then
+		let rd_ce_over_srst = el idx rd_ce_over_srst_l then
+		let wr_clk_enables =
+		    wr_ports = 0 => "0" | implode wr_clk_enable_l
+		then
+		let wr_clk_polarity = 
+		    wr_ports = 0 => "0" | implode wr_clk_polarity_l
+		then
+		let rd_transparency_masks =
+		    wr_ports = 0 => "0" | el idx rd_transparency_mask_l
+		then
+		let rd_collision_x_masks =
+		    wr_ports = 0 => "0" | el idx rd_collision_x_mask_l
+		then
 		// Signals for this read port
-		let arst = el idx arst_l in
-		let srst = el idx srst_l in
-		let rd_clk = el idx rd_clk_l in
-		let rd_en = el idx rd_en_l in
-		let rd_addr = el idx rd_addr_l in
-		let dout = el idx dout_l in
+		let arst = el idx arst_l then
+		let srst = el idx srst_l then
+		let rd_clk = el idx rd_clk_l then
+		let rd_en = el idx rd_en_l then
+		let rd_addr = el idx rd_addr_l then
+		let dout = el idx dout_l then
 		// Instantiate readport module
 		prim_mem_rd_port mem_info
 			    rd_clk_enable rd_clk_polarity
@@ -1448,11 +1503,11 @@ let _mem_v2 src mem wr_ports rd_ports lines width abits params
 			    dout
 	in
 	map mk_rd_port (1 upto rd_ports)
-    in
+    then
     //
-    let leaves = write_pexlifs @ mem_pexlifs @ read_pexlifs in
-    let ints = f_OLD_MEM:f_NEW_MEM:(write_internals@masked_wdatas) in
-    let pfn = sprintf "draw_hier _mem_v2" in
+    let leaves = write_pexlifs @ mem_pexlifs @ read_pexlifs then
+    let ints = f_OLD_MEM:f_NEW_MEM:(write_internals@masked_wdatas) then
+    let pfn = sprintf "draw_hier _mem_v2" then
     PINST pfn attrs F fa_inps fa_outs ints (P_HIER leaves)
 ;
 
