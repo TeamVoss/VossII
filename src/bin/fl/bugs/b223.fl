@@ -47,22 +47,24 @@ let myadder =
         "datapath" ::: re_ff_en eclk (init '&' update) (IF init THEN i__y ELSE ({'0::word})) tmp__l__main__y,
         "datapath" ::: re_ff_en eclk (is__S__MAIN__0 '&' update) (IF is__S__MAIN__0 THEN (l__main__x '+' l__main__y) ELSE ({'0::word})) l__main__z,
         "datapath" ::: re_ff_en eclk (init '&' update) (IF init THEN DONE ELSE ({'0::myadder_state})) tmp__ret__main,
-        "handshake" ::: ack <- is__DONE,
-        "control" ::: advance <- running,
-        "clkreset" ::: eclk <- clk,
-        "clkreset" ::: ereset <- reset,
-        "control" ::: hold <- ('~' advance),
-        "control" ::: init <- ('~' not__init),
-        "control" ::: is__DONE <- (state__myadder '=' DONE),
-        "control" ::: is__S__MAIN__0 <- (state__myadder '=' S__MAIN__0),
-        "datapath" ::: l__main__x <- (IF init THEN i__x ELSE tmp__l__main__x),
-        "datapath" ::: l__main__y <- (IF init THEN i__y ELSE tmp__l__main__y),
-        "control" ::: not__done <- ('~' is__DONE),
-        "datapath" ::: o__z <- l__main__z,
-        "datapath" ::: ret__main <- (IF init THEN DONE ELSE tmp__ret__main),
-        "control" ::: running <- (req '&' not__done),
-        "control" ::: update <- advance
+        "handshake" ::: ack <<-- is__DONE,
+        "control" ::: advance <<-- running,
+        "clkreset" ::: eclk <<-- clk,
+        "clkreset" ::: ereset <<-- reset,
+        "control" ::: hold <<-- ('~' advance),
+        "control" ::: init <<-- ('~' not__init),
+        "control" ::: is__DONE <<-- (state__myadder '=' DONE),
+        "control" ::: is__S__MAIN__0 <<-- (state__myadder '=' S__MAIN__0),
+        "datapath" ::: l__main__x <<-- (IF init THEN i__x ELSE tmp__l__main__x),
+        "datapath" ::: l__main__y <<-- (IF init THEN i__y ELSE tmp__l__main__y),
+        "control" ::: not__done <<-- ('~' is__DONE),
+        "datapath" ::: o__z <<-- l__main__z,
+        "datapath" ::: ret__main <<-- (IF init THEN DONE ELSE tmp__ret__main),
+        "control" ::: running <<-- (req '&' not__done),
+        "control" ::: update <<-- advance
 ];
+
+bifrost_simplify myadder;
 
 
 let examine_myadder = STE_debug (pexlif2fsm (myadder 'clk 'reset 'req 'ack 'i__x 'i__y 'o__z));

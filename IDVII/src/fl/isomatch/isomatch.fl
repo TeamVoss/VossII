@@ -24,6 +24,18 @@ lettype match =
 ;
 // note: M_LEAF could denote bothe alpha-equal leaves and SHA matches.
 
+letrec Pmatch match =
+    let Psub sub = list2str T "[" "," "]" (\(f,t).sprintf "(%s->%s)" f t) sub in
+    let Pmatch (M_LEAF sub) = sprintf "(M_LEAF %s)" (Psub sub)
+     /\ Pmatch (M_HIER sub matches) =
+	sprintf "(M_HIER %s %S)"
+		   (Psub sub)
+		   (map (\ (i,j,m).sprintf "<%d,%d,%s>" i j (Pmatch m)) matches)
+    in
+    Pmatch match
+;
+install_print_function Pmatch;
+
 let get_match_sub (M_LEAF s) = s
 /\  get_match_sub (M_HIER s _) = s
 ;

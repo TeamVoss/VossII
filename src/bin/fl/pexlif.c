@@ -62,6 +62,10 @@ extern str_mgr strings;
 /******************************************************************************/
 /*                              PRIVATE VARIABLES                             */
 /******************************************************************************/
+#if 0
+static int anon_cnt = 1;
+#endif
+
 static char str_buf[1024];
 // Global managers.
 static ustr_mgr        lstrings;
@@ -2141,20 +2145,25 @@ unfold_pexlif(g_ptr p, unint id)
     FOR_CONS(un_inter, li, item) {
         string old = GET_STRING(item);
 	string new = old;
-	while( VDB_has_name_collision(vdp, new) ) {
+#if 0
+new = wastrsave(&strings, gen_tprintf(ts, "_$%d_%s", anon_cnt++, old));
+#else
+	while( VDB_has_name_collision(vdp, new, TRUE) ) {
 	    int cnt;
 	    if( sscanf(new, "_$%d_", &cnt) != 1 ) {
-		new = wastrsave(&strings, gen_tprintf(ts, "_$1%s", old));
+		new = wastrsave(&strings, gen_tprintf(ts, "_$1_%s", old));
 	    } else {
 		string p = new+2;
 		while( *p && isdigit(*p) ) p++;
 		new = wastrsave(&strings, gen_tprintf(ts, "_$%d%s", cnt+1, p));
 	    }
 	}
+#endif
 	VDB_Insert_vector(vdp, new);
         g_ptr newg = Make_STRING_leaf(new);
-        INC_REFCNT(newg);
+        INC_REFCNT(old_inter);
 	old_inter = Make_CONS_ND(newg, old_inter);
+        INC_REFCNT(newg);
 	g_ptr p = Make_PAIR_ND(Make_STRING_leaf(old), Make_SINGLETON(newg));
 	inter_sub = Make_CONS_ND(p, inter_sub);
     }
@@ -2184,6 +2193,7 @@ unfold_pexlif(g_ptr p, unint id)
     }
     // Finally, construct new pexlif.
     INC_REFCNT(old_name);
+    INC_REFCNT(old_attrs);
     INC_REFCNT(old_leaf);
     INC_REFCNT(old_fa_inps);
     INC_REFCNT(old_fa_outs);
@@ -2191,7 +2201,7 @@ unfold_pexlif(g_ptr p, unint id)
     g_ptr new_pinst =
         mk_PINST(old_name, old_attrs, old_leaf, old_fa_inps, old_fa_outs,
                  old_inter, mk_P_HIER(children));
-    // /
+    //
     rem_fold_mem();
     rem_adj_mem();
     dispose_hash(&sub, NULLFCN);

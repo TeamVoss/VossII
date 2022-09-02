@@ -11,6 +11,8 @@ fprintf stdinfo ".";
 fprintf stdinfo ".";
 (cload (DIR^"/pexlif.fl")) fseq
 fprintf stdinfo ".";
+(cload (DIR^"/connectivity.fl")) fseq
+fprintf stdinfo ".";
 (cload (DIR^"../isomatch/isomatch.fl")) fseq
 fprintf stdinfo ".";
 (cload (DIR^"../verilog/pretty-pexlif.fl")) fseq
@@ -30,6 +32,8 @@ fprintf stdinfo ".";
 (cload (DIR^"/miter.fl")) fseq
 fprintf stdinfo ".";
 (cload (DIR^"/normalize_pexlif.fl")) fseq
+fprintf stdinfo ".";
+(cload (DIR^"/bifrost.fl")) fseq
 fprintf stdinfo ".";
 (is_defined "USE_OBSOLETE" => cload (DIR^"/obsolete.fl") | ()) fseq
 ();

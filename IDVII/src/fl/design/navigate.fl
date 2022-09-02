@@ -30,9 +30,6 @@ let vfanout ckt v =
     md_extract_vectors (flatmap get_real_fanout (md_expand_vector v))
 ;
 
-let dbg_ref = ref [""];
-
-
 let up_arrow = implode (map chr [27,91,65]);
 let down_arrow = implode (map chr [27,91,66]);
 let right_arrow = implode (map chr [27,91,67]);
@@ -92,7 +89,6 @@ let clear_and_draw fn =
 	(sprintf "wm geometry %s 200x70" w):
 	[]
     in
-    (dbg_ref := pgm) fseq
     tcl_eval pgm
 ;
 //    (print "\n\n") seq (print fn);

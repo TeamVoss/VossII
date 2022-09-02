@@ -1,0 +1,27 @@
+load "ste.fl";
+
+TYPE "byte" 8;
+
+STRUCT "str" [
+	("high", "byte"),
+	("low", "byte")
+];
+
+
+let tst =
+    byte_input i1 i2.
+    str_output	sum.
+    byte_internal   m1 m2.
+    CELL "tst" [
+	m1 <- i1 '+' '1,
+	m2 <- i2 '+' '1,
+	sum <- '0 <-- high ? m1
+		  <-- low  ? m2
+];
+
+let p = tst 'i1 'i2 'sum;
+
+let ckt = pexlif2fsm p;
+ckt;
+
+STE_debug ckt;

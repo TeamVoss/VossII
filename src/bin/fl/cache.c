@@ -248,6 +248,7 @@ Mark_RefVar(int ref_var)
     g_ptr node;
     node = *((g_ptr *) locate_buf(&ref_var_tbl, ref_var));
     Mark(node);
+    SET_REFCNT(node, MAX_REF_CNT);
 }
 
 void

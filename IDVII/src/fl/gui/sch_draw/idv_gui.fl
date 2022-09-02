@@ -461,7 +461,15 @@ let start_new_transform p start_new w =
     ()
 ;
 
-let IDV rw_database read_only_dbs =
+let import_model name p =
+    p fseq
+    val (IDV_RW_DB sname fname mnames tbl) = get_rw_db () then
+    let p_sha  = idv_save_pexlif p then
+    (add_model_in_rw_db T name p_sha) fseq
+    ()
+;
+
+let IDV0 rw_database read_only_dbs =
     // Open the databases
     (open_idv_db rw_database F) fseq
     (foreach (\db. open_idv_db db T) read_only_dbs) fseq
@@ -474,6 +482,14 @@ let IDV rw_database read_only_dbs =
     (cur_transf_windowsr := ((w,vfsm):(deref cur_transf_windowsr))) fseq
     ()
 ;
+
+let IDV_dbg p =
+    (IDV0 "DB_dbg" []) fseq
+    (import_model "DBG" p)
+;
+
+overload IDV IDV0 IDV_dbg;
+
 
 let add_transform canvas p tr =
     let vfsm = w2vfsm canvas in
@@ -506,6 +522,10 @@ let rename_name (PINST _ attrs lf fa_inps fa_outs ints body) new_name =
     PINST new_name attrs lf fa_inps fa_outs ints body
 ;
 
+let Dbg_imp = ref {(error "not yet") :: pexlif};
+let Dbg_pp' = ref {(error "not yet") :: pexlif};
+let Dbg_matches = ref { (error "not yet") :: ((int#(int#match)) list) list};
+
 let idv_finish_transformation canvas =
     val (parent,inside, sell) = get_idv_parent_info canvas then
     let vfsm = w2vfsm canvas in
@@ -513,6 +533,7 @@ let idv_finish_transformation canvas =
     let just = map (\(p,ckt,j).j) (butlast trfs) then
     just = [] => T |
     let imp = fst (hd trfs) in
+(Dbg_imp := imp) fseq
     let spec = fst (last trfs) in
     let spec_sig = pexlif_get_FP spec then
     let tr_name = find_next_anon_transform_name spec_sig then
@@ -573,10 +594,12 @@ let idv_finish_transformation canvas =
     op = "SaveAndApplyEverywhere" =>
 	let pp = get_idv_current_pexlif parent then
 	let matches = isomatch spec pp then
+(Dbg_matches := matches) fseq
 	let groups = map (map (fst # snd)) matches then
 	let nbr_groups = length groups then
 	let lbl = "_#*&_&*#_" in
-	let pp' = foldn_pexlif pp groups lbl then
+	let pp' = foldn_pexlif_anon pp groups lbl then
+(Dbg_pp' := pp') fseq
 	let imps =
 	    letrec do_sub (cp:cps) (m:ms) =
 		let matches = map (snd # snd) m then
@@ -1027,14 +1050,6 @@ export_to_tcl fl_display_transform_tree;
 //    in
 //    cnv p
 //;
-
-let import_model name p =
-    p fseq
-    val (IDV_RW_DB sname fname mnames tbl) = get_rw_db () then
-    let p_sha  = idv_save_pexlif p then
-    (add_model_in_rw_db T name p_sha) fseq
-    ()
-;
 
 let fl_import_model w filename =
     let p = read_pexlif filename then
@@ -1669,7 +1684,7 @@ let Pdraw_tree dt =
 install_print_function Pdraw_tree;    
 
 let build_vfanin_tbl ckt =
-    let vec_vis_fanin ckt vecs =
+    let vec_vis_fanin vecs =
         let nds = md_expand_vectors vecs in
         let get_pfn nd = (get_visualization_id ckt nd 0),
                          (get_visualization_pfn ckt nd 0),
@@ -1685,7 +1700,7 @@ let build_vfanin_tbl ckt =
         in
         flatmap process p
     in
-    list2tbl (vec_vis_fanin ckt (visualization_nodes ckt 0))
+    list2tbl (vec_vis_fanin (visualization_nodes ckt 0))
 ;
 
 let get_io_order p =
@@ -1709,9 +1724,7 @@ let get_io_order p =
 	zip (1 upto length vouts) vouts
     in
     let do (i,vo) = vo, (tr [] [(sprintf "o%d" i)] vo) in
-(fprintf stderr "Start of do\n") fseq
     let omaps = map do id_vouts then
-(fprintf stderr "Done omaps\n") fseq
     let do l = (fst (hd l)), (setify (map snd l)) in
     let inps = map do (partition fst (deref res)) then
     let sel l =
@@ -1818,16 +1831,23 @@ let simple_get_specialized_imp spec imp p =
     SOME imp'
 ;
 
+let dbg_spec = ref {(error "not yet") :: pexlif};
+let dbg_imp = ref {(error "not yet") :: pexlif};
+let dbg_p = ref {(error "not yet") :: pexlif};
+
 // Find a substitution that makes spec == p.
 // If such is found, return imp after applying the same substitution.
 let get_specialized_imp spec imp p =
+(dbg_spec := spec) fseq
+(dbg_imp := imp) fseq
+(dbg_p := p) fseq
     let ores = simple_get_specialized_imp spec imp p then
     has_value ores => ores |
     val (PINST nm1 attr1 lf1 in1 out1 int1 sckt1) = spec in
     val (PINST nm2 attr2 lf2 in2 out2 int2 sckt2) = p in
     length out1 != length out2 => NONE |
-    let spec' = wrap_pexlif spec in
-    let p'    = wrap_pexlif p in
+    let spec' = spec in
+    let p'    = p in
     val (oorder1, iorder1) = get_io_order spec' then
     val (oorder2, iorder2) = get_io_order p' then
     let ovsub = (map (\(sv,st). sv, (rev_assoc st oorder2)) oorder1) catch [] in
@@ -1855,7 +1875,7 @@ let replace_all parent spec imp =
     let groups = map (map snd) matches then
     let nbr_groups = length groups then
     let lbl = "_#*&_&*#_" in
-    let parent' = foldn_pexlif parent groups lbl then
+    let parent' = foldn_pexlif_anon parent groups lbl then
     let children' = pexlif_get_children parent' then
     let to_be_replaced = firstn nbr_groups children' then
     let remain = butfirstn nbr_groups children' then
@@ -2021,6 +2041,13 @@ let fl_do_selection_command canvas cmd =
 	cmd = "unmapped" =>
 	    val (unmapped,mapped) = split has_unmapped chs in
 	    md_extract_vectors (flatmap pexlif_get_outs_actuals unmapped)
+	|
+	cmd = "private_fanin" =>
+	    let io = buid_io_tbl p then
+	    let current_wires = deref rselection then
+	    let current_insts = wires2drivers io current_wires then
+	    let new_insts = inst_fanin_dfs io T 100 (\n.F) current_insts then
+	    md_extract_vectors (insts2wires io new_insts)
 	|
 	cmd = "invert" =>
 	    let all = md_expand_vectors ((map fst (fa_inps @ fa_outs))@ints) in

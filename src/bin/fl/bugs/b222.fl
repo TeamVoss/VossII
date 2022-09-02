@@ -1,0 +1,9 @@
+load "ste.fl";
+
+let p = verilog2pexlif F "" "b222" ["b222.v"] [];
+p fseq 1;
+
+let ckt = pexlif2fsm p;
+ckt;
+
+STE_debug ckt;

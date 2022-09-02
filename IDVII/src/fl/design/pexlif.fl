@@ -151,7 +151,8 @@ let vec_subtract vl1 vl2 =
 infix 7 vec_subtract;
 
 
-// Correct version of fold_pexlif (not terribly efficient).
+// Create a new pexlif in which instances in ids have been collected to
+// a new hiearchy named 'name'.
 let fold_pexlif p il new_name =
     val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER chs)) = p then
     let sel (i,sp) = mem i (setify il) in
@@ -191,18 +192,22 @@ let fold_pexlif p il new_name =
     (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER (cp:remain)))
 ;
 
-// Correct version of foldn_pexlif (not terribly efficient).
-let foldn_pexlif p ill new_base_name =
-    let all_sel = flat ill in
-    letrec select used (sel:sels) =
+// 
+// Create new instances for each group in the grouping list.
+// An entry in the grouping list consists of a name of the new group
+// and a list of indices for the instances to group into this new group.
+let foldn_pexlif p grl =
+    let all_sel = flatmap snd grl in
+    letrec select used ((lbl,sel):sels) =
 	let overlap = sel intersect used then
-	overlap == [] => sel:(select (sel@used) sels) |
+	overlap == [] => (lbl,sel):(select (sel@used) sels) |
 	(fprintf stdinfo "Overlapping selection in foldn_pexlif (%S)\n"
 		(map int2str overlap)) fseq
 	select used sels
      /\    select used [] = []
     in
-    let ill = select [] ill then
+    let grl' = select [] grl then
+    let ill = map snd grl' then
     val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER chs)) = p then
     let get_sel il = map (\i. el i chs) il in
     let selected_l = map get_sel ill then
@@ -231,9 +236,6 @@ let foldn_pexlif p ill new_base_name =
         let get_ainps (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd fa_inps in
         exp_trim ((map fst fa_outs)@(flatmap get_ainps remain))
     in
-    let mk_name i =
-	length ill = 1 => new_base_name | sprintf "%s[%d]" new_base_name i
-    in
     let mk_group i =
 	let sel = el i selected_l in
 	val (in_producers,in_consumers) = el i ifcs in
@@ -250,7 +252,7 @@ let foldn_pexlif p ill new_base_name =
 		    ((in_producers@in_consumers) vec_subtract (nouts @ ninps))
 	in
 	let mk_fa l = map (\v. (v,[v])) (md_extract_vectors l) in
-	let new_name = mk_name i then
+	let new_name = fst (el i grl') then
 	PINST new_name [] F (mk_fa ninps) (mk_fa nouts) new_ints (P_HIER sel)
     in
     let folded_children = map mk_group (1 upto (length ill)) then
@@ -265,6 +267,15 @@ let foldn_pexlif p ill new_base_name =
     (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER chs'))
 ;
 
+let foldn_pexlif_anon p ill new_base_name =
+    letrec mk_grl idx (il:ils) =
+	    ((sprintf "%s<%d>" new_base_name idx),il):(mk_grl (idx+1) ils)
+     /\    mk_grl idx [] = []
+    in
+    let grl = (length ill = 1) => [(new_base_name, hd ill)] | mk_grl 1 ill then
+    foldn_pexlif p grl
+;
+
 // Gather all child pints that has an attribute satisfying the predicate
 // and fold them into a group named 'new_name';
 let fold_by_label p attribute_predicate new_name =
@@ -277,28 +288,25 @@ let fold_by_label p attribute_predicate new_name =
     fold_pexlif p il new_name
 ;
 
-
-// Create a new pexlif in which instances in ids have been collected to
-// a new hiearchy named 'name'.
-// ...
-//  fold_pexlif::PINST->[int]->string->PINST
-let fold_pexlif pex ids name =
-        val (PINST n a l i o t (P_HIER ((PINST n' a' l' i' o' t' c'):cs))) =
-                fold_pexlif pex ids name
-        in
-        PINST n a l i o t (P_HIER ((PINST n' a' l' i' o' t' c'):cs))
+// Use the "Label" attributes to group the instances inside the pexlif.
+// Basically an easy way to create an extra level of hierarchy without
+// having to manually create all the interfaces.
+let pexlif_group_by_label p =
+    val (PINST nm attrs lf fa_inps fa_outs ints (P_HIER ps)) = p in
+    letrec get_lbl idx ((PINST nm attrs lf fa_inps fa_outs ints body):rem) =
+        ((find_attr "Label" "" attrs),idx):(get_lbl (idx+1) rem)
+     /\    get_lbl idx [] = []
+    in
+    let lbl_part = partition fst (get_lbl 1 ps) then
+    let mk l =
+        val (lbl,_) = hd l in
+        let indices = map snd l in
+        (lbl,indices)
+    in
+    let grl = filter (\(lbl,il). lbl != "") (map mk lbl_part) then
+    foldn_pexlif p grl
 ;
 
-// Create a new pexlif in which each collection of instances in idsl have
-// been collected to new hiearchies named 'name[<nbr>]'.
-// ...
-//  foldn_pexlif::PINST->[[int]]->string->PINST
-let foldn_pexlif pex idsl new_base_name =
-        val (PINST n a l i o t (P_HIER ((PINST n' a' l' i' o' t' c'):cs))) =
-                foldn_pexlif pex idsl new_base_name
-        in
-        PINST n a l i o t (P_HIER ((PINST n' a' l' i' o' t' c'):cs))
-;
 
 // Crate a new pexlif in which all the instances inside the instance id
 // are lifted up one level in the hierarchy. All the internal wires
@@ -438,23 +446,27 @@ let try_rev_assoc key l =
 
 let rename_internals p =
     val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER subfubs)) = p in
+    let get_base s = hd (str_split (get_vector_signature s) "[") in
     let init_map = map (\(f,_).f,f) (fa_inps @ fa_outs) then
     let mapping = ref init_map in
+    let bases_used = ref (map (\(m,n). get_base m) init_map) then
     let insert name =
-	let base = last (str_split name "/") in
-	let base = strip_BASE_TMP base in
+	let cname = strip_BASE_TMP (last (str_split name "/")) in
+	let base  = get_base cname in
 	letrec try i =
-	    let new_name = sprintf "%s%d%s" BASE_TMP i base in
-	    has_value (try_rev_assoc new_name (deref mapping)) => try (i+1) |
+	    let new_name = sprintf "%s%d%s" BASE_TMP i cname in
+	    let new_base = sprintf "%s%d%s" BASE_TMP i base in
+	    mem new_base (deref bases_used) => try (i+1) |
 	    (mapping := ((name, new_name):(deref mapping))) fseq
+	    (bases_used := (new_base:(deref bases_used))) fseq
 	    new_name
 	in
 	try 1
     in
     let ints' = map insert ints then
     let bit_mapping =
-	let expand_map (f,t) = zip (md_expand_vector f) (md_expand_vector t) in
-	flatmap expand_map (deref mapping)
+	let exp_map (f,t) = zip (md_expand_vector f) (md_expand_vector t) in
+	flatmap exp_map (deref mapping)
     then
     let map_name old_name =
 	str_is_prefix "0b" old_name => [old_name] |
@@ -477,9 +489,6 @@ let rename_internals p =
     let subfubs' = map trans subfubs then
     (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER subfubs'))
 ;
-
-let dbg_res = ref {(error "Not initialized") :: pexlif};
-let dbg_final = ref {(error "Not initialized") :: pexlif};
 
 // Flatten the pexlif until the stop_pred is satisfied.
 // Intermediate wire names are created on demand and are named
@@ -530,10 +539,7 @@ let gen_flatten_pexlif stop_pred p =
     let res =
 	(PINST name attrs leaf fa_inps fa_outs ints' (P_HIER children))
     then
-(dbg_res := res) fseq
-    let final = rename_internals res then
-(dbg_final := final) fseq
-    final
+    rename_internals res
 ;
 
 // A simple stop-predicate for flatten_pexlif that can be used to
@@ -545,13 +551,13 @@ let is_draw_leaf p =
 
 // A function to flatten a pexlif to basic drawing components.
 let flatten_pexlif p = gen_flatten_pexlif is_draw_leaf p;
+
 // A function to flatten recursively defined pexlifs
 let flatten_recursive_pexlif recursion_name p =
     let stop_pred p =
 	val (PINST name _ _ _ _ _ _) = p in
 	NOT (name = recursion_name)
     in
-    let p' = gen_flatten_pexlif stop_pred p then
-    rename_internals p'
+    gen_flatten_pexlif stop_pred p
 ;
 

@@ -143,7 +143,7 @@ let E_update_fn fp (W_UPDATE_FN lhs rhs) =
 ;
 
 
-letrec E_print_pexlif ind fp pexlif =
+letrec E_print_pexlif depth ind fp pexlif =
     let safe v =
 	let tr c = c = "\"" => "\\\"" | c in
 	implode (map tr (explode v))
@@ -168,12 +168,12 @@ letrec E_print_pexlif ind fp pexlif =
     let sints = list2str T "[" "," "]" (sprintf "\"%s\"") ints then
     (fprintf fp "%*s  %s\n" ind "" sints) fseq
     let p_content ind fp (P_HIER children) =
-	let p1 fp p = E_print_pexlif (ind+3) fp p in
+	let p1 fp p = E_print_pexlif (depth-1) (ind+3) fp p in
 	list2fp fp T "(P_HIER [" "," "])\n" p1 children
      /\ p_content ind fp (P_LEAF fns) =
 	list2fp fp T "(P_LEAF [" ", " "])\n" E_update_fn fns
     in
-    (p_content (ind+1) fp body) fseq
+    (depth <= 0 => fprintf fp "%*s...\n" ind "" | p_content (ind+1) fp body) fseq
     (fprintf fp "%*s)\n" ind "")
 ;
 
@@ -181,7 +181,16 @@ letrec E_print_pexlif ind fp pexlif =
 // to create the saved pexlif.
 let Emit_ASCII_pexlif file pexlif =
     let fp = fopen file "w" then
-    (E_print_pexlif 0 fp pexlif) fseq
+    (E_print_pexlif 100000000 0 fp pexlif) fseq
+    (fclose fp) fseq
+    (printf "Saved ASCI version of pexlif in %s\n" file)
+;
+
+// Emit a detailed version of pexlif to file but limited to
+// max_depth deeply nested instance.
+let limited_Emit_ASCII_pexlif file pexlif max_depth =
+    let fp = fopen file "w" then
+    (E_print_pexlif max_depth 0 fp pexlif) fseq
     (fclose fp) fseq
     (printf "Saved ASCI version of pexlif in %s\n" file)
 ;

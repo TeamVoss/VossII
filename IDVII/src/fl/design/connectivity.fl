@@ -1,0 +1,289 @@
+// cload "ste.fl";
+
+let forall pred l = (find_first0 (\e. NOT (pred e)) l) == 0;
+
+
+lettype point =
+		PT_INP	string
+	|	PT_OUT	string
+	|	PT_INST	int
+;
+
+let Ppoint (PT_INP f) = sprintf "(PT_INP %s)" f
+ /\ Ppoint (PT_OUT f) = sprintf "(PT_OUT %s)" f
+ /\ Ppoint (PT_INST idx) = sprintf "(PT_INST %d)" idx
+;
+install_print_function Ppoint;
+
+let is_pt_inst (PT_INST i) = T
+ /\ is_pt_inst other = F;
+
+let is_pt_inp (PT_INP n) = T
+ /\ is_pt_inp other = F;
+
+let is_pt_out (PT_OUT n) = T
+ /\ is_pt_out other = F;
+
+lettype io_tbl =
+	FANIN_OUT_TBLS
+	    {p :: pexlif}
+	    {cs :: (pexlif list)}
+	    {fanin_tbl :: ({string,((string#(vec_info list)#point) list)} tbl)}
+	    {fanout_tbl :: ({string,((string#(vec_info list)#point) list)} tbl)}
+;
+
+let Pio_tbl ios =
+    val (FANIN_OUT_TBLS p cs fi_tbl fo_tbl) = ios then
+    let base_cmp (n1,_) (n2,_) = node_name_cmp n1 n2 in
+    let Ptbl title tbl = 
+	let l = qsort base_cmp (tbl2list tbl) then
+	let p1 (base,info_list) =
+	    let pp (nm,vi,pt) = sprintf "(%s,%s)" nm (Ppoint pt) in
+	    let pinfo = list2str T "[" "," "]" pp info_list then
+	    sprintf "%s --> %s" base  pinfo
+	in
+	list2str T (sprintf "%s:\n\t" title) "\n\t" "\n" p1 l
+    in
+    (Ptbl "Fanin" fi_tbl)^
+    (Ptbl "Fanout" fo_tbl)
+;
+install_print_function Pio_tbl;
+
+let io2pexlif ios = val (FANIN_OUT_TBLS p cs fi_tbl fo_tbl) = ios in p;
+let io2children ios = val (FANIN_OUT_TBLS p cs fi_tbl fo_tbl) = ios in cs;
+let io_get_child ios idx = el idx (io2children ios);
+
+let insts2wires ios insts =
+    let pinsts = map (io_get_child ios) insts then
+    md_extract_vectors (flatmap pexlif_get_outs_actuals pinsts)
+;
+
+clet get_base_name s = hd (str_split (get_vector_signature s) "[");
+
+let range_overlap range1 range2 =
+    let order (l,r) = {l::int} <= r => (l,r) | (r,l) in
+    val (l1,r1)  = order range1 in
+    val (l2,r2)  = order range2 in
+    (r1 < l2) => F |
+    (r2 < l1) => F |
+    T
+;
+
+let ranges_overlap rl1 rl2 =
+    let tst1 rng = (find_first0 (range_overlap rng) rl2) != 0 in
+    (find_first0 tst1 rl1) != 0
+;
+
+let vec_overlap vn1 vn2 =
+    letrec tst ((TXT t1):rem1) ((TXT t2):rem2) = t1 != t2 => F | tst rem1 rem2
+     /\    tst ((RANGES rl1):rem1) ((RANGES rl2):rem2) =
+	ranges_overlap rl1 rl2 => tst rem1 rem2 | F
+     /\    tst [] [] = T
+     /\    tst _ _ = F
+    in
+    tst vn1 vn2
+;
+
+clet buid_io_tbl p =
+    NOT (pexlif_is_hier p) =>
+	FANIN_OUT_TBLS p [] (tbl_create 10) (tbl_create 10) 
+    |
+    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
+    let fanin0 =
+	let mk (f,as) =
+	    let b = get_base_name f in
+	    let vi = md_split_vector f in
+	    (b, (f, vi, PT_INP f))
+	in
+	map mk fa_inps
+    then
+    //
+    let fanout0 =
+	let mk (f,as) =
+	    let b = get_base_name f in
+	    let vi = md_split_vector f in
+	    (b, (f, vi, PT_OUT f))
+	in
+	map mk fa_outs
+    then
+    //
+    let do_fi1 idx (PINST cname cattrs clf cfa_inps cfa_outs cints cbody) =
+	let written = filter not_const (flatmap snd cfa_outs) then
+	let mk1 v =
+	    let b = get_base_name v in
+	    let vi = md_split_vector v in
+	    (b, (v, vi, PT_INST idx))
+	in
+	map mk1 written
+    in
+    let fanin_internal = map2 do_fi1 (1 upto (length cs)) cs then
+    let fanin_list = fanin0 @ (flat fanin_internal) then
+    //
+    let do_fo1 idx (PINST cname cattrs clf cfa_inps cfa_outs cints cbody) =
+	let read = filter not_const (flatmap snd cfa_inps) then
+	let mk1 v =
+	    let b = get_base_name v in
+	    let vi = md_split_vector v in
+	    (b, (v, vi, PT_INST idx))
+	in
+	map mk1 read
+    in
+    let fanout_internal = map2 do_fo1 (1 upto (length cs)) cs then
+    let fanout_list = fanout0 @ (flat fanout_internal) then
+    //
+    let mk_entry l =
+	let key = fst (hd l) in
+	let values = map snd l then
+	(key,values)
+    in
+    FANIN_OUT_TBLS
+	p
+	cs
+	(list2tbl (map mk_entry (partition fst fanin_list)))
+	(list2tbl (map mk_entry (partition fst fanout_list)))
+;
+
+let get_pt_fanin ios vec =
+    val (FANIN_OUT_TBLS p cs fi_tbl fo_tbl) = ios then
+    let b = get_base_name vec in    
+    let vi = md_split_vector vec in
+    let alts = (tbl_get fi_tbl b) catch [] then
+    letrec check ((av,avi,apt):rem) =
+	let rest = check rem then
+	av = vec => apt:rest |
+	vec_overlap vi avi => apt:rest | rest
+     /\    check [] = []
+    in
+    check alts
+;
+
+let get_pt_fanout ios vec =
+    val (FANIN_OUT_TBLS p cs fi_tbl fo_tbl) = ios then
+    let b = get_base_name vec in    
+    let vi = md_split_vector vec in
+    let alts = (tbl_get fo_tbl b) catch [] then
+    letrec check ((av,avi,apt):rem) =
+	let rest = check rem then
+	av = vec => apt:rest |
+	vec_overlap vi avi => apt:rest | rest
+     /\    check [] = []
+    in
+    check alts
+;
+
+let pt2insts ptlist =
+    let get_inst (PT_INST i) = [i]
+     /\ get_inst other = []
+    in
+    setify (flatmap get_inst ptlist)
+;
+
+let pt2inps ptlist =
+    let get (PT_INP n) = [n]
+     /\ get other = []
+    in
+    setify (flatmap get ptlist)
+;
+
+let pt2outs ptlist =
+    let get (PT_OUT n) = [n]
+     /\ get other = []
+    in
+    setify (flatmap get ptlist)
+;
+
+
+
+let wire2driver ios wire = setify (pt2insts (get_pt_fanin ios wire));
+
+let wires2drivers ios wires =
+    setify (flatmap (wire2driver ios) wires)
+;
+
+let wire2driven ios wire = setify (pt2insts (get_pt_fanout ios wire));
+
+let inst_fanin ios idx =
+    let p = io_get_child ios idx in
+    let i_wires = pexlif_get_inps_actuals p then
+    setify (flatmap (wire2driver ios) i_wires)
+;
+
+let inst_fanout ios idx =
+    let p = io_get_child ios idx in
+    let o_wires = pexlif_get_outs_actuals p then
+    setify (flatmap (wire2driven ios) o_wires)
+;
+
+let has_output_fanout ios idx =
+    let p = io_get_child ios idx in
+    let o_wires = pexlif_get_outs_actuals p then
+    let has_out wire = (find_first0 is_pt_out (get_pt_fanout ios wire)) != 0 in
+    (find_first0 has_out o_wires) != 0
+;
+
+let inst_fanin_dfs ios private_only max_levels stop_pred {indices:: int list} =
+    let t0 = set_tbl_insertn (tbl_create 100) indices then
+    letrec search rem_levels idx tbl =
+	rem_levels = 0 => tbl |
+	let next_set = inst_fanin ios idx then
+	// Remove already visited instances
+	let not_seen = filter (\i. NOT (tbl_member tbl i)) next_set then
+	// If private, remove instances with fanout outside seen cone
+	let relevant = NOT private_only => not_seen |
+		let keep i = NOT (has_output_fanout ios i) AND
+			    (forall (tbl_member tbl) (inst_fanout ios i))
+		in
+		filter keep not_seen
+	in
+	let new = filter (\i. NOT (stop_pred (io_get_child ios i))) relevant in
+	let tbl' = set_tbl_insertn tbl new then
+	sitlist (search (rem_levels-1)) new tbl'
+    in
+    let tbl' = sitlist (search max_levels) indices t0 then
+    tbl2keys tbl'
+;
+
+
+
+
+//
+//TYPE "byte" 8;
+//
+//
+//let tst =
+//    bit_input	clk reset vld.
+//    byte_input	a b c d.
+//    byte_output	out.
+//    byte_internal s1 s2.
+//    bit_internal  s3.
+//    CELL "tst" [
+//	STATE clk s1 [
+//	    (reset , ('0)),
+//	    (vld   , (a '+' b '+' s1 '*' s2))
+//	],
+//	STATE clk s2 [
+//	    (reset , '1),
+//	    (vld   , c '-' d)
+//	],
+//	STATE clk s3 [
+//	    (reset , '0),
+//	    ('1    , vld)
+//	],
+//	out <- (IF s3 THEN s1 ELSE '0xff)
+//];
+//
+//let p = tst 'clk 'reset 'vld 'a 'b 'c 'd 'out;
+//
+//STE_debug (pexlif2fsm p);
+//
+//let io = buid_io_tbl p;
+//io;
+//
+//inst_fanin_dfs io T 3 (\n.F) [19];
+//
+//inst_fanin_dfs io F 3 (\n.F) [19];
+//
+////limited_Emit_ASCII_pexlif "_Z1" p 1;
+//
+//
+//

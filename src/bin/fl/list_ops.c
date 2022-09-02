@@ -88,7 +88,10 @@ List_GC()
 g_ptr
 G_append(g_ptr list1, g_ptr list2)
 {
-    if( IS_NIL(list1) ) { return list2; }
+    if( IS_NIL(list1) ) {
+	INC_REFCNT(list2);
+	return list2;
+    }
     bool shared = is_shared_list(list1);
     if( shared ) { list1 = copy_list(list1); }
     g_ptr cur = list1;
@@ -97,6 +100,7 @@ G_append(g_ptr list1, g_ptr list2)
 	prev = cur;
 	cur = GET_CONS_TL(cur);
     }
+    INC_REFCNT(list2);
     SET_CONS_TL(prev,list2);
     return( list1 );
 }

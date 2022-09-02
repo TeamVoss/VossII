@@ -262,6 +262,9 @@ proc idv:create_idv_menu {nb w} {
             -command "idv:selection_command $w stateholding"
         $m add command -label "All unmapped" \
             -command "idv:selection_command $w unmapped"
+        $m add command -label "Add private fanincone" \
+            -command "idv:selection_command $w private_fanin"
+
         $m add command -label "Invert selection" \
             -command "idv:selection_command $w invert"
 

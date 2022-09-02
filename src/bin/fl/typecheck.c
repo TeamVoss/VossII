@@ -578,12 +578,12 @@ Print_Type(typeExp_ptr type, odests fp, bool newline, bool reset)
 }
 
 string
-Type2String(typeExp_ptr type)
+Type2String(typeExp_ptr type, bool reset)
 {
     if( (odests_fp = fmemopen(type_buf, 1024, "w")) == NULL ) {
         DIE("Should never happen");
     }
-    Print_Type(type, FILE_fp, TRUE, TRUE);
+    Print_Type(type, FILE_fp, TRUE, reset);
     fclose(odests_fp);
     odests_fp = NULL;
     int len = strlen(type_buf);

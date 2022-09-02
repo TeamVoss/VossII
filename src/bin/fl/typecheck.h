@@ -28,7 +28,7 @@ int		Printf_arity(ui pfn, string pat);
 void		Print_Full_Type(fn_ptr fn, odests fp, bool newline, bool reset);
 void		Print_Type(typeExp_ptr type, odests fp, bool newline,
 			   bool reset);
-string		Type2String(typeExp_ptr type);
+string		Type2String(typeExp_ptr type, bool reset);
 typeExp_ptr	Get_Type(string name, typeList_ptr tvars, int insert_missing);
 typeExp_ptr	Fix_Types(typeExp_ptr *constructor_type,
 			  typeExp_ptr concrete_type);

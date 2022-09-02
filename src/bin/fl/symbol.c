@@ -742,7 +742,8 @@ Add_To_OverloadList(string name, typeExp_ptr type, oll_ptr l,
     }
     fn = Find_Overload_Choice(fn, type);
     if( fn == NULL ) {
-        FP(err_fp, "=== No function %s of type %s\n", name, Type2String(type));
+        FP(err_fp, "=== No function %s of type %s\n", name,
+						      Type2String(type, TRUE));
         if( file_load )     
             FP(err_fp, "around line %d in file %s\n", start_line, file);
         else
@@ -1483,11 +1484,14 @@ get_args(g_ptr redex)
     g_ptr tail = redex;
     typeExp_ptr type = fp->type;
     arg_names_ptr ap = fp->arg_names;
+    bool reset = TRUE;
     while( type->typeOp == arrow_tp ) {
 	typeExp_ptr arg_type = type->typelist->type;
 	if( ap != NULL ) {
-	    g_ptr p = Make_PAIR_ND(Make_STRING_leaf(ap->name),
-				   Make_STRING_leaf(Type2String(arg_type)));
+	    g_ptr p = Make_PAIR_ND(
+			    Make_STRING_leaf(ap->name),
+			    Make_STRING_leaf(Type2String(arg_type, reset)));
+	    reset = FALSE;
 	    APPEND1(tail,p);
 	    ap = ap->next;
 	} else {
@@ -1498,6 +1502,42 @@ get_args(g_ptr redex)
 	}
 	type = Get_Real_Type(type->typelist->next->type);
     }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+get_arity(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    string name = GET_STRING(r);
+    fn_ptr fp = Find_Function_Def(symb_tbl, name);
+    if( fp == NULL ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot find function %s", name));
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
+    if( fp->overload ) {
+	MAKE_REDEX_FAILURE(redex,Fail_pr("%s is overloaded", name));
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
+    if( fp->implicit_args ) {
+	MAKE_REDEX_FAILURE(redex,Fail_pr("%s has implicit arguments", name));
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
+    typeExp_ptr type = fp->type;
+    int cnt = 0;
+    while( type->typeOp == arrow_tp ) {
+	cnt++;
+	type = Get_Real_Type(type->typelist->next->type);
+    }
+    MAKE_REDEX_INT(redex, cnt);
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
@@ -1531,7 +1571,7 @@ get_return_type(g_ptr redex)
     while( type->typeOp == arrow_tp ) {
 	type = Get_Real_Type(type->typelist->next->type);
     }
-    MAKE_REDEX_STRING(redex, Type2String(type));
+    MAKE_REDEX_STRING(redex, Type2String(type, TRUE));
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
@@ -1760,6 +1800,7 @@ void
 Symbols_Install_Functions()
 {
     typeExp_ptr term = Get_Type("term", NULL, TP_INSERT_PLACE_HOLDER);
+
     Add_ExtAPI_Function("get_args", "1", TRUE,
                         GLmake_arrow(
 			    GLmake_string(),
@@ -1767,6 +1808,10 @@ Symbols_Install_Functions()
 					    GLmake_string(),
 					    GLmake_string()))),
                         get_args);
+
+    Add_ExtAPI_Function("get_arity", "1", TRUE,
+                        GLmake_arrow(GLmake_string(), GLmake_int()),
+                        get_arity);
 
     Add_ExtAPI_Function("get_return_type", "1", TRUE,
                         GLmake_arrow(GLmake_string(), GLmake_string()),

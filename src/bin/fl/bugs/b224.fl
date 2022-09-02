@@ -1,0 +1,48 @@
+load "idv.fl";
+
+let p = read_pexlif (DIR^"b224.pexlif");
+wtime (p fseq 0);
+
+let p1 = el 1 (pexlif_get_children p);
+wtime (p1 fseq 1);
+
+let p11 = el 1 (pexlif_get_children p1);
+wtime (p11 fseq 11);
+
+let wrappers = qsort (\i1.\i2. i1-i2) ((1--27) subtract [9,10]);
+wrappers;
+
+let q = unfold_pexlif p11 27; (q fseq 27);
+let q = unfold_pexlif q 26; (q fseq 26);
+let q = unfold_pexlif q 25; (q fseq 25);
+let q = unfold_pexlif q 24; (q fseq 24);
+let q = unfold_pexlif q 23; (q fseq 23);
+let q = unfold_pexlif q 22; (q fseq 22);
+let q = unfold_pexlif q 21; (q fseq 21);
+let q = unfold_pexlif q 20; (q fseq 20);
+let q = unfold_pexlif q 19; (q fseq 19);
+let q = unfold_pexlif q 18; (q fseq 18);
+let q = unfold_pexlif q 17; (q fseq 17);
+let q = unfold_pexlif q 16; (q fseq 16);
+let q = unfold_pexlif q 15; (q fseq 15);
+let q = unfold_pexlif q 14; (q fseq 14);
+let q = unfold_pexlif q 13; (q fseq 13);
+let q = unfold_pexlif q 12; (q fseq 12);
+let q = unfold_pexlif q 11; (q fseq 11);
+let q = unfold_pexlif q 8; (q fseq 8);
+let q = unfold_pexlif q 7; (q fseq 7);
+let q = unfold_pexlif q 6; (q fseq 6);
+let q = unfold_pexlif q 5; (q fseq 5);
+let q = unfold_pexlif q 4; (q fseq 4);
+let q = unfold_pexlif q 3; (q fseq 3);
+let q = unfold_pexlif q 2; (q fseq 2);
+let q = unfold_pexlif q 1; (q fseq 1);
+
+9999999999999999;
+
+let pl = itlist (\i.\p. unfold_pexlif p i) wrappers p11;
+let ps = sitlist (\i.\p. unfold_pexlif p i) wrappers p11;
+
+ps fseq "Strict";
+pl fseq "Lazy";
+

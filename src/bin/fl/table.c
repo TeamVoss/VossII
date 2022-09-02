@@ -91,6 +91,50 @@ table_insert(g_ptr redex)
 }
 
 static void
+table_insertn(g_ptr redex)
+{
+    g_ptr   g_tbl, kd_list;
+    EXTRACT_2_ARGS(redex, g_tbl, kd_list);
+    table_ptr tp = (table_ptr) GET_EXT_OBJ(g_tbl);
+    while( !IS_NIL(kd_list) ) {
+	g_ptr gp = GET_CONS_HD(kd_list);
+	g_ptr g_key = GET_FST(gp);
+	g_ptr g_data = GET_SND(gp);
+	if( find_hash(&(tp->tbl), g_key) != NULL ) {
+	    MAKE_REDEX_FAILURE(redex,Fail_pr("tbl_insertn with duplicate key"));
+	    return;
+	} else {
+	    insert_hash(&(tp->tbl), (pointer) g_key, (pointer) g_data);
+	    SET_REFCNT(g_key, MAX_REF_CNT);
+	    SET_REFCNT(g_data, MAX_REF_CNT);
+	}
+	kd_list = GET_CONS_TL(kd_list);
+    }
+    MAKE_REDEX_EXT_OBJ(redex, table_oidx, tp);
+}
+
+static void
+set_table_insertn(g_ptr redex)
+{
+    g_ptr   g_tbl, k_list;
+    EXTRACT_2_ARGS(redex, g_tbl, k_list);
+    table_ptr tp = (table_ptr) GET_EXT_OBJ(g_tbl);
+    while( !IS_NIL(k_list) ) {
+	g_ptr g_key = GET_CONS_HD(k_list);
+	if( find_hash(&(tp->tbl), g_key) != NULL ) {
+	    MAKE_REDEX_FAILURE(redex,
+			       Fail_pr("set_tbl_insertn with duplicate key"));
+	    return;
+	} else {
+	    insert_hash(&(tp->tbl), (pointer) g_key, (pointer) g_key);
+	    SET_REFCNT(g_key, MAX_REF_CNT);
+	}
+	k_list = GET_CONS_TL(k_list);
+    }
+    MAKE_REDEX_EXT_OBJ(redex, table_oidx, tp);
+}
+
+static void
 table_delete(g_ptr redex)
 {
     g_ptr   g_tbl, g_key;
@@ -135,6 +179,48 @@ table_to_list(g_ptr redex)
     MAKE_REDEX_NIL(redex);
     scan_tail = redex;
     scan_hash(&(tp->tbl), scan_fn);
+}
+
+static void
+key_scan_fn(pointer pkey, pointer pdata)
+{
+    g_ptr key = (g_ptr) pkey;
+    g_ptr data = (g_ptr) pdata;
+    INC_REFCNT(key);
+    INC_REFCNT(data);
+    APPEND1(scan_tail, key);
+}
+
+static void
+table_to_keys(g_ptr redex)
+{
+    g_ptr   g_tbl;
+    EXTRACT_1_ARG(redex, g_tbl);
+    table_ptr tp = (table_ptr) GET_EXT_OBJ(g_tbl);
+    MAKE_REDEX_NIL(redex);
+    scan_tail = redex;
+    scan_hash(&(tp->tbl), key_scan_fn);
+}
+
+static void
+data_scan_fn(pointer pkey, pointer pdata)
+{
+    g_ptr key = (g_ptr) pkey;
+    g_ptr data = (g_ptr) pdata;
+    INC_REFCNT(key);
+    INC_REFCNT(data);
+    APPEND1(scan_tail, data);
+}
+
+static void
+table_to_data(g_ptr redex)
+{
+    g_ptr   g_tbl;
+    EXTRACT_1_ARG(redex, g_tbl);
+    table_ptr tp = (table_ptr) GET_EXT_OBJ(g_tbl);
+    MAKE_REDEX_NIL(redex);
+    scan_tail = redex;
+    scan_hash(&(tp->tbl), data_scan_fn);
 }
 
 static void
@@ -320,6 +406,20 @@ Table_Install_Functions()
 				GLmake_arrow(tv2, GLmake_tbl(tv1, tv2)))),
 			table_insert);
 
+    Add_ExtAPI_Function("tbl_insertn", "11", FALSE,
+			GLmake_arrow(
+			    GLmake_tbl(tv1, tv2),
+			    GLmake_arrow(
+			      GLmake_list(GLmake_tuple(tv1,tv2)),
+			      GLmake_tbl(tv1, tv2))),
+			table_insertn);
+
+    Add_ExtAPI_Function("set_tbl_insertn", "11", FALSE,
+			GLmake_arrow(
+			    GLmake_tbl(tv1, tv1),
+			    GLmake_arrow(GLmake_list(tv1),GLmake_tbl(tv1,tv1))),
+			set_table_insertn);
+
     Add_ExtAPI_Function("tbl_delete", "11", FALSE,
 			GLmake_arrow(
 			    GLmake_tbl(tv1, tv2),
@@ -334,6 +434,16 @@ Table_Install_Functions()
 			GLmake_arrow(GLmake_tbl(tv1, tv2),
 				     GLmake_list(GLmake_tuple(tv1,tv2))),
 			table_to_list);
+
+    Add_ExtAPI_Function("tbl2keys", "1", FALSE,
+			GLmake_arrow(GLmake_tbl(tv1, tv2),
+				     GLmake_list(tv1)),
+			table_to_keys);
+
+    Add_ExtAPI_Function("tbl2data", "1", FALSE,
+			GLmake_arrow(GLmake_tbl(tv1, tv2),
+				     GLmake_list(tv2)),
+			table_to_data);
 
     Add_ExtAPI_Function("list2tbl", "1", FALSE,
 			GLmake_arrow(GLmake_list(GLmake_tuple(tv1,tv2)),

@@ -1521,6 +1521,10 @@ Do_garbage_collect()
     do_gc_asap = FALSE;
     if( RCverbose_GC )
 	FP(fl_gc_fp, "done\n");
+#ifdef CHECK_REF_CNTS
+    check_ref_cnts(root_node);
+    fprintf(stderr, "Ref counts checked\n");
+#endif
 }
 
 void

@@ -2888,7 +2888,7 @@ let STATE {clk::bit} {state:: *a} {cond_res_list:: (bit # *a) list} =
     let n = length cond_res_list then
     let w_clk = hw_destr clk then
     let n_clk = hd (w_depends w_clk) then
-    let w_state = hw_mk_var {undefined :: *a} BASE_TMP then
+    let w_state = hw_mk_var {undefined :: *a} (sprintf "%ss" BASE_TMP) then
     let new_state = {hw_constr w_state :: *a} then
     let w_new_state = hw_destr new_state then
     let n_new_state = hd (w_depends w_new_state) then
@@ -2955,7 +2955,7 @@ let EN_STATE {clk::bit} {enable::bit} {state:: *a}
     let n = length cond_res_list then
     let w_clk = hw_destr clk then
     let n_clk = hd (w_depends w_clk) then
-    let w_state = hw_mk_var {undefined :: *a} BASE_TMP then
+    let w_state = hw_mk_var {undefined :: *a} (sprintf "%ss" BASE_TMP) then
     let new_state = {hw_constr w_state :: *a} then
     let w_new_state = hw_destr new_state then
     let n_new_state = hd (w_depends w_new_state) then

@@ -50,7 +50,8 @@ bool           vec_equ(pointer k1, pointer k2);
 vector_db_ptr  VDB_create();
 void	       VDB_destroy(vector_db_ptr vdbp);
 void	       VDB_Insert_vector(vector_db_ptr vdbp, string vec);
-bool	       VDB_has_name_collision(vector_db_ptr vdbp, string vec);
+bool	       VDB_has_name_collision(vector_db_ptr vdbp, string vec,
+				      bool basename_only);
 vec_ptr	       Copy_vector(rec_mgr *vector_mgr_ptr, rec_mgr *range_mgr_ptr,
 			   vec_ptr old);
 void           DBG_print_range(range_ptr rp);

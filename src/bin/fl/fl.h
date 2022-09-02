@@ -23,13 +23,13 @@
 /********************************************************************/
 #define PARANOIA 1		 // Turn on checking before doing graph ops.
 #if 0
-#define NO_REFCNT_GC	1	 // Turn off reference counting g.c.
-#define DONT_FREE_ND 1		 // Never free a node
 #define TRACK_FREEING 1		 // Keep the old value & location of freed node
-#define NO_CACHE_HIT	1	 // Turn all memo tables into no-ops (miss only)
-#define TRACE_FUNCTION_CALLS 1	 // Trace (user named) function calls
+#define NO_REFCNT_GC	1	 // Turn off reference counting g.c.
 #define CHECK_REF_CNTS 1	 // Check every reachable nodes reference count
 #define VERBOSE_DEC_REF_CNT 1	 // Verbose decrementation of reference counts
+#define DONT_FREE_ND 1		 // Never free a node
+#define NO_CACHE_HIT	1	 // Turn all memo tables into no-ops (miss only)
+#define TRACE_FUNCTION_CALLS 1	 // Trace (user named) function calls
 #define DO_GRAPH_COMPARISON 1	 // Compare two processes graphs at run time
 #define DBG_TRACE_AND_SAVE 1	 // Save intemediate graphs & ops performed
 #define COMPACT_BEXPR_PRINT 1	 // Print bexprs in compressed form
@@ -162,6 +162,7 @@ typedef struct name_list_rec	*name_list_ptr;
 typedef struct impl_arg_rec	*impl_arg_ptr;
 
 /* Then include the forward declarations in local .h files */
+#include	"prefs_ext.h"
 #include	"error.h"
 #include	"symbol_tbl.h"
 #include	"file_ops.h"
@@ -343,6 +344,12 @@ typedef struct impl_arg_rec {
         FP(err_fp, "Fatal error (line %d in %s): ", __LINE__, __FILE__);     \
 	FP(err_fp, __VA_ARGS__);					     \
 	fprintf(stderr, __VA_ARGS__);					     \
+	if( RCadd_debug_info ) {					     \
+	    FP(err_fp, "\n%s",						     \
+		       Get_stack_trace(RCmax_stack_trace_entries));	     \
+	    fprintf(stderr, "\n%s",					     \
+		       Get_stack_trace(RCmax_stack_trace_entries));	     \
+	}								     \
 	exit(-1);							     \
 };
 

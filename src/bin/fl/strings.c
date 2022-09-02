@@ -2084,7 +2084,7 @@ colliding(vec_ptr v1, vec_ptr v2)
 }
 
 bool
-VDB_has_name_collision(vector_db_ptr vdbp, string vec)
+VDB_has_name_collision(vector_db_ptr vdbp, string vec, bool basename_only)
 {
     // Store the current active record managers
     ustr_mgr *tmp_lstringsp = lstringsp;
@@ -2098,6 +2098,9 @@ VDB_has_name_collision(vector_db_ptr vdbp, string vec)
     vec_ptr vp = split_name(vec);
     string key = get_base_name(vp);
     vec_list_ptr cur_vlp = (vec_list_ptr) find_hash(&(vdbp->sig2vec_list), key);
+    if( basename_only ) {
+	return( cur_vlp != NULL );
+    }
     while(cur_vlp != NULL ) {
 	if( colliding(vp, cur_vlp->vec) ) {
 	    // Now restore the record managers
