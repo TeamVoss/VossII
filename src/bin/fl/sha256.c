@@ -516,3 +516,129 @@ SHA256_traverse_graph(int *g_cntp, hash_record *g_tblp,
 	    DIE("Should never happen");
     }
 }
+
+
+int
+SHA256_acyclic_type(int *g_cntp, hash_record *g_tblp,
+		      SHA256_ptr sha, g_ptr node)
+{
+    int res, lres, rres;
+    string s;
+    if( node == NULL ) return 1;
+    res = *g_cntp;
+    *g_cntp = res+1;
+    if( IS_NIL(node) ) {
+	SHA256_printf(sha, "%d=[]\n", res);
+	return res;
+    }
+    switch( GET_TYPE(node) ) {
+	case LAMBDA_ND: 
+	    rres = SHA256_acyclic_type(g_cntp, g_tblp, sha,
+					 GET_LAMBDA_BODY(node));
+	    SHA256_printf(sha, "%d=\\%s.%d\n", res, GET_LAMBDA_VAR(node), rres);
+	    return res;
+	case APPLY_ND:
+	    lres = SHA256_acyclic_type(g_cntp, g_tblp, sha,
+					 GET_APPLY_LEFT(node));
+	    rres = SHA256_acyclic_type(g_cntp, g_tblp, sha,
+					 GET_APPLY_RIGHT(node));
+	    SHA256_printf(sha, "%d=%d@%d\n", res, lres, rres);
+	    return res;
+	case CONS_ND: 
+	    lres = SHA256_acyclic_type(g_cntp,g_tblp,sha, GET_CONS_HD(node));
+	    rres = SHA256_acyclic_type(g_cntp,g_tblp,sha, GET_CONS_TL(node));
+	    SHA256_printf(sha, "%d=%d:%d\n", res, lres, rres);
+	    return res;
+	case LEAF:
+	    switch( GET_LEAF_TYPE(node) ) {
+		case INT:
+		    s = Arbi_ToString(GET_AINT(node),10);
+		    SHA256_printf(sha, "%d=I%s\n", res, s);
+		    return res;
+		case STRING:
+		    s = GET_STRING(node);
+		    SHA256_printf(sha, "%d=\"%s\"\n", res, s);
+		    return res;
+		case BOOL:
+		    lres = SHA256_bdd(g_cntp, g_tblp, sha, GET_BOOL(node));
+		    SHA256_printf(sha, "%d=B %d\n", res, lres);
+		    return res;
+		case BEXPR:
+		    lres = SHA256_bexpr(g_cntp, g_tblp, sha, GET_BEXPR(node));
+		    SHA256_printf(sha, "%d=BE %d\n", res, lres);
+		    return res;
+		case PRIM_FN:
+		    {
+			switch ( GET_PRIM_FN(node) ) {
+			    case P_EXTAPI_FN:
+				SHA256_printf(sha, "%d=EFN(%s)\n",
+						res,
+						Get_ExtAPI_Function_Name(
+							GET_EXTAPI_FN(node)));
+				return res;
+			    case P_SSCANF:
+				SHA256_printf(sha, "%d=sscanf \\\"%s\\\"\n)",
+						   res,GET_PRINTF_STRING(node));
+				return res;
+			    case P_PRINTF:
+				SHA256_printf(sha, "%d=printf \\\"%s\\\"\n)",
+						   res,GET_PRINTF_STRING(node));
+				return res;
+			    case P_SPRINTF:
+				SHA256_printf(sha, "%d=sprintf \\\"%s\\\"\n)",
+						   res,GET_PRINTF_STRING(node));
+				return res;
+			    case P_EPRINTF:
+				SHA256_printf(sha, "%d=eprintf \\\"%s\\\"\n)",
+						   res,GET_PRINTF_STRING(node));
+				return res;
+			    case P_FPRINTF:
+				SHA256_printf(sha, "%d=fprintf \\\"%s\\\"\n)",
+						   res,GET_PRINTF_STRING(node));
+				return res;
+			    case P_REF_VAR: {
+				int r = GET_REF_VAR(node);
+				lres = SHA256_acyclic_type(g_cntp, g_tblp,
+							     sha,Get_RefVar(r));
+				SHA256_printf(sha, "%d=REF %d\n", res, r);
+				return res;
+			    }
+			    default:
+				SHA256_printf(sha, "%d=PFN %s\n", res, 
+						Get_pfn_name(node, FALSE));
+				return res;
+			}
+		    }
+		case EXT_OBJ:
+		    {
+                        unint class = GET_EXT_OBJ_CLASS(node);
+                        ext_obj_ptr op = M_LOCATE_BUF(&ext_obj_buf, class);
+			if( op->sha256_fn != NULL ) {
+			    op->sha256_fn(g_cntp,g_tblp,sha,GET_EXT_OBJ(node));
+			    SHA256_printf(sha, "%d=EO\n", res);
+			} else {
+			    Wprintf("SHA256 signature for %s is not accurate\n",
+				    Get_ExtAPI_Object_name(class));
+			    SHA256_printf(sha, "%d=EOp %p\n",
+						res, GET_EXT_OBJ(node));
+			}
+			return res;
+		    }
+		case VAR:
+		    s = GET_VAR(node);
+		    SHA256_printf(sha, "%d=VAR %s\n", res, s);
+		    return res;
+		case USERDEF:
+		{
+		    fn_ptr fn = GET_USERDEF(node);
+		    SHA256_printf(sha, "%d=UD %s\n", res, fn->signature);
+		    return res;
+		}
+		default:
+		    DIE("Unknown LEAF type");
+	    }
+	default:
+	    DIE("Should never happen");
+    }
+}
+

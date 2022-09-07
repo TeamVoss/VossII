@@ -47,7 +47,7 @@ proc idv:create_idv_gui {w rw_db} {
 	    frame $ww.tf.sp -width 10
 	    pack $ww.tf.sp -side left
 	    label $ww.tf.she_lbl -text "Show transformation name"
-	    set ::idv(show_transform_name) 0
+	    set ::idv(show_transform_name) 1
 	    ttk::checkbutton $ww.tf.she_cb \
 		-variable ::idv(show_transform_name) \
 		-command "idv:update_transf_canvas $c"
@@ -310,6 +310,11 @@ proc idv:create_idv_menu {nb w} {
         balloon $w.menu.rename_w "Rename selected wires"
         pack $w.menu.rename_w -side left -padx 5
 
+        button $w.menu.retime_fwd -image $::icon(retime_fwd) \
+                -command "idv:retime_fwd $w"
+        balloon $w.menu.retime_fwd "Retime selected instance forward"
+        pack $w.menu.retime_fwd -side left -padx 5
+
         button $w.menu.fev -image $::icon(fev) \
                 -command "idv:do_fev $w"
         balloon $w.menu.fev "Replace with new design that has been FEV-ed"
@@ -350,6 +355,8 @@ proc idv:unfold {w} { fl_do_unfold $w.c }
 proc idv:flatten {w} { fl_do_flatten $w.c }
 
 proc idv:duplicate {w} { fl_do_duplicate $w.c }
+
+proc idv:retime_fwd {w} { fl_do_retime_fwd $w.c }
 
 proc idv:merge {w} { fl_do_merge $w.c }
 
@@ -455,12 +462,12 @@ proc idv:name_transform_and_use {inside c tr_name model_name} {
 	pack $w.namef.e -side right
 	pack $w.namef.l -side left -fill x -anchor w
     #
-    frame $w.imp_name
-    pack $w.imp_name -side top -fill x
-	label $w.imp_name.l -text "Name of final model: "
-	entry $w.imp_name.e -textvariable ::idv(imp_name) -width 30
-	pack $w.imp_name.e -side right
-	pack $w.imp_name.l -side left -fill x -anchor w
+#    frame $w.imp_name
+#    pack $w.imp_name -side top -fill x
+#	label $w.imp_name.l -text "Name of final model: "
+#	entry $w.imp_name.e -textvariable ::idv(imp_name) -width 30
+#	pack $w.imp_name.e -side right
+#	pack $w.imp_name.l -side left -fill x -anchor w
     #
     frame $w.buttons
     pack $w.buttons -side top
@@ -668,9 +675,10 @@ proc idv:make_template {w c type args} {
     }
 }
 
-proc idv:do_bdd_var_order {} {
+proc idv:do_bdd_var_order {c} {
     set pexlif_file $::idv(fev_imp_file) 
-    fl_bdd_var_order $pexlif_file
+    fl_bdd_var_order $c $pexlif_file
+#     idv:edit_and_load $w file load_file pexlif_file type
 }
 
 proc idv:do_verify {w canvas type} {
@@ -765,7 +773,7 @@ proc idv:do_fev {ww} {
     pack $w.f5 -side top -fill x -pady 10
 	labelframe $w.f5.bdd -relief groove -text BDD
 	    button $w.f5.bdd.order -text "Variable ordering" \
-		-command idv:do_bdd_var_order
+		-command "idv:do_bdd_var_order $ww.c"
 	    button $w.f5.bdd.verify -text "Verify" \
 		-command "idv:do_verify $w $ww.c BDD"
 	labelframe $w.f5.sat -relief groove -text SAT

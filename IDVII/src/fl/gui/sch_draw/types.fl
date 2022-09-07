@@ -13,6 +13,7 @@ lettype justification =
                     |   REPLACE_ALL {repeatedly::bool} {tr::transform}
                     |   FEV {engine::string} {options::(string#string) list}
                     |   DUPLICATE {id::int}
+                    |   RETIME_FWD {ids::(int list)}
                     |   MERGE {ids::int list}
 		    |	RENAME_WIRES {sub:: (string#string) list}
 		    |	MK_THM

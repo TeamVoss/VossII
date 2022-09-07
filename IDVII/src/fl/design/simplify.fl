@@ -380,8 +380,10 @@ let split_complex p =
     length chs != 1 OR ints != [] => p | hd chs
 ;
 
-let do_shr sz v1 v2 = v1 >= 0 => v1/(2**v2) | ((2**sz+v1)/(2**v2));
+
+let do_shr sz v1 v2 = sscanf "%b" (string_butlastn (sprintf "%*b" sz v1) v2);
 let do_ashr v1 v2 = v1 >= 0 => v1 / (2**v2) | -1*((-1*v1)/(2**v2));
+
 
 let perform_binary constr e1 e2 =
     val (W_CONST sz1 v1) = e1 in
@@ -427,93 +429,98 @@ let const_eq a b =
 
 
 letrec const_prop e assuming (is_binary e) =
-	val (constr, a1, a2) = split_binary e in
-	let  c1 = const_prop a1 in
-	let  c2 = const_prop a2 in
+	val (constr, a1, a2) = split_binary e then
+	let  c1 = const_prop a1 then
+	let  c2 = const_prop a2 then
 	is_CONST c1 AND is_CONST c2 => perform_binary constr c1 c2 |
 	constr c1 c2
  /\    const_prop (W_NOT e) =
-	let c = const_prop e in
+	let c = const_prop e then
 	is_CONST c =>
-	    val (sz,v) = get_const c in
+	    val (sz,v) = get_const c then
 	    W_CONST sz (intNOT v)
 	|
 	    W_NOT c
  /\    const_prop (W_SX sz e) =
-	let c = const_prop e in
+	let c = const_prop e then
 	is_CONST c =>
-	    val (osz,v) = get_const c in
+	    val (osz,v) = get_const c then
 	    (W_CONST sz v)
 	|
 	W_SX sz c
  /\    const_prop (W_ZX sz e) =
-	let c = const_prop e in
+	let c = const_prop e then
 	is_CONST c =>
-	    val (osz,v) = get_const c in
-	    (W_CONST sz (2**osz+v))
+	    val (osz,v) = get_const c then
+	    sz < osz => eprintf "ZX requires truncation! (%d>%d)" osz sz |
+	    v >= 0 => W_CONST sz v | W_CONST sz (2**osz+v)
 	|
 	W_ZX sz c
  /\    const_prop (W_ITE c t e) =
-	let cc = const_prop c in
+	let cc = const_prop c then
 	is_CONST cc =>
-	    val (osz,v) = get_const cc in
+	    val (osz,v) = get_const cc then
 	    v == 1 => const_prop t |
 	    v == 0 => const_prop e |
 	    eprintf "W_ITE with illegal condition (%d)" v
 	|
-	let ct = const_prop t in
-	let ce = const_prop e in
+	let ct = const_prop t then
+	let ce = const_prop e then
 	const_eq ct ce => ct |
 	W_ITE cc ct ce
  /\    const_prop (W_SLICE indices e) =
-	let ce = const_prop e in
+	let ce = const_prop e then
 	is_CONST ce =>
-	    val (osz,ov) = get_const ce in
-	    let bits = explode (sprintf "%*b" osz ov) in
-	    let sels = gather bits indices in
-	    let sz = length sels in
-	    let base = sscanf "%b" (implode sels) in
-	    hd sels = "0" => W_CONST sz base | W_CONST sz (base-2**sz)
+	    val (osz,ov) = get_const ce then
+	    let bits = explode (sprintf "%*b" osz ov) then
+	    let sels = gather bits indices then
+	    let sz = length sels then
+	    let base = sscanf "%b" (implode sels) then
+	    hd sels = "0" => W_CONST sz base |
+	    W_CONST sz (base-2**sz)
 	|
 	(W_SLICE indices ce)
  /\    const_prop (W_NAMED_SLICE name indices e) =
-	let ce = const_prop e in
+	let ce = const_prop e then
 	is_CONST ce =>
-	    val (osz,ov) = get_const ce in
-	    let bits = explode (sprintf "%*b" osz ov) in
-	    let sels = gather bits indices in
-	    let sz = length sels in
-	    let base = sscanf "%b" (implode sels) in
-	    hd sels = "0" => W_CONST sz base | W_CONST sz (base-2**sz)
+	    val (osz,ov) = get_const ce then
+	    let bits = explode (sprintf "%*b" osz ov) then
+	    let sels = gather bits indices then
+	    let sz = length sels then
+	    let base = sscanf "%b" (implode sels) then
+	    hd sels = "0" => W_CONST sz base |
+	    W_CONST sz (base-2**sz)
 	|
 	(W_NAMED_SLICE name indices ce)
  /\    const_prop (W_UPDATE_NAMED_SLICE b name indices n) =
-	let cb = const_prop b in
-	let cn = const_prop n in
+	let cb = const_prop b then
+	let cn = const_prop n then
 	is_CONST cb AND is_CONST cn =>
-	    val (bsz,bv) = get_const cb in
-	    val (nsz,nv) = get_const cn in
-	    let bbits = explode (sprintf "%*b" bsz bv) in
-	    let nbits = explode (sprintf "%*b" nsz nv) in
-	    let sub = zip indices nbits in
+	    val (bsz,bv) = get_const cb then
+	    val (nsz,nv) = get_const cn then
+	    let bbits = explode (sprintf "%*b" bsz bv) then
+	    let nbits = explode (sprintf "%*b" nsz nv) then
+	    let sub = zip indices nbits then
 	    letrec process i (b:bs) =
-		let next = (assoc i sub) catch b in
+		let next = (assoc i sub) catch b then
 		next:(process (i-1) bs)
 	     /\    process i [] = []
-	    in
-	    let result = process (bsz-1) bbits in
-	    let base = sscanf "%b" (implode result) in
-	    hd result = "0" => W_CONST bsz base | W_CONST bsz (base-2**bsz)
+	     then
+	    let result = process (bsz-1) bbits then
+	    let base = sscanf "%b" (implode result) then
+	    hd result = "0" => W_CONST bsz base |
+	    W_CONST bsz (base-2**bsz)
 	|
 	W_UPDATE_NAMED_SLICE cb name indices cn
  /\    const_prop (W_CAT parts) =
-	let cparts = map const_prop parts in
+	let cparts = map const_prop parts then
 	letrec merge ((W_CONST sz1 v1):(W_CONST sz2 v2):rem) =
-	    merge ((W_CONST (sz1+sz2) (v1*(2**sz2)+v2)):rem)
+	    let r = W_CONST (sz1+sz2) (v1*(2**sz2)+v2) then
+	    merge (r:rem)
 	 /\    merge (r:rem) = r:(merge rem)
 	 /\    merge [] = []
 	in
-	let parts' = merge cparts in
+	let parts' = merge cparts then
 	let cnv [(W_CONST sz v)] = (W_CONST sz v)
 	 /\ cnv other = W_CAT other
 	in
@@ -521,6 +528,4 @@ letrec const_prop e assuming (is_binary e) =
  /\    const_prop other = other
 ;
 
-
- 
 end_abstype split_complex const_prop;

@@ -58,9 +58,6 @@ let is__WrApPeR_ (PINST nm _ _ _ _ _ (P_HIER _)) = (nm = "_WrApPeR_")
 let PINST n a l i o t c =
     let mk_pinst n a l i o t c =
 	let is_signature s = (s == "FP") OR (s == "SHA") in
-	let a' = filter (NOT # is_signature # fst) a in
-	let f  = ("FP",  fp_pinst    i o t c) in
-	let s  = ("SHA", sha_pinst n i o t c) in
 	let process_assertions (P_HIER ps) =
             let get_assert_nd (PINST _ _ _ _ outs _ _) =
                 length outs != 1 => [] |
@@ -79,6 +76,9 @@ let PINST n a l i o t c =
 	    eprintf "Duplicatated assertion (%s)" (hd (el idx ap))
 	|
 	let t' = setify (assert_nds @ t) in
+	let a' = filter (NOT # is_signature # fst) a in
+	let f  = ("FP",  fp_pinst    i o t' c) in
+	let s  = ("SHA", sha_pinst n i o t' c) in
 	PINST n (f : s : a') l i o t' c
     in
     let get_wrappers (P_HIER chs) = find_all is__WrApPeR_ chs
@@ -94,8 +94,9 @@ let PINST n a l i o t c =
 	let wrappers = qsort (\i1.\i2. i1-i2) (setify wrappers) then
 	let p = PINST n a l i o t c then
 	let p' = itlist (\i.\p. unfold_pexlif p i) wrappers p then
-	val (PINST n a l i o t c) = p' then
-	mk_pinst n a l i o t c
+        let lbl (PINST n a l i o t c) = mk_pinst n a l i o t c in
+	val (PINST n a l i o t (P_HIER cs)) = p' then
+	mk_pinst n a l i o t (P_HIER (map lbl cs))
 ;
 
 
@@ -396,6 +397,8 @@ end_abstype decorate_pexlif_hiers;
 //------------------------------------------------------------------------------
 // Fin.
 
+clet get_base_name s = hd (str_split (get_vector_signature s) "[");
+
 let BASE_TMP = "_$";
 
 let BASE_TMP_len = strlen BASE_TMP;
@@ -561,3 +564,36 @@ let flatten_recursive_pexlif recursion_name p =
     gen_flatten_pexlif stop_pred p
 ;
 
+// =============================================================
+// Code for creating new unique names
+// =============================================================
+
+lettype name_db = NAME_DB {tbl :: ({string,string} tbl) ref};
+		    
+
+let build_name_db p =
+    NOT (pexlif_is_hier p) => eprintf "build_name_db on leaf pexlif" |
+    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
+    let bases = map get_base_name ((map fst fa_inps)@(map fst fa_outs)@ints) in
+    let tbl = set_tbl_insertn (tbl_create (length bases)) (setify bases) then
+    NAME_DB (ref tbl)
+;
+
+let get_unique_name name_db original_name =
+    val (NAME_DB rtbl) = name_db in
+    let tbl = deref rtbl in
+    let find_new_name name =
+        let cname = strip_BASE_TMP name in
+        let base  = get_base_name cname in
+        letrec try i =
+            let new_name = sprintf "%s%d%s" BASE_TMP i cname in
+            let new_base = sprintf "%s%d%s" BASE_TMP i base in
+	    tbl_member tbl new_base => try (i+1) |
+	    let tbl' = set_tbl_insertn tbl [new_base] then
+	    (rtbl := tbl') fseq
+            new_name 
+        in
+        try 1 
+    in
+    find_new_name original_name
+;

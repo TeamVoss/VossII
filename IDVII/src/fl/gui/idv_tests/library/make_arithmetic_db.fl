@@ -1,13 +1,11 @@
 load "idv.fl";
 
-open_idv_db "DB_arithm" F;
+IDV "DB_arithm" [];
 
 let SZ = sscanf "%d" (el 1 ARGS);
 
 let make_theorem transform_name spec imp =
-    let spec = convert_to_idv_format (remove_wrappers spec) then
-    let imp = convert_to_idv_format (remove_wrappers imp) then
-    NOT (SZ > 6 OR ((BDD_comb_EQ (wrap_pexlif spec) (wrap_pexlif imp)) == T)) =>
+    NOT (SZ > 6 OR ((BDD_EQ (wrap_pexlif spec) (wrap_pexlif imp)) == T)) =>
 	eprintf "Claim %s is not valid!\n" transform_name
     |
     let signature = pexlif_get_FP spec then
@@ -17,14 +15,9 @@ let make_theorem transform_name spec imp =
     (record_transformation signature tr)
 ;
 
-let do_import_model name p =
-    let p' = convert_to_idv_format (remove_wrappers p) then
-    import_model name p'
-;
+let do_import_model name p = import_model name p;
 
 TYPE "tp" SZ;
-TYPE "tp1" (SZ+1);
-TYPE "tp2" (2*SZ);
 
 let a_vars = flatmap depends (wexpr2bool [] (hw_destr {'a::tp}));
 let b_vars = flatmap depends (wexpr2bool [] (hw_destr {'b::tp}));
@@ -193,6 +186,41 @@ let mul_impl =
 	]
 );
 
+let CSA =
+    tp_input  x y z.
+    tp_output c s.
+    CELL "CSA" [
+        c <- x '^' y '^' z,
+        s <- '2 '*' (x '&' y '|' x '&' z '|' y '&' z)
+];
+
+let add3CSA =
+    tp_input x y z.
+    tp_output out.
+    tp_internal c s.
+    CELL "CSA_tree" [
+	CSA x y z c s,
+	out <- c '+' s
+];
+
+
+let add4 =
+    tp_input a b c d.
+    tp_output o.
+    CELL "add4" [
+	o <- (a '+' b) '+' (c '+' d)
+];
+
+let add4CSA =
+    tp_input a b c d.
+    tp_output o.
+    tp_internal c1 s1 c2 s2.
+    CELL "add4" [
+	CSA a b c c1 s1,
+	CSA d c1 s1 c2 s2,
+	o <- c2 '+' s2
+];
+
 // ----------------------------------------------------------------
 
 // ----------------------------------------------------------------
@@ -238,6 +266,13 @@ let Amod1 = add_mod1 {'a::tp} 'b 'n 'o;
 do_import_model (sprintf "Amod1<%d>: (a+b)%%n" SZ) Amod1;
 let Amod2 = add_mod2 {'a::tp} 'b 'n 'o;
 do_import_model (sprintf "Amod2<%d>: (a%%n + b%%n)%%n" SZ) Amod2;
+let Aadd3CSA = add3CSA {'a::tp} 'b 'c 'o;
+do_import_model (sprintf "ACSA<%d>: CSA & CPA" SZ) Aadd3CSA;
+let Aadd4 = add4 {'a::tp} 'b 'c 'd 'o;
+do_import_model (sprintf "A4_22<%d>: (a+b)+(c+d)" SZ) Aadd4;
+let A4CSA = add4CSA {'a::tp} 'b 'c 'd 'o;
+do_import_model (sprintf "A4CSA<%d>: 2 CSAs & CPA" SZ) A4CSA;
+
 
 
 make_theorem "add_is_commutative" A Ar;
@@ -249,6 +284,9 @@ make_theorem "add_assoc_21-is_12" A3_21 A3_12;
 make_theorem "add_assoc_12-is_21" A3_12 A3_21;
 make_theorem "add_insert_mods" Amod1 Amod2;
 make_theorem "add_remove_mods" Amod2 Amod1;
+make_theorem "A12_to_CSA" A3_12 Aadd3CSA;
+make_theorem "A21_to_CSA" A3_21 Aadd3CSA;
+make_theorem "A22_to_CSA" Aadd4 A4CSA;
 
 let B     = mul {'a::tp} 'b 'o;
 do_import_model (sprintf "B<%d>: a*b" SZ) B;

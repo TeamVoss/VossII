@@ -463,9 +463,21 @@ let log2 n =
 ;
 
 let ipow base n =
-    letrec pow n = n = 0 => 1 | base*(pow (n-1)) in
-    pow n
+    n < 0 => eprintf "Cannot raise to negative power (%d)" n |
+    n = 0 => 1 |
+    n <= 10 =>
+	letrec pow n = n = 0 => 1 | base*(pow (n-1)) in
+	pow n
+    |
+	// Use iterative squaring for big n
+	let digits = rev (explode (sprintf "%b" n)) in
+	letrec square cur (d:ds) =
+	    (d = "1" => cur | 1)*(square (cur*cur) ds)
+	 /\    square cur [] = 1
+	in
+	square base digits
 ;
+
 let bvpow base n =
     letrec pow n = n = (int2bv 0) => (int2bv 1) | base*(pow (n-(int2bv 1))) in
     pow n

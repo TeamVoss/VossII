@@ -2966,7 +2966,6 @@ sha_pinst(g_ptr redex)
     SHA256_ptr sha = Begin_SHA256();
     hash_record  g_tbl;
     create_hash(&g_tbl, 1000, ptr_hash, ptr_equ);
-    int g_cnt = 1;
     SHA256_printf(sha, "%s\n", GET_STRING(gname));
     while( !IS_NIL(inps) ) {
 	SHA256_printf(sha, "i:%s\n", GET_STRING(GET_FST(GET_CONS_HD(inps))));
@@ -2993,8 +2992,9 @@ sha_pinst(g_ptr redex)
 	qsort(START_BUF(&fn_buf), COUNT_BUF(&fn_buf), sizeof(g_ptr), g_cmp);
 	g_ptr *gpp;
 	int fn_cnt = 1;
+	int g_cnt = 1;
 	FOR_BUF(&fn_buf, g_ptr, gpp) {
-	    int sig = SHA256_traverse_graph(&g_cnt, &g_tbl, sha, *gpp);
+	    int sig = SHA256_acyclic_type(&g_cnt, &g_tbl, sha, *gpp);
 	    SHA256_printf(sha, "fn[%d]:%d\n", fn_cnt, sig);
 	    fn_cnt++;
 	}
@@ -3168,7 +3168,9 @@ Pexlif_Install_Functions()
 			GLmake_list(GLmake_tuple(GLmake_string(),tv1)),
 			GLmake_arrow(
 			    GLmake_list(GLmake_string()),
-			    GLmake_arrow(content_tp, GLmake_string())))))
+			    GLmake_arrow(
+				content_tp,
+				GLmake_string())))))
         , sha_pinst
     );
 
@@ -3180,4 +3182,6 @@ Pexlif_Install_Functions()
 void
 pexlif_dummy()
 {
+    (void) g_cmp(NULL, NULL);
+    (void) signature_rec_cmp(NULL, NULL);
 }

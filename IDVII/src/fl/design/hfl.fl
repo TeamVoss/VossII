@@ -14,6 +14,14 @@ lettype *a hw_type =
 	{hw_values:: *a -> string}
 ;
 
+let special_md_sizes l =
+    let res = md_sizes l then
+    res != 1 => res |
+    // Possibly wrong for xyz[-1:0] nodes
+    let idx = find_first0 (str_is_substr "[-1:0]") l in
+    idx != 0 => 0 | res
+;
+
 open_overload {hw_type_destr :: ({*a} hw_type)};
 
 // Make sure there are at least two possibilities for the open overloaded
@@ -595,7 +603,7 @@ let base_assignment do_split lhs rhs =
         let dep_vars = (w_depends rhs) in
         let inps = map (\n.n,[n]) dep_vars in
         let driven = base_get_lhs_vars lhs in
-        let sz = md_sizes driven in
+        let sz = special_md_sizes driven in
         let lhs' = W_VAR sz "_tmp" in
         let outs = [(mk_name sz "_tmp", driven)] in
         let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
@@ -607,7 +615,7 @@ let base_assignment do_split lhs rhs =
     let mk_pinst_w_order lhs rhs inps =
 	let inps = map (\n.n,[n]) (flatmap w_depends (rev inps)) in
         let driven = base_get_lhs_vars lhs in
-        let sz = md_sizes driven in
+        let sz = special_md_sizes driven in
         let lhs' = W_VAR sz "_tmp" in
         let outs = [(mk_name sz "_tmp", driven)] in
         let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
@@ -683,7 +691,7 @@ let base_assignment do_split lhs rhs =
 		    let dep_vars = md_extract_vectors (w_depends rhs) in
 		    let inps = map (\n.n,[n]) dep_vars in
 		    let driven = base_get_lhs_vars lhs in
-		    let sz = md_sizes driven in
+		    let sz = special_md_sizes driven in
 		    let lhs' = W_VAR sz "_tmp" in
 		    let outs = [(mk_name sz "_tmp", driven)] in
 		    let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
@@ -710,7 +718,7 @@ let base_assignment do_split lhs rhs =
 		    let dep_vars = md_extract_vectors (w_depends rhs) in
 		    let inps = map (\n.n,[n]) dep_vars in
 		    let driven = base_get_lhs_vars lhs in
-		    let sz = md_sizes driven in
+		    let sz = special_md_sizes driven in
 		    let lhs' = W_VAR sz "_tmp" in
 		    let outs = [(mk_name sz "_tmp", driven)] in
 		    let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
@@ -737,7 +745,7 @@ let base_assignment do_split lhs rhs =
 		    let dep_vars = md_extract_vectors (w_depends rhs) in
 		    let inps = map (\n.n,[n]) dep_vars in
 		    let driven = base_get_lhs_vars lhs in
-		    let sz = md_sizes driven in
+		    let sz = special_md_sizes driven in
 		    let lhs' = W_VAR sz "_tmp" in
 		    let outs = [(mk_name sz "_tmp", driven)] in
 		    let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
@@ -764,7 +772,7 @@ let base_assignment do_split lhs rhs =
 		    let dep_vars = md_extract_vectors (w_depends rhs) in
 		    let inps = map (\n.n,[n]) dep_vars in
 		    let driven = base_get_lhs_vars lhs in
-		    let sz = md_sizes driven in
+		    let sz = special_md_sizes driven in
 		    let lhs' = W_VAR sz "_tmp" in
 		    let outs = [(mk_name sz "_tmp", driven)] in
 		    let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
@@ -994,7 +1002,7 @@ let w_CASE w_out cond_res_list w_default_value =
 // E.g.,
 //	foo <- a '&' b
 //	bar-->valid <- req `&` done '|' old_req
-let <- L R =
+let <- {L:: *a} {R:: *a} =
     let lhs = hw_destr {L:: *a} in
     let rhs = hw_destr {R:: *a} in
     base_assignment T lhs rhs
@@ -1633,7 +1641,7 @@ let wexpr_hw_is_arithmetic {e::wexpr} = T;
 let wexpr_hw_size {e::wexpr} = wexpr_size e;
 let wexpr_hw_destr {e::wexpr} = e;
 let wexpr_hw_constr {e::wexpr} = e;
-let wexpr_hw_values {e::wexpr} = error "Not relevant";
+let wexpr_hw_values {e::wexpr} = "";
 let {wexpr_hw_type_destr :: {wexpr} hw_type} =
             HW_TYPE wexpr_hw_type_name
                     wexpr_hw_mk_var
@@ -3627,3 +3635,60 @@ let ::: name p =
     PINST nm (("Label",name):attrs) lf fa_inps fa_outs ints body
 ;
 infixr 0 :::;
+
+
+let resize_pexlif sz {p::pexlif} =
+    let tri i = i = 0 => sz | i in
+    let tr1 n =
+	NOT (str_is_substr "[-1:0]" n) => n |
+	mk_name sz (hd (str_split n "["))
+    in
+    let trfa (f,as) = (tr1 f), (map tr1 as) in
+    letrec trwexpr (W_VAR osz name) = W_VAR (tri osz) name
+     /\    trwexpr (W_EXPLICIT_VAR osz nm) = W_EXPLICIT_VAR (tri osz) (tr1 nm)
+     /\    trwexpr (W_X osz) = W_X (tri osz)
+     /\    trwexpr (W_CONST osz v) = W_CONST (tri osz) v
+     /\    trwexpr (W_NAMED_CONST name osz v) = W_NAMED_CONST name (tri osz) v
+     /\    trwexpr e assuming (is_binary e) =
+	val (op, l, r) = split_binary e in
+	op (trwexpr l) (trwexpr r)
+     /\    trwexpr (W_ITE c a b) = W_ITE (trwexpr c) (trwexpr a) (trwexpr b)
+     /\    trwexpr (W_NOT e) = W_NOT (trwexpr e)
+     /\    trwexpr (W_PRED name e) = W_PRED name (trwexpr e)
+     /\    trwexpr (W_SX osz e) = W_SX (tri osz) (trwexpr e)
+     /\    trwexpr (W_ZX osz e) = W_ZX (tri osz) (trwexpr e)
+     /\    trwexpr other = error "Cannot translate wexpr constructor"
+    in
+    let trfn (W_UPDATE_FN lhs rhs) =
+	W_UPDATE_FN (trwexpr lhs) (trwexpr rhs)
+     /\ trfn (W_PHASE_DELAY lhs rhs) =
+	W_PHASE_DELAY (trwexpr lhs) (trwexpr rhs)
+    in
+    letrec trp (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) =
+	let fa_inps' = map trfa fa_inps in
+	let fa_outs' = map trfa fa_outs in
+	let ints' = map tr1 ints in
+	let cs' = map trp cs in
+	PINST name attrs lf fa_inps' fa_outs' ints' (P_HIER cs')
+     /\   trp (PINST name attrs lf fa_inps fa_outs ints (P_LEAF fns)) =
+	let fa_inps' = map trfa fa_inps in
+	let fa_outs' = map trfa fa_outs in
+	let ints' = map tr1 ints in
+	let fns' = map trfn fns in
+	PINST name attrs lf fa_inps' fa_outs' ints' (P_LEAF fns')
+    in
+    trp p
+;
+
+let extract_re_ff p =
+    NOT (pexlif_is_hier p) => NONE |
+    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
+    let sz = md_sizes (snd (hd fa_outs)) then
+    let base = re_ff 'clk {'d :: wexpr} {'q :: wexpr} then
+    let master = resize_pexlif sz base then
+    NOT ((pexlif_get_SHA p) == (pexlif_get_SHA master)) => NONE |
+    let clk = hd (assoc "clk" fa_inps) in
+    let din = assoc (mk_name sz "d") fa_inps in
+    let dout = assoc (mk_name sz "q") fa_outs in
+    SOME ("re_ff", base, p, clk, din, dout, [])
+;

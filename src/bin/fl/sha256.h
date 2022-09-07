@@ -19,6 +19,9 @@ string	    Get_SHA256_hash(SHA256_ptr ctx);
 void	    SHA256_Install_Functions();
 int	    SHA256_traverse_graph(int *g_cntp, hash_record *g_tblp,
 				  SHA256_ptr sha, g_ptr node);
+int	    SHA256_acyclic_type(int *g_cntp, hash_record *g_tblp,
+				SHA256_ptr sha, g_ptr node);
+
 string	    Get_SHA256_signature(g_ptr node);
 
 #else /* EXPORT_FORWARD_DECL */
