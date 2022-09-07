@@ -2053,7 +2053,7 @@ get_weak_expressions(g_ptr redex)
     formula *fp;
     int idx = 0;
     FOR_BUF(weakening_bufp, formula, fp) {
-	char nm[10];
+	char nm[20];
 	sprintf(nm, "_%d", idx);
 	idx++;
 	string name = wastrsave(&strings, nm);
@@ -2084,7 +2084,7 @@ get_abstract_depends(g_ptr redex)
     formula *fp;
     int idx = 0;
     FOR_BUF(weakening_bufp, formula, fp) {
-	char nm[10];
+	char nm[20];
 	sprintf(nm, "_%d", idx);
 	idx++;
 	string name = wastrsave(&strings, nm);
@@ -7610,7 +7610,7 @@ BDD_c_limited_AND(gbv a, gbv b)
 	if( information_flow_weakening ) {
 	    int idx = COUNT_BUF(weakening_bufp);
 	    push_buf(weakening_bufp, &r);
-	    char nm[10];
+	    char nm[20];
 	    sprintf(nm, "_%d", idx);
 	    string name = wastrsave(&strings, nm);
 	    res.f = B_Var(name);
@@ -7635,7 +7635,7 @@ BDD_c_limited_OR(gbv a, gbv b)
 	if( information_flow_weakening ) {
 	    int idx = COUNT_BUF(weakening_bufp);
 	    push_buf(weakening_bufp, &r);
-	    char nm[10];
+	    char nm[20];
 	    sprintf(nm, "_%d", idx);
 	    string name = wastrsave(&strings, nm);
 	    res.f = B_Var(name);
@@ -8238,7 +8238,7 @@ limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
 	sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 	res->vec = anon;
 	string pfn = strtemp("draw_concat ");
-	char buf[10];
+	char buf[20];
 	int len = 0;
 	for(sch_list_ptr sl = cur_children; sl != NULL; sl = sl->next) {
 	    len++;
@@ -8547,7 +8547,7 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 	res->vec = anon;
 	string pfn = strtemp("draw_concat ");
-	char buf[10];
+	char buf[20];
 	int len = 0;
 	for(sch_list_ptr sl = cur_children; sl != NULL; sl = sl->next) {
 	    len++;
@@ -8588,7 +8588,7 @@ mk_vector_name(string base, int size)
 	    return( wastrsave(&strings, base) );
     } else {
 	string res = strtemp(base);
-	char buf[10];
+	char buf[20];
 	Sprintf(buf, "[%d:0]", size-1);
 	strappend(buf);
 	return( wastrsave(&strings, res) );

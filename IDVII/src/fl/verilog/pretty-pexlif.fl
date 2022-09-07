@@ -1030,19 +1030,6 @@ let make_verilog_safe p =
     (final, sub)
 ;
 
-let safe_pexlif2verilog netlist {fp::stream} {pex::pexlif} =
-    val (pex',sub) = make_verilog_safe pex then
-    (pexlif2verilog_start ()) fseq
-    (pretty_pexlif_h netlist "" pex') fseq
-    let results = pexlif2verilog_end () then
-    let do1 (module_name, descr) =
-	(frender fp (p_source_text (Source_text [descr]))) fseq
-	(fprintf fp "\n\n")
-    in
-    (foreach do1 results) fseq
-    sub
-;
-
 // Write out a Verliog version of pex to the stream fp.
 // If netlist is T then stop at standard cells and only emit a netlist.
 let pexlif2verilog netlist {fp::stream} {pex::pexlif} =
@@ -1064,6 +1051,12 @@ let pexlif2verilog netlist {fp::stream} {pex::pexlif} =
 	(fprintf fp "\n\n")
     in
     (foreach do1 results)
+;
+
+let safe_pexlif2verilog netlist {fp::stream} {pex::pexlif} =
+    val (pex',sub) = make_verilog_safe pex then
+    (pexlif2verilog netlist fp pex') fseq
+    sub
 ;
 
 // Write out a Verliog version of pex in the directory 'path'.

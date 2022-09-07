@@ -1,8 +1,8 @@
 //
 // Redefine a top-level function created from a Bifrost compilation so that:
-//  * ... (more coming)
 //  * the content of the (flat) pexlif is first grouped according to the
 //    "Label" attributes.
+//  * ... (more coming)
 //
 let bifrost_simplify fn =
     let rtype = get_return_type fn then
