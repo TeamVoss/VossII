@@ -1,0 +1,109 @@
+load "ste.fl";
+
+ENUM "state" ["INIT", "READ", "WRITE", "DONE"];
+
+//let tst = 
+//    state_input	inp.
+//    bit_output	is_init is_read is_write is_done.
+//    CELL "tst" [
+//	is_init <- (inp '=' INIT),
+//	is_read <- (inp '=' READ),
+//	is_write <- (inp '=' WRITE),
+//	is_done <- (inp '=' DONE)
+//];
+//
+//let p = tst 'ino 'o1 'o2 'o3 'o4;
+//
+//p;
+//
+//pexlif2verilog F stdout p;
+//
+//
+//let tst = 
+//    state_input	inp.
+//    bit_output	out.
+//    CELL "tst" [
+//	out <- (inp '=' '1) '|' (inp '=' '3)
+//];
+//
+//let p = tst 'ino 'o1;
+//
+//p;
+//
+//pexlif2verilog F stdout p;
+
+
+let c1 =
+    state_output    out.
+    CELL "c1" [
+	out <- '1
+];
+
+let c3 =
+    state_output    out.
+    CELL "c3" [
+	out <- '3
+];
+
+let p = wrap_pexlif (c1 'out);
+let g = wrap_pexlif (c3 'out);
+
+p;
+
+g;
+
+
+//isomatch (wrap_pexlif p1) (wrap_pexlif p3);
+
+
+(pexlif_get_leaf p OR pexlif_get_leaf g) ;// =>
+   // eprintf "isomatch expects a hier. needle and haystack." |
+//  ss::(((int#int) list) list) = solutions, each sol. #matches.
+
+//let ss = internal_isomatch p g T;
+//ss;
+
+
+let w = T;
+//let internal_isomatch p g w =
+let sp = internal_search_create p g w;
+sp;
+
+letrec go s =
+	let xs = internal_search_step s then
+	empty xs => [] | (xs : go s)
+;
+
+go sp;
+
+
+
+
+
+let ps = pexlif_get_children p;
+let gs = pexlif_get_children g;
+
+concat $ filter (NOT # empty) $ pam ss (\{sol::(int#int) list}.
+    // Solutions start indices at 0, FL expects them to start at 1.
+    let sol' = map (\(i,j). (i+1,j+1)) sol in
+    // This is more or less 'expand' but p&g are not part of sol.
+    let gs_order = map snd sol' in
+    let gs'      = reorder_nodes gs gs_order in
+    let pairings = zip ps gs' in
+    // /
+    let go1 (i,j) (a,b) = (i,j,explore a b) in
+    let {options::((int#int#(match list)) list)} =
+	    map2 go1 sol' pairings
+    in
+    any (\(_,_,xs). empty xs) options => [] |
+    // /
+    let {choices::(((int#(int#match)) list) list)} =
+	    flatten_options options
+    in
+    let valid = coherent # flat # map get_match_sub in
+    filter (valid # map (snd # snd)) choices
+)
+
+
+
+

@@ -1,0 +1,19 @@
+load "ste.fl";
+
+TYPE "word" 4;
+
+let test =
+    bit_input clk.
+    word_input	a b.
+    word_output out.
+    word_internal mid.
+    CELL "test" [
+	mid <- a '+' b,
+	re_ff clk mid out
+];
+
+let p = test 'clk 'a 'b 'out;
+
+pexlif2verilog F stdout p;
+
+safe_pexlif2verilog F stdout p;
