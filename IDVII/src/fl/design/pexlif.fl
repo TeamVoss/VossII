@@ -59,14 +59,14 @@ let PINST n a l i o t c =
     let mk_pinst n a l i o t c =
 	let is_signature s = (s == "FP") OR (s == "SHA") in
 	let process_assertions (P_HIER ps) =
-            let get_assert_nd (PINST _ _ _ _ outs _ _) =
-                length outs != 1 => [] |
+            let get_assert_nd (PINST _ _ _ _ outs _ _) res =
+                length outs != 1 => res |
                 val (f,as) = hd outs then
                 md_size f != 1 => [] |
                 let a = hd as in
-                str_is_substr "assert__" a => as | []
+                str_is_substr "assert__" a => (a:res) | res
 	    in
-            flatmap get_assert_nd ps
+	    sitlist get_assert_nd ps []
 	 /\ process_assertions _ =  []
 	in
 	let assert_nds = process_assertions c then
@@ -454,7 +454,11 @@ let rename_internals p =
     let mapping = ref init_map in
     let bases_used = ref (map (\(m,n). get_base m) init_map) then
     let insert name =
-	let cname = strip_BASE_TMP (last (str_split name "/")) in
+        let cname =
+            let core_name = last (str_split name "/") in
+            let core = strip_BASE_TMP core_name in
+            core = "" => core_name | core
+        in
 	let base  = get_base cname in
 	letrec try i =
 	    let new_name = sprintf "%s%d%s" BASE_TMP i cname in

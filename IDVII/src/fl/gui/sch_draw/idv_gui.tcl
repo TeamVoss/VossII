@@ -243,6 +243,8 @@ proc idv:create_idv_menu {nb w} {
             -command "idv:name_and_save_model $w implementation"
         $m add command -label "Name initial model" \
             -command "idv:name_and_save_model $w specification"
+        $m add command -label "Save pexlif model" \
+            -command "idv:save_pexlif $w"
         $m add command -label "Write out pexlif model" \
             -command "idv:write_pexlif $w"
         $m add command -label "Write out Verilog model" \
@@ -637,9 +639,10 @@ proc idv:edit_and_load {w file load_file pexlif_file type} {
 proc idv:make_template {w c type args} {
     set ::idv(fev_imp_file) ""
     if { $type == "synthesis" } {
-	if { [catch {expr [llength [glob -dir $::idv(code_dir) "_synth*"]]+1} cnt] } {
-	set cnt 1
-    }
+	if { [catch {expr [llength [glob -dir $::idv(code_dir) "_synth*"]]+1} \
+	      cnt] } {
+	    set cnt 1
+	}
 	set file [format {%s/_synth_%d} $::idv(code_dir) $cnt]
     } else {
 	set file $::idv(fev_template_file)
@@ -832,9 +835,9 @@ proc idv:write_verilog {w only_netlist} {
     }
 }
 
-proc idv:write_pexlif {w} {
+proc idv:save_pexlif {w} {
     set types {
-        {{pexlif}      {.fl}        }
+        {{pexlif}      {.pexlif}        }
         {{All Files}     *          }
     }
     set file [tk_getSaveFile -filetypes $types \
@@ -843,6 +846,20 @@ proc idv:write_pexlif {w} {
     if { $file != "" } {
 	set name [file rootname [file tail $file]]
 	fl_save_pexlif $w.c $file
+    }
+}
+
+proc idv:write_pexlif {w} {
+    set types {
+        {{fl}      {.fl}        }
+        {{All Files}     *          }
+    }
+    set file [tk_getSaveFile -filetypes $types \
+	    -initialdir $::idv(code_dir) -title "Name file to write pexlif" \
+	    -confirmoverwrite 1]
+    if { $file != "" } {
+	set name [file rootname [file tail $file]]
+	fl_write_pexlif $w.c $file
     }
 }
 

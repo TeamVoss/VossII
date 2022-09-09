@@ -1447,12 +1447,12 @@ let fl_set_selection canvas {op::string} {vecs::string list} =
 	(rselection := vsel) fseq
 	(fl_update_colors canvas) fseq
 	let rnds = extract_vectors vsel then
-	let tcl_sel = list2str T "{" " " "}" id rnds then
-	let cmd2 = [ "selection clear",
-		     sprintf "set ::x_selection %s" tcl_sel,
-		     "selection own ." ]
-	then
-	(tcl_eval cmd2) fseq ()
+	let set1 v = sprintf "lappend ::x_selection {%s}" v in
+	let cmds = ["selection clear", "catch {unset ::x_selection}"]
+		   @ (map set1 rnds)
+		   @ ["selection own ."]
+	in
+	(big_tcl_eval cmds) fseq ()
     in
     op = "SET_SELECTION" =>
 	vecs = ["_"] => set_selection [] | set_selection vecs

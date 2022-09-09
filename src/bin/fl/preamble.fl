@@ -1770,9 +1770,18 @@ install_print_function Pwexpr;
 letrec DBGwexpr (W_X sz) =
 	    sprintf "(W_X %d)" sz
  /\    DBGwexpr (W_NAMED_CONST name sz v) =
-	    sprintf "(W_NAMED_CONST \"%s\" %d 0b%0*b)" name sz sz v
+	    (sprintf "(W_NAMED_CONST \"%s\" %d 0b%0*b)" name sz sz v) catch
+	    (
+		(fprintf stderr "Named constant %s does not fit!" name) fseq
+		(sprintf "(W_NAMED_CONST \"%s\" %d 0b%b)" name sz v)
+	    )
  /\    DBGwexpr (W_CONST sz v) =
-	    sprintf "(W_CONST %d 0b%0*b)" sz sz v
+	    (sprintf "(W_CONST %d 0b%0*b)" sz sz v) catch
+	    (
+		(fprintf stderr "Constant 0x%x does not fit in %d bits" v sz) fseq
+		(sprintf "(W__CONST %d 0b%b)" sz v)
+	    )
+
  /\    DBGwexpr (W_VAR sz base) =
 	    sprintf "(W_VAR %d \"%s\")" sz base
  /\    DBGwexpr (W_EXPLICIT_VAR sz name) =

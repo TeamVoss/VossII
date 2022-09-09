@@ -1421,7 +1421,7 @@ subst_fa_list(hash_record_ptr tbl, g_ptr fa_list)
 }
 
 
-#define RESTRICT(e) ( (e) & (((ui) 1) << 63) )
+#define RESTRICT(e) ( (e) & ((((ui) 1) << 63)-1) )
 
 static ui
 pm_val(ui n, ui v)
@@ -1443,7 +1443,7 @@ fp_mem(g_ptr node)
 static ui
 fp_w_rec(g_ptr node)
 {
-    g_ptr argn_0, argn_1, argn_2, argn_3; g_ptr orig_node = node; (void) orig_node;
+    g_ptr argn_0, argn_1, argn_2, argn_3;
     // Arity 1
     if( GET_TYPE(node) != CONS_ND ) {
 	fp_status = FALSE;
@@ -1492,7 +1492,7 @@ fp_w_rec(g_ptr node)
     }
     if( IS_CONSTRUCTOR(W_CONST, node) ) {
 	ui v = *Arbi_ToInt(Arbi_mod(GET_AINT(argn_0),
-				    Arbi_FromInt(((ui)1) << 63)));
+				    Arbi_FromInt(((ui)1) << 62)));
 	return( pm_val(2, GET_INT(argn_1)) + pm_val(3, v) );
     }
     if( IS_CONSTRUCTOR(W_EQ, node) ) {
@@ -1564,7 +1564,7 @@ fp_w_rec(g_ptr node)
     }
     if( IS_CONSTRUCTOR(W_NAMED_CONST, node) ) {
 	ui v = *Arbi_ToInt(Arbi_mod(GET_AINT(argn_0),
-				    Arbi_FromInt(((ui)1) << 63)));
+				    Arbi_FromInt(((ui)1) << 62)));
 	return( pm_val(4, GET_INT(argn_1)) + pm_val(5, v) );
     }
     if( IS_CONSTRUCTOR(W_MEM_READ, node) ) {

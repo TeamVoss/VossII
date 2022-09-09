@@ -1638,7 +1638,7 @@ TYPE "bit" 1;
 let wexpr_hw_type_name {bv::wexpr} = "wexpr";
 let wexpr_hw_mk_var {we::wexpr} base = W_VAR 0 base;
 let wexpr_hw_is_arithmetic {e::wexpr} = T;
-let wexpr_hw_size {e::wexpr} = wexpr_size e;
+let wexpr_hw_size {e::wexpr} = wexpr_size e;	// ???? Maybe 0   ????????
 let wexpr_hw_destr {e::wexpr} = e;
 let wexpr_hw_constr {e::wexpr} = e;
 let wexpr_hw_values {e::wexpr} = "";
@@ -1727,7 +1727,17 @@ let wOR {a:: *a} {b:: *a} =
 let '|' = wOR;
 infix 3 '|';
 
-let '<#=' a b = W_LAT_LEQ a b;
+let wleq {a:: *a} {b:: *a} =
+    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
+		 hw_size hw_destr hw_constr hw_values) =
+	{hw_type_destr :: {*a} hw_type}
+    in
+    let res = W_LAT_LEQ (hw_destr a) (hw_destr b) in
+    hw_bit_constr res
+;
+
+//let '<#=' a b = W_LAT_LEQ a b;
+overload '<#=' wleq W_LAT_LEQ;
 infix 2 '<#=';
 
 let wXOR a b = wOR (wAND (wNOT a) b) (wAND a (wNOT b));
@@ -2481,22 +2491,16 @@ let re_ff_en clk en d q = base_re_ff_en d en clk q;
 // A rising edge D flip-flop with enable and asynchronous reset (active high).
 let re_ff_en_reset clk en reset d q = base_re_ff_en_reset d en reset clk q;
 
-end_abstype re_ff re_ff_reset re_ff_en re_ff_en_reset;
-
-begin_abstype;
 // ---------------------------------------------------
 // Needed to make the drawing functions happy....
 let base_fe_ff =
     input d.
     bit_input clk.
     output q.
-    internal TmP_d_o TmP_clk_o TmP_q_o TmP_en.
+    bit_internal nclk.
     CELL "draw_ff_fe" [
-	TmP_d_o <: d,
-	TmP_q_o <: q,
-	TmP_clk_o <: clk,
-	TmP_en <- TmP_clk_o '&' '~' clk,
-	MUX TmP_en TmP_d_o TmP_q_o q
+	base_re_ff d nclk q,
+	nclk <- '~' clk
 ];
 
 let base_fe_ff_en =
@@ -2550,7 +2554,9 @@ let fe_ff_en clk en d q = base_fe_ff_en d en clk q;
 // A falling edge D flip-flop with enable and asynchronous reset (active high).
 let fe_ff_en_reset clk en reset d q = base_fe_ff_en_reset d en reset clk q;
 
-end_abstype fe_ff fe_ff_reset fe_ff_en fe_ff_en_reset;
+end_abstype re_ff re_ff_reset re_ff_en re_ff_en_reset
+	    fe_ff fe_ff_reset fe_ff_en fe_ff_en_reset
+;
 
 
 begin_abstype;

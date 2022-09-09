@@ -6627,6 +6627,8 @@ op_LAT_LEQ(ncomp_ptr op)
 	gbv aL = INP_L(i);
 	gbv bH = INP_H(i+op->size);
 	gbv bL = INP_L(i+op->size);
+	// NOTE: The only operation that is not monotonic!!!!
+	// Should only be used in verification checkers!
 	OUT_H(i) = c_AND(c_OR(bH, c_NOT(aH)), c_OR(bL, c_NOT(aL)));
 	OUT_L(i) = c_NOT(OUT_H(i));
     }

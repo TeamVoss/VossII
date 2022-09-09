@@ -38,35 +38,56 @@ let mk_miter spec imp =
     d != [] => eprintf "Output mismatch: %S in pexlif 2 but not in pexlif 1" d |
     // Same inputs and outputs
     // Now rename the outputs
-    let spec' =
+    val (spec',spec_outs) =
 	let fa_outs1' = map (\(f,as). f,(map (sprintf "P1_%s") as)) fa_outs1 in
-	PINST n1 a1 l1 fa_inps1 fa_outs1' ints1 chs1
+	(PINST n1 a1 l1 fa_inps1 fa_outs1' ints1 chs1),
+	(md_merge_vectors (flatmap snd fa_outs1'))
     in
-    let imp' =
+    val (imp',imp_outs) =
 	let fa_outs2' = map (\(f,as). f,(map (sprintf "P2_%s") as)) fa_outs2 in
-	PINST n2 a2 l2 fa_inps2 fa_outs2' ints2 chs2
+	(PINST n2 a2 l2 fa_inps2 fa_outs2' ints2 chs2),
+	(md_merge_vectors (flatmap snd fa_outs2'))
     in
-    val (eq_nd, eqs) =
-	let vname = sprintf "_eq[%d:0]" (length outs1 -1) then
-	let nds = md_expand_vector vname then
-	vname, (map (\n. W_VAR 1 n) nds)
+    let rel = vec_zip spec_outs imp_outs in
+    let mk_order_ok_pexlif1 v eq_nd =
+	let sz = md_size v then
+	let iv = vec_assoc v rel then
+	let f_spec = mk_name sz "spec" then
+	let f_imp  = mk_name sz "imp" then
+	let f_ok   = mk_name sz "ok_rel" then
+	let fa_inps = [(f_spec, [v]), (f_imp, iv)] then
+	let fa_outs = [("ok", [eq_nd])] then
+	let ints = [f_ok] then
+	let mk_bit_cmp i_spec i_imp ok =
+	    let o1  = W_EXPLICIT_VAR 1 i_spec in
+	    let o2  = W_EXPLICIT_VAR 1 i_imp in
+	    let okv = W_EXPLICIT_VAR 1 ok in
+	    okv <- (o2 '<#=' o1)
+	in
+	let order_pexlifs = map3 mk_bit_cmp (md_expand_vector f_spec)
+					    (md_expand_vector f_imp)
+					    (md_expand_vector f_ok)
+	then
+	let and_pexlif = 
+	    (W_VAR 1 "ok") <- AND_n (map (W_VAR 1) (md_expand_vector f_ok))
+	in
+	PINST "order_ok" [] F fa_inps fa_outs ints
+		(P_HIER (and_pexlif:order_pexlifs))
     in
-    let mk_eq out_i eq_i = 
-	let o1 = W_VAR 1 ("P1_"^out_i) in
-	let o2 = W_VAR 1 ("P2_"^out_i) in
-	eq_i <- (o2 '<#=' o1)
-    in
-    let eq_pexlifs = map2 mk_eq outs1 eqs in
-    let and_pexlif = (W_VAR 1 "_OK_") <- AND_n eqs then
+    let sz = length spec_outs in
+    let eq_v = mk_name sz "_ok" then
+    let eq_nds = md_expand_vector eq_v then
+    let check_pexlifs = map2 mk_order_ok_pexlif1 spec_outs eq_nds then
     let pfn = "draw_hier miter" in
     let fa_inps = map (\n. n,[n]) (md_extract_vectors inps1) in
     let fa_outs = [("_OK_", ["_OK_"])] in
-    let o1s = map (\n."P1_"^n) outs1 in
-    let o2s = map (\n."P2_"^n) outs2 in
-    let ints = eq_nd:(md_extract_vectors (o1s @ o2s)) in
-    let children = spec' : imp' : and_pexlif : eq_pexlifs in
-    let mpexlif = PINST pfn [] F fa_inps fa_outs ints (P_HIER children) in
-    let mant = map (\n. T,n,variable n,0,1) inps1 in
-    mpexlif, mant
+    let ints = eq_v:(spec_outs@imp_outs) then
+    let final_and = (W_VAR 1 "_OK_") <- AND_n (map (W_EXPLICIT_VAR 1) eq_nds) in
+    let mpexlif =
+	PINST "miter" [] F fa_inps fa_outs ints
+		(P_HIER ([spec', imp', final_and]@check_pexlifs))
+    then
+    let mant = map (\n. T,n,variable n,0,1) inps1 then
+    (mpexlif, mant)
 ;
 

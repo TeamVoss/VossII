@@ -931,24 +931,6 @@ let pretty_pexlif_h netlist module (PINST name _ _ fa_inps fa_outs _ _)
       val [(p,_),(clk,_)] = fa_inps in
       val [(q,_)] = fa_outs in
       [premade_ff_re (ID module) clk p q]
-/\  pretty_pexlif_h netlist module (PINST name _ _ fa_inps fa_outs _ _)
-	assuming (name == "draw_ff_re_reset")
-    =
-      val ((p,_):(re,_):(clk,_):[]) = fa_inps in
-      val ((q,_):[]) = fa_outs in
-      [premade_ff_re_reset (ID module) clk re p q]
-/\  pretty_pexlif_h netlist module (PINST name _ _ fa_inps fa_outs _ _)
-	assuming (name == "draw_ff_re_with_en")
-    =
-      val ((p,_):(en,_):(clk,_):[]) = fa_inps in
-      val ((q,_):[]) = fa_outs in
-      [premade_ff_re_with_en (ID module) clk en p q]
-/\  pretty_pexlif_h netlist module (PINST name _ _ fa_inps fa_outs _ _)
-	assuming (name == "draw_ff_re_with_en_reset")
-    =
-      val ((p,_):(en,_):(re,_):(clk,_):[]) = fa_inps in
-      val ((q,_):[]) = fa_outs in
-      [premade_ff_re_with_en_reset (ID module) clk en re p q]
 /\  pretty_pexlif_h netlist module p assuming (pexlif_is_hier p) =
       [pretty_pexlif_hier netlist module p]
 /\  pretty_pexlif_h netlist module p = pretty_pexlif_leaf module p
@@ -966,53 +948,29 @@ let pretty_pexlif_h netlist module (PINST name _ _ fa_inps fa_outs _ _)
 
 // -----------------------------------------------------------------------------
 
-
 // Modify the node wire names so that they all are valid according to
 // the Verilog standard.
 // Returns the new pexlif and a connection list for the top-level
 // to make the new pexlif equivalent to the original.
 let make_verilog_safe p =
-    letrec clean (PINST nm attrs lf fa_inps fa_outs ints (P_HIER chs)) =
-        letrec mk_int_sub i (v:vs) =
-            let sz = md_size v then
-            let new = sz = 1 => sprintf "m%d" i |
-                                sprintf "m%d[%d:0]" i (sz-1)
-            in
-            ((v,new):(zip (md_expand_vector v) (md_expand_vector new)))
-            @ (mk_int_sub (i+1) vs)
-         /\   mk_int_sub i [] = []
-        in
-        let int_sub = mk_int_sub 1 (md_extract_vectors ints) then
-        letrec mk_inp_sub i ((f,as):rem) =
-            let sz = md_size f then
-            let new = sz = 1 => sprintf "i%d" i |
-                                sprintf "i%d[%d:0]" i (sz-1)
-            in
-            ((f,new):(zip (md_expand_vector f) (md_expand_vector new)))
-            @ (mk_inp_sub (i+1) rem)
-         /\   mk_inp_sub i [] = []
-        in
-        let inp_sub = mk_inp_sub 1 fa_inps then
-        letrec mk_out_sub i ((f,as):rem) =
-            let sz = md_size f then
-            let new = sz = 1 => sprintf "o%d" i |
-                                sprintf "o%d[%d:0]" i (sz-1)
-            in
-            ((f,new):(zip (md_expand_vector f) (md_expand_vector new)))
-            @ (mk_out_sub (i+1) rem)
-         /\   mk_out_sub i [] = []
-        in
-        let out_sub = mk_out_sub 1 fa_outs then
+    let make_subs ints fa_inps fa_outs =
+	let mk_int_sub i v = v, (mk_name (md_size v) (sprintf "m%d" i)) in
+	let int_sub = map_index mk_int_sub (md_extract_vectors ints) then
+	let mk_inp_sub i (f,as) = f, (mk_name (md_size f) (sprintf "i%d" i)) in
+	let inp_sub = map_index mk_inp_sub fa_inps then
+	let mk_out_sub i (f,as) = f, (mk_name (md_size f) (sprintf "o%d" i)) in
+	let out_sub = map_index mk_out_sub fa_outs then
         let fa_inps' = map (\(f,as). assoc f inp_sub, as) fa_inps then
         let fa_outs' = map (\(f,as). assoc f out_sub, as) fa_outs then
         let ints' = map (\v. assoc v int_sub) ints then
         let sub = inp_sub @ out_sub @ int_sub then
+	(fa_inps', fa_outs', ints', sub)
+    in
+    letrec clean (PINST nm attrs lf fa_inps fa_outs ints (P_HIER chs)) =
+	val (fa_inps',fa_outs',ints',sub) = make_subs ints fa_inps fa_outs then
         let try_assoc n = (assoc n sub) catch n in
         let rename (PINST lnm lattrs llf lfa_inps lfa_outs linst lbody) =
-            let tr a =
-                [(assoc a sub)] catch
-                (md_merge_vectors (map try_assoc (md_expand_vector a)))
-            in
+            let tr a = vec_assoc a sub in
             let tr_fa (f,as) = (f, flatmap tr as) in
             let lfa_inps' = map tr_fa lfa_inps then
             let lfa_outs' = map tr_fa lfa_outs then
@@ -1020,7 +978,22 @@ let make_verilog_safe p =
         in
         let chs' = map (\p. rename (clean p)) chs then
         PINST nm attrs lf fa_inps' fa_outs' ints' (P_HIER chs')
-     /\    clean other = other
+     /\    clean (PINST nm attrs lf fa_inps fa_outs ints (P_LEAF fns)) =
+	val (fa_inps',fa_outs',ints',sub) = make_subs ints fa_inps fa_outs then
+	let wsub =
+	    let mk_sub (f,t) =
+		let sz = md_size f in
+		(f, (W_VAR sz (get_base_name t)))
+	    in
+	    setify (map mk_sub sub)
+	then
+	let clean_fn (W_UPDATE_FN lhs rhs) =
+		W_UPDATE_FN (w_substitute wsub lhs) (w_substitute wsub rhs)
+	 /\ clean_fn (W_PHASE_DELAY lhs rhs) =
+		W_UPDATE_FN (w_substitute wsub lhs) (w_substitute wsub rhs)
+	in
+	let fns' = map clean_fn fns in
+        PINST nm attrs lf fa_inps' fa_outs' ints' (P_LEAF fns')
     in
     val (PINST nm attrs lf fa_inps fa_outs ints body) = clean p then
     let sub = (fa_inps @ fa_outs) then

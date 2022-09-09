@@ -399,7 +399,7 @@ let perform_binary constr e1 e2 =
       /\ do (W_MUL e1 e2)  = W_CONST sz (v1 * v2)
       /\ do (W_DIV e1 e2)  = W_CONST sz (v1 / v2)
       /\ do (W_MOD e1 e2)  = W_CONST sz (v1 % v2)
-      /\ do (W_SHL e1 e2)  = W_CONST sz (v1 * (2**v2))
+      /\ do (W_SHL e1 e2)  = W_CONST sz ((v1 * (2**v2)) intAND (2 ** sz-1))
       /\ do (W_SHR e1 e2)  = W_CONST sz (do_shr sz v1 v2)
       /\ do (W_ASHR e1 e2) = W_CONST sz (do_ashr v1 v2)
       /\ do (W_LAT_LEQ e1 e2) = W_CONST 1 (v1 = v2 => 1 | 0)

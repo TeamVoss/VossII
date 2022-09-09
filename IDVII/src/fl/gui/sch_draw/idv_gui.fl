@@ -1007,25 +1007,30 @@ let generate_hfl_template fp p basename pexlif_file =
     (fprintf fp "quit;\n")
 ;
 
+//let make_anon_names top_name p =
+//    letrec mk_anon inst (PINST nm attrs lf fa_inps fa_outs ints (P_HIER chs)) =
+//	let nm' = inst in
+//	letrec do i (c:cs) =
+//	    let inst' = sprintf "%s_%d" inst i in
+//	    let c' = mk_anon inst' c then
+//	    c' : (do (i+1) cs)
+//	 /\   do i [] = []
+//	in
+//	let chs' = do 1 chs then
+//	let nm'' =
+//	    (str_is_prefix "draw_" nm) AND NOT (str_is_prefix "draw_hier" nm) =>
+//	    nm | nm'
+//	in
+//	PINST nm'' attrs lf fa_inps fa_outs ints (P_HIER chs')
+//     /\   mk_anon inst (PINST nm attrs lf fa_inps fa_outs ints leaf) =
+//	PINST inst attrs lf fa_inps fa_outs ints leaf
+//    in
+//    mk_anon top_name p
+//;
+
 let make_anon_names top_name p =
-    letrec mk_anon inst (PINST nm attrs lf fa_inps fa_outs ints (P_HIER chs)) =
-	let nm' = inst in
-	letrec do i (c:cs) =
-	    let inst' = sprintf "%s_%d" inst i in
-	    let c' = mk_anon inst' c then
-	    c' : (do (i+1) cs)
-	 /\   do i [] = []
-	in
-	let chs' = do 1 chs then
-	let nm'' =
-	    (str_is_prefix "draw_" nm) AND NOT (str_is_prefix "draw_hier" nm) =>
-	    nm | nm'
-	in
-	PINST nm'' attrs lf fa_inps fa_outs ints (P_HIER chs')
-     /\   mk_anon inst (PINST nm attrs lf fa_inps fa_outs ints leaf) =
-	PINST inst attrs lf fa_inps fa_outs ints leaf
-    in
-    mk_anon top_name p
+    val (PINST nm attrs lf fa_inps fa_outs ints body) = p in
+    PINST top_name attrs lf fa_inps fa_outs ints body
 ;
 
 let create_verilog_load_file basename file pexlif_file =
@@ -1078,6 +1083,8 @@ let do_osu018_synthesis file bname pexlif_file p synth_args =
     // Now append the loading commands
     let fp = fopen (file^"_load.fl") "w" then
     (fprintf fp "cload \"osu018_stdcells.fl\";\n") seq
+    (fprintf fp "(update_vossrc \"RECURSION-CALL-LIMIT\" \"100000\") seq ();\n")
+    seq
     (fprintf fp "load \"%s.fl\";\n" file) seq
     (fprintf fp "\n\nlet p = Q%s [(\"instance\", \"%s\")]" bname bname) seq
     let pr1 fp (f,as) = list2fp fp T (sprintf "(\"%s\", [" f) ", " "])"
@@ -2002,9 +2009,15 @@ export_to_tcl fl_save_verilog;
 
 let fl_save_pexlif canvas file =
     let p = get_idv_current_pexlif canvas then
-    Emit_ASCII_pexlif file p
+    write_pexlif file p
 ;
 export_to_tcl fl_save_pexlif;
+
+let fl_write_pexlif canvas file =
+    let p = get_idv_current_pexlif canvas then
+    Emit_ASCII_pexlif file p
+;
+export_to_tcl fl_write_pexlif;
 
 let has_phase_delay_inside p =
     letrec check (PINST _ _ _ _ _ _ (P_HIER chs)) =
