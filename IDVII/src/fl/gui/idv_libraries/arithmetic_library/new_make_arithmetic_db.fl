@@ -1,0 +1,363 @@
+load "idv.fl";
+
+let models_todo = ref {[]:: (string#pexlif) list};
+let thms_todo   = ref {[]:: (string#(string#string)) list};
+
+let name_model name p =
+    p fseq
+    let old = deref models_todo then
+    (find_first0 (\p. fst p = name) old) != 0 =>
+	eprintf "A model named %s already in database" name
+    |
+    let new = (name,p):old then
+    (models_todo := new) fseq
+    ()
+;
+
+let name_theorem name spec imp =
+    let old = deref thms_todo then
+    let models = deref models_todo then
+    let tst n =
+	((assoc n models) fseq ()) catch
+	eprintf "Cannot find model %s for theorem %s" n name
+    in
+    (tst spec) fseq
+    (tst imp) fseq
+    //
+    let new = (name,spec,imp):old then 
+    thms_todo := new
+;
+
+let wire =
+    input a.
+    output o.
+    CELL "add0" [
+	o <- a
+];
+
+let double_not =
+    input a.
+    output o.
+    internal m.
+    CELL "double_not" [
+	m <- '~' a,
+	o <- '~' m
+];
+
+let add =
+    input a b.
+    output o.
+    CELL "add" [
+	o <- a '+' b
+];
+
+let add_rev =
+    input a b.
+    output o.
+    CELL "add_rev" [
+	o <- b '+' a
+];
+
+let add0 =
+    input a.
+    output o.
+    internal b.
+    CELL "add0" [
+	b <- (W_CONST 0 0),
+	add a b o
+];
+
+let add0_rev =
+    input b.
+    output o.
+    internal a.
+    CELL "add0" [
+	a <- (W_CONST 0 0),
+	add a b o
+];
+
+let add3_21 =
+    input a b c.
+    output o.
+    CELL "add3" [
+	o <- (a '+' b) '+' c
+];
+
+let add3_12 =
+    input a b c.
+    output o.
+    CELL "add3" [
+	o <- a '+' (b '+' c)
+];
+
+let CSA =
+    input  x y z.
+    output c s.
+    CELL "CSA" [
+        c <- x '^' y '^' z,
+        s <- (W_CONST 0 2) '*' (x '&' y '|' x '&' z '|' y '&' z)
+];
+
+let add3CSA =
+    input x y z.
+    output out.
+    internal c s.
+    CELL "CSA_tree" [
+	CSA x y z c s,
+	out <- c '+' s
+];
+
+
+let add4 =
+    input a b c d.
+    output o.
+    CELL "add4" [
+	o <- (a '+' b) '+' (c '+' d)
+];
+
+let add4CSA =
+    input a b c d.
+    output o.
+    internal c1 s1 c2 s2.
+    CELL "add4" [
+	CSA a b c c1 s1,
+	CSA d c1 s1 c2 s2,
+	o <- c2 '+' s2
+];
+
+
+
+let mul =
+    input a b.
+    output o.
+    CELL "mul" [
+	o <- a '*' b
+];
+
+let mul_rev =
+    input a b.
+    output o.
+    CELL "mul_rev" [
+	o <- b '*' a
+];
+
+let mul1 =
+    input a.
+    output o.
+    internal b.
+    CELL "mul1" [
+	b <- (W_CONST 0 1),
+	mul a b o
+];
+
+let mul1_rev =
+    input b.
+    output o.
+    internal a.
+    CELL "mul1" [
+	a <- (W_CONST 0 1), 
+	mul a b o
+];
+
+let const0 =
+    input  {a :: *a}.
+    output {o :: *a}.
+    CELL "const0" [
+	o <- (W_CONST 0 0)
+];
+
+let mul0 =
+    input a.
+    output o.
+    internal m.
+    CELL "mul0" [
+	m <- (W_CONST 0 0),
+	o <- m '*' a
+];
+
+let mul0_rev =
+    input a.
+    output o.
+    internal m.
+    CELL "mul0" [
+	m <- (W_CONST 0 0),
+	o <- a '*' m
+];
+
+
+let mul3_21 =
+    input a b c.
+    output o.
+    CELL "mul3" [
+	o <- (a '*' b) '*' c
+];
+
+let mul3_12 =
+    input a b c.
+    output o.
+    CELL "mul3" [
+	o <- a '*' (b '*' c)
+];
+
+//let mul_impl =
+//    input   {a:: *a} {b:: *a}.
+//    output  {o:: *a}.
+//    let N = hw_size {'q:: *a} in
+//    list_internal N {psums:: *a list}.
+//    internal zero.
+//    CELL "mul_impl" (
+//        let mk_psum i =
+//            (el i psums) <-  (a '<<' (''(i-1))) '&' (SX (b~~(i-1)))
+//        in
+//        (map mk_psum (N -- 1))@
+//        [
+//	    o <- itlist (defix '+') psums zero,
+//	    zero <- '0
+//	]
+//);
+
+// ----------------------------------------------------------------
+
+// ----------------------------------------------------------------
+
+let distr1 =
+    input a b c.
+    output  o.
+    CELL "distr" [
+	o <- a '*' (b '+' c)
+];
+
+let distr1_rev =
+    input a b c.
+    output  o.
+    CELL "distr" [
+	o <- (b '+' c) '*' a
+];
+
+let distr2 =
+    input a b c.
+    output  o.
+    CELL "distr" [
+	o <- (a '*' b) '+' (a '*' c)
+];
+
+let distr2_rev =
+    input a b c.
+    output  o.
+    CELL "distr" [
+	o <- (b '*' a) '+' (c '*' a)
+];
+
+
+
+
+// Name all the various models needed
+// Note: they are all using an anonymous type wexpr.
+
+// Basic models
+name_model "wire"	  (wire {'a::wexpr} 'o);
+name_model "NOT(NOT a)"	  (double_not {'a::wexpr} 'o);
+
+// Addition models
+name_model "a+b"	  (add {'a::wexpr} 'b 'o);
+name_model "b+a"	  (add_rev {'a::wexpr} 'b 'o);
+name_model "a+0"	  (add0 {'a::wexpr} 'o);
+name_model "0+a"	  (add0_rev {'a::wexpr} 'o);
+name_model "(a+b)+c"	  (add3_21 {'a::wexpr} 'b 'c 'o);
+name_model "a+(b+c)"	  (add3_12 {'a::wexpr} 'b 'c 'o);
+name_model "CSA(a+b+c)"	  (add3CSA {'a::wexpr} 'b 'c 'o);
+name_model "a+(b+(c+d))"  (add4 {'a::wexpr} 'b 'c 'd 'o);
+name_model "CSA(a+b+c+d)" (add4CSA {'a::wexpr} 'b 'c 'd 'o);
+
+// Multiplication models
+name_model "a*b"	  (mul {'a::wexpr} 'b 'o);
+name_model "b*a"	  (mul_rev {'a::wexpr} 'b 'o);
+name_model "(a*b)*c"	  (mul3_21 {'a::wexpr} 'b 'c 'o);
+name_model "a*(b*c)"	  (mul3_12 {'a::wexpr} 'b 'c 'o);
+name_model "a*1"	  (mul1 {'a::wexpr} 'o);
+name_model "1*a"	  (mul1_rev {'a::wexpr} 'o);
+name_model "0"		  (const0 {'a::wexpr} 'o);
+name_model "0*a"	  (mul0 {'a::wexpr} 'o);
+name_model "a*0"	  (mul0_rev {'a::wexpr} 'o);
+
+// Distributivity models
+name_model "a*(b+c)"	  (distr1 {'a::wexpr} 'b 'c 'o);
+name_model "(a*b)+(a*c)"  (distr2 {'a::wexpr} 'b 'c 'o);
+name_model "(b+c)*a"	  (distr1_rev {'a::wexpr} 'b 'c 'o);
+name_model "(b*a)+(c*a)"  (distr2_rev {'a::wexpr} 'b 'c 'o);
+
+
+//name_model "Sum((a*2^i)&b[i])" (mul_impl {'a::wexpr} 'b 'o);
+
+
+// Now state all theorems
+name_theorem "double_not" "wire" "NOT(NOT a)";
+name_theorem "add_is_commutative" "a+b" "b+a";
+name_theorem "add_assoc_21-is_12" "(a+b)+c" "a+(b+c)";
+name_theorem "add_a0_is_wire" "a+0" "wire";
+name_theorem "add_0b_is_wire" "0+a" "wire";
+name_theorem "A12_to_CSA" "a+(b+c)" "CSA(a+b+c)";
+name_theorem "A21_to_CSA" "(a+b)+c" "CSA(a+b+c)";
+name_theorem "A22_to_CSA" "a+(b+(c+d))" "CSA(a+b+c+d)";
+
+name_theorem "mul_is_commutative" "a*b" "b*a";
+name_theorem "mul_a1_is_wire" "a*1" "wire";
+name_theorem "mul_1b_is_wire" "1*a" "wire";
+name_theorem "mul_assoc_21_is_12" "(a*b)*c" "a*(b*c)";
+//name_theorem "mul_expand_to_sum_of_partial_products" "a*b" "Sum((a*2^i)&b[i])";
+name_theorem "mul_distributes_over_add" "a*(b+c)" "(a*b)+(a*c)";
+name_theorem "mul_distributes_over_add" "(b+c)*a" "(b*a)+(c*a)";
+
+
+let do_import_model sz (name,w_p) =
+    let p = resize_pexlif sz w_p then
+    let name' = sprintf "%d:%s" sz name then
+    import_model name' p
+;
+
+let make_theorem sz (transform_name, spec_name, imp_name) =
+    let try_assoc n l =
+	(assoc n l) catch eprintf "Cannot find model %s." n
+    in
+    let models = deref models_todo then
+    let w_spec = try_assoc spec_name models then
+    let w_imp  = try_assoc imp_name models then
+    let spec = resize_pexlif sz w_spec then
+    let imp  = resize_pexlif sz w_imp then
+    NOT (sz > 6 OR ((BDD_EQ (wrap_pexlif spec) (wrap_pexlif imp)) == T)) =>
+	eprintf "===========\nClaim %s is not valid!\n" transform_name
+    |
+    let signature = pexlif_get_FP spec then
+    let imp_sha  = idv_save_pexlif imp then 
+    let spec_sha = idv_save_pexlif spec then
+    let tname = sprintf "%d:%s" sz transform_name then
+    let tr = TRANSFORM tname spec_sha imp_sha [MK_THM] then
+    (record_transformation signature tr) fseq
+    let signature = pexlif_get_FP imp then
+    let tname = sprintf "%d:reverse-%s" sz transform_name then
+    let tr = TRANSFORM tname imp_sha spec_sha [MK_THM] then
+    (record_transformation signature tr)
+;
+
+let make_models_and_theorems sz =
+    // Store all models instantiated to size sz
+    (foreach (do_import_model sz) (deref models_todo)) fseq
+    (foreach (make_theorem sz) (deref thms_todo))
+;
+
+
+let a_vars = md_expand_vector "a[6:0]";
+let b_vars = md_expand_vector "b[6:0]";
+let c_vars = md_expand_vector "c[6:0]";
+let n_vars = md_expand_vector "n[6:0]";
+var_order (interleave [a_vars, b_vars, c_vars, n_vars]);
+
+let MAX_SZ = 100;
+
+system "/bin/rm -rf DB_arithm";
+IDV "DB_arithm" [];
+foreach make_models_and_theorems (1 upto MAX_SZ);
+
+fl_save_idv_db "exit";
+
+quit;

@@ -12,6 +12,10 @@ let make_theorem transform_name spec imp =
     let imp_sha  = idv_save_pexlif imp then 
     let spec_sha = idv_save_pexlif spec then
     let tr = TRANSFORM transform_name spec_sha imp_sha [MK_THM] then
+    (record_transformation signature tr) fseq
+    let transform_name = "reverse-"^transform_name in
+    let signature = pexlif_get_FP imp then
+    let tr = TRANSFORM transform_name imp_sha spec_sha [MK_THM] then
     (record_transformation signature tr)
 ;
 
@@ -277,13 +281,10 @@ do_import_model (sprintf "A4CSA<%d>: 2 CSAs & CPA" SZ) A4CSA;
 
 make_theorem "add_is_commutative" A Ar;
 make_theorem "add_a0_is_wire" A0 W;
-make_theorem "wire_is_add_a0" W A0;
 make_theorem "add_0b_is_wire" A0r W;
-make_theorem "wire_is_add_0b" W A0r;
 make_theorem "add_assoc_21-is_12" A3_21 A3_12;
 make_theorem "add_assoc_12-is_21" A3_12 A3_21;
 make_theorem "add_insert_mods" Amod1 Amod2;
-make_theorem "add_remove_mods" Amod2 Amod1;
 make_theorem "A12_to_CSA" A3_12 Aadd3CSA;
 make_theorem "A21_to_CSA" A3_21 Aadd3CSA;
 make_theorem "A22_to_CSA" Aadd4 A4CSA;
@@ -309,16 +310,11 @@ do_import_model (sprintf "Bimp<%d>:" SZ) Bimp;
 
 make_theorem "mul_is_commutative" B Br;
 make_theorem "mul_a1_is_wire" B1 W;
-make_theorem "wire_is_mul_a1" W B1;
 make_theorem "mul_1b_is_wire" B1r W;
-make_theorem "wire_is_mul_1b" W B1r;
 make_theorem "mul_assoc_21_is_12" B3_21 B3_12;
 make_theorem "mul_assoc_12_is_21" B3_12 B3_21;
 make_theorem "mul_insert_mods" Bmod1 Bmod2;
-make_theorem "mul_remove_mods" Bmod2 Bmod1;
-
 make_theorem "mul_expand_to_sum_of_partial_products" B Bimp;
-make_theorem "mul_collapse_from_sum_of_partial_products" Bimp B;
 
 let D1 = distr1 {'a::tp} 'b 'c 'o;
 do_import_model (sprintf "D1<%d>: a*(b+c)" SZ) D1;
@@ -326,8 +322,6 @@ let D2 = distr2 {'a::tp} 'b 'c 'o;
 do_import_model (sprintf "D2<%d>: (a*b)+(a*c)" SZ) D2;
 
 make_theorem "mul_distributes_over_add" D1 D2;
-make_theorem "reverse_mul_distributes_over_add" D2 D1;
-
 
 fl_save_idv_db "exit";
 
