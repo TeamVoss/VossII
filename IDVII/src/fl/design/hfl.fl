@@ -922,12 +922,7 @@ let base_assignment do_split lhs rhs =
     let outs = map (\n.n,[n]) (get_lhs_vars lhs) in
     let inps = map (\n.n,[n]) (w_depends rhs) in
     let dep_vars = get_wbase_names rhs then
-    let pfn =
-//	get_vossrc "DRAW-FULL-STATEMENTS" == "YES" =>
-//	    sprintf "draw_hfl {%s}" (base_compact_wprint dep_vars rhs)
-//	|
-	    "_WrApPeR_"
-    then
+    let pfn = "_WrApPeR_" then
     PINST pfn [] F inps outs (deref internals) (P_HIER subfubs)
 ;
 

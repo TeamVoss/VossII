@@ -38,9 +38,10 @@ proc idv:create_idv_gui {w rw_db} {
         set c $ww.c
 	frame $ww.tf
 	pack $ww.tf -side top -fill x
-	    label $ww.tf.shn_lbl -text "Show model name"
-	    set ::idv(show_model_name) 1
-	    ttk::checkbutton $ww.tf.shn_cb -variable ::idv(show_model_name) \
+	    label $ww.tf.shn_lbl -text "Show anon model names"
+	    set ::idv(show_anon_model_names) 0
+	    ttk::checkbutton $ww.tf.shn_cb \
+		-variable ::idv(show_anon_model_names) \
 		-command "idv:update_transf_canvas $c"
 	    pack $ww.tf.shn_lbl -side left 
 	    pack $ww.tf.shn_cb -side left 
@@ -307,6 +308,12 @@ proc idv:create_idv_menu {nb w} {
         balloon $w.menu.merge "Merge selected identical instances"
         pack $w.menu.merge -side left -padx 5
 
+
+        button $w.menu.wire2bufs_w -image $::icon(wire2bufs) \
+                -command "idv:do_wire2bufs $w"
+        balloon $w.menu.wire2bufs_w "Add buffers in wire(s)"
+        pack $w.menu.wire2bufs_w -side left -padx 5
+
         button $w.menu.rename_w -image $::icon(rename_wires) \
                 -command "idv:do_rename_wires $w"
         balloon $w.menu.rename_w "Rename selected wires"
@@ -365,6 +372,10 @@ proc idv:merge {w} { fl_do_merge $w.c }
 proc idv:new_transf {w} { fl_do_new_tranf $w.c }
 
 proc idv:db_replace {w} { fl_do_replacement $w.c }
+
+proc idv:do_rename_wires {w} { fl_rename_wires $w.c }
+
+proc idv:do_wire2bufs {w} { fl_do_wire2buffer $w.c }
 
 proc idv:new_toplevel_transf {w sl} {
     set idx [$sl curselection]
@@ -508,8 +519,9 @@ proc idv:name_transform_and_use {inside c tr_name model_name} {
 
 proc idv:update_transf_canvas {c} {
     foreach node [array names ::idv_transf_node_map] {
-	if { $::idv(show_model_name) } {
-	    regexp {([^:]*):(.*)} $::idv_transf_node_map($node) -> db model_name
+	regexp {([^:]*):(.*)} $::idv_transf_node_map($node) -> db model_name
+	set is_anon [regexp {anon_[0-9]*} $model_name]
+	if { !$is_anon || $::idv(show_anon_model_names) } {
 	    $c itemconfigure $::dot_node2text_tag($c,$node) \
 		    -text " $model_name" -anchor c
 	} else {
@@ -520,8 +532,11 @@ proc idv:update_transf_canvas {c} {
     foreach edge [array names ::idv_transf_edge_map] {
 	if { $::idv(show_transform_name) } {
 	    regexp {([^:]*):(.*)} $::idv_transf_edge_map($edge) -> db edge_name
+	    set raw_name $::idv_transf_edge_map($edge)
+	    set edge_name [fl_format_transf_name 15 $raw_name]
 	    $c itemconfigure $::dot_edge2text_tag($c,$edge) \
-		    -text $edge_name -anchor w
+		    -text $edge_name 
+;# -anchor w -justify r
 	} else {
 	    $c itemconfigure $::dot_edge2text_tag($c,$edge) -text ""
 	}
@@ -551,7 +566,6 @@ proc idv:show_transformations {dot_file w} {
 	set fig_tag $::dot_node2node_fig_tag($c,$node)
 	$c bind $fig_tag <ButtonPress-3> \
 	    "idv:show_model_menu $c $node %X %Y; break"
-	$c itemconfigure $fig_tag -outline white
 	set txt_tag $::dot_node2text_tag($c,$node)
 	$c bind $txt_tag <ButtonPress-3> \
 	    "idv:show_model_menu $c $node %X %Y; break"
@@ -816,8 +830,6 @@ proc idv:fev_pexlif {w} {
                                  -title "Pexlif file to load" -parent $w]
     set ::idv(fev_imp_file) $file
 }
-
-proc idv:do_rename_wires {w} { fl_rename_wires $w.c }
 
 proc done_edit_proc {args} { }
 

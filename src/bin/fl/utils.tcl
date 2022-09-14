@@ -412,7 +412,7 @@ proc display_dot {dot_pgm {w ""} {close_fun ""}} {
 
     set fp [open "|dot -Ttk $dot_pgm" "r"]
     while {[gets $fp line] >= 0} {
-	set nline [regsub {{"Times" 14}} $line {$::base_mfont}]
+	set nline [regsub {{"Times" 14}} $line {$::voss2_txtfont1}]
         eval $nline
     }
     close $fp

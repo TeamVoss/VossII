@@ -34,9 +34,12 @@ static bool     parse_int(string s, int *resp);
 static bool     parse_bool(string s, formula *resp);
 static bool     get_end_of_item(string s, string *endp);
 static bool     tcl_to_g_ptr(string txt, typeExp_ptr arg_type, g_ptr *resp);
-static bool     g_ptr_to_tcl_string_rec(g_ptr np, typeExp_ptr type);
-static bool     g_ptr_to_tcl_string(g_ptr np, typeExp_ptr type, string *resp);
+static void     g_ptr2tcl(g_ptr np, typeExp_ptr type, FILE *tcl_fp);
 static bool     ok_tcl_callback_type(typeExp_ptr type);
+static bool	can_be_sent_to_tcl(g_ptr np, typeExp_ptr type);
+
+
+/************************************************************************/
 /*			Public Functions				*/
 /************************************************************************/
 void
@@ -104,16 +107,16 @@ get_callback_fun(string cmd) {
     return(-1);
 }
 
-bool
-Tcl_callback_eval(string cmd, string *resp)
+void
+Tcl_callback_eval(string cmd, int rid, FILE *tcl_fp)
 {
     ASSERT( tcl_initialized == TCL_MAGIC_NUMBER);
     while( *cmd == ' ' ) cmd++;
     int fun_idx = get_callback_fun(cmd);
     if( fun_idx < 0 ) {
 	Fail_pr("Not a valid callback function format (%s). WHAT????", cmd);
-	*resp = FailBuf;
-	return FALSE;
+	fprintf(tcl_fp,"%d 0%s\n", rid, protect(FailBuf));
+	return;
     }
     tstr_ptr tstrings = new_temp_str_mgr();
     tcl_callback_ptr tcp;
@@ -132,9 +135,9 @@ Tcl_callback_eval(string cmd, string *resp)
 	if( *start == 0 ) {
             Fail_pr("Argument %d missing for callback function %s",
 		    arg_cnt+1, tcp->name);
-	    *resp = FailBuf;
-	    free_temp_str_mgr(tstrings);
-            return FALSE;
+	    fprintf(tcl_fp,"%d 0%s\n", rid, protect(FailBuf));
+            free_temp_str_mgr(tstrings);
+	    return;
 	}
         while( *p && *p != ' ') p++;
         char tmp = *p;
@@ -148,9 +151,9 @@ Tcl_callback_eval(string cmd, string *resp)
         if( !tcl_to_g_ptr(arg_s, arg_type, &arg) ) {
             Fail_pr("Argument %d is of wrong type in tcl function %s",
                     arg_cnt, tcp->name);
-	    *resp = FailBuf;
-	    free_temp_str_mgr(tstrings);
-            return FALSE;
+	    fprintf(tcl_fp,"%d 0%s\n", rid, protect(FailBuf));
+            free_temp_str_mgr(tstrings);
+	    return;
         }
         redex = Make_APPL_ND(redex, arg);
 	type = Get_Real_Type(type->typelist->next->type);
@@ -160,15 +163,27 @@ Tcl_callback_eval(string cmd, string *resp)
     // Then evaluate the function
     redex = Eval(redex);
     if( is_fail(redex) ) {
-        *resp = tprintf("%s\nIn fl callback function %s\n", FailBuf, tcp->name);
-	return FALSE;
+	fprintf(tcl_fp, "%d 0", rid);
+	Tcl_printf(tcl_fp, "%s\nIn fl callback function %s\n",
+			   FailBuf, tcp->name);
+	fprintf(tcl_fp, "\n");
+	return;
     } else {
 	/* Extract the return type */
 	while( type->typeOp == arrow_tp ) {
 	    type = Get_Real_Type(type->typelist->next->type);
 	}
-	bool ok = g_ptr_to_tcl_string(redex, type, resp);
-	return( ok );
+	if( !can_be_sent_to_tcl(redex, type) ) {
+	    fprintf(tcl_fp, "%d 0", rid);
+	    Tcl_printf(tcl_fp, "%s\nIn fl callback function %s\n",
+			       FailBuf, tcp->name);
+	    fprintf(tcl_fp, "\n");
+	    return;
+	}
+	fprintf(tcl_fp, "%d 1", rid);
+	g_ptr2tcl(redex, type, tcl_fp);
+	fprintf(tcl_fp, "\n");
+	return;
     }
 }
 
@@ -397,38 +412,20 @@ tcl_to_g_ptr(string txt, typeExp_ptr type, g_ptr *resp)
 }
 
 static bool
-g_ptr_to_tcl_string_rec(g_ptr np, typeExp_ptr type)
+can_be_sent_to_tcl(g_ptr np, typeExp_ptr type)
 {
     type = Get_Real_Type(type);
     switch( type->typeOp ) {
-        case string_tp:
-            {
-                // Protect the string (if needed)
-                string s = GET_STRING(np);
-		gen_charappend(tmp_str_buf, '{');
-		gen_strappend(tmp_str_buf, s);
-		gen_charappend(tmp_str_buf, '}');
-                return TRUE;
-            }
-        case void_tp:
-	    {
-                gen_strappend(tmp_str_buf, "{}");
-                return TRUE;
-	    }
-        case int_tp:
-            {
-		gen_strappend(tmp_str_buf,  Arbi_ToString(GET_AINT(np),10) );
-                return TRUE;
-            }
+        case string_tp: { return TRUE; }
+        case void_tp: { return TRUE; }
+        case int_tp: { return TRUE; }
         case bool_tp:
             {
                 formula f = GET_BOOL(np);
                 if( f == B_Zero() ) {
-                    gen_charappend(tmp_str_buf, '0');
                     return TRUE;
                 } else
                 if( f == B_One() ) {
-                    gen_charappend(tmp_str_buf, '1');
                     return TRUE;
                 }
                 Fail_pr("Cannot return a symbolic expression to tcl");
@@ -437,30 +434,22 @@ g_ptr_to_tcl_string_rec(g_ptr np, typeExp_ptr type)
         case list_tp:
             {
                 g_ptr li, el;
-                bool first = TRUE;
-                gen_charappend(tmp_str_buf, '{');
                 typeExp_ptr etype = Get_Real_Type(type->typelist->type);
                 FOR_CONS(np, li, el) {
-                    if( !first ) gen_charappend(tmp_str_buf, ' ');
-                    first = FALSE;
-                    if( !g_ptr_to_tcl_string_rec(el, etype) ) { return FALSE; }
+                    if( !can_be_sent_to_tcl(el, etype) ) { return FALSE; }
                 }
-                gen_charappend(tmp_str_buf, '}');
                 return TRUE;
             }
         case tuple_tp:
             {
                 typeExp_ptr ftype = Get_Real_Type(type->typelist->type);
-                gen_charappend(tmp_str_buf, '{');
-                if( !g_ptr_to_tcl_string_rec(GET_CONS_HD(np), ftype) ) {
+                if( !can_be_sent_to_tcl(GET_CONS_HD(np), ftype) ) {
                     return FALSE;
                 }
                 typeExp_ptr stype = Get_Real_Type(type->typelist->next->type);
-                gen_charappend(tmp_str_buf, ' ');
-                if( !g_ptr_to_tcl_string_rec(GET_CONS_TL(np), stype) ) {
+                if( !can_be_sent_to_tcl(GET_CONS_TL(np), stype) ) {
                     return FALSE;
                 }
-                gen_charappend(tmp_str_buf, '}');
                 return TRUE;
             }
         default:
@@ -470,16 +459,67 @@ g_ptr_to_tcl_string_rec(g_ptr np, typeExp_ptr type)
     }
 }
 
-static bool
-g_ptr_to_tcl_string(g_ptr np, typeExp_ptr type, string *resp)
+static void
+g_ptr2tcl(g_ptr np, typeExp_ptr type, FILE *tcl_fp)
 {
-    string tmp = gen_strtemp(tmp_str_buf, "");
-    if( !g_ptr_to_tcl_string_rec(np, type) ) {
-        *resp = FailBuf;
-        return FALSE;
-    } else {
-        *resp = tmp;
-        return TRUE;
+    type = Get_Real_Type(type);
+    switch( type->typeOp ) {
+        case string_tp:
+            {
+		Tcl_printf(tcl_fp, "{%s}", GET_STRING(np));
+                return;
+            }
+        case void_tp:
+	    {
+		Tcl_printf(tcl_fp, "{}");
+                return;
+	    }
+        case int_tp:
+            {
+		Tcl_printf(tcl_fp, "%s", Arbi_ToString(GET_AINT(np),10));
+                return;
+            }
+        case bool_tp:
+            {
+                formula f = GET_BOOL(np);
+                if( f == B_Zero() ) {
+		    Tcl_printf(tcl_fp, "0");
+                    return;
+                } else
+                if( f == B_One() ) {
+		    Tcl_printf(tcl_fp, "1");
+                    return;
+                }
+		DIE("Should never happen!");
+            }
+        case list_tp:
+            {
+                g_ptr li, el;
+                bool first = TRUE;
+		Tcl_printf(tcl_fp, "{");
+                typeExp_ptr etype = Get_Real_Type(type->typelist->type);
+                FOR_CONS(np, li, el) {
+                    if( !first ) Tcl_printf(tcl_fp, " ");
+                    first = FALSE;
+		    
+                    g_ptr2tcl(el, etype, tcl_fp);
+                }
+		Tcl_printf(tcl_fp, "}");
+                return;
+            }
+        case tuple_tp:
+            {
+                typeExp_ptr ftype = Get_Real_Type(type->typelist->type);
+		Tcl_printf(tcl_fp, "{");
+                g_ptr2tcl(GET_CONS_HD(np), ftype, tcl_fp);
+                typeExp_ptr stype = Get_Real_Type(type->typelist->next->type);
+                Tcl_printf(tcl_fp, " ");
+                g_ptr2tcl(GET_CONS_TL(np), stype, tcl_fp);
+		Tcl_printf(tcl_fp, "}");
+		return;
+            }
+        default:
+            DIE("Should never happen");
     }
 }
 

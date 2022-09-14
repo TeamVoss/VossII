@@ -63,11 +63,14 @@ bool	perform_fl_command(string txt);
 void	Start_stdin_parsing();
 
 /* ===================== Local variables defined ===================== */
-#define TCL_CMD_BUF_SZ  16384
+#define TCL_CMD_BUF_SZ	    16384
+#define TCL_PRINTF_BUF_SZ   16384
+//
 static char             buf[TCL_CMD_BUF_SZ];
 static char             path_buf[PATH_MAX+1];
 static char             parse_buf[6*TCL_CMD_BUF_SZ];
 static char             stdin_buf[2*TCL_CMD_BUF_SZ];
+static char		tcl_buf[TCL_PRINTF_BUF_SZ+1];
 static string 		start_file   = NULL;
 static string 		input_file_for_cmds   = NULL;
 static int 		input_file_for_cmds_pid = -1;
@@ -559,17 +562,9 @@ fl_main(int argc, char *argv[])
 			break;
 		    }
                     buf[strlen(s)-1] = 0;
-                    string res;
 		    string start;
 		    int rid = (int) strtol(buf, &start, 10);
-                    bool ok = Tcl_callback_eval(start, &res);
-                    if( ok ) {
-                        fprintf(callback_from_tcl_fp_res,
-				"%d 1%s\n", rid, protect(res));
-                    } else {
-                        fprintf(callback_from_tcl_fp_res,
-				"%d 0%s\n", rid, protect(res));
-                    }
+		    Tcl_callback_eval(start, rid, callback_from_tcl_fp_res);
                     fflush(callback_from_tcl_fp_res);
                 }
                 break;
@@ -712,6 +707,60 @@ Ustr_equ(pointer p1, pointer p2)
     return( p1 == p2 );
 }
 
+void
+Tcl_printf (FILE *tcl_fp, const string format, ...)
+{
+    va_list arg;
+    va_start(arg, format);
+    vsnprintf(tcl_buf, TCL_PRINTF_BUF_SZ, format, arg);
+    va_end(arg);
+    string p = tcl_buf;
+    while( *p ) {
+        switch( *p ) {
+            case '\r':
+		// Ignore CR
+                p++;
+                break;
+            case '"':
+            case '[':
+            case ']':
+            case '{':
+            case '}':
+            case ';':
+            case '#':
+            case '$':
+            case ' ':
+            case '\t':
+            case '\n':
+                fprintf(tcl_fp, "\\u%04x", ((unsigned int) *p));
+                p++;
+                break;
+            case '\\':
+                p++;
+                if( *p && *p == 'u' ) {
+                    unsigned int ch;
+                    if( sscanf(p, "u%04x", &ch) == 1 ) {
+                        p--;
+                        char tmp = *(p+6);
+                        *(p+6) = 0;
+			fprintf(tcl_fp, "%s", p);
+                        *(p+6) = tmp;
+                        p += 6;
+                        break;
+                    }
+                }
+                p--;
+                fprintf(tcl_fp, "\\u%04x", ((unsigned int) *p));
+                p++;
+                break;
+            default:
+		fputc(*p, tcl_fp);
+                p++;
+                break;
+        }
+    }
+}
+
 /* ==================================================================== */
 /*                                                                      */
 /*                         Local functions                              */
@@ -851,6 +900,8 @@ setup_sockets()
 
 }
 
+
+
 string
 protect(string txt)
 {
@@ -979,15 +1030,9 @@ Send_to_tcl(string cmd, string *resp)
 	}
 	if( (s = fgets(buf, TCL_CMD_BUF_SZ-1, callback_from_tcl_fp)) != NULL ) {
             buf[strlen(s)-1] = 0;
-            string res;
 	    string start;
 	    int rid = (int) strtol(buf, &start, 10);
-	    bool ok = Tcl_callback_eval(start, &res);
-            if( ok ) {
-                fprintf(callback_from_tcl_fp_res,"%d 1%s\n", rid, protect(res));
-            } else {
-                fprintf(callback_from_tcl_fp_res,"%d 0%s\n", rid, protect(res));
-            }
+	    Tcl_callback_eval(start, rid, callback_from_tcl_fp_res);
             fflush(callback_from_tcl_fp_res);
         }
 	CHECK_FOR_INTERRUPT;

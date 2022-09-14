@@ -17,7 +17,7 @@
 /* -------- Function prototypes for exported functions -------- */
 void        Init_tcl();
 bool	    Register_tcl_callback(string name, symbol_tbl_ptr stbl);
-bool        Tcl_callback_eval(string cmd, string *resp);
+void        Tcl_callback_eval(string cmd, int rid, FILE *tcl_fp);
 void        Mark_tcl_callbacks();
 
 #else /* EXPORT_FORWARD_DECL */

@@ -155,6 +155,7 @@ bool            Send_to_tcl(string cmd, string *resp);
 void            Serve_Interrupt();
 bool		Mk_output_file_in_tmp_dir(string prefix, FILE **fpp,
 					  string *filename);
+void		Tcl_printf (FILE *tcl_fp, const string format, ...);
 
 /* Some forward declarations that are needed early.... */
 typedef struct g_rec            *g_ptr;

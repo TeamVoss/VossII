@@ -6,6 +6,15 @@
 let Init_idv_gui = (tcl_eval [sprintf "source %sidv_gui.tcl" DIR]) fseq ();
 Init_idv_gui;
 
+let clean_name s =
+    let tr c =
+	c = " " => "_" |
+	c = "{" => "_" |
+	c = "}" => "_" | c
+    in
+    implode (map tr (explode s))
+;
+
 let EDIT_cmd file =
     let cmd = "/usr/bin/X11/xterm -sb -sl 20000 -j -rw -ls -bg white "^
 	      "-fg black -fn 7x14 -geometry 80x40 -e /usr/bin/vi "
@@ -855,6 +864,26 @@ let fl_do_new_toplevel_transf {w::string} db name =
 ;
 export_to_tcl fl_do_new_toplevel_transf;
 
+letrec trim_leading_space s =
+	s = "" => s |
+	(string_hd s) != " " => s | trim_leading_space (string_tl s)
+;
+
+let fl_format_transf_name max_size name =
+    // Strip database name
+    let tr_name = list2str T "" ":" "" id (tl (str_split name ":")) then
+    // Remove leading space
+    let tr_name = trim_leading_space tr_name in
+    // Insert newlines to avoid too long lines
+    letrec split_lines cur_len (n:ns) =
+	let l = strlen n in
+	n^((cur_len+l) > max_size => ("\n"^(split_lines 0 ns))
+				   | (" "^(split_lines (cur_len+l+1) ns)))
+     /\    split_lines _ [] = ""
+    in
+    split_lines 0 (str_split tr_name " ")
+;
+export_to_tcl fl_format_transf_name;
 
 let fl_display_transform_tree canvas dbname name =
     let db = get_idv_db dbname then
@@ -873,17 +902,22 @@ let fl_display_transform_tree canvas dbname name =
 	(vertex_map := ((vertex_name,ext_name):(deref vertex_map))) fseq
 	let sz = float2str (int2float (1+strlen ext_name)*0.1) then
 	let dc = sprintf
-      "%s [shape=box, width=%s, height=0.10, fixedsize=shape, label = \"%s\"]\n"
-			vertex_name sz vertex_name
+      "%s [shape=box, fixedsize=shape, label = \"%s\", fontname=\"Courer New\", fontsize=\"12\"]\n"
+			vertex_name vertex_name
 	then
 	(vertices := (dc:(deref vertices))) fseq
 	(done := ((deref done)@[(p,vertex_name)])) fseq
 	let next_states = get_transform_fanout p then
 	let mk_edge (trans_name, dest_name, p_dest) =
 	    let dest = fanout_rec dest_name p_dest then
-	    let edge_name = sprintf "e%d" (length (deref edges)) then
+	    let edge_name =
+		let name = clean_name (trim_leading_space trans_name) in
+		let len = strlen name in
+		let name' = len <= 20 => name | string_butlastn name (len-20) in
+		sprintf "e%d-%s" (length (deref edges)) name'
+	    then
 	    (edge_map := ((edge_name, trans_name):(deref edge_map))) fseq
-	    let edge = sprintf "%s -> %s [ label = \"%s\" ];\n"
+	    let edge = sprintf "%s -> %s [ label = \"%s\", fontname=\"Courier New\", fontsize=\"12\"];\n"
 			       vertex_name dest edge_name
 	    then
 	    (edges := (edge:(deref edges)))
@@ -897,7 +931,6 @@ let fl_display_transform_tree canvas dbname name =
     let file = stream2filename fp then
     (fprintf fp "digraph transform_tree {\n") fseq
     (fprintf fp "rankdir=TB;\n") fseq
-    (fprintf fp "size=\"8,5\"\n") fseq
     (foreach (fprintf fp "%s") (deref vertices)) fseq
     (foreach (fprintf fp "%s") (deref edges)) fseq
     (fprintf fp "}\n") fseq
@@ -911,15 +944,16 @@ let fl_display_transform_tree canvas dbname name =
     (foreach mk_ndmap (deref vertex_map)) fseq
     //
     (tcl_eval ["catch {unset ::idv_transf_edge_map}"]) fseq
-    let mk_ndmap (n,nn) =
+    let mk_edgemap (n,nn) =
 	let cmd = sprintf "set ::idv_transf_edge_map(%s) {%s}" n nn in
 	(tcl_eval [cmd]) fseq ()
     in
-    (foreach mk_ndmap (deref edge_map)) fseq
+    (foreach mk_edgemap (deref edge_map)) fseq
     //
     (tcl_eval [sprintf "idv:show_transformations %s %s" file canvas]) fseq
     ()
 ;
+
 export_to_tcl fl_display_transform_tree;
 
 //cletrec convert_to_idv_format p =
@@ -957,15 +991,6 @@ let fl_import_model w filename =
     ()
 ;
 export_to_tcl fl_import_model;
-
-let clean_name s =
-    let tr c =
-	c = " " => "_" |
-	c = "{" => "_" |
-	c = "}" => "_" | c
-    in
-    implode (map tr (explode s))
-;
 
 let generate_hfl_template fp p basename pexlif_file =
     val (PINST name attrs lf fa_inps fa_outs ints body) = p in
@@ -1610,11 +1635,21 @@ let Pdraw_tree dt =
 ;
 install_print_function Pdraw_tree;    
 
+let remove_add_inst pfn =
+    NOT (str_is_prefix "add_inst " pfn) => pfn |
+    letrec skip_digit (c:cs) = 
+	let oc = ord c in
+	(ord "0" <= oc) AND (oc <= ord "9") => skip_digit cs | implode cs
+     /\    skip_digit [] = eprintf "remove_add_inst failed on %s" pfn
+    in
+    skip_digit (butfirstn (strlen "add_inst ") (explode pfn))
+;
+
 let build_vfanin_tbl ckt =
     let vec_vis_fanin vecs =
         let nds = md_expand_vectors vecs in
         let get_pfn nd = (get_visualization_id ckt nd 0),
-                         (get_visualization_pfn ckt nd 0),
+                         (remove_add_inst (get_visualization_pfn ckt nd 0)),
                          nd
         in
         let p = partition fst (map get_pfn nds) then
@@ -1854,7 +1889,7 @@ let fl_do_replacement canvas =
 	    (refresh_idv_canvas canvas cmd)
 	)
 	|
-	eprintf "Transformation spec not an exact match in %s" op
+	eprintf "Transformation spec not an exact match in %s\n" op
     |
     op = "ApplyEverywhere" =>
 	let res = replace_all parent spec imp then
@@ -2189,3 +2224,50 @@ let fl_do_retime_fwd canvas =
     refresh_idv_canvas canvas cmd
 ;
 export_to_tcl fl_do_retime_fwd;
+
+
+let do_wire2buffer wire p =
+    NOT (pexlif_is_hier p) => error "wire2buffer on a leaf instance" |
+    let sz = md_size wire in
+    let io = buid_io_tbl p then
+    let name_db = build_name_db p then
+    let fanouts = wire2driven io wire then
+    let cnt = length fanouts in
+    let w_wire = W_EXPLICIT_VAR sz wire in
+    let mk_buf out = resize_pexlif sz ((W_EXPLICIT_VAR sz out) <- w_wire) in
+    let new_outs = map (get_unique_name name_db) (replicate cnt wire) then
+    let buf_pexlifs = map mk_buf new_outs then
+    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
+    let remain = gather cs ((1 upto length cs) subtract fanouts) then
+    let update_inp new idx =
+	let sp = el idx cs in
+	val (PINST sname sattrs slf sfa_inps sfa_outs sints sbody) = sp in
+	let sub = vec_zip [wire] [new] in
+	let rename (f,as) =
+	    let tr a = (hd (vec_assoc a sub)) catch a in
+	    f, (map tr as)
+	in
+	let sfa_inps' = map rename sfa_inps then
+	PINST sname sattrs slf sfa_inps' sfa_outs sints sbody
+    in
+    let modified = map2 update_inp new_outs fanouts then
+    let cs' = buf_pexlifs @ modified @ remain then
+    let ints' = new_outs@ints then
+    PINST name attrs lf fa_inps fa_outs ints' (P_HIER cs')
+;
+
+let fl_do_wire2buffer canvas =
+    let vfsm = w2vfsm canvas in
+    let p = get_idv_current_pexlif canvas then
+    let selected_wires = md_extract_vectors (get_selected_wires vfsm) then
+    selected_wires = [] => () |
+    let p' = itlist do_wire2buffer selected_wires p then
+    (add_transform canvas p' (WIRE2BUFFER selected_wires)) fseq
+    let cmd =
+	sprintf "wire2buffer vis %s;"
+		(list2str T "[" "," "]" (sprintf "\"%s\"") selected_wires)
+    then
+    refresh_idv_canvas canvas cmd
+;
+export_to_tcl fl_do_wire2buffer;
+

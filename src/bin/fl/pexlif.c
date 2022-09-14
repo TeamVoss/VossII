@@ -1478,11 +1478,8 @@ fp_w_rec(g_ptr node)
     argn_1  = GET_SND(node);
     node = GET_FST(node);
     //
-    if( IS_CONSTRUCTOR(W_VAR, node) ) {
+    if( IS_CONSTRUCTOR(W_VAR, node) || IS_CONSTRUCTOR(W_EXPLICIT_VAR, node) ) {
 	return( pm_val(6, GET_INT(argn_1)) );
-    }
-    if( IS_CONSTRUCTOR(W_EXPLICIT_VAR, node) ) {
-	return( pm_val(7, GET_INT(argn_1)) );
     }
     if( IS_CONSTRUCTOR(W_SX, node) ) {
 	return( pm_val(30, GET_INT(argn_1)) + pm_val(31, fp_w_rec(argn_0)) );
