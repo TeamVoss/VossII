@@ -344,7 +344,7 @@ let _sdffe p_clk p_en p_srst sz src q srst en clk d =
 	    (deref fa_inps_r) (deref fa_outs_r) (deref ints_r) subs
 ;
 
-let _sdffce p_clk p_en p_srst sz src q srst en clk d =
+let _sdffce p_clk p_en p_srst rst_value sz src q srst en clk d =
     let attrs = mk_attr src __FILE__ __LINE__ then
     let fa_inps_r = ref [] then
     let fa_outs_r = ref [] then
@@ -364,7 +364,9 @@ let _sdffce p_clk p_en p_srst sz src q srst en clk d =
     let d_del	  = W_PHASE_DELAY dD D then
     let q_del	  = W_PHASE_DELAY dQ Q then
     let srst_del  = W_PHASE_DELAY dSRST SRST then
-    let ZERO	  = W_CONST sz 0 then
+    let ZERO	  =
+	rst_value = "" => W_CONST sz 0 | W_CONST sz (sscanf "%b" rst_value)
+    then
     let clk_cond  = p_clk => W_AND (W_NOT dCLK) CLK
 			   | W_AND dCLK (W_NOT CLK)
     then

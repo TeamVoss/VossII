@@ -709,6 +709,7 @@ struct PexlifDumper
 			if( cell->hasParam(ID::CLK_POLARITY) && !cell->getParam(ID::CLK_POLARITY).as_bool() )   { f << "F "; } else { f << "T "; }
 			if( cell->hasParam(ID::EN_POLARITY) && !cell->getParam(ID::EN_POLARITY).as_bool() )   { f << "F "; } else { f << "T "; }
 			if( cell->hasParam(ID::SRST_POLARITY) && !cell->getParam(ID::SRST_POLARITY).as_bool() ) { f << "F "; } else { f << "T "; }
+			if( cell->hasParam(ID::SRST_VALUE) ) { f << "\""; f << cell->getParam(ID::SRST_VALUE).as_string(); f << "\""; } else { f << "\"\""; }
 			f << stringf("%d \"%s\" ", out.size(), src.c_str());
 			dump_sigspec(f, out);
 			f << " ";

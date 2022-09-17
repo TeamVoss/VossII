@@ -395,7 +395,7 @@ static void         bexpr_cHL_Print(odests fp, gbv H, gbv L);
 static void         switch_to_BDDs();
 static int          update_node(ste_ptr ste, int idx, gbv Hnew, gbv Lnew);
 static gbv *        allocate_value_buf(int sz, gbv H, gbv L);
-static bool         initialize(ste_ptr ste);
+static bool         initialize(ste_ptr ste, bool trace_all);
 static sch_ptr      mk_repeat(vstate_ptr vp, char *anon);
 static bool         has_ifc_nodes(vstate_ptr vp, ilist_ptr il, ilist_ptr *silp,
                                   ilist_ptr *rilp);
@@ -715,7 +715,7 @@ gSTE(g_ptr redex, value_type type)
     //
     bool old_RCverbose_ste_run = RCverbose_ste_run;
     RCverbose_ste_run = FALSE;
-    if( !initialize(ste) || quit_simulation_early ) {
+    if( !initialize(ste, trace_all) || quit_simulation_early ) {
 	if( quit_simulation_early ) {
 	    MAKE_REDEX_FAILURE(redex, Fail_pr("Simulation interrupted"));
 	} else {
@@ -7802,7 +7802,7 @@ allocate_value_buf(int sz, gbv H, gbv L)
 }
 
 static bool
-initialize(ste_ptr ste)
+initialize(ste_ptr ste, bool trace_all)
 {
     nnode_ptr np;
     FOR_BUF(nodesp, nnode_rec, np) {
@@ -7828,6 +7828,15 @@ initialize(ste_ptr ste)
 	    return FALSE;
 	}
 	todo = do_combinational(ste);
+	int idx = 0;
+	FOR_BUF(nodesp, nnode_rec, np) {
+	    if( trace_all || np->has_trace ) {
+		gbv curH = *(cur_buf+2*idx);
+		gbv curL = *(cur_buf+2*idx+1);
+		record_trace(idx, 0, curH, curL);
+	    }
+	    idx++;
+	}
 	if( todo < 0 ) return FALSE;
 	if( todo > 0 ) 
 	    do_phase(ste);
