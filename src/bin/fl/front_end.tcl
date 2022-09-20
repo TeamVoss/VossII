@@ -1751,7 +1751,11 @@ proc __basic_fl_callback {fun_name args} {
     set carg ""
     set sep ""
     foreach arg $args {
-        append carg $sep [protect $arg]
+	if { $arg == "" } {
+	    append carg $sep {{{}}}
+	} else {
+	    append carg $sep [protect $arg]
+	}
         set sep " "
     }
     incr ::result_id

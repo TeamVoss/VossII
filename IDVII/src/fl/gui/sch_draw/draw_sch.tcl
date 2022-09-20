@@ -1077,10 +1077,14 @@ proc selection_execute {c wx wy sx sy shift} {
 	}
     }
     set ::previous_selection [fl_get_anon_selected $c]
+    fl_clear_selection_list {};
+    foreach nd $nodes {
+	fl_add_to_selection_list $nd
+    }
     if { [expr ($shift == 1) || ($shift == 3)] }  {
-	fl_set_selection $c "MODIFY_SELECTION" $nodes
+	fl_set_selection $c "MODIFY_SELECTION"
     } else {
-	fl_set_selection $c "SET_SELECTION" $nodes
+	fl_set_selection $c "SET_SELECTION"
     }
 }
 
@@ -3307,7 +3311,11 @@ proc sc:double_draw_inside {c levels inst_nbr tag} {
     } else {
 	set old $::previous_selection
     }
-    fl_set_selection $c "SET_SELECTION" $old
+    fl_clear_selection_list {}
+    foreach nd $old {
+	fl_add_to_selection_list $nd
+    }
+    fl_set_selection $c "SET_SELECTION"
     fl_draw_inside $c $levels $tag $inst_nbr
 }
 

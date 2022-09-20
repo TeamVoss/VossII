@@ -1,0 +1,24 @@
+
+let fl_f {dummy::void} =
+    fprintf stderr "Oh yes!\n"
+;
+export_to_tcl fl_f;
+
+let fl_g i {dummy::void} =
+    fprintf stderr "Well %d!\n" i
+;
+export_to_tcl fl_g;
+
+let fl_h {dummy::void} i =
+    fprintf stderr "Maybe %d!\n" i
+;
+export_to_tcl fl_h;
+
+
+111111;
+tcl_eval ["fl_f {}"];
+222222;
+tcl_eval ["fl_g 1 {}"];
+333333;
+tcl_eval ["fl_h {} 2"];
+444444;

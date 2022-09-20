@@ -1437,8 +1437,21 @@ let fl_get_waveform_res idx =
 export_to_tcl fl_get_waveform_res;
 
 
+let selection_list = ref {[] :: string list};
 
-let fl_set_selection canvas {op::string} {vecs::string list} =
+let fl_clear_selection_list {dummy::void} =
+    selection_list := []
+;
+non_lazy fl_clear_selection_list;
+export_to_tcl fl_clear_selection_list;
+
+let fl_add_to_selection_list vec =
+    (selection_list := (vec : (deref selection_list)))
+;
+export_to_tcl fl_add_to_selection_list;
+
+
+let set_selection canvas {op::string} {vecs:: string list} =
     let vfsm = w2vfsm canvas then
     let active_canvases = deref (vfsm2canvases_r vfsm) then
     let rselection = vfsm2selection_r vfsm then
@@ -1464,6 +1477,11 @@ let fl_set_selection canvas {op::string} {vecs::string list} =
 	set_selection new_selection
     |
     (fprintf stderr "Unknown selection command (%s)\n" op)
+;
+
+let fl_set_selection canvas {op::string} =
+    let vecs = deref selection_list then
+    set_selection canvas op vecs
 ;
 export_to_tcl fl_set_selection;
 

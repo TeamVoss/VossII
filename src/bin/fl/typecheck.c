@@ -100,9 +100,7 @@ static bool		unify(bool quiet, typeExp_ptr t1, typeExp_ptr t2);
 static int		get_insert_star_cnt(typeExp_ptr type);
 static void		reset_cnt(typeExp_ptr type);
 static void		print_type_rec(typeExp_ptr type, odests fp, int prec);
-#if DEBUG
 static void		dbg_print_type_rec(typeExp_ptr type,odests fp,int prec);
-#endif
 static typeExp_ptr	fresh_inst(typeExp_ptr type);
 static typeExp_ptr	fresh_inst_rec(typeExp_ptr type);
 static typeList_ptr	GLget_typeList_rec();
@@ -127,7 +125,6 @@ static void		dbg_print_node_type_tree(node_type_ptr ntp, int level);
 /*			Public Functions				*/
 /************************************************************************/
 
-#ifdef DEBUG
 void
 PT(typeExp_ptr type)
 {
@@ -144,8 +141,6 @@ PTN(g_ptr node)
     } else
 	FP(err_fp, "Undetermined type\n");
 }
-#endif /* DEBUG */
-
 
 void
 TC_Init()
@@ -2494,8 +2489,6 @@ DPT(typeExp_ptr type)
     fprintf(stderr, "\n");
 }
 
-#if DEBUG
-
 static void
 dbg_print_type_rec(typeExp_ptr type, odests fp, int prec)
 {
@@ -2587,7 +2580,6 @@ dbg_print_type_rec(typeExp_ptr type, odests fp, int prec)
 	    DIE("Unexpected type operator");
     }
 }
-#endif
 
 static void
 print_type_rec(typeExp_ptr type, odests fp, int prec)

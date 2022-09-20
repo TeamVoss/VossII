@@ -2117,7 +2117,7 @@ let fl_do_selection_command canvas cmd =
 	|
 	eprintf "Unknown selection command (%s)\n" cmd
     then
-    fl_set_selection canvas "SET_SELECTION" new_selection
+    set_selection canvas "SET_SELECTION" new_selection
 ;
 export_to_tcl fl_do_selection_command;
 

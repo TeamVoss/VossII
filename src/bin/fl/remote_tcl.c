@@ -19,6 +19,7 @@ extern g_ptr    *sp;
 extern void PR(g_ptr np);
 extern FILE     *to_tcl_fp;
 extern bool     gui_mode;
+extern g_ptr	void_nd;
 
 /************************************************************************/
 /*			Local Variables					*/
@@ -206,7 +207,6 @@ Mark_tcl_callbacks()
 static bool
 parse_int(string s, int *resp)
 {
-//fprintf(stderr, "    parse_int %s --> ", s);
     int neg = 1;
     if( *s && *s == '-' ) {
         neg = -1;
@@ -229,30 +229,24 @@ parse_int(string s, int *resp)
                 s++;
                 break;
             default:
-//fprintf(stderr, " FAILED\n");
                 return( FALSE );
         }
     }
     *resp = neg * i;
-//fprintf(stderr, "%d\n", *resp);
     return(TRUE);
 }
 
 static bool
 parse_bool(string s, formula *resp)
 {
-//fprintf(stderr, "    parse_bool %s --> ", s);
     if( *s == '0' ) {
         *resp = B_Zero();
-//fprintf(stderr, "T\n");
         return( TRUE );
     } else
     if( *s == '1' ) {
         *resp = B_One();
-//fprintf(stderr, "F\n");
         return( TRUE );
     } else {
-//fprintf(stderr, " FAILED\n");
         return FALSE;
     }
 }
@@ -261,7 +255,6 @@ static bool
 get_end_of_item(string txt, string *endp)
 {
     string s = txt;
-//fprintf(stderr, "  get_end_of_item %s --> ", txt);
     int curl_cnt = 0;
     while( *s ) {
         switch (*s) {
@@ -278,7 +271,6 @@ get_end_of_item(string txt, string *endp)
                 s++;
 		if( curl_cnt == 0 ) {
                     *endp = s;
-//fprintf(stderr, " %ld\n", *endp-txt);
                     return TRUE;
 		}
 		break;
@@ -288,7 +280,6 @@ get_end_of_item(string txt, string *endp)
                     break;
                 } else {
                     *endp = s;
-//fprintf(stderr, " %ld\n", *endp-txt);
                     return TRUE;
                 }
             default:
@@ -297,11 +288,9 @@ get_end_of_item(string txt, string *endp)
         }
     }
     if( curl_cnt > 0 ) {
-//fprintf(stderr, "FAILED\n");
 	return FALSE;
     }
     *endp = s;
-//fprintf(stderr, " %ld\n", *endp-txt);
     return TRUE;
 }
 
@@ -309,7 +298,6 @@ static bool
 tcl_to_g_ptr(string txt, typeExp_ptr type, g_ptr *resp)
 {
     type = Get_Real_Type(type);
-// fprintf(stderr, "tcl_to_g_ptr for %s and type ", txt); PT(type);
     // Trim of surrounding { } pair
     if( *txt == '{' ) {
 	string s = txt;
@@ -339,8 +327,12 @@ tcl_to_g_ptr(string txt, typeExp_ptr type, g_ptr *resp)
 	    txt++;
 	}
     }
-// fprintf(stderr, "  After trimming |%s|\n", txt);
     switch( type->typeOp ) {
+        case void_tp:
+            {
+                *resp = void_nd;
+                return TRUE;
+            }
         case string_tp:
             {
                 string res = wastrsave(&strings, txt);
