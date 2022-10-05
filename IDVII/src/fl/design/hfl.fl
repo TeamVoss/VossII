@@ -2458,6 +2458,17 @@ let base_re_ff_reset =
 	MUX reset '0 cur q
 ];
 
+let base_re_ff_sreset =
+    input	d.
+    bit_input	reset.
+    bit_input	clk.
+    output	q.
+    internal	mid.
+    CELL "draw_ff_re_reset" [
+	MUX reset '0 d mid,
+	base_re_ff mid clk q
+];
+
 let base_re_ff_en_reset =
     input	d.
     bit_input	en.
@@ -2470,6 +2481,46 @@ let base_re_ff_en_reset =
 	MUX reset '0 tmp mid,
 	base_re_ff mid clk cur,
 	MUX reset '0 cur q
+];
+
+let base_re_ff_en_sreset =
+    input	d.
+    bit_input	en.
+    bit_input	reset.
+    bit_input	clk.
+    output	q.
+    internal	tmp mid.
+    CELL "draw_ff_re_with_en_reset" [
+	MUX en d q tmp,
+	MUX reset '0 tmp mid,
+	base_re_ff mid clk q
+];
+
+let base_re_ff_en_reset_with_value reset_value =
+    input	d.
+    bit_input	en.
+    bit_input	reset.
+    bit_input	clk.
+    output	q.
+    internal	tmp mid cur.
+    CELL "draw_ff_re_with_en_reset" [
+	MUX en d q tmp,
+	MUX reset reset_value tmp mid,
+	base_re_ff mid clk cur,
+	MUX reset reset_value cur q
+];
+
+let base_re_ff_en_sreset_with_value reset_value =
+    input	d.
+    bit_input	en.
+    bit_input	reset.
+    bit_input	clk.
+    output	q.
+    internal	tmp mid.
+    CELL "draw_ff_re_with_en_reset" [
+	MUX en d q tmp,
+	MUX reset reset_value tmp mid,
+	base_re_ff mid clk q
 ];
 
 //
@@ -2485,6 +2536,20 @@ let re_ff_en clk en d q = base_re_ff_en d en clk q;
 
 // A rising edge D flip-flop with enable and asynchronous reset (active high).
 let re_ff_en_reset clk en reset d q = base_re_ff_en_reset d en reset clk q;
+
+// A rising edge D flip-flop with enable and asynchronous reset (active high).
+let re_ff_en_reset_with_value reset_value clk en reset d q =
+    base_re_ff_en_reset_with_value reset_value d en reset clk q;
+
+// A rising edge D flip-flop with synchronous reset (active high).
+let re_ff_sreset clk reset d q = base_re_ff_sreset d reset clk q;
+
+// A rising edge D flip-flop with enable and synchronous reset (active high).
+let re_ff_en_sreset clk en reset d q = base_re_ff_en_sreset d en reset clk q;
+
+// A rising edge D flip-flop with enable and synchronous reset (active high).
+let re_ff_en_sreset_with_value reset_value clk en reset d q =
+    base_re_ff_en_sreset_with_value reset_value d en reset clk q;
 
 // ---------------------------------------------------
 // Needed to make the drawing functions happy....
@@ -2549,7 +2614,8 @@ let fe_ff_en clk en d q = base_fe_ff_en d en clk q;
 // A falling edge D flip-flop with enable and asynchronous reset (active high).
 let fe_ff_en_reset clk en reset d q = base_fe_ff_en_reset d en reset clk q;
 
-end_abstype re_ff re_ff_reset re_ff_en re_ff_en_reset
+end_abstype re_ff re_ff_reset re_ff_en re_ff_en_reset re_ff_en_reset_with_value
+	    re_ff_sreset re_ff_en_sreset re_ff_en_sreset_with_value
 	    fe_ff fe_ff_reset fe_ff_en fe_ff_en_reset
 ;
 
@@ -3638,6 +3704,14 @@ let ::: name p =
 infixr 0 :::;
 
 
+//
+// Resize a pexlif constructed by instatiating an fl function using wexprs. 
+// NOTE: All nodes that uses wexpr as datatype will be converted
+// to a vector of size sz. All others will remian as is.
+//
+// For example:  resize_pexlif 12 (re_ff 'clk {'d::wexpr} 'o)
+// returns a re_ff pexlif where data input (and output) will be of size 12(11:0)
+//
 let resize_pexlif sz {p::pexlif} =
     let tri i = i = 0 => sz | i in
     let tr1 n =
@@ -3681,6 +3755,7 @@ let resize_pexlif sz {p::pexlif} =
     trp p
 ;
 
+// Extract the relevant information for a re_ff (if possible)
 let extract_re_ff p =
     NOT (pexlif_is_hier p) => NONE |
     val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
@@ -3693,3 +3768,4 @@ let extract_re_ff p =
     let dout = assoc (mk_name sz "q") fa_outs in
     SOME ("re_ff", base, p, clk, din, dout, [])
 ;
+
