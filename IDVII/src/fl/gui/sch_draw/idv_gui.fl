@@ -492,8 +492,8 @@ let IDV0 rw_database read_only_dbs =
     ()
 ;
 
-let IDV_dbg p =
-    (IDV0 "DB_dbg" []) fseq
+let IDV_dbg p rw_database read_only_dbs =
+    (IDV0 rw_database read_only_dbs) fseq
     let name = pexlif_get_name p then
     (import_model name p) fseq
     (tcl_eval ["idv:update_idv_list"]) fseq
@@ -1094,13 +1094,16 @@ let do_osu018_synthesis file bname pexlif_file p synth_args =
     ((mem "Flat" synth_args) => (fprintf fp "flatten\n") | ()) seq
     (fprintf fp "synth -top %s\n" bname) seq
     (fprintf fp "dfflibmap -liberty %sosu018_stdcells.lib\n" lib_dir) seq
-    (fprintf fp "abc -liberty %s/osu018_stdcells.lib\n" lib_dir) seq
+    (fprintf fp "dfflegalize -cell $_DFF_P_ x\n") seq
+    (fprintf fp "abc -liberty %s/osu018_stdcells.lib -keepff\n" lib_dir) seq
+    (fprintf fp "clean\n") seq
+(fprintf fp "techmap -map /home/cseger/FP_HW/bifrost/examples/sha256_slow/adff2dff.v\n") seq
     (fprintf fp "clean\n") seq
     (fprintf fp "autoname\n") seq
     (fprintf fp "clean -purge\n") seq
     (fprintf fp "write_pexlif -noalias -icells -gates ") seq
     (fprintf fp "-impltf %s.fl\n" file) seq
-(fprintf fp "write_verilog -noattr -renameprefix TmP %s_DBG.v\n" file) seq
+(fprintf fp "write_verilog %s_FINAL.v\n" file) seq
     (fclose fp) seq
     // Now run Yosys to synthesize and map the design to the osu018 library
     let cmd = sprintf "yosys -s %s" yosys_file then
@@ -1111,11 +1114,12 @@ let do_osu018_synthesis file bname pexlif_file p synth_args =
     (fprintf fp "(update_vossrc \"RECURSION-CALL-LIMIT\" \"100000\") seq ();\n")
     seq
     (fprintf fp "load \"%s.fl\";\n" file) seq
-    (fprintf fp "\n\nlet p = Q%s [(\"instance\", \"%s\")]" bname bname) seq
+    (fprintf fp "\n\nlet p = unfold_pexlif (wrap_pexlif (Q%s [(\"instance\", \"%s\")]" bname bname)
+    seq
     let pr1 fp (f,as) = list2fp fp T (sprintf "(\"%s\", [" f) ", " "])"
 				(\fp.\a. fprintf fp "\"%s\"" a) as
     in
-    (list2fp fp T "\n\t[" ",\n\t" "\n\t];\n" pr1 io_sub) fseq
+    (list2fp fp T "\n\t[" ",\n\t" "\n\t])) 1;\n" pr1 io_sub) fseq
     (fprintf fp "\np fseq ();\n") seq
     (fprintf fp "write_pexlif \"%s\" p;\n" pexlif_file) seq
     (fprintf fp "\"===SuCcEsS===\";\n") seq
@@ -1393,6 +1397,17 @@ let BDD_EQ p1 p2 =
     ok
 ;
 
+lettype remote_bdd_eq =
+	REMOTE_BDD_EQ {fun:: void->bool}
+;
+
+let BDD_EQ p1 p2 =
+    let task = REMOTE_BDD_EQ (\v. BDD_EQ p1 (v fseq p2)) then
+(fprintf stderr "Write out task\n") fseq
+    (write_remote_bdd_eq "_Z" task) fseq
+(fprintf stderr "Done writing out task\n") fseq
+    (BDD_EQ p1 p2)
+;
 
 // Try to verify two combinational pexlifs are equal by building
 // a miter circuit and simulating the circuit.

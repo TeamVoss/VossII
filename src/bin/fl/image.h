@@ -25,8 +25,6 @@ void	    Image_Install_Functions();
 
 #define READ_BUF_SIZE	4096
 
-typedef unsigned char	uchar;
-
 typedef struct color_rec    *color_ptr;
 typedef struct color_rec {
     uchar	valid;

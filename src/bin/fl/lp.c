@@ -87,9 +87,9 @@ static void       LP_solution(g_ptr redex);
 static Rational *      lp_solution(Tableau *a);
 #ifdef DEBUG
 static void lp_WriteTableau(odests f, Tableau *a);
-static void write_row(odests f, Row *r, int ncol);
-static void write_number(odests f, Rational r);
-static void write_string(odests f, char *s);
+static void DBG_write_row(odests f, Row *r, int ncol);
+static void DBG_write_number(odests f, Rational r);
+static void DBG_write_string(odests f, char *s);
 #endif
 
 #define FREE(p)		Free((pointer)(p))
@@ -1760,7 +1760,7 @@ static int  indent = 0;
 
 
 static void
-write_string(odests f, char *s)
+DBG_write_string(odests f, char *s)
 {
     int len = strlen(s);
 
@@ -1800,84 +1800,84 @@ write_string(odests f, char *s)
 }
 
 static void
-write_int(odests f, int i)
+DBG_write_int(odests f, int i)
 {
     char buf[32];
 
     Sprintf(buf, "%d", i);
-    write_string(f, buf);
+    DBG_write_string(f, buf);
 }
 
 static void
-write_number(odests f, Rational r)
+DBG_write_number(odests f, Rational r)
 {
     char *s;
 
     s = strtemp(Arbi_ToString(r->n, 10));
     s = strappend("/");
     s = strappend(Arbi_ToString(r->d,10));
-    write_string(f, s);
+    DBG_write_string(f, s);
 }
 
 
 static void
-write_relation(odests f, int r)
+DBG_write_relation(odests f, int r)
 {
     switch(r) {
-    case LT:   write_string(f, "< ");	break;
-    case LE:   write_string(f, "<=");	break;
-    case EQ:   write_string(f, "= ");	break;
-    case GE:   write_string(f, ">=");	break;
-    case GT:   write_string(f, "> ");	break;
-    case NE:   write_string(f, "<>");	break;
-    case COST: write_string(f, "$");	break;
+    case LT:   DBG_write_string(f, "< ");	break;
+    case LE:   DBG_write_string(f, "<=");	break;
+    case EQ:   DBG_write_string(f, "= ");	break;
+    case GE:   DBG_write_string(f, ">=");	break;
+    case GT:   DBG_write_string(f, "> ");	break;
+    case NE:   DBG_write_string(f, "<>");	break;
+    case COST: DBG_write_string(f, "$");	break;
     default: DIE("Internal error: write_relation --- bad relation");
     }
 }
 
 static void
-write_dimension(odests f, Tableau *a)
+DBG_write_dimension(odests f, Tableau *a)
 {
-    write_int(f, a->nrow);
-    write_string(f, ", ");
-    write_int(f, a->ncol);
+    DBG_write_int(f, a->nrow);
+    DBG_write_string(f, ", ");
+    DBG_write_int(f, a->ncol);
 }
 
 static void
-write_row(odests f, Row *r, int ncol)
+DBG_write_row(odests f, Row *r, int ncol)
 {
     int j;
 
-    write_relation(f, r->rel);
+    DBG_write_relation(f, r->rel);
     for(j = 0; j <= ncol; j++) {
-        write_string(f, " ");
-        write_number(f, r->cols[j]);
-        if(j < ncol) write_string(f, ", ");
-        else write_string(f,";\n");
+        DBG_write_string(f, " ");
+        DBG_write_number(f, r->cols[j]);
+        if(j < ncol) DBG_write_string(f, ", ");
+        else DBG_write_string(f,";\n");
     }
 }
 
 static void
-write_rows(odests f, Tableau *a)
+DBG_write_rows(odests f, Tableau *a)
 {
     int i;
 
     if(a->rows[0].cols != NULL)
-        write_row(f, a->rows, a->ncol);
+        DBG_write_row(f, a->rows, a->ncol);
     for(i = 1; i <= a->nrow; i++)
-        write_row(f, a->rows + i, a->ncol);
+        DBG_write_row(f, a->rows + i, a->ncol);
 }
 
 static void
 lp_WriteTableau(odests f, Tableau *a)
 {
-    write_string(f, "{ ");
-    write_dimension(f, a);
-    write_string(f, ";\n");
+    DBG_write_string(f, "{ ");
+    DBG_write_dimension(f, a);
+    DBG_write_string(f, ";\n");
     indent++;
-    write_rows(f, a);
+    DBG_write_rows(f, a);
     indent--;
-    write_string(f, "}\n");
+    DBG_write_string(f, "}\n");
 }
 
 void

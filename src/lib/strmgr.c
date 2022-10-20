@@ -108,6 +108,12 @@ uStrsave(ustr_mgr_ptr smp, string s)
     return( ret );
 }
 
+int
+ustr_mgr_size(ustr_mgr_ptr smp)
+{
+    return( hash_size(&(smp->utbl)) );
+}
+
 tstr_ptr
 new_temp_str_mgr()
 {

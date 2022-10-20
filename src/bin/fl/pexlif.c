@@ -96,6 +96,7 @@ static hash_record     outputs_tbl;
 static hash_record_ptr outputs_tbl_ptr;
 static bool	       fp_status;
 
+static string s_EMPTY_STRING;
 static string s_FP;
 static string s_SHA;
 
@@ -2217,7 +2218,7 @@ find_value_list(g_ptr attrs, string name)
 	}
 	attrs = GET_CONS_TL(attrs);
     }
-    return NULL;
+    return s_EMPTY_STRING;
 }
 
 string
@@ -3102,8 +3103,9 @@ Pexlif_Init()
     s_MEM                  = Mk_constructor_name("MEM");
     // /
     s_no_instance = wastrsave(&strings, "{}");
-    s_FP	  = wastrsave(&strings, "FP");
-    s_SHA	  = wastrsave(&strings, "SHA");
+    s_EMPTY_STRING  = wastrsave(&strings, "");
+    s_FP	    = wastrsave(&strings, "FP");
+    s_SHA	    = wastrsave(&strings, "SHA");
     // /
     new_ustrmgr(&lstrings);
     new_mgr(&vec_mgr, sizeof(vec_rec));

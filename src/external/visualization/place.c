@@ -956,6 +956,7 @@ rename_loop_repeat_nodes(sch_draw_ptr tree, hash_record_ptr done)
 static void
 break_loops_rec(sch_draw_ptr tree, hash_record_ptr seen, hash_record_ptr done)
 {
+    if( tree == NULL ) return;
     if( IS_REPEAT_ND(tree) ) {
 	sch_draw_ptr driver = find_hash(seen, (pointer) tree->name);
 	if(driver != NULL) {
@@ -1003,13 +1004,16 @@ break_loops_rec(sch_draw_ptr tree, hash_record_ptr seen, hash_record_ptr done)
 		fanin1->tree = new_driver;
 		fanin2->tree = repeat_to_loop_src;
 	    }
+	} else {
+	    driver = (sch_draw_ptr) find_hash(&drivers, tree->name);
+	    break_loops_rec(driver, seen, done);
 	}
     } else {
 	insert_hash(seen, (pointer) tree->name, (pointer) tree);
 	for(sch_draw_list_ptr lp = tree->fanins; lp != NULL; lp = lp->next) {
 	    break_loops_rec(lp->tree, seen, done);
 	} 
-	delete_hash(seen, (pointer) tree->name); // does it go here?
+	delete_hash(seen, (pointer) tree->name);
     }
 }
 

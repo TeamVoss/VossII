@@ -1,0 +1,30 @@
+load "idv.fl";
+
+TYPE "byte" 8;
+
+ENUM "abc" ["INIT", "READ", "WRITE"];
+
+let test =
+    bit_input	clk.
+    byte_input	a b.
+    abc_input	sel.
+    bit_output	out.
+    byte_internal l1 l2.
+    byte_internal i1 i2.
+    CELL "test" [
+	out <- (l1 '=' l2) '&' (sel '=' INIT) '|' (sel '=' WRITE),
+	re_ff clk i1 l1,
+	re_ff clk i2 l2,
+	i1 <- a '+' ZX l2,
+	i2 <- b '&' SX l1
+];
+
+let p = test 'clk 'a 'b 'sel 'out;
+
+IDV p "/tmp/DB_dbg" [];
+
+//let ckt = pexlif2fsm p;
+
+
+//STE_debug ckt;
+

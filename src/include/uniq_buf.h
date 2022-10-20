@@ -39,6 +39,7 @@ void		free_uniq_buf(uniq_buffer_ptr bp);
 bool		empty_uniq_buf(uniq_buffer_ptr bp);
 bool		push_uniq_buf(uniq_buffer_ptr bp, pointer item);
 int		get_uniq_buf_index(uniq_buffer_ptr bp, pointer item);
+int		find_insert_uniq_buf(uniq_buffer_ptr bp, pointer item);
 pointer		locate_uniq_buf(uniq_buffer_ptr bp, int i);
 bool		fetch_uniq_buf(uniq_buffer_ptr bp, int i, pointer dest);
 #endif /* _UNIQ_BUF_H */

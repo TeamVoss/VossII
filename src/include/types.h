@@ -25,6 +25,8 @@ typedef void	            *pointer;
 typedef unsigned char       *bpointer;
 typedef int		    bool;
 typedef unsigned char	    flag;
+typedef unsigned char	    uchar;
+
 
 #define TRUE 1
 #define FALSE 0

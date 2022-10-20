@@ -131,6 +131,14 @@ free_rec(rec_mgr_ptr mp, pointer r)
     }
 }
 
+int
+mgr_size(rec_mgr_ptr mp, char *file, int line)
+{
+    ensure_pure_mgr(mp, file, line);
+    return( mp->live );
+}
+
+
 pointer
 rec_element(rec_mgr_ptr mp, unint idx, char *file, int line)
 {

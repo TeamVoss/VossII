@@ -35,6 +35,11 @@ let mk_attr src file lineno =
     | [("fl_src", sprintf "%s:%d" file lineno), ("src", src)]
 ;
 
+let update_attrs_and_ios attrs fa_inps fa_outs p =
+    val (PINST name oattrs lf ofa_inps ofa_outs ints body) = p in
+    PINST name attrs lf fa_inps fa_outs ints body
+;
+
 let _not sz src out inp =
     let attrs = mk_attr src __FILE__ __LINE__ then
     let f_out = mk_name sz "Y" in
@@ -75,79 +80,49 @@ let _logic_not sz src out inp =
 ;
 
 let _dff sz src out clk d =
+    let base = resize_pexlif sz (re_ff 'clk (W_VAR sz "d") (W_VAR sz "q")) in
     let attrs = mk_attr src __FILE__ __LINE__ then
-    let f_out = mk_name sz "Q" in
-    let Q = W_VAR sz "Q" in
-    let f_clk = mk_name 1 "CLK" in
-    let CLK = W_VAR 1 "CLK" in
-    let i_dQ = mk_name sz "Q_##_" in
-    let dQ = W_VAR sz "Q_##_" in
-    let f_D = mk_name sz "D" in
-    let D = W_VAR sz "D" in
-    let i_dCLK = mk_name 1 "CLK_##_" in
-    let dCLK = W_VAR 1 "CLK_##_" in
-    let i_dD = mk_name sz "D_##_" in
-    let dD = W_VAR sz "D_##_" in
-    let fa_inps = [(f_D, d), (f_clk, clk)] in
-    let fa_outs = [(f_out, out)] in
-    let ints = [i_dQ, i_dCLK, i_dD] in
-    let clk_del = W_PHASE_DELAY dCLK CLK in
-    let d_del = W_PHASE_DELAY dD D in
-    let y_del = W_PHASE_DELAY dQ Q in
-    let mux = W_UPDATE_FN Q (W_ITE (W_AND CLK (W_NOT dCLK)) dD dQ) in
-    let subs = P_LEAF [clk_del, d_del, y_del, mux] in
-    PINST "draw_dff" attrs T fa_inps fa_outs ints subs
+    let fa_inps = [("clk", clk), ((mk_name sz "d"), d)] then 
+    let fa_outs = [((mk_name sz "q"), out)] then 
+    update_attrs_and_ios attrs fa_inps fa_outs base
 ;
+
 
 let _dlatch polarity sz src out clk d =
     let attrs = mk_attr src __FILE__ __LINE__ then
-    let f_out = mk_name sz "Q" in
-    let Q = W_VAR sz "Q" in
-    let f_clk = mk_name 1 "EN" in
-    let EN = W_VAR 1 "EN" in
-    let i_dQ = mk_name sz "Q_##_" in
-    let dQ = W_VAR sz "Q_##_" in
-    let f_D = mk_name sz "D" in
-    let D = W_VAR sz "D" in
-    let ints = [i_dQ] in
-    let fa_inps = [(f_D, d), (f_clk, clk)] in
-    let fa_outs = [(f_out, out)] in
-    let y_del = W_PHASE_DELAY dQ Q in
-    let mux = W_UPDATE_FN Q (polarity => (W_ITE EN D dQ) | (W_ITE EN dQ D)) in
-    let subs = P_LEAF [y_del, mux] in
-    let pfn = polarity => "draw_pos_d_latch" | "draw_neg_d_latch" in
-    PINST pfn attrs T fa_inps fa_outs ints subs
+    let fn = polarity => ah_latch | al_latch in
+    let base = resize_pexlif sz (fn 'clk (W_VAR sz "d") (W_VAR sz "q")) in
+    let attrs = mk_attr src __FILE__ __LINE__ then
+    let fa_inps = [("clk", clk), ((mk_name sz "d"), d)] then 
+    let fa_outs = [((mk_name sz "q"), out)] then 
+    update_attrs_and_ios attrs fa_inps fa_outs base
 ;
 
-let _adff sz src out arst clk d =
+
+let adlatch p_en p_arst reset_value =
+    bit_input	    clk.
+    bit_input	    arst.
+    input	    {d:: *a}.
+    output	    {out:: *a}.
+    bit_internal    en.
+    internal	    {mid:: *a}.
+    CELL (sprintf "draw_adlatch %s %s" (p_en=>"1"|"0") (p_arst=>"1"|"0")) [
+	ah_latch en mid out,
+	en  <- (p_en => clk | '~' clk),
+	mid <- (IF (p_arst => arst | '~' arst) THEN reset_value ELSE d)
+];
+
+let _adlatch p_en p_arst rst_value sz src out clk arst d =
     let attrs = mk_attr src __FILE__ __LINE__ then
-    let f_out = mk_name sz "Q" in
-    let Q = W_VAR sz "Q" in
-    let f_arst = mk_name 1 "ARST" in
-    let ARST = W_VAR 1 "ARST" in
-    let f_clk = mk_name 1 "CLK" in
-    let CLK = W_VAR 1 "CLK" in
-    let i_dQ = mk_name sz "Q_##_" in
-    let dQ = W_VAR sz "Q_##_" in
-    let f_D = mk_name sz "D" in
-    let D = W_VAR sz "D" in
-    let i_dCLK = mk_name 1 "CLK_##_" in
-    let dCLK = W_VAR 1 "CLK_##_" in
-    let i_dD = mk_name sz "D_##_" in
-    let dD = W_VAR sz "D_##_" in
-    let fa_inps = [(f_D, d), (f_clk, clk), (f_arst, arst)] in
-    let fa_outs = [(f_out, out)] in
-    let ints = [i_dQ, i_dCLK, i_dD] in
-    let clk_del = W_PHASE_DELAY dCLK CLK in
-    let d_del = W_PHASE_DELAY dD D in
-    let y_del = W_PHASE_DELAY dQ Q in
-    let ZERO = W_CONST sz 0 in
-    let mux = W_UPDATE_FN Q
-		(W_ITE ARST ZERO
-			    (W_ITE (W_AND CLK (W_NOT dCLK)) dD dQ)) in
-    let subs = P_LEAF [clk_del, d_del, y_del, mux] in
-    PINST "draw_adff" attrs T fa_inps fa_outs ints subs
+    let ZERO = W_CONST 0 (rst_value = "" => 0 | (sscanf "%b" rst_value)) then
+    let p = resize_pexlif sz (adlatch p_en p_arst ZERO 'clk 'arst 'd 'q) in
+    let attrs = mk_attr src __FILE__ __LINE__ then
+    let fa_inps = [("clk", clk), ("arst", arst), ((mk_name sz "d"), d)] then 
+    let fa_outs = [((mk_name sz "q"), out)] then 
+    update_attrs_and_ios attrs fa_inps fa_outs p
 ;
+
+//_adlatch T T "010" 3 "ds.we:12" ["Out[2:0]"] ["CLK"] ["ARST"] ["D[2:0]"];
 
 let mk_ifc_signal fa_r sz name act =
     let formal = mk_name sz name then
@@ -163,49 +138,70 @@ let mk_int_signal int_r sz name =
     Wvar
 ;
 
+
+let _aldff p_clk p_aload =
+    input	    ad.
+    bit_input	    aload.
+    input	    d.
+    bit_input	    clk.
+    output	    q.
+    internal	    md fq.
+    CELL (sprintf "draw_aldff %s %s" (p_clk=>"1"|"0") (p_aload=>"1"|"0")) [
+	md <- (IF aload THEN ad ELSE d),
+	re_ff clk md fq,
+	q <- (IF aload THEN ad ELSE fq)
+];
+
+
 let _aldff p_clk p_aload sz src q aload ad clk d =
+    let attrs = mk_attr src __FILE__ __LINE__ then
+    let p = _aldff p_clk p_aload {'ad::wexpr} 'aload 'd 'clk 'q in
+    let attrs = mk_attr src __FILE__ __LINE__ then
+    let fa_inps = [((mk_name sz "ad"), ad), ("aload", aload),
+		   ((mk_name sz "d"), d), ("clk", clk)]
+    in
+    let fa_outs = [((mk_name sz "q"), q)] then 
+    update_attrs_and_ios attrs fa_inps fa_outs (resize_pexlif sz p)
+;
+
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+let _adff p_clk p_arst rst_value sz src q arst clk d =
     let attrs = mk_attr src __FILE__ __LINE__ then
     let fa_inps_r = ref [] then
     let fa_outs_r = ref [] then
     let ints_r    = ref [] then
-    // Signal declarations (inputs in reverse order for drawing)
     let Q	  = mk_ifc_signal fa_outs_r sz "Q" q then
+    let ARST	  = mk_ifc_signal fa_inps_r 1 "ARST" arst then
     let CLK	  = mk_ifc_signal fa_inps_r 1 "CLK" clk then
     let D	  = mk_ifc_signal fa_inps_r sz "D" d then
-    let ALOAD	  = mk_ifc_signal fa_inps_r 1 "ALOAD" aload then
-    let AD	  = mk_ifc_signal fa_inps_r sz "AD" ad then
-    //
     let dQ	  = mk_int_signal ints_r sz "Q_##_" then
-    let dALOAD	  = mk_int_signal ints_r 1 "ALOAD_##_" then
-    let dAD	  = mk_int_signal ints_r sz "AD_##_" then
     let dCLK	  = mk_int_signal ints_r 1 "CLK_##_" then
     let dD	  = mk_int_signal ints_r sz "D_##_" then
-    // Expressions
+    let clk_del	  = W_PHASE_DELAY dCLK CLK then
+    let d_del	  = W_PHASE_DELAY dD D then
+    let y_del	  = W_PHASE_DELAY dQ Q then
+    let ZERO	  =
+	rst_value = "" => W_CONST sz 0 | W_CONST sz (sscanf "%b" rst_value)
+    then
     let clk_cond  = p_clk => W_AND (W_NOT dCLK) CLK
 			   | W_AND dCLK (W_NOT CLK)
     then
-    let aload_cond  = p_aload => W_AND (W_NOT dALOAD) ALOAD
-			       | W_AND dALOAD (W_NOT ALOAD)
+    let rst_cond  = p_arst => ARST | W_NOT ARST then
+    let mux	  = W_UPDATE_FN Q
+		    (W_ITE rst_cond ZERO (W_ITE clk_cond dD dQ))
     then
-    // Components
-    let clk_del	  = W_PHASE_DELAY dCLK CLK then
-    let aload_del = W_PHASE_DELAY dALOAD ALOAD then
-    let ad_del	  = W_PHASE_DELAY dAD AD then
-    let d_del	  = W_PHASE_DELAY dD D then
-    let q_del	  = W_PHASE_DELAY dQ Q then
-    let mux	  = W_UPDATE_FN Q (W_ITE aload_cond dAD (W_ITE clk_cond dD dQ))
-    then
-    // Final assembly
-    let subs	   = P_LEAF [clk_del, aload_del, d_del, ad_del, q_del, mux] then
-    let pfn = sprintf "draw_aldff %s %s"
+    let subs	   = P_LEAF [clk_del, d_del, y_del, mux] then
+    let pfn = sprintf "draw_adff %s %s"
 		      (p_clk  => "1" | "0")
-		      (p_aload => "1" | "0")
+		      (p_arst => "1" | "0")
     then
     PINST pfn attrs T
 	    (deref fa_inps_r) (deref fa_outs_r) (deref ints_r) subs
 ;
 
-let _adffe p_clk p_en p_arst sz src q arst en clk d =
+let _adffe p_clk p_en p_arst rst_value sz src q arst en clk d =
     let attrs = mk_attr src __FILE__ __LINE__ then
     let fa_inps_r = ref [] then
     let fa_outs_r = ref [] then
@@ -223,7 +219,9 @@ let _adffe p_clk p_en p_arst sz src q arst en clk d =
     let en_del	  = W_PHASE_DELAY dEN EN then
     let d_del	  = W_PHASE_DELAY dD D then
     let y_del	  = W_PHASE_DELAY dQ Q then
-    let ZERO	  = W_CONST sz 0 then
+    let ZERO	  =
+	rst_value = "" => W_CONST sz 0 | W_CONST sz (sscanf "%b" rst_value)
+    then
     let clk_cond  = p_clk => W_AND (W_NOT dCLK) CLK
 			   | W_AND dCLK (W_NOT CLK)
     then
@@ -274,7 +272,7 @@ let _dffe p_clk p_en sz src q en clk d =
     PINST pfn attrs T (deref fa_inps_r) (deref fa_outs_r) (deref ints_r) subs
 ;
 
-let _sdff p_clk p_srst sz src q srst clk d =
+let _sdff p_clk p_srst rst_value sz src q srst clk d =
     let attrs = mk_attr src __FILE__ __LINE__ then
     let fa_inps_r = ref [] then
     let fa_outs_r = ref [] then
@@ -293,7 +291,9 @@ let _sdff p_clk p_srst sz src q srst clk d =
     let srst_del  = W_PHASE_DELAY dSRST SRST then
     let clk_cond  = p_clk => W_AND (W_NOT dCLK) CLK | W_AND dCLK (W_NOT CLK) then
     let srst_cond = p_srst => dSRST | W_NOT dSRST then
-    let ZERO	  = W_CONST sz 0 then
+    let ZERO	  =
+	rst_value = "" => W_CONST sz 0 | W_CONST sz (sscanf "%b" rst_value)
+    then
     let mux	  = W_UPDATE_FN Q
 			(W_ITE clk_cond 
 			    (W_ITE srst_cond ZERO dD) dQ) then
@@ -306,7 +306,7 @@ let _sdff p_clk p_srst sz src q srst clk d =
 	    (deref fa_inps_r) (deref fa_outs_r) (deref ints_r) subs
 ;
 
-let _sdffe p_clk p_en p_srst sz src q srst en clk d =
+let _sdffe p_clk p_en p_srst rst_value sz src q srst en clk d =
     let attrs = mk_attr src __FILE__ __LINE__ then
     let fa_inps_r = ref [] then
     let fa_outs_r = ref [] then
@@ -326,7 +326,9 @@ let _sdffe p_clk p_en p_srst sz src q srst en clk d =
     let d_del	  = W_PHASE_DELAY dD D then
     let q_del	  = W_PHASE_DELAY dQ Q then
     let srst_del  = W_PHASE_DELAY dSRST SRST then
-    let ZERO	  = W_CONST sz 0 then
+    let ZERO	  =
+	rst_value = "" => W_CONST sz 0 | W_CONST sz (sscanf "%b" rst_value)
+    then
     let clk_cond  = p_clk => W_AND (W_NOT dCLK) CLK | W_AND dCLK (W_NOT CLK) then
     let en_cond   = p_en => dEN | W_NOT dEN then
     let srst_cond = p_srst => dSRST | W_NOT dSRST then

@@ -1,0 +1,33 @@
+load "idv.fl";
+
+let tst =
+    bit_input a b.
+    bit_output res.
+    CELL "tst" [
+	res <- a '<#=' b
+];
+
+let p = tst 'a 'b 'res;
+
+p;
+
+let ckt = pexlif2fsm p;
+ckt;
+
+//let vis = STE_debug ckt;
+
+let ant =
+    "a" is 0 in_phase 2 followed_by
+	   1 in_phase 3
+  and
+    "b" is 0 in_phase 2 followed_by
+	   1 in_phase 3
+;
+
+let ste = STE "-e" ckt [] ant [] [];
+ste;
+
+
+get_trace ste "res";
+
+

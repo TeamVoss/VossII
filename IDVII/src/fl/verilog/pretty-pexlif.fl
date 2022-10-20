@@ -414,7 +414,8 @@ let pretty_expression {we::wexpr} =
       /\  go (W_EXPLICIT_VAR sz v) =
             warn "EXPLICIT_VAR is treated as VAR" (variable_exp sz v)
       /\  go (W_PRED _ a) =
-            warn "PRED is ignored" (go a)
+//            warn "PRED is ignored"
+	    (go a)
       /\  go (W_NAMED_SLICE _ is a) = (slice_exp is a)
       // Not yet supported op. -------------------
       /\  go (W_UPDATE_NAMED_SLICE (W_VAR b_sz b) name indices (W_VAR n_sz n)) =
@@ -968,9 +969,8 @@ let make_verilog_safe p =
     in
     letrec clean (PINST nm attrs lf fa_inps fa_outs ints (P_HIER chs)) =
 	val (fa_inps',fa_outs',ints',sub) = make_subs ints fa_inps fa_outs then
-        let try_assoc n = (assoc n sub) catch n in
         let rename (PINST lnm lattrs llf lfa_inps lfa_outs linst lbody) =
-            let tr a = vec_assoc a sub in
+            let tr a = (vec_assoc a sub) catch [a] in
             let tr_fa (f,as) = (f, flatmap tr as) in
             let lfa_inps' = map tr_fa lfa_inps then
             let lfa_outs' = map tr_fa lfa_outs then

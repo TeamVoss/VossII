@@ -122,6 +122,36 @@ Get_vector_signature(ustr_mgr *string_mgrp, vec_ptr vp)
     return res;
 }
 
+vec_list_ptr
+Expand_constant(rec_mgr *vector_list_mgr, rec_mgr *vector_mgr, string s)
+{
+    if( strncmp(s, "0b", 2) != 0 ) { return NULL; }
+    s += 2;
+    vec_list_ptr    res = NULL;
+    vec_list_ptr    tail;
+    while( *s && ((*s == '0') || (*s == '1')) ) {
+	vec_ptr v = (vec_ptr) new_rec(vector_mgr);
+	v->type = TXT;
+	char vbuf[2];
+	vbuf[0] = *s;
+	vbuf[1] = 0;
+	v->u.name = uStrsave(lstringsp, vbuf);
+	v->next = NULL;
+        vec_list_ptr vlp = (vec_list_ptr) new_rec(vector_list_mgr);
+        vlp->vec  = v;
+        vlp->next = NULL;
+	if( res == NULL ) {
+	    res = vlp;
+	} else {
+	    tail->next = vlp;
+	}
+	tail = vlp;
+	s++;
+    }
+    if( *s ) { return NULL; }
+    return res;
+}
+
 // todo: contig. or non-contig. vector?
 g_ptr
 Vec2nodes(string name)
@@ -130,9 +160,11 @@ Vec2nodes(string name)
     tstr_ptr tstrings = new_temp_str_mgr();
     g_ptr res = Make_NIL();
     g_ptr tail = res;
-    vec_ptr vp = split_name(name);
-    vec_list_ptr vlp =
-        Expand_vector(vec_list_rec_mgrp, vec_rec_mgrp, range_rec_mgrp, vp);
+    vec_list_ptr vlp = Expand_constant(vec_list_rec_mgrp, vec_rec_mgrp, name);
+    if( vlp == NULL ) {
+	vec_ptr vp = split_name(name);
+	vlp = Expand_vector(vec_list_rec_mgrp,vec_rec_mgrp,range_rec_mgrp, vp);
+    }
     sname_list_ptr nlp =
         show_non_contig_vectors(sname_list_rec_mgrp, tstrings, vlp);
     while( nlp != NULL ) {
@@ -149,6 +181,16 @@ Vec2nodes(string name)
 int
 Get_Vector_Size(string vec)
 {
+    if( strncmp(vec, "0b", 2) == 0 ) {
+	int len = 0;
+	string s = vec+2;
+	while( *s && ((*s == '0') || (*s == '1')) ) {
+	    len++;
+	    s++;
+	}
+	if( *s == 0 ) { return len; }
+	FP(warning_fp, "Get_Vector_Size on invalid constant (%s)", vec);
+    }
     begin_vector_ops();
     vec_ptr vp = split_name(vec);
     int sz = vec_size(vp);
@@ -726,9 +768,14 @@ md_expand_vectors(g_ptr redex)
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
     for(g_ptr np = r; !IS_NIL(np); np = GET_CONS_TL(np)) {
-        vec_ptr vp = split_name(GET_STRING(GET_CONS_HD(np)));
-        vec_list_ptr vlp =
-            Expand_vector(vec_list_rec_mgrp, vec_rec_mgrp, range_rec_mgrp, vp);
+	string name = GET_STRING(GET_CONS_HD(np));
+	vec_list_ptr vlp =
+	    Expand_constant(vec_list_rec_mgrp, vec_rec_mgrp, name);
+	if( vlp == NULL ) {
+	    vec_ptr vp = split_name(name);
+	    vlp = Expand_vector(vec_list_rec_mgrp, vec_rec_mgrp,
+				range_rec_mgrp,vp);
+	}
         sname_list_ptr nlp =
             show_non_contig_vectors(sname_list_rec_mgrp, tstrings, vlp);
         while( nlp != NULL ) {
@@ -755,9 +802,12 @@ md_expand_vector(g_ptr redex)
     // /
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
-    vec_ptr vp = split_name(GET_STRING(r));
-    vec_list_ptr vlp =
-        Expand_vector(vec_list_rec_mgrp, vec_rec_mgrp, range_rec_mgrp, vp);
+    string name = GET_STRING(r);
+    vec_list_ptr vlp = Expand_constant(vec_list_rec_mgrp, vec_rec_mgrp, name);
+    if( vlp == NULL ) {
+	vec_ptr vp = split_name(name);
+	vlp = Expand_vector(vec_list_rec_mgrp,vec_rec_mgrp,range_rec_mgrp,vp);
+    }
     sname_list_ptr nlp =
         show_non_contig_vectors(sname_list_rec_mgrp, tstrings, vlp);
     while( nlp != NULL ) {

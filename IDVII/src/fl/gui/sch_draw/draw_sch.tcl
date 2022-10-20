@@ -2965,7 +2965,7 @@ proc draw_input {txt c tag x y} {
 }
 
 proc draw_constant {txt c tag x y} {
-    return [draw_input $txt $c $tag $x $y]
+    return [draw_hfl_code 0 -1 "$txt" $c $tag $x $y]
 }
 
 proc draw_dangling_input {txt c tag x y} {
@@ -4210,8 +4210,11 @@ proc draw_dff {c tag x y} {
     return [draw_box_pat 2 {RisingEdge} {Dlabel ClkInLabel} $c $tag $x $y]
 }
 
-proc draw_adff {c tag x y} {
-    return [draw_box_pat 3 {RisingEdge} {Dlabel ClkInLabel Rlabel} $c $tag $x $y]
+proc draw_adlatch {p_en p_arst c tag x y} {
+    if { $p_en == 1 } { set en ActHighWaveForm } else { set en ActLowWaveForm }
+    if { $p_arst == 1 } { set rlabel Rlabel } else { set rlabel negRlabel }
+    return [draw_box_pat 3 $en \
+	[list Dlabel ClkInLabel $rlabel] $c $tag $x $y]
 }
 
 proc draw_aldff {pclk pald c tag x y} {
@@ -4220,6 +4223,13 @@ proc draw_aldff {pclk pald c tag x y} {
     set edge "TwoEdges $a_edge $c_edge"
     return [draw_box_pat 4 $edge \
 		     [list Alabel ClkInLabel $Dlabel ClkInLabel] $c $tag $x $y]
+}
+
+proc draw_adff {pclk prst c tag x y} {
+    if { $pclk == 1 } { set edge RisingEdge } else { set edge FallingEdge }
+    if { $prst == 1 } { set rlabel Rlabel } else { set rlabel negRlabel }
+    return [draw_box_pat 3 $edge \
+			 [list Dlabel ClkInLabel $rlabel] $c $tag $x $y]
 }
 
 proc draw_adffe {pclk pen prst c tag x y} {

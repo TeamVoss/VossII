@@ -38,16 +38,16 @@ let mk_miter spec imp =
     d != [] => eprintf "Output mismatch: %S in pexlif 2 but not in pexlif 1" d |
     // Same inputs and outputs
     // Now rename the outputs
-    val (spec',spec_outs) =
+    let spec' =
 	let fa_outs1' = map (\(f,as). f,(map (sprintf "P1_%s") as)) fa_outs1 in
-	(PINST n1 a1 l1 fa_inps1 fa_outs1' ints1 chs1),
-	(md_merge_vectors (flatmap snd fa_outs1'))
+	(PINST n1 a1 l1 fa_inps1 fa_outs1' ints1 chs1)
     in
-    val (imp',imp_outs) =
+    let imp'=
 	let fa_outs2' = map (\(f,as). f,(map (sprintf "P2_%s") as)) fa_outs2 in
-	(PINST n2 a2 l2 fa_inps2 fa_outs2' ints2 chs2),
-	(md_merge_vectors (flatmap snd fa_outs2'))
+	(PINST n2 a2 l2 fa_inps2 fa_outs2' ints2 chs2)
     in
+    let spec_outs = map (sprintf "P1_%s") outs1 in
+    let imp_outs  = map (sprintf "P2_%s") outs1 in
     let rel = vec_zip spec_outs imp_outs in
     let mk_order_ok_pexlif1 v eq_nd =
 	let sz = md_size v then

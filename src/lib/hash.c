@@ -71,6 +71,12 @@ create_hash(hash_record_ptr hp, unint size,
 }
 
 void
+duplicate_hash_struct(hash_record_ptr old_hp, hash_record_ptr new_hp)
+{
+    create_hash(new_hp,old_hp->tbl_size, old_hp->hash_fn, old_hp->hash_eq);
+}
+
+void
 autosize_hash(hash_record_ptr hp)
 {
     ASSERT(hp->initialized == HASH_MAGIC_NBR);

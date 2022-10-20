@@ -1,0 +1,42 @@
+load "ste.fl";
+
+TYPE "byte" 2;
+
+let test =
+    bit_input	clk.
+    byte_input	a b c.
+    bit_output	res.
+    byte_internal ad bd.
+    CELL "test" [
+	re_ff clk a ad,
+	re_ff clk b bd,
+	res <- (ad '+' bd) '>' c
+];
+
+let p = test 'clk 'a 'b 'c 'res;
+
+p fseq 1;
+
+//write_pexlif "_Z" p;
+
+//let pp = read_pexlif "_Z";
+
+//p == pp;
+
+
+let ckt = pexlif2fsm p;
+
+ckt;
+
+lettype foo = FOO {ckt::fsm};
+
+let t1 = FOO ckt;
+
+write_foo "_ZZ" t1;
+
+let t2 = read_foo "_ZZ";
+
+t1;
+t2;
+
+t1 == t2;

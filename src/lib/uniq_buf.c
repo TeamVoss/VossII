@@ -65,6 +65,24 @@ get_uniq_buf_index(uniq_buffer_ptr bp, pointer item)
     return( PTR2INT(find_hash(&(bp->item2idx), item))-1 );
 }
 
+int
+find_insert_uniq_buf(uniq_buffer_ptr bp, pointer item)
+{
+    cur_item_size = bp->item_size;
+    pointer cur = find_hash(&(bp->item2idx), item);
+    if( cur != NULL ) {
+	return( PTR2INT(cur)-1 );
+    } else {
+	pointer p = new_rec(&(bp->recs));
+	bcopy(item, p, bp->item_size);
+	push_buf(&(bp->buf), item);
+	bp->items++;
+	int idx = bp->items;
+	insert_hash(&(bp->item2idx), p, INT2PTR(idx));
+	return( idx-1 );
+    }
+}
+
 
 pointer
 locate_uniq_buf(uniq_buffer_ptr bp, int i)

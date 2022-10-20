@@ -14,6 +14,8 @@
 #include "pexlif.h"
 
 /* ------------- Global variables -------------- */
+value_type		current_type;
+value_type		old_type;
 
 /********* Global variables referenced ***********/
 extern symbol_tbl_ptr	symb_tbl;
@@ -88,13 +90,12 @@ static jmp_buf	    node_map_jmp_env;
 static jmp_buf	    event_jmp_env;
 static hash_record  *new_tbl;
 static int	    sch2tcl_cnt = 0;
-static FILE	    *current_fp;
 static string	    s_use_bdds;
 static string	    s_use_bexprs;
 static string	    s_use_ints;
 static string	    s_DummyOut;
 static string	    s_draw_repeat;
-static string	    s_empty_string;
+static string	    s_ES;
 
 static string	    s_SCH_INT;
 static string	    s_SCH_LEAF;
@@ -117,7 +118,6 @@ static vstate_ptr   vstate_free_list = NULL;
 static rec_mgr	    node_comp_pair_rec_mgr;
 static hash_record  node_comp_pair_tbl;
 //
-static hash_record  pointer_map;    // For reading fsms
 static hash_record  *all_name_tblp;
 static rec_mgr      *vec_info_rec_mgrp;
 static rec_mgr      *ilist_rec_mgrp;
@@ -128,6 +128,7 @@ static rec_mgr	    *range_rec_mgrp;
 static rec_mgr	    *vis_io_rec_mgrp;
 static rec_mgr	    *vis_rec_mgrp;
 static rec_mgr	    *vis_list_rec_mgrp;
+static rec_mgr	    *attr_list_rec_mgrp;
 static buffer	    attr_buf;
 static buffer	    *nodesp;
 static buffer	    *compositesp;
@@ -142,6 +143,7 @@ static rec_mgr	    *old_range_rec_mgrp;
 static rec_mgr	    *old_vis_io_rec_mgrp;
 static rec_mgr	    *old_vis_rec_mgrp;
 static rec_mgr	    *old_vis_list_rec_mgrp;
+static rec_mgr	    *old_attr_list_rec_mgrp;
 static buffer	    *old_nodesp;
 static buffer	    *old_compositesp;
 static buffer	    *old_top_inpsp;
@@ -166,12 +168,12 @@ static rec_mgr	    *trace_event_rec_mgrp;
 static rec_mgr	    *old_trace_event_rec_mgrp;
 static rec_mgr	    *trace_rec_mgrp;
 static rec_mgr	    *old_trace_rec_mgrp;
+static rec_mgr	    *event_rec_mgrp;
+static rec_mgr	    *old_event_rec_mgrp;
 static buffer	    *weakening_bufp;
 static buffer	    *event_bufp;
 static buffer	    *old_weakening_bufp;
 static buffer	    *old_event_bufp;
-static value_type   current_type;
-static value_type   old_type;
 //
 static gbv	    *weak_buf;
 static gbv	    *ant_buf;
@@ -205,234 +207,6 @@ static int	    max_rank = 1;
 
 static int	    BDD_size_limit;
 static bool	    information_flow_weakening;
-
-/* ----- Forward definitions local functions ----- */
-
-static vis_ptr	    get_vis_info_at_level(vis_list_ptr vp, int draw_level);
-static void	    report_source_locations(odests dfp);
-static unint        ni_pair_hash(pointer key, unint size);
-static bool         ni_pair_equ(pointer k1, pointer k2);
-static unint        ilist_ptr_hash(pointer key, unint size);
-static bool         ilist_ptr_equ(pointer k1, pointer k2);
-static void         cp_done(pointer key, pointer data);
-static sch_list_ptr copy_sch_list(vstate_ptr vp, sch_list_ptr sl);
-static sch_ptr      copy_sch(vstate_ptr vp, sch_ptr sch);
-static void         push_undo_point(vstate_ptr vp);
-static void         pop_undo_point(vstate_ptr vp);
-static vstate_ptr   mk_vstate(fsm_ptr fsm);
-static g_ptr        ilist2nds(ilist_ptr il);
-static vec_ptr      split_vector_name(rec_mgr *vec_rec_mgrp,
-                                      rec_mgr *range_rec_mgrp, string name);
-static string       get_vector_signature(vec_ptr vp);
-static fsm_ptr      create_fsm();
-static gbv          GET_GBV(g_ptr nd);
-static void         SET_GBV(g_ptr nd, gbv value);
-static void         MAKE_REDEX_GBV(g_ptr nd, gbv value);
-static g_ptr        Make_GBV_leaf(gbv value);
-static void         extract_five_tuple(g_ptr nd, gbv *whenp, string *namep,
-                                       gbv *val, int *fromp, int *top);
-static void         extract_four_tuple(g_ptr nd, gbv *whenp, string *namep,
-                                       int *fromp, int *top);
-static void         extract_tripple(g_ptr nd, string *namep, int *fromp,
-                                    int *top);
-static int          event_cmp(const void *p1, const void *p2);
-static bool         create_event_buffer(ste_ptr ste, buffer *ebufp, g_ptr wl,
-                                        g_ptr ant, g_ptr cons, g_ptr trl,
-					bool abort_ASAP);
-static void         process_event(buffer *event_bufp, int time);
-static void         record_trace(int idx, int time, gbv H, gbv L);
-static ste_ptr      create_ste(fsm_ptr fsm, value_type type);
-static void         push_ste(ste_ptr ste);
-static void         pop_ste();
-static void         push_fsm_env(fsm_ptr fsm);
-static void         pop_fsm_env();
-static void         push_fsm(fsm_ptr fsm);
-static void         pop_fsm();
-static void         mark_fsm_fn(pointer p);
-static void         gbv_mark(gbv value);
-static void         mark_trace_entries(pointer key, pointer data);
-static void         mark_ste_fn(pointer p);
-static void         mark_vstate_fn(pointer p);
-static void         sweep_vstate_fn(void);
-static void         sweep_fsm_fn(void);
-static void         sweep_ste_fn(void);
-static formula      ste_eq_fn(pointer p1, pointer p2, bool identical);
-static pointer      ste_gmap_fn(gmap_info_ptr ip, pointer a);
-static pointer      ste_gmap2_fn(gmap_info_ptr ip, pointer a, pointer b);
-static void         insert_pointer_map(pointer old_ptr, pointer new_ptr);
-static pointer      old2new(pointer old);
-static void         write_ptr(FILE *fp, pointer p, bool nl);
-static pointer      read_ptr(FILE *fp, bool nl);
-static void         write_string(FILE *fp, string s, bool nl);
-static string       read_string(FILE *fp, bool nl);
-static void         write_int(FILE *fp, int i, bool nl);
-static int          read_int(FILE *fp, bool nl);
-static void         write_vis_io_recs(FILE *fp, rec_mgr *vis_io_rec_mgrp);
-static void         read_vis_io_recs(FILE *fp, rec_mgr *vis_io_rec_mgrp);
-static void         write_vis_recs(FILE *fp, rec_mgr *vis_rec_mgrp);
-static void         read_vis_recs(FILE *fp, rec_mgr *vis_rec_mgrp);
-static void         write_range_recs(FILE *fp, rec_mgr *range_rec_mgrp);
-static void         read_range_recs(FILE *fp, rec_mgr *range_rec_mgrp);
-static void         write_vec_recs(FILE *fp, rec_mgr *vec_rec_mgrp);
-static void         read_vec_recs(FILE *fp, rec_mgr *vec_rec_mgrp);
-static void         write_ilist_recs(FILE *fp, rec_mgr *ilist_rec_mgrp);
-static void         read_ilist_recs(FILE *fp, rec_mgr *ilist_rec_mgrp);
-static void         write_idx_list_recs(FILE *fp, rec_mgr *idx_list_rec_mgrp);
-static void         read_idx_list_recs(FILE *fp, rec_mgr *idx_list_rec_mgrp);
-static void         write_node_buffer(FILE *fp, buffer *nodesp);
-static void         read_node_buffer(FILE *fp, buffer *nodesp) ;
-static void         write_composite_buffer(FILE *fp, buffer *compositesp);
-static void         read_composite_buffer(FILE *fp, buffer *compositesp);
-static void         write_name_ip(pointer key, pointer data);
-static void         write_all_name_tbl(FILE *fp, hash_record *all_name_tblp);
-static void         read_all_name_tbl(FILE *fp, hash_record *all_name_tblp);
-static void         save_fsm_fn(FILE *fp, pointer p);
-static pointer      load_fsm_fn(FILE *fp);
-static unint        idx_list_hash(pointer key, unint n);
-static bool         idx_list_equ(pointer k1, pointer k2);
-static string       op2str(ncomp_ptr cp);
-//static string       get_real_name(vec_info_ptr ip, int idx);
-static void         print_nodes(odests fp, fsm_ptr fsm);
-static void         print_composites(odests fp);
-static string       anon2real(vstate_ptr vp, string aname);
-static void         print_sch_tree(vstate_ptr vp, int indent, sch_ptr sch);
-static string       vstate2str_fn(pointer p);
-static string       sch2tcl(vstate_ptr vp, g_ptr *tlp, sch_ptr sch);
-static string       fsm2str_fn(pointer p);
-static string       compute_sha256_signature(fsm_ptr fsm);
-static formula      fsm_eq_fn(pointer p1, pointer p2, bool identical);
-static string       ste2str_fn(pointer p);
-static int          get_wexpr_size(g_ptr we);
-static ilist_ptr    ilist_copy(ilist_ptr ip);
-static ilist_ptr    make_input_arg(g_ptr we, int sz, hash_record *vtblp,
-                                   string hier, bool pdel);
-static idx_list_ptr find_insert_idx(idx_list_ptr ip);
-static void         add_fanout(nnode_ptr np, int comp_idx);
-static void         add_fanouts(ilist_ptr inps, int comp_idx);
-static bool         compile_expr(hash_record *vtblp, string hier,
-                                 ilist_ptr outs, g_ptr we, bool pdel);
-static string       mk_vec_name(string base, int sz);
-static ilist_ptr    get_lhs_indices(hash_record *vtblp, string hier, g_ptr e);
-static ilist_ptr    declare_vector(hash_record *vtblp, string hier, string name,
-                                   bool transient, ilist_ptr act_map,
-				   string value_list);
-static int          find_node_index(vec_ptr decl, vec_ptr vp, int start);
-static string       idx2name(int idx);
-static ilist_ptr    vec2indices(string name);
-static int          name2idx(string name);
-static ilist_ptr    map_vector(hash_record *vtblp, string hier, string name,
-			       bool ingnore_dangling);
-static int          vec_size(vec_ptr vec);
-static int          get_stride(vec_ptr vp);
-static bool         inside(int i, int upper, int lower);
-static int          find_index_from_end(int i, range_ptr rp);
-static bool         is_full_range(vec_ptr v1, vec_ptr v2);
-static void         map_node(vec_ptr decl, vec_ptr ivec, ilist_ptr map, int i);
-static int          compute_ilist_length(ilist_ptr l);
-static ilist_ptr    ilist_append(ilist_ptr l1, ilist_ptr l2);
-static ilist_ptr    append_range(ilist_ptr l, int i_from, int i_to);
-static ilist_ptr    translate_range(ilist_ptr map, int from, int to);
-//
-static void         geq_fn(int size, gbv *av, gbv *bv, gbv *resv) ;
-static void         sub_fn(int size, gbv *av, gbv *bv, gbv *resv) ;
-static void         ITE_fn(int size, gbv cH, gbv cL, gbv *av, gbv *bv, gbv *resv);
-static void         shift_left_by_1(int size, gbv *vp, gbv iH, gbv iL, gbv *resp);
-static void         sshl_fun(int size, gbv *vp, int cnt, gbv *resp);
-static void         sshr_fun(int size, gbv *vp, int cnt, gbv *resp);
-static void         sashr_fun(int size, gbv *vp, int cnt, gbv *resp);
-static void         add_op_todo(ncomp_ptr cp);
-static void         do_phase(ste_ptr ste);
-static int          do_combinational(ste_ptr ste);
-static int          do_wl_op(ste_ptr ste, ncomp_ptr op);
-static void         op_X(ncomp_ptr op);
-static void         op_CONST(ncomp_ptr op);
-static void         op_VAR(ncomp_ptr op);
-static void         op_AND(ncomp_ptr op);
-static void         op_LAT_LEQ(ncomp_ptr op);
-static void         op_OR(ncomp_ptr op);
-static void         op_NOT(ncomp_ptr op);
-static void         op_EQ(ncomp_ptr op);
-static void         op_GR(ncomp_ptr op);
-static void         op_ADD(ncomp_ptr op);
-static void         op_SUB(ncomp_ptr op);
-static void         op_MUL(ncomp_ptr op);
-static void         op_ITE(ncomp_ptr op);
-static void         reset_tmps(int cnt);
-static void         op_DIV(ncomp_ptr op);
-static void         op_MOD(ncomp_ptr op);
-static void         op_SHL(ncomp_ptr op);
-static void         op_SHR(ncomp_ptr op);
-static void         op_ASHR(ncomp_ptr op);
-static void         op_SX(ncomp_ptr op);
-static void         op_ZX(ncomp_ptr op);
-static void         op_SLICE(ncomp_ptr op);
-static void	        op_UPDATE_SLICE(ncomp_ptr op);
-static void         op_WIRE(ncomp_ptr op);
-static void         op_MEM_READ(ncomp_ptr op);
-static void         op_MEM_WRITE(ncomp_ptr op);
-static bool         traverse_pexlif(hash_record *parent_tblp, g_ptr p,
-                                    string hier, bool top_level,
-                                    int draw_level, int inst_cnt,
-				    int max_depth);
-static bool         no_fanout(ncomp_ptr cp);
-static int          assign_rank(int depth, ncomp_ptr cp);
-static int          rank_order();
-static void         bexpr_c_Print(odests fp, gbv a, int size);
-static void         BDD_c_Print(odests fp, gbv a, int size);
-static gbv          bexpr_c_NOT(gbv a);
-static gbv          BDD_c_NOT(gbv a);
-static gbv          bexpr_c_AND(gbv a, gbv b);
-static gbv          BDD_c_AND(gbv a, gbv b);
-static gbv          bexpr_c_OR(gbv a, gbv b);
-static gbv          BDD_c_OR(gbv a, gbv b);
-static bool         bexpr_c_NEQ(gbv a, gbv b);
-static bool         BDD_c_NEQ(gbv a, gbv b);
-static bool         c_EQ(gbv a, gbv b);
-static void         switch_to_bexprs();
-static void         switch_to_ints();
-static void         BDD_cHL_Print(odests fp, gbv H, gbv L);
-static void         bexpr_cHL_Print(odests fp, gbv H, gbv L);
-static void         switch_to_BDDs();
-static int          update_node(ste_ptr ste, int idx, gbv Hnew, gbv Lnew);
-static gbv *        allocate_value_buf(int sz, gbv H, gbv L);
-static bool         initialize(ste_ptr ste, bool trace_all);
-static sch_ptr      mk_repeat(vstate_ptr vp, char *anon);
-static bool         has_ifc_nodes(vstate_ptr vp, ilist_ptr il, ilist_ptr *silp,
-                                  ilist_ptr *rilp);
-static bool         has_stop_nodes(vstate_ptr vp, ilist_ptr il, ilist_ptr *silp,
-                                   ilist_ptr *rilp);
-static void         expand_fanin(vstate_ptr vp, hash_record *exp, sch_ptr sch,
-                                 string aname, int levels, bool expand,
-				 int draw_level);
-static void         build_limit_tbl(vstate_ptr vp, hash_record *limit_tblp,
-                                    string sn, sch_ptr sch);
-static sch_ptr      limited_draw_fanin(vstate_ptr vp, ilist_ptr il,
-                                       hash_record *limit_tblp, int draw_level);
-static bool         same_ilist(ilist_ptr il1, ilist_ptr il2);
-static bool         all_outs(ilist_ptr il, vis_io_ptr vp);
-static sch_ptr      draw_fanin(vstate_ptr vp, ilist_ptr il, int levels,
-                               int anon_cnt, int draw_level);
-static string       mk_fresh_anon_name(g_ptr internals, int *cur_cntp);
-static string       mk_vector_name(string base, int size);
-static string       create_constant(int sz, int *ccnt, g_ptr ints, string cnst,
-                                    buffer *chbufp);
-static g_ptr        mk_list1(g_ptr el);
-static g_ptr        mk_pair(g_ptr fst, g_ptr snd);
-static string       create_merge_component(int sz, int *ccnt, g_ptr *intsp,
-                                           g_ptr acts, int len,
-                                           buffer *chbufp);
-static g_ptr        clean_pexlif_ios(g_ptr node);
-static gbv	    BDD_c_limited_AND(gbv a, gbv b);
-static gbv	    BDD_c_limited_OR(gbv a, gbv b);
-static void	    base_print_ilist(ilist_ptr il);
-static int	    fsm_sha256_fn(int *g_cntp, hash_record *g_tblp,
-				  SHA256_ptr sha, pointer a);
-static event_list_ptr add_active_event(hash_record *tblp, event_ptr ep);
-static event_list_ptr delete_active_event(hash_record *tblp, event_ptr ep);
-
-// Use of "wl_op" means these two don't fit in "pexlif.c".
-static bool is_binary_wexpr(g_ptr node, wl_op *opp, g_ptr *ap, g_ptr *bp);
-static bool is_relation_wexpr(g_ptr node, wl_op *opp, g_ptr *ap, g_ptr *bp);
 
 static string state_holding_names [] = {
 	"draw_adff",
@@ -473,6 +247,228 @@ static string state_holding_names [] = {
 };
 static hash_record  state_holding_tbl;
 
+/* ----- Forward definitions local functions ----- */
+static void           save_fsm_fn(FILE *fp, pointer p);
+static pointer        load_fsm_fn(FILE *fp);
+static void           save_ste_fn(FILE *fp, pointer p);
+static pointer        load_ste_fn(FILE *fp);
+static void           save_vstate_fn(FILE *fp, pointer p);
+static pointer        load_vstate_fn(FILE *fp);
+static unint          ni_pair_hash(pointer key, unint size);
+static bool           ni_pair_equ(pointer k1, pointer k2);
+static void           cp_done(pointer key, pointer data);
+static sch_list_ptr   copy_sch_list(vstate_ptr vp, sch_list_ptr sl);
+static sch_ptr        copy_sch(vstate_ptr vp, sch_ptr sch);
+static void           push_undo_point(vstate_ptr vp);
+static void           pop_undo_point(vstate_ptr vp);
+static vstate_ptr     mk_vstate(fsm_ptr fsm);
+static g_ptr          ilist2nds(ilist_ptr il);
+static vec_ptr        split_vector_name(rec_mgr *vec_rec_mgrp,
+                                        rec_mgr *range_rec_mgrp, string name);
+static string         get_vector_signature(vec_ptr vp);
+static fsm_ptr        create_fsm();
+static gbv            GET_GBV(g_ptr nd);
+static void           SET_GBV(g_ptr nd, gbv value);
+static void           MAKE_REDEX_GBV(g_ptr redex, gbv value);
+static g_ptr          Make_GBV_leaf(gbv value);
+static void           extract_five_tuple(g_ptr nd, gbv *whenp, string *namep,
+                                         gbv *val, int *fromp, int *top);
+static void           extract_four_tuple(g_ptr nd, gbv *whenp, string *namep,
+                                         int *fromp, int *top);
+static void           extract_tripple(g_ptr nd, string *namep, int *fromp,
+                                      int *top);
+static int            event_cmp(const void *p1, const void *p2);
+static bool           create_event_buffer(ste_ptr ste, buffer *ebufp, g_ptr wl,
+                                          g_ptr ant, g_ptr cons, g_ptr trl,
+                                          bool abort_ASAP);
+static void           process_event(buffer *event_bufp, int time);
+static void           record_trace(int idx, int time, gbv H, gbv L);
+static ste_ptr        create_ste(fsm_ptr fsm, value_type type);
+static void           push_ste(ste_ptr ste);
+static void           pop_ste();
+static void           push_fsm_env(fsm_ptr fsm);
+static void           pop_fsm_env();
+static void           push_fsm(fsm_ptr fsm);
+static void           pop_fsm();
+static void           mark_fsm_fn(pointer p);
+static void           gbv_mark(gbv value);
+static void           mark_trace_entries(pointer key, pointer data);
+static void           mark_ste_fn(pointer p);
+static void           mark_vstate_fn(pointer p);
+static void           sweep_vstate_fn(void);
+static void           sweep_fsm_fn(void);
+static void           sweep_ste_fn(void);
+static formula        ste_eq_fn(pointer p1, pointer p2, bool identical);
+static pointer        ste_gmap_fn(gmap_info_ptr ip, pointer a);
+static pointer        ste_gmap2_fn(gmap_info_ptr ip, pointer a, pointer b);
+static unint          idx_list_hash(pointer key, unint n);
+static bool           idx_list_equ(pointer k1, pointer k2);
+static string         op2str(ncomp_ptr cp);
+static void           print_nodes(odests fp, fsm_ptr fsm);
+static void           print_composites(odests fp);
+static string         anon2real(vstate_ptr vp, string aname);
+static void           print_sch_tree(vstate_ptr vp, int indent, sch_ptr sch);
+static string         vstate2str_fn(pointer p);
+static string         sch2tcl(vstate_ptr vp, g_ptr *tlp, sch_ptr sch);
+static string         fsm2str_fn(pointer p);
+static string         compute_sha256_signature(fsm_ptr fsm);
+static formula        fsm_eq_fn(pointer p1, pointer p2, bool identical);
+static string         ste2str_fn(pointer p);
+static int            get_wexpr_size(g_ptr we);
+static ilist_ptr      ilist_copy(ilist_ptr ip);
+static ilist_ptr      make_input_arg(g_ptr we, int sz, hash_record *vtblp,
+                                     string hier, bool pdel);
+static idx_list_ptr   find_insert_idx(idx_list_ptr ip);
+static void           add_fanout(nnode_ptr np, int comp_idx);
+static void           add_fanouts(ilist_ptr inps, int comp_idx);
+static bool           compile_expr(hash_record *vtblp, string hier,
+                                   ilist_ptr outs, g_ptr we, bool pdel);
+static string         mk_vec_name(string base, int sz);
+static ilist_ptr      get_lhs_indices(hash_record *vtblp, string hier, g_ptr e);
+static void           report_source_locations(odests dfp);
+static ilist_ptr      declare_vector(hash_record *vtblp, string hier,
+                                     string name, bool transient,
+                                     ilist_ptr act_map, string value_list);
+static int            find_node_index(vec_ptr decl, vec_ptr vp, int start);
+static string         idx2name(int idx);
+static bool           idx_is_user_defined(int idx);
+static bool           ilist_is_user_defined(ilist_ptr il);
+static ilist_ptr      vec2indices(string name);
+static int            name2idx(string name);
+static ilist_ptr      map_vector(hash_record *vtblp, string hier, string name,
+                                 bool ignore_missing);
+static int            vec_size(vec_ptr vec);
+static int            get_stride(vec_ptr vp);
+static bool           inside(int i, int upper, int lower);
+static int            find_index_from_end(int i, range_ptr rp);
+static bool           is_full_range(vec_ptr v1, vec_ptr v2);
+static int            ilist_sel(ilist_ptr ip, int idx);
+static void           map_node(vec_ptr decl, vec_ptr ivec, ilist_ptr map,
+                               int cur);
+static int            compute_ilist_length(ilist_ptr l);
+static ilist_ptr      ilist_append(ilist_ptr l1, ilist_ptr l2);
+static ilist_ptr      append_range(ilist_ptr l, int i_from, int i_to);
+static ilist_ptr      translate_range(ilist_ptr map, int from, int to);
+static void           geq_fn(int size, gbv *av, gbv *bv, gbv *resv) ;
+static void           sub_fn(int size, gbv *av, gbv *bv, gbv *resv) ;
+static void           ITE_fn(int size, gbv cH, gbv cL, gbv *av, gbv *bv,
+                             gbv *resv);
+static void           shift_left_by_1(int size, gbv *vp, gbv iH, gbv iL,
+                                      gbv *resp);
+static void           sshl_fun(int size, gbv *vp, int cnt, gbv *resp);
+static void           sshr_fun(int size, gbv *vp, int cnt, gbv *resp);
+static void           sashr_fun(int size, gbv *vp, int cnt, gbv *resp);
+static void           add_op_todo(ncomp_ptr cp);
+static void           do_phase(ste_ptr ste);
+static int            do_combinational(ste_ptr ste);
+static int            do_wl_op(ste_ptr ste, ncomp_ptr op);
+static void           op_X(ncomp_ptr op);
+static void           op_CONST(ncomp_ptr op);
+static void           op_VAR(ncomp_ptr op);
+static void           op_LAT_LEQ(ncomp_ptr op);
+static void           op_AND(ncomp_ptr op);
+static void           op_OR(ncomp_ptr op);
+static void           op_NOT(ncomp_ptr op);
+static void           op_EQ(ncomp_ptr op);
+static void           op_GR(ncomp_ptr op);
+static void           op_ADD(ncomp_ptr op);
+static void           op_SUB(ncomp_ptr op);
+static void           op_MUL(ncomp_ptr op);
+static void           op_ITE(ncomp_ptr op);
+static void           reset_tmps(int cnt);
+static void           op_DIV(ncomp_ptr op);
+static void           op_MOD(ncomp_ptr op);
+static void           op_SHL(ncomp_ptr op);
+static void           op_SHR(ncomp_ptr op);
+static void           op_ASHR(ncomp_ptr op);
+static void           op_SX(ncomp_ptr op);
+static void           op_ZX(ncomp_ptr op);
+static void           op_SLICE(ncomp_ptr op);
+static void           op_UPDATE_SLICE(ncomp_ptr op);
+static void           op_WIRE(ncomp_ptr op);
+static void           op_MEM_READ(ncomp_ptr op);
+static void           op_MEM_WRITE(ncomp_ptr op);
+static bool           traverse_pexlif(hash_record *parent_tblp, g_ptr p,
+                                      string hier, bool top_level,
+                                      int draw_level, int inst_cnt,
+                                      int max_depth);
+static bool           no_fanout(ncomp_ptr cp);
+static int            assign_rank(int depth, ncomp_ptr cp);
+static int            rank_order();
+static void           bexpr_c_Print(odests fp, gbv a, int size);
+static void           BDD_c_Print(odests fp, gbv a, int size);
+static gbv            bexpr_c_NOT(gbv a);
+static gbv            BDD_c_NOT(gbv a);
+static gbv            bexpr_c_AND(gbv a, gbv b);
+static gbv            BDD_c_AND(gbv a, gbv b);
+static gbv            bexpr_c_OR(gbv a, gbv b);
+static gbv            BDD_c_OR(gbv a, gbv b);
+static gbv            BDD_c_limited_AND(gbv a, gbv b);
+static gbv            BDD_c_limited_OR(gbv a, gbv b);
+static bool           bexpr_c_NEQ(gbv a, gbv b);
+static bool           BDD_c_NEQ(gbv a, gbv b);
+static bool           c_EQ(gbv a, gbv b);
+static void           switch_to_bexprs();
+static void           switch_to_ints();
+static void           BDD_cHL_Print(odests fp, gbv H, gbv L);
+static void           bexpr_cHL_Print(odests fp, gbv H, gbv L);
+static void           switch_to_BDDs();
+static int            update_node(ste_ptr ste, int idx, gbv Hnew, gbv Lnew);
+static gbv *          allocate_value_buf(int sz, gbv H, gbv L);
+static bool           initialize(ste_ptr ste, bool trace_all);
+static sch_ptr        mk_repeat(vstate_ptr vp, char *anon);
+static bool           has_ifc_nodes(vstate_ptr vp, ilist_ptr il,
+                                    ilist_ptr *silp, ilist_ptr *rilp);
+static bool           has_stop_nodes(vstate_ptr vp, ilist_ptr il,
+                                     ilist_ptr *silp, ilist_ptr *rilp);
+static void           expand_fanin(vstate_ptr vp, hash_record *exp, sch_ptr sch,
+                                   string aname, int levels, bool expand,
+                                   int draw_level);
+static void           build_limit_tbl(vstate_ptr vp, hash_record *limit_tblp,
+                                      string sn, sch_ptr sch);
+static sch_ptr        limited_draw_fanin(vstate_ptr vsp, ilist_ptr il,
+                                         hash_record *limit_tblp,
+                                         int draw_level);
+static bool           same_ilist(ilist_ptr il1, ilist_ptr il2);
+static bool           all_outs(ilist_ptr il, vis_io_ptr vp);
+static sch_ptr        draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels,
+                                 int anon_cnt, int draw_level);
+static string         mk_fresh_anon_name(g_ptr internals, int *cur_cntp);
+static string         mk_vector_name(string base, int size);
+static string         create_constant(int sz, int *ccnt, g_ptr ints, string cnst,
+                                      buffer *chbufp);
+static bool           is_binary_wexpr(g_ptr node, wl_op *opp, g_ptr *ap,
+                                      g_ptr *bp);
+static bool           is_relation_wexpr(g_ptr node, wl_op *opp, g_ptr *ap,
+                                        g_ptr *bp);
+static g_ptr          mk_list1(g_ptr el);
+static g_ptr          mk_pair(g_ptr fst, g_ptr snd);
+static string         create_merge_component(int sz, int *ccnt, g_ptr *intsp,
+                                             g_ptr acts, int len,
+                                             buffer *chbufp);
+static g_ptr          clean_pexlif_ios(g_ptr node);
+static int            fsm_sha256_fn(int *g_cntp, hash_record *g_tblp,
+                                    SHA256_ptr sha, pointer a);
+static event_list_ptr add_active_event(hash_record *tblp, event_ptr ep);
+static event_list_ptr delete_active_event(hash_record *tblp, event_ptr ep);
+static void           allocate_ste_buffers(fsm_ptr fsm);
+static void           free_ste_buffers();
+static void           simulation_break_handler();
+static void           gSTE(g_ptr redex, value_type type);
+static void           base_print_ilist(ilist_ptr il);
+static void           fl_clean_pexlif_ios(g_ptr redex);
+static fsm_ptr        gen_pexlif2fsm(g_ptr p, g_ptr black_box_list,
+                                     int max_depth);
+static int            nn_cmp(const void *pi, const void *pj);
+static bool           is_draw_fub(vis_ptr vp);
+static vis_ptr        get_vis_info_at_level(vis_list_ptr vlp, int level);
+static string         value_type2string(value_type type);
+static void           gen_get_trace(g_ptr redex, value_type type);
+static void           gen_get_trace_val(g_ptr redex, value_type type);
+static void           gen_get_ste_result(g_ptr redex, value_type type);
+static void           dbg_print_ils(pointer key, pointer data);
+static void           dbg_print_stop_nds(pointer key, pointer data);
+
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
 /********************************************************/
@@ -485,15 +481,15 @@ Fsm_Init()
     new_mgr(&vstate_rec_mgr, sizeof(vstate_rec));
     s_draw_repeat =   wastrsave(&strings, "draw_repeat_nd");
 
-    s_empty_string =   wastrsave(&strings, "");
-    s_use_bdds =       wastrsave(&strings, "bdd");
-    s_use_bexprs =     wastrsave(&strings, "bexpr");
-    s_use_ints =       wastrsave(&strings, "int");
-    s_DummyOut =       wastrsave(&strings, "DummyOut");
-    s_fsm =	       wastrsave(&strings, "fsm");
-    s_ste =	       wastrsave(&strings, "ste");
-    s_SCH_INT =	       Mk_constructor_name("SCH_INT");
-    s_SCH_LEAF =       Mk_constructor_name("SCH_LEAF");
+    s_ES =	    wastrsave(&strings, "");
+    s_use_bdds =    wastrsave(&strings, "bdd");
+    s_use_bexprs =  wastrsave(&strings, "bexpr");
+    s_use_ints =    wastrsave(&strings, "int");
+    s_DummyOut =    wastrsave(&strings, "DummyOut");
+    s_fsm =	    wastrsave(&strings, "fsm");
+    s_ste =	    wastrsave(&strings, "ste");
+    s_SCH_INT =	    Mk_constructor_name("SCH_INT");
+    s_SCH_LEAF =    Mk_constructor_name("SCH_LEAF");
     //
     fsm_oidx  = Add_ExtAPI_Object("fsm",
                                   mark_fsm_fn,
@@ -510,8 +506,8 @@ Fsm_Init()
     ste_oidx = Add_ExtAPI_Object("ste",
                                   mark_ste_fn,
                                   sweep_ste_fn,
-                                  NULL, //save_ste_fn,
-                                  NULL, //load_ste_fn,
+                                  save_ste_fn,
+                                  load_ste_fn,
                                   ste2str_fn,
                                   ste_eq_fn,
                                   ste_gmap_fn,
@@ -522,8 +518,8 @@ Fsm_Init()
     vstate_oidx = Add_ExtAPI_Object("vstate",
                                   mark_vstate_fn,
                                   sweep_vstate_fn,
-                                  NULL, //save_vstate_fn,
-                                  NULL, //load_vstate_fn,
+                                  save_vstate_fn,
+                                  load_vstate_fn,
                                   vstate2str_fn,
                                   NULL, //vstate_eq_fn,
                                   NULL, //vstate_gmap_fn,
@@ -578,306 +574,251 @@ get_real_name(vec_info_ptr ip, int idx)
     return res;
 }
 
+void
+write_ncomp_rec(FILE *fp, pointer p)
+{
+    ncomp_ptr vp = (ncomp_ptr) p;
+    write_unint(fp, vp->size);
+    write_unint(fp, vp->rank);
+    write_unint(fp, vp->phase_delay);
+    write_unint(fp, vp->no_weakening);
+    write_unint(fp, vp->flag);
+    wl_op op = vp->op;
+    if( op == op_X ) {
+	write_int(fp, 1);
+    }
+    else if( op == op_CONST ) {
+	write_int(fp, 2);
+	write_arbi_T(fp, vp->arg.value);
+    }
+    else if( op == op_VAR ) {
+	write_int(fp, 3);
+    }
+    else if( op == op_AND ) {
+	write_int(fp, 4);
+    }
+    else if( op == op_OR ) {
+	write_int(fp, 5);
+    }
+    else if( op == op_NOT ) {
+	write_int(fp, 6);
+    }
+    else if( op == op_EQ ) {
+	write_int(fp, 7);
+    }
+    else if( op == op_GR ) {
+	write_int(fp, 8);
+    }
+    else if( op == op_ADD ) {
+	write_int(fp, 9);
+    }
+    else if( op == op_SUB ) {
+	write_int(fp, 10);
+    }
+    else if( op == op_MUL ) {
+	write_int(fp, 11);
+    }
+    else if( op == op_ITE ) {
+	write_int(fp, 12);
+    }
+    else if( op == op_DIV ) {
+	write_int(fp, 13);
+    }
+    else if( op == op_MOD ) {
+	write_int(fp, 14);
+    }
+    else if( op == op_SHL ) {
+	write_int(fp, 15);
+    }
+    else if( op == op_SHR ) {
+	write_int(fp, 16);
+    }
+    else if( op == op_ASHR ) {
+	write_int(fp, 17);
+    }
+    else if( op == op_SX ) {
+	write_int(fp, 18);
+	write_int(fp, vp->arg.extension_size);
+    }
+    else if( op == op_ZX ) {
+	write_int(fp, 19);
+	write_int(fp, vp->arg.extension_size);
+    }
+    else if( op == op_SLICE ) {
+	write_int(fp, 20);
+	write_idx_list_ptr(fp, vp->arg.idx_list);
+    }
+    else if( op == op_WIRE ) {
+	write_int(fp, 21);
+    }
+    else if( op == op_MEM_READ ) {
+	write_int(fp, 22);
+	write_int(fp, vp->arg.mem.addr_size);
+	write_int(fp, vp->arg.mem.data_size);
+	write_int(fp, vp->arg.mem.lines);
+    }
+    else if( op == op_MEM_WRITE ) {
+	write_int(fp, 23);
+	write_int(fp, vp->arg.mem.addr_size);
+	write_int(fp, vp->arg.mem.data_size);
+	write_int(fp, vp->arg.mem.lines);
+    }
+    else if( op == op_LAT_LEQ ) {
+	write_int(fp, 24);
+    }
+    else {
+	DIE("Should not happen!");
+    }
+    write_ilist_ptr(fp, vp->inps);
+    write_ilist_ptr(fp, vp->outs);
+}
+
+void
+read_ncomp_rec(FILE *fp, pointer p)
+{
+    ncomp_rec *vp = (ncomp_rec *) p;
+    read_unint(fp, &(vp->size));
+    { unint i; read_unint(fp, &i); vp->rank = i; }
+    { unint i; read_unint(fp, &i); vp->phase_delay = i; }
+    { unint i; read_unint(fp, &i); vp->no_weakening = i; }
+    { unint i; read_unint(fp, &i); vp->flag = i; }
+    int type;
+    read_int(fp, &type);
+    switch( type ) {
+	case 1: vp->op = op_X; break;
+	case 2: {
+	    vp->op = op_CONST;
+	    read_arbi_T(fp, &(vp->arg.value));
+	    break;
+	}
+	case 3: vp->op = op_VAR; break;
+	case 4: vp->op = op_AND; break;
+	case 5: vp->op = op_OR; break;
+	case 6: vp->op = op_NOT; break;
+	case 7: vp->op = op_EQ; break;
+	case 8: vp->op = op_GR; break;
+	case 9: vp->op = op_ADD; break;
+	case 10: vp->op = op_SUB; break;
+	case 11: vp->op = op_MUL; break;
+	case 12: vp->op = op_ITE; break;
+	case 13: vp->op = op_DIV; break;
+	case 14: vp->op = op_MOD; break;
+	case 15: vp->op = op_SHL; break;
+	case 16: vp->op = op_SHR; break;
+	case 17: vp->op = op_ASHR; break;
+	case 18: {
+	    vp->op = op_SX;
+	    read_int(fp, &(vp->arg.extension_size));
+	    break;
+	}
+	case 19: {
+	    vp->op = op_ZX;
+	    read_int(fp, &(vp->arg.extension_size));
+	    break;
+	}
+	case 20: {
+	    vp->op = op_SLICE;
+	    read_idx_list_ptr(fp, &(vp->arg.idx_list));
+	    break;
+	}
+	case 21: vp->op = op_WIRE; break;
+	case 22: {
+	    vp->op = op_MEM_READ;
+	    read_int(fp, &(vp->arg.mem.addr_size));
+	    read_int(fp, &(vp->arg.mem.data_size));
+	    read_int(fp, &(vp->arg.mem.lines));
+	    break;
+	}
+	case 23: {
+	    vp->op = op_MEM_WRITE;
+	    read_int(fp, &(vp->arg.mem.addr_size));
+	    read_int(fp, &(vp->arg.mem.data_size));
+	    read_int(fp, &(vp->arg.mem.lines));
+	    break;
+	}
+	case 24: vp->op = op_LAT_LEQ; break;
+	default:
+	    DIE("Should never happen!");
+    }
+    read_ilist_ptr(fp, &(vp->inps));
+    read_ilist_ptr(fp, &(vp->outs));
+}
+
+
+fsm_ptr
+get_fsm_rec()
+{
+    fsm_ptr fsm;
+    if( fsm_free_list != NULL ) {
+	fsm = fsm_free_list;
+	fsm_free_list = fsm->next;
+	fsm->next = NULL;
+    } else {
+	fsm = (fsm_ptr) new_rec(&fsm_rec_mgr);
+    }
+    return fsm;
+}
+
+ste_ptr
+get_ste_rec()
+{
+    ste_ptr ste;
+    if( ste_free_list != NULL ) {
+	ste = ste_free_list;
+	ste_free_list = ste->next;
+	ste->next = NULL;
+    } else {
+	ste = (ste_ptr) new_rec(&ste_rec_mgr);
+    }
+    return ste;
+}
+
+vstate_ptr
+get_vstate_rec()
+{
+    vstate_ptr vp;
+    if( vstate_free_list != NULL ) {
+	vp = vstate_free_list;
+	vp->next = NULL;
+	vstate_free_list = vstate_free_list->next;
+    } else {
+	vp = new_rec(&vstate_rec_mgr);
+	vp->mark = 0;
+	vp->next = NULL;
+    }
+    return vp;
+}
+
+unint
+ilist_ptr_hash(pointer key, unint size)
+{
+    ilist_ptr ip = (ilist_ptr) key;
+    unint cur = 13;
+    while(ip != NULL) {
+	cur = (cur + 19*ip->from + 97*ip->to) % size;
+	ip = ip->next;
+    }
+    return cur;
+}
+
+bool
+ilist_ptr_equ(pointer k1, pointer k2)
+{
+    ilist_ptr ip1 = (ilist_ptr) k1;
+    ilist_ptr ip2 = (ilist_ptr) k2;
+    while( ip1 != NULL && ip2 != NULL ) {
+	if( ip1->from != ip2->from ) return FALSE;
+	if( ip1->to != ip2->to ) return FALSE;
+	ip1 = ip1->next;
+	ip2 = ip2->next;
+    }
+    if( ip1 != NULL || ip2 != NULL ) return FALSE;
+    return TRUE;
+}
+
 /********************************************************/
 /*	    EXPORTED EXTAPI FUNCTIONS    		*/
 /********************************************************/
-
-static void
-allocate_ste_buffers(fsm_ptr fsm)
-{
-    int nds  = COUNT_BUF(&(fsm->nodes));
-    weak_buf = allocate_value_buf(nds, c_ZERO, c_ZERO);
-    ant_buf  = allocate_value_buf(nds, c_ONE, c_ONE);
-    cons_buf = allocate_value_buf(nds, c_ONE, c_ONE);
-    cur_buf  = allocate_value_buf(nds, c_ONE, c_ONE);
-    next_buf = allocate_value_buf(nds, c_ONE, c_ONE);
-    // Set the initial values correctly for built-in constants
-    *(cur_buf+0) = c_ZERO; *(cur_buf+1) = c_ONE;    // !0
-    *(cur_buf+2) = c_ONE;  *(cur_buf+3) = c_ZERO;   // !1
-    *(cur_buf+4) = c_ONE;  *(cur_buf+5) = c_ONE;    // !X (bottom)
-    *(cur_buf+6) = c_ZERO; *(cur_buf+7) = c_ZERO;   // !T (top)
-}
-
-static void
-free_ste_buffers()
-{
-    Free(weak_buf);
-    Free(ant_buf);
-    Free(cons_buf);
-    Free(cur_buf);
-    Free(next_buf);
-    weak_buf = NULL;
-    ant_buf = NULL;
-    cons_buf = NULL;
-    cur_buf = NULL;
-    next_buf = NULL;
-}
-
-static void
-simulation_break_handler()
-{
-    if( quit_simulation_early ) return;
-    if( !gui_mode || use_stdout ) {
-        FP(err_fp, "\n\n---- Simulation interrupted ----\n");
-    }
-    quit_simulation_early = TRUE;
-}
-
-static void
-gSTE(g_ptr redex, value_type type)
-{
-    void    (*old_handler)();
-
-    // STE opts fsm wl ant cons trl
-    g_ptr g_opts, g_fsm, wl, ant, cons, trl;
-    nbr_errors_reported = 0;
-    EXTRACT_6_ARGS(redex, g_opts, g_fsm, wl, ant, cons, trl);
-    string opts = GET_STRING(g_opts);
-    bool trace_all = FALSE;
-    print_failures = RCprint_failures;
-    if( strstr(opts, "-s") != NULL )
-	print_failures = FALSE;
-    if( strstr(opts, "-e") != NULL )
-	trace_all = TRUE;
-    bool abort_ASAP = FALSE;
-    if( strstr(opts, "-a") != NULL )
-	abort_ASAP = TRUE;
-    int abort_time = 99999999;
-    //
-    string mt = strstr(opts, "-m");
-    if( mt != NULL ) {
-	if( sscanf(mt, "-m %d", &abort_time) != 1 ) {
-	    FP(warning_fp, "Unrecognized flag in STE call (");
-	    FP(warning_fp, "-m should be followed by time). Ignored.\n");
-	}
-    }
-    //
-    BDD_size_limit = -1;
-    string dw = strstr(opts, "-w");
-    if( dw != NULL ) {
-	if( type != use_bdds ) {
-	    FP(err_fp, "Weakening (-w) currently only avaliable in BDD based ");
-	    FP(err_fp, "STE. Flag ignored\n");
-	} else if( sscanf(dw, "-w %d", &BDD_size_limit) != 1 ) {
-	    FP(warning_fp, "Unrecognized flag in STE call (-w should be ");
-	    FP(warning_fp,"followed by BDD size limit). Ignored.\n");
-	}
-    }
-    information_flow_weakening = FALSE;
-    if( strstr(opts, "-ifw") != NULL ) {
-	if( type != use_bdds ) {
-	    FP(err_fp, "Information flow weakening (-ifw) only avaliable ");
-	    FP(err_fp, "in BDD based STE.  Flag ignored\n");
-	} else {
-	    information_flow_weakening = TRUE;
-	}
-    }
-
-    old_handler = signal(SIGINT, simulation_break_handler);
-    quit_simulation_early = FALSE;
-
-    fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
-    push_fsm(fsm);
-    ste_ptr ste = create_ste(fsm, type);
-    ste->abort_ASAP = abort_ASAP;
-    //
-    // Now translate weakenings, ant, cons and trl into events
-    //
-    bool ok = create_event_buffer(ste,event_bufp,wl,ant,cons,trl,abort_ASAP);
-    //
-    // Allocate value buffers
-    //
-    allocate_ste_buffers(fsm);
-    //
-    // Create event wheel buffers
-    //
-    buffer sim_wheel_buf;
-    sim_wheel_bufp = &sim_wheel_buf;
-    new_buf(sim_wheel_bufp, fsm->ranks, sizeof(buffer));
-    for(int i = 0; i <= fsm->ranks; i++) {
-	buffer b;
-	new_buf(&b, 100, sizeof(ncomp_ptr));
-	push_buf(sim_wheel_bufp, &b);
-    }
-    //
-    // Make sure g.c. can see the object
-    //
-    MAKE_REDEX_EXT_OBJ(redex, ste_oidx, ste);
-    if( !ok || quit_simulation_early ) {
-	ste->max_time = 0;
-	pop_fsm();
-	signal(SIGINT, old_handler);
-	return;
-    }
-    ste->active = TRUE;
-    //
-    // Perform constant propagation
-    //
-    bool old_RCverbose_ste_run = RCverbose_ste_run;
-    RCverbose_ste_run = FALSE;
-    if( !initialize(ste, trace_all) || quit_simulation_early ) {
-	if( quit_simulation_early ) {
-	    MAKE_REDEX_FAILURE(redex, Fail_pr("Simulation interrupted"));
-	} else {
-	    MAKE_REDEX_FAILURE(redex, Fail_pr("Initialization failed"));
-	}
-	free_ste_buffers();
-	ste->max_time = 0;
-	ste->active = FALSE;
-	pop_fsm();
-	signal(SIGINT, old_handler);
-	return;
-    }
-    RCverbose_ste_run = old_RCverbose_ste_run;
- 
-    // Is there anything to run?
-    if( COUNT_BUF(event_bufp) == 0 ) {
-	MAKE_REDEX_EXT_OBJ(redex, ste_oidx, ste);
-	ste->max_time = 0;
-	free_ste_buffers();
-	ste->active = FALSE;
-	pop_fsm();
-	signal(SIGINT, old_handler);
-	return;
-    }
-    //
-    // If yes, run the real STE algorithm
-    //
-    event_ptr ep = M_LOCATE_BUF(event_bufp, COUNT_BUF(event_bufp)-1);
-    int min_time = ep->time;
-    ep = FAST_LOC_BUF(event_bufp, 0);
-    int max_time = ep->time+1;
-
-    if( RCprint_time ) {
-	if( gui_mode ) {
-            Sprintf(buf, "simulation_start %d %d", min_time, max_time);
-            Info_to_tcl(buf);
-	} else {
-	    FP(bdd_gc_fp, "\nStart simulation:\n");
-	}
-    }
-    for(int t = min_time; t <= max_time; t++) {
-	ste->cur_time = t;
-	if( t > abort_time || quit_simulation_early ) {
-	    if( gui_mode ) {
-		Sprintf(buf, "simulation_end");
-		Info_to_tcl(buf);
-	    }
-	    FP(warning_fp, "Simulation interrupted at time %d\n", abort_time);
-	    ste->active = FALSE;
-	    signal(SIGINT, old_handler);
-	    return;
-	}
-	if( RCprint_time ) {
-	    if( gui_mode ) {
-		Sprintf(buf, "simulation_update %d", t);
-		Info_to_tcl(buf);
-	    } else {
-		if( (t % RCprint_time_mod) == 0 )
-		    FP(sim_fp, "Time: %d\n", t);
-	    }
-	}
-	process_event(event_bufp, t);
-	nnode_ptr np;
-	// Put nodes whose weak/ant changed on evaluation list.
-	int idx = 0;
-	FOR_BUF(nodesp, nnode_rec, np) {
-	    if( np->has_ant_or_weak_change ) {
-		if( np->composite >= 0 ) {
-		    ncomp_ptr c;
-		    c = (ncomp_ptr) M_LOCATE_BUF(compositesp,np->composite);
-		    add_op_todo(c);
-		} else if( np->composite == -1 ) {
-		    // Input node
-		    update_node(ste, idx, c_ONE, c_ONE);
-		}
-		np->has_ant_or_weak_change = FALSE;
-	    }
-	    idx++;
-	}
-	do_combinational(ste);
-	// Do consequents and traces
-	idx = 0;
-	FOR_BUF(nodesp, nnode_rec, np) {
-	    if( np->has_cons ) {
-		gbv curH = *(cur_buf+2*idx);
-		gbv curL = *(cur_buf+2*idx+1);
-		gbv chkH = *(cons_buf+2*idx);
-		gbv chkL = *(cons_buf+2*idx+1);
-		if( RCnotify_check_failures &&
-		    (nbr_errors_reported < RCmax_nbr_errors) )
-		{
-		    gbv ok = c_AND(c_OR(chkH,c_NOT(curH)),
-				   c_OR(chkL,c_NOT(curL)));
-		    if( c_NEQ(ok, c_ONE) ) {
-			FP(err_fp, "Warning: Consequent failure at time %d", t);
-			FP(err_fp, " on node %s\n", idx2name(idx));
-			if( print_failures ) {
-			    FP(err_fp, "Current value:");
-			    cHL_Print(err_fp, curH, curL);
-			    FP(err_fp, "\nExpected value:");
-			    cHL_Print(err_fp, chkH, chkL);
-			    /* Print a counter example */
-			    gbv bad = c_AND(
-					c_OR(c_AND(chkH,c_NOT(curH)),
-					     c_AND(c_NOT(chkH),curH)),
-					c_OR(c_AND(chkL,c_NOT(curL)),
-					     c_AND(c_NOT(chkL),curL)));
-			    if( c_NEQ(bad,c_ZERO) ) {
-				FP(err_fp, "\nStrong disagreement when: ");
-				c_Print(err_fp, bad, -1);
-			    } else {
-				FP(err_fp, "\nWeak disagreement when:");
-				gbv bad = c_OR(c_AND(c_NOT(chkH), curH),
-					       c_AND(c_NOT(chkL), curL));
-				c_Print(err_fp, bad, -1);
-			    }
-			    FP(err_fp, "\n");
-			}
-			nbr_errors_reported++;
-			FP(err_fp, "\n");
-			if( abort_ASAP ) {
-			    gbv v = ste->checkTrajectory;
-			    v = c_AND(v, c_OR(c_NOT(curH), chkH));
-			    v = c_AND(v, c_OR(c_NOT(curL), chkL));
-			    ste->checkTrajectory = v;
-			    if( gui_mode ) {
-				Sprintf(buf, "simulation_end");
-				Info_to_tcl(buf);
-			    }
-			    ste->active = FALSE;
-			    ste->max_time = t;
-			    signal(SIGINT, old_handler);
-			    return;
-			}
-		    }
-		}
-		gbv v = ste->checkTrajectory;
-		v = c_AND(v, c_OR(c_NOT(curH), chkH));
-		v = c_AND(v, c_OR(c_NOT(curL), chkL));
-		ste->checkTrajectory = v;
-	    }
-	    if( trace_all || np->has_trace ) {
-		gbv curH = *(cur_buf+2*idx);
-		gbv curL = *(cur_buf+2*idx+1);
-		record_trace(idx, t, curH, curL);
-	    }
-	    idx++;
-	}
-	do_phase(ste);
-	if( Do_gc_asap )
-	    Garbage_collect();
-    }
-    ste->max_time = max_time;
-    free_ste_buffers();
-    ste->active = FALSE;
-    if( gui_mode ) {
-	Sprintf(buf, "simulation_end");
-	Info_to_tcl(buf);
-    }
-    signal(SIGINT, old_handler);
-    pop_fsm();
-}
 
 static void
 newSTE(g_ptr redex)
@@ -893,165 +834,6 @@ static void
 bSTE(g_ptr redex)
 {
     gSTE(redex, use_bexprs);
-}
-
-void
-DBG_print_vec_ptr(vec_ptr vp) 
-{
-    for(vec_ptr p = vp; p != NULL; p = p->next) {
-	if( p->type == TXT ) {
-	    FP(err_fp, "%s", p->u.name);
-	} else {
-	    range_ptr r = p->u.ranges;
-	    while( r != NULL ) {
-		FP(err_fp, "<%d-%d>", r->upper, r->lower);
-		r = r->next;
-	    }
-	}
-    }
-    FP(err_fp, "\n");
-}
-
-static void
-base_print_ilist(ilist_ptr il)
-{
-    g_ptr nds = ilist2nds(il);
-    g_ptr res = Merge_Vectors(nds, TRUE);
-    while( !IS_NIL(res) ) {
-	FP(err_fp, " %s", GET_STRING(GET_CONS_HD(res)));
-	res = GET_CONS_TL(res);
-    }
-}
-
-void
-DBG_print_ilist(ilist_ptr il)
-{
-    FP(err_fp, " ilist:");
-    base_print_ilist(il);
-    FP(err_fp, "\n");
-}
-
-void
-DBG_print_vis_io_ptr(vis_io_ptr vp)
-{
-    FP(err_fp, " vis_io_ptr:");
-    while( vp ) {
-	FP(err_fp, " %s [", vp->f_vec);
-	base_print_ilist(vp->acts);
-	FP(err_fp, "]");
-	vp = vp->next;
-    }
-    FP(err_fp, "\n");
-}
-
-void
-DBG_print_ints(g_ptr il)
-{
-    while( !IS_NIL(il) ) {
-	FP(err_fp, " %s", GET_STRING(GET_CONS_HD(il)));
-	il = GET_CONS_TL(il);
-    }
-    FP(err_fp, "\n");
-}
-
-void
-DBG_pexlif(g_ptr pexlif)
-{
-    string pr_fn = wastrsave(&strings, "pretty_pexlif");
-    g_ptr fn = Make_VAR_leaf(pr_fn);
-    fn = Find_Function(symb_tbl, fn);
-    g_ptr res = Make_APPL_ND(fn, pexlif);
-    INC_REFCNT(pexlif);
-    Eval(res);
-    Flush(stdout_fp);
-}
-
-void
-dbg_print_sch_rec(sch_ptr sch, int indent)
-{
-    if( sch->children == NULL ) {
-	FP(err_fp, "%*s(LEAF %s %s)\n", indent, "", sch->vec, sch->pfn);
-    } else {
-	FP(err_fp, "%*s(NODE %s %s\n", indent, "", sch->vec, sch->pfn);
-	for(sch_list_ptr sl = sch->children; sl != NULL; sl = sl->next) {
-	    dbg_print_sch_rec(sl->sch, indent+3);
-	}
-	FP(err_fp, "%*s)\n", indent, "");
-    }
-}
-
-void
-DBG_print_sch(string title, sch_ptr sch)
-{
-    FP(err_fp, "===================================================\n");
-    FP(err_fp, "%s\n", title);
-    FP(err_fp, "===================================================\n");
-    dbg_print_sch_rec(sch, 0);
-}
-
-#if 1
-static void
-fl_clean_pexlif_ios(g_ptr redex)
-{
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr p = GET_APPLY_RIGHT(redex);
-    p = clean_pexlif_ios(p);
-    OVERWRITE(redex, p);
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);
-}
-#endif
-
-
-static fsm_ptr
-gen_pexlif2fsm(g_ptr p, g_ptr black_box_list, int max_depth)
-{
-    p = clean_pexlif_ios(p);
-    //
-    fsm_ptr fsm = create_fsm();
-    push_fsm(fsm);
-    new_buf(&attr_buf, 100, sizeof(g_ptr));
-    //
-    visualization_id = 0;
-    undeclared_node_cnt = 0;
-    new_mgr(&node_comp_pair_rec_mgr, sizeof(node_comp_pair_rec));
-    create_hash(&node_comp_pair_tbl, 1000, ni_pair_hash, ni_pair_equ);
-    create_hash(&idx_list_uniq_tbl, 100, idx_list_hash, idx_list_equ);
-    create_hash(&bb_tbl, 1000, str_hash, str_equ);
-    hash_record parent_tbl;
-    create_hash(&parent_tbl, 2, str_hash, str_equ);
-    if( black_box_list != NULL ) {
-	for(g_ptr bbl = black_box_list; !IS_NIL(bbl); bbl = GET_CONS_TL(bbl)) {
-	    string bb_inst = GET_STRING(GET_CONS_HD(bbl));
-	    insert_hash(&bb_tbl, bb_inst, bb_inst);
-	}
-    }
-    // Default nodes
-    // 0    == constant 0
-    // 1    == constant 1
-    // 2    == constant X
-    // 3    == constant top
-    declare_vector(&parent_tbl, "", wastrsave(&strings, "!0"),FALSE,NULL,NULL);
-    declare_vector(&parent_tbl, "", wastrsave(&strings, "!1"),FALSE,NULL,NULL);
-    declare_vector(&parent_tbl, "", wastrsave(&strings, "!X"),FALSE,NULL,NULL);
-    declare_vector(&parent_tbl, "", wastrsave(&strings, "!T"),FALSE,NULL,NULL);
-    ihier_buf[0] = 0;
-    if( traverse_pexlif(&parent_tbl, p, "", TRUE, 0, 1, max_depth) ) {
-        fsm->top_name = get_top_name(p);
-        fsm->ranks = rank_order();
-        fsm->sha256_sig = compute_sha256_signature(fsm);
-    } else {
-	fsm = NULL;
-    }
-    free_mgr(&node_comp_pair_rec_mgr);
-    dispose_hash(&node_comp_pair_tbl, NULLFCN);
-    dispose_hash(&parent_tbl, NULLFCN);
-    dispose_hash(&idx_list_uniq_tbl, NULLFCN);
-    dispose_hash(&bb_tbl, NULLFCN);
-    free_buf(&attr_buf);
-    pop_fsm();
-    return fsm;
 }
 
 static void
@@ -1101,14 +883,6 @@ pexlif2fsm2(g_ptr redex)
     }
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
-}
-
-static int
-nn_cmp(const void *pi, const void *pj)
-{
-    string *i = (string *) pi;
-    string *j = (string *) pj;
-    return( strcmp(*i, *j) );
 }
 
 static void
@@ -1282,35 +1056,6 @@ outputs(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
-static bool
-is_draw_fub(vis_ptr vp)
-{
-    return( strncmp(vp->pfn, "draw_fub ", strlen("draw_fub ")) == 0 );
-}
-
-static vis_ptr
-get_vis_info_at_level(vis_list_ptr vlp, int level)
-{
-    if( level < 0 ) {
-	// Find the lowest, non-fub version
-	int least = 9999999;
-	vis_ptr res = NULL;
-	for( vis_list_ptr cp = vlp; cp != NULL; cp = cp->next ) {
-	    if( !is_draw_fub(cp->vp) ) {
-		if( cp->vp->draw_level < least ) {
-		    least = cp->vp->draw_level;
-		    res = cp->vp;
-		}
-	    }
-	}
-	return res;
-    } else {
-	while( vlp && vlp->vp->draw_level != level ) { vlp = vlp->next; }
-	if( vlp == NULL ) return NULL;
-	return vlp->vp;
-    }
-}
-
 static void
 visualization_nodes(g_ptr redex)
 {
@@ -1355,7 +1100,7 @@ get_latch_type(g_ptr redex)
         return;
     }
     nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
-    string res = s_empty_string;
+    string res = s_ES;
     vis_list_ptr vp = np->draw_info;
     while( vp != NULL ) {
 	string s;
@@ -1388,7 +1133,7 @@ is_latch(g_ptr redex)
         return;
     }
     nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
-    string res = s_empty_string;
+    string res = s_ES;
     vis_list_ptr vp = np->draw_info;
     while( vp != NULL ) {
 	string s;
@@ -1398,7 +1143,7 @@ is_latch(g_ptr redex)
 	}
 	vp = vp->next;
     }
-    if( res == s_empty_string ) {
+    if( res == s_ES ) {
 	MAKE_REDEX_BOOL(redex, B_Zero());
     } else {
 	MAKE_REDEX_BOOL(redex, B_One());
@@ -1582,8 +1327,15 @@ get_visualization_attributes(g_ptr redex)
 			   Fail_pr("Node %s has no drawing information", node));
 	return;
     }
-    INC_REFCNT(vp->attrs);
-    OVERWRITE(redex, vp->attrs);
+    MAKE_REDEX_NIL(redex);
+    g_ptr tail = redex;
+    attr_list_ptr ap = vp->attrs;
+    while( ap != NULL ) {
+	g_ptr nm = Make_STRING_leaf(wastrsave(&strings, ap->name));
+	g_ptr vl = Make_STRING_leaf(wastrsave(&strings, ap->value));
+	APPEND1(tail, Make_PAIR_ND(nm, vl));
+	ap = ap->next;
+    }
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -2018,22 +1770,6 @@ ste2fsm(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
-static string
-value_type2string(value_type type)
-{
-    switch( type ) {
-	case use_bdds:
-	    return s_use_bdds;
-	case use_bexprs:
-	    return s_use_bexprs;
-	case use_ints:
-	    return s_use_ints;
-	default:
-	    DIE("Impossible");
-    }
-    DIE("Impossible");
-}
-
 static void
 get_weak_expressions(g_ptr redex)
 {
@@ -2098,52 +1834,6 @@ get_abstract_depends(g_ptr redex)
 }
 
 static void
-gen_get_trace(g_ptr redex, value_type type)
-{
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr g_ste, g_node;
-    EXTRACT_2_ARGS(redex, g_ste, g_node);
-    ste_ptr ste = (ste_ptr) GET_EXT_OBJ(g_ste);
-    if( ste->type != type ) {
-	string msg = Fail_pr("Asking for %s values when STE run created %ss",
-			      value_type2string(type),
-			      value_type2string(ste->type));
-	MAKE_REDEX_FAILURE(redex, msg);
-	return;
-    }
-    string node = GET_STRING(g_node);
-    push_ste(ste);
-    push_fsm(ste->fsm);
-    int idx = name2idx(node);
-    if( idx < 0 ) {
-	pop_ste();
-	pop_fsm();
-	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
-	return;
-    }
-    trace_ptr tp = (trace_ptr) find_hash(trace_tblp, INT2PTR(idx));
-    if( tp == NULL ) {
-	pop_ste();
-	pop_fsm();
-	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not traced", node));
-	return;
-    }
-    MAKE_REDEX_NIL(redex);
-    g_ptr tail = redex;
-    for(trace_event_ptr te = tp->events; te != NULL; te = te->next) {
-	g_ptr event = Make_CONS_ND(Make_INT_leaf(te->time),
-				   Make_CONS_ND(Make_GBV_leaf(te->H),
-						Make_GBV_leaf(te->L)));
-	APPEND1(tail, event);
-    }
-    pop_fsm();
-    pop_ste();
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);
-}
-
-static void
 get_trace(g_ptr redex)
 {
     gen_get_trace(redex, use_bdds);
@@ -2153,56 +1843,6 @@ static void
 get_btrace(g_ptr redex)
 {
     gen_get_trace(redex, use_bexprs);
-}
-
-static void
-gen_get_trace_val(g_ptr redex, value_type type)
-{
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr g_ste, g_node, g_time;
-    EXTRACT_3_ARGS(redex, g_ste, g_node, g_time);
-    ste_ptr ste = (ste_ptr) GET_EXT_OBJ(g_ste);
-    if( ste->type != type ) {
-	string msg = Fail_pr("Asking for %s values when STE run created %ss",
-			      value_type2string(type),
-			      value_type2string(ste->type));
-	MAKE_REDEX_FAILURE(redex, msg);
-	return;
-    }
-    string node = GET_STRING(g_node);
-    int	time = GET_INT(g_time);
-    push_ste(ste);
-    push_fsm(ste->fsm);
-    int idx = name2idx(node);
-    if( idx < 0 ) {
-	pop_ste();
-	pop_fsm();
-	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in ste-fsm", node));
-	return;
-    }
-    trace_ptr tp = (trace_ptr) find_hash(trace_tblp, INT2PTR(idx));
-    if( tp == NULL ) {
-	pop_ste();
-	pop_fsm();
-	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not traced", node));
-	return;
-    }
-    bool found = FALSE;
-    for(trace_event_ptr te = tp->events; te != NULL; te = te->next) {
-	if( te->time <= time ) {
-	    found = TRUE;
-	    MAKE_REDEX_CONS_ND(redex,Make_GBV_leaf(te->H),Make_GBV_leaf(te->L));
-	    break;
-	}
-    }
-    if( !found ) {
-	MAKE_REDEX_CONS_ND(redex,Make_GBV_leaf(c_ONE),Make_GBV_leaf(c_ONE));
-    }
-    pop_fsm();
-    pop_ste();
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);
 }
 
 static void
@@ -2260,52 +1900,6 @@ get_ste_type(g_ptr redex)
     ste_ptr ste = (ste_ptr) GET_EXT_OBJ(g_ste);
     string type = value_type2string(ste->type);
     MAKE_REDEX_STRING(redex, type);
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);
-}
-
-static void
-gen_get_ste_result(g_ptr redex, value_type type)
-{
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr g_ste, g_flag;
-    EXTRACT_2_ARGS(redex, g_ste, g_flag);
-    ste_ptr ste = (ste_ptr) GET_EXT_OBJ(g_ste);
-    if( ste->type != type ) {   
-        string msg = Fail_pr("Asking for %s value when STE run created %ss",
-                              value_type2string(type),
-                              value_type2string(ste->type));
-        MAKE_REDEX_FAILURE(redex, msg);
-        return;
-    }
-    string flag = GET_STRING(g_flag);
-    gbv res;
-    if( strcmp(flag, "antOK") == 0 ) {
-	res = ste->assertion_OK;
-    } else if( strcmp(flag, "trajOK") == 0 ) {
-	res = ste->validTrajectory;
-    } else if( strcmp(flag, "consOK") == 0 ) {
-	res = ste->check_OK;
-    } else if( strcmp(flag, "checkOK") == 0 ) {
-	res = ste->checkTrajectory;
-    } else if( strcmp(flag, "implies") == 0 ) {
-	// Implication only
-	res = c_OR(c_NOT(ste->assertion_OK),
-                   c_OR(c_NOT(ste->validTrajectory),
-                        c_AND(ste->checkTrajectory, ste->check_OK)));
-    } else if( strcmp(flag, "strong") == 0 || strcmp(flag, "") == 0 ) {
-	// All (normal)
-	res = c_AND(ste->assertion_OK,
-                   c_AND(ste->validTrajectory,
-                        c_AND(ste->checkTrajectory, ste->check_OK)));
-    } else {
-        MAKE_REDEX_FAILURE(redex,
-			   Fail_pr("Unknown type (%s) in (b)get_ste_result",
-				    flag));
-        return;
-    }
-    MAKE_REDEX_GBV(redex, res);
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
@@ -2586,37 +2180,6 @@ visualize_expand_fanin(g_ptr redex)
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
-
-#if 0
-static void
-dbg_print_ils(pointer key, pointer data)
-{
-    (void) data;
-    ilist_ptr il = (ilist_ptr) key;
-    g_ptr nds = ilist2nds(il);
-    g_ptr vecs = Merge_Vectors(nds, TRUE);
-    string res = strtemp("");
-    bool first = TRUE;
-    while( !IS_NIL(vecs) ) {
-	if( !first )
-	    charappend(' ');
-	first = FALSE;
-	strappend(GET_STRING(GET_CONS_HD(vecs)));
-	vecs = GET_CONS_TL(vecs);
-    }
-    FP(err_fp, "%s\n", res);
-}
-#endif
-
-#if 0
-static void
-dbg_print_stop_nds(pointer key, pointer data)
-{
-    (void) data;
-    int id = PTR2INT(key);
-    FP(err_fp, " %s", idx2name(id));
-}
-#endif
 
 
 // visualize_hide_fanin vfsm anon
@@ -3165,6 +2728,51 @@ Fsm_Install_Functions()
 /*                    LOCAL FUNCTIONS    		*/
 /********************************************************/
 
+static void
+save_fsm_fn(FILE *fp, pointer p)
+{
+    fsm_ptr fsm = (fsm_ptr) p;
+    write_fsm_ptr(fp, fsm);
+}
+
+static pointer
+load_fsm_fn(FILE *fp)
+{
+    fsm_ptr fsm;
+    read_fsm_ptr(fp, &fsm);
+    return( (pointer) fsm);
+}
+
+static void
+save_ste_fn(FILE *fp, pointer p)
+{
+    ste_ptr ste = (ste_ptr) p;
+    write_ste_ptr(fp, ste);
+}
+
+static pointer
+load_ste_fn(FILE *fp)
+{
+    ste_ptr ste;
+    read_ste_ptr(fp, &ste);
+    return( (pointer) ste);
+}
+
+static void
+save_vstate_fn(FILE *fp, pointer p)
+{
+    vstate_ptr vstate = (vstate_ptr) p;
+    write_vstate_ptr(fp, vstate);
+}
+
+static pointer
+load_vstate_fn(FILE *fp)
+{
+    vstate_ptr vstate;
+    read_vstate_ptr(fp, &vstate);
+    return( (pointer) vstate);
+}
+
 static unint
 ni_pair_hash(pointer key, unint size)
 {
@@ -3178,33 +2786,6 @@ ni_pair_equ(pointer k1, pointer k2)
     node_comp_pair_ptr ncp1 = (node_comp_pair_ptr) k1;
     node_comp_pair_ptr ncp2 = (node_comp_pair_ptr) k2;
     return( (ncp1->np == ncp2->np) && (ncp1->comp_idx == ncp2->comp_idx) );
-}
-
-static unint
-ilist_ptr_hash(pointer key, unint size)
-{
-    ilist_ptr ip = (ilist_ptr) key;
-    unint cur = 13;
-    while(ip != NULL) {
-	cur = (cur + 19*ip->from + 97*ip->to) % size;
-	ip = ip->next;
-    }
-    return cur;
-}
-
-static bool
-ilist_ptr_equ(pointer k1, pointer k2)
-{
-    ilist_ptr ip1 = (ilist_ptr) k1;
-    ilist_ptr ip2 = (ilist_ptr) k2;
-    while( ip1 != NULL && ip2 != NULL ) {
-	if( ip1->from != ip2->from ) return FALSE;
-	if( ip1->to != ip2->to ) return FALSE;
-	ip1 = ip1->next;
-	ip2 = ip2->next;
-    }
-    if( ip1 != NULL || ip2 != NULL ) return FALSE;
-    return TRUE;
 }
 
 
@@ -3271,18 +2852,11 @@ pop_undo_point(vstate_ptr vp)
     vp->old_versions = vp->old_versions->next;
 }
 
+
 static vstate_ptr
 mk_vstate(fsm_ptr fsm)
 {
-    vstate_ptr vp;
-    if( vstate_free_list != NULL ) {
-	vp = vstate_free_list;
-	vstate_free_list = vstate_free_list->next;
-    } else {
-	vp = new_rec(&vstate_rec_mgr);
-	vp->mark = 0;
-	vp->next = NULL;
-    }
+    vstate_ptr vp = get_vstate_rec();
     vp->fsm = fsm;
     create_hash(&(vp->done), 100, ilist_ptr_hash, ilist_ptr_equ);
     create_hash(&(vp->stop_nds), 100, int_hash, int_equ);
@@ -3333,19 +2907,6 @@ get_vector_signature(vec_ptr vp)
     return( wastrsave(&strings, sig) );
 }
 
-void
-dbg_dump_buf(string msg, gbv *buf)
-{
-    FP(err_fp, "\n-----%s------\n ", msg);
-    for(unint i = 0; i < COUNT_BUF(nodesp); i++) {
-	FP(err_fp, "Node %s: ", idx2name(i));
-	gbv H = *(buf+2*i);
-	gbv L = *(buf+2*i+1);
-	cHL_Print(err_fp, H, L);
-	FP(err_fp, "\n");
-    }
-}
-
 static fsm_ptr
 create_fsm()
 {
@@ -3362,15 +2923,9 @@ create_fsm()
     rec_mgr	*_vis_io_rec_mgrp;
     rec_mgr	*_vis_rec_mgrp;
     rec_mgr	*_vis_list_rec_mgrp;
+    rec_mgr	*_attr_list_rec_mgrp;
     //
-    fsm_ptr fsm;
-    if( fsm_free_list != NULL ) {
-	fsm = fsm_free_list;
-	fsm_free_list = fsm->next;
-	fsm->next = NULL;
-    } else {
-	fsm = (fsm_ptr) new_rec(&fsm_rec_mgr);
-    }
+    fsm_ptr fsm = get_fsm_rec();
     fsm->next = NULL;
     fsm->mark = 1;
     //
@@ -3412,6 +2967,9 @@ create_fsm()
     //
     _vis_list_rec_mgrp = &(fsm->vis_list_rec_mgr);
     new_mgr(_vis_list_rec_mgrp, sizeof(vis_list_rec));
+    //
+    _attr_list_rec_mgrp = &(fsm->attr_list_rec_mgr);
+    new_mgr(_attr_list_rec_mgrp, sizeof(attr_list_rec));
     //
     return fsm;
 }
@@ -3574,22 +3132,22 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	    Fail_pr("Cannot find node %s in weakening list\n", node);
 	    longjmp(event_jmp_env, 1);
 	}
-	event_rec er;
+	event_ptr ep = new_rec(event_rec_mgrp);
 	int event_id = event_id_cnt++;
-	er.event_id = event_id;
-	er.type = start_weak;
-	er.nd_idx = nd_idx;
-	er.time = from;
-	er.H = when;
-	er.L = when;
-	push_buf(ebufp, &er);
-	er.event_id = event_id;
-	er.type = end_weak;
-	er.nd_idx = nd_idx;
-	er.time = to;
-	er.H = when;
-	er.L = when;
-	push_buf(ebufp, &er);
+	ep->event_id = event_id;
+	ep->type = start_weak;
+	ep->nd_idx = nd_idx;
+	ep->time = from;
+	ep->H = when;
+	ep->L = when;
+	push_buf(ebufp, &ep);
+	ep->event_id = event_id;
+	ep->type = end_weak;
+	ep->nd_idx = nd_idx;
+	ep->time = to;
+	ep->H = when;
+	ep->L = when;
+	push_buf(ebufp, &ep);
     }
     for(g_ptr cur = ant; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
 	g_ptr t = GET_CONS_HD(cur);
@@ -3602,15 +3160,15 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	    Fail_pr("Cannot find node %s in antecedent\n", node);
 	    longjmp(event_jmp_env, 1);
 	}
-	event_rec er;
+	event_ptr ep = new_rec(event_rec_mgrp);
 	int event_id = event_id_cnt++;
-	er.event_id = event_id;
-	er.type = start_ant;
-	er.nd_idx = nd_idx;
-	er.time = from;
-	er.H = c_OR(c_NOT(when), val);
-	er.L = c_OR(c_NOT(when), c_NOT(val));
-	gbv okA = c_OR(er.H, er.L);
+	ep->event_id = event_id;
+	ep->type = start_ant;
+	ep->nd_idx = nd_idx;
+	ep->time = from;
+	ep->H = c_OR(c_NOT(when), val);
+	ep->L = c_OR(c_NOT(when), c_NOT(val));
+	gbv okA = c_OR(ep->H, ep->L);
 	if( RCnotify_OK_A_failures &&
 	    (nbr_errors_reported < RCmax_nbr_errors) &&
 	    c_NEQ(okA,c_ONE) )
@@ -3626,14 +3184,14 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	    }
 	}
 	ste->assertion_OK = c_AND(ste->assertion_OK, okA);
-	push_buf(ebufp, &er);
-	er.event_id = event_id;
-	er.type = end_ant;
-	er.nd_idx = nd_idx;
-	er.time = to;
-	er.H = c_ONE;
-	er.L = c_ONE;
-	push_buf(ebufp, &er);
+	push_buf(ebufp, &ep);
+	ep->event_id = event_id;
+	ep->type = end_ant;
+	ep->nd_idx = nd_idx;
+	ep->time = to;
+	ep->H = c_ONE;
+	ep->L = c_ONE;
+	push_buf(ebufp, &ep);
     }
     for(g_ptr cur = cons; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
 	g_ptr t = GET_CONS_HD(cur);
@@ -3646,15 +3204,15 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	    Fail_pr("Cannot find node %s in consequent\n", node);
 	    longjmp(event_jmp_env, 1);
 	}
-	event_rec er;
+	event_ptr ep = new_rec(event_rec_mgrp);
 	int event_id = event_id_cnt++;
-	er.event_id = event_id;
-	er.type = start_cons;
-	er.nd_idx = nd_idx;
-	er.time = from;
-	er.H = c_OR(c_NOT(when), val);
-	er.L = c_OR(c_NOT(when), c_NOT(val));
-	gbv okC = c_OR(er.H, er.L);
+	ep->event_id = event_id;
+	ep->type = start_cons;
+	ep->nd_idx = nd_idx;
+	ep->time = from;
+	ep->H = c_OR(c_NOT(when), val);
+	ep->L = c_OR(c_NOT(when), c_NOT(val));
+	gbv okC = c_OR(ep->H, ep->L);
 	if( RCnotify_OK_C_failures &&
 	    (nbr_errors_reported < RCmax_nbr_errors) &&
 	    c_NEQ(okC,c_ONE) )
@@ -3670,14 +3228,14 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	    }
 	}
 	ste->check_OK = c_AND(ste->check_OK, okC);
-	push_buf(ebufp, &er);
-	er.event_id = event_id;
-	er.type = end_cons;
-	er.nd_idx = nd_idx;
-	er.time = to;
-	er.H = c_ONE;
-	er.L = c_ONE;
-	push_buf(ebufp, &er);
+	push_buf(ebufp, &ep);
+	ep->event_id = event_id;
+	ep->type = end_cons;
+	ep->nd_idx = nd_idx;
+	ep->time = to;
+	ep->H = c_ONE;
+	ep->L = c_ONE;
+	push_buf(ebufp, &ep);
     }
     for(g_ptr cur = trl; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
 	g_ptr t = GET_CONS_HD(cur);
@@ -3689,22 +3247,22 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	    Fail_pr("Cannot find node %s in trace list\n", node);
 	    longjmp(event_jmp_env, 1);
 	}
-	event_rec er;
+	event_ptr ep = new_rec(event_rec_mgrp);
 	int event_id = event_id_cnt++;
-	er.event_id = event_id;
-	er.type = start_trace;
-	er.nd_idx = nd_idx;
-	er.time = from;
-	er.H = c_ZERO;	// Don't care
-	er.L = c_ZERO;	// Don't care
-	push_buf(ebufp, &er);
-	er.event_id = event_id;
-	er.type = end_trace;
-	er.nd_idx = nd_idx;
-	er.time = to;
-	er.H = c_ZERO;
-	er.L = c_ZERO;
-	push_buf(ebufp, &er);
+	ep->event_id = event_id;
+	ep->type = start_trace;
+	ep->nd_idx = nd_idx;
+	ep->time = from;
+	ep->H = c_ZERO;	// Don't care
+	ep->L = c_ZERO;	// Don't care
+	push_buf(ebufp, &ep);
+	ep->event_id = event_id;
+	ep->type = end_trace;
+	ep->nd_idx = nd_idx;
+	ep->time = to;
+	ep->H = c_ZERO;
+	ep->L = c_ZERO;
+	push_buf(ebufp, &ep);
     }
     // Sort in decreasing time, node index, and start/end so that
     // start_events on a node comes before end events on the same node & time
@@ -3720,7 +3278,8 @@ process_event(buffer *event_bufp, int time)
     while ( !done ) {
 	int sz = COUNT_BUF(event_bufp);
 	if( sz == 0 ) return;
-	event_ptr ep = (event_ptr) M_LOCATE_BUF(event_bufp, sz-1);
+	event_ptr *epp = (event_ptr*) M_LOCATE_BUF(event_bufp, sz-1);
+	event_ptr ep = *epp;
 	if( ep->time > time ) {
 	    done = TRUE;
 	} else {
@@ -3846,14 +3405,7 @@ record_trace(int idx, int time, gbv H, gbv L)
 static ste_ptr
 create_ste(fsm_ptr fsm, value_type type)
 {
-    ste_ptr ste;
-    if( ste_free_list != NULL ) {
-	ste = ste_free_list;
-	ste_free_list = ste->next;
-	ste->next = NULL;
-    } else {
-	ste = (ste_ptr) new_rec(&ste_rec_mgr);
-    }
+    ste_ptr ste = get_ste_rec();
     ste->mark = 1;
     ste->max_time = 0;
     ste->next = NULL;
@@ -3871,12 +3423,14 @@ create_ste(fsm_ptr fsm, value_type type)
     new_mgr(_trace_event_rec_mgrp, sizeof(trace_event_rec));
     rec_mgr     *_trace_rec_mgrp = &(ste->trace_rec_mgr);
     new_mgr(_trace_rec_mgrp, sizeof(trace_rec));
+    rec_mgr     *_event_rec_mgrp = &(ste->event_rec_mgr);
+    new_mgr(_event_rec_mgrp, sizeof(event_rec));
     rec_mgr     *_event_list_rec_mgr = &(ste->event_list_rec_mgr);
     new_mgr(_event_list_rec_mgr, sizeof(event_list_rec));
     buffer     *_weakening_bufp = &(ste->weakening_buf);
     new_buf(_weakening_bufp, 100, sizeof(formula));
     buffer     *_event_bufp = &(ste->event_buf);
-    new_buf(_event_bufp, 1000, sizeof(event_rec));
+    new_buf(_event_bufp, 1000, sizeof(event_ptr));
     push_ste(ste);
     ste->validTrajectory = c_ONE;
     ste->checkTrajectory = c_ONE;
@@ -3896,6 +3450,7 @@ push_ste(ste_ptr ste)
     old_trace_event_rec_mgrp = trace_event_rec_mgrp;
     old_event_list_rec_mgrp = event_list_rec_mgrp;
     old_trace_rec_mgrp = trace_rec_mgrp;
+    old_event_rec_mgrp = event_rec_mgrp;
     old_weakening_bufp = weakening_bufp;
     old_event_bufp = event_bufp;
     current_type = ste->type;
@@ -3919,6 +3474,7 @@ push_ste(ste_ptr ste)
     trace_event_rec_mgrp = &(ste->trace_event_rec_mgr);
     event_list_rec_mgrp = &(ste->event_list_rec_mgr);
     trace_rec_mgrp = &(ste->trace_rec_mgr);
+    event_rec_mgrp = &(ste->event_rec_mgr);
     weakening_bufp = &(ste->weakening_buf);
     event_bufp = &(ste->event_buf);
 }
@@ -3947,6 +3503,7 @@ pop_ste()
     trace_event_rec_mgrp = old_trace_event_rec_mgrp;
     event_list_rec_mgrp = old_event_list_rec_mgrp;
     trace_rec_mgrp = old_trace_rec_mgrp;
+    event_rec_mgrp = old_event_rec_mgrp;
     weakening_bufp = old_weakening_bufp;
     event_bufp = old_event_bufp;
 }
@@ -3967,6 +3524,7 @@ push_fsm_env(fsm_ptr fsm)
     old_vis_io_rec_mgrp = vis_io_rec_mgrp;
     old_vis_rec_mgrp = vis_rec_mgrp;
     old_vis_list_rec_mgrp = vis_list_rec_mgrp;
+    old_attr_list_rec_mgrp = attr_list_rec_mgrp;
     all_name_tblp = &(fsm->all_name_tbl);
     vec_info_rec_mgrp = &(fsm->vec_info_rec_mgr);
     ilist_rec_mgrp = &(fsm->ilist_rec_mgr);
@@ -3980,6 +3538,7 @@ push_fsm_env(fsm_ptr fsm)
     vis_io_rec_mgrp = &(fsm->vis_io_rec_mgr);
     vis_rec_mgrp = &(fsm->vis_rec_mgr);
     vis_list_rec_mgrp = &(fsm->vis_list_rec_mgr);
+    attr_list_rec_mgrp = &(fsm->attr_list_rec_mgr);
 }
 
 static void
@@ -4023,10 +3582,6 @@ mark_fsm_fn(pointer p)
 	if( op == op_CONST ) {
 	    Arbi_mark(cp->arg.value);
 	}
-    }
-    vis_ptr vp;
-    FOR_REC(&(fsm->vis_rec_mgr), vis_ptr, vp) {
-	Mark(vp->attrs);
     }
 }
 
@@ -4095,10 +3650,10 @@ mark_ste_fn(pointer p)
     FOR_BUF(weakening_bufp, formula, fp) {
 	B_Mark(*fp);
     }
-    event_ptr ep;
-    FOR_BUF(event_bufp, event_rec, ep) {
-	gbv_mark(ep->H);
-	gbv_mark(ep->L);
+    event_ptr *epp;
+    FOR_BUF(event_bufp, event_ptr, epp) {
+	gbv_mark((*epp)->H);
+	gbv_mark((*epp)->L);
     }
     pop_fsm_env();
     pop_ste();
@@ -4160,6 +3715,7 @@ sweep_fsm_fn(void)
 		free_mgr(&(fsm->vis_io_rec_mgr));
 		free_mgr(&(fsm->vis_rec_mgr));
 		free_mgr(&(fsm->vis_list_rec_mgr));
+		free_mgr(&(fsm->attr_list_rec_mgr));
 		fsm->next = fsm_free_list;
 		fsm_free_list = fsm;
 		fsm->mark = 0;
@@ -4189,6 +3745,7 @@ sweep_ste_fn(void)
 		free_mgr(&(ste->trace_event_rec_mgr));
 		free_mgr(&(ste->event_list_rec_mgr));
 		free_mgr(&(ste->trace_rec_mgr));
+		free_mgr(&(ste->event_rec_mgr));
 		free_buf(&(ste->event_buf));
 		free_buf(&(ste->weakening_buf));
 		ste->next = ste_free_list;
@@ -4231,602 +3788,6 @@ ste_gmap2_fn(gmap_info_ptr ip, pointer a, pointer b)
     (void) b;
     DIE("Not implemented yet");
 }
-
-static void
-insert_pointer_map(pointer old_ptr, pointer new_ptr)
-{
-    pointer p = find_hash(&pointer_map, old_ptr);
-    if( p == NULL )
-	insert_hash(&pointer_map, old_ptr, new_ptr);
-    else if( p != new_ptr ) {
-	Rprintf("Corrupted file. Pointer mismatch");
-    }
-}
-
-static pointer
-old2new(pointer old)
-{
-    if( old == NULL ) return NULL;
-    return( find_hash(&pointer_map, old) );
-}
-
-static void
-write_ptr(FILE *fp, pointer p, bool nl)
-{
-    fprintf(fp, "%p%s", p, nl?"\n" : " ");
-}
-
-static pointer
-read_ptr(FILE *fp, bool nl)
-{
-    pointer p;
-    if( nl ) {
-	if( fscanf(fp, "%p\n", &p) != 1 )
-	    Rprintf("Corrupted fsm object (expeced pointer)");
-    } else {
-	if( fscanf(fp, "%p ", &p) != 1 )
-	    Rprintf("Corrupted fsm object (expeced pointer)");
-    }
-    return( p );
-}
-
-static void
-write_string(FILE *fp, string s, bool nl)
-{
-    fprintf(fp, "%d%s", Save_get_string_idx(s), nl?"\n":" ");
-}
-
-static string
-read_string(FILE *fp, bool nl)
-{
-    int idx;
-    if( nl ) {
-	if( fscanf(fp, "%d\n", &idx) != 1 )
-	    Rprintf("Corrupted fsm object (expeced string)");
-    } else {
-	if( fscanf(fp, "%d ", &idx) != 1 )
-	    Rprintf("Corrupted fsm object (expeced string)");
-    }
-    return( Load_get_string_from_idx(idx) );
-}
-
-static void
-write_int(FILE *fp, int i, bool nl)
-{
-    fprintf(fp, "%d%s", i, nl?"\n":" ");
-}
-
-static int
-read_int(FILE *fp, bool nl)
-{
-    int i;
-    if( nl ) {
-	if( fscanf(fp, "%d\n", &i) != 1 )
-	    Rprintf("Corrupted fsm object (expected integer)");
-    } else {
-	if( fscanf(fp, "%d ", &i) != 1 )
-	    Rprintf("Corrupted fsm object (expected integer)");
-    }
-    return( i );
-}
-
-static void
-write_vis_io_recs(FILE *fp, rec_mgr *vis_io_rec_mgrp)
-{
-    vis_io_ptr vp;
-    int cnt = 0;
-    FOR_REC(vis_io_rec_mgrp, vis_io_ptr, vp) {
-	cnt++;
-    }
-    write_int(fp, cnt, TRUE);
-    FOR_REC(vis_io_rec_mgrp, vis_io_ptr, vp) {
-	write_ptr(fp, vp, FALSE);
-	write_string(fp, vp->f_vec, FALSE);
-	write_ptr(fp, vp->acts, FALSE);
-	write_ptr(fp, vp->next, TRUE);
-    }
-}
-
-static void
-read_vis_io_recs(FILE *fp, rec_mgr *vis_io_rec_mgrp)
-{
-    int cnt = read_int(fp, TRUE);
-    for(int i = 0; i < cnt; i++) {
-	vis_io_ptr vp = (vis_io_ptr) new_rec(vis_io_rec_mgrp);
-	pointer p = read_ptr(fp, FALSE);
-	insert_pointer_map(p, (pointer) vp);
-	vp->f_vec = read_string(fp, FALSE);
-	vp->acts = old2new(read_ptr(fp, FALSE));
-	// Place holder
-	vp->next = read_ptr(fp, TRUE);
-    }
-    // Replace old with new pointers
-    vis_io_ptr vp;
-    FOR_REC(vis_io_rec_mgrp, vis_io_ptr, vp) {
-	vp->next = old2new(vp->next);
-    }
-}
-
-static void
-write_vis_recs(FILE *fp, rec_mgr *vis_rec_mgrp)
-{
-    vis_ptr vp;
-    int cnt = 0;
-    FOR_REC(vis_rec_mgrp, vis_ptr, vp) {
-	cnt++;
-    }
-    write_int(fp, cnt, TRUE);
-    FOR_REC(vis_rec_mgrp, vis_ptr, vp) {
-	write_ptr(fp, vp, FALSE);
-	write_int(fp, vp->id, FALSE);
-	write_string(fp, vp->pfn, FALSE);
-	write_ptr(fp, vp->fa_inps, FALSE);
-	write_ptr(fp, vp->fa_inps, TRUE);
-    }
-}
-
-static void
-read_vis_recs(FILE *fp, rec_mgr *vis_rec_mgrp)
-{
-    int cnt = read_int(fp, TRUE);
-    for(int i = 0; i < cnt; i++) {
-	vis_ptr vp = (vis_ptr) new_rec(vis_rec_mgrp);
-	pointer p = read_ptr(fp, FALSE);
-	insert_pointer_map(p, (pointer) vp);
-	vp->id  = read_int(fp, FALSE);
-	vp->pfn = read_string(fp, FALSE);
-	vp->fa_inps = old2new(read_ptr(fp, FALSE));
-	vp->fa_outs = old2new(read_ptr(fp, FALSE));
-    }
-}
-
-static void
-write_range_recs(FILE *fp, rec_mgr *range_rec_mgrp)
-{
-    range_ptr rp;
-    int cnt = 0;
-    FOR_REC(range_rec_mgrp, range_ptr, rp) {
-	cnt++;
-    }
-    write_int(fp, cnt, TRUE);
-    FOR_REC(range_rec_mgrp, range_ptr, rp) {
-	write_ptr(fp, rp, FALSE);
-	write_int(fp, rp->upper, FALSE);
-	write_int(fp, rp->lower, FALSE);
-	write_ptr(fp, rp->next, TRUE);
-    }
-}
-
-static void
-read_range_recs(FILE *fp, rec_mgr *range_rec_mgrp)
-{
-    int cnt = read_int(fp, TRUE);
-    for(int i = 0; i < cnt; i++) {
-	range_ptr rp = (range_ptr) new_rec(range_rec_mgrp);
-	pointer p = read_ptr(fp, FALSE);
-	insert_pointer_map(p, (pointer) rp);
-	rp->upper = read_int(fp, FALSE);
-	rp->lower = read_int(fp, FALSE);
-	// Place holder
-	rp->next = read_ptr(fp, TRUE);
-    }
-    // Replace old with new pointers
-    range_ptr rp;
-    FOR_REC(range_rec_mgrp, range_ptr, rp) {
-	rp->next = old2new(rp->next);
-    }
-}
-
-static void
-write_vec_recs(FILE *fp, rec_mgr *vec_rec_mgrp)
-{
-    vec_ptr vp;
-    int cnt = 0;
-    FOR_REC(vec_rec_mgrp, vec_ptr, vp) {
-	cnt++;
-    }
-    write_int(fp, cnt, TRUE);
-    FOR_REC(vec_rec_mgrp, vec_ptr, vp) {
-	write_ptr(fp, vp, FALSE);
-	if( vp->type == TXT ) {
-	    write_int(fp, 1, FALSE);
-	    write_string(fp, vp->u.name, FALSE);
-	} else {
-	    write_int(fp, 2, FALSE);
-	    write_ptr(fp, vp->u.ranges, FALSE);
-	}
-	write_ptr(fp, vp->next, TRUE);
-    }
-}
-
-static void
-read_vec_recs(FILE *fp, rec_mgr *vec_rec_mgrp)
-{
-    int cnt = read_int(fp, TRUE);
-    for(int i = 0; i < cnt; i++) {
-	vec_ptr vp = (vec_ptr) new_rec(vec_rec_mgrp);
-	pointer p = read_ptr(fp, FALSE);
-	insert_pointer_map(p, (pointer) vp);
-	int type = read_int(fp, FALSE);
-	if( type == 1 ) {
-	    vp->type = TXT;
-	    vp->u.name = read_string(fp, FALSE);
-	} else {
-	    ASSERT(type == 2);
-	    vp->type = INDEX;
-	    pointer o_ptr = read_ptr(fp, FALSE);
-	    vp->u.ranges = old2new(o_ptr);
-	}
-	// Place holder
-	vp->next = read_ptr(fp, TRUE);
-    }
-    // Replace old with new pointers
-    vec_ptr vp;
-    FOR_REC(vec_rec_mgrp, vec_ptr, vp) {
-	vp->next = old2new(vp->next);
-    }
-}
-
-static void
-write_ilist_recs(FILE *fp, rec_mgr *ilist_rec_mgrp)
-{
-    ilist_ptr ip;
-    int cnt = 0;
-    FOR_REC(ilist_rec_mgrp, ilist_ptr, ip) {
-	cnt++;
-    }
-    write_int(fp, cnt, TRUE);
-    FOR_REC(ilist_rec_mgrp, ilist_ptr, ip) {
-	write_ptr(fp, ip, FALSE);
-	write_int(fp, ip->from, FALSE);
-	write_int(fp, ip->to, FALSE);
-	write_int(fp, ip->size, FALSE);
-	write_ptr(fp, ip->next, TRUE);
-    }
-}
-
-static void
-read_ilist_recs(FILE *fp, rec_mgr *ilist_rec_mgrp)
-{
-    int cnt = read_int(fp, TRUE);
-    for(int i = 0; i < cnt; i++) {
-	ilist_ptr ip = (ilist_ptr) new_rec(ilist_rec_mgrp);
-	pointer p = read_ptr(fp, FALSE);
-	insert_pointer_map(p, (pointer) ip);
-	ip->from = read_int(fp, FALSE);
-	ip->to = read_int(fp, FALSE);
-	ip->size = read_int(fp, FALSE);
-	// Place holder
-	ip->next = read_ptr(fp, TRUE);
-    }
-    // Replace old with new pointers
-    ilist_ptr ip;
-    FOR_REC(ilist_rec_mgrp, ilist_ptr, ip) {
-	ip->next = old2new(ip->next);
-    }
-}
-
-static void
-write_idx_list_recs(FILE *fp, rec_mgr *idx_list_rec_mgrp)
-{
-    idx_list_ptr ip;
-    int cnt = 0;
-    FOR_REC(idx_list_rec_mgrp, idx_list_ptr, ip) {
-	cnt++;
-    }
-    write_int(fp, cnt, TRUE);
-    FOR_REC(idx_list_rec_mgrp, idx_list_ptr, ip) {
-	write_ptr(fp, ip, FALSE);
-	write_int(fp, ip->idx, FALSE);
-	write_ptr(fp, ip->next, TRUE);
-    }
-}
-
-static void
-read_idx_list_recs(FILE *fp, rec_mgr *idx_list_rec_mgrp)
-{
-    int cnt = read_int(fp, TRUE);
-    for(int i = 0; i < cnt; i++) {
-	idx_list_ptr ip = (idx_list_ptr) new_rec(idx_list_rec_mgrp);
-	pointer p = read_ptr(fp, FALSE);
-	insert_pointer_map(p, (pointer) ip);
-	ip->idx = read_int(fp, FALSE);
-	// Place holder
-	ip->next = read_ptr(fp, TRUE);
-    }
-    // Replace old with new pointers
-    idx_list_ptr ip;
-    FOR_REC(idx_list_rec_mgrp, idx_list_ptr, ip) {
-	ip->next = old2new(ip->next);
-    }
-}
-
-static void
-write_node_buffer(FILE *fp, buffer *nodesp)
-{
-    write_int(fp, COUNT_BUF(nodesp), TRUE);
-    nnode_ptr np;
-    FOR_BUF(nodesp, nnode_rec, np) {
-	write_ptr(fp, np->vec, FALSE);
-	write_int(fp, np->idx, FALSE);
-	write_int(fp, np->is_top_input, FALSE);
-	write_int(fp, np->is_top_output, FALSE);
-	write_int(fp, np->composite, FALSE);
-	write_ptr(fp, np->fanouts, FALSE);
-	write_ptr(fp, np->draw_info, TRUE);
-    }
-}
-
-static void
-read_node_buffer(FILE *fp, buffer *nodesp) 
-{
-    int sz = read_int(fp, TRUE);
-    for(int i = 0; i < sz; i++) {
-	nnode_rec nr;
-	pointer p = read_ptr(fp, FALSE);
-	nr.vec = old2new(p);
-	nr.idx = read_int(fp, FALSE);
-	nr.has_phase_event = FALSE;
-	nr.has_weak = FALSE;
-	nr.has_ant = FALSE;
-	nr.has_cons = FALSE;
-	nr.has_trace = FALSE;
-	nr.composite = read_int(fp, FALSE);
-	nr.is_top_input = read_int(fp, FALSE);
-	nr.is_top_output = read_int(fp, FALSE);
-	p = read_ptr(fp, TRUE);
-	nr.fanouts = old2new(p);
-	p = read_ptr(fp, TRUE);
-	nr.draw_info = old2new(p);
-	push_buf(nodesp, &nr);
-    }
-}
-
-static void
-write_composite_buffer(FILE *fp, buffer *compositesp)
-{
-    write_int(fp, COUNT_BUF(compositesp), TRUE);
-    ncomp_ptr cp;
-    FOR_BUF(compositesp, ncomp_rec, cp) {
-	write_int(fp, cp->size, FALSE);
-	write_int(fp, cp->rank, FALSE);
-	write_int(fp, cp->phase_delay, FALSE);
-	wl_op op = cp->op;
-	if( op == op_X ) {
-	    write_int(fp, 1, FALSE);
-	}
-	else if( op == op_CONST ) {
-	    write_int(fp, 2, FALSE);
-	    string s = Arbi_ToString(cp->arg.value, 16);
-	    write_string(fp, s, FALSE);
-	}
-	else if( op == op_VAR ) {
-	    write_int(fp, 3, FALSE);
-	}
-	else if( op == op_AND ) {
-	    write_int(fp, 4, FALSE);
-	}
-	else if( op == op_OR ) {
-	    write_int(fp, 5, FALSE);
-	}
-	else if( op == op_NOT ) {
-	    write_int(fp, 6, FALSE);
-	}
-	else if( op == op_EQ ) {
-	    write_int(fp, 7, FALSE);
-	}
-	else if( op == op_GR ) {
-	    write_int(fp, 8, FALSE);
-	}
-	else if( op == op_ADD ) {
-	    write_int(fp, 9, FALSE);
-	}
-	else if( op == op_SUB ) {
-	    write_int(fp, 10, FALSE);
-	}
-	else if( op == op_MUL ) {
-	    write_int(fp, 11, FALSE);
-	}
-	else if( op == op_ITE ) {
-	    write_int(fp, 12, FALSE);
-	}
-	else if( op == op_DIV ) {
-	    write_int(fp, 13, FALSE);
-	}
-	else if( op == op_MOD ) {
-	    write_int(fp, 14, FALSE);
-	}
-	else if( op == op_SHL ) {
-	    write_int(fp, 15, FALSE);
-	}
-	else if( op == op_SHR ) {
-	    write_int(fp, 16, FALSE);
-	}
-	else if( op == op_ASHR ) {
-	    write_int(fp, 17, FALSE);
-	}
-	else if( op == op_SX ) {
-	    write_int(fp, 18, FALSE);
-	    write_int(fp, cp->arg.extension_size, FALSE);
-	}
-	else if( op == op_ZX ) {
-	    write_int(fp, 19, FALSE);
-	    write_int(fp, cp->arg.extension_size, FALSE);
-	}
-	else if( op == op_SLICE ) {
-	    write_int(fp, 20, FALSE);
-	    write_ptr(fp, cp->arg.idx_list, FALSE);
-	}
-	else if( op == op_WIRE ) {
-	    write_int(fp, 21, FALSE);
-	}
-	else if( op == op_MEM_READ ) {
-	    write_int(fp, 22, FALSE);
-	    write_int(fp, cp->arg.mem.addr_size, FALSE);
-	    write_int(fp, cp->arg.mem.data_size, FALSE);
-	    write_int(fp, cp->arg.mem.lines, FALSE);
-	}
-	else if( op == op_MEM_WRITE ) {
-	    write_int(fp, 23, FALSE);
-	    write_int(fp, cp->arg.mem.addr_size, FALSE);
-	    write_int(fp, cp->arg.mem.data_size, FALSE);
-	    write_int(fp, cp->arg.mem.lines, FALSE);
-	}
-	else if( op == op_LAT_LEQ ) {
-	    write_int(fp, 24, FALSE);
-	}
-	else {
-	    DIE("Should not happen!");
-	}
-	write_ptr(fp, cp->inps, FALSE);
-	write_ptr(fp, cp->outs, TRUE);
-    }
-}
-
-static void
-read_composite_buffer(FILE *fp, buffer *compositesp)
-{
-    int cnt = read_int(fp, TRUE);
-    for(int i = 0; i < cnt; i++) {
-	ncomp_rec   cr;
-	cr.size = read_int(fp, FALSE);
-	cr.rank = read_int(fp, FALSE);
-	cr.phase_delay = read_int(fp, FALSE);
-	int type = read_int(fp, FALSE);
-	switch( type ) {
-	    case 1: cr.op = op_X; break;
-	    case 2: {
-		cr.op = op_CONST;
-		string s = read_string(fp, FALSE);
-		cr.arg.value = Arbi_FromString(s, 16);
-		break;
-	    }
-	    case 3: cr.op = op_VAR; break;
-	    case 4: cr.op = op_AND; break;
-	    case 5: cr.op = op_OR; break;
-	    case 6: cr.op = op_NOT; break;
-	    case 7: cr.op = op_EQ; break;
-	    case 8: cr.op = op_GR; break;
-	    case 9: cr.op = op_ADD; break;
-	    case 10: cr.op = op_SUB; break;
-	    case 11: cr.op = op_MUL; break;
-	    case 12: cr.op = op_ITE; break;
-	    case 13: cr.op = op_DIV; break;
-	    case 14: cr.op = op_MOD; break;
-	    case 15: cr.op = op_SHL; break;
-	    case 16: cr.op = op_SHR; break;
-	    case 17: cr.op = op_ASHR; break;
-	    case 18: {
-		cr.op = op_SX;
-		cr.arg.extension_size = read_int(fp, FALSE);
-		break;
-	    }
-	    case 19: {
-		cr.op = op_ZX;
-		cr.arg.extension_size = read_int(fp, FALSE);
-		break;
-	    }
-	    case 20: {
-		cr.op = op_SLICE;
-		pointer p = read_ptr(fp, FALSE);
-		cr.arg.idx_list = old2new(p);
-		break;
-	    }
-	    case 21: cr.op = op_WIRE; break;
-	    case 22: {
-		cr.op = op_MEM_READ;
-		cr.arg.mem.addr_size = read_int(fp, FALSE);
-		cr.arg.mem.data_size = read_int(fp, FALSE);
-		cr.arg.mem.lines = read_int(fp, FALSE);
-		break;
-	    }
-	    case 23: {
-		cr.op = op_MEM_WRITE;
-		cr.arg.mem.addr_size = read_int(fp, FALSE);
-		cr.arg.mem.data_size = read_int(fp, FALSE);
-		cr.arg.mem.lines = read_int(fp, FALSE);
-		break;
-	    }
-	    case 24: cr.op = op_LAT_LEQ; break;
-	    default:
-		DIE("Should never happen!");
-	}
-	cr.inps = old2new(read_ptr(fp, FALSE));
-	cr.outs = old2new(read_ptr(fp, TRUE));
-	push_buf(compositesp, &cr);
-    }
-}
-
-static void
-write_name_ip(pointer key, pointer data)
-{
-    string name = (string) key;
-    vec_info_ptr ip = (vec_info_ptr) data;
-    write_string(current_fp, name, FALSE);
-    write_ptr(current_fp, ip, TRUE);
-}
-
-static void
-write_all_name_tbl(FILE *fp, hash_record *all_name_tblp)
-{
-    write_int(fp, hash_size(all_name_tblp), TRUE);
-    current_fp = fp;
-    scan_hash(all_name_tblp, write_name_ip);
-    current_fp = NULL;
-}
-
-static void
-read_all_name_tbl(FILE *fp, hash_record *all_name_tblp)
-{
-    int cnt = read_int(fp, TRUE);
-    for(int i = 0; i < cnt; i++) {
-	string name = read_string(fp, FALSE);
-	vec_info_ptr ip = old2new(read_ptr(fp, TRUE));
-	insert_hash(all_name_tblp, name, ip);
-    }
-}
-
-static void
-save_fsm_fn(FILE *fp, pointer p)
-{
-    fsm_ptr fsm = (fsm_ptr) p;
-    push_fsm(fsm);
-    write_string(fp, fsm->sha256_sig, TRUE);
-    write_string(fp, fsm->top_name, TRUE);
-    write_int(fp, fsm->ranks, TRUE);
-    write_range_recs(fp, &(fsm->range_rec_mgr));
-    write_vec_recs(fp, &(fsm->vec_rec_mgr));
-    write_ilist_recs(fp, &(fsm->ilist_rec_mgr));
-    write_vis_io_recs(fp, &(fsm->vis_io_rec_mgr));
-    write_vis_recs(fp, &(fsm->vis_rec_mgr));
-    write_idx_list_recs(fp, &(fsm->idx_list_rec_mgr));
-    write_node_buffer(fp, &(fsm->nodes));
-    write_composite_buffer(fp, &(fsm->composites));
-    write_all_name_tbl(fp, &(fsm->all_name_tbl));
-}
-
-static pointer
-load_fsm_fn(FILE *fp)
-{
-    fsm_ptr fsm;
-    fsm = create_fsm();
-    create_hash(&pointer_map, 100, ptr_hash, ptr_equ);
-    fsm->sha256_sig = read_string(fp, TRUE);
-    fsm->top_name = read_string(fp, TRUE);
-    fsm->ranks = read_int(fp, TRUE);
-    read_range_recs(fp, &(fsm->range_rec_mgr));
-    read_vec_recs(fp, &(fsm->vec_rec_mgr));
-    read_ilist_recs(fp, &(fsm->ilist_rec_mgr));
-    read_vis_io_recs(fp, &(fsm->vis_io_rec_mgr));
-    read_vis_recs(fp, &(fsm->vis_rec_mgr));
-    read_idx_list_recs(fp, &(fsm->idx_list_rec_mgr));
-    read_node_buffer(fp, &(fsm->nodes));
-    read_composite_buffer(fp, &(fsm->composites));
-    read_all_name_tbl(fp, &(fsm->all_name_tbl));
-    dispose_hash(&pointer_map, NULLFCN);
-    return( (pointer) fsm);
-}
-
 
 static unint
 idx_list_hash(pointer key, unint n)
@@ -5284,7 +4245,7 @@ make_input_arg(g_ptr we, int sz, hash_record *vtblp, string hier, bool pdel)
 	Sprintf(buf, "__tmp%d", ++temporary_node_cnt);
 	string tname = mk_vec_name(buf, sz);
 	tname = wastrsave(&strings, tname);
-	inps = declare_vector(vtblp, hier, tname, FALSE, NULL, NULL);
+	inps = declare_vector(vtblp, hier, tname, FALSE, NULL, s_ES);
 	if( !compile_expr(vtblp, hier, inps, we, pdel) ) {
 	    return NULL;
 	}
@@ -5329,21 +4290,6 @@ add_fanouts(ilist_ptr inps, int comp_idx)
     FOREACH_NODE(nd, inps) {
 	nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, nd);
 	add_fanout(np, comp_idx);
-    }
-}
-
-void
-dbg_print_ilist(string msg, ilist_ptr ip)
-{
-    int cnt = 0;
-    fprintf(stderr, "%s\n", msg);
-    while( ip != NULL && cnt < 20 ) {
-	fprintf(stderr, "    [%p] %d-->%d (%d)\n", ip,ip->from,ip->to,ip->size);
-	cnt++;
-	ip = ip->next;
-    }
-    if( cnt >= 20 ) {
-	fprintf(stderr, "Too long list...\n");
     }
 }
 
@@ -5976,7 +4922,7 @@ map_vector(hash_record *vtblp, string hier, string name, bool ignore_missing)
             FP(warning_fp, "Replaced %s with %s\n\n", name, new_name);
         }
         name = new_name;
-        declare_vector(vtblp, hier, name, FALSE, NULL, NULL);
+        declare_vector(vtblp, hier, name, FALSE, NULL, s_ES);
         vp = split_vector_name(vec_rec_mgrp,range_rec_mgrp, name);
         sig = get_vector_signature(vp);
         oip = (vec_info_ptr) find_hash(vtblp,sig);
@@ -6836,8 +5782,8 @@ reset_tmps(int cnt)
     }
 }
 
-#if 0
- static void dbg_info(string msg, int size, gbv *res)
+static void
+dbg_info(string msg, int size, gbv *res)
 {
     FP(err_fp, "%s: ", msg);
     for(int i = 0; i < size; i++) {
@@ -6847,7 +5793,6 @@ reset_tmps(int cnt)
     }
     FP(err_fp, "\n");
 }
-#endif
 
 static void
 op_DIV(ncomp_ptr op)
@@ -7188,7 +6133,21 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
     {
         vp = (vis_ptr) new_rec(vis_rec_mgrp);
         vp->draw_level = draw_level;
-        vp->attrs = attrs;
+        vp->attrs = NULL;
+	attr_list_ptr  a_tail = NULL;
+	while( !IS_NIL(attrs) ) {
+	    attr_list_ptr ap = new_rec(attr_list_rec_mgrp);
+	    ap->name = GET_STRING(GET_FST(GET_CONS_HD(attrs)));
+	    ap->value = GET_STRING(GET_SND(GET_CONS_HD(attrs)));
+	    ap->next = NULL;
+	    if( a_tail == NULL ) {
+		vp->attrs = ap;
+	    } else {
+		a_tail->next = ap;
+	    }
+	    a_tail = ap;
+	    attrs = GET_CONS_TL(attrs);
+	}
         draw_level++;
         vp->id = ++visualization_id;
         vp->pinst_cnt = inst_cnt;
@@ -7258,12 +6217,12 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
                     phier = wastrsave(&strings, phier);
                     Wprintf("Signal %s not declared in %s.", actual, phier);
                     tmp = declare_vector(&vinfo_tbl, hier, actual,
-                                         FALSE, NULL, NULL);
+                                         FALSE, NULL, s_ES);
                 }
                 act_list = ilist_append(act_list, tmp);
                 acts = GET_CONS_TL(acts);
             }
-            declare_vector(&vinfo_tbl, hier, fname, TRUE, act_list, NULL);
+            declare_vector(&vinfo_tbl, hier, fname, TRUE, act_list, s_ES);
             if( vp != NULL ) {
                 vis_io_ptr vio = (vis_io_ptr) new_rec(vis_io_rec_mgrp);
                 vio->f_vec = fname;
@@ -7300,12 +6259,12 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
                     phier = wastrsave(&strings, phier);
                     Wprintf("Signal %s not declared in %s", actual, phier);
                     tmp = declare_vector(&vinfo_tbl, hier, actual,
-                                         FALSE, NULL, NULL);
+                                         FALSE, NULL, s_ES);
                 }
                 act_list = ilist_append(act_list, tmp);
                 acts = GET_CONS_TL(acts);
             }
-            declare_vector(&vinfo_tbl, hier, fname, TRUE, act_list, NULL);
+            declare_vector(&vinfo_tbl, hier, fname, TRUE, act_list, s_ES);
             if( vp != NULL ) {
                 vis_io_ptr vio = (vis_io_ptr) new_rec(vis_io_rec_mgrp);
                 vio->f_vec = fname;
@@ -7955,44 +6914,6 @@ build_limit_tbl(vstate_ptr vp, hash_record *limit_tblp, string sn, sch_ptr sch)
 	build_limit_tbl(vp, limit_tblp, sn, sl->sch);
     }
 }
-
-#if 0
-static sch_ptr
-OBSOLETE_is_input(vstate_ptr vsp, ilist_ptr il)
-{
-    FOREACH_NODE(nd, il) {
-	nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, nd);
-	if( np->is_top_input == 0 ) {
-	    return NULL;
-	}
-    }
-    g_ptr nds = ilist2nds(il);
-    g_ptr vecs = Merge_Vectors(nds, TRUE);
-    string pfn = strtemp("");
-    strappend("draw_input ");
-    char sep = '{';
-    while( !IS_NIL(vecs) ) {
-	charappend(sep);
-	sep = ' ';
-	charappend('{');
-	strappend(GET_STRING(GET_CONS_HD(vecs)));
-	charappend('}');
-	vecs = GET_CONS_TL(vecs);
-    }
-    strappend("}");
-    pfn = wastrsave(&strings, pfn);
-    int anon_cnt = COUNT_BUF(&(vsp->anon_buf));
-    push_buf(&(vsp->anon_buf), &il);
-    Sprintf(buf, "an%06d", anon_cnt);
-    string anon = wastrsave(&strings, buf);
-    insert_hash(&(vsp->done), il, anon);
-    sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
-    res->vec = anon;
-    res->pfn = pfn;
-    res->children = NULL;
-    return res;
-}
-#endif
 
 static sch_ptr
 limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
@@ -9024,6 +7945,9 @@ _DuMMy_fsm()
 {
     SET_GBV(NULL, c_ZERO);
     clean_pexlif_ios(NULL);
+    dbg_print_stop_nds(NULL, NULL);
+    dbg_print_ils(NULL, NULL);
+    dbg_info("", 0, NULL);
 }
 
 static event_list_ptr
@@ -9071,4 +7995,709 @@ delete_active_event(hash_record *tblp, event_ptr ep)
     return start;
 }
 
+static void
+allocate_ste_buffers(fsm_ptr fsm)
+{
+    int nds  = COUNT_BUF(&(fsm->nodes));
+    weak_buf = allocate_value_buf(nds, c_ZERO, c_ZERO);
+    ant_buf  = allocate_value_buf(nds, c_ONE, c_ONE);
+    cons_buf = allocate_value_buf(nds, c_ONE, c_ONE);
+    cur_buf  = allocate_value_buf(nds, c_ONE, c_ONE);
+    next_buf = allocate_value_buf(nds, c_ONE, c_ONE);
+    // Set the initial values correctly for built-in constants
+    *(cur_buf+0) = c_ZERO; *(cur_buf+1) = c_ONE;    // !0
+    *(cur_buf+2) = c_ONE;  *(cur_buf+3) = c_ZERO;   // !1
+    *(cur_buf+4) = c_ONE;  *(cur_buf+5) = c_ONE;    // !X (bottom)
+    *(cur_buf+6) = c_ZERO; *(cur_buf+7) = c_ZERO;   // !T (top)
+}
 
+static void
+free_ste_buffers()
+{
+    Free(weak_buf);
+    Free(ant_buf);
+    Free(cons_buf);
+    Free(cur_buf);
+    Free(next_buf);
+    weak_buf = NULL;
+    ant_buf = NULL;
+    cons_buf = NULL;
+    cur_buf = NULL;
+    next_buf = NULL;
+}
+
+static void
+simulation_break_handler()
+{
+    if( quit_simulation_early ) return;
+    if( !gui_mode || use_stdout ) {
+        FP(err_fp, "\n\n---- Simulation interrupted ----\n");
+    }
+    quit_simulation_early = TRUE;
+}
+
+static void
+gSTE(g_ptr redex, value_type type)
+{
+    void    (*old_handler)();
+
+    // STE opts fsm wl ant cons trl
+    g_ptr g_opts, g_fsm, wl, ant, cons, trl;
+    nbr_errors_reported = 0;
+    EXTRACT_6_ARGS(redex, g_opts, g_fsm, wl, ant, cons, trl);
+    string opts = GET_STRING(g_opts);
+    bool trace_all = FALSE;
+    print_failures = RCprint_failures;
+    if( strstr(opts, "-s") != NULL )
+	print_failures = FALSE;
+    if( strstr(opts, "-e") != NULL )
+	trace_all = TRUE;
+    bool abort_ASAP = FALSE;
+    if( strstr(opts, "-a") != NULL )
+	abort_ASAP = TRUE;
+    int abort_time = 99999999;
+    //
+    string mt = strstr(opts, "-m");
+    if( mt != NULL ) {
+	if( sscanf(mt, "-m %d", &abort_time) != 1 ) {
+	    FP(warning_fp, "Unrecognized flag in STE call (");
+	    FP(warning_fp, "-m should be followed by time). Ignored.\n");
+	}
+    }
+    //
+    BDD_size_limit = -1;
+    string dw = strstr(opts, "-w");
+    if( dw != NULL ) {
+	if( type != use_bdds ) {
+	    FP(err_fp, "Weakening (-w) currently only avaliable in BDD based ");
+	    FP(err_fp, "STE. Flag ignored\n");
+	} else if( sscanf(dw, "-w %d", &BDD_size_limit) != 1 ) {
+	    FP(warning_fp, "Unrecognized flag in STE call (-w should be ");
+	    FP(warning_fp,"followed by BDD size limit). Ignored.\n");
+	}
+    }
+    information_flow_weakening = FALSE;
+    if( strstr(opts, "-ifw") != NULL ) {
+	if( type != use_bdds ) {
+	    FP(err_fp, "Information flow weakening (-ifw) only avaliable ");
+	    FP(err_fp, "in BDD based STE.  Flag ignored\n");
+	} else {
+	    information_flow_weakening = TRUE;
+	}
+    }
+
+    old_handler = signal(SIGINT, simulation_break_handler);
+    quit_simulation_early = FALSE;
+
+    fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
+    push_fsm(fsm);
+    ste_ptr ste = create_ste(fsm, type);
+    ste->abort_ASAP = abort_ASAP;
+    //
+    // Now translate weakenings, ant, cons and trl into events
+    //
+    bool ok = create_event_buffer(ste,event_bufp,wl,ant,cons,trl,abort_ASAP);
+    //
+    // Allocate value buffers
+    //
+    allocate_ste_buffers(fsm);
+    //
+    // Create event wheel buffers
+    //
+    buffer sim_wheel_buf;
+    sim_wheel_bufp = &sim_wheel_buf;
+    new_buf(sim_wheel_bufp, fsm->ranks, sizeof(buffer));
+    for(int i = 0; i <= fsm->ranks; i++) {
+	buffer b;
+	new_buf(&b, 100, sizeof(ncomp_ptr));
+	push_buf(sim_wheel_bufp, &b);
+    }
+    //
+    // Make sure g.c. can see the object
+    //
+    MAKE_REDEX_EXT_OBJ(redex, ste_oidx, ste);
+    if( !ok || quit_simulation_early ) {
+	ste->max_time = 0;
+	pop_fsm();
+	signal(SIGINT, old_handler);
+	return;
+    }
+    ste->active = TRUE;
+    //
+    // Perform constant propagation
+    //
+    bool old_RCverbose_ste_run = RCverbose_ste_run;
+    RCverbose_ste_run = FALSE;
+    if( !initialize(ste, trace_all) || quit_simulation_early ) {
+	if( quit_simulation_early ) {
+	    MAKE_REDEX_FAILURE(redex, Fail_pr("Simulation interrupted"));
+	} else {
+	    MAKE_REDEX_FAILURE(redex, Fail_pr("Initialization failed"));
+	}
+	free_ste_buffers();
+	ste->max_time = 0;
+	ste->active = FALSE;
+	pop_fsm();
+	signal(SIGINT, old_handler);
+	return;
+    }
+    RCverbose_ste_run = old_RCverbose_ste_run;
+ 
+    // Is there anything to run?
+    if( COUNT_BUF(event_bufp) == 0 ) {
+	MAKE_REDEX_EXT_OBJ(redex, ste_oidx, ste);
+	ste->max_time = 0;
+	free_ste_buffers();
+	ste->active = FALSE;
+	pop_fsm();
+	signal(SIGINT, old_handler);
+	return;
+    }
+    //
+    // If yes, run the real STE algorithm
+    //
+    event_ptr *epp = M_LOCATE_BUF(event_bufp, COUNT_BUF(event_bufp)-1);
+    event_ptr ep = *epp;
+    int min_time = ep->time;
+    epp = FAST_LOC_BUF(event_bufp, 0);
+    ep = *epp;
+    int max_time = ep->time+1;
+
+    if( RCprint_time ) {
+	if( gui_mode ) {
+            Sprintf(buf, "simulation_start %d %d", min_time, max_time);
+            Info_to_tcl(buf);
+	} else {
+	    FP(bdd_gc_fp, "\nStart simulation:\n");
+	}
+    }
+    for(int t = min_time; t <= max_time; t++) {
+	ste->cur_time = t;
+	if( t > abort_time || quit_simulation_early ) {
+	    if( gui_mode ) {
+		Sprintf(buf, "simulation_end");
+		Info_to_tcl(buf);
+	    }
+	    FP(warning_fp, "Simulation interrupted at time %d\n", abort_time);
+	    ste->active = FALSE;
+	    signal(SIGINT, old_handler);
+	    return;
+	}
+	if( RCprint_time ) {
+	    if( gui_mode ) {
+		Sprintf(buf, "simulation_update %d", t);
+		Info_to_tcl(buf);
+	    } else {
+		if( (t % RCprint_time_mod) == 0 )
+		    FP(sim_fp, "Time: %d\n", t);
+	    }
+	}
+	process_event(event_bufp, t);
+	nnode_ptr np;
+	// Put nodes whose weak/ant changed on evaluation list.
+	int idx = 0;
+	FOR_BUF(nodesp, nnode_rec, np) {
+	    if( np->has_ant_or_weak_change ) {
+		if( np->composite >= 0 ) {
+		    ncomp_ptr c;
+		    c = (ncomp_ptr) M_LOCATE_BUF(compositesp,np->composite);
+		    add_op_todo(c);
+		} else if( np->composite == -1 ) {
+		    // Input node
+		    update_node(ste, idx, c_ONE, c_ONE);
+		}
+		np->has_ant_or_weak_change = FALSE;
+	    }
+	    idx++;
+	}
+	do_combinational(ste);
+	// Do consequents and traces
+	idx = 0;
+	FOR_BUF(nodesp, nnode_rec, np) {
+	    if( np->has_cons ) {
+		gbv curH = *(cur_buf+2*idx);
+		gbv curL = *(cur_buf+2*idx+1);
+		gbv chkH = *(cons_buf+2*idx);
+		gbv chkL = *(cons_buf+2*idx+1);
+		if( RCnotify_check_failures &&
+		    (nbr_errors_reported < RCmax_nbr_errors) )
+		{
+		    gbv ok = c_AND(c_OR(chkH,c_NOT(curH)),
+				   c_OR(chkL,c_NOT(curL)));
+		    if( c_NEQ(ok, c_ONE) ) {
+			FP(err_fp, "Warning: Consequent failure at time %d", t);
+			FP(err_fp, " on node %s\n", idx2name(idx));
+			if( print_failures ) {
+			    FP(err_fp, "Current value:");
+			    cHL_Print(err_fp, curH, curL);
+			    FP(err_fp, "\nExpected value:");
+			    cHL_Print(err_fp, chkH, chkL);
+			    /* Print a counter example */
+			    gbv bad = c_AND(
+					c_OR(c_AND(chkH,c_NOT(curH)),
+					     c_AND(c_NOT(chkH),curH)),
+					c_OR(c_AND(chkL,c_NOT(curL)),
+					     c_AND(c_NOT(chkL),curL)));
+			    if( c_NEQ(bad,c_ZERO) ) {
+				FP(err_fp, "\nStrong disagreement when: ");
+				c_Print(err_fp, bad, -1);
+			    } else {
+				FP(err_fp, "\nWeak disagreement when:");
+				gbv bad = c_OR(c_AND(c_NOT(chkH), curH),
+					       c_AND(c_NOT(chkL), curL));
+				c_Print(err_fp, bad, -1);
+			    }
+			    FP(err_fp, "\n");
+			}
+			nbr_errors_reported++;
+			FP(err_fp, "\n");
+			if( abort_ASAP ) {
+			    gbv v = ste->checkTrajectory;
+			    v = c_AND(v, c_OR(c_NOT(curH), chkH));
+			    v = c_AND(v, c_OR(c_NOT(curL), chkL));
+			    ste->checkTrajectory = v;
+			    if( gui_mode ) {
+				Sprintf(buf, "simulation_end");
+				Info_to_tcl(buf);
+			    }
+			    ste->active = FALSE;
+			    ste->max_time = t;
+			    signal(SIGINT, old_handler);
+			    return;
+			}
+		    }
+		}
+		gbv v = ste->checkTrajectory;
+		v = c_AND(v, c_OR(c_NOT(curH), chkH));
+		v = c_AND(v, c_OR(c_NOT(curL), chkL));
+		ste->checkTrajectory = v;
+	    }
+	    if( trace_all || np->has_trace ) {
+		gbv curH = *(cur_buf+2*idx);
+		gbv curL = *(cur_buf+2*idx+1);
+		record_trace(idx, t, curH, curL);
+	    }
+	    idx++;
+	}
+	do_phase(ste);
+	if( Do_gc_asap )
+	    Garbage_collect();
+    }
+    ste->max_time = max_time;
+    free_ste_buffers();
+    ste->active = FALSE;
+    if( gui_mode ) {
+	Sprintf(buf, "simulation_end");
+	Info_to_tcl(buf);
+    }
+    signal(SIGINT, old_handler);
+    pop_fsm();
+}
+
+void
+DBG_print_vec_ptr(vec_ptr vp) 
+{
+    for(vec_ptr p = vp; p != NULL; p = p->next) {
+	if( p->type == TXT ) {
+	    FP(err_fp, "%s", p->u.name);
+	} else {
+	    range_ptr r = p->u.ranges;
+	    while( r != NULL ) {
+		FP(err_fp, "<%d-%d>", r->upper, r->lower);
+		r = r->next;
+	    }
+	}
+    }
+    FP(err_fp, "\n");
+}
+
+void
+dbg_dump_buf(string msg, gbv *buf)
+{
+    FP(err_fp, "\n-----%s------\n ", msg);
+    for(unint i = 0; i < COUNT_BUF(nodesp); i++) {
+	FP(err_fp, "Node %s: ", idx2name(i));
+	gbv H = *(buf+2*i);
+	gbv L = *(buf+2*i+1);
+	cHL_Print(err_fp, H, L);
+	FP(err_fp, "\n");
+    }
+}
+
+void
+dbg_print_ilist(string msg, ilist_ptr ip)
+{
+    int cnt = 0;
+    fprintf(stderr, "%s\n", msg);
+    while( ip != NULL && cnt < 20 ) {
+	fprintf(stderr, "    [%p] %d-->%d (%d)\n", ip,ip->from,ip->to,ip->size);
+	cnt++;
+	ip = ip->next;
+    }
+    if( cnt >= 20 ) {
+	fprintf(stderr, "Too long list...\n");
+    }
+}
+
+static void
+base_print_ilist(ilist_ptr il)
+{
+    g_ptr nds = ilist2nds(il);
+    g_ptr res = Merge_Vectors(nds, TRUE);
+    while( !IS_NIL(res) ) {
+	FP(err_fp, " %s", GET_STRING(GET_CONS_HD(res)));
+	res = GET_CONS_TL(res);
+    }
+}
+
+void
+DBG_print_ilist(ilist_ptr il)
+{
+    FP(err_fp, " ilist:");
+    base_print_ilist(il);
+    FP(err_fp, "\n");
+}
+
+void
+DBG_print_vis_io_ptr(vis_io_ptr vp)
+{
+    FP(err_fp, " vis_io_ptr:");
+    while( vp ) {
+	FP(err_fp, " %s [", vp->f_vec);
+	base_print_ilist(vp->acts);
+	FP(err_fp, "]");
+	vp = vp->next;
+    }
+    FP(err_fp, "\n");
+}
+
+void
+DBG_print_ints(g_ptr il)
+{
+    while( !IS_NIL(il) ) {
+	FP(err_fp, " %s", GET_STRING(GET_CONS_HD(il)));
+	il = GET_CONS_TL(il);
+    }
+    FP(err_fp, "\n");
+}
+
+void
+DBG_pexlif(g_ptr pexlif)
+{
+    string pr_fn = wastrsave(&strings, "pretty_pexlif");
+    g_ptr fn = Make_VAR_leaf(pr_fn);
+    fn = Find_Function(symb_tbl, fn);
+    g_ptr res = Make_APPL_ND(fn, pexlif);
+    INC_REFCNT(pexlif);
+    Eval(res);
+    Flush(stdout_fp);
+}
+
+void
+dbg_print_sch_rec(sch_ptr sch, int indent)
+{
+    if( sch->children == NULL ) {
+	FP(err_fp, "%*s(LEAF %s %s)\n", indent, "", sch->vec, sch->pfn);
+    } else {
+	FP(err_fp, "%*s(NODE %s %s\n", indent, "", sch->vec, sch->pfn);
+	for(sch_list_ptr sl = sch->children; sl != NULL; sl = sl->next) {
+	    dbg_print_sch_rec(sl->sch, indent+3);
+	}
+	FP(err_fp, "%*s)\n", indent, "");
+    }
+}
+
+void
+DBG_print_sch(string title, sch_ptr sch)
+{
+    FP(err_fp, "===================================================\n");
+    FP(err_fp, "%s\n", title);
+    FP(err_fp, "===================================================\n");
+    dbg_print_sch_rec(sch, 0);
+}
+
+static void
+fl_clean_pexlif_ios(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr p = GET_APPLY_RIGHT(redex);
+    p = clean_pexlif_ios(p);
+    OVERWRITE(redex, p);
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+
+static fsm_ptr
+gen_pexlif2fsm(g_ptr p, g_ptr black_box_list, int max_depth)
+{
+    p = clean_pexlif_ios(p);
+    //
+    fsm_ptr fsm = create_fsm();
+    push_fsm(fsm);
+    new_buf(&attr_buf, 100, sizeof(g_ptr));
+    //
+    visualization_id = 0;
+    undeclared_node_cnt = 0;
+    new_mgr(&node_comp_pair_rec_mgr, sizeof(node_comp_pair_rec));
+    create_hash(&node_comp_pair_tbl, 1000, ni_pair_hash, ni_pair_equ);
+    create_hash(&idx_list_uniq_tbl, 100, idx_list_hash, idx_list_equ);
+    create_hash(&bb_tbl, 1000, str_hash, str_equ);
+    hash_record parent_tbl;
+    create_hash(&parent_tbl, 2, str_hash, str_equ);
+    if( black_box_list != NULL ) {
+	for(g_ptr bbl = black_box_list; !IS_NIL(bbl); bbl = GET_CONS_TL(bbl)) {
+	    string bb_inst = GET_STRING(GET_CONS_HD(bbl));
+	    insert_hash(&bb_tbl, bb_inst, bb_inst);
+	}
+    }
+    // Default nodes
+    // 0    == constant 0
+    // 1    == constant 1
+    // 2    == constant X
+    // 3    == constant top
+    declare_vector(&parent_tbl, "", wastrsave(&strings, "!0"),FALSE,NULL,s_ES);
+    declare_vector(&parent_tbl, "", wastrsave(&strings, "!1"),FALSE,NULL,s_ES);
+    declare_vector(&parent_tbl, "", wastrsave(&strings, "!X"),FALSE,NULL,s_ES);
+    declare_vector(&parent_tbl, "", wastrsave(&strings, "!T"),FALSE,NULL,s_ES);
+    ihier_buf[0] = 0;
+    if( traverse_pexlif(&parent_tbl, p, "", TRUE, 0, 1, max_depth) ) {
+        fsm->top_name = get_top_name(p);
+        fsm->ranks = rank_order();
+        fsm->sha256_sig = compute_sha256_signature(fsm);
+    } else {
+	fsm = NULL;
+    }
+    free_mgr(&node_comp_pair_rec_mgr);
+    dispose_hash(&node_comp_pair_tbl, NULLFCN);
+    dispose_hash(&parent_tbl, NULLFCN);
+    dispose_hash(&idx_list_uniq_tbl, NULLFCN);
+    dispose_hash(&bb_tbl, NULLFCN);
+    free_buf(&attr_buf);
+    pop_fsm();
+    return fsm;
+}
+
+
+static int
+nn_cmp(const void *pi, const void *pj)
+{
+    string *i = (string *) pi;
+    string *j = (string *) pj;
+    return( strcmp(*i, *j) );
+}
+
+static bool
+is_draw_fub(vis_ptr vp)
+{
+    return( strncmp(vp->pfn, "draw_fub ", strlen("draw_fub ")) == 0 );
+}
+
+static vis_ptr
+get_vis_info_at_level(vis_list_ptr vlp, int level)
+{
+    if( level < 0 ) {
+	// Find the lowest, non-fub version
+	int least = 9999999;
+	vis_ptr res = NULL;
+	for( vis_list_ptr cp = vlp; cp != NULL; cp = cp->next ) {
+	    if( !is_draw_fub(cp->vp) ) {
+		if( cp->vp->draw_level < least ) {
+		    least = cp->vp->draw_level;
+		    res = cp->vp;
+		}
+	    }
+	}
+	return res;
+    } else {
+	while( vlp && vlp->vp->draw_level != level ) { vlp = vlp->next; }
+	if( vlp == NULL ) return NULL;
+	return vlp->vp;
+    }
+}
+
+static string
+value_type2string(value_type type)
+{
+    switch( type ) {
+	case use_bdds:
+	    return s_use_bdds;
+	case use_bexprs:
+	    return s_use_bexprs;
+	case use_ints:
+	    return s_use_ints;
+	default:
+	    DIE("Impossible");
+    }
+    DIE("Impossible");
+}
+
+static void
+gen_get_trace(g_ptr redex, value_type type)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_ste, g_node;
+    EXTRACT_2_ARGS(redex, g_ste, g_node);
+    ste_ptr ste = (ste_ptr) GET_EXT_OBJ(g_ste);
+    if( ste->type != type ) {
+	string msg = Fail_pr("Asking for %s values when STE run created %ss",
+			      value_type2string(type),
+			      value_type2string(ste->type));
+	MAKE_REDEX_FAILURE(redex, msg);
+	return;
+    }
+    string node = GET_STRING(g_node);
+    push_ste(ste);
+    push_fsm(ste->fsm);
+    int idx = name2idx(node);
+    if( idx < 0 ) {
+	pop_ste();
+	pop_fsm();
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	return;
+    }
+    trace_ptr tp = (trace_ptr) find_hash(trace_tblp, INT2PTR(idx));
+    if( tp == NULL ) {
+	pop_ste();
+	pop_fsm();
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not traced", node));
+	return;
+    }
+    MAKE_REDEX_NIL(redex);
+    g_ptr tail = redex;
+    for(trace_event_ptr te = tp->events; te != NULL; te = te->next) {
+	g_ptr event = Make_CONS_ND(Make_INT_leaf(te->time),
+				   Make_CONS_ND(Make_GBV_leaf(te->H),
+						Make_GBV_leaf(te->L)));
+	APPEND1(tail, event);
+    }
+    pop_fsm();
+    pop_ste();
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+gen_get_trace_val(g_ptr redex, value_type type)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_ste, g_node, g_time;
+    EXTRACT_3_ARGS(redex, g_ste, g_node, g_time);
+    ste_ptr ste = (ste_ptr) GET_EXT_OBJ(g_ste);
+    if( ste->type != type ) {
+	string msg = Fail_pr("Asking for %s values when STE run created %ss",
+			      value_type2string(type),
+			      value_type2string(ste->type));
+	MAKE_REDEX_FAILURE(redex, msg);
+	return;
+    }
+    string node = GET_STRING(g_node);
+    int	time = GET_INT(g_time);
+    push_ste(ste);
+    push_fsm(ste->fsm);
+    int idx = name2idx(node);
+    if( idx < 0 ) {
+	pop_ste();
+	pop_fsm();
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in ste-fsm", node));
+	return;
+    }
+    trace_ptr tp = (trace_ptr) find_hash(trace_tblp, INT2PTR(idx));
+    if( tp == NULL ) {
+	pop_ste();
+	pop_fsm();
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not traced", node));
+	return;
+    }
+    bool found = FALSE;
+    for(trace_event_ptr te = tp->events; te != NULL; te = te->next) {
+	if( te->time <= time ) {
+	    found = TRUE;
+	    MAKE_REDEX_CONS_ND(redex,Make_GBV_leaf(te->H),Make_GBV_leaf(te->L));
+	    break;
+	}
+    }
+    if( !found ) {
+	MAKE_REDEX_CONS_ND(redex,Make_GBV_leaf(c_ONE),Make_GBV_leaf(c_ONE));
+    }
+    pop_fsm();
+    pop_ste();
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+gen_get_ste_result(g_ptr redex, value_type type)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_ste, g_flag;
+    EXTRACT_2_ARGS(redex, g_ste, g_flag);
+    ste_ptr ste = (ste_ptr) GET_EXT_OBJ(g_ste);
+    if( ste->type != type ) {   
+        string msg = Fail_pr("Asking for %s value when STE run created %ss",
+                              value_type2string(type),
+                              value_type2string(ste->type));
+        MAKE_REDEX_FAILURE(redex, msg);
+        return;
+    }
+    string flag = GET_STRING(g_flag);
+    gbv res;
+    if( strcmp(flag, "antOK") == 0 ) {
+	res = ste->assertion_OK;
+    } else if( strcmp(flag, "trajOK") == 0 ) {
+	res = ste->validTrajectory;
+    } else if( strcmp(flag, "consOK") == 0 ) {
+	res = ste->check_OK;
+    } else if( strcmp(flag, "checkOK") == 0 ) {
+	res = ste->checkTrajectory;
+    } else if( strcmp(flag, "implies") == 0 ) {
+	// Implication only
+	res = c_OR(c_NOT(ste->assertion_OK),
+                   c_OR(c_NOT(ste->validTrajectory),
+                        c_AND(ste->checkTrajectory, ste->check_OK)));
+    } else if( strcmp(flag, "strong") == 0 || strcmp(flag, "") == 0 ) {
+	// All (normal)
+	res = c_AND(ste->assertion_OK,
+                   c_AND(ste->validTrajectory,
+                        c_AND(ste->checkTrajectory, ste->check_OK)));
+    } else {
+        MAKE_REDEX_FAILURE(redex,
+			   Fail_pr("Unknown type (%s) in (b)get_ste_result",
+				    flag));
+        return;
+    }
+    MAKE_REDEX_GBV(redex, res);
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+dbg_print_ils(pointer key, pointer data)
+{
+    (void) data;
+    ilist_ptr il = (ilist_ptr) key;
+    g_ptr nds = ilist2nds(il);
+    g_ptr vecs = Merge_Vectors(nds, TRUE);
+    string res = strtemp("");
+    bool first = TRUE;
+    while( !IS_NIL(vecs) ) {
+	if( !first )
+	    charappend(' ');
+	first = FALSE;
+	strappend(GET_STRING(GET_CONS_HD(vecs)));
+	vecs = GET_CONS_TL(vecs);
+    }
+    FP(err_fp, "%s\n", res);
+}
+
+static void
+dbg_print_stop_nds(pointer key, pointer data)
+{
+    (void) data;
+    int id = PTR2INT(key);
+    FP(err_fp, " %s", idx2name(id));
+}

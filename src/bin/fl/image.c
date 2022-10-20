@@ -28,7 +28,7 @@ extern FILE		*odests_fp;
 static int		image_oidx;
 static typeExp_ptr	image_handle_tp;
 static image_ptr	image_free_list = NULL;
-static char		read_buf[READ_BUF_SIZE];
+static char		im_read_buf[READ_BUF_SIZE];
 
 static hash_record	X11_colors;
 static rec_mgr	    	color_rec_mgr;
@@ -44,10 +44,6 @@ static formula   image_eq_fn(pointer p1, pointer p2, bool identical);
 static image_ptr create_image(string name, int rows, int cols);
 static color_ptr mk_rgb(int r, int g, int b);
 static void      create_X11_color_map();
-static void      write_int(FILE *fp, int i, bool nl);
-static int       read_int(FILE *fp, bool nl);
-static void      write_string(FILE *fp, string s, bool nl);
-static string    read_string(FILE *fp, bool nl);
 static void	 rgb2hsv(int r, int g, int b, int *hp, int *sp, int *vp);
 static int       image_sha256_fn(int *g_cntp, hash_record *g_tblp,
 				 SHA256_ptr sha, pointer a);
@@ -84,7 +80,7 @@ get_non_comment_line(FILE *fp)
 {
     string line;
     do {
-	line = fgets(read_buf, READ_BUF_SIZE, fp);
+	line = fgets(im_read_buf, READ_BUF_SIZE, fp);
     } while ( strncmp(line, "/*", 2) == 0 );
     return line;
 }
@@ -101,7 +97,7 @@ import_xpm_image(g_ptr redex)
 			   Fail_pr("Cannot open file %s for reading", file));
 	return;
     }
-    string line = fgets(read_buf, READ_BUF_SIZE, fp);
+    string line = fgets(im_read_buf, READ_BUF_SIZE, fp);
     if( strcmp(line, "/* XPM */\n") != 0 ) {
 	MAKE_REDEX_FAILURE(redex,
 			   Fail_pr("Incorrect format\nGot %s\nExpected: %s\n",
@@ -430,32 +426,35 @@ static void
 save_image_fn(FILE *fp, pointer p)
 {
     image_ptr ip = (image_ptr) p;
-    write_string(fp, ip->name, FALSE);
-    write_int(fp, ip->rows, FALSE);
-    write_int(fp, ip->cols, TRUE);
+    write_string(fp, ip->name);
+    write_int(fp, ip->rows);
+    write_int(fp, ip->cols);
     color_ptr cp;
     FOR_BUF(&(ip->cbuf), color_rec, cp) {
-	write_int(fp, cp->valid, FALSE);
-	write_int(fp, cp->r, FALSE);
-	write_int(fp, cp->g, FALSE);
-	write_int(fp, cp->b, TRUE);
+	write_uchar(fp, cp->valid);
+	write_uchar(fp, cp->r);
+	write_uchar(fp, cp->g);
+	write_uchar(fp, cp->b);
     }
 }
 
 static pointer
 load_image_fn(FILE *fp)
 {
-    string name = read_string(fp, FALSE);
-    int rows = read_int(fp, FALSE);
-    int cols = read_int(fp, TRUE);
+    string name;
+    read_string(fp, &name);
+    int rows;
+    read_int(fp, &rows);
+    int cols;
+    read_int(fp, &cols);
     image_ptr ip = create_image(name, rows, cols);
     buffer  *cbp = &(ip->cbuf);
     for(int i = 0; i < rows*cols; i++) {
 	color_rec cr;
-	cr.valid = read_int(fp, FALSE);
-	cr.r	 = read_int(fp, FALSE);
-	cr.g	 = read_int(fp, FALSE);
-	cr.b	 = read_int(fp, TRUE);
+	read_uchar(fp, &(cr.valid));
+	read_uchar(fp, &(cr.r));
+	read_uchar(fp, &(cr.g));
+	read_uchar(fp, &(cr.b));
 	push_buf(cbp, &cr);
     }
     return((pointer) ip);
@@ -465,8 +464,8 @@ static string
 image2str_fn(pointer p)
 {
     image_ptr ip = (image_ptr) p;
-    sprintf(read_buf, "Image with %d rows and %d columns\n",ip->rows,ip->cols);
-    string msg = wastrsave(&strings, read_buf);
+    sprintf(im_read_buf, "Image with %d rows and %d columns\n",ip->rows,ip->cols);
+    string msg = wastrsave(&strings, im_read_buf);
     if( RCverbose_image_print ) {
         FP(stdout_fp, "%s", msg);
 	color_ptr cp;
@@ -2071,47 +2070,6 @@ create_X11_color_map()
     insert_hash(&X11_colors, wastrsave(&strings, "LightGreen"),
                              mk_rgb(144,238,144));
 }
-
-static void
-write_int(FILE *fp, int i, bool nl)
-{
-    fprintf(fp, "%d%s", i, nl?"\n":" ");
-}
-
-static int
-read_int(FILE *fp, bool nl)
-{
-    int i;
-    if( nl ) {
-        if( fscanf(fp, "%d\n", &i) != 1 )
-            Rprintf("Corrupted image object (expected integer)");
-    } else {
-        if( fscanf(fp, "%d ", &i) != 1 )
-            Rprintf("Corrupted image object (expected integer)");
-    }
-    return( i );
-}
-
-static void
-write_string(FILE *fp, string s, bool nl)
-{
-    fprintf(fp, "%d%s", Save_get_string_idx(s), nl?"\n":" ");
-}
-
-static string
-read_string(FILE *fp, bool nl)
-{
-    int idx;
-    if( nl ) {
-        if( fscanf(fp, "%d\n", &idx) != 1 )
-            Rprintf("Corrupted image object (expeced string)");
-    } else {
-        if( fscanf(fp, "%d ", &idx) != 1 )
-            Rprintf("Corrupted image object (expeced string)");
-    }
-    return( Load_get_string_from_idx(idx) );
-}
-
 
 static void
 rgb2hsv(int r, int g, int b, int *hp, int *sp, int *vp)

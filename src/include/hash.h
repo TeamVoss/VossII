@@ -45,6 +45,8 @@ typedef struct hash_record_q {
 void		create_hash(hash_record_ptr hp, unint size,
 			    unint (*hash_fn)(pointer key, unint n),
 			    bool (*hash_eq)(pointer k1, pointer k2));
+void		duplicate_hash_struct(hash_record_ptr old_hp,
+				      hash_record_ptr new_hp);
 void		autosize_hash(hash_record_ptr hp);
 void		freeze_size_hash(hash_record_ptr hp);
 void		dispose_hash(hash_record_ptr hp,

@@ -12,6 +12,30 @@
 #include "io.h"
 #include "graph.h"
 
+int		write_graph_line_nbr;
+int		read_graph_line_nbr;
+int		dbg_indent;
+
+#if 0
+#define WR_DBG0(type)   { fprintf(stderr, "%*s%s on line %d\n",     \
+			  2*(dbg_indent++),"",(type), write_graph_line_nbr); }
+#define RD_DBG0(type)   { fprintf(stderr, "%*s%s on line %d\n", \
+			  2*(dbg_indent++),"",(type), read_graph_line_nbr); }
+#define WR_DBG1(type)   { fprintf(stderr, "%*s%s on line %d\n",     \
+			      2*dbg_indent,"",(type), write_graph_line_nbr++); }
+#define RD_DBG1(type)   { fprintf(stderr, "%*s%s on line %d\n", \
+                              2*dbg_indent,"",(type), read_graph_line_nbr++); }
+#define END_DBG(type)   { \
+		    fprintf(stderr,"%*s%s\n",2*(--dbg_indent),"",(type)); }
+#else
+#define WR_DBG0(type)
+#define RD_DBG0(type)
+#define WR_DBG1(type)   
+#define RD_DBG1(type)
+#define END_DBG(type)
+#endif
+
+
 extern g_ptr    void_nd;
 extern str_mgr  strings;
 extern char     FailBuf[4096];
@@ -28,17 +52,11 @@ static char		bdd_pbuf[4096];
 static char		buf[4096];
 static uniq_buffer	bexpr_buf;
 static uniq_buffer	bool_buf;
-#if 0
-static uniq_buffer	fsm_buf;
-#endif
 static uniq_buffer	string_buf;
 static hash_record	g_save_tbl;
 static int		g_save_cnt;
 static buffer		bool_results;
 static buffer		bexpr_results;
-#if 0
-static buffer		fsm_results;
-#endif
 static buffer		str_results;
 
 /* ----- Forward definitions local functions ----- */
@@ -934,91 +952,22 @@ Load_get_string_from_idx(int idx)
     return( *((string *) FAST_LOC_BUF(&str_results, idx)) );
 }
 
-#if 0
-int
-Load_get_fsm_from_idx(int idx)
-{
-    return( *((int *) FAST_LOC_BUF(&fsm_results, idx)) );
-}
-#endif
-
 int
 Save_get_bool_idx(formula f)
 {
-    return( get_uniq_buf_index(&bool_buf, (pointer) &f) );
+    return( find_insert_uniq_buf(&bool_buf, (pointer) &f) );
 }
 
 int
 Save_get_bexpr_idx(bexpr be)
 {
-    return( get_uniq_buf_index(&bexpr_buf, (pointer) &be) );
+    return( find_insert_uniq_buf(&bexpr_buf, (pointer) &be) );
 }
 
 int
 Save_get_string_idx(string s)
 {
-    return( get_uniq_buf_index(&string_buf, (pointer) &s) );
-}
-
-#if 0
-int
-Save_get_fsm_idx(int ckt)
-{
-    return( get_uniq_buf_index(&fsm_buf, (pointer) &ckt) );
-}
-#endif
-
-static g_ptr
-record_bexpr(g_ptr leaf_node)
-{
-    if( GET_LEAF_TYPE(leaf_node) == BEXPR ) {
-	bexpr be = GET_BEXPR(leaf_node);
-	push_uniq_buf(&bexpr_buf, (pointer) &be);
-    }
-    return NULL;
-}
-
-static g_ptr
-record_bool(g_ptr leaf_node)
-{
-    if( GET_LEAF_TYPE(leaf_node) == BOOL ) {
-	formula b = GET_BOOL(leaf_node);
-	push_uniq_buf(&bool_buf, (pointer) &b);
-    }
-    return NULL;
-}
-
-
-static g_ptr
-record_string(g_ptr leaf_node)
-{
-    ASSERT(IS_LEAF(leaf_node));
-    if( IS_STRING(leaf_node) ) {
-	string s = GET_STRING(leaf_node);
-	push_uniq_buf(&string_buf, (pointer) &s);
-    } else if( IS_PRIM_FN(leaf_node) ) {
-	switch( GET_PRIM_FN(leaf_node) ) {
-	    string s;
-	    case P_FAIL:
-		s = GET_FAIL_STRING(leaf_node);
-		push_uniq_buf(&string_buf, (pointer) &s);
-		break;
-	    case P_PRINTF:
-	    case P_FPRINTF:
-	    case P_EPRINTF:
-	    case P_SPRINTF:
-	    case P_SSCANF:
-		s = GET_PRINTF_STRING(leaf_node);
-		push_uniq_buf(&string_buf, (pointer) &s);
-		break;
-	    default:
-		break;
-	}
-    } else if( IS_VAR(leaf_node) ) {
-	string s = GET_VAR(leaf_node);
-	push_uniq_buf(&string_buf, (pointer) &s);
-    }
-    return NULL;
+    return( find_insert_uniq_buf(&string_buf, (pointer) &s) );
 }
 
 #define TAG_APPLY	'A'
@@ -1044,6 +993,7 @@ record_string(g_ptr leaf_node)
 bool
 Save_graph(string type_sig, string file_name, g_ptr node)
 {
+    Serialize_Begin();
     Sprintf(buf, "%s/tmp_save_XXXXXX", Voss_tmp_dir);
     string dir = wastrsave(&strings, mkdtemp(buf));
     Sprintf(buf, "%s/signature", dir);
@@ -1054,31 +1004,11 @@ Save_graph(string type_sig, string file_name, g_ptr node)
     string bool_file_name = wastrsave(&strings, buf);
     new_uniq_buf(&bexpr_buf, 100, sizeof(bexpr));
     new_uniq_buf(&bool_buf, 100, sizeof(formula));
-#if 0
-    new_uniq_buf(&fsm_buf, 100, sizeof(int));
-#endif
     new_uniq_buf(&string_buf, 100, sizeof(string));
-    // Bexpr saving
-    Gen_map(record_bexpr, node, TRUE);
-    Save_bexprs(bexpr_file_name, &(bexpr_buf.buf));
-    // BDD saving
-    Gen_map(record_bool, node, TRUE);
-    Save_BDDs(bool_file_name, &(bool_buf.buf));
-    // String saving
-    Gen_map(record_string, node, TRUE);
-    Sprintf(buf, "%s/strings", dir);
-    FILE *fp = fopen(buf, "w");
-    if( fp == NULL ) {
-	DIE("Failed to save graph %s\n%s\n", buf, strerror(errno));
-    }
-    string *sp;
-    FOR_UNIQ_BUF(&string_buf, string, sp) {
-	fprintf(fp, "%d %s\n", (int) strlen(*sp), *sp);
-    }
-    fclose(fp);
+
     // Graph saving
     Sprintf(buf, "%s/graph", dir);
-    fp = fopen(buf, "w");
+    FILE *fp = fopen(buf, "w");
     if( fp == NULL ) {
 	DIE("Failed to save graph to %s\n%s\n", buf, strerror(errno));
     }
@@ -1090,8 +1020,25 @@ Save_graph(string type_sig, string file_name, g_ptr node)
     dispose_hash(&g_save_tbl, NULLFCN);
     create_hash(&g_save_tbl, 1000, ptr_hash, ptr_equ);
     g_save_cnt = 0;
+    write_graph_line_nbr = 1;
+    dbg_indent = 0;
     save_graph_rec(fp, node);
     dispose_hash(&g_save_tbl, NULLFCN);
+    fclose(fp);
+    // Bexpr saving
+    Save_bexprs(bexpr_file_name, &(bexpr_buf.buf));
+    // BDD saving
+    Save_BDDs(bool_file_name, &(bool_buf.buf));
+    // String saving
+    Sprintf(buf, "%s/strings", dir);
+    fp = fopen(buf, "w");
+    if( fp == NULL ) {
+	DIE("Failed to save graph %s\n%s\n", buf, strerror(errno));
+    }
+    string *sp;
+    FOR_UNIQ_BUF(&string_buf, string, sp) {
+	fprintf(fp, "%d %s\n", (int) strlen(*sp), *sp);
+    }
     fclose(fp);
     // Type signature saving
     if( (fp = fopen(sig_file_name, "w")) == NULL ) {
@@ -1103,17 +1050,11 @@ Save_graph(string type_sig, string file_name, g_ptr node)
     fclose(fp);
     free_uniq_buf(&bexpr_buf);
     free_uniq_buf(&bool_buf);
-#if 0
-    free_uniq_buf(&fsm_buf);
-#endif
     free_uniq_buf(&string_buf);
     // Tar up the files
-#if 0
-#else
     Sprintf(buf,
 	    "tar -c -z -C %s -f %s signature bexprs bools strings graph",
 	    dir, file_name);
-#endif
     if( system(buf) != 0 ) {
 	Fail_pr("Command '%s' failed????", buf);
 	return FALSE;
@@ -1121,6 +1062,7 @@ Save_graph(string type_sig, string file_name, g_ptr node)
     Sprintf(buf, "/bin/rm -rf %s", dir);
     int i  = system(buf);
     (void) i;
+    Serialize_End();
     return TRUE;
 }
 
@@ -1137,6 +1079,7 @@ Save_graph(string type_sig, string file_name, g_ptr node)
 bool
 Load_graph(string type_sig, string file_name, g_ptr redex)
 {
+    Unserialize_Begin();
     Sprintf(buf, "%s/tmp_load_XXXXXX", Voss_tmp_dir);
     string dir = wastrsave(&strings, mkdtemp(buf));
     // Make files
@@ -1154,12 +1097,14 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
     Sprintf(buf, " tar -C %s -x -z -f %s", dir, file_name);
     if( system(buf) != 0 ) {
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Failed to read %s", file_name));
+	Unserialize_End();
 	return(FALSE);
     }
     // ------------- Read and parse signature ------------------
     FILE *fp;
     if( (fp = fopen(sig_file_name, "r")) == NULL ) {
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Failed to open %s", sig_file_name));
+	Unserialize_End();
 	return(FALSE);
     }
     int g_node_cnt;
@@ -1167,6 +1112,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 	fclose(fp);
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Syntax error at line 1 in %s",
 					  sig_file_name));
+	Unserialize_End();
 	return(FALSE);
     }
     string tmp = strtemp("");
@@ -1175,6 +1121,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
     if( strncmp(tmp, type_sig, strlen(type_sig)) != 0 ) {
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Type signature mismatch in %s",
 					  file_name));
+	Unserialize_End();
 	return(FALSE);
     }
     // ------------- Read bools ------------------
@@ -1183,6 +1130,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Failed to read BDDs in %s",
 					  file_name));
 	free_buf(&bool_results);
+	Unserialize_End();
 	return(FALSE);
     }
     // ------------- Read bexprs ------------------
@@ -1192,6 +1140,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 					  file_name));
 	free_buf(&bool_results);
 	free_buf(&bexpr_results);
+	Unserialize_End();
 	return(FALSE);
     }
     // ------------- Read strings ------------------
@@ -1200,10 +1149,8 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Failed to read exe file %s", buf));
 	free_buf(&bool_results);
 	free_buf(&bexpr_results);
-#if 0
-	free_buf(&fsm_results);
-#endif
 	free_buf(&str_results);
+	Unserialize_End();
 	return( FALSE );
     }
     while( !feof(fp) ) {
@@ -1221,10 +1168,8 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		fclose(fp);
 		free_buf(&bool_results);
 		free_buf(&bexpr_results);
-#if 0
-		free_buf(&fsm_results);
-#endif
 		free_buf(&str_results);
+		Unserialize_End();
 		return( FALSE );
 	    }
 	    charappend(c);
@@ -1246,14 +1191,14 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot open %s", graph_file_name));
 	free_buf(&bool_results);
 	free_buf(&bexpr_results);
-#if 0
-	free_buf(&fsm_results);
-#endif
 	free_buf(&str_results);
 	free_buf(&gbuf);
+	Unserialize_End();
 	return( FALSE );
     }
     int line;
+    read_graph_line_nbr = 1;
+    dbg_indent = 0;
     for(line = 0; line < g_node_cnt; line++) {
         int c = fgetc(fp);
         ungetc(c, fp);
@@ -1266,6 +1211,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		pointer p;
 		ext_obj_ptr op;
 	    case TAG_APPLY:
+		RD_DBG1("APPLY node");
 		if( fscanf(fp,"A %d %d %d\n", &ig, &il, &ir) != 3 )
 		    RD_FAIL("TAG_APPLY");
 		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
@@ -1276,12 +1222,14 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		INC_REFCNT(r);
 		break;
 	    case TAG_NIL:
+		RD_DBG1("NIL node");
 		if( fscanf(fp,"0 %d\n", &ig) != 1 )
 		    RD_FAIL("TAG_NIL");
 		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
 		MAKE_REDEX_CONS_ND(g, NULL, NULL);
 		break;
 	    case TAG_CONS:
+		RD_DBG1("CONS node");
 		if( fscanf(fp,"C %d %d %d\n", &ig, &il, &ir) != 3 )
 		    RD_FAIL("TAG_CONS");
 		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
@@ -1294,6 +1242,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 	    case TAG_INT:
 		{
 		    int sz;
+		    RD_DBG1("INT node");
 		    if( fscanf(fp,"I %d %d ", &ig, &sz) != 2 )
 			RD_FAIL("TAG_INT LENGTH");
 		    g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
@@ -1316,6 +1265,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		    break;
 		}
 	    case TAG_STRING:
+		RD_DBG1("STRING node");
 		if( fscanf(fp,"S %d %d\n", &ig, &il) != 2 )
 		    RD_FAIL("TAG_STRING");
 		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
@@ -1323,6 +1273,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		MAKE_REDEX_STRING(g, s);
 		break;
 	    case TAG_BOOL:
+		RD_DBG1("BOOL node");
 		if( fscanf(fp,"B %d %d\n", &ig, &il) != 2 )
 		    RD_FAIL("TAG_BOOL");
 		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
@@ -1330,6 +1281,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		MAKE_REDEX_BOOL(g, b);
 		break;
 	    case TAG_BEXPR:
+		RD_DBG1("BEXPR node");
 		if( fscanf(fp,"E %d %d\n", &ig, &il) != 2 )
 		    RD_FAIL("TAG_BEXPR");
 		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
@@ -1337,6 +1289,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		MAKE_REDEX_BEXPR(g, be);
 		break;
 	    case TAG_FAIL:
+		RD_DBG1("P_FAIL node");
 		if( fscanf(fp,"F %d %d\n", &ig, &il) != 2 )
 		    RD_FAIL("TAG_FAIL");
 		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
@@ -1345,6 +1298,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		break;
 	    case TAG_REF_VAR:
 		{
+		    RD_DBG1("P_REF_VAR node");
 		    if( fscanf(fp,"R %d %d\n", &ig, &il) != 2 )
 			RD_FAIL("TAG_REF_VAR");
 		    g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
@@ -1357,6 +1311,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		    break;
 		}
 	    case TAG_SSCANF:
+		RD_DBG1("P_SSCANF node");
 		if( fscanf(fp,"< %d %d\n", &ig, &il) != 2 )
 		    RD_FAIL("TAG_SSCANF");
 		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
@@ -1365,6 +1320,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		SET_PRINTF_STRING(g, s);
 		break;
 	    case TAG_PRINTF:
+		RD_DBG1("P_PRINTF node");
 		if( fscanf(fp,"! %d %d\n", &ig, &il) != 2 )
 		    RD_FAIL("TAG_PRINTF");
 		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
@@ -1373,6 +1329,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		SET_PRINTF_STRING(g, s);
 		break;
 	    case TAG_EPRINTF:
+		RD_DBG1("P_EPRINTF node");
 		if( fscanf(fp,"@ %d %d\n", &ig, &il) != 2 )
 		    RD_FAIL("TAG_EPRINTF");
 		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
@@ -1381,6 +1338,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		SET_PRINTF_STRING(g, s);
 		break;
 	    case TAG_FPRINTF:
+		RD_DBG1("P_FPRINTF node");
 		if( fscanf(fp,"# %d %d\n", &ig, &il) != 2 )
 		    RD_FAIL("TAG_FPRINTF");
 		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
@@ -1389,6 +1347,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		SET_PRINTF_STRING(g, s);
 		break;
 	    case TAG_SPRINTF:
+		RD_DBG1("P_SPRINTF node");
 		if( fscanf(fp,"$ %d %d\n", &ig, &il) != 2 )
 		    RD_FAIL("TAG_SPRINTF");
 		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
@@ -1398,6 +1357,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		break;
 	    case TAG_CACHE:
 		{
+		    RD_DBG1("P_CACHE node");
 		    if( fscanf(fp,"= %d\n", &ig) != 1 )
 			RD_FAIL("TAG_CACHE");
 		    g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
@@ -1407,18 +1367,21 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		    break;
 		}
 	    case TAG_EXTAPI:
+		RD_DBG1("P_EXTAPI_FN node");
 		if( fscanf(fp,"X %d %d\n", &ig, &il) != 2 )
 		    RD_FAIL("TAG_EXTAPI");
 		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
 		MAKE_REDEX_EXTAPI(g, il);
 		break;
 	    case TAG_PRIM_FN:
+		RD_DBG1("generic P_FN node");
 		if( fscanf(fp,"P %d %d\n", &ig, &il) != 2 )
 		    RD_FAIL("TAG_PRIM_FN");
 		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
 		MAKE_REDEX_PRIM_FN(g, il);
 		break;
 	    case TAG_VAR:
+		RD_DBG1("VAR node");
 		if( fscanf(fp,"V %d %d\n", &ig, &il) != 2 )
 		    RD_FAIL("TAG_VAR");
 		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
@@ -1426,6 +1389,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 		MAKE_REDEX_VAR(g, s);
 		break;
 	    case TAG_EXTOBJ:
+		RD_DBG1("EXT_OBJ node");
 		if( fscanf(fp,"O %d %d\n", &ig, &il) != 2 )
 		    RD_FAIL("TAG_EXTOBJ");
 		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
@@ -1448,14 +1412,12 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
     OVERWRITE(redex, result);
     free_buf(&bool_results);
     free_buf(&bexpr_results);
-#if 0
-    free_buf(&fsm_results);
-#endif
     free_buf(&str_results);
     free_buf(&gbuf);
     Sprintf(buf, "/bin/rm -rf %s", dir);
     int i = system(buf);
     (void) i;
+    Unserialize_End();
     return( TRUE );
 
   rd_fail:
@@ -1464,9 +1426,6 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
     fclose(fp);
     free_buf(&bool_results);
     free_buf(&bexpr_results);
-#if 0
-    free_buf(&fsm_results);
-#endif
     free_buf(&str_results);
     free_buf(&gbuf);
     Sprintf(buf, "/bin/rm -rf %s", dir);
@@ -1474,6 +1433,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 	int i = system(buf);
 	(void) i;
     }
+    Unserialize_End();
     return( FALSE );
 }
 
@@ -1773,9 +1733,9 @@ print_list(int pfn, g_ptr l,int i,g_ptr redex,bool ljust, bool zfill, int size)
 static bool
 can_be_saved(g_ptr np)
 {
+  restart:
     if( find_hash(&g_save_tbl, (pointer) np) != NULL ) return( TRUE );
     insert_hash(&g_save_tbl, (pointer) np, (pointer) np);
-  restart:
     switch( GET_TYPE(np) ) {
 	case APPLY_ND:
 	    {
@@ -1873,17 +1833,20 @@ save_graph_rec(FILE *fp, g_ptr np)
 		int l = save_graph_rec(fp, GET_APPLY_LEFT(np));
 		int r = save_graph_rec(fp, GET_APPLY_RIGHT(np));
 		fprintf(fp, "%c %d %d %d\n", TAG_APPLY, res, l, r);
+		WR_DBG1("APPLY node");
 		return( res );
 	    }
 	case CONS_ND:
 	    {
 		if( IS_NIL(np) ) {
 		    fprintf(fp, "%c %d\n", TAG_NIL, res);
+		    WR_DBG1("NIL node");
 		    return( res );
 		} else {
 		    int l = save_graph_rec(fp, GET_CONS_HD(np));
 		    int r = save_graph_rec(fp, GET_CONS_TL(np));
 		    fprintf(fp, "%c %d %d %d\n", TAG_CONS, res, l, r);
+		    WR_DBG1("CONS node");
 		    return( res );
 		}
 	    }
@@ -1899,22 +1862,27 @@ save_graph_rec(FILE *fp, g_ptr np)
 			s = Arbi_ToString(GET_AINT(np), 10);
 			fprintf(fp, "%c %d %d %s\n", TAG_INT, res,
 				    (int) strlen(s), s);
+			WR_DBG1("INT node");
 			return( res );
 		    case STRING:
 			s = GET_STRING(np);
-			INT_EMIT(TAG_STRING,get_uniq_buf_index(&string_buf,&s));
+			INT_EMIT(TAG_STRING,find_insert_uniq_buf(&string_buf,&s));
+			WR_DBG1("STRING node");
 			return( res );
 		    case BOOL:
 			f = GET_BOOL(np);
-			INT_EMIT(TAG_BOOL,get_uniq_buf_index(&bool_buf,&f));
+			INT_EMIT(TAG_BOOL,find_insert_uniq_buf(&bool_buf,&f));
+			WR_DBG1("BOOL node");
 			return( res );
 		    case BEXPR:
 			b = GET_BEXPR(np);
-			INT_EMIT(TAG_BEXPR, get_uniq_buf_index(&bexpr_buf, &b));
+			INT_EMIT(TAG_BEXPR, find_insert_uniq_buf(&bexpr_buf, &b));
+			WR_DBG1("BEXPR node");
 			return( res );
 		    case EXT_OBJ:
 			i = GET_EXT_OBJ_CLASS(np);
 			INT_EMIT(TAG_EXTOBJ, i);
+			WR_DBG1("EXT_OBJ node");
 			op = M_LOCATE_BUF(&ext_obj_buf, i);
 			ASSERT(op->save_fn != NULL );
 			op->save_fn(fp, GET_EXT_OBJ(np));
@@ -1924,7 +1892,8 @@ save_graph_rec(FILE *fp, g_ptr np)
 			    case P_FAIL:
 				s = GET_FAIL_STRING(np);
 				INT_EMIT(TAG_FAIL,
-					 get_uniq_buf_index(&string_buf, &s));
+					 find_insert_uniq_buf(&string_buf, &s));
+				WR_DBG1("P_FAIL node");
 				return( res );
 			    case P_REF_VAR:
 				{
@@ -1932,45 +1901,55 @@ save_graph_rec(FILE *fp, g_ptr np)
 				    g_ptr root = Get_RefVar(ref_var);
 				    int ch = save_graph_rec(fp, root);
 				    INT_EMIT(TAG_REF_VAR, ch);
+				    WR_DBG1("P_REF_VAR node");
 				    return( res );
 				}
 			    case P_SSCANF:
 				s = GET_PRINTF_STRING(np);
 				INT_EMIT(TAG_SSCANF,
-					get_uniq_buf_index(&string_buf,&s));
+					find_insert_uniq_buf(&string_buf,&s));
+				WR_DBG1("P_SSCANF node");
 				return( res );
 			    case P_PRINTF:
 				s = GET_PRINTF_STRING(np);
 				INT_EMIT(TAG_PRINTF,
-					get_uniq_buf_index(&string_buf,&s));
+					find_insert_uniq_buf(&string_buf,&s));
+				WR_DBG1("P_PRINTF node");
 				return( res );
 			    case P_FPRINTF:
 				s = GET_PRINTF_STRING(np);
 				INT_EMIT(TAG_FPRINTF,
-					get_uniq_buf_index(&string_buf,&s));
+					find_insert_uniq_buf(&string_buf,&s));
+				WR_DBG1("P_FPRINTF node");
 				return( res );
 			    case P_SPRINTF:
 				s = GET_PRINTF_STRING(np);
 				INT_EMIT(TAG_SPRINTF,
-					get_uniq_buf_index(&string_buf,&s));
+					find_insert_uniq_buf(&string_buf,&s));
+				WR_DBG1("P_SPRINTF node");
 				return( res );
 			    case P_EPRINTF:
 				s = GET_PRINTF_STRING(np);
 				INT_EMIT(TAG_EPRINTF,
-					get_uniq_buf_index(&string_buf,&s));
+					find_insert_uniq_buf(&string_buf,&s));
+				WR_DBG1("P_EPRINTF node");
 				return( res );
 			    case P_CACHE:
 				fprintf(fp, "%c %d\n", TAG_CACHE, res);
+				WR_DBG1("P_CACHE node");
 				return( res );
 			    case P_EXTAPI_FN:
 				LONG_EMIT(TAG_EXTAPI, GET_EXTAPI_FN(np));
+				WR_DBG1("P_EXTAPI_FN node");
 				return( res );
 			    default:
 				LONG_EMIT(TAG_PRIM_FN, GET_PRIM_FN(np));
+				WR_DBG1("generic P_FN node");
 				return( res );
 			}
 		    case VAR:
 			STR_EMIT(TAG_VAR, GET_VAR(np));
+			WR_DBG1("VAR node");
 			return( res );
 		    default:
 			DIE("Unexpected node type");

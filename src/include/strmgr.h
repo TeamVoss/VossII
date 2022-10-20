@@ -45,6 +45,7 @@ void		new_strmgr(str_mgr_ptr smp);
 void		free_strmgr(str_mgr_ptr smp);
 void		new_ustrmgr(ustr_mgr_ptr smp);
 void		free_ustrmgr(ustr_mgr_ptr smp);
+int		ustr_mgr_size(ustr_mgr_ptr smp);
 string		Strsave(str_mgr_ptr smp, string s);
 string		uStrsave(ustr_mgr_ptr smp, string s);
 string		WAstrsave(str_mgr_ptr smp, string s);

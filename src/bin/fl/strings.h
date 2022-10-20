@@ -27,9 +27,10 @@ vec_ptr	       Split_vector_name(
                    rec_mgr *range_mgrp, string vec);
 string         Get_vector_signature(ustr_mgr *string_mgrp, vec_ptr vp);
 int	       Get_Vector_Size(string vec);
-vec_list_ptr   Expand_vector(
-                   rec_mgr *vector_list_mgr, rec_mgr *vector_mgr,
-                   rec_mgr *range_mgr, vec_ptr vec);
+vec_list_ptr   Expand_constant(rec_mgr *vector_list_mgr, rec_mgr *vector_mgr,
+			       string s);
+vec_list_ptr   Expand_vector(rec_mgr *vector_list_mgr, rec_mgr *vector_mgr,
+			     rec_mgr *range_mgr, vec_ptr vec);
 vec_list_ptr   Merge_Vectors_gen(rec_mgr *vec_list_mgr, vec_list_ptr vecs);
 g_ptr	       Merge_Vectors(g_ptr nds, bool non_contig_vecs);
 g_ptr	       Extract_Vectors(g_ptr nds, bool non_contig_vecs);
@@ -74,13 +75,15 @@ typedef struct range_rec {
 	range_ptr      next;
 } range_rec;
 
-typedef struct vec_rec {
-    vec_type       type;
-    union {
-        string	   name;
+typedef union  {
+        string     name;
         range_ptr  ranges;
-    }              u;
-    vec_ptr	       next;
+    } vec_rec_content;
+
+typedef struct vec_rec {
+    vec_type		type;
+    vec_rec_content	u;  // SEL: ->type -> TXT INDEX
+    vec_ptr		next;
 } vec_rec;
 
 typedef struct vec_list_rec {
@@ -102,10 +105,10 @@ typedef struct merge_list_rec {
 
 typedef struct vector_db_rec	{
 	ustr_mgr    ustring_mgr;
-	rec_mgr	    vec_rec_mgr;
-	rec_mgr	    range_rec_mgr;
-	rec_mgr	    vec_list_rec_mgr;
-	hash_record sig2vec_list;
+	rec_mgr	    vec_rec_mgr;	    // TYPE: vec_rec
+	rec_mgr	    range_rec_mgr;	    // TYPE: range_rec
+	rec_mgr	    vec_list_rec_mgr;	    // TYPE: vec_list_rec
+	hash_record sig2vec_list;	    // TYPE: string -> vec_list_ptr
 } vector_db_rec;
 
 
