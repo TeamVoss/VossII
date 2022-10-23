@@ -47,6 +47,9 @@ void	read_hash_tbl(FILE *fp,  hash_record_ptr hp,
 		      void (*read_hash_data)(FILE *fp, pointer *pp));
 void	write_ustr_mgr(FILE *fp, ustr_mgr *usmp);
 void	write_ustr_mgr(FILE *fp, ustr_mgr *usmp);
+void	write_g_ptr(FILE *fp, g_ptr p);
+void	read_g_ptr(FILE *fp, g_ptr *pp);
+
 
 
 // Extracted from scripts/template
@@ -58,8 +61,11 @@ void write_ste_ptr(FILE *fp, ste_ptr p);
 void read_ste_ptr(FILE *fp, ste_ptr *pp);
 void write_fsm_ptr(FILE *fp, fsm_ptr p);
 void read_fsm_ptr(FILE *fp, fsm_ptr *pp);
+void write_table_ptr(FILE *fp, table_ptr p);
+void read_table_ptr(FILE *fp, table_ptr *pp);
 void write_ilist_ptr(FILE *fp, ilist_ptr p);
 void read_ilist_ptr(FILE *fp, ilist_ptr *pp);
+
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */

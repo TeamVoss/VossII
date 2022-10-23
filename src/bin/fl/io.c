@@ -70,7 +70,6 @@ static bool     force_arg_and_check(g_ptr redex, g_ptr arg);
 static bool     print_list(int pfn, g_ptr l, int i,g_ptr redex,
                            bool ljust, bool zfill, int size);
 static bool	can_be_saved(g_ptr np);
-static int	save_graph_rec(FILE *fp, g_ptr np);
 
 /****************************************************************************/
 /*                           Main functions                                 */
@@ -1018,12 +1017,9 @@ Save_graph(string type_sig, string file_name, g_ptr node)
 	return( FALSE );
     }
     dispose_hash(&g_save_tbl, NULLFCN);
-    create_hash(&g_save_tbl, 1000, ptr_hash, ptr_equ);
-    g_save_cnt = 0;
     write_graph_line_nbr = 1;
     dbg_indent = 0;
-    save_graph_rec(fp, node);
-    dispose_hash(&g_save_tbl, NULLFCN);
+    write_g_ptr(fp, node);
     fclose(fp);
     // Bexpr saving
     Save_bexprs(bexpr_file_name, &(bexpr_buf.buf));
@@ -1065,16 +1061,6 @@ Save_graph(string type_sig, string file_name, g_ptr node)
     Serialize_End();
     return TRUE;
 }
-
-#if 1
-#define RD_FAIL(msg) {							    \
-		fprintf(stderr, "Load_graph failure %s around line %d\n",   \
-				(msg), line);				    \
-		goto rd_fail;						    \
-    }
-#else
-#define RD_FAIL(msg) goto rd_fail;
-#endif
 
 bool
 Load_graph(string type_sig, string file_name, g_ptr redex)
@@ -1181,263 +1167,37 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
     }
     fclose(fp);
     // ------------- Read graph ------------------
-    buffer gbuf;
-    new_buf(&gbuf, g_node_cnt, sizeof(g_ptr));
-    for(int i = 0; i < g_node_cnt; i++) {
-	g_ptr np = Get_node();
-	push_buf(&gbuf,&np);
+    if( (fp = fopen(graph_file_name, "r")) == NULL ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot open %s", graph_file_name));
+	free_buf(&bool_results);
+	free_buf(&bexpr_results);
+	free_buf(&str_results);
+	Unserialize_End();
+	return( FALSE );
     }
     if( (fp = fopen(graph_file_name, "r")) == NULL ) {
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot open %s", graph_file_name));
 	free_buf(&bool_results);
 	free_buf(&bexpr_results);
 	free_buf(&str_results);
-	free_buf(&gbuf);
 	Unserialize_End();
 	return( FALSE );
     }
-    int line;
+    g_ptr result;
     read_graph_line_nbr = 1;
     dbg_indent = 0;
-    for(line = 0; line < g_node_cnt; line++) {
-        int c = fgetc(fp);
-        ungetc(c, fp);
-        switch( c ) {
-		int ig, il, ir;
-		g_ptr g, l, r;
-		string s;
-		bexpr be;
-		formula b;
-		pointer p;
-		ext_obj_ptr op;
-	    case TAG_APPLY:
-		RD_DBG1("APPLY node");
-		if( fscanf(fp,"A %d %d %d\n", &ig, &il, &ir) != 3 )
-		    RD_FAIL("TAG_APPLY");
-		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
-		l = *((g_ptr *) FAST_LOC_BUF(&gbuf, il));
-		r = *((g_ptr *) FAST_LOC_BUF(&gbuf, ir));
-		MAKE_REDEX_APPL_ND(g, l, r);
-		INC_REFCNT(l);
-		INC_REFCNT(r);
-		break;
-	    case TAG_NIL:
-		RD_DBG1("NIL node");
-		if( fscanf(fp,"0 %d\n", &ig) != 1 )
-		    RD_FAIL("TAG_NIL");
-		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
-		MAKE_REDEX_CONS_ND(g, NULL, NULL);
-		break;
-	    case TAG_CONS:
-		RD_DBG1("CONS node");
-		if( fscanf(fp,"C %d %d %d\n", &ig, &il, &ir) != 3 )
-		    RD_FAIL("TAG_CONS");
-		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
-		l = *((g_ptr *) FAST_LOC_BUF(&gbuf, il));
-		r = *((g_ptr *) FAST_LOC_BUF(&gbuf, ir));
-		MAKE_REDEX_CONS_ND(g, l, r);
-		INC_REFCNT(l);
-		INC_REFCNT(r);
-		break;
-	    case TAG_INT:
-		{
-		    int sz;
-		    RD_DBG1("INT node");
-		    if( fscanf(fp,"I %d %d ", &ig, &sz) != 2 )
-			RD_FAIL("TAG_INT LENGTH");
-		    g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
-		    string tmp = strtemp("");
-		    char *p = tmp;
-		    for(int i = 0; i < sz; i++) {
-			if( (c = fgetc(fp)) == EOF )
-			    RD_FAIL("TAG_INT DIGIT");
-			*p = c;
-			p++;
-		    }
-		    fgetc(fp);	// Eat newline
-		    *p = 0;
-		    arbi_T ai = Arbi_FromString(tmp, 10);
-		    if( ai == NULL ) {
-			fprintf(stderr, "Failing int string: %s\n", tmp);
-			RD_FAIL("INT_reading");
-		    }
-		    MAKE_REDEX_AINT(g, ai);
-		    break;
-		}
-	    case TAG_STRING:
-		RD_DBG1("STRING node");
-		if( fscanf(fp,"S %d %d\n", &ig, &il) != 2 )
-		    RD_FAIL("TAG_STRING");
-		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
-		s = *((string *) FAST_LOC_BUF(&str_results, il));
-		MAKE_REDEX_STRING(g, s);
-		break;
-	    case TAG_BOOL:
-		RD_DBG1("BOOL node");
-		if( fscanf(fp,"B %d %d\n", &ig, &il) != 2 )
-		    RD_FAIL("TAG_BOOL");
-		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
-		b = *((formula *) FAST_LOC_BUF(&bool_results, il));
-		MAKE_REDEX_BOOL(g, b);
-		break;
-	    case TAG_BEXPR:
-		RD_DBG1("BEXPR node");
-		if( fscanf(fp,"E %d %d\n", &ig, &il) != 2 )
-		    RD_FAIL("TAG_BEXPR");
-		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
-		be = *((bexpr *) FAST_LOC_BUF(&bexpr_results, il));
-		MAKE_REDEX_BEXPR(g, be);
-		break;
-	    case TAG_FAIL:
-		RD_DBG1("P_FAIL node");
-		if( fscanf(fp,"F %d %d\n", &ig, &il) != 2 )
-		    RD_FAIL("TAG_FAIL");
-		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
-		s = *((string *) FAST_LOC_BUF(&str_results, il));
-		MAKE_REDEX_FAILURE(g, s);
-		break;
-	    case TAG_REF_VAR:
-		{
-		    RD_DBG1("P_REF_VAR node");
-		    if( fscanf(fp,"R %d %d\n", &ig, &il) != 2 )
-			RD_FAIL("TAG_REF_VAR");
-		    g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
-		    l = *((g_ptr *) FAST_LOC_BUF(&gbuf, il));
-		    int ref_var = Make_RefVar();
-		    Set_RefVar(ref_var,l);
-		    INC_REFCNT(l);
-		    MAKE_REDEX_PRIM_FN(g, P_REF_VAR);
-		    SET_REF_VAR(g, ref_var);
-		    break;
-		}
-	    case TAG_SSCANF:
-		RD_DBG1("P_SSCANF node");
-		if( fscanf(fp,"< %d %d\n", &ig, &il) != 2 )
-		    RD_FAIL("TAG_SSCANF");
-		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
-		s = *((string *) FAST_LOC_BUF(&str_results, il));
-		MAKE_REDEX_PRIM_FN(g, P_SSCANF);
-		SET_PRINTF_STRING(g, s);
-		break;
-	    case TAG_PRINTF:
-		RD_DBG1("P_PRINTF node");
-		if( fscanf(fp,"! %d %d\n", &ig, &il) != 2 )
-		    RD_FAIL("TAG_PRINTF");
-		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
-		s = *((string *) FAST_LOC_BUF(&str_results, il));
-		MAKE_REDEX_PRIM_FN(g, P_PRINTF);
-		SET_PRINTF_STRING(g, s);
-		break;
-	    case TAG_EPRINTF:
-		RD_DBG1("P_EPRINTF node");
-		if( fscanf(fp,"@ %d %d\n", &ig, &il) != 2 )
-		    RD_FAIL("TAG_EPRINTF");
-		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
-		s = *((string *) FAST_LOC_BUF(&str_results, il));
-		MAKE_REDEX_PRIM_FN(g, P_EPRINTF);
-		SET_PRINTF_STRING(g, s);
-		break;
-	    case TAG_FPRINTF:
-		RD_DBG1("P_FPRINTF node");
-		if( fscanf(fp,"# %d %d\n", &ig, &il) != 2 )
-		    RD_FAIL("TAG_FPRINTF");
-		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
-		s = *((string *) FAST_LOC_BUF(&str_results, il));
-		MAKE_REDEX_PRIM_FN(g, P_FPRINTF);
-		SET_PRINTF_STRING(g, s);
-		break;
-	    case TAG_SPRINTF:
-		RD_DBG1("P_SPRINTF node");
-		if( fscanf(fp,"$ %d %d\n", &ig, &il) != 2 )
-		    RD_FAIL("TAG_SPRINTF");
-		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
-		s = *((string *) FAST_LOC_BUF(&str_results, il));
-		MAKE_REDEX_PRIM_FN(g, P_SPRINTF);
-		SET_PRINTF_STRING(g, s);
-		break;
-	    case TAG_CACHE:
-		{
-		    RD_DBG1("P_CACHE node");
-		    if( fscanf(fp,"= %d\n", &ig) != 1 )
-			RD_FAIL("TAG_CACHE");
-		    g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
-		    MAKE_REDEX_PRIM_FN(g, P_CACHE);
-		    int ci = Make_g_cache();
-		    SET_CACHE_TBL(g, ci);
-		    break;
-		}
-	    case TAG_EXTAPI:
-		RD_DBG1("P_EXTAPI_FN node");
-		if( fscanf(fp,"X %d %d\n", &ig, &il) != 2 )
-		    RD_FAIL("TAG_EXTAPI");
-		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
-		MAKE_REDEX_EXTAPI(g, il);
-		break;
-	    case TAG_PRIM_FN:
-		RD_DBG1("generic P_FN node");
-		if( fscanf(fp,"P %d %d\n", &ig, &il) != 2 )
-		    RD_FAIL("TAG_PRIM_FN");
-		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
-		MAKE_REDEX_PRIM_FN(g, il);
-		break;
-	    case TAG_VAR:
-		RD_DBG1("VAR node");
-		if( fscanf(fp,"V %d %d\n", &ig, &il) != 2 )
-		    RD_FAIL("TAG_VAR");
-		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
-		s = *((string *) FAST_LOC_BUF(&str_results, il));
-		MAKE_REDEX_VAR(g, s);
-		break;
-	    case TAG_EXTOBJ:
-		RD_DBG1("EXT_OBJ node");
-		if( fscanf(fp,"O %d %d\n", &ig, &il) != 2 )
-		    RD_FAIL("TAG_EXTOBJ");
-		g = *((g_ptr *) FAST_LOC_BUF(&gbuf, ig));
-		op = M_LOCATE_BUF(&ext_obj_buf, il);
-		p = op->load_fn(fp);
-		if( p == NULL ) {
-		    fprintf(stderr,
-			    "Load_graph failure for %s object around line %d\n",
-			     op->name, line);
-		    goto rd_fail;
-		}
-		MAKE_REDEX_EXT_OBJ(g, il, p);
-		break;
-	    default:
-		RD_FAIL("UNKNOWN_TAG");
-	}
-    }
+    read_g_ptr(fp, &result);
     fclose(fp);
-    g_ptr result = *((g_ptr *) FAST_LOC_BUF(&gbuf,0));
     OVERWRITE(redex, result);
     free_buf(&bool_results);
     free_buf(&bexpr_results);
     free_buf(&str_results);
-    free_buf(&gbuf);
     Sprintf(buf, "/bin/rm -rf %s", dir);
     int i = system(buf);
     (void) i;
     Unserialize_End();
     return( TRUE );
-
-  rd_fail:
-    MAKE_REDEX_FAILURE(redex,
-	Fail_pr("Syntax error at line %d in %s", line+1, graph_file_name));
-    fclose(fp);
-    free_buf(&bool_results);
-    free_buf(&bexpr_results);
-    free_buf(&str_results);
-    free_buf(&gbuf);
-    Sprintf(buf, "/bin/rm -rf %s", dir);
-    {
-	int i = system(buf);
-	(void) i;
-    }
-    Unserialize_End();
-    return( FALSE );
 }
-
-#undef RD_FAIL
 
 void
 Init_io()
@@ -1722,14 +1482,6 @@ print_list(int pfn, g_ptr l,int i,g_ptr redex,bool ljust, bool zfill, int size)
     return( TRUE );
 }
 
-#define STR_EMIT(tag,s)					    \
-    fprintf(fp, "%c %d %s\n", tag, res, (s));
-#define INT_EMIT(tag,i)					    \
-    fprintf(fp, "%c %d %d\n", tag, res, (i));
-#define LONG_EMIT(tag,i)					    \
-    fprintf(fp, "%c %d %ld\n", tag, res, (i));
-
-
 static bool
 can_be_saved(g_ptr np)
 {
@@ -1810,155 +1562,3 @@ can_be_saved(g_ptr np)
 	    DIE("Unexpected node type");
     }
 }
-
-static int
-save_graph_rec(FILE *fp, g_ptr np)
-{
-    int res = g_save_cnt;
-    // Optimization: Only put nodes with REFCNT > 0 into hash table
-    // since they are the only ones that are shared...
-    if( GET_REFCNT(np) != 0 ) {
-	int ores;
-	if( (ores = PTR2INT(find_hash(&g_save_tbl, (pointer) np))) != 0 ) {
-	    return ores;
-	}
-	insert_hash(&g_save_tbl, (pointer) np, INT2PTR(res));
-	g_save_cnt++;
-    } else {
-	g_save_cnt++;
-    }
-    switch( GET_TYPE(np) ) {
-	case APPLY_ND:
-	    {
-		int l = save_graph_rec(fp, GET_APPLY_LEFT(np));
-		int r = save_graph_rec(fp, GET_APPLY_RIGHT(np));
-		fprintf(fp, "%c %d %d %d\n", TAG_APPLY, res, l, r);
-		WR_DBG1("APPLY node");
-		return( res );
-	    }
-	case CONS_ND:
-	    {
-		if( IS_NIL(np) ) {
-		    fprintf(fp, "%c %d\n", TAG_NIL, res);
-		    WR_DBG1("NIL node");
-		    return( res );
-		} else {
-		    int l = save_graph_rec(fp, GET_CONS_HD(np));
-		    int r = save_graph_rec(fp, GET_CONS_TL(np));
-		    fprintf(fp, "%c %d %d %d\n", TAG_CONS, res, l, r);
-		    WR_DBG1("CONS node");
-		    return( res );
-		}
-	    }
-	case LEAF:
-	    {
-		formula f;
-		bexpr   b;
-		int	i;
-		string  s;
-		ext_obj_ptr op;
-		switch( GET_LEAF_TYPE(np) ) {
-		    case INT:
-			s = Arbi_ToString(GET_AINT(np), 10);
-			fprintf(fp, "%c %d %d %s\n", TAG_INT, res,
-				    (int) strlen(s), s);
-			WR_DBG1("INT node");
-			return( res );
-		    case STRING:
-			s = GET_STRING(np);
-			INT_EMIT(TAG_STRING,find_insert_uniq_buf(&string_buf,&s));
-			WR_DBG1("STRING node");
-			return( res );
-		    case BOOL:
-			f = GET_BOOL(np);
-			INT_EMIT(TAG_BOOL,find_insert_uniq_buf(&bool_buf,&f));
-			WR_DBG1("BOOL node");
-			return( res );
-		    case BEXPR:
-			b = GET_BEXPR(np);
-			INT_EMIT(TAG_BEXPR, find_insert_uniq_buf(&bexpr_buf, &b));
-			WR_DBG1("BEXPR node");
-			return( res );
-		    case EXT_OBJ:
-			i = GET_EXT_OBJ_CLASS(np);
-			INT_EMIT(TAG_EXTOBJ, i);
-			WR_DBG1("EXT_OBJ node");
-			op = M_LOCATE_BUF(&ext_obj_buf, i);
-			ASSERT(op->save_fn != NULL );
-			op->save_fn(fp, GET_EXT_OBJ(np));
-			return( res );
-		    case PRIM_FN:
-			switch( GET_PRIM_FN(np) ) {
-			    case P_FAIL:
-				s = GET_FAIL_STRING(np);
-				INT_EMIT(TAG_FAIL,
-					 find_insert_uniq_buf(&string_buf, &s));
-				WR_DBG1("P_FAIL node");
-				return( res );
-			    case P_REF_VAR:
-				{
-				    int ref_var = GET_REF_VAR(np);
-				    g_ptr root = Get_RefVar(ref_var);
-				    int ch = save_graph_rec(fp, root);
-				    INT_EMIT(TAG_REF_VAR, ch);
-				    WR_DBG1("P_REF_VAR node");
-				    return( res );
-				}
-			    case P_SSCANF:
-				s = GET_PRINTF_STRING(np);
-				INT_EMIT(TAG_SSCANF,
-					find_insert_uniq_buf(&string_buf,&s));
-				WR_DBG1("P_SSCANF node");
-				return( res );
-			    case P_PRINTF:
-				s = GET_PRINTF_STRING(np);
-				INT_EMIT(TAG_PRINTF,
-					find_insert_uniq_buf(&string_buf,&s));
-				WR_DBG1("P_PRINTF node");
-				return( res );
-			    case P_FPRINTF:
-				s = GET_PRINTF_STRING(np);
-				INT_EMIT(TAG_FPRINTF,
-					find_insert_uniq_buf(&string_buf,&s));
-				WR_DBG1("P_FPRINTF node");
-				return( res );
-			    case P_SPRINTF:
-				s = GET_PRINTF_STRING(np);
-				INT_EMIT(TAG_SPRINTF,
-					find_insert_uniq_buf(&string_buf,&s));
-				WR_DBG1("P_SPRINTF node");
-				return( res );
-			    case P_EPRINTF:
-				s = GET_PRINTF_STRING(np);
-				INT_EMIT(TAG_EPRINTF,
-					find_insert_uniq_buf(&string_buf,&s));
-				WR_DBG1("P_EPRINTF node");
-				return( res );
-			    case P_CACHE:
-				fprintf(fp, "%c %d\n", TAG_CACHE, res);
-				WR_DBG1("P_CACHE node");
-				return( res );
-			    case P_EXTAPI_FN:
-				LONG_EMIT(TAG_EXTAPI, GET_EXTAPI_FN(np));
-				WR_DBG1("P_EXTAPI_FN node");
-				return( res );
-			    default:
-				LONG_EMIT(TAG_PRIM_FN, GET_PRIM_FN(np));
-				WR_DBG1("generic P_FN node");
-				return( res );
-			}
-		    case VAR:
-			STR_EMIT(TAG_VAR, GET_VAR(np));
-			WR_DBG1("VAR node");
-			return( res );
-		    default:
-			DIE("Unexpected node type");
-		}
-	    }
-	default:
-	    DIE("Unexpected node type");
-    }
-}
-
-#undef STR_EMIT
-#undef INT_EMIT

@@ -11,11 +11,13 @@
 /* table.h -- header for table.c */
 #ifdef EXPORT_FORWARD_DECL
 /* --- Forward declarations that need to be exported to earlier .h files --- */
-typedef struct ilist_rec    *ilist_ptr;
+typedef struct table_rec    *table_ptr;	// ALLOCATE: get_table_rec()
+
 
 /* ----- Function prototypes for public functions ----- */
 void	    Table_Init();
 void	    Table_Install_Functions();
+table_ptr   get_table_rec();
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */
@@ -24,11 +26,10 @@ void	    Table_Install_Functions();
 #include "fl.h"	/* Global data types and include files 		     */
 
 
-typedef struct table_rec    *table_ptr;
 typedef struct table_rec {
-    hash_record		tbl;
+    hash_record		tbl;	// TYPE: g_ptr -> g_ptr
     table_ptr		next;
-    unsigned char       flag:1;
+    uchar		flag:1;
 } table_rec;
 
 

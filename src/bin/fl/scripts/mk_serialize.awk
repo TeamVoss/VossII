@@ -1,10 +1,13 @@
 BEGIN	    {
 		dcnt = 0; 
+
 		top_level["fsm_ptr"] = 1;
 		top_level["ste_ptr"] = 1;
 		top_level["vstate_ptr"] = 1;
 		top_level["idx_list_ptr"] = 1;
 		top_level["ilist_ptr"] = 1;
+		top_level["table_ptr"] = 1;
+
 		marked["int"] = 1;
 		marked["unint"] = 1;
 		marked["bool"] = 1;
@@ -12,9 +15,12 @@ BEGIN	    {
 		marked["hash_record"] = 1;
 		marked["rec_mgr"] = 1;
 		marked["buffer"] = 1;
+
 		dont_process["ncomp_rec"] = 1;
+
 		prelude["ste_rec"] = "    old_type = current_type;\n    current_type = vp->type;\n";
 		postlude["ste_rec"] = "    current_type = old_type;\n";
+
 	    }
 
 function TR(name) {
@@ -392,7 +398,11 @@ function process_enum(tp, choices,     elements, i) {
 		    PR2(tp,sprintf("        default: { DIE(\"Shouldn't happen\"); }\n"));
 		    PR2(tp,sprintf("    }}\n"));
 		} else {
-		    PR2(tp,sprintf("    read_%s(fp, &(vp->%s));\n", type[j], name[j]));
+		    if( has_field[j] == 1 ) {
+			PR2(tp,sprintf("    { %s i; read_%s(fp, &i); vp->%s = i; }\n", type[j], type[j], name[j]));
+		    } else {
+			PR2(tp,sprintf("    read_%s(fp, &(vp->%s));\n", type[j], name[j]));
+		    }
 		}
 		break;
 	    }

@@ -10,6 +10,7 @@
 /************************************************************************/
 #include "strings.h"
 #include "fsm.h"
+#include "table.h"
 #include "serialize.h"
 #include "graph.h"
 
@@ -41,6 +42,8 @@ extern value_type   old_type;
 extern int          write_graph_line_nbr;
 extern int          read_graph_line_nbr;
 extern int          dbg_indent;
+extern buffer	    ext_obj_buf;
+extern str_mgr      strings;
 
 /***** PRIVATE VARIABLES *****/
 static bool unserialize_in_process = FALSE;
@@ -54,6 +57,8 @@ static void (*cur_write_hash_data)(FILE *fp, pointer data);
 /* Forward declaration of local functions */
 static void		write_ustr_mgr_string(pointer key, pointer data);
 static void		write_hash_fun(pointer key, pointer data);
+static void		write_g_rec(FILE *fp, g_ptr np);
+static void		read_g_rec(FILE *fp, g_ptr np);
 
 /* ----- Forward definitions local functions ----- */
 static void	write_hash_fun(pointer key, pointer data);
@@ -392,9 +397,313 @@ read_ustr_mgr(FILE *fp,  ustr_mgr *usmp)
     }
 }
 
+// ------------------------------------------------------------------
+// Code for (un-)serialize g_ptr (and g_rec)
+
+void
+write_g_ptr(FILE *fp, g_ptr p)
+{
+    WR_DBG1("{ g_ptr");
+    if( write_pointer(fp, (pointer) p) ) {
+        write_g_rec(fp, p);
+    }
+    END_DBG("} g_ptr");
+}
+
+void
+read_g_ptr(FILE *fp, g_ptr *pp)
+{
+    pointer oldp, newp;
+    RD_DBG1("{ g_ptr");
+    read_pointer(fp, &oldp);
+    if( oldp == NULL ) {
+        *pp = NULL;
+        END_DBG("} g_ptr");
+        return;
+    }
+    if( (newp = Old2new(oldp)) != NULL ) {
+        *pp = (g_ptr) newp;
+    } else {
+        newp = (pointer) Get_node();
+        Insert_pointer_map(oldp, newp);
+        read_g_rec(fp, newp);
+        *pp = (g_ptr) newp;
+    }
+    END_DBG("} g_ptr");
+}
+
 /********************************************************/
 /*                    LOCAL FUNCTIONS    		*/
 /********************************************************/
+
+#define TAG_APPLY       'A'
+#define TAG_CONS        'C'
+#define TAG_NIL         '0'
+#define TAG_INT         'I'
+#define TAG_STRING      'S'
+#define TAG_BOOL        'B'
+#define TAG_BEXPR       'E'
+#define TAG_FAIL        'F'
+#define TAG_REF_VAR     'R'
+#define TAG_PRINTF      '!'
+#define TAG_EPRINTF     '@'
+#define TAG_FPRINTF     '#'
+#define TAG_SPRINTF     '$'
+#define TAG_SSCANF      '<'
+#define TAG_CACHE       '='
+#define TAG_EXTAPI      'X'
+#define TAG_PRIM_FN     'P'
+#define TAG_VAR         'V'
+#define TAG_EXTOBJ      'O'
+
+#define EMIT(tag)	    fprintf(fp, "%c\n", (tag));
+
+static void
+write_g_rec(FILE *fp, g_ptr np)
+{
+    WR_DBG1("g_rec node");
+    switch( GET_TYPE(np) ) {
+	case APPLY_ND:
+	    {
+		EMIT(TAG_APPLY);
+		write_g_ptr(fp, GET_APPLY_LEFT(np));
+		write_g_ptr(fp, GET_APPLY_RIGHT(np));
+		return;
+	    }
+	case CONS_ND:
+	    {
+		if( IS_NIL(np) ) {
+		    EMIT(TAG_NIL);
+		    return;
+		} else {
+		    EMIT(TAG_CONS);
+		    write_g_ptr(fp, GET_CONS_HD(np));
+		    write_g_ptr(fp, GET_CONS_TL(np));
+		    return;
+		}
+	    }
+	case LEAF:
+	    {
+		switch( GET_LEAF_TYPE(np) ) {
+		    case INT:
+			EMIT(TAG_INT);
+			write_arbi_T(fp, GET_AINT(np));
+			return;
+		    case STRING:
+			EMIT(TAG_STRING);
+			write_string(fp, GET_STRING(np));
+			return;
+		    case BOOL:
+			EMIT(TAG_BOOL);
+			write_formula(fp, GET_BOOL(np));
+			return;
+		    case BEXPR:
+			EMIT(TAG_BEXPR);
+			write_bexpr(fp, GET_BEXPR(np));
+			return;
+		    case EXT_OBJ: {
+			EMIT(TAG_EXTOBJ);
+			int i = GET_EXT_OBJ_CLASS(np);
+			write_int(fp, i);
+			ext_obj_ptr op = M_LOCATE_BUF(&ext_obj_buf, i);
+			ASSERT(op->save_fn != NULL );
+			op->save_fn(fp, GET_EXT_OBJ(np));
+			return;
+		    }
+		    case PRIM_FN:
+			switch( GET_PRIM_FN(np) ) {
+			    case P_FAIL:
+				EMIT(TAG_FAIL);
+				write_string(fp, GET_FAIL_STRING(np));
+				return;
+			    case P_REF_VAR:
+				{
+				    EMIT(TAG_REF_VAR);
+				    int ref_var = GET_REF_VAR(np);
+				    g_ptr root = Get_RefVar(ref_var);
+				    write_g_ptr(fp, root);
+				    return;
+				}
+			    case P_SSCANF:
+				EMIT(TAG_SSCANF);
+				write_string(fp, GET_PRINTF_STRING(np));
+				return;
+			    case P_PRINTF:
+				EMIT(TAG_PRINTF);
+				write_string(fp, GET_PRINTF_STRING(np));
+				return;
+			    case P_FPRINTF:
+				EMIT(TAG_FPRINTF);
+				write_string(fp, GET_PRINTF_STRING(np));
+				return;
+			    case P_SPRINTF:
+				EMIT(TAG_SPRINTF);
+				write_string(fp, GET_PRINTF_STRING(np));
+				return;
+			    case P_EPRINTF:
+				EMIT(TAG_EPRINTF);
+				write_string(fp, GET_PRINTF_STRING(np));
+				return;
+			    case P_CACHE:
+				EMIT(TAG_CACHE);
+				/* Should we save the content of the cache? */
+				return;
+			    case P_EXTAPI_FN:
+				EMIT(TAG_EXTAPI);
+				write_int(fp, GET_EXTAPI_FN(np));
+				return;
+			    default:
+				EMIT(TAG_PRIM_FN);
+				write_int(fp, GET_PRIM_FN(np));
+				return;
+			}
+		    case VAR:
+			EMIT(TAG_VAR);
+			write_string(fp, GET_VAR(np));
+			return;
+		    default:
+			DIE("Unexpected node type");
+		}
+	    }
+	default:
+	    DIE("Unexpected node type");
+    }
+}
+
+static void
+read_g_rec(FILE *fp, g_ptr np)
+{
+    RD_DBG1("g_rec node");
+    int type = fgetc(fp);
+    fgetc(fp);	// Eat newline
+    switch( type ) {
+	case TAG_APPLY: {
+	    g_ptr l, r;
+	    read_g_ptr(fp, &l);
+	    read_g_ptr(fp, &r);
+	    INC_REFCNT(l);
+	    INC_REFCNT(r);
+	    MAKE_REDEX_APPL_ND(np,l,r);
+	    return;
+	}
+	case TAG_NIL:
+	    MAKE_REDEX_NIL(np);
+	    return;
+	case TAG_CONS: {
+	    g_ptr h, t;
+	    read_g_ptr(fp, &h);
+	    read_g_ptr(fp, &t);
+	    INC_REFCNT(h);
+	    INC_REFCNT(t);
+	    MAKE_REDEX_CONS_ND(np,h,t);
+	    return;
+	}
+	case TAG_INT: {
+	    arbi_T ai;
+	    read_arbi_T(fp, &ai);
+	    MAKE_REDEX_AINT(np,ai);
+	    return;
+	}
+	case TAG_STRING: {
+	    string s;
+	    read_string(fp, &s);
+	    MAKE_REDEX_STRING(np, s);
+	    return;
+	}
+	case TAG_BOOL: {
+	    formula f;
+	    read_formula(fp, &f);
+	    MAKE_REDEX_BOOL(np, f);
+	    return;
+	}
+	case TAG_BEXPR: {
+	    bexpr f;
+	    read_bexpr(fp, &f);
+	    MAKE_REDEX_BEXPR(np, f);
+	    return;
+	}
+	case TAG_EXTOBJ: {
+	    int class;
+	    read_int(fp, &class);
+	    ext_obj_ptr op = M_LOCATE_BUF(&ext_obj_buf, class);
+	    ASSERT(op->load_fn != NULL );
+	    pointer p = op->load_fn(fp);
+	    MAKE_REDEX_EXT_OBJ(np, class, p);
+	    return;
+	}
+	case TAG_FAIL: {
+	    string s;
+	    read_string(fp, &s);
+	    MAKE_REDEX_FAILURE(np, s);
+	    return;
+	}
+	case TAG_REF_VAR: {
+	    g_ptr c;
+	    read_g_ptr(fp, &c);
+	    int ref_var = Make_RefVar();
+	    Set_RefVar(ref_var, c);
+	    INC_REFCNT(c);
+	    MAKE_REDEX_PRIM_FN(np, P_REF_VAR);
+	    SET_REF_VAR(np, ref_var);
+	    return;
+	}
+	case TAG_SSCANF: {
+	    string s;
+	    read_string(fp, &s);
+	    MAKE_REDEX_PRIM_FN(np, P_SSCANF);
+	    SET_PRINTF_STRING(np, s);
+	    return;
+	}
+	case TAG_PRINTF: {
+	    string s;
+	    read_string(fp, &s);
+	    MAKE_REDEX_PRIM_FN(np, P_PRINTF);
+	    SET_PRINTF_STRING(np, s);
+	    return;
+	}
+	case TAG_FPRINTF: {
+	    string s;
+	    read_string(fp, &s);
+	    MAKE_REDEX_PRIM_FN(np, P_FPRINTF);
+	    SET_PRINTF_STRING(np, s);
+	    return;
+	}
+	case TAG_SPRINTF: {
+	    string s;
+	    read_string(fp, &s);
+	    MAKE_REDEX_PRIM_FN(np, P_SPRINTF);
+	    SET_PRINTF_STRING(np, s);
+	    return;
+	}
+	case TAG_EPRINTF: {
+	    string s;
+	    read_string(fp, &s);
+	    MAKE_REDEX_PRIM_FN(np, P_EPRINTF);
+	    SET_PRINTF_STRING(np, s);
+	    return;
+	}
+	case TAG_CACHE: {
+	    MAKE_REDEX_PRIM_FN(np, P_CACHE);
+	    int ci = Make_g_cache();
+	    SET_CACHE_TBL(np, ci);
+	    return;
+	}
+	case TAG_EXTAPI: {
+	    int op;
+	    read_int(fp, &op);
+	    MAKE_REDEX_EXTAPI(np, op);
+	    return;
+	}
+	case TAG_PRIM_FN: {
+	    int pfn;
+	    read_int(fp, &pfn);
+	    MAKE_REDEX_PRIM_FN(np, pfn);
+	    return;
+	}
+	default:
+	    DIE("Unexpected node type");
+    }
+}
 
 static void
 write_ustr_mgr_string(pointer key, pointer data)
@@ -410,6 +719,20 @@ write_hash_fun(pointer key, pointer data)
     cur_write_hash_key(cur_fp, key);
     cur_write_hash_data(cur_fp, data);
 }
+
+static unint
+g_ptr_hash(pointer p, unint n)
+{
+    return( G_rec_hash(p, n) );
+}
+
+static bool
+g_ptr_equ(pointer p1, pointer p2)
+{
+    return( G_rec_equ(p1, p2) );
+}
+
+
 
 
 /********************************************************/

@@ -28,7 +28,6 @@ static int		table_oidx;
 static table_ptr	table_free_list = NULL;
 
 /* ----- Forward definitions local functions ----- */
-static table_ptr	    get_table_rec();
 static g_ptr		    scan_tail;
 static rec_mgr		    table_rec_mgr;
 
@@ -253,21 +252,6 @@ list_to_table(g_ptr redex)
 /*                    LOCAL FUNCTIONS    		*/
 /********************************************************/
 
-static table_ptr
-get_table_rec()
-{
-    table_ptr res;
-    if( table_free_list != NULL ) {
-        res = table_free_list;
-        table_free_list = table_free_list->next;
-    } else {
-        res = (table_ptr) new_rec(&table_rec_mgr);
-    }
-    res->flag = 0;
-    res->next = NULL;
-    return res;
-}
-
 static void
 scan_mark_entries(pointer pkey, pointer pdata)
 {
@@ -306,16 +290,15 @@ table_sweep_fn(void)
 static void
 table_save_fn(FILE *fp, pointer p)
 {
-    (void) fp;
-    (void) p;
-    DIE("table_save not implemented yet");
+    write_table_ptr(fp, (table_ptr) p);
 }
 
 static pointer
 table_load_fn(FILE *fp)
 {
-    (void) fp;
-    DIE("table_load not implemented yet");
+    table_ptr tp;
+    read_table_ptr(fp, &tp);
+    return( (pointer) tp);
 }
 
 static formula
@@ -451,3 +434,17 @@ Table_Install_Functions()
 			list_to_table);
 }
 
+table_ptr
+get_table_rec()
+{
+    table_ptr res;
+    if( table_free_list != NULL ) {
+        res = table_free_list;
+        table_free_list = table_free_list->next;
+    } else {
+        res = (table_ptr) new_rec(&table_rec_mgr);
+    }
+    res->flag = 0;
+    res->next = NULL;
+    return res;
+}
