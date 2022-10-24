@@ -308,11 +308,15 @@ proc idv:create_idv_menu {nb w} {
         balloon $w.menu.merge "Merge selected identical instances"
         pack $w.menu.merge -side left -padx 5
 
-
         button $w.menu.wire2bufs_w -image $::icon(wire2bufs) \
                 -command "idv:do_wire2bufs $w"
         balloon $w.menu.wire2bufs_w "Add buffers in wire(s)"
         pack $w.menu.wire2bufs_w -side left -padx 5
+
+        button $w.menu.bufs2wire_w -image $::icon(bufs2wire) \
+                -command "idv:do_bufs2wires $w"
+        balloon $w.menu.bufs2wire_w "Remove selected buffer(s)"
+        pack $w.menu.bufs2wire_w -side left -padx 5
 
         button $w.menu.rename_w -image $::icon(rename_wires) \
                 -command "idv:do_rename_wires $w"
@@ -376,6 +380,8 @@ proc idv:db_replace {w} { fl_do_replacement $w.c }
 proc idv:do_rename_wires {w} { fl_rename_wires $w.c }
 
 proc idv:do_wire2bufs {w} { fl_do_wire2buffer $w.c }
+
+proc idv:do_bufs2wires {w} { fl_do_remove_wires $w.c }
 
 proc idv:new_toplevel_transf {w sl} {
     set idx [$sl curselection]

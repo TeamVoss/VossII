@@ -17,6 +17,7 @@ lettype justification =
                     |   MERGE {ids::int list}
 		    |	RENAME_WIRES {sub:: (string#string) list}
 		    |	WIRE2BUFFER {wires:: string list}
+                    |   REMOVE_WIRES {ids::(int list)}
 		    |	MK_THM
 //
 // ...

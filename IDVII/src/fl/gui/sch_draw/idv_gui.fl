@@ -2286,3 +2286,75 @@ let fl_do_wire2buffer canvas =
 ;
 export_to_tcl fl_do_wire2buffer;
 
+
+let remove_wire p il =
+    il = [] => p |
+    NOT (pexlif_is_hier p) => error "remove_wire on a leaf instance" |
+    // This code relies on fold_pexlif putting the new instance first!!!!
+    let p' = fold_pexlif p il "_TMP_" then
+    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p' in
+    let block = hd cs then
+    let remain = tl cs then
+    has_state block => eprintf "Selection is not all wires" |
+    let inps = pexlif_get_inps_actuals block in
+    let outs = pexlif_get_outs_actuals block in
+    let ckt = pexlif2fsm block then
+    let ant = map (\n.T,n,variable n, 0, 1) (setify (md_expand_vectors inps)) in
+    let ste = STE "-e" ckt [] ant [] [] then
+    let mk_sub o =
+	val (H,L) = get_trace_val ste o 0 then
+	NOT (H == NOT L) => eprintf "Node %s is not a wire (non binary)" o |
+	let dep = depends H in
+	length dep != 1 => eprintf "Node %s is not a wire (function)" o |
+	let v = hd dep in
+	NOT (H == (variable v)) =>
+	    eprintf "Node %s is not a wire (inverted)" o
+	|
+	(o, v)
+    in
+    let sub = map mk_sub outs then
+    let rename1 (PINST sname sattrs slf sfa_inps sfa_outs sints sbody) =
+	let rename_act (f,as) =
+	    let eas = map (\a. (assoc a sub) catch a) (md_expand_vectors as) in
+	    let as' = md_merge_vectors eas then
+	    (f, as')
+	in
+	let sfa_inps' = map rename_act sfa_inps then
+	(PINST sname sattrs slf sfa_inps' sfa_outs sints sbody)
+    in
+    let remain' = map rename1 remain then
+    let fa_outs' =
+	let rename_formal (f,as) =
+	    let fs' = map (\f. (assoc f sub) catch f) (md_expand_vector f) in
+	    let f' = md_merge_vectors fs' then
+	    length f' = 1 => [((hd f'),as)] |
+	    let eas = md_expand_vectors as in
+	    let fa = zip fs' eas then
+	    letrec pr (f:fs) eas =
+		let sz = md_size f in
+		let as = firstn sz eas then
+		(f,md_merge_vectors as):
+		pr fs (butfirstn sz eas)
+	     /\   pr [] [] = []
+	     /\   pr [] _ = eprintf "f/a length mismatch!"
+	    in
+	    pr f' eas
+	in
+	flatmap rename_formal fa_outs
+    then
+    (PINST name attrs lf fa_inps fa_outs' ints (P_HIER remain'))
+;
+
+let fl_do_remove_wires canvas =
+    let vfsm = w2vfsm canvas in
+    let il = get_selected_pinsts canvas then
+    il = [] => () |
+    let p = get_idv_current_pexlif canvas then
+    let p' =  remove_wire p il then
+    (add_transform canvas p' (REMOVE_WIRES il)) fseq
+    let cmd =
+	sprintf "remove_wires vis %s;" (list2str T "[" "," "]" int2str il)
+    in
+    refresh_idv_canvas canvas cmd
+;
+export_to_tcl fl_do_remove_wires;
