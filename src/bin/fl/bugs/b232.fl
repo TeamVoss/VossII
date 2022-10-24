@@ -17,16 +17,34 @@ let p = test 'clk 'a 'b 'c 'res;
 
 p fseq 1;
 
-//write_pexlif "_Z" p;
-
-//let pp = read_pexlif "_Z";
-
-//p == pp;
-
-
 let ckt = pexlif2fsm p;
-
 ckt;
+
+let ant =
+    "clk" is_clock 10
+  and
+    "a[1:0]"	     is 0 for 1 cycle
+	    followed_by 1 for 1 cycle
+	    followed_by 2 for 1 cycle
+	    followed_by 3 for 1 cycle
+	    followed_by "a[1:0]" for 1 cycle
+  and
+    "b[1:0]"	     is 0 for 1 cycle
+	    followed_by 1 for 1 cycle
+	    followed_by 2 for 1 cycle
+	    followed_by 3 for 1 cycle
+	    followed_by "b[1:0]" for 1 cycle
+  and
+    "c[1:0]"	     is 0 for 1 cycle
+	    followed_by 1 for 1 cycle
+	    followed_by 2 for 1 cycle
+	    followed_by 3 for 1 cycle
+	    followed_by "c[1:0]" for 1 cycle
+;
+
+ant;
+
+//STE "-e" ckt [] ant [] [];
 
 lettype foo = FOO {ckt::fsm};
 
@@ -34,9 +52,17 @@ let t1 = FOO ckt;
 
 write_foo "_ZZ" t1;
 
+
 let t2 = read_foo "_ZZ";
 
 t1;
 t2;
 
 t1 == t2;
+
+val (FOO nckt) = t2;
+
+nodes nckt;
+
+
+STE "-e" nckt [] ant [] [];

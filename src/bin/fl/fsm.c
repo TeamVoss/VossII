@@ -3103,8 +3103,8 @@ extract_tripple(g_ptr nd, string *namep, int *fromp, int *top)
 static int
 event_cmp(const void *p1, const void *p2)
 {
-    event_ptr e1 = (event_ptr) p1;
-    event_ptr e2 = (event_ptr) p2;
+    event_ptr e1 = *((event_ptr *) p1);
+    event_ptr e2 = *((event_ptr *) p2);
     if( e2->time == e1->time ) {
 	if( e1->nd_idx == e2->nd_idx ) {
 	    return( e1->type - e2->type );
@@ -3141,6 +3141,7 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	ep->H = when;
 	ep->L = when;
 	push_buf(ebufp, &ep);
+	ep = new_rec(event_rec_mgrp);
 	ep->event_id = event_id;
 	ep->type = end_weak;
 	ep->nd_idx = nd_idx;
@@ -3185,6 +3186,7 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	}
 	ste->assertion_OK = c_AND(ste->assertion_OK, okA);
 	push_buf(ebufp, &ep);
+	ep = new_rec(event_rec_mgrp);
 	ep->event_id = event_id;
 	ep->type = end_ant;
 	ep->nd_idx = nd_idx;
@@ -3229,6 +3231,7 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	}
 	ste->check_OK = c_AND(ste->check_OK, okC);
 	push_buf(ebufp, &ep);
+	ep = new_rec(event_rec_mgrp);
 	ep->event_id = event_id;
 	ep->type = end_cons;
 	ep->nd_idx = nd_idx;
@@ -3256,6 +3259,7 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
 	ep->H = c_ZERO;	// Don't care
 	ep->L = c_ZERO;	// Don't care
 	push_buf(ebufp, &ep);
+	ep = new_rec(event_rec_mgrp);
 	ep->event_id = event_id;
 	ep->type = end_trace;
 	ep->nd_idx = nd_idx;
@@ -3266,7 +3270,7 @@ create_event_buffer(ste_ptr ste, buffer *ebufp,
     }
     // Sort in decreasing time, node index, and start/end so that
     // start_events on a node comes before end events on the same node & time
-    qsort(START_BUF(ebufp), COUNT_BUF(ebufp), sizeof(event_rec), event_cmp);
+    qsort(START_BUF(ebufp), COUNT_BUF(ebufp), sizeof(event_ptr), event_cmp);
     return TRUE;
 }
 
