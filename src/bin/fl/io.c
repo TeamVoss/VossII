@@ -81,6 +81,23 @@ Get_fp(io_ptr ip)
     return( ip->fp );
 }
 
+io_ptr
+Get_OpenStream(string name)
+{
+    for(io_ptr ip = open_ios; ip != NULL; ip = ip->next) {
+        if( strcmp(name, ip->name) == 0 ) {
+	    return ip;
+	}
+    }	
+    return NULL;
+}
+
+string
+Get_StreamName(io_ptr ip)
+{
+    return( ip->name );
+}
+
 /*                                                                  */
 /* Function to open a file or a pipeline to a command.              */
 /* mode is one of:                                                  */
@@ -1549,6 +1566,22 @@ can_be_saved(g_ptr np)
 				return( TRUE );
 			    case P_EXTAPI_FN:
 				return( TRUE );
+			    case P_FILEFP:
+				{
+                                    io_ptr ip = GET_FILE_IO_PTR(np);
+				    if( 
+					(strcmp(ip->name, "stdout") == 0)
+				       ||
+					(strcmp(ip->name, "stderr") == 0)
+				       ||
+					(strcmp(ip->name, "stdinfo") == 0)) {
+				        return TRUE;
+				    } else {
+					Fail_pr("Cannot save stream %s",
+						ip->name);
+					return FALSE;
+				    }
+				}
 			    default:
 				return( TRUE );
 			}

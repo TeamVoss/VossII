@@ -253,7 +253,8 @@ let load_idv_db sname fname =
     let db_file = sprintf "%s/transform_db" fname then
     NOT (file_exists db_file) => IDV_RW_DB sname fname [] (list2tbl []) |
     val (IDV_TRANSFORM_INFO mnames sig_trfs) = read_idv_trfm_info db_file then
-    IDV_RW_DB sname fname mnames (list2tbl sig_trfs)
+    let tbl = list2tbl sig_trfs then
+    IDV_RW_DB sname fname mnames tbl
 ;
 
 let fl_save_idv_db {cmd::string} =
@@ -1072,6 +1073,10 @@ let create_verilog_load_file basename file pexlif_file =
 ;
 
 let do_osu018_synthesis file bname pexlif_file p synth_args =
+    let cw = tcl_eval ["idv:make_info_window 0"] then
+    let info_cmd = "echo 'Clean and write out synthesis friendly Verilog'\n" in
+    val (status, _, _) = gui_exec cw "Prepare for synthesis" info_cmd then
+    status = "SIGKILL" => "" |
     let lib_dir = DIR^"../../../../lib/osu018_stdcells/" then
     // Rename Verilog hierarchy to sane names
     // Toplevel name is `bname`
@@ -1097,17 +1102,17 @@ let do_osu018_synthesis file bname pexlif_file p synth_args =
     (fprintf fp "dfflegalize -cell $_DFF_P_ x\n") seq
     (fprintf fp "abc -liberty %s/osu018_stdcells.lib -keepff\n" lib_dir) seq
     (fprintf fp "clean\n") seq
-(fprintf fp "techmap -map /home/cseger/FP_HW/bifrost/examples/sha256_slow/adff2dff.v\n") seq
-    (fprintf fp "clean\n") seq
     (fprintf fp "autoname\n") seq
     (fprintf fp "clean -purge\n") seq
     (fprintf fp "write_pexlif -noalias -icells -gates ") seq
     (fprintf fp "-impltf %s.fl\n" file) seq
-(fprintf fp "write_verilog %s_FINAL.v\n" file) seq
     (fclose fp) seq
     // Now run Yosys to synthesize and map the design to the osu018 library
     let cmd = sprintf "yosys -s %s" yosys_file then
-    (system cmd) != 0 => eprintf "yosys -s %s failed\n" yosys_file |
+    let cw = tcl_eval ["idv:make_info_window 0"] then
+    val (status, emsg, logfile) = gui_exec cw "Yosys synthesis" cmd then
+    status = "SIGKILL" => "" |
+    status != "0" => eprintf "yosys failed\nSee %s for details" logfile |
     // Now append the loading commands
     let fp = fopen (file^"_load.fl") "w" then
     (fprintf fp "cload \"osu018_stdcells.fl\";\n") seq
@@ -1128,9 +1133,12 @@ let do_osu018_synthesis file bname pexlif_file p synth_args =
     (file^"_load.fl")
 ;
 
+
 let fl_run_fl_loader file =
     let cmd = sprintf "fl -noX -unbuf_stdout -F %s" file then
-    system cmd
+    let cw = tcl_eval ["idv:make_info_window 0"] then
+    val (status, _, _) = gui_exec cw "Load result" cmd then
+    status
 ;
 export_to_tcl fl_run_fl_loader;
 
@@ -1167,6 +1175,7 @@ let fl_make_template canvas type file basename create {synth_args::string list} 
 	|
 	eprintf "Unknown template type (%s)" type
     then
+    load_file = "" => ["-", "-"] |
     [pexlif_file, load_file]
 ;
 export_to_tcl fl_make_template;
@@ -1176,7 +1185,12 @@ let fl_bdd_var_order {canvas::string} {file::string} =
     let vfsm = w2vfsm canvas then
     let p = get_idv_current_pexlif canvas then
     let ofile =
-	sprintf "%s/code/%s.order" (get_idv_db_dir ()) (clean_name file)
+	let name = last (str_split (clean_name file) "/") in
+	let base =
+	    NOT (str_is_suffix ".pexlif" name) => name |
+	    substr name 1 (strlen name - 7)
+	in
+	sprintf "%s/code/%s.order" (get_idv_db_dir ()) base
     then
     let fp = fopen ofile "w" then
     val (PINST name attrs lf fa_inps fa_outs ints body) = p in
@@ -1197,75 +1211,13 @@ let fl_bdd_var_order {canvas::string} {file::string} =
     let emit_tv v = (fprintf fp "\n\t\t(md_expand_vector \"%s\")" v) in
     (foreach emit_tv (inps)) fseq
     (fprintf fp "\n);\n") fseq
+    (fprintf fp "\"===SuCcEsS===\";\n") fseq
+    (fprintf fp "ARGS = [\"DONT_QUIT\"] => () | quit;\n") fseq
     let full_file_name = stream2filename fp then
     (fclose fp) fseq
-    (load full_file_name)
+    full_file_name
 ;
 export_to_tcl fl_bdd_var_order;
-
-//let dbg_ant = ref {[]::((bool#string#bool#int#int) list) list};
-//let dbg_ckt = ref {(error "nope")::fsm};
-//
-//// Try to verify two combinational pexlifs are equal by building
-//// a miter circuit and simulating the circuit.
-//// This code works for combinational circuits and state-matching sequential
-//// circuits.
-//// More general sequential equivalence is still left to figure out....
-//let BDD_EQ p1 p2 =
-//    val (miter_pexlif, ant) = mk_miter p1 p2 then
-//    let cons = [(T,"_OK_",T,0,1)] in
-//    let ckt = pexlif2fsm miter_pexlif then
-//(dbg_ckt := ckt) fseq
-//    val (assumes,asserts) = split (str_is_prefix "i1/") (assertions ckt) then
-//    let phdels = filter (is_phase_delay ckt) (nodes ckt) then
-//    let trl = map (\n. n,0,2) (assumes@asserts@phdels) then
-//    let vars_cnt = ref 0 in
-//    letrec gradual_STE binary_only ant remain =
-//(fprintf stderr "\n================\n binary_only: %B\n" binary_only) fseq
-//(fprintf stderr "remain: %S\n" (md_extract_vectors remain)) fseq
-//(dbg_ant := (ant:(deref dbg_ant))) fseq
-//        let old_pref = update_vossrc "NOTIFY-CHECK-FAILURES" "NO" then
-//        let ste = STE "-s" ckt [] ant cons trl then
-//        (update_vossrc "NOTIFY-CHECK-FAILURES" old_pref) fseq
-//        let base_ok = get_ste_result ste "" then
-//        let a_c =
-//            itlist (\a.\r. r AND ((get_trace_val ste a 0) = (T,F))) assumes T
-//        then
-//        let c_c =
-//            itlist (\a.\r. r AND ((get_trace_val ste a 0) = (T,F))) asserts T
-//        then
-//        let ok = NOT a_c OR (c_c AND base_ok) then
-//        ok == T => T |
-//        let rvals = map (\ph. ph,get_trace_val ste ph 1) remain in
-//        let process l =
-//	    val (_,H,L) = hd l in
-//            (H == NOT L) OR (NOT binary_only AND (NOT ((H,L) == (T,T)))) =>
-//		let nd = sprintf "_%d_" (deref vars_cnt) then
-//		(vars_cnt := (deref vars_cnt + 1)) fseq
-//                map (\(pn,_). (T,pn, variable nd,-1,0)) l
-//            |
-//            []
-//        in
-//        let ph_ant = flatmap process (partition snd rvals) then
-//        let added = map (\(w,n,v,f,t).n) ph_ant then
-//(fprintf stderr "added: %S\n" (md_extract_vectors added)) fseq
-//        (added = []) AND NOT binary_only =>
-//            let vars = depends ant in
-//            let cex = full_example F vars (NOT ok) then
-//            let ant' = substitute cex ant then
-//            let vis = STE_debug ckt then
-//            let tab_1 = draw_fanin vis (0) 100 ("_OK_":asserts) then
-//            tab_1 fseq
-//            let ste = STE "-e" vis [] ant' cons [] then
-//            ok
-//        |
-//        let remain' = remain subtract added then
-//        let ant' = ph_ant@ant then
-//	let binary_only' = binary_only AND (added != []) in
-//        gradual_STE binary_only' ant' remain'
-//    in
-//    gradual_STE T ant phdels
-//;
 
 
 // Function to compute a unique parametric representation
@@ -1314,7 +1266,7 @@ let check_eq ckt ant cons assumes asserts trl =
     (ok,cex)
 ;
 
-let BDD_EQ p1 p2 =
+let BDD_EQ_base p1 p2 =
     val (miter_pexlif, ant) = mk_miter p1 p2 then 
     let cons = [(T,"_OK_",T,0,1)] in
     let ckt = pexlif2fsm miter_pexlif then
@@ -1326,13 +1278,9 @@ let BDD_EQ p1 p2 =
 	// Combinational circuits
 	//
 	val (ok,cex) = check_eq ckt ant cons assumes asserts trl then
-	ok == T => T |
-	let ant' = substitute cex ant then
-	let vis = STE_debug ckt then
-	let tab_1 = draw_fanin vis (0) 100 ("_OK_":asserts) then
-	tab_1 fseq
-	let ste = STE "-e" vis [] ant' [] [] then
-	ok
+	ok == T => (T,NONE) |
+	let cex_ant = substitute cex ant then
+	(ok, SOME (ckt, asserts, cex_ant))
     |
     //
     // Sequential circuit.
@@ -1357,13 +1305,13 @@ let BDD_EQ p1 p2 =
     let total_ant = ant @ ph_ant then
     // First try for every state (including partial X states).
     val (ok, cex) = check_eq ckt total_ant cons assumes asserts trl then
-    ok == T => T |
+    ok == T => (T, NONE) |
     // Try the same verificataion but assuming binary inputs & state
     let bcond = itlist (\ft.\r. (fst ft) AND r) ph_ant T then
     let bsub = param bcond then
     let total_ant' = substitute bsub total_ant then
     val (ok, cex) = check_eq ckt total_ant' cons assumes asserts trl then
-    ok == T => T |
+    ok == T => (T, NONE) |
     // Failed. Now build the shortest sequence that shows the failure
     let cex_state = substitute cex (hd (deref state_sequence)) then
     letrec find_last_possible cnt (HL:rem) =
@@ -1390,23 +1338,57 @@ let BDD_EQ p1 p2 =
 	(substitute cex (map (\(w,n,v,_,_). w,n,v,etime,etime+1) ant)) @
 	mk_cex etime rel_next_funs rel_states cex_state
     then
+    ok, SOME (ckt, asserts, cex_ant)
+;
+
+
+let BDD_remote_types =
+    let tp =
+	"(bool#{fsm#(string list)#((bool#string#bool#int#int) list)} opt)"
+    in
+    (sprintf "lettype remote_bdd_req = REMOTE_BDD_REQ {fun:: void->%s};\n" tp)^
+    (sprintf "lettype remote_bdd_result = REMOTE_BDD_REPLY {res_cex::%s};\n" tp)
+;
+(eval BDD_remote_types) fseq ();
+
+let BDD_EQ p1 p2 order_file =
+    let dir = mktempd "extern_eval" then
+    let fl_f = sprintf "%s/run.fl" dir then
+    let req_f = sprintf "%s/req" dir then
+    let res_f = sprintf "%s/res" dir then
+    let task = REMOTE_BDD_REQ (\v. BDD_EQ_base p1 (v fseq p2)) then
+    (write_remote_bdd_req req_f task) fseq
+    let fp = fopen fl_f "w" then
+    (fprintf fp "(update_vossrc \"RECURSION-CALL-LIMIT\" \"%s\") seq ();\n"
+		(get_vossrc "RECURSION-CALL-LIMIT")) fseq
+    (order_file != "" => (fprintf fp "load \"%s\";\n" order_file) | ()) fseq
+    (fprintf fp "%s\n" BDD_remote_types) fseq
+    (fprintf fp "val (REMOTE_BDD_REQ f) = read_remote_bdd_req \"%s\";\n" req_f)
+    fseq
+    (fprintf fp "let res = f ();\nres fseq ();\n") fseq
+    (fprintf fp "write_remote_bdd_result \"%s\" (REMOTE_BDD_REPLY res);\n"
+		res_f) fseq
+    (fprintf fp "quit;\n") fseq
+    (fclose fp) fseq
+    let wid = tcl_eval ["winfo id [idv:make_info_window 1]"] then
+    let cmd = sprintf "fl -use %s -use_stdout -F %s DONT_QUIT" wid fl_f then
+    (system cmd) fseq
+    NOT (file_exists res_f) => F |
+    val (REMOTE_BDD_REPLY (res,opt_cex)) = read_remote_bdd_result res_f then
+    res == T => res |
+    val (ckt, asserts, cex_ant) = get_value opt_cex then
+    let cw = tcl_eval ["idv:make_info_window 0"] then
+    let sel = window_choose_alternative
+		    "Verification failed."
+		    "Do you want to simulate a counterexample?"
+		    [("Yes", "Yes"), ("No","No")] cw
+    then
+    sel = "No" => ((tcl_eval ["idv:make_info_window 0"]) fseq res) |
     let vis = STE_debug ckt then
     let tab_1 = draw_fanin vis (0) 100 ("_OK_":asserts) then
     tab_1 fseq
     let ste = STE "-e" vis [] cex_ant [] [] then
-    ok
-;
-
-lettype remote_bdd_eq =
-	REMOTE_BDD_EQ {fun:: void->bool}
-;
-
-let BDD_EQ p1 p2 =
-    let task = REMOTE_BDD_EQ (\v. BDD_EQ p1 (v fseq p2)) then
-(fprintf stderr "Write out task\n") fseq
-    (write_remote_bdd_eq "_Z" task) fseq
-(fprintf stderr "Done writing out task\n") fseq
-    (BDD_EQ p1 p2)
+    res
 ;
 
 // Try to verify two combinational pexlifs are equal by building
@@ -1476,12 +1458,12 @@ let Sim_comb_EQ effort p1 p2 =
 
 
 
-let fl_do_verify canvas {file::string} {type::string} =
+let fl_do_verify canvas {file::string} {type::string} {ordering_file::string} =
     (
 	let vfsm = w2vfsm canvas then
 	let spec = get_idv_current_pexlif canvas then
 	let imp = read_pexlif file then
-	let ok = type = "BDD"	     => ((BDD_EQ spec imp) == T) |
+	let ok = type = "BDD"	     => ((BDD_EQ spec imp ordering_file) == T) |
 		 type = "SAT"	     => ((SAT_comb_EQ spec imp) == bT) |
 		 type = "Sim_None"   => T |
 		 type = "Sim_Light"  => ((Sim_comb_EQ 5 spec imp) == T) |
@@ -1489,7 +1471,7 @@ let fl_do_verify canvas {file::string} {type::string} =
 		 type = "Sim_Heavy"  => ((Sim_comb_EQ 12 spec imp) == T) |
 		 eprintf "Unknown engine (%s)" type
 	then
-	NOT ok => "cex" |
+	NOT ok => (type = "BDD" => "already_dealt_with_cex" | "cex") |
 	let just = FEV type [] in
 	(add_transform canvas imp just) fseq
 	let signature = pexlif_get_FP spec then

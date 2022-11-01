@@ -693,21 +693,40 @@ proc idv:make_template {w c type args} {
 	}
 	val {pexlif_file load_file} \
 	    [fl_make_template $c $type $file $base $create_file [list $args]]
-	set ::idv(fev_imp_file) \
-		[idv:edit_and_load $w $file $load_file $pexlif_file $type]
+	if { $pexlif_file == "-" } {
+	    set ::idv(fev_imp_file) ""
+	} else {
+	    set ::idv(fev_imp_file) \
+		    [idv:edit_and_load $w $file $load_file $pexlif_file $type]
+	}
     }
 }
 
-proc idv:do_bdd_var_order {c} {
+proc idv:do_bdd_var_order {w c} {
     set pexlif_file $::idv(fev_imp_file) 
-    fl_bdd_var_order $c $pexlif_file
-#     idv:edit_and_load $w file load_file pexlif_file type
+    set order_file [fl_bdd_var_order $c $pexlif_file]
+    set res [idv:edit_and_load $w $order_file $order_file "_dummy_" "order"]
+    if { $res != "" } {
+	set ::idv(ordering_file) $order_file
+    } else {
+	set ::idv(ordering_file) ""
+    }
+}
+
+proc idv:mark_progress {ew name1 name2 op} {
+    if ![winfo exists $ew] { return; }
+    set pexlif_file $::idv(fev_imp_file) 
+    if [file exists $pexlif_file] {
+	$ew configure -bg "light green"
+    } else {
+	$ew configure -bg white
+    }
 }
 
 proc idv:do_verify {w canvas type} {
     set pexlif_file $::idv(fev_imp_file) 
     if { ![file exists $pexlif_file] } { return; }
-    set res [fl_do_verify $canvas $pexlif_file $type]
+    set res [fl_do_verify $canvas $pexlif_file $type $::idv(ordering_file)]
     if { $res == "ok" } {
 	destroy $w
 	set ::idv(fev_template_file) ""
@@ -716,6 +735,8 @@ proc idv:do_verify {w canvas type} {
 	tk_messageBox \
 	    -message "Verification failed.\nCounterexample simulated." \
 	    -type ok -parent $w
+    } elseif { $res == "already_dealt_with_cex" } {
+	# Do nothing here
     } else {
 	tk_messageBox \
 	    -message "Verification failed.\n$res." -type ok -parent $w
@@ -769,11 +790,13 @@ proc idv:do_fev {ww} {
     pack $w.f3 -side top -fill x -pady 10
 	label $w.f3.l -text "Load pexlif:" -width 20 -justify left \
 	    -anchor w
-	entry $w.f3.e -textvariable ::idv(fev_imp_file) -width 30
+	entry $w.f3.e -textvariable ::idv(fev_imp_file) -width 30 -bg white
 	button $w.f3.dir -image $::icon(folder) -command "idv:fev_pexlif $w"
 	pack $w.f3.l -side left -anchor w -anchor w
 	pack $w.f3.e -side left -fill x -expand yes
 	pack $w.f3.dir -side left
+
+    trace add variable ::idv(fev_imp_file) write "idv:mark_progress $w.f3.e"
 
     labelframe $w.f4 -relief groove -text Check
     pack $w.f4 -side top -fill x -pady 10
@@ -796,7 +819,7 @@ proc idv:do_fev {ww} {
     pack $w.f5 -side top -fill x -pady 10
 	labelframe $w.f5.bdd -relief groove -text BDD
 	    button $w.f5.bdd.order -text "Variable ordering" \
-		-command "idv:do_bdd_var_order $ww.c"
+		-command "idv:do_bdd_var_order $w $ww.c"
 	    button $w.f5.bdd.verify -text "Verify" \
 		-command "idv:do_verify $w $ww.c BDD"
 	labelframe $w.f5.sat -relief groove -text SAT
@@ -808,6 +831,22 @@ proc idv:do_fev {ww} {
 	    pack $w.f5.bdd.verify -side left -padx 5 -fill x -expand yes
 	    pack $w.f5.sat.verify -side left -padx 5 -fill x -expand yes
 
+    frame $w.vossframe
+    pack $w.vossframe -side bottom -fill both -expand yes
+    set ::idv(info_window) $w.vossframe
+    set ::idv(ordering_file) ""
+}
+
+proc idv:make_info_window {make_container} {
+    set f $::idv(info_window).f
+    catch {destroy $f}
+    if { $make_container == 1 } {
+	frame $f -relief flat -container yes
+    } else {
+	frame $f -relief flat
+    } 
+    pack $f -side bottom -expand yes -fill both
+    return $f
 }
 
 proc idv:fev_template_file {code_dir w c} {

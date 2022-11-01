@@ -8,7 +8,7 @@ let shorten_sha sha = "\"" ^ substr sha 1 4 ^ "..\"";
 
 // Fetch attribute 's'. If none exists, returns 'a'.
 //  find_attr::string->string->(string#string list)->string
-let find_attr s a = snd # find_maybe (defix == s # fst) ("", a);
+let find_attr s default attrs = (assoc s attrs) catch default;
 
 // Fetch the "fingerprint" attribute, if any.
 //  find_fingerprint::(string#string list)->int
@@ -17,11 +17,6 @@ let find_fingerprint = s2int # find_attr "FP" "0";
 // Fetch the "signature" attribute, if any.
 //  find_signature::(string#string list)->string
 let find_signature = find_attr "SHA" "";
-
-// Predicate for hierarchical pexlif
-let pexlif_is_hier (PINST nm attrs lf fa_inps fa_outs ints (P_HIER cs)) = T
- /\ pexlif_is_hier oter = F
-;
 
 let pexlif_get_FP  = find_fingerprint # pexlif_get_attrs;
 let pexlif_get_SHA = find_signature   # pexlif_get_attrs;
@@ -44,61 +39,6 @@ let pexlif_get_outs_actuals (PINST _ _ _ fa_inps fa_outs _ _) =
         md_extract_vectors (flatmap snd fa_outs)
 ;
 let pexlif_get_name (PINST nm _ _ _ _ _ _) = nm;
-let is__WrApPeR_ (PINST nm _ _ _ _ _ (P_HIER _)) = (nm = "_WrApPeR_")
- /\ is__WrApPeR_ _ = F
-;
-
-//------------------------------------------------------------------------------
-// ...
-//------------------------------------------------------------------------------
-
-// Re-define PINST so that we always compute a signature (FP) and
-// a SHA256 (SHA) signatures and store them in the attribute list.
-// Also, every (non-toplevel) wrapper PINST is unfolded.
-let PINST n a l i o t c =
-    let mk_pinst n a l i o t c =
-	let is_signature s = (s == "FP") OR (s == "SHA") in
-	let process_assertions (P_HIER ps) =
-            let get_assert_nd (PINST _ _ _ _ outs _ _) res =
-                length outs != 1 => res |
-                val (f,as) = hd outs then
-                md_size f != 1 => [] |
-                let a = hd as in
-                str_is_substr "assert__" a => (a:res) | res
-	    in
-	    sitlist get_assert_nd ps []
-	 /\ process_assertions _ =  []
-	in
-	let assert_nds = process_assertions c then
-	(length (setify assert_nds) != length assert_nds) =>
-	    let ap = partition id assert_nds in
-	    let idx = find_first0 (\l.length l > 1) ap in
-	    eprintf "Duplicatated assertion (%s)" (hd (el idx ap))
-	|
-	let t' = setify (assert_nds @ t) in
-	let a' = filter (NOT # is_signature # fst) a in
-	let f  = ("FP",  fp_pinst    i o t' c) in
-	let s  = ("SHA", sha_pinst n i o t' c) in
-	PINST n (f : s : a') l i o t' c
-    in
-    let get_wrappers (P_HIER chs) = find_all is__WrApPeR_ chs
-     /\ get_wrappers _ = []
-    in
-    let wrappers = get_wrappers c in
-    wrappers = [] =>
-	mk_pinst n a l i o t c
-    |
-	// Lift all wrapper pexlifs by unfolding them
-	// Process the unfolds in reverse order
-	// Relies on unfold1 i does not change children 1--(i-1).
-	let wrappers = qsort (\i1.\i2. i1-i2) (setify wrappers) then
-	let p = PINST n a l i o t c then
-	let p' = itlist (\i.\p. unfold_pexlif p i) wrappers p then
-        let lbl (PINST n a l i o t c) = mk_pinst n a l i o t c in
-	val (PINST n a l i o t (P_HIER cs)) = p' then
-	mk_pinst n a l i o t (P_HIER (map lbl cs))
-;
-
 
 //------------------------------------------------------------------------------
 let not_const n = NOT (str_is_prefix "0b" n);
@@ -355,7 +295,7 @@ let collect_names wexpr =
         /\  collect (W_SLICE _ w) = collect w
         /\  collect (W_NAMED_SLICE _ _ w) = collect w
         /\  collect (W_UPDATE_NAMED_SLICE a _ _ b) = collect a @ collect b
-        /\  collect (W_CAT as) = concat (map collect as)
+        /\  collect (W_CAT as) = flat (map collect as)
         /\  collect (W_MEM_READ _ m a) = collect m @ collect a
         /\  collect (W_MEM_WRITE _ m a d) = collect m @ collect a @ collect d
         in
@@ -396,35 +336,6 @@ end_abstype decorate_pexlif_hiers;
 
 //------------------------------------------------------------------------------
 // Fin.
-
-clet get_base_name s = hd (str_split (get_vector_signature s) "[");
-
-let BASE_TMP = "_$";
-
-let BASE_TMP_len = strlen BASE_TMP;
-let o0 = ord "0";
-let o9 = ord "9";
-
-let strip_BASE_TMP s =
-    NOT (str_is_prefix BASE_TMP s) => s |
-    let rem = substr s (BASE_TMP_len+1) (-1) in
-    letrec skip_dig (c:cs) =
-        let oc = ord c in
-        (o0 <= oc) AND (oc <= o9) => skip_dig cs | implode (c:cs)
-     /\    skip_dig [] = ""
-    in
-    skip_dig (explode rem)
-;
-
-
-
-let wrap_pexlif p =
-    val (PINST _ _ _ l_fa_inps l_fa_outs _ _) = p in
-    let mk_io fa = map (\v. v, [v]) (md_extract_vectors (flatmap snd fa)) in
-    let fa_inps = mk_io l_fa_inps in
-    let fa_outs = mk_io l_fa_outs in
-    (PINST "wrapper" [] F fa_inps fa_outs [] (P_HIER [p]))
-;
 
 let pexlif_rename p new_name =
     val (PINST _ attrs lf fa_inps fa_outs ints content) = p in
@@ -600,4 +511,18 @@ let get_unique_name name_db original_name =
         try 1 
     in
     find_new_name original_name
+;
+
+// Extract the relevant information for a re_ff (if possible)
+let extract_re_ff p =
+    NOT (pexlif_is_hier p) => NONE |
+    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
+    let sz = md_sizes (snd (hd fa_outs)) then
+    let base = re_ff 'clk {'d :: wexpr} {'q :: wexpr} then
+    let master = resize_pexlif sz base then
+    NOT ((pexlif_get_SHA p) == (pexlif_get_SHA master)) => NONE |
+    let clk = hd (assoc "clk" fa_inps) in
+    let din = assoc (mk_name sz "d") fa_inps in
+    let dout = assoc (mk_name sz "q") fa_outs in
+    SOME ("re_ff", base, p, clk, din, dout, [])
 ;

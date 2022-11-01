@@ -64,9 +64,6 @@ proc change_fonts {new_font} {
     update
 }
 
-
-
-
 # Useful procedure that allows syntaxx like: val {v1 v2 v3} $list
 proc val {vars list} {
     if { [llength $vars] != [llength $list] } {
@@ -82,20 +79,20 @@ proc val {vars list} {
     }
 }
 
-
-
-
-
 proc util:set_result {w ret} {
     set ::results($w) $ret
     destroy $w
 }
 
-proc util:report_result {msg_header msg_details return_alts} {
-    set w [format {.result_report_%d} $::util_window_cnt]
-    incr ::util_window_cnt
-    catch {destroy $w}
-    toplevel $w
+proc util:report_result {msg_header msg_details return_alts {pw ""}} {
+    if { $pw == "" } {
+	set w [format {.result_report_%d} $::util_window_cnt]
+	incr ::util_window_cnt
+	catch {destroy $w}
+	toplevel $w
+    } else {
+	set w $pw
+    }
     frame $w.tf -relief flat
 	ttk::scrollbar $w.tf.hsb -orient horizontal \
 		-command [list $w.tf.t xview]
@@ -1128,3 +1125,82 @@ proc balloon:show {w arg} {
 }
 
 
+############################################################
+
+proc gui_execute_sub_process {w cmd logfile comment {cmd_file ""}} {
+
+    set fp [open "|$cmd 2>@1"]
+    fconfigure $fp -blocking 0
+
+    set pids [pid $fp]
+
+    set sw $w.t
+
+    if ![winfo exists $sw] {
+        frame $sw -relief flat
+        pack $sw -side top -fill both -expand yes
+
+        label $sw.l -text $comment -relief flat -font {Helvetica -12 bold}
+        pack $sw.l -side top -pady 2 -fill x
+
+        button $sw.b -text Interrupt -command "subproc:interrupt $w $pids"
+        pack $sw.b -side bottom -pady 10
+	
+        scrollbar $sw.yscroll -command "$sw.t yview"
+        scrollbar $sw.xscroll -orient horizontal -command "$sw.t xview"
+        text $sw.t -setgrid 1 \
+            -yscroll "$sw.yscroll set" -xscroll "$sw.xscroll set" \
+            -font $::voss2_txtfont1 -bg lightgrey
+        pack $sw.yscroll -side right -fill y
+        pack $sw.xscroll -side bottom -fill x
+        pack $sw.t -side top -fill both -expand yes
+        update idletasks
+    } else {
+        button $sw.b -text Interrupt -command "subproc:interrupt $w $pids"
+        pack $sw.b -side bottom -pady 10
+	$sw.t delete 1.0 end
+        update idletasks
+    }
+    if { $cmd_file != "" } {
+        set cfp [open $cmd_file "r"]    
+        $sw.t insert end [read $cfp]
+        $sw.t insert end "\n"
+        close $cfp
+    }
+
+    set logfp [open $logfile w]
+
+    while 1 {
+	if [eof $fp] {
+	    fconfigure $fp -blocking 1
+	    catch {close $fp} result options
+	    break
+	} else {
+	    set txt [read $fp]
+	    if [winfo exists $sw] {
+		$sw.t insert end $txt
+		$sw.t yview end
+	    }
+	    update
+	}
+	after 100
+    }
+    close $logfp
+    catch {destroy $sw.b}
+    if { $result == "" } {
+	return "0 {}"
+    }
+    set errorcode [dict get $options -errorcode]
+    set ecode [lrange $errorcode 2 end]
+    return "$ecode $result"
+}
+
+proc subproc:interrupt {w pids} {
+    foreach pid $pids {
+        catch "exec kill -9 $pid"
+    }
+    set tw [winfo toplevel $w]
+    catch {destroy $w}
+    update
+    wm geometry $tw ""
+}

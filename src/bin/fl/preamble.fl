@@ -114,6 +114,7 @@ let quit = exit 0;
 let stdout = fopen "stdout" "w";
 let stderr = fopen "stderr" "w";
 let stdinfo = fopen "stdinfo" "w";
+stdout fseq stderr fseq stdinfo fseq ();
 
 export_to_tcl update_vossrc;
 export_to_tcl get_vossrc;
@@ -873,25 +874,6 @@ let file_signature file =
 
 lettype window = WINDOW {window_name::string};
 
-// Create a top-level window with the msg_header text highlighted followed by
-// msg_details. Also create a list of buttons, one for each (name,ret_val)
-// pair in return_alts.
-// The function returns a handle to the window and a call to get_window_result
-// with this handle will wait to a button to be pressed when pressed,
-// the window will be destroyed and ret_val returned.
-//
-// NOTE: Only functional in normal (i.e., not -noX) mode!
-let report_result msg_header msg_details return_alts =
-    let pre = sprintf "util:report_result {%s} {%s} {"
-		      msg_header msg_details
-    then
-    let pfn (txt,ret) = sprintf "{%s %s}" txt ret in
-    let cmd = list2str T pre " " "}" pfn return_alts then
-    let w = tcl_eval [cmd] then
-    (WINDOW w)
-;
-non_lazy report_result;
-
 // Takes a handle to a prompt window waits for a button to be pressed.
 // When a button is pressed, the prompt window will be destroyed and button's
 // ret_val will be returned.
@@ -900,11 +882,49 @@ let get_window_result window =
     tcl_eval [sprintf "util:wait_for_button %s" w]
 ;
 
+let report_result0 msg_header msg_details return_alts =
+    let pre = sprintf "util:report_result {%s} {%s} {"
+		      msg_header msg_details
+    then
+    let pfn (txt,ret) = sprintf "{%s %s}" txt ret in
+    let cmd = list2str T pre " " "}" pfn return_alts then
+    let w = tcl_eval [cmd] then
+    (WINDOW w)
+;
+non_lazy report_result0;
+
+let report_result1 msg_header msg_details return_alts window =
+    let pre = sprintf "util:report_result {%s} {%s} {"
+		      msg_header msg_details
+    then
+    let pfn (txt,ret) = sprintf "{%s %s}" txt ret in
+    let post = sprintf "} %s" window in
+    let cmd = list2str T pre " " post pfn return_alts then
+    let w = tcl_eval [cmd] then
+    (WINDOW w)
+;
+non_lazy report_result1;
+
+// Create a top-level window with the msg_header text highlighted followed by
+// msg_details. Also create a list of buttons, one for each (name,ret_val)
+// pair in return_alts.
+// The function returns a handle to the window and a call to get_window_result
+// with this handle will wait to a button to be pressed when pressed,
+// the window will be destroyed and ret_val.
+// To get the result, invoke get_window_result with the window handle.
+//
+// The window to place the query in can be given as a last argument.
+//
+// NOTE: Only functional in normal (i.e., not -noX) mode!
+overload  report_result report_result0 report_result1;
+
+
 // Create a top-level window with the msg_header text highlighted followed by
 // the content of the msg_file file.
 // Also create a list of buttons, one for each (name,ret_val) pair
 // in return_alts. The button will be named "name" and when pressed,
-// the window will be destroyed and ret_val returned.
+// the window will be destroyed.
+// To get the result, invoke get_window_result with the window handle.
 //
 // NOTE: Only functional in normal (i.e., not -noX) mode!
 let report_result_in_file msg msg_file return_alts =
@@ -915,6 +935,22 @@ let report_result_in_file msg msg_file return_alts =
     (WINDOW w)
 ;
 non_lazy report_result_in_file;
+
+let window_choose_alternative0 msg_header msg_details return_alts =
+    let w = report_result msg_header msg_details return_alts then
+    get_window_result w
+;
+let window_choose_alternative1 msg_header msg_details return_alts window =
+    let w = report_result msg_header msg_details return_alts window then
+    get_window_result w
+;
+
+// Create a top-level window with the msg_header text highlighted followed by
+// msg_details. Also create a list of buttons, one for each (name,ret_val)
+// pair in return_alts.
+// The function creates a window, waits for a button to be pressed,
+// and return the value associated with the button pressed.
+overload window_choose_alternative window_choose_alternative0 window_choose_alternative1;
 
 
 begin_abstype;
@@ -1863,6 +1899,66 @@ andlettype content =
         |   P_LEAF {fns::update_fn list}
 ;
 
+
+// Re-define PINST so that we always compute a signature (FP) and
+// a SHA256 (SHA) signatures and store them in the attribute list.
+// Also, every (non-toplevel) wrapper PINST is unfolded.
+let PINST n a l i o t c =
+    let mk_pinst n a l i o t c =
+        let is_signature s = (s == "FP") OR (s == "SHA") in
+        let process_assertions (P_HIER ps) =
+            let get_assert_nd (PINST _ _ _ _ outs _ _) =
+                length outs != 1 => [] |
+                val (f,as) = hd outs then
+                md_size f != 1 => [] |
+                let a = hd as in
+                str_is_substr "assert__" a => [a] | []
+            in
+            flatmap get_assert_nd ps
+         /\ process_assertions _ =  []
+        in
+        let assert_nds = process_assertions c then
+        (length (setify assert_nds) != length assert_nds) =>
+            let ap = partition id assert_nds in
+            let idx = find_first0 (\l.length l > 1) ap in
+            eprintf "Duplicatated assertion (%s)" (hd (el idx ap))
+        |
+        let t' = setify (assert_nds @ t) in
+        let a' = filter (NOT # is_signature # fst) a in
+        let f  = ("FP",  fp_pinst    i o t' c) in
+        let s  = ("SHA", sha_pinst n i o t' c) in
+        PINST n (f : s : a') l i o t' c
+    in
+    let is__WrApPeR_ (PINST nm _ _ _ _ _ (P_HIER _)) = (nm = "_WrApPeR_")
+     /\ is__WrApPeR_ _ = F
+    in
+    let get_wrappers (P_HIER chs) = find_all is__WrApPeR_ chs
+     /\ get_wrappers _ = []
+    in
+    let wrappers = get_wrappers c in
+    wrappers = [] =>
+        mk_pinst n a l i o t c
+    |
+        // Lift all wrapper pexlifs by unfolding them
+        // Process the unfolds in reverse order
+        // Relies on unfold1 i does not change children 1--(i-1).
+        let wrappers = qsort (\i1.\i2. i1-i2) (setify wrappers) then
+        let p = PINST n a l i o t c then
+        let p' = itlist (\i.\p. unfold_pexlif p i) wrappers p then
+        let lbl (PINST n a l i o t c) = mk_pinst n a l i o t c in
+        val (PINST n a l i o t (P_HIER cs)) = p' then
+        mk_pinst n a l i o t (P_HIER (map lbl cs))
+;
+
+// Create a wrapper for a pexlif so that formal/actuals are the same.
+let wrap_pexlif p =
+    val (PINST _ _ _ l_fa_inps l_fa_outs _ _) = p in
+    let mk_io fa = map (\v. v, [v]) (md_extract_vectors (flatmap snd fa)) in
+    let fa_inps = mk_io l_fa_inps in
+    let fa_outs = mk_io l_fa_outs in
+    (PINST "wrapper" [] F fa_inps fa_outs [] (P_HIER [p]))
+;
+
 // Convert any bexpr occurring in "e" to a BDD.
 // Currently only defined to bexprs, lists, pairs and list of pairs of bexprs.
 // Usage: bexpr2bdd e;
@@ -2010,3 +2106,41 @@ let fl_mktempd base =
     dir
 ;
 export_to_tcl fl_mktempd;
+
+// Execute a Linux command and capture the output in a tcl window.
+// Allows the user to interrupt the process.
+// Returns 0 if successful, 1 if interrupted.
+let gui_exec {window::string} {title::string} {cmd::string} =
+    let dir = mktempd "gui_exec" then
+    let cmd_file = sprintf "%s/cmd_in" dir then
+    let log_file = sprintf "%s/cmd_out" dir then
+    let fp = fopen cmd_file "w" then
+    (fprintf fp "exec %s" cmd) fseq
+    (fclose fp) fseq
+    let ncmd = sprintf "/bin/sh %s" cmd_file then
+    let tcmd = sprintf "gui_execute_sub_process %s {%s} %s {%s} %s"
+			window ncmd log_file title cmd_file
+    in
+    let res =  tcl2list (tcl_eval [tcmd]) then
+    let status = hd res then
+    let emsg = list2str T "" " " "" id (tl res) then
+    (system (sprintf "/bin/rm -f %s" cmd_file)) fseq
+    (status, emsg, log_file)
+;
+non_lazy gui_exec;
+
+// Execute a Linux command and return the status and name of output file
+// Intended for -noX mode.
+let non_gui_exec {cmd::string} =
+    let dir = mktempd "gui_exec" then
+    let cmd_file = sprintf "%s/cmd_in" dir then
+    let log_file = sprintf "%s/cmd_out" dir then
+    let fp = fopen cmd_file "w" then
+    (fprintf fp "exec %s" cmd) fseq
+    (fclose fp) fseq
+    let scmd = sprintf "/bin/sh %s > %s 2>&1" cmd_file log_file then
+    let res = system scmd then
+    (int2str res, [], log_file)
+;
+non_lazy non_gui_exec;
+

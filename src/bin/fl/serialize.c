@@ -455,6 +455,8 @@ read_g_ptr(FILE *fp, g_ptr *pp)
 #define TAG_PRIM_FN     'P'
 #define TAG_VAR         'V'
 #define TAG_EXTOBJ      'O'
+#define TAG_DEBUG	'D'
+#define TAG_FILEFP	'f'
 
 #define EMIT(tag)	    fprintf(fp, "%c\n", (tag));
 
@@ -516,6 +518,19 @@ write_g_rec(FILE *fp, g_ptr np)
 				EMIT(TAG_FAIL);
 				write_string(fp, GET_FAIL_STRING(np));
 				return;
+			    case P_DEBUG:
+				{
+				    EMIT(TAG_DEBUG);
+				    write_string(fp, GET_DEBUG_STRING(np));
+				    return;
+				}
+			    case P_FILEFP:
+				{
+				    EMIT(TAG_FILEFP);
+				    io_ptr ip = GET_FILE_IO_PTR(np);
+				    write_string(fp, Get_StreamName(ip));
+				    return;
+				}
 			    case P_REF_VAR:
 				{
 				    EMIT(TAG_REF_VAR);
@@ -698,6 +713,23 @@ read_g_rec(FILE *fp, g_ptr np)
 	    int pfn;
 	    read_int(fp, &pfn);
 	    MAKE_REDEX_PRIM_FN(np, pfn);
+	    return;
+	}
+	case TAG_DEBUG: {
+	    string s;
+	    read_string(fp, &s);
+	    MAKE_REDEX_PRIM_FN(np, P_DEBUG);
+	    SET_DEBUG_STRING(np, s);
+	    return;
+	}
+	case TAG_FILEFP:
+	{
+	    string name;
+	    read_string(fp, &name);
+	    MAKE_REDEX_PRIM_FN(np, P_FILEFP);
+	    io_ptr ip = Get_OpenStream(name);
+	    ASSERT(ip != NULL);
+	    SET_FILE_IO_PTR(np, ip);
 	    return;
 	}
 	default:

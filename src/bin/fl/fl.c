@@ -71,13 +71,14 @@ static char             path_buf[PATH_MAX+1];
 static char             parse_buf[6*TCL_CMD_BUF_SZ];
 static char             stdin_buf[2*TCL_CMD_BUF_SZ];
 static char		tcl_buf[TCL_PRINTF_BUF_SZ+1];
-static string 		start_file   = NULL;
-static string 		input_file_for_cmds   = NULL;
+static string 		use_window		= NULL;
+static string 		start_file		= NULL;
+static string 		input_file_for_cmds     = NULL;
 static int 		input_file_for_cmds_pid = -1;
 static string 		output_file_for_results = NULL;
-static string 		v_order_file = NULL;
-static string	        new_default_dir = NULL;
-static string	        new_temp_dir = NULL;
+static string 		v_order_file		= NULL;
+static string	        new_default_dir		= NULL;
+static string	        new_temp_dir		= NULL;
 static buffer		tcl_eval_done_buf;
 static buffer		tcl_eval_result_buf;
 static string		s_empty_string;
@@ -286,6 +287,11 @@ fl_main(int argc, char *argv[])
 	} else
         if( strcmp(argv[1], "-I") == 0 ) {
             new_default_dir = argv[2];
+            argc -= 2; argv += 2;
+        } else
+        if( strcmp(argv[1], "-use") == 0 ||
+	    strcmp(argv[1], "--use") == 0 ) {
+            use_window = argv[2];
             argc -= 2; argv += 2;
         } else
         if( strcmp(argv[1], "-r") == 0 ) {
@@ -865,8 +871,14 @@ setup_sockets()
     uint32_t addr = ntohs(serv_addr.sin_addr.s_addr);
     uint16_t port = ntohs(serv_addr.sin_port);
 
-    Sprintf(buf, "wish %s/front_end.tcl %d %d %d %s &",
-		 binary_location, getpid(), addr, port, Voss_tmp_dir);
+    if( use_window != NULL ) {
+	Sprintf(buf, "wish %s/front_end.tcl %d %d %d %s -use %s &",
+		     binary_location, getpid(), addr, port, Voss_tmp_dir,
+		     use_window);
+    } else {
+	Sprintf(buf, "wish %s/front_end.tcl %d %d %d %s &",
+		     binary_location, getpid(), addr, port, Voss_tmp_dir);
+    }
     if( system(buf) != 0 ) {
         Eprintf("Failed to execute %s/front_end.tcl\n", binary_location);
     }

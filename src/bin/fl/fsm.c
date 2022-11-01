@@ -666,6 +666,10 @@ write_ncomp_rec(FILE *fp, pointer p)
     else if( op == op_LAT_LEQ ) {
 	write_int(fp, 24);
     }
+    else if( op == op_UPDATE_SLICE ) {
+	write_int(fp, 25);
+	write_idx_list_ptr(fp, vp->arg.idx_list);
+    }
     else {
 	DIE("Should not happen!");
     }
@@ -736,7 +740,12 @@ read_ncomp_rec(FILE *fp, pointer p)
 	    read_int(fp, &(vp->arg.mem.lines));
 	    break;
 	}
-	case 24: vp->op = op_LAT_LEQ; break;
+	case 24:
+	    vp->op = op_LAT_LEQ; break;
+	case 25:
+	    vp->op = op_UPDATE_SLICE;
+	    read_idx_list_ptr(fp, &(vp->arg.idx_list));
+	    break;
 	default:
 	    DIE("Should never happen!");
     }

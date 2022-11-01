@@ -608,3 +608,140 @@ clet cmd_merge_vectors ns =
     merge_const [] vs
 ;
 
+
+clet is_var (W_VAR _ _) = T
+  /\ is_var (W_EXPLICIT_VAR _ _) = T
+  /\ is_var _ = F;
+
+clet is_simple_var (W_VAR _ _) = T
+  /\ is_simple_var _ = F;
+
+clet is_vars l = itlist (\v.\r. is_var v AND r) l T;
+
+let is_binary_base (W_EQ  a b)  = (is_var a) AND (is_var b)
+ /\ is_binary_base (W_NOT (W_EQ a b))  = (is_var a) AND (is_var b)
+ /\ is_binary_base (W_GR  a b)  = (is_var a) AND (is_var b)
+ /\ is_binary_base (W_AND a b)  = (is_var a) AND (is_var b)
+ /\ is_binary_base (W_LAT_LEQ a b) = (is_var a) AND (is_var b)
+ /\ is_binary_base (W_NOT (W_AND a b))  = (is_var a) AND (is_var b)
+ /\ is_binary_base (W_OR  a b)  = (is_var a) AND (is_var b)
+ /\ is_binary_base (W_NOT (W_OR a b))  = (is_var a) AND (is_var b)
+ /\ is_binary_base (W_ADD a b)  = (is_var a) AND (is_var b)
+ /\ is_binary_base (W_SUB a b)  = (is_var a) AND (is_var b)
+ /\ is_binary_base (W_MUL a b)  = (is_var a) AND (is_var b)
+ /\ is_binary_base (W_DIV a b)  = (is_var a) AND (is_var b)
+ /\ is_binary_base (W_MOD a b)  = (is_var a) AND (is_var b)
+ /\ is_binary_base (W_SHL a b)  = (is_var a) AND (is_var b)
+ /\ is_binary_base (W_SHR a b)  = (is_var a) AND (is_var b)
+ /\ is_binary_base (W_ASHR a b) = (is_var a) AND (is_var b)
+ /\ is_binary_base other = F
+;
+
+let is_binary (W_EQ  a b)  = T
+  /\ is_binary (W_GR  a b)  = T
+  /\ is_binary (W_AND a b) = T
+  /\ is_binary (W_LAT_LEQ a b) = T
+  /\ is_binary (W_OR  a b)  = T
+  /\ is_binary (W_ADD a b)  = T
+  /\ is_binary (W_SUB a b)  = T
+  /\ is_binary (W_MUL a b)  = T
+  /\ is_binary (W_DIV a b)  = T
+  /\ is_binary (W_MOD a b)  = T
+  /\ is_binary (W_SHL a b)  = T
+  /\ is_binary (W_SHR a b)  = T
+  /\ is_binary (W_ASHR a b) = T
+  /\ is_binary other = F
+;
+
+let split_binary (W_EQ  a b)  = W_EQ, a, b
+  /\ split_binary (W_GR  a b)  = W_GR, a, b
+  /\ split_binary (W_AND  a b) = W_AND, a, b
+  /\ split_binary (W_LAT_LEQ  a b) = W_LAT_LEQ, a, b
+  /\ split_binary (W_OR  a b)  = W_OR, a, b
+  /\ split_binary (W_ADD a b)  = W_ADD, a, b
+  /\ split_binary (W_SUB a b)  = W_SUB, a, b
+  /\ split_binary (W_MUL a b)  = W_MUL, a, b
+  /\ split_binary (W_DIV a b)  = W_DIV, a, b
+  /\ split_binary (W_MOD a b)  = W_MOD, a, b
+  /\ split_binary (W_SHL a b)  = W_SHL, a, b
+  /\ split_binary (W_SHR a b)  = W_SHR, a, b
+  /\ split_binary (W_ASHR a b) = W_ASHR, a, b
+  /\ split_binary other = error "Should not happen"
+;
+
+// Predicate for hierarchical pexlif
+let pexlif_is_hier (PINST nm attrs lf fa_inps fa_outs ints (P_HIER cs)) = T
+ /\ pexlif_is_hier oter = F
+;
+
+//
+// Resize a pexlif constructed by instatiating an fl function using wexprs. 
+// NOTE: All nodes that uses wexpr as datatype will be converted
+// to a vector of size sz. All others will remian as is.
+//
+// For example:  resize_pexlif 12 (re_ff 'clk {'d::wexpr} 'o)
+// returns a re_ff pexlif where data input (and output) will be of size 12(11:0)
+//
+let resize_pexlif sz {p::pexlif} =
+    let tri i = i = 0 => sz | i in
+    let tr1 n =
+	NOT (str_is_substr "[-1:0]" n) => n |
+	mk_name sz (hd (str_split n "["))
+    in
+    let trfa (f,as) = (tr1 f), (map tr1 as) in
+    letrec trwexpr (W_VAR osz name) = W_VAR (tri osz) name
+     /\    trwexpr (W_EXPLICIT_VAR osz nm) = W_EXPLICIT_VAR (tri osz) (tr1 nm)
+     /\    trwexpr (W_X osz) = W_X (tri osz)
+     /\    trwexpr (W_CONST osz v) = W_CONST (tri osz) v
+     /\    trwexpr (W_NAMED_CONST name osz v) = W_NAMED_CONST name (tri osz) v
+     /\    trwexpr e assuming (is_binary e) =
+	val (op, l, r) = split_binary e in
+	op (trwexpr l) (trwexpr r)
+     /\    trwexpr (W_ITE c a b) = W_ITE (trwexpr c) (trwexpr a) (trwexpr b)
+     /\    trwexpr (W_NOT e) = W_NOT (trwexpr e)
+     /\    trwexpr (W_PRED name e) = W_PRED name (trwexpr e)
+     /\    trwexpr (W_SX osz e) = W_SX (tri osz) (trwexpr e)
+     /\    trwexpr (W_ZX osz e) = W_ZX (tri osz) (trwexpr e)
+     /\    trwexpr other = error "Cannot translate wexpr constructor"
+    in
+    let trfn (W_UPDATE_FN lhs rhs) =
+	W_UPDATE_FN (trwexpr lhs) (trwexpr rhs)
+     /\ trfn (W_PHASE_DELAY lhs rhs) =
+	W_PHASE_DELAY (trwexpr lhs) (trwexpr rhs)
+    in
+    letrec trp (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) =
+	let fa_inps' = map trfa fa_inps in
+	let fa_outs' = map trfa fa_outs in
+	let ints' = map tr1 ints in
+	let cs' = map trp cs in
+	PINST name attrs lf fa_inps' fa_outs' ints' (P_HIER cs')
+     /\   trp (PINST name attrs lf fa_inps fa_outs ints (P_LEAF fns)) =
+	let fa_inps' = map trfa fa_inps in
+	let fa_outs' = map trfa fa_outs in
+	let ints' = map tr1 ints in
+	let fns' = map trfn fns in
+	PINST name attrs lf fa_inps' fa_outs' ints' (P_LEAF fns')
+    in
+    trp p
+;
+
+
+clet get_base_name s = hd (str_split (get_vector_signature s) "[");
+
+let BASE_TMP = "_$";
+
+let BASE_TMP_len = strlen BASE_TMP;
+let o0 = ord "0";
+let o9 = ord "9";
+
+let strip_BASE_TMP s =
+    NOT (str_is_prefix BASE_TMP s) => s |
+    let rem = substr s (BASE_TMP_len+1) (-1) in
+    letrec skip_dig (c:cs) =
+        let oc = ord c in
+        (o0 <= oc) AND (oc <= o9) => skip_dig cs | implode (c:cs)
+     /\    skip_dig [] = ""
+    in
+    skip_dig (explode rem)
+;
+
