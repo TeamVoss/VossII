@@ -10,31 +10,7 @@ hierarchy -top `basename`
 
 `flatten`
 
-proc
-opt_expr
-opt_clean
-check
-opt -nodffe -nosdff
-fsm
-opt -nodffe -nosdff
-wreduce
-peepopt
-opt_clean
-alumacc
-share
-opt -nodffe -nosdff
-memory -nomap
-opt_clean
-opt -nodffe -nosdff -full
-memory_map
-opt -nodffe -nosdff -full
-techmap
-opt -nodffe -nosdff -fast
-abc -fast
-opt -nodffe -nosdff -fast
-hierarchy -check
-stat
-check
+synth -top `basename`
 
 dfflibmap -liberty `libdir`/osu018_stdcells.lib
 dfflegalize -cell $_DFF_P_ x

@@ -369,7 +369,7 @@ proc draw_bdd_profile {vws} {
     $w.c configure -scrollregion [$w.c bbox all]
 }
 
-proc display_dot {dot_pgm {w ""} {close_fun ""}} {
+proc display_dot {dot_pgm {w ""} {close_fun ""} {logfile ""}} {
     if { $w == "" } {
 	incr ::dot_displays
 	set w .dot$::dot_displays
@@ -407,7 +407,8 @@ proc display_dot {dot_pgm {w ""} {close_fun ""}} {
     set ::mfont($c) $::base_mfont
     set ::sfont($c) $::base_sfont
 
-    set fp [open "|dot -Ttk $dot_pgm" "r"]
+    if { $logfile == "" } { set logfile "/dev/null"; }
+    set fp [open "|dot -Ttk $dot_pgm 2> $logfile"]
     while {[gets $fp line] >= 0} {
 	set nline [regsub {{"Times" 14}} $line {$::voss2_txtfont1}]
         eval $nline

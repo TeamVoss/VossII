@@ -1119,7 +1119,11 @@ let do_synthesis file bname pexlif_file p synth_type synth_script =
     (list2fp fp T "" "" "" (\fp.\s. fprintf fp "%s\n" s) script) fseq
     (fclose fp) seq
     // Now run Yosys 
-    let cmd = sprintf "yosys -s %s" yosys_file then
+    let write_pexlif =
+	sprintf "%s../../../../../src/external/write_pexlif/write_pexlif.so"
+		DIR
+    then
+    let cmd = sprintf "yosys -m %s -s %s" write_pexlif yosys_file then
     let cw = tcl_eval ["idv:make_info_window 0"] then
     val (status, emsg, logfile) = gui_exec cw "Yosys synthesis" cmd then
     status = "SIGKILL" => "" |
