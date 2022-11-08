@@ -37,23 +37,14 @@ LIB_DIR := $(ROOT_DIR)/vosslib
 DOC_DIR := $(ROOT_DIR)/doc
 # Minisat installation directory
 MINISAT_DIR := $(SRC_DIR)/external/minisat
-# Yosys installation directory
-YOSYS_DIR := $(SRC_DIR)/external/yosys
-# Yosys patch directory
-YOSYS_PATCH_DIR := $(SRC_DIR)/external/yosys_Voss_patches
+# Yosys write_pexlif backend source
+YOSYS_WRITE_PEXLIF := $(SRC_DIR)/external/yosys/write_pexlif
 # circuit-isomatch installation directory
 CKT_ISO_MATCH_DIR := $(SRC_DIR)/external/circuit-isomatch/src
 # Visualization installation directory
 VISUALIZATION_DIR := $(SRC_DIR)/external/visualization
 # Plugin directory
 PLUGIN_DIR := $(LIB_DIR)
-# Linking flag passed to yosys makefile
-YOSYS_LINKFLAG := -static
-# Patch for the yosys makefile to add pexlif backend
-YOSYS_PEXLIF_PATCH := external/yosys_makefile_pexlif_backend.patch
-# Relative path to yosys makefile
-YOSYS_MAKEFILE := $(YOSYS_DIR)/Makefile
-YOSYS_PATCHED_MAKEFILE := $(YOSYS_DIR)/Makefile_VossII
 
 #
 # Flags
@@ -89,7 +80,7 @@ docker_package:
 	docker build -t vossii-static-builder ..
 	docker run --user $(REPO_OWNER) -v `pwd`/..:/vossroot vossii-static-builder
 
-package: clean yosys_clean
+package: clean
 	make install LINKFLAG=-static
 	rm -r ../voss ; true
 	install -m 755 -d ../voss/
@@ -103,7 +94,7 @@ package: clean yosys_clean
 
 	install -m 755 -t ../voss/bin ../bin/fl
 	install -m 755 -t ../voss/bin ../bin/functor
-	install -m 755 -t ../voss/bin ../bin/yosys
+	install -m 755 -t ../voss/bin ../bin/write_pexlif.so
 	install -m 755 -t ../voss/bin ../bin/front_end.tcl
 	install -m 644 -t ../voss/bin ../bin/prefs.tcl
 	install -m 644 -t ../voss/bin ../bin/utils.tcl
@@ -182,9 +173,10 @@ install_fixed_address: fl functor
 	cp -r vosslib/* $(LIB_DIR)
 	chmod -R ugo+rX $(LIB_DIR)
 
-install_all: install_all_but_yosys install_yosys
-
-install_all_but_yosys: fl functor ignore_signals install_visualization
+install_all: fl functor \
+			ignore_signals \
+			install_visualization \
+			install_write_pexlif
 	@-mkdir -p $(BIN_DIR)
 	@-unlink $(BIN_DIR)/fl
 	@cp ./bin/fl/fl $(BIN_DIR)/fl
@@ -212,14 +204,12 @@ install_all_but_yosys: fl functor ignore_signals install_visualization
 install_visualization: visualization
 	cp external/visualization/schematic_draw_module.so ../IDVII/
 
-install_yosys: .yosys .yosys_pexlif
+install_write_pexlif: $(YOSYS_WRITE_PEXLIF)/write_pexlif.so
 	@-mkdir -p $(BIN_DIR)
-	@cp $(YOSYS_DIR)/yosys $(BIN_DIR)/yosys
-	@chmod ugo+rx $(BIN_DIR)/yosys
+	@cp $(YOSYS_WRITE_PEXLIF)/write_pexlif.so $(BIN_DIR)/write_pexlif.so
+	@chmod ugo+rx $(BIN_DIR)/write_pexlif.so
 
 install:
-	@-touch $(YOSYS_DIR)/yosys
-	@-touch .yosys
 	@-make install_all
 
 circuit-isomatch:
@@ -232,22 +222,8 @@ minisat:
 visualization:
 	make -C "$(VISUALIZATION_DIR)"
 
-$(YOSYS_PATCHED_MAKEFILE):
-	patch -p0 $(YOSYS_MAKEFILE) -o $(YOSYS_PATCHED_MAKEFILE) < $(YOSYS_PEXLIF_PATCH)
-	touch .yosys_makefile_patched
-
-.yosys: $(YOSYS_PATCHED_MAKEFILE)
-	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f $(YOSYS_PATCHED_MAKEFILE) config-gcc-static
-	echo "========================================================="
-	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f $(YOSYS_PATCHED_MAKEFILE)
-	touch .yosys
-
-.yosys_pexlif: $(YOSYS_PATCH_DIR)/backends/pexlif/pexlif.cc \
-	       $(YOSYS_PATCH_DIR)/frontends/ast/genrtlil.cc 
-	cp $(YOSYS_PATCH_DIR)/backends/pexlif/pexlif.cc $(YOSYS_DIR)/backends/pexlif/pexlif.cc
-	cp $(YOSYS_PATCH_DIR)/frontends/ast/genrtlil.cc $(YOSYS_DIR)/frontends/ast/genrtlil.cc
-	make -C "$(YOSYS_DIR)" LDFLAGS=$(YOSYS_LINKFLAG) -f $(YOSYS_PATCHED_MAKEFILE)
-	touch .yosys_pexlif
+$(YOSYS_WRITE_PEXLIF)/write_pexlif.so: $(YOSYS_WRITE_PEXLIF)/write_pexlif.cc
+	make -C $(YOSYS_WRITE_PEXLIF)
 
 clean:
 	@-make -C lib clean
@@ -255,6 +231,5 @@ clean:
 	@-make -C bin/functor clean
 	@-make -C external/minisat clean
 	@-make -C external/visualization clean
+	@-make -C $(YOSYS_WRITE_PEXLIF) clean
 
-yosys_clean:
-	@-/bin/rm -f .yosys .yosys_pexlif $(YOSYS_PATCHED_MAKEFILE)

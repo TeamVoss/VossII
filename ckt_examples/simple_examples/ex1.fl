@@ -1,0 +1,39 @@
+load "idv.fl";
+
+TYPE "byte" 8;
+
+let bar =
+    byte_input	    a b c.
+    byte_output	    res.
+    byte_internal   mid.
+    CELL "bar" [
+	mid <- (IF (a '>=' b) THEN (c '-' a) ELSE (c '-' b)) ,
+	res <- (IF (mid '<=' '3) THEN '0 ELSE mid)
+];
+
+let tst =
+    bit_input	    clk reset en.
+    byte_input	    a b.
+    byte_output	    o.
+    byte_internal   aa ad bd ptmp tmp t1 t2.
+    bit_internal    dclk.
+    CELL "tst" [
+	dclk <- clk,
+	re_ff_en dclk '1 a aa,
+	ad <- aa,
+	re_ff_en clk en b bd,
+	bar ad bd b ptmp,
+	re_ff_en ('~' clk) ('~' en) ptmp tmp,
+	always_ff (posedge clk) [
+            t1 <== (IF reset THEN '0 ELSE (IF en THEN tmp ELSE t1)),
+            t2 <== t1,
+            o <== t2
+        ]
+];
+
+let p = tst 'clk 'reset 'en 'a 'b 'o;
+p fseq ();
+
+system "rm -rf DB_ex1";
+
+IDV p "DB_ex1" [];

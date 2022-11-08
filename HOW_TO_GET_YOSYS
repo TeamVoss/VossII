@@ -1,0 +1,10 @@
+Download an archive matching your OS from the releases page
+(https://github.com/YosysHQ/oss-cad-suite-build/releases).
+
+Extract the archive to a location of your choice
+
+Set the environment:
+
+export PATH="<extracted_location>/oss-cad-suite/bin:$PATH"
+
+
