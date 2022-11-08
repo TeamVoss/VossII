@@ -168,336 +168,17 @@ nonfix '-;
 overload '- '- neg_make_const_or_var;
 free_binder '-;
 
-begin_abstype;
-letrec dep (W_X sz) = []
- /\     dep (W_CONST sz v) = []
- /\     dep (W_NAMED_CONST name sz v) = []
- /\     dep (W_VAR sz b) = [b]
- /\     dep (W_EXPLICIT_VAR sz b) = [b]
- /\     dep (W_AND a b) = (dep a) union (dep b)
- /\     dep (W_LAT_LEQ a b) = (dep a) union (dep b)
- /\     dep (W_OR  a b) = (dep a) union (dep b)
- /\     dep (W_EQ  a b) = (dep a) union (dep b)
- /\     dep (W_PRED name cond) = dep cond
- /\     dep (W_GR  a b) = (dep a) union (dep b)
- /\     dep (W_ADD a b) = (dep a) union (dep b)
- /\     dep (W_SUB a b) = (dep a) union (dep b)
- /\     dep (W_MUL a b) = (dep a) union (dep b)
- /\     dep (W_DIV a b) = (dep a) union (dep b)
- /\     dep (W_MOD a b) = (dep a) union (dep b)
- /\     dep (W_SHL a b) = (dep a) union (dep b)
- /\     dep (W_SHR a b) = (dep a) union (dep b)
- /\     dep (W_ASHR a b) = (dep a) union (dep b)
- /\     dep (W_SX sz w) = dep w
- /\     dep (W_ZX sz w) = dep w
- /\     dep (W_NOT a)   = dep a
- /\     dep (W_ITE c t e) = (dep c) union (dep t) union (dep e)
- /\     dep (W_SLICE indices w) = dep w
- /\     dep (W_NAMED_SLICE name indices w) = dep w
- /\     dep (W_UPDATE_NAMED_SLICE base name indices w) = (dep base) union (dep w)
- /\     dep (W_CAT parts) =itlist (\e.\r. dep e union r) parts []
- /\     dep (W_MEM_READ info mem addr) = (dep mem) union (dep addr)
- /\     dep (W_MEM_WRITE info mem addr data) =
-	    (dep mem) union (dep addr) union (dep data)
-;
-
-letrec get_wbase_names e = dep e;
-end_abstype get_wbase_names;
-
-let base_compact_wprint inps rhs =
-    let i_map = zip inps (1 upto (length inps)) in
-    letrec P pri (W_X sz) = sprintf "X[%d:0]" (sz-1)
-     /\    P pri (W_CONST sz v) =
-	    v < 16 => int2str v |
-	    sz < 5 OR ((sz % 4) != 0) => sprintf "0b%0*b" sz v
-				       | sprintf "0x%x" v
-     /\    P pri (W_NAMED_CONST name sz v) = name
-     /\    P pri (W_VAR sz base) =
-		let inp = assoc base i_map in
-		sprintf "i%d" inp
-     /\    P pri (W_EXPLICIT_VAR sz base) =
-		let inp = assoc base i_map in
-		sprintf "i%d" inp
-     /\    P pri (W_AND a b) =
-		pri > 5 => sprintf "(%s&%s)" (P 5 a) (P 5 b)
-			 | sprintf "%s&%s" (P 5 a) (P 5 b)
-     /\    P pri (W_LAT_LEQ a b) =
-		pri > 2 => sprintf "(%s [<=] %s)" (P 2 a) (P 2 b)
-			 | sprintf "%s [<=] %s" (P 2 a) (P 2 b)
-     /\    P pri (W_OR  a b) =
-		pri > 4 => sprintf "(%s|%s)" (P 4 a) (P 4 b)
-			 | sprintf "%s|%s" (P 4 a) (P 4 b)
-     /\    P pri (W_NOT a) =
-		pri > 8 => sprintf "(~%s)" (P 8 a) | sprintf "~%s" (P 8 a)
-     /\    P pri (W_EQ  (W_CONST sz v) b) =
-		pri > 3 => sprintf "(%s=%s)" (P 3 b) (P 3 (W_CONST sz v))
-			 | sprintf "%s=%s" (P 3 b) (P 3 (W_CONST sz v))
-     /\    P pri (W_EQ  a b) =
-		pri > 3 => sprintf "(%s=%s)" (P 3 a) (P 3 b)
-			 | sprintf "%s=%s" (P 3 a) (P 3 b)
-     /\    P pri (W_PRED name cond) =
-	    let inps = get_wbase_names cond in
-	    let sassoc i al = (assoc i al) catch 999 in
-	    let vinps = map (\i. sprintf "i%d" (sassoc i i_map)) inps in
-	    let args = list2str T "(" "," ")" id (qsort node_name_cmp vinps) in
-	    sprintf "%s%s" name args
-     /\    P pri (W_SHL a (W_CONST sz v)) =
-		pri > 4 => sprintf "(%s<<%d)" (P 4 a) v
-			 | sprintf "%s<<%d" (P 4 a) v
-     /\    P pri (W_SHR a (W_CONST sz v)) =
-		pri > 4 => sprintf "(%s>>%d)" (P 4 a) v
-			 | sprintf "%s>>%d" (P 4 a) v
-     /\    P pri (W_ASHR a (W_CONST sz v)) =
-		pri > 4 => sprintf "(%s|>>%d)" (P 4 a) v
-			 | sprintf "%s|>>%d" (P 4 a) v
-     /\    P pri (W_GR  (W_CONST sz v) b) =
-		pri > 3 => sprintf "(%s<%s)" (P 3 b) (P 3 (W_CONST sz v))
-			 | sprintf "%s<%s" (P 3 b) (P 3 (W_CONST sz v))
-     /\    P pri (W_GR  a b) =
-		pri > 3 => sprintf "(%s>%s)" (P 3 a) (P 3 b)
-			 | sprintf "%s>%s" (P 3 a) (P 3 b)
-     /\    P pri (W_ADD a b) =
-		pri > 2 => sprintf "(%s+%s)" (P 2 a) (P 2 b)
-			 | sprintf "%s+%s" (P 2 a) (P 2 b)
-     /\    P pri (W_SUB a b) =
-		pri > 2 => sprintf "(%s-%s)" (P 2 a) (P 2 b)
-			 | sprintf "%s-%s" (P 2 a) (P 2 b)
-     /\    P pri (W_MUL a b) =
-		pri > 3 => sprintf "(%s*%s)" (P 3 a) (P 3 b)
-			 | sprintf "%s*%s" (P 3 a) (P 3 b)
-     /\    P pri (W_DIV a b) =
-		pri > 4 => sprintf "(%s/%s)" (P 4 a) (P 4 b)
-			 | sprintf "%s/%s" (P 4 a) (P 4 b)
-     /\    P pri (W_MOD a b) =
-		pri > 4 => sprintf "(%s%%%s)" (P 4 a) (P 4 b)
-			 | sprintf "%s%%%s" (P 4 a) (P 4 b)
-     /\    P pri (W_SHL a b) =
-		pri > 4 => sprintf "(%s<<%s)" (P 4 a) (P 4 b)
-			 | sprintf "%s<<%s" (P 4 a) (P 4 b)
-     /\    P pri (W_SHR a b) =
-		pri > 4 => sprintf "(%s>>%s)" (P 4 a) (P 4 b)
-			 | sprintf "%s>>%s" (P 4 a) (P 4 b)
-     /\    P pri (W_ASHR a b) =
-		pri > 4 => sprintf "(%s|>>%s)" (P 4 a) (P 4 b)
-			 | sprintf "%s|>>%s" (P 4 a) (P 4 b)
-     /\    P pri (W_SX sz w) =
-		pri > 0 => sprintf "(SX %s)" (P pri w)
-			 | sprintf "SX %s" (P pri w)
-     /\    P pri (W_ZX sz w) =
-		pri > 0 => sprintf "(ZX %s)" (P pri w)
-			 | sprintf "ZX %s" (P pri w)
-     /\    P pri (W_ITE c t e) =
-		pri > 1 => sprintf "(%s?%s:%s)" (P 1 c) (P 1 t) (P 1 e)
-			 | sprintf "%s?%s:%s" (P 1 c) (P 1 t) (P 1 e)
-     /\    P pri (W_SLICE indices w) =
-		let vec = pr_indices indices then
-		pri > 9 => sprintf "(%s%s)" (P 9 w) vec
-			 | sprintf "%s%s" (P 9 w) vec
-     /\    P pri (W_NAMED_SLICE name indices w) =
-		pri > 9 => sprintf "(%s-->%s)" (P 9 w) name
-			 | sprintf "%s-->%s" (P 9 w) name
-     /\    P pri (W_UPDATE_NAMED_SLICE base name ids w) =
-		letrec get_exprs (W_UPDATE_NAMED_SLICE base name ids w) =
-		    (sprintf "%s ? %s" name (P 10 w)):(get_exprs base)
-		 /\    get_exprs other = [(P 10 other)]
-		in
-		let lines = get_exprs (W_UPDATE_NAMED_SLICE base name ids w) in
-		val (s_base:rem) = rev lines in
-		let max_rem_len = itlist (\s.\m. max m (strlen s)) rem 0 in
-		let rem' = map (sprintf "%-*s\n" (max_rem_len+1)) rem in
-		let pre = sprintf "%s<--" s_base in
-		let sep = sprintf "%*s<--" (strlen s_base) "" in
-		let post = "" in
-		list2str T pre sep post id rem'
-     /\    P pri (W_CAT parts) =
-		let inps = map (P 1) parts then
-		let ivs = md_merge_vectors inps then
-		length ivs = 1 => hd ivs |
-		let in_one = list2str T "{" "," "}" id ivs then
-		strlen in_one <= 10 => in_one |
-		list2str T "{" ",\n" "}" id ivs
-     /\    P pri (W_MEM_READ info mem addr) =
-	    sprintf "%s[%s]" (P pri mem) (P pri addr)
-     /\    P pri (W_MEM_WRITE info mem addr d) =
-	    sprintf "(%s[%s]<-%s)" (P pri mem) (P pri addr) (P pri d)
-    in
-    P 0 rhs
-;
-
-let inp2tcl inps rhs =
-    let i_map = zip inps (1 upto (length inps)) in
-    letrec P ic pri (W_X sz) = sprintf "X[%d:0]" (sz-1)
-     /\    P ic pri (W_CONST sz v) =
-	    v < 16 => int2str v |
-	    sz < 5 OR ((sz % 4) != 0) => sprintf "0b%0*b" sz v
-				       | sprintf "0x%x" v
-     /\    P ic pri (W_NAMED_CONST name sz v) = name
-     /\    P ic pri (W_VAR sz base) =
-		let inp = assoc base i_map in
-		sprintf "i%d" inp
-     /\    P ic pri (W_EXPLICIT_VAR sz base) =
-		let inp = assoc base i_map in
-		sprintf "i%d" inp
-     /\    P ic pri (W_NOT (W_CONST sz v)) =
-		let v' = intNOT v in
-		sz <= 8 => sprintf "%*b" sz v' |
-		v' < 0 => sprintf "~0x%*x" ((sz+3)/4) v |
-		sprintf "0x%*x" ((sz+3)/4) v'
-     /\    P ic pri (W_SLICE indices w) =
-		let vec = pr_indices indices then
-		pri > 9 => sprintf "(%s%s)" (P ic 9 w) vec
-			 | sprintf "%s%s" (P ic 9 w) vec
-     /\    P ic pri (W_NAMED_SLICE name indices w) =
-		pri > 9 => sprintf "(%s-->%s)" (P ic 9 w) name
-			 | sprintf "%s-->%s" (P ic 9 w) name
-     /\    P ic pri (W_CAT parts) =
-		let ss = map (P T 1) parts then
-		ic OR length parts < 2 =>
-		    list2str T "{" "," "}" id ss
-		|
-		    list2str T "{" ",\n" "}" id ss
-     /\   P ic pri other = base_compact_wprint inps rhs
-    in
-    P F 0 rhs
-;
-
 let compact_wprint rhs =
     let inps = get_wbase_names rhs then
     base_compact_wprint inps rhs
-;
-
-let get_binary_draw_cmd (W_EQ  a b)  = "draw_binary_arithm {=}"
- /\ get_binary_draw_cmd (W_NOT (W_EQ a b))  = "draw_binary_arithm {!=}"
- /\ get_binary_draw_cmd (W_GR  a b)  = "draw_binary_arithm {>}"
- /\ get_binary_draw_cmd (W_AND  a b) = "draw_and2"
- /\ get_binary_draw_cmd (W_LAT_LEQ  a b) = "draw_lat_leq"
- /\ get_binary_draw_cmd (W_NOT (W_AND  a b)) = "draw_nand2"
- /\ get_binary_draw_cmd (W_OR  a b)  = "draw_or2"
- /\ get_binary_draw_cmd (W_NOT (W_OR  a b))  = "draw_nor2"
- /\ get_binary_draw_cmd (W_ADD a b)  = "draw_binary_arithm {+}"
- /\ get_binary_draw_cmd (W_SUB a b)  = "draw_binary_arithm {-}"
- /\ get_binary_draw_cmd (W_MUL a b)  = "draw_binary_arithm {*}"
- /\ get_binary_draw_cmd (W_DIV a b)  = "draw_binary_arithm {/}"
- /\ get_binary_draw_cmd (W_MOD a b)  = "draw_binary_arithm {%}"
- /\ get_binary_draw_cmd (W_SHL a b)  = "draw_binary_arithm {<<}"
- /\ get_binary_draw_cmd (W_SHR a b)  = "draw_binary_arithm {>>}"
- /\ get_binary_draw_cmd (W_ASHR a b) = "draw_binary_arithm {|>>}"
- /\ get_binary_draw_cmd other = error "Should not happen"
-;
-
-let is_XOR (W_OR (W_AND (W_NOT a) b) (W_AND c (W_NOT d))) = (a==c) AND (b==d)
- /\ is_XOR (W_OR (W_AND a (W_NOT b)) (W_AND (W_NOT c) d)) = (a==c) AND (b==d)
- /\ is_XOR _ = F
 ;
 
 let dest_XOR (W_OR (W_AND (W_NOT a) b) (W_AND c (W_NOT d))) = [a,b]
  /\ dest_XOR (W_OR (W_AND a (W_NOT b)) (W_AND (W_NOT c) d)) = [a,b]
 ;
 
-let is_LEQ (W_NOT (W_GR a b)) = T
- /\ is_LEQ _ = F;
-
 let dest_LEQ (W_NOT (W_GR a b)) = [a,b];
 
-letrec is_tuple (W_CAT [e1, e2]) =
-    let is_slice (W_SLICE l e) = T
-     /\ is_slice other = F
-    in
-    (is_slice e1 OR is_tuple e1) AND
-    (is_slice e2 OR is_tuple e2)
- /\    is_tuple other = F
-;
-
-let tuple2tcl inps e =
-    letrec match (W_CAT [e,f]) = match e @ match f
-     /\    match (W_SLICE l e) = match e
-     /\    match other = [other]
-    in
-    let es = setify (match e) in
-    length es != 1 => error "Not a pair operator" |
-    let expr = hd es in
-    letrec cat2tuple top (W_CAT [e1, e2]) =
-        let s1 = cat2tuple T e1 in
-        let s2 = cat2tuple F e2 in
-        top => sprintf "(%s, %s)" s1 s2 | sprintf "%s, %s" s1 s2
-    /\     cat2tuple top other = inp2tcl inps other
-    in
-    let clean (W_ITE c t e) =
-        let sc = sprintf "IF %s THEN" (inp2tcl inps c) in
-        let st = cat2tuple T t in
-        let se = cat2tuple T e in
-	let lc = strlen sc in
-	let lt = strlen st in
-	let le = strlen se in
-	let l = max (max lc lt) le in
-	sprintf "%-*s\n%-*s\n%-*s\n%-*s" (l+3) sc l st (l+3) "ELSE" l se
-     /\ clean other = cat2tuple T other
-    in
-    clean expr
-;
-
-
-let opt_base_compact_wprint inps rhs =
-    let special (W_ADD var (W_CONST sz v)) assuming (is_var var AND v < 10) =
-	sprintf "draw_unary_arithm {+%d}" v
-     /\ special (W_SUB var (W_CONST sz v)) assuming (is_var var AND v < 10) =
-	sprintf "draw_unary_arithm {-%d}" v
-     /\ special (W_EQ var (W_CONST sz v)) assuming (is_var var AND v < 10) =
-	sprintf "draw_unary_arithm {=%d}" v
-     /\ special (W_NOT (W_EQ var (W_CONST sz v)))
-		assuming (is_var var AND v < 10) =
-	sprintf "draw_unary_arithm {!=%d}" v
-     /\ special (W_EQ var (W_CONST sz v)) assuming (is_var var) =
-	sprintf "draw_hfl {=0x%x}" v
-     /\ special (W_PRED name cond) =
-	sprintf "draw_predicate %s %d" name (length inps)
-     /\ special (W_ITE var1 var2 var3) assuming (is_vars [var1,var1,var3]) =
-	"draw_ite"
-     /\ special (W_NOT var) assuming (is_var var) =
-	"draw_inverter"
-     /\ special var assuming (is_var var) =
-	"draw_buffer"
-     /\ special (W_NAMED_SLICE name indices var) assuming (is_var var) =
-	sprintf "draw_field %s" name
-     /\ special (W_SX sz (W_VAR ssz name)) = "draw_unary_arithm {SX}"
-     /\ special (W_ZX sz (W_VAR ssz name)) = "draw_unary_arithm {ZX}"
-     /\ special (W_SX sz (W_EXPLICIT_VAR ssz name)) = "draw_unary_arithm {SX}"
-     /\ special (W_ZX sz (W_EXPLICIT_VAR ssz name)) = "draw_unary_arithm {ZX}"
-     /\ special op assuming (is_XOR op) = "draw_xor2"
-     /\ special op assuming (is_LEQ op) = "draw_binary_arithm {<=}"
-     /\ special op assuming (is_binary_base op) = get_binary_draw_cmd op
-     /\ special op assuming (is_tuple op) =
-	(sprintf "draw_hfl {%s}" (tuple2tcl inps op)) catch
-	let body = base_compact_wprint inps rhs then
-	sprintf "draw_hfl {%s}" body
-     /\ special other =
-	let body = base_compact_wprint inps rhs then
-	sprintf "draw_hfl {%s}" body
-    in
-    special rhs
-;
-
-
-let mk_draw_cmd phase_delay rhs =
-    let inps = get_wbase_names rhs then
-    inps = [] =>
-	let special (W_NAMED_CONST name sz v) =
-		sprintf "draw_constant {%s}" name
-	 /\ special (W_X sz) =
-		sprintf "draw_constant {X[%d:0]}" (sz-1)
-	 /\ special (W_CONST sz v) =
-	    v < 16 => sprintf "draw_constant %d" v |
-	    sz < 5 OR ((sz % 4) != 0) => sprintf "draw_constant 0b%0*b" sz v
-				       | sprintf "draw_constant 0x%x" v
-	 /\ special rhs =
-		let body = inp2tcl inps rhs then
-		sprintf "draw_hfl {%s}" body
-	in
-	special rhs
-    |
-    let base = opt_base_compact_wprint inps rhs then
-    NOT phase_delay => base | sprintf "draw_phase_delay_on_output {%s}" base
-;
 
 let is_wide_OR e  =
     letrec cnt (W_OR a b) = 1 + cnt a + cnt b
@@ -3443,6 +3124,19 @@ let re_ff_en_reset_mux =
         q <- (IF (en '&' ('~' reset)) THEN d ELSE qtmp)
 ];
 
+// A rising edge D flip-flop with enable and synchronous reset (active high) and bypass mux.
+let re_ff_en_sreset_mux =
+    bit_input	clk.
+    bit_input	en.
+    bit_input	reset.
+    input	d.
+    output	q.
+    internal    qtmp.
+    // Should use different drawing symbol....
+    CELL "draw_hier re_ff_en_reset_mux" [
+	re_ff_en_sreset clk en reset d qtmp,
+        q <- (IF (en '&' ('~' reset)) THEN d ELSE qtmp)
+];
 
 
 let is_HIER (P_HIER _) = T

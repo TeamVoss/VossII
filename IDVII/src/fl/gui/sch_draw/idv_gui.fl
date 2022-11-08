@@ -767,6 +767,7 @@ let fl_do_new_tranf canvas =
     let vfsm = w2vfsm canvas then
     let w = vfsm2id vfsm then
     let il = get_selected_pinsts canvas then
+    il = [] => () |
     let parent = get_idv_current_pexlif canvas then
     // This code relies on fold_pexlif putting the new instance first!!!!
     let p' = fold_pexlif parent il "_TMP_" then
@@ -1072,12 +1073,25 @@ let create_verilog_load_file basename file pexlif_file =
     load_file
 ;
 
-let do_osu018_synthesis file bname pexlif_file p synth_args =
+let synth_args_ref = ref {[] :: (string#string) list};
+let synth_script_ref   = ref {[]:: string list};
+
+let get_synth_opt key =
+    (assoc key (deref synth_args_ref)) catch
+    eprintf "Failed to find synthesis option '%s'\n" key
+;
+
+
+let fl_get_synthesis_script_dir {dummy::void} =
+    sprintf "%s/yosys_scripts" DIR
+;
+export_to_tcl fl_get_synthesis_script_dir;
+
+let do_synthesis file bname pexlif_file p synth_type synth_script =
     let cw = tcl_eval ["idv:make_info_window 0"] then
     let info_cmd = "echo 'Clean and write out synthesis friendly Verilog'\n" in
     val (status, _, _) = gui_exec cw "Prepare for synthesis" info_cmd then
     status = "SIGKILL" => "" |
-    let lib_dir = DIR^"../../../../lib/osu018_stdcells/" then
     // Rename Verilog hierarchy to sane names
     // Toplevel name is `bname`
     let p' = make_anon_names bname p then
@@ -1092,22 +1106,19 @@ let do_osu018_synthesis file bname pexlif_file p synth_args =
     let cmd = sprintf "sed -f %s < %s > %s.v" edit_file pre_v_file file then
     (system cmd) != 0 => eprintf "System command |%s| failed\n" cmd |
     // Create a yosys synthesis script for this Verilog file
+    (synth_args_ref := [
+	    ("basename", bname),
+	    ("file",	 file),
+	    ("flatten",  (synth_type = "Flat" => "flatten" | "")),
+	    ("libdir", DIR^"../../../../lib/osu018_stdcells/")]) fseq
+    (load (sprintf "%s/%s.fl" (fl_get_synthesis_script_dir ()) synth_script))
+    seq
     let fp = mktemp "yosys_script" then
     let yosys_file = stream2filename fp then
-    (fprintf fp "read_verilog %s.v\n" file) seq
-    (fprintf fp "hierarchy -top %s\n" bname) seq
-    ((mem "Flat" synth_args) => (fprintf fp "flatten\n") | ()) seq
-    (fprintf fp "synth -top %s\n" bname) seq
-    (fprintf fp "dfflibmap -liberty %sosu018_stdcells.lib\n" lib_dir) seq
-    (fprintf fp "dfflegalize -cell $_DFF_P_ x\n") seq
-    (fprintf fp "abc -liberty %s/osu018_stdcells.lib -keepff\n" lib_dir) seq
-    (fprintf fp "clean\n") seq
-    (fprintf fp "autoname\n") seq
-    (fprintf fp "clean -purge\n") seq
-    (fprintf fp "write_pexlif -noalias -icells -gates ") seq
-    (fprintf fp "-impltf %s.fl\n" file) seq
+    let script = deref synth_script_ref then
+    (list2fp fp T "" "" "" (\fp.\s. fprintf fp "%s\n" s) script) fseq
     (fclose fp) seq
-    // Now run Yosys to synthesize and map the design to the osu018 library
+    // Now run Yosys 
     let cmd = sprintf "yosys -s %s" yosys_file then
     let cw = tcl_eval ["idv:make_info_window 0"] then
     val (status, emsg, logfile) = gui_exec cw "Yosys synthesis" cmd then
@@ -1132,6 +1143,20 @@ let do_osu018_synthesis file bname pexlif_file p synth_args =
     (fclose fp) seq
     (file^"_load.fl")
 ;
+
+let fl_do_synthesis canvas file basename synth_type synth_script =
+    let vfsm = w2vfsm canvas then
+    let pexlif_file = sprintf "%s/pexlifs/%s.pexlif"
+			      (get_idv_db_dir ()) (clean_name basename)
+    then
+    let p = get_idv_current_pexlif canvas then
+    let load_file =
+	    do_synthesis file basename pexlif_file p synth_type synth_script
+    then
+    load_file = "" => ["-", "-"] |
+    [pexlif_file, load_file]
+;
+export_to_tcl fl_do_synthesis;
 
 
 let fl_run_fl_loader file =
@@ -1169,9 +1194,6 @@ let fl_make_template canvas type file basename create {synth_args::string list} 
 	      (fclose fp)
 	    ) fseq
 	    load_file
-	|
-	type = "synthesis" =>
-	    do_osu018_synthesis file basename pexlif_file p synth_args
 	|
 	eprintf "Unknown template type (%s)" type
     then
@@ -1222,22 +1244,34 @@ export_to_tcl fl_bdd_var_order;
 
 // Function to compute a unique parametric representation
 let unique_param pvec =
-    // Make all variables current and extract the parametric vars
-    let c_pvec = bdd_next2current pvec then
-    let pvars = depends c_pvec then
-    // Now recursively make the pvec canonical
-    letrec clean i (v:vs) cond =
-        let nv = bdd_current2next (variable ("$"^(int2str i))) then
-        let H = Quant_thereis pvars (cond AND v) then
-        let L = Quant_thereis pvars (cond AND NOT v) then
-        let bit = nv => H | NOT L then
-        let cond' = cond AND (bit = v) then
-        // Try to simplify cond' if no further dependencies are needed
-        let pv = (pvars intersect (depends [cond'])) subtract (depends vs) then
-        let cond'' = Quant_thereis pv cond' then
-        bit:(clean (i+1) vs cond'')
-     /\    clean i [] cond = [] in
-    clean 1 c_pvec T
+    let base_unique_param pvec =
+	// Make all variables current and extract the parametric vars
+	let c_pvec = bdd_next2current pvec then
+	let pvars = depends c_pvec then
+	// Now recursively make the pvec canonical
+	letrec clean i (v:vs) cond =
+	    let nv = bdd_current2next (variable ("$"^(int2str i))) then
+	    let H = Quant_thereis pvars (cond AND v) then
+	    let L = Quant_thereis pvars (cond AND NOT v) then
+	    let bit = nv => H | NOT L then
+	    let cond' = cond AND (bit = v) then
+	    // Try to simplify cond' if no further dependencies are needed
+	    let pv =
+		(pvars intersect (depends [cond'])) subtract (depends vs)
+	    then
+	    let cond'' = Quant_thereis pv cond' then
+	    bit:(clean (i+1) vs cond'')
+	 /\    clean i [] cond = [] in
+	clean 1 c_pvec T
+    in
+    let ipvec = map_index (\i.\r. i,r) pvec then
+    let ps = partition snd ipvec then
+    let u_pvec = map (\l. snd (hd l)) ps then
+    let u_res = base_unique_param u_pvec then
+    let expand (l,res) = map (\(i,_). i, res) l in
+    let result = flatmap expand (zip ps u_res) then
+    let pcmp (i1,_) (i2,_) = i1-i2 in
+    map snd (qsort pcmp result)
 ;
 
 let mk_HLs_unique HLs =
@@ -1361,7 +1395,9 @@ let BDD_EQ p1 p2 order_file =
     let fp = fopen fl_f "w" then
     (fprintf fp "(update_vossrc \"RECURSION-CALL-LIMIT\" \"%s\") seq ();\n"
 		(get_vossrc "RECURSION-CALL-LIMIT")) fseq
-    (order_file != "" => (fprintf fp "load \"%s\";\n" order_file) | ()) fseq
+    (((order_file = "") OR (order_file = "{}")) => () |
+		fprintf fp "load \"%s\";\n" order_file 
+    ) fseq
     (fprintf fp "%s\n" BDD_remote_types) fseq
     (fprintf fp "val (REMOTE_BDD_REQ f) = read_remote_bdd_req \"%s\";\n" req_f)
     fseq
@@ -2275,7 +2311,7 @@ let remove_wire p il =
     // This code relies on fold_pexlif putting the new instance first!!!!
     let p' = fold_pexlif p il "_TMP_" then
     val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p' in
-    let block = hd cs then
+    let block = wrap_pexlif (hd cs) then
     let remain = tl cs then
     has_state block => eprintf "Selection is not all wires" |
     let inps = pexlif_get_inps_actuals block in
@@ -2294,7 +2330,7 @@ let remove_wire p il =
 	|
 	(o, v)
     in
-    let sub = map mk_sub outs then
+    let sub = map mk_sub (md_expand_vectors outs) then
     let rename1 (PINST sname sattrs slf sfa_inps sfa_outs sints sbody) =
 	let rename_act (f,as) =
 	    let eas = map (\a. (assoc a sub) catch a) (md_expand_vectors as) in

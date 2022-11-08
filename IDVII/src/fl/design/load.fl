@@ -2,7 +2,6 @@
 // Copyright 2020 Carl-Johan Seger
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
-
 (cload (DIR^"/misc.fl")) fseq
 fprintf stdinfo ".";
 (cload (DIR^"/util.fl")) fseq

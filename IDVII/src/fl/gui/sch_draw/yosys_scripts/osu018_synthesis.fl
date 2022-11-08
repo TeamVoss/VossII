@@ -1,0 +1,49 @@
+synth_script_ref :=
+    let basename = get_synth_opt "basename" then
+    let file = get_synth_opt "file" then
+    let flatten = get_synth_opt "flatten" then
+    let libdir = get_synth_opt "libdir" then
+    <{
+
+read_verilog `file`.v
+hierarchy -top `basename`
+
+`flatten`
+
+proc
+opt_expr
+opt_clean
+check
+opt -nodffe -nosdff
+fsm
+opt -nodffe -nosdff
+wreduce
+peepopt
+opt_clean
+alumacc
+share
+opt -nodffe -nosdff
+memory -nomap
+opt_clean
+opt -nodffe -nosdff -full
+memory_map
+opt -nodffe -nosdff -full
+techmap
+opt -nodffe -nosdff -fast
+abc -fast
+opt -nodffe -nosdff -fast
+hierarchy -check
+stat
+check
+
+dfflibmap -liberty `libdir`/osu018_stdcells.lib
+dfflegalize -cell $_DFF_P_ x
+abc -liberty `libdir`/osu018_stdcells.lib -keepff
+clean
+autoname
+clean -purge
+write_pexlif -noalias -icells -gates -impltf `file`.fl
+
+}> "functor"
+;
+

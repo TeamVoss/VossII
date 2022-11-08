@@ -1,0 +1,23 @@
+synth_script_ref :=
+    let basename = get_synth_opt "basename" then
+    let file = get_synth_opt "file" then
+    let flatten = get_synth_opt "flatten" then
+    let libdir = get_synth_opt "libdir" then
+    <{
+
+read_verilog `file`.v
+hierarchy -top `basename`
+
+`flatten`
+
+synth -top `basename`
+
+clean
+autoname
+clean -purge
+
+write_pexlif -noalias -icells -gates -impltf `file`.fl
+
+}> "functor"
+;
+

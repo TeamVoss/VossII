@@ -691,8 +691,15 @@ proc idv:make_template {w c type args} {
 		cancel  {return}
 	    }
 	}
-	val {pexlif_file load_file} \
-	    [fl_make_template $c $type $file $base $create_file [list $args]]
+	if { $type == "synthesis" } {
+	    val {pexlif_file load_file} [fl_do_synthesis $c $file $base	      \
+						     $::idv(synthesis_type)   \
+						     $::idv(synthesis_script)]
+	} else {
+	    val {pexlif_file load_file} \
+		[fl_make_template $c $type $file $base $create_file]
+	}
+
 	if { $pexlif_file == "-" } {
 	    set ::idv(fev_imp_file) ""
 	} else {
@@ -774,16 +781,30 @@ proc idv:do_fev {ww} {
 
     labelframe $w.f2b -relief groove -text Synthesis
     pack $w.f2b -side top -fill x -pady 10
-	ttk::labelframe $w.f2b.lbl -relief flat -text \
+	ttk::labelframe $w.f2b.lbl1 -relief flat -text \
 		"Synthesis type: " \
 		-labelanchor w
 	tk_optionMenu $w.f2b.type ::idv(synthesis_type) \
 		Flat Hierarchical
 	set ::idv(synthesis_type) Flat
+
+	ttk::labelframe $w.f2b.lbl2 -relief flat -text \
+		"Script: " \
+		-labelanchor w
+	set synthesis_scripts_dir [fl_get_synthesis_script_dir ""]
+	catch {unset synthesis_scripts}
+	foreach f [glob -directory $synthesis_scripts_dir "*.fl"] {
+	    lappend synthesis_scripts [file rootname [file tail $f]]
+	}
+	eval tk_optionMenu $w.f2b.scripts ::idv(synthesis_script) \
+		$synthesis_scripts
+
 	button $w.f2b.synth -text "Synthesize" -command \
-	    "idv:make_template $w $ww.c synthesis $::idv(synthesis_type)"
-	pack $w.f2b.lbl -side left -padx 5
+	    "idv:make_template $w $ww.c synthesis"
+	pack $w.f2b.lbl1 -side left -padx 5
 	pack $w.f2b.type -side left -padx 5
+	pack $w.f2b.lbl2 -side left -padx 5
+	pack $w.f2b.scripts -side left -padx 5
 	pack $w.f2b.synth -side right -padx 5
 
     labelframe $w.f3 -relief groove -text Implementation

@@ -806,23 +806,16 @@ let pexlif2verilog_end {dummy::void} = (deref module_store_descr_list_ref);
 non_lazy pexlif2verilog_end;
 
 
-let DBG_p = ref {(error "not yet"):: pexlif};
-let DBG_needle = ref {(error "not yet"):: pexlif};
-let DBG_c = ref {(error "not yet"):: pexlif};
-
 let find_insert_module netlist p i =
     p fseq
-(DBG_p := p) fseq
     val (PINST name attrs lf fa_inps fa_outs ints body) = p then
     let p_ios = fa_inps@fa_outs then
     let instance_name = sprintf "inst_%d" i then
     let sig = pexlif_get_FP p then
     let needle = wrap_pexlif p then
-(DBG_needle := needle) fseq
     let cur_tbl = deref module_store_tbl_ref then
     let candidates = (tbl_get cur_tbl sig) catch [] then
     letrec search ((c,module_name):rem) =
-(DBG_c := c) fseq
         let raw_matches = isomatch needle c then
         raw_matches = [] => search rem |
 	length raw_matches > 1 => eprintf "More than one raw_matches!" |
