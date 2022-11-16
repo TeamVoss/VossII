@@ -1,5 +1,9 @@
 load "idv.fl";
 
+NOT noX =>
+    eprintf "new_make_arithmetic_db.fl should be evaluated in -noX mode" | ()
+;
+
 let models_todo = ref {[]:: (string#pexlif) list};
 let thms_todo   = ref {[]:: (string#(string#string)) list};
 
@@ -315,6 +319,15 @@ let do_import_model sz (name,w_p) =
     import_model name' p
 ;
 
+let a_vars = md_expand_vector "a[6:0]";
+let b_vars = md_expand_vector "b[6:0]";
+let c_vars = md_expand_vector "c[6:0]";
+let n_vars = md_expand_vector "n[6:0]";
+var_order (interleave [a_vars, b_vars, c_vars, n_vars]);
+
+// Evaluate this in the current process (much faster since many small runs)
+use_separate_process_evaluation_r := F;
+
 let make_theorem sz (transform_name, spec_name, imp_name) =
     let try_assoc n l =
 	(assoc n l) catch eprintf "Cannot find model %s." n
@@ -324,7 +337,9 @@ let make_theorem sz (transform_name, spec_name, imp_name) =
     let w_imp  = try_assoc imp_name models then
     let spec = resize_pexlif sz w_spec then
     let imp  = resize_pexlif sz w_imp then
-    NOT (sz > 6 OR ((BDD_EQ (wrap_pexlif spec) (wrap_pexlif imp)) == T)) =>
+    NOT (sz > 6 OR
+	 ((BDD_EQ (wrap_pexlif spec) (wrap_pexlif imp) "") == T))
+	=>
 	eprintf "===========\nClaim %s is not valid!\n" transform_name
     |
     let signature = pexlif_get_FP spec then
@@ -341,22 +356,22 @@ let make_theorem sz (transform_name, spec_name, imp_name) =
 
 let make_models_and_theorems sz =
     // Store all models instantiated to size sz
+    (fprintf stdinfo
+	    "\n========== make_models_and_theorems for size %d ==========\n" sz)
+    seq
     (foreach (do_import_model sz) (deref models_todo)) fseq
     (foreach (make_theorem sz) (deref thms_todo))
 ;
 
 
-let a_vars = md_expand_vector "a[6:0]";
-let b_vars = md_expand_vector "b[6:0]";
-let c_vars = md_expand_vector "c[6:0]";
-let n_vars = md_expand_vector "n[6:0]";
-var_order (interleave [a_vars, b_vars, c_vars, n_vars]);
-
+let MIN_SZ = 1;
 let MAX_SZ = 100;
+//let MIN_SZ = 3;
+//let MAX_SZ = 8;
 
 system "/bin/rm -rf DB_arithm";
 IDV "DB_arithm" [];
-foreach make_models_and_theorems (1 upto MAX_SZ);
+foreach make_models_and_theorems (MIN_SZ upto MAX_SZ);
 
 fl_save_idv_db "exit";
 

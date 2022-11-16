@@ -28,9 +28,16 @@ There is also a more extensive
 Installation
 ------------
 
-Download our
+For some major parts of VossII functionality (e.g., importing Verilog files
+and interface with synthesis tools), VossII relies on tools from the OSS CAD Suite (https://github.com/YosysHQ/oss-cad-suite-build) and thus a prerequisite to unlock all features of VossII is to have a version of oss-cad-suite installed on your machine.
+You can get a ready to use version of oss-cad-suite at (https://github.com/YosysHQ/oss-cad-suite-build/releases).
+Follow the instructions in (https://github.com/YosysHQ/oss-cad-suite-build) to
+get a version.
+
+
+To get VossII, the simplest is to download our
 [pre-built binaries](https://github.com/TeamVoss/VossII/releases/latest)
-and unpack them to your directory of choice, then put <installation-directory>/bin in your search path and you will be able to run the fl interpreter by simply invokng fl. Note that you need the <voss dir>/bin in your search path for the Verilog reader to work, and it must be earlier than any paths containing other versions of yosys!
+and unpack them to your directory of choice, then put <installation-directory>/bin in your search path and you will be able to run the fl interpreter by simply invokng fl. Note that you need the OSS version of yosys in your search path for the Verilog reader to work.
 
 
 Voss II depends on Tk for its graphical bits. If the fl interpreter dies with
@@ -57,8 +64,8 @@ build dependencies:
 
 ```shell
 sudo apt-get install gcc g++ doxygen flex bison gawk \
-                     libz-dev tcl-dev tk-dev libc6-dev \
-                     clang libreadline-dev python3 imagemagick pandoc
+                     libz-dev tcl-dev tk-dev libc6-dev
+                     
 ```
 
 Then, from the root of the VossII repository (assuming you've already

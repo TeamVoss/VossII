@@ -1,0 +1,18 @@
+let implies a b = (NOT a) OR b;
+infixr 5 implies;
+
+VARS "a b c d e p q";
+let transitions = AND_list
+  [ (a implies b)
+  , (a implies c)
+  , (b implies d)
+  , (d implies b)
+  , (d implies e)
+  , (p implies q)
+  ];
+
+let reachable s t =
+  Quant_forall (depends transitions) (transitions implies (s implies t));
+
+reachable a d;
+reachable a q;

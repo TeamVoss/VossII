@@ -1,0 +1,3 @@
+let capitalize s = (chr ((ord (string_hd s))+(ord "A")-(ord "a")))^(string_tl s);
+let classify name type = sprintf "%s is a %s" (capitalize name) type;
+map2 classify ["john", "anna", "betsy", "bob"] ["boy","girl","girl","boy"];

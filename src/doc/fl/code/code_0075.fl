@@ -1,0 +1,6 @@
+// Read the old value
+get_vossrc "DYNAMIC-ORDERING";
+// Update the value
+update_vossrc "DYNAMIC-ORDERING" "NO";
+// Read the new value
+get_vossrc "DYNAMIC-ORDERING";

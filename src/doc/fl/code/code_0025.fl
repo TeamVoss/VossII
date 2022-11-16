@@ -1,0 +1,4 @@
+let conv i = sprintf "%0*b is the same as %x or %d\n" 16 i i i;
+conv 2;
+conv 142;
+conv (-142);

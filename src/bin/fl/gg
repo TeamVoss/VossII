@@ -1,0 +1,6 @@
+set pagination off
+break Rand_Var
+r -noX -f bugs/b194.fl
+set dbg_my_stop = 1
+break nbr_succ_overload_res
+c

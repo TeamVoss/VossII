@@ -1,0 +1,469 @@
+load "ste.fl";
+
+
+forward_declare {M:: int-> int};
+
+letrec F 0 = 1
+ /\    F n = n - M (F (n-1))
+;
+
+letrec M 0 = 0
+ /\    M n = n - F (M (n-1))
+;
+
+F 10;
+
+map F (1--20);
+
+
+forward_declare {foo:: int list -> int};
+
+let foo l = 1 + length l;
+
+foo [1];
+
+
+TYPE "byte" 8;
+TYPE "addr" 8;
+TYPE "pc" 29;
+{'a::byte};
+{'a::addr};
+{'a::pc};
+
+{'1::byte} '+' {'2::byte};
+//{'1::byte} '+' {'2::addr};
+
+
+ENUM "op" ["ADD", "JMP", "NOP"];
+ENUM "state" [("INIT", 1), ("FETCH", 2), ("EXECUTE", 4), ("WB", 8)];
+{'a::op};
+{'a::state};
+ADD;
+NOP;
+INIT;
+WB;
+
+//ADD '+' JMP;
+
+
+STRUCT "bundle" [("high","byte"),("low","byte")];
+
+STRUCT "opcode" 32 [
+		    ("opcode", "op", [31,29]),	// Non-contigous!
+		    ("dest", "addr", (23--16)),
+		    ("src1", "addr", (15--8)),
+		    ("src2", "addr", (7--0)),
+		    ("target", "pc", (28--0))
+		    ]
+;
+
+'a<--high ? '0xab;
+
+'a<--high ? '0xab <-- low ? '0xba;
+
+'a-->opcode;
+'a-->dest;
+'a-->target;
+
+MEMORY "regfile" [(10,"addr")] "byte";
+
+{'a::regfile};
+
+read_regfile 'a '0x3;
+
+write_regfile 'a '0x0 '0xab;
+
+write_regfile 'a '0x3 'd;
+
+
+MEMORY "array" [(4,"addr"),(5,"addr")] "byte";
+
+{'a::array};
+
+read_array 'a '0x3 '0x1;
+
+write_array 'a '0x0 '0x0 '0xab;
+
+write_array 'a '0x3 '0x2 'd;
+
+
+
+
+({'a::byte} '>>' '0x1) '<<' '2;
+
+let abs x y = IF (x '>' y) THEN x ELSE y;
+
+let add3 =
+    byte_input      a.
+    byte_input      b.
+    byte_input      c.
+    byte_output     o.
+    byte_internal   m.
+    CELL "draw_hier add3" [
+        m <- a '+' b,
+        o <- m '+' c
+];
+
+let add9 =
+    byte_input      i1 i2 i3 i4 i5 i6 i7 i8 i9.
+    byte_output     o.
+    byte_internal   m1 m2 m3.
+    CELL "draw_hier add6" [
+        add3 i1 i2 i3 m1,
+        add3 i4 i5 i6 m2,
+        add3 i7 i8 i9 m3,
+        add3 m1 m2 m3 o
+];
+
+let add3 =
+    input      a.
+    input      b.
+    input      c.
+    output     o.
+    internal   m.
+    CELL "draw_hier add3" [
+        m <- a '+' b,
+        o <- m '+' c
+];
+
+let add9 =
+    input      i1 i2 i3 i4 i5 i6 i7 i8 i9.
+    output     o.
+    internal   m1 m2 m3.
+    CELL "draw_hier add6" [
+        add3 i1 i2 i3 m1,
+        add3 i4 i5 i6 m2,
+        add3 i7 i8 i9 m3,
+        add3 m1 m2 m3 o
+];
+
+//add9 {'0::byte} '1 '2 '3 '4 '5 '6 '7 '8 'res;
+
+
+letrec add_list =
+    list_input	il.
+    output	o.
+    internal	m.
+    CELL "draw_hier add_list" (
+	length il = 1 => [o <- (hd il)] |
+	[
+	    add_list (tl il) m,
+	    o <- (hd il) '+' m
+	]
+);
+
+//STE_debug (pexlif2fsm (add_list [{'a::byte},'b,'c,'d,'e,'f,'g,'h,'i] 'o));
+
+
+letrec add_tree =
+    list_input	il.
+    output	o.
+    internal	m1 m2.
+    CELL "draw_hier add_tree" (
+	let l = length il in
+	l = 1 => [o <- (hd il)] |
+	let high = firstn (l/2) il in
+	let low  = butfirstn (l/2) il in
+	[
+	    add_tree high m1,
+	    add_tree low m2,
+	    o <- m1 '+' m2
+	]
+);
+
+let add9 =
+    input      i1 i2 i3 i4 i5 i6 i7 i8 i9.
+    output     o.
+    CELL "draw_hier add_tree" [
+	add_tree [i1, i2, i3, i4, i5, i6, i7, i8, i9] o
+];
+
+let add2 =
+    input      a b.
+    output     r.
+    CELL "draw_hier add_tree" [
+	add_tree [a, b] r
+];
+
+
+let flatten_pexlif stop_pred p =
+    letrec do_flat sub pref p =
+	let tr n = (assoc n sub) catch n in
+	val (PINST name attrs leaf fa_inps fa_outs ints content) = p in
+	leaf OR stop_pred p => 
+	    let tr_io (f,as) =
+		let as' = md_merge_vectors (map tr (md_expand_vectors as)) in
+		(f,as')
+	    in
+	    let fa_inps' = map tr_io fa_inps in
+	    let fa_outs' = map tr_io fa_outs in
+	    [(PINST name attrs leaf fa_inps' fa_outs' ints content)]
+	|
+	    val (P_HIER children) = content in
+	    let mk_io_sub (f,as) =
+		zip (md_expand_vector f) (map tr (md_expand_vectors as))
+	    in
+	    let io_sub = flatmap mk_io_sub (fa_inps @ fa_outs) in
+	    let mk_int_sub f =
+		map (\n. n, sprintf "%s%s" pref n) (md_expand_vector f)
+	    in
+	    let int_sub = flatmap mk_int_sub ints in
+	    let sub' = io_sub @ int_sub in
+	    let prefs = map (sprintf "%si%d/" pref) (1 upto length children) in
+	    flat (map2 (do_flat sub') prefs children)
+    in
+    let children = do_flat [] "" p in
+    let wires_used (PINST _ _ _ fa_inps fa_outs _ _) =
+	md_expand_vectors (flatmap snd (fa_inps @ fa_outs)) 
+    in
+    let all = setify (flatmap wires_used children) in
+    val (PINST name attrs _ fa_inps fa_outs _ _) = p in
+    let ios = md_expand_vectors (flatmap snd (fa_inps @ fa_outs)) in
+    let new_ints = md_extract_vectors (all subtract ios) in
+    (PINST name attrs F fa_inps fa_outs new_ints (P_HIER children))
+;
+
+let is_draw_leaf p =
+    val (PINST name _ _ _ _ _ _) = p in
+    (str_is_prefix "draw_" name) AND NOT (str_is_prefix "draw_hier" name)
+;
+
+
+//let p = add2 {'a::byte} 'b 'r;
+
+//flatten_pexlif is_draw_leaf p;
+
+//STE_debug (pexlif2fsm (flatten_pexlif is_draw_leaf p));
+
+
+
+
+let p = 
+    PINST "top" [] F [("a",["a"])] [("o",["o"])] ["tm"] (P_HIER [
+	//
+	PINST "a"  [] F [("a",["a"])] [("o",["tm"])] ["m"] (P_HIER [
+	    PINST "draw_not"  [] T [("i",["a"])] [("j",["m"])] ["i"]
+			    (P_LEAF []),
+	    PINST "draw_not"  [] T [("i",["m"])] [("j",["o"])] ["i"]
+			    (P_LEAF [])
+	]),
+	//
+	PINST "b"  [] F [("a",["tm"])] [("o",["o"])] ["m"] (P_HIER [
+	    PINST "draw_not"  [] T [("i",["a"])] [("j",["m"])] ["i"]
+			    (P_LEAF []),
+	    PINST "draw_not"  [] T [("i",["m"])] [("j",["o"])] ["i"]
+			    (P_LEAF [])
+	])
+    ])
+;
+//p;
+
+//flatten_pexlif p;
+
+
+//STE_debug (pexlif2fsm ((add9 {'i1::byte}'i2 'i3 'i4 'i5 'i6 'i7 'i8 'i9 'o)));
+//STE_debug (pexlif2fsm (flatten_pexlif is_draw_leaf ((add9 {'i1::byte}'i2 'i3 'i4 'i5 'i6 'i7 'i8 'i9 'o))));
+
+
+ENUM "fsm"  ["IDLE", "REQ", "MISS", "UPDATE", "HIT"];
+
+
+let fsm_example =
+    bit_input	    clk reset.
+    bit_input	    req.
+    bit_input	    hit.
+    bit_input	    valid.
+    bit_output	    need_data.
+    bit_output	    ready.
+    //
+    fsm_internal    state.
+    CELL "draw_hier CACHE" [
+	(Moore_FSM "CACHE_FSM" clk state
+	    (reset, IDLE) [
+		IDLE --- req --- REQ,
+		REQ  --- hit --- HIT,
+		REQ  --- '~' hit --- MISS,
+		MISS --- '~' valid --- MISS,
+		MISS --- valid --- UPDATE,
+		UPDATE --- default --- HIT,
+		HIT  --- default --- IDLE
+	]),
+	need_data <- is_MISS state,
+	ready <- is_HIT state
+];
+
+STE_debug (pexlif2fsm (fsm_example 'clk 'reset 'req 'hit 'valid 'need_data 'ready));
+
+
+%%%%%%%%%%%%%%%%%%%%%
+
+
+
+stopppppppppppp;
+%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
+
+
+
+
+
+
+
+
+let tst =
+    byte_input a b.
+    byte_output res.
+    CELL "aaa" [
+	res <- a '+' b
+];
+
+tst 'a 'b 'res;
+
+flatten_pexlif (tst 'a 'b 'res);
+
+
+
+
+
+
+
+
+
+
+
+letrec number_of_wires (PINST name opts leaf fa_inps fa_outs ints content) =
+    let local = length (md_expand_vectors ints) in
+    leaf => local |
+    itlist (\pp. \r. number_of_wires pp+r) (content_get_children content) local
+;
+
+letrec extract_subckts target p =
+    val (PINST name opts leaf fa_inps fa_outs ints content) = p in
+    str_is_suffix target name => [p] |
+    leaf => [] |
+    flatmap (extract_subckts target) (content_get_children content) 
+;
+	
+
+let get_name p =
+    letrec get p =
+	val (PINST name opts leaf fa_inps fa_outs ints content) = p in
+	leaf => [name] |
+	name:(flatmap get (content_get_children content))
+    in
+    setify (get p)
+;
+
+let p = verilog2pexlif "-Iverilog_examples"
+		       "mux4"
+			["small.v", "small_lib.v"]
+		        []
+;
+
+number_of_wires p;
+
+extract_subckts "not" p;
+
+let ckt = pexlif2fsm p;
+ckt;
+
+inputs ckt;
+outputs ckt;
+
+fanin ckt "mux_out";
+
+fanout ckt "mid01";
+
+let toplevel n = NOT (str_is_substr "/" n);
+
+filter toplevel (fanin_dfs ckt toplevel ["mux_out"]);
+
+node2vector ckt "sel[0]";
+
+
+//
+let top_fanin ckt nd =
+    let toplevel n = NOT (str_is_substr "/" n) in
+    let all_inps = fanin_dfs ckt toplevel [nd] in
+    let top_level_inps = filter toplevel all_inps in
+    top_level_inps subtract [nd]
+;  
+
+top_fanin ckt "moux_out";
+
+
+%%%%%%%%%%%%%%%%%%%%%%
+
+int2bv 1;
+int2bv (-1);
+int2bv 12;
+int2bv (-12);
+bv2int (int2bv (-12));
+bv2list (int2bv (-12));
+list2bv [F,F,F,T,T];
+bv2int (list2bv [F,T,F,T,T,T,F]);
+
+
+{ '1 :: bv};
+{ '-12 :: bv};
+letrec {pow2:: bv -> bv} n = (n = '0) => '1 | '2 * pow2 (n - '1);
+pow2 '6;
+
+
+
+letrec {pow2:: *a -> *a} n = (n = '0) => '1 | '2 * pow2 (n - '1);
+pow2 3;
+pow2 {'3::int};
+pow2 {'3.0::float};
+pow2 {'3::bv};
+pow2 {'3::bev};
+
+
+bv_variable "a[7:0]";
+bv_variable "a[1:0][3:0]";
+bv_constrained_variable "a[7:0]" (\v. '0 < v AND v < '10);
+bv_examples 100 it;
+
+
+bv_constrained_variable "a[8:0]" (\v. v >= '0);
+bv_ZX (bv_variable "a[7:0]");
+
+bv_constrained_variable "a[7:0]" (\v. v >= '0);
+bv_ZX (bv_variable "a[6:0]");
+
+
+bv_constrained_variable "a[1:0][7:0]" (\v. '3 < v AND v < '10);
+
+
+bv2list (int2bv (-12));
+list2bv [F,F,F,T,T];
+fixed_bv2list 16 F '-3;
+fixed_bv2list 16 T '-3;
+
+// Return an integer n if its collatz sequence is longer than n.
+// Otherwise, return 0
+let {large_collatz:: bv -> bv} n =
+    letrec collatz cnt cur = cur = '1 => cnt |
+	    (cur % '2) = '1 => collatz (cnt + '1) ('3 * cur + '1)
+			     | collatz (cnt + '1) (cur / '2)
+    in
+    let res = collatz '0 n in
+    n < res => n | '0
+;
+
+// Try this for integers between 1 and 99.
+let res =
+    large_collatz (bv_constrained_variable "a[7:0]" (\v. '1 <= v AND v < '100))
+;
+
+// Difficult to understand symbolic expression
+res;
+
+// Print out (at most) 100 examples.
+bv_examples 100 res;
+
+

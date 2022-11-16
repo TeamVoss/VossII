@@ -1,0 +1,2 @@
+new_type_abbrev pair = int#int;
+let p = (1,2);

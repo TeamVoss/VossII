@@ -1,0 +1,4 @@
+let add x y = x+2*y;
+add 1 4;
+let f = add 1;
+f 4;

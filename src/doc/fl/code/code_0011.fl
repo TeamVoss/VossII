@@ -1,0 +1,3 @@
+let e1 = a XOR b;
+// If-then-else with symbolic condition.
+e1 => a | b;

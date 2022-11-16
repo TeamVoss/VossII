@@ -1,0 +1,2 @@
+{'1::byte} '+' {'1::byte};  // Ok
+{'1::byte} '+' {'1::addr};  // Fails typechecking

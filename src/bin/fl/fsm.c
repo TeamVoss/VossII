@@ -3825,7 +3825,7 @@ op2str(ncomp_ptr cp)
     if( op == op_X ) return( strtemp("op_X") );
     else if( op == op_CONST ) {
 	strtemp("op_CONST ");
-	return( strappend(Arbi_ToString(cp->arg.value, 16)) );
+	return( strappend(Arbi_ToString(cp->arg.value, 10)) );
     }
     else if( op == op_VAR ) return( strtemp("op_VAR") );
     else if( op == op_AND ) return( strtemp("op_AND") );
@@ -4356,6 +4356,7 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	return TRUE;
     }
     if( is_W_CONST(we,&sz,&value) || is_W_NAMED_CONST(we,&name,&sz,&value) ) {
+	ASSERT(value != NULL);
 	cr.op = op_CONST;
 	cr.size = sz;
 	cr.inps = NULL;
@@ -6317,11 +6318,14 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
 		sprintf(buf, "%s_code %d %d %s",
 			     res, nbr_inputs, inst_cnt, res+len+1);
 	    }
-            pfn = gen_strtemp(sm, buf);
-        } else if(strncmp(vp->pfn, "draw_hier ", 10) == 0) {
+            pfn = gen_strappend(sm, buf);
+        } else if( (match = strstr(vp->pfn, "draw_hier ")) != NULL ) {
             // Replace draw_hier txt with draw_fub txt inst inputs outputs
-            gen_strtemp(sm, "draw_fub ");
-	    gen_strappend(sm, vp->pfn + 10);
+            int len = match-vp->pfn;
+            gen_strtemp(sm, vp->pfn);
+	    gen_strtruncate(sm, len);
+            gen_strappend(sm, "draw_fub ");
+	    gen_strappend(sm, match+10);
             string iname = find_instance_name(attrs);
             if( iname == s_no_instance ) {
                 gen_strappend(sm, " ");

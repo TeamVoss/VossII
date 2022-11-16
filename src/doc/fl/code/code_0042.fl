@@ -1,0 +1,15 @@
+// Original version
+letrec fib 1 = 1
+ /\    fib 2 = 1
+ /\    fib n = fib (n-1) + fib (n-2)
+;
+
+time (fib 30);
+
+// Memoized version
+cletrec fib 1 = 1
+  /\    fib 2 = 1
+  /\    fib n = fib (n-1) + fib (n-2)
+;
+
+time (fib 30);

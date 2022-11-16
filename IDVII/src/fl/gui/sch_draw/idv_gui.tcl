@@ -852,21 +852,24 @@ proc idv:do_fev {ww} {
 	    pack $w.f5.bdd.verify -side left -padx 5 -fill x -expand yes
 	    pack $w.f5.sat.verify -side left -padx 5 -fill x -expand yes
 
-    frame $w.vossframe
+    ttk::notebook $w.vossframe
     pack $w.vossframe -side bottom -fill both -expand yes
+    set ::idv(info_window_cnt) 0
     set ::idv(info_window) $w.vossframe
     set ::idv(ordering_file) ""
 }
 
-proc idv:make_info_window {make_container} {
-    set f $::idv(info_window).f
+proc idv:make_info_window {title make_container} {
+    incr ::idv(info_window_cnt)
+    set f $::idv(info_window).f$::idv(info_window_cnt)
     catch {destroy $f}
     if { $make_container == 1 } {
 	frame $f -relief flat -container yes
     } else {
 	frame $f -relief flat
     } 
-    pack $f -side bottom -expand yes -fill both
+    $::idv(info_window) add $f -text $title
+    $::idv(info_window) select $f
     return $f
 }
 

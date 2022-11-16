@@ -1,0 +1,21 @@
+let implies a b = (NOT a) OR b;
+infixr 5 implies;
+
+VARS "a b c d e p q";
+let transitions = AND_list
+  [ (a implies b)
+  , (a implies c)
+  , (b implies d)
+  , (d implies b)
+  , (d implies e)
+  , (p implies q)
+  ];
+
+let reachable s t = transitions implies (s implies t);
+
+// Reachable: we see a nice, concise T
+reachable a d;
+
+// Not reachable: we get a formula describing the hypothetical conditions
+// under which q WOULD be reachable.
+reachable a q;

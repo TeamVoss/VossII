@@ -1,0 +1,21 @@
+let add3 =
+    input      a.
+    input      b.
+    input      c.
+    output     o.   
+    internal   m.   
+    CELL "draw_hier add3" [
+        m <- a '+' b,
+        o <- m '+' c
+];
+
+let add9 =
+    input      i1 i2 i3 i4 i5 i6 i7 i8 i9.
+    output     o.
+    internal   m1 m2 m3.
+    CELL "draw_hier add6" [
+        add3 i1 i2 i3 m1,
+        add3 i4 i5 i6 m2,
+        add3 i7 i8 i9 m3,
+        add3 m1 m2 m3 o
+];

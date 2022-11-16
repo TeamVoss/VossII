@@ -1,0 +1,1 @@
+lettype card = king | queen | jack | other int;

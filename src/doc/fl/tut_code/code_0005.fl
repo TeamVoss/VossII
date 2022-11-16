@@ -1,0 +1,4 @@
+[1, 2, 3];
+"these" : "are" : "strings" : [];
+
+("a string", ["a", "list"], 42);

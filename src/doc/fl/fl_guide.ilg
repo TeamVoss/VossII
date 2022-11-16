@@ -1,0 +1,7 @@
+This is makeindex, version 2.15 [TeX Live 2015] (kpathsea + Thai support).
+Scanning style file ./my_index_style............done (12 attributes redefined, 0 ignored).
+Scanning input file fl_guide.idx2....done (152 entries accepted, 0 rejected).
+Sorting entries....done (1150 comparisons).
+Generating output file glossary.tex....done (216 lines written, 0 warnings).
+Output written in glossary.tex.
+Transcript written in fl_guide.ilg.

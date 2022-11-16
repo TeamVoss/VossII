@@ -1,0 +1,6 @@
+lettype suit = spades | hearts | clubs | diamonds;
+lettype rank = ace | king | queen | jack | numeric int;
+lettype card = card suit rank;
+
+new_type_abbrev hand = card list;
+let myHand = {[aceOfSpades, twoOfHearts] :: hand};

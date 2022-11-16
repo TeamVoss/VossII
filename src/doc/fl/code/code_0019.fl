@@ -1,0 +1,23 @@
+VARS "s[2:0]";
+
+// Simple forward reachability code
+let image R init =
+    val (next_vars,cur_vars) = split (str_is_suffix "_n") (depends R) in
+    letrec fwd cur =
+	let next = bdd_next2current (Quant_thereis cur_vars (cur AND R)) in
+	let cur' = cur OR next in
+	cur == cur' => cur | fwd cur'
+    in
+    fwd init
+;
+
+// Simple backwards reachability code
+let preimage R init =
+    val (next_vars,cur_vars) = split (str_is_suffix "_n") (depends R) in
+    letrec back cur =
+	let prev = bdd_current2next (Quant_thereis next_vars (cur AND R)) in
+	let cur' = cur OR prev in
+	cur == cur' => cur | back cur'
+    in
+    bdd_next2current (back (bdd_current2next init))
+;

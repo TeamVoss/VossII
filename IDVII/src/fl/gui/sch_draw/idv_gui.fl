@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------
 
 let Init_idv_gui = (tcl_eval [sprintf "source %sidv_gui.tcl" DIR]) fseq ();
-Init_idv_gui;
+NOT noX => Init_idv_gui | ();
 
 let clean_name s =
     let tr c =
@@ -285,7 +285,7 @@ let open_idv_db dir readonly =
 	status = 0 => () |
 	eprintf "FAILURE: %s\n" cmd
     in
-    let full_name = tcl_eval ["file normalize "^dir] then
+    let full_name = normalize_file dir then
     let my_host = hd (snd (exec "hostname")) then
     let my_pid  = pid then
     NOT (file_exists full_name) =>
@@ -484,6 +484,7 @@ let IDV0 rw_database read_only_dbs =
     (open_idv_db rw_database F) fseq
     (foreach (\db. open_idv_db db T) read_only_dbs) fseq
     // Start GUI
+    noX => () |
     let w = get_new_idv_window () then
     (tcl_eval [sprintf "idv:create_idv_gui %s %s" w rw_database]) fseq
     let vfsm = IDV_ENV w (ref []) (ref []) (ref []) (ref []) (ref []) in
@@ -497,6 +498,7 @@ let IDV_dbg p rw_database read_only_dbs =
     (IDV0 rw_database read_only_dbs) fseq
     let name = pexlif_get_name p then
     (import_model name p) fseq
+    noX => () |
     (tcl_eval ["idv:update_idv_list"]) fseq
     ()
 ;
@@ -1075,6 +1077,7 @@ let create_verilog_load_file basename file pexlif_file =
 
 let synth_args_ref = ref {[] :: (string#string) list};
 let synth_script_ref   = ref {[]:: string list};
+let synth_stdcell_names = ref {[]:: string list};
 
 let get_synth_opt key =
     (assoc key (deref synth_args_ref)) catch
@@ -1088,7 +1091,7 @@ let fl_get_synthesis_script_dir {dummy::void} =
 export_to_tcl fl_get_synthesis_script_dir;
 
 let do_synthesis file bname pexlif_file p synth_type synth_script =
-    let cw = tcl_eval ["idv:make_info_window 0"] then
+    let cw = tcl_eval ["idv:make_info_window {Write Verilog} 0"] then
     let info_cmd = "echo 'Clean and write out synthesis friendly Verilog'\n" in
     val (status, _, _) = gui_exec cw "Prepare for synthesis" info_cmd then
     status = "SIGKILL" => "" |
@@ -1111,7 +1114,7 @@ let do_synthesis file bname pexlif_file p synth_type synth_script =
 	    ("file",	 file),
 	    ("flatten",  (synth_type = "Flat" => "flatten" | "")),
 	    ("libdir", DIR^"../../../../lib/osu018_stdcells/")]) fseq
-    (load (sprintf "%s/%s.fl" (fl_get_synthesis_script_dir ()) synth_script))
+    (_load (sprintf "%s/%s.fl" (fl_get_synthesis_script_dir ()) synth_script) F)
     seq
     let fp = mktemp "yosys_script" then
     let yosys_file = stream2filename fp then
@@ -1121,22 +1124,30 @@ let do_synthesis file bname pexlif_file p synth_type synth_script =
     // Now run Yosys 
     let write_pexlif = sprintf "%s../../../../../bin/write_pexlif.so" DIR then
     let cmd = sprintf "yosys -m %s -s %s" write_pexlif yosys_file then
-    let cw = tcl_eval ["idv:make_info_window 0"] then
+    let cw = tcl_eval ["idv:make_info_window Yosys 0"] then
     val (status, emsg, logfile) = gui_exec cw "Yosys synthesis" cmd then
     status = "SIGKILL" => "" |
     status != "0" => eprintf "yosys failed\nSee %s for details" logfile |
     // Now append the loading commands
     let fp = fopen (file^"_load.fl") "w" then
-    (fprintf fp "cload \"osu018_stdcells.fl\";\n") seq
+    (synth_script = "osu018_synthesis" =>
+	(fprintf fp "cload \"osu018_stdcells.fl\";\n")
+    |
+	let pre = "let stdcells = [\n\t" then
+	let cells = deref synth_stdcell_names then
+	let ps fp s = fprintf fp "\"%s\"" s then
+	(list2fp fp T  pre ",\n\t" "\n];\n" ps cells) seq
+	(fprintf fp "cload \"synth_load_file.fl\";\n")
+    ) seq
     (fprintf fp "(update_vossrc \"RECURSION-CALL-LIMIT\" \"100000\") seq ();\n")
     seq
     (fprintf fp "load \"%s.fl\";\n" file) seq
-    (fprintf fp "\n\nlet p = unfold_pexlif (wrap_pexlif (Q%s [(\"instance\", \"%s\")]" bname bname)
-    seq
+    (fprintf fp "\n\nlet p = rename_stdcells (unfold_pexlif (wrap_pexlif ") fseq
+    (fprintf fp "(Q%s [(\"instance\", \"%s\")]" bname bname) fseq
     let pr1 fp (f,as) = list2fp fp T (sprintf "(\"%s\", [" f) ", " "])"
 				(\fp.\a. fprintf fp "\"%s\"" a) as
     in
-    (list2fp fp T "\n\t[" ",\n\t" "\n\t])) 1;\n" pr1 io_sub) fseq
+    (list2fp fp T "\n\t[" ",\n\t" "\n\t])) 1);\n" pr1 io_sub) fseq
     (fprintf fp "\np fseq ();\n") seq
     (fprintf fp "write_pexlif \"%s\" p;\n" pexlif_file) seq
     (fprintf fp "\"===SuCcEsS===\";\n") seq
@@ -1162,7 +1173,7 @@ export_to_tcl fl_do_synthesis;
 
 let fl_run_fl_loader file =
     let cmd = sprintf "fl -noX -unbuf_stdout -F %s" file then
-    let cw = tcl_eval ["idv:make_info_window 0"] then
+    let cw = tcl_eval ["idv:make_info_window {Load result} 0"] then
     val (status, _, _) = gui_exec cw "Load result" cmd then
     status
 ;
@@ -1285,7 +1296,13 @@ let mk_HLs_unique HLs =
 
 let check_eq ckt ant cons assumes asserts trl =
     let old_pref = update_vossrc "NOTIFY-CHECK-FAILURES" "NO" then
-    let ste = STE "" ckt [] ant cons trl then
+    let ste =
+	NOT noX => STE "" ckt [] ant cons trl |
+	let old = update_vossrc "PRINT-TIME" "NO" then
+	let res = STE "-s" ckt [] ant cons trl then
+	(update_vossrc "PRINT-TIME" old) fseq
+	res
+    then
     (update_vossrc "NOTIFY-CHECK-FAILURES" old_pref) fseq
     let base_ok = get_ste_result ste "" then
     let a_c =
@@ -1386,7 +1403,27 @@ let BDD_remote_types =
 ;
 (eval BDD_remote_types) fseq ();
 
-let BDD_EQ p1 p2 order_file =
+let use_separate_process_evaluation_r = ref T;
+
+let BDD_EQ_1 p1 p2 order_file =
+    NOT (deref use_separate_process_evaluation_r) =>
+	noX => fst (BDD_EQ_base p1 p2) |
+	val (res, opt_cex) = BDD_EQ_base p1 p2 then
+	res == T => res |
+	val (ckt, asserts, cex_ant) = get_value opt_cex then
+	let cw = tcl_eval ["idv:make_info_window CEX 0"] then
+	let sel = window_choose_alternative
+			"Verification failed."
+			"Do you want to simulate a counterexample?"
+			[("Yes", "Yes"), ("No","No")] cw
+	then
+	sel = "No" => res |
+	let vis = STE_debug ckt then
+	let tab_1 = draw_fanin vis (0) 100 ("_OK_":asserts) then
+	tab_1 fseq
+	let ste = STE "-e" vis [] cex_ant [] [] then
+	res
+    |
     let dir = mktempd "extern_eval" then
     let fl_f = sprintf "%s/run.fl" dir then
     let req_f = sprintf "%s/req" dir then
@@ -1407,26 +1444,43 @@ let BDD_EQ p1 p2 order_file =
 		res_f) fseq
     (fprintf fp "quit;\n") fseq
     (fclose fp) fseq
-    let wid = tcl_eval ["winfo id [idv:make_info_window 1]"] then
-    let cmd = sprintf "fl -use %s -use_stdout -F %s DONT_QUIT" wid fl_f then
-    (system cmd) fseq
+    (noX =>
+	let cmd = sprintf "fl -noX -use_stdout -F %s DONT_QUIT" fl_f then
+	(system cmd)
+    |
+	let wid = tcl_eval ["winfo id [idv:make_info_window FEV 1]"] then
+	let cmd = sprintf "fl -use %s -use_stdout -F %s DONT_QUIT" wid fl_f then
+	(system cmd)
+    ) fseq
     NOT (file_exists res_f) => F |
     val (REMOTE_BDD_REPLY (res,opt_cex)) = read_remote_bdd_result res_f then
-    res == T => res |
+    res == T OR noX => res |
     val (ckt, asserts, cex_ant) = get_value opt_cex then
-    let cw = tcl_eval ["idv:make_info_window 0"] then
+    let cw = tcl_eval ["idv:make_info_window CEX 0"] then
     let sel = window_choose_alternative
 		    "Verification failed."
 		    "Do you want to simulate a counterexample?"
 		    [("Yes", "Yes"), ("No","No")] cw
     then
-    sel = "No" => ((tcl_eval ["idv:make_info_window 0"]) fseq res) |
+    sel = "No" => res |
     let vis = STE_debug ckt then
     let tab_1 = draw_fanin vis (0) 100 ("_OK_":asserts) then
     tab_1 fseq
     let ste = STE "-e" vis [] cex_ant [] [] then
     res
 ;
+
+let BDD_EQ_2 p1 p2 variable_order =
+    let fp = mktemp "var_order" then
+    let order_file = stream2filename fp then
+    (fprintf fp "var_order ") fseq
+    let pfn fp s = fprintf fp "\"%s\"" s in
+    (list2fp fp T "[\n\t" ",\n\t" "\n];\n" pfn variable_order) fseq
+    (fclose fp) fseq
+    BDD_EQ_1 p1 p2 order_file
+;
+
+overload BDD_EQ BDD_EQ_1 BDD_EQ_2;
 
 // Try to verify two combinational pexlifs are equal by building
 // a miter circuit and simulating the circuit.
@@ -2377,3 +2431,4 @@ let fl_do_remove_wires canvas =
     refresh_idv_canvas canvas cmd
 ;
 export_to_tcl fl_do_remove_wires;
+

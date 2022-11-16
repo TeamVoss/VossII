@@ -10,6 +10,7 @@
 /************************************************************************/
 #include <limits.h>
 #include <time.h>
+#include <stdlib.h>
 #include "system.h"
 #include "graph.h"
 
@@ -184,6 +185,18 @@ get_USER(g_ptr redex)
     MAKE_REDEX_STRING(redex, wastrsave(&strings, getenv("USER")));
 }
 
+static void
+normalize_file(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    realpath(GET_STRING(r), path_buf);
+    MAKE_REDEX_STRING(redex, wastrsave(&strings, path_buf));
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+
 void
 System_Install_Functions()
 {
@@ -222,6 +235,10 @@ System_Install_Functions()
     Add_ExtAPI_Function("USER", "", FALSE,
 			GLmake_string(),
 			get_USER);
+    Add_ExtAPI_Function("normalize_file", "1", FALSE,
+			GLmake_arrow(GLmake_string(), GLmake_string()),
+			normalize_file);
+
 }
 
 /********************************************************/

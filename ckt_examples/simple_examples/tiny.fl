@@ -1,0 +1,18 @@
+load "idv.fl";
+
+TYPE "byte" 8;
+
+let tst =
+    bit_input	    a b c.
+    bit_output	    o.
+    CELL "tst" [
+	o <- a '&' (b '|' '~' c)
+];
+
+let p = tst 'a 'b 'c 'o;
+p fseq ();
+
+system "rm -rf DB_tiny";
+
+IDV p "DB_tiny" [];
+

@@ -45,7 +45,7 @@ let QAOI21X1 {attrs::(string#string) list} conns =
         _or 1 "non_udp_cells.v:104.6-104.27" ["I1_out"] ["I0_out"] ["C"] ,
         _and 1 "non_udp_cells.v:103.7-103.22" ["I0_out"] ["A"] ["B"] 
     ] in
-    PINST "draw_stdcell AOI21X1 {draw_and_or_gate 3 {{+ + {}} { {} {} +}} 1}" 
+    PINST "draw_stdcell AOI21X1 draw_and_or_gate 3 {{+ + {}} { {} {} +}} 1" 
 	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
 ;
 
@@ -68,7 +68,7 @@ let QAOI22X1 {attrs::(string#string) list} conns =
         _and 1 "non_udp_cells.v:137.7-137.22" ["I1_out"] ["C"] ["D"] ,
         _and 1 "non_udp_cells.v:136.7-136.22" ["I0_out"] ["A"] ["B"] 
     ] in
-    PINST "draw_stdcell AOI22X1 {draw_and_or_gate 4 {{+ + {} {}} { {} {} + +}} 1}" 
+    PINST "draw_stdcell AOI22X1 draw_and_or_gate 4 {{+ + {} {}} { {} {} + +}} 1" 
 	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
 ;
 
@@ -171,7 +171,7 @@ let QFAX1 {attrs::(string#string) list} conns =
         _xor 1 "non_udp_cells.v:287.7-287.22" ["I5_out"] ["A"] ["B"] ,
         _or 1 "non_udp_cells.v:286.6-286.36" ["YC"] ["_$3"] ["I3_out"] 
     ] in
-    PINST "draw_stdcell FAX1 {draw_hfl_code 3 full_adder}" 
+    PINST "draw_stdcell FAX1 draw_hfl_code 3 full_adder" 
 	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
 ;
 
@@ -189,7 +189,7 @@ let QHAX1 {attrs::(string#string) list} conns =
         _xor 1 "non_udp_cells.v:328.7-328.18" ["YS"] ["A"] ["B"] ,
         _and 1 "non_udp_cells.v:327.7-327.18" ["YC"] ["A"] ["B"] 
     ] in
-    PINST "draw_stdcell HAX1 {draw_hfl_code 3 half_adder}" 
+    PINST "draw_stdcell HAX1 draw_hfl_code 3 half_adder" 
 	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
 ;
 
@@ -337,7 +337,7 @@ let QOAI21X1 {attrs::(string#string) list} conns =
         _and 1 "non_udp_cells.v:567.7-567.27" ["I1_out"] ["I0_out"] ["C"] ,
         _or 1 "non_udp_cells.v:566.6-566.22" ["I0_out"] ["A"] ["B"] 
     ] in
-    PINST "draw_stdcell OAI21X1 {draw_or_and_gate 3 {{+ + {}} { {} {} +}} 1}" 
+    PINST "draw_stdcell OAI21X1 draw_or_and_gate 3 {{+ + {}} { {} {} +}} 1" 
 	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
 ;
 
@@ -358,7 +358,7 @@ let QOAI22X1 {attrs::(string#string) list} conns =
         _or 1 "non_udp_cells.v:600.6-600.22" ["I1_out"] ["C"] ["D"] ,
         _or 1 "non_udp_cells.v:599.6-599.22" ["I0_out"] ["A"] ["B"] 
     ] in
-    PINST "draw_stdcell OAI22X1 {draw_or_and_gate 4 {{+ + {} {}} { {} {} + +}} 1}" 
+    PINST "draw_stdcell OAI22X1 draw_or_and_gate 4 {{+ + {} {}} { {} {} + +}} 1" 
 	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
 ;
 
@@ -407,7 +407,7 @@ let QTBUFX1 {attrs::(string#string) list} conns =
         _not 1 "non_udp_cells.v:0.0-0.0" ["I0_out"] ["A"],
         _mux 1 "non_udp_cells.v:0.0-0.0" ["Y"] ["0bz"] ["I0_out"] ["EN"]
     ] in
-    PINST "draw_stdcell TBUFX1 {draw_hfl_code 2 neg_tri_buf}" 
+    PINST "draw_stdcell TBUFX1 draw_hfl_code 2 neg_tri_buf" 
 	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
 ;
 
@@ -424,7 +424,7 @@ let QTBUFX2 {attrs::(string#string) list} conns =
         _not 1 "non_udp_cells.v:0.0-0.0" ["I0_out"] ["A"],
         _mux 1 "non_udp_cells.v:0.0-0.0" ["Y"] ["0bz"] ["I0_out"] ["EN"]
     ] in
-    PINST "draw_stdcell TBUFX2 {draw_hfl_code 2 neg_tri_buf}" 
+    PINST "draw_stdcell TBUFX2 draw_hfl_code 2 neg_tri_buf" 
 	  attrs F _fa_inps _fa_outs ints (P_HIER _body)
 ;
 
@@ -501,7 +501,7 @@ let QDFFSR {attrs::(string#string) list} conns =
 	_dffsr T F F 1 "osu018_stdcells.fl:485.0-485.10" ["Q"]
 		["R"] ["S"] ["CLK"] ["D"]
     ] in
-    PINST "draw_stdcell DFFSR {draw_dffsr 1 0 0}" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+    PINST "draw_stdcell DFFSR draw_dffsr 1 0 0" attrs F _fa_inps _fa_outs ints (P_HIER _body)
 ;
 
 let QLATCH {attrs::(string#string) list} conns =

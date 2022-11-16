@@ -1,0 +1,9 @@
+forward_declare {prBexpr::BExpr->string};
+letrec prIExpr (Ivar s) = s
+ /\    prIExpr (Plus a b) = (prIExpr a)^" + "^(prIExpr b)
+ /\    prIExpr (ITE c t e) = "if "^(prBexpr c)^" then "^
+                             (prIExpr t)^" else "^(prIExpr e)
+;
+letrec prBExpr (And a b) = (prBExpr a) ^ " AND " ^ (prBExpr b)
+ /\    prBExpr (GEQ a b) = (prIExpr a)^" >= "^ (prIExpr b)
+;

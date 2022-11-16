@@ -1,0 +1,3 @@
+let null l = l = [];
+let f x y = null x OR null y;
+f [1,2,3] ["abc", "cdef"];

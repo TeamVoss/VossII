@@ -1,0 +1,6 @@
+variable "q";
+VARS "a b c[3:0] d[1:0][2:0]";
+a;
+b;
+c;
+d;

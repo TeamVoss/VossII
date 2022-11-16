@@ -1,0 +1,5 @@
+letrec collatz 1 = [1]
+ /\    collatz n assuming (n % 2 = 0) = n:(collatz (n/2))
+ /\    collatz n assuming (n % 2 = 1) = n:(collatz (3*n+1))
+;
+collatz 7;

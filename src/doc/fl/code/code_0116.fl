@@ -1,0 +1,2 @@
+let ste_res = STE "-e" ckt [] ant [] [];
+ste_res;

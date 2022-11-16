@@ -1,0 +1,27 @@
+// The states of the finite state machine
+ENUM "my_fsm"  ["IDLE", "REQ", "MISS", "UPDATE", "HIT"];
+
+
+let fsm_example =
+    bit_input       clk reset.
+    bit_input       req.
+    bit_input       hit.
+    bit_input       valid.
+    bit_output      need_data.
+    bit_output      ready.
+    //
+    my_fsm_internal    state.
+    CELL "draw_hier CACHE" [
+        (Moore_FSM "CACHE_FSM" clk state
+            (reset, IDLE) [
+                IDLE --- req --- REQ,
+                REQ  --- hit --- HIT,
+                REQ  --- '~' hit --- MISS,
+                MISS --- '~' valid --- MISS,
+                MISS --- valid --- UPDATE,
+                UPDATE --- default --- HIT,
+                HIT  --- default --- IDLE
+        ]),
+        need_data <- is_MISS state,
+        ready <- is_HIT state
+];

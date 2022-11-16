@@ -1,0 +1,6 @@
+let to_string 0 = "zero"
+   /\ to_string 1 = "one"
+   /\ to_string _ = "many"
+   ;
+
+to_string 0;

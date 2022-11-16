@@ -1,0 +1,23 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+(cload (DIR^"../IDVII/src/fl/design/util.fl")) fseq
+(cload (DIR^"../IDVII/src/fl/design/yosys_lib.fl"));
+
+
+let rename_stdcells p =
+    stdcells = [] => p |
+    let tbl = list2tbl (map (\s.s,T) stdcells) then
+    letrec rename (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) =
+        tbl_member tbl name =>
+            let name' = sprintf "draw_stdcell %s draw_hier {}" name then
+            (PINST name' attrs lf fa_inps fa_outs ints (P_HIER cs))
+        |
+        let cs' = map rename cs then
+        PINST name attrs lf fa_inps fa_outs ints (P_HIER cs')
+     /\   rename other = other
+    in
+    rename p
+;
+

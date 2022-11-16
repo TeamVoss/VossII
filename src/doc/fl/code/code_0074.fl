@@ -1,0 +1,15 @@
+
+// Syntactic sugaring
+let forall fn s = E_FORALL s (fn (E_VAR s));
+binder forall;
+let ' v = E_VAR v;
+free_binder ';
+let && = E_AND;
+infix 4 &&;
+let || a b = E_NOT (E_AND (E_NOT a) (E_NOT b));
+infix 3 ||;
+
+'a && 'b;
+
+forall a b c. a || b && c;
+

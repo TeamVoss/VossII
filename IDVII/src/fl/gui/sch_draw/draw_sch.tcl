@@ -1497,20 +1497,26 @@ proc popup_node_name {c node x y} {
 proc add_inst {inst_nbr args} {
     set argcnt [llength $args]
     set cmd [lrange $args 0 [expr $argcnt-5]]
+    if { [regexp {draw_constant } $cmd] } {
+	return [eval $args]
+    }
     set c [lindex $args [expr $argcnt-4]]
     set tag [lindex $args [expr $argcnt-3]]
     set x [lindex $args [expr $argcnt-2]]
     set y [lindex $args [expr $argcnt-1]]
-    if { ![regexp {draw_constant } $cmd] } {
-	val {lx ly ux uy} [get_width_height $cmd]
-	set ii [$c create text [expr $x+$lx] [expr $y-$ly] \
-	      -anchor nw -justify left -font $::sfont($c) -fill $::inst_col \
-	      -text "i$inst_nbr"]
-	add_font_tags $c $ii _IsTeXt_
-	set ::tag2inst_nbr($c,$tag) $inst_nbr
-    }
-    lappend cmd $c $tag $x $y
-    eval $cmd
+    set stag _MaInDrAwBoDy
+    set res [eval [lrange $args 0 [expr $argcnt-5]] $c $stag $x $y]
+    set bb [$c bbox $stag&&!_IsDePeNdEnCy_&&!_WiRe_]
+    if { $bb == "" } { return $res }
+    val {lx ly ux uy} $bb
+    $c addtag $tag withtag $stag
+    $c dtag $stag
+    set ii [$c create text [expr $lx+[min_sep $c]] [expr $uy] \
+	  -anchor nw -justify left -font $::sfont($c) -fill $::inst_col \
+	  -text "i$inst_nbr"]
+    add_font_tags $c $ii _IsTeXt_
+    set ::tag2inst_nbr($c,$tag) $inst_nbr
+    return $res
 }
 
 proc vec_draw {vec_size args} {
@@ -3391,7 +3397,7 @@ proc draw_fub {module inst inst_nbr inames onames c tag x y} {
     set m_hi_y [expr round($lowy+($outs-1)*$sep+[min_sep $c]/2)]
     set m_x [expr $x-[min_sep $c]/3]
     $c create rectangle $m_x $m_lo_y $x $m_hi_y \
-	    -outline $gcolor -fill $fc -tags $tag
+	    -outline $gcolor -fill $fc -tags "$tag _WiRe_"
     set xl [expr $xr]
     for {set i 0} {$i < $outs} {incr i} {
 	set yl [expr round($lowy+$i*$sep)]
@@ -4672,10 +4678,15 @@ proc rtl:visualize {file start_line start_col end_line end_col} {
     pack $w.t -side right -expand yes -fill both
 }
 
-proc draw_stdcell {name pfn c tag x y} {
+proc draw_stdcell {name args} {
+    set argcnt [llength $args]
+    set c [lindex $args [expr $argcnt-4]]
+    set tag [lindex $args [expr $argcnt-3]]
+    set x [lindex $args [expr $argcnt-2]]
+    set y [lindex $args [expr $argcnt-1]]
     set stag _StDcElL
-    set res [eval $pfn $c $stag $x $y]
-    val {lx ly ux uy} [$c bbox $stag&&!_IsDePeNdEnCy_]
+    set res [eval [lrange $args 0 [expr $argcnt-5]] $c $stag $x $y]
+    val {lx ly ux uy} [$c bbox $stag&&!_IsDePeNdEnCy_&&!_WiRe_]
     $c addtag $tag withtag $stag
     $c dtag $stag
     set bx $lx ;# [expr $lx+[min_sep $c]]

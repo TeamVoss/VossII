@@ -1,0 +1,4 @@
+bv2list (int2bv (-12));
+list2bv [F,F,F,T,T];
+fixed_bv2list 16 F '-3;
+fixed_bv2list 16 T '-3;

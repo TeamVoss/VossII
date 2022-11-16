@@ -1,0 +1,18 @@
+
+let ant =
+    "din_0" is  "a" for 5 phases
+  and
+    "din_1" is	0 for 1 phase followed_by "0x1" for 2 phases followed_by
+		0 for 1 phase followed_by "b" for 1 phase
+  and
+    "din_2" is	"c" for 5 phases
+  and
+    "din_3" is	"d" for 5 phases
+  and
+    "sel[1:0]" is   "0x0" for 1 phase followed_by
+		    "0x1" for 1 phase followed_by
+		    "0x2" for 1 phase followed_by
+		    "0x3" for 1 phase followed_by
+		    "s[1:0]" for 1 phase
+;
+

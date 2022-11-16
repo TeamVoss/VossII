@@ -1,0 +1,2 @@
+let zero = 0;
+let succ x = x + 1;

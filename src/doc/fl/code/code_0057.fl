@@ -1,0 +1,11 @@
+let half x = (x % 2) = 1 => eprintf "HALF_ERR: f2 is given an odd number (%d)" x
+                        | x/2
+;
+letrec  robust_half x =
+    (half x) gen_catch
+    (\msg. str_is_prefix "HALF_ERR" msg => robust_half (x+1) | error msg)
+;
+
+robust_half 2;
+robust_half 3;
+robust_half (1/0);

@@ -1,0 +1,6 @@
+let e1 = a XOR b;
+let e2 = a OR b;
+// Not the same function
+e1 == e2;
+// Under what conditions is e1 equal to e2.
+e1 = e2;

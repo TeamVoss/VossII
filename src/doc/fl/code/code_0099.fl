@@ -1,0 +1,4 @@
+STRUCT "bundle" [("high","byte"),("low","byte")];
+'a-->high;                          // Extract field
+'a<--high ? '0xab;                  // Update field
+'a<--high ? '0xab <-- low ? '0xba;  // Nested updates

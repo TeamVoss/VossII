@@ -1,0 +1,25 @@
+
+// Example of simple state machine
+let transition_relation =
+    let s' = bdd_current2next s in
+    let mk_trans (f,t) = (s = (int2bl 3 f)) AND (s' = (int2bl 3 t)) in
+    let my_fsm = [(0,1),
+		  (1,0), (1,1), (1,2),
+		  (2,5),
+		  (3,4), (3,2),
+		  (4,3),
+		  (5,5)]
+    in
+    itlist (\tr.\r. mk_trans tr OR r) my_fsm F
+;
+
+// Compute the set of states reachable from init
+let init = (s = int2bl 3 0);
+let final_image = image transition_relation init;
+enumerate_examples 20 (depends s) final_image;
+
+// Compute the set of states that could have taken us to final.
+let final = (s = int2bl 3 3);
+let res = preimage transition_relation final;
+enumerate_examples 20 (depends s) res;
+

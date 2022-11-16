@@ -1,0 +1,10 @@
+let add9 =
+    byte_input	    i1 i2 i3 i4 i5 i6 i7 i8 i9.
+    byte_output	    o.
+    byte_internal   m1 m2 m3.
+    CELL "draw_hier add6" [
+	add3 i1 i2 i3 m1,
+	add3 i4 i5 i6 m2,
+	add3 i7 i8 i9 m3,
+	add3 m1 m2 m3 o
+];

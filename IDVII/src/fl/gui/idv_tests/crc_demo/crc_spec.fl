@@ -1,0 +1,96 @@
+set_font font_large;
+
+load "idv.fl";
+
+TYPE "word" 8;
+
+ENUM "state" ["INIT", "REQUEST", "COMPUTE", "ADJUST", "DONE"];
+
+let spec =
+    bit_input	clk reset.
+    bit_input	wakeup req.
+    word_input	packet_size.
+    word_input	inp.
+    word_output	checksum.
+    bit_output	done.
+    //
+    bit_internal    is_zero.
+    word_internal   cnt.
+    state_internal  ctrl_state.
+    CELL "spec" [
+    Moore_FSM "controller" clk ctrl_state
+	(reset, INIT) [
+	    INIT    ---	    wakeup	---	    REQUEST,
+	    REQUEST ---	     req	---	    COMPUTE,
+	    REQUEST ---	    wakeup	---	    REQUEST,
+	    REQUEST ---	    '1		---	    INIT,
+	    COMPUTE ---	('~'  is_zero)	---	    COMPUTE,
+	    COMPUTE ---	    is_zero	---	    ADJUST,
+	    ADJUST  ---	 ('~' req)	---	    DONE,
+	    DONE    ---  '1		---	    INIT
+    ],
+    STATE clk cnt [
+	    (is_REQUEST ctrl_state) --- ('packet_size '-' '1),
+	    (is_COMPUTE ctrl_state) --- (cnt '-' '1)
+	],
+    is_zero <- (cnt '=' '0),
+    STATE clk checksum [
+	(is_REQUEST ctrl_state) --- '0,
+	(is_COMPUTE ctrl_state) --- (checksum '+' inp)
+    ],
+    done <- (is_DONE ctrl_state)
+];
+
+
+let p = spec 'clk 'reset 'wakeup 'req 'packet_size 'inp 'checksum 'done;
+p fseq ();
+
+write_pexlif "crc_spec.pexlif" p;
+
+
+let vis = STE_debug (pexlif2fsm p);
+vis;
+
+let generate_inps start_cycle n =
+    letrec gen c =
+	c >= start_cycle+n => [] |
+	let v = random 0 255 then
+	("inp[7:0]" is v in_cycle c) and (gen (c+1))
+    in
+    gen start_cycle
+;
+
+let PACKETS = 4;
+let N = PACKETS + 10;
+
+let ant =
+    "clk" is_clock N
+  and
+    "reset" is 1 in_cycle 1 otherwise 0 until N cycles
+  and
+    "wakeup" is 1 in_cycle 4 otherwise 0 until N cycles 
+  and
+    "req" is 1 in_cycle 5 otherwise 0 until N cycles 
+  and
+    "packet_size[7:0]" is PACKETS in_cycle 5
+  and
+    (generate_inps 6 PACKETS)
+;
+
+
+STE "-e" vis [] ant [] [];
+
+add_waveform vis ["clk"];
+add_waveform vis ["reset"];
+add_waveform vis ["wakeup"];
+add_waveform vis ["req"];
+add_waveform vis ["packet_size[7:0]"];
+add_waveform vis ["inp[7:0]"];
+add_waveform vis ["OUTPUTS"];
+add_waveform vis ["checksum[7:0]"];
+add_waveform vis ["done"];
+add_waveform vis ["INTERNALS"];
+add_waveform vis ["ctrl_state[2:0]"];
+let tab_1 = draw_fanin vis (0) 100 ["checksum[7:0]","done"];
+tab_1;
+

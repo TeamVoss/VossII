@@ -1,0 +1,7 @@
+load "ste.fl";
+let p = verilog2pexlif "-Iverilog_examples"         // Yosys flags
+                       "mux4"                       // Top-level module
+                        ["small.v", "small_lib.v"]  // Files to read & compile
+                        []                          // Additional files needed
+;
+let ckt = pexlif2fsm p;

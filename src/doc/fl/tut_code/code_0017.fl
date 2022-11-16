@@ -1,0 +1,6 @@
+lettype suit = spades | hearts | clubs | diamonds;
+lettype rank = ace | king | queen | jack | numeric int;
+lettype card = card suit rank;
+
+let aceOfSpades = card spades ace;
+let twoOfHearts = card hearts (numeric 2);

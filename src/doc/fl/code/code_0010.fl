@@ -1,0 +1,11 @@
+VARS "q[2:0] r[2:0]";
+// Force creation
+q fseq r fseq ();
+// Order the variables sequentially
+var_order ((md_expand_vector "q[2:0]")@(md_expand_vector "r[2:0]"));
+draw_bdds T [q = r];
+// Order the variables by interleaving them MSB to LSB
+var_order (interleave [(md_expand_vector "q[3:0]"),
+		       (md_expand_vector "r[3:0]")])
+;
+draw_bdds T [q = r];

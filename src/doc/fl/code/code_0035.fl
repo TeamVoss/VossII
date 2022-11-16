@@ -1,0 +1,2 @@
+let add (x,y) = x+2*y;
+add (3,4);

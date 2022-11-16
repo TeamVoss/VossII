@@ -1,0 +1,3 @@
+let v = variable "v";
+v=v;
+variable "v" = variable"v";

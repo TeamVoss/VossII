@@ -1,0 +1,11 @@
+let l1 = 1 upto 8;
+let l2 = 13 downto 1;
+let l3 = 1--100;
+l1 @ l2;
+lastn 5 l1;
+butlast l2;
+firstn 7 l3;
+butfirstn 96 l3;
+cluster 4 (1--20);
+let ll = [l1, l2, [4,8,12]];
+flat ll;

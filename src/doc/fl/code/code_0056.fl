@@ -1,0 +1,10 @@
+hd(tl [2]);
+1/0;
+error "My message";
+let select idx l =
+    idx < 1 OR idx > length l =>
+        eprintf "select called with illegal index (%d)" idx
+    |
+    el idx l
+;
+select 10 [1,2,3,4];

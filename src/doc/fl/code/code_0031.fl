@@ -1,0 +1,6 @@
+let top_level q =
+        val (i,b) = q in
+        i < 3 => b | F
+;
+top_level (12,variable "a");
+top_level (-2,variable "a");

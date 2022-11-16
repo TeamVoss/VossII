@@ -1,0 +1,48 @@
+load "idv.fl";
+
+let spec = read_pexlif "_crc_spec.pexlif";
+let imp  = read_pexlif "_crc_imp.pexlif";
+
+let vis1 = STE_debug (pexlif2fsm spec);
+vis1;
+
+let vis2 = STE_debug (pexlif2fsm imp);
+vis2;
+
+BDD_EQ spec imp;
+
+
+
+
+let generate_inps start_cycle n =
+    letrec gen c =
+	c >= start_cycle+n => [] |
+	let v = random 0 255 then
+	("inp[7:0]" is v in_cycle c) and (gen (c+1))
+    in
+    gen start_cycle
+;
+
+let PACKETS = 4;
+let N = PACKETS + 10;
+
+let ant =
+    "clk" is_clock N
+  and
+    "reset" is 1 in_cycle 1 otherwise 0 until N cycles
+  and
+    "wakeup" is 1 in_cycle 2 otherwise 0 until N cycles 
+  and
+    "req" is 1 in_cycle 3 otherwise 0 until N cycles 
+  and
+    "packet_size[7:0]" is PACKETS in_cycle 3
+  and
+    (generate_inps 4 PACKETS)
+;
+
+
+STE "-e" vis1 [] ant [] [];
+
+STE "-e" vis2 [] ant [] [];
+
+

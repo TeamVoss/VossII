@@ -1,0 +1,17 @@
+load "idv.fl";
+
+TYPE "byte" 4;
+
+let tst =
+    byte_input	    a b c.
+    byte_output	    o.
+    CELL "tst" [
+	o <- (IF (a '>' b) THEN (c '-' a) ELSE (c '-' b))
+];
+
+let p = tst 'a 'b 'c 'o;
+p fseq ();
+
+system "rm -rf DB_medium";
+
+IDV p "DB_medium" [];

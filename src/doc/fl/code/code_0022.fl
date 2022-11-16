@@ -1,0 +1,12 @@
+let a = bvariable "a";
+let b = bvariable "b";
+let c = bvariable "c";
+
+let ex0 = bNOT (a bAND b);
+ex0;
+
+let ex1 = bNOT a bOR bNOT (b bAND (c bOR (b bAND bNOT c)));
+ex1;
+
+let ex2 = bNOT a bOR bNOT (b bAND (c bOR (bNOT b bAND c)));
+ex2;

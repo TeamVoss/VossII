@@ -1,0 +1,6 @@
+let q = ((1,2),3);
+let qq = (1,2,3);
+q;
+qq;
+let qqq = (1,"abc");
+qqq;

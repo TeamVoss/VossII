@@ -1,0 +1,8 @@
+
+let e = forall a b. thereis c. ~(a^^b) || ~(a^^(c^^b));
+is_taut e;
+let f = thereis c. forall a b. ~(a^^b) || ~(a^^(c^^b));
+is_taut f;
+let g = forall a b c. ~(a^^b) || ~(a^^(c^^b));
+is_taut g;
+

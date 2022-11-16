@@ -32,6 +32,87 @@
 USING_YOSYS_NAMESPACE
 PRIVATE_NAMESPACE_BEGIN
 
+char *
+idv_clean_name(std::string &str)
+{
+    bool changed = true;
+    while( changed ) {
+	changed = false;
+	size_t found = str.find("$extern:", 0);
+	if( found != std::string::npos ) {
+	    changed = true;
+	    str.replace(found, 8, "");
+	}
+	found = str.find("$paramod", 0);
+	if( found != std::string::npos ) {
+	    changed = true;
+	    str.replace(found, 8, "");
+	}
+    }
+    if( str[0] == '\\' ) {
+	str.replace(0, 1, "");
+    }
+    for (size_t i = 0; i < str.size(); i++) {
+	if( str[i] == '\\' || str[i] == '#' || str[i] == '=' ||
+	    str[i] == ':' || str[i] == '<' || str[i] == '>' ||
+	    str[i] == '$' || str[i] == '\'' )
+	{
+	    str[i] = '_';
+	}
+    }
+
+    char *res = new char [str.length()+1];
+    std::strcpy(res, str.c_str());
+    return( res );
+}
+
+char *
+id_clean_name(RTLIL::IdString &id)
+{
+    std::string mstr = id.str();
+    return( idv_clean_name(mstr) );
+}
+
+char *
+Cstr(RTLIL::IdString id) 
+{
+    std::string str = RTLIL::unescape_id(id);
+    return( idv_clean_name(str) );
+}
+
+
+std::string
+Core_name(RTLIL::IdString id)
+{
+    std::string str = RTLIL::unescape_id(id);
+    bool changed = true;
+    while( changed ) {
+	changed = false;
+	size_t found = str.find("$extern:", 0);
+	if( found != std::string::npos ) {
+	    changed = true;
+	    str.replace(found, 8, "");
+	}
+	found = str.find("$paramod", 0);
+	if( found != std::string::npos ) {
+	    changed = true;
+	    str.replace(found, 8, "");
+	}
+    }
+    size_t init_pos = str.find("\\", 0);
+    size_t next_pos = str.find("\\", init_pos+1);
+    if( next_pos == std::string::npos ) {
+	str = str.substr(init_pos+1, next_pos);
+    } else {
+	str = str.substr(init_pos+1, next_pos-1);
+    }
+    for (size_t i = 0; i < str.size(); i++) {
+	if (str[i] == '\\' || str[i] == '$' ) { str[i] = '_'; }
+    }
+    return str;
+}
+
+
 struct PexlifDumperConfig
 {
 	bool icells_mode;
@@ -97,12 +178,28 @@ struct PexlifDumper
 	const char *cstr(RTLIL::IdString id)
 	{
 		std::string str = RTLIL::unescape_id(id);
-		if( str.substr(0,8) == "$paramod" ) {
-		    str = str.substr(9);
+		bool changed = true;
+		while( changed ) {
+		    changed = false;
+		    size_t found = str.find("$extern:", 0);
+		    if( found != std::string::npos ) {
+			changed = true;
+			str.replace(found, 8, "");
+		    }
+		    found = str.find("$paramod", 0);
+		    if( found != std::string::npos ) {
+			changed = true;
+			str.replace(found, 8, "");
+		    }
 		}
-		for (size_t i = 0; i < str.size(); i++)
-			if (str[i] == '\\' || str[i] == '#' || str[i] == '=' || str[i] == '<' || str[i] == '>')
-				str[i] = '_';
+		for (size_t i = 0; i < str.size(); i++) {
+		    if( str[i] == '\\' || str[i] == '#' || str[i] == '=' ||
+			str[i] == ':' || str[i] == '<' || str[i] == '>' ||
+			str[i] == '$' || str[i] == '\'' )
+		    {
+			str[i] = '_';
+		    }
+		}
 		cstr_buf.push_back(str);
 		return cstr_buf.back().c_str();
 	}
@@ -153,7 +250,7 @@ struct PexlifDumper
 		return "subckt";
 	}
 
-	void dump_const(std::ostream &f, const RTLIL::Const &data, int width, int offset)
+	void dump_const(std::ostream &f, const RTLIL::Const &data, int width = -1, int offset = 0)
 	{
 		if (width < 0)
 			width = data.bits.size() - offset;
@@ -238,18 +335,21 @@ struct PexlifDumper
 		if (chunk.wire == NULL) {
 			dump_const(f, chunk.data, chunk.width, chunk.offset);
 		} else {
-			const char *name = chunk.wire->name.c_str();
-			if( *name == '\\' ) name++;
+// OLD OLD OLD		const char *name = chunk.wire->name.c_str();
+			const char *nm = id_clean_name(chunk.wire->name);
+			if( *nm == '\\' ) nm++;
+			f << "\"" << nm;
 			if (chunk.width == chunk.wire->width && chunk.offset == 0) {
 				if( chunk.width == 1 ) {
-				    f << stringf("\"%s\"", name);
+				    f << "\"";
 				} else {
-				    f << stringf("\"%s[%d:0]\"", name, chunk.width-1);
+				    f << stringf("[%d:0]\"", chunk.width-1);
 				}
-			} else if (chunk.width == 1) 
-				f << stringf("\"%s[%d]\"", name, chunk.offset);
-			else
-				f << stringf("\"%s[%d:%d]\"", name, chunk.offset+chunk.width-1, chunk.offset);
+			} else if (chunk.width == 1) {
+				f << stringf("[%d]\"", chunk.offset);
+			} else {
+				f << stringf("[%d:%d]\"", chunk.offset+chunk.width-1, chunk.offset);
+			}
 		}
 	}
 
@@ -293,7 +393,8 @@ struct PexlifDumper
 	void dump()
 	{
 		f << stringf("\n");
-		f << stringf("let Q%s {attrs::(string#string) list} conns =\n", cstr(module->name));
+		f << stringf("let Q%s {attrs::(string#string) list} conns =\n",
+			     Cstr(module->name));
 
 		std::map<int, RTLIL::Wire*> inputs, outputs, internals;
 
@@ -402,9 +503,8 @@ struct PexlifDumper
 		f << "    let _fa_outs = map _mk_fa outs in\n";
 		f << "    let _body = [\n        ";
 		start = true;
-		for (auto &cell_it : module->cells_)
+		for (auto cell : module->cells())
 		{
-		    RTLIL::Cell *cell = cell_it.second;
 		    string src = "";
 		    if (cell->attributes.count("\\src")) {
 			Const si = cell->attributes.at("\\src");
@@ -875,6 +975,48 @@ struct PexlifDumper
 			continue;
 		    }
 
+#if 0
+		    if( cell->type == "\\LUT4" ) {
+			f << "_" << cell->type.substr(1);
+			f << stringf(" 1 \"%s\"", src.c_str());
+			f << " ";
+			dump_const(f, cell->parameters.at("\\INIT"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\O"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\I3"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\I2"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\I1"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\I0"));
+			continue;
+		    }
+
+		    if( cell->type == "\\LUT6" ) {
+			f << "_" << cell->type.substr(1);
+			f << stringf(" 1 \"%s\"", src.c_str());
+			f << " ";
+			dump_const(f, cell->parameters.at("\\INIT"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\O"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\I5"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\I4"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\I3"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\I2"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\I1"));
+			f << " ";
+			dump_sigspec(f, cell->getPort("\\I0"));
+			continue;
+		    }
+#endif
+
 		    if (cell->type == "$pmux") {
 			RTLIL::SigSpec out = cell->getPort("\\Y");
 			RTLIL::SigSpec sel = cell->getPort("\\S");
@@ -1000,6 +1142,7 @@ struct PexlifDumper
 			continue;
 		    }
 
+
 		    if( cell->type == "$mem_v2" ) {
 			// General data
 			const char *mem = cstr(cell->parameters["\\MEMID"].decode_string());
@@ -1104,8 +1247,12 @@ struct PexlifDumper
 			continue;
 		    }
 
-		    f << stringf("Q%s [(\"instance\", \"%s\"), (\"src\", \"%s\")] [\n                ",
-				 cstr(cell->type), (((cell->name).c_str())+1), src.c_str());
+		    f << "Q" << Cstr(cell->type)
+		      << " [(\"instance\","
+		      << stringf("\"%s\"", ((id_clean_name(cell->name))+1))
+		      << "), (\"src\", \""
+		      << src
+		      << "\")] [\n                ";
 
 		    bool first = true;
 		    for (auto &conn : cell->connections()) {
@@ -1128,6 +1275,7 @@ struct PexlifDumper
 		    if (config->attr_mode)
 			    dump_params(".attr", cell->attributes);
 		    if (config->param_mode)
+
 			    dump_params(".param", cell->parameters);
 		}
 
@@ -1146,7 +1294,7 @@ struct PexlifDumper
 		    dump_sigspec(f, conn.second);
 		}
 		f << "\n    ] in\n";
-		f << stringf("    PINST \"draw_hier %s\" attrs F _fa_inps _fa_outs ints (P_HIER _body)\n;\n\n", cstr(module->name));
+		f << stringf("    PINST \"%s\" attrs F _fa_inps _fa_outs ints (P_HIER _body)\n;\n\n", Core_name(module->name).c_str());
 
 	}
 
@@ -1346,17 +1494,11 @@ struct PexlifBackend : public Backend {
 
 		for (auto module : mod_list) {
 			RTLIL::IdString id = module->name;
-			vector<shared_str> cstr_buf;
-			std::string str = RTLIL::unescape_id(id);
-			if( str.substr(0,8) == "$paramod" ) {
-			    str = str.substr(9);
-			}
-			for (size_t i = 0; i < str.size(); i++)
-				if (str[i] == '\\' || str[i] == '#' || str[i] == '=' || str[i] == '<' || str[i] == '>')
-					str[i] = '_';
-			cstr_buf.push_back(str);
-			*f << stringf("forward_declare {Q%s::((string#string) list) -> ((string#(string list)) list) -> pexlif};\n",
-				      cstr_buf.back().c_str());
+			char *name = Cstr(id);
+			*f << "forward_declare {Q" << name <<
+			      "::((string#string) list) -> " <<
+			      "((string#(string list)) list) " <<
+			      "-> pexlif};\n";
 		}
 
 		for (auto module : mod_list)

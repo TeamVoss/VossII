@@ -1,0 +1,2 @@
+lettype    IExpr = Ivar string | Plus IExpr IExpr | ITE BExpr IExpr IExpr
+andlettype BExpr = And BExpr BExpr | GEQ IExpr IExpr;

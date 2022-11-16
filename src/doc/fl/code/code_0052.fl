@@ -1,0 +1,9 @@
+let iplus {a::int} {b::int} = a+b;
+let splus {a::string} {b::string} = a^b;
+overload + iplus splus;
+let foo a b = a OR b;
+overload + + foo;
+infix 2 +;
+1+2;
+"a"+"bc";
+T+F;

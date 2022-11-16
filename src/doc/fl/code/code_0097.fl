@@ -1,0 +1,10 @@
+ENUM "op" ["ADD", "JMP", "NOP"];
+ENUM "state" [("INIT", 1), ("FETCH", 2), ("EXECUTE", 4), ("WB", 8)];
+{'a::op};
+{'a::state};
+ADD;
+NOP;
+INIT;
+WB;
+is_FETCH 'a;
+is_WB 'a;

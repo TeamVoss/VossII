@@ -1,0 +1,10 @@
+let f x = hd x;
+
+letrec map2 fn [] [] = []
+ /\    map2 fn (a:as) (b:bs) = (fn a b) : (map2 fn as bs)
+ /\    map2 fn _ _ = error "Lists of different length in map2"
+;
+
+letrec fact n = n=0 => 1 | n*fact (n-1);
+let binom n k = (fact n) / ((fact k) * (fact (n-k)));
+map2 binom [8,8,8,8,8,8,8,8,8] [0,1,2,3,4,5,6,7,8];

@@ -1,0 +1,7 @@
+load "ste.fl";
+let ckt =
+  verilog2pexlif
+    "-Iverilog_examples"       // Flags to Yosys, which parses the Verilog for us
+    "mux4"                     // Top-level module
+    ["small.v", "small_lib.v"] // Files to read and compile
+    [];                        // Additional files

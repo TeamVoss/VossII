@@ -1,0 +1,6 @@
+letrec extract_subckts target p =
+    val (PINST name opts leaf fa_inps fa_outs ints content) = p in
+    str_is_suffix target name => [p] |
+    leaf => [] |
+    flatmap (extract_subckts target) (get_children content)
+;

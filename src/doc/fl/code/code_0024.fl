@@ -1,0 +1,16 @@
+
+let q = "abc and _12!@@#";
+let qq = "qw\"q qw";
+q^qq;
+explode q;
+implode ["1", "2"];
+filter (str_is_prefix "a") ["abc", "Ava", "vad", "bbAb", "aaa"];
+filter (str_is_suffix "a") ["abc", "Ava", "vad", "bbAb", "aaa"];
+filter (str_match "*a*") ["abc", "Ava", "vad", "bbAb", "aaa"];
+qsort strcmp ["abc", "Ava", "vad", "bbAb", "aaa"];
+let s = "A funny story often told is the story of";
+strlen s;
+strstr s "is";
+substr s 1 25;
+substr s 26 (-1);
+sprintf "%s: %032b (%d)" "abc" 1423 1423;

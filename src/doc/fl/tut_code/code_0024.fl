@@ -1,0 +1,1 @@
+!x. !y. NOT (x AND y) = (NOT x) OR (NOT y);

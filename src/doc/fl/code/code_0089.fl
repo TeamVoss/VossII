@@ -1,0 +1,15 @@
+// Return an integer n if its collatz sequence is longer than n.
+// Otherwise, return 0
+let {large_collatz:: bv -> bv} n =
+    letrec collatz cnt cur = cur = '1 => cnt |
+            (cur % '2) = '1 => collatz (cnt + '1) ('3 * cur + '1)
+                             | collatz (cnt + '1) (cur / '2)
+    in
+    let res = collatz '0 n in
+    n < res => n | '0
+;
+
+// Try this for integers between 1 and 99.
+let res =
+    large_collatz (bv_constrained_variable "a[7:0]" (\v. '1 <= v AND v < '100))
+;

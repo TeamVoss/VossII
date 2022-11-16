@@ -1,0 +1,6 @@
+let v s = variable s;
+let a = v "a"; let b = v "b"; let c = v "c"; let d = v "d";
+let ex = (a AND NOT b);
+ex;
+let nex = ex AND (a=c) AND (b=d);
+Quant_thereis ["a","b"] nex;

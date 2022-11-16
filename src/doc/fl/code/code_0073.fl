@@ -1,0 +1,7 @@
+
+let ns i = 1000*i;
+postfix ns;
+let to a b = (a,b);
+infix 3 to;
+2 ns to 4 ns;
+

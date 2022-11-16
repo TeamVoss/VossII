@@ -1,0 +1,9 @@
+let get_children (P_HIER ch) = ch
+ /\ get_children (P_LEAF _) = []
+;
+
+letrec number_of_wires (PINST name opts leaf fa_inps fa_outs ints content) =
+    let local = length (md_expand_vectors ints) in
+    leaf => local |
+    itlist (\pp. \r. number_of_wires pp+r) (get_children content) local
+;

@@ -1,0 +1,4 @@
+let x = 2;
+let y = let x = 4 in x-5;
+x;
+y;

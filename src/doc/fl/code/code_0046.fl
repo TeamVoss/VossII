@@ -1,0 +1,5 @@
+hd [1,2,3];
+hd ["abc", "edf"];
+(hd ["a", "b"]), hd [4,2,1];
+let q = [T,T,F];
+hd q;

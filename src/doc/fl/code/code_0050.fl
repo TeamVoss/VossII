@@ -1,0 +1,5 @@
+let f x y =
+    let null l = l = [] in
+    null x OR null y
+;
+f [1,2,3] ["abc", "cdef"];

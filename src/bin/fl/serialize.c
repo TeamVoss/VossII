@@ -216,7 +216,7 @@ void
 write_arbi_T(FILE *fp, arbi_T ai)
 {
     WR_DBG1("arbi_T");
-    string s = Arbi_ToString(ai, 16);
+    string s = Arbi_ToString(ai, 10);
     write_string(fp, s);
 }
 
@@ -226,7 +226,8 @@ read_arbi_T(FILE *fp, arbi_T *aip)
     string s;
     RD_DBG1("arbi_T");
     read_string(fp, &s);
-    *aip = Arbi_FromString(s,16);
+    *aip = Arbi_FromString(s, 10);
+    ASSERT(*aip != NULL );
 }
 
 void

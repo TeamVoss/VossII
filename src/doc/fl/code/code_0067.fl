@@ -1,0 +1,8 @@
+
+lettype expr =  E_FORALL string expr |
+                E_VAR string |
+                E_TRUE |
+                E_AND expr expr |
+                E_NOT expr
+;
+

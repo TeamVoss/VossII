@@ -1,0 +1,10 @@
+let add3 =
+    byte_input	    a.
+    byte_input	    b.
+    byte_input	    c.
+    byte_output	    o.
+    byte_internal   m.
+    CELL "draw_hier add3" [
+	m <- a '+' b,
+	o <- m '+' c
+];

@@ -1,0 +1,19 @@
+
+lettype expr = Val int |
+               Mult expr expr |
+               Plus expr expr |
+               Negate expr;
+letrec eval (Val i) = i
+  /\   eval (Mult e1 e2) = (eval e1) * (eval e2)
+  /\   eval (Plus e1 e2) = (eval e1) + (eval e2)
+  /\   eval (Negate e1) = 0-(eval e1)
+;
+let ** a b = Mult a b;
+let ++ a b = Plus a b;
+infix 4 **;
+infix 3 ++;
+let ' i = Val i;
+prefix 0 ';
+let q = '1 ++ Negate '2 ** Negate '4;
+eval q;
+

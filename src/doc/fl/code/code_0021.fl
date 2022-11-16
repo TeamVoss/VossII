@@ -1,0 +1,8 @@
+VARS "a b s[2:0]";
+param (a AND b);
+param (a OR b);
+
+// Note that this is a state vector that only takes on values
+// that are in the final_image and that all states in final_image
+// has some assignment to the variables.
+substitute (param final_image) s;

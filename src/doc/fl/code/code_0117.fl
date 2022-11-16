@@ -1,0 +1,3 @@
+get_trace ste_res "mux_out";
+// See it in increasing time instead.
+rev it;

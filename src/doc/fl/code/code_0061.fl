@@ -1,0 +1,8 @@
+let pr_card king = "K"
+  /\  pr_card queen = "Q"
+  /\  pr_card jack = "J"
+  /\  pr_card (other n) = int2str n;
+pr_card king;
+pr_card queen;
+pr_card jack;
+pr_card (other 5);

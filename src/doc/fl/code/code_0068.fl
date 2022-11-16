@@ -1,0 +1,28 @@
+
+let Pexpr expr =
+    letrec do_print indent (E_FORALL s e) =
+        (printf "(E_FORALL %s\n%*s" s (indent+2) "") fseq
+        (do_print (indent+2) e) fseq
+        (printf "%*s)\n" indent "")
+     /\    do_print indent (E_VAR s) = printf "%s\n" s
+     /\    do_print indent (E_TRUE) = printf "T\n"
+     /\    do_print indent (E_AND e1 e2) =
+        (printf "(E_AND\n%*s" (indent+2) "") fseq
+        (do_print (indent+2) e1) fseq
+        (printf "%*s" (indent+2) "") fseq
+        (do_print (indent+2) e2) fseq
+        (printf "%*s)\n" indent "")
+     /\    do_print indent (E_NOT e) =
+        (printf "(E_NOT\n%*s" (indent+2) "") fseq
+        (do_print (indent+2) e) fseq
+        (printf "%*s)\n" indent "")
+    in
+    (do_print 0 expr) fseq
+    ""
+;
+install_print_function Pexpr;
+
+let e = E_FORALL "a" (E_AND (E_VAR "a") (E_NOT (E_AND E_TRUE (E_VAR "a"))));
+
+e;
+

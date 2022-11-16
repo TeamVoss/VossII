@@ -1,0 +1,4 @@
+let v1 = int2bv 3;
+let v2 = int2bv 12;
+let res = a => v1 | v2;
+res;

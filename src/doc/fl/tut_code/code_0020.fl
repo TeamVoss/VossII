@@ -1,0 +1,3 @@
+T AND F;
+T XOR (F OR T);
+IF T THEN (print "hello") ELSE (print "absurdity");

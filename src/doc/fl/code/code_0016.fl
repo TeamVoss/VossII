@@ -1,0 +1,5 @@
+!a. ?b. (a XOR b);
+let a = variable "a"; let b = variable "b"; let c = variable "c";
+a AND b OR c;
+Quant_forall ["a"] (a AND b OR c);
+Quant_thereis ["a","c"] (a AND b OR c);

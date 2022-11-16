@@ -13,7 +13,7 @@ let Init_sch_draw =
    sprintf "source %s/waveform.tcl" DIR
   ]) fseq ()
 ;
-Init_sch_draw;
+NOT noX => Init_sch_draw | ();
 
 let dbg_tcl_eval l =
     (fprintf stderr "CMDS:\n") fseq
@@ -46,7 +46,7 @@ let Create_Dummy_Placement =
          ]) fseq
     ()
 ;
-Create_Dummy_Placement;
+NOT noX => Create_Dummy_Placement | ();
 
 let accurate_toplevel_pexlif2fsm p =
     let old1 = update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" "TRUE" then
@@ -255,7 +255,8 @@ export_to_tcl fl_destroy_vfsm;
 //       more difficult (but not impossible) but makes it safer since
 //       possibly erroneous trace values are eliminated.
 //
-let bool_STE opts ckt wl ant cons trl = busy (STE opts ckt wl ant cons trl);
+let bool_STE opts ckt wl ant cons trl =
+    noX => (STE opts ckt wl ant cons trl) | busy (STE opts ckt wl ant cons trl);
 
 
 // Perform symbolic trajectory evaluation on the circuit displayed in vfsm.

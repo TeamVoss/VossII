@@ -1,0 +1,27 @@
+load "idv.fl";
+
+let property name {s :: bit} =
+    let vs = base_get_lhs_vars (hw_destr s) in
+    PINST (sprintf "draw_hier %s" name) [] F
+	    [("a",vs)] [("a",vs)] [] (P_HIER [])
+;
+
+
+let tst =
+    bit_input a b c.
+    bit_output o.
+    bit_internal na.
+    CELL "draw_hier tst" [
+	na <- '~' a,
+	o <- na '&' (b '|' c),
+	(property "na_prop" na),
+	(property "b_prop" b),
+	(property "c_prop" c)
+];
+
+let p = tst 'a 'b 'c 'o;
+
+let ckt = toplevel_pexlif2fsm p;
+ckt;
+
+STE_debug ckt;

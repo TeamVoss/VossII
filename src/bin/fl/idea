@@ -1,0 +1,33 @@
+
+forall [x | '0 < x AND x <= '10].
+    ( ... x .... y ....)
+;
+
+====>
+
+forall ["x"] (\x. '0 < x AND x <= '10) (\x. ( ... x .... y ....)) 
+
+
+&& 
+
+
+forall [x y | '0 < x AND x <= '10 AND y > '0].
+    ( ... x .... y ....)
+;
+
+forall ["x", "y"] (\x.\y. '0 < x AND x <= '10 AND y > '0) (\x.\y. ( ... x .... y ....)) 
+
+
+
+How about:
+
+forall [(BR t1 t2) | ((depth t1) < 3) AND ((depth t2) < 2)].
+    (... t1 ... t2 ...)
+;
+
+
+===>
+
+forall ["_$1"] (\(BR t1 t2). ((depth t1) < 3) AND ((depth t2) < 2)) (\(BR t1 t2).  ... t1 ... t2 ...)
+
+

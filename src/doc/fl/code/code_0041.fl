@@ -1,0 +1,13 @@
+forward_declare {Male:: int-> int};
+
+letrec Female 0 = 1
+ /\    Female n = n - Male (Female (n-1))
+;
+
+letrec Male 0 = 0
+ /\    Male n = n - Female (Male (n-1))
+;
+
+Female 10;
+
+map Male (1--20);

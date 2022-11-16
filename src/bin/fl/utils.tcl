@@ -1151,7 +1151,7 @@ proc gui_execute_sub_process {w cmd logfile comment {cmd_file ""}} {
         scrollbar $sw.xscroll -orient horizontal -command "$sw.t xview"
         text $sw.t -setgrid 1 \
             -yscroll "$sw.yscroll set" -xscroll "$sw.xscroll set" \
-            -font $::voss2_txtfont1 -bg lightgrey
+            -font $::voss2_txtfont1 -bg white
         pack $sw.yscroll -side right -fill y
         pack $sw.xscroll -side bottom -fill x
         pack $sw.t -side top -fill both -expand yes

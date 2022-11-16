@@ -1,0 +1,35 @@
+
+begin_abstype;
+
+let empty_state = [];
+let add_to_state state var value = (var,value):state;
+let lookup var state =
+    (assoc var state) catch
+    eprintf "Cannot find variable %s (not bound?)" var
+;
+
+let expr2bool e =
+    letrec eval (E_FORALL s e) state =
+            let state0 = add_to_state state s T in
+            let state1 = add_to_state state s F in
+            (eval e state0) AND (eval e state1)
+     /\    eval (E_VAR s) state = lookup s state
+     /\    eval (E_TRUE) state = T
+     /\    eval (E_AND e1 e2) state = (eval e1 state) AND (eval e2 state)
+     /\    eval (E_NOT e) state = NOT (eval e state)
+    in
+    eval e empty_state
+;
+
+lettype theorem = THM expr;
+let Ptheorem t =
+    let PP (THM e) = fprintf stdout "Expression is a theorem\n" in
+    (PP t) fseq ""
+;
+install_print_function Ptheorem;
+
+let is_taut e =
+    (expr2bool e == T) => THM e | error "Expression is not a theorem"
+;
+end_abstype is_taut;
+

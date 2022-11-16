@@ -5,3 +5,5 @@
 (cload (DIR^"../IDVII/src/fl/design/util.fl")) fseq
 (cload (DIR^"../IDVII/src/fl/design/yosys_lib.fl")) fseq
 (cload (DIR^"../IDVII/lib/osu018_stdcells/stdcells.fl"));
+
+let rename_stdcells {p::pexlif} = p;

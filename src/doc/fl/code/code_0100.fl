@@ -1,0 +1,22 @@
+STRUCT "opcode" 32 [
+                    ("opcode", "op", [31,29]),  // Non-contiguous!
+                    ("dest", "addr", (23--16)),
+                    ("src1", "addr", (15--8)),
+                    ("src2", "addr", (7--0)),
+                    ("target", "pc", (28--0))
+                    ]
+;
+
+'a-->opcode;
+'a-->dest;
+'a-->target;
+
+'0<--opcode ? ADD
+  <--dest   ? '0x1
+  <--src1   ? '0x2
+  <--src2   ? '0x3
+;
+
+'0<--opcode ? JMP
+  <--target ? '0xabba
+;

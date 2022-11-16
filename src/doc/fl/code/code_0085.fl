@@ -1,0 +1,6 @@
+letrec {pow2:: *a -> *a} n = (n = '0) => '1 | '2 * pow2 (n - '1);
+pow2 3;
+pow2 {'3::int};
+pow2 {'3.0::float};
+pow2 {'3::bv};
+pow2 {'3::bev};

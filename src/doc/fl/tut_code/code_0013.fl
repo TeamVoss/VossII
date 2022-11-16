@@ -1,0 +1,4 @@
+let firstForStrings (x, _) = {x :: string};
+
+firstForStrings ("hello", 5.5, 123);
+firstForStrings (1, 2);

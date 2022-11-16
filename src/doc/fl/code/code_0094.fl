@@ -1,0 +1,36 @@
+let flatten_pexlif stop_pred p =
+    letrec do_flat sub pref p =
+        let tr n = (assoc n sub) catch n in
+        val (PINST name attrs leaf fa_inps fa_outs ints content) = p in
+        leaf OR stop_pred p =>
+            let tr_io (f,as) =
+                let as' = md_merge_vectors (map tr (md_expand_vectors as)) in
+                (f,as')
+            in
+            let fa_inps' = map tr_io fa_inps in
+            let fa_outs' = map tr_io fa_outs in
+            [(PINST name attrs leaf fa_inps' fa_outs' ints content)]
+        |
+            val (P_HIER children) = content in
+            let mk_io_sub (f,as) =
+                zip (md_expand_vector f) (map tr (md_expand_vectors as))
+            in 
+            let io_sub = flatmap mk_io_sub (fa_inps @ fa_outs) in
+            let mk_int_sub f = 
+                map (\n. n, sprintf "%s%s" pref n) (md_expand_vector f)
+            in
+            let int_sub = flatmap mk_int_sub ints in
+            let sub' = io_sub @ int_sub in
+            let prefs = map (sprintf "%si%d/" pref) (1 upto length children) in
+            flat (map2 (do_flat sub') prefs children)
+    in
+    let children = do_flat [] "" p in
+    let wires_used (PINST _ _ _ fa_inps fa_outs _ _) =
+        md_expand_vectors (flatmap snd (fa_inps @ fa_outs))
+    in
+    let all = setify (flatmap wires_used children) in
+    val (PINST name attrs _ fa_inps fa_outs _ _) = p in
+    let ios = md_expand_vectors (flatmap snd (fa_inps @ fa_outs)) in
+    let new_ints = md_extract_vectors (all subtract ios) in
+    (PINST name attrs F fa_inps fa_outs new_ints (P_HIER children))
+;   

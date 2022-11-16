@@ -150,6 +150,17 @@ gen_strtemp(tstr_ptr tp, string s)
 }
 
 string
+gen_strtruncate(tstr_ptr tp, int len)
+{
+    ASSERT(tp->initialized == STRMGR_MAGIC_NBR);
+    if( len < 0 ) { len = 0; }
+    tp->tmp_buf[len] = 0;
+    tp->cur_tmp = &(tp->tmp_buf[len]);
+    tp->tmp_cnt = len;
+    return(tp->tmp_buf);
+}
+
+string
 gen_strappend(tstr_ptr tp, string s)
 {
     ASSERT(tp->initialized == STRMGR_MAGIC_NBR);

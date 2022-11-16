@@ -1,0 +1,17 @@
+
+let ~ e = E_NOT e;
+prefix 0 ~;
+let && a b = E_AND a b;
+infix 4 &&;
+let || a b = E_NOT (E_AND (E_NOT a) (E_NOT b));
+infix 3 ||;
+let forall fn s = E_FORALL s (fn (E_VAR s));
+binder forall;
+let thereis fn s = E_NOT (E_FORALL s (E_NOT (fn (E_VAR s))));
+binder thereis;
+let ^^ a b = ~a && ~b || a && b;
+infix 4 ^^;
+
+// Example
+let e = forall a b. thereis c. ~(a^^b) || ~(a^^(c^^b));
+

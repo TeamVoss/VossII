@@ -1,0 +1,8 @@
+load "ste.fl";  // Must be loaded for HFL
+
+TYPE "byte" 8;
+TYPE "addr" 8;
+TYPE "pc" 29;
+{'a::byte};
+{'a::addr};
+{'a::pc};

@@ -1,0 +1,11 @@
+letrec add_list =
+    list_input  il.
+    output      o.
+    internal    m.
+    CELL "draw_hier add_list" (
+        length il = 1 => [o <- (hd il)] |
+        [
+            add_list (tl il) m,
+            o <- (hd il) '+' m
+        ]
+);

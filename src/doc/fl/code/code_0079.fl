@@ -1,0 +1,9 @@
+let pr name = fprintf stderr "We have now reached: %s\n" name;
+
+letrec fac n =
+    ((n % 2 = 0) => pr (n seq "Even") | pr (n seq "Odd")) fseq
+    n = 0 => 1 | n* fac (n-1)
+;
+
+fac 7;
+fac 11;

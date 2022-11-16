@@ -1,0 +1,5 @@
+MEMORY "regfile" [(10,"addr")] "byte";
+{'a::regfile};
+read_regfile 'a '0x3;
+write_regfile 'a '0x0 '0xab;
+write_regfile 'a '0x3 'd;

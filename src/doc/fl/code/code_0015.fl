@@ -1,0 +1,29 @@
+lettype stree = STREE {type::bv}
+                      {o_val:: {bv} opt}        // Use bvs instead of integers!
+                      {o_left :: {stree} opt}
+                      {o_right :: {stree} opt}
+;
+
+// Define constructors for the symbolic binary tree
+let leaf_type = int2bv 0;
+let branch_type = int2bv 1;
+let LF v = STREE leaf_type (SOME (int2bv v)) NONE NONE;
+let BR l r = STREE branch_type NONE (SOME l) (SOME r);
+
+// Define a function that adds up the leaves. Note: bvs are used instead of ints
+letrec sum_leaves (STREE type o_val o_left o_right) =
+        type = leaf_type => get_value o_val |
+        (sum_leaves (get_value o_left)) + (sum_leaves (get_value o_right))
+;
+
+let t1 = BR (BR (LF 1) (LF 2)) (LF 3);
+sum_leaves t1;
+
+let t2 = BR (BR (BR (BR (LF 1) (LF 2)) (LF 3)) (LF 4)) (BR (LF 5) (LF 6));
+sum_leaves t2;
+
+// A symbolic tree
+let st = a => t1 | t2;
+
+// Note that sum_leaves still work for it.
+sum_leaves (a => t1 | t2);

@@ -1,0 +1,10 @@
+let model = bget_model [(ex0 bXOR ex1)] 10;
+// No model exists when ex0 and ex1 are different (i.e., ex0 == ex1)
+model;
+
+let model = bget_model [(ex0 bXOR ex2)] 10;
+// A model is found
+model;
+
+bsubstitute model ex0;
+bsubstitute model ex2;

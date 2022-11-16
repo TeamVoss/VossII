@@ -1,0 +1,19 @@
+let go_on topic =
+    let query = sprintf "Do you want to continue with %s?" topic in
+    tcl_eval [
+	"toplevel .foo",
+	sprintf "label .foo.question -text {%s}" query,
+	"frame .foo.answer",
+	"button .foo.answer.yes -text Yes -command {set res 1}",
+	"button .foo.answer.no  -text No  -command {set res 0}",
+	"pack .foo.question -side top -fill x",
+	"pack .foo.answer -side top -fill x",
+	"pack .foo.answer.yes -side left -expand y -fill x",
+	"pack .foo.answer.no  -side left -expand y -fill x",
+	"update",
+	"i_am_free",
+	"tkwait variable res",
+	"destroy .foo",
+	"set res"
+    ] = "1"
+;

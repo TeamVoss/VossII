@@ -1,0 +1,2 @@
+bv_constrained_variable "a[8:0]" (\v. v >= '0);
+bv_ZX (bv_variable "a[7:0]");

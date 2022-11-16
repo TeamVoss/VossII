@@ -1,0 +1,14 @@
+let l = [1,2,3,3,2,1,2];
+hd l;
+tl l;
+0:l;
+length l;
+letrec odd_even (a:b:rem) =
+    val (r_odd, r_even) = odd_even rem then
+    (a:r_odd), (b:r_even)
+ /\    odd_even [a] = [a],[]
+ /\    odd_even [] = [], []
+;
+val (odd,even) = odd_even (1--20);
+odd;
+even;

@@ -1,0 +1,24 @@
+letrec fl_fac n = (n = 1) => 1 | n*fl_fac (n-1);
+export_to_tcl fl_fac;
+
+let fac_calc title =
+    tcl_eval [
+	"toplevel .foo",
+	sprintf "label .foo.title -text {%s}" title,
+	"frame .foo.c",
+	"entry .foo.c.inp",
+	"button .foo.c.do -text Compute -command { docomp }",
+	"entry .foo.c.out",
+	"pack .foo.title .foo.c -side top -fill x",
+	"pack .foo.c.inp .foo.c.do .foo.c.out -side left",
+	(
+	    "proc docomp {} {"^
+	    "   set i [.foo.c.inp get];"^
+	    "   set o [fl_fac $i];"^
+	    "   .foo.c.out delete 0 end;"^
+	    "   .foo.c.out insert 0 $o;"^
+	    "}"
+	)
+    ]
+;
+

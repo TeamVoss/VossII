@@ -1,0 +1,5 @@
+VARS "a b c d";
+let e = [(1,[a AND b XOR c]), (2,[T,T,a,b, d])];
+e;
+substitute [("a",T),("b",F),("c",F),("d",F)] e;
+substitute [("a",b),("b",a)] e;

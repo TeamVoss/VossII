@@ -1,0 +1,5 @@
+MEMORY "array" [(4,"addr"),(5,"addr")] "byte";
+{'a::array};
+read_array 'a '0x3 '0x1;
+write_array 'a '0x0 '0x0 '0xab;
+write_array 'a '0x3 '0x2 'd;

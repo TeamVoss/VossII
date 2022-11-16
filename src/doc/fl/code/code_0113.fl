@@ -1,0 +1,24 @@
+// Get a list of all inputs to the circuit
+inputs ckt;
+
+// Get a list of all outputs of the circuit
+outputs ckt;
+
+// Return the immediate fanin from a node in a circuit.
+fanin ckt "mux_out";
+
+// Return the immediate fanout from a node in a circuit.
+fanout ckt "mid01";
+
+// Find the full vector given a node in it.
+node2vector ckt "sel[0]";
+
+// Use fanin_dfs to recursively go back until a toplevel node is encountered
+let top_fanin ckt nd =
+    let toplevel n = NOT (str_is_substr "/" n) in
+    let all_inps = fanin_dfs ckt toplevel [nd] in
+    let top_level_inps = filter toplevel all_inps in
+    top_level_inps subtract [nd]
+;
+
+top_fanin ckt "mux_out";

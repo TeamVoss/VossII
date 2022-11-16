@@ -1,0 +1,7 @@
+letrec mutex_list [x]    = x
+      /\ mutex_list (x:xs) = IF x THEN AND_list (map NOT xs) ELSE mutex_list xs
+      ;
+
+let x = variable "x";
+let y = variable "y";
+mutex_list [F, F, F, x, y];

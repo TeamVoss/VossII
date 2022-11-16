@@ -1,0 +1,1 @@
+let ihd {l::int list} = hd l;

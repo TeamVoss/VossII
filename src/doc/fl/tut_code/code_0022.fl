@@ -1,0 +1,3 @@
+let x = variable "x";
+let y = variable "y";
+(NOT (x AND y)) == ((NOT x) OR (NOT y));

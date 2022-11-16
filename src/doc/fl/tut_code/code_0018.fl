@@ -1,0 +1,10 @@
+lettype rank = ace | king | queen | jack | numeric int;
+
+let cardValue ace         = 14
+   /\ cardValue king        = 13
+   /\ cardValue queen       = 13
+   /\ cardValue jack        = 13
+   /\ cardValue (numeric n) = n
+   ;
+
+let better a b = cardValue a > cardValue b;

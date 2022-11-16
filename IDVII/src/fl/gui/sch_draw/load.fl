@@ -3,16 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
-noX => 
-(
-(eval "let STE_debug ckt = ckt; fprintf stdinfo \"WARNING: STE_debug not fully functional in -noX mode\";") seq
-(eval "let draw_fanin = error \"draw_fanin not avaliable in -noX mode\";") seq
-()
-)
-|
-(
-    (cload (DIR^"types.fl")) fseq
-    (cload (DIR^"draw_sch.fl")) fseq
-    (cload (DIR^"idv_gui.fl")) fseq
-    ()
-);
+(cload (DIR^"types.fl")) fseq
+(cload (DIR^"draw_sch.fl")) fseq
+(cload (DIR^"idv_gui.fl")) fseq
+();

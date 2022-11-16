@@ -1,0 +1,23 @@
+let cnt_r = ref 1;
+
+letrec fib 1 = 1
+ /\    fib 2 = 1
+ /\    fib n =
+	(cnt_r := (deref cnt_r + 1)) fseq
+	fib (n-1) + fib (n-2)
+;
+
+cnt_r := 0;
+fib 20;
+deref cnt_r;
+
+cletrec mfib 1 = 1
+  /\    mfib 2 = 1
+  /\    mfib n =
+	(cnt_r := (deref cnt_r + 1)) fseq
+	mfib (n-1) + mfib (n-2)
+;
+
+cnt_r := 0;
+mfib 20;
+deref cnt_r;

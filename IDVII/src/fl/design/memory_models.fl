@@ -1,0 +1,119 @@
+cload "ste.fl";
+
+// =================================================================
+// Work in progress.....
+// =================================================================
+
+let RAM_DELAY = 5;
+
+let DISTINCT_LOCATIONS = 3;
+
+ENUM "ram_state" ["R_IDLE", "R_WAITING", "R_READY"];
+
+let mk_var name =
+    let r_sz = hw_size {'a:: *r} in
+    let nds = md_expand_vector name in
+    length nds != r_sz => eprintf "Length mismatch for %s" name |
+    {(hw_constr (W_CAT (map (W_VAR 1) nds))):: *r}
+;
+
+letrec EMM_rec =
+    list_input		data_l.
+    list_input		addr_l.
+    addr_input		addr.
+    cache_line_output	out.
+    cache_line_internal rem.
+    CELL "draw_hier EMM" (
+	data_l = [] => [out <- 'X] |
+	let my_data = hd data_l in
+	let my_addr = hd addr_l in
+	(my_addr <: my_addr):
+	(my_data <: my_data):
+	(out <- (IF (my_addr '=' addr) THEN my_data ELSE rem)):
+	(EMM_rec (tl data_l) (tl addr_l) addr rem):[]
+);
+
+let get_vs v = get_lhs_vars (hw_destr v);
+
+let insert_internals internals (PINST name attrs leaf inps outs ints body) =
+    let ints' = md_extract_vectors (internals @ ints) in
+    (PINST name attrs leaf inps outs ints' body)
+;
+
+let EMM name =
+    addr_input          addr.
+    cache_line_output   out.
+    let pfn = sprintf "draw_hier {EMM %s (%d)}" name DISTINCT_LOCATIONS in
+    let asz = hw_size {'a::addr}-1 then
+    let dsz = hw_size {'a::cache_line}-1 then
+    let mkd i = {mk_var (sprintf "%s_dta[%d][%d:0]" name i dsz) ::cache_line} in
+    let mka i = {mk_var (sprintf "%s_adr[%d][%d:0]" name i asz) ::addr} in
+    let data_l = map mkd (0 upto (DISTINCT_LOCATIONS-1)) then
+    let addr_l = map mka (0 upto (DISTINCT_LOCATIONS-1)) then
+    let internals =
+	md_extract_vectors ((flatmap get_vs data_l)@(flatmap get_vs addr_l))
+    then
+    insert_internals internals (
+    CELL pfn [
+	EMM_rec data_l addr_l addr out
+]);
+
+let RAM_model =
+    bit_input		clk.
+    bit_input		reset.
+    addr_input		addr.
+    bit_input		req.
+    cache_line_output	data.
+    bit_output		valid.
+    //
+    ram_state_internal	state.
+    bit_internal	timeout.
+    byte_internal	n_cnt cnt.
+    CELL "draw_hier RAM_model" [
+	EMM "MEM_EMM" addr data,
+	(Moore_FSM "RAM_STATE" clk state
+	(reset, R_IDLE) [
+		R_IDLE --- req --- R_WAITING,
+		R_WAITING --- timeout --- R_READY,
+		R_READY --- default --- R_IDLE
+	    ]
+	),
+	CASE n_cnt [
+	    is_R_IDLE state --- ''RAM_DELAY,
+	    is_R_WAITING state --- cnt '-' '1
+	] cnt,
+	re_ff clk n_cnt cnt,
+	timeout <- cnt '=' '0,
+	valid <- is_R_READY state
+];
+
+let p_RAM = RAM_model 'clk 'reset 'addr 'req 'data 'valid;
+let ckt_RAM = pexlif2fsm p_RAM;
+let vis_RAM = STE_debug ckt_RAM;
+
+
+let mk_EMM_ant ckt name (MEM addr_data_list) =
+    length addr_data_list > DISTINCT_LOCATIONS =>
+	eprintf "Too many address/data pairs in mk_EMM_ant!" 
+    |
+    let l1 = filter (str_is_substr name) (vectors ckt) then
+    length l1 != 2 => eprintf "More than one %s set of nodes" name |
+    let pref = hd (str_split (hd l1) name) in
+    let asz = hw_size {'0::addr} in
+    let dsz = hw_size {'0::cache_line} in
+    let mk_a_vec i = 
+	{mk_var (sprintf "%s%s_adr[%d][%d:0]" pref name i (asz-1))::addr}
+    in
+    let mk_d_vec i =
+	{mk_var (sprintf "%s%s_dta[%d][%d:0]" pref name i (dsz-1))::cache_line}
+    in
+    letrec mk i ((a,d):rem) =
+	((mk_a_vec i) is a in_phase 0) and
+	((mk_d_vec i) is d in_phase 0) and
+	(mk (i+1) rem)
+     /\    mk i [] = []
+    in
+    mk 0 addr_data_list
+;
+
+

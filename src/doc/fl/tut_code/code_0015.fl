@@ -1,0 +1,4 @@
+let two = 2;
+let addTwo x = two + x;
+let two = 3;
+addTwo 2;

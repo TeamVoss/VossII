@@ -1,0 +1,66 @@
+synth_script_ref :=
+    let basename = get_synth_opt "basename" then
+    let file = get_synth_opt "file" then
+    let flatten = get_synth_opt "flatten" then
+    let libdir = get_synth_opt "libdir" then
+    let cell_lib =
+	sprintf "%s../../../../../lib/yosys/techlibs/xilinx/cells_sim.v" DIR
+    then
+    <{
+
+read_verilog `file`.v
+hierarchy -top `basename`
+
+`flatten`
+
+synth_xilinx
+
+techmap -map `cell_lib` -extern
+
+proc
+opt
+
+clean
+autoname
+clean -purge
+
+write_pexlif -noalias -icells -gates -impltf `file`.fl
+
+}> "functor"
+;
+
+
+synth_stdcell_names := [
+    "VCC", "GND", "IBUF", "IBUFG", "OBUF", "IOBUF", "OBUFT", 
+    "BUFG", "BUFGCTRL", "BUFHCE", "INV",
+    "LUT1", "LUT2", "LUT3", "LUT4", "LUT5", "LUT6", "LUT6_2",
+    "\\$__ABC9_LUT7", "\\$__ABC9_LUT8",
+    "MUXCY", "MUXF5", "MUXF6", "MUXF7", "MUXF8", "MUXF9",
+    "XORCY",
+    "CARRY4", "CARRY8",
+    "ORCY",
+    "MULT_AND",
+    "FDRE", "FDRE_1", "FDSE", "FDSE_1", "FDRSE", "FDRSE_1", 
+    "FDCE", "FDCE_1", "FDPE", "FDPE_1", "FDCPE", "FDCPE_1",
+    "LDCE", "LDPE", "LDCPE",
+    "AND2B1L", "OR2L",
+    "RAM16X1S", "RAM16X1S_1", "RAM32X1S", "RAM32X1S_1", "RAM64X1S",
+    "RAM64X1S_1", "RAM128X1S", "RAM128X1S_1", "RAM256X1S", "RAM512X1S",
+    "RAM16X2S", "RAM32X2S", "RAM64X2S", "RAM16X4S", "RAM32X4S",
+    "RAM16X8S", "RAM32X8S", 
+    "RAM16X1D", "RAM16X1D_1",
+    "RAM32X1D", "RAM32X1D_1",
+    "RAM64X1D", "RAM64X1D_1",
+    "RAM128X1D",
+    "RAM256X1D",
+    "RAM32M", "RAM32M16",
+    "RAM64M", "RAM64M8",
+    "RAM32X16DR8",
+    "RAM64X8SW",
+    "ROM16X1", "ROM32X1", "ROM64X1", "ROM128X1", "ROM256X1",
+    "SRL16", "SRL16E", "SRLC16", "SRLC16E", "SRLC32E",
+    "CFGLUT5",
+    "MULT18X18", "MULT18X18S", "MULT18X18SIO",
+    "DSP48A", "DSP48A1", "DSP48", "DSP48E1",
+    "RAMB18E1", "RAMB36E1"
+];
