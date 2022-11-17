@@ -20,6 +20,7 @@ void DBG_printf(const string fmt, ...);
 void ErrMsg(const string fmt, ...);
 void Eprintf(const string fmt, ...);
 void Rprintf(const string fmt, ...);
+void Info_printf(const string fmt, ...);
 void Wprintf(const string fmt, ...);
 char *Fail_pr(const string fmt, ...);
 void Fail_append(const string fmt, ...);

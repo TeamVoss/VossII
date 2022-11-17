@@ -150,6 +150,18 @@ Rprintf (const string format, ...)
     longjmp(*start_envp, 1);
 }
 
+/* Info_printf -- A printf function for information messages */
+VOID
+Info_printf (const string format, ...)
+{
+    FP(warning_fp, "---- ");
+    va_list arg;
+    va_start(arg, format);
+    FP_va(warning_fp, format, arg);
+    va_end(arg);
+    FP(warning_fp, "\n");
+}
+
 /* Fail_pr -- My own version of C Library Sprintf(FailBuf,...) */
 /* Failure message functions. */
 char *

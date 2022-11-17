@@ -119,6 +119,7 @@ typedef struct fsm_rec {
     buffer      composites;	    // TYPE: ncomp_rec
     buffer	top_inps;	    // TYPE: string
     buffer	top_outs;	    // TYPE: string
+    buffer	props;		    // TYPE: string
     rec_mgr	vis_io_rec_mgr;	    // TYPE: vis_io_rec
     rec_mgr	vis_rec_mgr;	    // TYPE: vis_rec
     rec_mgr	vis_list_rec_mgr;   // TYPE: vis_list_rec

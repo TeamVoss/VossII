@@ -859,6 +859,20 @@ proc idv:do_fev {ww} {
     set ::idv(ordering_file) ""
 }
 
+proc idv:make_top_info_window { title } {
+    set w .exec
+    catch {destroy $w}
+    toplevel $w
+    label $w.l -text $title -font $::voss2_txtfont3
+    pack $w.l -side top -fill x
+    button $w.b -text Close -command [list destroy $w]
+    pack $w.b -side bottom -fill x
+    ttk::notebook $w.vossframe
+    pack $w.vossframe -side bottom -fill both -expand yes
+    set ::idv(info_window_cnt) 0
+    set ::idv(info_window) $w.vossframe
+}
+
 proc idv:make_info_window {title make_container} {
     incr ::idv(info_window_cnt)
     set f $::idv(info_window).f$::idv(info_window_cnt)

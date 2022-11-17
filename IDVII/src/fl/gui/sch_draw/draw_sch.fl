@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
+
+
 let Init_sch_draw =
   (tcl_eval [
    sprintf "set ::imagedir %s%s" DIR "images",
@@ -32,7 +34,6 @@ let big_tcl_eval l =
     res
 ;
 
-
 let Create_Dummy_Placement =
     (tcl_eval ["catch {destroy .c9999999}",
           "frame .c9999999",
@@ -56,7 +57,6 @@ let accurate_toplevel_pexlif2fsm p =
     (update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" old2) fseq
     res
 ;
-
 
 // -------------------------------------------------------------
 

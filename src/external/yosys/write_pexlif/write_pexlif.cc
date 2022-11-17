@@ -866,11 +866,11 @@ struct PexlifDumper
 		    }
 
 		    if (cell->type == "$adff") {
+			f << "_adff ";
 			if( cell->hasParam(ID::CLK_POLARITY) && !cell->getParam(ID::CLK_POLARITY).as_bool() )   { f << "F "; } else { f << "T "; }
 			if( cell->hasParam(ID::ARST_POLARITY) && !cell->getParam(ID::ARST_POLARITY).as_bool() ) { f << "F "; } else { f << "T "; }
 			if( cell->hasParam(ID::ARST_VALUE) ) { f << "\""; f << cell->getParam(ID::ARST_VALUE).as_string(); f << "\" "; } else { f << "\"\" "; }
 			RTLIL::SigSpec out = cell->getPort("\\Q");
-			f << "_adff ";
 			f << stringf("%d \"%s\" ", out.size(), src.c_str());
 			dump_sigspec(f, out);
 			f << " ";

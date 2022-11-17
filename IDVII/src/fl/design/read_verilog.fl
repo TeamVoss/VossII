@@ -78,23 +78,33 @@ let verilog2pexlif no_popup flags top_level_module file_list additional_files =
     (fprintf sfp "write_pexlif -noalias -icells -gates -impltf _out.fl\n") fseq
     (fclose sfp) fseq
     // Run yosys
-    let cmd = sprintf "cd %s; yosys script.ys  > yosys.log 2>&1" tmp_dir then
-    (system cmd) != 0 =>
-	noX OR no_popup =>
-	    eprintf "yosys failed. See %s/yosys.log for datails" tmp_dir
-	|
-	    ((report_result_in_file "Yosys failed."
-		    (tmp_dir^"/yosys.log") [("Ok","0")]) fseq
-	     eprintf "yosys failed. See %s/yosys.log for datails" tmp_dir)
-    |
+    let wr_pexlif = (get_vossrc "VOSS-BINARY-DIRECTORY")^"/write_pexlif.so" in
     (
-    noX OR no_popup =>
-	fprintf stderr "-W- Check %s/yosys.log for Verilog warnings!\n" tmp_dir
-    |
-	((report_result_in_file "Yosys results:" 
-		    (tmp_dir^"/yosys.log") [("Ok","0")]) fseq ())
-    )
-    fseq
+	noX OR no_popup =>
+	    let cmd = sprintf "cd %s; yosys -m %s script.ys  > yosys.log 2>&1"
+			      tmp_dir wr_pexlif
+	    then
+	    (system cmd) != 0 =>
+		eprintf "yosys failed. See %s/yosys.log for datails" tmp_dir
+	    |
+	    fprintf stderr "-W- Check %s/yosys.log for Verilog warnings!\n"
+		    tmp_dir
+	|
+	    let tcmd =
+		sprintf "idv:make_top_info_window {Read Verilog module %s}"
+			top_level_module
+	    then
+	    (tcl_eval [tcmd]) fseq
+	    let cw = tcl_eval ["idv:make_info_window Yosys 0"] then
+	    let cmd = sprintf "yosys -m %s script.ys" wr_pexlif then
+	    val (status, emsg, logfile) =
+		gui_exec cw "Yosys parsing" cmd tmp_dir
+	    then
+	    status = "SIGKILL" => eprintf "Yosys run interrupted" |
+	    status != "0" => eprintf "yosys failed\nSee %s for details" logfile
+	    |
+	    ()
+    ) fseq
     // Covert fl to pexlif
     (load (sprintf "%s/_out.fl" tmp_dir)) fseq
     let fl_cmd = 

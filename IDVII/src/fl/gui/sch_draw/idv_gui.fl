@@ -1093,7 +1093,7 @@ export_to_tcl fl_get_synthesis_script_dir;
 let do_synthesis file bname pexlif_file p synth_type synth_script =
     let cw = tcl_eval ["idv:make_info_window {Write Verilog} 0"] then
     let info_cmd = "echo 'Clean and write out synthesis friendly Verilog'\n" in
-    val (status, _, _) = gui_exec cw "Prepare for synthesis" info_cmd then
+    val (status, _, _) = gui_exec cw "Prepare for synthesis" info_cmd "" then
     status = "SIGKILL" => "" |
     // Rename Verilog hierarchy to sane names
     // Toplevel name is `bname`
@@ -1122,10 +1122,10 @@ let do_synthesis file bname pexlif_file p synth_type synth_script =
     (list2fp fp T "" "" "" (\fp.\s. fprintf fp "%s\n" s) script) fseq
     (fclose fp) seq
     // Now run Yosys 
-    let write_pexlif = sprintf "%s../../../../../bin/write_pexlif.so" DIR then
-    let cmd = sprintf "yosys -m %s -s %s" write_pexlif yosys_file then
+    let wr_pexlif = (get_vossrc "VOSS-BINARY-DIRECTORY")^"/write_pexlif.so" in
+    let cmd = sprintf "yosys -m %s -s %s" wr_pexlif yosys_file then
     let cw = tcl_eval ["idv:make_info_window Yosys 0"] then
-    val (status, emsg, logfile) = gui_exec cw "Yosys synthesis" cmd then
+    val (status, emsg, logfile) = gui_exec cw "Yosys synthesis" cmd "" then
     status = "SIGKILL" => "" |
     status != "0" => eprintf "yosys failed\nSee %s for details" logfile |
     // Now append the loading commands
@@ -1174,7 +1174,7 @@ export_to_tcl fl_do_synthesis;
 let fl_run_fl_loader file =
     let cmd = sprintf "fl -noX -unbuf_stdout -F %s" file then
     let cw = tcl_eval ["idv:make_info_window {Load result} 0"] then
-    val (status, _, _) = gui_exec cw "Load result" cmd then
+    val (status, _, _) = gui_exec cw "Load result" cmd "" then
     status
 ;
 export_to_tcl fl_run_fl_loader;

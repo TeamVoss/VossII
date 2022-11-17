@@ -23,6 +23,7 @@ static bool	v_readline(FILE *fp, string key, string val);
 
 #define STRSAVE(s)	WAstrsave(&rc_strings,(s))
 
+extern void Info_printf(string fmt, ...);
 extern void Rprintf(string fmt, ...);
 #define ABORT(...)      { Rprintf(__VA_ARGS__); }
 
@@ -170,6 +171,7 @@ initRC(vossrc_ptr vp, string file, string path)
 	return;
     if( *path == NULLSTR ) {
 	if( (fp = fopen(file, "r+")) != NULL ) {
+	    Info_printf("Reading preferences from %s\n", file);
 	    /* There was such a file. Read it in */
 	    while( v_readline(fp, keyword, association) ) {
                 updateRCvalue(keyword, association);
@@ -187,6 +189,7 @@ initRC(vossrc_ptr vp, string file, string path)
 	    new_name = strappend(file);
 	    if( (fp = fopen(new_name, "r+")) != NULL ) {
 		/* There was such a file. Read it in */
+		Info_printf("Reading preferences from %s\n", new_name);
 		while( v_readline(fp, keyword, association) ) {
                     updateRCvalue(keyword, association);
 		}
@@ -218,6 +221,7 @@ initRC(vossrc_ptr vp, string file, string path)
 	new_name = strappend(file);
 	if( (fp = fopen(new_name, "r+")) != NULL ) {
 	    /* There was such a file. Read it in */
+	    Info_printf("Reading preferences from %s\n", new_name);
 	    while( v_readline(fp, keyword, association) ) {
                 updateRCvalue(keyword, association);
 	    }

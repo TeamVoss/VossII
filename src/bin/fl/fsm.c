@@ -134,6 +134,7 @@ static buffer	    *nodesp;
 static buffer	    *compositesp;
 static buffer	    *top_inpsp;
 static buffer	    *top_outsp;
+static buffer	    *propsp;
 static hash_record  *old_all_name_tblp;
 static rec_mgr      *old_vec_info_rec_mgrp;
 static rec_mgr      *old_ilist_rec_mgrp;
@@ -148,6 +149,7 @@ static buffer	    *old_nodesp;
 static buffer	    *old_compositesp;
 static buffer	    *old_top_inpsp;
 static buffer	    *old_top_outsp;
+static buffer	    *old_propsp;
 static ilist_ptr    idx_map_result;
 static ilist_ptr    im_cur;
 static hash_record  idx_list_uniq_tbl;
@@ -933,22 +935,10 @@ assertions(g_ptr redex)
     EXTRACT_1_ARG(redex, g_fsm);
     fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
     push_fsm(fsm);
-    buffer res_buf;
-    new_buf(&res_buf, COUNT_BUF(&(fsm->nodes)), sizeof(string));
-    nnode_ptr np;
-    FOR_BUF(&(fsm->nodes), nnode_rec, np) {
-	int start = np->vec->map->from;
-	string nname = get_real_name(np->vec, np->idx-start+1);
-	if( *nname != '!' && strstr(nname, "assert__") != NULL ) {
-	    nname = wastrsave(&strings, nname);
-	    push_buf(&res_buf, &nname);
-	}
-    }
-    qsort(START_BUF(&res_buf), COUNT_BUF(&res_buf), sizeof(string), nn_cmp);
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
     string *spp;
-    FOR_BUF(&res_buf, string, spp) { APPEND1(tail, Make_STRING_leaf(*spp)); }
+    FOR_BUF(propsp, string, spp) { APPEND1(tail, Make_STRING_leaf(*spp)); }
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -2929,6 +2919,7 @@ create_fsm()
     buffer	*_compositesp;
     buffer	*_top_inpsp;
     buffer	*_top_outsp;
+    buffer	*_propsp;
     rec_mgr	*_vis_io_rec_mgrp;
     rec_mgr	*_vis_rec_mgrp;
     rec_mgr	*_vis_list_rec_mgrp;
@@ -2967,6 +2958,9 @@ create_fsm()
     //
     _top_outsp = &(fsm->top_outs);
     new_buf(_top_outsp, 100, sizeof(string));
+    //
+    _propsp = &(fsm->props);
+    new_buf(_propsp, 100, sizeof(string));
     //
     _vis_io_rec_mgrp = &(fsm->vis_io_rec_mgr);
     new_mgr(_vis_io_rec_mgrp, sizeof(vis_io_rec));
@@ -3534,6 +3528,7 @@ push_fsm_env(fsm_ptr fsm)
     old_compositesp = compositesp;
     old_top_inpsp = top_inpsp;
     old_top_outsp = top_outsp;
+    old_propsp = propsp;
     old_vis_io_rec_mgrp = vis_io_rec_mgrp;
     old_vis_rec_mgrp = vis_rec_mgrp;
     old_vis_list_rec_mgrp = vis_list_rec_mgrp;
@@ -3548,6 +3543,7 @@ push_fsm_env(fsm_ptr fsm)
     compositesp = &(fsm->composites);
     top_inpsp = &(fsm->top_inps);
     top_outsp = &(fsm->top_outs);
+    propsp = &(fsm->props);
     vis_io_rec_mgrp = &(fsm->vis_io_rec_mgr);
     vis_rec_mgrp = &(fsm->vis_rec_mgr);
     vis_list_rec_mgrp = &(fsm->vis_list_rec_mgr);
@@ -3567,6 +3563,7 @@ pop_fsm_env()
     compositesp = old_compositesp;
     top_inpsp = old_top_inpsp;
     top_outsp = old_top_outsp;
+    propsp = old_propsp;
 }
 
 static void
@@ -6137,6 +6134,9 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
     // Declare new nodes (internal)
     for(g_ptr l = internals; !IS_NIL(l); l = GET_CONS_TL(l)) {
         string name = GET_STRING(GET_CONS_HD(l));
+	if( *name != '!' && strstr(name, "assert__") != NULL ) {
+	    push_buf(propsp, &name);
+	}
         string value_list = find_value_list(attrs, name);
         declare_vector(&vinfo_tbl, hier, name, FALSE, NULL, value_list);
     }
@@ -8486,6 +8486,7 @@ gen_pexlif2fsm(g_ptr p, g_ptr black_box_list, int max_depth)
     } else {
 	fsm = NULL;
     }
+    qsort(START_BUF(propsp), COUNT_BUF(propsp), sizeof(string), nn_cmp);
     free_mgr(&node_comp_pair_rec_mgr);
     dispose_hash(&node_comp_pair_tbl, NULLFCN);
     dispose_hash(&parent_tbl, NULLFCN);

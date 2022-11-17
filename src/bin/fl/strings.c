@@ -184,7 +184,7 @@ Get_Vector_Size(string vec)
     if( strncmp(vec, "0b", 2) == 0 ) {
 	int len = 0;
 	string s = vec+2;
-	while( *s && ((*s == '0') || (*s == '1')) ) {
+	while( *s && ((*s == '0') || (*s == '1') || (*s == 'x')) ) {
 	    len++;
 	    s++;
 	}

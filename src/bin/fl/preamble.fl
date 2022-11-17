@@ -2110,11 +2110,12 @@ export_to_tcl fl_mktempd;
 // Execute a Linux command and capture the output in a tcl window.
 // Allows the user to interrupt the process.
 // Returns 0 if successful, 1 if interrupted.
-let gui_exec {window::string} {title::string} {cmd::string} =
+let gui_exec {window::string} {title::string} {cmd::string} {workdir::string} =
     let dir = mktempd "gui_exec" then
     let cmd_file = sprintf "%s/cmd_in" dir then
     let log_file = sprintf "%s/cmd_out" dir then
     let fp = fopen cmd_file "w" then
+    (workdir != "" => (fprintf fp "cd %s\n" workdir) | ()) fseq
     (fprintf fp "exec %s" cmd) fseq
     (fclose fp) fseq
     let ncmd = sprintf "/bin/sh %s" cmd_file then

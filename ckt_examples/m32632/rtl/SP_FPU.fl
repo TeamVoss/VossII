@@ -1,15 +1,6 @@
-load "ste.fl";
+load "idv.fl";
 
 let p = verilog2pexlif F "" "SP_FPU" ["SP_FPU.v"] [];
 time (p fseq 1);
 
-let ckt = pexlif2fsm p;
-time (ckt fseq 2);
-
-let vis = STE_debug ckt;
-vis;
-
-random_simulation vis [("BCLK","01")] [] 100;
-
-let lats = setify (map (get_latch_type ckt) (nodes ckt));
-
+IDV p "DB_sp_fpu" [];
