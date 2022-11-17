@@ -7,7 +7,6 @@ LIB_FILES = ../../lib/alloc.c \
 	    ../../lib/buf.c \
 	    ../../lib/hash.c \
 	    ../../lib/morestr.c \
-	    ../../lib/readrc.c \
 	    ../../lib/rec.c \
 	    ../../lib/strmgr.c \
 	    ../../lib/timer.c \
