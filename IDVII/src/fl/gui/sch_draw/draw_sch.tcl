@@ -1504,13 +1504,15 @@ proc add_inst {inst_nbr args} {
     set tag [lindex $args [expr $argcnt-3]]
     set x [lindex $args [expr $argcnt-2]]
     set y [lindex $args [expr $argcnt-1]]
-    set stag _MaInDrAwBoDy
-    set res [eval [lrange $args 0 [expr $argcnt-5]] $c $stag $x $y]
-    set bb [$c bbox $stag&&!_IsDePeNdEnCy_&&!_WiRe_]
+    set old_tags [$c find withtag $tag&&!_IsDePeNdEnCy_&&!_WiRe_]
+    set res [eval [lrange $args 0 [expr $argcnt-5]] $c $tag $x $y]
+    foreach t [$c find withtag $tag&&!_IsDePeNdEnCy_&&!_WiRe_] {
+	if { [lsearch -exact $old_tags $t] == -1 } { lappend new_tags $t }
+    }
+    if ![info exists new_tags] { return $res }
+    set bb [eval $c bbox $new_tags]
     if { $bb == "" } { return $res }
     val {lx ly ux uy} $bb
-    $c addtag $tag withtag $stag
-    $c dtag $stag
     set ii [$c create text [expr $lx+[min_sep $c]] [expr $uy] \
 	  -anchor nw -justify left -font $::sfont($c) -fill $::inst_col \
 	  -text "i$inst_nbr"]
@@ -4403,7 +4405,7 @@ proc fsm:display_fsm {sch_c aname fsm_name dot_pgm states edges inps} {
     pack $w.c -side top -fill both -expand yes
 
     # Now call dot and evaluate the resulting tcl code
-    set fp [open "|dot -Ttk $dot_pgm" "r"]
+    set fp [open "|dot -Ttk $dot_pgm 2> /dev/null" "r"]
     while {[gets $fp line] >= 0} {
         eval $line
     }
@@ -4684,15 +4686,17 @@ proc draw_stdcell {name args} {
     set tag [lindex $args [expr $argcnt-3]]
     set x [lindex $args [expr $argcnt-2]]
     set y [lindex $args [expr $argcnt-1]]
-    set stag _StDcElL
-    set res [eval [lrange $args 0 [expr $argcnt-5]] $c $stag $x $y]
-    val {lx ly ux uy} [$c bbox $stag&&!_IsDePeNdEnCy_&&!_WiRe_]
-    $c addtag $tag withtag $stag
-    $c dtag $stag
-    set bx $lx ;# [expr $lx+[min_sep $c]]
-    set by $ly ;# [expr $ly+2*[min_sep $c]]
-    set tx $ux ;# [expr $ux-3*[min_sep $c]]
-    set ty $uy ;# [expr $uy-2*[min_sep $c]]
+    set old_tags [$c find withtag $tag&&!_IsDePeNdEnCy_&&!_WiRe_]
+    set res [eval [lrange $args 0 [expr $argcnt-5]] $c $tag $x $y]
+    foreach t [$c find withtag $tag&&!_IsDePeNdEnCy_&&!_WiRe_] {
+	if { [lsearch -exact $old_tags $t] == -1 } { lappend new_tags $t }
+    }
+    set bb [eval $c bbox $new_tags]
+    val {lx ly ux uy} $bb
+    set bx $lx
+    set by $ly
+    set tx $ux
+    set ty $uy
     $c create rectangle  $bx $by $tx $ty -outline green -fill "" \
 	-tag "$tag _IsStDcElL_"
     set t [$c create text $bx $by -text $name -anchor sw -justify left \
