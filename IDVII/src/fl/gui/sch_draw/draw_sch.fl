@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
+let DBG_timing = F;
 
 
 let Init_sch_draw =
@@ -24,14 +25,19 @@ let dbg_tcl_eval l =
 ;
 
 let big_tcl_eval l =
-//    length l < 10 => tcl_eval l |
+    length l < 10 => tcl_eval l |
     let fp = mktemp "tcl_eval" then
     (foreach (fprintf fp "%s\n") l) fseq
     let filename = stream2filename fp then
 //    (fprintf fp "exec /bin/rm -f %s\n" filename) fseq
     (fclose fp) fseq
-    let res = tcl_eval [sprintf "source %s" filename] then
-    res
+    let cmd = tcl_eval [sprintf "source %s" filename] in
+    DBG_timing =>
+	val (res,t) = wtime cmd then
+	(fprintf stderr "big_tcl_eval for %d lines: %s\n" (length l) t) fseq
+	res
+    |
+    cmd
 ;
 
 let Create_Dummy_Placement =
@@ -1248,45 +1254,47 @@ let update_colors vfsm =
     let active_canvases = deref (vfsm2canvases_r vfsm) then
     let do_one_canvas (c,evis) =
 	let vis = evis2vis evis in
-	let send color anon =
-	    (tcl_eval [
-		sprintf "cb:prim_set_wire_color %s %s %s" c anon color]) fseq ()
+	let send_cmd color anon =
+	    sprintf "cb:prim_set_wire_color %s %s %s" c anon color
 	in
 	let do_one_col l =
-	    l = [] => () |
+	    l = [] => [] |
 	    let color = snd (hd l) in
 	    let vecs = md_extract_vectors (map fst l) in
 	    val (full_anons, part_anons) =
 		visualization_vecs2tags vis T vecs
 	    then
-	    (foreach (send color) full_anons) fseq
-	    (foreach (send (weaken_color color)) part_anons)
+	    let cmds1 = map (send_cmd color) full_anons then
+	    let wcolor = weaken_color color in
+	    let cmds2 = map (send_cmd wcolor) part_anons then
+	    (cmds1@cmds2)
 	in
-	(tcl_eval [sprintf "cb:restore_original_colors %s" c]) fseq
-	(foreach do_one_col (partition snd highlights)) fseq
+	let tcmd1 = sprintf "cb:restore_original_colors %s" c in
+	let tcmd2 = flatmap do_one_col (partition snd highlights) then
 	// Now do selection since it overrides other colors
-	(do_one_col (map (\v.v,"red") selection))
+	let tcmd3 = do_one_col (map (\v.v,"red") selection) then
+	tcmd1:(tcmd2@tcmd3)
     in
-    (foreach do_one_canvas active_canvases) fseq
+    let tcmds = flatmap do_one_canvas active_canvases then
     NOT (is_IDV_ENV vfsm) =>
 	// Now update the waveform window too
 	let w = deref (vfsm2wvr vfsm) then
-	(tcl_eval [sprintf "wv:restore_original_colors %s" w]) fseq
+	let tcmd1 = sprintf "wv:restore_original_colors %s" w then
 	let do_one_col l =
-	    l = [] => () | (
+	    l = [] => [] |
 	    let color = snd (hd l) then
 	    let vecs = md_extract_vectors (map fst l) then
 	    let do v = sprintf "wv:prim_set_name_color %s {%s} %s;" w v color in
 	    let cmds = map do vecs then
-	    (tcl_eval cmds) fseq ())
+	    cmds
 	in
-	(foreach do_one_col (partition snd highlights))
-	fseq
+	let tcmd2 = flatmap do_one_col (partition snd highlights) then
 	// Now do selection since it overrides other colors
-	(do_one_col (map (\v.v,"red") selection))
+	let tcmd3 = do_one_col (map (\v.v,"red") selection) then
+	big_tcl_eval (tcmds@[tcmd1]@tcmd2@tcmd3)
     |
-	()
- ) gen_catch (\msg. (fprintf stderr "Failure: %s\n" msg)) 
+	big_tcl_eval tcmds
+ ) gen_catch (\msg. (fprintf stderr "Failure: %s\n" msg) fseq "")
 ;
 non_lazy update_colors;
 

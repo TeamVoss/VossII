@@ -2143,9 +2143,6 @@ unfold_pexlif(g_ptr p, unint id)
     FOR_CONS(un_inter, li, item) {
         string old = GET_STRING(item);
 	string new = old;
-#if 0
-new = wastrsave(&strings, gen_tprintf(ts, "_$%d_%s", anon_cnt++, old));
-#else
 	while( VDB_has_name_collision(vdp, new, TRUE) ) {
 	    int cnt;
 	    if( sscanf(new, "_$%d_", &cnt) != 1 ) {
@@ -2156,7 +2153,6 @@ new = wastrsave(&strings, gen_tprintf(ts, "_$%d_%s", anon_cnt++, old));
 		new = wastrsave(&strings, gen_tprintf(ts, "_$%d%s", cnt+1, p));
 	    }
 	}
-#endif
 	VDB_Insert_vector(vdp, new);
         g_ptr newg = Make_STRING_leaf(new);
         INC_REFCNT(old_inter);

@@ -1022,7 +1022,6 @@ partition(g_ptr redex)
     g_ptr pred = GET_APPLY_RIGHT(l);
     g_ptr list = GET_APPLY_RIGHT(redex);
 
-//Disable_GC = TRUE;
     int used = 0;
     new_buf(&partition_results, 100, sizeof(g_ptr));
     new_buf(&partition_results_tail, 100, sizeof(g_ptr));
@@ -1037,7 +1036,6 @@ partition(g_ptr redex)
 	if( is_fail(use) ) {
 	    MAKE_REDEX_FAILURE(redex, FailBuf);
 	    POP_GLOBAL_GC(COUNT_BUF(&partition_results));
-//Disable_GC = FALSE;
 	    DEC_REF_CNT(l);
 	    DEC_REF_CNT(r);
 	    return;
@@ -1071,7 +1069,6 @@ partition(g_ptr redex)
     free_buf(&partition_results);
     free_buf(&partition_results_tail);
     dispose_hash(&partition_tbl, NULLFCN);
-//Disable_GC = FALSE;
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }

@@ -1505,7 +1505,7 @@ proc add_inst {inst_nbr args} {
     set x [lindex $args [expr $argcnt-2]]
     set y [lindex $args [expr $argcnt-1]]
     set old_tags [$c find withtag $tag&&!_IsDePeNdEnCy_&&!_WiRe_]
-    set res [eval [lrange $args 0 [expr $argcnt-5]] $c $tag $x $y]
+    set res [eval $args]
     foreach t [$c find withtag $tag&&!_IsDePeNdEnCy_&&!_WiRe_] {
 	if { [lsearch -exact $old_tags $t] == -1 } { lappend new_tags $t }
     }
@@ -3285,6 +3285,15 @@ proc get_width {c x y cur_max txt} {
     return $cur_max
 }
 
+proc get_txt_width {c tag cur_max} {
+    val {x1 y1 x2 y2} [$c bbox $tag]
+    set new_wid [expr abs($x2-$x1)]
+    if { $new_wid > $cur_max } {
+	set cur_max $new_wid
+    }
+    return $cur_max
+}
+
 proc extract_name_draw_hfl_code {inputs inst_nbr type args} {
     if { $inst_nbr == "-1" } {
 	return "N/A"
@@ -3343,18 +3352,39 @@ proc draw_fub {module inst inst_nbr inames onames c tag x y} {
     # Compute the needed width
     #
     set twid [rect_wid $c]
-    set twid [get_width $c $x $y $twid $module]
-    set twid [get_width $c $x $y $twid $inst]
+    set txt(module) [$c create text $x $y -anchor n -justify center \
+			    -font $::mfont($c) -text $module]
+    add_font_tags $c $txt(module) _IsTeXt_
+    set twid [get_txt_width $c $txt(module) $twid]
+    set txt(inst) [$c create text $x $y -anchor s -justify center \
+	    -font $::mfont($c) -text $inst]
+    add_font_tags $c $txt(inst) _IsTeXt_
+    set twid [get_txt_width $c $txt(inst) $twid]
+    #
     set iwid [letter_sz $c]
+    set icnt 0
     foreach name $inames {
 	val {fname anames} $name
-	set iwid [get_width $c $x $y $iwid $fname]
+	set nm "inp_$icnt"
+	incr icnt
+	set txt($nm) [$c create text $x $y -anchor w -justify left \
+		-font $::mfont($c) -text $fname]
+	add_font_tags $c $txt($nm) _IsTeXt_
+	set iwid [get_txt_width $c $txt($nm) $iwid]
     }
+    #
     set owid [letter_sz $c]
+    set ocnt 0
     foreach name $onames {
 	val {fname anames} $name
-	set owid [get_width $c $x $y $owid $fname]
+	set nm "out_$ocnt"
+	incr ocnt
+	set txt($nm) [$c create text $x $y -anchor e -justify right \
+			-font $::mfont($c) -text $fname]
+	add_font_tags $c $txt($nm) _IsTeXt_
+	set owid [get_txt_width $c $txt($nm) $owid]
     }
+    #
     set rwid [max $twid [expr $iwid + $owid + 5*[letter_sz $c]]]
     set xr [expr $x-5*[min_sep $c]]
     set rht [expr round(([max $inps $outs]+1)*[rect_ht $c])] 
@@ -3364,15 +3394,12 @@ proc draw_fub {module inst inst_nbr inames onames c tag x y} {
     #
     set dr [$c create rectangle [expr ($xr-$rwid)] [expr ($y+$erht/2)] \
 		$xr [expr ($y-$erht/2)] -outline $gcolor -fill $fc -tags $tag]
+    $c lower $dr all
 
     set mid_x [expr ($xr-$rwid/2)]
     set top_y [expr $y-$erht/2]
-    set f [$c create text $mid_x $top_y -anchor n -justify center \
-	    -font $::mfont($c) -text $module]
-    add_font_tags $c $f _IsTeXt_
-    set f [$c create text $mid_x $top_y -anchor s -justify center \
-	    -font $::mfont($c) -text $inst]
-    add_font_tags $c $f _IsTeXt_
+    $c move $txt(module) [expr $mid_x-$x] [expr $top_y-$y]
+    $c move $txt(inst) [expr $mid_x-$x] [expr $top_y-$y]
     # Inputs
     if { $inps == 0 } {
 	set inp_locs {}
@@ -3383,10 +3410,8 @@ proc draw_fub {module inst inst_nbr inames onames c tag x y} {
 	set xl [expr ($nx)]
 	for {set i 0} {$i < $inps} {incr i} {
 	    set yl [expr ($lowy+$i*$sep)]
-	    val {fname anames} [lindex $inames $i]
-	    set f [$c create text $nx $yl -anchor w -justify left \
-		    -font $::mfont($c) -text $fname]
-	    add_font_tags $c $f _IsTeXt_
+	    set nm "inp_$i"
+	    $c move $txt($nm) [expr $nx-$x] [expr $yl-$y]
 	    $c create line $xl $yl $nx $yl -fill $gcolor
 	    lappend inp_locs [expr round($xl)] [expr round($yl)]
 	}
@@ -3403,10 +3428,9 @@ proc draw_fub {module inst inst_nbr inames onames c tag x y} {
     set xl [expr $xr]
     for {set i 0} {$i < $outs} {incr i} {
 	set yl [expr round($lowy+$i*$sep)]
+	set nm "out_$i"
+	$c move $txt($nm) [expr $nx-$x] [expr $yl-$y]
 	val {fname anames} [lindex $onames $i]
-	set f [$c create text $xl $yl -anchor e -justify right \
-		-font $::sfont($c) -text $fname]
-	add_font_tags $c $f _IsTeXt_
 	set wtag [fl_vecs2tags $c $anames]
 	if [fl_is_vector_name $fname] {
 	    $c create line $xl $yl $m_x $yl -fill $gcolor -width 3 \

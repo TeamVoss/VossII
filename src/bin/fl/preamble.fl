@@ -1905,7 +1905,6 @@ andlettype content =
 // Also, every (non-toplevel) wrapper PINST is unfolded.
 let PINST n a l i o t c =
     let mk_pinst n a l i o t c =
-        let is_signature s = (s == "FP") OR (s == "SHA") in
         let process_assertions (P_HIER ps) =
             let get_assert_nd (PINST _ _ _ _ outs _ _) =
                 length outs != 1 => [] |
@@ -1924,6 +1923,7 @@ let PINST n a l i o t c =
             eprintf "Duplicatated assertion (%s)" (hd (el idx ap))
         |
         let t' = setify (assert_nds @ t) in
+        let is_signature s = (s == "FP") OR (s == "SHA") in
         let a' = filter (NOT # is_signature # fst) a in
         let f  = ("FP",  fp_pinst    i o t' c) in
         let s  = ("SHA", sha_pinst n i o t' c) in

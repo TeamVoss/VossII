@@ -6,6 +6,16 @@
 let Init_idv_gui = (tcl_eval [sprintf "source %sidv_gui.tcl" DIR]) fseq ();
 NOT noX => Init_idv_gui | ();
 
+let make_info_window title container =
+    let t = (str_is_substr " " title) => sprintf "{%s}" title | title in
+    let cmd = sprintf "idv:make_info_window %s %d" t (container => 1 | 0) in
+    container => 
+	tcl_eval [sprintf "winfo id [%s]" cmd]
+    |
+	tcl_eval [sprintf "%s" cmd]
+;
+non_lazy make_info_window;
+
 let clean_name s =
     let tr c =
 	c = " " => "_" |
@@ -1091,7 +1101,7 @@ let fl_get_synthesis_script_dir {dummy::void} =
 export_to_tcl fl_get_synthesis_script_dir;
 
 let do_synthesis file bname pexlif_file p synth_type synth_script =
-    let cw = tcl_eval ["idv:make_info_window {Write Verilog} 0"] then
+    let cw = make_info_window "Write Verilog" F then
     let info_cmd = "echo 'Clean and write out synthesis friendly Verilog'\n" in
     val (status, _, _) = gui_exec cw "Prepare for synthesis" info_cmd "" then
     status = "SIGKILL" => "" |
@@ -1124,7 +1134,7 @@ let do_synthesis file bname pexlif_file p synth_type synth_script =
     // Now run Yosys 
     let wr_pexlif = (get_vossrc "VOSS-BINARY-DIRECTORY")^"/write_pexlif.so" in
     let cmd = sprintf "yosys -m %s -s %s" wr_pexlif yosys_file then
-    let cw = tcl_eval ["idv:make_info_window Yosys 0"] then
+    let cw = make_info_window "Yosys" F then
     val (status, emsg, logfile) = gui_exec cw "Yosys synthesis" cmd "" then
     status = "SIGKILL" => "" |
     status != "0" => eprintf "yosys failed\nSee %s for details" logfile |
@@ -1173,13 +1183,13 @@ export_to_tcl fl_do_synthesis;
 
 let fl_run_fl_loader file =
     let cmd = sprintf "fl -noX -unbuf_stdout -F %s" file then
-    let cw = tcl_eval ["idv:make_info_window {Load result} 0"] then
+    let cw = make_info_window "Load result" F then
     val (status, _, _) = gui_exec cw "Load result" cmd "" then
     status
 ;
 export_to_tcl fl_run_fl_loader;
 
-let fl_make_template canvas type file basename create {synth_args::string list} =
+let fl_make_template canvas type file basename create =
     let vfsm = w2vfsm canvas then
     let pexlif_file = sprintf "%s/pexlifs/%s.pexlif"
 			      (get_idv_db_dir ()) (clean_name basename)
@@ -1411,7 +1421,7 @@ let BDD_EQ_1 p1 p2 order_file =
 	val (res, opt_cex) = BDD_EQ_base p1 p2 then
 	res == T => res |
 	val (ckt, asserts, cex_ant) = get_value opt_cex then
-	let cw = tcl_eval ["idv:make_info_window CEX 0"] then
+	let cw = make_info_window "CEX" F then
 	let sel = window_choose_alternative
 			"Verification failed."
 			"Do you want to simulate a counterexample?"
@@ -1448,7 +1458,7 @@ let BDD_EQ_1 p1 p2 order_file =
 	let cmd = sprintf "fl -noX -use_stdout -F %s DONT_QUIT" fl_f then
 	(system cmd)
     |
-	let wid = tcl_eval ["winfo id [idv:make_info_window FEV 1]"] then
+	let wid = make_info_window "FEV" T then
 	let cmd = sprintf "fl -use %s -use_stdout -F %s DONT_QUIT" wid fl_f then
 	(system cmd)
     ) fseq
@@ -1456,7 +1466,7 @@ let BDD_EQ_1 p1 p2 order_file =
     val (REMOTE_BDD_REPLY (res,opt_cex)) = read_remote_bdd_result res_f then
     res == T OR noX => res |
     val (ckt, asserts, cex_ant) = get_value opt_cex then
-    let cw = tcl_eval ["idv:make_info_window CEX 0"] then
+    let cw = make_info_window "CEX" F then
     let sel = window_choose_alternative
 		    "Verification failed."
 		    "Do you want to simulate a counterexample?"
@@ -2366,6 +2376,7 @@ let remove_wire p il =
     // This code relies on fold_pexlif putting the new instance first!!!!
     let p' = fold_pexlif p il "_TMP_" then
     val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p' in
+    let top_inps = md_expand_vectors (map fst fa_inps) then
     let block = wrap_pexlif (hd cs) then
     let remain = tl cs then
     has_state block => eprintf "Selection is not all wires" |
@@ -2395,11 +2406,26 @@ let remove_wire p il =
 	let sfa_inps' = map rename_act sfa_inps then
 	(PINST sname sattrs slf sfa_inps' sfa_outs sints sbody)
     in
-    let remain' = map rename1 remain then
+    let remain' = ref (map rename1 remain) then
     let fa_outs' =
 	let rename_formal (f,as) =
-	    let fs' = map (\f. (assoc f sub) catch f) (md_expand_vector f) in
+	    let fs = md_expand_vector f in
+	    let fs' = map (\f. (assoc f sub) catch f) fs in
+	    fs' == fs => [(f,as)] |
 	    let f' = md_merge_vectors fs' then
+	    (fs' intersect top_inps) != [] =>
+		// Not allowed to have primary inputs to primary outputs
+		// Must insert a buffer
+		let sz = length fs' in
+		let fa_inps = [((mk_name sz "i"),f')] in
+		let fa_outs = [((mk_name sz "o"), [f])] in
+		let lfs = [(W_UPDATE_FN (W_VAR sz "o") (W_VAR sz "i"))] in
+		let buf =
+		    PINST "draw_buffer" [] T fa_inps fa_outs [] (P_LEAF lfs)
+		then
+		(remain' := (buf:(deref remain'))) fseq
+		[(f,as)]
+	    |
 	    length f' = 1 => [((hd f'),as)] |
 	    let eas = md_expand_vectors as in
 	    let fa = zip fs' eas then
@@ -2415,7 +2441,7 @@ let remove_wire p il =
 	in
 	flatmap rename_formal fa_outs
     then
-    (PINST name attrs lf fa_inps fa_outs' ints (P_HIER remain'))
+    (PINST name attrs lf fa_inps fa_outs' ints (P_HIER (deref remain')))
 ;
 
 let fl_do_remove_wires canvas =

@@ -196,13 +196,54 @@ let is_wide_AND e  =
 
 (cload (DIR^"/simplify.fl")) fseq ();
 
-cletrec get_cases (W_ITE c1 t1 (W_ITE c2 t2 e2)) =
-	    (c1,t1):(get_cases (W_ITE c2 t2 e2))
-  /\    get_cases (W_ITE c t e) = [(c,t),((W_CONST 1 1), e)]
-  /\    get_cases other = [((W_CONST 1 1), other)]
+//clet get_cases e =
+let get_cases e =
+    letrec get_all_choices conds (W_ITE c t e) =
+	    conds != [] =>
+		let cond = hd conds in
+		(get_all_choices [(W_AND cond c)] t)@
+		(get_all_choices [(W_AND cond (W_NOT c))] e)
+	    |
+		(get_all_choices [c] t)@(get_all_choices [W_NOT c] e)
+     /\    get_all_choices conds other = [(hd conds, other)]
+    in
+    let cases = get_all_choices [] e then
+    let p = partition snd cases then
+    let mk l =
+	let res = snd (hd l) in
+	let cond = accumulate (defix W_OR) (map fst l) then
+	(cond,res)
+    in
+    map mk p
 ;
 
-clet is_case e = (length (get_cases e)) > 2;
+//cletrec get_cases (W_ITE c1 t1 (W_ITE c2 t2 e2)) =
+//	    (c1,t1):(get_cases (W_ITE c2 t2 e2))
+//  /\    get_cases (W_ITE c t e) = [(c,t),((W_CONST 1 1), e)]
+//  /\    get_cases other = [((W_CONST 1 1), other)]
+//;
+
+//let is_case e = (length (get_cases e)) > 2;
+
+let is_case (W_ITE c (W_ITE c2 _ _) _) = T
+ /\ is_case (W_ITE c _ (W_ITE c2 _ _)) = T
+ /\ is_case other = F
+;
+
+
+let append_label lbl ps =
+    let add1 (PINST name attrs lf fa_inps fa_outs ints body) =
+	val (lbl_attrs, other) = split (\(an,av). an = "Label") attrs then
+	let attrs' =
+	    (lbl_attrs = []) => ("Label", lbl):other |
+	    let cur_lbl = snd (hd lbl_attrs) in
+	    let new_lbl = sprintf "%s/%s" cur_lbl lbl in
+	    ("Label", new_lbl):other
+	in
+	(PINST name attrs' lf fa_inps fa_outs ints body)
+    in
+    map add1 ps
+;
 
 forward_declare {w_CASE :: wexpr ->
 			   ((wexpr#wexpr) list) ->
@@ -461,7 +502,7 @@ let base_assignment do_split lhs rhs =
 			      let p1 = split mid e then
 			      (mid, p1)
 		then
-		(p0@p1), (c',e')
+		((append_label "Ctrl" p0)@p1), (c',e')
 	    in
 	    let c_cases = map mk_cond p_cases then
 	    let ps = flatmap fst c_cases then
@@ -663,6 +704,7 @@ infix 1 <:;
 
 
 let anon_arg_cnt = ref 0;
+
 
 let get_act_args fn a =
     (
@@ -3331,9 +3373,10 @@ letrec reduce_tree op =
 	]
 );
 
-let ::: name p =
+let ::: lbl p =
     val (PINST nm attrs lf fa_inps fa_outs ints body) = p in
-    PINST nm (("Label",name):attrs) lf fa_inps fa_outs ints body
+    let attrs' = attrs@[("Label", lbl)] in
+    (PINST nm attrs' lf fa_inps fa_outs ints body)
 ;
 infixr 0 :::;
 

@@ -94,7 +94,7 @@ infix 7 vec_subtract;
 
 // Create a new pexlif in which instances in ids have been collected to
 // a new hiearchy named 'name'.
-let fold_pexlif p il new_name =
+let fold_pexlif_with_label p il new_name lbls =
     val (PINST name attrs leaf fa_inps fa_outs ints (P_HIER chs)) = p then
     let sel (i,sp) = mem i (setify il) in
     val (sels,rems) = split sel (zip (1 upto (length chs)) chs) in
@@ -123,7 +123,8 @@ let fold_pexlif p il new_name =
 	sort ((in_producers@in_consumers) vec_subtract (new_outs @ new_inps))
     in
     let mk_fa l = map (\v. (v,[v])) (sort l) in
-    let cp = PINST new_name [] F (mk_fa new_inps) (mk_fa new_outs) new_ints
+    let nattrs = map (\lbl. ("Label", lbl)) lbls in
+    let cp = PINST new_name nattrs F (mk_fa new_inps) (mk_fa new_outs) new_ints
                 (P_HIER selected)
     in
     let ints' = sort
@@ -132,6 +133,8 @@ let fold_pexlif p il new_name =
     in
     (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER (cp:remain)))
 ;
+
+let fold_pexlif p il new_name = fold_pexlif_with_label p il new_name [];
 
 // 
 // Create new instances for each group in the grouping list.
@@ -229,23 +232,41 @@ let fold_by_label p attribute_predicate new_name =
     fold_pexlif p il new_name
 ;
 
+let get_rev_labels attrs =
+    rev (map snd (filter (\(an,av). an = "Label") attrs))
+;
+
 // Use the "Label" attributes to group the instances inside the pexlif.
 // Basically an easy way to create an extra level of hierarchy without
 // having to manually create all the interfaces.
-let pexlif_group_by_label p =
+letrec pexlif_group_by_label p =
     val (PINST nm attrs lf fa_inps fa_outs ints (P_HIER ps)) = p in
+    ps = [] => p |
     letrec get_lbl idx ((PINST nm attrs lf fa_inps fa_outs ints body):rem) =
-        ((find_attr "Label" "" attrs),idx):(get_lbl (idx+1) rem)
+	let lbls = get_rev_labels attrs in
+	let rest = get_lbl (idx+1) rem in
+	lbls = [] => rest | (lbls, idx):rest
      /\    get_lbl idx [] = []
     in
     let lbl_part = partition fst (get_lbl 1 ps) then
     let mk l =
-        val (lbl,_) = hd l in
-        let indices = map snd l in
-        (lbl,indices)
+	val (lbl,_) = hd l in
+	let indices = map snd l in
+	(lbl,indices)
     in
-    let grl = filter (\(lbl,il). lbl != "") (map mk lbl_part) then
-    foldn_pexlif p grl
+    let hier_cmp (l1,_) (l2,_) = length l2 - length l1 in
+    let lbl_idx_list = qsort hier_cmp (map mk lbl_part) then
+    length (fst (hd lbl_idx_list)) = 1 =>
+	// No sub-hierarchies and thus group remaining according to label
+	let gr_list = map (\(lbll,indices). hd lbll, indices) lbl_idx_list in
+	foldn_pexlif p gr_list
+    |
+    // Must first fold first sub-hierarchy
+    val (lbls, indices) = hd lbl_idx_list in
+    let lbl = last lbls in
+    let p' = fold_pexlif_with_label p indices lbl (rev (butlast lbls)) in
+    // Now call recursively to group remaining
+    pexlif_group_by_label p'
 ;
 
 
