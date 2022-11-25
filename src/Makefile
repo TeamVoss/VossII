@@ -129,7 +129,7 @@ library:
 	COMPATIBILITY_FLAG=$(COMPATIBILITY_FLAG) \
 	LIB_DIR=$(LIB_DIR) RANLIB=$(RANLIB) $(TCL_INCLUDE)
 
-fl: library minisat circuit-isomatch visualization IDV
+fl: library minisat circuit-isomatch visualization
 	@make -C bin/fl \
 	CC=$(CC) CX=$(CX) \
 	FL_OPTIONS=$(FL_OPTIONS) DEBUG_FLAG=$(DEBUG_FLAG) \
@@ -157,8 +157,6 @@ functor:
 	OPTIMIZATION_FLAG=$(OPTIMIZATION_FLAG) \
 	COMPATIBILITY_FLAG=$(COMPATIBILITY_FLAG) $(TCL_INCLUDE)
 
-IDV:
-	@cd ../IDVII/src/fl/design; make
 
 ignore_signals:
 	@make -C bin/ignore_signals CC=$(CC) CX=$(CX) LINKFLAG=$(LINKFLAG)
@@ -206,6 +204,7 @@ install_all: fl functor \
 	@-mkdir -p $(LIB_DIR)
 	cp -r vosslib/* $(LIB_DIR)
 	chmod -R a+rX $(LIB_DIR)
+	@cd ../IDVII/src/fl/design; make
 
 install_visualization: visualization
 	cp external/visualization/schematic_draw_module.so ../IDVII/
@@ -238,4 +237,5 @@ clean:
 	@-make -C external/minisat clean
 	@-make -C external/visualization clean
 	@-make -C $(YOSYS_WRITE_PEXLIF) clean
+	@-make -C ../IDVII/src/fl/design clean
 
