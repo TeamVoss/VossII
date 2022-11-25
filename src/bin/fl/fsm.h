@@ -236,15 +236,15 @@ typedef struct ste_rec {
     gbv         checkTrajectory; // SEL: ->type -> use_bdds use_bexprs use_ints
     gbv         assertion_OK;	 // SEL: ->type -> use_bdds use_bexprs use_ints
     gbv         check_OK;	 // SEL: ->type -> use_bdds use_bexprs use_ints
-    hash_record	trace_tbl;		// TYPE: int -> trace_ptr
-    hash_record	active_weak_tbl;	// TYPE: int -> event_list_ptr
-    hash_record	active_ant_tbl;		// TYPE: int -> event_list_ptr
-    hash_record	active_cons_tbl;	// TYPE: int -> event_list_ptr
+    hash_record	trace_tbl;		// TYPE: pint -> trace_ptr
+    hash_record	active_weak_tbl;	// TYPE: pint -> event_list_ptr
+    hash_record	active_ant_tbl;		// TYPE: pint -> event_list_ptr
+    hash_record	active_cons_tbl;	// TYPE: pint -> event_list_ptr
     rec_mgr	trace_event_rec_mgr;	// TYPE: trace_event_rec
     rec_mgr	trace_rec_mgr;		// TYPE: trace_rec
     rec_mgr	event_rec_mgr;		// TYPE: event_rec
     buffer	event_buf;		// TYPE: event_ptr
-    buffer	weakening_buf;		// TYPE: formula
+    buffer	weakening_buf;		// TYPE: pformula
     rec_mgr	event_list_rec_mgr;	// TYPE: event_list_rec
 } ste_rec;
 
@@ -275,8 +275,8 @@ typedef struct vstate_rec {
     int		mark;		// For g.c.
     vstate_ptr	next;		// Only used for free list
     fsm_ptr	    fsm;	// Circuit
-    hash_record	    stop_nds;		// TYPE: int -> int
-    hash_record	    ifc_nds;		// TYPE: int -> int
+    hash_record	    stop_nds;		// TYPE: pint -> pint
+    hash_record	    ifc_nds;		// TYPE: pint -> pint
     rec_mgr	    sch_rec_mgr;	// TYPE: sch_rec
     rec_mgr	    sch_list_rec_mgr;	// TYPE: sch_list_rec
     rec_mgr	    sch_inst_rec_mgr;	// TYPE: sch_inst_rec

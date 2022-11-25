@@ -53,6 +53,9 @@ FL_OPTIONS = '-D__STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS'
 
 COMPATIBILITY_FLAG = '-std=gnu99'
 
+
+TCL_INCLUDE = '-I/usr/include/tcl8.6/'
+
 #
 # Version control
 #
@@ -124,7 +127,7 @@ library:
 	CC=$(CC) CX=$(CX) \
 	DEBUG_FLAG=$(DEBUG_FLAG) OPTIMIZATION_FLAG=$(OPTIMIZATION_FLAG) \
 	COMPATIBILITY_FLAG=$(COMPATIBILITY_FLAG) \
-	LIB_DIR=$(LIB_DIR) RANLIB=$(RANLIB)
+	LIB_DIR=$(LIB_DIR) RANLIB=$(RANLIB) $(TCL_INCLUDE)
 
 fl: library minisat circuit-isomatch visualization IDV
 	@make -C bin/fl \
@@ -136,7 +139,7 @@ fl: library minisat circuit-isomatch visualization IDV
 	LINKFLAG=$(LINKFLAG) ROOT_DIR=$(ROOT_DIR) VERSION_DATE=$(VERSION_DATE) \
 	MINISAT_DIR=$(MINISAT_DIR) \
 	CKT_ISO_MATCH_DIR=$(CKT_ISO_MATCH_DIR) \
-	PLUGIN_DIR=$(PLUGIN_DIR)
+	PLUGIN_DIR=$(PLUGIN_DIR) TCL_INCLUDE=$(TCL_INCLUDE)
 
 install_plugin_tools:
 	make -C bin/fl abi_version.h
@@ -152,7 +155,7 @@ functor:
 	@cd ./bin/functor; make \
 	CC=$(CC) LINKFLAG=$(LINKFLAG) DEBUG_FLAG=$(DEBUG_FLAG) \
 	OPTIMIZATION_FLAG=$(OPTIMIZATION_FLAG) \
-	COMPATIBILITY_FLAG=$(COMPATIBILITY_FLAG)
+	COMPATIBILITY_FLAG=$(COMPATIBILITY_FLAG) $(TCL_INCLUDE)
 
 IDV:
 	@cd ../IDVII/src/fl/design; make
@@ -223,7 +226,7 @@ minisat:
 	make -C "$(MINISAT_DIR)" install
 
 visualization:
-	make -C "$(VISUALIZATION_DIR)"
+	make -C "$(VISUALIZATION_DIR)" TCL_INCLUDE=$(TCL_INCLUDE)
 
 $(YOSYS_WRITE_PEXLIF)/write_pexlif.so: $(YOSYS_WRITE_PEXLIF)/write_pexlif.cc
 	make -C $(YOSYS_WRITE_PEXLIF)
