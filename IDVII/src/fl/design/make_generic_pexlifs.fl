@@ -1,5 +1,7 @@
 cload "ste.fl";
 
+system "mkdir generics";
+
 let make name p =
     let file = sprintf "%s/generics/%s.pexlif" DIR name then
     p fseq
@@ -74,3 +76,5 @@ make "aldff_1_1"
     (aldff T T (W_VAR 0 "ad") 'aload (W_VAR 0 "d") 'clk (W_VAR 0 "q"))
 ;
 
+
+quit;
