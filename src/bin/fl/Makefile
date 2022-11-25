@@ -16,7 +16,7 @@ CFLAGS = $(DEBUG_FLAG) $(OPTIMIZATION_FLAG) $(FL_OPTIONS) \
 # Minisat legacy code workaround
 CXXFLAGS = -fpermissive -Wno-error
 
-INC = -I../../include -I$(MINISAT_DIR)/include -DROOT_DIR='"$(ROOT_DIR)"'
+INC = -I../../include -I$(MINISAT_DIR)/include $(TCL_INCLUDE) -DROOT_DIR='"$(ROOT_DIR)"'
 LIB = ../../lib/fl_lib.a $(MINISAT_DIR)/lib/libminisat.a \
       $(CKT_ISO_MATCH_DIR)/libisomatch.a
 FL_LIB_FLAGS = -ldl

@@ -34,6 +34,8 @@
 #define END_DBG(type)  
 #endif
 
+typedef formula pformula;
+
 /* ------------- Global variables -------------- */
 
 /********* Global variables referenced ***********/
@@ -66,6 +68,19 @@ static void	write_hash_fun(pointer key, pointer data);
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
 /********************************************************/
+
+unint
+pint_hash(pointer p, unint n)
+{
+    return( ((long unsigned int) p) % n );
+}
+
+bool
+pint_equ(pointer p1, pointer p2)
+{
+    return( ((long unsigned int) p1) == ((long unsigned int) p2) );
+}
+
 
 void
 Serialize_Begin()
@@ -179,6 +194,24 @@ read_int(FILE *fp, int *ip)
 }
 
 void
+write_pint(FILE *fp, void *pi)
+{
+    int i = PTR2INT(pi);
+    WR_DBG1("int");
+    fprintf(fp, "%d\n", i);
+}
+
+void
+read_pint(FILE *fp, int *ip)
+{
+    int i;
+    RD_DBG1("int");
+    if( fscanf(fp, "%d\n", &i) != 1 )
+	Rprintf("Corrupted int object");
+    *ip = i;
+}
+
+void
 write_unint(FILE *fp, unint i)
 {
     WR_DBG1("unint");
@@ -243,6 +276,24 @@ read_formula(FILE *fp, formula *pf)
 {
     int idx;
     RD_DBG1("formula");
+    read_int(fp, &idx);
+    *pf = Load_get_bool_from_idx(idx);
+}
+
+void
+write_pformula(FILE *fp, void *pf)
+{
+    formula f = PTR2INT(pf);
+    WR_DBG1("pformula");
+    int i = Save_get_bool_idx(f);
+    write_int(fp, i);
+}
+
+void
+read_pformula(FILE *fp, formula *pf)
+{
+    int idx;
+    RD_DBG1("pformula");
     read_int(fp, &idx);
     *pf = Load_get_bool_from_idx(idx);
 }

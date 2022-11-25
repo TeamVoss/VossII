@@ -1,7 +1,7 @@
 
 CC = gcc
 # CFLAGS = -O3 -fPIC
-CFLAGS = -g -fPIC
+CFLAGS = -g -fPIC $(TCL_INCLUDE)
 
 LIB_FILES = ../../lib/alloc.c \
 	    ../../lib/buf.c \
