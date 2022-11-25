@@ -126,7 +126,7 @@ library:
 	COMPATIBILITY_FLAG=$(COMPATIBILITY_FLAG) \
 	LIB_DIR=$(LIB_DIR) RANLIB=$(RANLIB)
 
-fl: library minisat circuit-isomatch visualization
+fl: library minisat circuit-isomatch visualization IDV
 	@make -C bin/fl \
 	CC=$(CC) CX=$(CX) \
 	FL_OPTIONS=$(FL_OPTIONS) DEBUG_FLAG=$(DEBUG_FLAG) \
@@ -153,6 +153,9 @@ functor:
 	CC=$(CC) LINKFLAG=$(LINKFLAG) DEBUG_FLAG=$(DEBUG_FLAG) \
 	OPTIMIZATION_FLAG=$(OPTIMIZATION_FLAG) \
 	COMPATIBILITY_FLAG=$(COMPATIBILITY_FLAG)
+
+IDV:
+	@cd ../IDVII/src/fl/design; make
 
 ignore_signals:
 	@make -C bin/ignore_signals CC=$(CC) CX=$(CX) LINKFLAG=$(LINKFLAG)
