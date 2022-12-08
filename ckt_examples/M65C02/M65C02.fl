@@ -54,7 +54,7 @@ let fixed_bv2list bits sign_ext bv =
 //
 // (Although the two reserved bits B and 1 are part of the documentation, they
 // are not used internally and the PSW actually consists of six bits. Also, FL
-// refers to it as 'i1/PSW[5:0]'.)
+// refers to it as 'i69/PSW[5:0]'.)
 //
 // While the 6502 supports a number of instructions with different addressing
 // modes, we focus our attention on its "Add Memory to Accumulator with Carry"
@@ -250,8 +250,8 @@ let static =
     // Microprogram setup.
     "MC[2:0]"      is "0b100"     in_cycle 0 and  // Microcycle controller.
     "uPL[31:28]"   is "0b0101"    in_phase 0 and  // Instruction field.
-    "i4/dRst"      is "0x0"       in_cycle 0 and  // Delayed reset.
-    "i1/PSW[5:0]"  is "0b000100"  in_cycle 1 and  // Program status word.
+    "i72/dRst"     is "0x0"       in_cycle 0 and  // Delayed reset.
+    "i69/PSW[5:0]" is "0b000100"  in_cycle 1 and  // Program status word.
     "OP1[7:0]"     is "0x0"       in_cycle 0 and  // Operand one.
     "OP2[7:0]"     is "0x0"       in_cycle 0 and  // Operand two.
     // Constant.
@@ -280,8 +280,8 @@ let ant =
 let cons =
     "A[7:0]"     is res     in_cycle 9 and
     // Here we can also check the PSW.
-    "i1/PSW[0]" is [carry]  in_cycle 9 and
-    "i1/PSW[1]" is [zero]   in_cycle 9
+    "i69/PSW[0]" is [carry]  in_cycle 9 and
+    "i69/PSW[1]" is [zero]   in_cycle 9
 ;
 
 let ok = T;
@@ -308,6 +308,8 @@ let cons =
 ;
 let ste  = STE "-e" vis [] ant cons [];
 let ok = ok AND get_ste_result ste "strong";
+
+ok;
 
 // -----------------------------------------------------------------------------
 // 0x0157 _ADC_dpX, opcode 0x75, NA <= OP1 + X.

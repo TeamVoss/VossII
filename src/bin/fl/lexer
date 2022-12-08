@@ -100,6 +100,8 @@ static struct keyword_rec {
     {"binder_with_accumulator", BINDER_WITH_ACC},
     {"sized_binder_with_accumulator", SZ_BINDER_WITH_ACC},
     {"clear_fixities", CLEAR_FIXITIES},
+    {"slet", S_LET},
+    {"sletrec", S_LETREC},
     {"clet", C_LET},
     {"cletrec", C_LETREC},
     {"end_abstype", END_ADT},

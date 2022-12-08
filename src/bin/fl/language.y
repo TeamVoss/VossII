@@ -245,6 +245,8 @@ extern int dbg_tst_line_cnt;
 %token <loc_t>	BINDER_WITH_ACC
 %token <loc_t>	SZ_BINDER_WITH_ACC
 %token <loc_t>	CLEAR_FIXITIES
+%token <loc_t>	S_LET
+%token <loc_t>	S_LETREC
 %token <loc_t>	C_LET
 %token <loc_t>	C_LETREC
 %token <loc_t>	END_ADT
@@ -319,7 +321,7 @@ extern int dbg_tst_line_cnt;
 %type  <overloads_t>	overload_list
 %type  <expr_t>		top_expr expr expr05 expr1 expr2 expr_list arg_expr
 %type  <cl_t>		rev_expr_list
-%type  <decl_t>		decl cache_decl fn_defs fn_def lhs_expr_list
+%type  <decl_t>		decl cache_decl strict_decl fn_defs fn_def lhs_expr_list
 %type  <str_t>		var_or_infix
 %type  <type_name_t>	type_name
 %type  <tpLptr_t>	type_list
@@ -466,6 +468,20 @@ stmt		: expr
 		    }
                 }
 		| cache_decl
+		{
+		    if( $1.ok ) {
+			result_ptr res;
+			arg_names_ptr ap = Get_argument_names($1.expr);
+			res = Compile(symb_tbl, $1.expr, NULL, TRUE); 
+			if( res != NULL ) {
+			    symb_tbl = New_fn_def($1.var, res, symb_tbl,
+						  !file_load, $1.file, $1.line,
+						  ap);
+			    Free_result_ptr(res);
+			}
+		    }
+		}
+		| strict_decl
 		{
 		    if( $1.ok ) {
 			result_ptr res;
@@ -832,7 +848,6 @@ cache_decl	: C_LET fn_defs
 		{
 		    if( $2.ok ) {
 			g_ptr	res;
-
 			res = $2.expr;
 			if( RCadd_debug_info ) {
 			    g_ptr dbg = Make_Debug_Primitive($2.var,
@@ -864,7 +879,6 @@ cache_decl	: C_LET fn_defs
 		    /* return: var = Y\var.\arg1.\arg2. . . . .\argn.expr */
 		    if( $2.ok ) {
 			g_ptr	res;
-
 			res = $2.expr;
 			if( RCadd_debug_info ) {
 			    g_ptr dbg = Make_Debug_Primitive($2.var,
@@ -877,6 +891,63 @@ cache_decl	: C_LET fn_defs
 			    cache_nbr = Make_g_cache();
 			    tmp = Make_0inp_Primitive(P_CACHE);
 			    SET_CACHE_TBL(tmp, cache_nbr);
+			    res = Make_APPL_ND(
+				    Make_APPL_ND(tmp, Make_arglist($2.cnt)),
+				    res);
+			}
+			res = Add_args($2.cnt, res);
+			$$.expr = Make_1inp_Primitive(P_Y,
+						  Make_Lambda($2.var,res));
+			$$.var  = $2.var;
+			$$.file = $1.file;
+			$$.line = $1.line;
+			if( $2.type != NULL ) { TypeHint($$.expr,$2.type); }
+			$$.ok	= TRUE;
+		    } else {
+			$$.ok = FALSE;
+		    }
+		}
+		;
+
+strict_decl	: S_LET fn_defs
+		{
+		    if( $2.ok ) {
+			g_ptr	res;
+			res = $2.expr;
+			if( RCadd_debug_info ) {
+			    g_ptr dbg = Make_Debug_Primitive($2.var,
+							     $1.file, $1.line);
+			    res = Make_APPL_ND(dbg, res);
+			}
+			if( $2.cnt > 0 ) {
+			    g_ptr tmp = Make_0inp_Primitive(P_STRICT_ARGS);
+			    res = Make_APPL_ND(
+				    Make_APPL_ND(tmp, Make_arglist($2.cnt)),
+				    res);
+			}
+			$$.expr = Add_args($2.cnt, res);
+			$$.var  = $2.var;
+			$$.file = $1.file;
+			$$.line = $1.line;
+			if( $2.type != NULL ) { TypeHint($$.expr,$2.type); }
+			$$.ok	= TRUE;
+		    } else {
+			$$.ok = FALSE;
+		    }
+		}
+		| S_LETREC fn_defs
+		{
+		    /* return: var = Y\var.\arg1.\arg2. . . . .\argn.expr */
+		    if( $2.ok ) {
+			g_ptr	res;
+			res = $2.expr;
+			if( RCadd_debug_info ) {
+			    g_ptr dbg = Make_Debug_Primitive($2.var,
+							     $1.file, $1.line);
+			    res = Make_APPL_ND(dbg, res);
+			}
+			if( $2.cnt > 0 ) {
+			    g_ptr tmp = Make_0inp_Primitive(P_STRICT_ARGS);
 			    res = Make_APPL_ND(
 				    Make_APPL_ND(tmp, Make_arglist($2.cnt)),
 				    res);

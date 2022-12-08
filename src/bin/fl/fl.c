@@ -33,6 +33,8 @@ bool	    use_stdin = FALSE;
 bool	    use_stdout = FALSE;
 bool        Interrupt_asap = FALSE;
 bool	    cephalopode_mode = FALSE;
+bool	    profiling_active = FALSE;
+bool	    profiling_builtins = FALSE;
 #if DBG_TRACE_AND_SAVE
 int	    debug_id = -1;
 int	    debug_start_comparing = 0;
@@ -253,6 +255,19 @@ fl_main(int argc, char *argv[])
 	    (strcmp(argv[1], "--use_stdin") == 0) )
 	{
             use_stdin = TRUE;
+            argc--, argv++;
+        } else
+        if( (strcmp(argv[1], "-P") == 0) ||
+	    (strcmp(argv[1], "--Profiling") == 0) )
+	{
+            profiling_active = TRUE;
+	    profiling_builtins = TRUE;
+            argc--, argv++;
+        } else
+        if( (strcmp(argv[1], "-p") == 0) ||
+	    (strcmp(argv[1], "--profiling") == 0) )
+	{
+            profiling_active = TRUE;
             argc--, argv++;
         } else
         if( (strcmp(argv[1], "-C") == 0) ||
@@ -698,6 +713,7 @@ Exit(int status)
 	(void) i;
     }
     fprintf(stderr, "\n");
+    if( profiling_active ) { Emit_profile_data(); }
     exit(status);
 }
 

@@ -1,0 +1,24 @@
+load "idv.fl";
+
+//TYPE "word" 4;
+
+let foo =
+    bit_input a b c.
+    bit_output o.
+    CELL "draw_stdcell ABC draw_hier foo" [
+	o <- a '&' (b '|' '~' c)
+];
+
+let test =
+    bit_input a b c d e f.
+    bit_output out.
+    internal m1 m2.
+    CELL "test" [
+	foo a b c m1,
+	foo d e f m2,
+	out <- m1 '&' m2
+];
+
+let p = test 'a 'b 'c 'd 'e 'f 'out;
+
+wtime (p fseq 1);

@@ -40,6 +40,7 @@ static void		rename_loop_repeat_nodes(sch_draw_ptr tree,
 						 hash_record_ptr done);
 static void		break_loops_rec(sch_draw_ptr tree,
 					hash_record_ptr seen,
+					hash_record_ptr	new_nodes,
 					hash_record_ptr done);
 static void		find_drivers_rec(sch_draw_ptr tree);
 
@@ -932,9 +933,12 @@ Break_loops(sch_draw_ptr tree)
     create_hash(&seen_tbl, 100, str_hash, str_equ);
     hash_record done_tbl;
     create_hash(&done_tbl, 100, str_hash, str_equ);
-    break_loops_rec(tree, &seen_tbl, &done_tbl);
-    rename_loop_repeat_nodes(tree, &done_tbl);
+    hash_record new_nodes;
+    create_hash(&new_nodes, 100, str_hash, str_equ);
+    break_loops_rec(tree, &seen_tbl, &new_nodes, &done_tbl);
+    rename_loop_repeat_nodes(tree, &new_nodes);
     dispose_hash(&seen_tbl, NULLFCN);
+    dispose_hash(&new_nodes, NULLFCN);
     dispose_hash(&done_tbl, NULLFCN);
 }
 
@@ -954,13 +958,16 @@ rename_loop_repeat_nodes(sch_draw_ptr tree, hash_record_ptr done)
 }
 
 static void
-break_loops_rec(sch_draw_ptr tree, hash_record_ptr seen, hash_record_ptr done)
+break_loops_rec(sch_draw_ptr tree,
+		hash_record_ptr seen,
+		hash_record_ptr new_nodes,
+		hash_record_ptr done)
 {
     if( tree == NULL ) return;
     if( IS_REPEAT_ND(tree) ) {
 	sch_draw_ptr driver = find_hash(seen, (pointer) tree->name);
 	if(driver != NULL) {
-	    char* fb_name = (string) find_hash(done, (pointer) tree->name);
+	    char* fb_name = (string) find_hash(new_nodes, (pointer) tree->name);
 	    if( fb_name != NULL ) {
 		tree->name = fb_name;
 	    } else {
@@ -968,7 +975,7 @@ break_loops_rec(sch_draw_ptr tree, hash_record_ptr seen, hash_record_ptr done)
 		char new_name[100];
 		sprintf(new_name, "FeEdBaCk_%s", tree->name);
 		tree->name = uStrsave(&strings, new_name);
-		insert_hash(done, (pointer) fb_name, (pointer) tree->name);
+		insert_hash(new_nodes, (pointer) fb_name, (pointer) tree->name);
 		tree->pfn = uStrsave(&strings, "draw_loop_source");
 		tree->pfn_type = Pfn2pfn_type(tree->pfn);
 		sch_draw_ptr new_driver =
@@ -1006,12 +1013,14 @@ break_loops_rec(sch_draw_ptr tree, hash_record_ptr seen, hash_record_ptr done)
 	    }
 	} else {
 	    driver = (sch_draw_ptr) find_hash(&drivers, tree->name);
-	    break_loops_rec(driver, seen, done);
+	    break_loops_rec(driver, seen, new_nodes, done);
 	}
     } else {
+	if( find_hash(done, (pointer) tree->name) ) { return; }
+	insert_hash(done, (pointer) tree->name, (pointer) tree->name);
 	insert_hash(seen, (pointer) tree->name, (pointer) tree);
 	for(sch_draw_list_ptr lp = tree->fanins; lp != NULL; lp = lp->next) {
-	    break_loops_rec(lp->tree, seen, done);
+	    break_loops_rec(lp->tree, seen, new_nodes, done);
 	} 
 	delete_hash(seen, (pointer) tree->name);
     }

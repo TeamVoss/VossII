@@ -1796,6 +1796,11 @@ get_prim_fun_type(g_ptr node)
 	    tVar1 = new_tVar();
 	    type  = (make_arrow(tVar0,make_arrow(tVar1,tVar1)));
 	    break;
+	case P_STRICT_ARGS:
+	    tVar0 = new_tVar();
+	    tVar1 = new_tVar();
+	    type  = (make_arrow(tVar0,make_arrow(tVar1,tVar1)));
+	    break;
 	case P_IS_TUPLE:
 	    tVar0 = new_tVar();
 	    type = (make_arrow(tVar0, bool_op));

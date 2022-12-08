@@ -1205,3 +1205,12 @@ proc subproc:interrupt {w pids} {
     update
     wm geometry $tw ""
 }
+
+proc safe_name {name} {
+    regsub -all {\\} "$name" "" tmp
+    regsub -all {\-} "$tmp" "\\-" tmp2
+    regsub -all {\[} $tmp2 "\\\[" tmp3
+    regsub -all {\]} "$tmp3" "\\\]" res
+    return $res
+}
+

@@ -10,11 +10,12 @@ let bifrost_simplify fn =
         eprintf "Return type not pexlif (%s). bifrost_simplify failed" rtype
     |
     let arity = get_arity fn then
+    let args = get_args fn then
     let pre1 = sprintf "let %s " fn in
-    let lhs = list2str T pre1 " " " = " (sprintf "a%d") (1 upto arity) in
+    let lhs = list2str T pre1 " " " = " fst args in
     let pre2 = sprintf "pexlif_group_by_label (%s " fn in
     let post2 = ");" in
-    let rhs = list2str T pre2 " " post2 (sprintf "a%d") (1 upto arity) in
+    let rhs = list2str T pre2 " " post2 fst args in
     let cmd = lhs^rhs in
     (eval cmd) fseq ()
 ;

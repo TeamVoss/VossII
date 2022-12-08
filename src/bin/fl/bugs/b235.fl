@@ -1,0 +1,17 @@
+
+letrec fib 0 = 1
+ /\    fib 1 = 1
+ /\    fib n = fib (n-1) + fib (n-2)
+;
+
+let slow n = (system (n fseq "sleep 2")) fseq n;
+
+letrec fac n = n = 0 => 1 | (slow n)*fac(n-1);
+
+let choose n c = fac n / (fac (n-c) * fac c);
+
+wtime (choose 5 3);
+
+//fib 27;
+
+//quit;

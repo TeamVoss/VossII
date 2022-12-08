@@ -53,6 +53,7 @@ string s_W_CAT;
 string s_W_MEM_READ;
 string s_W_MEM_WRITE;
 string s_MEM;
+string s_WrApPeR;
 // /
 string s_no_instance;
 
@@ -95,6 +96,7 @@ static hash_record_ptr inputs_tbl_ptr;
 static hash_record     outputs_tbl;
 static hash_record_ptr outputs_tbl_ptr;
 static bool	       fp_status;
+static g_ptr	       cur_ints;
 
 static string s_EMPTY_STRING;
 static string s_FP;
@@ -1118,632 +1120,26 @@ static ui    primes[] = {
 #endif
 
 // Forward definitions local functions -----------------------------------------
-static inline void    new_adj_mem();
-static inline void    rem_adj_mem();
-static vec_ptr        split_vector(string name);
-static void           record_vector_signatures(
-                          adj_key_ptr *tail, unint index, string name,
-                          bool input);
-static void           mk_adj_tables(
-                          adj_key_list_ptr *keys, unint *count, g_ptr p);
-static inline void    new_fold_mem();
-static inline void    rem_fold_mem();
-static bool           mk_formal_actuals_substitution(
-                          hash_record_ptr tbl, g_ptr fa);
-static sname_list_ptr subst_formal(hash_record_ptr tbl, g_ptr f);
-static g_ptr          subst_fa_list(hash_record_ptr tbl, g_ptr fa_list);
-
-/******************************************************************************/
-/*                                LOCAL FUNCTIONS                             */
-/******************************************************************************/
-
-static inline void
-new_adj_mem()
-{
-    adj_bkt_mgr_ptr = &adj_bkt_mgr;
-    adj_key_mgr_ptr = &adj_key_mgr;
-    adj_key_list_mgr_ptr = &adj_key_list_mgr;
-    inputs_tbl_ptr = &inputs_tbl;
-    outputs_tbl_ptr = &outputs_tbl;
-    new_mgr(adj_bkt_mgr_ptr, sizeof(adj_bkt_rec));
-    new_mgr(adj_key_mgr_ptr, sizeof(adj_key_rec));
-    new_mgr(adj_key_list_mgr_ptr, sizeof(adj_key_list_rec));
-    create_hash(inputs_tbl_ptr, 100, str_hash, str_equ);
-    create_hash(outputs_tbl_ptr, 100, str_hash, str_equ);
-}
-
-static inline void
-rem_adj_mem()
-{
-    free_mgr(adj_bkt_mgr_ptr);
-    free_mgr(adj_key_mgr_ptr);
-    free_mgr(adj_key_list_mgr_ptr);
-    dispose_hash(inputs_tbl_ptr, NULLFCN);
-    dispose_hash(outputs_tbl_ptr, NULLFCN);
-    adj_bkt_mgr_ptr = NULL;
-    adj_key_mgr_ptr = NULL;
-    adj_key_list_mgr_ptr = NULL;
-    inputs_tbl_ptr = NULL;
-    outputs_tbl_ptr = NULL;
-}
-
-static vec_ptr
-split_vector(string name)
-{
-    vec_ptr vp = Split_vector_name(&lstrings, &vec_mgr, &rng_mgr, name);
-    for(vec_ptr p = vp; p != NULL; p = p->next) {
-        if(p->type == TXT) {
-            p->u.name = wastrsave(&strings, p->u.name);
-        }
-    }
-    return vp;
-}
-
-static void
-record_vector_signatures(adj_key_ptr *tail, unint index, string name, bool input)
-{
-    vec_ptr vec = split_vector(name);
-    string key = Get_vector_signature(&lstrings, vec);
-    debug_print("##### record_vector_signatures: %d %s %s\n", index, key, name);
-    // Record signature as we'll need it later again.
-    adj_key_ptr n = (adj_key_ptr) new_rec(adj_key_mgr_ptr);
-    n->name = name;
-    n->signature = key;
-    n->input = input;
-    n->vec = vec;
-    n->next = NULL;
-    (*tail) = n;
-    // Record vec. in tabel.
-    hash_record_ptr tbl;
-    if(input) {
-        tbl = inputs_tbl_ptr;
-    } else {
-        tbl = outputs_tbl_ptr;
-    }
-    adj_bkt_ptr bkt = (adj_bkt_ptr) find_hash(tbl, key);
-    if(bkt == NULL) {
-        adj_bkt_ptr b = (adj_bkt_ptr) new_rec(adj_bkt_mgr_ptr);
-        b->index = index;
-        b->vec = vec;
-        b->next = NULL;
-	debug_print("Initial insert %s in %s table\n",
-		    key,(input?"input":"output"));
-        insert_hash(tbl, key, b);
-    } else {
-	debug_print("Append %s in %s table\n", key, (input?"input":"output"));
-        // todo: why not record as head since order does not matter? 
-        while(bkt->next != NULL) {
-            bkt = bkt->next;
-        }
-        adj_bkt_ptr b = (adj_bkt_ptr) new_rec(adj_bkt_mgr_ptr);
-        b->index = index;
-        b->vec = vec;
-        b->next = NULL;
-        bkt->next = b;
-    }
-}
-
-static void
-mk_adj_tables(adj_key_list_ptr *keys, unint *count, g_ptr p)
-{
-    g_ptr attrs, fa_inps, fa_outs, inter, cont, children, fns;
-    string name;
-    bool leaf;
-    if(!is_PINST(p, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
-        DIE("Bad input");
-    }    
-    if(is_P_LEAF(cont, &fns)) {
-        DIE("Bad input");
-    }
-    if(is_P_HIER(cont, &children)) {
-        string vec;
-        adj_key_ptr key = NULL, *key_tail = &key;
-        // Record vector names for parent's formals.
-        // todo: count outputs as inputs for the environment and vice versa.
-        FOREACH_FORMAL(vec, fa_inps) {
-            record_vector_signatures(key_tail, 0, vec, FALSE);
-            key_tail = &(*key_tail)->next;
-        }
-        FOREACH_FORMAL(vec, fa_outs) {
-            record_vector_signatures(key_tail, 0, vec, TRUE);
-            key_tail = &(*key_tail)->next;
-        }
-        adj_key_list_ptr key_lst = (adj_key_list_ptr) new_rec(adj_key_list_mgr_ptr);
-        key_lst->key  = key;
-        key_lst->next = NULL;
-        *keys = key_lst;
-        adj_key_list_ptr *key_lst_tail = &key_lst->next;
-        // Record vector names for each child's actuals.
-        *count = 1;
-        g_ptr child, tmp;
-        FOR_CONS(children, tmp, child) {
-            if(!is_PINST(child, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
-                DIE("Bad input");
-            }
-            adj_key_ptr key = NULL, *key_tail = &key;
-            FOREACH_ACTUAL(vec, fa_inps) {
-                record_vector_signatures(key_tail, *count, vec, TRUE);
-                key_tail = &(*key_tail)->next;
-            }
-            FOREACH_ACTUAL(vec, fa_outs) {
-                record_vector_signatures(key_tail, *count, vec, FALSE);
-                key_tail = &(*key_tail)->next;
-            }
-            adj_key_list_ptr key_lst = (adj_key_list_ptr) new_rec(adj_key_list_mgr_ptr);
-            key_lst->key  = key;
-            key_lst->next = NULL;
-            *key_lst_tail = key_lst;
-            key_lst_tail = &key_lst->next;
-            *count = *count + 1;
-        }
-        return;
-    }
-    DIE("Impossible");
-}
-
-// -----------------------------------------------------------------------------
-
-static inline void
-new_fold_mem()
-{
-    vector_list_mgr_ptr = &vector_list_mgr;
-    vector_mgr_ptr = &vector_mgr;
-    range_mgr_ptr = &range_mgr;
-    sname_list_mgr_ptr = &sname_list_mgr;
-    fa_subst_mgr_ptr = &fa_subst_mgr;
-    new_mgr(vector_list_mgr_ptr, sizeof(vec_list_rec));
-    new_mgr(vector_mgr_ptr, sizeof(vec_rec));
-    new_mgr(range_mgr_ptr, sizeof(range_rec));
-    new_mgr(sname_list_mgr_ptr, sizeof(sname_list_rec));
-    new_mgr(fa_subst_mgr_ptr, sizeof(fa_subst_rec));
-}
-
-static inline void
-rem_fold_mem()
-{
-    free_mgr(vector_list_mgr_ptr);
-    free_mgr(vector_mgr_ptr);
-    free_mgr(range_mgr_ptr);
-    free_mgr(sname_list_mgr_ptr);
-    free_mgr(fa_subst_mgr_ptr);
-    vector_list_mgr_ptr = NULL;
-    vector_mgr_ptr = NULL;
-    range_mgr_ptr = NULL;
-    sname_list_mgr_ptr = NULL;
-    fa_subst_mgr_ptr = NULL;
-}
-
-static sname_list_ptr
-get_expanded_version(string n)
-{
-    vec_ptr nv = Split_vector_name(&lstrings, vector_mgr_ptr, range_mgr_ptr, n);
-    vec_list_ptr nds;
-    nds = Expand_vector(vector_list_mgr_ptr,vector_mgr_ptr,range_mgr_ptr,nv);
-    return( Show_vectors(sname_list_mgr_ptr, nds, FALSE) );
-}
-
-static bool
-mk_formal_actuals_substitution(hash_record_ptr tbl, g_ptr fa)
-{
-    ASSERT(tbl != NULL );
-    if(IS_NIL(fa)) { return TRUE; }
-    g_ptr li, lj, pair, actual;
-    FOR_CONS(fa, li, pair) {
-        g_ptr formal = GET_FST(pair);
-	string f = GET_STRING(formal);
-        g_ptr actuals = GET_SND(pair);
-	// If formal is mapped to a single actual, add the vector map to
-	// speed up translations later
-	if( IS_NIL(GET_CONS_TL(actuals)) ) {
-	    string a = GET_STRING(GET_CONS_HD(actuals));
-            insert_hash(tbl, f, a);
-	}
-        // Walk down the expanded version of f and a and add to mapping
-	sname_list_ptr fv = get_expanded_version(f);
-        FOR_CONS(actuals, lj, actual) {
-	    string a = GET_STRING(actual);
-	    sname_list_ptr av = get_expanded_version(a);
-	    while( av != NULL ) {
-		if( fv == NULL ) {
-		    Fail_pr("Actual larger than formal (%s)!", f);
-		    return( FALSE );
-		}
-		insert_hash(tbl, fv->name, av->name);
-		fv = fv->next;
-		av = av->next;
-	    }
-	}
-	if( fv != NULL ) {
-	    Fail_pr("Actual smaller than formal (%s)!", f);
-	    return( FALSE );
-	}
-    }
-    return TRUE;
-}
-
-static sname_list_ptr
-subst_formal(hash_record_ptr tbl, g_ptr gf)
-{
-    ASSERT( tbl != NULL );
-    ASSERT( IS_STRING(gf) );
-    string  f = GET_STRING(gf);
-    string repl = find_hash(tbl, f);
-    if( repl != NULL ) {
-	sname_list_ptr sp = new_rec(sname_list_mgr_ptr);
-	sp->name = repl;
-	sp->next = NULL;
-	return sp;
-    }
-    // Must do one bit at a time
-    vec_ptr fv = Split_vector_name(&lstrings, vector_mgr_ptr, range_mgr_ptr, f);
-    vec_list_ptr fe = Expand_vector(vector_list_mgr_ptr, vector_mgr_ptr,
-				    range_mgr_ptr, fv);
-    sname_list_ptr fl = Show_vectors(sname_list_mgr_ptr, fe, FALSE);
-    sname_list_ptr res = NULL;
-    sname_list_ptr *res_tl = &res;
-    while( fl != NULL ) {
-	string f = fl->name;
-	string repl = find_hash(tbl, f);
-	sname_list_ptr sp = new_rec(sname_list_mgr_ptr);
-	if( repl == NULL ) {
-	    sp->name = f;
-	} else {
-	    sp->name = repl;
-	}
-	sp->next = NULL;
-	*res_tl = sp;
-	res_tl = &sp->next;
-	fl = fl->next;
-    }
-    return res;
-}
-
-static g_ptr
-subst_fa_list(hash_record_ptr tbl, g_ptr fa_list)
-{
-    g_ptr i, j, pair, actual;
-    g_ptr res = Make_NIL(), res_tail = res;
-    FOR_CONS(fa_list, i, pair) {
-        g_ptr formal  = GET_FST(pair);
-        g_ptr actuals = GET_SND(pair);
-        g_ptr as = Make_NIL(), as_tail = as;
-        FOR_CONS(actuals, j, actual) {
-            sname_list_ptr names = subst_formal(tbl, actual);
-            for(; names != NULL; names = names->next) {
-                APPEND1(as_tail,
-			Make_STRING_leaf(wastrsave(&strings, names->name)));
-            }
-        }
-	as = Merge_Vectors(as, FALSE);
-        INC_REFCNT(formal);
-        APPEND1(res_tail, Make_PAIR_ND(formal, as));
-    }
-    return res;
-}
-
-
-#define RESTRICT(e) ( (e) & ((((ui) 1) << 63)-1) )
-
-static ui
-pm_val(ui n, ui v)
-{
-    return( v * primes[n & ((1<<13)-1)] );
-}
-
-static ui
-fp_mem(g_ptr node)
-{
-    int a_sz, lines, d_sz;
-    if( !destr_MEM(node, &a_sz, &lines, &d_sz) ) {
-	fp_status = FALSE;
-	return 0;
-    }
-    return( pm_val(0,a_sz) + pm_val(1,lines) + pm_val(2,d_sz) );
-}
-
-static ui
-fp_w_rec(g_ptr node)
-{
-    g_ptr argn_0, argn_1, argn_2, argn_3;
-    // Arity 1
-    if( GET_TYPE(node) != CONS_ND ) {
-	fp_status = FALSE;
-	return 0;
-    }
-    argn_0  = GET_SND(node);
-    node = GET_FST(node);
-    //
-    if( IS_CONSTRUCTOR(W_NOT, node) ) {
-	return( pm_val(10, fp_w_rec(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_X, node) ) {
-	return( pm_val(1, GET_INT(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_CAT, node) ) {
-	ui idx = 41;
-	ui sum = 0;
-	while( !IS_NIL(argn_0) ) {
-	    ui r = fp_w_rec(GET_CONS_HD(argn_0));
-	    sum = sum + pm_val(idx, r);
-	    idx++;
-	    argn_0 = GET_CONS_TL(argn_0);
-	}
-	return sum;
-    }
-    //
-    // Arity 2
-    if( GET_TYPE(node) != CONS_ND ) {
-	fp_status = FALSE;
-	return 0;
-    }
-    argn_1  = GET_SND(node);
-    node = GET_FST(node);
-    //
-    if( IS_CONSTRUCTOR(W_VAR, node) || IS_CONSTRUCTOR(W_EXPLICIT_VAR, node) ) {
-	return( pm_val(6, GET_INT(argn_1)) );
-    }
-    if( IS_CONSTRUCTOR(W_SX, node) ) {
-	return( pm_val(30, GET_INT(argn_1)) + pm_val(31, fp_w_rec(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_ZX, node) ) {
-	return( pm_val(32, GET_INT(argn_1)) + pm_val(33, fp_w_rec(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_CONST, node) ) {
-	ui v = *Arbi_ToInt(Arbi_mod(GET_AINT(argn_0),
-				    Arbi_FromInt(((ui)1) << 62)));
-	return( pm_val(2, GET_INT(argn_1)) + pm_val(3, v) );
-    }
-    if( IS_CONSTRUCTOR(W_EQ, node) ) {
-	return( pm_val(11, fp_w_rec(argn_1)+fp_w_rec(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_GR, node) ) {
-	return( pm_val(13, fp_w_rec(argn_1)) + pm_val(14,fp_w_rec(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_ADD, node) ) {
-	return( pm_val(15, fp_w_rec(argn_1)+fp_w_rec(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_AND, node) ) {
-	return( pm_val(8, fp_w_rec(argn_1)+fp_w_rec(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_ASHR, node) ) {
-	return( pm_val(28, fp_w_rec(argn_1)) + pm_val(29,fp_w_rec(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_DIV, node) ) {
-	return( pm_val(20, fp_w_rec(argn_1)) + pm_val(21,fp_w_rec(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_LAT_LEQ, node) ) {
-	return( pm_val(49, fp_w_rec(argn_1)) + pm_val(50,fp_w_rec(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_MOD, node) ) {
-	return( pm_val(22, fp_w_rec(argn_1)) + pm_val(23,fp_w_rec(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_MUL, node) ) {
-	return( pm_val(18, fp_w_rec(argn_1)+fp_w_rec(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_OR, node) ) {
-	return( pm_val(9, fp_w_rec(argn_1)+fp_w_rec(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_PRED, node) ) {
-	return( pm_val(12, fp_w_rec(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_SHL, node) ) {
-	return( pm_val(24, fp_w_rec(argn_1)) + pm_val(25,fp_w_rec(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_SHR, node) ) {
-	return( pm_val(26, fp_w_rec(argn_1)) + pm_val(27,fp_w_rec(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_SLICE, node) ) {
-	ui idx = 1;
-	ui sum = pm_val(37, fp_w_rec(argn_0));
-	while( !IS_NIL(argn_1) ) {
-	    ui r = GET_INT(GET_CONS_HD(argn_1));
-	    sum = sum + pm_val(idx, r);
-	    idx++;
-	    argn_1 = GET_CONS_TL(argn_1);
-	}
-	return sum;
-    }
-    if( IS_CONSTRUCTOR(W_SUB, node) ) {
-	return( pm_val(16, fp_w_rec(argn_1)) + pm_val(17,fp_w_rec(argn_0)) );
-    }
-    //
-    // Arity 3
-    if( GET_TYPE(node) != CONS_ND ) {
-	fp_status = FALSE;
-	return 0;
-    }
-    argn_2  = GET_SND(node);
-    node = GET_FST(node);
-    //
-    if( IS_CONSTRUCTOR(W_ITE, node) ) {
-	return( pm_val(34, fp_w_rec(argn_2)) +
-		pm_val(35,fp_w_rec(argn_1)) +
-		pm_val(36,fp_w_rec(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_NAMED_CONST, node) ) {
-	ui v = *Arbi_ToInt(Arbi_mod(GET_AINT(argn_0),
-				    Arbi_FromInt(((ui)1) << 62)));
-	return( pm_val(4, GET_INT(argn_1)) + pm_val(5, v) );
-    }
-    if( IS_CONSTRUCTOR(W_MEM_READ, node) ) {
-	return(
-	    pm_val(42, fp_mem(argn_2)) +
-	    pm_val(43, fp_w_rec(argn_1)) +
-	    pm_val(44, fp_w_rec(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_NAMED_SLICE, node) ) {
-	ui idx = 1;
-	ui sum = pm_val(37, fp_w_rec(argn_0));
-	while( !IS_NIL(argn_1) ) {
-	    sum = sum + pm_val(idx, GET_INT(GET_CONS_HD(argn_1)));
-	    idx++;
-	    argn_1 = GET_CONS_TL(argn_1);
-	}
-	return sum;
-    }
-    //
-    // Arity 4
-    if( GET_TYPE(node) != CONS_ND ) {
-	fp_status = FALSE;
-	return 0;
-    }
-    argn_3  = GET_SND(node);
-    node = GET_FST(node);
-    //
-    if( IS_CONSTRUCTOR(W_MEM_WRITE, node) ) {
-	return( pm_val(45, fp_mem(argn_3)) +
-		pm_val(46, fp_w_rec(argn_2)) +
-		pm_val(47, fp_w_rec(argn_1)) +
-		pm_val(48, fp_w_rec(argn_0)) );
-    }
-    if( IS_CONSTRUCTOR(W_UPDATE_NAMED_SLICE, node) ) {
-	ui idx = 1;
-	ui sum = pm_val(39, fp_w_rec(argn_3)) + pm_val(40, fp_w_rec(argn_0));
-	while( !IS_NIL(argn_1) ) {
-	    sum = sum + pm_val(idx, GET_INT(GET_CONS_HD(argn_1)));
-	    idx++;
-	    argn_1 = GET_CONS_TL(argn_1);
-	}
-	return sum;
-    }
-    return 0;
-}
-
-static bool
-fp_w(g_ptr node, ui *resp)
-{
-    fp_status = TRUE;
-    *resp = RESTRICT(fp_w_rec(node));
-    return fp_status;
-}
-
-static bool
-fp_fn(g_ptr node, ui *resp)
-{
-    g_ptr lhs, rhs;
-    if( is_W_UPDATE_FN(node, &lhs, &rhs) ) {
-	ui lres, rres;
-	if( fp_w(lhs, &lres) && fp_w(rhs, &rres) ) {
-	    *resp = pm_val(51,lres) + pm_val(52,rres);
-	    return TRUE;
-	} else {
-	    return FALSE;
-	}
-    }
-    if( is_W_PHASE_DELAY(node, &lhs, &rhs) ) {
-	ui lres, rres;
-	if( fp_w(lhs, &lres) && fp_w(rhs, &rres) ) {
-	    *resp = pm_val(53,lres) + pm_val(54,rres);
-	    return TRUE;
-	} else {
-	    return FALSE;
-	}
-    }
-    return FALSE;
-}
-
-static int
-int_cmp(const void *pi, const void *pj)
-{
-    int *i = (int *) pi;
-    int *j = (int *) pj;
-    return( *i - *j );
-}
-
-
-static ui
-fp_formal(g_ptr fa_list)
-{
-    buffer sz_buf;
-    new_buf(&sz_buf, 100, sizeof(int));
-    while( !IS_NIL(fa_list) ) {
-	int sz = Get_Vector_Size(GET_STRING(GET_FST(GET_CONS_HD(fa_list))));
-	push_buf(&sz_buf, &sz);
-	fa_list = GET_CONS_TL(fa_list);
-    }
-    qsort(START_BUF(&sz_buf), COUNT_BUF(&sz_buf), sizeof(int), int_cmp);
-    ui idx = 1;
-    ui sum = 0;
-    int *ip;
-    FOR_BUF(&sz_buf, int, ip) {
-	sum = sum + pm_val(idx, *ip);
-	idx++;
-    }
-    free_buf(&sz_buf);
-    return sum;
-}
-
-static ui
-fp_internal(g_ptr int_list)
-{
-    buffer sz_buf;
-    new_buf(&sz_buf, 100, sizeof(int));
-    while( !IS_NIL(int_list) ) {
-	int sz = Get_Vector_Size(GET_STRING(GET_CONS_HD(int_list)));
-	push_buf(&sz_buf, &sz);
-	int_list = GET_CONS_TL(int_list);
-    }
-    qsort(START_BUF(&sz_buf), COUNT_BUF(&sz_buf), sizeof(int), int_cmp);
-    ui idx = 1;
-    ui sum = 0;
-    int *ip;
-    FOR_BUF(&sz_buf, int, ip) {
-	sum = sum + pm_val(idx, *ip);
-	idx++;
-    }
-    free_buf(&sz_buf);
-    return sum;
-}
-
-static ui
-find_signature(g_ptr attrs)
-{
-    while( !IS_NIL(attrs) ) {
-	if( STREQ(GET_STRING(GET_FST(GET_CONS_HD(attrs))), s_FP) ) {
-	    return( (ui) atol(GET_STRING(GET_SND(GET_CONS_HD(attrs)))) );
-	}
-	attrs = GET_CONS_TL(attrs);
-    }
-    return 0;
-}
-
-static bool
-fp_content(g_ptr node, ui *resp)
-{
-    g_ptr fns, children;
-    if( is_P_LEAF(node, &fns) ) {
-	ui sum = 0;
-	while( !IS_NIL(fns) ) {
-	    ui sig;
-	    if( !fp_fn(GET_CONS_HD(fns), &sig) ) { return FALSE; }
-	    sum += sig;
-	    fns = GET_CONS_TL(fns);
-	}
-	*resp = pm_val(59,sum);
-	return TRUE;
-    }
-    if(is_P_HIER(node, &children)) {
-	ui sum = 0;
-	while( !IS_NIL(children) ) {
-	    g_ptr attrs, fa_inps, fa_outs, ints, cont;
-	    string name;
-	    bool leaf;
-	    g_ptr p = GET_CONS_HD(children);
-	    if(!is_PINST(p,&name,&attrs,&leaf,&fa_inps,&fa_outs,&ints,&cont)) {
-		DIE("Bad input");
-	    }
-	    ui sig = find_signature(attrs) +
-		     fp_formal(fa_inps) + 
-		     fp_formal(fa_outs) + 
-		     fp_internal(ints);
-	    sum += sig;
-	    children = GET_CONS_TL(children);
-	}
-	*resp = pm_val(65,sum);
-	return TRUE;
-    }
-    return FALSE;
-}
+static inline void	new_adj_mem();
+static inline void	rem_adj_mem();
+static vec_ptr		split_vector(string name);
+static void		record_vector_signatures(
+			      adj_key_ptr *tail, unint index, string name,
+			      bool input);
+static void		mk_adj_tables(
+			      adj_key_list_ptr *keys, unint *count, g_ptr p);
+static inline void  	new_fold_mem();
+static inline void	rem_fold_mem();
+static bool		mk_formal_actuals_substitution(
+			      hash_record_ptr tbl, g_ptr fa);
+static sname_list_ptr	subst_formal(hash_record_ptr tbl, g_ptr f);
+static g_ptr		subst_fa_list(hash_record_ptr tbl, g_ptr fa_list);
+static void		get_wrappers(g_ptr redex);
+static void		mk_pinst(g_ptr redex);
+static void		fp_pinst(g_ptr redex);
+static void		sha_pinst(g_ptr redex);
+static void		unfold_pexlif_fn(g_ptr redex);
+static void		fold_pexlif_fn(g_ptr redex);
 
 /******************************************************************************/
 /*                               PUBLIC FUNCTIONS                             */
@@ -2805,6 +2201,762 @@ mk_W_MEM_WRITE(g_ptr info, g_ptr mem, g_ptr addr, g_ptr data)
     return res;
 }
 
+
+void
+Pexlif_Init()
+{
+    s_PINST                = Mk_constructor_name("PINST");
+    s_P_HIER               = Mk_constructor_name("P_HIER");
+    s_P_LEAF               = Mk_constructor_name("P_LEAF");
+    s_W_UPDATE_FN          = Mk_constructor_name("W_UPDATE_FN");
+    s_W_PHASE_DELAY        = Mk_constructor_name("W_PHASE_DELAY");
+    s_W_X                  = Mk_constructor_name("W_X");
+    s_W_CONST              = Mk_constructor_name("W_CONST");
+    s_W_NAMED_CONST        = Mk_constructor_name("W_NAMED_CONST");
+    s_W_VAR                = Mk_constructor_name("W_VAR");
+    s_W_EXPLICIT_VAR       = Mk_constructor_name("W_EXPLICIT_VAR");
+    s_W_AND                = Mk_constructor_name("W_AND");
+    s_W_LAT_LEQ            = Mk_constructor_name("W_LAT_LEQ");
+    s_W_OR                 = Mk_constructor_name("W_OR");
+    s_W_NOT                = Mk_constructor_name("W_NOT");
+    s_W_PRED               = Mk_constructor_name("W_PRED");
+    s_W_EQ                 = Mk_constructor_name("W_EQ");
+    s_W_GR                 = Mk_constructor_name("W_GR");
+    s_W_ADD                = Mk_constructor_name("W_ADD");
+    s_W_SUB                = Mk_constructor_name("W_SUB");
+    s_W_MUL                = Mk_constructor_name("W_MUL");
+    s_W_DIV                = Mk_constructor_name("W_DIV");
+    s_W_MOD                = Mk_constructor_name("W_MOD");
+    s_W_SHL                = Mk_constructor_name("W_SHL");
+    s_W_SHR                = Mk_constructor_name("W_SHR");
+    s_W_ASHR               = Mk_constructor_name("W_ASHR");
+    s_W_SX                 = Mk_constructor_name("W_SX");
+    s_W_ZX                 = Mk_constructor_name("W_ZX");
+    s_W_ITE                = Mk_constructor_name("W_ITE");
+    s_W_SLICE              = Mk_constructor_name("W_SLICE");
+    s_W_NAMED_SLICE        = Mk_constructor_name("W_NAMED_SLICE");
+    s_W_UPDATE_NAMED_SLICE = Mk_constructor_name("W_UPDATE_NAMED_SLICE");
+    s_W_CAT                = Mk_constructor_name("W_CAT");
+    s_W_MEM_READ           = Mk_constructor_name("W_MEM_READ");
+    s_W_MEM_WRITE          = Mk_constructor_name("W_MEM_WRITE");
+    s_MEM                  = Mk_constructor_name("MEM");
+    // /
+    s_no_instance = wastrsave(&strings, "{}");
+    s_EMPTY_STRING  = wastrsave(&strings, "");
+    s_FP	    = wastrsave(&strings, "FP");
+    s_SHA	    = wastrsave(&strings, "SHA");
+    s_WrApPeR       = wastrsave(&strings, "_WrApPeR_");
+    // /
+    new_ustrmgr(&lstrings);
+    new_mgr(&vec_mgr, sizeof(vec_rec));
+    new_mgr(&rng_mgr, sizeof(range_rec));
+}
+
+void
+Pexlif_Install_Functions()
+{
+    typeExp_ptr pexlif_tp = Get_Type("pexlif", NULL, TP_INSERT_PLACE_HOLDER);
+    typeExp_ptr content_tp = Get_Type("content", NULL, TP_INSERT_PLACE_HOLDER);
+    typeExp_ptr tv1 = GLnew_tVar();
+
+    Add_ExtAPI_Function(
+          "fold_pexlif"
+        , "111"
+        , FALSE
+        , GLmake_arrow(
+              pexlif_tp
+            , GLmake_arrow(
+                  GLmake_list(GLmake_int())
+                , GLmake_arrow(
+                      GLmake_string()
+                    , pexlif_tp)))
+        , fold_pexlif_fn
+    );
+
+    Add_ExtAPI_Function(
+          "unfold_pexlif"
+        , "11"
+        , FALSE
+        , GLmake_arrow(pexlif_tp, GLmake_arrow(GLmake_int(), pexlif_tp))
+        , unfold_pexlif_fn
+    );
+
+
+    Add_ExtAPI_Function(
+          "fp_pinst"
+        , "1111"
+        , FALSE
+        , GLmake_arrow(
+	    GLmake_list(GLmake_tuple(GLmake_string(),tv1)),
+	    GLmake_arrow(
+		GLmake_list(GLmake_tuple(GLmake_string(),tv1)),
+		GLmake_arrow(
+		    GLmake_list(GLmake_string()),
+		    GLmake_arrow(content_tp, GLmake_string()))))
+        , fp_pinst
+    );
+
+    Add_ExtAPI_Function(
+          "sha_pinst"
+        , "11111"
+        , FALSE
+        , GLmake_arrow(
+	    GLmake_string(),
+	    GLmake_arrow(
+		GLmake_list(GLmake_tuple(GLmake_string(),tv1)),
+		    GLmake_arrow(
+			GLmake_list(GLmake_tuple(GLmake_string(),tv1)),
+			GLmake_arrow(
+			    GLmake_list(GLmake_string()),
+			    GLmake_arrow(
+				content_tp,
+				GLmake_string())))))
+        , sha_pinst
+    );
+
+    Add_ExtAPI_Function(
+          "mk_pinst"
+        , "1111111"
+        , FALSE
+        , GLmake_arrow(
+	    GLmake_string(),
+	    GLmake_arrow(
+	      GLmake_list(GLmake_tuple(GLmake_string(),GLmake_string())),
+	      GLmake_arrow(
+		GLmake_bool(),
+		GLmake_arrow(
+		  GLmake_list(GLmake_tuple(GLmake_string(),
+					   GLmake_list(GLmake_string()))),
+		  GLmake_arrow(
+		    GLmake_list(GLmake_tuple(GLmake_string(),
+					     GLmake_list(GLmake_string()))),
+		    GLmake_arrow(
+		      GLmake_list(GLmake_string()),
+		      GLmake_arrow(content_tp, pexlif_tp)))))))
+        , mk_pinst
+    );
+
+    Add_ExtAPI_Function(
+          "get_wrappers"
+        , "1"
+        , FALSE
+        , GLmake_arrow(content_tp, GLmake_list(GLmake_int()))
+        , get_wrappers
+    );
+
+}
+
+/******************************************************************************/
+/*                                LOCAL FUNCTIONS                             */
+/******************************************************************************/
+
+static inline void
+new_adj_mem()
+{
+    adj_bkt_mgr_ptr = &adj_bkt_mgr;
+    adj_key_mgr_ptr = &adj_key_mgr;
+    adj_key_list_mgr_ptr = &adj_key_list_mgr;
+    inputs_tbl_ptr = &inputs_tbl;
+    outputs_tbl_ptr = &outputs_tbl;
+    new_mgr(adj_bkt_mgr_ptr, sizeof(adj_bkt_rec));
+    new_mgr(adj_key_mgr_ptr, sizeof(adj_key_rec));
+    new_mgr(adj_key_list_mgr_ptr, sizeof(adj_key_list_rec));
+    create_hash(inputs_tbl_ptr, 100, str_hash, str_equ);
+    create_hash(outputs_tbl_ptr, 100, str_hash, str_equ);
+}
+
+static inline void
+rem_adj_mem()
+{
+    free_mgr(adj_bkt_mgr_ptr);
+    free_mgr(adj_key_mgr_ptr);
+    free_mgr(adj_key_list_mgr_ptr);
+    dispose_hash(inputs_tbl_ptr, NULLFCN);
+    dispose_hash(outputs_tbl_ptr, NULLFCN);
+    adj_bkt_mgr_ptr = NULL;
+    adj_key_mgr_ptr = NULL;
+    adj_key_list_mgr_ptr = NULL;
+    inputs_tbl_ptr = NULL;
+    outputs_tbl_ptr = NULL;
+}
+
+static vec_ptr
+split_vector(string name)
+{
+    vec_ptr vp = Split_vector_name(&lstrings, &vec_mgr, &rng_mgr, name);
+    for(vec_ptr p = vp; p != NULL; p = p->next) {
+        if(p->type == TXT) {
+            p->u.name = wastrsave(&strings, p->u.name);
+        }
+    }
+    return vp;
+}
+
+static void
+record_vector_signatures(adj_key_ptr *tail, unint index, string name, bool input)
+{
+    vec_ptr vec = split_vector(name);
+    string key = Get_vector_signature(&lstrings, vec);
+    debug_print("##### record_vector_signatures: %d %s %s\n", index, key, name);
+    // Record signature as we'll need it later again.
+    adj_key_ptr n = (adj_key_ptr) new_rec(adj_key_mgr_ptr);
+    n->name = name;
+    n->signature = key;
+    n->input = input;
+    n->vec = vec;
+    n->next = NULL;
+    (*tail) = n;
+    // Record vec. in tabel.
+    hash_record_ptr tbl;
+    if(input) {
+        tbl = inputs_tbl_ptr;
+    } else {
+        tbl = outputs_tbl_ptr;
+    }
+    adj_bkt_ptr bkt = (adj_bkt_ptr) find_hash(tbl, key);
+    if(bkt == NULL) {
+        adj_bkt_ptr b = (adj_bkt_ptr) new_rec(adj_bkt_mgr_ptr);
+        b->index = index;
+        b->vec = vec;
+        b->next = NULL;
+	debug_print("Initial insert %s in %s table\n",
+		    key,(input?"input":"output"));
+        insert_hash(tbl, key, b);
+    } else {
+	debug_print("Append %s in %s table\n", key, (input?"input":"output"));
+        // todo: why not record as head since order does not matter? 
+        while(bkt->next != NULL) {
+            bkt = bkt->next;
+        }
+        adj_bkt_ptr b = (adj_bkt_ptr) new_rec(adj_bkt_mgr_ptr);
+        b->index = index;
+        b->vec = vec;
+        b->next = NULL;
+        bkt->next = b;
+    }
+}
+
+static void
+mk_adj_tables(adj_key_list_ptr *keys, unint *count, g_ptr p)
+{
+    g_ptr attrs, fa_inps, fa_outs, inter, cont, children, fns;
+    string name;
+    bool leaf;
+    if(!is_PINST(p, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
+        DIE("Bad input");
+    }    
+    if(is_P_LEAF(cont, &fns)) {
+        DIE("Bad input");
+    }
+    if(is_P_HIER(cont, &children)) {
+        string vec;
+        adj_key_ptr key = NULL, *key_tail = &key;
+        // Record vector names for parent's formals.
+        // todo: count outputs as inputs for the environment and vice versa.
+        FOREACH_FORMAL(vec, fa_inps) {
+            record_vector_signatures(key_tail, 0, vec, FALSE);
+            key_tail = &(*key_tail)->next;
+        }
+        FOREACH_FORMAL(vec, fa_outs) {
+            record_vector_signatures(key_tail, 0, vec, TRUE);
+            key_tail = &(*key_tail)->next;
+        }
+        adj_key_list_ptr key_lst = (adj_key_list_ptr) new_rec(adj_key_list_mgr_ptr);
+        key_lst->key  = key;
+        key_lst->next = NULL;
+        *keys = key_lst;
+        adj_key_list_ptr *key_lst_tail = &key_lst->next;
+        // Record vector names for each child's actuals.
+        *count = 1;
+        g_ptr child, tmp;
+        FOR_CONS(children, tmp, child) {
+            if(!is_PINST(child, &name, &attrs, &leaf, &fa_inps, &fa_outs, &inter, &cont)) {
+                DIE("Bad input");
+            }
+            adj_key_ptr key = NULL, *key_tail = &key;
+            FOREACH_ACTUAL(vec, fa_inps) {
+                record_vector_signatures(key_tail, *count, vec, TRUE);
+                key_tail = &(*key_tail)->next;
+            }
+            FOREACH_ACTUAL(vec, fa_outs) {
+                record_vector_signatures(key_tail, *count, vec, FALSE);
+                key_tail = &(*key_tail)->next;
+            }
+            adj_key_list_ptr key_lst = (adj_key_list_ptr) new_rec(adj_key_list_mgr_ptr);
+            key_lst->key  = key;
+            key_lst->next = NULL;
+            *key_lst_tail = key_lst;
+            key_lst_tail = &key_lst->next;
+            *count = *count + 1;
+        }
+        return;
+    }
+    DIE("Impossible");
+}
+
+// -----------------------------------------------------------------------------
+
+static inline void
+new_fold_mem()
+{
+    vector_list_mgr_ptr = &vector_list_mgr;
+    vector_mgr_ptr = &vector_mgr;
+    range_mgr_ptr = &range_mgr;
+    sname_list_mgr_ptr = &sname_list_mgr;
+    fa_subst_mgr_ptr = &fa_subst_mgr;
+    new_mgr(vector_list_mgr_ptr, sizeof(vec_list_rec));
+    new_mgr(vector_mgr_ptr, sizeof(vec_rec));
+    new_mgr(range_mgr_ptr, sizeof(range_rec));
+    new_mgr(sname_list_mgr_ptr, sizeof(sname_list_rec));
+    new_mgr(fa_subst_mgr_ptr, sizeof(fa_subst_rec));
+}
+
+static inline void
+rem_fold_mem()
+{
+    free_mgr(vector_list_mgr_ptr);
+    free_mgr(vector_mgr_ptr);
+    free_mgr(range_mgr_ptr);
+    free_mgr(sname_list_mgr_ptr);
+    free_mgr(fa_subst_mgr_ptr);
+    vector_list_mgr_ptr = NULL;
+    vector_mgr_ptr = NULL;
+    range_mgr_ptr = NULL;
+    sname_list_mgr_ptr = NULL;
+    fa_subst_mgr_ptr = NULL;
+}
+
+static sname_list_ptr
+get_expanded_version(string n)
+{
+    vec_ptr nv = Split_vector_name(&lstrings, vector_mgr_ptr, range_mgr_ptr, n);
+    vec_list_ptr nds;
+    nds = Expand_vector(vector_list_mgr_ptr,vector_mgr_ptr,range_mgr_ptr,nv);
+    return( Show_vectors(sname_list_mgr_ptr, nds, FALSE) );
+}
+
+static bool
+mk_formal_actuals_substitution(hash_record_ptr tbl, g_ptr fa)
+{
+    ASSERT(tbl != NULL );
+    if(IS_NIL(fa)) { return TRUE; }
+    g_ptr li, lj, pair, actual;
+    FOR_CONS(fa, li, pair) {
+        g_ptr formal = GET_FST(pair);
+	string f = GET_STRING(formal);
+        g_ptr actuals = GET_SND(pair);
+	// If formal is mapped to a single actual, add the vector map to
+	// speed up translations later
+	if( IS_NIL(GET_CONS_TL(actuals)) ) {
+	    string a = GET_STRING(GET_CONS_HD(actuals));
+            insert_hash(tbl, f, a);
+	}
+        // Walk down the expanded version of f and a and add to mapping
+	sname_list_ptr fv = get_expanded_version(f);
+        FOR_CONS(actuals, lj, actual) {
+	    string a = GET_STRING(actual);
+	    sname_list_ptr av = get_expanded_version(a);
+	    while( av != NULL ) {
+		if( fv == NULL ) {
+		    Fail_pr("Actual larger than formal (%s)!", f);
+		    return( FALSE );
+		}
+		insert_hash(tbl, fv->name, av->name);
+		fv = fv->next;
+		av = av->next;
+	    }
+	}
+	if( fv != NULL ) {
+	    Fail_pr("Actual smaller than formal (%s)!", f);
+	    return( FALSE );
+	}
+    }
+    return TRUE;
+}
+
+static sname_list_ptr
+subst_formal(hash_record_ptr tbl, g_ptr gf)
+{
+    ASSERT( tbl != NULL );
+    ASSERT( IS_STRING(gf) );
+    string  f = GET_STRING(gf);
+    string repl = find_hash(tbl, f);
+    if( repl != NULL ) {
+	sname_list_ptr sp = new_rec(sname_list_mgr_ptr);
+	sp->name = repl;
+	sp->next = NULL;
+	return sp;
+    }
+    // Must do one bit at a time
+    vec_ptr fv = Split_vector_name(&lstrings, vector_mgr_ptr, range_mgr_ptr, f);
+    vec_list_ptr fe = Expand_vector(vector_list_mgr_ptr, vector_mgr_ptr,
+				    range_mgr_ptr, fv);
+    sname_list_ptr fl = Show_vectors(sname_list_mgr_ptr, fe, FALSE);
+    sname_list_ptr res = NULL;
+    sname_list_ptr *res_tl = &res;
+    while( fl != NULL ) {
+	string f = fl->name;
+	string repl = find_hash(tbl, f);
+	sname_list_ptr sp = new_rec(sname_list_mgr_ptr);
+	if( repl == NULL ) {
+	    sp->name = f;
+	} else {
+	    sp->name = repl;
+	}
+	sp->next = NULL;
+	*res_tl = sp;
+	res_tl = &sp->next;
+	fl = fl->next;
+    }
+    return res;
+}
+
+static g_ptr
+subst_fa_list(hash_record_ptr tbl, g_ptr fa_list)
+{
+    g_ptr i, j, pair, actual;
+    g_ptr res = Make_NIL(), res_tail = res;
+    FOR_CONS(fa_list, i, pair) {
+        g_ptr formal  = GET_FST(pair);
+        g_ptr actuals = GET_SND(pair);
+        g_ptr as = Make_NIL(), as_tail = as;
+        FOR_CONS(actuals, j, actual) {
+            sname_list_ptr names = subst_formal(tbl, actual);
+            for(; names != NULL; names = names->next) {
+                APPEND1(as_tail,
+			Make_STRING_leaf(wastrsave(&strings, names->name)));
+            }
+        }
+	as = Merge_Vectors(as, FALSE);
+        INC_REFCNT(formal);
+        APPEND1(res_tail, Make_PAIR_ND(formal, as));
+    }
+    return res;
+}
+
+
+#define RESTRICT(e) ( (e) & ((((ui) 1) << 63)-1) )
+
+static ui
+pm_val(ui n, ui v)
+{
+    return( v * primes[n & ((1<<13)-1)] );
+}
+
+static ui
+fp_mem(g_ptr node)
+{
+    int a_sz, lines, d_sz;
+    if( !destr_MEM(node, &a_sz, &lines, &d_sz) ) {
+	fp_status = FALSE;
+	return 0;
+    }
+    return( pm_val(0,a_sz) + pm_val(1,lines) + pm_val(2,d_sz) );
+}
+
+static ui
+fp_w_rec(g_ptr node)
+{
+    g_ptr argn_0, argn_1, argn_2, argn_3;
+    // Arity 1
+    if( GET_TYPE(node) != CONS_ND ) {
+	fp_status = FALSE;
+	return 0;
+    }
+    argn_0  = GET_SND(node);
+    node = GET_FST(node);
+    //
+    if( IS_CONSTRUCTOR(W_NOT, node) ) {
+	return( pm_val(10, fp_w_rec(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_X, node) ) {
+	return( pm_val(1, GET_INT(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_CAT, node) ) {
+	ui idx = 41;
+	ui sum = 0;
+	while( !IS_NIL(argn_0) ) {
+	    ui r = fp_w_rec(GET_CONS_HD(argn_0));
+	    sum = sum + pm_val(idx, r);
+	    idx++;
+	    argn_0 = GET_CONS_TL(argn_0);
+	}
+	return sum;
+    }
+    //
+    // Arity 2
+    if( GET_TYPE(node) != CONS_ND ) {
+	fp_status = FALSE;
+	return 0;
+    }
+    argn_1  = GET_SND(node);
+    node = GET_FST(node);
+    //
+    if( IS_CONSTRUCTOR(W_VAR, node) || IS_CONSTRUCTOR(W_EXPLICIT_VAR, node) ) {
+	return( pm_val(6, GET_INT(argn_1)) );
+    }
+    if( IS_CONSTRUCTOR(W_SX, node) ) {
+	return( pm_val(30, GET_INT(argn_1)) + pm_val(31, fp_w_rec(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_ZX, node) ) {
+	return( pm_val(32, GET_INT(argn_1)) + pm_val(33, fp_w_rec(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_CONST, node) ) {
+	ui v = *Arbi_ToInt(Arbi_mod(GET_AINT(argn_0),
+				    Arbi_FromInt(((ui)1) << 62)));
+	return( pm_val(2, GET_INT(argn_1)) + pm_val(3, v) );
+    }
+    if( IS_CONSTRUCTOR(W_EQ, node) ) {
+	return( pm_val(11, fp_w_rec(argn_1)+fp_w_rec(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_GR, node) ) {
+	return( pm_val(13, fp_w_rec(argn_1)) + pm_val(14,fp_w_rec(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_ADD, node) ) {
+	return( pm_val(15, fp_w_rec(argn_1)+fp_w_rec(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_AND, node) ) {
+	return( pm_val(8, fp_w_rec(argn_1)+fp_w_rec(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_ASHR, node) ) {
+	return( pm_val(28, fp_w_rec(argn_1)) + pm_val(29,fp_w_rec(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_DIV, node) ) {
+	return( pm_val(20, fp_w_rec(argn_1)) + pm_val(21,fp_w_rec(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_LAT_LEQ, node) ) {
+	return( pm_val(49, fp_w_rec(argn_1)) + pm_val(50,fp_w_rec(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_MOD, node) ) {
+	return( pm_val(22, fp_w_rec(argn_1)) + pm_val(23,fp_w_rec(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_MUL, node) ) {
+	return( pm_val(18, fp_w_rec(argn_1)+fp_w_rec(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_OR, node) ) {
+	return( pm_val(9, fp_w_rec(argn_1)+fp_w_rec(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_PRED, node) ) {
+	return( pm_val(12, fp_w_rec(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_SHL, node) ) {
+	return( pm_val(24, fp_w_rec(argn_1)) + pm_val(25,fp_w_rec(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_SHR, node) ) {
+	return( pm_val(26, fp_w_rec(argn_1)) + pm_val(27,fp_w_rec(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_SLICE, node) ) {
+	ui idx = 1;
+	ui sum = pm_val(37, fp_w_rec(argn_0));
+	while( !IS_NIL(argn_1) ) {
+	    ui r = GET_INT(GET_CONS_HD(argn_1));
+	    sum = sum + pm_val(idx, r);
+	    idx++;
+	    argn_1 = GET_CONS_TL(argn_1);
+	}
+	return sum;
+    }
+    if( IS_CONSTRUCTOR(W_SUB, node) ) {
+	return( pm_val(16, fp_w_rec(argn_1)) + pm_val(17,fp_w_rec(argn_0)) );
+    }
+    //
+    // Arity 3
+    if( GET_TYPE(node) != CONS_ND ) {
+	fp_status = FALSE;
+	return 0;
+    }
+    argn_2  = GET_SND(node);
+    node = GET_FST(node);
+    //
+    if( IS_CONSTRUCTOR(W_ITE, node) ) {
+	return( pm_val(34, fp_w_rec(argn_2)) +
+		pm_val(35,fp_w_rec(argn_1)) +
+		pm_val(36,fp_w_rec(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_NAMED_CONST, node) ) {
+	ui v = *Arbi_ToInt(Arbi_mod(GET_AINT(argn_0),
+				    Arbi_FromInt(((ui)1) << 62)));
+	return( pm_val(4, GET_INT(argn_1)) + pm_val(5, v) );
+    }
+    if( IS_CONSTRUCTOR(W_MEM_READ, node) ) {
+	return(
+	    pm_val(42, fp_mem(argn_2)) +
+	    pm_val(43, fp_w_rec(argn_1)) +
+	    pm_val(44, fp_w_rec(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_NAMED_SLICE, node) ) {
+	ui idx = 1;
+	ui sum = pm_val(37, fp_w_rec(argn_0));
+	while( !IS_NIL(argn_1) ) {
+	    sum = sum + pm_val(idx, GET_INT(GET_CONS_HD(argn_1)));
+	    idx++;
+	    argn_1 = GET_CONS_TL(argn_1);
+	}
+	return sum;
+    }
+    //
+    // Arity 4
+    if( GET_TYPE(node) != CONS_ND ) {
+	fp_status = FALSE;
+	return 0;
+    }
+    argn_3  = GET_SND(node);
+    node = GET_FST(node);
+    //
+    if( IS_CONSTRUCTOR(W_MEM_WRITE, node) ) {
+	return( pm_val(45, fp_mem(argn_3)) +
+		pm_val(46, fp_w_rec(argn_2)) +
+		pm_val(47, fp_w_rec(argn_1)) +
+		pm_val(48, fp_w_rec(argn_0)) );
+    }
+    if( IS_CONSTRUCTOR(W_UPDATE_NAMED_SLICE, node) ) {
+	ui idx = 1;
+	ui sum = pm_val(39, fp_w_rec(argn_3)) + pm_val(40, fp_w_rec(argn_0));
+	while( !IS_NIL(argn_1) ) {
+	    sum = sum + pm_val(idx, GET_INT(GET_CONS_HD(argn_1)));
+	    idx++;
+	    argn_1 = GET_CONS_TL(argn_1);
+	}
+	return sum;
+    }
+    return 0;
+}
+
+static bool
+fp_w(g_ptr node, ui *resp)
+{
+    fp_status = TRUE;
+    *resp = RESTRICT(fp_w_rec(node));
+    return fp_status;
+}
+
+static bool
+fp_fn(g_ptr node, ui *resp)
+{
+    g_ptr lhs, rhs;
+    if( is_W_UPDATE_FN(node, &lhs, &rhs) ) {
+	ui lres, rres;
+	if( fp_w(lhs, &lres) && fp_w(rhs, &rres) ) {
+	    *resp = pm_val(51,lres) + pm_val(52,rres);
+	    return TRUE;
+	} else {
+	    return FALSE;
+	}
+    }
+    if( is_W_PHASE_DELAY(node, &lhs, &rhs) ) {
+	ui lres, rres;
+	if( fp_w(lhs, &lres) && fp_w(rhs, &rres) ) {
+	    *resp = pm_val(53,lres) + pm_val(54,rres);
+	    return TRUE;
+	} else {
+	    return FALSE;
+	}
+    }
+    return FALSE;
+}
+
+static int
+int_cmp(const void *pi, const void *pj)
+{
+    int *i = (int *) pi;
+    int *j = (int *) pj;
+    return( *i - *j );
+}
+
+
+static ui
+fp_formal(g_ptr fa_list)
+{
+    buffer sz_buf;
+    new_buf(&sz_buf, 100, sizeof(int));
+    while( !IS_NIL(fa_list) ) {
+	int sz = Get_Vector_Size(GET_STRING(GET_FST(GET_CONS_HD(fa_list))));
+	push_buf(&sz_buf, &sz);
+	fa_list = GET_CONS_TL(fa_list);
+    }
+    qsort(START_BUF(&sz_buf), COUNT_BUF(&sz_buf), sizeof(int), int_cmp);
+    ui idx = 1;
+    ui sum = 0;
+    int *ip;
+    FOR_BUF(&sz_buf, int, ip) {
+	sum = sum + pm_val(idx, *ip);
+	idx++;
+    }
+    free_buf(&sz_buf);
+    return sum;
+}
+
+static ui
+fp_internal(g_ptr int_list)
+{
+    buffer sz_buf;
+    new_buf(&sz_buf, 100, sizeof(int));
+    while( !IS_NIL(int_list) ) {
+	int sz = Get_Vector_Size(GET_STRING(GET_CONS_HD(int_list)));
+	push_buf(&sz_buf, &sz);
+	int_list = GET_CONS_TL(int_list);
+    }
+    qsort(START_BUF(&sz_buf), COUNT_BUF(&sz_buf), sizeof(int), int_cmp);
+    ui idx = 1;
+    ui sum = 0;
+    int *ip;
+    FOR_BUF(&sz_buf, int, ip) {
+	sum = sum + pm_val(idx, *ip);
+	idx++;
+    }
+    free_buf(&sz_buf);
+    return sum;
+}
+
+static ui
+find_signature(g_ptr attrs)
+{
+    while( !IS_NIL(attrs) ) {
+	if( STREQ(GET_STRING(GET_FST(GET_CONS_HD(attrs))), s_FP) ) {
+	    return( (ui) atol(GET_STRING(GET_SND(GET_CONS_HD(attrs)))) );
+	}
+	attrs = GET_CONS_TL(attrs);
+    }
+    return 0;
+}
+
+static bool
+fp_content(g_ptr node, ui *resp)
+{
+    g_ptr fns, children;
+    if( is_P_LEAF(node, &fns) ) {
+	ui sum = 0;
+	while( !IS_NIL(fns) ) {
+	    ui sig;
+	    if( !fp_fn(GET_CONS_HD(fns), &sig) ) { return FALSE; }
+	    sum += sig;
+	    fns = GET_CONS_TL(fns);
+	}
+	*resp = pm_val(59,sum);
+	return TRUE;
+    }
+    if(is_P_HIER(node, &children)) {
+	ui sum = 0;
+	while( !IS_NIL(children) ) {
+	    g_ptr attrs, fa_inps, fa_outs, ints, cont;
+	    string name;
+	    bool leaf;
+	    g_ptr p = GET_CONS_HD(children);
+	    if(!is_PINST(p,&name,&attrs,&leaf,&fa_inps,&fa_outs,&ints,&cont)) {
+		DIE("Bad input");
+	    }
+	    ui sig = find_signature(attrs) +
+		     fp_formal(fa_inps) + 
+		     fp_formal(fa_outs) + 
+		     fp_internal(ints);
+	    sum += sig;
+	    children = GET_CONS_TL(children);
+	}
+	*resp = pm_val(65,sum);
+	return TRUE;
+    }
+    return FALSE;
+}
 // ? ---------------------------------------------------------------------------
 
 static void
@@ -2843,11 +2995,9 @@ unfold_pexlif_fn(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
-static void
-fp_pinst(g_ptr redex)
+static string
+compute_fp_pinst(g_ptr inps, g_ptr outs, g_ptr ints, g_ptr content)
 {
-    g_ptr inps, outs, ints, content;
-    EXTRACT_4_ARGS(redex, inps, outs, ints, content);
     ui res = 0;
     res += fp_formal(inps);
     res += fp_formal(outs);
@@ -2856,10 +3006,23 @@ fp_pinst(g_ptr redex)
     if( fp_content(content, &sig) ) {
 	res += sig;
 	sprintf(str_buf, "%ld", res);
-	MAKE_REDEX_STRING(redex, wastrsave(&strings, str_buf));
-	return;
+	return( wastrsave(&strings, str_buf) );
     }
-    MAKE_REDEX_FAILURE(redex, Fail_pr("fp_pinst failed...."));
+    Fail_pr("fp_pinst failed....");
+    return NULL;
+}
+
+static void
+fp_pinst(g_ptr redex)
+{
+    g_ptr inps, outs, ints, content;
+    EXTRACT_4_ARGS(redex, inps, outs, ints, content);
+    string res = compute_fp_pinst(inps, outs, ints, content);
+    if( res == NULL ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("fp_pinst failed...."));
+    } else {
+	MAKE_REDEX_STRING(redex, res);
+    }
     return;
 }
 
@@ -2875,20 +3038,6 @@ find_sha(g_ptr attrs)
     DIE("Should never happen... Missing SHA256 signature.");
 }
 
-
-//let sha_pinst n i o t c =
-//    let get_cont (P_LEAF fs) = (qsort gcmp fs),[]
-//     /\ get_cont (P_HIER cs) =
-//        let go (PINST n a _ i o t _) =
-//            (n,
-//             find_signature a,
-//             map snd i,
-//             map snd o,
-//             qsort strcmp t)
-//        in
-//        [], (qsort gcmp (map go cs))
-//    in
-//    sha256_signature (n,map fst i, map snd o, t, get_cont c)
 
 static int
 signature_rec_cmp(const void *p1, const void *p2)
@@ -2940,7 +3089,6 @@ signature_rec_cmp(const void *p1, const void *p2)
     return 0;
 }
 
-
 static int
 g_cmp(const void *pi, const void *pj)
 {
@@ -2949,18 +3097,14 @@ g_cmp(const void *pi, const void *pj)
     return( Graph_cmp(*i, *j) );
 }
 
-static void
-sha_pinst(g_ptr redex)
+static string
+compute_sha_pinst(g_ptr name, g_ptr inps, g_ptr outs, g_ptr ints, g_ptr content)
 {
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr gname, inps, outs, ints, content;
-    EXTRACT_5_ARGS(redex, gname, inps, outs, ints, content);
 
     SHA256_ptr sha = Begin_SHA256();
     hash_record  g_tbl;
     create_hash(&g_tbl, 1000, ptr_hash, ptr_equ);
-    SHA256_printf(sha, "%s\n", GET_STRING(gname));
+    SHA256_printf(sha, "%s\n", GET_STRING(name));
     while( !IS_NIL(inps) ) {
 	SHA256_printf(sha, "i:%s\n", GET_STRING(GET_FST(GET_CONS_HD(inps))));
 	inps = GET_CONS_TL(inps);
@@ -3051,126 +3195,131 @@ sha_pinst(g_ptr redex)
 	free_buf(&ch_buf);
     } 
     string sig = Get_SHA256_hash(sha);
-    MAKE_REDEX_STRING(redex, sig);
-    End_SHA256(sha);
     dispose_hash(&g_tbl, NULLFCN);
+    End_SHA256(sha);
+    return( sig );
+}
+
+static void
+sha_pinst(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr name, inps, outs, ints, content;
+    EXTRACT_5_ARGS(redex, name, inps, outs, ints, content);
+    string sig = compute_sha_pinst(name, inps, outs, ints, content);
+    MAKE_REDEX_STRING(redex, sig);
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
     return;
 }
 
-void
-Pexlif_Init()
+static bool
+is_assertion(g_ptr p, string *namep)
 {
-    s_PINST                = Mk_constructor_name("PINST");
-    s_P_HIER               = Mk_constructor_name("P_HIER");
-    s_P_LEAF               = Mk_constructor_name("P_LEAF");
-    s_W_UPDATE_FN          = Mk_constructor_name("W_UPDATE_FN");
-    s_W_PHASE_DELAY        = Mk_constructor_name("W_PHASE_DELAY");
-    s_W_X                  = Mk_constructor_name("W_X");
-    s_W_CONST              = Mk_constructor_name("W_CONST");
-    s_W_NAMED_CONST        = Mk_constructor_name("W_NAMED_CONST");
-    s_W_VAR                = Mk_constructor_name("W_VAR");
-    s_W_EXPLICIT_VAR       = Mk_constructor_name("W_EXPLICIT_VAR");
-    s_W_AND                = Mk_constructor_name("W_AND");
-    s_W_LAT_LEQ            = Mk_constructor_name("W_LAT_LEQ");
-    s_W_OR                 = Mk_constructor_name("W_OR");
-    s_W_NOT                = Mk_constructor_name("W_NOT");
-    s_W_PRED               = Mk_constructor_name("W_PRED");
-    s_W_EQ                 = Mk_constructor_name("W_EQ");
-    s_W_GR                 = Mk_constructor_name("W_GR");
-    s_W_ADD                = Mk_constructor_name("W_ADD");
-    s_W_SUB                = Mk_constructor_name("W_SUB");
-    s_W_MUL                = Mk_constructor_name("W_MUL");
-    s_W_DIV                = Mk_constructor_name("W_DIV");
-    s_W_MOD                = Mk_constructor_name("W_MOD");
-    s_W_SHL                = Mk_constructor_name("W_SHL");
-    s_W_SHR                = Mk_constructor_name("W_SHR");
-    s_W_ASHR               = Mk_constructor_name("W_ASHR");
-    s_W_SX                 = Mk_constructor_name("W_SX");
-    s_W_ZX                 = Mk_constructor_name("W_ZX");
-    s_W_ITE                = Mk_constructor_name("W_ITE");
-    s_W_SLICE              = Mk_constructor_name("W_SLICE");
-    s_W_NAMED_SLICE        = Mk_constructor_name("W_NAMED_SLICE");
-    s_W_UPDATE_NAMED_SLICE = Mk_constructor_name("W_UPDATE_NAMED_SLICE");
-    s_W_CAT                = Mk_constructor_name("W_CAT");
-    s_W_MEM_READ           = Mk_constructor_name("W_MEM_READ");
-    s_W_MEM_WRITE          = Mk_constructor_name("W_MEM_WRITE");
-    s_MEM                  = Mk_constructor_name("MEM");
-    // /
-    s_no_instance = wastrsave(&strings, "{}");
-    s_EMPTY_STRING  = wastrsave(&strings, "");
-    s_FP	    = wastrsave(&strings, "FP");
-    s_SHA	    = wastrsave(&strings, "SHA");
-    // /
-    new_ustrmgr(&lstrings);
-    new_mgr(&vec_mgr, sizeof(vec_rec));
-    new_mgr(&rng_mgr, sizeof(range_rec));
+    g_ptr g_name, g_leaf, g_attrs, g_fa_inps, g_fa_outs, g_inter, g_cont;
+    destr_PINST(p, &g_name, &g_attrs, &g_leaf, &g_fa_inps, &g_fa_outs,
+		&g_inter, &g_cont);
+    // Make sure there is a single output that has assert__ in its name
+    if( IS_NIL(g_fa_outs) ) return FALSE;
+    if( !IS_NIL(GET_CONS_TL(g_fa_outs)) ) return FALSE;
+    string name = GET_STRING(GET_FST(GET_CONS_HD(g_fa_outs)));
+    if( Get_Vector_Size(name) != 1 ) return FALSE;
+    if( strstr(name, "assert__") == NULL ) return FALSE;
+    *namep = name;
+    return TRUE;
 }
 
-void
-Pexlif_Install_Functions()
+static void
+add_assertion_declarations(pointer key, pointer data)
 {
-    typeExp_ptr pexlif_tp = Get_Type("pexlif", NULL, TP_INSERT_PLACE_HOLDER);
-    typeExp_ptr content_tp = Get_Type("content", NULL, TP_INSERT_PLACE_HOLDER);
-    typeExp_ptr tv1 = GLnew_tVar();
-
-    Add_ExtAPI_Function(
-          "fold_pexlif"
-        , "111"
-        , FALSE
-        , GLmake_arrow(
-              pexlif_tp
-            , GLmake_arrow(
-                  GLmake_list(GLmake_int())
-                , GLmake_arrow(
-                      GLmake_string()
-                    , pexlif_tp)))
-        , fold_pexlif_fn
-    );
-    Add_ExtAPI_Function(
-          "unfold_pexlif"
-        , "11"
-        , FALSE
-        , GLmake_arrow(pexlif_tp, GLmake_arrow(GLmake_int(), pexlif_tp))
-        , unfold_pexlif_fn
-    );
-
-
-    Add_ExtAPI_Function(
-          "fp_pinst"
-        , "1111"
-        , FALSE
-        , GLmake_arrow(
-	    GLmake_list(GLmake_tuple(GLmake_string(),tv1)),
-	    GLmake_arrow(
-		GLmake_list(GLmake_tuple(GLmake_string(),tv1)),
-		GLmake_arrow(
-		    GLmake_list(GLmake_string()),
-		    GLmake_arrow(content_tp, GLmake_string()))))
-        , fp_pinst
-    );
-
-    Add_ExtAPI_Function(
-          "sha_pinst"
-        , "11111"
-        , FALSE
-        , GLmake_arrow(
-	    GLmake_string(),
-	    GLmake_arrow(
-		GLmake_list(GLmake_tuple(GLmake_string(),tv1)),
-		    GLmake_arrow(
-			GLmake_list(GLmake_tuple(GLmake_string(),tv1)),
-			GLmake_arrow(
-			    GLmake_list(GLmake_string()),
-			    GLmake_arrow(
-				content_tp,
-				GLmake_string())))))
-        , sha_pinst
-    );
-
+    (void) data;
+    string name = (string) key;
+    cur_ints = Make_CONS_ND(Make_STRING_leaf(name), cur_ints);    
 }
 
+static bool
+is_signature(g_ptr l)
+{
+    if( IS_NIL(l) ) return FALSE;
+    string key = GET_STRING(GET_FST(GET_CONS_HD(l)));
+    return( STREQ(key, s_FP) || STREQ(key, s_SHA) );
+}
+
+static void
+mk_pinst(g_ptr redex)
+{
+    g_ptr name, attrs, gleaf, inps, outs, ints, content;
+    EXTRACT_7_ARGS(redex, name, attrs, gleaf, inps, outs, ints, content);
+    g_ptr ps;
+    hash_record assertion_tbl;
+    create_hash(&assertion_tbl, 100, str_hash, str_equ);
+    if(is_P_HIER(content, &ps) ) {
+	while( !IS_NIL(ps) ) {
+	    g_ptr p = GET_CONS_HD(ps);
+	    string wname;
+	    if( is_assertion(p, &wname) ) {
+		if( find_hash(&assertion_tbl, wname) != NULL ) {
+		    dispose_hash(&assertion_tbl, NULLFCN);
+		    string msg = Fail_pr("Duplicatated assertion (%s)", wname);
+		    MAKE_REDEX_FAILURE(redex,msg);
+		    return;
+		}
+		insert_hash(&assertion_tbl, wname, wname);
+	    }
+	    ps = GET_CONS_TL(ps);
+	}
+    }
+    if( hash_size(&assertion_tbl) != 0 ) {
+	g_ptr cur = ints;
+	INC_REFCNT(ints);
+	while( !IS_NIL(cur) ) {
+	    string wname = GET_STRING(GET_CONS_HD(cur));
+	    if( find_hash(&assertion_tbl, wname) != NULL ) {
+		delete_hash(&assertion_tbl, wname);
+	    }
+	    cur = GET_CONS_TL(cur);
+	}
+	cur_ints = ints;
+	scan_hash(&assertion_tbl, add_assertion_declarations);
+	ints = cur_ints;
+    }
+    dispose_hash(&assertion_tbl, NULLFCN);
+    string fp_sig = compute_fp_pinst(inps, outs, ints, content);
+    string sha_sig = compute_sha_pinst(name, inps, outs, ints, content);
+    while( !IS_NIL(attrs) && is_signature(attrs) ) {
+	attrs = GET_CONS_TL(attrs);
+    }
+    if( !IS_NIL(attrs) ) { INC_REFCNT(attrs); }
+    attrs = Make_CONS_ND(Make_PAIR_ND(Make_STRING_leaf(s_FP),
+				      Make_STRING_leaf(fp_sig)), attrs);
+    attrs = Make_CONS_ND(Make_PAIR_ND(Make_STRING_leaf(s_SHA),
+				      Make_STRING_leaf(sha_sig)), attrs);
+
+    g_ptr res = mk_PINST(name, attrs, gleaf, inps, outs, ints, content);
+    OVERWRITE(redex, res);
+}
+
+static void
+get_wrappers(g_ptr redex)
+{
+    g_ptr content, ps;
+    EXTRACT_1_ARG(redex, content);
+    MAKE_REDEX_NIL(redex);
+    g_ptr tail = redex;
+    if( !is_P_HIER(content, &ps) ) {
+	return;
+    }
+    int idx = 1;
+    while( !IS_NIL(ps) ) {
+	if( STREQ(get_top_name(GET_CONS_HD(ps)), s_WrApPeR) ) {
+	    APPEND1(tail, Make_INT_leaf(idx));
+	}
+	ps = GET_CONS_TL(ps);
+	idx++;
+    }
+    return;
+}
 /******************************************************************************/
 /*                               DUMMY FUNCTIONS                              */
 /******************************************************************************/

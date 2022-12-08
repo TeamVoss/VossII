@@ -1035,7 +1035,10 @@ partition(g_ptr redex)
 	use = Eval(use);
 	if( is_fail(use) ) {
 	    MAKE_REDEX_FAILURE(redex, FailBuf);
-	    POP_GLOBAL_GC(COUNT_BUF(&partition_results));
+	    POP_GLOBAL_GC(2*COUNT_BUF(&partition_results));
+	    free_buf(&partition_results);
+	    free_buf(&partition_results_tail);
+	    dispose_hash(&partition_tbl, NULLFCN);
 	    DEC_REF_CNT(l);
 	    DEC_REF_CNT(r);
 	    return;
@@ -1046,6 +1049,7 @@ partition(g_ptr redex)
 	    idx = used;
 	    insert_hash(&partition_tbl, use, INT2PTR(idx));
 	    g_ptr r = Make_NIL();
+	    PUSH_GLOBAL_GC(use);
 	    PUSH_GLOBAL_GC(r);
 	    push_buf(&partition_results, &r);
 	    push_buf(&partition_results_tail, &r);
@@ -1057,7 +1061,7 @@ partition(g_ptr redex)
 	tl = GET_CONS_TL(tl);
 	store_buf(&partition_results_tail,idx-1, &tl);
     }
-    POP_GLOBAL_GC(COUNT_BUF(&partition_results));
+    POP_GLOBAL_GC(2*COUNT_BUF(&partition_results));
     g_ptr tail = redex;
     MAKE_REDEX_NIL(redex);
     g_ptr *gp;

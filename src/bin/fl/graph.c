@@ -9,10 +9,13 @@
 #include "symbol.h"
 #include "plugin_loader.h"
 #include <unistd.h>
+#include <time.h>
 
 /************************************************************************/
 /*			Global Variables				*/
 /************************************************************************/
+extern bool		profiling_active;
+extern bool		profiling_builtins;
 extern bool		cephalopode_mode;
 extern bool		compile_to_C_flag;
 extern bool		transitive_visibility;
@@ -134,6 +137,10 @@ static string		s_SOME;
 static string		s_ite;
 static string		s_update_ref_var;
 
+static buffer		profiling_buf;
+static hash_record	profiling_tbl;
+static rec_mgr		profile_data_rec_mgr;
+
 static buffer		global_gc_buf;
 static formula		current_bdd_cond;
 static formula		cur_eval_cond;
@@ -215,6 +222,7 @@ static struct prim_fun_name_rec {
 		    {P_SYSTEM, "P_SYSTEM", "system"},
 		    {P_EVAL, "P_EVAL", "eval"},
 		    {P_CACHE, "P_CACHE", ""},
+		    {P_STRICT_ARGS, "P_STRICT_ARGS", ""},
 		    {P_IS_TUPLE, "P_IS_TUPLE", ""},
 		    {P_STRICT_CONS, "P_STRICT_CONS", ""},
 		    {P_STRICT_TUPLE, "P_STRICT_TUPLE", ""},
@@ -268,7 +276,7 @@ static bool  		print_result_local(g_ptr node, odests fp, bool pr_brack,
 static g_ptr 		compile_rec(g_ptr node);
 static res_rec		compile(g_ptr node, free_list_ptr vlp);
 static void  		sweep();
-static void  		push_trace_fn(string name);
+static void  		push_trace_fn(string name, bool builtin);
 static void  		pop_trace_fn();
 static void		free_CL_node(cl_ptr nd);
 static g_ptr		convert_CL_rec(cl_ptr nd);
@@ -504,6 +512,11 @@ G_Init()
     s = strtemp(RC_TMP_FILE_DIR);
     s = strappend("/FL_BOOL2STR_XXXXXX");
     tmp_file_template1 = wastrsave(&strings, s);
+    if( profiling_active ) {
+	new_buf(&profiling_buf, 100, sizeof(prof_timing_rec));
+	create_hash(&profiling_tbl, 100, Ustr_hash, Ustr_equ);
+	new_mgr(&profile_data_rec_mgr, sizeof(profile_data_rec));
+    }
     /* Place strings in unique table */
     s_T = wastrsave(&strings, "T");
     s_F = wastrsave(&strings, "F");
@@ -922,8 +935,15 @@ Restore_eval_context(eval_ctx_ptr ctx)
     if( cur_sz < ctx->old_fn_trace_buf_size )
 	DIE("Bad bug in fn_trace_buf management.... Guru time!");
     if( cur_sz > ctx->old_fn_trace_buf_size ) {
-	resize_buf(&fn_trace_buf, ctx->old_fn_trace_buf_size);
-    
+	ui new_size = ctx->old_fn_trace_buf_size;
+	resize_buf(&fn_trace_buf, new_size);
+	if( profiling_active ) {
+	    while( COUNT_BUF(&profiling_buf) > new_size ) {
+		prof_timing_rec start;
+		pop_buf(&profiling_buf, &start);
+		(start.fun_data)->recursion_depth--;
+	    }
+	}
     }
     cur_eval_cond = ctx->cur_eval_cond;
 }
@@ -936,6 +956,13 @@ Reset_eval_context()
     start_envp = NULL;
     Call_level = 0;
     resize_buf(&fn_trace_buf, 0);
+    if( profiling_active ) {
+	while( COUNT_BUF(&profiling_buf) > 0 ) {
+	    prof_timing_rec start;
+	    pop_buf(&profiling_buf, &start);
+	    (start.fun_data)->recursion_depth--;
+	}
+    }
     while( cur_file != NULL ) {
 	fclose(yyin);
 	yyin = Return_to_old_fid();
@@ -2313,6 +2340,118 @@ Get_Vars(buffer *bp, g_ptr node)
     DIE("Should never occur!");
 }
 
+static int
+profile_cmp_time_per_invocation(const void *pi, const void *pj)
+{
+    profile_data_ptr p1 = (profile_data_ptr) pi;
+    profile_data_ptr p2 = (profile_data_ptr) pj;
+    double per1 = p1->time_used / ((double) p1->invocation_cnt);
+    double per2 = p2->time_used / ((double) p2->invocation_cnt);
+    double diff = per2 - per1;
+    if( diff > 0.0 ) return( 1 );
+    if( diff < 0.0 ) return( -1 );
+    return( 0 );
+}
+
+static int
+profile_cmp_time(const void *pi, const void *pj)
+{
+    profile_data_ptr p1 = (profile_data_ptr) pi;
+    profile_data_ptr p2 = (profile_data_ptr) pj;
+    double diff = p2->time_used - p1->time_used;
+    if( diff > 0.0 ) return( 1 );
+    if( diff < 0.0 ) return( -1 );
+    return( 0 );
+}
+
+static int
+profile_cmp_invocations(const void *pi, const void *pj)
+{
+    profile_data_ptr p1 = (profile_data_ptr) pi;
+    profile_data_ptr p2 = (profile_data_ptr) pj;
+    return( p2->invocation_cnt - p1->invocation_cnt );
+}
+
+static int
+profile_cmp_fun_name(const void *pi, const void *pj)
+{
+    profile_data_ptr p1 = (profile_data_ptr) pi;
+    profile_data_ptr p2 = (profile_data_ptr) pj;
+    return( strcmp(p1->fun_name, p2->fun_name) );
+}
+
+static void
+print_profile_data(FILE *fp, int sz, buffer *bp)
+{
+    profile_data_ptr	pd;
+    FOR_BUF(bp, profile_data_rec, pd) {
+	if( !pd->builtin || profiling_builtins ) {
+	    double per_invoc = pd->time_used / ((double) pd->invocation_cnt);
+	    fprintf(fp, "%-*s %'11d %15f %15f\n", sz, pd->fun_name,
+			pd->invocation_cnt, pd->time_used, per_invoc);
+	}
+    }
+}
+
+void
+Emit_profile_data()
+{
+    buffer  out_buf;
+    new_buf(&out_buf, 100, sizeof(profile_data_rec));
+    profile_data_ptr	pd;
+    int sz = 0;
+    FOR_REC(&profile_data_rec_mgr, profile_data_ptr, pd) { 
+	int len = strlen(pd->fun_name);
+	if( len > sz ) { sz = len; }
+	push_buf(&out_buf, pd);
+    }
+    sz += 3;
+    FILE *fp = fopen("gmon.out", "w");
+    if( fp == NULL ) {
+	fprintf(stderr, "Failed to open gmon.out for writing\n");
+    } else {
+
+	fprintf(fp, "Profile sorted by decreasing run time per invocation\n");
+	fprintf(fp, "====================================================\n");
+	fprintf(fp, "%-*s Invocations %15s %15s\n", sz, "Name", "Time", "Time/invocation");
+	qsort(START_BUF(&out_buf),
+	      COUNT_BUF(&out_buf),
+	      sizeof(profile_data_rec),
+	      profile_cmp_time_per_invocation);
+	print_profile_data(fp, sz, &out_buf);
+	fprintf(fp, "\n\n");
+
+	fprintf(fp, "Profile sorted by decreasing run time\n");
+	fprintf(fp, "=====================================\n");
+	fprintf(fp, "%-*s Invocations %15s %15s\n", sz, "Name", "Time", "Time/invocation");
+	qsort(START_BUF(&out_buf),
+	      COUNT_BUF(&out_buf),
+	      sizeof(profile_data_rec),
+	      profile_cmp_time);
+	print_profile_data(fp, sz, &out_buf);
+	fprintf(fp, "\n\n");
+
+	fprintf(fp, "Profile sorted by decreasing invocation count\n");
+	fprintf(fp, "=============================================\n");
+	fprintf(fp, "%-*s Invocations %15s %15s\n", sz, "Name", "Time", "Time/invocation");
+	qsort(START_BUF(&out_buf),
+	      COUNT_BUF(&out_buf),
+	      sizeof(profile_data_rec),
+	      profile_cmp_invocations);
+	print_profile_data(fp, sz, &out_buf);
+	fprintf(fp, "\n\n");
+	fprintf(fp, "Profile sorted by function name\n");
+	fprintf(fp, "===============================\n");
+	fprintf(fp, "%-*s Invocations %15s %15s\n", sz, "Name", "Time", "Time/invocation");
+	qsort(START_BUF(&out_buf),
+	      COUNT_BUF(&out_buf),
+	      sizeof(profile_data_rec),
+	      profile_cmp_fun_name);
+	print_profile_data(fp, sz, &out_buf);
+	fclose(fp);
+    }
+}
+
 /************************************************************************/
 /*			Local Functions					*/
 /************************************************************************/
@@ -2884,10 +3023,10 @@ traverse_left(g_ptr oroot)
 			goto clean_up;
 		    redex = *(sp+1);
                     if( pfn == P_SEQ ) {
-			push_trace_fn(s_seq);
+			push_trace_fn(s_seq, TRUE);
                         arg1 = traverse_left(GET_APPLY_RIGHT(*sp));
                     } else {
-			push_trace_fn(s_fseq);
+			push_trace_fn(s_fseq, TRUE);
                         arg1 = force(GET_APPLY_RIGHT(*sp), FALSE);
                     }
 		    if( is_fail(arg1) ) {
@@ -2928,7 +3067,7 @@ traverse_left(g_ptr oroot)
 		    }
 #endif
 //fprintf(stderr, "DEBUG: ");
-		    push_trace_fn(GET_DEBUG_STRING(root));
+		    push_trace_fn(GET_DEBUG_STRING(root), FALSE);
 		    /* It now is an identity function for arg1 */
 		    arg1 = traverse_left(GET_APPLY_RIGHT(*sp));
 		    OVERWRITE(redex, arg1);
@@ -2948,7 +3087,7 @@ traverse_left(g_ptr oroot)
 		    /* Return E1 if E1 does not fail. Otherwise return E2 */
 		    if( depth < 2 )
 			goto clean_up;
-		    push_trace_fn(s_catch);
+		    push_trace_fn(s_catch, TRUE);
 		    redex = *(sp+1);
 		    arg1 = GET_APPLY_RIGHT(*sp);
 		    arg2 = GET_APPLY_RIGHT(*(sp+1));
@@ -2970,7 +3109,7 @@ traverse_left(g_ptr oroot)
 		    redex = *(sp+1);
 		    arg1 = GET_APPLY_RIGHT(*sp);
 		    arg2 = GET_APPLY_RIGHT(*(sp+1));
-		    push_trace_fn(s_gen_catch);
+		    push_trace_fn(s_gen_catch, TRUE);
                     arg1 = force(arg1, FALSE);
                     if( !is_fail(arg1) ) {
                         /* Return E1 */
@@ -3175,7 +3314,7 @@ traverse_left(g_ptr oroot)
 		    if( depth < 1 )
 			goto clean_up;
 		    arg1  = GET_APPLY_RIGHT(*sp);
-		    push_trace_fn(s_hd);
+		    push_trace_fn(s_hd, TRUE);
 		    redex = *sp;
 		    if( !IS_CONS(arg1) ) {
 			arg1 = traverse_left(arg1);
@@ -3199,7 +3338,7 @@ traverse_left(g_ptr oroot)
 		    /* Evalate before updating since hd is a projection fn */
 		    if( depth < 1 )
 			goto clean_up;
-		    push_trace_fn(s_fst);
+		    push_trace_fn(s_fst, TRUE);
 		    arg1  = GET_APPLY_RIGHT(*sp);
 		    redex = *sp;
 		    if( !IS_CONS(arg1) ) {
@@ -3224,7 +3363,7 @@ traverse_left(g_ptr oroot)
 		    /* Evalate before updating since tl is a projection fn */
 		    if( depth < 1 )
 			goto clean_up;
-		    push_trace_fn(s_tl);
+		    push_trace_fn(s_tl, TRUE);
 		    arg1  = GET_APPLY_RIGHT(*sp);
 		    redex = *sp;
 		    if( !IS_CONS(arg1) ) {
@@ -3249,7 +3388,7 @@ traverse_left(g_ptr oroot)
 		    /* Evalate before updating since tl is a projection fn */
 		    if( depth < 1 )
 			goto clean_up;
-		    push_trace_fn(s_snd);
+		    push_trace_fn(s_snd, TRUE);
 		    arg1  = GET_APPLY_RIGHT(*sp);
 		    redex = *sp;
 		    if( !IS_CONS(arg1) ) {
@@ -4065,6 +4204,33 @@ traverse_left(g_ptr oroot)
 		    }
 		    goto finish1;
 
+		case P_STRICT_ARGS:
+		    if( depth < 2 )
+			goto clean_up;
+		    redex = *(sp+1);
+		    /* Force all arguments (note P_STRICT_TUPLE is used!) */
+		    arg1 = force(GET_APPLY_RIGHT(*sp), FALSE);
+		    if( is_fail(arg1) ) {
+			goto fail2;
+		    }
+		    ASSERT( IS_CONS(arg1) );
+		    arg3 = arg1;
+		    while( !IS_NIL(arg3) ) {
+			g_ptr res;
+			ASSERT( IS_CONS(arg3) );
+			res = GET_CONS_HD(arg3);
+			if( is_fail(res) ) {
+			    goto fail2;
+			}
+			arg3 = GET_CONS_TL(arg3);
+		    }
+		    /* Must evaluate expression */
+		    PUSH_GLOBAL_GC(arg1);
+		    arg2 = traverse_left(GET_APPLY_RIGHT(*(sp+1)));
+		    OVERWRITE(redex, arg2);
+		    POP_GLOBAL_GC(1);
+		    goto finish2;
+
 		case P_CACHE:
 		    if( depth < 2 )
 			goto clean_up;
@@ -4108,6 +4274,7 @@ traverse_left(g_ptr oroot)
 			INC_REFCNT(redex);
 		    }
 		    goto finish2;
+
 		case P_MK_REF_VAR:
 		    if( depth < 1 )
 			goto clean_up;
@@ -4236,7 +4403,6 @@ traverse_left(g_ptr oroot)
 			}
 			redex = *(sp+acnt-1);
 			if( depth < acnt ) goto clean_up;
-			push_trace_fn(Get_ExtAPI_Function_Name(id));
 			s = Get_ExtAPI_Strictness(id);
 			int i = 0;
 			while( *s ) {
@@ -4254,7 +4420,6 @@ traverse_left(g_ptr oroot)
 					depth = depth - acnt;
 					root = redex;
 					DO_TRACE_DBG();
-					pop_trace_fn();
 					goto start;
 				    }
 				    break;
@@ -4269,7 +4434,6 @@ traverse_left(g_ptr oroot)
 					depth = depth - acnt;
 					root = redex;
 					DO_TRACE_DBG();
-					pop_trace_fn();
 					goto start;
 				    }
 				    break;
@@ -4284,7 +4448,6 @@ traverse_left(g_ptr oroot)
 					depth = depth - acnt;
 					root = redex;
 					DO_TRACE_DBG();
-					pop_trace_fn();
 					goto start;
 				    }
 				    break;
@@ -4300,7 +4463,6 @@ traverse_left(g_ptr oroot)
 					depth = depth - acnt;
 					root = redex;
 					DO_TRACE_DBG();
-					pop_trace_fn();
 					goto start;
 				    }
 				    break;
@@ -4314,6 +4476,7 @@ traverse_left(g_ptr oroot)
 			    s++;
 			}
 			// Now perform the function
+			push_trace_fn(Get_ExtAPI_Function_Name(id), TRUE);
 			Get_ExtAPI_Function(id)(redex);
 			pop_trace_fn();
 			sp = sp + acnt;
@@ -5003,18 +5166,51 @@ Eval(g_ptr redex)
 }
 
 static void
-push_trace_fn(string name)
+push_trace_fn(string name, bool builtin)
 {
-//fprintf(stderr, "push_trace_fn %s\n", name);
     push_buf(&fn_trace_buf, (pointer) &name);
+    if( profiling_active ) {
+	profile_data_ptr pd = find_hash(&profiling_tbl, name);
+	if( pd == NULL ) {
+	    pd = new_rec(&profile_data_rec_mgr);
+	    pd->fun_name = name;
+	    pd->invocation_cnt = 0;
+	    pd->builtin = builtin;
+	    if( builtin && !profiling_builtins )
+		pd->recursion_depth = 1;    // Don't measure builtins
+	    else
+		pd->recursion_depth = 0;
+	    pd->time_used = 0.0;
+	    insert_hash(&profiling_tbl, name, pd);
+	}
+	prof_timing_rec cur;
+	pd->recursion_depth++;
+	cur.fun_data = pd;
+	clock_gettime(CLOCK_REALTIME, &(cur.timepoint));
+	push_buf(&profiling_buf, &cur);
+    }
 }
 
 static void
 pop_trace_fn()
 {
-    string dummy;
-    pop_buf(&fn_trace_buf, (pointer) &dummy);
-//fprintf(stderr, "pop_buf %s\n", dummy);
+    string fun_name;
+    pop_buf(&fn_trace_buf, (pointer) &fun_name);
+    if( profiling_active ) {
+	struct timespec end;
+	prof_timing_rec start;
+	pop_buf(&profiling_buf, &start);
+	clock_gettime(CLOCK_REALTIME, &end);
+	profile_data_ptr pd = start.fun_data;
+	pd->recursion_depth--;
+	if( pd->recursion_depth == 0 ) {
+	    long secs  = end.tv_sec - start.timepoint.tv_sec;
+	    long nsecs = end.tv_nsec - start.timepoint.tv_nsec;
+	    double time_spent = secs + nsecs * 1e-9;
+	    pd->invocation_cnt++;
+	    pd->time_used += time_spent;
+	}
+    }
 }
 
 

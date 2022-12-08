@@ -131,11 +131,11 @@ proc wv:create_waveform_viewer {w maxtime} {
 
 	    $nn bind all <ButtonPress-3> {wv:mk_name_list_menu %W %x %y %X %Y}
 
-	    bind $nn <ButtonPress-1> "selection_lock %W %x %y 0"
-	    bind $nn <B1-Motion> "selection_move %W %x %y 0"
+	    bind $nn <ButtonPress-1> "wv:selection_lock %W %x %y 0"
+	    bind $nn <B1-Motion> "wv:selection_move %W %x %y 0"
 	    bind $nn <ButtonRelease-1>  "wv:selection_execute %W %x %y %X %Y 0"
-	    bind $nn <Shift-ButtonPress-1> "selection_lock %W %x %y 1"
-	    bind $nn <Shift-B1-Motion> "selection_move %W %x %y 1"
+	    bind $nn <Shift-ButtonPress-1> "wv:selection_lock %W %x %y 1"
+	    bind $nn <Shift-B1-Motion> "wv:selection_move %W %x %y 1"
 	    bind $nn <Shift-ButtonRelease-1> \
 			"wv:selection_execute %W %x %y %X %Y 1"
 	    bind $nn 1 "wv:set_sel_to_col %W DarkOrchid1"
@@ -206,6 +206,43 @@ proc wv:set_time_explicitly {w x y} {
     set ::vstatus(time,[w2root $w]) $time
 }
 
+proc wv:selection_lock {c wx wy shift} {
+    global selection_anchor_point
+    # Grab the focus when the user clicks on the canvas, so the key bindings
+    # for the canvas will be active (like for coloring signals).
+    focus $c
+    set x [$c canvasx $wx]
+    set y [$c canvasy $wy]
+    set selection_anchor_point($c,orig_x) $x
+    set selection_anchor_point($c,orig_y) $y
+    set selection_anchor_point($c,fig) ""
+    set selection_anchor_point($c,txt) ""
+    set selection_anchor_point($c,selection_movement) 0
+}
+
+proc wv:selection_move {c wx wy shift} {
+    global selection_anchor_point
+    set x [$c canvasx $wx]
+    set y [$c canvasy $wy]
+    catch {$c delete $selection_anchor_point($c,fig)}
+    catch {$c delete $selection_anchor_point($c,txt)}
+    if ![info exists selection_anchor_point($c,orig_x)] { return }
+    if ![info exists selection_anchor_point($c,orig_y)] { return }
+    set ox $selection_anchor_point($c,orig_x)
+    set oy $selection_anchor_point($c,orig_y)
+    set deltax [expr $x - $ox]
+    set deltay [expr $y - $oy]
+    #
+    if [expr abs($deltax) <= 2.0 && abs($deltay) <= 2.0] { return }
+    set selection_anchor_point($c,selection_movement) 1
+    set selection_anchor_point($c,fig) \
+        [$c create line  $ox $oy $x $oy $x $y $ox $y $ox $oy \
+            -fill red -dash {1 3}]
+    catch {$c lower $selection_anchor_point($c,fig) \
+                    $selection_anchor_point($c,txt)}
+}
+
+
 proc wv:selection_execute {w wx wy sx sy shift} {
     global selection_anchor_point
     if ![info exists selection_anchor_point($w,orig_x)] { return }
@@ -226,10 +263,15 @@ proc wv:selection_execute {w wx wy sx sy shift} {
 	set vecs [wv:tags2vecs [$w find overlap [min $x $ox] [min $y $oy] \
 					        [max $x $ox] [max $y $oy]]]
     } 
+
+    fl_clear_selection_list {};
+    foreach vec $vecs {
+        fl_add_to_selection_list $vec
+    }
     if $shift { 
-        fl_set_selection $w "MODIFY_SELECTION" [list $vecs]
+        fl_set_selection $w "MODIFY_SELECTION"
     } else {
-        fl_set_selection $w "SET_SELECTION" [list $vecs]
+        fl_set_selection $w "SET_SELECTION"
     }
 }
 
@@ -397,8 +439,11 @@ proc wv:prim_set_name_color {w vec color} {
     set pw $f.panes
     set nf $pw.name_frame
     set nn $nf.names
+    set wf $pw.waveform_frame
+    set ww $wf.waveforms
 
-    foreach item [$nn find withtag BaCkGrOuNd$vec] {
+    set bgtag [format {BaCkGrOuNd%s} [string map { {[} {__} {]} {___}} $vec]]
+    foreach item [$nn find withtag $bgtag] {
 	if { $color == "_OrIgInAlCoLoR_" } {
 	    set dcol [get_stored_default_color $nn $item]
 	    $nn itemconfigure $item -fill $dcol
@@ -406,6 +451,16 @@ proc wv:prim_set_name_color {w vec color} {
 	    record_orig_color $nn $item
 	    $nn itemconfigure $item -fill $color
 	    lappend ::changed_colors($nn) $item
+	}
+    }
+    foreach item [$ww find withtag $bgtag] {
+	if { $color == "_OrIgInAlCoLoR_" } {
+	    set dcol [get_stored_default_color $ww $item]
+	    $ww itemconfigure $item -fill $dcol
+	} else {
+	    record_orig_color $ww $item
+	    $ww itemconfigure $item -fill $color
+	    lappend ::changed_colors($ww) $item
 	}
     }
 }
@@ -676,8 +731,9 @@ proc wv:prim_add_waveform {w vec} {
     set ybot [expr $ytop + $::wv_height]
 
     # Add vector name
+    set bgtag [format {BaCkGrOuNd%s} [string map { {[} {__} {]} {___}} $vec]]
     set w1 [$nn create rectangle 0 $ybot 400 $ytop -fill white -outline "" \
-	    -tags "BaCkGrOuNd$vec $vec"]
+	    -tags "$bgtag $vec"]
     set w2 [$nn create line 0 $ybot 400 $ybot -fill lightblue -dash . ]
     set w3 [$nn create text 15 $ybot -text $vec -anchor sw -justify left \
 	    -tags "TxTxT $vec" -font $::voss2_txtfont]
@@ -689,17 +745,21 @@ proc wv:prim_add_waveform {w vec} {
     # Add waveform background
     set maxt [expr $t*$::wv_xscale($f)]
     set bb [$ww create rectangle 0 $ybot $maxt $ytop -fill white \
-		-outline "" -tags $vtag]
+		-outline "" -tags "$bgtag $vtag"]
     wv:add_value_popup $ww $bb
     set bl [$ww create line 0 $ybot $maxt $ybot -fill lightblue -dash . \
 		-tags $vtag]
     wv:add_value_popup $ww $bl
+
+    set ybot [expr $ybot-2]
+    set ytop [expr $ytop+2]
 
     # Add actual waveform
     set cnt [fl_get_waveform_cnt $w $vec $::wv_info($f,show_depend)]
     for {set i 0} {$i < $cnt} {incr i} {
 	foreach ch [fl_get_waveform_res $i] {
 	    val {nt {v dep_col}} $ch
+	    if { $dep_col == "-" } { set dep_col ""; }
 	    if { $nt >= $t } { continue; }
 	    set lx [expr $nt*$::wv_xscale($f)]
 	    set rx [expr $t*$::wv_xscale($f)]

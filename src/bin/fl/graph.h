@@ -130,6 +130,8 @@ g_ptr	     Reflect_expr(g_ptr node);
 formula	     Get_cur_eval_cond();
 unsigned int Graph_hash(pointer np, unsigned int n);
 bool	     Graph_equ(pointer p1, pointer p2);
+void	     Emit_profile_data();
+
 #ifdef DEBUG
 int	     PRsize(g_ptr node);
 void	     PRl(g_ptr np, int limit);
@@ -522,6 +524,7 @@ typedef struct g_rec {
 #define P_UNTYPE	    125
 #define P_UNQUOTE	    126
 #define P_LOAD_PLUGIN	    127
+#define P_STRICT_ARGS	    128
 
 #define P_VOID          1022
 
@@ -702,6 +705,23 @@ typedef struct g_rec {
 					a1 = GET_APPLY_RIGHT(t);    \
 				    }
 
+#define EXTRACT_7_ARGS(np,a1,a2,a3,a4,a5,a6,a7)  {		    \
+					g_ptr t = (np);		    \
+					a7 = GET_APPLY_RIGHT(t);    \
+					t = GET_APPLY_LEFT(t);	    \
+					a6 = GET_APPLY_RIGHT(t);    \
+					t = GET_APPLY_LEFT(t);	    \
+					a5 = GET_APPLY_RIGHT(t);    \
+					t = GET_APPLY_LEFT(t);	    \
+					a4 = GET_APPLY_RIGHT(t);    \
+					t = GET_APPLY_LEFT(t);	    \
+					a3 = GET_APPLY_RIGHT(t);    \
+					t = GET_APPLY_LEFT(t);	    \
+					a2 = GET_APPLY_RIGHT(t);    \
+					t = GET_APPLY_LEFT(t);	    \
+					a1 = GET_APPLY_RIGHT(t);    \
+				    }
+
 typedef enum {mk_tuple_tp, mk_list_tp, no_tp}   constr_tp;
 
 typedef struct cl_rec {
@@ -786,6 +806,21 @@ typedef struct gmap_info_rec {
 	    g_ptr	(*leaf_fun2)(g_ptr,g_ptr);
 	}		u;
 } gmap_info_rec;
+
+typedef struct profile_data_rec	    *profile_data_ptr;
+typedef struct profile_data_rec {
+	string		fun_name;
+	bool		builtin;
+	int		recursion_depth;
+	int		invocation_cnt;
+	double		time_used;
+} profile_data_rec;
+
+typedef struct prof_timing_rec	    *prof_timing_ptr;
+typedef struct prof_timing_rec {
+    profile_data_ptr	fun_data;
+    struct timespec	timepoint;
+} prof_timing_rec;
 
 #if defined(PARANOIA) && !defined(FL_PLUGIN)
 string		f_GET_LAMBDA_VAR(g_ptr node);

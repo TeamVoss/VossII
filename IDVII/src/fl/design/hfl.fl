@@ -196,7 +196,6 @@ let is_wide_AND e  =
 
 (cload (DIR^"/simplify.fl")) fseq ();
 
-//clet get_cases e =
 let get_cases e =
     letrec get_all_choices conds (W_ITE c t e) =
 	    conds != [] =>
@@ -216,14 +215,6 @@ let get_cases e =
     in
     map mk p
 ;
-
-//cletrec get_cases (W_ITE c1 t1 (W_ITE c2 t2 e2)) =
-//	    (c1,t1):(get_cases (W_ITE c2 t2 e2))
-//  /\    get_cases (W_ITE c t e) = [(c,t),((W_CONST 1 1), e)]
-//  /\    get_cases other = [((W_CONST 1 1), other)]
-//;
-
-//let is_case e = (length (get_cases e)) > 2;
 
 let is_case (W_ITE c (W_ITE c2 _ _) _) = T
  /\ is_case (W_ITE c _ (W_ITE c2 _ _)) = T
@@ -591,6 +582,12 @@ let base_assignment do_split lhs rhs =
 let w_CASE w_out cond_res_list w_default_value =
     let sz = wexpr_size w_default_value then
     let n = length cond_res_list then
+//    n = 1 =>
+//	val (c,t) = hd cond_res_list in
+//	let e = w_default_value in
+//	let base = base_assignment T w_out (W_ITE c t e) in
+//	resize_pexlif sz base
+//    |
     let n_out = hd (w_depends w_out) then
     let fa_outs = [(n_out,[n_out])] then
     let var2name (W_VAR s b) = [mk_name s b]
@@ -721,12 +718,6 @@ let get_act_args fn a =
 	let vs = get_lhs_vars tmp then
 	([asignm], vs)
     )
-;
-
-let mk_wrap_ifc fas =
-    let raw_all_act_inps = flatmap snd fas in
-    let all_acts = extract_vectors raw_all_act_inps in
-    map (\v.v,[v]) all_acts
 ;
 
 let mk_wrap_inps tmps pexlifs =
@@ -2189,29 +2180,29 @@ let base_re_ff_en_sreset_with_value reset_value =
 //
 // A rising edge D flip-flop.
 // 
-let re_ff clk d q = base_re_ff d clk q;
+slet re_ff clk d q = base_re_ff d clk q;
 
 // A rising edge D flip-flop with asynchronous reset (active high).
-let re_ff_reset clk reset d q = base_re_ff_reset d reset clk q;
+slet re_ff_reset clk reset d q = base_re_ff_reset d reset clk q;
 
 // A rising edge D flip-flop with enable.
-let re_ff_en clk en d q = base_re_ff_en d en clk q;
+slet re_ff_en clk en d q = base_re_ff_en d en clk q;
 
 // A rising edge D flip-flop with enable and asynchronous reset (active high).
-let re_ff_en_reset clk en reset d q = base_re_ff_en_reset d en reset clk q;
+slet re_ff_en_reset clk en reset d q = base_re_ff_en_reset d en reset clk q;
 
 // A rising edge D flip-flop with enable and asynchronous reset (active high).
-let re_ff_en_reset_with_value reset_value clk en reset d q =
+slet re_ff_en_reset_with_value reset_value clk en reset d q =
     base_re_ff_en_reset_with_value reset_value d en reset clk q;
 
 // A rising edge D flip-flop with synchronous reset (active high).
-let re_ff_sreset clk reset d q = base_re_ff_sreset d reset clk q;
+slet re_ff_sreset clk reset d q = base_re_ff_sreset d reset clk q;
 
 // A rising edge D flip-flop with enable and synchronous reset (active high).
-let re_ff_en_sreset clk en reset d q = base_re_ff_en_sreset d en reset clk q;
+slet re_ff_en_sreset clk en reset d q = base_re_ff_en_sreset d en reset clk q;
 
 // A rising edge D flip-flop with enable and synchronous reset (active high).
-let re_ff_en_sreset_with_value reset_value clk en reset d q =
+slet re_ff_en_sreset_with_value reset_value clk en reset d q =
     base_re_ff_en_sreset_with_value reset_value d en reset clk q;
 
 // ---------------------------------------------------
@@ -3067,13 +3058,18 @@ add_open_overload hw_type_destr hw_pair_hw_type_destr;
 
 let hw__list__destr as = W_CAT (map hw_destr as);
 
+let hw__list__constr (W_CAT l) = map hw_constr l
+ /\ hw__list__constr (W_ITE c (W_CAT l1) (W_CAT l2)) =
+	map2 (\e1.\e2. hw_constr (W_ITE c e1 e2)) l1 l2
+;
+
 let hw_list_hw_type_destr =
 	    HW_TYPE (error "Not defined for lists")
 		    (error "Not defined for lists")
 		    (error "Not defined for lists")
 		    (error "Not defined for lists")
 		    hw__list__destr
-		    (error "Not defined for lists")
+		    hw__list__constr
 		    (error "Not defined for lists")
 ;
 add_open_overload hw_type_destr hw_list_hw_type_destr;

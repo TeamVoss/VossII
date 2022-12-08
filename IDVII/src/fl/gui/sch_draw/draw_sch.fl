@@ -5,6 +5,36 @@
 
 let DBG_timing = F;
 
+let visualize_fanin ckt l1 l2 i1 l3 i2 =
+    DBG_timing => 
+	(fprintf stderr "start visualize_fanin\n") fseq
+	val (res,t) = wtime (visualize_fanin ckt l1 l2 i1 l3 i2) then
+	(fprintf stderr "visualize_fanin: %s\n" t) fseq
+	res
+    |
+	visualize_fanin ckt l1 l2 i1 l3 i2
+;
+
+let visualisation2tcl vis =
+    DBG_timing => 
+	(fprintf stderr "start visualisation2tcl\n") fseq
+	val (res,t) = wtime (visualisation2tcl vis) then
+	(fprintf stderr "visualisation2tcl: %s\n" t) fseq
+	res
+    |
+	visualisation2tcl vis
+;
+
+let tcl_eval l =
+    DBG_timing =>
+	val (res,t) = wtime (tcl_eval l) then
+	(fprintf stderr "tcl_eval program of length %d: %s\n" (length l) t) fseq
+	((sscanf "%d" t) < 10 => () | (fprintf stderr "tcl_pgm\n%S\n" l)) fseq
+	res
+    |
+	tcl_eval l
+;
+
 
 let Init_sch_draw =
   (tcl_eval [
@@ -1389,9 +1419,9 @@ let base_get_waveform w vec show_depend =
         let vec_trace = merge_traces traces then
         let mk_tr (time,vals) =
 	    let color = 
-		NOT show_depend => "white" |
+		NOT show_depend => "-" |
 		let col = get_dependency_color ste time [vec] then
-		col == "" => "white" | col
+		col == "" => "-" | col
 	    in
             let val2s HL =
                 HL == (T,F) => "1" |

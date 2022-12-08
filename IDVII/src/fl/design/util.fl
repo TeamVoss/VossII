@@ -702,7 +702,7 @@ let resize_pexlif sz {p::pexlif} =
      /\    trwexpr (W_PRED name e) = W_PRED name (trwexpr e)
      /\    trwexpr (W_SX osz e) = W_SX (tri osz) (trwexpr e)
      /\    trwexpr (W_ZX osz e) = W_ZX (tri osz) (trwexpr e)
-     /\    trwexpr other = error "Cannot translate wexpr constructor"
+     /\    trwexpr other = eprintf "Cannot translate wexpr (%s)" (Pwexpr other)
     in
     let trfn (W_UPDATE_FN lhs rhs) =
 	W_UPDATE_FN (trwexpr lhs) (trwexpr rhs)

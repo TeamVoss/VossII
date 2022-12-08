@@ -252,14 +252,14 @@ let zero_extend_exp sz a =
       (Exp_primary (Prim_cat (CAT [zero, a'])), 14)
 ;
 
-let unwrap_prim (Exp_primary (Prim_hier (HID NONE (ID i)) rng)) = (i, rng)
-/\  unwrap_prim _ = error "SX/SLICE is only supported for variables."
+let unwrap_prim tp (Exp_primary (Prim_hier (HID NONE (ID i)) rng)) = i
+/\  unwrap_prim tp _ = eprintf "%s is only supported for variables." tp
 ;
 
 let sign_extend_exp sz a =
       let a'  = fst (pretty_expression a) in
       let sz' = wexpr_size a in
-      let id  = fst (unwrap_prim a') in
+      let id  = unwrap_prim "SX" a' in
       let rng = sz' > 1 => let x = sz' - 1 in [(x,x)] | [] in
       let ext =
             Exp_primary (Prim_mcat (MCAT (cdec (sz-sz'))
@@ -275,7 +275,7 @@ let slice_exp is a =
             (hd is, last is)
       in
       let a'  = fst (pretty_expression a) in
-      let id  = fst (unwrap_prim a') in
+      let id  = unwrap_prim "SLICE" a' in
       let rng = [contig_slice is] in
       (Exp_primary (prim_hier id rng), 100)
 ;

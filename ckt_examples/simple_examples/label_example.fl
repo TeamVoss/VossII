@@ -1,0 +1,26 @@
+load "idv.fl";
+
+TYPE "word" 8;
+
+let tst =
+    bit_input clk.
+    word_input a b c.
+    word_output	o.
+    internal tmp o1.
+    CELL "tst" [
+	"def" ::: re_ff clk (a '+' (b '*' c)) o1,
+	"abc" ::: tmp <- (a '*' (b '+' c)),
+	"qqq" ::: o <- (IF (o1 '=' tmp) THEN (IF (a '=' b) THEN c ELSE b) ELSE c)
+];
+
+let p = tst 'clk 'a 'b 'c 'o;
+
+//p;
+
+let p' = pexlif_group_by_label p;
+//p';
+
+
+system "rm -fr DB_q";
+
+IDV p' "DB_q" [];

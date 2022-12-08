@@ -802,14 +802,14 @@ let bdd_next2current f =
 // Existentially quantify out all the variables in 'vars' from f.
 // Usage: Quant_thereis vars f;
 let Quant_thereis vars f =
-    let qv = itlist (\n.\r. variable n AND r) vars T in
+    let qv = sitlist (\n.\r. variable n AND r) vars T in
     quant_thereis qv f
 ;
 
 // Existentially quantify out all the variables in vars from f.
 // Usage: Quant_forall vars f;
 let Quant_forall vars f =
-    let qv = itlist (\n.\r. variable n AND r) vars T in
+    let qv = sitlist (\n.\r. variable n AND r) vars T in
     quant_forall qv f
 ;
 
@@ -970,7 +970,7 @@ cletrec set2iset set =
         e <= 0 => eprintf "Illegal set member (%d). Should be >= 1." e |
         (2**(e-1)) intOR i
     in
-    ISET (itlist add set 0)
+    ISET (sitlist add set 0)
 ;
 
 // Return the list of elements in the iset. Elements are numbers 1, 2, 3, ...
@@ -1270,7 +1270,7 @@ let merge_funs info indices =
     val (idx:rem_indices) = indices then
     val (r_funs, r_deps) = unzip (map (\i. assoc i main_list) indices) then
 //    let new_fun = qAND_list (map deref r_funs) then
-    let new_fun = itlist (\rf.\r. deref rf AND r) r_funs T then
+    let new_fun = sitlist (\rf.\r. deref rf AND r) r_funs T then
     let new_dep = setify (flatmap deref r_deps) then
     val (rf1:rfs) = r_funs then
     (rf1 := new_fun) fseq (foreach (\r. r := T) rfs) fseq
@@ -1375,7 +1375,7 @@ clet param cond =
 
 cletrec fparam_rec vars f = vars = [] => [] |
     let Quant_thereis vs f =
-        quant_thereis (itlist (\v.\r. variable v OR r) vs F) f
+        quant_thereis (sitlist (\v.\r. variable v OR r) vs F) f
     in
     let nvariable s = bdd_current2next (variable s) in
     val (v:vs) = vars in
@@ -1899,52 +1899,20 @@ andlettype content =
         |   P_LEAF {fns::update_fn list}
 ;
 
-
 // Re-define PINST so that we always compute a signature (FP) and
 // a SHA256 (SHA) signatures and store them in the attribute list.
 // Also, every (non-toplevel) wrapper PINST is unfolded.
-let PINST n a l i o t c =
-    let mk_pinst n a l i o t c =
-        let process_assertions (P_HIER ps) =
-            let get_assert_nd (PINST _ _ _ _ outs _ _) =
-                length outs != 1 => [] |
-                val (f,as) = hd outs then
-                md_size f != 1 => [] |
-                let a = hd as in
-                str_is_substr "assert__" a => [a] | []
-            in
-            flatmap get_assert_nd ps
-         /\ process_assertions _ =  []
-        in
-        let assert_nds = process_assertions c then
-        (length (setify assert_nds) != length assert_nds) =>
-            let ap = partition id assert_nds in
-            let idx = find_first0 (\l.length l > 1) ap in
-            eprintf "Duplicatated assertion (%s)" (hd (el idx ap))
-        |
-        let t' = setify (assert_nds @ t) in
-        let is_signature s = (s == "FP") OR (s == "SHA") in
-        let a' = filter (NOT # is_signature # fst) a in
-        let f  = ("FP",  fp_pinst    i o t' c) in
-        let s  = ("SHA", sha_pinst n i o t' c) in
-        PINST n (f : s : a') l i o t' c
-    in
-    let is__WrApPeR_ (PINST nm _ _ _ _ _ (P_HIER _)) = (nm = "_WrApPeR_")
-     /\ is__WrApPeR_ _ = F
-    in
-    let get_wrappers (P_HIER chs) = find_all is__WrApPeR_ chs
-     /\ get_wrappers _ = []
-    in
-    let wrappers = get_wrappers c in
+slet PINST n a l i o t c =
+    let wrappers = get_wrappers c then
     wrappers = [] =>
         mk_pinst n a l i o t c
     |
         // Lift all wrapper pexlifs by unfolding them
         // Process the unfolds in reverse order
         // Relies on unfold1 i does not change children 1--(i-1).
-        let wrappers = qsort (\i1.\i2. i1-i2) (setify wrappers) then
+        let wrappers = qsort (\i1.\i2. i1-i2) wrappers then
         let p = PINST n a l i o t c then
-        let p' = itlist (\i.\p. unfold_pexlif p i) wrappers p then
+        let p' = sitlist (\i.\p. unfold_pexlif p i) wrappers p then
         let lbl (PINST n a l i o t c) = mk_pinst n a l i o t c in
         val (PINST n a l i o t (P_HIER cs)) = p' then
         mk_pinst n a l i o t (P_HIER (map lbl cs))

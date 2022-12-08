@@ -3,4 +3,5 @@ break exit
 break abort
 break Dbg_stop
 break Rprintf
-r -noX -f bugs/b233.fl
+break mk_pinst
+r -noX -f bugs/b234.fl

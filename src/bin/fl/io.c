@@ -1564,6 +1564,8 @@ can_be_saved(g_ptr np)
 				return( TRUE );
 			    case P_CACHE:
 				return( TRUE );
+			    case P_STRICT_ARGS:
+				return( TRUE );
 			    case P_EXTAPI_FN:
 				return( TRUE );
 			    case P_FILEFP:

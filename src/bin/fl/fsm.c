@@ -5205,10 +5205,22 @@ append_range(ilist_ptr l, int i_from, int i_to)
     ilist_ptr cur = l;
     while( cur->next != NULL ) { cur = cur->next; }
     // Can we extend the last range?
-    bool cur_down = cur->from >= cur->to;
-    bool new_down = i_from >= i_to;
-    if( ( cur_down &&  new_down && ((cur->to-1) == i_from)) ||
-	(!cur_down && !new_down && ((cur->to+1) == i_from)) )
+    bool cur_single = cur->from == cur->to;
+    bool cur_down   = cur->from >  cur->to;
+    bool cur_up     = cur->from <  cur->to;
+    bool new_single = i_from == i_to;
+    bool new_down   = i_from >  i_to;
+    bool new_up     = i_from <  i_to;
+    if(    (cur_single || cur_up)
+	&& ((cur->to+1) == i_from)
+	&& (new_up || new_single) )
+    {
+	cur->to = i_to;
+	return l;
+    }
+    if(    (cur_single || cur_down)
+	&& ((cur->to-1) == i_from)
+	&& (new_down || new_single) )
     {
 	cur->to = i_to;
 	return l;

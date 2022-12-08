@@ -11,7 +11,6 @@
 /* image.h -- header for image.c */
 #ifdef EXPORT_FORWARD_DECL
 /* --- Forward declarations that need to be exported to earlier .h files --- */
-typedef struct ilist_rec    *ilist_ptr;
 
 /* ----- Function prototypes for public functions ----- */
 void	    Image_Init();
