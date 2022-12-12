@@ -239,7 +239,7 @@ let get_rev_labels attrs =
 // Use the "Label" attributes to group the instances inside the pexlif.
 // Basically an easy way to create an extra level of hierarchy without
 // having to manually create all the interfaces.
-letrec pexlif_group_by_label p =
+sletrec pexlif_group_by_label p =
     val (PINST nm attrs lf fa_inps fa_outs ints (P_HIER ps)) = p in
     ps = [] => p |
     letrec get_lbl idx ((PINST nm attrs lf fa_inps fa_outs ints body):rem) =
@@ -249,6 +249,7 @@ letrec pexlif_group_by_label p =
      /\    get_lbl idx [] = []
     in
     let lbl_part = partition fst (get_lbl 1 ps) then
+    lbl_part = [] => p |
     let mk l =
 	val (lbl,_) = hd l in
 	let indices = map snd l in

@@ -20,3 +20,62 @@ let bifrost_simplify fn =
     (eval cmd) fseq ()
 ;
 free_binder bifrost_simplify;
+
+letrec bifrost_get_dependent_files file =
+    let cmd = sprintf "gawk -e '/^#include/ { print $2;}' < %s"  file in
+    let fp = fopen cmd "|r" then
+    letrec rd fp =
+	let file = fgets fp then
+	file = "" => [] |
+	let name = string_tl (string_butlastn file 2) in
+	name : (rd fp)
+    in
+    let raw_files = rd fp then
+    (fclose fp) fseq
+    let files = setify raw_files then
+    setify (files @ (flatmap bifrost_get_dependent_files files))
+;
+
+// Load or compile a bifrost program.
+// If the file and its dependencies are older than the compiled model,
+// simply load the compiled model.
+// 
+// NOTE: The code assumes the #include statements has a fixed string
+// as file to include.
+//
+let bifrost_load pgm =
+    let fname = file_fullname pgm then
+    let res_name = fname^".fl" then
+    let orig_time = 
+	let files = fname : (bifrost_get_dependent_files fname) in
+	let find_max_mod_time f r = max (file_modified_time f) r in
+	itlist find_max_mod_time files (-1)
+    in
+    let res_time = file_modified_time res_name then
+    ( (file_exists res_name) AND (res_time >= orig_time) => () |
+	let parts = str_split fname "/" in
+	let ndir = list2str T "" "/" "" id (butlast parts) then
+	let dir = ndir != "" => ndir |
+		let fp = fopen "pwd" "|r" then
+		let dir = string_butlast (fgets fp) then
+		(fclose fp) fseq
+		dir
+	then
+	let fp = mktemp "bifrost_log" then
+	let logfile = stream2filename fp then
+	(fclose fp) fseq
+	let cmd = sprintf "cd %s & bifrost %s > %s" dir fname logfile then
+	((system cmd) != 0) OR (NOT (file_exists res_name)) =>
+	    noX =>
+		eprintf "bifrost failed for program %s. See %s\n" fname logfile
+	    |    
+		let msg = sprintf "Bifrost failed on %s\n" fname then
+		let w = report_result_in_file msg logfile [("Ok","0")] in
+		(get_window_result w) fseq
+		eprintf "bifrost failed for program %s." fname
+	|
+	()
+    ) fseq
+    _load res_name F
+;
+

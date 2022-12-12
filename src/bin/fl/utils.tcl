@@ -99,7 +99,8 @@ proc util:report_result {msg_header msg_details return_alts {pw ""}} {
 	ttk::scrollbar $w.tf.vsb -orient vertical \
 		-command [list $w.tf.t yview]
 	text $w.tf.t -xscrollcommand [list $w.tf.hsb set] \
-		-yscrollcommand [list $w.tf.vsb set] -width 80
+		-yscrollcommand [list $w.tf.vsb set] -width 80 \
+		-font $::voss2_txtfont
 	pack $w.tf.hsb -side bottom -fill x
 	pack $w.tf.vsb -side right -fill y
 	pack $w.tf.t -side top -fill both -expand yes
@@ -109,7 +110,8 @@ proc util:report_result {msg_header msg_details return_alts {pw ""}} {
     foreach alt $return_alts {
 	set txt [lindex $alt 0]
 	set ret [lindex $alt 1]
-	button $w.bf.b$i -text $txt -command [list util:set_result $w $ret]
+	button $w.bf.b$i -text $txt -command [list util:set_result $w $ret] \
+	    -font $::voss2_txtfont
 	pack $w.bf.b$i -side left -expand yes
 	incr i
     }
