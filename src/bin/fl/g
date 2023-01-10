@@ -2,6 +2,7 @@ set pagination off
 break exit
 break abort
 break Dbg_stop
-break Rprintf
-break mk_pinst
-r -noX -f bugs/b234.fl
+break Rand_Var
+r -noX -f bugs/b236.fl
+break Get_argument_names
+c

@@ -337,6 +337,9 @@ typedef struct g_rec {
 #define IS_P_CACHE(np)		(IS_LEAF(np) &&				    \
 				 IS_PRIM_FN(np) &&			    \
 				 GET_PRIM_FN(np) == P_CACHE)
+#define IS_P_STRICT_ARGS(np)	(IS_LEAF(np) &&				    \
+				 IS_PRIM_FN(np) &&			    \
+				 GET_PRIM_FN(np) == P_STRICT_ARGS)
 #define IS_P_ERROR(np)		(IS_LEAF(np) &&				    \
 				 IS_PRIM_FN(np) &&			    \
 				 GET_PRIM_FN(np) == P_ERROR)

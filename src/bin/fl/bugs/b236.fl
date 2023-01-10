@@ -1,0 +1,7 @@
+
+rvariable "a";
+
+let f x y = x+y+1;
+
+slet g x y = x+y+1;
+

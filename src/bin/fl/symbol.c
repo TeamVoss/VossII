@@ -422,6 +422,7 @@ static g_ptr            ignore_P_DEBUG(g_ptr node);
 static bool             get_named_arg(g_ptr node, string *namep, g_ptr *nextp);
 static g_ptr            ignore_simple_P_PCATCH(g_ptr onode);
 static g_ptr            ignore_P_CACHE(g_ptr onode);
+static g_ptr            ignore_P_STRICT_ARGS(g_ptr onode);
 static bool		get_HFL_arg_name(g_ptr node, string *namep,
 					 g_ptr *next_nodep);
 static fn_ptr		get_fn_rec();
@@ -1885,6 +1886,7 @@ Get_argument_names(g_ptr onode)
     }
     if( node == NULL ) return NULL;
     node = ignore_P_CACHE(node);
+    node = ignore_P_STRICT_ARGS(node);
     node = ignore_P_DEBUG(node);
     if( node == NULL ) return NULL;
     node = ignore_simple_P_PCATCH(node);
@@ -2343,6 +2345,19 @@ ignore_P_CACHE(g_ptr onode)
     if( !IS_APPLY(GET_APPLY_LEFT(node)) ) return onode;
     if( !IS_P_CACHE(GET_APPLY_LEFT(GET_APPLY_LEFT(node))) ) return onode;
     node = GET_APPLY_RIGHT(node);
+    return node;
+}
+
+static g_ptr
+ignore_P_STRICT_ARGS(g_ptr onode)
+{
+    g_ptr node = onode;
+    if( !IS_APPLY(node) ) return onode;
+    node = GET_APPLY_LEFT(node);
+    if( !IS_APPLY(node) ) return onode;
+    node = GET_APPLY_LEFT(node);
+    if( !IS_P_STRICT_ARGS(node) ) return onode;
+    node = GET_APPLY_RIGHT(onode);
     return node;
 }
 

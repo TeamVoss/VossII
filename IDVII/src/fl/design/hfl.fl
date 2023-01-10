@@ -3010,6 +3010,24 @@ let delay boxed N clk reset din dout = (
     CELL pfn [(delay_rec N clk reset din dout)]
 ) clk reset din dout;
 
+let phase_delay_non_zero N =
+    input   din.
+    output  dout.
+    list_internal (N-1)  mids.
+    CELL (sprintf "phase_delay(%d)" N) (
+	map2 (\i.\o. o <: i) (din:mids) (mids@[dout])
+);
+
+let phase_delay_zero =
+    input   din.
+    output  dout.
+    CELL "phase_delay(%0)" [
+	dout <- din
+];
+
+let phase_delay N =
+    N = 0 => phase_delay_zero | phase_delay_non_zero N
+;
 
 let hw__pair__type_name {p:: *a # *b} =
     let a = {undefined :: *a} in
@@ -3117,13 +3135,13 @@ let find_free_vars expr =
 
 // Expression for bitwise OR-ing together a list of signals.
 let OR_n l =
-    l = [] => error "OR_n for empty list" |
+    l = [] => '0 |
     accumulate (defix '|') l
 ;
 
 // Expression for bitwise AND-ing together a list of signals.
 let AND_n l =
-    l = [] => error "AND_n for empty list" |
+    l = [] => '1 |
     accumulate (defix '&') l
 ;
 

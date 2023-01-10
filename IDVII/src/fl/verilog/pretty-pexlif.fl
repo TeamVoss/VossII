@@ -113,13 +113,14 @@ let split_name_gen {vec::string} =
       in
       letrec
           parse_dim [] = []
-      /\  parse_dim ((RANGES [r]):(TXT "]") :[]) = [r]
-      /\  parse_dim ((RANGES [r]):(TXT "]["):ds) = r : parse_dim ds
+      /\  parse_dim ((RANGES ranges):(TXT "]") :[]) = ranges
+      /\  parse_dim ((RANGES ranges):(TXT "]["):ds) = ranges @ parse_dim ds
       /\  parse_dim _ = error "split_name: Expected a contig. range."
       in
       let is = md_split_vector vec in
       empty is => error "split_name: Empty vector." |
-      (parse_name (hd is), parse_dim (tl is))
+      ((parse_name (hd is), parse_dim (tl is))) gen_catch
+	(\msg. eprintf "parse_dim failed for %s\n%s\n" vec msg)
 ;
 // todo: I currenply assume the given vector is on a simple form, or at least
 // similar to the following examples:
@@ -827,7 +828,8 @@ let find_insert_module netlist p i =
 	// Convert formal in needle to actuals in instance
         let mk_io (f_n,as) =
 	    let as' = flatmap (\v. vec_rev_assoc v sub) as then
-	    connect_ports f_n as'
+	    let as'' = merge_vectors (md_expand_vectors as') then
+	    connect_ports f_n as''
 	in
 	let res = NPM_Item (MOGI_module (Module_instantiation (ID module_name)
 			[Module_instance (ID instance_name) NONE
@@ -976,9 +978,16 @@ let make_verilog_safe p =
 	let wsub =
 	    let mk_sub (f,t) =
 		let sz = md_size f in
-		(f, (W_VAR sz (get_base_name t)))
+		let sz2 = md_size t in
+		sz != sz2 => eprintf "Size mismatch (|%s| != |%s|)" f t |
+		let v_sub = (f, (W_VAR sz (get_base_name t))) in
+		let mk f1 t1 = (f1, (W_VAR 1 t1)) in
+		let b_subs =
+		    map2 mk (md_expand_vector f) (md_expand_vector t)
+		in
+		v_sub:b_subs
 	    in
-	    setify (map mk_sub sub)
+	    setify (flatmap mk_sub sub)
 	then
 	let clean_fn (W_UPDATE_FN lhs rhs) =
 		W_UPDATE_FN (w_substitute wsub lhs) (w_substitute wsub rhs)
