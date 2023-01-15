@@ -28,6 +28,7 @@
 #include "kernel/celltypes.h"
 #include "kernel/log.h"
 #include <string>
+#include <cstring>
 
 USING_YOSYS_NAMESPACE
 PRIVATE_NAMESPACE_BEGIN
