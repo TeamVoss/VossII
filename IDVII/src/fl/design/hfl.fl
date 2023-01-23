@@ -1287,7 +1287,7 @@ TYPE "bit" 1;
 let wexpr_hw_type_name {bv::wexpr} = "wexpr";
 let wexpr_hw_mk_var {we::wexpr} base = W_VAR 0 base;
 let wexpr_hw_is_arithmetic {e::wexpr} = T;
-let wexpr_hw_size {e::wexpr} = wexpr_size e;	// ???? Maybe 0   ????????
+let wexpr_hw_size {e::wexpr} = 0; // or (wexpr_size e) ????????????
 let wexpr_hw_destr {e::wexpr} = e;
 let wexpr_hw_constr {e::wexpr} = e;
 let wexpr_hw_values {e::wexpr} = "";
@@ -1576,7 +1576,7 @@ let ZX {inp:: *a} =
     in
     let sz_in = ihw_size inp in
     let sz_out = ohw_size {undefined :: *b} in
-    (sz_in > sz_out)
+    ((sz_in > sz_out) AND (sz_out != 0))
         => eprintf "ZX can't extend into smaller type (%d bits into %d bits)" sz_in sz_out
         |
     let w_out = W_ZX sz_out (ihw_destr inp) in
@@ -1595,7 +1595,7 @@ let SX {inp:: *a} =
     in
     let sz_in = ihw_size inp in
     let sz_out = ohw_size {undefined :: *b} in
-    (sz_in > sz_out)
+    ((sz_in > sz_out) AND (sz_out != 0))
         => eprintf "SX can't extend into smaller type (%d bits into %d bits)"
 		   sz_in sz_out
         |
@@ -2310,7 +2310,7 @@ end_abstype ah_latch al_latch;
 let extract_bit v idx =
     let wbits = hw_destr v in
     let sz = hw_size v in
-    idx >= 0 AND idx < sz => BV_bit (W_SLICE [idx] wbits) |
+    idx >= 0 AND ((sz = 0) OR idx < sz) => BV_bit (W_SLICE [idx] wbits) |
     eprintf "Range error: Trying to extract bit %d in vector of size [%d:0]"
 	    idx (sz-1)
 ;
@@ -3328,7 +3328,7 @@ free_binder pcompile;
 
 let _pExLiF_ = ref {(error "No pexlif") :: pexlif};
 
-let flfun2pexlif fn =
+let flfun2pexlif_core fn =
     let pdir = (deref pexlif_compile_dir) in
     let rtype = get_return_type fn then
     rtype != "pexlif" =>
@@ -3346,6 +3346,9 @@ let flfun2pexlif fn =
     let cmd = list2str T pre " " post (sprintf "'%s") (map fst args) then
     (eval cmd) fseq (deref _pExLiF_)
 ;
+
+let flfun2pexlif fn = flfun2pexlif_core fn;
+free_binder flfun2pexlif;
 
 let ASSERT {name::string} {expr::bit} =
     let oa = ord "a" in

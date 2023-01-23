@@ -3246,6 +3246,25 @@ is_signature(g_ptr l)
     return( STREQ(key, s_FP) || STREQ(key, s_SHA) );
 }
 
+static g_ptr
+strip_signatures(g_ptr attrs)
+{
+  start:
+    if( IS_NIL(attrs) ) { return( attrs ); }
+    if( is_signature(attrs) ) {
+	attrs = GET_CONS_TL(attrs);
+	goto start;
+    }
+    g_ptr next = GET_CONS_TL(attrs);
+    g_ptr new_next = strip_signatures(next);
+    if( next == new_next ) {
+	return( attrs );
+    }
+    g_ptr pair = GET_CONS_HD(attrs);
+    INC_REFCNT(pair);
+    return( Make_CONS_ND(pair, new_next) );
+}
+
 static void
 mk_pinst(g_ptr redex)
 {
@@ -3287,10 +3306,7 @@ mk_pinst(g_ptr redex)
     dispose_hash(&assertion_tbl, NULLFCN);
     string fp_sig = compute_fp_pinst(inps, outs, ints, content);
     string sha_sig = compute_sha_pinst(name, inps, outs, ints, content);
-    while( !IS_NIL(attrs) && is_signature(attrs) ) {
-	attrs = GET_CONS_TL(attrs);
-    }
-    if( !IS_NIL(attrs) ) { INC_REFCNT(attrs); }
+    attrs = strip_signatures(attrs);
     attrs = Make_CONS_ND(Make_PAIR_ND(Make_STRING_leaf(s_FP),
 				      Make_STRING_leaf(fp_sig)), attrs);
     attrs = Make_CONS_ND(Make_PAIR_ND(Make_STRING_leaf(s_SHA),

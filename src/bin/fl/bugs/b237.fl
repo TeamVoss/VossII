@@ -1,0 +1,23 @@
+load "idv.fl";
+
+TYPE "word" 4;
+
+let bug =
+    bit_input a.
+    word_output	o.
+    CELL "bug" [
+	o <- SX a
+];
+
+let p = (flfun2pexlif bug);
+
+let ckt = pexlif2fsm p;
+
+//update_vossrc "VERBOSE-STE-RUN" "YES";
+
+let ste = STE "-e" ckt [] [(T, "a", variable "a", 0, 1)] [] [];
+
+get_trace_val ste "o[3]" 0;
+//get_trace ste "o[2]";
+//get_trace ste "o[1]";
+//get_trace ste "o[0]";

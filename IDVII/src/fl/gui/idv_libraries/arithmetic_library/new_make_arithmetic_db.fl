@@ -4,7 +4,13 @@ NOT noX =>
     eprintf "new_make_arithmetic_db.fl should be evaluated in -noX mode" | ()
 ;
 
-let models_todo = ref {[]:: (string#pexlif) list};
+lettype model =
+	BASE_MODEL {model::pexlif}
+    |
+	PARAM_MODEL {model_fun:: int->pexlif}
+;
+
+let models_todo = ref {[]:: (string#model) list};
 let thms_todo   = ref {[]:: (string#(string#string)) list};
 
 let name_model name p =
@@ -13,7 +19,17 @@ let name_model name p =
     (find_first0 (\p. fst p = name) old) != 0 =>
 	eprintf "A model named %s already in database" name
     |
-    let new = (name,p):old then
+    let new = (name,BASE_MODEL p):old then
+    (models_todo := new) fseq
+    ()
+;
+
+let name_param_model name pfn =
+    let old = deref models_todo then
+    (find_first0 (\p. fst p = name) old) != 0 =>
+	eprintf "A model named %s already in database" name
+    |
+    let new = (name,PARAM_MODEL pfn):old then
     (models_todo := new) fseq
     ()
 ;
@@ -203,22 +219,21 @@ let mul3_12 =
 	o <- a '*' (b '*' c)
 ];
 
-//let mul_impl =
-//    input   {a:: *a} {b:: *a}.
-//    output  {o:: *a}.
-//    let N = hw_size {'q:: *a} in
-//    list_internal N {psums:: *a list}.
-//    internal zero.
-//    CELL "mul_impl" (
-//        let mk_psum i =
-//            (el i psums) <-  (a '<<' (''(i-1))) '&' (SX (b~~(i-1)))
-//        in
-//        (map mk_psum (N -- 1))@
-//        [
-//	    o <- itlist (defix '+') psums zero,
-//	    zero <- '0
-//	]
-//);
+let mul_impl N =
+    input   {a:: wexpr} {b:: wexpr}.
+    output  {o:: wexpr}.
+    list_internal N {psums:: wexpr list}.
+    internal zero.
+    CELL "mul_impl" (
+        let mk_psum i =
+            (el i psums) <-  (a '<<' (''(i-1))) '&' (SX (b~~(i-1)))
+        in
+        (map mk_psum (N -- 1))@
+        [
+	    o <- itlist (defix '+') psums zero,
+	    zero <- '0
+	]
+);
 
 // ----------------------------------------------------------------
 
@@ -284,14 +299,13 @@ name_model "0"		  (const0 {'a::wexpr} 'o);
 name_model "0*a"	  (mul0 {'a::wexpr} 'o);
 name_model "a*0"	  (mul0_rev {'a::wexpr} 'o);
 
+
 // Distributivity models
 name_model "a*(b+c)"	  (distr1 {'a::wexpr} 'b 'c 'o);
 name_model "(a*b)+(a*c)"  (distr2 {'a::wexpr} 'b 'c 'o);
 name_model "(b+c)*a"	  (distr1_rev {'a::wexpr} 'b 'c 'o);
 name_model "(b*a)+(c*a)"  (distr2_rev {'a::wexpr} 'b 'c 'o);
-
-
-//name_model "Sum((a*2^i)&b[i])" (mul_impl {'a::wexpr} 'b 'o);
+name_param_model "Sum((a*2^i)&b[i])" (\N. mul_impl N 'a 'b 'o);
 
 
 // Now state all theorems
@@ -308,12 +322,18 @@ name_theorem "mul_is_commutative" "a*b" "b*a";
 name_theorem "mul_a1_is_wire" "a*1" "wire";
 name_theorem "mul_1b_is_wire" "1*a" "wire";
 name_theorem "mul_assoc_21_is_12" "(a*b)*c" "a*(b*c)";
-//name_theorem "mul_expand_to_sum_of_partial_products" "a*b" "Sum((a*2^i)&b[i])";
+name_theorem "mul_expand_to_sum_of_partial_products" "a*b" "Sum((a*2^i)&b[i])";
 name_theorem "mul_distributes_over_add" "a*(b+c)" "(a*b)+(a*c)";
 name_theorem "mul_distributes_over_add" "(b+c)*a" "(b*a)+(c*a)";
 
+name_theorem "mul_definition" "a*b" "Sum((a*2^i)&b[i])";
 
-let do_import_model sz (name,w_p) =
+let do_import_model sz (name,BASE_MODEL w_p) =
+    let p = resize_pexlif sz w_p then
+    let name' = sprintf "%d:%s" sz name then
+    import_model name' p
+ /\ do_import_model sz (name, PARAM_MODEL w_p_fn) =
+    let w_p = w_p_fn sz in
     let p = resize_pexlif sz w_p then
     let name' = sprintf "%d:%s" sz name then
     import_model name' p
@@ -329,14 +349,8 @@ var_order (interleave [a_vars, b_vars, c_vars, n_vars]);
 use_separate_process_evaluation_r := F;
 
 let make_theorem sz (transform_name, spec_name, imp_name) =
-    let try_assoc n l =
-	(assoc n l) catch eprintf "Cannot find model %s." n
-    in
-    let models = deref models_todo then
-    let w_spec = try_assoc spec_name models then
-    let w_imp  = try_assoc imp_name models then
-    let spec = resize_pexlif sz w_spec then
-    let imp  = resize_pexlif sz w_imp then
+    let spec = get_current_model (sprintf "%d:%s" sz spec_name) then
+    let imp  = get_current_model (sprintf "%d:%s" sz imp_name) then
     NOT (sz > 6 OR
 	 ((BDD_EQ (wrap_pexlif spec) (wrap_pexlif imp) "") == T))
 	=>

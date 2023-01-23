@@ -1243,6 +1243,7 @@ proc set_preferences {} {
 namespace eval voss2_history {
 
     variable history_idx 0
+    variable embedded_window 1
 
     proc reset_history {} {
 	variable history_idx
@@ -1311,7 +1312,7 @@ namespace eval voss2_help {
 	    ttk::scrollbar $f.xscroll -orient horizontal \
 				      -command [list $f.t xview]
 	    text $f.t -background white -font $::voss2_help_font -wrap none \
-		-yscrollcommand [list $f.yscroll set] -setgrid 1 -width 50
+		-yscrollcommand [list $f.yscroll set] -setgrid 1
 	    set fp [open $file]
 	    set data [read $fp]
 	    $f.t insert 1.0 $data
@@ -1327,13 +1328,12 @@ namespace eval voss2_help {
 	}
     }
 
-    proc help_show_function_info {tb fun} {
+    proc help_show_function_info {nb tb fun} {
+	set cur_wid [winfo width $nb]
 	set wname [name2wname $fun]
 	if { ![winfo exists $tb.$wname] } {
 	    set f $tb.$wname
 	    frame $f -relief flat
-	    $tb add $f -text $fun
-	    $tb select $f
 	    button $f.b -text Close -command [list destroy $f] \
 		    -font $::voss2_txtfont
 	    pack $f.b -side bottom
@@ -1345,7 +1345,7 @@ namespace eval voss2_help {
 		-wrap none \
 		-xscrollcommand [list $f.xscroll set] \
 		-yscrollcommand [list $f.yscroll set] \
-		-setgrid 1 -width 50
+		-setgrid 1
 	    $f.t insert 1.0 [help_clean [help $fun]]
 	    $f.t tag configure source_loc   -foreground blue
 	    set file_loc [$f.t search {File:  } 1.0]
@@ -1376,7 +1376,7 @@ namespace eval voss2_help {
 			$f.t tag add $o_tag $cur_loc \
 				    "$cur_loc + [string length $ofun] chars"
 			$f.t tag bind $o_tag <Button-1> \
-			    "::voss2_help::help_show_function_info $tb $ofun"
+			   "::voss2_help::help_show_function_info $nb $tb $ofun"
 			set keep_going 1
 			set cur_loc [$f.t index "$cur_loc lineend + 1 chars"]
 		    } else {
@@ -1389,13 +1389,16 @@ namespace eval voss2_help {
 	    pack $f.yscroll -side right -fill y
 	    pack $f.xscroll -side bottom -fill x
 	    pack $f.t -side right -expand yes -fill both
+	    $tb add $f -text $fun
+	    $tb select $f
+	    $nb configure -width $cur_wid 
 	} else {
 	    set f $tb.$wname
 	    $tb select $f
 	}
     }
 
-    proc help_show_info {lb tb} {
+    proc help_show_info {nb lb tb} {
 	variable max_results_to_list
 	foreach index [$lb curselection] {
 	    set fun [$lb get $index]
@@ -1405,7 +1408,7 @@ namespace eval voss2_help {
 		$lb see $index
 		return
 	    } else {
-		help_show_function_info $tb $fun
+		help_show_function_info $nb $tb $fun
 	    }
 	}
 	$lb selection clear 0 end
@@ -1428,30 +1431,43 @@ namespace eval voss2_help {
     }
 
     proc help_detach {w nb} {
+	variable embedded_window
 	set idx [$nb index current]
 	if { $idx == 0 } {
 	    set tw $::voss2_top_level.voss2_help
-	    wm manage $tw
-	    $nb configure -width 900 -height 500
-	    $nb select 1
+	    if { $embedded_window == 1 } {
+		wm manage $tw
+		wm geometry $w 900x500
+		$nb select 1
+		set embedded_window 0
+		$::voss2_info(txtwin) see end
+	    } else {
+		wm forget $tw
+		pack $w -side bottom -before $::voss2_info(txtwin) -fill x
+		$nb select 1
+		set embedded_window 1
+	    }
 	}
     }
 
     proc help_start {} {
+	variable embedded_window
 	set w $::voss2_top_level.voss2_help
 	if [winfo exists $w] { return }
 	if [info exists ::voss2_status(hidden_fl_window)] {
+	    set embedded_window 0
 	    toplevel $w
 	} else {
 	    frame $w 
+	    set embedded_window 1
 	}
 
-	set w_top_notebook		$w.nb
-	set w_detach_tab_frame	$w.nb.dt
-	set w_function_tab_frame	$w.nb.f
-	set w_panedwindow		$w.nb.f.p
-	set w_search_frame		$w.nb.f.p.w
-	set w_help_tab_notebook	$w.nb.f.p.e
+	set w_top_notebook			$w.nb
+	set w_detach_tab_frame			$w.nb.dt
+	set w_function_tab_frame		$w.nb.f
+	set w_panedwindow			$w.nb.f.p
+	set w_search_frame			$w.nb.f.p.w
+	set w_help_tab_notebook			$w.nb.f.p.e
 
 	set w_special_tab_frame	$w.nb.s
 	set w_special_panedwindow		$w.nb.s.p
@@ -1460,13 +1476,13 @@ namespace eval voss2_help {
 	set w_special_search_alts	    	$w.nb.s.p.w.alts
 	set w_special_action_buttons    	$w.nb.s.p.w.actions
 
-	set w_search_name_pat	$w.nb.f.p.w.name
-	set w_search_file_pat	$w.nb.f.p.w.file
-	set w_search_arg_pat	$w.nb.f.p.w.arg
-	set w_search_res_pat	$w.nb.f.p.w.res
-	set w_search_button	    	$w.nb.f.p.w.search
-	set w_search_alts	    	$w.nb.f.p.w.alts
-	set w_action_buttons    	$w.nb.f.p.w.actions
+	set w_search_name_pat			$w.nb.f.p.w.name
+	set w_search_file_pat			$w.nb.f.p.w.file
+	set w_search_arg_pat			$w.nb.f.p.w.arg
+	set w_search_res_pat			$w.nb.f.p.w.res
+	set w_search_button			$w.nb.f.p.w.search
+	set w_search_alts			$w.nb.f.p.w.alts
+	set w_action_buttons			$w.nb.f.p.w.actions
 	
 	set ::help_search_name_pat "*"
 	set ::help_search_file_pat "*"
@@ -1489,8 +1505,6 @@ namespace eval voss2_help {
 	$w.nb add $w_special_tab_frame -text "Special"
 
 	$w.nb select 1
-
-############
 
 	ttk::panedwindow $w_special_panedwindow -orient horizontal
 	pack $w_special_panedwindow -side top -fill both -expand yes
@@ -1523,6 +1537,7 @@ namespace eval voss2_help {
 
 	    button $w_special_action_buttons.info -text "Man page" \
 	      -command "::voss2_help::help_show_info \
+				$w.nb \
 				$w_special_search_alts.list \
 				$w_special_help_tab_notebook"
 	    pack $w_special_action_buttons.info -side left -expand yes
@@ -1609,7 +1624,7 @@ namespace eval voss2_help {
 
 	    button $w_action_buttons.info -text "Man page" \
 					  -font $::voss2_txtfont \
-	      -command "::voss2_help::help_show_info $w_search_alts.list \
+	      -command "::voss2_help::help_show_info $w.nb $w_search_alts.list \
 						     $w_help_tab_notebook"
 	    pack $w_action_buttons.info -side left -expand yes
 

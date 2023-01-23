@@ -1,0 +1,65 @@
+set_font font_largest;
+
+load "idv.fl";
+update_vossrc "VERBOSE-STE-RUN" "YES";
+update_vossrc "VERBOSE-FSM-PRINT" "YES";
+
+let p =
+(PINST "wrapper" [] F
+  [("a[7][0]",["a[7][0]"])]
+  [("o[7:0]",["o[7:0]"])]
+  []
+    (P_HIER [
+	(PINST "TMP_" [] F
+	  [("a[7][0]",["a[7][0]"])]
+	  [("o[7:0]",["o[7:0]"])]
+	  []
+	    (P_HIER [
+		(PINST "draw_buffer" [] T
+		  [("A[7:0]",["a[7][0]", "a[7][0]", "a[7][0]", "a[7][0]", "a[7][0]", "a[7][0]", "a[7][0]", "a[7][0]"])]
+		  [("Y[7:0]",["o[7:0]"])]
+		  []
+		    (P_LEAF [(W_UPDATE_FN (W_VAR 8 "Y") (W_VAR 8 "A"))])
+		)
+	    ])
+	)
+    ])
+);
+
+let p =
+(PINST "wrapper" [("SHA","b0a265d89664f9356188297ba57c3cd7ca77284b4bc08b6348b2a93d6b25bc8d"),("FP","1843347723609")] F
+  [("_$1bs[7][0]",["_$1bs[7][0]"])]
+  [("_$1[7:0]",["_$1[7:0]"])]
+  []
+(P_HIER [
+    (PINST "_TMP_" [("SHA","fb42e432a160218ef50837a6df7ff802c17af2ea376532d85435040471594896"),("FP","5814977019")] F
+      [("_$1bs[7][0]",["_$1bs[7][0]"])]
+      [("_$1[7:0]",["_$1[7:0]"])]
+      []
+(P_HIER [
+        (PINST "draw_buffer" [("SHA","f01ac0d6b4e96a5a1bb0597b1525aeb9bc0f3cf8b917e1c48a47d43dcef8c17b"),("FP","18343728"),("fl_src","/home/cseger/VossII/IDVII/src/fl/design/yosys_lib.fl:75"),("src","DB_q/code/_synth_7.v:3.20-3.22"),("SHA","c9dc93f24b247d1f03db5e6e2858992e88495d428d65ed3ee0dec52394b83c0b"),("FP","5814977040"),("instance","_synth_7"),("SHA","45176940236bd43319a4420d492a643458fe1b21e1e648d78e573a8455da71f1"),("FP","5814977040")] T
+          [("A[7:0]",["_$1bs[7][0]", "_$1bs[7][0]", "_$1bs[7][0]", "_$1bs[7][0]", "_$1bs[7][0]", "_$1bs[7][0]", "_$1bs[7][0]", "_$1bs[7][0]"])]
+          [("Y[7:0]",["_$1[7:0]"])]
+          []
+(P_LEAF [(W_UPDATE_FN (W_VAR 8 "Y") (W_VAR 8 "A"))])
+        )
+])
+    )
+])
+);
+p;
+
+dbg_clean_pexlif_ios p;
+
+let ckt = pexlif2fsm p;
+ckt;
+
+//nodes ckt;
+
+fanin ckt "_$1[7]";
+
+fanin ckt "i1/_$2[7]";
+
+let vis = STE "-e" ckt [] [(T,"_$1bs[7][0]",variable "q", 0,1)] [] [];
+get_trace_val vis "_$1[7]" 0;
+get_trace_val vis "i1/_$2[7]" 0;

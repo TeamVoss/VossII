@@ -3,6 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
+let log_all_transformations = T;
+
+//let log cmd p 
+
 let Init_idv_gui = (tcl_eval [sprintf "source %sidv_gui.tcl" DIR]) fseq ();
 NOT noX => Init_idv_gui | ();
 
@@ -86,30 +90,33 @@ let CHECK_FOR_RW_DB {dummy::void} =
     eprintf "No IDV r/w database open."
 ;
 
-let model_present model_name =
+let add_model_in_rw_db top_level name sha_name =
     (CHECK_FOR_RW_DB ()) fseq
     val (IDV_RW_DB sname fname mnames tbl) =
 	hd (deref cur_idv_rw_transform_db)
     in
-    (find_first0 (\(top,mname,sha). mname = model_name) mnames) != 0
-;
-
-let add_model_in_rw_db top_level model_name sha_name =
-    (CHECK_FOR_RW_DB ()) fseq
-    val (IDV_RW_DB sname fname mnames tbl) =
-	hd (deref cur_idv_rw_transform_db)
-    in
-    model_present model_name =>
-	eprintf "A model named %s already exists" model_name
-    |
-    let same_sha (top,mname,sha) = sha = sha_name in
-    let idx = find_first0 same_sha mnames then
-    idx != 0 =>
+    ((find_first0 (\(top,mname,sha). mname = name) mnames) != 0)
+    AND (
+	let msg =
+	    sprintf "A model named %s already exists. Replace it?" name
+	in
+	NOT (window_yes_no (get_current_idv_window ()) msg) 
+    ) => () |
+    let idx =
+	let same_sha (top,mname,sha) = sha = sha_name in
+	(find_first0 same_sha mnames)
+    then
+    (idx != 0) AND
+    (
 	val (top,mname,sha) = el idx mnames then
-	fprintf stdinfo "This circuit is alrady named %s. Saving ignored" mname
-    |
-    let mnames' = (top_level, model_name, sha_name):mnames then
-    (cur_idv_rw_transform_db := [(IDV_RW_DB sname fname mnames' tbl)])
+	let msg = (sprintf "This circuit is alrady named %s." mname)^
+		  "  Do you still want to save it?"
+	in 
+	NOT (window_yes_no (get_current_idv_window ()) msg)
+    ) => () |
+    let mnames' = filter (\(top,mn,sn). mn != name) mnames then
+    let mnames'' = (top_level, name, sha_name):mnames' then
+    (cur_idv_rw_transform_db := [(IDV_RW_DB sname fname mnames'' tbl)])
 ;
 
 let sha2model db sha_name =
@@ -128,7 +135,6 @@ let model2sha db model_name =
     length cands > 1 => eprintf "More than one model named %s" model_name |
     hd cands
 ;
-
 
 let delete_model_in_rw_db model_name =
     (CHECK_FOR_RW_DB ()) fseq
@@ -489,6 +495,13 @@ let import_model name p =
     ()
 ;
 
+let get_current_model model_name =
+    let db = get_rw_db () then
+    val (IDV_RW_DB sname fname mnames tbl) = db then
+    let sha_imp = model2sha db model_name then
+    idv_load_pexlif sname sha_imp
+;
+
 let IDV0 rw_database read_only_dbs =
     // Open the databases
     (open_idv_db rw_database F) fseq
@@ -819,7 +832,6 @@ let fl_model_name_used name =
 export_to_tcl fl_model_name_used;
 
 let fl_do_name_model canvas name version =
-    model_present name => eprintf "Model %s already exists" name |
     let trfs = get_idv_info canvas then
     let p = fst (version = "specification" => (last trfs) | (hd trfs)) then
     let p_sha  = idv_save_pexlif p then
@@ -900,6 +912,7 @@ let fl_format_transf_name max_size name =
 export_to_tcl fl_format_transf_name;
 
 let fl_display_transform_tree canvas dbname name =
+    (tcl_eval ["catch {unset ::idv_transf_node_map}"]) fseq
     let db = get_idv_db dbname then
     let p_sha = model2sha db name then
     let p = idv_load_pexlif dbname p_sha then
@@ -927,7 +940,7 @@ let fl_display_transform_tree canvas dbname name =
 	    let edge_name =
 		let name = clean_name (trim_leading_space trans_name) in
 		let len = strlen name in
-		let name' = len <= 20 => name | string_butlastn name (len-20) in
+		let name' = len <= 200 => name | string_butlastn name (len-20) in
 		sprintf "e%d-%s" (length (deref edges)) name'
 	    then
 	    (edge_map := ((edge_name, trans_name):(deref edge_map))) fseq
@@ -950,7 +963,6 @@ let fl_display_transform_tree canvas dbname name =
     (fprintf fp "}\n") fseq
     (fclose fp) fseq
     //
-    (tcl_eval ["catch {unset ::idv_transf_node_map}"]) fseq
     let mk_ndmap (n,nn) =
 	let cmd = sprintf "set ::idv_transf_node_map(%s) {%s}" n nn in
 	(tcl_eval [cmd]) fseq ()
@@ -1422,10 +1434,10 @@ let BDD_EQ_1 p1 p2 order_file =
 	res == T => res |
 	val (ckt, asserts, cex_ant) = get_value opt_cex then
 	let cw = make_info_window "CEX" F then
-	let sel = window_choose_alternative
+	let sel = window_choose_alternative cw
 			"Verification failed."
 			"Do you want to simulate a counterexample?"
-			[("Yes", "Yes"), ("No","No")] cw
+			[("Yes", "Yes"), ("No","No")]
 	then
 	sel = "No" => res |
 	let vis = STE_debug ckt then
@@ -1467,10 +1479,10 @@ let BDD_EQ_1 p1 p2 order_file =
     res == T OR noX => res |
     val (ckt, asserts, cex_ant) = get_value opt_cex then
     let cw = make_info_window "CEX" F then
-    let sel = window_choose_alternative
+    let sel = window_choose_alternative cw
 		    "Verification failed."
 		    "Do you want to simulate a counterexample?"
-		    [("Yes", "Yes"), ("No","No")] cw
+		    [("Yes", "Yes"), ("No","No")]
     then
     sel = "No" => res |
     let vis = STE_debug ckt then
@@ -1743,6 +1755,7 @@ let remove_add_inst pfn =
     skip_digit (butfirstn (strlen "add_inst ") (explode pfn))
 ;
 
+let dbg_tbl = ref {[] :: (string#(string#(string list))) list};
 let build_vfanin_tbl ckt =
     let vec_vis_fanin vecs =
         let nds = md_expand_vectors vecs in
@@ -1760,7 +1773,15 @@ let build_vfanin_tbl ckt =
         in
         flatmap process p
     in
-    list2tbl (vec_vis_fanin (visualization_nodes ckt 0))
+    let res = vec_vis_fanin (visualization_nodes ckt 0) then
+(dbg_tbl := res) fseq
+    list2tbl res
+;
+
+let dbg_tbl_get tbl key =
+    (tbl_get tbl key) catch
+    (eprintf "Failed to find |%s| in %S\n" key (
+(map (\(k,(pfn,fin)). sprintf "(%s->%s,%S)" k pfn fin) (tbl2list tbl))))
 ;
 
 let get_io_order p =
@@ -1773,7 +1794,7 @@ let get_io_order p =
     letrec tr seen path vec =
 	mem vec vinps => ((res := ((vec,path):(deref res))) seq DT_INP) |
 	mem vec seen => DT_CYCLE |
-	val (pfn,vfanins) = tbl_get vfi_tbl vec then
+	val (pfn,vfanins) = dbg_tbl_get vfi_tbl vec then
 	(vfanins = []) AND (str_is_substr "draw_input" pfn) => DT_CONST |
 	let id_vfanins = zip (1 upto length vfanins) vfanins in
 	let do (i,vfi) = tr (vec:seen) ((int2str i):pfn:path) vfi in
@@ -1922,6 +1943,20 @@ let get_specialized_imp spec imp p =
 ;
 
 
+let do_replace_first p db tr =
+    val (PINST nm attrs leaf fa_inps fa_outs ints (P_HIER (cp:cps))) = p in
+    val (TRANSFORM name sha_spec sha_imp just) = tr then
+    let spec = idv_load_pexlif (db_sname db) sha_spec then
+    let imp  = idv_load_pexlif (db_sname db) sha_imp then
+    let o_imp' = get_specialized_imp spec imp cp then
+    NOT (has_value o_imp') =>
+	eprintf "Transformation spec not an exact match in replace\n"
+    |
+    let new = get_value o_imp' then
+    let p' = PINST nm attrs leaf fa_inps fa_outs ints (P_HIER (new:cps)) then
+    unfold_pexlif p' 1
+;
+
 let replace_all parent spec imp =
     let raw_matches = isomatch spec parent then
     let matches = map (\l. map (\(si,(ii,_)). si,ii) l) raw_matches then
@@ -1943,13 +1978,30 @@ let replace_all parent spec imp =
     unfold_all_labeled tmp lbl
 ;
 
+let do_replace_everywhere repeat p db tr =
+    val (TRANSFORM name sha_spec sha_imp just) = tr then
+    let spec = idv_load_pexlif (db_sname db) sha_spec then
+    let imp  = idv_load_pexlif (db_sname db) sha_imp then
+    NOT repeat => replace_all p spec imp |
+    letrec do_replace cnt p =
+	cnt > 1000 =>
+	    (fprintf stdinfo "Reached max replace limit. Stopped replacing")
+	    fseq
+	    p
+	|
+	let p' = replace_all p spec imp then
+	p == p' => p | do_replace (cnt+1) p'
+    in
+    do_replace 1 p
+;
+
 let fl_do_replacement canvas =
     let vfsm = w2vfsm canvas then
     let w = vfsm2id vfsm then
-    let sell = get_selected_pinsts canvas then
+    let il = get_selected_pinsts canvas then
     let parent = get_idv_current_pexlif canvas then
     // This code relies on fold_pexlif putting the new instance first!!!!
-    let p' = fold_pexlif parent sell "_TMP_" then
+    let p' = fold_pexlif parent il "_TMP_" then
     val (PINST nm attrs leaf fa_inps fa_outs ints (P_HIER (p:ps))) = p' in
     let signature = pexlif_get_FP p then
     let dbs = (deref cur_idv_rw_transform_db)@
@@ -1969,47 +2021,27 @@ let fl_do_replacement canvas =
     let idx = (sscanf "%d" sidx)+1 then
     val (db,tr) = el idx alts then
     val (TRANSFORM name sha_spec sha_imp just) = tr then
-    let spec = idv_load_pexlif (db_sname db) sha_spec then
-    let imp  = idv_load_pexlif (db_sname db) sha_imp then
     op = "ApplyOnce" =>
-	let o_imp' = get_specialized_imp spec imp p then
-	has_value o_imp' =>
-	(
-	    let imp' = get_value o_imp' then
-	    let p' =
-		PINST nm attrs leaf fa_inps fa_outs ints (P_HIER (imp' : ps))
-	    then
-	    let p'' = unfold_pexlif p' 1 then
-	    (add_transform canvas p'' (REPLACE sell tr)) fseq
-	    let cmd = sprintf "replace vis %s \"%s\";"
-			  (list2str T "[" "," "]" int2str sell) name
-	    in
-	    (refresh_idv_canvas canvas cmd)
-	)
-	|
-	eprintf "Transformation spec not an exact match in %s\n" op
+	let p'' = do_replace_first p' db tr then
+	(add_transform canvas p'' (REPLACE il tr)) fseq
+	let cmd = sprintf "replace vis %s \"%s\";"
+		      (list2str T "[" "," "]" int2str il) name
+	in
+	(refresh_idv_canvas canvas cmd)
     |
     op = "ApplyEverywhere" =>
-	let res = replace_all parent spec imp then
+	let res = do_replace_everywhere F parent db tr then
 	(add_transform canvas res (REPLACE_ALL F tr)) fseq
 	let cmd = sprintf "replace_all vis %s \"%s\";"
-			  (list2str T "[" "," "]" int2str sell) name
+			  (list2str T "[" "," "]" int2str il) name
 	in
 	(refresh_idv_canvas canvas cmd)
     |
     op = "RepeatApplyEverywhere" =>
-	letrec do1 cnt p =
-	    cnt > 1000 =>
-		(fprintf stdinfo "Reached max replace limit. Aborted") fseq
-		p
-	    |
-	    let p' = replace_all p spec imp then
-	    p == p' => p | do1 (cnt+1) p'
-	in
-	let res = do1 1 parent then
+	let res = do_replace_everywhere T parent db tr then
 	(add_transform canvas res (REPLACE_ALL T tr)) fseq
 	let cmd = sprintf "replace_all vis %s \"%s\";"
-			  (list2str T "[" "," "]" int2str sell) name
+			  (list2str T "[" "," "]" int2str il) name
 	in
 	(refresh_idv_canvas canvas cmd)
     |
@@ -2017,6 +2049,7 @@ let fl_do_replacement canvas =
 ;
 export_to_tcl fl_do_replacement;
 
+// Invoked from fl_remove_active_sch_tab_window in draw_sch.fl
 let idv_finish_transformation canvas =
     val (parent,inside, sell) = get_idv_parent_info canvas then
     let vfsm = w2vfsm canvas in
@@ -2026,7 +2059,7 @@ let idv_finish_transformation canvas =
     let imp = fst (hd trfs) in
     let spec = fst (last trfs) in
     let spec_sig = pexlif_get_FP spec then
-    let tr_name = find_next_anon_transform_name spec_sig "" then
+    let tr_name = find_next_anon_transform_name spec_sig "trfs" then
     let model_name = find_next_anon_name () then
     let cmd = sprintf "idv:name_transform_and_use %s %s %s %s"
 		       (inside => "1" | "0") canvas tr_name model_name

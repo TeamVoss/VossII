@@ -940,7 +940,7 @@ let window_choose_alternative0 msg_header msg_details return_alts =
     let w = report_result msg_header msg_details return_alts then
     get_window_result w
 ;
-let window_choose_alternative1 msg_header msg_details return_alts window =
+let window_choose_alternative1 window msg_header msg_details return_alts =
     let w = report_result msg_header msg_details return_alts window then
     get_window_result w
 ;
@@ -952,6 +952,56 @@ let window_choose_alternative1 msg_header msg_details return_alts window =
 // and return the value associated with the button pressed.
 overload window_choose_alternative window_choose_alternative0 window_choose_alternative1;
 
+
+let window_yes_no1 parent msg =
+    let cmd = (sprintf "tk_messageBox  -message {%s}" msg)^ 
+              " -type yesno -icon question"^
+	      (sprintf " -parent %s" parent)
+    in
+    (tcl_eval [cmd]) = "yes"
+;
+non_lazy window_yes_no1;
+
+let window_yes_no2 parent (msg, details) =
+    let det = details = "" => "" | sprintf " -detail {%s}" details in
+    let cmd = (sprintf "tk_messageBox  -message {%s}" msg)^ 
+              " -type yesno -icon question"^det^
+	      (sprintf " -parent %s" parent)
+    in
+    (tcl_eval [cmd]) = "yes"
+;
+non_lazy window_yes_no2;
+
+// Pop up a window and ask for Yes/No to the msg.
+// If extra details are desired, a pair of msg,details can be given.
+// The popup window will be placed above 'parent'.
+overload window_yes_no window_yes_no1 window_yes_no2;
+non_lazy window_yes_no;
+
+let window_ok1 parent msg =
+    let cmd = (sprintf "tk_messageBox  -message {%s}" msg)^ 
+              " -type ok -icon question"^
+	      (sprintf " -parent %s" parent)
+    in
+    (tcl_eval [cmd]) fseq ()
+;
+non_lazy window_ok1;
+
+let window_ok2 parent (msg, details) =
+    let det = details = "" => "" | sprintf " -detail {%s}" details in
+    let cmd = (sprintf "tk_messageBox  -message {%s}" msg)^ 
+              " -type ok -icon question"^det^
+	      (sprintf " -parent %s" parent)
+    in
+    (tcl_eval [cmd]) fseq ()
+;
+non_lazy window_ok2;
+
+// Pop up a window with some information that is closed by clicing Ok.
+// If extra details are desired, a pair of msg,details can be given.
+// The popup window will be placed above 'parent'.
+overload window_ok window_ok1 window_ok2;
+non_lazy window_ok;
 
 begin_abstype;
 // ----------------------------------------------------------------------

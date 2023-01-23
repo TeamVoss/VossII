@@ -1,0 +1,43 @@
+load "idv.fl";
+
+let q =
+    PINST "tst" [] F 
+    [("a",["a"])]
+    [("o",["o"])]
+    [("m[2,0]")]
+    (P_HIER [
+	(PINST "AA" [] T
+	    [("i",["a"])]
+	    [("o", ["m[2]"])]
+	    []
+	    (P_LEAF [(W_UPDATE_FN (W_VAR 1 "o") (W_NOT (W_VAR 1 "i")))])
+	)
+	,
+	(PINST "BB" [] T
+	    [("i",["m[2]"])]
+	    [("o", ["m[0]"])]
+	    []
+	    (P_LEAF [(W_UPDATE_FN (W_VAR 1 "o") (W_NOT (W_VAR 1 "i")))])
+	)
+	,
+	(PINST "CC" [] T
+	    [("i",["m[0]"])]
+	    [("o", ["o"])]
+	    []
+	    (P_LEAF [(W_UPDATE_FN (W_VAR 1 "o") (W_NOT (W_VAR 1 "i")))])
+	)
+    ]
+    )
+;
+
+q;
+
+//rvariable "a";
+
+update_vossrc "VERBOSE-FSM-PRINT" "YES";
+
+
+let ckt = pexlif2fsm q;
+ckt;
+
+visualization_nodes ckt 0;

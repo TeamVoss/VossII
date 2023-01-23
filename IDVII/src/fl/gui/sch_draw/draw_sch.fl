@@ -34,6 +34,7 @@ let tcl_eval l =
     |
 	tcl_eval l
 ;
+non_lazy tcl_eval;
 
 
 let Init_sch_draw =
@@ -53,6 +54,7 @@ let dbg_tcl_eval l =
     (foreach (fprintf stderr "%s\n") l) fseq
     (tcl_eval l)
 ;
+non_lazy dbg_tcl_eval;
 
 let big_tcl_eval l =
     length l < 10 => tcl_eval l |
@@ -69,6 +71,7 @@ let big_tcl_eval l =
     |
     cmd
 ;
+non_lazy big_tcl_eval;
 
 let Create_Dummy_Placement =
     (tcl_eval ["catch {destroy .c9999999}",
@@ -236,7 +239,7 @@ let STE_debug fsm =
 ;
 
 let VIS fl_function_name =
-    let p = flfun2pexlif fl_function_name then
+    let p = flfun2pexlif_core fl_function_name then
     let ckt = pexlif2fsm p then
     STE_debug ckt
 ;
@@ -1358,6 +1361,11 @@ let get_current_vis {dummy::void} =
 ;
 non_lazy get_current_vis;
 
+let get_current_idv_window {dummy::void} =
+    let vfsm = get_current_vis () then
+    vfsm2id vfsm
+;
+non_lazy get_current_idv_window;
 
 let fl_update_colors c =
     let vfsm = w2vfsm c then

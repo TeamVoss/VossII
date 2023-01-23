@@ -435,9 +435,11 @@ static bool           same_ilist(ilist_ptr il1, ilist_ptr il2);
 static bool           all_outs(ilist_ptr il, vis_io_ptr vp);
 static sch_ptr        draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels,
                                  int anon_cnt, int draw_level);
-static string         mk_fresh_anon_name(g_ptr internals, int *cur_cntp);
+static string         mk_fresh_anon_name(g_ptr internals, g_ptr fa_inps,
+					 g_ptr fa_outs, int *cur_cntp);
 static string         mk_vector_name(string base, int size);
-static string         create_constant(int sz, int *ccnt, g_ptr ints, string cnst,
+static string         create_constant(int sz, int *ccnt, g_ptr ints,
+				      g_ptr fa_inps, g_ptr fa_outs, string cnst,
                                       buffer *chbufp);
 static bool           is_binary_wexpr(g_ptr node, wl_op *opp, g_ptr *ap,
                                       g_ptr *bp);
@@ -446,6 +448,7 @@ static bool           is_relation_wexpr(g_ptr node, wl_op *opp, g_ptr *ap,
 static g_ptr          mk_list1(g_ptr el);
 static g_ptr          mk_pair(g_ptr fst, g_ptr snd);
 static string         create_merge_component(int sz, int *ccnt, g_ptr *intsp,
+					     g_ptr fa_inps, g_ptr fa_outs,
                                              g_ptr acts, int len,
                                              buffer *chbufp);
 static g_ptr          clean_pexlif_ios(g_ptr node);
@@ -543,36 +546,38 @@ Fsm_Init()
 }
 
 string
-get_real_name(vec_info_ptr ip, int idx)
+get_real_name(vec_info_ptr ip, int oidx)
 {
     vec_ptr decl = ip->declaration;
     string res = strtemp(ip->hierarchy);
+    int idx = oidx;
     while( decl != NULL ) {
 	if( decl->type != INDEX ) {
 	    strappend(decl->u.name);
 	    decl = decl->next;
 	} else {
-	    range_ptr r = decl->u.ranges;
-	    int i = r->upper;
 	    int stride = get_stride(decl->next);
-	    if( r->upper <= r->lower ) {
-		// Going up
-		while( idx > stride ) {
-		    i++;
-		    idx = idx-stride;
+	    range_ptr r = decl->u.ranges;
+	    int cur_chunk = (abs(r->upper-r->lower)+1)*stride;
+	    while( idx >= cur_chunk ) {
+		idx -= cur_chunk;
+		r = r->next;
+		if( r == NULL ) {
+		    Rprintf("Illegal index in get_real_name (%d)\n", oidx);
 		}
-	    } else {
-		// Going downs
-		while( idx > stride ) {
-		    i--;
-		    idx = idx-stride;
-		}
+		cur_chunk = (abs(r->upper-r->lower)+1)*stride;
 	    }
-	    Sprintf(buf, "%d", i);
+	    int offset = idx / stride;
+	    if( r->upper > r->lower ) {
+		Sprintf(buf, "%d", r->upper-offset);
+	    } else {
+		Sprintf(buf, "%d", r->upper+offset);
+	    }
 	    strappend(buf);
+	    idx = idx - offset*stride;
 	    decl = decl->next;
 	}
-    }
+}
     return res;
 }
 
@@ -910,7 +915,7 @@ nodes(g_ptr redex)
     nnode_ptr np;
     FOR_BUF(&(fsm->nodes), nnode_rec, np) {
 	int start = np->vec->map->from;
-	string nname = get_real_name(np->vec, np->idx-start+1);
+	string nname = get_real_name(np->vec, np->idx-start);
 	if( *nname != '!' ) {
 	    nname = wastrsave(&strings, nname);
 	    push_buf(&res_buf, &nname);
@@ -958,7 +963,7 @@ edges(g_ptr redex)
     nnode_ptr np;
     FOR_BUF(&(fsm->nodes), nnode_rec, np) {
         int start = np->vec->map->from;
-        string sname = get_real_name(np->vec, np->idx-start+1);
+        string sname = get_real_name(np->vec, np->idx-start);
         if(*sname != '!') {
 	    g_ptr from = Make_STRING_leaf(wastrsave(&strings, sname));
 	    for(idx_list_ptr ilp = np->fanouts; ilp != NULL; ilp = ilp->next) {
@@ -1070,7 +1075,7 @@ visualization_nodes(g_ptr redex)
     FOR_BUF(&(fsm->nodes), nnode_rec, np) {
 	if( get_vis_info_at_level(np->draw_info, GET_INT(g_level)) != NULL ) {
 	    int start = np->vec->map->from;
-	    string nname = get_real_name(np->vec, np->idx-start+1);
+	    string nname = get_real_name(np->vec, np->idx-start);
 	    if( *nname != '!' ) {
 		g_ptr s = Make_STRING_leaf(wastrsave(&strings, nname));
 		APPEND1(tail, s);
@@ -3897,7 +3902,7 @@ print_nodes(odests fp, fsm_ptr fsm)
     nnode_ptr np;
     FOR_BUF(&(fsm->nodes), nnode_rec, np) {
 	int start = np->vec->map->from;
-	string nname = get_real_name(np->vec, np->idx-start+1);
+	string nname = get_real_name(np->vec, np->idx-start);
 	FP(fp, "  %d %s composite:%d fanouts: [",
 		      np->idx, nname, np->composite);
 	char sep = ' ';
@@ -4817,7 +4822,7 @@ idx2name(int idx)
 {
     nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
     int start = np->vec->map->from;
-    string nname = get_real_name(np->vec, np->idx-start+1);
+    string nname = get_real_name(np->vec, np->idx-start);
     return nname;
 }
 
@@ -4925,7 +4930,7 @@ map_vector(hash_record *vtblp, string hier, string name, bool ignore_missing)
 	if( is_assertion ) {
 	    new_name = name;
 	} else {
-	    sprintf(tmp_name_buf, "_$%d_%s", undeclared_node_cnt, name);
+	    sprintf(tmp_name_buf, "_$$%d_%s", undeclared_node_cnt, name);
 	    undeclared_node_cnt++;
 	    new_name = wastrsave(&strings, tmp_name_buf);
 	}
@@ -5054,7 +5059,7 @@ find_index_from_end(int i, range_ptr rp)
     // Find the range containing i
     int idx = 0;
     while( rp != NULL && !inside(i, rp->upper, rp->lower) ) {
-	idx += abs(rp->upper-rp->lower);
+	idx += abs(rp->upper-rp->lower)+1;
 	rp = rp->next;
     }
     if( rp == NULL ) {
@@ -7256,6 +7261,7 @@ all_outs(ilist_ptr il, vis_io_ptr vp)
     return res;
 }
 
+
 static sch_ptr
 draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	   int draw_level)
@@ -7522,7 +7528,7 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 }
 
 static string
-mk_fresh_anon_name(g_ptr internals, int *cur_cntp)
+mk_fresh_anon_name(g_ptr internals, g_ptr fa_inps, g_ptr fa_outs, int *cur_cntp)
 {
     bool found = TRUE;
     int cur_cnt = *cur_cntp;
@@ -7537,6 +7543,27 @@ mk_fresh_anon_name(g_ptr internals, int *cur_cntp)
 		break;
 	    }
 	}
+	if( !found ) {
+	    for(g_ptr cur = fa_inps; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
+		if( strncmp(GET_STRING(GET_FST(GET_CONS_HD(cur))), buf, len)
+		    == 0 )
+		{
+		    found = TRUE;
+		    break;
+		}
+	    }
+	}
+	if( !found ) {
+	    for(g_ptr cur = fa_outs; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
+		if( strncmp(GET_STRING(GET_FST(GET_CONS_HD(cur))), buf, len)
+		    == 0 )
+		{
+		    found = TRUE;
+		    break;
+		}
+	    }
+	}
+
     }
     *cur_cntp = cur_cnt;
     return( wastrsave(&strings, buf) );
@@ -7557,11 +7584,12 @@ mk_vector_name(string base, int size)
 }
 
 static string
-create_constant(int sz, int *ccnt, g_ptr ints, string cnst, buffer *chbufp)
+create_constant(int sz, int *ccnt, g_ptr ints, g_ptr fa_inps, g_ptr fa_outs,
+		string cnst, buffer *chbufp)
 {
     ASSERT( *cnst == '0' && *(cnst+1) == 'b' );
     ASSERT( sz == (int) strlen(cnst)-2 );
-    string base = mk_fresh_anon_name(ints, ccnt);
+    string base = mk_fresh_anon_name(ints, fa_inps, fa_outs, ccnt);
     string out  = mk_vector_name(base, sz);
     string tmp = NULL;
     if( index(cnst, 'z') != NULL || index(cnst, 'Z') != NULL ) {
@@ -7756,15 +7784,26 @@ mk_pair(g_ptr fst, g_ptr snd)
     return( Make_CONS_ND(fst, snd) );
 }
 
+static bool
+all_same(string msb, g_ptr al)
+{
+    while( !IS_NIL(al) ) {
+	if( !STREQ(msb, GET_STRING(GET_CONS_HD(al))) ) { return FALSE; }
+	al = GET_CONS_TL(al);
+    }
+    return( TRUE );
+}
+
 static string
 create_merge_component(int sz, int *ccnt, g_ptr *intsp,
+		       g_ptr fa_inps, g_ptr fa_outs,
 		       g_ptr acts, int len, buffer *chbufp)
 {
-    string base = mk_fresh_anon_name(*intsp, ccnt);
+    string base = mk_fresh_anon_name(*intsp, fa_inps, fa_outs, ccnt);
     string out  = mk_vector_name(base, sz);
     *intsp = Make_CONS_ND(Make_STRING_leaf(out), *intsp);
     string msb = GET_STRING(GET_CONS_HD(acts));
-    if( Get_Vector_Size(msb) == 1 ) {
+    if( (Get_Vector_Size(msb) == 1) && ((len == 1) || all_same(msb, acts)) ) {
 	g_ptr al = acts;
 	g_ptr base_inp = al;
 	int cnt = 0;
@@ -7846,7 +7885,8 @@ create_merge_component(int sz, int *ccnt, g_ptr *intsp,
 	int csz;
 	if( *act == '0' ) {
 	    csz = strlen(act)-2;
-	    string t = create_constant(csz, ccnt, *intsp, act, chbufp);
+	    string t = create_constant(csz, ccnt, *intsp, fa_inps, fa_outs,
+				       act, chbufp);
 	    *intsp = Make_CONS_ND(Make_STRING_leaf(t), *intsp);
 	    Sprintf(buf, "i%d", inp_cnt);
 	    g_ptr f = Make_STRING_leaf(mk_vector_name(buf, csz));
@@ -7927,8 +7967,8 @@ clean_pexlif_ios(g_ptr node)
 	    int len = List_length(acts);
 	    if( len > 1 ) {
 		int sz = Get_Vector_Size(fname);
-		string t = create_merge_component(sz, &cur_cnt, &ints,
-						  acts, len, &ch_buf);
+		string t = create_merge_component(sz, &cur_cnt, &ints, inps,
+						  outs, acts, len, &ch_buf);
 		g_ptr new_acts = Make_CONS_ND(Make_STRING_leaf(t), Make_NIL());
 		SET_CONS_TL(new_pair, new_acts);
 	    } else {
@@ -7936,7 +7976,8 @@ clean_pexlif_ios(g_ptr node)
 		if( *act == '0' ) {
 		    // Constant
 		    int sz = Get_Vector_Size(fname);
-		    string t = create_constant(sz,&cur_cnt,ints,act,&ch_buf);
+		    string t = create_constant(sz, &cur_cnt, ints, inps, outs,
+					       act, &ch_buf);
 		    ints = Make_CONS_ND(Make_STRING_leaf(t), ints);
 		    g_ptr nacts = Make_CONS_ND(Make_STRING_leaf(t), Make_NIL());
 		    SET_CONS_TL(new_pair, nacts);
@@ -8248,7 +8289,7 @@ gSTE(g_ptr redex, value_type type)
 		gbv curL = *(cur_buf+2*idx+1);
 		gbv chkH = *(cons_buf+2*idx);
 		gbv chkL = *(cons_buf+2*idx+1);
-		if( RCnotify_check_failures &&
+		if( (type != use_bexprs) && RCnotify_check_failures &&
 		    (nbr_errors_reported < RCmax_nbr_errors) )
 		{
 		    gbv ok = c_AND(c_OR(chkH,c_NOT(curH)),
@@ -8456,7 +8497,6 @@ fl_clean_pexlif_ios(g_ptr redex)
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
-
 
 static fsm_ptr
 gen_pexlif2fsm(g_ptr p, g_ptr black_box_list, int max_depth)

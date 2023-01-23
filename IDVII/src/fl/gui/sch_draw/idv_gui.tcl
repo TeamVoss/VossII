@@ -18,7 +18,7 @@ proc idv:create_idv_gui {w rw_db} {
     pack $nb -side top -expand y -fill both
     set ::sch_window_cnt($w) 0
     bindtags $w top_level_idv_window
-    bind top_level_idv_window <Destroy> [list fl_save_idv_db exit]
+    bind top_level_idv_window <Destroy> idv:close_idv_gui
     $nb add [frame $nb.idv] -text "IDV Home"
 
     # Now make the front page
@@ -153,6 +153,11 @@ proc idv:create_idv_gui {w rw_db} {
 
 	# Populate listbox (probably need to limit thenumber of models...)
 	idv:update_idv_list
+}
+
+proc idv:close_idv_gui {} {
+    catch {unset ::idv}
+    fl_save_idv_db exit
 }
 
 proc idv:inform_canvas_change {w} {
@@ -438,8 +443,6 @@ proc idv:select_replacement {c alts} {
     foreach nm $alts {
 	$f.list insert end $nm
     }
-
-
     tkwait window $w
     return [list $::idv(replacement_command) $::idv(replacement_idx)]
 }
@@ -539,7 +542,7 @@ proc idv:update_transf_canvas {c} {
 	if { $::idv(show_transform_name) } {
 	    regexp {([^:]*):(.*)} $::idv_transf_edge_map($edge) -> db edge_name
 	    set raw_name $::idv_transf_edge_map($edge)
-	    set edge_name [fl_format_transf_name 15 $raw_name]
+	    set edge_name [fl_format_transf_name 200 $raw_name]
 	    $c itemconfigure $::dot_edge2text_tag($c,$edge) \
 		    -text $edge_name 
 ;# -anchor w -justify r

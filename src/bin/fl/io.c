@@ -1192,14 +1192,6 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 	Unserialize_End();
 	return( FALSE );
     }
-    if( (fp = fopen(graph_file_name, "r")) == NULL ) {
-	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot open %s", graph_file_name));
-	free_buf(&bool_results);
-	free_buf(&bexpr_results);
-	free_buf(&str_results);
-	Unserialize_End();
-	return( FALSE );
-    }
     g_ptr result;
     read_graph_line_nbr = 1;
     dbg_indent = 0;

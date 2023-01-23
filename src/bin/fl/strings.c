@@ -132,9 +132,11 @@ Expand_constant(rec_mgr *vector_list_mgr, rec_mgr *vector_mgr, string s)
     while( *s && ((*s == '0') || (*s == '1')) ) {
 	vec_ptr v = (vec_ptr) new_rec(vector_mgr);
 	v->type = TXT;
-	char vbuf[2];
-	vbuf[0] = *s;
-	vbuf[1] = 0;
+	char vbuf[4];
+	vbuf[0] = '0';
+	vbuf[1] = 'b';
+	vbuf[2] = *s;
+	vbuf[3] = 0;
 	v->u.name = uStrsave(lstringsp, vbuf);
 	v->next = NULL;
         vec_list_ptr vlp = (vec_list_ptr) new_rec(vector_list_mgr);

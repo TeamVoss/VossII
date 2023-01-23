@@ -686,7 +686,7 @@ let resize_pexlif sz {p::pexlif} =
     let tri i = i = 0 => sz | i in
     let tr1 n =
 	NOT (str_is_substr "[-1:0]" n) => n |
-	mk_name sz (hd (str_split n "["))
+	mk_name sz (hd (str_split n "[-1:0]"))
     in
     let trfa (f,as) = (tr1 f), (map tr1 as) in
     letrec trwexpr (W_VAR osz name) = W_VAR (tri osz) name
@@ -702,6 +702,7 @@ let resize_pexlif sz {p::pexlif} =
      /\    trwexpr (W_PRED name e) = W_PRED name (trwexpr e)
      /\    trwexpr (W_SX osz e) = W_SX (tri osz) (trwexpr e)
      /\    trwexpr (W_ZX osz e) = W_ZX (tri osz) (trwexpr e)
+     /\    trwexpr (W_SLICE indices w) = W_SLICE indices (trwexpr w)
      /\    trwexpr other = eprintf "Cannot translate wexpr (%s)" (Pwexpr other)
     in
     let trfn (W_UPDATE_FN lhs rhs) =
