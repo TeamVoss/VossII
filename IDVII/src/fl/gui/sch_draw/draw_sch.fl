@@ -533,7 +533,10 @@ let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
 	(flatmap snd (get_visualization_fanins fsm (hd nds) cur_draw_level))
 	subtract nds
     then
-    let phier= tcl_eval [sprintf "set ::sch_info(instance_hier,%s)" canvas] then
+    let phier= 
+		tcl_eval [
+			sprintf "if { ![info exists ::sch_info(draw_level,%s)] } {set ::sch_info(draw_level,%s) 0}" canvas canvas]
+	then
     let hier = sprintf "%si%d/" phier inst_nbr then
     let name =
 	let pfn = get_visualization_pfn fsm (hd nds) cur_draw_level then
