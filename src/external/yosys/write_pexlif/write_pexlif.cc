@@ -62,7 +62,7 @@ idv_clean_name(std::string &str)
     }
 
     char *res = new char [str.length()+1];
-    std::strcpy(res, str.c_str());
+    strcpy(res, str.c_str());
     return( res );
 }
 

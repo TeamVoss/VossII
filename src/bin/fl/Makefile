@@ -56,6 +56,7 @@ clean:
 	-@touch .q
 	-@/bin/rm -f *.o fl y.tab.c y.tab.h y.output lex.yy.c .q
 	-@/bin/rm -f prefs_ext.h prefs.h abi_version.h
+	@make -C scripts clean
 
 # gcc -I ../../include/ -M *.c | sed -e 's/\/usr[^ ]*//g' > zz
 
