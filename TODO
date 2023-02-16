@@ -1,7 +1,3 @@
-Bug fixes to do:
-================
-
-1) Fix the save_fsm and load_fsm functions.
 
 
 ENHANCEMENTS needed:
@@ -17,16 +13,18 @@ ENHANCEMENTS needed:
 
 
 
-TODO to move Voss to "more or less" forte equivalent.
-======================================================
+TODO to move Voss to ">=" Forte/ReFlect.
+========================================
 
-1) Add dynamic weakening to the STE engine
+1) Add dynamic weakening to the STE engine (done, but not very efficient)
 
 2) Add SMT solver (?)
+   - Add a WSTE engine
 
 3) Add fork primitive
+   - Create a para_eval mechanism
 
-4) Add GUI based debugger.
+4) Add GUI based debugger for fl.
 
 5) Add named fields in type constructors + default values.
 
@@ -39,6 +37,13 @@ TODO to move Voss to "more or less" forte equivalent.
     node as the cached argument.
 
 9) Add clean_clet <fn>.
+
+10) Add slettype (symbolic_lettype) consstruct to make types that can be
+    used symbolically in pattern matching.
+
+11) Add a default pretty printer for all userdefined datatypes.
+
+12) Add an efficient GSTE engine.
 
 
 DONE: 
@@ -82,4 +87,5 @@ instead of going through an internal string representation).
 33) Add bSTE
 34) Add tables to fl
 35) Add fanin_dfs, _bfs and fanout_... functionality. 
+36) Fixed the save_fsm and load_fsm functions.
 
