@@ -16,8 +16,8 @@ REPO_OWNER := `stat --printf "%u:%g" .`
 YACC   ='bison -y'
 LEX    ='flex -l'
 RANLIB = ranlib
-CC     = gcc
-CX     = g++
+CC     ?= gcc
+CX     ?= g++
 # CC     = clang
 # CX     = clang++
 
@@ -218,14 +218,14 @@ install:
 	@-make install_all
 
 circuit-isomatch:
-	make -C "$(CKT_ISO_MATCH_DIR)" release
+	make -C "$(CKT_ISO_MATCH_DIR)" release CC=$(CC) CXX=$(CX)
 
 minisat:
 	make -C "$(MINISAT_DIR)" config prefix=$(MINISAT_DIR) CC=$(CC) CXX=$(CX)
 	make -C "$(MINISAT_DIR)" install
 
 visualization:
-	make -C "$(VISUALIZATION_DIR)" TCL_INCLUDE=$(TCL_INCLUDE)
+	make -C "$(VISUALIZATION_DIR)" TCL_INCLUDE=$(TCL_INCLUDE) CC=$(CC) CXX=$(CX)
 
 $(YOSYS_WRITE_PEXLIF)/write_pexlif.so: $(YOSYS_WRITE_PEXLIF)/write_pexlif.cc
 	make -C $(YOSYS_WRITE_PEXLIF)

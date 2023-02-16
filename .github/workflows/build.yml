@@ -1,0 +1,103 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+
+# much is from yosys ci
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os.id }}
+    strategy:
+      matrix:
+        os:
+          - { id: ubuntu-20.04, name: focal }
+        compiler:
+          - 'gcc-11'
+          - 'clang-12'
+          - 'clang-15'
+        yosys:
+          - 'yosys-0.26'
+      fail-fast: false
+
+    steps:
+      - name: doxygen
+        run: |
+          sudo apt update
+          sudo apt-get install -y doxygen flex bison gawk libz-dev tcl-dev tk-dev libstdc++-11-dev graphviz
+
+      - name: Setup GCC
+        shell: bash
+        if: startsWith(matrix.compiler, 'gcc')
+        run: |
+          CXX=${CC/#gcc/g++}
+          sudo apt-add-repository ppa:ubuntu-toolchain-r/test
+          sudo apt-get update
+          sudo apt-get install $CC $CXX
+          echo "CC=$CC" >> $GITHUB_ENV
+          echo "CXX=$CXX" >> $GITHUB_ENV
+          echo "CX=$CXX" >> $GITHUB_ENV
+        env:
+          CC: ${{ matrix.compiler }}
+
+      - name: Setup Clang
+        shell: bash
+        if: startsWith(matrix.compiler, 'clang')
+        run: |
+          wget https://apt.llvm.org/llvm-snapshot.gpg.key
+          sudo apt-key add llvm-snapshot.gpg.key
+          rm llvm-snapshot.gpg.key
+          sudo apt-add-repository "deb https://apt.llvm.org/${{ matrix.os.name }}/ llvm-toolchain-${{ matrix.os.name }} main"
+          sudo apt-add-repository "deb https://apt.llvm.org/${{ matrix.os.name }}/ llvm-toolchain-${{ matrix.os.name }}-15 main"
+          sudo apt-get update
+          CXX=${CC/#clang/clang++}
+          LLD=${CC/#clang/lld}
+          sudo apt-get install -y $CC $CXX $LLD
+          echo "CC=$CC" >> $GITHUB_ENV
+          echo "CXX=$CXX" >> $GITHUB_ENV
+          echo "CX=$CXX" >> $GITHUB_ENV
+        env:
+          CC: ${{ matrix.compiler }}
+
+      - name: Runtime environment
+        shell: bash
+        env:
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          echo "procs=$(nproc)" >> $GITHUB_ENV
+
+      - name: Tool versions
+        shell: bash
+        run: |
+          $CC --version
+          $CXX --version
+
+      - name: Cache yosys
+        id: cache-yosys
+        uses: actions/cache@v3
+        with:
+          path: ~/.local/
+          key: ${{ matrix.os.id }}-${{ matrix.yosys }}-${{ matrix.compiler }}
+
+      - name: yosys
+        if: steps.cache-yosys.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.local/
+          git clone https://github.com/yosyshq/yosys.git
+          cd yosys
+          git checkout ${{ matrix.yosys }}
+          if [[ ${CC%-*} == 'gcc' ]] ; then
+              make config-gcc
+          fi
+          make PREFIX=~/.local -j${{ env.procs }}
+          make PREFIX=~/.local install
+
+      - uses: actions/checkout@v3
+
+      - name: compile vossii
+        shell: bash
+        run: |
+          make -C src package -j4

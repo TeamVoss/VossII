@@ -7,19 +7,24 @@
 MINISAT_DIR ?=../../external/minisat/
 PLUGIN_DIR ?=$(ROOT_DIR)/plugins
 
-CFLAGS = $(DEBUG_FLAG) $(OPTIMIZATION_FLAG) $(FL_OPTIONS) \
-	$(COMPATIBILITY_FLAG) \
-	-Wall -Wextra -Werror -Wclobbered \
+BASE_FLAGS = $(DEBUG_FLAG) $(OPTIMIZATION_FLAG) $(FL_OPTIONS) \
+	-Wall -Wextra -Werror \
 	-DVERSION_DATE='"$(VERSION_DATE)"' \
 	-DDEFAULT_PLUGIN_DIR='"$(PLUGIN_DIR)"' -DFL_BINARY=1
 
+CFLAGS += $(BASE_FLAGS) $(COMPATIBILITY_FLAG)
+CXXFLAGS += $(BASE_FLAGS) -fpermissive -Wno-error
+
+ifeq '' '$(findstring clang++,$(CX))'
+  FL_LIB_FLAGS = -ldl
+else
+  FL_LIB_FLAGS = -ldl -fuse-ld=$(subst clang++,lld,$(CX))
+endif
 # Minisat legacy code workaround
-CXXFLAGS = -fpermissive -Wno-error
 
 INC = -I../../include -I$(MINISAT_DIR)/include $(TCL_INCLUDE) -DROOT_DIR='"$(ROOT_DIR)"'
 LIB = ../../lib/fl_lib.a $(MINISAT_DIR)/lib/libminisat.a \
       $(CKT_ISO_MATCH_DIR)/libisomatch.a
-FL_LIB_FLAGS = -ldl
 
 # All headers that affect fl's plugin ABI.
 ABI_HEADERS = float.h graph.h plugin.h strings.h typecheck.h ../../include/types.h
@@ -34,22 +39,28 @@ OBJ = new_bdd.o error.o arb_prec.o file_ops.o initialize.o symbol_tbl.o \
 	iso.o pexlif.o doc.o serialize.o
 
 fl: $(OBJ) $(LIB)
-	$(CX) $(CFLAGS) $(INC) $(LINKFLAG) -o fl $(OBJ) $(LIB) \
+	$(CX) $(CXXFLAGS) $(INC) $(LINKFLAG) -o fl $(OBJ) $(LIB) \
 	$(COMPAT_LIB) $(FL_LIB_FLAGS)
 
 #
 # compilation with includes
 #
+y.tab.o: y.tab.c
+	$(CC) $(INC) -c $<
+
+lex.yy.o: lex.yy.c
+	$(CC) $(INC) -c $<
+
 .c.o:
 	$(CC) $(CFLAGS) $(INC) -c $<
 
 .cc.o:
-	$(CX) $(CFLAGS) $(CXXFLAGS) $(INC) -c $<
+	$(CXX) $(CXXFLAGS) $(CXXFLAGS) $(INC) -c $<
 
 y.tab.c: language.y fl.h language.h graph.h prefs_ext.h
 	@$(YACC) -d -v language.y
 
-lex.yy.c: lexer y.tab.h graph.h fl.h
+lex.yy.c: lexer y.tab.c graph.h fl.h y.tab.c
 	@$(LEX) lexer
 
 clean:
@@ -71,7 +82,7 @@ emit.o:		    emit.h fl.h
 error.o:	    error.h fl.h
 expand_cursor.o:    expand_cursor.h fl.h
 file_ops.o:	    file_ops.h fl.h
-fl.o:		    fl.h y.tab.h prefs_ext.h fl.h
+fl.o:		    fl.h y.tab.c prefs_ext.h fl.h
 graph.o:	    graph.h prefs_ext.h typecheck.h fl.h
 initialize.o:	    initialize.h prefs.h fl.h
 io.o:		    io.h graph.h fl.h

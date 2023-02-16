@@ -2874,7 +2874,7 @@ Handle_Recursion_Limits()
 	Send_to_tcl(buf, &s);
 	switch( *s ) {
 		case 'd': return TRUE;
-		case 'x': Exit(2);
+		case 'x': Exit(2); break;
 		case 'a': return FALSE;
 		default: break;
 	}
