@@ -97,6 +97,15 @@ let accurate_toplevel_pexlif2fsm p =
     res
 ;
 
+let accurate_pexlif2fsm p =
+    let old1 = update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" "TRUE" then
+    let old2 = update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" "FALSE" then
+    let res = pexlif2fsm p then
+    (update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" old1) fseq
+    (update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" old2) fseq
+    res
+;
+
 // -------------------------------------------------------------
 
 let cur_canvas = ref "";
@@ -457,12 +466,16 @@ let canvas2tab c =
     gen_catch (\msg. (fprintf stderr "canvas2tab: %s fails\n" c) seq error msg)
 ;
 
+let start_draw_op c = tcl_eval [sprintf "sc:prepare_draw_info %s" c];
+non_lazy start_draw_op;
+
 let gen_draw_fanin vfsm draw_level levels vecs =
     let stop_list = deref (vfsm2stop_list_r vfsm) then
     let fsm = vfsm2fsm vfsm then 
     let w = vfsm2id vfsm then
     let vis = visualize_fanin fsm stop_list [] levels vecs draw_level then
     val (tab_window, c) = get_new_sch_canvas w draw_level "" "" then
+    (start_draw_op c) fseq
     let cmd =	
 	let tab = canvas2tab c then
 	let svecs = list2str T "[" "," "]" (sprintf "\"%s\"") vecs in
@@ -478,7 +491,8 @@ let gen_draw_fanin vfsm draw_level levels vecs =
                 "update",
 		sprintf "bind %s <Map> {fl_update_colors %s}"  c c,
 		sprintf "fl_update_colors %s"  c,
-                sprintf "set_scrollregion %s" c
+                sprintf "set_scrollregion %s" c,
+                sprintf "sc:remove_draw_info %s" c
               ]) fseq
     c
 ;
@@ -513,6 +527,7 @@ let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
 	let outs = outputs ckt then
 	let vis = visualize_fanin ckt [] [] 100 outs 0 then
 	val (tab_window, c) = get_new_sch_canvas w 0 "" hier then
+	(start_draw_op c) fseq
 	let cmd = "OBSOLETE" in
 	let evis =
 	    TR_SEQ canvas T [inst_nbr] (ref vis) (ref [(p,ckt,SPEC)])
@@ -524,7 +539,8 @@ let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
 		    sprintf "%s delete all" c,
 		    sprintf "draw_network %s $%s" c final_res,
 		    "update",
-		    sprintf "set_scrollregion %s" c
+		    sprintf "set_scrollregion %s" c,
+		    sprintf "sc:remove_draw_info %s" c
 		  ]) fseq
 	c
     |
@@ -553,6 +569,7 @@ let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
     let draw_level = cur_draw_level+1 in
     let vis = visualize_fanin fsm stop_list ifc_list 100 vecs draw_level then
     val (tab_window, c) = get_new_sch_canvas w draw_level hier hier then
+    (start_draw_op c) fseq
     let cmd =	
 	let tab = canvas2tab c then
 	let svecs = list2str T "[" "," "]" (sprintf "\"%s\"") vecs in
@@ -569,7 +586,8 @@ let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
 		sprintf "bind %s <Map> {fl_update_colors %s}"  c c,
 		sprintf "fl_update_colors %s"  c,
 		sprintf "draw_hier_boundingbox %s {%s}" c name,
-                sprintf "set_scrollregion %s" c
+                sprintf "set_scrollregion %s" c,
+                sprintf "sc:remove_draw_info %s" c
               ]) fseq
     c
 ;
@@ -609,6 +627,42 @@ let fl_draw_inside canvas cur_draw_level tag inst_nbr =
 ;
 export_to_tcl fl_draw_inside;
 
+let fl_show_info canvas inst_nbr =
+    let parent = get_idv_current_pexlif canvas then
+    let p = el inst_nbr (pexlif_get_children parent) then
+    let sha = pexlif_get_SHA p then
+    let sig = pexlif_get_FP p then
+    val (PINST name attrs lf fa_inps fa_outs ints body) = p in
+    let get_children (P_HIER cs) = length cs
+     /\ get_children other = -1
+    in
+    let child_info =
+        let cnt = get_children body in
+        cnt < 0 => "Leaf" | sprintf "Hierarchy with %d children" cnt
+    in
+    let inps = map fst fa_inps in
+    let nbr_inps = length inps in
+    let inp_szs = map md_size inps in
+    let outs = map fst fa_outs in
+    let nbr_outs = length outs in
+    let out_szs = map md_size outs in
+    let nbr_ints = length ints in
+    let int_szs = map md_size ints in
+    let msg = sprintf "Pexlif information for instance %d" inst_nbr in
+    let details = list2str T "" "\n" "\n" id [
+        (sprintf "Name: %s" name),
+        (sprintf "Type: %s" child_info),
+        (sprintf "SHA signature: %s" sha),
+        (sprintf "FP signature: %d" sig),
+        (sprintf "Inputs: %d %S" nbr_inps (map int2str inp_szs)),
+        (sprintf "Outputs: %d %S" nbr_outs (map int2str out_szs)),
+        (sprintf "Internal: %d %S" nbr_ints (map int2str int_szs))
+        ]
+    then
+    (report_result0 msg details [("Ok","1")]) fseq ()
+;
+export_to_tcl fl_show_info;
+
 
 let fl_draw_fanin_by_tag canvas draw_level levels tag =
     let vfsm = w2vfsm canvas then
@@ -642,6 +696,7 @@ let fl_show_rtl canvas dlev tag =
     foreach show srcs
 ;
 export_to_tcl fl_show_rtl;
+
 
 let fl_is_vector_name name = md_size name > 1;
 export_to_tcl fl_is_vector_name;
@@ -1281,6 +1336,21 @@ let weaken_color color =
 
 let update_colors vfsm =
   (
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//  let anames = visualize_get_shown_anons vis then
+//  let shown an =
+//	let rvec = visualization_anon2real vis an then
+//	let same = rvec vec_intersect selection then
+//	same = [] => ([], []) |
+//	(rvec vec_subtract selection) = [] => [an],[] | [], [an]
+//  in
+//  val (full_l,partial_l) = unzip (map shown anames) then
+//  let full = flat full_l then
+//  let partial = flat partial_l then
+//
+//
+//
+
     let selection = deref (vfsm2selection_r vfsm) then
     let base_highlights = deref (vfsm2hll_r vfsm) then
     let highlights = map hd (partition fst base_highlights) in
@@ -1293,7 +1363,8 @@ let update_colors vfsm =
 	let do_one_col l =
 	    l = [] => [] |
 	    let color = snd (hd l) in
-	    let vecs = md_extract_vectors (map fst l) in
+//	    let vecs = md_extract_vectors (map fst l) in
+	    let vecs = md_expand_vectors (map fst l) in
 	    val (full_anons, part_anons) =
 		visualization_vecs2tags vis T vecs
 	    then
@@ -1316,7 +1387,8 @@ let update_colors vfsm =
 	let do_one_col l =
 	    l = [] => [] |
 	    let color = snd (hd l) then
-	    let vecs = md_extract_vectors (map fst l) then
+//	    let vecs = md_extract_vectors (map fst l) then
+	    let vecs = md_expand_vectors (map fst l) then
 	    let do v = sprintf "wv:prim_set_name_color %s {%s} %s;" w v color in
 	    let cmds = map do vecs then
 	    cmds
@@ -1580,6 +1652,7 @@ let fl_delete_stop_nd canvas vec =
 export_to_tcl fl_delete_stop_nd;
 
 let fl_expand_fanin c draw_level levels tag =
+    (start_draw_op c) fseq
     let vis = evis2vis (canvas2vis c) then
     let vis = visualize_expand_fanin vis tag levels draw_level then
     let cmd =
@@ -1597,13 +1670,15 @@ let fl_expand_fanin c draw_level levels tag =
                 sprintf "draw_network %s $%s" c final_res,
                 "update",
                 sprintf "bind %s <Map> {fl_update_colors %s}"  c c,
-                sprintf "set_scrollregion %s" c
+                sprintf "set_scrollregion %s" c,
+                sprintf "sc:remove_draw_info %s" c
               ]) fseq
     ()
 ;
 export_to_tcl fl_expand_fanin;
 
 let fl_undo_expansion c =
+    (start_draw_op c) fseq
     let vis = evis2vis (canvas2vis c) then
     let vis = visualize_undo vis then
     val (final_res, cmds) = visualisation2tcl vis then
@@ -1613,13 +1688,15 @@ let fl_undo_expansion c =
                 "update",
                 sprintf "bind %s <Map> {fl_update_colors %s}"  c c,
 		sprintf "fl_update_colors %s"  c,
-                sprintf "set_scrollregion %s" c
+                sprintf "set_scrollregion %s" c,
+                sprintf "sc:remove_draw_info %s" c
               ]) fseq
     ()
 ;
 export_to_tcl fl_undo_expansion;
 
 let fl_hide_fanin c tag make_it_stop_node =
+    (start_draw_op c) fseq
     (make_it_stop_node => (fl_add_stop_nd c tag) | ()) fseq
     let vis = evis2vis (canvas2vis c) then
     let vis = visualize_hide_fanin vis tag (-1) then
@@ -1636,7 +1713,8 @@ let fl_hide_fanin c tag make_it_stop_node =
                 "update",
                 sprintf "bind %s <Map> {fl_update_colors %s}"  c c,
 		sprintf "fl_update_colors %s"  c,
-                sprintf "set_scrollregion %s" c
+                sprintf "set_scrollregion %s" c,
+                sprintf "sc:remove_draw_info %s" c
               ]) fseq
     ()
 ;

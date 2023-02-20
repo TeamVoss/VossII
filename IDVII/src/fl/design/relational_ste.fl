@@ -64,8 +64,8 @@ clet prop2pexlif nwe =
 	let nm = sprintf "@%d_%s" t pin in
 	let f = assoc pin io_map in
 	let t' = t - min_time in
-	t' = 0 => (nm, W_EXPLICIT_VAR sz f) |
-	let df = W_EXPLICIT_VAR sz (sprintf "d%d_%s" t' f) in
+	t' = 0 => (nm, f) |
+	let df = sprintf "d%d_%s" t' f in
 	(nm, df)
     in
     let wsub = map mk_sub timed_inps in

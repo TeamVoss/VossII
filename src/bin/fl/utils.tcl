@@ -158,12 +158,16 @@ proc util:process_is_alive {process_id} {
     }
 }
 
-proc util:watch_process {pid {delay 50} {action "destroy ."} } {
+proc util:watch_process {pid {delay 50} {action "destroy ."} {persistent 0} } {
     if [util:process_is_alive $pid] {
-        after $delay [list util:watch_process $pid $delay $action]
+        set id [after $delay \
+		    [list util:watch_process $pid $delay $action $persistent]]
+	if $persistent {
+	    set ::persistent_afters($id) 1
+	}
     } else {
         eval uplevel #0 $action
-        update idletasks
+        update
     }
 }
 
@@ -258,6 +262,12 @@ set ::always_alive {}
 
 proc make_window_always_alive {w} {
     lappend ::always_alive $w
+    set ::always_alive_tbl($w) 1
+    set pw [winfo parent $w]
+    while { $pw != "" } {
+	set ::always_alive_tbl($pw) 1
+	set pw [winfo parent $pw]
+    }
 }
 
 proc remove_window_always_alive {w} {
@@ -268,26 +278,39 @@ proc remove_window_always_alive {w} {
 	    lappend ::always_alive $ww
 	}
     }
+    catch {unset ::always_alive_tbl}
+    foreach w $::always_alive {
+	set ::always_alive_tbl($w) 1
+	set pw [winfo parent $w]
+	while { $pw != "" } {
+	    set ::always_alive_tbl($pw) 1
+	    set pw [winfo parent $pw]
+	}
+    }
 }
 
-proc mk_busy {w mode} {
+proc mk_busy {w} {
+    if ![winfo exists $w] { return }
+    if ![info exists ::always_alive_tbl($w)] {
+	tk busy hold $w -cursor watch
+	return
+    }
     foreach cw [winfo children $w] {
-	set has_active_child 0
-	set len [string length $cw]
-	foreach aw $::always_alive {
-	    if [string equal -length $len $cw $aw] {
-		set has_active_child 1
-	    }
-	}
-	if { $has_active_child == 0 } {
-	    if { $mode == 1 } {
-		catch {tk busy hold $cw -cursor watch}
-	    } else {
-		catch {tk busy forget $cw}
-	    }
-	} else {
-	    mk_busy $cw $mode
-	}
+	mk_busy $cw
+    }
+}
+
+
+proc mk_available {w} {
+    if ![winfo exists $w] { return }
+    if ![info exists ::always_alive_tbl($w)] {
+        if { [tk busy status $w] == 1 } {
+            tk busy forget $w
+        }
+        return
+    }
+    foreach cw [winfo children $w] {
+        mk_available $cw
     }
 }
 
@@ -295,7 +318,7 @@ proc i_am_busy {} {
     foreach w [wm stackorder .] {
 	incr ::busy_level($w)
 	if { $::busy_level($w) == 1 } {
-	    mk_busy $w 1
+	    mk_busy $w
 	}
     }
     update
@@ -307,11 +330,11 @@ proc i_am_free {} {
 	if [info exists ::busy_level($w)] {
 	    incr ::busy_level($w) -1
 	    if { [expr $::busy_level($w) <= 0] } {
-		mk_busy $w 0
+		mk_available $w
 		set ::busy_level($w) 0
 	    }
 	} else {
-	    mk_busy $w 0
+	    mk_available $w
 	    set ::busy_level($w) 0
 	}
     }
@@ -319,10 +342,15 @@ proc i_am_free {} {
 }
 
 proc make_all_active {} {
-    foreach w [wm stackorder .] {
-	mk_busy $w 0
-	set ::busy_level($w) 0
+    foreach w [tk busy current] {
+	if [winfo exists $w] {
+	    catch {tk busy forget $w}
+	}
     }
+    if [info exists ::busy_level] {
+	unset ::busy_level
+    }
+    update
 }
 
 
@@ -522,11 +550,12 @@ proc gui_io:get_data {title texts} {
     pack $w.bf.sp3 -side left -fill x -expand 1
     pack $w.bf.ok -side left -padx 10
     pack $w.bf.sp4 -side left -fill x -expand 1
-    i_am_free;
-    foreach ww [winfo children .] {
-	catch {tk busy forget $ww}
+    foreach w [tk busy current] {
+	if [winfo exists $w] {
+	    catch {tk busy forget $w}
+	}
     }
-#    update
+    update
     tkwait window $w
 }
 

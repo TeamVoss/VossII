@@ -413,7 +413,20 @@ let pretty_expression {we::wexpr} =
       // Ignored op. -----------------------------
       /\  go (W_NAMED_CONST _ sz c) = (const_exp sz c)
       /\  go (W_EXPLICIT_VAR sz v) =
-            warn "EXPLICIT_VAR is treated as VAR" (variable_exp sz v)
+	    let vsz = md_size v in
+	    vsz != sz => eprintf "W_EXPLICIT_VAR with size mismatch |%s|!=%d"
+				 v sz
+	    |
+	    let parts = str_split v "[" then
+	    length parts > 2 =>
+		eprintf "Multi-dimensional W_EXPLICIT_VAR %s" v
+	    |
+	    ((length parts = 2) AND (sprintf "%d:0]" (sz-1)) != (el 2 parts))
+		=> eprintf "Complex W_EXPLICIT_VAR %s" v
+	    |
+	    let base = hd parts then
+	    (variable_exp sz base)
+
       /\  go (W_PRED _ a) =
 //            warn "PRED is ignored"
 	    (go a)
@@ -975,24 +988,10 @@ let make_verilog_safe p =
         PINST nm attrs lf fa_inps' fa_outs' ints' (P_HIER chs')
      /\    clean (PINST nm attrs lf fa_inps fa_outs ints (P_LEAF fns)) =
 	val (fa_inps',fa_outs',ints',sub) = make_subs ints fa_inps fa_outs then
-	let wsub =
-	    let mk_sub (f,t) =
-		let sz = md_size f in
-		let sz2 = md_size t in
-		sz != sz2 => eprintf "Size mismatch (|%s| != |%s|)" f t |
-		let v_sub = (f, (W_VAR sz (get_base_name t))) in
-		let mk f1 t1 = (f1, (W_VAR 1 t1)) in
-		let b_subs =
-		    map2 mk (md_expand_vector f) (md_expand_vector t)
-		in
-		v_sub:b_subs
-	    in
-	    setify (flatmap mk_sub sub)
-	then
 	let clean_fn (W_UPDATE_FN lhs rhs) =
-		W_UPDATE_FN (w_substitute wsub lhs) (w_substitute wsub rhs)
+		W_UPDATE_FN (w_substitute sub lhs) (w_substitute sub rhs)
 	 /\ clean_fn (W_PHASE_DELAY lhs rhs) =
-		W_UPDATE_FN (w_substitute wsub lhs) (w_substitute wsub rhs)
+		W_UPDATE_FN (w_substitute sub lhs) (w_substitute sub rhs)
 	in
 	let fns' = map clean_fn fns in
         PINST nm attrs lf fa_inps' fa_outs' ints' (P_LEAF fns')

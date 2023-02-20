@@ -702,6 +702,12 @@ infix 7 intersect;
 let subtract l1 l2 = defix subtract l1 l2;
 infix 7 subtract;
 
+// Determine if set1 is the same as set2.
+let set_eq l1 l2 = defix set_eq l1 l2;
+
+// Determine if set1 is not the same as set2.
+let set_neq l1 l2 = NOT (defix set_eq l1 l2);
+
 // Determine if x is a member of the list l
 let mem x l = defix mem x l;
 

@@ -1212,6 +1212,71 @@ subtract(g_ptr redex)
 }
 
 static void
+set_eq(g_ptr redex)
+{
+    g_ptr set1, set2;
+    EXTRACT_2_ARGS(redex, set1, set2);
+    if( IS_NIL(set1) ) {
+	if( IS_NIL(set2) ) {
+	    MAKE_REDEX_BOOL(redex, B_One());
+	    return;
+	}
+	MAKE_REDEX_BOOL(redex, B_Zero());
+	return;
+    }
+    if( IS_NIL(set2) ) {
+	MAKE_REDEX_BOOL(redex, B_Zero());
+	return;
+    }
+    hash_record tbl1;
+    create_hash(&tbl1, 100, Graph_hash, Graph_equ);
+    int cnt1 = 0;
+    while( !IS_NIL(set1) ) {
+	cnt1++;
+	g_ptr d = GET_CONS_HD(set1);
+	if( find_hash(&tbl1, d) == NULL ) {
+	    insert_hash(&tbl1, d, d);
+	} else {
+	    MAKE_REDEX_FAILURE(redex, Fail_pr("set1 has duplicates in set_eq"));
+	    dispose_hash(&tbl1, NULLFCN);
+	    return;
+	}
+	set1 = GET_CONS_TL(set1);
+    }
+    hash_record tbl2;
+    create_hash(&tbl2, 100, Graph_hash, Graph_equ);
+    int cnt2 = 0;
+    while( !IS_NIL(set2) ) {
+	cnt2++;
+	g_ptr d = GET_CONS_HD(set2);
+	if( find_hash(&tbl1, d) == NULL ) {
+	    MAKE_REDEX_BOOL(redex, B_Zero());
+	    dispose_hash(&tbl1, NULLFCN);
+	    dispose_hash(&tbl2, NULLFCN);
+	    return;
+	}
+	if( find_hash(&tbl2, d) == NULL ) {
+	    insert_hash(&tbl2, d, d);
+	} else {
+	    MAKE_REDEX_FAILURE(redex, Fail_pr("set2 has duplicates in set_eq"));
+	    dispose_hash(&tbl1, NULLFCN);
+	    dispose_hash(&tbl2, NULLFCN);
+	    return;
+	}
+	set2 = GET_CONS_TL(set2);
+    }
+    dispose_hash(&tbl1, NULLFCN);
+    dispose_hash(&tbl2, NULLFCN);
+    if( cnt1 == cnt2 ) {
+	MAKE_REDEX_BOOL(redex, B_One());
+	return;
+    } else {
+	MAKE_REDEX_BOOL(redex, B_Zero());
+	return;
+    }
+}
+
+static void
 append(g_ptr redex)
 {
     g_ptr list1, list2;
@@ -1542,6 +1607,12 @@ List_ops_Install_Functions()
 			    GLmake_list(tv1),
 			    GLmake_arrow(GLmake_list(tv1), GLmake_list(tv1))),
                         subtract);
+
+    Add_ExtAPI_Function("set_eq", "11", FALSE,
+                        GLmake_arrow(
+			    GLmake_list(tv1),
+			    GLmake_arrow(GLmake_list(tv1), GLmake_bool())),
+                        set_eq);
 
     Add_ExtAPI_Function("last", "2", FALSE,
                         GLmake_arrow(GLmake_list(tv1), tv1),

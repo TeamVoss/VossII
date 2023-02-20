@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
+let clean_error_message msg = hd (str_split msg "Stack trace");
+
 let log_all_transformations = T;
 
 //let log cmd p 
@@ -437,6 +439,7 @@ let get_number_of_children (PINST _ _ _ _ _ _ (P_HIER chs)) =
 ;
 
 let refresh_idv_canvas canvas cmd =
+    (start_draw_op canvas) fseq
     let vfsm = w2vfsm canvas then
     let canvas_list = deref (vfsm2canvases_r vfsm) then
     let evis = snd (find (\p. fst p = canvas) canvas_list) then
@@ -458,13 +461,14 @@ let refresh_idv_canvas canvas cmd =
                 sprintf "draw_network %s $%s" canvas final_res,
                 "update",
 		sprintf "set_zoom_factor %s $old_zoom" canvas,
-                sprintf "set_scrollregion %s" canvas
+                sprintf "set_scrollregion %s" canvas,
+                sprintf "sc:remove_draw_info %s" canvas
               ]) fseq
     ()
 ;
 
 
-let start_new_transform p start_new w =
+let start_new_transform p w =
     let ckt = accurate_toplevel_pexlif2fsm p then
     let outs = outputs ckt then
     let props = assertions ckt then
@@ -472,6 +476,7 @@ let start_new_transform p start_new w =
     let vfsm = w2vfsm w then
     let vis = visualize_fanin ckt [] [] 100 (outs@props) 0 then
     val (tab_window, c) = get_new_sch_canvas w 0 "" "" then
+    (start_draw_op c) fseq
     let cmd = "DUMMY" in
     let evis = TR_SEQ "" F [] (ref vis) (ref [(p,ckt,SPEC)]) then
     (add_active_sch_tab_window vfsm c evis cmd) fseq
@@ -481,7 +486,8 @@ let start_new_transform p start_new w =
 		sprintf "%s delete all" c,
 		sprintf "draw_network %s $%s" c final_res,
 		"update",
-		sprintf "set_scrollregion %s" c
+		sprintf "set_scrollregion %s" c,
+                sprintf "sc:remove_draw_info %s" c
 	      ]
     ) fseq
     ()
@@ -507,23 +513,23 @@ let IDV0 rw_database read_only_dbs =
     (open_idv_db rw_database F) fseq
     (foreach (\db. open_idv_db db T) read_only_dbs) fseq
     // Start GUI
-    noX => () |
+    noX => "" |
     let w = get_new_idv_window () then
-    (tcl_eval [sprintf "idv:create_idv_gui %s %s" w rw_database]) fseq
+    (tcl_eval [sprintf "idv:create_idv_gui %s %s 0" w rw_database]) fseq
     let vfsm = IDV_ENV w (ref []) (ref []) (ref []) (ref []) (ref []) in
     (cur_vfsm := (vfsm:(deref cur_vfsm))) fseq
     (register_vfsm vfsm w) fseq
     (cur_transf_windowsr := ((w,vfsm):(deref cur_transf_windowsr))) fseq
-    ()
+    w
 ;
 
 let IDV_dbg p rw_database read_only_dbs =
-    (IDV0 rw_database read_only_dbs) fseq
+    let w = IDV0 rw_database read_only_dbs then
     let name = pexlif_get_name p then
     (import_model name p) fseq
-    noX => () |
+    noX => "" |
     (tcl_eval ["idv:update_idv_list"]) fseq
-    ()
+    w
 ;
 
 overload IDV IDV0 IDV_dbg;
@@ -563,14 +569,14 @@ let rename_name (PINST _ attrs lf fa_inps fa_outs ints body) new_name =
 let get_selected_pinsts canvas =
     let vfsm = w2vfsm canvas in
     let selection = deref (vfsm2selection_r vfsm) then
-    let all_sels = md_expand_vectors selection in
-    let ckt = get_idv_current_fsm canvas then
-    let nd2pinst n = [(get_visualization_pinst_cnt ckt n 0)] catch [] in
-    setify (flatmap nd2pinst all_sels)
+    let p = get_idv_current_pexlif canvas then
+    let tst pp = ((pexlif_get_outs_actuals pp) vec_intersect selection) != [] in
+    find_all tst (pexlif_get_children p)
 ;
 
 
 let fl_do_fold canvas name =
+  (
     let name' = "draw_hier "^name then
     let vfsm = w2vfsm canvas then
     let il = get_selected_pinsts canvas then
@@ -582,31 +588,36 @@ let fl_do_fold canvas name =
 		      (list2str T "[" "," "]" int2str il) name
     in
     refresh_idv_canvas canvas cmd
+  ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
 ;
 export_to_tcl fl_do_fold;
 
 let fl_do_unfold canvas =
+  (
     let vfsm = w2vfsm canvas then
     let il = get_selected_pinsts canvas then
     il = [] => () |
     // Process the unfolds in reverse order
     // Relies on unfold1 i does not change children 1--(i-1).
-    let il = qsort (\i1.\i2. i2-i1) (setify il) then
+    let il = qsort (\i1.\i2. i1-i2) (setify il) then
     let p = get_idv_current_pexlif canvas then
     let p' = itlist (\i.\p. unfold_pexlif p i) il p then
     (add_transform canvas p' (UNFOLD il)) fseq
     let cmd = sprintf "unfold vis %S;" (map int2str il) in
     refresh_idv_canvas canvas cmd
+  ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
 ;
 export_to_tcl fl_do_unfold;
 
 let fl_do_flatten canvas =
+  (
     let vfsm = w2vfsm canvas then
     let p = get_idv_current_pexlif canvas then
     let p' = flatten_pexlif p then
     (add_transform canvas p' FLATTEN) fseq
     let cmd = sprintf "flatten vis;" in
     refresh_idv_canvas canvas cmd
+  ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
 ;
 export_to_tcl fl_do_flatten;
 
@@ -624,6 +635,7 @@ let fl_do_idv_undo canvas =
     val (TR_SEQ parent inside sell rvis rtrf) = evis then
     let outs = outputs ckt then
     let props = assertions ckt then
+    (start_draw_op canvas) fseq
     let vis = visualize_fanin ckt [] [] 100 (outs@props) 0 then
     (rvis := vis) fseq
     (rtrf := trfs') fseq
@@ -636,7 +648,8 @@ let fl_do_idv_undo canvas =
                 sprintf "draw_network %s $%s" canvas final_res,
                 "update",
 		sprintf "set_zoom_factor %s $old_zoom" canvas,
-                sprintf "set_scrollregion %s" canvas
+                sprintf "set_scrollregion %s" canvas,
+                sprintf "sc:remove_draw_info %s" canvas
               ]) fseq
     ()
 ;
@@ -689,6 +702,7 @@ let duplicate_instance p idx =
 
 
 let fl_do_duplicate canvas =
+  (
     let vfsm = w2vfsm canvas then
     let il = get_selected_pinsts canvas then
     il = [] => () |
@@ -700,6 +714,7 @@ let fl_do_duplicate canvas =
     (add_transform canvas p' (DUPLICATE (hd il))) fseq
     let cmd = sprintf "duplicate vis %d;" (hd il) in
     refresh_idv_canvas canvas cmd
+  ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
 ;
 export_to_tcl fl_do_duplicate;
 
@@ -778,6 +793,7 @@ let merge_instances p ids =
 
 
 let fl_do_merge canvas =
+  (
     let vfsm = w2vfsm canvas then
     let il = get_selected_pinsts canvas then
     let p = get_idv_current_pexlif canvas then
@@ -785,10 +801,12 @@ let fl_do_merge canvas =
     (add_transform canvas p' (MERGE il)) fseq
     let cmd = sprintf "merge vis %s;" (list2str T "[" "," "]" int2str il) in
     refresh_idv_canvas canvas cmd
+  ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
 ;
 export_to_tcl fl_do_merge;
 
 let fl_do_new_tranf canvas =
+  (
     let vfsm = w2vfsm canvas then
     let w = vfsm2id vfsm then
     let il = get_selected_pinsts canvas then
@@ -804,6 +822,7 @@ let fl_do_new_tranf canvas =
     let props = assertions ckt then
     let vis = visualize_fanin ckt [] [] 100 (outs@props) 0 then
     val (tab_window, c) = get_new_sch_canvas w 0 "" "" then
+    (start_draw_op c) fseq
     let cmd =
 	let tab = canvas2tab c then
 	let svecs = list2str T "[" "," "]" (sprintf "\"%s\"") outs in
@@ -818,9 +837,11 @@ let fl_do_new_tranf canvas =
 		sprintf "%s delete all" c,
 		sprintf "draw_network %s $%s" c final_res,
 		"update",
-		sprintf "set_scrollregion %s" c
+		sprintf "set_scrollregion %s" c,
+                sprintf "sc:remove_draw_info %s" c
 	      ]) fseq
     ()
+  ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
 ;
 export_to_tcl fl_do_new_tranf;
 
@@ -882,7 +903,7 @@ let fl_do_new_toplevel_transf {w::string} db name =
     (CHECK_FOR_RW_DB ()) fseq
     let p_sha = get_sha_for_model db name then
     let p = idv_load_pexlif db p_sha then
-    (start_new_transform p F w) fseq
+    (start_new_transform p w) fseq
     (tcl_eval ["update"]) fseq
     is_rw_db db => () |
     (tcl_eval [sprintf "idv:name_and_save_model %s specification {%s}" w name])
@@ -1427,7 +1448,7 @@ let BDD_remote_types =
 
 let use_separate_process_evaluation_r = ref T;
 
-let BDD_EQ_1 p1 p2 order_file =
+slet BDD_EQ_1 p1 p2 order_file =
     NOT (deref use_separate_process_evaluation_r) =>
 	noX => fst (BDD_EQ_base p1 p2) |
 	val (res, opt_cex) = BDD_EQ_base p1 p2 then
@@ -1504,6 +1525,13 @@ let BDD_EQ_2 p1 p2 variable_order =
 
 overload BDD_EQ BDD_EQ_1 BDD_EQ_2;
 
+let IDV_BDD_EQ name spec imp ordering =
+    let ok = BDD_EQ spec imp ordering then
+    NOT (ok == T) => error "Not a valid transformation" |
+    let just = FEV "BDD" [("ordering", (sprintf "%S" ordering))] then
+    TRANSFORM name (idv_save_pexlif spec) (idv_save_pexlif imp) [just]
+;
+
 // Try to verify two combinational pexlifs are equal by building
 // a miter circuit and simulating the circuit.
 let SAT_comb_EQ p1 p2 =
@@ -1524,6 +1552,14 @@ let SAT_comb_EQ p1 p2 =
     (STE "-e" vis [] ant' (bexpr2bdd bcons) []) fseq
     ok
 ;
+
+let IDV_SAT_comb_EQ name spec imp =
+    let ok = SAT_comb_EQ spec imp then
+    NOT (ok == bT) => error "Not a valid transformation" |
+    let just = FEV "SAT" [] in
+    TRANSFORM name (idv_save_pexlif spec) (idv_save_pexlif imp) [just]
+;
+    
 
 let make_symb_random vars vec_size =
     letrec build (v:vs) =
@@ -1679,6 +1715,7 @@ letrec rename_pexlif_wires
 
 
 let fl_rename_wires canvas =
+  (
     let vfsm = w2vfsm canvas in
     let p = get_idv_current_pexlif canvas then
     let selected_wires = get_selected_wires vfsm then
@@ -1721,6 +1758,7 @@ let fl_rename_wires canvas =
     (add_transform canvas p' (RENAME_WIRES sub)) fseq
     let cmd = sprintf "rename_wires vis ...;"  in
     refresh_idv_canvas canvas cmd
+  ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
 ;
 export_to_tcl fl_rename_wires;
 
@@ -1746,75 +1784,68 @@ let Pdraw_tree dt =
 install_print_function Pdraw_tree;    
 
 let remove_add_inst pfn =
-    NOT (str_is_prefix "add_inst " pfn) => pfn |
+    let clean_draw_fub pfn =
+	NOT (str_is_substr "draw_fub " pfn) => pfn |
+	list2str T "" " " "" id (firstn 2 (str_split pfn " "))
+    in
+    NOT (str_is_prefix "add_inst " pfn) => clean_draw_fub pfn |
     letrec skip_digit (c:cs) = 
 	let oc = ord c in
 	(ord "0" <= oc) AND (oc <= ord "9") => skip_digit cs | implode cs
      /\    skip_digit [] = eprintf "remove_add_inst failed on %s" pfn
     in
-    skip_digit (butfirstn (strlen "add_inst ") (explode pfn))
+    clean_draw_fub (skip_digit (butfirstn (strlen "add_inst ") (explode pfn)))
 ;
 
-let dbg_tbl = ref {[] :: (string#(string#(string list))) list};
 let build_vfanin_tbl ckt =
     let vec_vis_fanin vecs =
         let nds = md_expand_vectors vecs in
-        let get_pfn nd = (get_visualization_id ckt nd 0),
-                         (remove_add_inst (get_visualization_pfn ckt nd 0)),
+        let get_pfn nd = (get_visualization_id ckt nd (-1)),
+                         (remove_add_inst (get_visualization_pfn ckt nd (-1))),
                          nd
         in
         let p = partition fst (map get_pfn nds) then
         let process l =
             val ((id,pfn,nd):rem) = l in
             let vec = md_extract_vectors (map (\(id,pfn,nd).nd) l) in
-            let fi = get_visualization_fanins ckt nd 0 in
+            let fi = get_visualization_fanins ckt nd (-1) in
             let vfi = md_merge_vectors (flatmap snd fi) then
             map (\v. (v, pfn, vfi)) vec
         in
         flatmap process p
     in
-    let res = vec_vis_fanin (visualization_nodes ckt 0) then
-(dbg_tbl := res) fseq
+    let res = vec_vis_fanin (visualization_nodes ckt (-1)) then
     list2tbl res
-;
-
-let dbg_tbl_get tbl key =
-    (tbl_get tbl key) catch
-    (eprintf "Failed to find |%s| in %S\n" key (
-(map (\(k,(pfn,fin)). sprintf "(%s->%s,%S)" k pfn fin) (tbl2list tbl))))
 ;
 
 let get_io_order p =
     let MAX_DEPTH = 100 in
-    let ckt = accurate_toplevel_pexlif2fsm p then
+    let ckt = accurate_pexlif2fsm p then
     let vfi_tbl = build_vfanin_tbl ckt then
     let vinps = inputs ckt in
     let inps = md_expand_vectors vinps in
     let res = ref [] then
     letrec tr seen path vec =
-	mem vec vinps => ((res := ((vec,path):(deref res))) seq DT_INP) |
-	mem vec seen => DT_CYCLE |
-	val (pfn,vfanins) = dbg_tbl_get vfi_tbl vec then
-	(vfanins = []) AND (str_is_substr "draw_input" pfn) => DT_CONST |
-	let id_vfanins = zip (1 upto length vfanins) vfanins in
-	let do (i,vfi) = tr (vec:seen) ((int2str i):pfn:path) vfi in
-	DT_BR pfn (map do id_vfanins)
+        mem vec vinps => ((res := ((vec,rev path):(deref res))) seq DT_INP) |
+        mem vec seen => DT_CYCLE |
+        val (pfn,vfanins) = tbl_get vfi_tbl vec then
+        (vfanins = []) AND (str_is_substr "draw_input" pfn) => DT_CONST |
+        let id_vfanins = zip (1 upto length vfanins) vfanins in
+        let do (i,vfi) = tr (vec:seen) ((int2str i):pfn:path) vfi in
+        DT_BR pfn (map do id_vfanins)
     in
-    let id_vouts =
-	let vouts = outputs ckt in
-	zip (1 upto length vouts) vouts
-    in
-    let do (i,vo) = vo, (tr [] [(sprintf "o%d" i)] vo) in
-    let omaps = map do id_vouts then
+    let do_out vo = vo, (tr [] [vo] vo) in
+    let omaps = map do_out (outputs ckt) then
     let do l = (fst (hd l)), (setify (map snd l)) in
     let inps = map do (partition fst (deref res)) then
     let sel l =
-	let vs = md_extract_vectors (map fst l) then
-	let sig = snd (hd l) in
-	map (\v. v, sig) vs
+        let vs = md_extract_vectors (map fst l) then
+        let sig = snd (hd l) in
+        map (\v. v, sig) vs
     in
     omaps, (flatmap sel (partition snd inps))
 ;
+
 
 let get_input_order p =
     let MAX_DEPTH = 100 in
@@ -1853,10 +1884,6 @@ let get_input_order p =
     flatmap sel (partition snd inps)
 ;
 
-let set_equal s1 s2 =
-    ((s1 subtract s2) = []) AND ((s2 subtract s1) = [])
-;
-
 let check_eq_by_sim p1 p2 =
     let ckt1 = pexlif2fsm (wrap_pexlif p1) then
     let ckt2 = pexlif2fsm (wrap_pexlif p2) then
@@ -1864,8 +1891,8 @@ let check_eq_by_sim p1 p2 =
     let inps2 = md_expand_vectors (inputs ckt2) in
     let outs1 = md_expand_vectors (outputs ckt1) in
     let outs2 = md_expand_vectors (outputs ckt2) in
-    NOT (set_equal inps1 inps2) => F |
-    NOT (set_equal outs1 outs2) => F |
+    (set_neq inps1 inps2) => F |
+    (set_neq outs1 outs2) => F |
     let ant = map (\n.bT,n, bvariable n, 0, 1) inps1 then
     let trl = map (\n.n,0,1) outs1 then
     let ste1 = bSTE "-s" ckt1 [] ant [] trl then
@@ -1912,6 +1939,21 @@ let simple_get_specialized_imp spec imp p =
     SOME imp'
 ;
 
+let lcmp l1 l2 =
+    let len1 = length l1 in
+    let len2 = length l2 in
+    len1 > len2 => 1 |
+    len1 < len2 => -1 |
+    letrec cmp (st1:st1s) (st2:st2s) =
+	let res = strcmp st1 st2 in
+	res > 0 => res |	
+	res < 0 => res |
+	cmp st1s st2s
+     /\    cmp [] [] = 0
+    in
+    cmp l1 l2
+;
+
 // Find a substitution that makes spec == p.
 // If such is found, return imp after applying the same substitution.
 let get_specialized_imp spec imp p =
@@ -1929,13 +1971,24 @@ let get_specialized_imp spec imp p =
     let osub =
 	flatmap (\(sv,pv).zip (md_expand_vector sv) (md_expand_vector pv)) ovsub
     then
+    let iorder1' = 
+	let tr (vinp, paths) =
+	    let rename_termination path = (assoc (hd path) ovsub):(tl path) in
+	    (vinp, (qsort lcmp (map rename_termination paths)))
+	in
+	map tr iorder1
+    then
+    let iorder2' =
+	let tr (vinp, paths) = (vinp, (qsort lcmp paths)) in
+	map tr iorder2
+    then
     let get_info (v,sig) = (md_size v,sig) in
-    NOT (set_equal (map get_info iorder1) (map get_info iorder2)) => NONE |
+    (set_neq (map get_info iorder1') (map get_info iorder2')) => NONE |
     let mk_sub (spec_v,spec_sig) =
-	let p_v = rev_assoc spec_sig iorder2 in
+	let p_v = rev_assoc spec_sig iorder2' in
 	zip (md_expand_vector spec_v) (md_expand_vector p_v)
     in
-    let isub = flatmap mk_sub iorder1 then
+    let isub = flatmap mk_sub iorder1' then
     let spec'' = pexlif_ifc_substitute (osub@isub) spec then
     NOT (check_eq_by_sim spec'' p') => NONE |
     let imp' = pexlif_ifc_substitute (osub@isub) imp then
@@ -1943,11 +1996,8 @@ let get_specialized_imp spec imp p =
 ;
 
 
-let do_replace_first p db tr =
-    val (PINST nm attrs leaf fa_inps fa_outs ints (P_HIER (cp:cps))) = p in
-    val (TRANSFORM name sha_spec sha_imp just) = tr then
-    let spec = idv_load_pexlif (db_sname db) sha_spec then
-    let imp  = idv_load_pexlif (db_sname db) sha_imp then
+let do_replace_first parent spec imp =
+    val (PINST nm attrs leaf fa_inps fa_outs ints (P_HIER (cp:cps))) = parent in
     let o_imp' = get_specialized_imp spec imp cp then
     NOT (has_value o_imp') =>
 	eprintf "Transformation spec not an exact match in replace\n"
@@ -1978,11 +2028,8 @@ let replace_all parent spec imp =
     unfold_all_labeled tmp lbl
 ;
 
-let do_replace_everywhere repeat p db tr =
-    val (TRANSFORM name sha_spec sha_imp just) = tr then
-    let spec = idv_load_pexlif (db_sname db) sha_spec then
-    let imp  = idv_load_pexlif (db_sname db) sha_imp then
-    NOT repeat => replace_all p spec imp |
+let do_replace_everywhere repeat parent spec imp =
+    NOT repeat => replace_all parent spec imp |
     letrec do_replace cnt p =
 	cnt > 1000 =>
 	    (fprintf stdinfo "Reached max replace limit. Stopped replacing")
@@ -1992,10 +2039,11 @@ let do_replace_everywhere repeat p db tr =
 	let p' = replace_all p spec imp then
 	p == p' => p | do_replace (cnt+1) p'
     in
-    do_replace 1 p
+    do_replace 1 parent
 ;
 
 let fl_do_replacement canvas =
+  (
     let vfsm = w2vfsm canvas then
     let w = vfsm2id vfsm then
     let il = get_selected_pinsts canvas then
@@ -2021,8 +2069,10 @@ let fl_do_replacement canvas =
     let idx = (sscanf "%d" sidx)+1 then
     val (db,tr) = el idx alts then
     val (TRANSFORM name sha_spec sha_imp just) = tr then
+    let spec = idv_load_pexlif (db_sname db) sha_spec then
+    let imp  = idv_load_pexlif (db_sname db) sha_imp then
     op = "ApplyOnce" =>
-	let p'' = do_replace_first p' db tr then
+	let p'' = do_replace_first p' spec imp then
 	(add_transform canvas p'' (REPLACE il tr)) fseq
 	let cmd = sprintf "replace vis %s \"%s\";"
 		      (list2str T "[" "," "]" int2str il) name
@@ -2030,7 +2080,7 @@ let fl_do_replacement canvas =
 	(refresh_idv_canvas canvas cmd)
     |
     op = "ApplyEverywhere" =>
-	let res = do_replace_everywhere F parent db tr then
+	let res = do_replace_everywhere F parent spec imp then
 	(add_transform canvas res (REPLACE_ALL F tr)) fseq
 	let cmd = sprintf "replace_all vis %s \"%s\";"
 			  (list2str T "[" "," "]" int2str il) name
@@ -2038,7 +2088,7 @@ let fl_do_replacement canvas =
 	(refresh_idv_canvas canvas cmd)
     |
     op = "RepeatApplyEverywhere" =>
-	let res = do_replace_everywhere T parent db tr then
+	let res = do_replace_everywhere T parent spec imp then
 	(add_transform canvas res (REPLACE_ALL T tr)) fseq
 	let cmd = sprintf "replace_all vis %s \"%s\";"
 			  (list2str T "[" "," "]" int2str il) name
@@ -2046,8 +2096,35 @@ let fl_do_replacement canvas =
 	(refresh_idv_canvas canvas cmd)
     |
     eprintf "Illegal operation '%s'\n" op
+  ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
 ;
 export_to_tcl fl_do_replacement;
+
+let IDV_replace_selected il tr tr_sequence =
+    let db = get_rw_db () then
+    val (TRANSFORM p_name p_sha_spec p_sha_imp p_just) = tr_sequence then
+    let p_imp  = idv_load_pexlif (db_sname db) p_sha_imp then
+    let p_imp' = fold_pexlif p_imp il "_TMP_" then
+    val (TRANSFORM e_name e_sha_spec e_sha_imp e_just) = tr then
+    let spec = idv_load_pexlif (db_sname db) e_sha_spec then
+    let imp  = idv_load_pexlif (db_sname db) e_sha_imp then
+    let p_imp'' = do_replace_first p_imp' spec imp then
+    let just = REPLACE il tr then
+    TRANSFORM p_name p_sha_spec (idv_save_pexlif p_imp'') (p_just@[just])
+;
+
+let IDV_pattern_replace repeat tr tr_sequence =
+    let db = get_rw_db () then
+    val (TRANSFORM p_name p_sha_spec p_sha_imp p_just) = tr_sequence then
+    let p_imp  = idv_load_pexlif (db_sname db) p_sha_imp then
+    val (TRANSFORM e_name e_sha_spec e_sha_imp e_just) = tr then
+    let spec = idv_load_pexlif (db_sname db) e_sha_spec then
+    let imp  = idv_load_pexlif (db_sname db) e_sha_imp then
+    let p_imp' = do_replace_everywhere repeat p_imp spec imp then
+    let just = REPLACE_ALL repeat tr then
+    TRANSFORM p_name p_sha_spec (idv_save_pexlif p_imp') (p_just@[just])
+;
+
 
 // Invoked from fl_remove_active_sch_tab_window in draw_sch.fl
 let idv_finish_transformation canvas =
@@ -2163,6 +2240,7 @@ let make_theorem transform_name spec imp =
 ;
 
 let fl_save_verilog canvas name file only_netlist =
+  (
     let vfsm = w2vfsm canvas in
     let p = get_idv_current_pexlif canvas then
     let netlist = only_netlist = "1" then
@@ -2170,6 +2248,7 @@ let fl_save_verilog canvas name file only_netlist =
     let fp = fopen file "w" then
     (pexlif2verilog netlist fp p') fseq
     (fclose fp)
+  ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
 ;
 export_to_tcl fl_save_verilog;
 
@@ -2180,8 +2259,10 @@ let fl_save_pexlif canvas file =
 export_to_tcl fl_save_pexlif;
 
 let fl_write_pexlif canvas file =
+  (
     let p = get_idv_current_pexlif canvas then
     Emit_ASCII_pexlif file p
+  ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
 ;
 export_to_tcl fl_write_pexlif;
 
@@ -2210,6 +2291,7 @@ let has_unmapped p =
 ;
 
 let fl_do_selection_command canvas cmd =
+  (
     let vfsm = w2vfsm canvas then
     let rselection = vfsm2selection_r vfsm then
     let p = get_idv_current_pexlif canvas then
@@ -2249,6 +2331,7 @@ let fl_do_selection_command canvas cmd =
 	eprintf "Unknown selection command (%s)\n" cmd
     then
     set_selection canvas "SET_SELECTION" new_selection
+  ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
 ;
 export_to_tcl fl_do_selection_command;
 
@@ -2343,6 +2426,7 @@ let do_retime_fwd p ill =
 
 
 let fl_do_retime_fwd canvas =
+  (
     let vfsm = w2vfsm canvas then
     let il = get_selected_pinsts canvas then
     il = [] => () |
@@ -2353,6 +2437,7 @@ let fl_do_retime_fwd canvas =
 	sprintf "retime_fwd vis %s;" (list2str T "[" "," "]" int2str il)
     in
     refresh_idv_canvas canvas cmd
+  ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
 ;
 export_to_tcl fl_do_retime_fwd;
 
@@ -2362,32 +2447,54 @@ let do_wire2buffer wire p =
     let sz = md_size wire in
     let io = buid_io_tbl p then
     let name_db = build_name_db p then
-    let fanouts = wire2driven io wire then
-    let cnt = length fanouts in
-    let w_wire = W_EXPLICIT_VAR sz wire in
-    let mk_buf out = resize_pexlif sz ((W_EXPLICIT_VAR sz out) <- w_wire) in
-    let new_outs = map (get_unique_name name_db) (replicate cnt wire) then
-    let buf_pexlifs = map mk_buf new_outs then
     val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
-    let remain = gather cs ((1 upto length cs) subtract fanouts) then
-    let update_inp new idx =
-	let sp = el idx cs in
-	val (PINST sname sattrs slf sfa_inps sfa_outs sints sbody) = sp in
-	let sub = vec_zip [wire] [new] in
-	let rename (f,as) =
-	    let tr a = (hd (vec_assoc a sub)) catch a in
-	    f, (map tr as)
+    // First fanout to instances
+    val (ints', cs') =
+	let fanouts = wire2driven io wire then
+	let cnt = length fanouts in
+	let w_wire = W_EXPLICIT_VAR sz wire in
+	let mk_buf out = resize_pexlif sz ((W_EXPLICIT_VAR sz out) <- w_wire) in
+	let new_outs = map (get_unique_name name_db) (replicate cnt wire) then
+	let buf_pexlifs = map mk_buf new_outs then
+	let remain = gather cs ((1 upto length cs) subtract fanouts) then
+	let update_inp new idx =
+	    let sp = el idx cs in
+	    val (PINST sname sattrs slf sfa_inps sfa_outs sints sbody) = sp in
+	    let sub = vec_zip [wire] [new] in
+	    let rename (f,as) =
+		let tr a = (hd (vec_assoc a sub)) catch a in
+		f, (map tr as)
+	    in
+	    let sfa_inps' = map rename sfa_inps then
+	    PINST sname sattrs slf sfa_inps' sfa_outs sints sbody
 	in
-	let sfa_inps' = map rename sfa_inps then
-	PINST sname sattrs slf sfa_inps' sfa_outs sints sbody
+	let modified = map2 update_inp new_outs fanouts then
+	let cs' = buf_pexlifs @ modified @ remain then
+	let ints' = new_outs@ints then
+	(ints', cs')
     in
-    let modified = map2 update_inp new_outs fanouts then
-    let cs' = buf_pexlifs @ modified @ remain then
-    let ints' = new_outs@ints then
-    PINST name attrs lf fa_inps fa_outs ints' (P_HIER cs')
+    // Then fanouts to top-level outputs
+    val (fa_outs', new_ints, new_insts) = 
+	let outs = wire2outputs io wire then
+	outs = [] => (fa_outs, [], []) |
+	let new_out = get_unique_name name_db wire then
+	let sub = vec_zip [wire] [new_out] then
+	let rename (f,as) =
+	    let f' = (hd (vec_assoc f sub)) catch f then
+	    (f',as)
+	in
+	let fa_outs' = map rename fa_outs then
+	let w_wire = W_EXPLICIT_VAR sz wire in
+	let inst = resize_pexlif sz ((W_EXPLICIT_VAR sz new_out) <- w_wire) in
+	(fa_outs', [wire], [inst])
+    in
+    let cs'' = new_insts @ cs' in
+    let ints'' = setify (ints' @ new_ints) then
+    PINST name attrs lf fa_inps fa_outs' ints'' (P_HIER cs'')
 ;
 
 let fl_do_wire2buffer canvas =
+  (
     let vfsm = w2vfsm canvas in
     let p = get_idv_current_pexlif canvas then
     let selected_wires = md_extract_vectors (get_selected_wires vfsm) then
@@ -2399,6 +2506,7 @@ let fl_do_wire2buffer canvas =
 		(list2str T "[" "," "]" (sprintf "\"%s\"") selected_wires)
     then
     refresh_idv_canvas canvas cmd
+  ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
 ;
 export_to_tcl fl_do_wire2buffer;
 
@@ -2478,6 +2586,7 @@ let remove_wire p il =
 ;
 
 let fl_do_remove_wires canvas =
+  (
     let vfsm = w2vfsm canvas in
     let il = get_selected_pinsts canvas then
     il = [] => () |
@@ -2488,6 +2597,52 @@ let fl_do_remove_wires canvas =
 	sprintf "remove_wires vis %s;" (list2str T "[" "," "]" int2str il)
     in
     refresh_idv_canvas canvas cmd
+  ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
 ;
 export_to_tcl fl_do_remove_wires;
+
+let extract_pexlif p il =
+    let p' = fold_pexlif p il "_TMP_" then
+    val (PINST _ _ _ _ _ _ (P_HIER (c:cs))) = p' then
+    c
+;
+
+let get_current_selection {dummy :: void} =
+    get_selected_pinsts (get_current_canvas dummy)
+;
+non_lazy get_current_selection;
+
+
+let IDV_get_spec tr_sequence =
+    let db = get_rw_db () then
+    val (TRANSFORM name sha_spec sha_imp just) = tr_sequence then
+    idv_load_pexlif (db_sname db) sha_spec
+;   
+    
+let IDV_get_imp tr_sequence =
+    let db = get_rw_db () then
+    val (TRANSFORM name sha_spec sha_imp just) = tr_sequence then
+    idv_load_pexlif (db_sname db) sha_imp
+;   
+
+let IDV_show_pexlif p =
+    let w = get_new_idv_window () then
+    let rw_database = db_sname (hd (deref cur_idv_rw_transform_db)) then
+    (tcl_eval [sprintf "idv:create_idv_gui %s %s 1" w rw_database]) fseq
+    let vfsm = IDV_ENV w (ref []) (ref []) (ref []) (ref []) (ref []) in
+    (cur_vfsm := (vfsm:(deref cur_vfsm))) fseq
+    (register_vfsm vfsm w) fseq
+    (cur_transf_windowsr := ((w,vfsm):(deref cur_transf_windowsr))) fseq
+    start_new_transform p w
+;
+    
+    
+let IDV_show_spec tr_sequence =
+    IDV_show_pexlif (IDV_get_spec tr_sequence)
+;
+
+let IDV_show_imp tr_sequence =
+    IDV_show_pexlif (IDV_get_imp tr_sequence)
+;
+
 

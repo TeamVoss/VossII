@@ -37,6 +37,7 @@ void	    dbg_print_ilist(string msg, ilist_ptr ip);
 void	    dbg_print_sch_rec(sch_ptr sch, int indent);
 void	    DBG_print_ilist(ilist_ptr il);
 void	    DBG_print_vec_ptr(vec_ptr vp);
+void	    DBG_print_vec_info_ptr(vec_info_ptr vp);
 #endif
 
 #else /* EXPORT_FORWARD_DECL */

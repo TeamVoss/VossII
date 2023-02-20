@@ -3271,9 +3271,9 @@ mk_pinst(g_ptr redex)
     g_ptr name, attrs, gleaf, inps, outs, ints, content;
     EXTRACT_7_ARGS(redex, name, attrs, gleaf, inps, outs, ints, content);
     g_ptr ps;
-    hash_record assertion_tbl;
-    create_hash(&assertion_tbl, 100, str_hash, str_equ);
     if(is_P_HIER(content, &ps) ) {
+	hash_record assertion_tbl;
+	create_hash(&assertion_tbl, 100, str_hash, str_equ);
 	while( !IS_NIL(ps) ) {
 	    g_ptr p = GET_CONS_HD(ps);
 	    string wname;
@@ -3288,22 +3288,24 @@ mk_pinst(g_ptr redex)
 	    }
 	    ps = GET_CONS_TL(ps);
 	}
-    }
-    if( hash_size(&assertion_tbl) != 0 ) {
-	g_ptr cur = ints;
-	INC_REFCNT(ints);
-	while( !IS_NIL(cur) ) {
-	    string wname = GET_STRING(GET_CONS_HD(cur));
-	    if( find_hash(&assertion_tbl, wname) != NULL ) {
-		delete_hash(&assertion_tbl, wname);
+	if( hash_size(&assertion_tbl) != 0 ) {
+	    g_ptr cur = ints;
+	    INC_REFCNT(ints);
+	    while( !IS_NIL(cur) ) {
+		string wname = GET_STRING(GET_CONS_HD(cur));
+		if( find_hash(&assertion_tbl, wname) != NULL ) {
+		    delete_hash(&assertion_tbl, wname);
+		}
+		cur = GET_CONS_TL(cur);
 	    }
-	    cur = GET_CONS_TL(cur);
+	    cur_ints = ints;
+	    scan_hash(&assertion_tbl, add_assertion_declarations);
+	    ints = cur_ints;
 	}
-	cur_ints = ints;
-	scan_hash(&assertion_tbl, add_assertion_declarations);
-	ints = cur_ints;
+	dispose_hash(&assertion_tbl, NULLFCN);
+    } else {
+	// Possible enhancement: Make internal signals in leaves anonymous
     }
-    dispose_hash(&assertion_tbl, NULLFCN);
     string fp_sig = compute_fp_pinst(inps, outs, ints, content);
     string sha_sig = compute_sha_pinst(name, inps, outs, ints, content);
     attrs = strip_signatures(attrs);

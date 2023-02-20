@@ -241,6 +241,35 @@ forward_declare {w_CASE :: wexpr ->
 			   wexpr ->
 			   pexlif};
 
+// Make a PINST from lhs/rhs wexpr in which we use anonymous names for the
+// internal signals (so all same leaves will have identical SHA signatures)
+let mk_pinst opt_pfn {lhs::wexpr} {rhs::wexpr} =
+    let dep_vars = (w_depends rhs) in
+    let nsub =
+	let mk_sub n i =
+	    let anon = mk_name (md_size n) (sprintf "i%d" i) in
+	    (n,anon)
+	in
+	map2 mk_sub dep_vars (1 upto (length dep_vars))
+    then
+    let wsub =
+	let mk_sub n i =
+	    let anon = mk_name (md_size n) (sprintf "i%d" i) in
+	    (n,anon)
+	in
+	map2 mk_sub dep_vars (1 upto (length dep_vars))
+    then
+    let inps = map (\(a,f).(f,[a])) nsub in
+    let driven = base_get_lhs_vars lhs in
+    let sz = special_md_sizes driven in
+    let lhs' = W_VAR sz "o" in
+    let outs = [(mk_name sz "o", driven)] in
+    let rhs' = w_substitute wsub rhs then
+    let body = P_LEAF [W_UPDATE_FN lhs' rhs'] then
+    let pfn = has_value opt_pfn => get_value opt_pfn | mk_draw_cmd F rhs then
+    PINST pfn [] T inps outs [] body
+;
+
 let base_assignment do_split lhs rhs =
     let l_sz = wexpr_size lhs in
     let r_sz = wexpr_size rhs in
@@ -252,29 +281,8 @@ let base_assignment do_split lhs rhs =
 	eprintf "%s is not a valid lhs expression" (Pwexpr lhs)
     |
     let rhs = const_prop rhs in
-    let mk_pinst {lhs::wexpr} {rhs::wexpr} =
-        let dep_vars = (w_depends rhs) in
-        let inps = map (\n.n,[n]) dep_vars in
-        let driven = base_get_lhs_vars lhs in
-        let sz = special_md_sizes driven in
-        let lhs' = W_VAR sz "_tmp" in
-        let outs = [(mk_name sz "_tmp", driven)] in
-        let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
-        let pfn = mk_draw_cmd F rhs in
-        PINST pfn [] T inps outs [] body
-    in
-    NOT do_split => mk_pinst lhs rhs |
+    NOT do_split => mk_pinst NONE lhs rhs |
     //
-    let mk_pinst_w_order lhs rhs inps =
-	let inps = map (\n.n,[n]) (flatmap w_depends (rev inps)) in
-        let driven = base_get_lhs_vars lhs in
-        let sz = special_md_sizes driven in
-        let lhs' = W_VAR sz "_tmp" in
-        let outs = [(mk_name sz "_tmp", driven)] in
-        let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
-        let pfn = mk_draw_cmd F rhs in
-        PINST pfn [] T inps outs [] body
-    in
     let id_cnt_ref = ref 1 then
     let internals = ref [] then
     let mk_tmp sz =
@@ -292,7 +300,7 @@ let base_assignment do_split lhs rhs =
 		let p1 = split mid a then
 		(mid, p1)
 	    in
-	    let p = mk_pinst lhs (W_ADD (W_CONST sz v) a') then
+	    let p = mk_pinst NONE lhs (W_ADD (W_CONST sz v) a') then
 	    p1@[p]
      /\    split lhs (W_ADD a (W_CONST sz v)) assuming (v < 10)  =
 	    val (a',p1) = is_var a => (a,[]) |
@@ -300,7 +308,7 @@ let base_assignment do_split lhs rhs =
 		let p1 = split mid a then
 		(mid, p1)
 	    in
-	    let p = mk_pinst lhs (W_ADD a' (W_CONST sz v)) then
+	    let p = mk_pinst NONE lhs (W_ADD a' (W_CONST sz v)) then
 	    p1@[p]
      /\    split lhs (W_SUB a (W_CONST sz v)) assuming (v < 10)  =
 	    val (a',p1) = is_var a => (a,[]) |
@@ -308,7 +316,7 @@ let base_assignment do_split lhs rhs =
 		let p1 = split mid a then
 		(mid, p1)
 	    in
-	    let p = mk_pinst lhs (W_SUB a' (W_CONST sz v)) then
+	    let p = mk_pinst NONE lhs (W_SUB a' (W_CONST sz v)) then
 	    p1@[p]
      /\    split lhs (W_GR a (W_CONST sz v)) assuming (v < 10)  =
 	    val (a',p1) = is_var a => (a,[]) |
@@ -316,7 +324,7 @@ let base_assignment do_split lhs rhs =
 		let p1 = split mid a then
 		(mid, p1)
 	    in
-	    let p = mk_pinst lhs (W_GR a' (W_CONST sz v)) then
+	    let p = mk_pinst NONE lhs (W_GR a' (W_CONST sz v)) then
 	    p1@[p]
      /\    split lhs (W_GR (W_CONST sz v) a) assuming (v < 10)  =
 	    val (a',p1) = is_var a => (a,[]) |
@@ -324,7 +332,7 @@ let base_assignment do_split lhs rhs =
 		let p1 = split mid a then
 		(mid, p1)
 	    in
-	    let p = mk_pinst lhs (W_GR (W_CONST sz v) a') then
+	    let p = mk_pinst NONE lhs (W_GR (W_CONST sz v) a') then
 	    p1@[p]
      /\    split lhs op assuming (is_wide_OR op) =
 		letrec split_OR (W_OR a b) = split_OR a @ split_OR b
@@ -342,15 +350,9 @@ let base_assignment do_split lhs rhs =
 		let p =
 		    let rhs = accumulate W_OR as in
 		    let dep_vars = md_extract_vectors (w_depends rhs) in
-		    let inps = map (\n.n,[n]) dep_vars in
-		    let driven = base_get_lhs_vars lhs in
-		    let sz = special_md_sizes driven in
-		    let lhs' = W_VAR sz "_tmp" in
-		    let outs = [(mk_name sz "_tmp", driven)] in
-		    let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
 		    let n = length dep_vars in
 		    let pfn = sprintf "draw_explicit_or_n %d" n in
-		    PINST pfn [] T inps outs [] body
+		    mk_pinst (SOME pfn) lhs rhs
 		in
 		p:ps
      /\    split lhs (W_NOT op) assuming (is_wide_OR op) =
@@ -369,15 +371,9 @@ let base_assignment do_split lhs rhs =
 		let p =
 		    let rhs = W_NOT (accumulate W_OR as) in
 		    let dep_vars = md_extract_vectors (w_depends rhs) in
-		    let inps = map (\n.n,[n]) dep_vars in
-		    let driven = base_get_lhs_vars lhs in
-		    let sz = special_md_sizes driven in
-		    let lhs' = W_VAR sz "_tmp" in
-		    let outs = [(mk_name sz "_tmp", driven)] in
-		    let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
 		    let n = length dep_vars in
 		    let pfn = sprintf "draw_explicit_nor_n %d" n in
-		    PINST pfn [] T inps outs [] body
+		    mk_pinst (SOME pfn) lhs rhs
 		in
 		p:ps
      /\    split lhs op assuming (is_wide_AND op) =
@@ -396,15 +392,9 @@ let base_assignment do_split lhs rhs =
 		let p =
 		    let rhs = accumulate W_AND as in
 		    let dep_vars = md_extract_vectors (w_depends rhs) in
-		    let inps = map (\n.n,[n]) dep_vars in
-		    let driven = base_get_lhs_vars lhs in
-		    let sz = special_md_sizes driven in
-		    let lhs' = W_VAR sz "_tmp" in
-		    let outs = [(mk_name sz "_tmp", driven)] in
-		    let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
 		    let n = length dep_vars in
 		    let pfn = sprintf "draw_explicit_and_n %d" n in
-		    PINST pfn [] T inps outs [] body
+		    mk_pinst (SOME pfn) lhs rhs
 		in
 		p:ps
      /\    split lhs (W_NOT op) assuming (is_wide_AND op) =
@@ -423,15 +413,9 @@ let base_assignment do_split lhs rhs =
 		let p =
 		    let rhs = W_NOT (accumulate W_AND as) in
 		    let dep_vars = md_extract_vectors (w_depends rhs) in
-		    let inps = map (\n.n,[n]) dep_vars in
-		    let driven = base_get_lhs_vars lhs in
-		    let sz = special_md_sizes driven in
-		    let lhs' = W_VAR sz "_tmp" in
-		    let outs = [(mk_name sz "_tmp", driven)] in
-		    let body = P_LEAF [W_UPDATE_FN lhs' rhs] in
 		    let n = length dep_vars in
 		    let pfn = sprintf "draw_explicit_nand_n %d" n in
-		    PINST pfn [] T inps outs [] body
+		    mk_pinst (SOME pfn) lhs rhs
 		in
 		p:ps
      /\    split lhs op assuming (is_LEQ op) =
@@ -447,7 +431,7 @@ let base_assignment do_split lhs rhs =
 		(mid, p1)
 	    in
 	    let op' = W_NOT (W_GR a' b') in
-	    let p = mk_pinst lhs op' then
+	    let p = mk_pinst NONE lhs op' then
 	    p1@p2@[p]
      /\    split lhs op assuming (is_XOR op) =
 	    val [a,b] = dest_XOR op in
@@ -462,7 +446,7 @@ let base_assignment do_split lhs rhs =
 		(mid, p1)
 	    in
 	    let op' = W_OR (W_AND (W_NOT a') b') (W_AND a' (W_NOT b')) in
-	    let p = mk_pinst lhs op' then
+	    let p = mk_pinst NONE lhs op' then
 	    p1@p2@[p]
      /\    split lhs op assuming (is_binary op) =
 	    val (constr, a, b) = split_binary op then
@@ -476,7 +460,7 @@ let base_assignment do_split lhs rhs =
 		let p1 = split mid b then
 		(mid, p1)
 	    in
-	    let p = mk_pinst lhs (constr a' b') then
+	    let p = mk_pinst NONE lhs (constr a' b') then
 	    p1@p2@[p]
      /\    split lhs e assuming (is_case e) =
 	    let raw_cases = get_cases e then
@@ -521,7 +505,7 @@ let base_assignment do_split lhs rhs =
 		let p1 = split mid b then
 		(mid, p1)
 	    in
-	    let p = mk_pinst_w_order lhs (W_ITE c' a' b') [b',a',c'] then
+	    let p = mk_pinst NONE lhs (W_ITE c' a' b') then
 	    p0@p1@p2@[p]
      /\    split lhs (W_SX sz e) =
 	    val (e',p0) = is_var e => (e,[]) |
@@ -529,7 +513,7 @@ let base_assignment do_split lhs rhs =
 		let p0 = split mid e then
 		(mid, p0)
 	    in
-	    let p = mk_pinst lhs (W_SX sz e') in
+	    let p = mk_pinst NONE lhs (W_SX sz e') in
 	    p0@[p]
      /\    split lhs (W_ZX sz e) =
 	    val (e',p0) = is_var e => (e,[]) |
@@ -537,7 +521,7 @@ let base_assignment do_split lhs rhs =
 		let p0 = split mid e then
 		(mid, p0)
 	    in
-	    let p = mk_pinst lhs (W_ZX sz e') in
+	    let p = mk_pinst NONE lhs (W_ZX sz e') in
 	    p0@[p]
      /\    split lhs (W_SLICE indices e) =
 	    val (e',p0) = is_var e => (e,[]) |
@@ -545,7 +529,7 @@ let base_assignment do_split lhs rhs =
 		let p0 = split mid e then
 		(mid, p0)
 	    in
-	    let p = mk_pinst lhs (W_SLICE indices e') in
+	    let p = mk_pinst NONE lhs (W_SLICE indices e') in
 	    p0@[p]
      /\    split lhs (W_NAMED_SLICE name indices e) =
 	    val (e',p0) = is_var e => (e,[]) |
@@ -553,7 +537,7 @@ let base_assignment do_split lhs rhs =
 		let p0 = split mid e then
 		(mid, p0)
 	    in
-	    let p = mk_pinst lhs (W_NAMED_SLICE name indices e') in
+	    let p = mk_pinst NONE lhs (W_NAMED_SLICE name indices e') in
 	    p0@[p]
      /\    split lhs (W_UPDATE_NAMED_SLICE b name indices n) =
 	    val (b',p1) = is_simple_var b => (b,[]) |
@@ -566,9 +550,9 @@ let base_assignment do_split lhs rhs =
 		let p2 = split mid n then
 		(mid, p2)
 	    in
-	    let p = mk_pinst lhs (W_UPDATE_NAMED_SLICE b' name indices n') then
+	    let p = mk_pinst NONE lhs (W_UPDATE_NAMED_SLICE b' name indices n') then
 	    p1@p2@[p]
-     /\    split lhs rhs = [mk_pinst lhs rhs]
+     /\    split lhs rhs = [mk_pinst NONE lhs rhs]
     in
     let subfubs = split lhs rhs then
     length subfubs = 1 => hd subfubs |

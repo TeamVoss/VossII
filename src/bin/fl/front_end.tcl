@@ -35,11 +35,14 @@ if {! [catch {glob "~/.VossII.Xdefaults"} x_resources]} {
 # Make sure we use a 72dpi independent of the display
 tk scaling 1.0
 
+option add *Dialog.msg.wrapLength 20c 
+option add *Dialog.dtl.wrapLength 20c
+
 # Counter for return results for fl callbacks
 set ::result_id 0
 
 set my_pid [pid]
-util:watch_process $fl_pid 300 [list exec kill -9 $my_pid]
+util:watch_process $fl_pid 300 [list exec kill -9 $my_pid] 1
 
 set x_selection         ""
 
@@ -200,6 +203,37 @@ proc voss2_interrupt_action {} {
     
     return $::interrupt_choice
 }
+
+# Called from fl
+proc voss2_recursion_limit_override {} {
+    set w .voss2_recursion_limit
+    catch {destroy $w}
+    toplevel $w
+
+    wm title $w "VossII Recursion Limit"
+    wm iconname $w "VossII Recursion Limit"
+    regexp {[0-9]*x[0-9]*\+([0-9]*)\+([0-9]*)} [winfo geometry .] --> dx dy
+    wm geometry $w +$dx+$dy
+
+    label $w.l -text "Recursion limit reached"
+    pack $w.l -side top -pady 4 -fill x -expand yes
+
+    button $w.c -text "Double limit" -command {set ::recursion_limit_choice d}
+    pack $w.c -side top -pady 2 -fill x -expand yes
+
+    button $w.s -text "Abort" -command {set ::recursion_limit_choice a}
+    pack $w.s -side top -pady 2 -fill x -expand yes
+
+    button $w.x -text "Exit VossII" -command {set ::recursion_limit_choice x}
+    pack $w.x -side top -pady 2 -fill x -expand yes
+
+    update
+    tkwait variable ::recursion_limit_choice
+    destroy $w
+
+    return $::recursion_limit_choice
+}
+
 
 
 proc simulation_start {start_time end_time} {
@@ -854,7 +888,16 @@ create_voss2_top_level_txtwin "$voss2_top_level.t" "$voss2_top_level.s"
 
 #-----------------------------------------------------------------------
 
-proc old_bgerror {msg} {
+proc bgerror {msg} {
+
+    # Cancel all delayed (after) commands
+    foreach id [after info] {
+	if ![info exists ::persistent_afters($id)] {
+	    after cancel $id
+	}
+    }
+
+    catch make_all_active
 
     # Release grabs
     if {[grab current .] != ""} {
@@ -871,9 +914,12 @@ proc old_bgerror {msg} {
     puts stderr [concat Error: $msg]
     puts stderr [concat Stack trace: $info]
 
+
+    set short_msg [join [lrange [split $msg "\n"] 0 3] "\n"]
+
     switch [tk_dialog .error "Error in Fl/tcl/tk script" \
-		    "Error: $msg" error 0 Ok Details ] {
-	0	{ voss2_set_cursor {} ;  return }
+		    "Error: $short_msg" error 0 Ok Details ] {
+	0	{ return }
     }
 
     set w .errorMsg
@@ -998,6 +1044,7 @@ proc WriteInfo {line} {
 
 proc WriteStdErr {txt} {
     WriteOutput "stderr_color" $txt
+    make_all_active
 }
 
 proc WriteWarning {txt} {

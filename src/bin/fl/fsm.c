@@ -4857,7 +4857,7 @@ ilist_is_user_defined(ilist_ptr il)
 static ilist_ptr
 vec2indices(string name)
 {
-    vec_ptr vp0 = split_vector_name(vec_rec_mgrp, range_rec_mgrp, name);
+   vec_ptr vp0 = split_vector_name(vec_rec_mgrp, range_rec_mgrp, name);
     string sig = get_vector_signature(vp0);
     vec_info_ptr ip = (vec_info_ptr) find_hash(all_name_tblp, sig);
     while( ip != NULL ) {
@@ -8421,6 +8421,17 @@ base_print_ilist(ilist_ptr il)
 }
 
 void
+DBG_print_vec_info_ptr(vec_info_ptr vp)
+{
+    FP(err_fp, " vec_info_ptr:");
+    while( vp != NULL ) {
+	FP(err_fp, " %s", vp->local_name);
+	vp = vp->next;
+    }
+    FP(err_fp, "\n");
+}
+
+void
 DBG_print_ilist(ilist_ptr il)
 {
     FP(err_fp, " ilist:");
@@ -8561,7 +8572,7 @@ nn_cmp(const void *pi, const void *pj)
 static bool
 is_draw_fub(vis_ptr vp)
 {
-    return( strncmp(vp->pfn, "draw_fub ", strlen("draw_fub ")) == 0 );
+    return( strstr(vp->pfn, "draw_fub ") != NULL );
 }
 
 static vis_ptr

@@ -7,7 +7,7 @@
 # Constants
 # ---------------------------------------------------
 
-proc idv:create_idv_gui {w rw_db} {
+proc idv:create_idv_gui {w rw_db read_only} {
     catch {destroy $w}
     toplevel $w
     wm geometry $w -20+100
@@ -18,7 +18,7 @@ proc idv:create_idv_gui {w rw_db} {
     pack $nb -side top -expand y -fill both
     set ::sch_window_cnt($w) 0
     bindtags $w top_level_idv_window
-    bind top_level_idv_window <Destroy> idv:close_idv_gui
+    bind top_level_idv_window <Destroy> "list idv:close_idv_gui $read_only"
     $nb add [frame $nb.idv] -text "IDV Home"
 
     # Now make the front page
@@ -155,8 +155,9 @@ proc idv:create_idv_gui {w rw_db} {
 	idv:update_idv_list
 }
 
-proc idv:close_idv_gui {} {
+proc idv:close_idv_gui {readonly} {
     catch {unset ::idv}
+    if { $readonly == 1 } { return }
     fl_save_idv_db exit
 }
 
@@ -878,6 +879,12 @@ proc idv:make_top_info_window { title } {
 
 proc idv:make_info_window {title make_container} {
     incr ::idv(info_window_cnt)
+    if ![info exists ::idv(info_window)] {
+	idv:make_top_info_window $title
+    }
+    if ![winfo exists $::idv(info_window)] {
+	idv:make_top_info_window $title
+    }
     set f $::idv(info_window).f$::idv(info_window_cnt)
     catch {destroy $f}
     if { $make_container == 1 } {

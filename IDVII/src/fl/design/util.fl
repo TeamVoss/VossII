@@ -1,3 +1,6 @@
+(cload (DIR^"../../../../vosslib/vector_names.fl")) fseq ();
+fprintf stdinfo ".";
+
 //-------------------------------------------------------------------
 // Copyright 2020 Carl-Johan Seger
 // SPDX-License-Identifier: Apache-2.0
@@ -547,10 +550,20 @@ let extract_pexlif_hierarchy pexlif hierarchy =
 
 let w_substitute sub we =
     letrec do (W_VAR sz b) =
-	let n = mk_name sz b in
-	(assoc n sub) catch (W_VAR sz b)
+	(
+	    let n = mk_name sz b in
+	    let ns = vec_assoc n sub then
+	    length ns = 1 => (W_EXPLICIT_VAR sz (hd ns)) |
+	    W_CAT (map (\n. W_EXPLICIT_VAR (md_size n) n) ns)
+	) catch
+	(W_VAR sz b)
      /\     do (W_EXPLICIT_VAR sz n) =
-	(assoc n sub) catch (W_EXPLICIT_VAR sz n)
+	(
+	    let ns = vec_assoc n sub then
+	    length ns = 1 => (W_EXPLICIT_VAR sz (hd ns)) |
+	    W_CAT (map (\n. W_EXPLICIT_VAR (md_size n) n) ns)
+	) catch
+	(W_EXPLICIT_VAR sz n)
      /\     do (W_AND a b) = W_AND (do a) (do b)
      /\     do (W_LAT_LEQ a b) = W_LAT_LEQ (do a) (do b)
      /\     do (W_OR a b)  = W_OR (do a) (do b)

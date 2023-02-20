@@ -408,6 +408,33 @@ proc nb:tab2c {w name} {
     error "No tab named $name in notebook under $w"
 }
 
+proc sc:show_draw_info {c} {
+    catch {destroy .draw_info}
+    toplevel .draw_info
+    label  .draw_info.l  -text "Drawing network..." -font $::voss2_txtfont6
+    pack .draw_info.l  -side top -expand yes -fill both
+    wm withdraw .draw_info
+    update
+    if [winfo exists .draw_info] {
+	set x [expr {([winfo screenwidth $c]-[winfo width .draw_info])/2}]
+	set y [expr {([winfo screenheight $c]-[winfo height .draw_info])/2}]
+	wm geometry  .draw_info +$x+$y
+	wm transient .draw_info $c
+	wm deiconify .draw_info
+	update
+    }
+}
+
+proc sc:remove_draw_info {c} {
+    after cancel $::sch_info(idle_id,$c)
+    catch {destroy .draw_info}
+    i_am_free
+}
+
+proc sc:prepare_draw_info {c} {
+    set ::sch_info(idle_id,$c) [after 500 [list sc:show_draw_info $c]]
+}
+
 proc get_new_sch_canvas {w draw_level instance_hier {name ""}} {
     set nb $w.nb
     incr ::sch_window_cnt($w)
@@ -799,6 +826,11 @@ proc cb:sch_canvas_menu {c wx wy sx sy} {
 	$m add command -label "Show RTL" \
 	    -command "after idle \
 		[list fl_show_rtl $c $::sch_info(draw_level,$c) $nodes]"
+
+	$m add command -label "Info" \
+	    -command "after idle \
+			[list fl_show_info $c $::tag2inst_nbr($c,$nodes)]"
+
 	set mm $m.mark
 	catch {destroy $mm}
 	menu $mm -tearoff 0

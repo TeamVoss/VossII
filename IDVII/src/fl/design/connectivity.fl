@@ -196,11 +196,13 @@ let pt2outs ptlist =
 
 let wire2driver ios wire = setify (pt2insts (get_pt_fanin ios wire));
 
-let wires2drivers ios wires =
-    setify (flatmap (wire2driver ios) wires)
-;
+let wires2drivers ios wires = setify (flatmap (wire2driver ios) wires);
 
 let wire2driven ios wire = setify (pt2insts (get_pt_fanout ios wire));
+
+let wire2input ios wire = setify (pt2inps (get_pt_fanout ios wire));
+
+let wire2outputs ios wire = setify (pt2outs (get_pt_fanout ios wire));
 
 let inst_fanin ios idx =
     let p = io_get_child ios idx in

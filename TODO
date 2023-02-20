@@ -45,6 +45,7 @@ TODO to move Voss to ">=" Forte/ReFlect.
 
 12) Add an efficient GSTE engine.
 
+13) Create a regression test environment based on Quick check.
 
 DONE: 
 =====

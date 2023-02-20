@@ -2863,6 +2863,23 @@ do_trace_dbg(int pfn, g_ptr root)
 #define DO_TRACE_DBG()	PRIM_DO_TRACE_DBG()
 #endif
 
+static bool
+Handle_Recursion_Limits()
+{
+    if( !gui_mode ) { return FALSE; }
+    while(1) {
+	char buf[50];
+	string s;
+	sprintf(buf, "voss2_recursion_limit_override");
+	Send_to_tcl(buf, &s);
+	switch( *s ) {
+		case 'd': return TRUE;
+		case 'x': Exit(2);
+		case 'a': return FALSE;
+		default: break;
+	}
+    }
+}
 
 g_ptr
 traverse_left(g_ptr oroot)
@@ -2882,9 +2899,13 @@ traverse_left(g_ptr oroot)
 
     Call_level++;
     if( COUNT_BUF(&fn_trace_buf) >= (unint) RCcall_limit ) {
-	Fail_pr("\n");
-	Rprintf("Recursion limit reached (RECURSION-CALL-LIMIT=%d)\n",
-		RCcall_limit);
+	if( Handle_Recursion_Limits() ) {
+	    RCcall_limit = RCcall_limit*2;
+	} else {
+	    Fail_pr("\n");
+	    Rprintf("Recursion limit reached (RECURSION-CALL-LIMIT=%d)\n",
+		    RCcall_limit);
+	}
     }
     if( root == NULL ) {
 	goto ret;
@@ -4696,7 +4717,7 @@ graph_hash_rec(g_ptr node, unsigned int n)
 {
     pointer tmp;
     unsigned int res = 1;
-    unsigned int res1, res2;
+    unsigned int bres, res1, res2;
   restart_walk:
     if( node == NULL )
 	return res;
@@ -4708,14 +4729,16 @@ graph_hash_rec(g_ptr node, unsigned int n)
 	case APPLY_ND:
 	    res1 = graph_hash_rec( GET_APPLY_LEFT(node), n);
 	    res2 = graph_hash_rec( GET_APPLY_RIGHT(node), n);
-	    res = (res + 1619*res1 + 883*res2) % n;
-	    insert_hash(&hash_comp_tbl, (pointer) node, INT2PTR(res));
+	    bres = (1619*res1 + 883*res2) % n;
+	    insert_hash(&hash_comp_tbl, (pointer) node, INT2PTR(bres));
+	    res = (res + bres) % n;
 	    return res;
 	case CONS_ND:
 	    res1 = graph_hash_rec( GET_CONS_HD(node), n);
 	    res2 = graph_hash_rec( GET_CONS_TL(node), n);
-	    res = (res + 4877*res1 + 769*res2) % n;
-	    insert_hash(&hash_comp_tbl, (pointer) node, INT2PTR(res));
+	    bres = (4877*res1 + 769*res2) % n;
+	    insert_hash(&hash_comp_tbl, (pointer) node, INT2PTR(bres));
+	    res = (res + bres) % n;
 	    return res;
 	case LEAF:
 	    if( IS_PRIM_FN(node) && GET_PRIM_FN(node) == P_REF_VAR ) {
@@ -4725,36 +4748,37 @@ graph_hash_rec(g_ptr node, unsigned int n)
 	    }
 	    switch( GET_LEAF_TYPE(node) ) {
 		case INT:
-		    res = (res + Arbi_hash(GET_AINT(node), n)) % n;
+		    bres = (Arbi_hash(GET_AINT(node), n)) % n;
 		    break;
 		case STRING:
-		    res = (res + str_hash(GET_STRING(node), n)) % n;
+		    bres = (str_hash(GET_STRING(node), n)) % n;
 		    break;
 		case BOOL:
-		    res = (res + (unsigned int) GET_BOOL(node)) % n;
+		    bres = ((unsigned int) GET_BOOL(node)) % n;
 		    break;
 		case BEXPR:
-		    res = (res + PTR2UINT(GET_BEXPR(node))) % n;
+		    bres = (PTR2UINT(GET_BEXPR(node))) % n;
 		    break;
 		case EXT_OBJ: {
 		    unint class = GET_EXT_OBJ_CLASS(node);
 		    // This is simplistic.
 		    // I should add a hash_fn for all EXT_OBJs to reduce
 		    // collisions!
-		    res = (res + 17*class) % n;
+		    bres = (17*class) % n;
 		    break;
 		}
 		case PRIM_FN:
 		    if( IS_EXTAPI_FN(node) ) {
-			res = (res+947*((unsigned int)GET_EXTAPI_FN(node))) % n;
+			bres = (947*((unsigned int)GET_EXTAPI_FN(node))) % n;
 		    } else {
-			res = (res+5*((unsigned int)GET_PRIM_FN(node))) % n;
+			bres = (5*((unsigned int)GET_PRIM_FN(node))) % n;
 		    }
 		    break;
 		default:
 		    DIE("Unexpected leaf node type in Graph_hash");
 	    }
-	    insert_hash(&hash_comp_tbl, (pointer) node, INT2PTR(res));
+	    insert_hash(&hash_comp_tbl, (pointer) node, INT2PTR(bres));
+	    res = (res + bres) % n;
 	    return res;
 	default:
 	    DIE("Should never happen");
@@ -4776,7 +4800,8 @@ Graph_equ(pointer p1, pointer p2)
 {
     g_ptr g1 = (g_ptr) p1;
     g_ptr g2 = (g_ptr) p2;
-    return( Is_equal(g1, g2, TRUE) == B_One() );
+    formula res = Is_equal(g1, g2, TRUE);
+    return( res == B_One() );
 }
 
 formula
