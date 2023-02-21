@@ -81,7 +81,7 @@ let bifrost_load pgm =
 
 // Protocol adapters
 
-let bifrost_adapter_twophase =
+let bifrost_tx_twophase =
   bit_input clk.
   bit_input reset.
   bit_input run.
@@ -93,7 +93,7 @@ let bifrost_adapter_twophase =
   bit_internal was_req.
   bit_internal was_ack.
   bit_internal sent.
-  CELL "bifrost_adapter_twophase" [
+  CELL "bifrost_tx_twophase" [
     re_ff_sreset clk reset ack was_ack,
     re_ff_sreset clk reset req was_req,
     re_ff_sreset clk reset ((run '|' sent) '&' hold) sent,
@@ -102,7 +102,7 @@ let bifrost_adapter_twophase =
     done <- run '&' ('~' (req '^' ack))
     ];
 
-let bifrost_adapter_fourphase =
+let bifrost_tx_fourphase =
   bit_input clk.
   bit_input reset.
   bit_input run.
@@ -113,7 +113,7 @@ let bifrost_adapter_fourphase =
   bit_output done.
   bit_internal was_ack.
   bit_internal still_done.
-  CELL "bifrost_adapter_fourphase" [
+  CELL "bifrost_tx_fourphase" [
     re_ff_sreset clk reset ack was_ack,
     re_ff_sreset clk reset (done '&' hold) still_done,
     req <- run '&' ('~' was_ack) '&' (ack '|' ('~' done)),
@@ -121,7 +121,7 @@ let bifrost_adapter_fourphase =
     done <- still_done '|' latch
     ];
 
-let bifrost_adapter_pulseecho =
+let bifrost_tx_pulseecho =
   bit_input clk.
   bit_input reset.
   bit_input run.
@@ -132,7 +132,7 @@ let bifrost_adapter_pulseecho =
   bit_output done.
   bit_internal sent.
   bit_internal still_done.
-  CELL "bifrost_adapter_pulseecho" [
+  CELL "bifrost_tx_pulseecho" [
     re_ff_sreset clk reset ((sent '|' req) '&' hold) sent,
     re_ff_sreset clk reset (done '&' hold) still_done,
     req <- run '&' ('~' sent),
@@ -140,7 +140,7 @@ let bifrost_adapter_pulseecho =
     done <- still_done '|' ack
     ];
 
-let bifrost_adapter_validready =
+let bifrost_tx_validready =
   bit_input clk.
   bit_input reset.
   bit_input run.
@@ -150,10 +150,25 @@ let bifrost_adapter_validready =
   bit_output latch.
   bit_output done.
   bit_internal still_done.
-  CELL "bifrost_adapter_validready" [
+  CELL "bifrost_tx_validready" [
     re_ff_sreset clk reset (done '&' hold) still_done,
     req <- run '&' ('~' still_done),
     latch <- req '&' ack,
     done <- still_done '|' latch
     ];
 
+let bifrost_rx_twophase =
+  bit_input clk.
+  bit_input reset.
+  bit_input done.
+  bit_input req.
+  bit_output ack.
+  bit_output start.
+  bit_internal was_req.
+  bit_internal was_ack.
+  CELL "bifrost_rx_twophase" [
+    re_ff_sreset clk reset req was_req,
+    re_ff_sreset clk reset ack was_ack,
+    ack <- was_ack '^' done,
+    start <- req '^' was_req
+    ];
