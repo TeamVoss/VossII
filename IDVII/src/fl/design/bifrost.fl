@@ -157,6 +157,22 @@ let bifrost_tx_validready =
     done <- still_done '|' latch
     ];
 
+let bifrost_rx_fourphase =
+  bit_input clk.
+  bit_input reset.
+  bit_input done.
+  bit_input req.
+  bit_output ack.
+  bit_output start.
+  bit_output may_continue.
+  bit_internal was_req.
+  CELL "bifrost_rx_fourphase" [
+    re_ff_sreset clk reset req was_req,
+    ack <- done,
+    start <- req '^' was_req,
+    may_continue <- '~' req
+    ];
+
 let bifrost_rx_twophase =
   bit_input clk.
   bit_input reset.
@@ -164,11 +180,13 @@ let bifrost_rx_twophase =
   bit_input req.
   bit_output ack.
   bit_output start.
+  bit_output may_continue.
   bit_internal was_req.
   bit_internal was_ack.
   CELL "bifrost_rx_twophase" [
     re_ff_sreset clk reset req was_req,
     re_ff_sreset clk reset ack was_ack,
     ack <- was_ack '^' done,
-    start <- req '^' was_req
+    start <- req '^' was_req,
+    may_continue <- '1
     ];
