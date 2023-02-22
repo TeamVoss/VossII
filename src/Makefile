@@ -39,8 +39,6 @@ DOC_DIR := $(ROOT_DIR)/doc
 MINISAT_DIR := $(SRC_DIR)/external/minisat
 # Yosys write_pexlif backend source
 YOSYS_WRITE_PEXLIF := $(SRC_DIR)/external/yosys/write_pexlif
-# circuit-isomatch installation directory
-CKT_ISO_MATCH_DIR := $(SRC_DIR)/external/circuit-isomatch/src
 # Visualization installation directory
 VISUALIZATION_DIR := $(SRC_DIR)/external/visualization
 # Plugin directory
@@ -129,7 +127,7 @@ library:
 	COMPATIBILITY_FLAG=$(COMPATIBILITY_FLAG) \
 	LIB_DIR=$(LIB_DIR) RANLIB=$(RANLIB) $(TCL_INCLUDE)
 
-fl: library minisat circuit-isomatch visualization
+fl: library minisat visualization
 	@make -C bin/fl \
 	CC=$(CC) CX=$(CX) \
 	FL_OPTIONS=$(FL_OPTIONS) DEBUG_FLAG=$(DEBUG_FLAG) \
@@ -138,7 +136,6 @@ fl: library minisat circuit-isomatch visualization
 	LIB_DIR=$(LIB_DIR) YACC=$(YACC) \
 	LINKFLAG=$(LINKFLAG) ROOT_DIR=$(ROOT_DIR) VERSION_DATE=$(VERSION_DATE) \
 	MINISAT_DIR=$(MINISAT_DIR) \
-	CKT_ISO_MATCH_DIR=$(CKT_ISO_MATCH_DIR) \
 	PLUGIN_DIR=$(PLUGIN_DIR) TCL_INCLUDE=$(TCL_INCLUDE)
 
 install_plugin_tools:
@@ -216,9 +213,6 @@ install_write_pexlif: $(YOSYS_WRITE_PEXLIF)/write_pexlif.so
 
 install:
 	@-make install_all
-
-circuit-isomatch:
-	make -C "$(CKT_ISO_MATCH_DIR)" release CC=$(CC) CXX=$(CX)
 
 minisat:
 	make -C "$(MINISAT_DIR)" config prefix=$(MINISAT_DIR) CC=$(CC) CXX=$(CX)

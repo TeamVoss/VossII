@@ -793,9 +793,7 @@ find(g_ptr redex)
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr pred = GET_APPLY_RIGHT(l);
     g_ptr list = GET_APPLY_RIGHT(redex);
-    //int idx = 0;
     while( !IS_NIL(list) ) {
-	//idx++;
 	g_ptr e = GET_CONS_HD(list);
 	g_ptr use = Make_APPL_ND(pred, e);
 	INC_REFCNT(pred);
