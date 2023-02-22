@@ -10,10 +10,13 @@
 using namespace signatureConstants;
 
 class UnimplementedOperator : public std::exception {
+    public:
     const char* what() {
         return "Reached the end of a supposedly comprehensive switch. "
             "An operator is unimplemented in `gateExpression.cpp`.";
     }
+    private:
+    using std::exception::what;
 };
 
 static bool isCommutative(expr::ExpressionBinOperator op) {

@@ -153,7 +153,6 @@ typedef struct fl_plugin_api_rec {
    */
   void (*print_node_type)(g_ptr node);
 } fl_plugin_api_rec;
-typedef fl_plugin_api_rec* fl_plugin_api;
 
 /* The fixity of an fl function. */
 typedef enum { NO_FIXITY, PREFIX, INFIXL, INFIXR, POSTFIX } fl_fun_fixity;
@@ -191,7 +190,6 @@ typedef struct fl_plugin_fun_rec {
   void (*fun_ptr)(g_ptr);
 } fl_plugin_fun_rec;
 typedef fl_plugin_fun_rec* fl_plugin_fun;
-typedef fl_plugin_fun_rec* fl_plugin_funs;
 
 
 /* Structure representing a single type exported to fl from an fl plugin. */
@@ -226,7 +224,6 @@ typedef struct fl_plugin_type_rec {
   typeExp_ptr type;
 } fl_plugin_type_rec;
 typedef fl_plugin_type_rec* fl_plugin_type;
-typedef fl_plugin_type_rec* fl_plugin_types;
 
 
 /* Metadata for an fl plugin. */
@@ -246,6 +243,5 @@ typedef struct fl_plugin_rec {
   /* Number of exported types. */
   int num_types;
 } fl_plugin_rec;
-typedef fl_plugin_rec* fl_plugin;
 
 #endif

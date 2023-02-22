@@ -39,7 +39,8 @@ class DynBitset {
 
                 /// Flips and returns the bit
                 inline bool operator~() const {
-                    return ~(*this);
+                    (*word) = ~(*word);
+                    return *this;
                 }
 
                 /// Value of the reference
@@ -66,6 +67,7 @@ class DynBitset {
             private:
                 Reference(DynBitset::Word* word, size_t pos)
                     : word(word), pos(pos) {}
+                Reference (const Reference&) = default;
 
                 DynBitset::Word* word;
                 size_t pos;
