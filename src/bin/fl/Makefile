@@ -10,7 +10,7 @@ PLUGIN_DIR ?=$(ROOT_DIR)/plugins
 BASE_FLAGS = $(DEBUG_FLAG) $(OPTIMIZATION_FLAG) $(FL_OPTIONS) \
 	-Wall -Wextra -Werror \
 	-DVERSION_DATE='"$(VERSION_DATE)"' \
-	-DDEFAULT_PLUGIN_DIR='"$(PLUGIN_DIR)"' -DFL_BINARY=1
+	-DDEFAULT_PLUGIN_DIR='"$(PLUGIN_DIR)"' -DFL_BINARY=1 -ledit -lncurses
 
 CFLAGS += $(BASE_FLAGS) $(COMPATIBILITY_FLAG)
 CXXFLAGS += $(BASE_FLAGS) -fpermissive -Wno-error
@@ -20,7 +20,6 @@ ifeq '' '$(findstring clang++,$(CX))'
 else
   FL_LIB_FLAGS = -ldl -fuse-ld=$(subst clang++,lld,$(CX))
 endif
-# Minisat legacy code workaround
 
 INC = -I../../include -I$(MINISAT_DIR)/include $(TCL_INCLUDE) -DROOT_DIR='"$(ROOT_DIR)"'
 LIB = ../../lib/fl_lib.a $(MINISAT_DIR)/lib/libminisat.a
