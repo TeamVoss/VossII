@@ -668,14 +668,15 @@ fl_main(int argc, char *argv[])
 	    Sprintf(buf, "%s/preamble.fl", binary_location);
 	    Read_from_file(buf, FALSE, FALSE);
 	}
-        Emit_prompt("");
         Set_default_break_handler();
         while(1) {
             switch( setjmp(toplevel_eval_env) ) {
                 case 0:
                     /* All ok */
-                    if (gui_mode)
+                    if (gui_mode) {
+                        Emit_prompt("");
                         do_parse(TRUE);
+                    }
                     else
                         do_parse_stdin(TRUE);
                     break;

@@ -18,8 +18,7 @@ symbol	[!%&$#+\-*/:<=>?@\\~`'^|\_]
 #include "y.tab.h"
 #include <unistd.h>
 #include <stdlib.h>
-#include <readline/readline.h>
-#include <readline/history.h>
+#include <editline/readline.h>
 
 #define YY_DECL                 int yylex (YYSTYPE *lvalp)
 
@@ -485,11 +484,12 @@ do_parse_stdin(bool flush)
             /* All ok */
 	    if( flush ) { YY_FLUSH_BUFFER; }
             /* credit: https://sourceforge.net/p/flex/mailman/message/23586115/ */
-            char *line, *prompt = "voss2> ";
+            char *line, *prompt = "voss2>";
+            rl_initialize();
             YY_BUFFER_STATE bp;
             while( 1 )
               {
-                line= readline(prompt);
+                line = readline(prompt);
                 if( line == 0 )
                   break;
                 else if( strlen(line) > 0)
