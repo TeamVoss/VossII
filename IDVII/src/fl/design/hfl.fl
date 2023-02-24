@@ -247,14 +247,14 @@ let mk_pinst opt_pfn {lhs::wexpr} {rhs::wexpr} =
     let dep_vars = (w_depends rhs) in
     let nsub =
 	let mk_sub n i =
-	    let anon = mk_name (md_size n) (sprintf "i%d" i) in
+	    let anon = mk_name (special_md_sizes [n]) (sprintf "i%d" i) in
 	    (n,anon)
 	in
 	map2 mk_sub dep_vars (1 upto (length dep_vars))
     then
     let wsub =
 	let mk_sub n i =
-	    let anon = mk_name (md_size n) (sprintf "i%d" i) in
+	    let anon = mk_name (special_md_sizes [n]) (sprintf "i%d" i) in
 	    (n,anon)
 	in
 	map2 mk_sub dep_vars (1 upto (length dep_vars))
