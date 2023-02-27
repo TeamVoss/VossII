@@ -140,7 +140,7 @@ gen_strtemp(tstr_ptr tp, string s)
     len = strlen(s);
     if( len > STR_BLOCK_SIZE ) {
 	string_too_long_warning();
-	len = STR_BLOCK_SIZE;
+	len = STR_BLOCK_SIZE-1;
     }
     bcopy(s, tp->tmp_buf, len);
     tp->tmp_buf[len] = 0;

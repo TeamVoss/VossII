@@ -10,15 +10,15 @@ PLUGIN_DIR ?=$(ROOT_DIR)/plugins
 BASE_FLAGS = $(DEBUG_FLAG) $(OPTIMIZATION_FLAG) $(FL_OPTIONS) \
 	-Wall -Wextra -Werror \
 	-DVERSION_DATE='"$(VERSION_DATE)"' \
-	-DDEFAULT_PLUGIN_DIR='"$(PLUGIN_DIR)"' -DFL_BINARY=1 -ledit -lncurses
+	-DDEFAULT_PLUGIN_DIR='"$(PLUGIN_DIR)"' -DFL_BINARY=1
 
 CFLAGS += $(BASE_FLAGS) $(COMPATIBILITY_FLAG)
 CXXFLAGS += $(BASE_FLAGS) -fpermissive -Wno-error
 
 ifeq '' '$(findstring clang++,$(CX))'
-  FL_LIB_FLAGS = -ldl
+  FL_LIB_FLAGS = -ledit -lncurses -ldl -ledit
 else
-  FL_LIB_FLAGS = -ldl -fuse-ld=$(subst clang++,lld,$(CX))
+  FL_LIB_FLAGS = -ledit -lncurses -ldl -ledit -fuse-ld=$(subst clang++,lld,$(CX))
 endif
 
 INC = -I../../include -I$(MINISAT_DIR)/include $(TCL_INCLUDE) -DROOT_DIR='"$(ROOT_DIR)"'
