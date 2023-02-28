@@ -3407,7 +3407,7 @@ let connect p conns =
     let sub = flatmap (\(v,w). vec_zip [v] (get_lhs_vars w)) conns then
     val (PINST name attrs lf fa_inps fa_outs ints body) = p in
     let tr (f,as) =
-        let as' = flatmap (\v. vec_assoc v sub) as then
+        let as' = flatmap (\v. (vec_assoc v sub) catch [v]) as then
         (f, as')
     in
     let fa_inps' = map tr fa_inps then
