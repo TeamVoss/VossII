@@ -3313,7 +3313,6 @@ free_binder pcompile;
 let _pExLiF_ = ref {(error "No pexlif") :: pexlif};
 
 let flfun2pexlif_core fn =
-    let pdir = (deref pexlif_compile_dir) in
     let rtype = get_return_type fn then
     rtype != "pexlif" =>
 	eprintf "Return type not pexlif (%s). VIS aborted\n" rtype
@@ -3380,4 +3379,39 @@ let ::: lbl p =
     (PINST nm attrs' lf fa_inps fa_outs ints body)
 ;
 infixr 0 :::;
+
+// Connect a pexlif inside an Hfl CELL
+// The connections are a list of (act,wva) where
+//	act is a vector name for an actual connection in p and
+//	wva is a wexpr deniting the pin/vector in the CELL to connect to.
+// Example:
+//
+// If p has actual input names "a[7:0]", "b[7:0]", and
+// outputs "o[7:0]" and "cout" and "word" is // an HW type of size 8,\
+// then one might do:
+//
+//   let top =
+//	word_input  x y z.
+//	word_output res.
+//	bit_output  cout.
+//	word_internal mid.
+//	CELL "top" [
+//	    connect p [("a[7:0]", `x),("b[7:0]", `mid),("o[7:0]", `res)],
+//	    mid <- y '-' z
+//  ];
+//
+//  Note that "cout" did not need a connection since it has the same name
+//  and size in the CELL as in the pexlif. 
+//
+let connect p conns =
+    let sub = flatmap (\(v,w). vec_zip [v] (get_lhs_vars w)) conns then
+    val (PINST name attrs lf fa_inps fa_outs ints body) = p in
+    let tr (f,as) =
+        let as' = flatmap (\v. vec_assoc v sub) as then
+        (f, as')
+    in
+    let fa_inps' = map tr fa_inps then
+    let fa_outs' = map tr fa_outs then
+    (PINST name attrs lf fa_inps' fa_outs' ints body)
+;
 
