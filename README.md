@@ -64,7 +64,8 @@ build dependencies:
 
 ```shell
 sudo apt-get install gcc g++ flex bison gawk \
-                     libz-dev tcl-dev tk-dev libc6-dev clang
+                     libz-dev tcl-dev tk-dev libc6-dev clang \
+                     libedit-dev
                      
 ```
 
