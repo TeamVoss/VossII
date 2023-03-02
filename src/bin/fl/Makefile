@@ -43,12 +43,6 @@ fl: $(OBJ) $(LIB)
 #
 # compilation with includes
 #
-y.tab.o: y.tab.c
-	$(CC) $(INC) -c $<
-
-lex.yy.o: lex.yy.c
-	$(CC) $(INC) -c $<
-
 .c.o:
 	$(CC) $(CFLAGS) $(INC) -c $<
 

@@ -2607,6 +2607,15 @@ let extract_pexlif p il =
     c
 ;
 
+let IDV_constant_propagate tr_sequence =
+    let db = get_rw_db () then
+    val (TRANSFORM p_name p_sha_spec p_sha_imp p_just) = tr_sequence then
+    let p_imp  = idv_load_pexlif (db_sname db) p_sha_imp then
+    let p_imp' = constant_propagation p_imp then
+    let just = CONSTANT_PROPAGATION then
+    TRANSFORM p_name p_sha_spec (idv_save_pexlif p_imp') (p_just@[just])
+;
+
 let get_current_selection {dummy :: void} =
     get_selected_pinsts (get_current_canvas dummy)
 ;

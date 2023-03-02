@@ -18,6 +18,7 @@ lettype justification =
 		    |	RENAME_WIRES {sub:: (string#string) list}
 		    |	WIRE2BUFFER {wires:: string list}
                     |   REMOVE_WIRES {ids::(int list)}
+                    |   CONSTANT_PROPAGATION
 		    |	MK_THM
 //
 // ...

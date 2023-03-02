@@ -501,6 +501,20 @@ let flatten_recursive_pexlif recursion_name p =
     gen_flatten_pexlif stop_pred p
 ;
 
+// Extract the relevant information for a re_ff (if possible)
+let extract_re_ff p =
+    NOT (pexlif_is_hier p) => NONE |
+    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
+    let sz = md_sizes (snd (hd fa_outs)) then
+    let base = re_ff 'clk {'d :: wexpr} {'q :: wexpr} then
+    let master = resize_pexlif sz base then
+    NOT ((pexlif_get_SHA p) == (pexlif_get_SHA master)) => NONE |
+    let clk = hd (assoc "clk" fa_inps) in
+    let din = assoc (mk_name sz "d") fa_inps in
+    let dout = assoc (mk_name sz "q") fa_outs in
+    SOME ("re_ff", base, p, clk, din, dout, [])
+;
+
 // =============================================================
 // Code for creating new unique names
 // =============================================================
@@ -512,6 +526,12 @@ let build_name_db p =
     NOT (pexlif_is_hier p) => eprintf "build_name_db on leaf pexlif" |
     val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
     let bases = map get_base_name ((map fst fa_inps)@(map fst fa_outs)@ints) in
+    let tbl = set_tbl_insertn (tbl_create (length bases)) (setify bases) then
+    NAME_DB (ref tbl)
+;
+
+let list2name_db names =
+    let bases = map get_base_name names in
     let tbl = set_tbl_insertn (tbl_create (length bases)) (setify bases) then
     NAME_DB (ref tbl)
 ;
@@ -535,16 +555,136 @@ let get_unique_name name_db original_name =
     find_new_name original_name
 ;
 
-// Extract the relevant information for a re_ff (if possible)
-let extract_re_ff p =
-    NOT (pexlif_is_hier p) => NONE |
-    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
-    let sz = md_sizes (snd (hd fa_outs)) then
-    let base = re_ff 'clk {'d :: wexpr} {'q :: wexpr} then
-    let master = resize_pexlif sz base then
-    NOT ((pexlif_get_SHA p) == (pexlif_get_SHA master)) => NONE |
-    let clk = hd (assoc "clk" fa_inps) in
-    let din = assoc (mk_name sz "d") fa_inps in
-    let dout = assoc (mk_name sz "q") fa_outs in
-    SOME ("re_ff", base, p, clk, din, dout, [])
+
+// =============================================================
+// Code for constant propagation
+// =============================================================
+
+//// Perform constant propagation and simplify the pexlif.
+//// Note that we only propagate constants through combinational units.
+//let constant_propagation p =
+//    let ckt = pexlif2fsm p then
+//    let ste = STE "-e" ckt [] [] [] [] then
+//    letrec simp hier p =
+//        val (PINST name attrs lf fa_inps fa_outs ints body) = p in
+//        let not_const (f,as) =
+//            let fs = md_expand_vector f in
+//            let tst f =
+//                let HL = get_trace_val ste (sprintf "%s%s" hier f) 0 then
+//                NOT ((HL == (T,F)) OR (HL == (F,T)))
+//            in
+//            (find_first0 tst fs) != 0
+//        in
+//        let idx = find_first0 not_const fa_outs then
+//        idx != 0 =>
+//            NOT (is_HIER body) => p |
+//            val (P_HIER cs) = body in
+//            let cs' = map2 (\i.\c. simp (sprintf "%si%d/" hier i) c)
+//                           (1 upto (length cs)) cs
+//            then
+//            (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs'))
+//        |
+//        let mk1 (f,as) =
+//            let fs = md_expand_vector f in
+//            let get_val f = fst (get_trace_val ste (sprintf "%s%s" hier f) 0) in
+//            let vs = map get_val fs then
+//            let i = bl2int (F:vs) in
+//            let sz = length fs in
+//            let lhs = W_EXPLICIT_VAR sz f in
+//            let rhs = W_CONST sz i in
+//            base_assignment T lhs rhs
+//        in
+//        let consts = map mk1 fa_outs then
+//        (PINST "_WrApPeR_" [] F [] fa_outs [] (P_HIER consts))
+//    in
+//    simp "" p
+//;
+
+// Perform constant propagation and simplify the pexlif.
+// Note that we only propagate constants through combinational units.
+let constant_propagation p =
+    let ckt = pexlif2fsm p then
+    let ste = STE "-e" ckt [] [] [] [] then
+    letrec simp hier p =
+        val (PINST name attrs lf fa_inps fa_outs ints body) = p in
+	let get_v f =
+	    let HL = get_trace_val ste (sprintf "%s%s" hier f) 0 then
+	    HL == (T,F) => "1" |
+	    HL == (F,T) => "0" |
+	    "X"
+	in
+	let fs = md_expand_vectors (map fst fa_outs) then
+	let vs = map get_v fs in
+	let has_constant =
+	    let idx = find_first0 (\s. s != "X") vs then
+	    idx != 0
+	then
+	let all_constant =
+	    let idx = find_first0 (\s. s = "X") vs then
+	    idx == 0
+	then
+	let nd2val = zip fs vs in
+	all_constant =>
+	    let mk1 (f,as) =
+		let fs = md_expand_vector f in
+		let v = sscanf "%b" (implode (map (\n. assoc n nd2val) fs)) then
+		let sz = length fs in
+		let lhs = W_EXPLICIT_VAR sz f in
+		let rhs = W_CONST sz v in
+		base_assignment T lhs rhs
+	    in
+	    let consts = map mk1 fa_outs then
+	    (PINST "_WrApPeR_" [] F [] fa_outs [] (P_HIER consts))
+	|
+	NOT (is_HIER body) => p |
+	let p' =
+            val (P_HIER cs) = body in
+            let cs' = map2 (\i.\c. simp (sprintf "%si%d/" hier i) c)
+                           (1 upto (length cs)) cs
+            then
+            (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs'))
+	in
+	NOT has_constant => p |
+	// Some, but not all, outputs are constant(s)
+	let fvs = map fst (fa_inps @ fa_outs) then
+	let nameDB = list2name_db fvs then
+	val [needed, const] = partition (\p. snd p = "X") nd2val in
+	//
+	let const_vecs = md_extract_vectors (map fst const) then
+	let mk_const v =
+	    let sz = md_size v in
+	    let v' = get_unique_name nameDB (mk_name sz (get_base_name v)) then
+	    let vs = md_expand_vector v in
+	    let value = sscanf "%b" (implode (map (\n. assoc n nd2val) vs)) then
+	    let lhs = W_EXPLICIT_VAR sz v' in
+	    let rhs = W_CONST sz value in
+	    let pp = base_assignment T lhs rhs then
+	    (v,v'),pp
+	in
+	val (sub1, const_insts) = unzip (map mk_const const_vecs) then
+	//
+	let need_vecs = md_extract_vectors (map fst needed) then
+	let mk_sub v =
+	    let sz = md_size v in
+	    let v' = get_unique_name nameDB (mk_name sz (get_base_name v)) then
+	    (v,v')
+	in
+	let sub2 = map mk_sub need_vecs then
+	//
+	let sub = sub1 @ sub2 in
+	let inside_rename (f,as) = f, (vec_assoc f sub) in
+	val (PINST name' attrs' lf' fa_inps' fa_outs' ints' body') = p' in
+	let fa_outs'' = map inside_rename fa_outs' then
+	let p'' = PINST name' attrs' lf' fa_inps' fa_outs'' ints' body' then	
+	let io_sub = vec_zip (map fst fa_outs) (flatmap snd fa_outs) then
+	let mk_fa (f,f') =
+	    let fs = vec_rev_assoc f' sub then
+	    let as = flatmap (\f. vec_assoc f io_sub) fs then
+	    (f', as)
+	in
+	let fa_outs = map mk_fa sub then
+	(PINST "_WrApPeR_" [] F [] fa_outs [] (P_HIER (p' : const_insts)))
+    in
+    simp "" p
 ;
+
