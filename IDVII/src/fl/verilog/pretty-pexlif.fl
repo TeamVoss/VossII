@@ -58,7 +58,7 @@ let vvalid_lhs {we::wexpr} =
 // -----------------------------------------------------------------------------
 // ...
 
-begin_abstype;
+//begin_abstype;
 
 let warn msg v = (fprintf stdinfo "%s\n" msg) fseq v;
 
@@ -1062,6 +1062,6 @@ let separated_pexlif2verilog netlist {path::string} {pex::pexlif} =
     (foreach do1 results)
 ;
 
-end_abstype safe_pexlif2verilog pexlif2verilog separated_pexlif2verilog;
+//end_abstype safe_pexlif2verilog pexlif2verilog separated_pexlif2verilog;
 
 // =============================================================================

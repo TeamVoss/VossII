@@ -1450,6 +1450,7 @@ let use_separate_process_evaluation_r = ref T;
 
 slet BDD_EQ_1 p1 p2 order_file =
     NOT (deref use_separate_process_evaluation_r) =>
+	(order_file != "" => (_load order_file T) | T) fseq
 	noX => fst (BDD_EQ_base p1 p2) |
 	val (res, opt_cex) = BDD_EQ_base p1 p2 then
 	res == T => res |
@@ -1542,7 +1543,7 @@ let SAT_comb_EQ p1 p2 =
     let ste = bSTE "-s" ckt [] bant bcons [] then
     let ok = bget_ste_result ste "" then
     ok == bT => bT |
-    let bcex = bget_model [bNOT ok] 10 then
+    let bcex = bget_model [bNOT ok] 1000 then
     bcex = [] => bT |
     let cex = bexpr2bdd bcex then
     let ant' = substitute cex ant then
@@ -2615,6 +2616,40 @@ let IDV_constant_propagate tr_sequence =
     let just = CONSTANT_PROPAGATION then
     TRANSFORM p_name p_sha_spec (idv_save_pexlif p_imp') (p_just@[just])
 ;
+
+//let pexlif_remove_dangling p =
+//    letrec clean p =
+//        val (PINST name attrs lf fa_inps fa_outs ints body) = p in
+//        NOT (is_HIER body) => p |
+//        val (P_HIER cs) = body in
+//        let cs' = map clean cs then
+//        let p' = PINST name attrs lf fa_inps fa_outs ints (P_HIER cs') then
+//        let io = buid_io_tbl p' then
+//        let current_wires = (io2assertions io)@(map fst fa_outs) then
+//        let current_insts = wires2drivers io current_wires then
+//        let new_insts = inst_fanin_dfs io T 1000 (\n.F) current_insts then
+//        let all_insts = current_insts union new_insts then
+//        let cs = io2children io then
+//        let cs' = gather cs all_insts then
+//        let all_wires = md_extract_vectors (insts2wires io all_insts) then
+//        let clean_inps (f,as) =
+//            ([f] vec_intersect all_wires) != [] => [(f,as)] | []
+//        in
+//        let fa_inps' = flatmap clean_inps fa_inps then
+//        PINST name attrs lf fa_inps' fa_outs ints (P_HIER cs')
+//    in
+//    clean p
+//;
+//
+//
+//let IDV_remove_dangling tr_sequence =
+//    let db = get_rw_db () then
+//    val (TRANSFORM p_name p_sha_spec p_sha_imp p_just) = tr_sequence then
+//    let p_imp  = idv_load_pexlif (db_sname db) p_sha_imp then
+//    let p_imp' = pexlif_remove_dangling p_imp then
+//    let just = REMOVE_DANGLING then
+//    TRANSFORM p_name p_sha_spec (idv_save_pexlif p_imp') (p_just@[just])
+//;
 
 let get_current_selection {dummy :: void} =
     get_selected_pinsts (get_current_canvas dummy)

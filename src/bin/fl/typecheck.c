@@ -7,7 +7,7 @@
 #include "graph.h"
 #include "symbol.h"
 
-#define MAX_OVERLOAD_RESOLUTION_DEPTH	10000
+#define MAX_OVERLOAD_RESOLUTION_DEPTH	50000
 
 #if 0
 #define USE_BDDS_FOR_OR

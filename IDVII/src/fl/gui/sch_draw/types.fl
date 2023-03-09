@@ -19,6 +19,7 @@ lettype justification =
 		    |	WIRE2BUFFER {wires:: string list}
                     |   REMOVE_WIRES {ids::(int list)}
                     |   CONSTANT_PROPAGATION
+                    |   REMOVE_DANGLING
 		    |	MK_THM
 //
 // ...

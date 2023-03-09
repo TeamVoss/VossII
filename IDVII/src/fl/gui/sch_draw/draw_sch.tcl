@@ -1388,7 +1388,7 @@ proc ckt:do_print_xref {c} {
     puts $fp "================"
     for {set j 1} {$j <= [llength $snamelist] } {incr j} {
         set nds [fl_tag2vec $c $idx2name($j)]
-	puts $fp [format {%3d --> %s} $j [clean_name $nds]]
+	puts $fp [format {%4d --> %s} $j [clean_name $nds]]
     }
     puts $fp ""
     puts $fp "Node->index map:"

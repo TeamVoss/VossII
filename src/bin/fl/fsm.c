@@ -577,7 +577,7 @@ get_real_name(vec_info_ptr ip, int oidx)
 	    idx = idx - offset*stride;
 	    decl = decl->next;
 	}
-}
+    }
     return res;
 }
 
@@ -918,7 +918,12 @@ nodes(g_ptr redex)
 	string nname = get_real_name(np->vec, np->idx-start);
 	if( *nname != '!' ) {
 	    nname = wastrsave(&strings, nname);
-	    push_buf(&res_buf, &nname);
+	    int idx = name2idx(nname);
+	    if( idx >= 0 ) { 
+		push_buf(&res_buf, &nname);
+	    } else {
+		FP(err_fp, "WARNING: %s not in circuit!\n", nname);
+	    }
 	}
     }
     qsort(START_BUF(&res_buf), COUNT_BUF(&res_buf), sizeof(string), nn_cmp);
@@ -4807,11 +4812,13 @@ find_node_index(vec_ptr decl, vec_ptr vp, int start)
 	    return res;
 	}
 	int stride = get_stride(decl->next);
-	if( vp->u.ranges->upper > decl->u.ranges->upper ||
-	   vp->u.ranges->lower < decl->u.ranges->lower ) {
-	    return -1;
+	range_ptr r = decl->u.ranges;
+	while( r != NULL && !inside(vp->u.ranges->upper, r->upper, r->lower) ) {
+	    res += (abs(r->upper-r->lower)+1)*stride;
+	    r = r->next;
 	}
-	res += abs(decl->u.ranges->upper - vp->u.ranges->upper)*stride;
+	if( r == NULL) { return -1; }
+	res += abs(r->upper - vp->u.ranges->upper)*stride;
 	vp = vp->next;
 	decl = decl->next;
     }
@@ -5048,8 +5055,8 @@ get_stride(vec_ptr vp)
 static bool
 inside(int i, int upper, int lower)
 {
-    if( upper < lower && upper <= i && i <= lower ) return TRUE;
-    if( upper >= lower && upper >= i && i >= lower ) return TRUE;
+    if( upper < lower && upper <= i && i <= lower ) { return TRUE; }
+    if( upper >= lower && upper >= i && i >= lower ) { return TRUE; }
     return FALSE;
 }
 
