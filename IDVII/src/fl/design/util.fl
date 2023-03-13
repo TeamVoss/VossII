@@ -1069,8 +1069,11 @@ let mk_draw_cmd phase_delay rhs =
 		sprintf "draw_constant {X[%d:0]}" (sz-1)
 	 /\ special (W_CONST sz v) =
 	    v < 16 => sprintf "draw_constant %d" v |
+	    (
 	    sz < 5 OR ((sz % 4) != 0) => sprintf "draw_constant 0b%0*b" sz v
 				       | sprintf "draw_constant 0x%x" v
+	    ) catch
+	    (sprintf "draw_constant 0x%x" v)
 	 /\ special rhs =
 		let body = inp2tcl inps rhs then
 		sprintf "draw_hfl {%s}" body

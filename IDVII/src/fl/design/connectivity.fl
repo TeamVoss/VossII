@@ -28,12 +28,13 @@ lettype io_tbl =
 	FANIN_OUT_TBLS
 	    {p :: pexlif}
 	    {cs :: (pexlif list)}
+	    {assertions:: string list}
 	    {fanin_tbl :: ({string,((string#(vec_info list)#point) list)} tbl)}
 	    {fanout_tbl :: ({string,((string#(vec_info list)#point) list)} tbl)}
 ;
 
 let Pio_tbl ios =
-    val (FANIN_OUT_TBLS p cs fi_tbl fo_tbl) = ios then
+    val (FANIN_OUT_TBLS p cs assertions fi_tbl fo_tbl) = ios then
     let base_cmp (n1,_) (n2,_) = node_name_cmp n1 n2 in
     let Ptbl title tbl = 
 	let l = qsort base_cmp (tbl2list tbl) then
@@ -49,8 +50,21 @@ let Pio_tbl ios =
 ;
 install_print_function Pio_tbl;
 
-let io2pexlif ios = val (FANIN_OUT_TBLS p cs fi_tbl fo_tbl) = ios in p;
-let io2children ios = val (FANIN_OUT_TBLS p cs fi_tbl fo_tbl) = ios in cs;
+let io2pexlif ios =
+    val (FANIN_OUT_TBLS p cs assertions fi_tbl fo_tbl) = ios in
+    p
+;
+
+let io2children ios =
+    val (FANIN_OUT_TBLS p cs assertions fi_tbl fo_tbl) = ios in
+    cs
+;
+
+let io2assertions ios =
+    val (FANIN_OUT_TBLS p cs assertions fi_tbl fo_tbl) = ios then
+    assertions
+;
+
 let io_get_child ios idx = el idx (io2children ios);
 
 let insts2wires ios insts =
@@ -86,7 +100,7 @@ let vec_overlap vn1 vn2 =
 
 clet buid_io_tbl p =
     NOT (pexlif_is_hier p) =>
-	FANIN_OUT_TBLS p [] (tbl_create 10) (tbl_create 10) 
+	FANIN_OUT_TBLS p [] [] (tbl_create 10) (tbl_create 10) 
     |
     val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
     let fanin0 =
@@ -136,15 +150,19 @@ clet buid_io_tbl p =
 	let values = map snd l then
 	(key,values)
     in
+    let fanin_list = map mk_entry (partition fst fanin_list) then
+    let find_assertion (nd,_) = (str_is_substr "assertion__" nd) => [nd] | [] in
+    let assertions = flatmap find_assertion fanin_list then
     FANIN_OUT_TBLS
 	p
 	cs
-	(list2tbl (map mk_entry (partition fst fanin_list)))
+	assertions
+	(list2tbl fanin_list)
 	(list2tbl (map mk_entry (partition fst fanout_list)))
 ;
 
 let get_pt_fanin ios vec =
-    val (FANIN_OUT_TBLS p cs fi_tbl fo_tbl) = ios then
+    val (FANIN_OUT_TBLS p cs assertions fi_tbl fo_tbl) = ios then
     let b = get_base_name vec in    
     let vi = md_split_vector vec in
     let alts = (tbl_get fi_tbl b) catch [] then
@@ -158,7 +176,7 @@ let get_pt_fanin ios vec =
 ;
 
 let get_pt_fanout ios vec =
-    val (FANIN_OUT_TBLS p cs fi_tbl fo_tbl) = ios then
+    val (FANIN_OUT_TBLS p cs assertions fi_tbl fo_tbl) = ios then
     let b = get_base_name vec in    
     let vi = md_split_vector vec in
     let alts = (tbl_get fo_tbl b) catch [] then

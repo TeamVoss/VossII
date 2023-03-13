@@ -12,8 +12,23 @@ You now get some useful key bindings:
 @{	    send from the beginning of the current paragraph to the current line
 @z (or @Z)  send from the current line to the mark z to fl
 @a (or @A)  send from the mark a to the mark z to fl
+@G	    send the rest of the file to fl
 
 @?	    print out help for the symbol at the current location
 
 @o (or @O)  open a window that has all of fl's stdout so far.
+
+))	    Comment out the curent line
+)}	    Comment out the next paragraph
+){	    Comment out the previous paragraph
+)G	    Comment out everything from here to end of file
+)L	    Comment out everything from here to end window
+)Z	    Comment out everything from here to the mark z
+
+((	    Uncomment the curent line
+(}	    Uncomment the next paragraph
+({	    Uncomment the previous paragraph
+(G	    Uncomment everything from here to end of file
+(L	    Uncomment everything from here to end window
+(Z	    Uncomment everything from here to the mark z
 

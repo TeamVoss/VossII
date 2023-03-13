@@ -1,3 +1,0 @@
-let andor (in1, in2, in3) -> (out) {
-	out = AND (OR in1 in2) in3
-}

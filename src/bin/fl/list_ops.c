@@ -793,9 +793,7 @@ find(g_ptr redex)
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr pred = GET_APPLY_RIGHT(l);
     g_ptr list = GET_APPLY_RIGHT(redex);
-    int idx = 0;
     while( !IS_NIL(list) ) {
-	idx++;
 	g_ptr e = GET_CONS_HD(list);
 	g_ptr use = Make_APPL_ND(pred, e);
 	INC_REFCNT(pred);
@@ -1373,7 +1371,14 @@ gather(g_ptr redex)
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
     while( !IS_NIL(indices) ) {
-	int idx = GET_INT(GET_CONS_HD(indices));
+	ui idx = GET_INT(GET_CONS_HD(indices));
+	if( idx < 1 || idx > COUNT_BUF(&buf) ) {
+	    free_buf(&buf);
+	    string s = Fail_pr("Index %d out of range in gather |l|=%d",
+			       idx, COUNT_BUF(&buf));
+	    MAKE_REDEX_FAILURE(redex, s);
+	    return;
+	}
 	g_ptr e = *((g_ptr *) M_LOCATE_BUF(&buf, idx-1));
 	SET_CONS_HD(tail, e);
 	INC_REFCNT(e);
@@ -1404,7 +1409,14 @@ separate(g_ptr redex)
     g_ptr sel = Make_NIL();
     g_ptr sel_tl = sel;
     while( !IS_NIL(indices) ) {
-	int idx = GET_INT(GET_CONS_HD(indices));
+	ui idx = GET_INT(GET_CONS_HD(indices));
+	if( idx < 1 || idx > COUNT_BUF(&buf) ) {
+	    free_buf(&buf);
+	    string s = Fail_pr("Index %d out of range in gather |l|=%d",
+			       idx, COUNT_BUF(&buf));
+	    MAKE_REDEX_FAILURE(redex, s);
+	    return;
+	}
 	g_ptr e = *((g_ptr *) M_LOCATE_BUF(&buf, idx-1));
 	if( e != NULL ) {
 	    SET_CONS_HD(sel_tl, e);

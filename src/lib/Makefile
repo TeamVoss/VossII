@@ -2,7 +2,7 @@
 # and includes dependencies to #include files elsewhere
 # in the subdirectory.
 #
-CFLAGS = $(DEBUG_FLAG) $(OPTIMIZATION_FLAG) $(COMPATIBILITY_FLAG) \
+CFLAGS += $(DEBUG_FLAG) $(OPTIMIZATION_FLAG) $(COMPATIBILITY_FLAG) \
 	 -Wall -Wextra -Werror
 
 #

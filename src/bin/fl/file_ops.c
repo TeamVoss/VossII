@@ -18,10 +18,11 @@ static unsigned char 	Tmp_buf[BUF_SIZE];
 
 
 /**** PRIVATE FUNCTIONS ****/
-static bool		file_open();
-static VOID		file_close();
-static VOID		file_write();
-static bool		file_read();
+
+static bool file_open(string filename, char op,file_ptr fp);
+static VOID file_write(pointer pp, unsigned int n, file_ptr fp);
+static bool file_read(unsigned char *p, register unsigned int n, file_ptr fp);
+static VOID file_close(file_ptr fp);
 
 /****************************************************************************/
 /*                           Main functions                                 */
@@ -96,11 +97,7 @@ LL_Read(int size)
 /*  Supported operations: r   -- read operation			  	   */
 /*  			  w   -- write operation (append to existing file) */
 /*  			  t   -- write operation (truncates existing file) */
-static bool
-file_open(filename, op, fp)
-string   filename;
-char     op;
-file_ptr fp;
+static bool file_open(string filename, char op,file_ptr fp)
 {
     ASSERT( fp->file_desc == -1 );
     ASSERT(op == 'w' || op == 'r' || op == 't');
@@ -133,8 +130,7 @@ file_ptr fp;
 
 /* file_close -- Close the file fp. Write out buffered writes etc. */
 static VOID
-file_close(fp)
-file_ptr fp;
+file_close(file_ptr fp)
 {
     ASSERT( fp->file_desc >= 0 );
     if( fp->op != 'r' ) {
@@ -180,10 +176,7 @@ file_write(pointer pp, unsigned int n, file_ptr fp)
 /* file_read -- Read n bytes from file fp into the area pointed to by p	   */
 /*		Returns TRUE is successful and FALSE if EOF is encountered */
 static bool
-file_read(p, n, fp)
-unsigned char 		*p;
-register unsigned int	n;
-file_ptr		fp;
+file_read(unsigned char *p,register unsigned int n,file_ptr fp)
 {
     register unsigned char  *bp;
     register int  	    used = fp->pos;

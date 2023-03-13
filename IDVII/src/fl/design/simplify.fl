@@ -473,7 +473,8 @@ letrec const_prop e assuming (is_binary e) =
 	is_CONST ce =>
 	    val (osz,ov) = get_const ce then
 	    let bits = explode (sprintf "%*b" osz ov) then
-	    let sels = gather bits indices then
+	    let bit_sels = map (\idx. osz-idx) indices then
+	    let sels = gather bits bit_sels then
 	    let sz = length sels then
 	    let base = sscanf "%b" (implode sels) then
 	    hd sels = "0" => W_CONST sz base |
@@ -485,7 +486,8 @@ letrec const_prop e assuming (is_binary e) =
 	is_CONST ce =>
 	    val (osz,ov) = get_const ce then
 	    let bits = explode (sprintf "%*b" osz ov) then
-	    let sels = gather bits indices then
+	    let bit_sels = map (\idx. osz-idx) indices then
+	    let sels = gather bits bit_sels then
 	    let sz = length sels then
 	    let base = sscanf "%b" (implode sels) then
 	    hd sels = "0" => W_CONST sz base |

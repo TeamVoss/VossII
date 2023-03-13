@@ -247,14 +247,14 @@ let mk_pinst opt_pfn {lhs::wexpr} {rhs::wexpr} =
     let dep_vars = (w_depends rhs) in
     let nsub =
 	let mk_sub n i =
-	    let anon = mk_name (md_size n) (sprintf "i%d" i) in
+	    let anon = mk_name (special_md_sizes [n]) (sprintf "i%d" i) in
 	    (n,anon)
 	in
 	map2 mk_sub dep_vars (1 upto (length dep_vars))
     then
     let wsub =
 	let mk_sub n i =
-	    let anon = mk_name (md_size n) (sprintf "i%d" i) in
+	    let anon = mk_name (special_md_sizes [n]) (sprintf "i%d" i) in
 	    (n,anon)
 	in
 	map2 mk_sub dep_vars (1 upto (length dep_vars))
@@ -2033,18 +2033,46 @@ let hw_unsplit l =
 // A circuit that takes an input (vector) and outputs a 1 only after the
 // input has been the same for duration_in_phases phases.
 //
-let is_stable duration_in_phases inp ok = (
-    input       inp.
-    bit_output  ok.
-    internal        old.
-    bit_internal    same.
-    bit_list_internal (duration_in_phases-1) same_list.
-    CELL (sprintf "draw_hfl {is stable\nfor %d  \nphases }" duration_in_phases)  (
-        (map2 (\o.\i. o <: i) same_list ((tl same_list)@[same]))@[
-        old <: inp,
-        same <- (old '=' inp),
-        ok <- itlist (\s.\r. s '&' r) same_list same
-])) inp ok;
+let is_stable duration_in_phases inp ok =
+    duration_in_phases = 0 =>
+	(
+	    input	inp.
+	    bit_output	ok.
+	    CELL "draw_hfl {is stable\nfor 0  \nphases }" [
+		ok <- '1
+	    ]
+	) inp ok
+    |
+    duration_in_phases = 1 =>
+	(
+	    input	inp.
+	    bit_output	ok.
+	    internal	old.
+	    CELL "draw_hfl {is stable\nfor 0  \nphases }" [
+		old <: inp,
+		ok <- old '=' inp
+	    ]
+	) inp ok
+    |
+	(
+	    input       inp.
+	    bit_output  ok.
+	    internal        old.
+	    bit_internal    same.
+	    bit_list_internal (duration_in_phases-1) same_list.
+	    CELL (sprintf "draw_hfl {is stable\nfor %d  \nphases }"
+			   duration_in_phases) 
+	    (
+		(map2 (\o.\i. o <: i) same_list ((tl same_list)@[same]))
+		@
+		[
+		    old <: inp,
+		    same <- (old '=' inp),
+		    ok <- itlist (\s.\r. s '&' r) same_list same
+		]
+	    )
+	) inp ok
+;
 
 
 // MUX between two signals.
@@ -3313,7 +3341,6 @@ free_binder pcompile;
 let _pExLiF_ = ref {(error "No pexlif") :: pexlif};
 
 let flfun2pexlif_core fn =
-    let pdir = (deref pexlif_compile_dir) in
     let rtype = get_return_type fn then
     rtype != "pexlif" =>
 	eprintf "Return type not pexlif (%s). VIS aborted\n" rtype
@@ -3380,4 +3407,39 @@ let ::: lbl p =
     (PINST nm attrs' lf fa_inps fa_outs ints body)
 ;
 infixr 0 :::;
+
+// Connect a pexlif inside an Hfl CELL
+// The connections are a list of (act,wva) where
+//	act is a vector name for an actual connection in p and
+//	wva is a wexpr deniting the pin/vector in the CELL to connect to.
+// Example:
+//
+// If p has actual input names "a[7:0]", "b[7:0]", and
+// outputs "o[7:0]" and "cout" and "word" is // an HW type of size 8,\
+// then one might do:
+//
+//   let top =
+//	word_input  x y z.
+//	word_output res.
+//	bit_output  cout.
+//	word_internal mid.
+//	CELL "top" [
+//	    connect p [("a[7:0]", `x),("b[7:0]", `mid),("o[7:0]", `res)],
+//	    mid <- y '-' z
+//  ];
+//
+//  Note that "cout" did not need a connection since it has the same name
+//  and size in the CELL as in the pexlif. 
+//
+let connect p conns =
+    let sub = flatmap (\(v,w). vec_zip [v] (get_lhs_vars w)) conns then
+    val (PINST name attrs lf fa_inps fa_outs ints body) = p in
+    let tr (f,as) =
+        let as' = flatmap (\v. (vec_assoc v sub) catch [v]) as then
+        (f, as')
+    in
+    let fa_inps' = map tr fa_inps then
+    let fa_outs' = map tr fa_outs then
+    (PINST name attrs lf fa_inps' fa_outs' ints body)
+;
 

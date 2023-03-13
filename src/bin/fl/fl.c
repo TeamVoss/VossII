@@ -61,8 +61,8 @@ extern string		binary_location;
 extern bool		RCadd_debug_info;
 
 bool	do_parse(bool flush);
+bool	do_parse_stdin(bool flush);
 bool	perform_fl_command(string txt);
-void	Start_stdin_parsing();
 
 /* ===================== Local variables defined ===================== */
 #define TCL_CMD_BUF_SZ	    16384
@@ -639,7 +639,6 @@ fl_main(int argc, char *argv[])
         FP(stdout_fp, "   /    VossII %s (%s)\n", FL_VERSION, VERSION_DATE);
         FP(stdout_fp, "VOSS-LIBRARY-DIRECTORY = %s\n", RCDefault_dir);
         FP(stdout_fp, "Temporary files directory = %s\n", Voss_tmp_dir);
-        Start_stdin_parsing();
         if( start_file != NULL ) {
 	    // Create a dummy file that loads preamble.fl and start_file
 	    FILE *fp;
@@ -669,13 +668,17 @@ fl_main(int argc, char *argv[])
 	    Sprintf(buf, "%s/preamble.fl", binary_location);
 	    Read_from_file(buf, FALSE, FALSE);
 	}
-        Emit_prompt("");
         Set_default_break_handler();
         while(1) {
             switch( setjmp(toplevel_eval_env) ) {
                 case 0:
                     /* All ok */
-                    do_parse(TRUE);
+                    if (gui_mode) {
+                        Emit_prompt("");
+                        do_parse(TRUE);
+                    }
+                    else
+                        do_parse_stdin(TRUE);
                     break;
                 case 2:
                     /* User interrupt with "return to top" */

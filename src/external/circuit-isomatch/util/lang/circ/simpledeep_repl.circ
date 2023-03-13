@@ -1,4 +1,0 @@
-let d2alt (a, b) -> (r, x) {
-  x = XOR a b
-  r = AND a b
-}

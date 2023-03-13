@@ -73,6 +73,7 @@ New_sch(sch_type type, int w, int h, int x, int y, char* name, string pfn,
     ans->pfn_type = Pfn2pfn_type(ans->pfn);
     ans->fanins = fanins;
     ans->loop_src = NULL;
+    return ans;
 }
 
 // Add_to_front_network adds a new sch_draw item to the front of a network.
@@ -207,6 +208,7 @@ Pretty_printer(sch_draw_ptr tree, char* filename)
 	fprintf(fp, ";\n");
     } else {
 	fprintf(stderr, "Empty tree given");
+	fclose(fp);
 	return;
     }
     fclose(fp);

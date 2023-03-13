@@ -260,7 +260,9 @@ static char pfn2str_buf[512];
 /* -----Function prototypes for local functions-----*/
 static g_ptr		mk_constr_nd(string constr_name);
 static int		is_large(g_ptr node);
+#ifndef NO_REFCNT_GC
 static void 		refcnt_free_nd(g_ptr node);
+#endif
 static g_ptr 		type_constr_rec(int cnt, int arg_cnt, g_ptr constr);
 static g_ptr 		abstract_rec(string var, g_ptr node);
 static bool  		is_free(string var, g_ptr node);
@@ -2491,12 +2493,13 @@ is_large(g_ptr node)
 }
 
 
+#ifndef NO_REFCNT_GC
 static void
 refcnt_free_nd(g_ptr node)
 {
 #ifndef DONT_FREE_ND
     /* Normal (default) version */
-    node->L = node->R = 0;
+    node->L = 0; node->R = 0;
     SET_RIGHT(node, free_list);
     free_list = node;
     return;
@@ -2531,6 +2534,7 @@ refcnt_free_nd(g_ptr node)
 #endif
 #endif
 }
+#endif
 
 
 
@@ -2874,7 +2878,7 @@ Handle_Recursion_Limits()
 	Send_to_tcl(buf, &s);
 	switch( *s ) {
 		case 'd': return TRUE;
-		case 'x': Exit(2);
+		case 'x': Exit(2); break;
 		case 'a': return FALSE;
 		default: break;
 	}
@@ -6447,7 +6451,6 @@ void Dummy()
     set_up_hash();
     accessible(NULL, NULL);
     is_a_list(NULL);
-    refcnt_free_nd(NULL);
 }
 
 static void
