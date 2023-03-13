@@ -140,7 +140,7 @@ let bifrost_tx_pulseecho =
     done <- still_done '|' ack
     ];
 
-let bifrost_tx_validready =
+let bifrost_tx_agreement =
   bit_input clk.
   bit_input reset.
   bit_input run.
