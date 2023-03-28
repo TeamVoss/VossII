@@ -537,12 +537,12 @@ Fsm_Init()
     new_buf(&tmps_buf, 1000, sizeof(gbv));
 
     create_hash(&state_holding_tbl, 50, str_hash, str_equ);
-    string *p = state_holding_names;
-    while( *p ) {
-	string n = wastrsave(&strings, *p);
-	insert_hash(&state_holding_tbl, n, n);
-	p++;
-    }
+	for (size_t i = 0; i < sizeof(state_holding_names) / sizeof(state_holding_names[0]); i++)
+	{
+		string *p = &state_holding_names[i];
+		string n = wastrsave(&strings, *p);
+		insert_hash(&state_holding_tbl, n, n);
+	}
 }
 
 string
