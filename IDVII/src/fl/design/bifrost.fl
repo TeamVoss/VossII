@@ -217,6 +217,22 @@ let bifrost_rx_twophase =
     may_continue <- '1
 ];
 
+let bifrost_rx_pulseecho =
+  bit_input clk.
+  bit_input reset.
+  bit_input done.
+  bit_input req.
+  bit_output ack.
+  bit_output start.
+  bit_output may_continue.
+  bit_internal was_done.
+  CELL "bifrost_rx_pulseecho" [
+    re_ff_sreset clk reset done was_done,
+    ack <- done '&' '~' was_done,
+    start <- req,
+    may_continue <- '1
+];
+
 
 // ==============================================================
 // Useful circuits
