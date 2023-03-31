@@ -72,8 +72,6 @@ let insts2wires ios insts =
     md_extract_vectors (flatmap pexlif_get_outs_actuals pinsts)
 ;
 
-clet get_base_name s = hd (str_split (get_vector_signature s) "[");
-
 let range_overlap range1 range2 =
     let order (l,r) = {l::int} <= r => (l,r) | (r,l) in
     val (l1,r1)  = order range1 in

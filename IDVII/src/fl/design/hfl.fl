@@ -1037,7 +1037,7 @@ let internal body_fun {fs::string} acc =
 		let prev_expr_pexlifs = tl pexlifs in
 		let ints'' = fv:ints' in
 		let p_main' =
-		    PINST n' attrs'' leaf' inps' outs' ints'' body'
+		    base_PINST n' attrs'' leaf' inps' outs' ints'' body'
 		in
 		(p_main', prev_expr_pexlifs)
 	    |
@@ -1046,7 +1046,7 @@ let internal body_fun {fs::string} acc =
 		(sprintf "node_values_%s" fv, values):attrs
 	    in
 	    let p_main' =
-		PINST n attrs' leaf inps outs (fv:ints) body
+		base_PINST n attrs' leaf inps outs (fv:ints) body
 	    in
 	    (p_main', [])
 	in
@@ -1054,7 +1054,7 @@ let internal body_fun {fs::string} acc =
 	let c_ints = get_tmp_outs p_exprs then
 	let c_inps = mk_wrap_inps c_ints (p_main:p_exprs) then
 	let c_outs = mk_wrap_outs [p_main] then
-	let res = PINST "_WrApPeR_" attrs F c_inps c_outs c_ints
+	let res = base_PINST "_WrApPeR_" attrs F c_inps c_outs c_ints
 		    (P_HIER (p_main:p_exprs)) then
 	res
     in
@@ -1113,7 +1113,7 @@ let list_internal cnt body_fun {base_fs::string} acc =
 		let prev_expr_pexlifs = tl pexlifs in
 		let ints'' = md_extract_vectors (fv@ints') in
 		let p_main' =
-		    PINST n' attrs'' leaf' inps' outs' ints'' body'
+		    base_PINST n' attrs'' leaf' inps' outs' ints'' body'
 		in
 		(p_main', prev_expr_pexlifs)
 	    |
@@ -1123,7 +1123,7 @@ let list_internal cnt body_fun {base_fs::string} acc =
 	    in
 	    let p_main' =
 		let ints' = md_extract_vectors (fv@ints) in
-		PINST n attrs' leaf inps outs ints' body
+		base_PINST n attrs' leaf inps outs ints' body
 	    in
 	    (p_main', [])
 	in
@@ -1131,7 +1131,7 @@ let list_internal cnt body_fun {base_fs::string} acc =
 	let c_ints = get_tmp_outs p_exprs in
 	let c_inps = mk_wrap_inps c_ints (p_main:p_exprs) in
 	let c_outs = mk_wrap_outs [p_main] in
-	let res = PINST "_WrApPeR_" attrs F c_inps c_outs c_ints
+	let res = base_PINST "_WrApPeR_" attrs F c_inps c_outs c_ints
 		    (P_HIER (p_main:p_exprs)) in
 	res
     in
@@ -3000,27 +3000,61 @@ let RAM name lines {raddr:: *a} {waddr:: *a} {din:: *d} {we::bit} {out:: *d} =
     PINST pfn [] T fa_inps fa_outs [s_mem] (P_HIER [rd,wr])
 ;
 
-letrec delay_rec N =
-    bit_input   clk.
-    bit_input   reset.
-    input       din.
-    output      dout.
-    internal    tmp1 tmp2.
-    CELL "delay_rec"
-    (N <= 0 => [dout <- din] | [
-	tmp1 <- (IF reset THEN '0 ELSE din),
-	re_ff clk tmp1 tmp2,
-        delay_rec (N-1) clk reset tmp2 dout
-]);
+begin_abstype;
 
-let delay boxed N clk reset din dout = (
-    bit_input   clk.
-    bit_input   reset.
-    input       din.
-    output      dout.
-    let pfn = boxed => sprintf "draw_hfl {DEL(%d)}" N | "delay" in
-    CELL pfn [(delay_rec N clk reset din dout)]
-) clk reset din dout;
+let delay_0 =
+    bit_input	clk.
+    input	din.
+    output	dout.
+    CELL "DEL(0)" [
+	dout <- din
+];
+
+let delay_n N =
+    bit_input	clk.
+    input	din.
+    output	dout.
+    //
+    list_internal (N-1) mids.
+    //
+    CELL (sprintf "DEL(%d)" N) (
+	map2 (\i.\o. re_ff clk i o) (din:mids) (mids@[dout])
+);
+
+// Return a pexlif that delays a signal N clock cycles.
+let delay N = N = 0 => delay_0 | delay_n N;
+
+end_abstype delay;
+
+begin_abstype;
+
+let rst_delay_0 =
+    bit_input	clk.
+    bit_input	reset.
+    input	din.
+    output	dout.
+    CELL "DEL(0)" [
+	dout <- din
+];
+
+let rst_delay_n N =
+    bit_input	clk.
+    bit_input	reset.
+    input	din.
+    output	dout.
+    //
+    list_internal (N-1) mids.
+    //
+    CELL (sprintf "DEL(%d)" N) (
+	map2 (\i.\o. re_ff_reset clk reset i o) (din:mids) (mids@[dout])
+);
+
+// Return a pexlif that delays a signal N clock cycles.
+// If reset is high, then all the delayed signals are set to 0.
+let rst_delay N = N = 0 => rst_delay_0 | rst_delay_n N;
+
+end_abstype rst_delay;
+
 
 let phase_delay_non_zero N =
     input   din.

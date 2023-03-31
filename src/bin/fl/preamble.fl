@@ -1929,6 +1929,8 @@ andlettype content =
         |   P_LEAF {fns::update_fn list}
 ;
 
+let base_PINST = PINST;
+
 // Re-define PINST so that we always compute a signature (FP) and
 // a SHA256 (SHA) signatures and store them in the attribute list.
 // Also, every (non-toplevel) wrapper PINST is unfolded.

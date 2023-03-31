@@ -1,0 +1,39 @@
+load "idv.fl";
+
+let pp =
+(PINST "mul_impl" [] F
+  [("a[1:0]",["a[1:0]"])]
+  [("out[1:0]",["out[1:0]"])]
+  ["mid[4,2,0][1:0]"]
+  (P_HIER [
+    (PINST "draw_inverter" [] T
+      [("i[1:0]",["a[1:0]"])]
+      [("o[1:0]",["mid[4][1:0]"])]
+      []
+      (P_LEAF [(W_UPDATE_FN (W_VAR 2 "o") (W_NOT (W_VAR 2 "i")))])
+    ),
+    (PINST "draw_inverter" [] T
+      [("i[1:0]",["mid[4][1:0]"])]
+      [("o[1:0]",["mid[2][1:0]"])]
+      []
+      (P_LEAF [(W_UPDATE_FN (W_VAR 2 "o") (W_NOT (W_VAR 2 "i")))])
+    ),
+    (PINST "draw_inverter" [] T
+      [("i[1:0]",["mid[2][1:0]"])]
+      [("o[1:0]",["mid[0][1:0]"])]
+      []
+      (P_LEAF [(W_UPDATE_FN (W_VAR 2 "o") (W_NOT (W_VAR 2 "i")))])
+    ),
+    (PINST "draw_inverter" [] T
+      [("i[1:0]",["mid[0][1:0]"])]
+      [("o[1:0]",["out[1:0]"])]
+      []
+      (P_LEAF [(W_UPDATE_FN (W_VAR 2 "o") (W_NOT (W_VAR 2 "i")))])
+    )
+  ]
+ )
+);
+
+let ckt = pexlif2fsm pp;
+ckt;
+nodes ckt;

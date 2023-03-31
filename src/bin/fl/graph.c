@@ -1612,6 +1612,16 @@ Print_leaf(g_ptr node, odests fp)
     }
 }
 
+static bool
+is_P_PCATCH(g_ptr node)
+{
+    if( GET_TYPE(node) != APPLY_ND ) return( FALSE );
+    node = GET_APPLY_LEFT(node);
+    if( GET_TYPE(node) != LEAF ) return( FALSE );
+    if( !IS_PRIM_FN(node) ) return( FALSE );
+    return( GET_PRIM_FN(node) == P_PCATCH );
+}
+
 bool
 Can_Fail_Pat_Match(g_ptr node)
 {
@@ -1621,6 +1631,9 @@ Can_Fail_Pat_Match(g_ptr node)
 	return(FALSE);
     switch( GET_TYPE(node) ) {
         case APPLY_ND:
+	    if( is_P_PCATCH(GET_APPLY_LEFT(node)) ) {
+		return( Can_Fail_Pat_Match(GET_APPLY_RIGHT(node)) );
+	    }
 	    if( Can_Fail_Pat_Match(GET_APPLY_LEFT(node)) )
 		return( TRUE );
 	    return( Can_Fail_Pat_Match(GET_APPLY_RIGHT(node)) );
