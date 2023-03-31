@@ -5228,6 +5228,7 @@ append_range(ilist_ptr l, int i_from, int i_to)
 	&& (new_up || new_single) )
     {
 	cur->to = i_to;
+	cur->size = abs(cur->to - cur->from) + 1;
 	return l;
     }
     if(    (cur_single || cur_down)
@@ -5235,6 +5236,7 @@ append_range(ilist_ptr l, int i_from, int i_to)
 	&& (new_down || new_single) )
     {
 	cur->to = i_to;
+	cur->size = abs(cur->to - cur->from) + 1;
 	return l;
     }
     ilist_ptr res = (ilist_ptr) new_rec(ilist_rec_mgrp);
@@ -7275,6 +7277,7 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 {
     string anon;
 
+
     // Is it aldready drawn
     if( (anon = (string) find_hash(&(vsp->done), il)) != NULL ) {
 	return(mk_repeat(vsp, anon) );
@@ -8442,6 +8445,7 @@ void
 DBG_print_ilist(ilist_ptr il)
 {
     FP(err_fp, " ilist:");
+    if( il == NULL ) { FP(err_fp, "<NULL>"); return; }
     base_print_ilist(il);
     FP(err_fp, "\n");
 }

@@ -8,24 +8,26 @@ let p =
 	(P_HIER [
 	  (PINST "add" [] T
 		[("i1[1:0]",["a[1:0]"]), ("i2[1:0]",["b[1:0]"])]
-		[("o[1:0]", ["tmp[1][1:0]"])]
+		[("o[1:0]", ["tmp[0][1:0]"])]
 		[]
 		(P_LEAF [(W_UPDATE_FN (W_VAR 2 "o")
 				      (W_ADD (W_VAR 2 "i1") (W_VAR 2 "i2")))])
 	  ),
 	  (PINST "sub" [] T
 		[("i1[1:0]",["a[1:0]"]), ("i2[1:0]",["b[1:0]"])]
-		[("o[1:0]", ["tmp[0][1:0]"])]
+		[("o[1:0]", ["tmp[1][1:0]"])]
 		[]
 		(P_LEAF [(W_UPDATE_FN (W_VAR 2 "o")
 				      (W_SUB (W_VAR 2 "i1") (W_VAR 2 "i2")))])
 	  ),
 	  (PINST "mul" [] T
-		[("i1[1:0]",["tmp[1][1:0]"]), ("i2[1:0]",["tmp[0][1:0]"])]
+		[("i[1:0][1:0]",["tmp[1:0][1:0]"])]
 		[("o[1:0]", ["res[1:0]"])]
 		[]
 		(P_LEAF [(W_UPDATE_FN (W_VAR 2 "o")
-				      (W_MUL (W_VAR 2 "i1") (W_VAR 2 "i2")))])
+				      (W_MUL (W_EXPLICIT_VAR 2 "i[1][1:0]")
+					     (W_EXPLICIT_VAR 2 "i[0][1:0]")))
+			])
 	  )
 	])
 ;
