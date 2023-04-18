@@ -198,11 +198,11 @@ let ant =
 		  i4 in_cycle 4 followed_by
 		  i5 in_cycle 5 otherwise NOP_instr until N cycles
   and
-    "i13/RF0[1][7:0]" is "b[1][7:0]" in_cycle 0
+    "i12/RF0[1][7:0]" is "b[1][7:0]" in_cycle 0
   and
-    "i13/RF0[2][7:0]" is "b[2][7:0]" in_cycle 0
+    "i12/RF0[2][7:0]" is "b[2][7:0]" in_cycle 0
   and
-    "i13/RF1[2][7:0]" is "r[7][7:0]" in_cycle 0
+    "i12/RF1[2][7:0]" is "r[7][7:0]" in_cycle 0
 ;
 
 (var_order (

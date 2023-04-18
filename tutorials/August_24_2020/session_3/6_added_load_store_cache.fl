@@ -78,8 +78,6 @@ MEMORY "valid_array" [(CACHE_LINES, "cache_addr")] "bit";
 MEMORY "tag_array" [(CACHE_LINES, "cache_addr")] "tag";
 MEMORY "cache_array" [(CACHE_LINES, "cache_addr")] "word";
 
-let NOP_instr = '0<--opc ? NOP;
-
 MEMORY "RF" [(4, "sreg")] "word";
 
 ENUM "cache_states" ["C_INIT", "C_WRITE", "C_MISS"];
@@ -400,6 +398,7 @@ let cpu =
     word_internal	cache_out.
     bit_internal	pre_dst_src1 pre_pre_dst_src1.
     bit_internal	pre_dst_src2 pre_pre_dst_src2.
+    bit_internal	is_mem_op.
     CELL "draw_hier cpu" [
 	STATE clk sec_levelIF [
 	    reset --- LOW,
@@ -413,23 +412,23 @@ let cpu =
 	],
 	ROM "ROM" 0 16 pc op,
 	validIF <- '~' (is_NOP (opIF-->opc)),
-	re_ff_en_reset clk nstall reset validIF validEXE,
-	re_ff_en_reset clk nstall reset validEXE validMEM,
-	re_ff_en_reset clk nstall reset validMEM validWB,
+	"pipe_regs" ::: re_ff_en_reset clk nstall reset validIF validEXE,
+	"pipe_regs" ::: re_ff_en_reset clk nstall reset validEXE validMEM,
+	"pipe_regs" ::: re_ff_en_reset clk nstall reset validMEM validWB,
 	//
-	re_ff_en clk nstall sec_levelIF sec_levelEXE,
-	re_ff_en clk nstall sec_levelEXE sec_levelMEM,
-	re_ff_en clk nstall sec_levelMEM sec_levelWB,
+	"pipe_regs" ::: re_ff_en clk nstall sec_levelIF sec_levelEXE,
+	"pipe_regs" ::: re_ff_en clk nstall sec_levelEXE sec_levelMEM,
+	"pipe_regs" ::: re_ff_en clk nstall sec_levelMEM sec_levelWB,
 	//
-	re_ff_en_reset clk nstall reset op opIF,
-	re_ff_en clk nstall opIF opEXE,
-	re_ff_en clk nstall opEXE opMEM,
-	re_ff_en clk nstall opMEM opWB,
+	"pipe_regs" ::: re_ff_en_reset clk nstall reset op opIF,
+	"pipe_regs" ::: re_ff_en clk nstall opIF opEXE,
+	"pipe_regs" ::: re_ff_en clk nstall opEXE opMEM,
+	"pipe_regs" ::: re_ff_en clk nstall opMEM opWB,
 	//
 	valid_destIF <- op_has_dst (opIF-->opc),
-	re_ff_en_reset clk nstall reset valid_destIF valid_destEXE,
-	re_ff_en_reset clk nstall reset valid_destEXE valid_destMEM,
-	re_ff_en_reset clk nstall reset valid_destMEM valid_destWB,
+	"pipe_regs" ::: re_ff_en_reset clk nstall reset valid_destIF valid_destEXE,
+	"pipe_regs" ::: re_ff_en_reset clk nstall reset valid_destEXE valid_destMEM,
+	"pipe_regs" ::: re_ff_en_reset clk nstall reset valid_destMEM valid_destWB,
 	//
 	RF clk sec_levelIF sec_levelWB (opIF-->src1) (opIF-->src2) (opWB-->dst)
 			 valid_destWB dataWB AdataIF BdataIF,
@@ -446,7 +445,9 @@ let cpu =
 	       BdataEXE dataMEM dataWB
 	       (opEXE-->src2) bpBdataEXE,
 	rw <- '~' (opMEM-->opc '=' ST),
-	cache clk reset validMEM rw
+	is_mem_op <- validMEM '&'
+		     ((opMEM-->opc '=' LD) '|' (opMEM-->opc '=' ST)),
+	cache clk reset is_mem_op rw
 			(word2addr bpBdataMEM) dataMEM cache_out nstall
 			ram_rw ram_addr ram_inp ram_out,
 	RAM ram_rw ram_addr ram_inp ram_out,
@@ -461,50 +462,46 @@ let cpu =
 	dbg_valid <- validWB
 ];
 
-let p = cpu 'clk 'reset 'dbg_opc 'dbg_valid 'dbg_op 'dbg_data;
+let p = pexlif_group_by_label (cpu 'clk 'reset 'dbg_opc 'dbg_valid 'dbg_op 'dbg_data);
 
 let vis = STE_debug (pexlif2fsm p);
 vis;
 
 var_order (
     (interleave (map md_expand_vector ["hi[11:0]", "li0[11:0]", "li1[11:0]" ]))@
-    (interleave (map md_expand_vector ["b[1][7:0]", "b[2][7:0]", "r[7][7:0]"]))
+    (interleave (map md_expand_vector ["b[1][7:0]", "b[2][7:0]", "r[2][7:0]"]))
 );
-//var_order ["li[4:0]","hi[4]","li[10]","li[7]","hi[3]","li[9]","li[6:5]","li[8]","hi[2:0]","hi[8:10]","hi[7:5]","r[7][7:6]","b[1:2][6]","b[2:1][7]","r[7][5]","b[1:2][5]","r[7][4]","b[1:2][4]","r[7][3]","b[1:2][3]","r[7][2]","b[1:2][2]","b[1][0:1]","r[7][1:0]","b[2][0:1]"];
 
 //update_vossrc "DYNAMIC-ORDERING" "NO";
 
-
-
-let change_to_public  = '0<-- opc ? PUBLIC;
-let change_to_private = '0<-- opc ? PRIVATE;
+let mk_op op = '0<-- opc ? op;
 
 let test i3 =
     let N = 50 in
     let ROM_ant = mk_ROM_ant "ROM" vis [
-	    change_to_public,
-	    NOP_instr,
-	    'li0<-- opc ? LD <-- dst ? '1 <--src2 ? '1,
-	    change_to_private,
+	    mk_op PUBLIC,
+	    mk_op NOP,
+	    (mk_op LD)<-- dst ? '1 <--src2 ? '1,
+	    mk_op PRIVATE,
 	    i3,
-	    change_to_public,
-	    '0<--opc ? GET_TIMER <-- dst ? '2,
-	    'li1<-- opc ? LD <-- dst ? '1 <--src2 ? '1,
-	    '0<--opc ? GET_TIMER <-- dst ? '3
+	    mk_op PUBLIC,
+	    (mk_op GET_TIMER)<-- dst ? '2,
+	    (mk_op LD)<-- dst ? '1 <--src2 ? '1,
+	    (mk_op GET_TIMER)<-- dst ? '3,
+	    mk_op HALT
     ] in
     let ant =
 	"clk" is_clock N
       and
-	"reset" is 1 in_cycle 0 followed_by
-		   1 in_cycle 1 otherwise 0 until N cycles
+	"reset" is 1 in_cycle 0 otherwise 0 until N cycles
       and
 	ROM_ant
       and
-	"i19/RF0[1][7:0]" is "b[1][7:0]" in_cycle 0
+	"i4/RF0[1][7:0]" is "b[1][7:0]" in_cycle 0
       and
-	"i19/RF0[2][7:0]" is "b[2][7:0]" in_cycle 0
+	"i4/RF0[2][7:0]" is "b[2][7:0]" in_cycle 0
       and
-	"i19/RF1[2][7:0]" is "r[7][7:0]" in_cycle 0
+	"i4/RF1[2][7:0]" is "r[2][7:0]" in_cycle 0
     in
     STE "-e" vis [] ant [] []
 //    STE "-e -w 1000 -ifw" vis [] ant [] []

@@ -2008,3 +2008,15 @@ let draw_show_values {vis::vfsm} c show =
     ) fseq ())
 ;
 
+
+// Turn on/off backannotation of values on canvas c.
+let draw_show_dependencies {vis::vfsm} c show =
+    let cur = tcl_eval [sprintf "set ::vstatus(show_bdd_group,%s)" c] then
+    let toggle = show XOR (cur = "1") then
+    NOT toggle => () |
+    ((tcl_eval [
+	sprintf "set ::vstatus(show_bdd_group,%s) %s" c (show => "1" | "0"),
+	sprintf "sch:toggle_show_value_buttons %s [winfo parent %s].menu" c c,
+	"update"]
+    ) fseq ())
+;

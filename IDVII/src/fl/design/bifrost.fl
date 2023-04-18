@@ -280,13 +280,24 @@ end_abstype find_max_age;
 // Memory controller for memory banking
 // ==============================================================
 
-
 //
 // Memory with 1 write port and (potentially) many read ports.
 // The memory is arranged as multiple words and thus if the addresses
 // are algigned, multiple reads can take place at the same time.
 //
-let mk_bifrost_memory name MEM_BANKS MEM_SIZE RAM_LATENCY addr data =
+// The addr and data arguments are not used but need to be of desired type.
+//
+let mk_bifrost_memory name
+		      MEM_BANKS MEM_SIZE RAM_LATENCY
+		      read_protocol write_protocol
+		      addr data
+    =
+    read_protocol != "pulseecho" =>
+	error "Currently only pulseecho supported as read_protocol"
+    |
+    write_protocol != "pulseecho" =>
+	error "Currently only pulseecho supported as write_protocol"
+    |
     let addr_tp = hw_type_name addr in
     let data_tp = hw_type_name data in
     let saddr_sz = int2str (hw_size addr) in
@@ -301,174 +312,170 @@ let mk_bifrost_memory name MEM_BANKS MEM_SIZE RAM_LATENCY addr data =
     let mem_read_fsm = sprintf "%s_mem_read_fsm" name in
     let mem_fsm = sprintf "%s_mem_fsm" name in
     let RAM = name^"_RAM" in
-    eval_fl_code
-    <{
-	begin_abstype;
+eval_fl_code
+<{
+begin_abstype;
  
-	let addr_sz = `saddr_sz`;
-	let MEM_BANKS = `sMEM_BANKS`;
-	let MEM_SIZE  = `sMEM_SIZE`;
-	let RAM_LATENCY  = `sRAM_LATENCY`;
+let addr_sz = `saddr_sz`;
+let MEM_BANKS = `sMEM_BANKS`;
+let MEM_SIZE  = `sMEM_SIZE`;
+let RAM_LATENCY  = `sRAM_LATENCY`;
  
-	let MEM_LINES = MEM_SIZE / MEM_BANKS;
-	TYPE "`maddr`" (addr_sz -(bits_needed (MEM_BANKS-1)));
+let MEM_LINES = MEM_SIZE / MEM_BANKS;
+TYPE "`maddr`" (addr_sz -(bits_needed (MEM_BANKS-1)));
  
-	let addr2maddr {a::`addr`} =
-	    let res =
-		frombits (butlastn (bits_needed (MEM_BANKS-1)) (tobits a))
-	    in
-	    {res::`maddr`}
-	;
- 
-	TYPE "`rd_id`" (bits_needed (MEM_BANKS-1));
-	TYPE "`rd_age`" (bits_needed (MEM_BANKS * RAM_LATENCY/2));
- 
-	MEMORY "`RAM`" [(MEM_LINES, "`maddr`")]  "`data`";
- 
-	let align_addr {addr::`addr`} = addr '&' '~' (''(MEM_BANKS-1));
-	let offset_addr {addr::`addr`} = addr '&' (''(MEM_BANKS-1));
-	ENUM "`mem_read_fsm`" ["IDLE", "READING", "DONE"];
-	let RAM =
-	    `maddr`_input	addr.
-	    `data`_input  inp.
-	    bit_input	rw.
-	    `data`_output out.
-	    //
-	    bit_internal    addr_rdy rw_rdy inp_rdy rd_rdy wr_rdy.
-	    `RAM`_internal    ram tmp_new_ram new_ram.
-	    internal        local_rd_data.
-	    CELL "RAM" [
-		is_stable RAM_LATENCY addr addr_rdy,
-		is_stable RAM_LATENCY rw rw_rdy,
-		is_stable RAM_LATENCY inp inp_rdy,
-		rd_rdy <- addr_rdy '&' rw_rdy,
-		Read_`RAM` ram addr local_rd_data,
-		out <- (IF (rd_rdy '&' rw) THEN local_rd_data ELSE 'X),
-		Write_`RAM` ram addr inp tmp_new_ram,
-		wr_rdy <- rd_rdy '&' inp_rdy,
-		new_ram <- (IF (wr_rdy '&' '~' rw) THEN tmp_new_ram ELSE ram),
-		ram <: new_ram
-	];
- 
-	let find_match =
-	    input	target_addr.
-	    list_input	addrs.
-	    list_input	data.
-	    bit_output	match.
-	    output	res.
-	    //
-	    bit_list_internal (length addrs) eqs.
-	    CELL "find_match" (
-		(map2 (\\eq.\\a. eq <- (a '=' target_addr)) eqs addrs)
-		@
-		[
-		    match <- OR_n eqs,
-		    CASE res (zip eqs data) 'X
-		]
-	);
- 
-	let mem_read_fsm =
-	    // External I/Os
-	    bit_input           clk reset.
-	    bit_input           req.
-	    `addr`_input          addr.
-	    bit_output          ack.
-	    `data`_output         res.
-	    //
-	    `rd_age`_output	age.
-	    `addr`_output         rd_addr.
-	    bit_input           res_valid.
-	    `addr`_list_input	res_addrs.
-	    `data`_list_input	res_data.
-	    //
-	    `mem_read_fsm`_internal   fsm.
-	    bit_internal	    raw_match match.
-	    internal		    my_addr raw_res.
-	    //
-	    CELL "mem_read_fsm" [
-		Moore_FSM "mem_read_fsm" clk fsm (reset, IDLE) [
-		    IDLE    --- req	--- READING,
-		    READING --- match	--- DONE,
-		    DONE    --- '1	--- IDLE
-		],
-		STATE clk age [
-		    reset			      --- '0,
-		    (is_IDLE fsm '&' req)	      --- '1,
-		    ((is_READING fsm) '&' '~' match)  --- (age '+' '1),
-		    '1				      --- '0
-		],
-		re_ff_en clk (is_IDLE fsm '&' req) addr my_addr,
-		rd_addr <- align_addr my_addr,
-		find_match my_addr res_addrs res_data raw_match raw_res,
-		match <- raw_match '&' res_valid,
-		ack <- is_DONE fsm,
-		re_ff_en clk match raw_res res
-	];
- 
- 
- 
-	ENUM "`mem_fsm`" ["IDLE", "MEM_WRITE", "MEM_READ"];
-
- 
-	let `name` =
-	    bit_input		    clk reset pwr_on.
-	    bit_list_input	    rd_reqs.
-	    `addr`_list_input	    rd_addrs.
-	    bit_list_output	    rd_acks.
-	    `data`_list_output	    rd_results.
-	    bit_input		    wr_req.
-	    `addr`_input		    wr_addr.
-	    `data`_input		    wr_data.
-	    bit_output		    wr_ack.
-	    //
-	    bit_list_internal MEM_BANKS	rws.
-	    `addr`_internal			mem_addr.
-	    `data`_list_internal MEM_BANKS	res_words.
-	    `addr`_list_internal MEM_BANKS	res_addrs.
-	    bit_internal			rd_ready.
-	    `mem_fsm`_internal			fsm.
-	    `rd_age`_list_internal MEM_BANKS	ages.
-	    `rd_id`_internal			choice.
-	    bit_internal			rd_done one_rd_rdy wr_done.
-	    `addr`_internal			rd_addr base_wr_addr offset.
-	    `addr`_list_internal MEM_BANKS	req_rd_addrs.
-	    //
-	    //
-	    CELL (sprintf "memory(%dx%d)" MEM_LINES MEM_BANKS) (
-		// Banks of RAMs
-		(map2 (RAM (addr2maddr mem_addr) wr_data) rws res_words)
-		@
-		// Bank of read_fsms
-		(map (\\(req,addr,ack,res,age,req_rd_addr).
-			mem_read_fsm clk reset req addr ack res age req_rd_addr
-				     rd_done res_addrs res_words)
-		    (zip6 rd_reqs rd_addrs rd_acks rd_results ages req_rd_addrs)
-		)
-		@
-		(map2 (\\ra.\\i. ra <- rd_addr '+' ''i) res_addrs (0--(MEM_BANKS-1)))
-		@
-		(map2 (\\rw.\\i. rw <- '~' (is_MEM_WRITE fsm) '|' (offset '!=' ''i))
-		      rws (0--(MEM_BANKS-1)))
-		@
-		[
-		    Moore_FSM "mem_fsm" clk fsm (reset, IDLE) [
-			IDLE	       --- wr_req     --- MEM_WRITE,
-			IDLE	       --- one_rd_rdy --- MEM_READ,
-			MEM_WRITE      --- wr_done    --- IDLE,
-			MEM_READ       --- rd_done    --- IDLE
-		    ],
-		    phase_delay RAM_LATENCY (is_IDLE fsm '&' one_rd_rdy) rd_done,
-		    phase_delay RAM_LATENCY (is_IDLE fsm '&' wr_req) wr_done,
-		    find_max_age ages one_rd_rdy choice,
-		    SELECT_list req_rd_addrs choice rd_addr,
-		    base_wr_addr <- align_addr wr_addr,
-		    offset <- offset_addr wr_addr,
-		    wr_ack <- is_MEM_WRITE fsm '&' wr_done,
-		    mem_addr <- (IF (is_MEM_WRITE fsm) THEN base_wr_addr ELSE rd_addr)
-		]
-	);
- 
-	end_abstype `name`;
- 
-    }> "functor"
+let addr2maddr {a::`addr`} =
+    let res =
+	frombits (butlastn (bits_needed (MEM_BANKS-1)) (tobits a))
+    in
+    {res::`maddr`}
 ;
+ 
+TYPE "`rd_id`" (bits_needed (MEM_BANKS-1));
+TYPE "`rd_age`" (bits_needed (MEM_BANKS * RAM_LATENCY/2));
+ 
+MEMORY "`RAM`" [(MEM_LINES, "`maddr`")]  "`data`";
+ 
+let align_addr {addr::`addr`} = addr '&' '~' (''(MEM_BANKS-1));
+let offset_addr {addr::`addr`} = addr '&' (''(MEM_BANKS-1));
+ENUM "`mem_read_fsm`" ["IDLE", "READING", "DONE"];
+let RAM =
+    `maddr`_input	addr.
+    `data`_input  inp.
+    bit_input	rw.
+    `data`_output out.
+    //
+    bit_internal    addr_rdy rw_rdy inp_rdy rd_rdy wr_rdy.
+    `RAM`_internal    ram tmp_new_ram new_ram.
+    internal        local_rd_data.
+    CELL "RAM" [
+	is_stable RAM_LATENCY addr addr_rdy,
+	is_stable RAM_LATENCY rw rw_rdy,
+	is_stable RAM_LATENCY inp inp_rdy,
+	rd_rdy <- addr_rdy '&' rw_rdy,
+	Read_`RAM` ram addr local_rd_data,
+	out <- (IF (rd_rdy '&' rw) THEN local_rd_data ELSE 'X),
+	Write_`RAM` ram addr inp tmp_new_ram,
+	wr_rdy <- rd_rdy '&' inp_rdy,
+	new_ram <- (IF (wr_rdy '&' '~' rw) THEN tmp_new_ram ELSE ram),
+	ram <: new_ram
+];
+ 
+let find_match =
+    input	target_addr.
+    list_input	addrs.
+    list_input	data.
+    bit_output	match.
+    output	res.
+    //
+    bit_list_internal (length addrs) eqs.
+    CELL "find_match" (
+	(map2 (\\eq.\\a. eq <- (a '=' target_addr)) eqs addrs)
+	@
+	[
+	    match <- OR_n eqs,
+	    CASE res (zip eqs data) 'X
+	]
+);
+ 
+let mem_read_fsm =
+    // External I/Os
+    bit_input           clk reset.
+    bit_input           req.
+    `addr`_input          addr.
+    bit_output          ack.
+    `data`_output         res.
+    //
+    `rd_age`_output	age.
+    `addr`_output         rd_addr.
+    bit_input           res_valid.
+    `addr`_list_input	res_addrs.
+    `data`_list_input	res_data.
+    //
+    `mem_read_fsm`_internal   fsm.
+    bit_internal	    raw_match match.
+    internal		    my_addr raw_res.
+    //
+    CELL "mem_read_fsm" [
+	Moore_FSM "mem_read_fsm" clk fsm (reset, IDLE) [
+	    IDLE    --- req	--- READING,
+	    READING --- match	--- DONE,
+	    DONE    --- '1	--- IDLE
+	],
+	STATE clk age [
+	    reset			      --- '0,
+	    (is_IDLE fsm '&' req)	      --- '1,
+	    ((is_READING fsm) '&' '~' match)  --- (age '+' '1),
+	    '1				      --- '0
+	],
+	re_ff_en clk (is_IDLE fsm '&' req) addr my_addr,
+	rd_addr <- align_addr my_addr,
+	find_match my_addr res_addrs res_data raw_match raw_res,
+	match <- raw_match '&' res_valid,
+	ack <- is_DONE fsm,
+	re_ff_en clk match raw_res res
+];
+ 
+ENUM "`mem_fsm`" ["IDLE", "MEM_WRITE", "MEM_READ"];
+ 
+let `name` =
+    bit_input		    clk reset pwr_on.
+    bit_list_input	    rd_reqs.
+    `addr`_list_input	    rd_addrs.
+    bit_list_output	    rd_acks.
+    `data`_list_output	    rd_results.
+    bit_input		    wr_req.
+    `addr`_input		    wr_addr.
+    `data`_input		    wr_data.
+    bit_output		    wr_ack.
+    //
+    bit_list_internal MEM_BANKS	rws.
+    `addr`_internal			mem_addr.
+    `data`_list_internal MEM_BANKS	res_words.
+    `addr`_list_internal MEM_BANKS	res_addrs.
+    bit_internal			rd_ready.
+    `mem_fsm`_internal			fsm.
+    `rd_age`_list_internal MEM_BANKS	ages.
+    `rd_id`_internal			choice.
+    bit_internal			rd_done one_rd_rdy wr_done.
+    `addr`_internal			rd_addr base_wr_addr offset.
+    `addr`_list_internal MEM_BANKS	req_rd_addrs.
+    //
+    //
+    CELL (sprintf "memory(%dx%d)" MEM_LINES MEM_BANKS) (
+	// Banks of RAMs
+	(map2 (RAM (addr2maddr mem_addr) wr_data) rws res_words)
+	@
+	// Bank of read_fsms
+	(map (\\(req,addr,ack,res,age,req_rd_addr).
+		mem_read_fsm clk reset req addr ack res age req_rd_addr
+			     rd_done res_addrs res_words)
+	    (zip6 rd_reqs rd_addrs rd_acks rd_results ages req_rd_addrs)
+	)
+	@
+	(map2 (\\ra.\\i. ra <- rd_addr '+' ''i) res_addrs (0--(MEM_BANKS-1)))
+	@
+	(map2 (\\rw.\\i. rw <- '~' (is_MEM_WRITE fsm) '|' (offset '!=' ''i))
+	      rws (0--(MEM_BANKS-1)))
+	@
+	[
+	    Moore_FSM "mem_fsm" clk fsm (reset, IDLE) [
+		IDLE	       --- wr_req     --- MEM_WRITE,
+		IDLE	       --- one_rd_rdy --- MEM_READ,
+		MEM_WRITE      --- wr_done    --- IDLE,
+		MEM_READ       --- rd_done    --- IDLE
+	    ],
+	    phase_delay RAM_LATENCY (is_IDLE fsm '&' one_rd_rdy) rd_done,
+	    phase_delay RAM_LATENCY (is_IDLE fsm '&' wr_req) wr_done,
+	    find_max_age ages one_rd_rdy choice,
+	    SELECT_list req_rd_addrs choice rd_addr,
+	    base_wr_addr <- align_addr wr_addr,
+	    offset <- offset_addr wr_addr,
+	    wr_ack <- is_MEM_WRITE fsm '&' wr_done,
+	    mem_addr <- (IF (is_MEM_WRITE fsm) THEN base_wr_addr ELSE rd_addr)
+	]
+);
+end_abstype `name`;
+ 
+}> "functor";
+
