@@ -127,6 +127,7 @@ g_ptr	     Eval(g_ptr redex);
 g_ptr	     Append_string_to_tail(g_ptr tail, string name);
 void	     Get_Vars(buffer *bp, g_ptr node);
 g_ptr	     Reflect_expr(g_ptr node);
+g_ptr	     Cephalopde_Reflect_expr(g_ptr node);
 formula	     Get_cur_eval_cond();
 unsigned int Graph_hash(pointer np, unsigned int n);
 bool	     Graph_equ(pointer p1, pointer p2);
