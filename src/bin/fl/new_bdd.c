@@ -318,7 +318,6 @@ Rand_Var(string name)
     BDD_RETURN( ret );
 }
 
-
 /* Return the size of the BDD */
 int
 Get_bdd_size(formula f, int limit) 
@@ -1204,6 +1203,63 @@ SHA256_bdd(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha, formula f)
     return res;
 }
 
+
+#if 0
+
+static int signature_target = 0;
+static hash_record path_cond_tbl;
+
+static int
+mark_relevant(formula f)
+{
+    if( f == ZERO || f == ONE)
+        return 1;
+    bdd_ptr bp = GET_BDDP(f);
+    int res;
+    if( (res = PTR2INT(find_hash(&path_cond_tbl, bp))) != 0 ) {
+	return res;
+    }
+    if( POS(f) == signature_target ) {
+	insert_hash(&path_cond_tbl, bp, INT2PTR(2));
+	return 2;
+    }
+    int lres = mark_relevant(GET_LSON(bp));
+    int rres = mark_relevant(GET_RSON(bp));
+    if( lres == 2 || rres == 2 ) { 
+	res = 2;
+    } else {
+	res = 1;
+    }
+    insert_hash(&path_cond_tbl, bp, INT2PTR(res));
+    return res;
+}
+
+static formula
+build_path_cond(formula f)
+{
+    if( f == ZERO || f == ONE)
+        return f;
+    formula pf = POS(f);
+    bdd_ptr bp = GET_BDDP(f);
+
+    if( f == ZERO || f == ONE )
+        return;
+
+    
+}
+
+formula
+Get_Path_Condition(int signature, formula f)
+{
+    signature_target = POS(signature);
+    create_hash(&path_cond_tbl, 100, bdd_hash, bdd_eq);
+    mark_relevant(f);
+    formula res = build_path_cond(f);
+
+    dispose_hash(&path_cond_tbl, NULLFCN);
+}
+
+#endif
 
 /********************************************************/
 /*	    EXPORTED EXTAPI FUNCTIONS    		*/
@@ -3220,15 +3276,15 @@ draw_bdd_rec(FILE *fp, hash_record *hp, formula f)
     if( use_negated_pointers ) {
 	if( ISNOT(R) ) {
 	    int to = draw_bdd_rec(fp, hp, POS(R));
-	    fprintf(fp, "n%u -> n%u [style=dotted, color=red];\n", res, to);
+	    fprintf(fp, "n%u -> n%u [style=dashed, color=red];\n", res, to);
 	} else {
 	    int to = draw_bdd_rec(fp, hp, R);
-	    fprintf(fp, "n%u -> n%u [style=dotted, color=blue];\n", res, to);
+	    fprintf(fp, "n%u -> n%u [style=dashed, color=blue];\n", res, to);
 	}
     } else {
 	if( ISNOT(f) ) { R = NOT(R); }
 	int to = draw_bdd_rec(fp, hp, R);
-	fprintf(fp, "n%u -> n%u [style=dotted, color=black];\n", res, to);
+	fprintf(fp, "n%u -> n%u [style=dashed, color=black];\n", res, to);
     }
     return res;
 }

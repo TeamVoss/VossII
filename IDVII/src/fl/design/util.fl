@@ -1067,7 +1067,12 @@ let opt_base_compact_wprint inps rhs =
 	sprintf "draw_unary_arithm {-%d}" v
      /\ special (W_EQ var (W_CONST sz v)) assuming (is_var var AND v < 10) =
 	sprintf "draw_unary_arithm {=%d}" v
+     /\ special (W_EQ (W_CONST sz v) var) assuming (is_var var AND v < 10) =
+	sprintf "draw_unary_arithm {=%d}" v
      /\ special (W_NOT (W_EQ var (W_CONST sz v)))
+		assuming (is_var var AND v < 10) =
+	sprintf "draw_unary_arithm {!=%d}" v
+     /\ special (W_NOT (W_EQ (W_CONST sz v) var))
 		assuming (is_var var AND v < 10) =
 	sprintf "draw_unary_arithm {!=%d}" v
      /\ special (W_EQ var (W_CONST sz v)) assuming (is_var var) =

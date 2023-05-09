@@ -318,6 +318,22 @@ let base_assignment do_split lhs rhs =
 	    in
 	    let p = mk_pinst NONE lhs (W_SUB a' (W_CONST sz v)) then
 	    p1@[p]
+     /\    split lhs (W_EQ a (W_CONST sz v)) assuming (v < 10)  =
+	    val (a',p1) = is_var a => (a,[]) |
+		let mid = mk_tmp (wexpr_size a) then
+		let p1 = split mid a then
+		(mid, p1)
+	    in
+	    let p = mk_pinst NONE lhs (W_EQ a' (W_CONST sz v)) then
+	    p1@[p]
+     /\    split lhs (W_NOT (W_EQ a (W_CONST sz v))) assuming (v < 10)  =
+	    val (a',p1) = is_var a => (a,[]) |
+		let mid = mk_tmp (wexpr_size a) then
+		let p1 = split mid a then
+		(mid, p1)
+	    in
+	    let p = mk_pinst NONE lhs (W_NOT (W_EQ a' (W_CONST sz v))) then
+	    p1@[p]
      /\    split lhs (W_GR a (W_CONST sz v)) assuming (v < 10)  =
 	    val (a',p1) = is_var a => (a,[]) |
 		let mid = mk_tmp (wexpr_size a) then

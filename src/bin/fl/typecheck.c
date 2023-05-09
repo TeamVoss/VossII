@@ -2106,6 +2106,7 @@ Find_Overload_Choice(fn_ptr fn, typeExp_ptr type)
 	pop_tc_context(TRUE);
 	return NULL;
     }
+    pop_tc_context(FALSE);
     if( fn->overload == FALSE ) {
 	return fn;
     }

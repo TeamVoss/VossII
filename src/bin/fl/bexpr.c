@@ -1100,6 +1100,13 @@ BE_Init()
     s_bEqual = wastrsave(&strings, "bEqual");
 }
 
+#if 0
+static void
+bexpr_signature(g_ptr redex)
+{
+}
+#endif
+
 void
 Bexpr_Install_Functions()
 {
@@ -1341,6 +1348,8 @@ be2bdd(bexpr be)
 	res = B_Var(BE_GET_VAR(b));
     } else {
 	res = B_And(be2bdd(BE_GET_LEFT(b)), be2bdd(BE_GET_RIGHT(b)));
+// BUGGY!!    if( Do_gc_asap )
+//            Garbage_collect();
     }
     b->bdd = res;
     b->has_bdd = 1;
@@ -1474,6 +1483,7 @@ be_and(bexpr f1, bexpr f2)
 	return( BE_FALSE );
     }
     if( RC_reorder_bexpr_ands ) {
+	// Make the right-spine as large as possible
 	if( f1->height > f2->height ) {
 	    bexpr tmp = f1;
 	    f1 = f2;
