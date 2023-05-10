@@ -384,6 +384,13 @@ let AND e1 e2 = defix AND e1 e2;
 // Compute the disjunction of 'e1' and 'e2'.
 let OR e1 e2 = defix OR e1 e2;
 
+// Compute the conjunction of 'e1' and 'e2' but limit the size
+// of the resulting BDD to sz. If it is bigger, raise an exception.
+let limitedAND e1 e2 sz = limitedAND e1 e2 sz;
+
+// Compute the disjunction of 'e1' and 'e2' but limit the size
+// of the resulting BDD to sz. If it is bigger, raise an exception.
+let limitedOR e1 e2 sz = limitedOR e1 e2 sz;
 
 // Compute the exclusive or of 'e1' and 'e2'.
 let XOR e1 e2 = defix XOR e1 e2;

@@ -1522,6 +1522,42 @@ bdd_size(g_ptr redex)
 }
 
 static void
+limitedAND(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr a, b, gsz;
+    EXTRACT_3_ARGS(redex, a, b, gsz);
+    int sz = GET_INT(gsz);
+    formula res = B_And(GET_BOOL(a), GET_BOOL(b));
+    if( Get_bdd_size(res, sz) >= sz ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("limitedAND exceeded max size"));
+    } else {
+	MAKE_REDEX_BOOL(redex, res);
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+limitedOR(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr a, b, gsz;
+    EXTRACT_3_ARGS(redex, a, b, gsz);
+    int sz = GET_INT(gsz);
+    formula res = B_Or(GET_BOOL(a), GET_BOOL(b));
+    if( Get_bdd_size(res, sz) >= sz ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("limitedOR exceeded max size"));
+    } else {
+	MAKE_REDEX_BOOL(redex, res);
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
 do_substitute(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
@@ -1697,6 +1733,24 @@ BDD_Install_Functions()
 						   GLmake_bool())),
 			bddXNOR);
     Insert_infix("XNOR", 4);
+
+    Add_ExtAPI_Function("limitedAND", "111", FALSE,
+			GLmake_arrow(
+			    GLmake_bool(),
+			    GLmake_arrow(
+			      GLmake_bool(),
+			      GLmake_arrow(GLmake_int(),
+					   GLmake_bool()))),
+			limitedAND);
+
+    Add_ExtAPI_Function("limitedOR", "111", FALSE,
+			GLmake_arrow(
+			    GLmake_bool(),
+			    GLmake_arrow(
+			      GLmake_bool(),
+			      GLmake_arrow(GLmake_int(),
+					   GLmake_bool()))),
+			limitedOR);
 
     Add_ExtAPI_Function("draw_bdds", "11", FALSE,
                         GLmake_arrow(GLmake_bool(),
