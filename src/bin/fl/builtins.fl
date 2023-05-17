@@ -519,7 +519,6 @@ let bNOT a = defix bNOT a;
 // the bexpr result canonical. However, no guarantee for functional identity.
 let bAND a1 a2 = defix bAND a1 a2;
 
-
 // Form disjunction of bexprs a1 and a2;
 // A simulator + SAT solver with a small timeout is used to keep
 // the bexpr result canonical. However, no guarantee for functional identity.
@@ -536,6 +535,10 @@ let bXOR a1 a2 = defix bXOR a1 a2;
 // the bexpr result canonical. However, no guarantee for functional identity.
 let bXNOR a1 a2 = defix bXNOR a1 a2;
 
+// Return a signature for the bexpr b.
+// NOTE: the signature is only guaranteed to stay the same during a
+// single VossII session. 
+let bexpr_signature b = bexpr_signature b;
 
 // Return the total size of all the bexprs in e
 let bsize e = defix bsize e;
