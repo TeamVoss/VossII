@@ -423,6 +423,8 @@ proc wv:restore_original_colors {w} {
     set pw $f.panes
     set nf $pw.name_frame
     set nn $nf.names
+    set wf $pw.waveform_frame
+    set ww $wf.waveforms
 
     if [info exists ::changed_colors($nn)] {
         foreach item $::changed_colors($nn) {
@@ -430,6 +432,14 @@ proc wv:restore_original_colors {w} {
             $nn itemconfigure $item -fill $dcol
         }
         unset ::changed_colors($nn)
+    }
+
+    if [info exists ::changed_colors($ww)] {
+        foreach item $::changed_colors($ww) {
+            set dcol [get_stored_default_color $ww $item]
+            $ww itemconfigure $item -fill $dcol
+        }
+        unset ::changed_colors($ww)
     }
 }
 

@@ -1244,7 +1244,7 @@ Compile(symbol_tbl_ptr stbl, g_ptr onode, typeExp_ptr type, bool delayed)
     }
 
     result_ptr rp = (result_ptr) new_rec(&result_rec_mgr);
-    rp->expr_init =  cephalopode_mode? Reflect_expr(node) : NULL;
+    rp->expr_init =  cephalopode_mode? Cephalopde_Reflect_expr(node) : NULL;
 
 #ifdef CHECK_REF_CNTS
     check_ref_cnts(node);
@@ -1270,7 +1270,7 @@ Compile(symbol_tbl_ptr stbl, g_ptr onode, typeExp_ptr type, bool delayed)
     check_ref_cnts(node);
 #endif
     rp->signature = Get_SHA256_signature(node);
-    rp->expr_comb = cephalopode_mode? Reflect_expr(node) : NULL;
+    rp->expr_comb = cephalopode_mode? Cephalopde_Reflect_expr(node) : NULL;
 
     /* Link in used definitions */
     node = Replace_name(node, stbl);
@@ -1612,6 +1612,16 @@ Print_leaf(g_ptr node, odests fp)
     }
 }
 
+static bool
+is_P_PCATCH(g_ptr node)
+{
+    if( GET_TYPE(node) != APPLY_ND ) return( FALSE );
+    node = GET_APPLY_LEFT(node);
+    if( GET_TYPE(node) != LEAF ) return( FALSE );
+    if( !IS_PRIM_FN(node) ) return( FALSE );
+    return( GET_PRIM_FN(node) == P_PCATCH );
+}
+
 bool
 Can_Fail_Pat_Match(g_ptr node)
 {
@@ -1621,6 +1631,9 @@ Can_Fail_Pat_Match(g_ptr node)
 	return(FALSE);
     switch( GET_TYPE(node) ) {
         case APPLY_ND:
+	    if( is_P_PCATCH(GET_APPLY_LEFT(node)) ) {
+		return( Can_Fail_Pat_Match(GET_APPLY_RIGHT(node)) );
+	    }
 	    if( Can_Fail_Pat_Match(GET_APPLY_LEFT(node)) )
 		return( TRUE );
 	    return( Can_Fail_Pat_Match(GET_APPLY_RIGHT(node)) );
@@ -5895,7 +5908,7 @@ mkConstr2(string name, g_ptr e1, g_ptr e2)
 }
 
 g_ptr
-Reflect_expr(g_ptr node)
+Cephalopde_Reflect_expr(g_ptr node)
 {
 
     if( IS_NIL(node)) {
@@ -5907,16 +5920,16 @@ Reflect_expr(g_ptr node)
 		return( GET_APPLY_RIGHT(node) );
 	    }
 	    return( mkConstr2(s_APPLY,
-			       Reflect_expr(GET_APPLY_LEFT(node)),
-			       Reflect_expr(GET_APPLY_RIGHT(node))) );
+			       Cephalopde_Reflect_expr(GET_APPLY_LEFT(node)),
+			       Cephalopde_Reflect_expr(GET_APPLY_RIGHT(node))) );
 	case LAMBDA_ND:
 	    return( mkConstr2(s_LAMBDA,
 			       Make_STRING_leaf(GET_LAMBDA_VAR(node)),
-			       Reflect_expr(GET_LAMBDA_BODY(node))) );
+			       Cephalopde_Reflect_expr(GET_LAMBDA_BODY(node))) );
 	case CONS_ND:
 	    return( mkConstr2(s_CONS,
-			       Reflect_expr(GET_CONS_HD(node)) ,
-			       Reflect_expr(GET_CONS_TL(node))) );
+			       Cephalopde_Reflect_expr(GET_CONS_HD(node)) ,
+			       Cephalopde_Reflect_expr(GET_CONS_TL(node))) );
 	case LEAF:
 	    switch( GET_LEAF_TYPE(node) ) {
 		case INT:
@@ -5990,6 +6003,117 @@ Reflect_expr(g_ptr node)
 		    return( mkConstr1(
 				s_LEAF,
 				mkConstr1(
+				    s_USERDEF,
+				    Make_INT_leaf(fp->id))) );
+		}
+		default:
+		    DIE("Illegal leaf node type");
+	    }
+	    break;
+	default:
+	    DIE("Illegal node type");
+    }
+}
+
+#define mkAPP1(name, expr) Make_APPL_ND(Make_VAR_leaf(name), expr)
+#define mkAPP2(name, e1, e2) Make_APPL_ND(Make_APPL_ND(Make_VAR_leaf(name), e1), e2)
+
+g_ptr
+Reflect_expr(g_ptr node)
+{
+
+    if( IS_NIL(node)) {
+	return( Make_VAR_leaf(s_NIL) );
+    }
+    switch( GET_TYPE(node) ) {
+	case APPLY_ND:
+	    if( IS_UNQUOTE(GET_APPLY_LEFT(node)) ) {
+		return( GET_APPLY_RIGHT(node) );
+	    }
+	    return( mkAPP2(s_APPLY,
+			       Reflect_expr(GET_APPLY_LEFT(node)),
+			       Reflect_expr(GET_APPLY_RIGHT(node))) );
+	case LAMBDA_ND:
+	    return( mkAPP2(s_LAMBDA,
+			       Make_STRING_leaf(GET_LAMBDA_VAR(node)),
+			       Reflect_expr(GET_LAMBDA_BODY(node))) );
+	case CONS_ND:
+	    return( mkAPP2(s_CONS,
+			       Reflect_expr(GET_CONS_HD(node)) ,
+			       Reflect_expr(GET_CONS_TL(node))) );
+	case LEAF:
+	    switch( GET_LEAF_TYPE(node) ) {
+		case INT:
+		    return( mkAPP1(
+				s_LEAF,
+			        mkAPP1(s_INT,
+					   Make_AINT_leaf(GET_AINT(node)))) );
+		case STRING:
+		    return( mkAPP1(
+				s_LEAF,
+			        mkAPP1(
+				    s_STRING,
+				    Make_STRING_leaf(GET_STRING(node)))) );
+		case BOOL:
+		    return( mkAPP1(
+				s_LEAF,
+			        mkAPP1(
+				    s_BOOL,
+				    Make_BOOL_leaf(GET_BOOL(node)))) );
+		case BEXPR:
+		    return( mkAPP1(
+				s_LEAF,
+			        mkAPP1(
+				    s_BEXPR,
+				    Make_BEXPR_leaf(GET_BEXPR(node)))) );
+		case PRIM_FN:
+		    {
+			int pfn = GET_PRIM_FN(node);
+			if( pfn == P_DEBUG ) {
+			    string name = GET_DEBUG_STRING(node);
+			    return( mkAPP1(
+					s_LEAF,
+					mkAPP2(
+					    s_EXT_PRIM_FN,
+					    Make_INT_leaf(pfn),
+					    Make_STRING_leaf(name))) );
+			}
+			if( pfn == P_PRINTF || pfn == P_SPRINTF ||
+			    pfn == P_EPRINTF || pfn == P_FPRINTF )
+			{
+			    string fmt = GET_PRINTF_STRING(node);
+			    return( mkAPP1(
+					s_LEAF,
+					mkAPP2(
+					    s_EXT_PRIM_FN,
+					    Make_INT_leaf(pfn),
+					    Make_STRING_leaf(fmt))) );
+			}
+			if( pfn == P_EXTAPI_FN ) {
+			    string name = Get_ExtAPI_Function_Name(
+						GET_EXTAPI_FN(node));
+			    return( mkAPP1(
+					s_LEAF,
+					mkAPP2(
+					    s_EXT_PRIM_FN,
+					    Make_INT_leaf(pfn),
+					    Make_STRING_leaf(name))) );
+			}
+			return( mkAPP1(
+				    s_LEAF,
+				    mkAPP1(
+					s_PRIM_FN,
+					Make_INT_leaf(pfn))) );
+		    }
+		case VAR:
+		    return( mkAPP1(s_VAR,
+				       Make_STRING_leaf(GET_VAR(node))) );
+		case USERDEF: {
+		    // Not clear what to do here....
+		    fn_ptr fp = GET_USERDEF(node);
+		    return( mkAPP1(
+				s_LEAF,
+				mkAPP1(
 				    s_USERDEF,
 				    Make_INT_leaf(fp->id))) );
 		}

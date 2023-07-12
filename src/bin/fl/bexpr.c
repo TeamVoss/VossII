@@ -1100,6 +1100,18 @@ BE_Init()
     s_bEqual = wastrsave(&strings, "bEqual");
 }
 
+static void
+bexpr_signature(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    bexpr v = GET_BEXPR(r);
+    int i = PTR2INT(v);
+    MAKE_REDEX_INT(redex, i);
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
 void
 Bexpr_Install_Functions()
 {
@@ -1112,6 +1124,10 @@ Bexpr_Install_Functions()
     Add_ExtAPI_Function("bvariable", "1", FALSE,
 			GLmake_arrow(GLmake_string(),GLmake_bexpr()),
 			bvariable);
+
+    Add_ExtAPI_Function("bexpr_signature", "1", FALSE,
+			GLmake_arrow(GLmake_bexpr(),GLmake_int()),
+			bexpr_signature);
 
     Add_ExtAPI_Function("bNOT", "1", FALSE,
 			GLmake_arrow(GLmake_bexpr(),GLmake_bexpr()),
@@ -1341,6 +1357,8 @@ be2bdd(bexpr be)
 	res = B_Var(BE_GET_VAR(b));
     } else {
 	res = B_And(be2bdd(BE_GET_LEFT(b)), be2bdd(BE_GET_RIGHT(b)));
+// BUGGY!!    if( Do_gc_asap )
+//            Garbage_collect();
     }
     b->bdd = res;
     b->has_bdd = 1;
@@ -1474,6 +1492,7 @@ be_and(bexpr f1, bexpr f2)
 	return( BE_FALSE );
     }
     if( RC_reorder_bexpr_ands ) {
+	// Make the right-spine as large as possible
 	if( f1->height > f2->height ) {
 	    bexpr tmp = f1;
 	    f1 = f2;

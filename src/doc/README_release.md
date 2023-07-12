@@ -1,74 +1,96 @@
-Voss II
-=======
 
-Voss II is a software suite for describing and reasoning about circuits.
-Circuits, and properties about them, are described in a functional language
-called *fl*.
+pexlif format
+=============
 
-Fl is a statically typed language with call-by-need semantics (also known as
-*lazy evaluation*) and binary decision diagrams built right into the language
-itself.
+The pexlif datatype is used to represent circuits in VossII.
+It is basically hierarchy + next-state functions.
+Before going into details of the different fields, let start with
+a simple example.
+COnsider the follong HFL program:
 
-Voss II has been tested and found to work on Debian, Ubuntu, Fedora, Red Hat
-and OpenSUSE. If you're using it on another distribution, we'd love to hear
-from you!
+load "idv.fl";
+TYPE "byte" 8;
 
+let inc =
+    byte_input	i.
+    byte_output	o.
+    CELL "inc" [
+	o <- i '+' '1
+];
 
-Usage
------
+let test =
+    byte_input	a b c.
+    byte_output	res.
+    byte_internal ap.
+    CELL "test" [
+	inc a ap,
+	res <- ap '-' (b '*' c)
+];
 
-After installing VossII, simply run `fl` to start the standalone interpreter
-for VossII. You can also use our official editor integrations, to run VossII
-from within vim, emacs or visual studio code.
+let p = flfun2pexlif test;
+p;
 
-See [the VossII tutorial](https://teamvoss.github.io) for more information.
+The (somewhat pretty-printed) result of evaluating p is:
 
+(PINST "test" [SHA->b2a4..,FP->6766..] F
+  [(a[7:0],[a[7:0]]),(b[7:0],[b[7:0]]),(c[7:0],[c[7:0]])]
+  [(res[7:0],[res[7:0]])]
+  [ap[7:0],_$1[7:0]]
+i1/:
+    (PINST "inc" [SHA->c326..,FP->2111..] F
+      [(i[7:0],[a[7:0]])]
+      [(o[7:0],[ap[7:0]])]
+      []
+i1/i1/:
+        (PINST "draw_unary_arithm {+1}" [SHA->4b74..,FP->6659..] T
+          [(i1[7:0],[i[7:0]])]
+          [(o[7:0],[o[7:0]])]
+          []
+          LEAF [
+            o[7:0] <- (i1[7:0] + 0x01)
+          ]
+        )
+    )
+i2/:
+    (PINST "draw_binary_arithm {*}" [SHA->12da..,FP->1243..] T
+      [(i1[7:0],[b[7:0]]),(i2[7:0],[c[7:0]])]
+      [(o[7:0],[_$1[7:0]])]
+      []
+      LEAF [
+        o[7:0] <- (i1[7:0] * i2[7:0])
+      ]
+    )
+i3/:
+    (PINST "draw_binary_arithm {-}" [SHA->4837..,FP->1114..] T
+      [(i1[7:0],[ap[7:0]]),(i2[7:0],[_$1[7:0]])]
+      [(o[7:0],[res[7:0]])]
+      []
+      LEAF [
+        o[7:0] <- (i1[7:0] - i2[7:0])
+      ]
+    )
+)
 
-Installation
-------------
+Basically, p is a pexlif with a top-level hierarchy box, named "test", that
+contains three instances, named "inc", "draw_binary_arithm {*}", and
+"draw_binary_arithm {-}".
+The instance "inc" contains only one instance, named "draw_unary_arithm {+1}"
+which is a leaf instance in which the actual functionality is captured
+(o[7:0] <- (i1[7:0] + 0x01)).
 
-There are two ways in which you can install our officially supported
-binaries for VossII on your system.
+In more details, a PINST has a name, a list of attributes (some of which are
+automatically computed!) a boolean signal denoting if the instance is a leaf
+or a hierarchical instance.
+Then each instance has two lists of (formal,actuals) pairs,
+or inside-outside names, for the input connections and outputs connections
+resepctively.  The formal (inside name) wire name is always a complete vector
+(or singleton if it is of size 1) whereas the actuals (outside names) is
+a list of signals and/or constants. So you might see something as
+complicated as ("a[7:0}", ["0xf","d[7:6]","e[2:3"]) where the inside
+wires a[7],a[6],...,a[0] are connected to 1, 1, 1, 1, d[7], d[6], e[2], e[3].
+After the formal_actual input and output lists there is a list of internal
+wire vectors. These are the "local" wires used to connect the subhierarchies.
+Finally, there is either a P_HIER with a list of PINSTS denoting
+more hiearchy, or a P_LEAF that contains either zero-delay next state
+functions or phase delay functions.
 
-### Rolling releases using git
-
-Clone this repository, and add `$REPO_DIRECTORY/bin` to your `$PATH`.
-You will also need to [install tk](#deps) before you can use VossII.
-
-To update to the latest released version of VossII, simply run `git pull`
-in `$REPO_DIRECTORY`.
-
-### Tarball
-
-Download and unpack the tarball from our
-[release page](https://github.com/TeamVoss/VossII/releases/latest), then
-add `$REPO_DIRECTORY/bin` to your `$PATH`.
-You will also need to [install tk](#deps) before you can use VossII.
-
-
-<span id="deps"></span>
-### Dependencies
-
-Voss II depends on Tk for its graphical bits. If the fl interpreter dies with
-an angry message about not being able to find `wish`, you need to install it:
-
-* **On Ubuntu/other Debian-based**
-  ```shell
-  sudo apt install tk
-  ```
-* **On Fedora/Red Hat**
-  ```shell
-  sudo yum install tk
-  ```
-* **On SUSE**
-  ```shell
-  sudo zypper install tk
-  ```
-
-
-Building
---------
-
-Currently we officially support building VossII on Debian-based systems.
-For build instructions, please se
-[our source repository](https://github.com/TeamVoss/VossII/).

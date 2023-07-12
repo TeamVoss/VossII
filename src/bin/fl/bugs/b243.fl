@@ -1,0 +1,18 @@
+
+let av = bev_variable "a[15:0]";
+let bv = bev_variable "b[15:0]";
+
+let tst =
+    let bv' = IF (bev_eq bv (int2bev 0)) THEN (int2bev 1) ELSE bv in
+    let ad  = av / bv' in
+    let am  = av % bv' in
+    let new = (ad * bv') + am in
+    let eq = bev_neq av new in
+    eq
+;
+
+bget_model [tst] 2;
+
+bget_model [tst] 10;
+
+bget_model [tst] 100;

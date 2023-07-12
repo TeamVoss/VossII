@@ -223,6 +223,9 @@ let test i3 =
     STE "-e" vis [] ant [] []
 ;
 
+// If no constraints on the secure instruction
+test {'hi::instr};
+
 // Assume secure instruction only writes to secure register file.
 let i3 = 'hi<-- dst ? (('hi-->dst)<--msb ? '1);
 test i3;

@@ -220,10 +220,8 @@ letrec map2 fn l1 l2 =
 // It is an error if the lengths of the lists are not the same.
 //
 letrec map3 fn l1 l2 l3 =
-    let empties = map empty [l1,l2,l3] in
-    let idx = find_first0 (\e. e != (hd empties)) empties then
-    idx != 0 => eprintf "Length mismatch in map3. |l1| != |l%d|" idx |
-    (hd empties) => [] |
+    (l1 = []) AND (l2 = []) AND (l3 = []) => [] |
+    (l1 = []) OR (l2 = []) OR (l3 = []) => error "Length mismatch in map3" |
     val (a:as) = l1 in
     val (b:bs) = l2 in
     val (c:cs) = l3 in
@@ -233,10 +231,10 @@ letrec map3 fn l1 l2 l3 =
 // Similar to map, map2 and map3 except operating over four lists.
 // It is an error if the lengths of the lists are not the same.
 letrec map4 fn l1 l2 l3 l4 =
-    let empties = map empty [l1,l2,l3, l4] in
-    let idx = find_first0 (\e. e != (hd empties)) empties then
-    idx != 0 => eprintf "Length mismatch in map4. |l1| != |l%d|" idx |
-    (hd empties) => [] |
+    (l1 = []) AND (l2 = []) AND (l3 = []) AND (l4 = []) => [] |
+    (l1 = []) OR (l2 = []) OR (l3 = []) OR (l4 = []) =>
+	error "Length mismatch in map4"
+    |
     val (a:as) = l1 in
     val (b:bs) = l2 in
     val (c:cs) = l3 in
@@ -247,10 +245,10 @@ letrec map4 fn l1 l2 l3 l4 =
 // Similar to map, map2 etc. except operating over five lists.
 // It is an error if the lengths of the lists are not the same.
 letrec map5 fn l1 l2 l3 l4 l5 =
-    let empties = map empty [l1,l2,l3, l4, l5] in
-    let idx = find_first0 (\e. e != (hd empties)) empties then
-    idx != 0 => eprintf "Length mismatch in map5. |l1| != |l%d|" idx |
-    (hd empties) => [] |
+    (l1 = []) AND (l2 = []) AND (l3 = []) AND (l4 = []) AND (l5 = []) => [] |
+    (l1 = []) OR (l2 = []) OR (l3 = []) OR (l4 = []) OR (l5 = []) =>
+	error "Length mismatch in map5"
+    |
     val (a:as) = l1 in
     val (b:bs) = l2 in
     val (c:cs) = l3 in
@@ -262,10 +260,10 @@ letrec map5 fn l1 l2 l3 l4 l5 =
 // Similar to map, map2 etc. except operating over six lists.
 // It is an error if the lengths of the lists are not the same.
 letrec map6 fn l1 l2 l3 l4 l5 l6 =
-    let empties = map empty [l1,l2,l3, l4, l5, l6] in
-    let idx = find_first0 (\e. e != (hd empties)) empties then
-    idx != 0 => eprintf "Length mismatch in map6. |l1| != |l%d|" idx |
-    (hd empties) => [] |
+    (l1=[]) AND (l2=[]) AND (l3=[]) AND (l4=[]) AND (l5=[]) AND (l6=[]) => [] |
+    (l1=[]) OR (l2=[]) OR (l3=[]) OR (l4=[]) OR (l5=[]) OR (l6=[]) =>
+	error "Length mismatch in map6"
+    |
     val (a:as) = l1 in
     val (b:bs) = l2 in
     val (c:cs) = l3 in
@@ -1928,6 +1926,8 @@ andlettype content =
             P_HIER {children::pexlif list}
         |   P_LEAF {fns::update_fn list}
 ;
+
+let base_PINST = PINST;
 
 // Re-define PINST so that we always compute a signature (FP) and
 // a SHA256 (SHA) signatures and store them in the attribute list.

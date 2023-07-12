@@ -627,8 +627,8 @@ Add_Destructors(string name, typeExp_ptr new_type,
         tmp->end_line_nbr   = line_nbr;
         tmp->expr          = Make_0inp_Primitive(P_I);
 	tmp->signature	   = Get_SHA256_signature(tmp->expr);
-        tmp->expr_init     = cephalopode_mode? Reflect_expr(tmp->expr) : NULL;
-        tmp->expr_comb     = cephalopode_mode? Reflect_expr(tmp->expr) : NULL;
+        tmp->expr_init     = cephalopode_mode? Cephalopde_Reflect_expr(tmp->expr) : NULL;
+        tmp->expr_comb     = cephalopode_mode? Cephalopde_Reflect_expr(tmp->expr) : NULL;
         tmp->super_comb    = Make_0inp_Primitive(P_I);
         tmp->type          = Fix_Types(&(fnp->type), new_type);
         tmp->overload      = FALSE;
@@ -669,9 +669,9 @@ Add_Destructors(string name, typeExp_ptr new_type,
         save_fun->expr           = save_expr;
 	save_fun->signature	 = Get_SHA256_signature(save_expr);
         save_fun->expr_init      = cephalopode_mode?
-					Reflect_expr(save_fun->expr) : NULL;
+					Cephalopde_Reflect_expr(save_fun->expr) : NULL;
         save_fun->expr_comb      = cephalopode_mode?
-					Reflect_expr(save_fun->expr) : NULL;
+					Cephalopde_Reflect_expr(save_fun->expr) : NULL;
         save_fun->super_comb     = save_expr;    // ????
         save_fun->type           = save_type;
         save_fun->overload           = FALSE;
@@ -702,9 +702,9 @@ Add_Destructors(string name, typeExp_ptr new_type,
         load_fun->expr           = load_expr;
 	load_fun->signature	 = Get_SHA256_signature(load_expr);
         load_fun->expr_init      = cephalopode_mode?
-					Reflect_expr(load_fun->expr) : NULL;
+					Cephalopde_Reflect_expr(load_fun->expr) : NULL;
         load_fun->expr_comb      = cephalopode_mode?
-					Reflect_expr(load_fun->expr) : NULL;
+					Cephalopde_Reflect_expr(load_fun->expr) : NULL;
         load_fun->super_comb     = load_expr;    // ????
         load_fun->type           = load_type;
         load_fun->overload           = FALSE;
@@ -843,8 +843,8 @@ Make_forward_declare(string name, typeExp_ptr type, symbol_tbl_ptr stbl,
     ret->name           = name;
     ret->expr           = expr;
     ret->signature	= Get_SHA256_signature(expr);
-    ret->expr_init      = cephalopode_mode? Reflect_expr(ret->expr) : NULL;
-    ret->expr_comb      = cephalopode_mode? Reflect_expr(ret->expr) : NULL;
+    ret->expr_init      = cephalopode_mode? Cephalopde_Reflect_expr(ret->expr) : NULL;
+    ret->expr_comb      = cephalopode_mode? Cephalopde_Reflect_expr(ret->expr) : NULL;
     ret->super_comb     = err;
     ret->overload       = FALSE;
     ret->open_overload  = FALSE;
@@ -1352,8 +1352,8 @@ Add_ExtAPI_Function(string name, string strictness,
     ret->name           = name;
     ret->expr           = expr;
     ret->signature	= Get_SHA256_signature(expr);
-    ret->expr_init      = cephalopode_mode? Reflect_expr(ret->expr) : NULL;
-    ret->expr_comb      = cephalopode_mode? Reflect_expr(ret->expr) : NULL;
+    ret->expr_init      = cephalopode_mode? Cephalopde_Reflect_expr(ret->expr) : NULL;
+    ret->expr_comb      = cephalopode_mode? Cephalopde_Reflect_expr(ret->expr) : NULL;
     ret->super_comb     = NULL;
     ret->overload       = FALSE;
     ret->open_overload  = FALSE;

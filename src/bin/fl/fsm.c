@@ -1796,7 +1796,7 @@ get_weak_expressions(g_ptr redex)
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
     formula *fp;
-    int idx = 0;
+    int idx = 1;
     FOR_BUF(weakening_bufp, formula, fp) {
 	char nm[20];
 	sprintf(nm, "_%d", idx);
@@ -1827,7 +1827,7 @@ get_abstract_depends(g_ptr redex)
     hash_record abs_tbl;
     create_hash(&abs_tbl, COUNT_BUF(weakening_bufp), str_hash, str_equ);
     formula *fp;
-    int idx = 0;
+    int idx = 1;
     FOR_BUF(weakening_bufp, formula, fp) {
 	char nm[20];
 	sprintf(nm, "_%d", idx);
@@ -5228,6 +5228,7 @@ append_range(ilist_ptr l, int i_from, int i_to)
 	&& (new_up || new_single) )
     {
 	cur->to = i_to;
+	cur->size = abs(cur->to - cur->from) + 1;
 	return l;
     }
     if(    (cur_single || cur_down)
@@ -5235,6 +5236,7 @@ append_range(ilist_ptr l, int i_from, int i_to)
 	&& (new_down || new_single) )
     {
 	cur->to = i_to;
+	cur->size = abs(cur->to - cur->from) + 1;
 	return l;
     }
     ilist_ptr res = (ilist_ptr) new_rec(ilist_rec_mgrp);
@@ -6613,7 +6615,7 @@ BDD_c_limited_AND(gbv a, gbv b)
 	    int idx = COUNT_BUF(weakening_bufp);
 	    push_buf(weakening_bufp, &r);
 	    char nm[20];
-	    sprintf(nm, "_%d", idx);
+	    sprintf(nm, "_%d", idx+1);
 	    string name = wastrsave(&strings, nm);
 	    res.f = B_Var(name);
 	} else {
@@ -6638,7 +6640,7 @@ BDD_c_limited_OR(gbv a, gbv b)
 	    int idx = COUNT_BUF(weakening_bufp);
 	    push_buf(weakening_bufp, &r);
 	    char nm[20];
-	    sprintf(nm, "_%d", idx);
+	    sprintf(nm, "_%d", idx+1);
 	    string name = wastrsave(&strings, nm);
 	    res.f = B_Var(name);
 	} else {
@@ -7274,6 +7276,7 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	   int draw_level)
 {
     string anon;
+
 
     // Is it aldready drawn
     if( (anon = (string) find_hash(&(vsp->done), il)) != NULL ) {
@@ -8442,6 +8445,7 @@ void
 DBG_print_ilist(ilist_ptr il)
 {
     FP(err_fp, " ilist:");
+    if( il == NULL ) { FP(err_fp, "<NULL>"); return; }
     base_print_ilist(il);
     FP(err_fp, "\n");
 }

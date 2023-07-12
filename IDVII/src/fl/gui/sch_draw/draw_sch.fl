@@ -1445,6 +1445,8 @@ let fl_update_colors c =
 ;
 export_to_tcl fl_update_colors;
 
+
+// Version 1: Fails often
 let bdepends_on exprs cprefix =
     val (check, other) = split (\v. string_hd v = cprefix) (bdepends exprs) then
     check = [] => F |
@@ -1452,8 +1454,32 @@ let bdepends_on exprs cprefix =
     let exprs' = bsubstitute sub exprs then
     let cmp (H1,L1) (H2,L2) = (H1 bXOR H2) bOR (L1 bXOR L2) in
     let diff = itlist (defix bOR) (map2 cmp exprs exprs') bF then
-    ((bget_model [diff] 100) != []) catch T
+    ((bget_model [diff] 10) != []) catch T
 ;
+
+// Version 2: Slow but can often solve the problem
+let bdepends_on exprs cprefix =
+    let tst1 E v =
+	let E0 = bsubstitute [(v,bF)] E then
+	let E1 = bsubstitute [(v,bT)] E then
+	let diff = E0 bXOR E1 then
+	bget_model [diff] 10
+    in
+    letrec check Es (v:vs) =
+        letrec ch1 (e:es) =
+            let res = tst1 e v then
+            res = [] => ch1 es | T
+         /\    ch1 [] = F
+        in
+        (ch1 Es) => T | (check Es vs)
+     /\   check Es [] = F
+    in
+    let Es = flatmap (\(H,L).[H,L]) exprs then
+    let vs = filter (\v. string_hd v = cprefix) (bdepends Es) then
+    vs = [] => F |
+    check Es vs
+;
+
 
 clet get_dependency_color ste t vecs =
     let nds = md_expand_vectors vecs then
@@ -1476,6 +1502,7 @@ clet get_dependency_color ste t vecs =
     (mem "r" deps) AND (mem "b" deps) => "pink" |
     "yellow"
 ;
+
 
 let fl_get_bdd_color c an =
     let vis   = evis2vis (canvas2vis c) then
@@ -2008,3 +2035,15 @@ let draw_show_values {vis::vfsm} c show =
     ) fseq ())
 ;
 
+
+// Turn on/off backannotation of values on canvas c.
+let draw_show_dependencies {vis::vfsm} c show =
+    let cur = tcl_eval [sprintf "set ::vstatus(show_bdd_group,%s)" c] then
+    let toggle = show XOR (cur = "1") then
+    NOT toggle => () |
+    ((tcl_eval [
+	sprintf "set ::vstatus(show_bdd_group,%s) %s" c (show => "1" | "0"),
+	sprintf "sch:toggle_show_value_buttons %s [winfo parent %s].menu" c c,
+	"update"]
+    ) fseq ())
+;

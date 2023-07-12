@@ -12,6 +12,8 @@ let mk_name sz base = sz = 1 => base | sprintf "%s[%d:0]" base (sz-1);
 // Function to determine if a node is a user given or automatically created.
 let is_user_given s = NOT (str_is_substr "_$" s);
 
+clet get_base_name s = hd (str_split (get_vector_signature s) "[");
+
 // todo: Pexlif's generated randomly doesn't follow this name schema.
 
 // A type to represent continous bit ranges
@@ -548,20 +550,59 @@ let extract_pexlif_hierarchy pexlif hierarchy =
     get indices pexlif
 ;
 
+let get_range v =
+    letrec trim ((TXT s):rem) = trim rem
+     /\    trim other = other
+    in
+    letrec no_range ((TXT l):rem) = no_range rem
+     /\    no_range ((RANGES l):rem) = F
+     /\    no_range [] = T
+    in
+    let get_one_range ((RANGES [(l,r)]):rem) = 
+	    no_range rem => [(l,r)] | eprintf "Not a single range (%s)" v
+     /\ get_one_range [] = []
+     /\ get_one_range other = eprintf "Not a single range (%s)" v
+    in
+    get_one_range (trim (md_split_vector v))
+;
+
 let w_substitute sub we =
+    let decls = map (\v. get_base_name v, md_size v)
+		    (md_extract_vectors (map snd sub))
+    then
     letrec do (W_VAR sz b) =
 	(
 	    let n = mk_name sz b in
-	    let ns = vec_assoc n sub then
-	    length ns = 1 => (W_EXPLICIT_VAR sz (hd ns)) |
-	    W_CAT (map (\n. W_EXPLICIT_VAR (md_size n) n) ns)
+	    let vs = vec_assoc n sub then
+	    let mk1 v =
+		let base = get_base_name v then
+		let v_sz = md_size v then
+		let decl_sz = assoc base decls then
+		let w_base = W_VAR decl_sz base then
+		v_sz = decl_sz => w_base |
+		val [(l,r)] = get_range v then
+		let indices = l--r then
+		(W_SLICE indices w_base)
+	    in
+	    let w_vs = map mk1 vs then
+	    length w_vs = 1 => hd w_vs | W_CAT w_vs
 	) catch
 	(W_VAR sz b)
      /\     do (W_EXPLICIT_VAR sz n) =
 	(
-	    let ns = vec_assoc n sub then
-	    length ns = 1 => (W_EXPLICIT_VAR sz (hd ns)) |
-	    W_CAT (map (\n. W_EXPLICIT_VAR (md_size n) n) ns)
+	    let vs = vec_assoc n sub then
+	    let mk1 v =
+		let base = get_base_name v then
+		let v_sz = md_size v then
+		let decl_sz = assoc base decls then
+		let w_base = W_VAR decl_sz base then
+		v_sz = decl_sz => w_base |
+		val [(l,r)] = get_range v then
+		let indices = l--r then
+		(W_SLICE indices w_base)
+	    in
+	    let w_vs = map mk1 vs then
+	    length w_vs = 1 => hd w_vs | W_CAT w_vs
 	) catch
 	(W_EXPLICIT_VAR sz n)
      /\     do (W_AND a b) = W_AND (do a) (do b)
@@ -1026,7 +1067,12 @@ let opt_base_compact_wprint inps rhs =
 	sprintf "draw_unary_arithm {-%d}" v
      /\ special (W_EQ var (W_CONST sz v)) assuming (is_var var AND v < 10) =
 	sprintf "draw_unary_arithm {=%d}" v
+     /\ special (W_EQ (W_CONST sz v) var) assuming (is_var var AND v < 10) =
+	sprintf "draw_unary_arithm {=%d}" v
      /\ special (W_NOT (W_EQ var (W_CONST sz v)))
+		assuming (is_var var AND v < 10) =
+	sprintf "draw_unary_arithm {!=%d}" v
+     /\ special (W_NOT (W_EQ (W_CONST sz v) var))
 		assuming (is_var var AND v < 10) =
 	sprintf "draw_unary_arithm {!=%d}" v
      /\ special (W_EQ var (W_CONST sz v)) assuming (is_var var) =
