@@ -166,6 +166,24 @@ let bifrost_tx_pulseecho =
     done <- still_done '|' ack
 ];
 
+let bifrost_tx_ackpulse =
+  bit_input clk.
+  bit_input reset.
+  bit_input run.
+  bit_input hold.
+  bit_input ack.
+  bit_output req.
+  bit_output latch.
+  bit_output done.
+  bit_internal sent.
+  bit_internal finished.
+  CELL "bifrost_tx_ackpulse" [
+    re_ff_sreset clk reset (done '&' hold) finished,
+    req <- run '&' ('~' finished),
+    latch <- ack,
+    done <- finished '|' ack
+    ];
+
 let bifrost_tx_agreement =
   bit_input clk.
   bit_input reset.
@@ -230,6 +248,26 @@ let bifrost_rx_pulseecho =
     re_ff_sreset clk reset done was_done,
     ack <- done '&' '~' was_done,
     start <- req,
+    may_continue <- '1
+];
+
+let bifrost_rx_ackpulse =
+  bit_input clk.
+  bit_input reset.
+  bit_input done.
+  bit_input req.
+  bit_output ack.
+  bit_output start.
+  bit_output may_continue.
+  bit_internal was_done.
+  bit_internal was_req.
+  bit_internal was_ack.
+  CELL "bifrost_rx_ackpulse" [
+    re_ff_sreset clk reset done was_done,
+    re_ff_sreset clk reset req was_req,
+    re_ff_sreset clk reset ack was_ack,
+    ack <- done '&' '~' was_done,
+    start <- req '&' (was_ack '|' ('~' was_req)),
     may_continue <- '1
 ];
 
@@ -478,4 +516,3 @@ let `name` =
 end_abstype `name`;
  
 }> "functor";
-
