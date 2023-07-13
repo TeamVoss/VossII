@@ -3091,6 +3091,27 @@ let phase_delay N =
     N = 0 => phase_delay_zero | phase_delay_non_zero N
 ;
 
+let rst_phase_delay_non_zero N =
+    bit_input	reset.
+    input	din.
+    output	dout.
+    list_internal (N-1)  mids.
+    CELL (sprintf "rst_phase_delay(%d)" N) (
+	map2 (\i.\o. o <: (IF reset THEN '0 ELSE i)) (din:mids) (mids@[dout])
+);
+
+let rst_phase_delay_zero =
+    bit_input	reset.
+    input	din.
+    output	dout.
+    CELL "rst_phase_delay(%0)" [
+	dout <- din
+];
+
+let rst_phase_delay N =
+    N = 0 => rst_phase_delay_zero | rst_phase_delay_non_zero N
+;
+
 let hw__pair__type_name {p:: *a # *b} =
     let a = {undefined :: *a} in
     let b = {undefined :: *b} in
@@ -3153,6 +3174,41 @@ let hw_list_hw_type_destr =
 		    (error "Not defined for lists")
 ;
 add_open_overload hw_type_destr hw_list_hw_type_destr;
+
+
+
+let INSERT =
+    input   {old_vec :: *a}.
+    input   new_value.
+    input   addr.
+    output  {out :: *a}.
+    CELL "draw_INSERT" [
+        let vec_sz = hw_size out in
+        let val_sz = hw_size new_value in
+        let addr_sz = hw_size addr in
+        (vec_sz % val_sz) != 0 =>
+            eprintf "Out size %d not a multiple of value size %d in REPLACE\n"
+                    vec_sz val_sz
+        |
+        let lines = vec_sz / val_sz in
+        lines > 2**addr_sz => 
+            eprintf "Too many lines (%d) in REPLACE for address size (%d)"
+                    lines addr_sz
+        |
+        let vs = tobits new_value in
+        let ovs = tobits old_vec in
+        let mk i =
+            let msb = vec_sz - ((i+1)*val_sz-1) in
+            let lsb = vec_sz - i*val_sz in
+            let old = gather ovs (msb--lsb) in
+            IF (addr '=' ''i) THEN vs ELSE old
+        in
+        out <- frombits (flatmap mk ((lines-1) -- 0))
+];
+
+
+
+
 
 let posedge clk = (T,clk);
 let negedge clk = (F,clk);
@@ -3461,11 +3517,11 @@ infixr 0 :::;
 // Connect a pexlif inside an Hfl CELL
 // The connections are a list of (act,wva) where
 //	act is a vector name for an actual connection in p and
-//	wva is a wexpr deniting the pin/vector in the CELL to connect to.
+//	wva is a wexpr denoting the pin/vector in the CELL to connect to.
 // Example:
 //
 // If p has actual input names "a[7:0]", "b[7:0]", and
-// outputs "o[7:0]" and "cout" and "word" is // an HW type of size 8,\
+// outputs "o[7:0]" and "cout" and "word" is a HW type of size 8,
 // then one might do:
 //
 //   let top =

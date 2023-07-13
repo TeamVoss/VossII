@@ -2547,6 +2547,45 @@ proc draw_SELECT {c tag x y} {
     return [list $inp_locs [list $x $y]]
 }
 
+proc draw_INSERT {c tag x y} {
+    global gcolor fc
+    add_value_field $c $tag $x $y
+    set ht [expr 6*[min_sep $c]]
+    set wid [expr round(0.7*[rect_wid $c])]
+    set xl [expr round($x-$wid)]
+    set x0 [expr round($x-29.0*$wid/40.0)]
+    set x1 [expr round($x-3.0*$wid/5.0)]
+    set xm [expr round($x-1.0*$wid/2.0)]
+    set x2 [expr round($x-2.0*$wid/5.0)]
+    set yt [expr round($y-$ht/2)]
+    set yb [expr round($y+$ht/2)]
+    set y1 [expr round($y-4.0*$ht/10.0)]
+    set y2 [expr round($y-1.0*$ht/10.0)]
+    set y3 [expr round($y+1.0*$ht/10.0)]
+    set y4 [expr round($y+4.0*$ht/10.0)]
+    set ya [expr round($y+1.0*$ht/4.0)]
+    set ymeet [expr round($y+1.0*$ht/8.0)]
+    $c create polygon \
+	    $xl $y \
+	    $x1 $yt \
+	    $x2 $yt \
+	    $x $y \
+	    $x2 $yb \
+	    $x1 $yb \
+	    $xl $y \
+	    -outline $gcolor -fill $fc -tags $tag
+    draw_three_dots $c $xm $y1 $xm $y2 $tag
+    draw_three_dots $c $xm $y3 $xm $y4 $tag
+    #
+    lappend inp_locs $xl $y
+    lappend inp_locs $xl $ya
+    lappend inp_locs $xl $yb
+    $c create line $xl $ya $xm $y -arrow last -fill $gcolor -width 3
+    $c create line $xl $yb $x0 $yb $x0 $ymeet -fill $gcolor -width 3
+    return [list $inp_locs [list $x $y]]
+}
+
+
 proc draw_DECODER {with_enable inp_sz out_sz c tag x y} {
     global gcolor fc
     add_value_field $c $tag $x $y

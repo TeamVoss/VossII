@@ -90,7 +90,7 @@ clet get_signatures vs =
 ;
 
 // 
-let vec_assoc {vec::string} {vsub::(string#string) list} =
+slet vec_assoc {vec::string} {vsub::(string#string) list} =
     [(assoc vec vsub)] gen_catch (\msg.
     NOT (str_is_substr "failed to find element" msg) => error msg |
     (
