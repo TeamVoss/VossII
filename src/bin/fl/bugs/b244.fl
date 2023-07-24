@@ -1,0 +1,27 @@
+load "idv.fl";
+
+TYPE "word" 8;
+
+let tst =
+    word_input a b c d.
+    bit_output o1 o2.
+    word_output o3 o4 o5 o6.
+    CELL "tst" [
+        o1 <- a '<' b,
+        o2 <- d '<' c,
+        o3 <- (IF o1 THEN a ELSE b),
+        o4 <- (IF (c '>=' d) THEN c ELSE d),
+        o5 <- (a '|' '~' b) '&' b '&' c '&' d,
+        o6 <- a '|' b '|' c '|' d
+];
+
+let p = flfun2pexlif tst;
+let ckt = pexlif2fsm p;
+
+let ste = random_simulation ckt [] [] 100;
+ste;
+
+get_trace ste "o1";
+
+limited_get_trace ste 30 40 "o1";
+

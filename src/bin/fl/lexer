@@ -1,4 +1,4 @@
-%x EXTERN_PARSING
+%x EXTERN_PARSING PREPROC_IGNORE
 
 let     [a-zA-Z\_]
 bindig  [0-1]
@@ -19,6 +19,7 @@ symbol	[!%&$#+\-*/:<=>?@\\~`'^|\_]
 #include <unistd.h>
 #include <stdlib.h>
 #include <editline/readline.h>
+#include <ctype.h> 
 
 #define YY_DECL                 int yylex (YYSTYPE *lvalp)
 
@@ -71,6 +72,12 @@ static char		cmd_buf[1024];
 static string		expand_string(string s);
 static void		start_extern_parsing();
 static void		end_extern_parsing(string cmd);
+
+static hash_record  define_tbl;
+static buffer	    define_polarity;
+static void	    hash_define(char *id);
+static void	    hash_undefine(char *id);
+static bool	    is_defined(char *id);
 
 static void
 append_line(string txt)
@@ -193,6 +200,128 @@ __LINE__			    {
                                         lvalp->str_t = wastrsave(&strings,lbuf);
 					RETURN(DEC_NUMBER, "_DEC_NUMBER");
 				    }
+
+^"#define"{white}+[^\n]*\n	    { hash_define(&(yytext[8])); line_nbr++; }
+^"#undefine"{white}+[^\n]*\n	    { hash_undefine(&(yytext[10])); line_nbr++;}
+
+^"#ifdef"{white}+[^\n]*\n	    {
+					int ignore;
+					if( is_defined(&(yytext[7])) ) {
+					    ignore = 0;
+					} else {
+					    ignore = 1;
+					}
+					push_buf(&define_polarity, &ignore);
+					ignore = 0;
+					int *ip;
+					FOR_BUF(&define_polarity, int, ip) {
+					    if( *ip == 1 ) { ignore = 1; }
+					}
+					if( ignore == 1 ) {
+					    BEGIN PREPROC_IGNORE;
+					} else {
+					    BEGIN INITIAL;
+					}
+					line_nbr++;
+				    }
+
+<PREPROC_IGNORE>^"#ifdef"{white}+[^\n]*\n	    {
+					int ignore = 1;
+					push_buf(&define_polarity, &ignore);
+					line_nbr++;
+				    }
+
+^"#else"\n			    {
+					int ignore;
+					if( COUNT_BUF(&define_polarity) == 0 ) {
+					    Eprintf(
+			"#else without matching #ifdef on line %d in file %s\n",
+						    line_nbr, cur_file_name);
+					}
+					pop_buf(&define_polarity, &ignore);
+					ignore = 1-ignore;
+					push_buf(&define_polarity, &ignore);
+					ignore = 0;
+					int *ip;
+					FOR_BUF(&define_polarity, int, ip) {
+					    if( *ip == 1 ) { ignore = 1; }
+					}
+					if( ignore == 1 ) {
+					    BEGIN PREPROC_IGNORE;
+					} else {
+					    BEGIN INITIAL;
+					}
+					line_nbr++;
+				    }
+
+
+<PREPROC_IGNORE>^"#else"\n	    {
+					int ignore;
+					if( COUNT_BUF(&define_polarity) == 0 ) {
+					    Eprintf(
+			"#else without matching #ifdef on line %d in file %s\n",
+						    line_nbr, cur_file_name);
+					}
+					pop_buf(&define_polarity, &ignore);
+					ignore = 1-ignore;
+					push_buf(&define_polarity, &ignore);
+					ignore = 0;
+					int *ip;
+					FOR_BUF(&define_polarity, int, ip) {
+					    if( *ip == 1 ) { ignore = 1; }
+					}
+					if( ignore == 1 ) {
+					    BEGIN PREPROC_IGNORE;
+					} else {
+					    BEGIN INITIAL;
+					}
+					line_nbr++;
+				    }
+
+^"#endif"\n			    {
+					int ignore;
+					if( COUNT_BUF(&define_polarity) == 0 ) {
+					    Eprintf(
+		       "#endif without matching #ifdef on line %d in file %s\n",
+						    line_nbr, cur_file_name);
+					}
+					pop_buf(&define_polarity, &ignore);
+					ignore = 0;
+					int *ip;
+					FOR_BUF(&define_polarity, int, ip) {
+					    if( *ip == 1 ) { ignore = 1; }
+					}
+					if( ignore == 1 ) {
+					    BEGIN PREPROC_IGNORE;
+					} else {
+					    BEGIN INITIAL;
+					}
+					line_nbr++;
+				    }
+
+<PREPROC_IGNORE>^"#endif"\n	    {
+					int ignore;
+					if( COUNT_BUF(&define_polarity) == 0 ) {
+					    Eprintf(
+		       "#endif without matching #ifdef on line %d in file %s\n",
+						    line_nbr, cur_file_name);
+					}
+					pop_buf(&define_polarity, &ignore);
+					ignore = 0;
+					int *ip;
+					FOR_BUF(&define_polarity, int, ip) {
+					    if( *ip == 1 ) { ignore = 1; }
+					}
+					if( ignore == 1 ) {
+					    BEGIN PREPROC_IGNORE;
+					} else {
+					    BEGIN INITIAL;
+					}
+					line_nbr++;
+				    }
+
+<PREPROC_IGNORE>[^\n]		    { }
+<PREPROC_IGNORE>^\n		    { line_nbr++;  }
 
 DIR                                 {
                                         lvalp->str_t = DIR;
@@ -416,6 +545,57 @@ Init_lexer()
     strtemp(getcwd(path,1024));
     DIR = wastrsave(&strings, charappend('/'));
     cur_file_name = wastrsave(&strings, "stdin");
+    create_hash(&define_tbl, 1000, str_hash, str_equ);
+    new_buf(&define_polarity, 100, sizeof(int));
+    int init_polarity = 0;
+    push_buf(&define_polarity, &init_polarity);
+}
+
+static void
+hash_define(char *id)
+{
+    while( *id && isspace(*id) ) id++;
+    if( !*id ) {
+	FP(err_fp, "#define without any id on line %d in file %s\n",
+		   line_nbr, cur_file_name);
+	return;
+    }
+    id = wastrsave(&strings, id);
+    if( find_hash(&define_tbl, id) == NULL ) {
+	insert_hash(&define_tbl, id, id);
+    }
+}
+
+static void
+hash_undefine(char *id)
+{
+    while( *id && isspace(*id) ) id++;
+    if( !*id ) {
+	FP(err_fp, "#undef without any id on line %d in file %s\n",
+		   line_nbr, cur_file_name);
+	return;
+    }
+    id = wastrsave(&strings, id);
+    if( find_hash(&define_tbl, id) != NULL ) {
+	delete_hash(&define_tbl, id);
+    }
+}
+
+static bool
+is_defined(char *id)
+{
+    while( *id && isspace(*id) ) id++;
+    if( !*id ) {
+	FP(err_fp, "#ifdef without any id on line %d in file %s\n",
+		   line_nbr, cur_file_name);
+	return FALSE;
+    }
+    id = wastrsave(&strings, id);
+    if( find_hash(&define_tbl, id) != NULL ) {
+	return TRUE;
+    } else {
+	return FALSE;
+    }
 }
 
 int yywrap() { return 1; }

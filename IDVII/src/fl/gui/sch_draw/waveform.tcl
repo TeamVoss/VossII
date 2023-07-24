@@ -68,6 +68,7 @@ proc wv:create_waveform_viewer {w maxtime} {
 
 	set menu $f.menu
 	set cbc $menu.show_bdd
+	set mm $menu.minmax
 	set tf $menu.time
 	set zi $tf.zoom_in
 	set zt $tf.zoom
@@ -79,6 +80,8 @@ proc wv:create_waveform_viewer {w maxtime} {
 	set pb $tf.plus
 
 	set root [w2root $w]
+
+
 	frame $tf -relief flat -height 10
 	pack $tf -side right
 	    ttk::button $zi -image ::bitmap::zoom_in -command "wv:zoom_in $w"
@@ -107,6 +110,25 @@ proc wv:create_waveform_viewer {w maxtime} {
 	    ttk::button $pb -text "+" \
 		-command "gui:update_time $root +1" -width 2
 	    pack $pb -side left
+
+	frame $mm -relief flat -height 10
+	pack $mm -side right -padx 30
+	    ttk::label $mm.l -text "Show from: "
+	    ttk::entry $mm.min -justify center -width 5 \
+		-textvariable ::vstatus(min_time_to_show,$root) \
+                -validate all \
+                -validatecommand {string is integer %P}
+	    ttk::label $mm.m -text "to: "
+	    ttk::entry $mm.max -justify center -width 5 \
+		-textvariable ::vstatus(max_time_to_show,$root) \
+                -validate all \
+                -validatecommand {string is integer %P}
+	    pack $mm.l -side left
+	    pack $mm.min -side left
+	    pack $mm.m -side left
+	    pack $mm.max -side left
+	    set ::vstatus(min_time_to_show,$root) 0
+	    set ::vstatus(max_time_to_show,$root) -1
 
 
     # Actual waveform viewer windows

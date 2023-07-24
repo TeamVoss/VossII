@@ -46,6 +46,7 @@ void		free_buf(buffer_ptr bp);
 bool		empty_buf(buffer_ptr bp);
 void		push_buf(buffer_ptr bp, pointer item);
 void		pop_buf(buffer_ptr bp, pointer p);
+pointer		top_of_buf(buffer_ptr bp);
 void		store_buf(buffer_ptr bp, unint i, pointer item);
 pointer		locate_buf(buffer_ptr bp, unint i);
 bool		fetch_buf(buffer_ptr bp, unint i, pointer dest);

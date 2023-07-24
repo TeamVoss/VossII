@@ -115,3 +115,10 @@ locate_buf(buffer_ptr bp, unint i)
     }
     return( M_LOCATE_BUF(bp,i) );
 }
+
+pointer
+top_of_buf(buffer_ptr bp)
+{
+    ASSERT(bp->buf_size > 0 );
+    return( M_LOCATE_BUF(bp,bp->buf_size-1) );
+}

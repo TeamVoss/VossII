@@ -468,6 +468,7 @@ static int            nn_cmp(const void *pi, const void *pj);
 static bool           is_draw_fub(vis_ptr vp);
 static vis_ptr        get_vis_info_at_level(vis_list_ptr vlp, int level);
 static string         value_type2string(value_type type);
+static void           gen_limited_get_trace(g_ptr redex, value_type type);
 static void           gen_get_trace(g_ptr redex, value_type type);
 static void           gen_get_trace_val(g_ptr redex, value_type type);
 static void           gen_get_ste_result(g_ptr redex, value_type type);
@@ -1855,6 +1856,18 @@ get_btrace(g_ptr redex)
 }
 
 static void
+limited_get_trace(g_ptr redex)
+{
+    gen_limited_get_trace(redex, use_bdds);
+}
+
+static void
+limited_get_btrace(g_ptr redex)
+{
+    gen_limited_get_trace(redex, use_bexprs);
+}
+
+static void
 get_trace_val(g_ptr redex)
 {
     gen_get_trace_val(redex, use_bdds);
@@ -2627,6 +2640,41 @@ Fsm_Install_Functions()
 				   GLmake_bexpr(),
 				   GLmake_bexpr()))))),
 			get_btrace);
+
+
+    Add_ExtAPI_Function("limited_get_trace", "1111", FALSE,
+			GLmake_arrow(
+			  ste_handle_tp,
+			  GLmake_arrow(
+			    GLmake_int(),
+			    GLmake_arrow(
+			      GLmake_int(),
+			      GLmake_arrow(
+				GLmake_string(),
+				GLmake_list(
+				  GLmake_tuple(
+				    GLmake_int(),
+				    GLmake_tuple(
+				       GLmake_bool(),
+				       GLmake_bool()))))))),
+			limited_get_trace);
+
+    Add_ExtAPI_Function("limited_bget_trace", "1111", FALSE,
+			GLmake_arrow(
+			  ste_handle_tp,
+			  GLmake_arrow(
+			    GLmake_int(),
+			    GLmake_arrow(
+			      GLmake_int(),
+			      GLmake_arrow(
+				GLmake_string(),
+				GLmake_list(
+				  GLmake_tuple(
+				    GLmake_int(),
+				    GLmake_tuple(
+				       GLmake_bexpr(),
+				       GLmake_bexpr()))))))),
+			limited_get_btrace);
 
     Add_ExtAPI_Function("get_trace_val", "111", FALSE,
 			GLmake_arrow(
@@ -8660,6 +8708,70 @@ gen_get_trace(g_ptr redex, value_type type)
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
     for(trace_event_ptr te = tp->events; te != NULL; te = te->next) {
+	g_ptr event = Make_CONS_ND(Make_INT_leaf(te->time),
+				   Make_CONS_ND(Make_GBV_leaf(te->H),
+						Make_GBV_leaf(te->L)));
+	APPEND1(tail, event);
+    }
+    pop_fsm();
+    pop_ste();
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+gen_limited_get_trace(g_ptr redex, value_type type)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_ste, g_node, g_min, g_max;
+    EXTRACT_4_ARGS(redex, g_ste, g_min, g_max, g_node);
+    int t_min = GET_INT(g_min);
+    int t_max = GET_INT(g_max);
+    ste_ptr ste = (ste_ptr) GET_EXT_OBJ(g_ste);
+    if( ste->type != type ) {
+	string msg = Fail_pr("Asking for %s values when STE run created %ss",
+			      value_type2string(type),
+			      value_type2string(ste->type));
+	MAKE_REDEX_FAILURE(redex, msg);
+	return;
+    }
+    string node = GET_STRING(g_node);
+    push_ste(ste);
+    push_fsm(ste->fsm);
+    int idx = name2idx(node);
+    if( idx < 0 ) {
+	pop_ste();
+	pop_fsm();
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	return;
+    }
+    trace_ptr tp = (trace_ptr) find_hash(trace_tblp, INT2PTR(idx));
+    if( tp == NULL ) {
+	pop_ste();
+	pop_fsm();
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not traced", node));
+	return;
+    }
+    MAKE_REDEX_NIL(redex);
+    g_ptr tail = redex;
+    bool first = TRUE;
+    for(trace_event_ptr te = tp->events; te != NULL; te = te->next) {
+	if( te->time > t_max ) { continue; }
+	if( first && te->time < t_max ) {
+	    g_ptr event = Make_CONS_ND(Make_INT_leaf(t_max),
+				   Make_CONS_ND(Make_GBV_leaf(c_ONE),
+						Make_GBV_leaf(c_ONE)));
+	    APPEND1(tail, event);
+	}
+	first = FALSE;
+	if( te->time < t_min ) {
+	    g_ptr event = Make_CONS_ND(Make_INT_leaf(t_min),
+				   Make_CONS_ND(Make_GBV_leaf(te->H),
+						Make_GBV_leaf(te->L)));
+	    APPEND1(tail, event);
+	    break;
+	}
 	g_ptr event = Make_CONS_ND(Make_INT_leaf(te->time),
 				   Make_CONS_ND(Make_GBV_leaf(te->H),
 						Make_GBV_leaf(te->L)));

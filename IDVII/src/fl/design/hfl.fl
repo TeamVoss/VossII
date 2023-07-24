@@ -3143,7 +3143,7 @@ let hw__pair__mk_var p base =
     W_VAR sz base
 ;
 
-let hw__pair__values {p:: *a # *b} = error "Not relevant";
+let hw__pair__values {p:: *a # *b} = "";
 
 let hw_pair_hw_type_destr =
 	    HW_TYPE hw__pair__type_name
@@ -3164,6 +3164,8 @@ let hw__list__constr (W_CAT l) = map hw_constr l
 	map2 (\e1.\e2. hw_constr (W_ITE c e1 e2)) l1 l2
 ;
 
+let hw__list__values {p:: *a list} = "";
+
 let hw_list_hw_type_destr =
 	    HW_TYPE (error "Not defined for lists")
 		    (error "Not defined for lists")
@@ -3171,7 +3173,7 @@ let hw_list_hw_type_destr =
 		    (error "Not defined for lists")
 		    hw__list__destr
 		    hw__list__constr
-		    (error "Not defined for lists")
+		    hw__list__values
 ;
 add_open_overload hw_type_destr hw_list_hw_type_destr;
 

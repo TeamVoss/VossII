@@ -109,6 +109,8 @@ Eprintf (const string format, ...)
 {
     va_list arg;
     va_start(arg, format);
+    // Make sure error message is visible on stderr since GUI will be disappear
+    use_stdout = TRUE;
     FP_va(err_fp, format, arg);
     va_end(arg);
     exit(-1);
