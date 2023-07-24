@@ -748,6 +748,14 @@ let fl_set_global_time canvas t =
 ;
 export_to_tcl fl_set_global_time;
 
+let fl_record_minmax_update canvas t_min t_max =
+    let vfsm = w2vfsm canvas then
+    let cmd = sprintf "draw_set_minmax vis %d %d;" t_min t_max then
+    (add_command vfsm cmd)
+;
+export_to_tcl fl_record_minmax_update;
+
+
 let fl_inform_show_value_change c show =
     let tab = canvas2tab c then
     let vfsm = w2vfsm c then
@@ -1514,14 +1522,16 @@ let fl_get_bdd_color c an =
 ;
 export_to_tcl fl_get_bdd_color;
 
-let base_get_waveform w vec show_depend =
+let base_get_waveform w vec min_time max_time show_depend =
     let ste = canvas2ste w then
     let type = get_ste_type ste then
     let nds = md_expand_vector vec in
     let opt_states = node2value_list (ste2fsm ste) (hd nds) in
-    let max_time = get_ste_maxtime ste then
+    let max_time = (max_time < 0) => get_ste_maxtime ste | max_time then
     type = "bdd" =>
-        let traces = (map (get_trace ste) nds) catch [] then
+        let traces =
+	    (map (limited_get_trace ste min_time max_time) nds) catch []
+	then
         traces = [] => [(max_time,"X", "white"),(0,"-", "white")] |
         let vec_trace = merge_traces traces then
         let mk_tr (time,vals) =
@@ -1569,8 +1579,8 @@ let base_get_waveform w vec show_depend =
 
 let _fl_get_waveform_ref = ref [(1,"","")];
 
-let fl_get_waveform_cnt w vec show_depend =
-    let res = base_get_waveform w vec show_depend then
+let fl_get_waveform_cnt w vec min_time max_time show_depend =
+    let res = base_get_waveform w vec min_time max_time show_depend then
     (_fl_get_waveform_ref := res) fseq
     (length res+99)/100
 ;
@@ -2008,6 +2018,16 @@ let draw_set_time vfsm t =
     let old = tcl_eval [sprintf "set ::vstatus(time,%s)" w] then
     (tcl_eval [sprintf "set ::vstatus(time,%s) %d" w t, "update"]) fseq
     sscanf "%d" old
+;
+
+// Set the visible window in the waveform viewer to be between t_min and t_max.
+let draw_set_minmax vfsm t_min t_max =
+    let w = (vfsm2id vfsm) then
+    (tcl_eval [
+	sprintf "set ::wv_info(min_time_to_show,[w2root %s]) %d" w t_min,
+	sprintf "set ::wv_info(max_time_to_show,[w2root %s]) %d" w t_max,
+	sprintf "gui:update_minmax %s.nb.waveform" w
+    ]) fseq ()
 ;
 
 // Get the vsfm named 'name'

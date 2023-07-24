@@ -33,6 +33,7 @@ proc gui:update_time {root change} {
 }
 
 proc wv:create_waveform_viewer {w maxtime} {
+
     set f $w.f
     catch {destroy $f}
 
@@ -115,20 +116,22 @@ proc wv:create_waveform_viewer {w maxtime} {
 	pack $mm -side right -padx 30
 	    ttk::label $mm.l -text "Show from: "
 	    ttk::entry $mm.min -justify center -width 5 \
-		-textvariable ::vstatus(min_time_to_show,$root) \
+		-textvariable ::wv_info(min_time_to_show,$root) \
                 -validate all \
                 -validatecommand {string is integer %P}
+	    bind $mm.min <KeyPress-Return> "gui:update_minmax $w"
 	    ttk::label $mm.m -text "to: "
 	    ttk::entry $mm.max -justify center -width 5 \
-		-textvariable ::vstatus(max_time_to_show,$root) \
+		-textvariable ::wv_info(max_time_to_show,$root) \
                 -validate all \
                 -validatecommand {string is integer %P}
+	    bind $mm.max <KeyPress-Return> "gui:update_minmax $w"
 	    pack $mm.l -side left
 	    pack $mm.min -side left
 	    pack $mm.m -side left
 	    pack $mm.max -side left
-	    set ::vstatus(min_time_to_show,$root) 0
-	    set ::vstatus(max_time_to_show,$root) -1
+	    set ::wv_info(min_time_to_show,$root) 0
+	    set ::wv_info(max_time_to_show,$root) 0
 
 
     # Actual waveform viewer windows
@@ -179,7 +182,7 @@ proc wv:create_waveform_viewer {w maxtime} {
 	frame $wf -relief flat
 	    canvas $wt -background white -height 30 \
 		    -xscrollcommand [list $wx set]
-	    wv:draw_time_line $f $::wv_info($f,maxtime)
+	    wv:draw_time_line $f
 	    bind $wt <ButtonPress-1> "wv:set_time_explicitly %W %x %y"
 
 	    pack $wt -side top -fill x
@@ -202,8 +205,6 @@ proc wv:create_waveform_viewer {w maxtime} {
 	pack $pw -side right -fill both -expand yes
     pack $f -side left -fill both -expand yes
 
-
-
     $ww config -scrollregion [$wt bbox all]
     $wt config -scrollregion [$wt bbox all]
     $pw sashpos 0 50
@@ -223,8 +224,10 @@ proc wv:create_waveform_viewer {w maxtime} {
 
 proc wv:set_time_explicitly {w x y} {
     set root [w2root $w]
+    set t_min $::wv_info(min_time_to_show,$root)
+    set t_max $::wv_info(max_time_to_show,$root)
     set f $root.nb.waveform.f
-    set time [expr int([$w canvasx $x]/$::wv_xscale($f))]
+    set time [expr int([$w canvasx $x]/$::wv_xscale($f))+$t_min]
     set ::vstatus(time,[w2root $w]) $time
 }
 
@@ -351,7 +354,9 @@ proc wv:add_value_popup {ww obj} {
     $ww bind $obj <ButtonPress-3> {
 	set f [wv:ww2f %W]
 	set w [winfo parent [winfo parent [winfo parent $f]]]
-	set time [expr int([%W canvasx %x]/$::wv_xscale($f))]
+	set root [w2root $w]
+	set t_min $::wv_info(min_time_to_show,$root)
+	set time [expr int([%W canvasx %x]/$::wv_xscale($f))+$t_min]
 	set tags [%W gettags current]
 	set vec [wv:vtag2name $tags]
 	if { $vec != "" } { wv:add_value_menu $w [list $vec] $time %X %Y }
@@ -360,7 +365,9 @@ proc wv:add_value_popup {ww obj} {
     $ww bind $obj <Enter> {
 	set f [wv:ww2f %W]
 	set w [winfo parent [winfo parent [winfo parent $f]]]
-	set time [expr int([%W canvasx %x]/$::wv_xscale($f))]
+	set root [w2root $w]
+	set t_min $::wv_info(min_time_to_show,$root)
+	set time [expr int([%W canvasx %x]/$::wv_xscale($f))+$t_min]
 	set tags [%W gettags current]
 	set vec [wv:vtag2name $tags]
 	if { $vec != "" } {
@@ -375,7 +382,9 @@ proc wv:add_value_popup {ww obj} {
 	unpost_popup %W
 	set f [wv:ww2f %W]
 	set w [winfo parent [winfo parent [winfo parent $f]]]
-	set time [expr int([%W canvasx %x]/$::wv_xscale($f))]
+	set root [w2root $w]
+	set t_min $::wv_info(min_time_to_show,$root)
+	set time [expr int([%W canvasx %x]/$::wv_xscale($f))+$t_min]
 	set tags [%W gettags current]
 	set vec [wv:vtag2name $tags]
 	if { $vec != "" } {
@@ -393,10 +402,14 @@ proc wv:set_time_pointer {w args} {
     set ww $wf.waveforms
 
     set root [w2root $w]
+    set t_min $::wv_info(min_time_to_show,$root)
+    set t_max $::wv_info(max_time_to_show,$root)
     set t $::vstatus(time,$root)
-    if { $t == "" } { set t 0 }
+    if { $t == "" } { set t $t_min }
+    if { $t < $t_min } { set t $t_min }
+    if { $t > $t_max } { set t $t_max }
     set ::vstatus(time_shadow,$root) $t
-    set x1 [expr $t * $::wv_xscale($f)]
+    set x1 [expr ($t-$t_min) * $::wv_xscale($f)]
     set x2 [expr $x1 + $::wv_xscale($f)]
     set ytop 0
     set ybot 30
@@ -413,13 +426,19 @@ proc wv:set_time_pointer {w args} {
     $ww lower _TiMwPoInT_
 }
 
-proc wv:draw_time_line {f maxtime} {
+proc wv:draw_time_line {f} {
+    set root [w2root $f]
+    set t_min $::wv_info(min_time_to_show,$root)
+    set t_max $::wv_info(max_time_to_show,$root)
+    if { $t_max < 0 } {
+	set t_max $::wv_info($f,maxtime)
+    }
     set pw $f.panes
     set wf $pw.waveform_frame
     set wt $wf.time_scale
-    $wt create line 0 20 [expr $::wv_xscale($f)*$maxtime] 20 -arrow last
-    for {set t 0} {$t <= $maxtime} {incr t} {
-	set x [expr $t*$::wv_xscale($f)]
+    $wt create line 0 20 [expr $::wv_xscale($f)*($t_max-$t_min)] 20 -arrow last
+    for {set t $t_min} {$t <= $t_max} {incr t} {
+	set x [expr ($t-$t_min)*$::wv_xscale($f)]
 	if [expr ($t % 10) == 0] {
 	    $wt create line $x 10 $x 30
 	    $wt create text $x 17 -text $t -anchor sw -justify left \
@@ -430,7 +449,6 @@ proc wv:draw_time_line {f maxtime} {
 	    $wt create line $x 18 $x 22
 	}
     }
-
 }
 
 proc wv:add_waveform {w vecs} {
@@ -747,11 +765,16 @@ proc wv:prim_add_waveform {w vec} {
     set wx $wf.xscroll
 
     unpost_popup $ww
-    set new_maxtime [fl_get_ste_maxtime $w]
-    if { $new_maxtime != $::wv_info($f,maxtime) } {
-	wv:set_new_max_time $w 0
+
+    set root [w2root $w]
+    set t_min $::wv_info(min_time_to_show,$root)
+    set t_max $::wv_info(max_time_to_show,$root)
+    if { $t_max == 0 } {
+	set new_maxtime [fl_get_ste_maxtime $w]
+	set ::wv_info($f,maxtime) $new_maxtime
+	set t_max $new_maxtime
+	set ::wv_info(max_time_to_show,$root) $t_max
     }
-    set t $::wv_info($f,maxtime)
     set vec [clean_name $vec]
     if [info exists ::wv_info($f,vectors)] {
 	set cnt [llength $::wv_info($f,vectors)]
@@ -775,7 +798,7 @@ proc wv:prim_add_waveform {w vec} {
     set ::wv_info(vtag2name,$vtag) $vec
 
     # Add waveform background
-    set maxt [expr $t*$::wv_xscale($f)]
+    set maxt [expr ($t_max-$t_min)*$::wv_xscale($f)]
     set bb [$ww create rectangle 0 $ybot $maxt $ytop -fill white \
 		-outline "" -tags "$bgtag $vtag"]
     wv:add_value_popup $ww $bb
@@ -787,14 +810,17 @@ proc wv:prim_add_waveform {w vec} {
     set ytop [expr $ytop+2]
 
     # Add actual waveform
-    set cnt [fl_get_waveform_cnt $w $vec $::wv_info($f,show_depend)]
+    set cnt [fl_get_waveform_cnt $w $vec \
+		$::wv_info(min_time_to_show,$root) \
+		$::wv_info(max_time_to_show,$root) \
+		$::wv_info($f,show_depend)]
+    set t $t_max
     for {set i 0} {$i < $cnt} {incr i} {
 	foreach ch [fl_get_waveform_res $i] {
 	    val {nt {v dep_col}} $ch
 	    if { $dep_col == "-" } { set dep_col ""; }
-	    if { $nt >= $t } { continue; }
-	    set lx [expr $nt*$::wv_xscale($f)]
-	    set rx [expr $t*$::wv_xscale($f)]
+	    set lx [expr ($nt-$t_min)*$::wv_xscale($f)]
+	    set rx [expr ($t-$t_min)*$::wv_xscale($f)]
 	    
 	    set t $nt
 	    switch $v {
@@ -925,6 +951,14 @@ proc wv:zoom_out {w} {
     wv:set_new_max_time $w 1
 }
 
+proc gui:update_minmax {w} {
+    set root [w2root $w]
+    set t_min $::wv_info(min_time_to_show,$root)
+    set t_max $::wv_info(max_time_to_show,$root)
+    fl_record_minmax_update $w $t_min $t_max
+    wv:set_new_max_time $w 1
+}
+
 proc wv:set_new_max_time {w force} {
     set f $w.f
     set pw $f.panes
@@ -953,7 +987,7 @@ proc wv:set_new_max_time {w force} {
     $ww delete all
     $nn delete all
 
-    wv:draw_time_line $f $::wv_info($f,maxtime)
+    wv:draw_time_line $f
 
     foreach vec $vectors {
 	wv:add_waveform $w $vec
@@ -984,7 +1018,7 @@ proc wv:toggle_show_depend {w} {
     $ww delete all
     $nn delete all
 
-    wv:draw_time_line $f $::wv_info($f,maxtime)
+    wv:draw_time_line $f
 
     foreach vec $vectors {
 	wv:add_waveform $w $vec
