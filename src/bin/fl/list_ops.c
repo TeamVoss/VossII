@@ -1163,11 +1163,16 @@ intersect(g_ptr redex)
     }
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
-    while( !IS_NIL(set1) ) {
+    bool done = FALSE;
+    while( !done && !IS_NIL(set1) ) {
 	g_ptr d = GET_CONS_HD(set1);
 	if( find_hash(&set, d) != NULL ) {
 	    APPEND1(tail, d);
 	    INC_REFCNT(d);
+	    delete_hash(&set, d);
+	    if( hash_size(&set) == 0 ) {
+		done = TRUE;
+	    } 
 	}
 	set1 = GET_CONS_TL(set1);
     }

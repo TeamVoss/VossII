@@ -1904,6 +1904,13 @@ overload random_simulation random_simulation_fsm random_simulation_vis;
 //  fl API to drawing routine(s)
 // ======================================================================
 
+let check_valid_vectors vfsm op vs =
+    let ckt = vfsm2fsm vfsm in
+    let nds = md_expand_vectors vs in
+    let missing = filter (\n. NOT (is_node ckt n)) nds in
+    missing = [] => () |
+    eprintf "Invalid vector(s) in %s %S\n" op (md_extract_vectors missing)
+;
 
 // Draw a fanin cone from the vectors in vecs.
 //
@@ -1923,7 +1930,8 @@ overload random_simulation random_simulation_fsm random_simulation_vis;
 // Returns the name of the canvas for the new fanin drawing.
 //
 let draw_fanin vfsm hierarchy_level levels vecs =
-    gen_draw_fanin vfsm hierarchy_level levels vecs
+    (check_valid_vectors vfsm "draw_fanin" vecs) fseq
+    (gen_draw_fanin vfsm hierarchy_level levels vecs)
 ;
 
 
@@ -1941,7 +1949,9 @@ let draw_fanin vfsm hierarchy_level levels vecs =
 // Returns the name of the canvas for the new fanin drawing.
 //
 let draw_inside vfsm hierarchy_level vecs =
-    gen_draw_inside vfsm "" (hierarchy_level-1) vecs 0
+    (check_valid_vectors vfsm "draw_inside" vecs) fseq
+    let c = get_current_canvas () then
+    gen_draw_inside vfsm c (hierarchy_level-1) vecs 0
 ;
 
 // Hide a subtree
@@ -1952,6 +1962,7 @@ let draw_inside vfsm hierarchy_level vecs =
 // stop:	    Make the node also a global stop node
 //
 let draw_hide {vfsm::vfsm} tab vecs stop =
+    (check_valid_vectors vfsm "draw_hide" vecs) fseq
     let anons = (fl_vecs2tags tab vecs) then
     anons = [] => eprintf "Cannot find anon names for %S in %s\n" vecs tab |
     let anon = hd anons in
@@ -1969,6 +1980,7 @@ let draw_hide {vfsm::vfsm} tab vecs stop =
 // vecs:	    The list of vectors to end at (whose fanins to draw)
 //
 let add_waveform vfsm vecs =
+    (check_valid_vectors vfsm "add_waveform" vecs) fseq
     let w = vfsm2id vfsm then
     let ww = sprintf "%s.nb.waveform" w then
     let cmds = map (\v. sprintf "wv:prim_add_waveform %s {%s}" ww v) vecs in

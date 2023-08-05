@@ -1768,6 +1768,27 @@ basename(g_ptr redex)
 }
 
 static void
+is_node(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_fsm, g_node;
+    EXTRACT_2_ARGS(redex, g_fsm, g_node);
+    fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
+    string node = GET_STRING(g_node);
+    push_fsm(fsm);
+    int idx = name2idx(node);
+    if( idx >= 0 ) {
+	MAKE_REDEX_BOOL(redex, B_One());
+    } else {
+	MAKE_REDEX_BOOL(redex, B_Zero());
+    }
+    pop_fsm();
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
 ste2fsm(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
@@ -2600,6 +2621,12 @@ Fsm_Install_Functions()
 				     GLmake_arrow(GLmake_string(),
 						  GLmake_string())),
 			basename);
+
+    Add_ExtAPI_Function("is_node", "11", FALSE,
+			GLmake_arrow(fsm_handle_tp,
+				     GLmake_arrow(GLmake_string(),
+						  GLmake_bool())),
+			is_node);
 
     Add_ExtAPI_Function("get_weak_expressions", "1", FALSE,
 			 GLmake_arrow(ste_handle_tp,
