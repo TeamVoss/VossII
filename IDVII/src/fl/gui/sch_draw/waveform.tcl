@@ -42,7 +42,7 @@ proc wv:create_waveform_viewer {w maxtime} {
 	set maxtime 1
     }
     set ::wv_info($f,maxtime) $maxtime
-    set ::wv_info($f,vectors) {}
+    set ::wv_info(vectors,$f) {}
 
     set pw $f.panes
     set nf $pw.name_frame
@@ -182,7 +182,6 @@ proc wv:create_waveform_viewer {w maxtime} {
 	frame $wf -relief flat
 	    canvas $wt -background white -height 30 \
 		    -xscrollcommand [list $wx set]
-	    wv:draw_time_line $f
 	    bind $wt <ButtonPress-1> "wv:set_time_explicitly %W %x %y"
 
 	    pack $wt -side top -fill x
@@ -218,6 +217,8 @@ proc wv:create_waveform_viewer {w maxtime} {
 
     trace add variable ::vstatus(time,$root) write \
         "after idle [list wv:set_time_pointer $w]" 
+
+    wv:draw_time_line $f
 
     return $f
 }
@@ -541,19 +542,19 @@ proc wv:delete_waveform {nn idx} {
     set nf $pw.name_frame
     set nn $nf.names
 
-    if ![info exists ::wv_info($f,vectors)] { return 0 }
-    set max [expr [llength $::wv_info($f,vectors)]-1]
+    if ![info exists ::wv_info(vectors,$f)] { return 0 }
+    set max [expr [llength $::wv_info(vectors,$f)]-1]
     if [expr $idx > $max] { return }
 
     # Remove the name
-    set vecs $::wv_info($f,vectors)
-    unset ::wv_info($f,vectors)
+    set vecs $::wv_info(vectors,$f)
+    unset ::wv_info(vectors,$f)
     fl_record_waveform_deletion $f $idx
     for {set i 0} { $i < $idx } {incr i} {
-	lappend ::wv_info($f,vectors) [lindex $vecs $i]
+	lappend ::wv_info(vectors,$f) [lindex $vecs $i]
     }
     for {set i [expr $idx+1]} {$i <= $max} {incr i} {
-	lappend ::wv_info($f,vectors) [lindex $vecs $i]
+	lappend ::wv_info(vectors,$f) [lindex $vecs $i]
     }
     # 
     val {lx ly ux uy} [$nn bbox all]
@@ -592,17 +593,17 @@ proc wv:move_waveform {nn idx dir} {
     set nn $nf.names
 
     fl_record_waveform_movement $nn $idx $dir
-    if ![info exists ::wv_info($f,vectors)] { return 0 }
+    if ![info exists ::wv_info(vectors,$f)] { return 0 }
     if [expr $idx == 0 && $dir == -1] { return 0 }
-    set max [expr [llength $::wv_info($f,vectors)]-1]
+    set max [expr [llength $::wv_info(vectors,$f)]-1]
     if [expr $idx == $max && $dir == 1] { return 0 }
     set swap_idx [expr $idx+$dir]
 
     # Swap the names
-    set vec [lindex $::wv_info($f,vectors) $idx]
-    set swap_vec [lindex $::wv_info($f,vectors) $swap_idx]
-    lset ::wv_info($f,vectors) $idx $swap_vec
-    lset ::wv_info($f,vectors) $swap_idx $vec
+    set vec [lindex $::wv_info(vectors,$f) $idx]
+    set swap_vec [lindex $::wv_info(vectors,$f) $swap_idx]
+    lset ::wv_info(vectors,$f) $idx $swap_vec
+    lset ::wv_info(vectors,$f) $swap_idx $vec
     val {blx bly bux buy} [$nn bbox all]
     set ytop [expr $idx*($::wv_height + $::wv_sep)+$::wv_sep]
     set ybot [expr $ytop + $::wv_height]
@@ -653,8 +654,8 @@ proc wv:enter_name_window {nn x y X Y} {
     set f [winfo parent [winfo parent [winfo parent $nn]]]
     $nn delete _ArRoW_
     set idx [expr int([$nn canvasy $y]/($::wv_height + $::wv_sep))]
-    if [info exists ::wv_info($f,vectors)] {
-	set max [expr [llength $::wv_info($f,vectors)]-1]
+    if [info exists ::wv_info(vectors,$f)] {
+	set max [expr [llength $::wv_info(vectors,$f)]-1]
     } else {
 	set max 0
     }
@@ -675,8 +676,8 @@ proc wv:move_name_window {nn x y X Y} {
     set f [winfo parent [winfo parent [winfo parent $nn]]]
     $nn delete _ArRoW_
     set idx [expr int([$nn canvasy $y]/($::wv_height + $::wv_sep))]
-    if [info exists ::wv_info($f,vectors)] {
-	set max [expr [llength $::wv_info($f,vectors)]-1]
+    if [info exists ::wv_info(vectors,$f)] {
+	set max [expr [llength $::wv_info(vectors,$f)]-1]
     } else {
 	set max 0
     }
@@ -774,14 +775,15 @@ proc wv:prim_add_waveform {w vec} {
 	set ::wv_info($f,maxtime) $new_maxtime
 	set t_max $new_maxtime
 	set ::wv_info(max_time_to_show,$root) $t_max
+	wv:draw_time_line $f
     }
     set vec [clean_name $vec]
-    if [info exists ::wv_info($f,vectors)] {
-	set cnt [llength $::wv_info($f,vectors)]
+    if [info exists ::wv_info(vectors,$f)] {
+	set cnt [llength $::wv_info(vectors,$f)]
     } else {
 	set cnt 0
     }
-    lappend ::wv_info($f,vectors) $vec
+    lappend ::wv_info(vectors,$f) $vec
     set ytop [expr $cnt*($::wv_height + $::wv_sep)+$::wv_sep]
     set ybot [expr $ytop + $::wv_height]
 
@@ -976,12 +978,12 @@ proc wv:set_new_max_time {w force} {
     if { !$force && $new_maxtime == $::wv_info($f,maxtime) } { return }
 
     set ::wv_info($f,maxtime) $new_maxtime
-    if [info exists ::wv_info($f,vectors)] {
-	set vectors $::wv_info($f,vectors)
+    if [info exists ::wv_info(vectors,$f)] {
+	set vectors $::wv_info(vectors,$f)
     } else {
 	set vectors {}
     }
-    set ::wv_info($f,vectors) {}
+    set ::wv_info(vectors,$f) {}
 
     $wt delete all
     $ww delete all
@@ -994,6 +996,14 @@ proc wv:set_new_max_time {w force} {
     }
 }
 
+proc wv:get_waveform_vectors {w} {
+    set f $w.f
+    if [info exists ::wv_info(vectors,$f)] {
+	return $::wv_info(vectors,$f)
+    } else {
+	return {}
+    }
+}
 
 proc wv:toggle_show_depend {w} {
     set f $w.f
@@ -1007,12 +1017,12 @@ proc wv:toggle_show_depend {w} {
     set new_maxtime [fl_get_ste_maxtime $w]
 
     set ::wv_info($f,maxtime) $new_maxtime
-    if [info exists ::wv_info($f,vectors)] {
-	set vectors $::wv_info($f,vectors)
+    if [info exists ::wv_info(vectors,$f)] {
+	set vectors $::wv_info(vectors,$f)
     } else {
 	set vectors {}
     }
-    set ::wv_info($f,vectors) {}
+    set ::wv_info(vectors,$f) {}
 
     $wt delete all
     $ww delete all

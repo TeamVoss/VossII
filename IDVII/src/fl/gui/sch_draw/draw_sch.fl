@@ -457,8 +457,10 @@ let get_new_sch_canvas w draw_level name instance_hier =
 	tcl_eval [sprintf "get_new_sch_canvas %s %d {%s}%s" w draw_level
 			  instance_hier rname]
     then
+    (
     val [tab_w, canvas] = str_split tw_c " " then
     (tab_w, canvas)
+    ) gen_catch (\msg. (fprintf stderr "tw_c: |%s|\n" tw_c) fseq error msg)
 ;
 
 let canvas2tab c =
@@ -1344,21 +1346,6 @@ let weaken_color color =
 
 let update_colors vfsm =
   (
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-//  let anames = visualize_get_shown_anons vis then
-//  let shown an =
-//	let rvec = visualization_anon2real vis an then
-//	let same = rvec vec_intersect selection then
-//	same = [] => ([], []) |
-//	(rvec vec_subtract selection) = [] => [an],[] | [], [an]
-//  in
-//  val (full_l,partial_l) = unzip (map shown anames) then
-//  let full = flat full_l then
-//  let partial = flat partial_l then
-//
-//
-//
-
     let selection = deref (vfsm2selection_r vfsm) then
     let base_highlights = deref (vfsm2hll_r vfsm) then
     let highlights = map hd (partition fst base_highlights) in
@@ -1371,7 +1358,6 @@ let update_colors vfsm =
 	let do_one_col l =
 	    l = [] => [] |
 	    let color = snd (hd l) in
-//	    let vecs = md_extract_vectors (map fst l) in
 	    let vecs = md_expand_vectors (map fst l) in
 	    val (full_anons, part_anons) =
 		visualization_vecs2tags vis T vecs
@@ -1392,19 +1378,26 @@ let update_colors vfsm =
 	// Now update the waveform window too
 	let w = deref (vfsm2wvr vfsm) then
 	let tcmd1 = sprintf "wv:restore_original_colors %s" w then
-	let do_one_col l =
-	    l = [] => [] |
-	    let color = snd (hd l) then
-//	    let vecs = md_extract_vectors (map fst l) then
-	    let vecs = md_expand_vectors (map fst l) then
-	    let do v = sprintf "wv:prim_set_name_color %s {%s} %s;" w v color in
-	    let cmds = map do vecs then
-	    cmds
+	let wv_vecs = tcl2list (tcl_eval ["wv:get_waveform_vectors "^w]) then
+	let esel = md_expand_vectors selection then
+	let exp1 (v,col) =
+	    map (\n. n, col) ((md_expand_vector v) subtract esel)
 	in
-	let tcmd2 = flatmap do_one_col (partition snd highlights) then
-	// Now do selection since it overrides other colors
-	let tcmd3 = do_one_col (map (\v.v,"red") selection) then
-	big_tcl_eval (tcmds@[tcmd1]@tcmd2@tcmd3)
+	let e_selection = map (\n. n, "red") esel then
+	let nd_colors = e_selection @ (flatmap exp1 highlights) then
+	let do1w wvec =
+	    let nds = md_expand_vector wvec in
+	    let cols = map (\n. (assoc n nd_colors) catch "") nds then
+	    let summary = filter (\n. n != "") (setify cols) in
+	    summary == [] =>
+		sprintf "wv:prim_set_name_color %s {%s} _OrIgInAlCoLoR_;" w wvec
+	    |
+	    length summary != 1 => "" |
+	    let col = hd summary in
+	    sprintf "wv:prim_set_name_color %s {%s} %s;" w wvec col
+	in
+	let cmds = map do1w wv_vecs then
+	big_tcl_eval (tcmds@cmds)
     |
 	big_tcl_eval tcmds
  ) gen_catch (\msg. (fprintf stderr "Failure: %s\n" msg) fseq "")

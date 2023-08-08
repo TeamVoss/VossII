@@ -321,7 +321,7 @@ __LINE__			    {
 				    }
 
 <PREPROC_IGNORE>[^\n]		    { }
-<PREPROC_IGNORE>^\n		    { line_nbr++;  }
+<PREPROC_IGNORE>\n		    { line_nbr++;  }
 
 DIR                                 {
                                         lvalp->str_t = DIR;
