@@ -10,6 +10,14 @@ set fl_pid          [lindex $argv 0]
 set socket_addr     [lindex $argv 1]
 set socket_port     [lindex $argv 2]
 set tmp_dir         [lindex $argv 3]
+if { $argc == 5 } {
+    set ::scaling_factor [lindex $argv 4]
+} else {
+    set ::scaling_factor 1.0
+}
+
+# Make sure we use a 72dpi independent of the display
+tk scaling 1.0
 
 # Get the directory this file is in
 set DIR  [file dirname [file normalize [info script]]]
@@ -31,9 +39,6 @@ set ::voss2_bcolor	#fff0b0
 if {! [catch {glob "~/.VossII.Xdefaults"} x_resources]} {
     option readfile $x_resources 
 }
-
-# Make sure we use a 72dpi independent of the display
-tk scaling 1.0
 
 option add *Dialog.msg.wrapLength 20c 
 option add *Dialog.dtl.wrapLength 20c
@@ -885,6 +890,7 @@ create_voss2_top_level_menu "$voss2_top_level.menu"
 frame ".voss2.toolbar"
 pack ".voss2.toolbar" -fill both  
 create_voss2_top_level_txtwin "$voss2_top_level.t" "$voss2_top_level.s"
+
 
 #-----------------------------------------------------------------------
 
@@ -1941,3 +1947,6 @@ proc sg:capture {w} {
 # This is a workaround. Should fix change_fonts (and other) procs.
 set old_limit [interp recursionlimit {}]
 interp recursionlimit {} [expr {$old_limit + 50000}]
+
+update
+eval change_fonts $::voss2_txtfont

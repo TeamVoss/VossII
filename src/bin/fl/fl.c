@@ -84,6 +84,7 @@ static string	        new_temp_dir		= NULL;
 static buffer		tcl_eval_done_buf;
 static buffer		tcl_eval_result_buf;
 static string		s_empty_string;
+static string		scaling_factor = "";
 
 /* ===================== Local functions defined ===================== */
 static void	busy(bool busy);
@@ -237,6 +238,10 @@ fl_main(int argc, char *argv[])
         if( (strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0) ) {
 	    print_help();
 	    exit(0);
+        } else
+        if( strcmp(argv[1], "--scaling") == 0 ) {
+	    scaling_factor = argv[2];
+            argc -= 2; argv += 2;
         } else
         if( strcmp(argv[1], "--read_input_from_file") == 0 ) {
             input_file_for_cmds = argv[2];
@@ -452,10 +457,6 @@ fl_main(int argc, char *argv[])
 	fcntl(0, F_SETFL, flags | O_NONBLOCK);
 
         gui_mode = 1;
-
-	// Set the font to the default according to vossrc entry
-	string font_cmd = tprintf("change_fonts %s", RCtext_font);
-	Send_to_tcl(font_cmd, NULL);
 
         if(hide_window) { Send_to_tcl("hide_fl_window", NULL); }
 
@@ -891,12 +892,13 @@ setup_sockets()
     uint16_t port = ntohs(serv_addr.sin_port);
 
     if( use_window != NULL ) {
-	Sprintf(buf, "wish %s/front_end.tcl %d %d %d %s -use %s &",
+	Sprintf(buf, "wish %s/front_end.tcl %d %d %d %s %s -use %s &",
 		     binary_location, getpid(), addr, port, Voss_tmp_dir,
-		     use_window);
+		     scaling_factor, use_window);
     } else {
-	Sprintf(buf, "wish %s/front_end.tcl %d %d %d %s &",
-		     binary_location, getpid(), addr, port, Voss_tmp_dir);
+	Sprintf(buf, "wish %s/front_end.tcl %d %d %d %s %s &",
+		     binary_location, getpid(), addr, port, Voss_tmp_dir,
+		     scaling_factor);
     }
     if( system(buf) != 0 ) {
         Eprintf("Failed to execute %s/front_end.tcl\n", binary_location);

@@ -5,22 +5,36 @@
 
 set ::util_window_cnt 0
 
-set base_ttfont [font actual {{bitstream vera sans mono} 6}]
-set base_tfont  [font actual {{bitstream vera sans mono} 8}]
-set base_sfont  [font actual {{bitstream vera sans mono} 10}]
-set base_mfont  [font actual {{bitstream vera sans mono} 11}]
-set base_bfont  [font actual {{bitstream vera sans mono} 13}]
+proc get_font {name} {
+    set font [font actual $name]
+    if { $::scaling_factor != 1.0 } {
+	set idx [lsearch -exact $font -size]
+	incr idx
+	set old_size [lindex $font $idx]
+	set new_size [expr round($old_size*(1.0+($::scaling_factor-1.0)/4.0))]
+	set new_font [lreplace $font $idx $idx $new_size]
+	return [font create [list $new_font]]
+    } else {
+	return [font create [list $font]]
+    }
+}
 
-set ::voss2_txtfont0    "-*-courier-bold-r-normal-*-10-*-*-*-*-*-*-*"
-set ::voss2_txtfont1    "-*-courier-bold-r-normal-*-12-*-*-*-*-*-*-*"
-set ::voss2_txtfont2    "-*-courier-bold-r-normal-*-14-*-*-*-*-*-*-*"
-set ::voss2_txtfont3    "-*-courier-bold-r-normal-*-16-*-*-*-*-*-*-*"
-set ::voss2_txtfont4    "-*-courier-bold-r-normal-*-18-*-*-*-*-*-*-*"
-set ::voss2_txtfont5    "-*-courier-bold-r-normal-*-20-*-*-*-*-*-*-*"
-set ::voss2_txtfont6    "-*-courier-bold-r-normal-*-24-*-*-*-*-*-*-*"
+set base_ttfont [get_font {{bitstream vera sans mono} 6}]
+set base_tfont  [get_font {{bitstream vera sans mono} 8}]
+set base_sfont  [get_font {{bitstream vera sans mono} 10}]
+set base_mfont  [get_font {{bitstream vera sans mono} 11}]
+set base_bfont  [get_font {{bitstream vera sans mono} 13}]
+
+set ::voss2_txtfont0    [get_font "{Courier Bold} 6"]
+set ::voss2_txtfont1    [get_font "{Courier Bold} 8"]
+set ::voss2_txtfont2    [get_font "{Courier Bold} 10"]
+set ::voss2_txtfont3    [get_font "{Courier Bold} 16"]
+set ::voss2_txtfont4    [get_font "{Courier Bold} 18"]
+set ::voss2_txtfont5    [get_font "{Courier Bold} 20"]
+set ::voss2_txtfont6    [get_font "{Courier Bold} 22"]
+
 set ::voss2_txtfont     $::voss2_txtfont2
 set ::voss2_help_font   $::voss2_txtfont1
-
 
 set base_sc     0.85            ;# Scale factor
 
@@ -61,6 +75,16 @@ proc change_fonts {new_font} {
     option add *TCombobox*Listbox.font $new_font
     option add *TCombobox*Entry.font $new_font
     option add *TCombobox*TEntry.font $new_font
+    option add *Button.font $new_font
+    option add *Label.font $new_font
+    option add *Text.font $new_font
+    option add *Entry.font $new_font
+    option add *Menu.font $new_font
+    option add *Menubutton.font $new_font
+    option add *Message.font $new_font
+    option add *Radiobutton.font $new_font
+    option add *Checkbutton.font $new_font
+    option add *Listbox.font $new_font
     update
 }
 
@@ -1123,8 +1147,6 @@ proc bbox2fl {bb} {
     return [list [expr round($lx)] [expr round($ly)] \
                  [expr round($ux)] [expr round($uy)]]
 }
-
-change_fonts $::voss2_txtfont
 
 
 proc balloon {w help} {

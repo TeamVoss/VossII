@@ -6,10 +6,6 @@
 set DIR [file dirname [file normalize [info script]]]
 
 set voss2_preferences {
-    {"Display" "" "" "header" ""}
-    {"TEXT-FONT" "RCtext_font"
-	"Font used for text widgets" "enum"
-	"-*-courier-bold-r-normal-*-14-*-*-*-*-*-*-* -*-courier-bold-r-normal-*-10-*-*-*-*-*-*-* -*-courier-bold-r-normal-*-12-*-*-*-*-*-*-* -*-courier-bold-r-normal-*-16-*-*-*-*-*-*-* -*-courier-bold-r-normal-*-18-*-*-*-*-*-*-* -*-courier-bold-r-normal-*-20-*-*-*-*-*-*-*"}
 
  {"Runtime" "" "" "header" ""}
     {"RECURSION-CALL-LIMIT" "RCcall_limit"
