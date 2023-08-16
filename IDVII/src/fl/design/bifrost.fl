@@ -194,7 +194,7 @@ let bifrost_tx_agreement =
   bit_output latch.
   bit_output done.
   bit_internal still_done.
-  CELL "bifrost_tx_validready" [
+  CELL "bifrost_tx_agreement" [
     re_ff_sreset clk reset (done '&' hold) still_done,
     req <- run '&' ('~' still_done),
     latch <- req '&' ack,
@@ -271,6 +271,20 @@ let bifrost_rx_ackpulse =
     may_continue <- '1
 ];
 
+let bifrost_rx_perpetual =
+  bit_input clk.
+  bit_input reset.
+  bit_input done.
+  bit_input req.
+  bit_output ack.
+  bit_output start.
+  bit_output may_continue.
+  bit_internal started.
+  CELL "bifrost_rx_perpetual" [
+    re_ff_reset clk reset (started '|' start) started,
+    start <- '~' (reset '|' started),
+    may_continue <- '1
+];
 
 // ==============================================================
 // Useful circuits
