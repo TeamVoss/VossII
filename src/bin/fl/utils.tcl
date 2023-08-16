@@ -13,17 +13,17 @@ proc get_font {name} {
 	set old_size [lindex $font $idx]
 	set new_size [expr round($old_size*(1.0+($::scaling_factor-1.0)/4.0))]
 	set new_font [lreplace $font $idx $idx $new_size]
-	return [font create [list $new_font]]
+	return [eval font create $new_font]
     } else {
-	return [font create [list $font]]
+	return [eval font create $font]
     }
 }
 
-set base_ttfont [get_font {{bitstream vera sans mono} 6}]
-set base_tfont  [get_font {{bitstream vera sans mono} 8}]
-set base_sfont  [get_font {{bitstream vera sans mono} 10}]
-set base_mfont  [get_font {{bitstream vera sans mono} 11}]
-set base_bfont  [get_font {{bitstream vera sans mono} 13}]
+set base_ttfont [get_font "{bitstream vera sans mono} 6"]
+set base_tfont  [get_font "{bitstream vera sans mono} 8"]
+set base_sfont  [get_font "{bitstream vera sans mono} 10"]
+set base_mfont  [get_font "{bitstream vera sans mono} 11"]
+set base_bfont  [get_font "{bitstream vera sans mono} 13"]
 
 set ::voss2_txtfont0    [get_font "{Courier Bold} 6"]
 set ::voss2_txtfont1    [get_font "{Courier Bold} 8"]
@@ -787,7 +787,8 @@ proc unpost_popup {c} {
 }
 
 
-proc scale_font {font zoom_factor} {
+proc scale_font {fontname zoom_factor} {
+    set font [font actual $fontname]
     set idx [lsearch -exact $font -size]
     incr idx
     set old_size [lindex $font $idx]

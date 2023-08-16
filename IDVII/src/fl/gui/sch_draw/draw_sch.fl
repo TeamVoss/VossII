@@ -451,16 +451,19 @@ let fl_record_waveform_movement w idx dir =
 ;
 export_to_tcl fl_record_waveform_movement;
 
+let tw_c_r = ref ("","");
+let fl_update_tw_c tab_w c =
+    (tw_c_r := (tab_w, c))
+;
+export_to_tcl fl_update_tw_c;
+
 let get_new_sch_canvas w draw_level name instance_hier =
-    let rname = name = "" => "" | sprintf " {%s}" name in
-    let tw_c =
-	tcl_eval [sprintf "get_new_sch_canvas %s %d {%s}%s" w draw_level
-			  instance_hier rname]
-    then
+    let rname = name = "" => "-" | sprintf "{%s}" name in
     (
-    val [tab_w, canvas] = str_split tw_c " " then
-    (tab_w, canvas)
-    ) gen_catch (\msg. (fprintf stderr "tw_c: |%s|\n" tw_c) fseq error msg)
+	tcl_eval [sprintf "sc:get_new_sch_canvas %s %d {%s} %s" w draw_level
+			  instance_hier rname]
+    ) fseq
+    deref tw_c_r
 ;
 
 let canvas2tab c =

@@ -435,11 +435,11 @@ proc sc:prepare_draw_info {c} {
     set ::sch_info(idle_id,$c) [after 500 [list sc:show_draw_info $c]]
 }
 
-proc get_new_sch_canvas {w draw_level instance_hier {name ""}} {
+proc sc:get_new_sch_canvas {w draw_level instance_hier name} {
     set nb $w.nb
     incr ::sch_window_cnt($w)
     set cc [format {%s.c%d} $nb $::sch_window_cnt($w)]
-    if { $name == "" } {
+    if { $name == "-" } {
 	set name "C$::sch_window_cnt($w):"
 	set instance_hier $name
     }
@@ -455,7 +455,7 @@ proc get_new_sch_canvas {w draw_level instance_hier {name ""}} {
     set ::sch_info(draw_level,$c) $draw_level
     update
     set ::sch_info(instance_hier,$c) $instance_hier
-    return [list $cc $c]
+    fl_update_tw_c $cc $c
 }
 
 proc set_scrollregion {c} {
