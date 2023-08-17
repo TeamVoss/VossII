@@ -11,7 +11,7 @@ proc get_font {name} {
 	set idx [lsearch -exact $font -size]
 	incr idx
 	set old_size [lindex $font $idx]
-	set new_size [expr round($old_size*(1.0+($::scaling_factor-1.0)/4.0))]
+	set new_size [expr round($old_size*(1.0+($::scaling_factor-1.0)/10.0))]
 	set new_font [lreplace $font $idx $idx $new_size]
 	return [eval font create $new_font]
     } else {
@@ -35,8 +35,6 @@ set ::voss2_txtfont6    [get_font "{Courier Bold} 22"]
 
 set ::voss2_txtfont     $::voss2_txtfont2
 set ::voss2_help_font   $::voss2_txtfont1
-
-set base_sc     0.85            ;# Scale factor
 
 image create bitmap ::bitmap::detach -data "#define detach_width 16
 #define detach_height 16
@@ -820,7 +818,7 @@ proc scale_text_objects {c label new_size new_font zoom_factor} {
 
 proc set_text_font_according_to_zoom {c zoom_factor} {
     # Update new font sizes and scale factor
-    global base_mfont mfont base_sfont sfont base_sc sc
+    global base_mfont mfont base_sfont sfont sc
     val {new_msize new_mfont}  [scale_font $base_mfont $zoom_factor]
     val {new_ssize new_sfont}  [scale_font $base_sfont $zoom_factor]
     set mfont($c) $new_mfont

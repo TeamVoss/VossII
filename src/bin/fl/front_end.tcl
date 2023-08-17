@@ -12,8 +12,11 @@ set socket_port     [lindex $argv 2]
 set tmp_dir         [lindex $argv 3]
 if { $argc == 5 } {
     set ::scaling_factor [lindex $argv 4]
+    set ::base_sc     [expr 0.85*$::scaling_factor]
 } else {
     set ::scaling_factor 1.0
+    set ::base_sc     0.85            ;# Scale factor
+
 }
 
 # Make sure we use a 72dpi independent of the display
