@@ -560,7 +560,8 @@ let port {vec::string} =
 	bin sz F i
     |
 	// Named signal
-	val (id,rs) = split_name_rng vec in Exp_primary (prim_hier id rs)
+	val (id,rs) = split_name_rng vec in
+	Exp_primary (prim_hier id rs)
 ;
 
 let connect_ports f as =
@@ -569,7 +570,8 @@ let connect_ports f as =
     /\  connect (a:as) = SOME (Exp_primary (Prim_cat (CAT (map port (a:as)))))
     in
     val (id,_) = split_name_rng f in
-    Port_con_named (ID id) (connect as)
+    let as' = merge_vectors (md_expand_vectors as) in
+    Port_con_named (ID id) (connect as')
 ;
 
 let port_instantiation mi ai {args::(string#(string list))list} =
@@ -847,8 +849,8 @@ let find_insert_module netlist p i =
 	let res = NPM_Item (MOGI_module (Module_instantiation (ID module_name)
 			[Module_instance (ID instance_name) NONE
 			  (empty c_ios => NONE | SOME (map mk_io c_ios))]))
-	then
-        [res]
+	in
+        [res] catch []
      /\    search [] = []
     in
     let found = search candidates then

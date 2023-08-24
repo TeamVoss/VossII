@@ -1,0 +1,20 @@
+
+md_expand_vector "_abs[1_0][2:0]";
+md_expand_vector "_abs[1_0][5,2:0]";
+
+md_extract_vectors ["_abs[1_0][2]", "_abs[1_0][0]", "_abs[1_0][1]"];
+
+md_merge_vectors ["_abs[1_0][2]", "_abs[1_0][0]", "_abs[1_0][1]"];
+
+md_merge_vectors ["_abs[1_0][2]", "_abs[1_0][1:0]"];
+
+md_merge_vectors ["0b0", "0b0"];
+
+md_extract_vectors ["0b0", "0b0"];
+
+md_merge_vectors ["0b0", "0b1"];
+
+md_extract_vectors ["0b0", "0b1"];
+
+
+md_merge_vectors ["0b01", "0b1"];

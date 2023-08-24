@@ -1,8 +1,5 @@
 set pagination off
 break exit
 break abort
-break Rand_Var
 break Dbg_stop
-r -noX -f bugs/b242.fl
-break Compile
-c
+r -noX -f bugs/b245.fl

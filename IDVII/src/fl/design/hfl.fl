@@ -14,14 +14,6 @@ lettype *a hw_type =
 	{hw_values:: *a -> string}
 ;
 
-let special_md_sizes l =
-    let res = md_sizes l then
-    res != 1 => res |
-    // Possibly wrong for xyz[-1:0] nodes
-    let idx = find_first0 (str_is_substr "[-1:0]") l in
-    idx != 0 => 0 | res
-;
-
 open_overload {hw_type_destr :: ({*a} hw_type)};
 
 // Make sure there are at least two possibilities for the open overloaded

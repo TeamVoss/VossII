@@ -6,6 +6,22 @@ fprintf stdinfo ".";
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
+let special_md_size v =
+    let res = md_size v then
+    res != 1 => res |
+    // Possibly wrong for xyz[-1:0] nodes
+    (str_is_substr "[-1:0]" v) => 0 | res
+;
+
+let special_md_sizes l =
+    let res = md_sizes l then
+    res != 1 => res |
+    // Possibly wrong for xyz[-1:0] nodes
+    let idx = find_first0 (str_is_substr "[-1:0]") l in
+    idx != 0 => 0 | res
+;
+
+
 // Create a (potential vector) name given size and base.
 let mk_name sz base = sz = 1 => base | sprintf "%s[%d:0]" base (sz-1);
 
@@ -567,7 +583,7 @@ let get_range v =
 ;
 
 let w_substitute sub we =
-    let decls = map (\v. get_base_name v, md_size v)
+    let decls = map (\v. get_base_name v, special_md_size v)
 		    (md_extract_vectors (map snd sub))
     then
     letrec do (W_VAR sz b) =
@@ -576,7 +592,7 @@ let w_substitute sub we =
 	    let vs = vec_assoc n sub then
 	    let mk1 v =
 		let base = get_base_name v then
-		let v_sz = md_size v then
+		let v_sz = special_md_size v then
 		let decl_sz = assoc base decls then
 		let w_base = W_VAR decl_sz base then
 		v_sz = decl_sz => w_base |
@@ -593,7 +609,7 @@ let w_substitute sub we =
 	    let vs = vec_assoc n sub then
 	    let mk1 v =
 		let base = get_base_name v then
-		let v_sz = md_size v then
+		let v_sz = special_md_size v then
 		let decl_sz = assoc base decls then
 		let w_base = W_VAR decl_sz base then
 		v_sz = decl_sz => w_base |
@@ -748,15 +764,15 @@ let resize_pexlif sz {p::pexlif} =
      /\    trwexpr (W_X osz) = W_X (tri osz)
      /\    trwexpr (W_CONST osz v) = W_CONST (tri osz) v
      /\    trwexpr (W_NAMED_CONST name osz v) = W_NAMED_CONST name (tri osz) v
-     /\    trwexpr e assuming (is_binary e) =
-	val (op, l, r) = split_binary e in
-	op (trwexpr l) (trwexpr r)
      /\    trwexpr (W_ITE c a b) = W_ITE (trwexpr c) (trwexpr a) (trwexpr b)
      /\    trwexpr (W_NOT e) = W_NOT (trwexpr e)
      /\    trwexpr (W_PRED name e) = W_PRED name (trwexpr e)
      /\    trwexpr (W_SX osz e) = W_SX (tri osz) (trwexpr e)
      /\    trwexpr (W_ZX osz e) = W_ZX (tri osz) (trwexpr e)
      /\    trwexpr (W_SLICE indices w) = W_SLICE indices (trwexpr w)
+     /\    trwexpr e assuming (is_binary e) =
+	val (op, l, r) = split_binary e in
+	op (trwexpr l) (trwexpr r)
      /\    trwexpr other = eprintf "Cannot translate wexpr (%s)" (Pwexpr other)
     in
     let trfn (W_UPDATE_FN lhs rhs) =

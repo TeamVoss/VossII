@@ -91,22 +91,25 @@ clet get_signatures vs =
 
 // 
 slet vec_assoc {vec::string} {vsub::(string#string) list} =
-    [(assoc vec vsub)] gen_catch (\msg.
-    NOT (str_is_substr "failed to find element" msg) => error msg |
-    (
-    let sigs = get_signatures (map fst vsub) in
-    let vsig = get_vector_signature vec in
-    let pots = assoc vsig sigs in
-    let pot_res = map (\v. assoc v vsub) pots in
-    let exp_from = md_expand_vectors pots in
-    let exp_to   = md_expand_vectors pot_res in
-    let sub = zip exp_from exp_to in
-    let res = map (\n. assoc n sub) (md_expand_vector vec) then
-    md_merge_vectors res
-    ) gen_catch
-    (\msg.  eprintf "vec_assoc: Failed to find: %s in %S\n%s"
-		    vec (map (\(f,t).sprintf "(%s->%s)" f t) vsub) msg)
-);
+    [(assoc vec vsub)] gen_catch
+    (\msg.
+	NOT (str_is_substr "failed to find element" msg) => error msg |
+	(
+	    (
+		let sigs = get_signatures (map fst vsub) in
+		let vsig = get_vector_signature vec in
+		let pots = assoc vsig sigs in
+		let pot_res = map (\v. assoc v vsub) pots in
+		let exp_from = md_expand_vectors pots in
+		let exp_to   = md_expand_vectors pot_res in
+		let sub = zip exp_from exp_to in
+		let res = map (\n. assoc n sub) (md_expand_vector vec) then
+		md_merge_vectors res
+	    ) gen_catch
+	    (\msg. eprintf "vec_assoc: Failed to find: %s\n=== Msg: %s" vec msg)
+	)
+    )
+;
 
 // 
 let vec_rev_assoc {vec::string} {vsub::(string#string) list} =

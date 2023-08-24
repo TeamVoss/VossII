@@ -118,4 +118,3 @@ tab_2;
 let tab_3 = draw_inside vis 2 ["i3/rf_dataa[31:0]","i3/rf_datab[31:0]","i3/spr_dat_rf[31:0]"];
 tab_3;
 
-

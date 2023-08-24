@@ -3,6 +3,16 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
+let yosys_PINST name attrs leaf fa_inps fa_outs ints (P_HIER chs) =
+    let get_act (PINST _ _ _ c_fa_inps c_fa_outs _ _) =
+	(flatmap snd c_fa_inps) @ (flatmap snd c_fa_outs)
+    in
+    let used = filter (\n. NOT(str_is_prefix "0b" n)) (flatmap get_act chs) then
+    let ios = map fst (fa_inps @ fa_outs) in
+    let ints' = (ints @ used) vec_subtract ios then
+    (PINST name attrs leaf fa_inps fa_outs ints' (P_HIER chs))
+;
+
 let mk_ifc_signal fa_r sz name act =
     let formal = mk_name sz name then
     let Wvar = W_VAR sz name then
@@ -340,30 +350,15 @@ let _base_pmux out_sz sel_sz src out inp1 inp2 s =
 ;   
 
 
-let cmerge ns =
-    let raw = md_merge_vectors ns in
-    letrec merge_digits so_far (v:vs) =
-        str_is_prefix "0b" v => merge_digits ((string_lastn v 1):so_far) vs |
-        so_far = [] => v:(merge_digits [] vs) |
-        (list2str T "0b" "" "" id (rev so_far)):v:(merge_digits [] vs)
-     /\    merge_digits so_far [] =
-        so_far = [] => [] | [(list2str T "0b" "" "" id (rev so_far))]
-    in
-    merge_digits [] raw
-;
-
 let cluster_inputs out_sz inp =
     (
-        let expand s =
-            str_is_prefix "0b" s =>
-                map (sprintf "0b%s") (butfirstn 2 (explode s))
-            | md_expand_vector s
-        in
-        let inp_l = flatmap expand inp in
+	let inp_l = md_expand_vectors inp in
         let chunks = cluster out_sz inp_l in
-        map cmerge chunks
+        map md_merge_vectors chunks
     ) catch eprintf "cluster_inputs failed for %d %S\n" out_sz inp
 ;
+	
+
 
 let _gen_pmux out_sz sel_sz src out inp1 inp2 s =
     let base = _base_pmux out_sz sel_sz src out inp1 inp2 s in

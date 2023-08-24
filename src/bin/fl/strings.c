@@ -5,7 +5,7 @@
 
 /******************************************************************************/
 /*                                                                            */
-/*		Original author: Carl-Johan Seger, 2017                               */
+/*		Original author: Carl-Johan Seger, 2017                       */
 /*                                                                            */
 /******************************************************************************/
 #include "strings.h"
@@ -129,7 +129,7 @@ Expand_constant(rec_mgr *vector_list_mgr, rec_mgr *vector_mgr, string s)
     s += 2;
     vec_list_ptr    res = NULL;
     vec_list_ptr    tail;
-    while( *s && ((*s == '0') || (*s == '1')) ) {
+    while( *s && ((*s == '0') || (*s == '1') || (*s == 'x')) ) {
 	vec_ptr v = (vec_ptr) new_rec(vector_mgr);
 	v->type = TXT;
 	char vbuf[4];
@@ -1363,6 +1363,38 @@ merge_indices(range_ptr indices)
     return res;
 }
 
+static bool
+is_valid_index_or_range(string s)
+{
+    while( 1 ) {
+	if( *s == '-' ) {
+	    s++;
+	}
+	if( !isdigit(*s) ) {
+	    return( FALSE );
+	}
+	while( *s && isdigit(*s) ) s++;
+	if( *s == ':' ) {
+	    s++;
+	    if( *s == '-' ) {
+		s++;
+	    }
+	    if( !isdigit(*s) ) {
+		return( FALSE );
+	    }
+	    while( *s && isdigit(*s) ) s++;
+	}
+	if( *s == ']' ) {
+	    return TRUE;
+	}
+	if( *s != ',' ) {
+	    return FALSE;
+	} else {
+	    s++;
+	}
+    }
+}
+
 static vec_ptr
 split_name(string name)
 {
@@ -1370,7 +1402,7 @@ split_name(string name)
     vec_ptr *res_tl_ptr = &res;
     string p = name;
     while( *p ) {
-        if( isdigit(*p) ) {
+        if( is_valid_index_or_range(p) ) {
             // Index
             string e = p;
             while( *e && *e != ']' ) e++;
@@ -1429,8 +1461,14 @@ split_name(string name)
                 p = e;
             } else {
                 string e = p;
-                while( *e && *e != '[' ) e++;
-                if( *e == '[' ) e++;
+		bool done = FALSE;
+		while( !done ) {
+		    while( *e && *e != '[' ) {
+			e++;
+		    }
+		    if( *e == '[' ) e++;
+		    if( *e == 0 || is_valid_index_or_range(e) ) { done = 1; }
+		}
                 char tmp = *e;
                 *e = 0;
                 vec_ptr n = (vec_ptr) new_rec(vec_rec_mgrp);
@@ -1673,6 +1711,14 @@ nn_cmp(const void *pi, const void *pj)
     return( vec_name_cmp(vi, vj) );
 }
 
+
+static bool
+is_const(merge_list_ptr mp)
+{
+    vec_ptr vp = mp->vec;
+    return( vp && vp->type == TXT && strncmp(vp->u.name, "0b", 2) == 0 );
+}
+
 static merge_list_ptr
 gen_extract_vectors(buffer_ptr vec_buf)
 {
@@ -1701,11 +1747,13 @@ gen_extract_vectors(buffer_ptr vec_buf)
         }
         alts++;
     }
+
     // Now try to merge adjacent vectors into bigger vectors
     int not_changed = 0;
     do {
         if( alts != 1 ) {
-            if( mp->name_signature != mp->next->name_signature ) {
+            if( mp->name_signature != mp->next->name_signature || is_const(mp) )
+	    {
                 // Definitely cannot be merged
                 not_changed++;
                 mp = mp->next;
@@ -1793,76 +1841,90 @@ gen_merge_vectors(buffer_ptr vec_buf)
             // Never merge the last with the first
             mp = mp0;
         }
-        if( mp->name_signature != mp->next->name_signature ) {
-            // Definitely cannot be merged
-            not_changed++;
-            mp = mp->next;
-        } else {
-            // Potentially can be merged
-            vec_ptr v1 = mp->vec;
-            vec_ptr v2 = mp->next->vec;
-            while( v1 &&
-                   (v1->type == TXT ||
-                    //range_equ(v1->u.ranges, v2->u.ranges)) )
-                    same_range(v1->u.ranges,v2->u.ranges)) )
-            {
-                v1 = v1->next;
-                v2 = v2->next;
-            }
-            if( v1 == NULL ) {
-                // Two identical vectors; don't remove duplicates
-                not_changed++;
-                mp = mp->next;
-            } else {
-                // Make sure the rest matches
-                range_ptr r1 = v1->u.ranges;
-		while( r1->next != NULL ) { r1 = r1->next; }
-                range_ptr r2 = v2->u.ranges;
-                v1 = v1->next;
-                v2 = v2->next;
-                while( v1 && 
-                       (v1->type == TXT ||
-                        same_range(v1->u.ranges,v2->u.ranges)) )
-                {
-                    v1 = v1->next;
-                    v2 = v2->next;
-                }
-                if( v1 != NULL ) {
-		    // Different suffix
-                    not_changed++;
-                    mp = mp->next;
-                } else {
-		    // Same prefix and suffix
-                    if( (r1->upper >= r1->lower) && (r2->upper >= r2->lower) &&
-                        ((r1->lower - 1) == r2->upper) )
-                    {
-			// Continuous downwards range
-                        r1->lower = r2->lower;
-			r1->next = r2->next;
-                        mp->next->next->prev = mp;
-                        mp->next = mp->next->next;
-                        not_changed = 0;
-                        alts--;
-                    } else
-		    if( (r1->upper <= r1->lower) && (r2->upper <= r2->lower) &&
-                        ((r1->lower + 1) == r2->upper) )
-                    {
-			// Continuous upwards range
-                        r1->lower = r2->lower;
-			r1->next = r2->next;
-                        mp->next->next->prev = mp;
-                        mp->next = mp->next->next;
-                        not_changed = 0;
-                        alts--;
-                    } else {
-			r1->next = r2;
-                        mp->next->next->prev = mp;
-                        mp->next = mp->next->next;
-                        not_changed = 0;
-                    }
-                }
-            }
-        }
+	if( is_const(mp) && is_const(mp->next) ) {
+	    // Merge constants
+	    string tmp = strtemp(mp->vec->u.name);
+	    tmp = strappend(mp->next->vec->u.name+2);
+	    mp->vec->u.name = uStrsave(lstringsp, tmp);
+	    mp->name_signature = mk_name_signature(mp->vec);
+	    mp->next->next->prev = mp;
+	    mp->next = mp->next->next;
+	    not_changed = 0;
+	    alts--;
+	} else {
+	    if( mp->name_signature != mp->next->name_signature ) {
+		// Definitely cannot be merged
+		not_changed++;
+		mp = mp->next;
+	    } else {
+		// Potentially can be merged
+		vec_ptr v1 = mp->vec;
+		vec_ptr v2 = mp->next->vec;
+		while( v1 &&
+		       (v1->type == TXT ||
+			//range_equ(v1->u.ranges, v2->u.ranges)) )
+			same_range(v1->u.ranges,v2->u.ranges)) )
+		{
+		    v1 = v1->next;
+		    v2 = v2->next;
+		}
+		if( v1 == NULL ) {
+		    // Two identical vectors; don't remove duplicates
+		    not_changed++;
+		    mp = mp->next;
+		} else {
+		    // Make sure the rest matches
+		    range_ptr r1 = v1->u.ranges;
+		    while( r1->next != NULL ) { r1 = r1->next; }
+		    range_ptr r2 = v2->u.ranges;
+		    v1 = v1->next;
+		    v2 = v2->next;
+		    while( v1 && 
+			   (v1->type == TXT ||
+			    same_range(v1->u.ranges,v2->u.ranges)) )
+		    {
+			v1 = v1->next;
+			v2 = v2->next;
+		    }
+		    if( v1 != NULL ) {
+			// Different suffix
+			not_changed++;
+			mp = mp->next;
+		    } else {
+			// Same prefix and suffix
+			if(    (r1->upper >= r1->lower)
+			    && (r2->upper >= r2->lower) &&
+			       ((r1->lower - 1) == r2->upper) )
+			{
+			    // Continuous downwards range
+			    r1->lower = r2->lower;
+			    r1->next = r2->next;
+			    mp->next->next->prev = mp;
+			    mp->next = mp->next->next;
+			    not_changed = 0;
+			    alts--;
+			} else
+			if(    (r1->upper <= r1->lower)
+			    && (r2->upper <= r2->lower)
+			    && ((r1->lower + 1) == r2->upper) )
+			{
+			    // Continuous upwards range
+			    r1->lower = r2->lower;
+			    r1->next = r2->next;
+			    mp->next->next->prev = mp;
+			    mp->next = mp->next->next;
+			    not_changed = 0;
+			    alts--;
+			} else {
+			    r1->next = r2;
+			    mp->next->next->prev = mp;
+			    mp->next = mp->next->next;
+			    not_changed = 0;
+			}
+		    }
+		}
+	    }
+	}
     };
     return mp0;
 }

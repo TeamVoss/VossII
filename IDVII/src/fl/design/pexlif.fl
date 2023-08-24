@@ -438,11 +438,15 @@ let rename_internals p =
 let gen_flatten_pexlif stop_pred p =
     let mk_pref pref i = sprintf "%si%d/" pref i in
     letrec do_flat sub pref p =
-        let tr n = (assoc n sub) catch n in
+        let tr n = (str_is_prefix "0b" n) => [n] |
+	    (vec_assoc n sub) gen_catch (\msg.
+		eprintf "Cannot find node %s while processing %s\nList %S\n%s" n pref (map (\(f,t). sprintf "%s->%s" f t) sub) msg
+	    )
+	in
         val (PINST name attrs leaf fa_inps fa_outs ints content) = p in
         leaf OR stop_pred p =>
             let tr_io (f,as) =
-                let as' = cmd_merge_vectors (map tr (cmd_expand_vectors as)) in
+                let as' = md_merge_vectors (flatmap tr as) in
                 (f,as')
             in
             let fa_inps' = map tr_io fa_inps in
@@ -450,14 +454,10 @@ let gen_flatten_pexlif stop_pred p =
             [(PINST name attrs leaf fa_inps' fa_outs' ints content)]
         |
             val (P_HIER children) = content in
-            let mk_io_sub (f,as) =
-                zip (md_expand_vector f) (map tr (cmd_expand_vectors as))
-            in
+            let mk_io_sub (f,as) = vec_zip [f] (flatmap tr as) in
             let io_sub = flatmap mk_io_sub (fa_inps @ fa_outs) in
-            let mk_int_sub f =
-                map (\n. n, sprintf "%s%s" pref n) (md_expand_vector f)
-            in
-            let int_sub = flatmap mk_int_sub ints in
+            let mk_int_sub f = (f, sprintf "%s%s" pref f) in
+            let int_sub = map mk_int_sub ints in
             let sub' = io_sub @ int_sub in
             let prefs = map (mk_pref pref) (1 upto length children) in
             flat (map2 (do_flat sub') prefs children)
@@ -466,16 +466,16 @@ let gen_flatten_pexlif stop_pred p =
     leaf => p |
     val (P_HIER chs) = content in
     let prefs = map (mk_pref "") (1 upto length chs) in
-    let children = flat (map2 (do_flat []) prefs chs) in
+    let io_sub = flatmap (\(f,as).zip as as) (fa_inps @ fa_outs) in
+    let int_sub = map (\f. f,f) ints in
+    let sub = io_sub @ int_sub in
+    let children = flat (map2 (do_flat sub) prefs chs) in
     let wires_used (PINST _ _ _ fa_inps fa_outs _ _) =
-        cmd_expand_vectors (flatmap snd (fa_inps @ fa_outs))
+        (flatmap snd (fa_inps @ fa_outs))
     in
     let all = filter not_const (setify (flatmap wires_used children)) in
-    let declared =
-            (md_expand_vectors (map fst (fa_inps @ fa_outs))) @
-            (md_expand_vectors ints)
-    in
-    let ints' = ints@(md_extract_vectors (all subtract declared)) in
+    let declared = ((map fst (fa_inps @ fa_outs))) @ (ints) in
+    let ints' = ints@(md_extract_vectors (all vec_subtract declared)) in
     let res =
 	(PINST name attrs leaf fa_inps fa_outs ints' (P_HIER children))
     then
@@ -657,5 +657,45 @@ let constant_propagation p =
 		    (P_HIER (p'' : const_insts)))
     in
     simp "" p
+;
+
+
+// =============================================================
+// Code for sanity check a pexlif
+// At the moment, it only checks 
+// =============================================================
+let sanity_check_pexlif p =
+    letrec test hier (PINST name attrs lf fa_inps fa_outs ints body) =
+        let check_io (f,as) =
+            let f_sz = md_size f then
+            let a_sz = md_sizes as then
+            f_sz == a_sz => () |
+            eprintf "FAILURE: |%s| != |%S| in %s\n" f as hier
+        in
+        (foreach check_io fa_inps) fseq
+        (foreach check_io fa_outs) fseq
+        let rec (P_HIER chs) =
+	    let get_act (PINST _ _ _ c_fa_inps c_fa_outs _ _) =
+		(flatmap snd c_fa_inps) @ (flatmap snd c_fa_outs)
+	    in
+	    let used =
+		filter (\n. NOT (str_is_prefix "0b" n)) (flatmap get_act chs)
+	    then
+	    let declared = ints @ (map fst (fa_inps @ fa_outs)) then
+	    let missing = used vec_subtract declared then
+	    missing != [] =>
+		eprintf "FAILURE: Nodes %S not declared in %s\n" missing hier
+	    |
+            let pr_list = zip (1 upto length chs) chs in
+            let do (idx,sp) =
+                let hier' = sprintf "%s/i%d" hier idx in
+                test hier' sp
+            in
+            foreach do pr_list
+         /\ rec other = ()
+        in
+        rec body
+    in
+    (test "" p) fseq T
 ;
 

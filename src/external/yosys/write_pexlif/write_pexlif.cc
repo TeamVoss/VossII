@@ -1249,7 +1249,7 @@ struct PexlifDumper
 
 		    f << "Q" << Cstr(cell->type)
 		      << " [(\"instance\","
-		      << stringf("\"%s\"", ((id_clean_name(cell->name))+1))
+		      << stringf("\"%s\"", (id_clean_name(cell->name)))
 		      << "), (\"src\", \""
 		      << src
 		      << "\")] [\n                ";
@@ -1294,7 +1294,7 @@ struct PexlifDumper
 		    dump_sigspec(f, conn.second);
 		}
 		f << "\n    ] in\n";
-		f << stringf("    PINST \"%s\" attrs F _fa_inps _fa_outs ints (P_HIER _body)\n;\n\n", Core_name(module->name).c_str());
+		f << stringf("    yosys_PINST \"%s\" attrs F _fa_inps _fa_outs ints (P_HIER _body)\n;\n\n", Core_name(module->name).c_str());
 
 	}
 
