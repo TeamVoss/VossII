@@ -640,9 +640,19 @@ proc sch:detach {nb tw} {
     }
 }
 
-proc sch:destroy_canvas {nb tw} {
-    if [fl_remove_active_sch_tab_window $tw.cc.c] {
-	destroy $tw
+proc sch:destroy_canvas {w nb tw} {
+    set c $tw.cc.c
+    if [fl_remove_active_sch_tab_window $c] {
+	if [info exists ::sc(parent_frame,$c)] {
+	    set parent_frame $::sc(parent_frame,$c) 
+	    set parent_index [$nb index $parent_frame]
+	    destroy $tw
+	    ;# update idletasks
+	    $nb select $parent_index
+	    unset ::sc(parent_frame,$c)
+	} else {
+	    destroy $tw
+	}
     }
 }
 
@@ -682,7 +692,7 @@ proc create_circuit_canvas {nb mw} {
     pack $w.menu -side top -fill x
 
     ttk::button $w.menu.destroy -image ::img::delete \
-		    -command [list sch:destroy_canvas $nb $mw]
+		    -command [list sch:destroy_canvas $w $nb $mw]
     pack $w.menu.destroy -side right
 
     ttk::button $w.menu.detach -image $::icon(detach) \
@@ -849,7 +859,7 @@ proc cb:sch_canvas_menu {c wx wy sx sy} {
 	    -command "cb:set_wire_color $c $nodes _OrIgInAlCoLoR_"
     } else {
 	$m add command -label "New fanin" \
-	    -command "after idle [list fl_draw_fanin_by_tag $c \
+	    -command "after idle [list sc:draw_new_fanin_by_tag $c \
 			$::sch_info(draw_level,$c) 1 $nodes]"
 	$m add command -label "Draw inside" \
 	    -command "after idle [list sc:draw_inside $c $nodes]"
@@ -3388,7 +3398,17 @@ proc sc:draw_inside {c tag} {
     if ![info exists ::tag2inst_nbr($c,$tag)] { return }
     set inst_nbr $::tag2inst_nbr($c,$tag)
     set draw_level $::sch_info(draw_level,$c)
-    fl_draw_inside $c $draw_level $tag $inst_nbr
+    set new_c [fl_draw_inside $c $draw_level $tag $inst_nbr]
+    set tab_frame [winfo parent [winfo parent $c]]
+    set ::sc(parent_frame,$new_c) $tab_frame
+    return $new_c
+}
+
+proc sc:draw_new_fanin_by_tag {c draw_level levels tag} {
+    set new_c [fl_draw_fanin_by_tag $c $draw_level $levels $tag]
+    set tab_frame [winfo parent [winfo parent $c]]
+    set ::sc(parent_frame,$new_c) $tab_frame
+    return $new_c
 }
 
 proc sc:double_draw_inside {c levels inst_nbr tag} {
@@ -4595,10 +4615,22 @@ proc fsm:display_fsm {sch_c aname fsm_name dot_pgm states edges inps} {
 
     set root [w2root $sch_c]
     fl_add_fsm $root $c [fl_tag2vec $sch_c $aname]
-    bind $c <Destroy> [list fl_remove_fsm $root $c]
+    bind $c <Destroy> [list sc:tab_closed $w $root $c]
     focus $w.c
 }
 
+proc sc:tab_closed {w root c} {
+    if [info exists ::sc(parent_frame,$c)] {
+	set parent_frame $::sc(parent_frame,$c) 
+	set parent_index [$nb index $parent_frame]
+	set nb $w.nb
+	fl_remove_fsm $root $c
+	$nb select $parent_index
+	unset ::sc(parent_frame,$c)
+    } else {
+	fl_remove_fsm $root $c
+    }
+}
 
 proc mk_fsm_circle {c x y tag dotfile rad} {
     global gcolor fc
