@@ -871,44 +871,63 @@ Serve_Interrupt()
 static void
 setup_sockets()
 {
-    struct sockaddr_in serv_addr;
-
-    int listenfd = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in serv_addr = {0};
 
     socklen_t len = sizeof(serv_addr);
-    memset(&serv_addr, '0', len);
+    memset(&serv_addr, 0, len);
 
+#ifdef __APPLE__
+    serv_addr.sin_len = len;
+#endif
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    serv_addr.sin_port = 0;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(0);
 
-    if( bind(listenfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0 ) {
-        Eprintf("Failed to bind\n");
+    int listenfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (listenfd < 0) {
+        Eprintf("Creating socket failed\n");
     }
 
-    if (getsockname(listenfd, (struct sockaddr *)&serv_addr, &len) == -1) {
+
+    if( bind(listenfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) != 0 ) {
+        Eprintf("Failed to bind\n");
+	fprintf(stderr, "Error: %s\n", strerror(errno));
+    }
+
+    if (getsockname(listenfd, (struct sockaddr *)&serv_addr, &len) != 0) {
         Eprintf("Failed to getsockname\n");
+	fprintf(stderr, "Error: %s\n", strerror(errno));
     }
 
     uint32_t addr = ntohs(serv_addr.sin_addr.s_addr);
     uint16_t port = ntohs(serv_addr.sin_port);
 
+    pid_t fl_pid = getpid();
+
     if( use_window != NULL ) {
 	Sprintf(buf, "wish %s/front_end.tcl %d %d %d %s %s -use %s &",
-		     binary_location, getpid(), addr, port, Voss_tmp_dir,
+		     binary_location, fl_pid, addr, port, Voss_tmp_dir,
 		     scaling_factor, use_window);
     } else {
 	Sprintf(buf, "wish %s/front_end.tcl %d %d %d %s %s &",
-		     binary_location, getpid(), addr, port, Voss_tmp_dir,
+		     binary_location, fl_pid, addr, port, Voss_tmp_dir,
 		     scaling_factor);
     }
     if( system(buf) != 0 ) {
         Eprintf("Failed to execute %s/front_end.tcl\n", binary_location);
     }
 
-    listen(listenfd, 5);
+    if (listen(listenfd, 5) != 0) {
+	Eprintf("failed to listen\n");
+	fprintf(stderr, "Error: %s\n", strerror(errno));
+    }
+
 
     int connfd0 = accept(listenfd, (struct sockaddr*)NULL, NULL);
+    if (connfd0 == -1) {
+        Eprintf("failed to accept\n");
+        fprintf(stderr, "Error: %s\n", strerror(errno));
+    }
     fcntl(connfd0, F_SETFL, O_NONBLOCK);
     sync_to_tcl_fp = fdopen(connfd0, "r+");
     setvbuf(sync_to_tcl_fp, NULL, _IOLBF, 1000);

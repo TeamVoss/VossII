@@ -8,11 +8,16 @@
 /*		Original author: Carl-Johan Seger, 2017			*/
 /*									*/
 /************************************************************************/
-#include <limits.h>
 #include <time.h>
 #include <stdlib.h>
 #include "system.h"
 #include "graph.h"
+#ifndef __APPLE__
+#include <limits.h>
+#else
+#include <mach-o/dyld.h>
+#include <sys/syslimits.h>
+#endif
 
 /* ------------- Global variables ------------- */
 string binary_location;
@@ -249,9 +254,17 @@ static string
 get_binary_directory()
 {
     string tmp;
+#ifndef __APPLE__
     Sprintf(buf, "/proc/%d/exe", (int) getpid());
     ssize_t sz = readlink(buf, path_buf, 1000);
     (void) sz;
+#else
+	uint32_t size = sizeof(path_buf);
+	if (_NSGetExecutablePath(path_buf, &size) != 0)
+		printf("buffer too small; need size %u\n", size);
+	else
+		printf("VossII path is %s\n", path_buf);
+#endif
     tmp = rindex(path_buf, '/');
     if( tmp == NULL ) {
         Eprintf("readlink did not find full path. WHAT???");

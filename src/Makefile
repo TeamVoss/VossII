@@ -9,12 +9,18 @@
 ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../)
 SRC_DIR := $(ROOT_DIR)/src
 REPO_OWNER := `stat --printf "%u:%g" .`
+UNAME_S := $(shell uname -s)
 
 #
 # Tools (wih flags)
 #
-YACC   ='bison -y'
-LEX    ='flex -l'
+ifeq ($(UNAME_S), Darwin)
+	YACC   :="`brew --prefix`/opt/bison/bin/bison -y"
+	LEX    :="`brew --prefix`/bin/flex -l"
+else
+	YACC   :="bison -y"
+	LEX    :="flex -l"
+endif
 RANLIB = ranlib
 CC     ?= gcc
 CX     ?= g++

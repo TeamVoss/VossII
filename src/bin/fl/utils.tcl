@@ -166,14 +166,16 @@ proc util:report_result_in_file {msg file return_alts} {
 
 # NOTE: This is OS dependent!!!!
 proc util:process_is_alive {process_id} {
-    if [catch {set rl [split [exec ps -o s $process_id] "\n"]}] {
+    if [catch {set rl [exec ps -o state= $process_id]}] {
         return 0
     }
-    if { [llength $rl] != 2 } { return 0 }
-    set status [lindex $rl 1]
+    if { [llength $rl] != 1 } { return 0 }
+    set status [lindex $rl 0]
     switch $status {
 	R	-
 	S	-
+	SX	-
+	S+  -
 	D	-
 	T	{ return 1; }
 	default { return 0; }
