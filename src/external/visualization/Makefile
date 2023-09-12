@@ -19,7 +19,7 @@ LIB_FILES = ../../lib/alloc.c \
 schematic_draw_module.so: schematic_draw_module.c list_util.o place_bounds.o \
 			 place.o sch_util.o
 	$(CC) -shared $(CFLAGS) schematic_draw_module.c $(LIB_FILES) \
-		-I ../../include -I /usr/include/tcl \
+		-I ../../include \
 		-o schematic_draw_module.so
 
 
