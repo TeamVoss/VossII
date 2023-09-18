@@ -2266,7 +2266,7 @@ garbage_collect()
 
     if(RCdo_dynamic_var_order &&
        (((nodes_used > before/DYN_VAR_RED) &&
-	 (nodes_used > (uint) RCdynamic_ordering_threshold))
+	 (nodes_used > (unint) RCdynamic_ordering_threshold))
 	|| insist_on_reorder) )
     {
 	if( user_defined_ordering_flag )

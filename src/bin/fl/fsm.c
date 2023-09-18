@@ -2072,7 +2072,7 @@ visualization_anon2real(g_ptr redex)
     push_fsm(vp->fsm);
     string aname = GET_STRING(g_aname);
     if( *aname == 'a' && *(aname+1) == 'n' ) {
-        uint idx = atoi(aname+2);
+        unint idx = atoi(aname+2);
 	if( idx >= COUNT_BUF(&(vp->anon_buf)) ) {
 	    MAKE_REDEX_FAILURE(redex, Fail_pr("Anon node %d out of range",idx));
 	    pop_fsm();
@@ -2297,7 +2297,7 @@ visualize_get_shown_anons(g_ptr redex)
     vstate_ptr vp = (vstate_ptr) GET_EXT_OBJ(g_vstate);
     MAKE_REDEX_NIL(redex);
     g_ptr tl = redex;
-    for(uint i = 0; i < COUNT_BUF(&(vp->anon_buf)); i++) {
+    for(unint i = 0; i < COUNT_BUF(&(vp->anon_buf)); i++) {
 	Sprintf(buf, "an%06d", i);
 	APPEND1(tl, Make_STRING_leaf(wastrsave(&strings, buf)));
     }
