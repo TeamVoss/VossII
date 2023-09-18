@@ -18,7 +18,7 @@ fprintf stdinfo ".";
 fprintf stdinfo ".";
 (cload (DIR^"../verilog/pretty-pexlif.fl")) fseq
 fprintf stdinfo ".";
-(cload (DIR^"/STE.fl")) fseq
+(cload (DIR^"/ste_design.fl")) fseq
 fprintf stdinfo ".";
 (cload (DIR^"/monitor.fl")) fseq
 fprintf stdinfo ".";

@@ -117,7 +117,7 @@ prefs.h: prefs.tcl
 prefs_ext.h: prefs.h
 
 abi_version.h: $(ABI_HEADERS)
-	echo '#ifndef FL_ABI_VERSION' > abi_version.h
-	echo -n '#define FL_ABI_VERSION "' >> abi_version.h
-	cat $(ABI_HEADERS) | sha256sum | awk '{print ($$1 "\"")}' >> abi_version.h
-	echo '#endif' >> abi_version.h
+	printf '#ifndef FL_ABI_VERSION\n' > abi_version.h
+	printf '#define FL_ABI_VERSION "' >> abi_version.h
+	cat $(ABI_HEADERS) | sha256sum | gawk '{print ($$1 "\"")}' >> abi_version.h
+	printf '#endif\n' >> abi_version.h

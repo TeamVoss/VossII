@@ -4,13 +4,14 @@
 //-------------------------------------------------------------------
 
 #include <stdlib.h>
-#include <dlfcn.h>
 #include <limits.h>
 #include <dirent.h>
 #include "plugin_loader.h"
 #include "plugin_errlog.h"
 #include "plugin.h"
 
+// the ordering of include changes to prevent the typedef in types.h clash with dlfcn.h on macos
+#include <dlfcn.h>
 #define MAX_ERROR_SIZE 5120
 
 /* Error logger to use when fl_init calls back into register_types/register_funs. */
