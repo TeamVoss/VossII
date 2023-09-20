@@ -1131,7 +1131,7 @@ let split_multi_dim v =
     flatmap md_extract_vectors svs
 ;
 
-let is_var (H,L) =
+let HL_is_var (H,L) =
     NOT (H == NOT L) => F |
     val (v,(h,l)) = top_cofactor H in
     h == T AND l == F
@@ -1206,7 +1206,7 @@ let base_get_complete_value ste vectors t =
 	    in
 	    letrec group cur (nd:nds) (HL:HLs) =
 		is_const HL => group ((nd,HL):cur) nds HLs |
-		is_var HL   => group ((nd,HL):cur) nds HLs |
+		HL_is_var HL   => group ((nd,HL):cur) nds HLs |
 		cur != [] => (mk_range cur):(group []  (nd:nds) (HL:HLs)) |
 		let ovc = (HL = (F,F)) in
 		NOT (ovc == F) => (nd,["OVERCONSTRAINED"]):(group [] nds HLs) |

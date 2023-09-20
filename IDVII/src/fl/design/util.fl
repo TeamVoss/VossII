@@ -8,19 +8,28 @@ fprintf stdinfo ".";
 
 let special_md_size v =
     let res = md_size v then
-    res != 1 => res |
+    res != 2 => res |
     // Possibly wrong for xyz[-1:0] nodes
     (str_is_substr "[-1:0]" v) => 0 | res
 ;
 
 let special_md_sizes l =
     let res = md_sizes l then
-    res != 1 => res |
+    res != 2 => res |
     // Possibly wrong for xyz[-1:0] nodes
     let idx = find_first0 (str_is_substr "[-1:0]") l in
     idx != 0 => 0 | res
 ;
 
+let special_md_extract_vectors vs =
+    val (special, other) = split (str_is_substr "[-1:0]") vs in
+//    (setify special)@(md_extract_vectors other)
+let res = (setify special)@(md_extract_vectors other) then
+let old = md_extract_vectors vs then
+let sym_diff s1 s2 = (s1 subtract s2) @ (s2 subtract s1) in
+let diff = sym_diff res old in
+diff != [] => (fprintf stderr "DIFFERENCE: %S\n" diff) fseq res | res
+;
 
 // Create a (potential vector) name given size and base.
 let mk_name sz base = sz = 1 => base | sprintf "%s[%d:0]" base (sz-1);
@@ -584,7 +593,7 @@ let get_range v =
 
 let w_substitute sub we =
     let decls = map (\v. get_base_name v, special_md_size v)
-		    (md_extract_vectors (map snd sub))
+		    (special_md_extract_vectors (map snd sub))
     then
     letrec do (W_VAR sz b) =
 	(

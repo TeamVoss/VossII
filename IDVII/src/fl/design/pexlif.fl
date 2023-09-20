@@ -594,7 +594,7 @@ let constant_propagation p =
 		base_assignment T lhs rhs
 	    in
 	    let consts = map mk1 fa_outs then
-	    (PINST "_WrApPeR_" [] F [] fa_outs [] (P_HIER consts))
+	    (PINST "_DuMmYhIeRaRcHy_" [] F [] fa_outs [] (P_HIER consts))
 	|
 	NOT (is_HIER body) => p |
 	let p' =
@@ -653,7 +653,7 @@ let constant_propagation p =
 	    (f', as)
 	in
 	let fa_outs = map mk_fa outside_sub then
-	(PINST "_WrApPeR_" attrs F fa_inps fa_outs (map snd dangling_sub)
+	(PINST "_DuMmYhIeRaRcHy_" attrs F fa_inps fa_outs (map snd dangling_sub)
 		    (P_HIER (p'' : const_insts)))
     in
     simp "" p

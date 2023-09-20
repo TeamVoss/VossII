@@ -1496,6 +1496,10 @@ static range_ptr
 make_range_canonical(range_ptr rp)
 {
     if( rp == NULL ) { return NULL; }
+    if( rp->next == NULL && rp->upper == -1 && rp->lower == 0 ) {
+	// Special treatment of [-1:0] arrays.
+	return rp;
+    }
     if( rp->upper < rp->lower ) { 
         int tmp = rp->upper;
         rp->upper = rp->lower;
