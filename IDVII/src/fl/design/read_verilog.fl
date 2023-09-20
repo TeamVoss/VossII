@@ -109,7 +109,7 @@ let verilog2pexlif no_popup flags top_level_module file_list additional_files =
     (load (sprintf "%s/_out.fl" tmp_dir)) fseq
     let fl_cmd = 
 	(sprintf "last_pexlif_ref := ") ^
-	(sprintf "(Q%s [(\"instance\", \"%s\")] []);"
+	(sprintf "remove_wrappers (Q%s [(\"instance\", \"%s\")] []);"
 		 top_level_module top_level_module)
     in
     (eval fl_cmd) fseq

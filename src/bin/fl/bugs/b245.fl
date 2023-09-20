@@ -1,4 +1,6 @@
 
+md_extract_vectors ["a[-1:0]"];
+
 md_expand_vector "_abs[1_0][2:0]";
 md_expand_vector "_abs[1_0][5,2:0]";
 

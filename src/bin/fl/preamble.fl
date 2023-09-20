@@ -368,6 +368,14 @@ letrec unzip pl = empty pl => ([],[]) |
 		let h = hd pl in
 		(((fst h):(fst res)), ((snd h):(snd res)));
 
+// Take a list of triples pl and return a triple of lists
+letrec unzip3 pl =
+	empty pl => ([],[],[]) |
+	val (r1,r2,r3) = unzip3 (tl pl) in
+	val (e1,e2,e3) = hd pl in
+	(e1:r1), (e2:r2), (e3:r3)
+;
+
 
 // Convert a list to a string
 // Usage: list2str print_empty_list pre sep post pr_fun l, where

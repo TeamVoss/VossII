@@ -100,7 +100,25 @@ let get_hw_type_size name =
 ;
 non_lazy get_hw_type_size;
 
+let bundle_decls =
+    ref {[] :: (string#(((string#string) list)# ((string#string) list))) list}
+;
+
+let get_bundle_info name =
+    assoc name (deref bundle_decls)
+;
+
 let bundle2field bundle field = bundle^"'"^field;
+
+let make_bundle_signals base type =
+    val (left_signals, right_signals) = get_bundle_info type then
+    let mk_sig (field,field_type) =
+	let sz = get_hw_type_size field_type then
+	let bn = sprintf "%s'%s" base field in
+	sz = 1 => bn | sprintf "%s[%d:0]" bn (sz-1)
+    in
+    map mk_sig (left_signals @ right_signals)
+;
 
 let get_bundle_var e =
     let we = hw_destr e in
@@ -595,7 +613,7 @@ let base_assignment do_split lhs rhs =
     let outs = map (\n.n,[n]) (get_lhs_vars lhs) in
     let inps = map (\n.n,[n]) (w_depends rhs) in
     let dep_vars = get_wbase_names rhs then
-    let pfn = "_WrApPeR_" then
+    let pfn = "_DuMmYhIeRaRcHy_" then
     PINST pfn [] F inps outs (deref internals) (P_HIER subfubs)
 ;
 
@@ -666,7 +684,7 @@ let w_CASE w_out cond_res_list w_default_value =
     let get_acts (PINST _ _ _ ifa _ _ _) = flatmap snd ifa then
     let inps = (setify (flatmap get_acts children)) subtract ints then
     let fa_inps = map (\v.v,[v]) inps then
-    PINST "_WrApPeR_" [] F fa_inps fa_outs ints (P_HIER children)
+    PINST "_DuMmYhIeRaRcHy_" [] F fa_inps fa_outs ints (P_HIER children)
 ;
 
 
@@ -785,7 +803,10 @@ let input body_fun {fs::string} acc =
 		let acc' name bd =
 		    let p0 = acc name bd in
 		    val (PINST n attrs leaf inps outs ints body) = p0 in
-		    let attrs' = attrs in
+		    let attrs' =
+			("bundle",sprintf "{input %s %s}" fs (hw_type_name aa)):
+			attrs
+		    in
 		    let inps_n = inps@new_inps in
 		    let outs_n = outs@new_outs in
 		    PINST n attrs' leaf inps_n outs_n ints body
@@ -852,13 +873,13 @@ binder_with_accumulator input CELL;
 //	    ...
 let list_input body_fun {base_fs::string} acc =
         \{aa:: (*a list)}.
-	    is_bundle (hd aa) =>
-		val (lefts,rights) = hw_bundle_pairs (hd aa) in
+	    is_bundle {undefined :: *a} =>
+		val (lefts,rights) = hw_bundle_pairs {undefined :: *a} in
 		let as = map get_bundle_var aa in
 		let fs =
 		    map (sprintf "%s[%d]" base_fs) ((length aa-1) downto 0)
 		in
-                let wf = map (hw_mk_var (hd aa)) fs in
+                let wf = map (hw_mk_var {undefined :: *a}) fs in
                 let f = map hw_constr wf in
 		let mkl fs as =
 		    let mk (n,t) =
@@ -872,15 +893,18 @@ let list_input body_fun {base_fs::string} acc =
 		    in
 		    let new_inps = map mk lefts in
 		    let new_outs = map mk rights in
-		    (new_inps, new_outs)
+		    let attrs' = ("bundle", sprintf "{input %s %s}"
+					   fs (hw_type_name {undefined :: *a}))
+		    in
+		    (new_inps, new_outs, attrs')
 		in
-		val (new_inps_l, new_outs_l) = unzip (map2 mkl fs as) in
+		val (new_inps_l,new_outs_l,n_attrs) = unzip3 (map2 mkl fs as) in
 		let new_inps = flat new_inps_l in
 		let new_outs = flat new_outs_l in
 		let acc' name bd =
 		    let p0 = acc name bd in
 		    val (PINST n attrs leaf inps outs ints body) = p0 in
-		    let attrs' = attrs in
+		    let attrs' = n_attrs @ attrs in
 		    let inps_n = inps@new_inps in
 		    let outs_n = outs@new_outs in
 		    PINST n attrs' leaf inps_n outs_n ints body
@@ -961,7 +985,9 @@ let output body_fun {fs::string} acc =
                 let acc' name bd =
                     let p0 = acc name bd in 
                     val (PINST n attrs leaf inps outs ints body) = p0 in
-                    let attrs' = attrs in
+		    let attrs' = ("bundle", sprintf "{output %s %s}"
+						    fs (hw_type_name aa)):attrs
+		    in
                     let inps_n = inps@new_inps in
                     let outs_n = outs@new_outs in
                     PINST n attrs' leaf inps_n outs_n ints body
@@ -1048,15 +1074,18 @@ let list_output body_fun {base_fs::string} acc =
 		    in
 		    let new_inps = map mk rights in
 		    let new_outs = map mk lefts in
-		    (new_inps, new_outs)
+		    let attrs' = ("bundle", sprintf "{input %s %s}"
+					   fs (hw_type_name {undefined :: *a}))
+		    in
+		    (new_inps, new_outs, attrs')
 		in
-		val (new_inps_l, new_outs_l) = unzip (map2 mkl fs as) in
+		val (new_inps_l,new_outs_l,n_attrs) = unzip3 (map2 mkl fs as) in
 		let new_inps = flat new_inps_l in
 		let new_outs = flat new_outs_l in
 		let acc' name bd =
 		    let p0 = acc name bd in
 		    val (PINST n attrs leaf inps outs ints body) = p0 in
-		    let attrs' = attrs in
+		    let attrs' = n_attrs@attrs in
 		    let inps_n = inps@new_inps in
 		    let outs_n = outs@new_outs in
 		    PINST n attrs' leaf inps_n outs_n ints body
@@ -1179,7 +1208,11 @@ let internal body_fun {fs::string} acc =
 	let acc' name bd =
 	    let p0 = acc name bd then
 	    val (PINST n attrs leaf inps outs ints body) = p0 in
-	    base_PINST n attrs leaf inps outs (ints@new_ints) body
+	    let attrs' =
+		let tname = hw_type_name {undefined :: *a} in
+		("bundle",sprintf "{internal %s %s}" fs tname):attrs
+	    in
+	    base_PINST n attrs' leaf inps outs (ints@new_ints) body
 	in
 	body_fun {f:: *a} acc'
     |
@@ -1268,10 +1301,14 @@ let list_internal cnt body_fun {base_fs::string} acc =
 	    map mk (lefts@rights)
 	in
 	let new_ints = flatmap mkl fsl in
+	let tname = hw_type_name {undefined :: *a} in
+	let mk_attr fs = ("bundle",sprintf "{internal %s %s}" fs tname) in
+	let new_attrs = map mk_attr fsl in
 	let acc' name bd =
 	    let p0 = acc name bd then
 	    val (PINST n attrs leaf inps outs ints body) = p0 in
-	    base_PINST n attrs leaf inps outs (ints@new_ints) body
+	    let attrs' = new_attrs @ attrs in
+	    base_PINST n attrs' leaf inps outs (ints@new_ints) body
 	in
 	body_fun {f:: *a list} acc'
     |
@@ -2007,7 +2044,6 @@ let STRUCT_implicit name field_list =
 
 overload STRUCT STRUCT_explicit STRUCT_implicit;
 
-
 let BUNDLE name left_signals right_signals =
     let current = deref hw_types_decl_ref in
     mem name (map fst current) =>
@@ -2107,6 +2143,10 @@ let BUNDLE name left_signals right_signals =
         ) fseq ()
     in
     (foreach declare_field (left_signals @ right_signals))
+    fseq
+    let old = filter (\p. fst p != name) (deref bundle_decls) then
+    let new = (name,left_signals, right_signals):old then
+    (bundle_decls :=  new)
     fseq
     T
 ;
@@ -2972,7 +3012,7 @@ let STATE {clk::bit} {state:: *a} {cond_res_list:: (bit # *a) list} =
     let get_acts (PINST _ _ _ ifa _ _ _) = flatmap snd ifa in
     let inps = (setify (flatmap get_acts children)) subtract ints then
     let fa_inps = (map (\v.v,[v]) inps) then
-    PINST "_WrApPeR_" [] F fa_inps fa_states ints (P_HIER children)
+    PINST "_DuMmYhIeRaRcHy_" [] F fa_inps fa_states ints (P_HIER children)
 ;
 
 let EN_STATE {clk::bit} {enable::bit} {state:: *a}
@@ -3039,7 +3079,7 @@ let EN_STATE {clk::bit} {enable::bit} {state:: *a}
     let get_acts (PINST _ _ _ ifa _ _ _) = flatmap snd ifa in
     let inps = (setify (flatmap get_acts children)) subtract ints then
     let fa_inps = (map (\v.v,[v]) inps) then
-    PINST "_WrApPeR_" [] F fa_inps fa_states ints (P_HIER children)
+    PINST "_DuMmYhIeRaRcHy_" [] F fa_inps fa_states ints (P_HIER children)
 ;
 
 let SELECT =
@@ -3596,7 +3636,7 @@ let is_HIER (P_HIER _) = T
 ;
 
 let is_wrapper_or_empty (PINST nm _ _ _ _ _ _) =
-    (nm = "_WrApPeR_") OR (nm = "")
+    (nm = "_DuMmYhIeRaRcHy_") OR (nm = "")
 ;
 
 let remove_wrappers p =
@@ -3736,8 +3776,8 @@ let flfun2pexlif_core fn =
 	eprintf "Argument %s not a simple hw_type (%s). VIS for %s aborted\n"
 	      arg tp fn
     |
-    let pre = sprintf "let foo = %s " fn in
-    let post = " then (_pExLiF_ := foo);" in
+    let pre = sprintf "let foo = remove_wrappers (%s " fn in
+    let post = ") then (_pExLiF_ := foo);" in
     let cmd = list2str T pre " " post (sprintf "'%s") (map fst args) then
     (eval cmd) fseq (deref _pExLiF_)
 ;
