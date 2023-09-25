@@ -12,7 +12,7 @@ BASE_FLAGS = $(DEBUG_FLAG) $(OPTIMIZATION_FLAG) $(FL_OPTIONS) \
 	-DVERSION_DATE='"$(VERSION_DATE)"' \
 	-DDEFAULT_PLUGIN_DIR='"$(PLUGIN_DIR)"' -DFL_BINARY=1
 
-CFLAGS += $(BASE_FLAGS) $(COMPATIBILITY_FLAG) -Wno-unused-but-set-variable
+CFLAGS += $(BASE_FLAGS) $(COMPATIBILITY_FLAG) -Wno-unused-command-line-argument -Wno-unused-but-set-variable 
 CXXFLAGS += $(BASE_FLAGS) -fpermissive -Wno-error
 
 ifeq '' '$(findstring clang++,$(CX))'
