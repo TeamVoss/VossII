@@ -15,6 +15,31 @@ let visualize_fanin ckt l1 l2 i1 l3 i2 =
 	visualize_fanin ckt l1 l2 i1 l3 i2
 ;
 
+clet accurate_toplevel_pexlif2fsm p =
+    let old1 = update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" "TRUE" then
+    let old2 = update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" "FALSE" then
+    let res = toplevel_pexlif2fsm p then
+    (update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" old1) fseq
+    (update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" old2) fseq
+    res
+;
+
+let accurate_pexlif2fsm p =
+    let old1 = update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" "TRUE" then
+    let old2 = update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" "FALSE" then
+    let res = pexlif2fsm p then
+    (update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" old1) fseq
+    (update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" old2) fseq
+    res
+;
+
+let idv_visualize_fanin p =
+    let ckt = accurate_toplevel_pexlif2fsm p then
+    let outs = outputs ckt then
+    let props = assertions ckt then
+    visualize_fanin ckt [] [] 100 (outs@props) 0
+;
+
 let visualisation2tcl vis =
     DBG_timing => 
 	(fprintf stderr "start visualisation2tcl\n") fseq
@@ -88,24 +113,6 @@ let Create_Dummy_Placement =
 ;
 NOT noX => Create_Dummy_Placement | ();
 
-let accurate_toplevel_pexlif2fsm p =
-    let old1 = update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" "TRUE" then
-    let old2 = update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" "FALSE" then
-    let res = toplevel_pexlif2fsm p then
-    (update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" old1) fseq
-    (update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" old2) fseq
-    res
-;
-
-let accurate_pexlif2fsm p =
-    let old1 = update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" "TRUE" then
-    let old2 = update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" "FALSE" then
-    let res = pexlif2fsm p then
-    (update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" old1) fseq
-    (update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" old2) fseq
-    res
-;
-
 // -------------------------------------------------------------
 
 let cur_canvas = ref "";
@@ -165,11 +172,6 @@ let get_idv_info canvas = deref (get_idv_info_r canvas);
 
 let get_idv_current_pexlif canvas = fst (hd (get_idv_info canvas));
 
-let get_idv_current_fsm canvas =
-    val (p,ckt,just) = hd (get_idv_info canvas) then
-    ckt
-;
-
 let get_idv_parent_info canvas =
     let vfsm = w2vfsm canvas in
     NOT (is_IDV_ENV vfsm) => error "get_idv_info on STE_ENV" |
@@ -178,18 +180,6 @@ let get_idv_parent_info canvas =
 	    dassoc "canvas2trfs" canvas trfs
     then
     (parent, inside, sell)
-;
-
-let canvas2fsm canvas =
-    let vfsm = w2vfsm canvas in
-    is_STE_ENV vfsm => vfsm2fsm vfsm |
-    // IDV_ENV
-    let trfs = deref (vfsm2canvases_r vfsm) in
-    val (TR_SEQ parent inside sell vr trfsr) =
-	dassoc "canvas2trfs" canvas trfs
-    then
-    val (p,ckt,just) = hd (deref trfsr) in
-    ckt
 ;
 
 
@@ -528,14 +518,12 @@ let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
 	then
 	let hier = sprintf "%si%d/" phier inst_nbr then
 	let p = el inst_nbr (pexlif_get_children parent) then
-	let ckt = accurate_toplevel_pexlif2fsm p then
-	let outs = outputs ckt then
-	let vis = visualize_fanin ckt [] [] 100 outs 0 then
+	let vis = idv_visualize_fanin p then
 	val (tab_window, c) = get_new_sch_canvas w 0 "" hier then
 	(start_draw_op c) fseq
 	let cmd = "OBSOLETE" in
 	let evis =
-	    TR_SEQ canvas T [inst_nbr] (ref vis) (ref [(p,ckt,SPEC)])
+	    TR_SEQ canvas T [inst_nbr] (ref vis) (ref [(p,SPEC)])
 	then
 	(add_active_sch_tab_window vfsm c evis cmd) fseq
 	val (final_res, cmds) = visualisation2tcl vis then

@@ -23,7 +23,7 @@ let base_adlatch p_en p_arst =
     output          {out:: wexpr}.
     bit_internal    en.
     internal        {mid:: wexpr}.
-    CELL "_DuMmYhIeRaRcHy_" [
+    CELL "_WrApPeR_" [
         ah_latch en mid out,
         en  <- (p_en => clk | '~' clk),
         mid <- (IF (p_arst => arst | '~' arst) THEN reset_value ELSE d)

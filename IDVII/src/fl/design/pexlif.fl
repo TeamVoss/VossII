@@ -560,11 +560,26 @@ let get_unique_name name_db original_name =
 // Code for constant propagation
 // =============================================================
 
-// Perform constant propagation and simplify the pexlif.
+// Perform constant propagation and simplify the pexlif hiearchically.
 // Note that we only propagate constants through combinational units.
-let constant_propagation p =
+let hier_constant_propagation p =
     let ckt = pexlif2fsm p then
-    let ste = STE "-e" ckt [] [] [] [] then
+    // Incorporate all the assumtions
+    let a_nds = assertions ckt then
+    let a_deps = filter (is_input ckt) (fanin_dfs ckt (\n.F) a_nds) then
+    let a_ant = map (\n. T,n, variable n, 0, 1) a_deps then
+    let ste1 = STE "" ckt [] a_ant [] (map (\n.n,0,1) a_nds) then
+    let get_cond nd =
+	val (H,L) = get_trace_val ste1 nd 0 then
+	NOT (H == NOT L) => [] |
+	[H]
+    in
+    let conds = flatmap get_cond a_nds then
+    let cond = itlist (defix AND) conds T then
+    let psub = param cond then
+    let a_ant' = substitute psub a_ant then
+    //
+    let ste = STE "-e" ckt [] a_ant' [] [] then
     letrec simp hier p =
         val (PINST name attrs lf fa_inps fa_outs ints body) = p in
 	let get_v f =
@@ -594,7 +609,7 @@ let constant_propagation p =
 		base_assignment T lhs rhs
 	    in
 	    let consts = map mk1 fa_outs then
-	    (PINST "_DuMmYhIeRaRcHy_" [] F [] fa_outs [] (P_HIER consts))
+	    (PINST "_WrApPeR_" [] F [] fa_outs [] (P_HIER consts))
 	|
 	NOT (is_HIER body) => p |
 	let p' =
@@ -613,7 +628,8 @@ let constant_propagation p =
 	let fa_outs' = map (\(f,as). f,[f]) fa_outs' in
 	let fvs = (map fst (fa_inps @ fa_outs))@ints then
 	let nameDB = list2name_db fvs then
-	val (needed, const) = split (\p. snd p = "X") nd2val in
+	let keep (nd,v) = (v = "X") OR (str_is_substr "assert__" nd) in
+	val (needed, const) = split keep nd2val in
 	//
 	let const_vecs = md_extract_vectors (map fst const) then
 	let mk_const v =
@@ -653,10 +669,56 @@ let constant_propagation p =
 	    (f', as)
 	in
 	let fa_outs = map mk_fa outside_sub then
-	(PINST "_DuMmYhIeRaRcHy_" attrs F fa_inps fa_outs (map snd dangling_sub)
+	(PINST "_WrApPeR_" attrs F fa_inps fa_outs (map snd dangling_sub)
 		    (P_HIER (p'' : const_insts)))
     in
     simp "" p
+;
+
+// Perform constant propagation and simplify the pexlif at the top-level.
+// Note that we only propagate constants through combinational units.
+let constant_propagation p =
+    let ckt = pexlif2fsm p then
+    // Incorporate all the assumtions
+    let a_nds = assertions ckt then
+    let a_deps = filter (is_input ckt) (fanin_dfs ckt (\n.F) a_nds) then
+    let a_ant = map (\n. T,n, variable n, 0, 1) a_deps then
+    let ste1 = STE "" ckt [] a_ant [] (map (\n.n,0,1) a_nds) then
+    let get_cond nd =
+	val (H,L) = get_trace_val ste1 nd 0 then
+	NOT (H == NOT L) => [] |
+	[H]
+    in
+    let conds = flatmap get_cond a_nds then
+    let cond = itlist (defix AND) conds T then
+    let psub = param cond then
+    let a_ant' = substitute psub a_ant then
+    //
+    let ste = STE "-e" ckt [] a_ant' [] [] then
+    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
+    let get_v nd =
+	(str_is_substr "assert__" nd) => "X" |
+	let HL = get_trace_val ste nd 0 then
+	HL == (T,F) => "1" |
+	HL == (F,T) => "0" |
+	"X"
+    in
+    let transf lp =
+	val (PINST lname lattrs llf lfa_inps lfa_outs lints lbody) = lp in
+	let acts = md_expand_vectors (flatmap snd lfa_outs) then
+	let outvs = map get_v acts then
+	(find_first0 (\v. v = "X") outvs) != 0 => lp |
+	let sz = length outvs then
+	let v = sscanf "%b" (implode outvs) then
+	let lhs = W_VAR sz "c" in
+	let rhs = W_CONST sz v in
+	let lp' = base_assignment T lhs rhs then
+	val (PINST rnm rattrs rlf rfa_inps rfa_outs rinst rbody) = lp' then
+	let vacts = md_merge_vectors acts in
+	PINST rnm rattrs rlf [] [(fst (hd rfa_outs), vacts)] [] rbody
+    in
+    let cs' = map transf cs then
+    (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs'))
 ;
 
 

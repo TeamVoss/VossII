@@ -15,6 +15,9 @@ lettype *a hw_type =
       {hw_bundle_parts:: *a -> (((string#string) list)#((string#string) list))}
 ;
 
+//let my_PINST = base_PINST;
+let my_PINST = PINST;
+
 open_overload {hw_type_destr :: ({*a} hw_type)};
 
 // Make sure there are at least two possibilities for the open overloaded
@@ -613,7 +616,7 @@ let base_assignment do_split lhs rhs =
     let outs = map (\n.n,[n]) (get_lhs_vars lhs) in
     let inps = map (\n.n,[n]) (w_depends rhs) in
     let dep_vars = get_wbase_names rhs then
-    let pfn = "_DuMmYhIeRaRcHy_" then
+    let pfn = "_WrApPeR_" then
     PINST pfn [] F inps outs (deref internals) (P_HIER subfubs)
 ;
 
@@ -684,7 +687,7 @@ let w_CASE w_out cond_res_list w_default_value =
     let get_acts (PINST _ _ _ ifa _ _ _) = flatmap snd ifa then
     let inps = (setify (flatmap get_acts children)) subtract ints then
     let fa_inps = map (\v.v,[v]) inps then
-    PINST "_DuMmYhIeRaRcHy_" [] F fa_inps fa_outs ints (P_HIER children)
+    PINST "_WrApPeR_" [] F fa_inps fa_outs ints (P_HIER children)
 ;
 
 
@@ -1212,7 +1215,7 @@ let internal body_fun {fs::string} acc =
 		let tname = hw_type_name {undefined :: *a} in
 		("bundle",sprintf "{internal %s %s}" fs tname):attrs
 	    in
-	    base_PINST n attrs' leaf inps outs (ints@new_ints) body
+	    my_PINST n attrs' leaf inps outs (ints@new_ints) body
 	in
 	body_fun {f:: *a} acc'
     |
@@ -1238,7 +1241,7 @@ let internal body_fun {fs::string} acc =
 		let prev_expr_pexlifs = tl pexlifs in
 		let ints'' = fv:ints' in
 		let p_main' =
-		    base_PINST n' attrs'' leaf' inps' outs' ints'' body'
+		    my_PINST n' attrs'' leaf' inps' outs' ints'' body'
 		in
 		(p_main', prev_expr_pexlifs)
 	    |
@@ -1246,16 +1249,14 @@ let internal body_fun {fs::string} acc =
 		values = "" => attrs |
 		(sprintf "node_values_%s" fv, values):attrs
 	    in
-	    let p_main' =
-		base_PINST n attrs' leaf inps outs (fv:ints) body
-	    in
+	    let p_main' = my_PINST n attrs' leaf inps outs (fv:ints) body in
 	    (p_main', [])
 	in
 	p_exprs = [] => p_main |
 	let c_ints = get_tmp_outs p_exprs then
 	let c_inps = mk_wrap_inps c_ints (p_main:p_exprs) then
 	let c_outs = mk_wrap_outs [p_main] then
-	let res = base_PINST "_WrApPeR_" attrs F c_inps c_outs c_ints
+	let res = my_PINST "_WrApPeR_" attrs F c_inps c_outs c_ints
 		    (P_HIER (p_main:p_exprs)) then
 	res
     in
@@ -1308,7 +1309,7 @@ let list_internal cnt body_fun {base_fs::string} acc =
 	    let p0 = acc name bd then
 	    val (PINST n attrs leaf inps outs ints body) = p0 in
 	    let attrs' = new_attrs @ attrs in
-	    base_PINST n attrs' leaf inps outs (ints@new_ints) body
+	    my_PINST n attrs' leaf inps outs (ints@new_ints) body
 	in
 	body_fun {f:: *a list} acc'
     |
@@ -1335,7 +1336,7 @@ let list_internal cnt body_fun {base_fs::string} acc =
 		let prev_expr_pexlifs = tl pexlifs in
 		let ints'' = md_extract_vectors (fv@ints') in
 		let p_main' =
-		    base_PINST n' attrs'' leaf' inps' outs' ints'' body'
+		    my_PINST n' attrs'' leaf' inps' outs' ints'' body'
 		in
 		(p_main', prev_expr_pexlifs)
 	    |
@@ -1345,7 +1346,7 @@ let list_internal cnt body_fun {base_fs::string} acc =
 	    in
 	    let p_main' =
 		let ints' = md_extract_vectors (fv@ints) in
-		base_PINST n attrs' leaf inps outs ints' body
+		my_PINST n attrs' leaf inps outs ints' body
 	    in
 	    (p_main', [])
 	in
@@ -1353,7 +1354,7 @@ let list_internal cnt body_fun {base_fs::string} acc =
 	let c_ints = get_tmp_outs p_exprs in
 	let c_inps = mk_wrap_inps c_ints (p_main:p_exprs) in
 	let c_outs = mk_wrap_outs [p_main] in
-	let res = base_PINST "_WrApPeR_" attrs F c_inps c_outs c_ints
+	let res = my_PINST "_WrApPeR_" attrs F c_inps c_outs c_ints
 		    (P_HIER (p_main:p_exprs)) in
 	res
     in
@@ -3012,7 +3013,7 @@ let STATE {clk::bit} {state:: *a} {cond_res_list:: (bit # *a) list} =
     let get_acts (PINST _ _ _ ifa _ _ _) = flatmap snd ifa in
     let inps = (setify (flatmap get_acts children)) subtract ints then
     let fa_inps = (map (\v.v,[v]) inps) then
-    PINST "_DuMmYhIeRaRcHy_" [] F fa_inps fa_states ints (P_HIER children)
+    PINST "_WrApPeR_" [] F fa_inps fa_states ints (P_HIER children)
 ;
 
 let EN_STATE {clk::bit} {enable::bit} {state:: *a}
@@ -3079,7 +3080,7 @@ let EN_STATE {clk::bit} {enable::bit} {state:: *a}
     let get_acts (PINST _ _ _ ifa _ _ _) = flatmap snd ifa in
     let inps = (setify (flatmap get_acts children)) subtract ints then
     let fa_inps = (map (\v.v,[v]) inps) then
-    PINST "_DuMmYhIeRaRcHy_" [] F fa_inps fa_states ints (P_HIER children)
+    PINST "_WrApPeR_" [] F fa_inps fa_states ints (P_HIER children)
 ;
 
 let SELECT =
@@ -3636,7 +3637,7 @@ let is_HIER (P_HIER _) = T
 ;
 
 let is_wrapper_or_empty (PINST nm _ _ _ _ _ _) =
-    (nm = "_DuMmYhIeRaRcHy_") OR (nm = "")
+    (nm = "_WrApPeR_") OR (nm = "")
 ;
 
 let remove_wrappers p =

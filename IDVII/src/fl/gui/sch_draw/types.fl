@@ -12,7 +12,7 @@ lettype justification =
                     |   REPLACE {ids::int list} {tr::transform}
                     |   REPLACE_ALL {repeatedly::bool} {tr::transform}
                     |   FEV {engine::string} {options::(string#string) list}
-                    |   DUPLICATE {id::int}
+                    |   DUPLICATE {ids::int list}
                     |   RETIME_FWD {ids::(int list)}
                     |   MERGE {ids::int list}
 		    |	RENAME_WIRES {sub:: (string#string) list}
@@ -47,7 +47,7 @@ lettype evis =
 		    {inside::bool}
 		    {selection::int list}
 		    {vis:: vis ref}
-		    {transforms:: ((pexlif#fsm#justification) list) ref}
+		    {transforms:: ((pexlif#justification) list) ref}
 ;
 
 lettype vfsm =

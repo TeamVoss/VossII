@@ -334,6 +334,11 @@ proc idv:create_idv_menu {nb w} {
         balloon $w.menu.retime_fwd "Retime selected instance forward"
         pack $w.menu.retime_fwd -side left -padx 5
 
+        button $w.menu.const_prop -image $::icon(const_prop) \
+                -command "idv:constant_prop $w"
+        balloon $w.menu.const_prop "Propagate constants and simplify model"
+        pack $w.menu.const_prop -side left -padx 5
+
         button $w.menu.fev -image $::icon(fev) \
                 -command "idv:do_fev $w"
         balloon $w.menu.fev "Replace with new design that has been FEV-ed"
@@ -376,6 +381,8 @@ proc idv:flatten {w} { fl_do_flatten $w.c }
 proc idv:duplicate {w} { fl_do_duplicate $w.c }
 
 proc idv:retime_fwd {w} { fl_do_retime_fwd $w.c }
+
+proc idv:constant_prop {w} { fl_do_const_prop $w.c }
 
 proc idv:merge {w} { fl_do_merge $w.c }
 
@@ -700,8 +707,10 @@ proc idv:make_template {w c type args} {
 						     $::idv(synthesis_type)   \
 						     $::idv(synthesis_script)]
 	} else {
+	    set include_file $::idv(fev_include_file)
+	    if { $include_file == "" } { set include_file "-"; }
 	    val {pexlif_file load_file} \
-		[fl_make_template $c $type $file $base $create_file]
+	      [fl_make_template $c $type $file $include_file $base $create_file]
 	}
 
 	if { $pexlif_file == "-" } {
@@ -769,19 +778,33 @@ proc idv:do_fev {ww} {
 
     labelframe $w.f2 -relief groove -text Manual
     pack $w.f2 -side top -fill x -pady 10
-	label $w.f2.l -text "Make template in:" -width 20 -justify left \
-	    -anchor w
-	entry $w.f2.e -textvariable ::idv(fev_template_file) -width 30
-	button $w.f2.dir -image $::icon(folder) \
-	    -command "idv:fev_template_file $::idv(code_dir) $w $ww.c"
-	button $w.f2.verilog -text "Verilog" \
-	    -command "idv:make_template $w $ww.c verilog"
-	button $w.f2.hfl -text "HFL" -command "idv:make_template $w $ww.c hfl"
-	pack $w.f2.l -side left -anchor w
-	pack $w.f2.e -side left -fill x -expand yes
-	pack $w.f2.dir -side left
-	pack $w.f2.verilog -side left -padx 5
-	pack $w.f2.hfl -side left -padx 5
+	frame $w.f2.f1 -relief flat
+	frame $w.f2.f2 -relief flat
+	pack $w.f2.f1 -side top -fill x
+	pack $w.f2.f2 -side top -fill x
+	    label $w.f2.f1.l -text "Make template in:" -width 20 -justify left \
+		-anchor w
+	    entry $w.f2.f1.e -textvariable ::idv(fev_template_file) -width 30
+	    button $w.f2.f1.dir -image $::icon(folder) \
+		-command "idv:fev_template_file $::idv(code_dir) $w $ww.c"
+	    label $w.f2.f2.l -text "Include file:" -width 20 -justify left \
+		-anchor w
+	    entry $w.f2.f2.e -textvariable ::idv(fev_include_file) -width 30
+
+	    button $w.f2.f2.dir -image $::icon(folder) \
+		-command "idv:fev_include_file $::idv(code_dir) $w $ww.c"
+	    button $w.f2.f1.verilog -text "Verilog" \
+		-command "idv:make_template $w $ww.c verilog"
+	    button $w.f2.f1.hfl -text "HFL" \
+		-command "idv:make_template $w $ww.c hfl"
+	    pack $w.f2.f1.l -side left -anchor w
+	    pack $w.f2.f1.e -side left -fill x -expand yes
+	    pack $w.f2.f1.dir -side left
+	    pack $w.f2.f2.l -side left -anchor w
+	    pack $w.f2.f2.e -side left -fill x -expand yes
+	    pack $w.f2.f2.dir -side left
+	    pack $w.f2.f1.verilog -side left -padx 5
+	    pack $w.f2.f1.hfl -side left -padx 5
 
     labelframe $w.f2b -relief groove -text Synthesis
     pack $w.f2b -side top -fill x -pady 10
@@ -912,6 +935,16 @@ proc idv:fev_template_file {code_dir w c} {
 	    idv:make_template $w $c verilog
 	}
     }
+}
+
+proc idv:fev_include_file {code_dir w c} {
+    set types {
+        {{All Files}        *             }
+    }
+    set file [tk_getSaveFile -filetypes $types \
+		-initialdir $code_dir -title "Include file to load" \
+	        -confirmoverwrite 0]
+    set ::idv(fev_include_file) $file
 }
 
 proc idv:fev_pexlif {w} {

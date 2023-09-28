@@ -19,6 +19,8 @@ typedef struct vstate_rec   *vstate_ptr;    // ALLOCATE: get_vstate_rec()
 typedef struct ste_rec	    *ste_ptr;	    // ALLOCATE: get_ste_rec()
 typedef struct idx_list_rec *idx_list_ptr;
 
+typedef string    *stringp;
+
 /* ----- Function prototypes for public functions ----- */
 string get_real_name(vec_info_ptr ip, int idx);
 //
@@ -120,9 +122,9 @@ typedef struct fsm_rec {
     rec_mgr	idx_list_rec_mgr;   // TYPE: idx_list_rec
     buffer      nodes;		    // TYPE: nnode_rec
     buffer      composites;	    // TYPE: ncomp_rec
-    buffer	top_inps;	    // TYPE: string
-    buffer	top_outs;	    // TYPE: string
-    buffer	props;		    // TYPE: string
+    buffer	top_inps;	    // TYPE: stringp
+    buffer	top_outs;	    // TYPE: stringp
+    buffer	props;		    // TYPE: stringp
     rec_mgr	vis_io_rec_mgr;	    // TYPE: vis_io_rec
     rec_mgr	vis_rec_mgr;	    // TYPE: vis_rec
     rec_mgr	vis_list_rec_mgr;   // TYPE: vis_list_rec

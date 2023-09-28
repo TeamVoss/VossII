@@ -445,10 +445,8 @@ let refresh_idv_canvas canvas cmd =
     let evis = snd (find (\p. fst p = canvas) canvas_list) then
     val (TR_SEQ parent inside sell rvis rtrf) = evis then
     let trf = get_idv_info canvas then
-    val (p,ckt,_) = hd trf in
-    let outs = outputs ckt then
-    let props = assertions ckt then
-    let vis = visualize_fanin ckt [] [] 100 (outs@props) 0 then
+    val (p,_) = hd trf in
+    let vis = idv_visualize_fanin p then
     (rvis := vis) fseq
     (rtrf := trf) fseq
     (add_command vfsm cmd) fseq
@@ -469,16 +467,12 @@ let refresh_idv_canvas canvas cmd =
 
 
 let start_new_transform p w =
-    let ckt = accurate_toplevel_pexlif2fsm p then
-    let outs = outputs ckt then
-    let props = assertions ckt then
-    //
     let vfsm = w2vfsm w then
-    let vis = visualize_fanin ckt [] [] 100 (outs@props) 0 then
+    let vis = idv_visualize_fanin p then
     val (tab_window, c) = get_new_sch_canvas w 0 "" "" then
     (start_draw_op c) fseq
     let cmd = "DUMMY" in
-    let evis = TR_SEQ "" F [] (ref vis) (ref [(p,ckt,SPEC)]) then
+    let evis = TR_SEQ "" F [] (ref vis) (ref [(p,SPEC)]) then
     (add_active_sch_tab_window vfsm c evis cmd) fseq
     val (final_res, cmds) = visualisation2tcl vis then
     (big_tcl_eval ("create_sch":cmds)) fseq
@@ -537,9 +531,8 @@ overload IDV IDV0 IDV_dbg;
 
 let add_transform canvas p tr =
     let vfsm = w2vfsm canvas in
-    let ckt = accurate_toplevel_pexlif2fsm p then
     let trfsr = get_idv_info_r canvas then
-    (trfsr := ((p,ckt,tr):(deref trfsr))) fseq
+    (trfsr := ((p,tr):(deref trfsr))) fseq
     ()
 ;
 non_lazy add_transform;
@@ -628,15 +621,13 @@ let fl_do_idv_undo canvas =
     length trfs <= 1 => () |
     let trfs' = tl trfs then
     (trfsr := trfs') fseq
-    val (p,ckt,_) = hd trfs' in
+    val (p,_) = hd trfs' in
     let vfsm = w2vfsm canvas then
     let canvas_list = deref (vfsm2canvases_r vfsm) then
     let evis = snd (find (\p. fst p = canvas) canvas_list) then
     val (TR_SEQ parent inside sell rvis rtrf) = evis then
-    let outs = outputs ckt then
-    let props = assertions ckt then
     (start_draw_op canvas) fseq
-    let vis = visualize_fanin ckt [] [] 100 (outs@props) 0 then
+    let vis = idv_visualize_fanin p then
     (rvis := vis) fseq
     (rtrf := trfs') fseq
     val (final_res, cmds) = visualisation2tcl vis then
@@ -656,9 +647,40 @@ let fl_do_idv_undo canvas =
 ;
 export_to_tcl fl_do_idv_undo;
 
+let get_assert_name (PINST nm attrs lf fa_inps fa_outs ints body) =
+    length fa_outs != 1 => "" |
+    val (f,as) = hd fa_outs in
+    md_size f != 1 => "" |
+    let name = hd as in
+    NOT (str_is_substr "assert__" name) => "" |
+    name
+;
+    
 
-let duplicate_instance p idx =
-    let io = buid_io_tbl p then
+let duplicate_instance p indices =
+    let io = build_io_tbl p then
+    let cands = gather (io2children io) indices then
+    let names = map get_assert_name cands then
+    NOT (mem "" names) =>
+	// Assertions
+	let cur_assertions = io2assertions io then
+	let dup1 (name,cand) p =
+	    letrec try i =
+		let name' = sprintf "%s<%d>" name i then
+		NOT (mem name' cur_assertions) => name' |
+		try (i+1)
+	    in
+	    let name' = try 1 then
+	    val (PINST nm attrs lf fa_inps [(f,_)] ints body) = cand then
+	    let new = PINST nm attrs lf fa_inps [(f,[name'])] ints body then
+	    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p then
+	    (PINST name attrs lf fa_inps fa_outs ints (P_HIER (cs@[new])))
+	in
+	itlist dup1 (zip names cands) p
+    |
+    // A regular instance
+    length indices != 1 => error "Can only duplicate one instance at a time" |
+    let idx = hd indices then
     let fanouts = inst_fanout io idx then
     length fanouts < 2 => p |
     let name_db = build_name_db p then
@@ -706,13 +728,10 @@ let fl_do_duplicate canvas =
     let vfsm = w2vfsm canvas then
     let il = get_selected_pinsts canvas then
     il = [] => () |
-    length il > 1 => 
-	report_error "Can only duplicate one instance at a time"
-    |
     let p = get_idv_current_pexlif canvas then
-    let p' = duplicate_instance p (hd il) then
-    (add_transform canvas p' (DUPLICATE (hd il))) fseq
-    let cmd = sprintf "duplicate vis %d;" (hd il) in
+    let p' = duplicate_instance p il then
+    (add_transform canvas p' (DUPLICATE il)) fseq
+    let cmd = sprintf "duplicate vis %S;" (map int2str il) in
     refresh_idv_canvas canvas cmd
   ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
 ;
@@ -817,19 +836,11 @@ let fl_do_new_tranf canvas =
     val (PINST _ _ _ _ _ _ (P_HIER chs)) = p' in
     let p = el 1 chs then
     //
-    let ckt = accurate_toplevel_pexlif2fsm p then
-    let outs = outputs ckt then
-    let props = assertions ckt then
-    let vis = visualize_fanin ckt [] [] 100 (outs@props) 0 then
+    let vis = idv_visualize_fanin p then
     val (tab_window, c) = get_new_sch_canvas w 0 "" "" then
     (start_draw_op c) fseq
-    let cmd =
-	let tab = canvas2tab c then
-	let svecs = list2str T "[" "," "]" (sprintf "\"%s\"") outs in
-	sprintf "OBSOLETE: let %s = draw_fanin vis (%d) %d %s;\n%s;"
-		 tab 0 100 svecs tab
-    in
-    let evis = TR_SEQ canvas F il (ref vis) (ref [(p,ckt,SPEC)]) then
+    let cmd = "OBSOLETE: TO_BE_DETERMINED" in
+    let evis = TR_SEQ canvas F il (ref vis) (ref [(p,SPEC)]) then
     (add_active_sch_tab_window vfsm c evis cmd) fseq
     val (final_res, cmds) = visualisation2tcl vis then
     (big_tcl_eval ("create_sch":cmds)) fseq
@@ -1039,9 +1050,12 @@ let fl_import_model w filename =
 ;
 export_to_tcl fl_import_model;
 
-let generate_hfl_template fp p basename pexlif_file =
+let generate_hfl_template fp p basename pexlif_file include_file =
     val (PINST name attrs lf fa_inps fa_outs ints body) = p in
     (fprintf fp "load \"ste.fl\";\n") fseq
+    (include_file != "-" =>
+	(fprintf fp "load \"%s\";\n" include_file) | ()
+    ) fseq
     let name' = clean_name basename then
     let inps = map fst fa_inps in
     let outs = map fst fa_outs in
@@ -1222,7 +1236,7 @@ let fl_run_fl_loader file =
 ;
 export_to_tcl fl_run_fl_loader;
 
-let fl_make_template canvas type file basename create =
+let fl_make_template canvas type file include_file basename create =
     let vfsm = w2vfsm canvas then
     let pexlif_file = sprintf "%s/pexlifs/%s.pexlif"
 			      (get_idv_db_dir ()) (clean_name basename)
@@ -1232,7 +1246,9 @@ let fl_make_template canvas type file basename create =
 	type = "hfl" =>
 	    (create = 0 => () |
 		let fp = fopen file "w" then
-		(generate_hfl_template fp p basename pexlif_file) fseq
+		(generate_hfl_template fp p
+				       basename pexlif_file include_file)
+		fseq
 		(fclose fp)
 	    ) fseq
 	    file
@@ -1245,6 +1261,9 @@ let fl_make_template canvas type file basename create =
 	    (create = 0 => () |
 	      let p' = PINST basename attrs lf fa_inps fa_outs [] (P_HIER []) in
 	      let fp = fopen file "w" then
+	      (include_file != "-" =>
+		    fprintf fp "`include \"%s\"\n" include_file | ()
+	      ) fseq
 	      (pexlif2verilog F fp p') fseq
 	      (fclose fp)
 	    ) fseq
@@ -1448,9 +1467,12 @@ let BDD_remote_types =
 
 let use_separate_process_evaluation_r = ref T;
 
+let dbg_ckt = ref {(error "none"):: fsm};
+let dbg_ant = ref [(F,"",F,0,0)];
+
 slet BDD_EQ_1 p1 p2 order_file =
     NOT (deref use_separate_process_evaluation_r) =>
-	(order_file != "" => (_load order_file T) | T) fseq
+	(order_file != "{}" => (_load order_file T) | T) fseq
 	noX => fst (BDD_EQ_base p1 p2) |
 	val (res, opt_cex) = BDD_EQ_base p1 p2 then
 	res == T => res |
@@ -1493,7 +1515,7 @@ slet BDD_EQ_1 p1 p2 order_file =
 	(system cmd)
     |
 	let wid = make_info_window "FEV" T then
-	let cmd = sprintf "fl -use %s -use_stdout -F %s DONT_QUIT" wid fl_f then
+	let cmd = sprintf "fl -use %s -use_stdout -f %s DONT_QUIT" wid fl_f then
 	(system cmd)
     ) fseq
     NOT (file_exists res_f) => F |
@@ -1507,6 +1529,8 @@ slet BDD_EQ_1 p1 p2 order_file =
 		    [("Yes", "Yes"), ("No","No")]
     then
     sel = "No" => res |
+(dbg_ckt := ckt) fseq
+(dbg_ant := cex_ant) fseq
     let vis = STE_debug ckt then
     let tab_1 = draw_fanin vis (0) 100 ("_OK_":asserts) then
     tab_1 fseq
@@ -2132,7 +2156,7 @@ let idv_finish_transformation canvas =
     val (parent,inside, sell) = get_idv_parent_info canvas then
     let vfsm = w2vfsm canvas in
     let trfs = get_idv_info canvas then
-    let just = map (\(p,ckt,j).j) (butlast trfs) then
+    let just = map (\(p,j).j) (butlast trfs) then
     just = [] => T |
     let imp = fst (hd trfs) in
     let spec = fst (last trfs) in
@@ -2318,7 +2342,7 @@ let fl_do_selection_command canvas cmd =
 	    md_extract_vectors (flatmap pexlif_get_outs_actuals unmapped)
 	|
 	cmd = "private_fanin" =>
-	    let io = buid_io_tbl p then
+	    let io = build_io_tbl p then
 	    let current_wires = deref rselection then
 	    let current_insts = wires2drivers io current_wires then
 	    let new_insts = inst_fanin_dfs io T 100 (\n.F) current_insts then
@@ -2366,7 +2390,7 @@ let do_retime_fwd p ill =
     has_state block =>
 	eprintf "Selection contains state in retiming operation"
     |
-    let io = buid_io_tbl p' then
+    let io = build_io_tbl p' then
     let name_db = build_name_db p' then
     has_output_fanout io idx =>
 	eprintf "Selection has a fanout to an output pin"
@@ -2446,7 +2470,7 @@ export_to_tcl fl_do_retime_fwd;
 let do_wire2buffer wire p =
     NOT (pexlif_is_hier p) => error "wire2buffer on a leaf instance" |
     let sz = md_size wire in
-    let io = buid_io_tbl p then
+    let io = build_io_tbl p then
     let name_db = build_name_db p then
     val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
     // First fanout to instances
@@ -2608,14 +2632,26 @@ let extract_pexlif p il =
     c
 ;
 
-let IDV_constant_propagate tr_sequence =
-    let db = get_rw_db () then
-    val (TRANSFORM p_name p_sha_spec p_sha_imp p_just) = tr_sequence then
-    let p_imp  = idv_load_pexlif (db_sname db) p_sha_imp then
-    let p_imp' = constant_propagation p_imp then
-    let just = CONSTANT_PROPAGATION then
-    TRANSFORM p_name p_sha_spec (idv_save_pexlif p_imp') (p_just@[just])
+//let IDV_constant_propagate tr_sequence =
+//    let db = get_rw_db () then
+//    val (TRANSFORM p_name p_sha_spec p_sha_imp p_just) = tr_sequence then
+//    let p_imp  = idv_load_pexlif (db_sname db) p_sha_imp then
+//    let p_imp' = constant_propagation p_imp then
+//    let just = CONSTANT_PROPAGATION then
+//    TRANSFORM p_name p_sha_spec (idv_save_pexlif p_imp') (p_just@[just])
+//;
+
+let fl_do_const_prop canvas =
+  (
+    let vfsm = w2vfsm canvas then
+    let p = get_idv_current_pexlif canvas then
+    let p' = constant_propagation p then
+    (add_transform canvas p' CONSTANT_PROPAGATION) fseq
+    let cmd = sprintf "constant_prop vis;" in
+    refresh_idv_canvas canvas cmd
+  ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
 ;
+export_to_tcl fl_do_const_prop;
 
 //let pexlif_remove_dangling p =
 //    letrec clean p =
@@ -2624,7 +2660,7 @@ let IDV_constant_propagate tr_sequence =
 //        val (P_HIER cs) = body in
 //        let cs' = map clean cs then
 //        let p' = PINST name attrs lf fa_inps fa_outs ints (P_HIER cs') then
-//        let io = buid_io_tbl p' then
+//        let io = build_io_tbl p' then
 //        let current_wires = (io2assertions io)@(map fst fa_outs) then
 //        let current_insts = wires2drivers io current_wires then
 //        let new_insts = inst_fanin_dfs io T 1000 (\n.F) current_insts then

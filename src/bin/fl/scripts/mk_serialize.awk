@@ -469,12 +469,12 @@ END	{
 	    printf("/*************************************************/\n\n");
 	    for(tp in woutput) {
 		if( (marked[tp] == 1) && (top_level[tp] != 1) ) {
-		    if( dont_process[tp] == 1 ) { printf("#if 0\n"); }
-		    printf("%s", woutput[tp]);
-		    printf("%s", output1[tp]);
-		    printf("%s", declarations[tp]);
-		    printf("%s", output2[tp]);
-		    if( dont_process[tp] == 1 ) { printf("#endif\n\n"); }
+		    if( dont_process[tp] != 1 ) {
+			printf("%s", woutput[tp]);
+			printf("%s", output1[tp]);
+			printf("%s", declarations[tp]);
+			printf("%s", output2[tp]);
+		    }
 		}
 	    }
 	}

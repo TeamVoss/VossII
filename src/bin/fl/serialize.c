@@ -163,11 +163,31 @@ write_string(FILE *fp, string s)
 {
     ASSERT(s != NULL);
     WR_DBG1("string");
-    fprintf(fp, "%d\n", Save_get_string_idx(s));
+    int res = Save_get_string_idx(s);
+    fprintf(fp, "%d\n", res);
 }
 
 void
 read_string(FILE *fp, string *sp)
+{
+    int idx;
+    RD_DBG1("string");
+    if( fscanf(fp, "%d\n", &idx) != 1 )
+	Rprintf("Corrupted string object");
+    *sp = Load_get_string_from_idx(idx);
+}
+
+void
+write_stringp(FILE *fp, string *sp)
+{
+    ASSERT(*sp != NULL);
+    WR_DBG1("stringp");
+    int res = Save_get_string_idx(*sp);
+    fprintf(fp, "%d\n", res);
+}
+
+void
+read_stringp(FILE *fp, string *sp)
 {
     int idx;
     RD_DBG1("string");

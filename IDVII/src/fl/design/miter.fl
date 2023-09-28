@@ -39,15 +39,22 @@ let mk_miter spec imp =
     // Same inputs and outputs
     // Now rename the outputs
     let spec' =
-	let fa_outs1' = map (\(f,as). f,(map (sprintf "P1_%s") as)) fa_outs1 in
-	(PINST n1 a1 l1 fa_inps1 fa_outs1' ints1 chs1)
+	let fa_outs1' =
+	    map (\(f,as). f,(map (sprintf "P1_%s") (md_merge_vectors as)))
+		fa_outs1
+	in
+	(PINST "spec" a1 l1 fa_inps1 fa_outs1' ints1 chs1)
     in
     let imp'=
-	let fa_outs2' = map (\(f,as). f,(map (sprintf "P2_%s") as)) fa_outs2 in
-	(PINST n2 a2 l2 fa_inps2 fa_outs2' ints2 chs2)
+	let fa_outs2' =
+	    map (\(f,as). f,(map (sprintf "P2_%s") (md_merge_vectors as)))
+		fa_outs2
+	in
+	(PINST "imp" a2 l2 fa_inps2 fa_outs2' ints2 chs2)
     in
-    let spec_outs = map (sprintf "P1_%s") outs1 in
-    let imp_outs  = map (sprintf "P2_%s") outs1 in
+    let ovecs = md_merge_vectors outs1 in
+    let spec_outs = map (sprintf "P1_%s") ovecs in
+    let imp_outs  = map (sprintf "P2_%s") ovecs in
     let rel = vec_zip spec_outs imp_outs in
     let mk_order_ok_pexlif1 v eq_nd =
 	let sz = md_size v then
@@ -68,8 +75,8 @@ let mk_miter spec imp =
 					    (md_expand_vector f_imp)
 					    (md_expand_vector f_ok)
 	then
-	let and_pexlif = 
-	    (W_VAR 1 "ok") <- AND_n (map (W_VAR 1) (md_expand_vector f_ok))
+	let and_pexlif = (W_VAR 1 "ok") <- (W_EQ (W_VAR sz "ok_rel")
+						 (W_CONST sz (2**sz-1)))
 	in
 	PINST "order_ok" [] F fa_inps fa_outs ints
 		(P_HIER (and_pexlif:order_pexlifs))
@@ -82,7 +89,9 @@ let mk_miter spec imp =
     let fa_inps = map (\n. n,[n]) (md_extract_vectors inps1) in
     let fa_outs = [("_OK_", ["_OK_"])] in
     let ints = eq_v:(spec_outs@imp_outs) then
-    let final_and = (W_VAR 1 "_OK_") <- AND_n (map (W_EXPLICIT_VAR 1) eq_nds) in
+    let final_and = (W_VAR 1 "_OK_") <- (W_EQ (W_VAR sz "_ok")
+					      (W_CONST sz (2**sz-1)))
+    in
     let mpexlif =
 	PINST "miter" [] F fa_inps fa_outs ints
 		(P_HIER ([spec', imp', final_and]@check_pexlifs))

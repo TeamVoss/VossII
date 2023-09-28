@@ -3221,11 +3221,11 @@ is_assertion(g_ptr p, string *namep)
     destr_PINST(p, &g_name, &g_attrs, &g_leaf, &g_fa_inps, &g_fa_outs,
 		&g_inter, &g_cont);
     // Make sure there is a single output that has assert__ in its name
-    if( IS_NIL(g_fa_outs) ) return FALSE;
-    if( !IS_NIL(GET_CONS_TL(g_fa_outs)) ) return FALSE;
-    string name = GET_STRING(GET_FST(GET_CONS_HD(g_fa_outs)));
-    if( Get_Vector_Size(name) != 1 ) return FALSE;
-    if( strstr(name, "assert__") == NULL ) return FALSE;
+    if( IS_NIL(g_fa_outs) ) { return FALSE; }
+    if( !IS_NIL(GET_CONS_TL(g_fa_outs)) ) { return FALSE; }
+    string name = GET_STRING(GET_CONS_HD(GET_SND(GET_CONS_HD(g_fa_outs))));
+    if( Get_Vector_Size(name) != 1 ) { return FALSE; }
+    if( strstr(name, "assert__") == NULL ) { return FALSE; }
     *namep = name;
     return TRUE;
 }
