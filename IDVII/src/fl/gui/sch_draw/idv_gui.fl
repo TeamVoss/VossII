@@ -1380,6 +1380,13 @@ let check_eq ckt ant cons assumes asserts trl =
     (ok,cex)
 ;
 
+let make_binary ant =
+    let bcond = itlist (\ft.\r. (fst ft) AND r) ant T then
+    bcond == F => ant |
+    let bsub = param bcond then
+    substitute bsub ant
+;
+
 let BDD_EQ_base p1 p2 =
     val (miter_pexlif, ant) = mk_miter p1 p2 then 
     let cons = [(T,"_OK_",T,0,1)] in
@@ -1394,71 +1401,76 @@ let BDD_EQ_base p1 p2 =
 	val (ok,cex) = check_eq ckt ant cons assumes asserts trl then
 	ok == T => (T,NONE) |
 	let cex_ant = substitute cex ant then
-	(ok, SOME (ckt, asserts, cex_ant))
+	(ok, SOME (ckt, asserts, cex_ant,0))
     |
     //
     // Sequential circuit.
     //
     // Perform reachability analysis for phase delays
     let init_state = map (\n.(T,T)) phdels then
-    let state_sequence = ref [init_state] in
-    let next_state_fns = ref [] in
-    letrec reach idx HLs =
-	(fprintf stdinfo "Sequential BDD_EQ Iteration %d\n" idx) fseq
-	let mk_ant nd (H,L) = ((H = NOT L), nd, H, -1, 0) in
-	let ph_ant = map2 mk_ant phdels HLs then
-	let full_ant = ant @ ph_ant in
+    let state_seqs = ref {[]:: (((bool#bool) list)#((bool#bool) list)) list} in
+    let seen_r = ref init_state in
+    let trl = map (\n. n,0,2) ("_OK_":(assumes@asserts@phdels)) in
+    let move_ant t {ant::(bool#string#bool#int#int) list} =
+        let delay t (w,n,v,_,_) = (w,n,v,t-1,t) in
+        map (delay t) ant
+    in
+    let check full_ant =
         let ste = STE "" ckt [] full_ant [] trl then
-	let newHLs = map (\nd. get_trace_val ste nd 1) phdels then
-	(next_state_fns := (newHLs : (deref next_state_fns))) fseq
-	let HLs' = mk_HLs_unique ((variable "__1") => HLs | newHLs) then
-	(state_sequence := (HLs' : (deref state_sequence))) fseq
-	(HLs' == HLs) => ph_ant | reach (idx+1) HLs'
+        // Check if refinement is still ok
+        let ordering_holds = (get_trace_val ste "_OK_" 0) = (T,F) in
+        let assumes_hold =
+            itlist (\nd.\r. r AND ((get_trace_val ste nd 0) = (T,F))) assumes T
+        in
+        let asserts_hold =
+            itlist (\nd.\r. r AND ((get_trace_val ste nd 0) = (T,F))) asserts T
+        in
+        let ok = NOT assumes_hold OR (asserts_hold AND ordering_holds) then
+	(ok,ste)
     in
-    let ph_ant = reach 1 (map (\n.(T,T)) phdels) then
-    let total_ant = ant @ ph_ant then
-    // First try for every state (including partial X states).
-    val (ok, cex) = check_eq ckt total_ant cons assumes asserts trl then
-    ok == T => (T, NONE) |
-    // Try the same verificataion but assuming binary inputs & state
-    let bcond = itlist (\ft.\r. (fst ft) AND r) ph_ant T then
-    let bsub = param bcond then
-    let total_ant' = substitute bsub total_ant then
-    val (ok, cex) = check_eq ckt total_ant' cons assumes asserts trl then
-    ok == T => (T, NONE) |
-    // Failed. Now build the shortest sequence that shows the failure
-    let cex_state = substitute cex (hd (deref state_sequence)) then
-    letrec find_last_possible cnt (HL:rem) =
-	(HL = cex_state) == F => cnt | find_last_possible (cnt+1) rem
-    /\     find_last_possible cnt _ = cnt
+    letrec reach idx HLs =
+        (fprintf stdinfo "Sequential BDD_EQ Iteration %d\n" idx) fseq
+        let mk_ph_ant nd (H,L) = ((H = NOT L), nd, H, -1, 0) in
+        let ph_ant1 = map2 mk_ph_ant phdels HLs then
+        let full_ant = ant @ ph_ant1 in
+	val (tern_ok,t_ste) = check full_ant in
+	val (bool_ok,b_ste) = check (make_binary full_ant) in
+        (tern_ok == T) OR (bool_ok == T) =>
+	    let newHLs = map (\nd. get_trace_val t_ste nd 1) phdels then
+	    (state_seqs := ((HLs, newHLs):(deref state_seqs))) fseq
+	    let old_seen = deref seen_r then
+	    let new_seen =
+		mk_HLs_unique (variable "__1" => old_seen | newHLs)
+	    then
+	    new_seen == old_seen => (T,NONE) |
+	    (seen_r := new_seen) fseq
+	    reach (idx+1) (mk_HLs_unique newHLs)
+	|
+            // Failure. Create a counter example that only depends
+            // on primary inputs
+            let slices = deref state_seqs then
+            let vs = depends slices then
+            let cex = full_example F vs (NOT bool_ok) then
+            let final = substitute cex HLs then
+            let n = length slices in
+            let final_ant = move_ant (n+1) (substitute cex ant) in
+            letrec mk_cex t ((st,Nst):rem) cur =
+                let cond = (cur = Nst) then
+                let cex = full_example F vs cond then
+                let new_state = substitute cex st then
+                let this_ant = move_ant t (substitute cex ant) then
+                this_ant @ (mk_cex (t-1) rem new_state)
+             /\    mk_cex t [] _ = []
+            in
+            let cex_ant = final_ant@(mk_cex n slices final) then
+            (bool_ok, SOME (ckt, asserts, cex_ant, n))
     in
-    let start = (find_last_possible 0 (deref state_sequence))-1 then
-    let rel_next_funs = butfirstn start (deref next_state_fns) then
-    let rel_states = butfirstn start (deref state_sequence) then
-    let cex_state = substitute cex (hd rel_states) then
-    let avars = depends ant in
-    letrec mk_cex t (nfn:nfns) (st:sts) cur =
-	let cond = (cur = nfn) then
-	let vars = (depends cond) union avars in
-	let cex = full_example F vars cond then
-	let new_state = substitute cex st then
-	let delay (w,n,v,_,_) = (w,n,v,t-1,t) in
-	let ant' = map delay (substitute cex ant) then
-	(ant')@(mk_cex (t-1) nfns sts new_state)
-     /\   mk_cex t [] _ cur = []
-    in
-    let etime = length rel_states in
-    let cex_ant =
-	(substitute cex (map (\(w,n,v,_,_). w,n,v,etime,etime+1) ant)) @
-	mk_cex etime rel_next_funs rel_states cex_state
-    then
-    ok, SOME (ckt, asserts, cex_ant)
+    reach 1 init_state
 ;
-
 
 let BDD_remote_types =
     let tp =
-	"(bool#{fsm#(string list)#((bool#string#bool#int#int) list)} opt)"
+	"(bool#{fsm#(string list)#((bool#string#bool#int#int) list)#int} opt)"
     in
     (sprintf "lettype remote_bdd_req = REMOTE_BDD_REQ {fun:: void->%s};\n" tp)^
     (sprintf "lettype remote_bdd_result = REMOTE_BDD_REPLY {res_cex::%s};\n" tp)
@@ -1467,16 +1479,13 @@ let BDD_remote_types =
 
 let use_separate_process_evaluation_r = ref T;
 
-let dbg_ckt = ref {(error "none"):: fsm};
-let dbg_ant = ref [(F,"",F,0,0)];
-
 slet BDD_EQ_1 p1 p2 order_file =
     NOT (deref use_separate_process_evaluation_r) =>
 	(order_file != "{}" => (_load order_file T) | T) fseq
 	noX => fst (BDD_EQ_base p1 p2) |
 	val (res, opt_cex) = BDD_EQ_base p1 p2 then
 	res == T => res |
-	val (ckt, asserts, cex_ant) = get_value opt_cex then
+	val (ckt, asserts, cex_ant, fail_time) = get_value opt_cex then
 	let cw = make_info_window "CEX" F then
 	let sel = window_choose_alternative cw
 			"Verification failed."
@@ -1488,6 +1497,8 @@ slet BDD_EQ_1 p1 p2 order_file =
 	let tab_1 = draw_fanin vis (0) 100 ("_OK_":asserts) then
 	tab_1 fseq
 	let ste = STE "-e" vis [] cex_ant [] [] then
+	(draw_set_time vis fail_time) fseq
+	(draw_show_values vis tab_1 T) fseq
 	res
     |
     let dir = mktempd "extern_eval" then
@@ -1521,7 +1532,7 @@ slet BDD_EQ_1 p1 p2 order_file =
     NOT (file_exists res_f) => F |
     val (REMOTE_BDD_REPLY (res,opt_cex)) = read_remote_bdd_result res_f then
     res == T OR noX => res |
-    val (ckt, asserts, cex_ant) = get_value opt_cex then
+    val (ckt, asserts, cex_ant, fail_time) = get_value opt_cex then
     let cw = make_info_window "CEX" F then
     let sel = window_choose_alternative cw
 		    "Verification failed."
@@ -1529,12 +1540,12 @@ slet BDD_EQ_1 p1 p2 order_file =
 		    [("Yes", "Yes"), ("No","No")]
     then
     sel = "No" => res |
-(dbg_ckt := ckt) fseq
-(dbg_ant := cex_ant) fseq
     let vis = STE_debug ckt then
     let tab_1 = draw_fanin vis (0) 100 ("_OK_":asserts) then
     tab_1 fseq
     let ste = STE "-e" vis [] cex_ant [] [] then
+    (draw_set_time vis fail_time) fseq
+    (draw_show_values vis tab_1 T) fseq
     res
 ;
 

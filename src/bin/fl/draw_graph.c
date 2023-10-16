@@ -35,6 +35,18 @@ static string	get_version_name(g_ptr node);
 /*                           Main functions                                 */
 /****************************************************************************/
 
+
+static char tmp[1024];
+
+static string
+str_trunc(string s)
+{
+    if( strlen(s) < 100 ) return s;
+    strncpy(tmp, s, 100);
+    tmp[100] = 0;
+    return tmp;
+}
+
 #if TRACK_FREEING
 void
 oldGR(g_ptr onode)
@@ -399,6 +411,10 @@ draw_graph_rec(FILE *fp, hash_record *hp, int depth, bool do_addr,
 					    res, l);
 				return res;
 			    }
+			    case P_FAIL:
+				Sprintf(txt, "P_FAIL \\\"%s\\\"\n)",
+					     str_trunc(GET_FAIL_STRING(node)));
+				break;
 			    default:
 				Sprintf(txt, "%s", Get_pfn_name(node, TRUE));
 				break;

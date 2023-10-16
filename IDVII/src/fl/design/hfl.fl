@@ -2668,8 +2668,15 @@ let ++ a b =
 infix 1 ++;
 
 
+// Extract an element in a list
+let ~ l idx =
+    let len = length l in
+    el (len-idx) l
+;
+infix 9 ~;
+
 // Extract a single bit from a word
-let  ~~ = extract_bit;
+let ~~ = extract_bit;
 infix 9 ~~;
 
 // Extract a range from a word

@@ -1904,6 +1904,9 @@ let random_simulation_vis vis clks resets cnt =
 
 overload random_simulation random_simulation_fsm random_simulation_vis;
 
+let fl_load_waveforms file = (load file) fseq ();
+export_to_tcl fl_load_waveforms;
+
 // ======================================================================
 //  fl API to drawing routine(s)
 // ======================================================================

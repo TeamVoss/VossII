@@ -173,15 +173,17 @@ Fail_pr (const string format, ...)
     va_start(arg, format);
     vsnprintf(fbuf, FBUF_MAX_SZ, format, arg);
     va_end(arg);
+    tstr_ptr tmpstrs = new_temp_str_mgr();
     char        *res;
-    res = strtemp("---  ");
-    res = strappend(fbuf);
-    res = charappend('\n');
+    res = gen_strtemp(tmpstrs, "---  ");
+    res = gen_strappend(tmpstrs, fbuf);
+    res = gen_charappend(tmpstrs, '\n');
     if( RCadd_debug_info && strstr(res, "Stack trace:\n") == 0 ) {
-	strappend(Get_stack_trace(RCmax_stack_trace_entries));
+	gen_strappend(tmpstrs, Get_stack_trace(RCmax_stack_trace_entries));
     }
     strncpy(FailBuf, res, 4096-1);
     FailBuf[4096-1] = 0;
+    free_temp_str_mgr(tmpstrs);
     return FailBuf;
 }
 
@@ -194,18 +196,20 @@ Fail_append(const string format, ...)
     vsnprintf(fbuf, FBUF_MAX_SZ, format, arg);
     va_end(arg);
     string stack_tracep = strstr(FailBuf, "Stack trace:");
+    tstr_ptr tmpstrs = new_temp_str_mgr();
     string res;
     if( stack_tracep != NULL ) {
         *stack_tracep = '\0';
-        res = strtemp(FailBuf);
-        res = strappend(fbuf);
+        res = gen_strtemp(tmpstrs, FailBuf);
+        res = gen_strappend(tmpstrs, fbuf);
         *stack_tracep = 'S';
-        res = strappend(stack_tracep);
+        res = gen_strappend(tmpstrs, stack_tracep);
     } else {
-        res = strtemp(FailBuf);
-        res = strappend(fbuf);
+        res = gen_strtemp(tmpstrs, FailBuf);
+        res = gen_strappend(tmpstrs, fbuf);
     }
     strncpy(FailBuf, res, 4096-1);
+    free_temp_str_mgr(tmpstrs);
     FailBuf[4096-1] = 0;
 }
 

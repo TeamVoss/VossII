@@ -200,7 +200,7 @@ let STE options ckt wl ant cons trl = defix STE options ckt wl ant cons trl;
 //	"checkOK"   the condition under which the consequent is less than or
 //		    equal to the circuit values.
 //	"implies"   (antOK AND trajOK) ==> (consOK AND checkOK)
-//	"strong"    andOK AND trajOK AND consOK and checkOK
+//	"strong"    antOK AND trajOK AND consOK and checkOK
 //
 // If the type is the empty string, strong is assumed.
 //
@@ -216,7 +216,7 @@ let get_ste_result ste type = defix get_ste_result ste type;
 //	"checkOK"   the condition under which the consequent is less than or
 //		    equal to the circuit values.
 //	"implies"   (antOK AND trajOK) ==> (consOK AND checkOK)
-//	"strong"    andOK AND trajOK AND consOK and checkOK
+//	"strong"    antOK AND trajOK AND consOK and checkOK
 //
 // If the type is the empty string, strong is assumed.
 //

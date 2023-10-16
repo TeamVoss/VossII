@@ -32,6 +32,38 @@ proc gui:update_time {root change} {
     set ::vstatus(time,$root) $cur_t
 }
 
+proc wv:load_waveform_vectors {f} {
+    set types {
+        {{VossII Files}      {.fl}        }
+        {{All Files}        *             }
+    }
+    set file [tk_getOpenFile -filetypes $types -defaultextension ".fl" \
+                                 -title "File to load from"]
+    if {$file ne ""} {
+	fl_load_waveforms $file
+    }
+}
+
+proc wv:save_waveform_vectors {f} {
+    set types {
+        {{VossII Files}      {.fl}        }
+        {{All Files}        *             }
+    }
+    set file [tk_getSaveFile -filetypes $types -defaultextension ".fl" \
+                                 -title "File to save to"]
+    if {$file ne ""} {
+        if [catch {open $file w} fp] {
+            report_error "Cannot save commands in file $file."
+            return
+        }
+	puts $fp "let vis = get_current_vis ();"
+	foreach vec $::wv_info(vectors,$f) {
+	    puts $fp "add_waveform vis \[\"$vec\"\];"
+	}
+        close $fp
+    }
+}
+
 proc wv:create_waveform_viewer {w maxtime} {
 
     set f $w.f
@@ -138,8 +170,13 @@ proc wv:create_waveform_viewer {w maxtime} {
 	ttk::panedwindow $pw -orient horizontal 
 	frame $nf -relief flat
 	    canvas $nl -height 30 -background white
-	    $nl create text 20 15 -text "Vector:" -anchor w -justify left \
+	    $nl create text 20 15 -text "Vectors:" -anchor w -justify left \
 				-font $::voss2_txtfont
+	    button $nl.save -text Save -command "wv:save_waveform_vectors $f"
+	    button $nl.load -text Load -command "wv:load_waveform_vectors $f"
+	    $nl create window 100 15 -window $nl.save
+	    $nl create window 150 15 -window $nl.load
+
 	    pack $nl -side top -fill x
 	    scrollbar $sb -orient vertical \
 		    -command "wv:view [list [list $nn $ww]] yview"

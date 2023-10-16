@@ -1043,6 +1043,7 @@ Print_Result(result_ptr res, odests fp, bool print)
 	SET_TYPE(res->expr, LEAF);
 	SET_LEAF_TYPE(res->expr, PRIM_FN);
 	SET_PRIM_FN(res->expr, P_FAIL);
+	SET_FAIL_STRING(res->expr, wastrsave(&strings, FailBuf));
 	FP(err_fp, "Failure:    %s", FailBuf);
 	FailBuf[0] = 0;
 	ok = FALSE;
@@ -1809,14 +1810,14 @@ leaftype2str(int leaftype)
 #if 0
 #define FAIL_GM2(l,r,msg) {						    \
 			res = Make_0inp_Primitive(P_FAIL);		    \
-   SET_FAIL_STRING(res,Fail_pr("Structural mismatch in %s\n(%s)\n", ip->parent_op, (msg)));\
+   SET_FAIL_STRING(res,wastrsave(&strings, Fail_pr("Structural mismatch in %s\n(%s)\n", ip->parent_op, (msg))));\
    GRl(l); GRl(r);							    \
 			return res;					    \
 		      }
 #else
 #define FAIL_GM2(l,r,msg) {						    \
 			res = Make_0inp_Primitive(P_FAIL);		    \
-   SET_FAIL_STRING(res,Fail_pr("Structural mismatch in %s\n", ip->parent_op));\
+   SET_FAIL_STRING(res,wastrsave(&strings, Fail_pr("Structural mismatch in %s\n", ip->parent_op)));\
 			return res;					    \
 		      }
 #endif
@@ -1963,7 +1964,8 @@ gen_map2_rec(gmap_info_ptr ip, g_ptr l, g_ptr r)
 			if( lref_var != rref_var ) {
 			    res = Make_0inp_Primitive(P_FAIL);
 			    SET_FAIL_STRING(res,
-				Fail_pr("Different ref vars in gen_map2"));
+				wastrsave(&strings, 
+				    Fail_pr("Different ref vars in gen_map2")));
 			    return res;
 			}
 			g_ptr ll = Get_RefVar(lref_var);
@@ -4249,7 +4251,7 @@ traverse_left(g_ptr oroot)
 		    /* Force all arguments (note P_STRICT_TUPLE is used!) */
 		    arg1 = force(GET_APPLY_RIGHT(*sp), FALSE);
 		    if( is_fail(arg1) ) {
-			goto fail2;
+			goto arg1_fail2;
 		    }
 		    ASSERT( IS_CONS(arg1) );
 		    arg3 = arg1;
@@ -4258,6 +4260,7 @@ traverse_left(g_ptr oroot)
 			ASSERT( IS_CONS(arg3) );
 			res = GET_CONS_HD(arg3);
 			if( is_fail(res) ) {
+			    strcpy(FailBuf, GET_FAIL_STRING(res));
 			    goto fail2;
 			}
 			arg3 = GET_CONS_TL(arg3);
