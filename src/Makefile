@@ -53,11 +53,13 @@ PLUGIN_DIR := $(LIB_DIR)
 #
 # Flags
 #
+
 ifeq ($(UNAME_S), Darwin)
-    FL_OPTIONS = '-D__STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -Wno-error=clobbered -Wno-error=format-overflow -Wno-error=maybe-uninitialized -Wno-error=builtin-declaration-mismatch'
+	FL_OPTIONS = '-ld_classic -D__STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -Wno-unused-command-line-argument -Wno-unknown-warning-option -Wno-error=clobbered -Wno-error=format-overflow -Wno-error=maybe-uninitialized -Wno-error=builtin-declaration-mismatch -Wno-single-bit-bitfield-constant-conversion'
 else
     FL_OPTIONS = '-D__STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS'
 endif
+
 
 COMPATIBILITY_FLAG = '-std=gnu99'
 

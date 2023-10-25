@@ -179,15 +179,13 @@ proc util:process_is_alive {process_id} {
     }
     if { [llength $rl] != 1 } { return 0 }
     set status [lindex $rl 0]
-    switch $status {
-	R	-
-	S	-
-	SX	-
-	S+  -
-	D	-
-	T	{ return 1; }
-	default { return 0; }
-    }
+   switch -regexp -- $status {
+ 	R	-
+ 	S*	-
+ 	D	-
+ 	T	{ return 1; }
+    default { return 0;}
+ 	}
 }
 
 proc util:watch_process {pid {delay 50} {action "destroy ."} {persistent 0} } {
