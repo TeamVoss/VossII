@@ -25,13 +25,13 @@ INC = -I../../include -I$(MINISAT_DIR)/include $(TCL_INCLUDE) -DROOT_DIR='"$(ROO
 LIB = ../../lib/fl_lib.a $(MINISAT_DIR)/lib/libminisat.a
 
 # All headers that affect fl's plugin ABI.
-ABI_HEADERS = float.h graph.h plugin.h strings.h typecheck.h ../../include/types.h
+ABI_HEADERS = float.h graph.h plugin.h voss_strings.h typecheck.h ../../include/types.h
 
 OBJ = new_bdd.o error.o arb_prec.o file_ops.o initialize.o symbol_tbl.o \
 	y.tab.o lex.yy.o \
 	graph.o fl.o typecheck.o emit.o lp.o cache.o compile.o \
 	expand_cursor.o io.o remote_tcl.o bexpr.o minisat_ifc.o main.o \
-	draw_graph.o debug.o symbol.o strings.o int_ops.o list_ops.o \
+	draw_graph.o debug.o symbol.o voss_strings.o int_ops.o list_ops.o \
 	system.o float.o bv.o bev.o fsm.o sha256.o table.o image.o \
 	plugin.o plugin_loader.o plugin_checker.o plugin_errlog.o \
 	iso.o pexlif.o doc.o serialize.o
@@ -88,7 +88,7 @@ bexpr.o:	    bexpr.h graph.h fl.h
 draw_graph.o:	    draw_graph.h graph.h fl.h
 debug.o:	    debug.h graph.h io.h fl.h
 symbol.o:	    symbol.h graph.h typecheck.h fl.h
-strings.o:	    strings.h graph.h typecheck.h fl.h
+voss_strings.o:	    voss_strings.h graph.h typecheck.h fl.h
 int_ops.o:	    int_ops.h graph.h typecheck.h fl.h
 list_ops.o:	    list_ops.h graph.h typecheck.h fl.h
 system.o:	    system.h graph.h typecheck.h fl.h
@@ -99,14 +99,14 @@ fsm.o:		    fsm.h pexlif.h graph.h typecheck.h fl.h
 doc.o:		    doc.h graph.h typecheck.h fl.h
 sha256.o:	    sha256.h graph.h typecheck.h fl.h
 image.o:	    image.h graph.h typecheck.h fl.h
-plugin.o:	    plugin.h strings.h typecheck.h abi_version.h
-plugin_loader.o:    plugin_loader.h plugin.h strings.h typecheck.h abi_version.h plugin_errlog.h
-plugin_checker.o:   plugin_loader.h plugin.h strings.h typecheck.h abi_version.h plugin_errlog.h
+plugin.o:	    plugin.h voss_strings.h typecheck.h abi_version.h
+plugin_loader.o:    plugin_loader.h plugin.h voss_strings.h typecheck.h abi_version.h plugin_errlog.h
+plugin_checker.o:   plugin_loader.h plugin.h voss_strings.h typecheck.h abi_version.h plugin_errlog.h
 plugin_errlog.o:    plugin_errlog.h
 table.o:	    table.h graph.h typecheck.h fl.h
 iso.o:              iso.h fsm.h pexlif.h graph.h fl.h
-pexlif.o:           pexlif.h graph.h strings.h fl.h
-serialize.o:	    graph.h strings.h fsm.h scripts/template
+pexlif.o:           pexlif.h graph.h voss_strings.h fl.h
+serialize.o:	    graph.h voss_strings.h fsm.h scripts/template
 
 scripts/template:
 	@make -C scripts

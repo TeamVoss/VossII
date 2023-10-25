@@ -8,7 +8,7 @@
 /*		Original author: Carl-Johan Seger, 2019			*/
 /*									*/
 /************************************************************************/
-#include "strings.h"	// Need the vector/node name data structures
+#include "voss_strings.h"	// Need the vector/node name data structures
 #include "fsm.h"
 #include "graph.h"
 #include "pexlif.h"

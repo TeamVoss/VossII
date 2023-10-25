@@ -1,0 +1,65 @@
+let make_bundle_merge_arb name protocol =
+    val (left_signals, right_signals) = (get_bundle_info name) catch 
+	    eprintf "%s is not declared as a bundle" name 
+    then
+    protocol != "ackpulse" =>
+	(fprintf stdinfo
+	  "WARNING: No arbiter or merge operation available for %s protocol"
+	  protocol) fseq F
+    |
+    (cload (DIR^"ack_pulse_arbiter.fl")) fseq
+    (cload (DIR^"ack_pulse_merge.fl")) fseq
+    let rhs =
+	let mk1 (field,tp) =
+	    (sprintf "map2 (\\b.\\sel. (b-->%s) " field)^
+	    (sprintf "<- (SX sel '&' (main-->%s))) " field)^
+	    (sprintf " %s_reqs selected" name)
+	in
+	list2str T "\n\t\t  (" ")@\n\t\t  (" ")@" mk1 right_signals
+    then
+    let lhs = 
+	let mk1 (field, tp) = 
+	    (sprintf "  MUTEX_CASE (main-->%s) " field)^
+	    "(zip selected "^
+	    (sprintf "(map (\\b. b-->%s) %s_reqs))" field name)
+	in
+	list2str T "\n\t\t  " ",\n\t\t  " "" mk1 left_signals
+    then
+    (eval_fl_code <{
+	let `name`_ack_pulse_arbiter =
+	    bit_input           clk reset.
+	    `name`_list_input   `name`_reqs.
+	    `name`_output        main.
+	    //
+	    let sz = length `name`_reqs in
+	    let reqs = map (\\b. b-->req) `name`_reqs in
+	    let acks = map (\\b. b-->ack) `name`_reqs in
+	    bit_list_internal sz    selected.
+	    //
+	    CELL "`name`_ack_pulse_arbiter" (`rhs`
+	      [
+		ack_pulse_arbiter clk reset reqs acks (main-->req) (main-->ack) selected,`lhs`
+	    ]
+	    );
+    }> "functor"
+    ) fseq
+    (eval_fl_code <{
+	let `name`_ack_pulse_merge =
+	    bit_input           clk reset.
+	    `name`_list_input   `name`_reqs.
+	    `name`_output        main.
+	    //
+	    let sz = length `name`_reqs in
+	    let reqs = map (\\b. b-->req) `name`_reqs in
+	    let acks = map (\\b. b-->ack) `name`_reqs in
+	    bit_list_internal sz    selected.
+	    //
+	    CELL "`name`_ack_pulse_merge" (`rhs`
+	    [
+	     ack_pulse_merge clk reset reqs acks (main-->req) (main-->ack) selected, `lhs`
+	    ]
+	    );
+    }> "functor"
+    ) 
+;
+

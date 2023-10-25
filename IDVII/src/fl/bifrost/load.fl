@@ -1,0 +1,10 @@
+cload (DIR^"mk_bundle_arb_merge.fl") fseq 
+fprintf stdinfo ".";
+cload (DIR^"ack_pulse_arbiter.fl") fseq
+fprintf stdinfo ".";
+cload (DIR^"ack_pulse_merge.fl") fseq
+fprintf stdinfo ".";
+cload (DIR^"convert2bundle.fl") fseq
+fprintf stdinfo ".";
+cload (DIR^"bifrost.fl") fseq
+fprintf stdinfo ".";

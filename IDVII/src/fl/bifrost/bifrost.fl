@@ -43,7 +43,11 @@ letrec bifrost_get_dependent_files file =
 // NOTE: The code assumes the #include statements has a fixed string
 // as file to include.
 //
-let bifrost_load pgm =
+let bifrost_load pgm force =
+    NOT (str_is_suffix ".bfst" pgm) =>
+	eprintf "bifrost_load with a non-bifrost program (%s)." pgm
+    |
+    let module = string_butlastn (last (str_split pgm "/")) 5 in
     let fname = file_fullname pgm then
     let res_name = fname^".fl" then
     let orig_time = 
@@ -52,7 +56,7 @@ let bifrost_load pgm =
 	itlist find_max_mod_time files (-1)
     in
     let res_time = file_modified_time res_name then
-    ( (file_exists res_name) AND (res_time >= orig_time) => () |
+    ( NOT force AND (file_exists res_name) AND (res_time >= orig_time) => () |
 	let parts = str_split fname "/" in
 	let ndir = list2str T "" "/" "" id (butlast parts) then
 	let dir = ndir != "" => ndir |
@@ -74,7 +78,11 @@ let bifrost_load pgm =
 		(get_window_result w) fseq
 		eprintf "bifrost failed for program %s." fname
 	|
-	()
+	(_load res_name F) fseq
+	let bundle_info = make_bundle_version module then
+	let fp = fopen res_name "a" then
+	(fprintf fp ";\n%s\n" bundle_info) fseq
+	(fclose fp)
     ) fseq
     _load res_name F
 ;
@@ -530,3 +538,4 @@ let `name` =
 end_abstype `name`;
  
 }> "functor";
+

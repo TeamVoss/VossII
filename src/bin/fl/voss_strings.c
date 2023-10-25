@@ -8,7 +8,7 @@
 /*		Original author: Carl-Johan Seger, 2017                       */
 /*                                                                            */
 /******************************************************************************/
-#include "strings.h"
+#include "voss_strings.h"
 #include "graph.h"
 #include <limits.h>
 #include <stdlib.h>

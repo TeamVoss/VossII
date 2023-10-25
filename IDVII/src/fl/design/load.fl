@@ -32,7 +32,7 @@ fprintf stdinfo ".";
 fprintf stdinfo ".";
 (cload (DIR^"/normalize_pexlif.fl")) fseq
 fprintf stdinfo ".";
-(cload (DIR^"/bifrost.fl")) fseq
+(cload (DIR^"../bifrost/load.fl")) fseq
 fprintf stdinfo ".";
 (is_defined "USE_OBSOLETE" => cload (DIR^"/obsolete.fl") | ()) fseq
 ();

@@ -1806,15 +1806,19 @@ let SX {inp:: *a} =
     {out :: *b}
 ;
 
+let binary_enum_defs = ref {[] :: (string # (string list)) list};
+
 // Binary encoded enum
 let ENUM_binary name name_list =
     name_list = [] => error "ENUM must have at least one element" |
+    mem (name,name_list) (deref binary_enum_defs) => () |
     let sz = bits_needed ((length name_list)-1) in
     let value_list =
 	let mk (i,n) = sprintf "{%d %s}" i n in
 	list2str T "{" "" "}" mk (zip (0 upto (length name_list-1)) name_list)
     in
     NOT (core_TYPE name sz F value_list) => () |
+    (binary_enum_defs := ((name,name_list):(deref binary_enum_defs))) fseq
     letrec add_item cnt (n:ns) =
         let cmd1 =
             sprintf "let %s_%s = hw_%s_constr (W_NAMED_CONST \"%s\" %d %d);"
@@ -1844,8 +1848,11 @@ let ENUM_binary name name_list =
     add_item 0 name_list
 ;
 
+let custom_enum_defs = ref {[] :: (string # ((string#int) list)) list};
+
 let ENUM_custom name name_encoding_list =
     name_encoding_list = [] => error "ENUM must have at least one element" |
+    mem (name,name_encoding_list) (deref custom_enum_defs) => () |
     let max_code = itlist (\(n,ec).\r. max ec r) name_encoding_list 0 then
     let sz = bits_needed max_code in
     let value_list =
@@ -1853,6 +1860,8 @@ let ENUM_custom name name_encoding_list =
 	list2str T "{" "" "}" mk name_encoding_list
     in
     NOT (core_TYPE name sz F value_list) => () |
+    (custom_enum_defs := ((name,name_encoding_list):(deref custom_enum_defs)))
+    fseq
     letrec add_item ((n,cnt):ns) =
         let cmd1 =
             sprintf "let %s_%s = hw_%s_constr (W_NAMED_CONST \"%s\" %d %d);"
@@ -1884,15 +1893,20 @@ let ENUM_custom name name_encoding_list =
 
 overload ENUM ENUM_binary ENUM_custom;
 
+
+let mutex_enum_defs = ref {[] :: (string # (string list)) list};
+
 // Unary encoded enum
 let MUTEX_ENUM name name_list =
     name_list = [] => error "MUTEX_ENUM must have at least one element" |
+    mem (name,name_list) (deref mutex_enum_defs) => () |
     let sz = length name_list in
     let value_list =
 	let mk (i,n) = sprintf "{%d %s}" (2**i) n in
 	list2str T "{" "" "}" mk (zip (0 upto (length name_list-1)) name_list)
     in
     NOT (core_TYPE name sz F value_list) => () |
+    (mutex_enum_defs := ((name,name_list):(deref mutex_enum_defs))) fseq
     letrec add_item cnt (n:ns) =
         let cmd1 =
             sprintf "let %s_%s = hw_%s_constr (W_NAMED_CONST \"%s\" %d %d);"
@@ -2045,11 +2059,27 @@ let STRUCT_implicit name field_list =
 
 overload STRUCT STRUCT_explicit STRUCT_implicit;
 
+let bundle_decls_ref =
+    ref {[]:: (string#((string#string) list)#((string#string) list)) list}
+;
+
+let bundle_exists name =
+    (find_first0 (\p. fst p = name) (deref bundle_decls_ref)) != 0
+;
+
 let BUNDLE name left_signals right_signals =
+    let done = deref bundle_decls_ref then
+    mem (name,left_signals,right_signals) done => T |
     let current = deref hw_types_decl_ref in
     mem name (map fst current) =>
 	(fprintf stderr "A hw type called %s is already defined\n" name)
 	fseq F
+    |
+    let all_sigs = left_signals@right_signals in
+    let idx = find_first0 (\(_,t). NOT (is_hw_type t)) all_sigs then
+    idx != 0 =>
+	val (field,tp) = el idx all_sigs in
+	eprintf "Type '%s' for field '%s' not declared" tp field
     |
     let new = (name,0):current in
     (hw_types_decl_ref := new) fseq
@@ -2062,6 +2092,7 @@ let BUNDLE name left_signals right_signals =
     then
     let slefts = list2str T "[" "," "]" pr left_signals then
     let srights = list2str T "[" "," "]" pr right_signals then
+    //
     (eval_fl_code
     <{
 	lettype `name` = BUNDLE_`name` wexpr;
@@ -3594,6 +3625,15 @@ let XOR_n l =
     l = [] => error "XOR_n for empty list" |
     accumulate (defix '^') l
 ;
+
+let MUTEX_CASE =
+    output      {out:: *a}.
+    list_input  {conds:: (bit# *a) list}.
+    list_internal (length conds)    tmp.
+    CELL "MUTEX_CASE" (
+        (map2 (\o.\(c,v). o <- SX c '&' v) tmp conds)@
+        [out <- OR_n tmp]
+);
 
 
 // User contribution: flip-flops that wish they were latches.

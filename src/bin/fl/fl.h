@@ -186,7 +186,7 @@ typedef struct impl_arg_rec	*impl_arg_ptr;
 #include	"minisat_ifc.h"
 #include	"draw_graph.h"
 #include	"debug.h"
-#include	"strings.h"
+#include	"voss_strings.h"
 #include	"system.h"
 #include	"int_ops.h"
 #include	"list_ops.h"

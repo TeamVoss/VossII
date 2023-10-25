@@ -8,7 +8,7 @@
 *     Original author: Carl-Johan Seger 2017                        *
 *                                                                   *
 *********************************************************************/
-/* strings.h -- header for strings.c */
+/* voss_strings.h -- header for voss_strings.c */
 #ifdef EXPORT_FORWARD_DECL
 /* --- Forward declarations that need to be exported to earlier .h files --- */
 typedef struct range_rec      *range_ptr;
@@ -63,8 +63,8 @@ void           DBG_print_sname_list(sname_list_ptr slp);
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */
-#ifndef STRING_H
-#define STRING_H
+#ifndef VOSS_STRING_H
+#define VOSS_STRING_H
 #include "fl.h"	/* Global data types and include files 		     */
 
 typedef enum {TXT, INDEX} vec_type;
@@ -158,5 +158,5 @@ typedef struct vector_db_rec	{
     }                                                                          \
     fprintf(stderr, "\n");
 
-#endif /* STRING_H */
+#endif /* VOSS_STRING_H */
 #endif /* EXPORT_FORWARD_DECL */
