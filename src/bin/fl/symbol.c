@@ -2264,8 +2264,9 @@ static bool
 built_in(string filename)
 {
     int len = strlen(filename);
+    if (strcmp(filename, "builtin") == 0) { return TRUE; }
     if( len < builtins_len ) { return FALSE; }
-    return( strcmp(filename + (len-builtins_len), "builtins.fl") == 0 );
+    return (strcmp(filename + (len-builtins_len), "builtins.fl") == 0);
 }
 
 static g_ptr
