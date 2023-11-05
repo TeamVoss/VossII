@@ -1,0 +1,94 @@
+load "ste.fl";
+
+fprintf stderr "1111111111111111111111111111111111111111\n";
+
+TYPE "addr" 16;
+TYPE "byte" 8;
+
+BUNDLE "mem_read"
+	[("req","bit"), ("addr", "addr")]
+	[("ack","bit"), ("dout", "byte")]
+;
+
+let tst =
+    bit_input clk reset.
+    mem_read_input mem_read.	
+    CELL "tst" [
+	
+
+
+
+	STATE clk res [
+	    (reset, '0),
+	    ('1, a '+' res)
+	]
+];
+
+rvariable "a";
+let tst2
+    clk->('clk)
+    reset->('reset)
+    a->('a)
+    res->('res)
+    =
+    tst clk reset a res
+;
+
+
+let flip f a b = f b a;
+
+let pam = flip map;
+
+
+rvariable "a";
+let g x->1 y->2 = 10*x+y;
+g;
+g 2 3;
+
+rvariable "a";
+let f x->2 y->2 = (x,y);
+
+
+f 2 3;
+f y->99;
+f;
+
+let f1 x b = (x,b);
+
+f1 1 2;
+
+let f2 x->1 y->2 = x+y+y;
+
+22222;
+rvariable "a";
+f2;
+3333;
+
+f2 3 4;
+
+f2 x->4 y->5;
+
+f2 y->9 x->3;
+
+//rvariable "a";
+f2 x->998;
+
+f2 y->99;
+
+f2;
+
+//rvariable "a";
+f2 x->33;
+
+f2 y->2.3 x->1.0;
+
+
+let oink a b assuming (a > b) = 1
+ /\ oink a b = 22;
+
+
+fprintf stderr "4444444444444444444444444444444444444444\n";
+let g i inc->1 = i+inc;
+
+
+//f x->2 y->4;

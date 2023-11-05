@@ -3760,7 +3760,7 @@ let pcompile fn =
 	) fseq ()
     |
     // Now re-define the function to load/store a compiled version
-    let mk_top_arg (nm,tp) = sprintf "{%s :: %s}" nm tp in
+    let mk_top_arg (nm,tp) = sprintf "{(%s->('%s)) :: %s}" nm nm tp in
     let top = list2str T (sprintf "let %s " fn) " " " =\n" mk_top_arg args in
     let mid1 =
       (sprintf "\tlet sig = get_symbol_signature \"%s\" in\n" fn)^
@@ -3809,7 +3809,6 @@ let pcompile fn =
 ;
 free_binder pcompile;
 
-
 let _pExLiF_ = ref {(error "No pexlif") :: pexlif};
 
 let flfun2pexlif_core fn =
@@ -3832,6 +3831,31 @@ let flfun2pexlif_core fn =
 
 let flfun2pexlif fn = flfun2pexlif_core fn;
 free_binder flfun2pexlif;
+
+let create_default_version fn =
+    let rtype = get_return_type fn then
+    rtype != "pexlif" =>
+	(fprintf stderr
+	 "Return type not pexlif (%s). create_default_version aborted\n" rtype)
+	fseq ()
+    |
+    let args = get_args fn then
+    let idx = find_first0 (\(a,tp). NOT (is_hw_type tp)) args in
+    idx != 0 =>
+	val (arg,tp) = el idx args in
+	(fprintf stderr
+	 "Arg. %s not a simple hw_type(%s). create_default_version aborted\n"
+	  arg tp
+	) fseq ()
+    |
+    // Now re-define the function with defaults
+    let mk_top_arg (nm,tp) = sprintf "{(%s->('%s)) :: %s}" nm nm tp in
+    let def = list2str T (sprintf "let %s " fn) " " " =\n" mk_top_arg args in
+    let body = list2str T (sprintf "%s " fn) " " ";\n" fst args in
+    let cmd = sprintf "%s%s\n" def body in
+    (eval_fl_code [cmd]) fseq ()
+;
+free_binder create_default_version;
 
 let ASSERT {name::string} {expr::bit} =
     let oa = ord "a" in

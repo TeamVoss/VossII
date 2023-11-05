@@ -58,6 +58,8 @@ g_ptr	     traverse_left(g_ptr oroot);
 g_ptr	     reduce(g_ptr root, bool first);
 g_ptr        force(g_ptr node, bool first);
 VOID         G_Init();
+g_ptr	     Make_Named_Arg(string name, g_ptr expr);
+bool	     Destr_Named_Arg(g_ptr node, string *namep, g_ptr *exprp);
 string	     Mk_constructor_name(string constr_name);
 g_ptr	     Make_Failure(string msg);
 g_ptr        Make_TYPE(string name, int arg_cnt);
@@ -362,6 +364,10 @@ typedef struct g_rec {
 				 IS_PRIM_FN(np) &&			    \
 				 GET_PRIM_FN(np) == P_DEBUG)
 
+#define IS_NAMED_ARG(np)	(IS_LEAF(np) &&				    \
+				 IS_PRIM_FN(np) &&			    \
+				 GET_PRIM_FN(np) == P_NAMED_ARG)
+
 #define IS_MK_REF_VAR(np)	(IS_LEAF(np) &&				    \
 				 IS_PRIM_FN(np) &&			    \
 				 GET_PRIM_FN(np) == P_MK_REF_VAR)
@@ -529,6 +535,7 @@ typedef struct g_rec {
 #define P_UNQUOTE	    126
 #define P_LOAD_PLUGIN	    127
 #define P_STRICT_ARGS	    128
+#define P_NAMED_ARG	    129
 
 #define P_VOID          1022
 

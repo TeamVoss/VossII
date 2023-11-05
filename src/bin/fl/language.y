@@ -328,21 +328,21 @@ extern int dbg_tst_line_cnt;
 %token <str_t>	INFIX_VAR_UNARY_9
 %token <str_t>	THEN_COND_VAR ELSE_COND_VAR
 
-%type  <decl_list>	type_decl new_type_decl type_expr type
-%type  <overloads_t>	overload_list
-%type  <expr_t>		top_expr expr expr05 expr1 expr2 expr_list arg_expr
-%type  <cl_t>		rev_expr_list
-%type  <decl_t>		decl fn_defs fn_def lhs_expr_list
-%type  <str_t>		var_or_infix
-%type  <type_name_t>	type_name
-%type  <tpLptr_t>	type_list
-%type  <tpLptr_t>	targ_list
-%type  <type_t>		simple_type type_literal
-%type  <varlp_t>	var_list
-%type  <varl_itemp_t>	var_list_item
-%type  <opt_typed_var_t> opt_typed_var;
-%type  <tvar_list_t>	tvarlist;
-%type  <let_t>			let_top;
+%type  <decl_list>	    type_decl new_type_decl type_expr type
+%type  <overloads_t>	    overload_list
+%type  <expr_t>		    top_expr expr expr05 expr1 expr2 expr_list arg_expr
+%type  <cl_t>		    rev_expr_list
+%type  <decl_t>		    decl fn_defs fn_def lhs_expr_list
+%type  <str_t>		    var_or_infix
+%type  <type_name_t>	    type_name
+%type  <tpLptr_t>	    type_list
+%type  <tpLptr_t>	    targ_list
+%type  <type_t>		    simple_type type_literal
+%type  <varlp_t>	    var_list
+%type  <varl_itemp_t>	    var_list_item
+%type  <opt_typed_var_t>    opt_typed_var;
+%type  <tvar_list_t>	    tvarlist;
+%type  <let_t>		    let_top;
 
 %right	CROSSPROD
 %right	FN_TYPE
@@ -445,9 +445,8 @@ stmt		: expr
 		| decl
 		{
 		    if( $1.ok ) {
-			result_ptr res;
 			arg_names_ptr ap = Get_argument_names($1.expr);
-			res = Compile(symb_tbl, $1.expr, NULL, TRUE);
+			result_ptr res = Compile(symb_tbl, $1.expr, NULL, TRUE);
 			if( res != NULL ) {
 			    symb_tbl = New_fn_def($1.var, res, symb_tbl,
 						 !file_load,$1.file,$1.line,ap);
@@ -1601,6 +1600,10 @@ expr2		: VART
 		{
 		    $$ = Make_VAR_leaf($1);
 		}
+		| VART FN_TYPE expr1
+		{
+		    $$ = Make_Named_Arg($1, $3);
+		}
                 | PRINTFT STRINGT
                 { 
 		    $$ = Make_Printf_Primitive(P_PRINTF, $2);
@@ -1686,12 +1689,54 @@ expr2		: VART
 		}
 		;
 
-let_top :	     LET   {$$.file = $1.file; $$.line = $1.line; $$.recursive = FALSE; $$.strict = FALSE; $$.cached = FALSE;}
-		| LETREC   {$$.file = $1.file; $$.line = $1.line; $$.recursive = TRUE ; $$.strict = FALSE; $$.cached = FALSE;}
-		| S_LET    {$$.file = $1.file; $$.line = $1.line; $$.recursive = FALSE; $$.strict = TRUE ; $$.cached = FALSE;}
-		| S_LETREC {$$.file = $1.file; $$.line = $1.line; $$.recursive = TRUE ; $$.strict = TRUE ; $$.cached = FALSE;}
-		| C_LET    {$$.file = $1.file; $$.line = $1.line; $$.recursive = FALSE; $$.strict = FALSE; $$.cached = TRUE ;}
-		| C_LETREC {$$.file = $1.file; $$.line = $1.line; $$.recursive = TRUE ; $$.strict = FALSE; $$.cached = TRUE ;}
+let_top :	LET  
+		{
+		    $$.file = $1.file;
+		    $$.line = $1.line;
+		    $$.recursive = FALSE;
+		    $$.strict = FALSE;
+		    $$.cached = FALSE;
+		}
+		| LETREC
+		{
+		    $$.file = $1.file;
+		    $$.line = $1.line;
+		    $$.recursive = TRUE ;
+		    $$.strict = FALSE;
+		    $$.cached = FALSE;
+		}
+		| S_LET    
+		{
+		    $$.file = $1.file;
+		    $$.line = $1.line;
+		    $$.recursive = FALSE;
+		    $$.strict = TRUE ;
+		    $$.cached = FALSE;
+		}
+		| S_LETREC 
+		{
+		    $$.file = $1.file;
+		    $$.line = $1.line;
+		    $$.recursive = TRUE ;
+		    $$.strict = TRUE ;
+		    $$.cached = FALSE;
+		}
+		| C_LET    
+		{
+		    $$.file = $1.file;
+		    $$.line = $1.line;
+		    $$.recursive = FALSE;
+		    $$.strict = FALSE;
+		    $$.cached = TRUE ;
+		}
+		| C_LETREC 
+		{
+		    $$.file = $1.file;
+		    $$.line = $1.line;
+		    $$.recursive = TRUE ;
+		    $$.strict = FALSE;
+		    $$.cached = TRUE ;
+		}
 		;
 %%
 

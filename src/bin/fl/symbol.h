@@ -14,6 +14,7 @@
 /* --- Forward declarations that need to be exported to earlier .h files --- */
 typedef struct oll_rec		*oll_ptr;
 typedef struct arg_names_rec	*arg_names_ptr;
+typedef struct name_expr_rec	*name_expr_ptr;
 
 /* -------- Function prototypes for exported functions -------- */
 void		Init_symbol();
@@ -89,6 +90,7 @@ string		Get_userdef_name(g_ptr node);
 
 typedef struct arg_names_rec {
     string	    name;
+    g_ptr	    default_value;
     arg_names_ptr   next;
 } arg_names_rec;
 
@@ -123,11 +125,24 @@ typedef struct fn_rec {
         typeExp_ptr	    type;
         oll_ptr		    overload_list;
 	impl_arg_ptr	    implicit_args;
+	bool		    has_default_values;
 	arg_names_ptr	    arg_names;
         string		    signature;
         fn_ptr		    next;
 } fn_rec;
 
+typedef struct name_expr_rec {
+	string		var;
+	g_ptr		expr;
+} name_expr_rec;
+
+typedef struct arg_info_rec *arg_info_ptr;
+
+typedef struct arg_info_rec {
+	g_ptr	    spine;
+	string	    arg_name;
+	g_ptr	    arg_expr;
+} arg_info_rec;
 
 #endif /* SYMBOL_H */
 #endif /* EXPORT_FORWARD_DECL */

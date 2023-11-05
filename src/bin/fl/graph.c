@@ -250,6 +250,7 @@ static struct prim_fun_name_rec {
 		    {P_UNTYPE, "P_UNTYPE", ""},
 		    {P_UNQUOTE, "P_UNQUOTE", ""},
 		    {P_VOID, "P_VOID", ""},
+		    {P_NAMED_ARG, "P_NAMED_ARG", ""},
 		    // Empty
 };
 static char pfn2str_buf[512];
@@ -868,6 +869,39 @@ Make_PAIR_ND(g_ptr fst, g_ptr snd)
     SET_CONS_HD(root, fst);
     SET_CONS_TL(root, snd);
     return( root );
+}
+
+g_ptr
+Make_Named_Arg(string name, g_ptr expr)
+{
+    string pname = wastrsave(&strings, name);
+    return( Make_PAIR_ND(Make_0inp_Primitive(P_NAMED_ARG),
+			 Make_PAIR_ND(Make_STRING_leaf(pname), expr)) );
+}
+
+bool
+Destr_Named_Arg(g_ptr node, string *namep, g_ptr *exprp)
+{
+    if( node == NULL )
+	return FALSE;
+    if( !IS_CONS(node) )
+	return FALSE;
+    g_ptr lhs = GET_CONS_HD(node);
+    if( lhs == NULL )
+	return FALSE;
+    if(!IS_LEAF(lhs) || !IS_PRIM_FN(lhs) || (GET_PRIM_FN(lhs) != P_NAMED_ARG ))
+	return FALSE;
+    g_ptr rhs = GET_CONS_TL(node);
+    if( rhs == NULL )
+	return FALSE;
+    if( !IS_CONS(rhs) )
+	return FALSE;
+    g_ptr name = GET_CONS_HD(rhs);
+    if( name == NULL || !IS_LEAF(name) || !IS_STRING(name) )
+	return FALSE;
+    *namep = GET_STRING(name);
+    *exprp = GET_CONS_TL(rhs);
+    return TRUE;
 }
 
 string
@@ -2352,7 +2386,7 @@ Get_Vars(buffer *bp, g_ptr node)
 	    push_buf(bp, &name);
 	    return;
 	default:
-	   Rprintf("Illegal pattern in function definition\n");
+	   Rprintf("Illegal pattern in function definition(1)\n");
     }
     DIE("Should never occur!");
 }
@@ -4551,6 +4585,29 @@ traverse_left(g_ptr oroot)
                     MAKE_REDEX_STRING(redex, wastrsave(&strings, s));
                     goto finish1;
 
+		case P_NAMED_ARG:
+
+                    /*                                          */
+                    /*           @       ==>      x             */
+                    /*          / \                             */
+                    /*         @   z                            */
+                    /*        / \                               */
+                    /*       @   y                              */
+                    /*      / \                                 */
+                    /*    PNA   x                               */
+                    /*                                          */
+
+		    /* Evalate before updating (P_NAMED_ARG is projection fn) */
+		    if( depth < 3 )
+			goto clean_up;
+		    redex = *(sp+1);
+		    arg1  = GET_APPLY_RIGHT(*sp);
+		    arg2  = GET_APPLY_RIGHT(*(sp+1));
+		    arg3  = GET_APPLY_RIGHT(*(sp+2));
+		    arg1 = traverse_left(arg1);
+		    OVERWRITE(redex, arg1);
+		    goto finish3;
+
 		default:
 		    DIE("Illegal primitive function");
 	    }
@@ -5449,7 +5506,7 @@ trarg(g_ptr node, g_ptr E, bool constructor)
 		    }
 		    return(ret);
 		case PRIM_FN:
-		    Rprintf("Illegal pattern in function definition\n");
+		    Rprintf("Illegal pattern in function definition(2)\n");
 		    break;
 		case USERDEF:
 		    DIE("USERDEFs should not exists before typechecking!");
@@ -5458,8 +5515,15 @@ trarg(g_ptr node, g_ptr E, bool constructor)
 	    }
 	    break;
 	case CONS_ND:
+	    if( Destr_Named_Arg(node, &new, &l1) ) {
+		INC_REFCNT(l1);
+		E = Make_3inp_Primitive(P_NAMED_ARG, E, Make_VAR_leaf(new),l1);
+		ret = Make_Lambda(new, E);
+		MoveTypeHint(node, ret, TRUE);
+		return( ret );
+	    }
 	    if( GET_CONS_HD(node) != NULL || GET_CONS_TL(node) != NULL )
-		Rprintf("Illegal pattern in function definition\n");
+		Rprintf("Illegal pattern in function definition(3)\n");
 	    /* NIL */
 	    /* \x. (empty x) => E | PFAIL */
 	    new = Find_new_free_var(E);
@@ -5668,7 +5732,7 @@ trarg(g_ptr node, g_ptr E, bool constructor)
 	    return( ret );
 	    break;
 	default:
-	   Rprintf("Illegal pattern in function definition\n");
+	   Rprintf("Illegal pattern in function definition(4)\n");
     }
     DIE("Should never occur!"); return NULL; // Dummy
 }
@@ -5677,13 +5741,13 @@ static string
 make_Destructor(g_ptr np)
 {
     if( GET_TYPE(np) != LEAF || GET_LEAF_TYPE(np) != VAR)
-	Rprintf("Illegal pattern in function definition");
+	Rprintf("Illegal pattern in function definition(5)");
     string ret = strtemp("__DeStRuCtOr");
     ret = strappend(GET_VAR(np));
     ret = wastrsave(&strings, ret);
     if( Find_Function(symb_tbl, np) == NULL ) {
 	Rprintf(
-       "Illegal pattern in function definition. %s is not a type constructor\n",
+       "Illegal pattern in function definition(6). %s is not a type constructor\n",
 	GET_VAR(np));
     }
     return(ret);

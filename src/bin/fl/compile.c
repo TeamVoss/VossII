@@ -64,6 +64,20 @@ Optimise(g_ptr node)
 /************************************************************************/
 
 static g_ptr
+rm_P_NAMED_ARG(g_ptr node)
+{
+    if( !IS_APPLY(node) ) return node;
+    g_ptr l = GET_APPLY_LEFT(node);
+    if( !IS_APPLY(l) ) return node;
+    g_ptr ll = GET_APPLY_LEFT(l);
+    if( !IS_APPLY(ll) ) return node;
+    g_ptr lll = GET_APPLY_LEFT(ll); 
+    if( !IS_NAMED_ARG(lll) ) return node;
+    return( GET_APPLY_RIGHT(ll) );
+}
+
+
+static g_ptr
 mk_uniq_names(g_ptr node)
 {
     g_ptr	E, F, res;
@@ -86,9 +100,10 @@ mk_uniq_names(g_ptr node)
 	    var2 = wastrsave(&strings, buf);
 	    var = GET_LAMBDA_VAR(node);
 	    line = GET_LAMBDA_LINE_NBR(node);
+	    g_ptr body = rm_P_NAMED_ARG(GET_LAMBDA_BODY(node));
 	    /* Name capture so rename lambda variable */
 	    res = Make_Lambda(var2, substitute(var, Make_VAR_leaf(var2),
-					mk_uniq_names(GET_LAMBDA_BODY(node))));
+					mk_uniq_names(body)));
 	    SET_LAMBDA_LINE_NBR(res, line);
 	    MoveTypeHint(node, res, FALSE);
 	    return res;

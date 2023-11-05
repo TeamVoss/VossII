@@ -1917,6 +1917,14 @@ get_prim_fun_type(g_ptr node)
 	    tVar1 = new_tVar();
 	    type = (make_arrow(tVar0, tVar1));
 	    break;
+	case P_NAMED_ARG:
+	    tVar0 = new_tVar();
+	    tVar1 = new_tVar();
+	    type = (make_arrow(tVar0,
+			       make_arrow(tVar1,
+					  make_arrow(tVar1, tVar0))));
+	    break;
+
 	default:
 	    fprintf(stderr, "Unexpected primitive function (%d)\n", pfn);
 	    DIE("Unexpected primitive function (%d)", pfn);

@@ -112,8 +112,10 @@ let make_bundle_version fn =
     let body =
 	list2str T (sprintf "\t%s " fn) "\n\t\t" "\n];\n" id (deref call_args)
     then
+    let pcomp = sprintf "pcompile %s;\n" fn in
     let bundles = list2str T "\n" "\n" "\n" id (deref bundle_defs) in
-    sprintf "%s%s%s" bundles decl body
+    let final = sprintf "create_default_version bundle_%s;\n" fn in
+    sprintf "%s%s%s%s%s" pcomp bundles decl body final
 ;
 
 end_abstype make_bundle_version;

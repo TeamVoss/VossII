@@ -3,4 +3,6 @@ break exit
 break abort
 break Dbg_stop
 break Rand_Var
-r -noX -f bugs/b247.fl
+r -noX -f bugs/b248.fl
+break top_add_non_lazy_context
+c
