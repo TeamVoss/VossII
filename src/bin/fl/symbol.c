@@ -1946,22 +1946,6 @@ Get_argument_names(g_ptr onode)
     return res;
 }
 
-arg_names_ptr
-qGet_argument_names(g_ptr node)
-{
-    arg_names_ptr res = qGet_argument_names(node);
-    arg_names_ptr anp = res;
-    fprintf(stderr, "Get_argument_names for "); PR(node);
-    fprintf(stderr, " yielded: ");
-    while(anp != NULL ) {
-	fprintf(stderr, "\n\t%s(%s defaults)", anp->name, (anp->default_value == NULL)? "without" : "with");
-	anp = anp->next;
-    }
-    fprintf(stderr, "\n");
-    return res;
-}
-
-
 
 /************************************************************************/
 /*                      Local Functions                                 */
@@ -2072,6 +2056,8 @@ report_error_loc(g_ptr node, string type)
 
 /* Add dummy dependencies on the lambda bound vars for non_lazy function    */
 /* When a contiguous sequence of lambdas occurs, only use the last variable */ 
+/* Also handle named arguments and default values			    */
+/* %%%%%%%%%%%%%%%%%%%%%%%%% */
 static g_ptr
 add_non_lazy_context_rec(buffer *ctxt, symbol_tbl_ptr stbl, g_ptr node)
 {
@@ -2205,7 +2191,7 @@ add_non_lazy_context_rec(buffer *ctxt, symbol_tbl_ptr stbl, g_ptr node)
 		    break;
 		}
 	    }
-	    if( all_done ) {
+	    if( all_done && !has_named_arg & !fp->has_default_values ) {
 		free_buf(&arg_info_buf);
 		dispose_hash(&named_arg_tbl, NULLFCN);
 		return( node );
