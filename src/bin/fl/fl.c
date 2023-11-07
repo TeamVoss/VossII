@@ -33,6 +33,7 @@ bool	    use_stdin = FALSE;
 bool	    use_stdout = FALSE;
 bool        Interrupt_asap = FALSE;
 bool	    cephalopode_mode = FALSE;
+bool	    debug_tcl = FALSE;
 bool	    profiling_active = FALSE;
 bool	    profiling_builtins = FALSE;
 #if DBG_TRACE_AND_SAVE
@@ -287,6 +288,12 @@ fl_main(int argc, char *argv[])
 	    (strcmp(argv[1], "--unbuf_stdout") == 0) )
 	{
             unbuf_stdout = TRUE;
+            argc--, argv++;
+        } else
+        if( (strcmp(argv[1], "-debug_tcl") == 0) ||
+	    (strcmp(argv[1], "--debug_tcl") == 0) )
+	{
+            debug_tcl = TRUE;
             argc--, argv++;
         } else
         if( (strcmp(argv[1], "-use_stdout") == 0) ||
@@ -904,13 +911,15 @@ setup_sockets()
 
     pid_t fl_pid = getpid();
 
+	string front_end_tcl = debug_tcl ? "front_end_debug.tcl" : "front_end.tcl";
+
     if( use_window != NULL ) {
-	Sprintf(buf, "wish %s/front_end.tcl %d %d %d %s %s -use %s &",
-		     binary_location, fl_pid, addr, port, Voss_tmp_dir,
+	Sprintf(buf, "wish %s/%s %d %d %d %s %s -use %s &",
+		     binary_location, front_end_tcl, fl_pid, addr, port, Voss_tmp_dir,
 		     scaling_factor, use_window);
     } else {
-	Sprintf(buf, "wish %s/front_end.tcl %d %d %d %s %s &",
-		     binary_location, fl_pid, addr, port, Voss_tmp_dir,
+	Sprintf(buf, "wish %s/%s %d %d %d %s %s &",
+		     binary_location, front_end_tcl, fl_pid, addr, port, Voss_tmp_dir,
 		     scaling_factor);
     }
     if( system(buf) != 0 ) {
@@ -1238,6 +1247,7 @@ print_help()
  P("    -hide-window		    hide the main window while still preserving X functionality\n");
  P("    -noX			    do not use X windows (text only)\n");
  P("    --noX			    do not use X windows (text only)\n");
+ P("    -debug_tcl			use tcl_pro_debug to debug tcl functions. Need to set FL_PRODEBUG_AUTOPATH\n");
  P("    -use_stdin		    read inputs also from stdin\n");
  P("    -use_stdout		    write outputs also to stdout\n");
  P("    --hide-window		    hide the main window while still preserving X functionality\n");
