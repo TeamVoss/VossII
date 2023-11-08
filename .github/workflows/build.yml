@@ -16,7 +16,6 @@ jobs:
           - { id: ubuntu-20.04, name: focal }
         compiler:
           - 'gcc-11'
-          - 'clang-12'
           - 'clang-15'
         yosys:
           - 'yosys-0.26'
