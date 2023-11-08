@@ -1108,6 +1108,30 @@ TrArg(g_ptr node, g_ptr E, bool constructor)
 }
 
 
+g_ptr
+Copy_Graph(g_ptr node)
+{
+    g_ptr res;
+    if( node == NULL ) { return NULL; }
+    switch( GET_TYPE(node) ) {
+	case APPLY_ND:
+	    return( Make_APPL_ND(Copy_Graph(GET_APPLY_LEFT(node)),
+				 Copy_Graph(GET_APPLY_RIGHT(node))) );
+	case LAMBDA_ND:
+	    return( Make_Lambda(GET_LAMBDA_VAR(node),
+				Copy_Graph(GET_LAMBDA_BODY(node))) );
+	case CONS_ND:
+	    return( Make_CONS_ND(Copy_Graph(GET_CONS_HD(node)),
+				 Copy_Graph(GET_CONS_TL(node))) );
+	case LEAF:
+	    res = Get_node();
+	    *res = *node;
+	    return( res );
+	default:
+	    DIE("Illegal node type");
+    }
+}
+
 VOID
 Print_Expr(g_ptr node, odests fp)
 {
@@ -4600,7 +4624,7 @@ traverse_left(g_ptr oroot)
 		    /* Evalate before updating (P_NAMED_ARG is projection fn) */
 		    if( depth < 3 )
 			goto clean_up;
-		    redex = *(sp+1);
+		    redex = *(sp+2);
 		    arg1  = GET_APPLY_RIGHT(*sp);
 		    arg2  = GET_APPLY_RIGHT(*(sp+1));
 		    arg3  = GET_APPLY_RIGHT(*(sp+2));

@@ -1,38 +1,15 @@
-load "ste.fl";
-
 fprintf stderr "1111111111111111111111111111111111111111\n";
 
-TYPE "addr" 16;
-TYPE "byte" 8;
+let i1 = 1;
+let f1 = 1.0;
+overload one i1 f1;
 
-BUNDLE "mem_read"
-	[("req","bit"), ("addr", "addr")]
-	[("ack","bit"), ("dout", "byte")]
-;
+let inc x amt->one = x+amt;
 
-let tst =
-    bit_input clk reset.
-    mem_read_input mem_read.	
-    CELL "tst" [
-	
+inc 1;
 
+inc 1.4;
 
-
-	STATE clk res [
-	    (reset, '0),
-	    ('1, a '+' res)
-	]
-];
-
-rvariable "a";
-let tst2
-    clk->('clk)
-    reset->('reset)
-    a->('a)
-    res->('res)
-    =
-    tst clk reset a res
-;
 
 
 let flip f a b = f b a;

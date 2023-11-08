@@ -38,7 +38,7 @@ typedef struct fn_rec           *fn_ptr;
 typedef struct symb_tbl_rec     *symbol_tbl_ptr;
 
 /* -------- Function prototypes for exported functions -------- */
-
+g_ptr	     Copy_Graph(g_ptr node);
 bool	     G_check_for_errors(g_ptr np, int cnt);
 g_ptr	     Get_node();
 void	     SET_INT(g_ptr np, int i);

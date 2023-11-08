@@ -1938,7 +1938,7 @@ Get_argument_names(g_ptr onode)
     FUB_ROF(&args, name_expr_rec, nep) {
         arg_names_ptr t = (arg_names_ptr) new_rec(&arg_names_rec_mgr);
         t->name = nep->var;
-	t->default_value = nep->expr;
+	t->default_value = Copy_Graph(nep->expr);
         t->next = res;
         res = t;
     }
@@ -2200,7 +2200,7 @@ add_non_lazy_context_rec(buffer *ctxt, symbol_tbl_ptr stbl, g_ptr node)
 	    while( ap != NULL ) {
 		F = find_hash(&named_arg_tbl, ap->name);
 		if( F == NULL ) {
-		    F = ap->default_value;
+		    F = Copy_Graph(ap->default_value);
 		}
 		if( F == NULL ) {
 		    report_error_loc(node, "Syntax");
