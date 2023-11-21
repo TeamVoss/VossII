@@ -32,19 +32,19 @@
 (defvar fl-mostly-headless t)
 (defvar fl-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map "\C-f\C-f" 'fl-send-smart)
-    (define-key map "\C-f\C-n" 'fl-send-phrase)
-    (define-key map "\C-f\C-b" 'fl-send-buffer)
-    (define-key map "\C-f\C-e" 'fl-send)
-    (define-key map "\C-f\C-s" 'fl-start)
-    (define-key map "\C-f\C-q" 'fl-stop)
-    (define-key map "\C-f\C-k" 'fl-kill)
-    (define-key map "\C-f\C-r" 'fl-restart)
-    (define-key map "\C-f\C-c" 'fl-clear)
-    (define-key map "\C-f\C-h" 'fl-help)
-    (define-key map "\C-f\C-d" 'fl-describe)
-    (define-key map "\C-f\C-p" 'fl-preferences)
-    (define-key map "\C-f\C-t" 'fl-toggle-window)
+    (define-key map "\C-c\C-f" 'fl-send-smart)
+    (define-key map "\C-c\C-n" 'fl-send-phrase)
+    (define-key map "\C-c\C-b" 'fl-send-buffer)
+    (define-key map "\C-c\C-e" 'fl-send)
+    (define-key map "\C-c\C-s" 'fl-start)
+    (define-key map "\C-c\C-q" 'fl-stop)
+    (define-key map "\C-c\C-k" 'fl-kill)
+    (define-key map "\C-c\C-r" 'fl-restart)
+    (define-key map "\C-c\C-c" 'fl-clear)
+    (define-key map "\C-c\C-h" 'fl-help)
+    (define-key map "\C-c\C-d" 'fl-describe)
+    (define-key map "\C-c\C-p" 'fl-preferences)
+    (define-key map "\C-c\C-t" 'fl-toggle-window)
     map
   )
   "Keymap for fl-mode."
@@ -90,6 +90,18 @@
 (defconst fl-extra-operators
   (regexp-opt '("+" "-" "*" "/" "<-" "%" "--") t)
 )
+
+(defun fl-get-line-num ()
+  (if (use-region-p)
+      (format " set_line_number %d; " (line-number-at-pos (region-beginning)))
+    (format " set_line_number %d; " (line-number-at-pos))
+    )
+  )
+
+(defun fl-get-buffer-name()
+  (format " set_file_name %s; " (prin1-to-string (buffer-file-name)))
+  )
+
 
 (defun fl-spaced-regex (regex)
   "Avoid highlighting the given regex when it occurs within a word."
@@ -258,7 +270,13 @@
 (defun fl-send-region ()
   "Send the contents of the region to fl."
   (interactive)
-  (fl-send (buffer-substring-no-properties (mark) (point)))
+  (fl-send
+   (concat
+    (fl-get-buffer-name)
+    (fl-get-line-num)
+    (buffer-substring-no-properties (mark) (point))
+    )
+   )
   (message "Region sent to fl")
 )
 
@@ -304,16 +322,25 @@ expected if several phrases on a single line."
       (replace-regexp-in-string "\n" "\n>  " (string-trim-right s))
     ))
     (append-to-file s nil fl-file)
-    (message "Line sent to fl")
   ))
 )
 
 (defun fl-send-line ()
   "Sends the contents of the current line to fl."
   (interactive)
-  (fl-send (thing-at-point 'line t))
+  (fl-send
+   (concat
+    (fl-get-buffer-name)
+    " "
+    (fl-get-line-num)
+    " "
+    (thing-at-point 'line t)
+    )
+   )
   (message "Line sent to fl")
-)
+  )
+
+
 
 (defun fl-help ()
   "Opens the help window."
@@ -363,7 +390,7 @@ expected if several phrases on a single line."
   "Sends the current selection to fl, if any, otherwise sends the current line."
   (interactive)
   (if (use-region-p) (fl-send-region) (fl-send-line))
-)
+  )
 
 (defun fl-clear ()
   "Clears the fl output buffer."
