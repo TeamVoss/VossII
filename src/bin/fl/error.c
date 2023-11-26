@@ -47,10 +47,10 @@ FP_va(odests fp, const string format, va_list arg)
                 case fl_gc_fp:
                 case bdd_gc_fp:
                 case stdout_fp:
+                case warning_fp:
                     fprintf(stdout, "%s", fbuf); break;
                 case sim_fp:
                 case err_fp:
-                case warning_fp:
                     fprintf(stderr, "%s", fbuf); break;
                 default:
                     fprintf(stderr, "%s", fbuf); break;

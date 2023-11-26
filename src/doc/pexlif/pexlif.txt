@@ -1,0 +1,99 @@
+An introduction to the pexlif datatype
+=======================================
+
+The pexlif datatype is used to describe circuits in VossII.
+It is a combination of hierarchy and behavioral description.
+Before going through the fields, consider the following simple example:
+
+load "idv.fl";
+TYPE "byte" 8;
+
+let inc =
+    byte_input  i.
+    byte_output o.
+    CELL "inc" [
+        o <- i '+' '1
+];
+
+let test =
+    byte_input  a b c.
+    byte_output res.
+    byte_internal ap.
+    CELL "test" [
+        inc a ap,
+        res <- ap '-' (b '*' c)
+];
+
+let p = flfun2pexlif test;
+
+If we evaluate p we get:
+
+(PINST "test" [SHA->b2a4..,FP->6766..] F
+  [(a[7:0],[a[7:0]]),(b[7:0],[b[7:0]]),(c[7:0],[c[7:0]])]
+  [(res[7:0],[res[7:0]])]
+  [ap[7:0],_$1[7:0]]
+i1/:
+    (PINST "inc" [SHA->c326..,FP->2111..] F
+      [(i[7:0],[a[7:0]])]
+      [(o[7:0],[ap[7:0]])]
+      []
+i1/i1/:
+        (PINST "draw_unary_arithm {+1}" [SHA->4b74..,FP->6659..] T
+          [(i1[7:0],[i[7:0]])]
+          [(o[7:0],[o[7:0]])]
+          []
+          LEAF [
+            o[7:0] <- (i1[7:0] + 0x01)
+          ]
+        )
+    )
+i2/:
+    (PINST "draw_binary_arithm {*}" [SHA->12da..,FP->1243..] T
+      [(i1[7:0],[b[7:0]]),(i2[7:0],[c[7:0]])]
+      [(o[7:0],[_$1[7:0]])]
+      []
+      LEAF [
+        o[7:0] <- (i1[7:0] * i2[7:0])
+      ]
+    )
+i3/:
+    (PINST "draw_binary_arithm {-}" [SHA->4837..,FP->1114..] T
+      [(i1[7:0],[ap[7:0]]),(i2[7:0],[_$1[7:0]])]
+      [(o[7:0],[res[7:0]])]
+      []
+      LEAF [
+        o[7:0] <- (i1[7:0] - i2[7:0])
+      ]
+    )
+)
+
+Here we can see that there is a hierarchical top-level cell named "test"
+with three subinstances, named "inc", "draw_binary_arithm {*}", and
+"draw_binary_arithm {-}". The "inc" instance has one subinstance, named
+"draw_unary_arithm {+1}" and it is a leaf cell with a zero-delay next-state
+function "o[7:0] <- (i1[7:0] + 0x01)" etc.
+In each instance (PINST) there are inputs and outputs list that define
+how the wires are connected.
+
+More precisely, a PINST has 7 arguments:
+    1) a name of the instance. If it named draw_... the name is used for
+       visualization
+    2) a list of (name,value) pairs representing some attributes of the
+       instance. Two of the attributes SHA and FP are computed automatically
+       and are used in find/replace operations.
+    3) a Boolean denoting whether the instance is a leaf or not
+    4) A list of (formal, actuals) (or inside/outside) wire names for the inputs
+       to the instance. 
+    5) A list of (formal,actuals) wire names for the outputs to the instance,
+    6) A list of (complete vectors) for wires used internally connecting 
+       subinstances.
+    7) Either a P_HIER with a list of child instances or a P_LEAF which contains
+       zero-delay or phase-delay next-state functions expressed in wexpr.
+
+The input/output lists are used to denote how the instance should be wired up.
+The formal name is always a complete vector (unless of size 1) but the actuals
+is a list of constants and/or partial or complete vectors.  For example, you
+might have ("a[7:0]", ["0xf", "d[7:6]", "e[2:3]"]) which means that the
+(inside) wires a[7], a[6], a[5], a[4], a[3], a[2], a[1], a[0] will be
+connected to 1, 1, 1, 1, d[7], d[6], e[2], and e[3], respectively.
+

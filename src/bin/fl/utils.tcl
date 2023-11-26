@@ -557,11 +557,11 @@ proc gui_io:get_data {title texts} {
 	bind $te <KeyPress-Return> [list :gui:return 1 $w $tcnt]
 	$te insert 0 $default
 	pack $tl -side left
-	pack $te -side left -fill x
-	pack $tf -side top -fill x
+	pack $te -side left -fill x -expand y
+	pack $tf -side top -fill x -expand y
     }
     frame $w.bf
-    pack $w.bf -side bottom -fill x
+    pack $w.bf -side bottom -fill x -expand yes
     label $w.bf.sp1
     button $w.bf.cancel -text Cancel -command ":gui:return 0 $w $tcnt"
 

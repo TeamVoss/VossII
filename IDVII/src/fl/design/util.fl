@@ -481,9 +481,9 @@ letrec w2bv sub w =
      /\ w2bv (W_NOT a) = bv_NOT (w2bv sub a)
      /\ w2bv (W_PRED name cond) = w2bv sub cond
      /\ w2bv (W_EQ a b) =
-	    (bv_eq (w2bv sub a) (w2bv sub b)) => (int2bv 1) | (int2bv 0)
+	    (bv_eq (w2bv sub a) (w2bv sub b)) => (int2bv (-1)) | (int2bv 0)
      /\ w2bv (W_GR a b) =
-	    (bv_greater (w2bv sub a) (w2bv sub b)) => (int2bv 1) | (int2bv 0)
+	    (bv_greater (w2bv sub a) (w2bv sub b)) => (int2bv (-1)) | (int2bv 0)
      /\ w2bv (W_ADD a b) = bv_add (w2bv sub a) (w2bv sub b)
      /\ w2bv (W_SUB a b) = bv_sub (w2bv sub a) (w2bv sub b)
      /\ w2bv (W_MUL a b) = bv_mul (w2bv sub a) (w2bv sub b)
@@ -495,7 +495,7 @@ letrec w2bv sub w =
      /\ w2bv (W_SX sz w) = w2bv sub w
      /\ w2bv (W_ZX sz w) = bv_ZX (w2bv sub w)
      /\ w2bv (W_ITE c t e) =
-	    (w2bv sub c) = (int2bv 1) => (w2bv sub t) | (w2bv sub e)
+	    (w2bv sub c) = (int2bv (-1)) => (w2bv sub t) | (w2bv sub e)
      /\ w2bv (W_SLICE indices w) =
 		let sz = wexpr_size w in
 		list2bv (map (\idx. el (sz-idx) (w2bl w)) indices)

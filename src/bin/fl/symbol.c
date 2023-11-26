@@ -53,6 +53,7 @@ static string       s_empty;
 static char         help_buf[4096];
 static char         type_buf[4096];
 static hash_record  bound_var_tbl;
+static hash_record  non_lazy_processed_tbl;
 static int          overloaded_calls;
 static jmp_buf      context_env;
 static int          builtins_len;
@@ -574,8 +575,10 @@ Add_non_lazy_context_and_find_Userdefs(g_ptr node, symbol_tbl_ptr stbl)
     buffer context;
     new_buf (&context, 100, sizeof(string));
     create_hash(&bound_var_tbl, 100, str_hash, str_equ);
+    create_hash(&non_lazy_processed_tbl, 100, ptr_hash, ptr_equ);
     node = top_add_non_lazy_context(&context, stbl, &node);
     dispose_hash(&bound_var_tbl, NULLFCN);
+    dispose_hash(&non_lazy_processed_tbl, NULLFCN);
     free_buf (&context); 
     return(node);
 }
@@ -1705,6 +1708,23 @@ get_combinator_expression(g_ptr redex)
 }
 
 static void
+get_userdef_id(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    string name = GET_STRING(r);
+    fn_ptr fp = Find_Function_Def(symb_tbl, name);
+    if( fp != NULL ) {
+	MAKE_REDEX_INT(redex, fp->id);
+    } else {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot find any function named '%s'",
+					  name));
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
 get_userdef_combinator_expression(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
@@ -1857,6 +1877,11 @@ Symbols_Install_Functions()
     Add_ExtAPI_Function("get_combinator_expression", "1", TRUE,
                         GLmake_arrow(GLmake_string(), term),
                         get_combinator_expression);
+
+    Add_ExtAPI_Function("get_userdef_id", "1", TRUE,
+                        GLmake_arrow(GLmake_string(), GLmake_int()),
+                        get_userdef_id);
+
     Add_ExtAPI_Function("get_userdef_combinator_expression", "1", TRUE,
                         GLmake_arrow(GLmake_int(),
 				     GLmake_tuple(GLmake_string(), term)),
@@ -2068,6 +2093,8 @@ add_non_lazy_context_rec(buffer *ctxt, symbol_tbl_ptr stbl, g_ptr node)
     hash_record	    named_arg_tbl;
     arg_info_ptr    aip;
     if( node == NULL ) { return NULL; }
+    if( find_hash(&non_lazy_processed_tbl, node) != NULL ) { return node; }
+    insert_hash(&non_lazy_processed_tbl, node, node);
     switch( GET_TYPE(node) ) {
         case APPLY_ND:
 	    new_buf(&arg_info_buf, 100, sizeof(arg_info_rec));

@@ -6,3 +6,6 @@ break Rand_Var
 r -noX -f bugs/b248.fl
 break top_add_non_lazy_context
 c
+n
+n
+s

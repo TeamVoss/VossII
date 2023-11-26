@@ -8,3 +8,5 @@ cload (DIR^"convert2bundle.fl") fseq
 fprintf stdinfo ".";
 cload (DIR^"bifrost.fl") fseq
 fprintf stdinfo ".";
+cload (DIR^"make_interconnect.fl") fseq
+fprintf stdinfo ".";

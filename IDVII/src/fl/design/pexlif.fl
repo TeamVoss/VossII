@@ -724,7 +724,9 @@ let constant_propagation p =
 
 // =============================================================
 // Code for sanity check a pexlif
-// At the moment, it only checks 
+// At the moment, it checks:
+//  1) That |formal| == |actuals| is every interface
+//  2) That all wires/vectors are declared
 // =============================================================
 let sanity_check_pexlif p =
     letrec test hier (PINST name attrs lf fa_inps fa_outs ints body) =

@@ -237,12 +237,25 @@ let is_wide_AND e  =
 
 (cload (DIR^"/simplify.fl")) fseq ();
 
+
+//let simplify_W_AND c1 c2 =
+//    wexpr_size c1 != 1 => W_AND c1 c2 |
+//    let b1 = wexpr2bool [] c1 in
+//    let b2 = wexpr2bool [] c2 in
+//    let default = W_AND c1 c2 in
+//    let both = wexpr2bool [] default in
+//    b1 == both => c1 |
+//    b2 == both => c2 |
+//    default
+//;
+let simplify_W_AND = W_AND;
+
 let get_cases e =
     letrec get_all_choices conds (W_ITE c t e) =
 	    conds != [] =>
 		let cond = hd conds in
-		(get_all_choices [(W_AND cond c)] t)@
-		(get_all_choices [(W_AND cond (W_NOT c))] e)
+		(get_all_choices [(simplify_W_AND cond c)] t)@
+		(get_all_choices [(simplify_W_AND cond (W_NOT c))] e)
 	    |
 		(get_all_choices [c] t)@(get_all_choices [W_NOT c] e)
      /\    get_all_choices conds other = [(hd conds, other)]
@@ -1077,7 +1090,7 @@ let list_output body_fun {base_fs::string} acc =
 		    in
 		    let new_inps = map mk rights in
 		    let new_outs = map mk lefts in
-		    let attrs' = ("bundle", sprintf "{input %s %s}"
+		    let attrs' = ("bundle", sprintf "{output %s %s}"
 					   fs (hw_type_name {undefined :: *a}))
 		    in
 		    (new_inps, new_outs, attrs')
@@ -2059,21 +2072,17 @@ let STRUCT_implicit name field_list =
 
 overload STRUCT STRUCT_explicit STRUCT_implicit;
 
-let bundle_decls_ref =
-    ref {[]:: (string#((string#string) list)#((string#string) list)) list}
+let bundle_exists name =
+    (find_first0 (\p. fst p = name) (deref bundle_decls)) != 0
 ;
 
-let bundle_exists name =
-    (find_first0 (\p. fst p = name) (deref bundle_decls_ref)) != 0
-;
 
 let BUNDLE name left_signals right_signals =
-    let done = deref bundle_decls_ref then
-    mem (name,left_signals,right_signals) done => T |
+    let done = deref bundle_decls then
+    mem (name,left_signals,right_signals) done => () |
     let current = deref hw_types_decl_ref in
     mem name (map fst current) =>
 	(fprintf stderr "A hw type called %s is already defined\n" name)
-	fseq F
     |
     let all_sigs = left_signals@right_signals in
     let idx = find_first0 (\(_,t). NOT (is_hw_type t)) all_sigs then
@@ -2179,8 +2188,6 @@ let BUNDLE name left_signals right_signals =
     let old = filter (\p. fst p != name) (deref bundle_decls) then
     let new = (name,left_signals, right_signals):old then
     (bundle_decls :=  new)
-    fseq
-    T
 ;
 
 let MEMORY name size_list word_type =
@@ -2873,18 +2880,20 @@ let draw_fsm reset S0 orig_trans base_inps =
     (foreach mk_state states) fseq
     let ptrans = partition fst trans in
     let emit_edge ((f,fv),on',(t,tv)) =
-        append (sprintf "%s -> %s [ label = \"%s\" ];\n" f t on')
+	    append (sprintf "%s -> %s [ label = \"%s\" ];\n" f t on')
     in
-    letrec mk_edges done ((f,on',t):rem) =
-	let cond = W_AND on' (W_NOT done) in
-	let scond = cond_simplify cond in
-	let s_cond = base_compact_wprint base_inps scond in
+    letrec mk_edges {pri::int} ((f,on',t):rem) =
+	let scond = cond_simplify on' in
+	let s_cond0 = base_compact_wprint base_inps scond in
+	let s_cond1 = strlen s_cond0 > 5 => "?" | s_cond0 in
 	let f_cond = Pwexpr scond in
+	let s_cond = (pri < 0 => "" | sprintf "%d:" pri)^s_cond1 in
 	(emit_edge (f,s_cond,t)) fseq
-	(s_cond,f_cond):(mk_edges (W_OR done on') rem)
-     /\    mk_edges done [] = []
+	(s_cond,f_cond):(mk_edges (pri+1) rem)
+     /\    mk_edges {pri::int} [] = []
     in
-    let edges = flatmap (mk_edges (W_CONST 1 0)) ptrans then
+    let top_mk_edges l = length l > 1 => mk_edges 1 l | mk_edges (-999999) l in
+    let edges = flatmap top_mk_edges ptrans then
     (emit_edge (("dummy_inp",0), reset, S0n)) fseq
     (append (sprintf "}\n")) fseq
     let code = accumulate (defix ^) (rev (deref res)) then

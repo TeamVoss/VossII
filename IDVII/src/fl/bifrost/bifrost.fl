@@ -43,7 +43,7 @@ letrec bifrost_get_dependent_files file =
 // NOTE: The code assumes the #include statements has a fixed string
 // as file to include.
 //
-let bifrost_load pgm force =
+let bifrost_load pgm force->F =
     NOT (str_is_suffix ".bfst" pgm) =>
 	eprintf "bifrost_load with a non-bifrost program (%s)." pgm
     |
@@ -78,11 +78,7 @@ let bifrost_load pgm force =
 		(get_window_result w) fseq
 		eprintf "bifrost failed for program %s." fname
 	|
-	(_load res_name F) fseq
-	let bundle_info = make_bundle_version module then
-	let fp = fopen res_name "a" then
-	(fprintf fp ";\n%s\n" bundle_info) fseq
-	(fclose fp)
+	()
     ) fseq
     _load res_name F
 ;

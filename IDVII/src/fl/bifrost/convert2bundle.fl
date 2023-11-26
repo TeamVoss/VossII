@@ -106,7 +106,7 @@ let make_bundle_version fn =
 	(call_args := ((deref call_args)@new_call_args))
     in
     (foreach mk (partition fst snms)) fseq
-    let pre = sprintf "let bundle_%s =\n" fn in
+    let pre = sprintf "let %s =\n" fn in
     let post = sprintf "\tCELL \"%s\" [\n" fn in
     let decl = list2str T pre "" post id (deref bundle_args) then
     let body =
@@ -114,16 +114,37 @@ let make_bundle_version fn =
     then
     let pcomp = sprintf "pcompile %s;\n" fn in
     let bundles = list2str T "\n" "\n" "\n" id (deref bundle_defs) in
-    let final = sprintf "create_default_version bundle_%s;\n" fn in
+    let final = sprintf "\ncreate_default_version %s;\n" fn in
     sprintf "%s%s%s%s%s" pcomp bundles decl body final
 ;
 
-end_abstype make_bundle_version;
-
-
-let convert_bifrost_functions2bundle_functions funs =
-    let decls = map make_bundle_version funs then
-//    eval_fl_code decls
-foreach (fprintf stdout "%s\n") decls
+let bifrostfl2bundle unit_name load_files replace->F =
+    NOT (file_exists (unit_name^".bfst")) =>
+	eprintf "There is no Bifrost program called %s.bfst" unit_name
+    |
+    NOT (file_exists (unit_name^".bfst.fl")) =>
+	eprintf "Bifrost has not been run. Missing file %s.bfst.fl" unit_name
+    |
+    let ifile = sprintf "%s.bfst.fl" unit_name then
+    let ofile = sprintf "%s.bfl" unit_name then
+    NOT replace AND file_exists ofile =>
+        eprintf "File %s exists already and replace argument is F\n" ofile
+    |
+    (foreach (\f. (_load f F) fseq ()) load_files) fseq
+    (_load ifile F) fseq
+    let bundle_info = make_bundle_version unit_name then
+    // Now produce the resulting file
+    let fp = fopen ofile "w" then
+    (foreach (\f. fprintf fp "cload \"%s\";\n" f) load_files) fseq
+    (fprintf fp "\n\n") fseq
+    (fclose fp) fseq
+    (system (sprintf "/bin/cat %s >> %s" ifile ofile)) != 0 =>
+	eprintf "Failed to copy %s to %s\n" ifile ofile
+    |
+    let fp = fopen ofile "a" then
+    (fprintf fp ";\n%s\n" bundle_info) fseq
+    (fclose fp)
 ;
+
+end_abstype bifrostfl2bundle;
 
