@@ -472,9 +472,9 @@ letrec w2bv sub w =
 		// that I can think of. The rigth answer would probably have
 		// a wexpr2dualrail but that's pretty cumbersome too
 		mk_xvars sz
-     /\ w2bv (W_CONST sz v) = int2bv v
-     /\ w2bv (W_VAR sz b) = substitute sub (bv_variable (mk_name sz b))
-     /\ w2bv (W_EXPLICIT_VAR sz n) = substitute sub (bv_variable n)
+     /\ w2bv (W_CONST sz v) = bv_ZX (int2bv v)
+     /\ w2bv (W_VAR sz b) = bv_ZX (substitute sub (bv_variable (mk_name sz b)))
+     /\ w2bv (W_EXPLICIT_VAR sz n) = bv_ZX (substitute sub (bv_variable n))
      /\ w2bv (W_AND a b) = bv_AND (w2bv sub a) (w2bv sub b)
      /\ w2bv (W_LAT_LEQ a b) = error "W_LAT_LEQ cannot be converted"
      /\ w2bv (W_OR a b) = bv_OR (w2bv sub a) (w2bv sub b)
