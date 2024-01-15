@@ -61,8 +61,8 @@ let mk_load_file fp name mutually_exclusive units =
     let bundles = ref [] then
     let bundle_mk = ref [] then
     let add_mkb tp =
-	let s = sprintf "make_bundle_merge_arb \"%s\" \"ackpulse\";\n" tp then
-	(bundle_mk := (s:(deref bundle_mk)))
+	let code = make_bundle_merge_arb tp "ackpulse" then
+	(bundle_mk := (code:(deref bundle_mk)))
     then
     let merge_code = ref [] then
     let use_names = ref [] then

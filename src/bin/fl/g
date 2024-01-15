@@ -3,9 +3,6 @@ break exit
 break abort
 break Dbg_stop
 break Rand_Var
-r -noX -f bugs/b248.fl
-break top_add_non_lazy_context
+r -C -noX -f bugs/b251.fl
+break Cephalopde_Reflect_expr
 c
-n
-n
-s

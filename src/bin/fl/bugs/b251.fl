@@ -1,0 +1,8 @@
+
+rvariable "a";
+
+let double i = i+i;
+
+DBGterm (get_definition "double");
+draw_term (get_definition "double");
+

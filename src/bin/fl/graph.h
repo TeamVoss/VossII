@@ -103,7 +103,7 @@ void         Do_garbage_collect(string file, int line);
 void         Do_garbage_collect();
 #endif
 result_ptr   Compile(symbol_tbl_ptr stbl, g_ptr node, typeExp_ptr type,
-		     bool delayed);
+		     bool delayed, bool extract_arg_names);
 g_ptr	     Execute_fl_code(const string function, ...);
 void	     Free_result_ptr(result_ptr rp);
 FILE *       Return_to_old_fid();
@@ -776,6 +776,7 @@ typedef struct result_rec {
         impl_arg_ptr	implicit_args;
         g_ptr		super_comb;
         typeExp_ptr	type;
+	arg_names_ptr	arg_names;
 } result_rec;
 
 typedef struct comment_list_rec {

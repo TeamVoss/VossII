@@ -94,12 +94,16 @@ let hw_bundle_pairs {o:: *a} =
 ;
 
 
-let hw_types_decl_ref = ref {[]::(string#int) list};
+let hw_types_decl_ref = ref {[]::(string#(int#bool#string)) list};
 
 let is_hw_type name = mem name (map fst (deref hw_types_decl_ref));
 
+let get_hw_type_info name = assoc name (deref hw_types_decl_ref);
+non_lazy get_hw_type_info;
+
 let get_hw_type_size name =
-    assoc name (deref hw_types_decl_ref)
+    val (sz,arithm,vlist) = assoc name (deref hw_types_decl_ref) then
+    sz
 ;
 non_lazy get_hw_type_size;
 
@@ -155,20 +159,25 @@ let make_const_or_var s =
 	{hw_type_destr :: {*r} hw_type}
     in
     let sz = hw_size {undefined:: *r} in
+    let mk_CONST sz i =
+	let needed = bits_needed i in
+	sz < needed => eprintf "Constant %d does not fit in %d bits" i sz |
+	W_CONST sz i
+    in
     let w =
 	str_is_prefix "0x" s =>
 	    let i = sscanf "0x%x" s in
-	    W_CONST sz i
+	    mk_CONST sz i
 	|
 	str_is_prefix "0b" s =>
 	    let i = sscanf "0b%b" s in
-	    W_CONST sz i
+	    mk_CONST sz i
 	|
 	let s0 = string_hd s in
 	let os = ord s0 in
 	(ileq (ord "0") os) AND (ileq os (ord "9")) =>
 	    let i = sscanf "%d" s in
-	    W_CONST sz i
+	    mk_CONST sz i
 	|
 	s == "X" => W_X sz | hw_mk_var {undefined :: *r} s
     in
@@ -636,6 +645,7 @@ let base_assignment do_split lhs rhs =
 let w_CASE w_out cond_res_list w_default_value =
     let sz = wexpr_size w_default_value then
     let n = length cond_res_list then
+    let pwid = bits_needed (n-1) in
 //    n = 1 =>
 //	val (c,t) = hd cond_res_list in
 //	let e = w_default_value in
@@ -649,8 +659,8 @@ let w_CASE w_out cond_res_list w_default_value =
      /\ var2name other = []
     in
     letrec select cnt ((c,r):rem) =
-        let bc = sprintf "%sc%02d" BASE_TMP cnt then
-        let br = sprintf "%sr%02d" BASE_TMP cnt then
+        let bc = sprintf "%sc%0*d" BASE_TMP pwid cnt then
+        let br = sprintf "%sr%0*d" BASE_TMP pwid cnt then
         let lc = W_VAR 1 bc then
         let lr = W_VAR sz br then
         val (c_ints, c_act, c_extra) =
@@ -678,7 +688,7 @@ let w_CASE w_out cond_res_list w_default_value =
         let extras = c_extra@r_extra@extras then
         (fas, e, ints, extras)
      /\    select cnt [] =
-        let bd = sprintf "%sd%02d" BASE_TMP cnt then
+        let bd = sprintf "%sd%0*d" BASE_TMP pwid cnt then
         let ld = W_VAR sz bd then
         val (d_ints, d_act, d_extra) =
 	    let v = var2name w_default_value then
@@ -1380,7 +1390,7 @@ sized_binder_with_accumulator list_internal CELL;
 let eval_fl_code l =
     let fp = mktemp "eval_fl_code" then
     let fname = stream2filename  fp then
-    (map (fprintf fp "%s\n") l) fseq
+    (foreach (fprintf fp "%s\n") l) fseq
     (fclose fp) fseq
     (_load fname F) fseq
     // Comment out the next line to ease debugging...
@@ -1390,16 +1400,17 @@ let eval_fl_code l =
 non_lazy eval_fl_code;
 
 let core_TYPE name size is_arithmetic value_list =
-    let current = deref hw_types_decl_ref in
-    mem name (map fst current) =>
-	(fprintf stderr "A hw type called %s is already defined\n" name)
-	seq F
+    is_hw_type name => 
+	(get_hw_type_info name == (size,is_arithmetic,value_list)) => T |
+	eprintf "A hw type called %s is already defined\n" name
     |
-    let new = (name,size):current in
+    let current = deref hw_types_decl_ref in
+    let new = (name,(size,is_arithmetic, value_list)):current in
     (hw_types_decl_ref := new) fseq
+    //
     let ssz = sprintf "%d" size in
     let sarithm = is_arithmetic => "T" | "F" in
-    eval_fl_code
+    let pgm = 
     <{
 	lettype `name` = BV_`name` wexpr;
 	//
@@ -1490,6 +1501,8 @@ let core_TYPE name size is_arithmetic value_list =
 	;
 	install_print_function  P_`name`;
     }> "functor"
+    then
+    eval_fl_code pgm
 ;
 
 // Declare a new hw type with name 'name' and size number of bits as width.
@@ -1983,7 +1996,27 @@ non_lazy eval1;
 
 let field_name_info_ref = ref {[]::(string#((string#string)list)) list};
 
+let struct_defs_ref =
+    ref {[] :: ((string# int# ((string#string#(int list)) list)# bool) list)}
+;
+
 let base_STRUCT_explicit name size field_list do_check =
+    let cur = deref struct_defs_ref then
+    let idx = find_first0 (\t. fst t = name) cur then
+    let bundle = (name,size,field_list,do_check) then
+    idx != 0 => ((el idx cur) == bundle) => () |
+	let prStr (nm,sz,flist,check_flag) =
+	    let ptr (f,t,s) = sprintf "%s:%s%S" f t (map int2str s) in
+	    let fls = list2str T "[" ", " "]" ptr flist in
+	    sprintf "STRUCT %s %d %s %B" nm sz fls check_flag
+	in
+	let old = prStr (el idx cur) then
+	let new = prStr bundle then
+	eprintf "Cannot redefine STRUCT.\nOld: %s\nNew: %s\n" old new
+    | 
+    let new = bundle:cur then
+    (struct_defs_ref := new) fseq
+    //
     letrec check ((field_name, type, bits):rem) =
         NOT (is_defined (sprintf "BV_%s" type)) =>
             eprintf "Type %s not defined!" type
@@ -2090,7 +2123,7 @@ let BUNDLE name left_signals right_signals =
 	val (field,tp) = el idx all_sigs in
 	eprintf "Type '%s' for field '%s' not declared" tp field
     |
-    let new = (name,0):current in
+    let new = (name,(0,F,"")):current in
     (hw_types_decl_ref := new) fseq
     let pr (n,t) = sprintf "(\"%s\",\"%s\")" n t in
     let ssz =
@@ -2102,7 +2135,7 @@ let BUNDLE name left_signals right_signals =
     let slefts = list2str T "[" "," "]" pr left_signals then
     let srights = list2str T "[" "," "]" pr right_signals then
     //
-    (eval_fl_code
+    let pgm =
     <{
 	lettype `name` = BUNDLE_`name` wexpr;
 	//
@@ -2166,7 +2199,8 @@ let BUNDLE name left_signals right_signals =
 	;
 	install_print_function P_`name`;
     }> "functor"
-    ) fseq
+    then
+    (eval_fl_code pgm) fseq
     let declare_field (field, type) =
 	let cmd =
 	    let p1 = sprintf "let _%s {b::%s} = " field name in
@@ -2198,7 +2232,7 @@ let MEMORY name size_list word_type =
 	(fprintf stderr "A hw type called %s is already defined\n" name)
 	seq F
     |
-    let new = (name,tot_size):current in
+    let new = (name,(tot_size,F,"")):current in
     (hw_types_decl_ref := new) fseq
     let ssz = sprintf "%d" tot_size in
     let swidth = sprintf "%d" width in
@@ -2256,7 +2290,7 @@ let MEMORY name size_list word_type =
         in
         mk_expr (lsz) (rev size_list)
     in
-    eval_fl_code
+    let pgm = 
     <{
 	lettype `name` = BV_`name` wexpr;
 	let hw_`name`_is_arithmetic {bv::`name`} = F;
@@ -2346,13 +2380,15 @@ let MEMORY name size_list word_type =
 	;
 	install_print_function  P_`name`;
     }> "functor"
+    then
+    eval_fl_code pgm
 ;
 
 let emit_hw_type_info filename =
     let fp = fopen filename "w" then
     let fields = deref field_name_info_ref in
     let types = rev (deref hw_types_decl_ref) in
-    let pr1 (name, sz) =
+    let pr1 (name, (sz,is_arithm,v_list)) =
 	(name = "bit") => () |
 	(fprintf fp "type %s => \"%s\";\n" name name) fseq
 	let fields = (assoc name fields) catch [] then
@@ -2489,6 +2525,18 @@ let base_re_ff_reset =
 	MUX reset '0 cur q
 ];
 
+let base_re_ff_set =
+    input	d.
+    bit_input	set.
+    bit_input	clk.
+    output	q.
+    internal	mid cur.
+    CELL "draw_ff_re_set" [
+	MUX set '1 d mid,
+	base_re_ff mid clk cur,
+	MUX set '1 cur q
+];
+
 let base_re_ff_sreset =
     input	d.
     bit_input	reset.
@@ -2561,6 +2609,9 @@ slet re_ff clk d q = base_re_ff d clk q;
 
 // A rising edge D flip-flop with asynchronous reset (active high).
 slet re_ff_reset clk reset d q = base_re_ff_reset d reset clk q;
+
+// A rising edge D flip-flop with asynchronous set (active high).
+slet re_ff_set clk set d q = base_re_ff_set d set clk q;
 
 // A rising edge D flip-flop with enable.
 slet re_ff_en clk en d q = base_re_ff_en d en clk q;
@@ -2646,6 +2697,7 @@ let fe_ff_en clk en d q = base_fe_ff_en d en clk q;
 let fe_ff_en_reset clk en reset d q = base_fe_ff_en_reset d en reset clk q;
 
 end_abstype re_ff re_ff_reset re_ff_en re_ff_en_reset re_ff_en_reset_with_value
+	    re_ff_set
 	    re_ff_sreset re_ff_en_sreset re_ff_en_sreset_with_value
 	    fe_ff fe_ff_reset fe_ff_en fe_ff_en_reset
 ;
@@ -3001,6 +3053,7 @@ let CASE {out:: *a} {cond_res_list:: (bit # *a) list} {default_value:: *a} =
 let STATE {clk::bit} {state:: *a} {cond_res_list:: (bit # *a) list} =
     let sz = hw_size state in
     let n = length cond_res_list then
+    let pwid = bits_needed (n-1) in
     let w_clk = hw_destr clk then
     let n_clk = hd (w_depends w_clk) then
     let w_state = hw_mk_var {undefined :: *a} (sprintf "%ss" BASE_TMP) then
@@ -3022,8 +3075,8 @@ let STATE {clk::bit} {state:: *a} {cond_res_list:: (bit # *a) list} =
     let d_fas = [(nd,[nd])] in
     let default_p = (hw_constr ld) <- state then
     letrec select cnt ((c,r):rem) =
-        let bc = sprintf "%sc%02d" BASE_TMP cnt in
-        let br = sprintf "%sr%02d" BASE_TMP cnt in
+        let bc = sprintf "%sc%0*d" BASE_TMP pwid cnt in
+        let br = sprintf "%sr%0*d" BASE_TMP pwid cnt in
         let lc = W_VAR 1 bc in
         let lr = W_VAR sz br in
         val (c_ints, c_act, c_extra) =
@@ -3068,6 +3121,7 @@ let EN_STATE {clk::bit} {enable::bit} {state:: *a}
     =
     let sz = hw_size state in
     let n = length cond_res_list then
+    let pwid = bits_needed (n-1) in
     let w_clk = hw_destr clk then
     let n_clk = hd (w_depends w_clk) then
     let w_state = hw_mk_var {undefined :: *a} (sprintf "%ss" BASE_TMP) then
@@ -3089,8 +3143,8 @@ let EN_STATE {clk::bit} {enable::bit} {state:: *a}
     let d_fas = [(nd,[nd])] in
     let default_p = (hw_constr ld) <- state then
     letrec select cnt ((c,r):rem) =
-        let bc = sprintf "%sc%02d" BASE_TMP cnt in
-        let br = sprintf "%sr%02d" BASE_TMP cnt in
+        let bc = sprintf "%sc%0*d" BASE_TMP pwid cnt in
+        let br = sprintf "%sr%0*d" BASE_TMP pwid cnt in
         let lc = W_VAR 1 bc in
         let lr = W_VAR sz br in
         val (c_ints, c_act, c_extra) =
@@ -3635,15 +3689,66 @@ let XOR_n l =
     accumulate (defix '^') l
 ;
 
-let MUTEX_CASE =
-    output      {out:: *a}.
-    list_input  {conds:: (bit# *a) list}.
-    list_internal (length conds)    tmp.
-    CELL "MUTEX_CASE" (
-        (map2 (\o.\(c,v). o <- SX c '&' v) tmp conds)@
-        [out <- OR_n tmp]
-);
 
+let w_MUTEX_CASE w_out cond_res_list =
+    let sz = wexpr_size w_out then
+    let n = length cond_res_list then
+    let pwid = bits_needed (n-1) in
+    let n_out = hd (w_depends w_out) then
+    let fa_outs = [(n_out,[n_out])] then
+    let var2name (W_VAR s b) = [mk_name s b]
+     /\ var2name (W_EXPLICIT_VAR s b) = [b]
+     /\ var2name other = []
+    in
+    letrec select cnt ((c,r):rem) =
+        let bc = sprintf "%sc%0*d" BASE_TMP pwid cnt then
+        let br = sprintf "%sr%0*d" BASE_TMP pwid cnt then
+        let lc = W_VAR 1 bc then
+        let lr = W_VAR sz br then
+        val (c_ints, c_act, c_extra) =
+	    let v = var2name c then
+	    v = [] =>
+		let en = mk_name 1 bc then
+		let p = base_assignment T lc c then
+		([en], en, [p])
+	    |
+	    ([], hd v, [])
+        in
+        val (r_ints, r_act, r_extra) =
+	    let v = var2name r then
+	    v = [] =>
+		let en = mk_name sz br then
+		let p = base_assignment T lr r then
+		([en], en, [p])
+	    |
+	    ([], hd v, [])
+        in
+        val (fas, e, ints, extras) = select (cnt+1) rem then
+        let fas = (mk_name 1 bc, [c_act]):(mk_name sz br, [r_act]):fas then
+        let e = W_OR (W_AND (W_SX sz lc) lr) e then
+        let ints = c_ints@r_ints@ints then
+        let extras = c_extra@r_extra@extras then
+        (fas, e, ints, extras)
+     /\    select cnt [] =
+	[], (W_CONST sz 0), [], []
+    in
+    val (fas, rhs, ints, extras) = select 1 cond_res_list then
+    let body = base_assignment F w_out rhs then
+    let pfn = sprintf "draw_MUTEX_CASE %d" n then
+    let mux = PINST pfn [] T fas fa_outs [] (P_HIER [body]) then
+    let children = mux:extras then
+    let get_acts (PINST _ _ _ ifa _ _ _) = flatmap snd ifa then
+    let inps = (setify (flatmap get_acts children)) subtract ints then
+    let fa_inps = map (\v.v,[v]) inps then
+    PINST "_WrApPeR_" [] F fa_inps fa_outs ints (P_HIER children)
+;
+
+let MUTEX_CASE {out:: *a} {cond_res_list:: (bit # *a) list} =
+    let w_out = hw_destr out then
+    let cnv (cond,res) = hw_bit_destr cond, hw_destr res then
+    let w_cond_res_list = map cnv cond_res_list then
+    w_MUTEX_CASE w_out w_cond_res_list
+;
 
 // User contribution: flip-flops that wish they were latches.
 // Flip-flops with bypass muxes.
@@ -3720,6 +3825,31 @@ let remove_wrappers p =
 let ` typed_result = hw_destr typed_result;
 
 
+let create_default_version fn =
+    let rtype = get_return_type fn then
+    rtype != "pexlif" =>
+	(fprintf stderr
+	 "Return type not pexlif (%s). create_default_version aborted\n" rtype)
+	fseq ()
+    |
+    let args = get_args fn then
+    let idx = find_first0 (\(a,tp). NOT (is_hw_type tp)) args in
+    idx != 0 =>
+	val (arg,tp) = el idx args in
+	(fprintf stderr
+	 "Arg. %s not a simple hw_type(%s). create_default_version aborted\n"
+	  arg tp
+	) fseq ()
+    |
+    // Now re-define the function with defaults
+    let mk_top_arg (nm,tp) = sprintf "{(%s->('%s)) :: %s}" nm nm tp in
+    let def = list2str T (sprintf "let %s " fn) " " " =\n" mk_top_arg args in
+    let body = list2str T (sprintf "%s " fn) " " ";\n" fst args in
+    let cmd = sprintf "%s%s\n" def body in
+    (eval_fl_code [cmd]) fseq ()
+;
+free_binder create_default_version;
+
 let pexlif_compile_dir = ref {(error "No pexlif cache directory"):: string};
 
 let set_pexlif_cache dir =
@@ -3744,7 +3874,7 @@ let mk_fas_for_simple_actuals name e =
     (mk_name sz name), (var2name (hw_destr e))
 ;
 
-let only_simple conns = (find_first0 (\(f,as). as = []) conns) = 0;
+let dangling_conns conns = (find_first0 (\(f,as). as = []) conns) != 0;
 
 clet pcompile_read_pexlif fn pexlif_file =
     (fprintf stdinfo "-- Loading pre-compiled version of %s--\n" fn) fseq
@@ -3783,12 +3913,11 @@ let pcompile fn =
     in
     let case1 =
 	let pre =
-	  (sprintf "\tNOT (only_simple conns) =>\n")^
+	  (sprintf "\t(dangling_conns conns) =>\n")^
 	  (sprintf "\t    (fprintf stdinfo \"-- Building %s--\\n\") fseq\n" fn)^
 	  (sprintf "\t    %s " fn)
 	in
-	let mk_arg (nm,tp) = nm in
-	list2str T pre " " "\n\t|\n" mk_arg args
+	list2str T pre " " "\n\t|\n" fst args
     in
     let case2 = 
       (sprintf "\texists =>\n")^
@@ -3814,7 +3943,9 @@ let pcompile fn =
       (sprintf "\t  (PINST nm attrs lf fa_inps' fa_outs' ints body)\n")
     in
     let cmd = top^mid1^mid2^case1^case2^case3^";\n" in
-    (eval cmd) fseq ()
+    (eval cmd) fseq
+    (eval (sprintf "%s fseq ();\n" fn)) fseq 
+    ()
 ;
 free_binder pcompile;
 
@@ -3840,31 +3971,6 @@ let flfun2pexlif_core fn =
 
 let flfun2pexlif fn = flfun2pexlif_core fn;
 free_binder flfun2pexlif;
-
-let create_default_version fn =
-    let rtype = get_return_type fn then
-    rtype != "pexlif" =>
-	(fprintf stderr
-	 "Return type not pexlif (%s). create_default_version aborted\n" rtype)
-	fseq ()
-    |
-    let args = get_args fn then
-    let idx = find_first0 (\(a,tp). NOT (is_hw_type tp)) args in
-    idx != 0 =>
-	val (arg,tp) = el idx args in
-	(fprintf stderr
-	 "Arg. %s not a simple hw_type(%s). create_default_version aborted\n"
-	  arg tp
-	) fseq ()
-    |
-    // Now re-define the function with defaults
-    let mk_top_arg (nm,tp) = sprintf "{(%s->('%s)) :: %s}" nm nm tp in
-    let def = list2str T (sprintf "let %s " fn) " " " =\n" mk_top_arg args in
-    let body = list2str T (sprintf "%s " fn) " " ";\n" fst args in
-    let cmd = sprintf "%s%s\n" def body in
-    (eval_fl_code [cmd]) fseq ()
-;
-free_binder create_default_version;
 
 let ASSERT {name::string} {expr::bit} =
     let oa = ord "a" in

@@ -79,7 +79,7 @@ static int	    call_level = 0;
 #endif
 #endif /* DEBUG */
 
-bool		    perform_fl_command(string txt);
+bool		    perform_fl_command(string txt, bool restore_line_nbr);
 
 /************************************************************************/
 /*			Local Variables					*/
@@ -1274,7 +1274,8 @@ Free_result_ptr(result_ptr rp)
 }
 
 result_ptr
-Compile(symbol_tbl_ptr stbl, g_ptr onode, typeExp_ptr type, bool delayed)
+Compile(symbol_tbl_ptr stbl, g_ptr onode, typeExp_ptr type, bool delayed,
+	bool extract_arg_names)
 {
     res_rec	rt;
     g_ptr	super_comb = NULL;
@@ -1284,9 +1285,17 @@ Compile(symbol_tbl_ptr stbl, g_ptr onode, typeExp_ptr type, bool delayed)
 	longjmp(*start_envp,1);
     }
 
+    // Extract argument names and default values (if any)
+    result_ptr rp = (result_ptr) new_rec(&result_rec_mgr);
+    if( extract_arg_names ) 
+	rp->arg_names = Get_argument_names(onode);
+    else
+	rp->arg_names = NULL;
+
     /* Add context for non-lazy functions and implicit arguments */
     g_ptr node = Add_non_lazy_context_and_find_Userdefs(onode, stbl);
     if( node == NULL ) {
+	Free_result_ptr(rp);
 	Reset_TypeChecker();
 	longjmp(*start_envp,1);
     }
@@ -1299,10 +1308,10 @@ Compile(symbol_tbl_ptr stbl, g_ptr onode, typeExp_ptr type, bool delayed)
 
     if( type == NULL ) {
 	/* Failed type-checking */
+	Free_result_ptr(rp);
 	longjmp(*start_envp,1);
     }
 
-    result_ptr rp = (result_ptr) new_rec(&result_rec_mgr);
     rp->expr_init =  cephalopode_mode? Cephalopde_Reflect_expr(node) : NULL;
 
 #ifdef CHECK_REF_CNTS
@@ -1379,6 +1388,7 @@ Execute_fl_code(const string function, ...)
     result_ptr rp = (result_ptr) new_rec(&result_rec_mgr);
     rp->expr = expr;
     rp->type = NULL;
+    rp->arg_names = NULL;
     Print_Result(rp, stdout_fp, FALSE);
     expr = rp->expr;
     Free_result_ptr(rp);
@@ -1587,6 +1597,18 @@ Do_garbage_collect()
     SET_REFCNT(void_nd, MAX_REF_CNT);
     B_Mark(cur_eval_cond);
     Mark(root_node);
+    result_ptr	rp;
+    FOR_REC(&result_rec_mgr, result_ptr, rp) {
+	Mark(rp->expr_init);
+	Mark(rp->expr_comb);
+	Mark(rp->expr);
+	Mark(rp->super_comb);
+	arg_names_ptr ap = rp->arg_names;
+	while( ap != NULL ) {
+	    Mark(ap->default_value);
+	    ap = ap->next;
+	}
+    }
     Mark(print_nd);
     Mark(return_trace_list);
     Mark_tcl_callbacks();
@@ -2749,7 +2771,7 @@ abstract_rec(string var, g_ptr node)
 		    ASSERT(cached_is_free(var, e2));
 		    e2 = abstract_rec(var, e2);
 		    if( is_I(e2) )
-			return(e1);
+			return(e1); // <<<< IS THIS CORRECT??????
 		    if( GET_TYPE(e2) == APPLY_ND ) {
 			g_ptr r = GET_APPLY_RIGHT(e2);
 			cur = GET_APPLY_LEFT(e2);
@@ -3947,7 +3969,7 @@ traverse_left(g_ptr oroot)
                             SET_STRING(redex, wastrsave(&strings, buf));
                             break;
 			case P_EVAL:
-			    if( perform_fl_command(GET_STRING(arg1)) ) {
+			    if( perform_fl_command(GET_STRING(arg1), TRUE) ) {
 				MAKE_REDEX_BOOL(redex, B_One());
 			    } else {
 				MAKE_REDEX_BOOL(redex, B_Zero());
@@ -4120,7 +4142,6 @@ traverse_left(g_ptr oroot)
 		    arg2  = traverse_left(GET_APPLY_RIGHT(*(sp+1)));
                     if( is_fail(arg2) )
                         goto arg2_fail2;
-		    // Do not force the graph to write out!
 		    if( !Load_graph(GET_STRING(arg1), GET_STRING(arg2), redex) )
 			goto fail2;
 		    goto finish2;
@@ -5277,6 +5298,7 @@ Eval(g_ptr redex)
     Record_eval_context(&ctx);
     jmp_buf start_env;
     start_envp = &start_env;
+    PUSH_GLOBAL_GC(root_node);
     PUSH_GLOBAL_GC(redex);
     root_node = redex;
     if( setjmp(*start_envp) == 0 ) {
@@ -5287,7 +5309,7 @@ Eval(g_ptr redex)
 	MAKE_REDEX_FAILURE(redex, FailBuf);
     }
     Restore_eval_context(&ctx);
-    POP_GLOBAL_GC(1);
+    POP_GLOBAL_GC(2);
     return redex;
 }
 

@@ -6,10 +6,6 @@ let ack_pulse_merge =
     bit_input		m_ack.
     bit_list_output	selected.
     //
-    let sz = length reqs in
-    //
-    bit_list_internal sz	sel.
-    //
     CELL "ack_pulse_merge" (
 	(map2 (\sel.\req. sel <- req) selected reqs) @
 	(map2 (\ack.\req. ack <- m_ack '&' req) acks reqs) @

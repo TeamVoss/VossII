@@ -41,8 +41,7 @@ symbol_tbl_ptr	Make_forward_declare(string name, typeExp_ptr type,
 				     symbol_tbl_ptr stbl,
 				     string file, int start_line);
 symbol_tbl_ptr	New_fn_def(string name, result_ptr res, symbol_tbl_ptr stbl,
-			   bool print, string file, int start_line,
-			   arg_names_ptr arg_names);
+			   bool print, string file, int start_line);
 symbol_tbl_ptr	InsertOverloadDef(string name, bool open_overload, oll_ptr alts,
 				  typeExp_ptr type, symbol_tbl_ptr stbl,
 				  string file, int start_line);
@@ -81,6 +80,8 @@ void		Sweep_ext_objs();
 string		Get_ExtAPI_Object_name(int class);
 arg_names_ptr	Get_argument_names(g_ptr node);
 string		Get_userdef_name(g_ptr node);
+void		DBG_check(string msg);
+
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */

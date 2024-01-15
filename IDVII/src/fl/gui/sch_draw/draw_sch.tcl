@@ -2533,6 +2533,34 @@ proc draw_CASE {n c tag x y} {
     return [list $inp_locs [list $x $y]]
 }
 
+proc draw_MUTEX_CASE {n c tag x y} {
+    global gcolor fc
+    add_value_field $c $tag $x $y
+    set ht [expr ($n*3+1)*[min_sep $c]]
+    set wid [expr round(max((0.8*[rect_wid $c]),$n*[min_sep $c]/3))]
+    set xl [expr round($x-$wid)]
+    set top [expr round($y-(($ht+1)/2))]
+    set bot [expr round($y+(($ht+1)/2))]
+    $c create polygon \
+	    $xl $top \
+	    $x  [expr $top+[min_sep $c]] \
+	    $x  [expr $bot-[min_sep $c]] \
+	    $xl $bot \
+	    $xl $top \
+	    -outline $gcolor -fill $fc -tags $tag
+    set inps {}
+    set cy [expr round($top+[min_sep $c])]
+    set cx $xl
+    set xt [expr $xl+[min_sep $c]]
+    for {set i 1} {$i <= $n} {incr i} {
+	lappend inp_locs $xl $cy
+	set cy [expr round($cy+[min_sep $c])]
+	lappend inp_locs $xl $cy
+	set cy [expr round($cy+[min_sep $c])]
+    }
+    return [list $inp_locs [list $x $y]]
+}
+
 proc draw_SELECT {c tag x y} {
     global gcolor fc
     add_value_field $c $tag $x $y

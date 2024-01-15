@@ -115,7 +115,7 @@ let make_bundle_version fn =
     let pcomp = sprintf "pcompile %s;\n" fn in
     let bundles = list2str T "\n" "\n" "\n" id (deref bundle_defs) in
     let final = sprintf "\ncreate_default_version %s;\n" fn in
-    sprintf "%s%s%s%s%s" pcomp bundles decl body final
+    bundles, (sprintf "%s%s%s" pcomp decl body), final
 ;
 
 let bifrostfl2bundle unit_name load_files replace->F =
@@ -132,17 +132,21 @@ let bifrostfl2bundle unit_name load_files replace->F =
     |
     (foreach (\f. (_load f F) fseq ()) load_files) fseq
     (_load ifile F) fseq
-    let bundle_info = make_bundle_version unit_name then
+    val (bundle_decls, bundle_info, final) = make_bundle_version unit_name then
     // Now produce the resulting file
     let fp = fopen ofile "w" then
     (foreach (\f. fprintf fp "cload \"%s\";\n" f) load_files) fseq
     (fprintf fp "\n\n") fseq
+    (fprintf fp "%s\n\n" bundle_decls) fseq
+    (fprintf fp "begin_abstype;\n") fseq
     (fclose fp) fseq
     (system (sprintf "/bin/cat %s >> %s" ifile ofile)) != 0 =>
 	eprintf "Failed to copy %s to %s\n" ifile ofile
     |
     let fp = fopen ofile "a" then
     (fprintf fp ";\n%s\n" bundle_info) fseq
+    (fprintf fp "\nend_abstype %s;\n\n" unit_name) fseq
+    (fprintf fp "%s\n" final) fseq
     (fclose fp)
 ;
 

@@ -5,7 +5,7 @@ let make_bundle_merge_arb name protocol =
     protocol != "ackpulse" =>
 	(fprintf stdinfo
 	  "WARNING: No arbiter or merge operation available for %s protocol"
-	  protocol) fseq F
+	  protocol) fseq ""
     |
     (cload (DIR^"ack_pulse_arbiter.fl")) fseq
     (cload (DIR^"ack_pulse_merge.fl")) fseq
@@ -25,7 +25,7 @@ let make_bundle_merge_arb name protocol =
 	in
 	list2str T "\n\t\t  " ",\n\t\t  " "" mk1 left_signals
     then
-    (eval_fl_code <{
+    let arb_code = (<{
 	let `name`_ack_pulse_arbiter =
 	    bit_input           clk reset.
 	    `name`_list_input   `name`_reqs.
@@ -42,8 +42,8 @@ let make_bundle_merge_arb name protocol =
 	    ]
 	    );
     }> "functor"
-    ) fseq
-    (eval_fl_code <{
+    ) then
+    let merge_code = (<{
 	let `name`_ack_pulse_merge =
 	    bit_input           clk reset.
 	    `name`_list_input   `name`_reqs.
@@ -60,6 +60,7 @@ let make_bundle_merge_arb name protocol =
 	    ]
 	    );
     }> "functor"
-    ) 
+    ) then
+    list2str T "\n" "\n" "\n" id (arb_code @ merge_code)
 ;
 

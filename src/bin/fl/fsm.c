@@ -5542,7 +5542,11 @@ do_combinational(ste_ptr ste)
     while( !empty ) {
 	int rank = COUNT_BUF(sim_wheel_bufp) - 1;
 	empty = TRUE;
-	if( --iterations < 0 ) { return -1; }
+	if( --iterations < 0 ) {
+//FP(err_fp, "Too many iterations...\n");
+	     return -1;
+	}
+//if( iterations < 5 ) { FP(err_fp, "\n\niteration: %d\n", iterations); }
 	do {
 	    buffer *bp = (buffer *) M_LOCATE_BUF(sim_wheel_bufp, rank);
 	    if( COUNT_BUF(bp) > 0 ) {
@@ -5550,6 +5554,7 @@ do_combinational(ste_ptr ste)
 		while( COUNT_BUF(bp) > 0 ) {
 		    ncomp_ptr cp;
 		    pop_buf(bp, &cp);
+//if( iterations < 5 ) { FP(err_fp, "Computing the result for output: "); DBG_print_ilist(cp->outs); }
 		    cp->flag = FALSE;
 		    if( quit_simulation_early ) return -1;
 		    todo += do_wl_op(ste, cp);
@@ -6869,6 +6874,7 @@ update_node(ste_ptr ste, int idx, gbv Hnew, gbv Lnew)
     *(cur_buf+2*idx) = Hnew;
     *(cur_buf+2*idx+1) = Lnew;
     if( c_NEQ(Hnew,Hcur) || c_NEQ(Lnew,Lcur) ) {
+//FP(err_fp, "----> Node %s changed at time %d to ", idx2name(np->idx), ste->cur_time); cHL_Print(err_fp, Hnew, Lnew); FP(err_fp, "\n");
 	if( np->fanouts != NULL ) {
 	    for(idx_list_ptr il = np->fanouts; il != NULL; il = il->next) {
 		ncomp_ptr c;

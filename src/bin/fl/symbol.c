@@ -482,6 +482,30 @@ Init_symbol()
 }
 
 void
+DBG_check(string msg)
+{
+    fn_ptr      fp;
+    FOR_REC(&fn_rec_mgr, fn_ptr, fp) {
+	if( strcmp("int2arbi'arbiter'arb_rf_new", fp->name) == 0 ) {
+	    fprintf(stderr, "int2arbi'arbiter'arb_rf_new at %s\n", msg);
+	    fprintf(stderr, "in_use: %s\n", (fp->in_use? "1" : "0"));
+	    fprintf(stderr, "has_default_values: %s\n",
+			    (fp->has_default_values? "1" : "0"));
+	    arg_names_ptr ap = fp->arg_names;
+	    while( ap != NULL ) {
+		fprintf(stderr, "  arg: %s ", ap->name);
+		if( ap->default_value == NULL ) {
+		    fprintf(stderr, "NULL\n");
+		} else {
+		    PR(ap->default_value);
+		}
+		ap = ap->next;
+	    }
+	}
+    }
+}
+
+void
 Mark_symbols()
 {
     fn_ptr      fp;
@@ -502,7 +526,10 @@ Mark_symbols()
 	    if( fp->has_default_values ) {
 		arg_names_ptr ap = fp->arg_names;
 		while( ap != NULL ) {
-		    Mark(ap->default_value);
+		    if( ap->default_value != NULL ) {
+			Mark(ap->default_value);
+			SET_REFCNT(ap->default_value, MAX_REF_CNT);
+		    }
 		    ap = ap->next;
 		}
 	    }
@@ -651,8 +678,10 @@ Add_Destructors(string name, typeExp_ptr new_type,
         tmp->end_line_nbr   = line_nbr;
         tmp->expr          = Make_0inp_Primitive(P_I);
 	tmp->signature	   = Get_SHA256_signature(tmp->expr);
-        tmp->expr_init     = cephalopode_mode? Cephalopde_Reflect_expr(tmp->expr) : NULL;
-        tmp->expr_comb     = cephalopode_mode? Cephalopde_Reflect_expr(tmp->expr) : NULL;
+        tmp->expr_init     =
+	    cephalopode_mode? Cephalopde_Reflect_expr(tmp->expr) : NULL;
+        tmp->expr_comb     =
+	    cephalopode_mode? Cephalopde_Reflect_expr(tmp->expr) : NULL;
         tmp->super_comb    = Make_0inp_Primitive(P_I);
         tmp->type          = Fix_Types(&(fnp->type), new_type);
         tmp->overload      = FALSE;
@@ -692,10 +721,10 @@ Add_Destructors(string name, typeExp_ptr new_type,
         save_fun->end_line_nbr   = line_nbr;
         save_fun->expr           = save_expr;
 	save_fun->signature	 = Get_SHA256_signature(save_expr);
-        save_fun->expr_init      = cephalopode_mode?
-					Cephalopde_Reflect_expr(save_fun->expr) : NULL;
-        save_fun->expr_comb      = cephalopode_mode?
-					Cephalopde_Reflect_expr(save_fun->expr) : NULL;
+        save_fun->expr_init      =
+	    cephalopode_mode?  Cephalopde_Reflect_expr(save_fun->expr) : NULL;
+        save_fun->expr_comb      =
+	    cephalopode_mode?  Cephalopde_Reflect_expr(save_fun->expr) : NULL;
         save_fun->super_comb     = save_expr;    // ????
         save_fun->type           = save_type;
         save_fun->overload           = FALSE;
@@ -725,10 +754,10 @@ Add_Destructors(string name, typeExp_ptr new_type,
         load_fun->end_line_nbr   = line_nbr;
         load_fun->expr           = load_expr;
 	load_fun->signature	 = Get_SHA256_signature(load_expr);
-        load_fun->expr_init      = cephalopode_mode?
-					Cephalopde_Reflect_expr(load_fun->expr) : NULL;
-        load_fun->expr_comb      = cephalopode_mode?
-					Cephalopde_Reflect_expr(load_fun->expr) : NULL;
+        load_fun->expr_init      =
+		cephalopode_mode?Cephalopde_Reflect_expr(load_fun->expr) : NULL;
+        load_fun->expr_comb      =
+		cephalopode_mode?Cephalopde_Reflect_expr(load_fun->expr) : NULL;
         load_fun->super_comb     = load_expr;    // ????
         load_fun->type           = load_type;
         load_fun->overload           = FALSE;
@@ -885,7 +914,7 @@ Make_forward_declare(string name, typeExp_ptr type, symbol_tbl_ptr stbl,
 
 symbol_tbl_ptr
 New_fn_def(string name, result_ptr res, symbol_tbl_ptr stbl, bool print,
-           string file, int start_line, arg_names_ptr arg_names)
+           string file, int start_line)
 {
     fn_ptr      ret;
 
@@ -948,14 +977,15 @@ New_fn_def(string name, result_ptr res, symbol_tbl_ptr stbl, bool print,
     ret->end_line_nbr       = line_nbr;
     ret->comments           = cur_doc_comments;
     // Handle argument names and default values (if any)
-    ret->arg_names          = arg_names;
+    ret->arg_names          = res->arg_names;
     ret->has_default_values = FALSE;
-    while(arg_names != NULL) {
-	if( arg_names->default_value != NULL ) {
+    arg_names_ptr   ap = res->arg_names;
+    while(ap != NULL) {
+	if( ap->default_value != NULL ) {
 	    ret->has_default_values = TRUE;
-	    break;
+	    ap->default_value = Copy_Graph(ap->default_value);
 	}
-	arg_names = arg_names->next;
+	ap = ap->next;
     }
     // Prepare to pick up new comments
     cur_doc_comments = NULL;
@@ -1671,7 +1701,12 @@ get_definition(g_ptr redex)
 	    MAKE_REDEX_FAILURE(redex,
 			       Fail_pr("Function %s is overloaded", name));
 	} else  {
-	    OVERWRITE(redex, fp->expr_init);
+	    if( fp->implicit_args != NULL ) {
+		MAKE_REDEX_FAILURE(redex,
+		       Fail_pr("Function %s is mplicitly overloaded", name));
+	    } else {
+		OVERWRITE(redex, fp->expr_init);
+	    }
 	}
     }
     DEC_REF_CNT(l);
@@ -1700,7 +1735,13 @@ get_combinator_expression(g_ptr redex)
 	    MAKE_REDEX_FAILURE(redex,
 			       Fail_pr("Function %s is overloaded", name));
 	} else  {
-	    OVERWRITE(redex, fp->expr_comb);
+	    if( fp->implicit_args != NULL ) {
+		MAKE_REDEX_FAILURE(redex,
+		       Fail_pr("Function %s is mplicitly overloaded", name));
+	    } else {
+		OVERWRITE(redex, fp->expr_init);
+		OVERWRITE(redex, fp->expr_comb);
+	    }
 	}
     }
     DEC_REF_CNT(l);
@@ -1725,6 +1766,31 @@ get_userdef_id(g_ptr redex)
 }
 
 static void
+get_userdef_expression(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    if( !cephalopode_mode ) {
+	MAKE_REDEX_FAILURE(redex,
+		"get_userdef_expression only available in -C mode");
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
+    int idx = GET_INT(r);
+    fn_ptr fp = (fn_ptr) REC_EL(&fn_rec_mgr, idx);
+    if( fp == NULL ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot find USERDEF %d", idx));
+    } else {
+	g_ptr res = fp->expr_init;
+	INC_REFCNT(res);
+	MAKE_REDEX_PAIR(redex,Make_STRING_leaf(fp->name), res);
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
 get_userdef_combinator_expression(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
@@ -1741,8 +1807,9 @@ get_userdef_combinator_expression(g_ptr redex)
     if( fp == NULL ) {
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot find USERDEF %d", idx));
     } else {
-	MAKE_REDEX_PAIR(redex,Make_STRING_leaf(fp->name),
-			      fp->expr_comb);
+	g_ptr res = fp->expr_comb;
+	INC_REFCNT(res);
+	MAKE_REDEX_PAIR(redex,Make_STRING_leaf(fp->name), res);
     }
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -1882,6 +1949,10 @@ Symbols_Install_Functions()
                         GLmake_arrow(GLmake_string(), GLmake_int()),
                         get_userdef_id);
 
+    Add_ExtAPI_Function("get_userdef_expression", "1", TRUE,
+                        GLmake_arrow(GLmake_int(),
+				     GLmake_tuple(GLmake_string(), term)),
+                        get_userdef_expression);
     Add_ExtAPI_Function("get_userdef_combinator_expression", "1", TRUE,
                         GLmake_arrow(GLmake_int(),
 				     GLmake_tuple(GLmake_string(), term)),
@@ -1963,7 +2034,7 @@ Get_argument_names(g_ptr onode)
     FUB_ROF(&args, name_expr_rec, nep) {
         arg_names_ptr t = (arg_names_ptr) new_rec(&arg_names_rec_mgr);
         t->name = nep->var;
-	t->default_value = Copy_Graph(nep->expr);
+	t->default_value = nep->expr;
         t->next = res;
         res = t;
     }
@@ -2578,6 +2649,7 @@ get_named_arg(g_ptr node, name_expr_ptr name_expp, g_ptr *next_nodep)
     g_ptr E, var, default_val;
     if( is_P_NAMED_ARG(body, &E, &var, &default_val) ) {
 	name_expp->expr = default_val;
+	INC_REFCNT(default_val);
 	*next_nodep = E;
     } else {
 	name_expp->expr = NULL;
@@ -2655,5 +2727,16 @@ get_fn_rec()
     fn_ptr res = (fn_ptr) new_rec(&fn_rec_mgr);
     res->id = fn_rec_id_cnt;
     fn_rec_id_cnt++;
+    res->has_default_values = FALSE;
+    res->comments = NULL;
+    res->expr = NULL;                      
+    res->expr_init = NULL;
+    res->expr_comb = NULL;
+    res->super_comb = NULL;
+    res->type = NULL;
+    res->overload_list = NULL;
+    res->implicit_args = NULL;
+    res->arg_names = NULL;
+    res->next = NULL;
     return res;
 }

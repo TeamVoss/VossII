@@ -17,7 +17,8 @@
 void        Init_lexer();
 extern str_mgr	strings;
 extern string	default_vosslib_dir;
-
+extern bool	cephalopode_mode;
+extern bool     RCadd_debug_info;
 
 /***** PRIVATE VARIABLES *****/
 
@@ -39,6 +40,10 @@ Init()
     initRC(default_vossrc, ".vossrc", ".");
     Init_Paths(getRCvalue("VOSS-BINARY-DIRECTORY"),
 	       getRCvalue("VOSS-LIBRARY-DIRECTORY"));
+
+    if( cephalopode_mode ) {
+	RCadd_debug_info = FALSE;
+    }
 
     Init_arbi();
     B_Init();

@@ -168,7 +168,7 @@ lift_lets_and_letrecs(g_ptr node)
     if( node == NULL )
         return(node);
     switch( GET_TYPE(node) ) {
-	    case APPLY_ND:
+	case APPLY_ND:
 	    rson = lift_lets_and_letrecs(GET_APPLY_RIGHT(node));
 	    lson = GET_APPLY_LEFT(node);
 	    if( !IS_APPLY(lson) ) {
@@ -182,20 +182,25 @@ lift_lets_and_letrecs(g_ptr node)
 	    switch( is_let_or_letrec(node, &var, &E, &F) ) {
 		case 0:
 		    /* Application node */
-		    return( Make_APPL_ND(lson, rson) );
+		    res = Make_APPL_ND(lson, rson);
+		    break;
 		case 1:
 		    /* LET var = E in F */
 		    F = lift_lets_and_letrecs(Make_APPL_ND(F, rson));
-		    return( Make_APPL_ND(Make_Lambda(var,F),E) );
+		    res = Make_APPL_ND(Make_Lambda(var,F),E);
+		    break;
 		case 2:
 		    /* LETREC var = E in F */
 		    F = lift_lets_and_letrecs(Make_APPL_ND(F, rson));
-		    return( Make_APPL_ND(Make_Lambda(var,F),
+		    res = Make_APPL_ND(Make_Lambda(var,F),
 					 Make_1inp_Primitive(P_Y,
-					    Make_Lambda(var,E))) );
+					    Make_Lambda(var,E)));
+		    break;
 		default:
 		    DIE("Illegal return value from is_let_or_letrec");
 	    }
+	    MoveTypeHint(node, res, FALSE);
+	    return res;
 	    break;
         case LAMBDA_ND:
 	    E = lift_lets_and_letrecs(GET_LAMBDA_BODY(node));
@@ -205,6 +210,7 @@ lift_lets_and_letrecs(g_ptr node)
 	    line = GET_LAMBDA_LINE_NBR(node);
 	    res = Make_Lambda(var,E);
 	    SET_LAMBDA_LINE_NBR(res, line);
+	    MoveTypeHint(node, res, FALSE);
             return( res );
         case CONS_ND:
 	    ASSERT(GET_CONS_HD(node) == NULL && GET_CONS_TL(node) == NULL);

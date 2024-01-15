@@ -62,7 +62,7 @@ extern bool		RCadd_debug_info;
 
 bool	do_parse(bool flush);
 bool	do_parse_stdin(bool flush);
-bool	perform_fl_command(string txt);
+bool	perform_fl_command(string txt, bool restore_line_nbr);
 
 /* ===================== Local variables defined ===================== */
 #define TCL_CMD_BUF_SZ	    16384
@@ -281,6 +281,7 @@ fl_main(int argc, char *argv[])
 	    (strcmp(argv[1], "--cephalopode") == 0) )
 	{
             cephalopode_mode = TRUE;
+	    RCadd_debug_info = FALSE;
             argc--, argv++;
         } else
         if( (strcmp(argv[1], "-unbuf_stdout") == 0) ||
@@ -471,7 +472,7 @@ fl_main(int argc, char *argv[])
         {
             string cmd = tprintf("(_load \"%s/preamble.fl\" F) fseq ();",
 				 binary_location);
-            if( perform_fl_command(cmd) ) {
+            if( perform_fl_command(cmd, FALSE) ) {
                 /* Successful load */
             } else {
                 /* Failed load */
@@ -1111,7 +1112,7 @@ call_setjmp(string cur_start, bool *okp)
 {
     switch( setjmp(toplevel_eval_env) ) {
 	case 0:
-	    *okp = perform_fl_command(cur_start);
+	    *okp = perform_fl_command(cur_start, FALSE);
 	    return 0;
 	case 2:
 	    return 2;
