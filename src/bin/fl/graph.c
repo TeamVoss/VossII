@@ -96,6 +96,7 @@ static int		uniq_quant_cnt = 1;
 static buffer		fn_trace_buf;
 static rec_mgr		g_rec_mgr;
 static rec_mgr		result_rec_mgr;
+static result_ptr	top_result_rec_ptr = NULL;
 static rec_mgr		comment_list_rec_mgr;
 static rec_mgr		free_rec_mgr;
 static hash_record	free_tbl;
@@ -1270,6 +1271,15 @@ is_pat_fail(g_ptr node)
 void
 Free_result_ptr(result_ptr rp)
 {
+    if( top_result_rec_ptr == rp ) {
+	top_result_rec_ptr = rp->next;
+    } else {
+	result_ptr trp = top_result_rec_ptr;
+	while( trp->next != rp ) {
+	    trp = trp->next;
+	}
+	trp->next = rp->next;
+    }
     free_rec(&result_rec_mgr, (pointer) rp);
 }
 
@@ -1287,6 +1297,8 @@ Compile(symbol_tbl_ptr stbl, g_ptr onode, typeExp_ptr type, bool delayed,
 
     // Extract argument names and default values (if any)
     result_ptr rp = (result_ptr) new_rec(&result_rec_mgr);
+    rp->next = top_result_rec_ptr;
+    top_result_rec_ptr = rp;
     if( extract_arg_names ) 
 	rp->arg_names = Get_argument_names(onode);
     else
@@ -1386,6 +1398,8 @@ Execute_fl_code(const string function, ...)
 	expr = Make_APPL_ND(expr, g_arg);
     }
     result_ptr rp = (result_ptr) new_rec(&result_rec_mgr);
+    rp->next = top_result_rec_ptr;
+    top_result_rec_ptr = rp;
     rp->expr = expr;
     rp->type = NULL;
     rp->arg_names = NULL;
@@ -1597,8 +1611,8 @@ Do_garbage_collect()
     SET_REFCNT(void_nd, MAX_REF_CNT);
     B_Mark(cur_eval_cond);
     Mark(root_node);
-    result_ptr	rp;
-    FOR_REC(&result_rec_mgr, result_ptr, rp) {
+    result_ptr	rp = top_result_rec_ptr;
+    while( rp != NULL ) {
 	Mark(rp->expr_init);
 	Mark(rp->expr_comb);
 	Mark(rp->expr);
@@ -1608,6 +1622,7 @@ Do_garbage_collect()
 	    Mark(ap->default_value);
 	    ap = ap->next;
 	}
+	rp = rp->next;
     }
     Mark(print_nd);
     Mark(return_trace_list);

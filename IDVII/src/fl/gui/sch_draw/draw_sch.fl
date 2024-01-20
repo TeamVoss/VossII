@@ -759,6 +759,25 @@ let fl_inform_show_value_change c show =
 export_to_tcl fl_inform_show_value_change;
 
 
+let pretty_printers_ref = ref {[]::(string#(int->string)) list};
+
+
+let add_pretty_printer vec fn =
+    let old = filter (\p. fst p != vec) (deref pretty_printers_ref) then
+    let new = (vec,fn):old then
+    (pretty_printers_ref := new)
+;
+
+let rm_pretty_printer vec =
+    let new = filter (\p. fst p != vec) (deref pretty_printers_ref) then
+    (pretty_printers_ref := new)
+;
+
+let find_pretty_printer vec i =
+    let fn = assoc vec (deref pretty_printers_ref) then
+    fn i
+;
+
 let compress l =
     letrec compr cnt cur (v:vs) =
 	v == cur => compr (cnt+1) cur vs |
@@ -830,8 +849,10 @@ let fl_wv_get_short w vec t =
 		let i = sscanf "%b" s in
 		(assoc i opt_states) catch (sprintf "?0x%x?" i)
 	    |
-	    let res = length nds >= 4 =>
-			sprintf "0x%x" (sscanf "%b" s) | (implode vs)
+	    let i = sscanf "%b" s in
+	    let res =
+		let txt = length nds >= 4 => sprintf "0x%x" i | s in
+		(find_pretty_printer vec i) catch txt
 	    then
 	    strlen res > 30 => "..." | res
 	|
@@ -918,8 +939,11 @@ let fl_get_short_value w vecs compute_alternatives =
 		let i = sscanf "%b" s in
 		(assoc i opt_states) catch (sprintf "?0x%x?" i)
 	    |   
-	    let res = length nds >= 4 =>
-			sprintf "0x%x" (sscanf "%b" s) | (implode vs)
+	    let i = sscanf "%b" s in
+	    let res =
+		let txt = length nds >= 4 => sprintf "0x%x" i | (implode vs) in
+		((length vecs = 1) => (find_pretty_printer (hd vecs) i) | txt)
+		catch txt
 	    then
 	    strlen res > 30 => "..." | res
 	|
@@ -1003,8 +1027,10 @@ let fl_get_long_value canvas tag =
 	    let idx = find_first0 non_binary vals then
 	    idx = 0 =>
 		let b = implode (map (\(H,L). H=>"1"| "0") vals) then
-		let d = length r >= 4 => sprintf "0x%x" (sscanf "%b" b) | b in
-		(v,[d])
+		let i = sscanf "%b" b in
+		let base_txt = length r >= 4 => sprintf "0x%x" i | b in
+		let pretty_txt = (" "^(find_pretty_printer v i)) catch "" in
+		(v, [base_txt^pretty_txt])
 	    |
 	    let val2s (HL) =
 		HL == (T,F) => "1" |
@@ -1137,25 +1163,6 @@ let trim s =
     (implode es')
 ;
 
-
-let pretty_printers_ref = ref {[]::(string#(int->string)) list};
-
-
-let add_pretty_printer vec fn =
-    let old = filter (\p. fst p != vec) (deref pretty_printers_ref) then
-    let new = (vec,fn):old then
-    (pretty_printers_ref := new)
-;
-
-let rm_pretty_printer vec =
-    let new = filter (\p. fst p != vec) (deref pretty_printers_ref) then
-    (pretty_printers_ref := new)
-;
-
-let find_pretty_printer vec i =
-    let fn = assoc vec (deref pretty_printers_ref) then
-    fn i
-;
 
 let base_get_complete_value ste vectors t =
     let type = get_ste_type ste then
@@ -1568,8 +1575,15 @@ let base_get_waveform w vec min_time max_time show_depend =
 			let i = sscanf "%b" s in
 			(assoc i opt_states) catch "-"
                     |   
-                    length nds >= 4 => sprintf "0x%x" (sscanf "%b" s)
-                                     | (implode vs) 
+		    let i = sscanf "%b" s in
+		    let res =
+			let txt = length nds >= 4 => sprintf "0x%x" i
+					      | (implode vs)
+			in
+			(find_pretty_printer vec i)
+			catch txt
+		    then
+		    res
                 |
                 length alts = 1 => hd alts |
                 list2str T "{" "," "}" id (compress vs)

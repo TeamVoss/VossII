@@ -1656,18 +1656,7 @@ let smallPleaftype (INT i) = sprintf "%d" i
  /\ smallPleaftype (USERDEF i) = sprintf "UD%d" i
 ;
 
-// Use tcl//tk to draw the tree for the term e.
-let draw_term e =
-    let tmp_dir = mktempd "draw_term" then
-    let dot_file = sprintf "%s/graph.dot" tmp_dir then
-    let fp = fopen dot_file "w" then
-    (fprintf fp "digraph G {\n") fseq
-    (fprintf fp "node [shape=circle];\n") fseq
-    (fprintf fp "size = \"8.5,11.0\";\n") fseq
-    (fprintf fp "center = 1;\n") fseq
-    (fprintf fp "margin = 0.5;\n") fseq
-    (fprintf fp "ordering=out;\n") fseq
-    let rcnt = ref 0 then
+let base_draw_term fp rcnt t =
     letrec draw (APPLY E1 E2) =
 	let n = deref rcnt then
 	(rcnt := (n+1)) fseq
@@ -1711,14 +1700,29 @@ let draw_term e =
 	(fprintf fp "n%d [label = \"[]\"];\n" n) fseq
 	n
     in
-    (draw e) fseq
+    draw t
+;
+
+// Use tcl//tk to draw the tree for the term e.
+let draw_term e =
+    let tmp_dir = mktempd "draw_term" then
+    let dot_file = sprintf "%s/graph.dot" tmp_dir then
+    let fp = fopen dot_file "w" then
+    (fprintf fp "digraph G {\n") fseq
+    (fprintf fp "node [shape=circle];\n") fseq
+    (fprintf fp "size = \"8.5,11.0\";\n") fseq
+    (fprintf fp "center = 1;\n") fseq
+    (fprintf fp "margin = 0.5;\n") fseq
+    (fprintf fp "ordering=out;\n") fseq
+    let rcnt = ref 0 then
+    (base_draw_term fp rcnt e) fseq
     (fprintf fp "\n}\n") fseq
     (fclose fp) fseq
     let w = tcl_eval [sprintf "display_dot %s {} {}" dot_file] then
     (system (sprintf "/bin/rm -f %s" dot_file)) fseq
     ()
 ;
-end_abstype draw_term;
+end_abstype base_draw_term draw_term;
 
 // Create a bv that satisfies the constraint pred_fun.
 // Pred_fun is given as a function of the generated bv_variable.

@@ -777,6 +777,7 @@ typedef struct result_rec {
         g_ptr		super_comb;
         typeExp_ptr	type;
 	arg_names_ptr	arg_names;
+	result_ptr	next;		// In-use linked list
 } result_rec;
 
 typedef struct comment_list_rec {
