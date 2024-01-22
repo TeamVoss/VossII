@@ -379,7 +379,7 @@ let make_models_and_theorems sz =
 
 
 let MIN_SZ = 1;
-let MAX_SZ = 100;
+let MAX_SZ = 33;
 //let MIN_SZ = 3;
 //let MAX_SZ = 8;
 

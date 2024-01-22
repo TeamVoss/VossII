@@ -21,13 +21,13 @@
 /********************************************************************/
 /*	    Version control (debug, paranoia, etc.)		    */
 /********************************************************************/
-#define PARANOIA 1		 // Turn on checking before doing graph ops.
 #if 0
 #define TRACK_FREEING 1		 // Keep the old value & location of freed node
+#define DONT_FREE_ND 1		 // Never free a node
+#define PARANOIA 1		 // Turn on checking before doing graph ops.
 #define NO_REFCNT_GC	1	 // Turn off reference counting g.c.
 #define CHECK_REF_CNTS 1	 // Check every reachable nodes reference count
 #define VERBOSE_DEC_REF_CNT 1	 // Verbose decrementation of reference counts
-#define DONT_FREE_ND 1		 // Never free a node
 #define NO_CACHE_HIT	1	 // Turn all memo tables into no-ops (miss only)
 #define TRACE_FUNCTION_CALLS 1	 // Trace (user named) function calls
 #define DO_GRAPH_COMPARISON 1	 // Compare two processes graphs at run time
@@ -186,7 +186,7 @@ typedef struct impl_arg_rec	*impl_arg_ptr;
 #include	"minisat_ifc.h"
 #include	"draw_graph.h"
 #include	"debug.h"
-#include	"strings.h"
+#include	"voss_strings.h"
 #include	"system.h"
 #include	"int_ops.h"
 #include	"list_ops.h"
@@ -206,17 +206,17 @@ typedef struct impl_arg_rec	*impl_arg_ptr;
 #undef EXPORT_FORWARD_DECL
 
 typedef struct name_list_rec {		/* List of valid node names	*/
-	bool		    used;
-    string          name;           /* Valid name for this node */
-    name_list_ptr   next;
+	bool		used;
+	string          name;           /* Valid name for this node */
+	name_list_ptr   next;
 } name_list_rec;
 
 typedef struct impl_arg_rec {
 	bool		    used;
-    string		    name;   	    /* Valid name for this node */
+	string		    name;   	    /* Valid name for this node */
 	fn_ptr		    def;
 	typeExp_ptr	    type;	        /* General type for this node */
-    impl_arg_ptr	next;
+    impl_arg_ptr	    next;
 } impl_arg_rec;
 
 /*  ========= Generally useful macros ============ */

@@ -1,0 +1,41 @@
+load "ste.fl";
+
+lettype pckt = PCKT pexlif;
+lettype ckt = CKT fsm;
+
+let tst =
+    bit_input a b c.
+    bit_output o.
+    CELL "tst" [
+	o <- a '&' (b '|' c)
+];
+
+let p = flfun2pexlif tst;
+p fseq 1;
+
+let dir = mktempd "ckt";
+dir;
+
+write_pckt (dir^"/p.pexlif") (PCKT p);
+
+let fp = fopen (dir^"/compile.fl") "w";
+fprintf fp "load \"ste.fl\";\n";
+fprintf fp "lettype pckt = PCKT pexlif;\n";
+fprintf fp "lettype ckt = CKT fsm;\n";
+fprintf fp "val (PCKT p) = read_pckt \"%s/p.pexlif\";\n" dir;
+fprintf fp "let ckt = pexlif2fsm p; ckt fseq ();\n";
+fprintf fp "write_ckt \"%s/ckt.fsm\" (CKT ckt);\n" dir;
+fprintf fp "quit;\n";
+fclose fp;
+
+system "fl -noX -f %s/compile.fl";
+
+
+let ckt1 = pexlif2fsm p;
+ckt1;
+
+val (CKT ckt2) = read_ckt (dir^"/ckt.fsm");
+ckt2;
+
+ckt1;
+ckt2;

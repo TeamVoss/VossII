@@ -25,13 +25,21 @@ set base_sfont  [get_font "{bitstream vera sans mono} 10"]
 set base_mfont  [get_font "{bitstream vera sans mono} 11"]
 set base_bfont  [get_font "{bitstream vera sans mono} 13"]
 
-set ::voss2_txtfont0    [get_font "{Courier Bold} 6"]
-set ::voss2_txtfont1    [get_font "{Courier Bold} 8"]
-set ::voss2_txtfont2    [get_font "{Courier Bold} 10"]
-set ::voss2_txtfont3    [get_font "{Courier Bold} 16"]
-set ::voss2_txtfont4    [get_font "{Courier Bold} 18"]
-set ::voss2_txtfont5    [get_font "{Courier Bold} 20"]
-set ::voss2_txtfont6    [get_font "{Courier Bold} 22"]
+;#set ::voss2_txtfont0    [get_font "{Courier Bold} 6"]
+;#set ::voss2_txtfont1    [get_font "{Courier Bold} 8"]
+;#set ::voss2_txtfont2    [get_font "{Courier Bold} 10"]
+;#set ::voss2_txtfont3    [get_font "{Courier Bold} 16"]
+;#set ::voss2_txtfont4    [get_font "{Courier Bold} 18"]
+;#set ::voss2_txtfont5    [get_font "{Courier Bold} 20"]
+;#set ::voss2_txtfont6    [get_font "{Courier Bold} 22"]
+
+set ::voss2_txtfont0    [get_font "-*-courier-bold-r-normal-*-10-*-*-*-*-*-*-*"]
+set ::voss2_txtfont1    [get_font "-*-courier-bold-r-normal-*-12-*-*-*-*-*-*-*"]
+set ::voss2_txtfont2    [get_font "-*-courier-bold-r-normal-*-14-*-*-*-*-*-*-*"]
+set ::voss2_txtfont3    [get_font "-*-courier-bold-r-normal-*-16-*-*-*-*-*-*-*"]
+set ::voss2_txtfont4    [get_font "-*-courier-bold-r-normal-*-18-*-*-*-*-*-*-*"]
+set ::voss2_txtfont5    [get_font "-*-courier-bold-r-normal-*-20-*-*-*-*-*-*-*"]
+set ::voss2_txtfont6    [get_font "-*-courier-bold-r-normal-*-24-*-*-*-*-*-*-*"]
 
 set ::voss2_txtfont     $::voss2_txtfont2
 set ::voss2_help_font   $::voss2_txtfont1
@@ -166,18 +174,18 @@ proc util:report_result_in_file {msg file return_alts} {
 
 # NOTE: This is OS dependent!!!!
 proc util:process_is_alive {process_id} {
-    if [catch {set rl [split [exec ps -o s $process_id] "\n"]}] {
+    if [catch {set rl [exec ps -o state= $process_id]}] {
         return 0
     }
-    if { [llength $rl] != 2 } { return 0 }
-    set status [lindex $rl 1]
-    switch $status {
-	R	-
-	S	-
-	D	-
-	T	{ return 1; }
-	default { return 0; }
-    }
+    if { [llength $rl] != 1 } { return 0 }
+    set status [lindex $rl 0]
+   switch -regexp -- $status {
+ 	R	-
+ 	S*	-
+ 	D	-
+ 	T	{ return 1; }
+    default { return 0;}
+ 	}
 }
 
 proc util:watch_process {pid {delay 50} {action "destroy ."} {persistent 0} } {
@@ -549,11 +557,11 @@ proc gui_io:get_data {title texts} {
 	bind $te <KeyPress-Return> [list :gui:return 1 $w $tcnt]
 	$te insert 0 $default
 	pack $tl -side left
-	pack $te -side left -fill x
-	pack $tf -side top -fill x
+	pack $te -side left -fill x -expand y
+	pack $tf -side top -fill x -expand y
     }
     frame $w.bf
-    pack $w.bf -side bottom -fill x
+    pack $w.bf -side bottom -fill x -expand yes
     label $w.bf.sp1
     button $w.bf.cancel -text Cancel -command ":gui:return 0 $w $tcnt"
 

@@ -79,7 +79,7 @@ static int	    call_level = 0;
 #endif
 #endif /* DEBUG */
 
-bool		    perform_fl_command(string txt);
+bool		    perform_fl_command(string txt, bool restore_line_nbr);
 
 /************************************************************************/
 /*			Local Variables					*/
@@ -96,6 +96,7 @@ static int		uniq_quant_cnt = 1;
 static buffer		fn_trace_buf;
 static rec_mgr		g_rec_mgr;
 static rec_mgr		result_rec_mgr;
+static result_ptr	top_result_rec_ptr = NULL;
 static rec_mgr		comment_list_rec_mgr;
 static rec_mgr		free_rec_mgr;
 static hash_record	free_tbl;
@@ -250,6 +251,7 @@ static struct prim_fun_name_rec {
 		    {P_UNTYPE, "P_UNTYPE", ""},
 		    {P_UNQUOTE, "P_UNQUOTE", ""},
 		    {P_VOID, "P_VOID", ""},
+		    {P_NAMED_ARG, "P_NAMED_ARG", ""},
 		    // Empty
 };
 static char pfn2str_buf[512];
@@ -870,6 +872,39 @@ Make_PAIR_ND(g_ptr fst, g_ptr snd)
     return( root );
 }
 
+g_ptr
+Make_Named_Arg(string name, g_ptr expr)
+{
+    string pname = wastrsave(&strings, name);
+    return( Make_PAIR_ND(Make_0inp_Primitive(P_NAMED_ARG),
+			 Make_PAIR_ND(Make_STRING_leaf(pname), expr)) );
+}
+
+bool
+Destr_Named_Arg(g_ptr node, string *namep, g_ptr *exprp)
+{
+    if( node == NULL )
+	return FALSE;
+    if( !IS_CONS(node) )
+	return FALSE;
+    g_ptr lhs = GET_CONS_HD(node);
+    if( lhs == NULL )
+	return FALSE;
+    if(!IS_LEAF(lhs) || !IS_PRIM_FN(lhs) || (GET_PRIM_FN(lhs) != P_NAMED_ARG ))
+	return FALSE;
+    g_ptr rhs = GET_CONS_TL(node);
+    if( rhs == NULL )
+	return FALSE;
+    if( !IS_CONS(rhs) )
+	return FALSE;
+    g_ptr name = GET_CONS_HD(rhs);
+    if( name == NULL || !IS_LEAF(name) || !IS_STRING(name) )
+	return FALSE;
+    *namep = GET_STRING(name);
+    *exprp = GET_CONS_TL(rhs);
+    return TRUE;
+}
+
 string
 Find_new_free_var(g_ptr expr)
 {
@@ -1043,6 +1078,7 @@ Print_Result(result_ptr res, odests fp, bool print)
 	SET_TYPE(res->expr, LEAF);
 	SET_LEAF_TYPE(res->expr, PRIM_FN);
 	SET_PRIM_FN(res->expr, P_FAIL);
+	SET_FAIL_STRING(res->expr, wastrsave(&strings, FailBuf));
 	FP(err_fp, "Failure:    %s", FailBuf);
 	FailBuf[0] = 0;
 	ok = FALSE;
@@ -1072,6 +1108,30 @@ TrArg(g_ptr node, g_ptr E, bool constructor)
     return res;
 }
 
+
+g_ptr
+Copy_Graph(g_ptr node)
+{
+    g_ptr res;
+    if( node == NULL ) { return NULL; }
+    switch( GET_TYPE(node) ) {
+	case APPLY_ND:
+	    return( Make_APPL_ND(Copy_Graph(GET_APPLY_LEFT(node)),
+				 Copy_Graph(GET_APPLY_RIGHT(node))) );
+	case LAMBDA_ND:
+	    return( Make_Lambda(GET_LAMBDA_VAR(node),
+				Copy_Graph(GET_LAMBDA_BODY(node))) );
+	case CONS_ND:
+	    return( Make_CONS_ND(Copy_Graph(GET_CONS_HD(node)),
+				 Copy_Graph(GET_CONS_TL(node))) );
+	case LEAF:
+	    res = Get_node();
+	    *res = *node;
+	    return( res );
+	default:
+	    DIE("Illegal node type");
+    }
+}
 
 VOID
 Print_Expr(g_ptr node, odests fp)
@@ -1211,11 +1271,21 @@ is_pat_fail(g_ptr node)
 void
 Free_result_ptr(result_ptr rp)
 {
+    if( top_result_rec_ptr == rp ) {
+	top_result_rec_ptr = rp->next;
+    } else {
+	result_ptr trp = top_result_rec_ptr;
+	while( trp->next != rp ) {
+	    trp = trp->next;
+	}
+	trp->next = rp->next;
+    }
     free_rec(&result_rec_mgr, (pointer) rp);
 }
 
 result_ptr
-Compile(symbol_tbl_ptr stbl, g_ptr onode, typeExp_ptr type, bool delayed)
+Compile(symbol_tbl_ptr stbl, g_ptr onode, typeExp_ptr type, bool delayed,
+	bool extract_arg_names)
 {
     res_rec	rt;
     g_ptr	super_comb = NULL;
@@ -1225,9 +1295,19 @@ Compile(symbol_tbl_ptr stbl, g_ptr onode, typeExp_ptr type, bool delayed)
 	longjmp(*start_envp,1);
     }
 
+    // Extract argument names and default values (if any)
+    result_ptr rp = (result_ptr) new_rec(&result_rec_mgr);
+    rp->next = top_result_rec_ptr;
+    top_result_rec_ptr = rp;
+    if( extract_arg_names ) 
+	rp->arg_names = Get_argument_names(onode);
+    else
+	rp->arg_names = NULL;
+
     /* Add context for non-lazy functions and implicit arguments */
     g_ptr node = Add_non_lazy_context_and_find_Userdefs(onode, stbl);
     if( node == NULL ) {
+	Free_result_ptr(rp);
 	Reset_TypeChecker();
 	longjmp(*start_envp,1);
     }
@@ -1240,10 +1320,10 @@ Compile(symbol_tbl_ptr stbl, g_ptr onode, typeExp_ptr type, bool delayed)
 
     if( type == NULL ) {
 	/* Failed type-checking */
+	Free_result_ptr(rp);
 	longjmp(*start_envp,1);
     }
 
-    result_ptr rp = (result_ptr) new_rec(&result_rec_mgr);
     rp->expr_init =  cephalopode_mode? Cephalopde_Reflect_expr(node) : NULL;
 
 #ifdef CHECK_REF_CNTS
@@ -1318,8 +1398,11 @@ Execute_fl_code(const string function, ...)
 	expr = Make_APPL_ND(expr, g_arg);
     }
     result_ptr rp = (result_ptr) new_rec(&result_rec_mgr);
+    rp->next = top_result_rec_ptr;
+    top_result_rec_ptr = rp;
     rp->expr = expr;
     rp->type = NULL;
+    rp->arg_names = NULL;
     Print_Result(rp, stdout_fp, FALSE);
     expr = rp->expr;
     Free_result_ptr(rp);
@@ -1528,6 +1611,19 @@ Do_garbage_collect()
     SET_REFCNT(void_nd, MAX_REF_CNT);
     B_Mark(cur_eval_cond);
     Mark(root_node);
+    result_ptr	rp = top_result_rec_ptr;
+    while( rp != NULL ) {
+	Mark(rp->expr_init);
+	Mark(rp->expr_comb);
+	Mark(rp->expr);
+	Mark(rp->super_comb);
+	arg_names_ptr ap = rp->arg_names;
+	while( ap != NULL ) {
+	    Mark(ap->default_value);
+	    ap = ap->next;
+	}
+	rp = rp->next;
+    }
     Mark(print_nd);
     Mark(return_trace_list);
     Mark_tcl_callbacks();
@@ -1809,14 +1905,14 @@ leaftype2str(int leaftype)
 #if 0
 #define FAIL_GM2(l,r,msg) {						    \
 			res = Make_0inp_Primitive(P_FAIL);		    \
-   SET_FAIL_STRING(res,Fail_pr("Structural mismatch in %s\n(%s)\n", ip->parent_op, (msg)));\
+   SET_FAIL_STRING(res,wastrsave(&strings, Fail_pr("Structural mismatch in %s\n(%s)\n", ip->parent_op, (msg))));\
    GRl(l); GRl(r);							    \
 			return res;					    \
 		      }
 #else
 #define FAIL_GM2(l,r,msg) {						    \
 			res = Make_0inp_Primitive(P_FAIL);		    \
-   SET_FAIL_STRING(res,Fail_pr("Structural mismatch in %s\n", ip->parent_op));\
+   SET_FAIL_STRING(res,wastrsave(&strings, Fail_pr("Structural mismatch in %s\n", ip->parent_op)));\
 			return res;					    \
 		      }
 #endif
@@ -1963,7 +2059,8 @@ gen_map2_rec(gmap_info_ptr ip, g_ptr l, g_ptr r)
 			if( lref_var != rref_var ) {
 			    res = Make_0inp_Primitive(P_FAIL);
 			    SET_FAIL_STRING(res,
-				Fail_pr("Different ref vars in gen_map2"));
+				wastrsave(&strings, 
+				    Fail_pr("Different ref vars in gen_map2")));
 			    return res;
 			}
 			g_ptr ll = Get_RefVar(lref_var);
@@ -2350,7 +2447,7 @@ Get_Vars(buffer *bp, g_ptr node)
 	    push_buf(bp, &name);
 	    return;
 	default:
-	   Rprintf("Illegal pattern in function definition\n");
+	   Rprintf("Illegal pattern in function definition(1)\n");
     }
     DIE("Should never occur!");
 }
@@ -2689,7 +2786,7 @@ abstract_rec(string var, g_ptr node)
 		    ASSERT(cached_is_free(var, e2));
 		    e2 = abstract_rec(var, e2);
 		    if( is_I(e2) )
-			return(e1);
+			return(e1); // <<<< IS THIS CORRECT??????
 		    if( GET_TYPE(e2) == APPLY_ND ) {
 			g_ptr r = GET_APPLY_RIGHT(e2);
 			cur = GET_APPLY_LEFT(e2);
@@ -3887,7 +3984,7 @@ traverse_left(g_ptr oroot)
                             SET_STRING(redex, wastrsave(&strings, buf));
                             break;
 			case P_EVAL:
-			    if( perform_fl_command(GET_STRING(arg1)) ) {
+			    if( perform_fl_command(GET_STRING(arg1), TRUE) ) {
 				MAKE_REDEX_BOOL(redex, B_One());
 			    } else {
 				MAKE_REDEX_BOOL(redex, B_Zero());
@@ -4060,7 +4157,6 @@ traverse_left(g_ptr oroot)
 		    arg2  = traverse_left(GET_APPLY_RIGHT(*(sp+1)));
                     if( is_fail(arg2) )
                         goto arg2_fail2;
-		    // Do not force the graph to write out!
 		    if( !Load_graph(GET_STRING(arg1), GET_STRING(arg2), redex) )
 			goto fail2;
 		    goto finish2;
@@ -4249,7 +4345,7 @@ traverse_left(g_ptr oroot)
 		    /* Force all arguments (note P_STRICT_TUPLE is used!) */
 		    arg1 = force(GET_APPLY_RIGHT(*sp), FALSE);
 		    if( is_fail(arg1) ) {
-			goto fail2;
+			goto arg1_fail2;
 		    }
 		    ASSERT( IS_CONS(arg1) );
 		    arg3 = arg1;
@@ -4258,6 +4354,7 @@ traverse_left(g_ptr oroot)
 			ASSERT( IS_CONS(arg3) );
 			res = GET_CONS_HD(arg3);
 			if( is_fail(res) ) {
+			    strcpy(FailBuf, GET_FAIL_STRING(res));
 			    goto fail2;
 			}
 			arg3 = GET_CONS_TL(arg3);
@@ -4547,6 +4644,29 @@ traverse_left(g_ptr oroot)
                     }
                     MAKE_REDEX_STRING(redex, wastrsave(&strings, s));
                     goto finish1;
+
+		case P_NAMED_ARG:
+
+                    /*                                          */
+                    /*           @       ==>      x             */
+                    /*          / \                             */
+                    /*         @   z                            */
+                    /*        / \                               */
+                    /*       @   y                              */
+                    /*      / \                                 */
+                    /*    PNA   x                               */
+                    /*                                          */
+
+		    /* Evalate before updating (P_NAMED_ARG is projection fn) */
+		    if( depth < 3 )
+			goto clean_up;
+		    redex = *(sp+2);
+		    arg1  = GET_APPLY_RIGHT(*sp);
+		    arg2  = GET_APPLY_RIGHT(*(sp+1));
+		    arg3  = GET_APPLY_RIGHT(*(sp+2));
+		    arg1 = traverse_left(arg1);
+		    OVERWRITE(redex, arg1);
+		    goto finish3;
 
 		default:
 		    DIE("Illegal primitive function");
@@ -5193,6 +5313,7 @@ Eval(g_ptr redex)
     Record_eval_context(&ctx);
     jmp_buf start_env;
     start_envp = &start_env;
+    PUSH_GLOBAL_GC(root_node);
     PUSH_GLOBAL_GC(redex);
     root_node = redex;
     if( setjmp(*start_envp) == 0 ) {
@@ -5203,7 +5324,7 @@ Eval(g_ptr redex)
 	MAKE_REDEX_FAILURE(redex, FailBuf);
     }
     Restore_eval_context(&ctx);
-    POP_GLOBAL_GC(1);
+    POP_GLOBAL_GC(2);
     return redex;
 }
 
@@ -5446,7 +5567,7 @@ trarg(g_ptr node, g_ptr E, bool constructor)
 		    }
 		    return(ret);
 		case PRIM_FN:
-		    Rprintf("Illegal pattern in function definition\n");
+		    Rprintf("Illegal pattern in function definition(2)\n");
 		    break;
 		case USERDEF:
 		    DIE("USERDEFs should not exists before typechecking!");
@@ -5455,8 +5576,15 @@ trarg(g_ptr node, g_ptr E, bool constructor)
 	    }
 	    break;
 	case CONS_ND:
+	    if( Destr_Named_Arg(node, &new, &l1) ) {
+		INC_REFCNT(l1);
+		E = Make_3inp_Primitive(P_NAMED_ARG, E, Make_VAR_leaf(new),l1);
+		ret = Make_Lambda(new, E);
+		MoveTypeHint(node, ret, TRUE);
+		return( ret );
+	    }
 	    if( GET_CONS_HD(node) != NULL || GET_CONS_TL(node) != NULL )
-		Rprintf("Illegal pattern in function definition\n");
+		Rprintf("Illegal pattern in function definition(3)\n");
 	    /* NIL */
 	    /* \x. (empty x) => E | PFAIL */
 	    new = Find_new_free_var(E);
@@ -5665,7 +5793,7 @@ trarg(g_ptr node, g_ptr E, bool constructor)
 	    return( ret );
 	    break;
 	default:
-	   Rprintf("Illegal pattern in function definition\n");
+	   Rprintf("Illegal pattern in function definition(4)\n");
     }
     DIE("Should never occur!"); return NULL; // Dummy
 }
@@ -5674,13 +5802,13 @@ static string
 make_Destructor(g_ptr np)
 {
     if( GET_TYPE(np) != LEAF || GET_LEAF_TYPE(np) != VAR)
-	Rprintf("Illegal pattern in function definition");
+	Rprintf("Illegal pattern in function definition(5)");
     string ret = strtemp("__DeStRuCtOr");
     ret = strappend(GET_VAR(np));
     ret = wastrsave(&strings, ret);
     if( Find_Function(symb_tbl, np) == NULL ) {
 	Rprintf(
-       "Illegal pattern in function definition. %s is not a type constructor\n",
+       "Illegal pattern in function definition(6). %s is not a type constructor\n",
 	GET_VAR(np));
     }
     return(ret);

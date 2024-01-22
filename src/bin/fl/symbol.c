@@ -49,9 +49,11 @@ static char         buf[1024];
 static string       s_star;
 static string       s_CELL;
 static string       s_dummy;
+static string       s_empty;
 static char         help_buf[4096];
 static char         type_buf[4096];
 static hash_record  bound_var_tbl;
+static hash_record  non_lazy_processed_tbl;
 static int          overloaded_calls;
 static jmp_buf      context_env;
 static int          builtins_len;
@@ -419,11 +421,15 @@ static bool             built_in(string filename);
 static bool             already_defined(symbol_tbl_ptr stbl, fn_ptr fp);
 static g_ptr            ignore_P_Y(g_ptr node);
 static g_ptr            ignore_P_DEBUG(g_ptr node);
-static bool             get_named_arg(g_ptr node, string *namep, g_ptr *nextp);
+static g_ptr		ignore_P_NAMED_ARG(g_ptr node);
+static bool             get_named_arg(g_ptr node, name_expr_rec *namep,
+				      g_ptr *nextp);
 static g_ptr            ignore_simple_P_PCATCH(g_ptr onode);
 static g_ptr            ignore_P_CACHE(g_ptr onode);
 static g_ptr            ignore_P_STRICT_ARGS(g_ptr onode);
-static bool		get_HFL_arg_name(g_ptr node, string *namep,
+static bool		is_P_NAMED_ARG(g_ptr node, g_ptr *E, g_ptr *varp,
+				       g_ptr *def_val);
+static bool		get_HFL_arg_name(g_ptr node, name_expr_rec *nepp,
 					 g_ptr *next_nodep);
 static fn_ptr		get_fn_rec();
 
@@ -446,6 +452,7 @@ Init_symbol()
     s_star = wastrsave(&strings, "*");
     s_CELL = wastrsave(&strings, "CELL");
     s_dummy = wastrsave(&strings, "//DuMmY");
+    s_empty = wastrsave(&strings, "");
     fn_ptr dummy = (fn_ptr) get_fn_rec();
     dummy->ADT_level = ADT_level;
     dummy->name = s_dummy;
@@ -475,6 +482,30 @@ Init_symbol()
 }
 
 void
+DBG_check(string msg)
+{
+    fn_ptr      fp;
+    FOR_REC(&fn_rec_mgr, fn_ptr, fp) {
+	if( strcmp("int2arbi'arbiter'arb_rf_new", fp->name) == 0 ) {
+	    fprintf(stderr, "int2arbi'arbiter'arb_rf_new at %s\n", msg);
+	    fprintf(stderr, "in_use: %s\n", (fp->in_use? "1" : "0"));
+	    fprintf(stderr, "has_default_values: %s\n",
+			    (fp->has_default_values? "1" : "0"));
+	    arg_names_ptr ap = fp->arg_names;
+	    while( ap != NULL ) {
+		fprintf(stderr, "  arg: %s ", ap->name);
+		if( ap->default_value == NULL ) {
+		    fprintf(stderr, "NULL\n");
+		} else {
+		    PR(ap->default_value);
+		}
+		ap = ap->next;
+	    }
+	}
+    }
+}
+
+void
 Mark_symbols()
 {
     fn_ptr      fp;
@@ -492,6 +523,16 @@ Mark_symbols()
 	    Mark(fp->expr_init);
 	    Mark(fp->expr_comb);
             Mark(fp->super_comb);
+	    if( fp->has_default_values ) {
+		arg_names_ptr ap = fp->arg_names;
+		while( ap != NULL ) {
+		    if( ap->default_value != NULL ) {
+			Mark(ap->default_value);
+			SET_REFCNT(ap->default_value, MAX_REF_CNT);
+		    }
+		    ap = ap->next;
+		}
+	    }
         } else {
             fp->expr = NULL;
             fp->expr_init = NULL;
@@ -501,6 +542,14 @@ Mark_symbols()
             fp->overload = FALSE;
             fp->open_overload = FALSE;
             fp->overload_list = NULL;
+	    fp->has_default_values  = FALSE;
+	    arg_names_ptr ap = fp->arg_names;
+	    while( ap != NULL ) {
+		arg_names_ptr tmp = ap;
+		ap = ap->next;
+		free_rec(&arg_names_rec_mgr, tmp);
+	    }
+	    fp->arg_names = NULL;
         }
     }
 }
@@ -538,7 +587,7 @@ Gather_overloaded_calls(symbol_tbl_ptr stbl, g_ptr node)
 }
 
 static g_ptr
-do_setjmp(buffer *contextp, symbol_tbl_ptr stbl, g_ptr *nodep)
+top_add_non_lazy_context(buffer *contextp, symbol_tbl_ptr stbl, g_ptr *nodep)
 {
     g_ptr res = NULL;
     if( setjmp(context_env) == 0 ) {
@@ -553,8 +602,10 @@ Add_non_lazy_context_and_find_Userdefs(g_ptr node, symbol_tbl_ptr stbl)
     buffer context;
     new_buf (&context, 100, sizeof(string));
     create_hash(&bound_var_tbl, 100, str_hash, str_equ);
-    node = do_setjmp(&context, stbl, &node);
+    create_hash(&non_lazy_processed_tbl, 100, ptr_hash, ptr_equ);
+    node = top_add_non_lazy_context(&context, stbl, &node);
     dispose_hash(&bound_var_tbl, NULLFCN);
+    dispose_hash(&non_lazy_processed_tbl, NULLFCN);
     free_buf (&context); 
     return(node);
 }
@@ -627,8 +678,10 @@ Add_Destructors(string name, typeExp_ptr new_type,
         tmp->end_line_nbr   = line_nbr;
         tmp->expr          = Make_0inp_Primitive(P_I);
 	tmp->signature	   = Get_SHA256_signature(tmp->expr);
-        tmp->expr_init     = cephalopode_mode? Cephalopde_Reflect_expr(tmp->expr) : NULL;
-        tmp->expr_comb     = cephalopode_mode? Cephalopde_Reflect_expr(tmp->expr) : NULL;
+        tmp->expr_init     =
+	    cephalopode_mode? Cephalopde_Reflect_expr(tmp->expr) : NULL;
+        tmp->expr_comb     =
+	    cephalopode_mode? Cephalopde_Reflect_expr(tmp->expr) : NULL;
         tmp->super_comb    = Make_0inp_Primitive(P_I);
         tmp->type          = Fix_Types(&(fnp->type), new_type);
         tmp->overload      = FALSE;
@@ -668,10 +721,10 @@ Add_Destructors(string name, typeExp_ptr new_type,
         save_fun->end_line_nbr   = line_nbr;
         save_fun->expr           = save_expr;
 	save_fun->signature	 = Get_SHA256_signature(save_expr);
-        save_fun->expr_init      = cephalopode_mode?
-					Cephalopde_Reflect_expr(save_fun->expr) : NULL;
-        save_fun->expr_comb      = cephalopode_mode?
-					Cephalopde_Reflect_expr(save_fun->expr) : NULL;
+        save_fun->expr_init      =
+	    cephalopode_mode?  Cephalopde_Reflect_expr(save_fun->expr) : NULL;
+        save_fun->expr_comb      =
+	    cephalopode_mode?  Cephalopde_Reflect_expr(save_fun->expr) : NULL;
         save_fun->super_comb     = save_expr;    // ????
         save_fun->type           = save_type;
         save_fun->overload           = FALSE;
@@ -701,10 +754,10 @@ Add_Destructors(string name, typeExp_ptr new_type,
         load_fun->end_line_nbr   = line_nbr;
         load_fun->expr           = load_expr;
 	load_fun->signature	 = Get_SHA256_signature(load_expr);
-        load_fun->expr_init      = cephalopode_mode?
-					Cephalopde_Reflect_expr(load_fun->expr) : NULL;
-        load_fun->expr_comb      = cephalopode_mode?
-					Cephalopde_Reflect_expr(load_fun->expr) : NULL;
+        load_fun->expr_init      =
+		cephalopode_mode?Cephalopde_Reflect_expr(load_fun->expr) : NULL;
+        load_fun->expr_comb      =
+		cephalopode_mode?Cephalopde_Reflect_expr(load_fun->expr) : NULL;
         load_fun->super_comb     = load_expr;    // ????
         load_fun->type           = load_type;
         load_fun->overload           = FALSE;
@@ -861,7 +914,7 @@ Make_forward_declare(string name, typeExp_ptr type, symbol_tbl_ptr stbl,
 
 symbol_tbl_ptr
 New_fn_def(string name, result_ptr res, symbol_tbl_ptr stbl, bool print,
-           string file, int start_line, arg_names_ptr arg_names)
+           string file, int start_line)
 {
     fn_ptr      ret;
 
@@ -917,28 +970,38 @@ New_fn_def(string name, result_ptr res, symbol_tbl_ptr stbl, bool print,
         update_stbl(stbl, ret);
     }
     //
-    ret->visible        = TRUE;
-    ret->in_use         = TRUE;
-    ret->file_name      = file;
-    ret->start_line_nbr = start_line;
-    ret->end_line_nbr   = line_nbr;
-    ret->comments       = cur_doc_comments;
-    ret->arg_names      = arg_names;
+    ret->visible            = TRUE;
+    ret->in_use             = TRUE;
+    ret->file_name          = file;
+    ret->start_line_nbr     = start_line;
+    ret->end_line_nbr       = line_nbr;
+    ret->comments           = cur_doc_comments;
+    // Handle argument names and default values (if any)
+    ret->arg_names          = res->arg_names;
+    ret->has_default_values = FALSE;
+    arg_names_ptr   ap = res->arg_names;
+    while(ap != NULL) {
+	if( ap->default_value != NULL ) {
+	    ret->has_default_values = TRUE;
+	    ap->default_value = Copy_Graph(ap->default_value);
+	}
+	ap = ap->next;
+    }
     // Prepare to pick up new comments
     cur_doc_comments = NULL;
-    ret->non_lazy       = FALSE;
-    ret->forward        = FALSE;
-    ret->name           = name;
-    ret->expr_init      = res->expr_init;
-    ret->expr_comb      = res->expr_comb;
-    ret->signature	= res->signature;
-    ret->expr           = res->expr;
-    ret->super_comb     = res->super_comb;
-    ret->overload       = FALSE;
-    ret->open_overload  = FALSE;
-    ret->overload_list  = NULL;
-    ret->type           = res->type;
-    ret->implicit_args  = res->implicit_args;
+    ret->non_lazy           = FALSE;
+    ret->forward            = FALSE;
+    ret->name               = name;
+    ret->expr_init          = res->expr_init;
+    ret->expr_comb          = res->expr_comb;
+    ret->signature	    = res->signature;
+    ret->expr               = res->expr;
+    ret->super_comb         = res->super_comb;
+    ret->overload           = FALSE;
+    ret->open_overload      = FALSE;
+    ret->overload_list      = NULL;
+    ret->type               = res->type;
+    ret->implicit_args      = res->implicit_args;
     if( print ) {
         FP(stdout_fp, "%s::", name);
         Print_Full_Type(ret, stdout_fp, TRUE, TRUE);
@@ -1638,7 +1701,12 @@ get_definition(g_ptr redex)
 	    MAKE_REDEX_FAILURE(redex,
 			       Fail_pr("Function %s is overloaded", name));
 	} else  {
-	    OVERWRITE(redex, fp->expr_init);
+	    if( fp->implicit_args != NULL ) {
+		MAKE_REDEX_FAILURE(redex,
+		       Fail_pr("Function %s is mplicitly overloaded", name));
+	    } else {
+		OVERWRITE(redex, fp->expr_init);
+	    }
 	}
     }
     DEC_REF_CNT(l);
@@ -1667,8 +1735,56 @@ get_combinator_expression(g_ptr redex)
 	    MAKE_REDEX_FAILURE(redex,
 			       Fail_pr("Function %s is overloaded", name));
 	} else  {
-	    OVERWRITE(redex, fp->expr_comb);
+	    if( fp->implicit_args != NULL ) {
+		MAKE_REDEX_FAILURE(redex,
+		       Fail_pr("Function %s is mplicitly overloaded", name));
+	    } else {
+		OVERWRITE(redex, fp->expr_init);
+		OVERWRITE(redex, fp->expr_comb);
+	    }
 	}
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+get_userdef_id(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    string name = GET_STRING(r);
+    fn_ptr fp = Find_Function_Def(symb_tbl, name);
+    if( fp != NULL ) {
+	MAKE_REDEX_INT(redex, fp->id);
+    } else {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot find any function named '%s'",
+					  name));
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+get_userdef_expression(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    if( !cephalopode_mode ) {
+	MAKE_REDEX_FAILURE(redex,
+		"get_userdef_expression only available in -C mode");
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
+    int idx = GET_INT(r);
+    fn_ptr fp = (fn_ptr) REC_EL(&fn_rec_mgr, idx);
+    if( fp == NULL ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot find USERDEF %d", idx));
+    } else {
+	g_ptr res = fp->expr_init;
+	INC_REFCNT(res);
+	MAKE_REDEX_PAIR(redex,Make_STRING_leaf(fp->name), res);
     }
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -1691,8 +1807,9 @@ get_userdef_combinator_expression(g_ptr redex)
     if( fp == NULL ) {
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot find USERDEF %d", idx));
     } else {
-	MAKE_REDEX_PAIR(redex,Make_STRING_leaf(fp->name),
-			      fp->expr_comb);
+	g_ptr res = fp->expr_comb;
+	INC_REFCNT(res);
+	MAKE_REDEX_PAIR(redex,Make_STRING_leaf(fp->name), res);
     }
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -1827,6 +1944,15 @@ Symbols_Install_Functions()
     Add_ExtAPI_Function("get_combinator_expression", "1", TRUE,
                         GLmake_arrow(GLmake_string(), term),
                         get_combinator_expression);
+
+    Add_ExtAPI_Function("get_userdef_id", "1", TRUE,
+                        GLmake_arrow(GLmake_string(), GLmake_int()),
+                        get_userdef_id);
+
+    Add_ExtAPI_Function("get_userdef_expression", "1", TRUE,
+                        GLmake_arrow(GLmake_int(),
+				     GLmake_tuple(GLmake_string(), term)),
+                        get_userdef_expression);
     Add_ExtAPI_Function("get_userdef_combinator_expression", "1", TRUE,
                         GLmake_arrow(GLmake_int(),
 				     GLmake_tuple(GLmake_string(), term)),
@@ -1858,7 +1984,7 @@ arg_names_ptr
 Get_argument_names(g_ptr onode)
 {
     buffer args;
-    string  *sp;
+    name_expr_rec  *nep;
     arg_names_ptr res = NULL;
     g_ptr node = onode;
     if( node == NULL ) { return NULL; }
@@ -1871,8 +1997,9 @@ Get_argument_names(g_ptr onode)
     }
     if( arg_cnt == 0 ) {
 	node = ignore_P_DEBUG(node);
-	new_buf(&args, 10, sizeof(string));
-	string arg;
+	node = ignore_P_NAMED_ARG(node);
+	new_buf(&args, 10, sizeof(name_expr_rec));
+	name_expr_rec arg;
 	g_ptr next;
 	while( get_HFL_arg_name(node, &arg, &next) ) {
 	    push_buf(&args, (pointer) &arg);
@@ -1885,15 +2012,16 @@ Get_argument_names(g_ptr onode)
 	goto make_arg_list;
     }
     if( node == NULL ) return NULL;
+    node = ignore_P_NAMED_ARG(node);
     node = ignore_P_CACHE(node);
     node = ignore_P_STRICT_ARGS(node);
     node = ignore_P_DEBUG(node);
     if( node == NULL ) return NULL;
     node = ignore_simple_P_PCATCH(node);
     if( node == NULL ) return NULL;
-    new_buf(&args, 10, sizeof(string));
+    new_buf(&args, 10, sizeof(name_expr_rec));
     for(int i = 0; i < arg_cnt; i++) {
-        string arg;
+        name_expr_rec arg;
         g_ptr next;
         if( !get_named_arg(node, &arg, &next) ) {
             free_buf (&args); 
@@ -1903,16 +2031,16 @@ Get_argument_names(g_ptr onode)
         node = next;
     }
   make_arg_list:
-    FUB_ROF(&args, string, sp) {
+    FUB_ROF(&args, name_expr_rec, nep) {
         arg_names_ptr t = (arg_names_ptr) new_rec(&arg_names_rec_mgr);
-        t->name = *sp;
+        t->name = nep->var;
+	t->default_value = nep->expr;
         t->next = res;
         res = t;
     }
     free_buf (&args); 
     return res;
 }
-
 
 
 /************************************************************************/
@@ -2012,50 +2140,210 @@ get_overloaded_calls_rec(impl_arg_ptr l, symbol_tbl_ptr stbl, g_ptr node)
     return l;    /* Dummy */
 }
 
+static void
+report_error_loc(g_ptr node, string type)
+{
+    if( file_load )
+	FP(err_fp, "=== %s error around line %d in file %s\n", type,
+		GET_LINE_NBR(node), cur_file_name);
+    else
+	FP(err_fp, "=== %s error around line %d\n", type, GET_LINE_NBR(node));
+}
+
 /* Add dummy dependencies on the lambda bound vars for non_lazy function    */
 /* When a contiguous sequence of lambdas occurs, only use the last variable */ 
+/* Also handle named arguments and default values			    */
+/* %%%%%%%%%%%%%%%%%%%%%%%%% */
 static g_ptr
 add_non_lazy_context_rec(buffer *ctxt, symbol_tbl_ptr stbl, g_ptr node)
 {
-    g_ptr E, F, ctx_nd, res;
-    string name, new_name, *sp;
-    int line;
+    g_ptr	    E, F, Fn, ctx_nd, res;
+    string	    name, new_name, *sp;
+    int		    line;
+    buffer	    arg_info_buf;
+    hash_record	    named_arg_tbl;
+    arg_info_ptr    aip;
     if( node == NULL ) { return NULL; }
+    if( find_hash(&non_lazy_processed_tbl, node) != NULL ) { return node; }
+    insert_hash(&non_lazy_processed_tbl, node, node);
     switch( GET_TYPE(node) ) {
         case APPLY_ND:
-            E = add_non_lazy_context_rec(ctxt, stbl, GET_APPLY_LEFT(node));
-            F = add_non_lazy_context_rec(ctxt, stbl, GET_APPLY_RIGHT(node));
-            return( cond_mk_app(node, E, F) );
+	    new_buf(&arg_info_buf, 100, sizeof(arg_info_rec));
+	    bool has_named_arg = FALSE;
+	    while( GET_TYPE(node) == APPLY_ND ) {
+		F = GET_APPLY_RIGHT(node);
+		arg_info_rec	info;
+		if( Destr_Named_Arg(F, &name, &Fn) ) {
+		    has_named_arg = TRUE;
+		    info.spine = node;
+		    info.arg_name = name;
+		    info.arg_expr = add_non_lazy_context_rec(ctxt, stbl, Fn);
+		    INC_REFCNT(info.arg_expr);
+		} else {
+		    info.spine = node;
+		    info.arg_name = s_empty;
+		    info.arg_expr = add_non_lazy_context_rec(ctxt, stbl, F);
+		}
+		push_buf(&arg_info_buf, &info);
+		node = GET_APPLY_LEFT(node);
+	    }
+	    if( GET_TYPE(node) != LEAF ) {
+		node = add_non_lazy_context_rec(ctxt, stbl, node);
+		goto wrap_up;
+	    }
+            if( !IS_VAR(node) ) {
+		if( has_named_arg ) { goto err_named_arg; }
+                if( !IS_PRIM_FN(node) ) goto wrap_up;
+                int pfn = GET_PRIM_FN(node);
+                if( (pfn != P_PRINTF) && (pfn != P_SPRINTF) &&
+                    (pfn != P_EPRINTF) && (pfn != P_FPRINTF) &&
+                    (pfn != P_PRINT) && (pfn != P_MK_REF_VAR) )
+                {
+                    goto wrap_up;
+                }
+                // Printf like functions are non-lazy
+                if( COUNT_BUF(ctxt) == 0 ) { goto wrap_up; }
+                ctx_nd = Make_NIL();
+                FOR_BUF(ctxt, string, sp) {
+                    ctx_nd =
+                        Make_2inp_Primitive(P_CONS,
+                            Make_1inp_Primitive(P_UNTYPE, Make_VAR_leaf(*sp)),
+                            ctx_nd);
+                }
+		node = Make_2inp_Primitive(P_NSEQ, ctx_nd, node);
+		goto wrap_up;
+            }
+            name = GET_VAR(node);
+            if( is_bound(name) ) {
+		if( has_named_arg ) { goto err_named_arg; }
+                // Rename bound variables to ensure no name capture happens
+                // when implicit arguments for overloaded identifiers are added
+                string new_name = wastrsave(&strings, tprintf(".%s", name));
+                SET_VAR(node, new_name);
+		goto wrap_up;
+            }
+            fn_ptr fp = Find_Function_Def(stbl, name);
+            if( fp == NULL ) {
+		report_error_loc(node, "Type");
+                FP(err_fp, "Unidentified identifier \"%s\"\n", GET_VAR(node));
+		free_buf(&arg_info_buf);
+                longjmp(context_env, 1);
+            }
+            // Add implicit arguments
+            impl_arg_ptr np = fp->implicit_args;
+            int v_line_nbr = GET_LINE_NBR(node);
+            MAKE_REDEX_USERDEF(node, fp);
+            SET_LINE_NBR(node, v_line_nbr);
+            while( np != NULL ) {
+                g_ptr ifn = Make_USERDEF_leaf(np->def);
+                SET_LINE_NBR(ifn, v_line_nbr);
+                node = Make_APPL_ND(node, ifn);
+                np = np->next;
+            }
+	    // Add non-lazy dependencies if needed
+	    if( COUNT_BUF(ctxt) != 0 && is_non_lazy(stbl, name) ) {
+		ctx_nd = Make_NIL();
+		FOR_BUF(ctxt, string, sp) {
+		    ctx_nd = Make_2inp_Primitive(
+				    P_CONS,
+				    Make_1inp_Primitive(P_UNTYPE,
+							Make_VAR_leaf(*sp)),
+				    ctx_nd);
+		}
+		node = Make_2inp_Primitive(P_NSEQ, ctx_nd, node);
+	    }
+	    // Deal with named arguments
+	    create_hash(&named_arg_tbl, COUNT_BUF(&arg_info_buf),
+			Ustr_hash, Ustr_equ); 
+	    arg_names_ptr ap = fp->arg_names;
+	    if( has_named_arg ) {
+		if( ap == NULL ) {
+		    report_error_loc(node, "Syntax");
+		    FP(err_fp, "Function %s has no named arguments\n", name);
+		    free_buf(&arg_info_buf);
+		    longjmp(context_env, 1);
+		}
+		FOR_BUF(&arg_info_buf, arg_info_rec, aip) {
+		    if( !STREQ(aip->arg_name, s_empty) ) {
+			if( find_hash(&named_arg_tbl, aip->arg_name) != NULL ) {
+			    report_error_loc(node, "Syntax");
+			    FP(err_fp,
+			       "Named argument %s occurs more than once\n",
+			       aip->arg_name);
+			    free_buf(&arg_info_buf);
+			    dispose_hash(&named_arg_tbl, NULLFCN);
+			    longjmp(context_env, 1);
+			}
+			insert_hash(&named_arg_tbl,aip->arg_name,aip->arg_expr);
+		    }
+		}
+	    }
+	    // Now process positional arguments
+	    bool all_done = TRUE;
+	    FUB_ROF(&arg_info_buf, arg_info_rec, aip) {
+		if( STREQ(aip->arg_name, s_empty) ) {
+		    node = cond_mk_app(aip->spine, node, aip->arg_expr);
+		    ap = (ap != NULL)? ap->next : NULL;
+		} else {
+		    all_done = FALSE;
+		    break;
+		}
+	    }
+	    if( all_done && !has_named_arg & !fp->has_default_values ) {
+		free_buf(&arg_info_buf);
+		dispose_hash(&named_arg_tbl, NULLFCN);
+		return( node );
+	    }
+	    // Now process named arguments and defaults
+	    while( ap != NULL ) {
+		F = find_hash(&named_arg_tbl, ap->name);
+		if( F == NULL ) {
+		    F = Copy_Graph(ap->default_value);
+		}
+		if( F == NULL ) {
+		    report_error_loc(node, "Syntax");
+		    FP(err_fp,"%s is not given value for argument %s\n",
+			      name, ap->name);
+		    free_buf(&arg_info_buf);
+		    dispose_hash(&named_arg_tbl, NULLFCN);
+		    longjmp(context_env, 1);
+		}
+		F = add_non_lazy_context_rec(ctxt, stbl, F);
+		node = Make_APPL_ND(node, F);
+		ap = (ap != NULL)? ap->next : NULL;
+	    }
+	    free_buf(&arg_info_buf);
+	    dispose_hash(&named_arg_tbl, NULLFCN);
+	    return( node );
         case CONS_ND:
             E = add_non_lazy_context_rec(ctxt, stbl, GET_CONS_HD(node));
             F = add_non_lazy_context_rec(ctxt, stbl, GET_CONS_TL(node));
             return( cond_mk_cons(node, E, F) );
         case LAMBDA_ND:
             name = GET_LAMBDA_VAR(node);
-            add_binding(name);
             // Rename lambda variables to ensure no name capture happens
             // when implicit arguments for overloaded identifiers are added
             new_name = wastrsave(&strings, tprintf(".%s", name));
             line = GET_LAMBDA_LINE_NBR(node);
-            if( IS_LAMBDA(GET_LAMBDA_BODY(node)) ) {
-                /* Don't need to add this variable to the context */
-                E = add_non_lazy_context_rec(ctxt, stbl, GET_LAMBDA_BODY(node));
-                remove_binding(name);
-                res = Make_Lambda(new_name, E);
-                SET_LAMBDA_LINE_NBR(res, line);
-                MoveTypeHint(node, res, FALSE);
-                return res;
-            } else {
-                /* Add variable to context */
-                push_buf(ctxt, &new_name);
-                E = add_non_lazy_context_rec(ctxt, stbl, GET_LAMBDA_BODY(node));
-                remove_binding(name);
-                pop_buf(ctxt, NULL);
-                res = Make_Lambda(new_name, E);
-                SET_LAMBDA_LINE_NBR(res, line);
-                MoveTypeHint(node, res, FALSE);
-                return res;
-            }
+            add_binding(name);
+	    bool innermost = !IS_LAMBDA(GET_LAMBDA_BODY(node));
+	    if( innermost ) { push_buf(ctxt, &new_name); }
+	    g_ptr body = GET_LAMBDA_BODY(node);
+	    g_ptr En, var, def_val;
+	    if( is_P_NAMED_ARG(body, &En, &var, &def_val) ) {
+		E = add_non_lazy_context_rec(ctxt, stbl, En);
+		def_val = add_non_lazy_context_rec(ctxt, stbl, def_val);
+		E = Make_3inp_Primitive(P_NAMED_ARG, E, Make_VAR_leaf(new_name),
+						     def_val);
+	    } else {
+		E = add_non_lazy_context_rec(ctxt, stbl, body);
+	    }
+	    if( innermost ) { pop_buf(ctxt, NULL); }
+	    remove_binding(name);
+	    res = Make_Lambda(new_name, E);
+	    SET_LAMBDA_LINE_NBR(res, line);
+	    MoveTypeHint(node, res, FALSE);
+	    return res;
         case LEAF:
             if( !IS_VAR(node) ) {
                 if( !IS_PRIM_FN(node) ) return( node );
@@ -2085,7 +2373,7 @@ add_non_lazy_context_rec(buffer *ctxt, symbol_tbl_ptr stbl, g_ptr node)
                 SET_VAR(node, new_name);
                 return( node );
             }
-            fn_ptr fp = Find_Function_Def(stbl, name);
+            fp = Find_Function_Def(stbl, name);
             if( fp == NULL ) {
                 if( file_load )
                     FP(err_fp, "===Type error around line %d in file %s\n",
@@ -2097,8 +2385,8 @@ add_non_lazy_context_rec(buffer *ctxt, symbol_tbl_ptr stbl, g_ptr node)
                 longjmp(context_env, 1);
             }
             // Add implicit arguments
-            impl_arg_ptr np = fp->implicit_args;
-            int v_line_nbr = GET_LINE_NBR(node);
+            np = fp->implicit_args;
+            v_line_nbr = GET_LINE_NBR(node);
             MAKE_REDEX_USERDEF(node, fp);
             SET_LINE_NBR(node, v_line_nbr);
             while( np != NULL ) {
@@ -2107,19 +2395,53 @@ add_non_lazy_context_rec(buffer *ctxt, symbol_tbl_ptr stbl, g_ptr node)
                 node = Make_APPL_ND(node, ifn);
                 np = np->next;
             }
-            if( COUNT_BUF(ctxt) == 0 ) { return( node ); }
-            if( !is_non_lazy(stbl, name) ) { return( node ); }
-            ctx_nd = Make_NIL();
-            FOR_BUF(ctxt, string, sp) {
-                ctx_nd = Make_2inp_Primitive(P_CONS,
-                            Make_1inp_Primitive(P_UNTYPE, Make_VAR_leaf(*sp)),
-                            ctx_nd);
-            }
-            return( Make_2inp_Primitive(P_NSEQ, ctx_nd, node) );
+	    if( COUNT_BUF(ctxt) != 0 && is_non_lazy(stbl, name) ) {
+		ctx_nd = Make_NIL();
+		FOR_BUF(ctxt, string, sp) {
+		    ctx_nd = Make_2inp_Primitive(
+				    P_CONS,
+				    Make_1inp_Primitive(P_UNTYPE,
+							Make_VAR_leaf(*sp)),
+				    ctx_nd);
+		}
+		node = Make_2inp_Primitive(P_NSEQ, ctx_nd, node);
+	    }
+	    // Add any remaining default arguments
+	    if( fp->has_default_values ) {
+		ap = fp->arg_names;
+		while( ap != NULL ) {
+		    F = ap->default_value;
+		    if( F == NULL ) {
+			report_error_loc(node, "Syntax");
+			FP(err_fp,"%s is not given value for argument %s\n",
+				  name, ap->name);
+			longjmp(context_env, 1);
+		    }
+		    F = add_non_lazy_context_rec(ctxt, stbl, F);
+		    node = Make_APPL_ND(node, F);
+		    ap = ap->next;
+		}
+	    }
+	    return( node );
         default:
             DIE("Impossible");
     }
     return NULL;    /* Dummy */
+  wrap_up:
+    FUB_ROF(&arg_info_buf, arg_info_rec, aip) {
+	node = cond_mk_app(aip->spine, node, aip->arg_expr);
+    }
+    free_buf(&arg_info_buf);
+    return( node );
+
+  err_named_arg:
+    report_error_loc(node, "Syntax");
+    FP(err_fp, "Named argument in calling ", GET_VAR(node));
+    Print_leaf(node, err_fp);
+    FP(err_fp, "\n");
+    free_buf(&arg_info_buf);
+    longjmp(context_env, 1);
+
 }
 
 static bool
@@ -2264,8 +2586,9 @@ static bool
 built_in(string filename)
 {
     int len = strlen(filename);
+    if (strcmp(filename, "builtin") == 0) { return TRUE; }
     if( len < builtins_len ) { return FALSE; }
-    return( strcmp(filename + (len-builtins_len), "builtins.fl") == 0 );
+    return (strcmp(filename + (len-builtins_len), "builtins.fl") == 0);
 }
 
 static g_ptr
@@ -2279,6 +2602,33 @@ ignore_P_Y(g_ptr node)
     return node;
 }
 
+
+static bool
+is_P_NAMED_ARG(g_ptr node, g_ptr *E, g_ptr *var, g_ptr *default_val)
+{
+    if( !IS_APPLY(node) ) return FALSE;
+    g_ptr l = GET_APPLY_LEFT(node);
+    if( !IS_APPLY(l) ) return FALSE;
+    g_ptr ll = GET_APPLY_LEFT(l);
+    if( !IS_APPLY(ll) ) return FALSE;
+    g_ptr lll = GET_APPLY_LEFT(ll);
+    if( !IS_NAMED_ARG(lll) ) return FALSE;
+    *default_val = GET_APPLY_RIGHT(node);
+    *var = GET_APPLY_RIGHT(l);
+    *E = GET_APPLY_RIGHT(ll);
+    return TRUE;
+}
+
+static g_ptr
+ignore_P_NAMED_ARG(g_ptr node)
+{
+    g_ptr E, var, def_val;
+    if( is_P_NAMED_ARG(node, &E, &var, &def_val) ) {
+	return E;
+    }
+    return node;
+}
+
 static g_ptr
 ignore_P_DEBUG(g_ptr node)
 {
@@ -2289,19 +2639,28 @@ ignore_P_DEBUG(g_ptr node)
 }
 
 static bool
-get_named_arg(g_ptr node, string *namep, g_ptr *next_nodep)
+get_named_arg(g_ptr node, name_expr_ptr name_expp, g_ptr *next_nodep)
 {
     if( !IS_APPLY(node) ) return FALSE;
     if( !IS_LEAF_VAR(GET_APPLY_RIGHT(node)) ) return FALSE;
     node = GET_APPLY_LEFT(node);
     if( !IS_LAMBDA(node) ) return FALSE;
-    *next_nodep = GET_LAMBDA_BODY(node);
-    *namep = GET_LAMBDA_VAR(node);
+    name_expp->var = GET_LAMBDA_VAR(node);
+    g_ptr body = GET_LAMBDA_BODY(node);
+    g_ptr E, var, default_val;
+    if( is_P_NAMED_ARG(body, &E, &var, &default_val) ) {
+	name_expp->expr = default_val;
+	INC_REFCNT(default_val);
+	*next_nodep = E;
+    } else {
+	name_expp->expr = NULL;
+	*next_nodep = body;
+    }
     return TRUE;
 }
 
 static bool
-get_HFL_arg_name(g_ptr node, string *namep, g_ptr *next_nodep)
+get_HFL_arg_name(g_ptr node, name_expr_rec *nepp, g_ptr *next_nodep)
 {
     if( !IS_APPLY(node) ) return FALSE;
     if( !IS_LEAF_VAR(GET_APPLY_RIGHT(node)) ) return FALSE;
@@ -2309,12 +2668,14 @@ get_HFL_arg_name(g_ptr node, string *namep, g_ptr *next_nodep)
     node = GET_APPLY_LEFT(node);
     if( !IS_APPLY(node) ) return FALSE;
     if( !IS_STRING(GET_APPLY_RIGHT(node)) ) return FALSE;
-    *namep = GET_STRING(GET_APPLY_RIGHT(node));
+    string name = GET_STRING(GET_APPLY_RIGHT(node)); 
+    nepp->var = name;
+    nepp->expr = NULL;
     node = GET_APPLY_LEFT(node);
     if( !IS_LEAF_VAR(GET_APPLY_LEFT(node)) ) return FALSE;
     node = GET_APPLY_RIGHT(node);
     if( !IS_LAMBDA(node) ) return FALSE;
-    if( !STREQ(GET_LAMBDA_VAR(node), *namep) ) return FALSE;
+    if( !STREQ(GET_LAMBDA_VAR(node), name) ) return FALSE;
     node = GET_LAMBDA_BODY(node);
     if( !IS_LAMBDA(node) ) return FALSE;
     if( !STREQ(GET_LAMBDA_VAR(node), s_CELL) ) return FALSE;
@@ -2367,5 +2728,16 @@ get_fn_rec()
     fn_ptr res = (fn_ptr) new_rec(&fn_rec_mgr);
     res->id = fn_rec_id_cnt;
     fn_rec_id_cnt++;
+    res->has_default_values = FALSE;
+    res->comments = NULL;
+    res->expr = NULL;                      
+    res->expr_init = NULL;
+    res->expr_comb = NULL;
+    res->super_comb = NULL;
+    res->type = NULL;
+    res->overload_list = NULL;
+    res->implicit_args = NULL;
+    res->arg_names = NULL;
+    res->next = NULL;
     return res;
 }

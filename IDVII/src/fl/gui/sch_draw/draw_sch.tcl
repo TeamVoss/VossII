@@ -95,10 +95,13 @@ proc sch:show_values_on_canvas {c} {
 }
 
 proc sc:inform_time_change {w args} {
+    i_am_busy
     set root [w2root $w]
     set t $::vstatus(time,$root)
-    if { $t == "" } { set t 0 }
-    set ::vstatus(time_shadow,$root) $t
+    if { $t == "" } {
+	set t 0;
+	set ::vstatus(time_shadow,$root) $t
+    }
     fl_set_global_time $root $t
     foreach c [fl_get_active_sch_tab_windows $root] {
 	sch:show_values_on_canvas $c
@@ -107,6 +110,7 @@ proc sc:inform_time_change {w args} {
 	val {c vec} $c_vec
 	fsm:show_current_state $c $root $vec
     }
+    i_am_free
 }
 
 proc sc:inform_canvas_change {w} {
@@ -2530,6 +2534,34 @@ proc draw_CASE {n c tag x y} {
 	set cy [expr round($cy+[min_sep $c])]
     }
     lappend inp_locs $xl $cy
+    return [list $inp_locs [list $x $y]]
+}
+
+proc draw_MUTEX_CASE {n c tag x y} {
+    global gcolor fc
+    add_value_field $c $tag $x $y
+    set ht [expr ($n*3+1)*[min_sep $c]]
+    set wid [expr round(max((0.8*[rect_wid $c]),$n*[min_sep $c]/3))]
+    set xl [expr round($x-$wid)]
+    set top [expr round($y-(($ht+1)/2))]
+    set bot [expr round($y+(($ht+1)/2))]
+    $c create polygon \
+	    $xl $top \
+	    $x  [expr $top+[min_sep $c]] \
+	    $x  [expr $bot-[min_sep $c]] \
+	    $xl $bot \
+	    $xl $top \
+	    -outline $gcolor -fill $fc -tags $tag
+    set inps {}
+    set cy [expr round($top+[min_sep $c])]
+    set cx $xl
+    set xt [expr $xl+[min_sep $c]]
+    for {set i 1} {$i <= $n} {incr i} {
+	lappend inp_locs $xl $cy
+	set cy [expr round($cy+[min_sep $c])]
+	lappend inp_locs $xl $cy
+	set cy [expr round($cy+[min_sep $c])]
+    }
     return [list $inp_locs [list $x $y]]
 }
 

@@ -1,0 +1,14 @@
+let q = ref [];
+
+q := [1];
+deref q;
+
+q := ["a"] @ (deref q);
+deref q;
+
+{(deref q):: string list};
+{(deref q):: int list};
+{(deref q):: float list};
+
+
+

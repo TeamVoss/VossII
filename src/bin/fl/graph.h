@@ -38,7 +38,7 @@ typedef struct fn_rec           *fn_ptr;
 typedef struct symb_tbl_rec     *symbol_tbl_ptr;
 
 /* -------- Function prototypes for exported functions -------- */
-
+g_ptr	     Copy_Graph(g_ptr node);
 bool	     G_check_for_errors(g_ptr np, int cnt);
 g_ptr	     Get_node();
 void	     SET_INT(g_ptr np, int i);
@@ -58,6 +58,8 @@ g_ptr	     traverse_left(g_ptr oroot);
 g_ptr	     reduce(g_ptr root, bool first);
 g_ptr        force(g_ptr node, bool first);
 VOID         G_Init();
+g_ptr	     Make_Named_Arg(string name, g_ptr expr);
+bool	     Destr_Named_Arg(g_ptr node, string *namep, g_ptr *exprp);
 string	     Mk_constructor_name(string constr_name);
 g_ptr	     Make_Failure(string msg);
 g_ptr        Make_TYPE(string name, int arg_cnt);
@@ -101,7 +103,7 @@ void         Do_garbage_collect(string file, int line);
 void         Do_garbage_collect();
 #endif
 result_ptr   Compile(symbol_tbl_ptr stbl, g_ptr node, typeExp_ptr type,
-		     bool delayed);
+		     bool delayed, bool extract_arg_names);
 g_ptr	     Execute_fl_code(const string function, ...);
 void	     Free_result_ptr(result_ptr rp);
 FILE *       Return_to_old_fid();
@@ -362,6 +364,10 @@ typedef struct g_rec {
 				 IS_PRIM_FN(np) &&			    \
 				 GET_PRIM_FN(np) == P_DEBUG)
 
+#define IS_NAMED_ARG(np)	(IS_LEAF(np) &&				    \
+				 IS_PRIM_FN(np) &&			    \
+				 GET_PRIM_FN(np) == P_NAMED_ARG)
+
 #define IS_MK_REF_VAR(np)	(IS_LEAF(np) &&				    \
 				 IS_PRIM_FN(np) &&			    \
 				 GET_PRIM_FN(np) == P_MK_REF_VAR)
@@ -529,6 +535,7 @@ typedef struct g_rec {
 #define P_UNQUOTE	    126
 #define P_LOAD_PLUGIN	    127
 #define P_STRICT_ARGS	    128
+#define P_NAMED_ARG	    129
 
 #define P_VOID          1022
 
@@ -769,6 +776,8 @@ typedef struct result_rec {
         impl_arg_ptr	implicit_args;
         g_ptr		super_comb;
         typeExp_ptr	type;
+	arg_names_ptr	arg_names;
+	result_ptr	next;		// In-use linked list
 } result_rec;
 
 typedef struct comment_list_rec {

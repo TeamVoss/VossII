@@ -1,0 +1,154 @@
+begin_abstype;
+
+let is_digit c =
+    let o = ord c in
+    ord "0" <= o AND o <= ord "9"
+;
+
+let split_name_number nm =
+    let rs = rev (explode nm) in
+    let idx = find_first0 (\c. NOT (is_digit c)) rs in
+    idx <= 1 =>  (nm,[]) |
+    let nm = implode (rev (butfirstn (idx-1) rs)) in
+    let dig = sscanf "%d" (implode (rev (firstn (idx-1) rs))) in
+    (nm,[dig])
+;
+
+
+let split_bifrost_name (nm,tp) =
+    let l = str_split nm "'" in
+    hd l != "a" => eprintf "Bifrost name not starting with a' (%s)" nm |
+    let name = el 2 l in
+    val (bname,idxs) = split_name_number name in
+    let field = last l in
+    let direction =
+	length l = 3 =>
+	    field = "req" => "input" |
+	    field = "ack" => "output" |
+	    eprintf "Expected req or ack but got '%s'" field
+	|
+	let dir = el 3 l in
+	dir = "i" => "input" |
+	dir = "o" => "output" |
+	"input"
+    in
+    (name, bname, direction, field, tp)
+;
+
+let make_bundle_decl l =
+    val (name,bname,dir,field,tp) = hd l in
+    let lefts =
+	flatmap (\(_,_,dir,field,tp). dir = "input" => [(field,tp)] | []) l
+    then
+    let rights =
+	flatmap (\(_,_,dir,field,tp). dir = "output" => [(field,tp)] | []) l
+    then
+    let pr_pair (nm,tp) = sprintf "(\"%s\", \"%s\")" nm tp in
+    let left = list2str T "\n\t[" ", " "]" pr_pair lefts in
+    let right = list2str T "\n\t[" ", " "]" pr_pair rights in
+    sprintf "BUNDLE \"B_%s\" %s %s\n;\n" bname left right
+;
+
+let make_bundle_version fn =
+    let ret_type = get_return_type fn in
+    ret_type != "pexlif" =>
+	eprintf "Function '%s' not returning a pexlif (%s)" fn ret_type
+    |
+    let args = get_args fn in
+    (el 1 args) != ("clk", "bit") =>
+	eprintf "First argument is not 'clk' of type 'bit'"
+    |
+    (el 2 args) != ("reset", "bit") =>
+	eprintf "Second argument is not 'reset' of type 'bit'"
+    |
+    (el 3 args) != ("req", "bit") =>
+	eprintf "Third argument is not 'req' of type 'bit'"
+    |
+    (el 4 args) != ("ack", "bit") =>
+	eprintf "Fourth argument is not 'ack' of type 'bit'"
+    |
+    let idx = find_first0 (\(nm,_). str_is_prefix "a'" nm) args in
+    // Define the top-level bundle
+    let my_signals = gather args (5 upto (idx = 0 => length args | idx-1)) in
+    val (inps,outs) = split (\(nm,_).str_is_prefix "i'" nm) my_signals in
+    let pr_pair (nm,tp) =
+	sprintf "(\"%s\", \"%s\")" (string_butfirstn 2 nm) tp
+    in
+    let left = list2str T "\n\t[" ", " "]" pr_pair (("..req", "bit"):inps) in
+    let right = list2str T "\n\t[" ", " "]" pr_pair (("..ack", "bit"):outs) in
+    let top_bundle = sprintf "BUNDLE \"B_%s\" %s %s\n;\n" fn left right then
+    let bundle_defs = ref [top_bundle] in
+    // Now produce bundles, declarations and instantiations
+    let mk_arg direction (nm,tp) = sprintf "\t%s_%s\t%s.\n" tp direction nm in
+    let bundle_args = ref (map (mk_arg "input") (firstn 2 args)) then
+    let call_args = ref (map fst (firstn 2 args)) then
+    let my_signals = gather args (3 upto (idx = 0 => length args | idx-1)) in
+    let rem_signals = idx = 0 => [] | butfirstn (idx-1) args in
+    let new_call_args =
+	    let get_field nm = last (str_split nm "'") in
+	    map (\(nm,tp). sprintf "(S_%s-->%s)" fn (get_field nm)) my_signals
+    then
+    let new_bundle_arg = sprintf "\tB_%s_input\tS_%s.\n" fn fn then
+    (bundle_args := (deref bundle_args)@[new_bundle_arg]) fseq
+    (call_args := ((deref call_args)@new_call_args)) fseq
+    //
+    let snms = map split_bifrost_name rem_signals then
+    let mk l =
+	val (name,bname,dir,field,tp) = hd l in
+	let bundle_decl = make_bundle_decl l then
+	(bundle_defs := (bundle_decl : (deref bundle_defs))) fseq
+	let new_bundle_arg = sprintf "\tB_%s_output\tS_%s.\n" bname name in
+	(bundle_args := (deref bundle_args)@[new_bundle_arg]) fseq
+	let mk_call (name,bname,dir,field,tp) =
+	    sprintf "(S_%s-->%s)" name field
+	in
+	let new_call_args = map mk_call l then
+	(call_args := ((deref call_args)@new_call_args))
+    in
+    (foreach mk (partition fst snms)) fseq
+    let pre = sprintf "let %s =\n" fn in
+    let post = sprintf "\tCELL \"%s\" [\n" fn in
+    let decl = list2str T pre "" post id (deref bundle_args) then
+    let body =
+	list2str T (sprintf "\t%s " fn) "\n\t\t" "\n];\n" id (deref call_args)
+    then
+    let pcomp = sprintf "pcompile %s;\n" fn in
+    let bundles = list2str T "\n" "\n" "\n" id (deref bundle_defs) in
+    let final = sprintf "\ncreate_default_version %s;\n" fn in
+    bundles, (sprintf "%s%s%s" pcomp decl body), final
+;
+
+let bifrostfl2bundle unit_name load_files replace->F =
+    NOT (file_exists (unit_name^".bfst")) =>
+	eprintf "There is no Bifrost program called %s.bfst" unit_name
+    |
+    NOT (file_exists (unit_name^".bfst.fl")) =>
+	eprintf "Bifrost has not been run. Missing file %s.bfst.fl" unit_name
+    |
+    let ifile = sprintf "%s.bfst.fl" unit_name then
+    let ofile = sprintf "%s.bfl" unit_name then
+    NOT replace AND file_exists ofile =>
+        eprintf "File %s exists already and replace argument is F\n" ofile
+    |
+    (foreach (\f. (_load f F) fseq ()) load_files) fseq
+    (_load ifile F) fseq
+    val (bundle_decls, bundle_info, final) = make_bundle_version unit_name then
+    // Now produce the resulting file
+    let fp = fopen ofile "w" then
+    (foreach (\f. fprintf fp "cload \"%s\";\n" f) load_files) fseq
+    (fprintf fp "\n\n") fseq
+    (fprintf fp "%s\n\n" bundle_decls) fseq
+    (fprintf fp "begin_abstype;\n") fseq
+    (fclose fp) fseq
+    (system (sprintf "/bin/cat %s >> %s" ifile ofile)) != 0 =>
+	eprintf "Failed to copy %s to %s\n" ifile ofile
+    |
+    let fp = fopen ofile "a" then
+    (fprintf fp ";\n%s\n" bundle_info) fseq
+    (fprintf fp "\nend_abstype %s;\n\n" unit_name) fseq
+    (fprintf fp "%s\n" final) fseq
+    (fclose fp)
+;
+
+end_abstype bifrostfl2bundle;
+

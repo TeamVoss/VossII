@@ -1,0 +1,14 @@
+let ack_pulse_merge =
+    bit_input	    clk reset.
+    bit_list_input	reqs.
+    bit_list_output	acks.
+    bit_output		m_req.
+    bit_input		m_ack.
+    bit_list_output	selected.
+    //
+    CELL "ack_pulse_merge" (
+	(map2 (\sel.\req. sel <- req) selected reqs) @
+	(map2 (\ack.\req. ack <- m_ack '&' req) acks reqs) @
+	[ m_req <- OR_n reqs ]
+);
+

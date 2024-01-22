@@ -696,8 +696,10 @@ do_parse_stdin(bool flush)
 
 
 bool
-perform_fl_command(string txt)
+perform_fl_command(string txt, bool restore_line_nbr)
 {
+    int		old_line_nbr = line_nbr;
+    string	old_file_name = cur_file_name;
     YY_BUFFER_STATE old_buffer = YY_CURRENT_BUFFER;
     YY_BUFFER_STATE cmd_buffer = yy_scan_string(txt);
     prev_line[0] = '\0';
@@ -711,6 +713,10 @@ perform_fl_command(string txt)
     yy_delete_buffer(cmd_buffer);
     yy_switch_to_buffer(old_buffer);
     file_load = old_file_load;
+    if( restore_line_nbr ) {
+	line_nbr = old_line_nbr;
+	cur_file_name = old_file_name;
+    }
     return ok;
 }
 

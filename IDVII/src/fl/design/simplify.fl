@@ -438,7 +438,7 @@ letrec const_prop e assuming (is_binary e) =
 	let c = const_prop e then
 	is_CONST c =>
 	    val (sz,v) = get_const c then
-	    W_CONST sz (intNOT v)
+	    W_CONST sz ((intNOT v) intAND (2**sz-1))
 	|
 	    W_NOT c
  /\    const_prop (W_SX sz e) =

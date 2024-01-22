@@ -45,6 +45,7 @@ let Pio_tbl ios =
 	in
 	list2str T (sprintf "%s:\n\t" title) "\n\t" "\n" p1 l
     in
+    (sprintf "Assertions: %S\n" assertions)^
     (Ptbl "Fanin" fi_tbl)^
     (Ptbl "Fanout" fo_tbl)
 ;
@@ -96,7 +97,7 @@ let vec_overlap vn1 vn2 =
     tst vn1 vn2
 ;
 
-clet buid_io_tbl p =
+clet build_io_tbl p =
     NOT (pexlif_is_hier p) =>
 	FANIN_OUT_TBLS p [] [] (tbl_create 10) (tbl_create 10) 
     |
@@ -149,7 +150,7 @@ clet buid_io_tbl p =
 	(key,values)
     in
     let fanin_list = map mk_entry (partition fst fanin_list) then
-    let find_assertion (nd,_) = (str_is_substr "assertion__" nd) => [nd] | [] in
+    let find_assertion (nd,_) = (str_is_substr "assert__" nd) => [nd] | [] in
     let assertions = flatmap find_assertion fanin_list then
     FANIN_OUT_TBLS
 	p
@@ -207,8 +208,6 @@ let pt2outs ptlist =
     in
     setify (flatmap get ptlist)
 ;
-
-
 
 let wire2driver ios wire = setify (pt2insts (get_pt_fanin ios wire));
 
@@ -294,7 +293,7 @@ let inst_fanin_dfs ios private_only max_levels stop_pred {indices:: int list} =
 //
 //STE_debug (pexlif2fsm p);
 //
-//let io = buid_io_tbl p;
+//let io = build_io_tbl p;
 //io;
 //
 //inst_fanin_dfs io T 3 (\n.F) [19];

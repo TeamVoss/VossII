@@ -1,0 +1,207 @@
+begin_abstype;
+
+ENUM "req_fsm" ["IDLE", "ASKING"];
+
+let req_slice i =
+    bit_input		clk reset.
+    bit_input		freeze.
+    bit_input		req.
+    bit_input		selected0.
+    bit_input		selected1.
+    bit_input		m_ack.
+    bit_output		asks.
+    //
+    req_fsm_internal	state.
+    bit_internal	goto_ask.
+    CELL (sprintf "req_slice_%d" i) [
+	goto_ask <- req '&' '~' (selected0 '&' m_ack),
+	Moore_FSM "req" clk state (reset, IDLE) [
+	    IDLE    --- freeze		    ---  IDLE,
+	    IDLE    --- goto_ask	    ---  ASKING,
+	    ASKING  --- selected1 '&' m_ack --- IDLE
+	],
+	asks <- is_ASKING state
+];
+
+
+let prio =
+    bit_input	ask.
+    bit_input	gi.
+    bit_output	sel.
+    bit_output	go.
+    CELL "prio" [
+	sel <- gi '&' ask,
+	go  <- gi '&' '~' ask
+];
+
+let ack_pulse_arbiter =
+    bit_input           clk reset.
+    bit_list_input      reqs.
+    bit_list_output     acks.
+    bit_output          m_req.
+    bit_input           m_ack.
+    bit_list_output     sels.
+    //
+    bit_internal	freeze.
+    //
+    let sz = length reqs in
+    bit_list_internal sz	asks sels0 sels1.
+    bit_list_internal (sz+1)	gs gs0.
+    //
+    let mk_req_slice i =
+	req_slice i clk reset freeze (el i reqs) (el i sels0) (el i sels1)
+		    m_ack (el i asks)
+    in
+    let mk_prio_slice i =
+	prio (el i asks) (el i gs) (el i sels1) (el (i+1) gs)
+    in
+    let mk_immediate_prio_slice i =
+	prio (el i reqs) (el i gs0) (el i sels0) (el (i+1) gs0)
+    in
+    //
+    CELL "ack_pulse_arbiter" (
+	(map mk_req_slice (1 upto sz)) @
+	(map mk_prio_slice (1 upto sz)) @
+	(map mk_immediate_prio_slice (1 upto sz)) @
+	(map3 (\s.\s0.\s1. s <- s0 '|' s1) sels sels0 sels1) @
+	[
+	    freeze <- OR_n asks,
+	    (el 1 gs) <- '1,
+	    (el 1 gs0) <- '~' freeze,
+	    m_req <- OR_n sels
+	] @
+	(map2 (\ack.\sel. ack <- sel '&' m_ack) acks sels)
+);
+
+end_abstype ack_pulse_arbiter;
+
+//
+//let pulse2protocol =
+//    bit_input	clk reset.
+//    bit_input	preq.
+//    bit_input	ack.
+//    bit_output	req.
+//    //
+//    bit_internal    state.
+//    CELL "pulse2protocol" [
+//	re_ff_reset clk reset (req '&' '~' ack) state,
+//	req <- preq '|' state
+//];
+//
+//ENUM "delays" ["INIT", "D1", "D2", "D3"];
+//
+//let random_reply =
+//    bit_input	clk reset.
+//    bit_input	req.
+//    bit_output	ack.
+//    //
+//    bit_internal    r1 r0 direct.
+//    delays_internal del.
+//    CELL "random_reply" [
+//	Moore_FSM "delay" clk del (reset, INIT) [
+//	    INIT --- (req '&' r1 '&' r0)     --- D3,
+//	    INIT --- (req '&' r1 '&' '~' r0) --- D2,
+//	    INIT --- (req '&' '~'r1 '&' r0)  --- D1,
+//	    D3	 --- '1			     --- D2,
+//	    D2	 --- '1			     --- D1,
+//	    D1   --- '1			     --- INIT
+//	],
+//	direct <- (is_INIT del) '&' req '&' '~' r1 '&' '~' r0,
+//	ack <- direct '|' is_D1 del
+//];
+//    
+//
+//let tst =
+//    bit_input	clk reset.
+//    bit_input	preq0 preq1 preq2.
+//    bit_output	ack0 ack1 ack2.
+//    bit_output	m_req.
+//    //
+//    bit_internal	req0 req1 req2.
+//    bit_internal	m_ack.
+//    bit_internal	sel0 sel1 sel2.
+//    CELL "tst" [
+//	pulse2protocol clk reset preq0 ack0 req0,
+//	pulse2protocol clk reset preq1 ack1 req1,
+//	pulse2protocol clk reset preq2 ack2 req2,
+//	ack_pulse_arbiter clk reset [req2, req1, req0]
+//				    [ack2, ack1, ack0]
+//				    m_req m_ack
+//				    [sel2, sel1, sel0],
+//	random_reply clk reset m_req m_ack
+//];
+//
+//
+//
+//let p = flfun2pexlif tst;
+//
+//let ckt = pexlif2fsm p;
+//ckt;
+//
+//let vis = STE_debug ckt;
+//vis;
+//
+//let random_signals signals cycs =
+//    letrec mk t =
+//	t >= cycs => [] |
+//	let mkv s =
+//	    let v = rvariable (sprintf "%s@%d" s t) then
+//	    (T,s,v,t,t+2)
+//	in
+//	(map mkv signals)@(mk (t+2))
+//    in
+//    mk 0
+//;
+//	
+//
+//
+//let N = 50;
+//
+//let ant = 
+////    (random_signals ["i5/r1", "i5/r0"] (2*N))
+//    "i5/r1" is 0 for N cycles and "i5/r0" is 0 for N cycles
+//  and
+//    "clk" is_clock N
+//  and
+//    "reset" is 1 in_cycle 1 otherwise 0 until N cycles
+//  and
+//    "preq0" is 1 in_cycle 5 followed_by
+//	      1 in_cycle 10 followed_by
+//	      1 in_cycle 11 followed_by
+//	      1 in_cycle 20 followed_by
+//	      1 for 10 cycles
+//	    otherwise 0 until N cycles
+//  and
+//    "preq1" is 1 in_cycle 6 followed_by
+//	      1 in_cycle 10 followed_by
+//	      1 in_cycle 11 followed_by
+//	      1 in_cycle 12 followed_by
+//	      1 in_cycle 20 followed_by
+//	      1 for 10 cycles
+//	    otherwise 0 until N cycles
+//  and
+//    "preq2" is 1 in_cycle 8 followed_by
+//	      1 in_cycle 20 followed_by
+//	      1 for 10 cycles
+//	    otherwise 0 until N cycles
+//;
+//
+//
+//let ste = STE "-e" vis [] ant [] [];
+//ste;
+//
+//add_waveform vis ["clk"];
+//add_waveform vis ["m_req"];
+//add_waveform vis ["m_ack"];
+//add_waveform vis ["req0"];
+//add_waveform vis ["ack0"];
+//add_waveform vis ["req1"];
+//add_waveform vis ["ack1"];
+//add_waveform vis ["req2"];
+//add_waveform vis ["ack2"];
+//add_waveform vis ["sel2"];
+//add_waveform vis ["sel1"];
+//add_waveform vis ["sel0"];
+//
+//IDV p "DB_QQQ" [];
+

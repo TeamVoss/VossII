@@ -120,9 +120,9 @@ static bool file_open(string filename, char op,file_ptr fp)
 	if( op == 't' )
 	    fp->file_size = 0;
 	else
-	    fp->file_size = lseek(fp->file_desc, 0L, L_XTND);
+	    fp->file_size = lseek(fp->file_desc, 0L, SEEK_END);
 	if( op == 'r' )
-	    lseek(fp->file_desc, 0L, L_SET);
+	    lseek(fp->file_desc, 0L, SEEK_SET);
 	return TRUE;
     } else
 	return FALSE;

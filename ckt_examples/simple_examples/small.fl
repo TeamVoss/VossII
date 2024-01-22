@@ -1,0 +1,40 @@
+load "idv.fl";
+
+TYPE "word" 8;
+
+let tst =
+    word_input a b c d.
+    bit_output o1 o2.
+    word_output o3 o4 o5 o6.
+    CELL "tst" [
+	o1 <- a '<' b,
+	o2 <- d '<' c,
+	o3 <- (IF o1 THEN a ELSE b),
+	o4 <- (IF (c '>=' d) THEN c ELSE d),
+	o5 <- (a '|' '~' b) '&' b '&' c '&' d,
+	o6 <- a '|' b '|' c '|' d
+];
+
+let p = flfun2pexlif tst;
+
+//system "/bin/rm -rd DB_qqqq";
+//IDV p "DB_qqqq" [];
+
+let ant =
+    "a[7:0]" is 3 in_phase 0 followed_by
+	        0 in_phase 1 
+ and
+    "b[7:0]" is 1 in_phase 0 followed_by
+	        4 in_phase 1 
+ and
+    "c[7:0]" is 3 in_phase 0 followed_by
+	        0 in_phase 1 
+ and
+    "d[7:0]" is 1 in_phase 0 followed_by
+	        4 in_phase 1 
+;
+
+let vis = STE_debug (pexlif2fsm p);
+vis;
+
+STE "-e" vis [] ant [] [];

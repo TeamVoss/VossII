@@ -1,0 +1,174 @@
+load "ste.fl";
+
+TYPE "byte" 8;
+
+STRUCT "foo" [("valid", "bit"), ("data", "byte")];
+valid;
+
+BUNDLE "abc" [("req","bit"), ("arg1","byte"), ("arg2","byte")]
+             [("ack","bit"), ("sum", "byte")]
+;
+
+TYPE "addr" 12;
+
+BUNDLE "mread" [("req", "bit"), ("addr", "addr")]
+               [("ack", "bit"), ("dout", "byte")]
+;
+BUNDLE "mwrite" [("req", "bit"), ("addr", "addr"), ("din", "byte")]
+                [("ack", "bit")]
+;
+
+
+// Merging read requests when we know requests are mutually exclusive
+let read_merge =
+    mread_list_input    reqs.
+    mread_output        mem.
+    CELL "merge" (
+        (map (\r. r-->dout <- (IF r-->req THEN mem-->dout ELSE 'X)) reqs)
+        @
+        (map (\r. r-->ack <- r-->req '&' mem-->ack) reqs)
+        @
+        [
+          CASE (mem-->addr) (map (\r. r-->req, r-->addr) reqs) 'X
+        , mem-->req <- OR_n (map (\r. r-->req) reqs)
+        ]
+);
+
+// Merging write requests when we know requests are mutually exclusive
+let write_merge =
+    mwrite_list_input   reqs.
+    mwrite_output       mem.
+    CELL "merge" (
+        (map (\r. r-->ack <- r-->req '&' mem-->ack) reqs)
+        @
+        [
+          CASE (mem-->addr) (map (\r. r-->req, r-->addr) reqs) '0
+        , CASE (mem-->din) (map (\r. r-->req, r-->din) reqs) '0
+        , mem-->req <- OR_n (map (\r. r-->req) reqs)
+        ]
+);
+
+//write_merge ['a, 'b] 'm;
+
+let const2list sz i =
+    let s = sprintf "%0*b" sz i in
+    let res = map (\s. ''(sscanf "%d" s)) (explode s) in
+    {res::bit list}
+;
+    
+let list_constant_assign i =
+    bit_list_output outs.
+    let s = sprintf "%0*b" (length outs) i in
+    CELL s (
+	map2 (\o.\d. o <- ''d) outs (map (sscanf "%d") (explode s))
+);
+
+let list_bitwise_AND msg =
+    bit_list_input  as bs.
+    bit_list_output os.
+    CELL "draw_and2" (
+	(length as != length bs) =>
+	    (eprintf "list_AND for %s. Input mismatch (%d!=%d)\n" msg (length as) (length bs))
+	|
+	(length as != length os) =>
+	    (eprintf "list_AND for %s. Input/output mismatch (%d!=%d)\n" msg (length as) (length os))
+	|
+	map3 (\o.\a.\b. o <- a '&' b) os as bs
+);
+
+let list_ITE msg =
+    bit_input	    cond.
+    bit_list_input  ts es.
+    bit_list_output os.
+    CELL "draw_ite" (
+    (length ts != length es) =>
+	(eprintf "list_ITE for %s. Input mismatch (%d!=%d)\n" msg (length ts) (length es))
+    |
+    (length ts != length os) =>
+	(eprintf "list_ITE for %s. Input/output mismatch (%d!=%d)\n" msg (length ts) (length os))
+    |
+    (
+	map3 (\o.\t.\e. o <- (IF cond THEN t ELSE e)) os ts es
+));
+
+slet list_ITE msg cond ts es os = list_ITE msg cond ts es os;
+
+letrec list_greater_rec =
+    bit_list_input  as bs.
+    bit_output	    gr eq.
+    bit_internal    Hgr Heq Lgr Leq.
+    let N = length as in
+    let N2 = N/2 in
+    let a = hd as in
+    let b = hd bs in
+    CELL "list_greater_rec" (
+	N = 0 => [gr <- '0, eq <- '1] |
+	N = 1 => [gr <- a '&' '~' b, eq <- (a '=' b)] |
+	[
+	    list_greater_rec (butlastn N2 as) (butlastn N2 bs) Hgr Heq,
+	    list_greater_rec (lastn N2 as) (lastn N2 bs) Lgr Leq,
+	    gr <- Hgr '|' Heq '&' Lgr,
+	    eq <- Heq '&' Leq
+	]
+);
+
+let list_greater =
+    bit_list_input  as bs.
+    bit_output	    res.
+    bit_internal    eq.
+    CELL "draw_binary_arithm {>}" [
+	list_greater_rec as bs res eq
+];
+
+
+letrec find_next_rec =
+    bit_list_input  reqs.
+    bit_list_input  ages.
+    bit_list_output m_age.
+    bit_list_output sel.
+    //
+    let sz = length sel in
+    let N = length reqs in
+    let req = hd reqs in
+    let age = firstn sz ages in
+    //
+    bit_list_internal sz    Hm_age Hsel Lm_age Lsel.
+    bit_internal	    H.
+    //
+    CELL "find_next_rec" (
+      N = 0 => [
+	list_constant_assign 0 m_age,
+	list_constant_assign 0 sel
+      ] |
+      N = 1 => [
+	list_bitwise_AND "N=1" (replicate sz req) age m_age,
+	list_ITE "N=1" req (const2list sz 1) (const2list sz 0) sel
+      ] |
+      let N2 = N/2 in
+      [
+	find_next_rec (butlastn N2 reqs) (butlastn (sz*N2) ages) Hm_age Hsel,
+	find_next_rec (lastn N2 reqs) (lastn (sz*N2) ages) Lm_age Lsel,
+	list_greater Hm_age Lm_age H,
+	list_ITE "age" H Hm_age Lm_age m_age,
+	list_ITE "sel" H ((lastn N2 Hsel)@(replicate N2 '1)) Lsel sel
+      ]
+);
+
+let find_next =
+    bit_list_input  reqs.
+    bit_list_input  ages.
+    bit_list_output sel.
+    bit_list_internal (length reqs)  m_age.
+    CELL "find_next" [
+	find_next_rec reqs ages m_age sel
+];
+
+
+let p = find_next ['r1,'r2,'r3] ['a3, 'a2, 'a1, 'b3, 'b2, 'b1, 'c3, 'c2, 'c1 ] 'sel;
+(p fseq 0) catch 99;
+
+
+let p = find_next ['r1,'r2,'r3] ['a3, 'a2, 'a1, 'b3, 'b2, 'b1, 'c3, 'c2, 'c1 ] 'sel;
+rvariable "a";
+p fseq 9;
+

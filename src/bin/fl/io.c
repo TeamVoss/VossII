@@ -1030,6 +1030,7 @@ Save_graph(string type_sig, string file_name, g_ptr node)
     }
     create_hash(&g_save_tbl, 1000, ptr_hash, ptr_equ);
     if( !can_be_saved(node) ) {
+	fclose(fp);
 	dispose_hash(&g_save_tbl, NULLFCN);
 	return( FALSE );
     }

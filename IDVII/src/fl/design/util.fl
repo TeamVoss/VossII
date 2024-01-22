@@ -8,19 +8,28 @@ fprintf stdinfo ".";
 
 let special_md_size v =
     let res = md_size v then
-    res != 1 => res |
+    res != 2 => res |
     // Possibly wrong for xyz[-1:0] nodes
     (str_is_substr "[-1:0]" v) => 0 | res
 ;
 
 let special_md_sizes l =
     let res = md_sizes l then
-    res != 1 => res |
+    res != 2 => res |
     // Possibly wrong for xyz[-1:0] nodes
     let idx = find_first0 (str_is_substr "[-1:0]") l in
     idx != 0 => 0 | res
 ;
 
+let special_md_extract_vectors vs =
+    val (special, other) = split (str_is_substr "[-1:0]") vs in
+//    (setify special)@(md_extract_vectors other)
+let res = (setify special)@(md_extract_vectors other) then
+let old = md_extract_vectors vs then
+let sym_diff s1 s2 = (s1 subtract s2) @ (s2 subtract s1) in
+let diff = sym_diff res old in
+diff != [] => (fprintf stderr "DIFFERENCE: %S\n" diff) fseq res | res
+;
 
 // Create a (potential vector) name given size and base.
 let mk_name sz base = sz = 1 => base | sprintf "%s[%d:0]" base (sz-1);
@@ -463,18 +472,18 @@ letrec w2bv sub w =
 		// that I can think of. The rigth answer would probably have
 		// a wexpr2dualrail but that's pretty cumbersome too
 		mk_xvars sz
-     /\ w2bv (W_CONST sz v) = int2bv v
-     /\ w2bv (W_VAR sz b) = substitute sub (bv_variable (mk_name sz b))
-     /\ w2bv (W_EXPLICIT_VAR sz n) = substitute sub (bv_variable n)
+     /\ w2bv (W_CONST sz v) = bv_ZX (int2bv v)
+     /\ w2bv (W_VAR sz b) = bv_ZX (substitute sub (bv_variable (mk_name sz b)))
+     /\ w2bv (W_EXPLICIT_VAR sz n) = bv_ZX (substitute sub (bv_variable n))
      /\ w2bv (W_AND a b) = bv_AND (w2bv sub a) (w2bv sub b)
      /\ w2bv (W_LAT_LEQ a b) = error "W_LAT_LEQ cannot be converted"
      /\ w2bv (W_OR a b) = bv_OR (w2bv sub a) (w2bv sub b)
      /\ w2bv (W_NOT a) = bv_NOT (w2bv sub a)
      /\ w2bv (W_PRED name cond) = w2bv sub cond
      /\ w2bv (W_EQ a b) =
-	    (bv_eq (w2bv sub a) (w2bv sub b)) => (int2bv 1) | (int2bv 0)
+	    (bv_eq (w2bv sub a) (w2bv sub b)) => (int2bv (-1)) | (int2bv 0)
      /\ w2bv (W_GR a b) =
-	    (bv_greater (w2bv sub a) (w2bv sub b)) => (int2bv 1) | (int2bv 0)
+	    (bv_greater (w2bv sub a) (w2bv sub b)) => (int2bv (-1)) | (int2bv 0)
      /\ w2bv (W_ADD a b) = bv_add (w2bv sub a) (w2bv sub b)
      /\ w2bv (W_SUB a b) = bv_sub (w2bv sub a) (w2bv sub b)
      /\ w2bv (W_MUL a b) = bv_mul (w2bv sub a) (w2bv sub b)
@@ -486,7 +495,7 @@ letrec w2bv sub w =
      /\ w2bv (W_SX sz w) = w2bv sub w
      /\ w2bv (W_ZX sz w) = bv_ZX (w2bv sub w)
      /\ w2bv (W_ITE c t e) =
-	    (w2bv sub c) = (int2bv 1) => (w2bv sub t) | (w2bv sub e)
+	    (w2bv sub c) = (int2bv (-1)) => (w2bv sub t) | (w2bv sub e)
      /\ w2bv (W_SLICE indices w) =
 		let sz = wexpr_size w in
 		list2bv (map (\idx. el (sz-idx) (w2bl w)) indices)
@@ -584,7 +593,7 @@ let get_range v =
 
 let w_substitute sub we =
     let decls = map (\v. get_base_name v, special_md_size v)
-		    (md_extract_vectors (map snd sub))
+		    (special_md_extract_vectors (map snd sub))
     then
     letrec do (W_VAR sz b) =
 	(

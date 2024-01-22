@@ -8,7 +8,7 @@
 /*									      */
 /******************************************************************************/
 #include <ctype.h>
-#include "strings.h"
+#include "voss_strings.h"
 #include "graph.h"
 #include "io.h"
 

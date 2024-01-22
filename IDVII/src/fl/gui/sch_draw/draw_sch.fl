@@ -15,6 +15,31 @@ let visualize_fanin ckt l1 l2 i1 l3 i2 =
 	visualize_fanin ckt l1 l2 i1 l3 i2
 ;
 
+clet accurate_toplevel_pexlif2fsm p =
+    let old1 = update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" "TRUE" then
+    let old2 = update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" "FALSE" then
+    let res = toplevel_pexlif2fsm p then
+    (update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" old1) fseq
+    (update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" old2) fseq
+    res
+;
+
+let accurate_pexlif2fsm p =
+    let old1 = update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" "TRUE" then
+    let old2 = update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" "FALSE" then
+    let res = pexlif2fsm p then
+    (update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" old1) fseq
+    (update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" old2) fseq
+    res
+;
+
+let idv_visualize_fanin p =
+    let ckt = accurate_toplevel_pexlif2fsm p then
+    let outs = outputs ckt then
+    let props = assertions ckt then
+    visualize_fanin ckt [] [] 100 (outs@props) 0
+;
+
 let visualisation2tcl vis =
     DBG_timing => 
 	(fprintf stderr "start visualisation2tcl\n") fseq
@@ -88,24 +113,6 @@ let Create_Dummy_Placement =
 ;
 NOT noX => Create_Dummy_Placement | ();
 
-let accurate_toplevel_pexlif2fsm p =
-    let old1 = update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" "TRUE" then
-    let old2 = update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" "FALSE" then
-    let res = toplevel_pexlif2fsm p then
-    (update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" old1) fseq
-    (update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" old2) fseq
-    res
-;
-
-let accurate_pexlif2fsm p =
-    let old1 = update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" "TRUE" then
-    let old2 = update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" "FALSE" then
-    let res = pexlif2fsm p then
-    (update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" old1) fseq
-    (update_vossrc "VERBOSE-TOPLEVEL-FA-MISMATCH" old2) fseq
-    res
-;
-
 // -------------------------------------------------------------
 
 let cur_canvas = ref "";
@@ -165,11 +172,6 @@ let get_idv_info canvas = deref (get_idv_info_r canvas);
 
 let get_idv_current_pexlif canvas = fst (hd (get_idv_info canvas));
 
-let get_idv_current_fsm canvas =
-    val (p,ckt,just) = hd (get_idv_info canvas) then
-    ckt
-;
-
 let get_idv_parent_info canvas =
     let vfsm = w2vfsm canvas in
     NOT (is_IDV_ENV vfsm) => error "get_idv_info on STE_ENV" |
@@ -178,18 +180,6 @@ let get_idv_parent_info canvas =
 	    dassoc "canvas2trfs" canvas trfs
     then
     (parent, inside, sell)
-;
-
-let canvas2fsm canvas =
-    let vfsm = w2vfsm canvas in
-    is_STE_ENV vfsm => vfsm2fsm vfsm |
-    // IDV_ENV
-    let trfs = deref (vfsm2canvases_r vfsm) in
-    val (TR_SEQ parent inside sell vr trfsr) =
-	dassoc "canvas2trfs" canvas trfs
-    then
-    val (p,ckt,just) = hd (deref trfsr) in
-    ckt
 ;
 
 
@@ -528,14 +518,12 @@ let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
 	then
 	let hier = sprintf "%si%d/" phier inst_nbr then
 	let p = el inst_nbr (pexlif_get_children parent) then
-	let ckt = accurate_toplevel_pexlif2fsm p then
-	let outs = outputs ckt then
-	let vis = visualize_fanin ckt [] [] 100 outs 0 then
+	let vis = idv_visualize_fanin p then
 	val (tab_window, c) = get_new_sch_canvas w 0 "" hier then
 	(start_draw_op c) fseq
 	let cmd = "OBSOLETE" in
 	let evis =
-	    TR_SEQ canvas T [inst_nbr] (ref vis) (ref [(p,ckt,SPEC)])
+	    TR_SEQ canvas T [inst_nbr] (ref vis) (ref [(p,SPEC)])
 	then
 	(add_active_sch_tab_window vfsm c evis cmd) fseq
 	val (final_res, cmds) = visualisation2tcl vis then
@@ -771,6 +759,25 @@ let fl_inform_show_value_change c show =
 export_to_tcl fl_inform_show_value_change;
 
 
+let pretty_printers_ref = ref {[]::(string#(int->string)) list};
+
+
+let add_pretty_printer vec fn =
+    let old = filter (\p. fst p != vec) (deref pretty_printers_ref) then
+    let new = (vec,fn):old then
+    (pretty_printers_ref := new)
+;
+
+let rm_pretty_printer vec =
+    let new = filter (\p. fst p != vec) (deref pretty_printers_ref) then
+    (pretty_printers_ref := new)
+;
+
+let find_pretty_printer vec i =
+    let fn = assoc vec (deref pretty_printers_ref) then
+    fn i
+;
+
 let compress l =
     letrec compr cnt cur (v:vs) =
 	v == cur => compr (cnt+1) cur vs |
@@ -842,8 +849,10 @@ let fl_wv_get_short w vec t =
 		let i = sscanf "%b" s in
 		(assoc i opt_states) catch (sprintf "?0x%x?" i)
 	    |
-	    let res = length nds >= 4 =>
-			sprintf "0x%x" (sscanf "%b" s) | (implode vs)
+	    let i = sscanf "%b" s in
+	    let res =
+		let txt = length nds >= 4 => sprintf "0x%x" i | s in
+		(find_pretty_printer vec i) catch txt
 	    then
 	    strlen res > 30 => "..." | res
 	|
@@ -930,8 +939,11 @@ let fl_get_short_value w vecs compute_alternatives =
 		let i = sscanf "%b" s in
 		(assoc i opt_states) catch (sprintf "?0x%x?" i)
 	    |   
-	    let res = length nds >= 4 =>
-			sprintf "0x%x" (sscanf "%b" s) | (implode vs)
+	    let i = sscanf "%b" s in
+	    let res =
+		let txt = length nds >= 4 => sprintf "0x%x" i | (implode vs) in
+		((length vecs = 1) => (find_pretty_printer (hd vecs) i) | txt)
+		catch txt
 	    then
 	    strlen res > 30 => "..." | res
 	|
@@ -1015,8 +1027,10 @@ let fl_get_long_value canvas tag =
 	    let idx = find_first0 non_binary vals then
 	    idx = 0 =>
 		let b = implode (map (\(H,L). H=>"1"| "0") vals) then
-		let d = length r >= 4 => sprintf "0x%x" (sscanf "%b" b) | b in
-		(v,[d])
+		let i = sscanf "%b" b in
+		let base_txt = length r >= 4 => sprintf "0x%x" i | b in
+		let pretty_txt = (" "^(find_pretty_printer v i)) catch "" in
+		(v, [base_txt^pretty_txt])
 	    |
 	    let val2s (HL) =
 		HL == (T,F) => "1" |
@@ -1131,7 +1145,7 @@ let split_multi_dim v =
     flatmap md_extract_vectors svs
 ;
 
-let is_var (H,L) =
+let HL_is_var (H,L) =
     NOT (H == NOT L) => F |
     val (v,(h,l)) = top_cofactor H in
     h == T AND l == F
@@ -1149,25 +1163,6 @@ let trim s =
     (implode es')
 ;
 
-
-let pretty_printers_ref = ref {[]::(string#(int->string)) list};
-
-
-let add_pretty_printer vec fn =
-    let old = filter (\p. fst p != vec) (deref pretty_printers_ref) then
-    let new = (vec,fn):old then
-    (pretty_printers_ref := new)
-;
-
-let rm_pretty_printer vec =
-    let new = filter (\p. fst p != vec) (deref pretty_printers_ref) then
-    (pretty_printers_ref := new)
-;
-
-let find_pretty_printer vec i =
-    let fn = assoc vec (deref pretty_printers_ref) then
-    fn i
-;
 
 let base_get_complete_value ste vectors t =
     let type = get_ste_type ste then
@@ -1206,7 +1201,7 @@ let base_get_complete_value ste vectors t =
 	    in
 	    letrec group cur (nd:nds) (HL:HLs) =
 		is_const HL => group ((nd,HL):cur) nds HLs |
-		is_var HL   => group ((nd,HL):cur) nds HLs |
+		HL_is_var HL   => group ((nd,HL):cur) nds HLs |
 		cur != [] => (mk_range cur):(group []  (nd:nds) (HL:HLs)) |
 		let ovc = (HL = (F,F)) in
 		NOT (ovc == F) => (nd,["OVERCONSTRAINED"]):(group [] nds HLs) |
@@ -1580,8 +1575,15 @@ let base_get_waveform w vec min_time max_time show_depend =
 			let i = sscanf "%b" s in
 			(assoc i opt_states) catch "-"
                     |   
-                    length nds >= 4 => sprintf "0x%x" (sscanf "%b" s)
-                                     | (implode vs) 
+		    let i = sscanf "%b" s in
+		    let res =
+			let txt = length nds >= 4 => sprintf "0x%x" i
+					      | (implode vs)
+			in
+			(find_pretty_printer vec i)
+			catch txt
+		    then
+		    res
                 |
                 length alts = 1 => hd alts |
                 list2str T "{" "," "}" id (compress vs)
@@ -1915,6 +1917,9 @@ let random_simulation_vis vis clks resets cnt =
 ;
 
 overload random_simulation random_simulation_fsm random_simulation_vis;
+
+let fl_load_waveforms file = (load file) fseq ();
+export_to_tcl fl_load_waveforms;
 
 // ======================================================================
 //  fl API to drawing routine(s)

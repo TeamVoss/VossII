@@ -328,21 +328,21 @@ extern int dbg_tst_line_cnt;
 %token <str_t>	INFIX_VAR_UNARY_9
 %token <str_t>	THEN_COND_VAR ELSE_COND_VAR
 
-%type  <decl_list>	type_decl new_type_decl type_expr type
-%type  <overloads_t>	overload_list
-%type  <expr_t>		top_expr expr expr05 expr1 expr2 expr_list arg_expr
-%type  <cl_t>		rev_expr_list
-%type  <decl_t>		decl fn_defs fn_def lhs_expr_list
-%type  <str_t>		var_or_infix
-%type  <type_name_t>	type_name
-%type  <tpLptr_t>	type_list
-%type  <tpLptr_t>	targ_list
-%type  <type_t>		simple_type type_literal
-%type  <varlp_t>	var_list
-%type  <varl_itemp_t>	var_list_item
-%type  <opt_typed_var_t> opt_typed_var;
-%type  <tvar_list_t>	tvarlist;
-%type  <let_t>			let_top;
+%type  <decl_list>	    type_decl new_type_decl type_expr type
+%type  <overloads_t>	    overload_list
+%type  <expr_t>		    top_expr expr expr05 expr1 expr2 expr_list arg_expr
+%type  <cl_t>		    rev_expr_list
+%type  <decl_t>		    decl fn_defs fn_def lhs_expr_list
+%type  <str_t>		    var_or_infix
+%type  <type_name_t>	    type_name
+%type  <tpLptr_t>	    type_list
+%type  <tpLptr_t>	    targ_list
+%type  <type_t>		    simple_type type_literal
+%type  <varlp_t>	    var_list
+%type  <varl_itemp_t>	    var_list_item
+%type  <opt_typed_var_t>    opt_typed_var;
+%type  <tvar_list_t>	    tvarlist;
+%type  <let_t>		    let_top;
 
 %right	CROSSPROD
 %right	FN_TYPE
@@ -420,7 +420,7 @@ stmt0		: stmt
 stmt		: expr
 		{
                     result_ptr res;
-                    res = Compile(symb_tbl, $1, NULL, FALSE);
+                    res = Compile(symb_tbl, $1, NULL, FALSE, FALSE);
                     if( res != NULL ) {
                         if( Is_Void(res->type) ) {
                             Print_Result(res, stdout_fp, FALSE);
@@ -428,14 +428,14 @@ stmt		: expr
                             Print_Result(res, stdout_fp, TRUE);
                             FP(stdout_fp, "\n");
                             symb_tbl = New_fn_def(it, res, symb_tbl, !file_load,
-						  cur_file_name, line_nbr,NULL);
+						  cur_file_name, line_nbr);
                         }
 			Free_result_ptr(res);
                     }
 		}
 		| INSTALL_PFN expr
 		{
-		    result_ptr res = Compile(symb_tbl, $2, NULL, TRUE);
+		    result_ptr res = Compile(symb_tbl, $2, NULL, TRUE, FALSE);
 		    if( res != NULL ) {
 			Install_PrinterFn(res);
 			Free_result_ptr(res);
@@ -445,12 +445,11 @@ stmt		: expr
 		| decl
 		{
 		    if( $1.ok ) {
-			result_ptr res;
-			arg_names_ptr ap = Get_argument_names($1.expr);
-			res = Compile(symb_tbl, $1.expr, NULL, TRUE);
+			result_ptr res = Compile(symb_tbl, $1.expr,
+						 NULL, TRUE, TRUE);
 			if( res != NULL ) {
 			    symb_tbl = New_fn_def($1.var, res, symb_tbl,
-						 !file_load,$1.file,$1.line,ap);
+						 !file_load,$1.file,$1.line);
 			    Free_result_ptr(res);
 			}
 		    }
@@ -458,10 +457,10 @@ stmt		: expr
                 | VAL arg_expr EQUAL expr
                 {
                     result_ptr res;
-                    res = Compile(symb_tbl, $4, NULL, TRUE);
+                    res = Compile(symb_tbl, $4, NULL, TRUE, FALSE);
 		    if( res != NULL ) {
 			symb_tbl = New_fn_def(it, res, symb_tbl, FALSE,
-					      cur_file_name, line_nbr, NULL);
+					      cur_file_name, line_nbr);
 			buffer var_buf;
 			new_buf(&var_buf, 100, sizeof(string));
 			Get_Vars(&var_buf, $2);
@@ -469,12 +468,11 @@ stmt		: expr
 			FOR_BUF(&var_buf, string, sp) {
 			    g_ptr e = make_project_fun(*sp, $2);
 			    if( e == NULL ) break;
-			    res = Compile(symb_tbl, e, NULL, TRUE);
+			    res = Compile(symb_tbl, e, NULL, TRUE, FALSE);
 			    if( res == NULL ) break;
 			    symb_tbl = New_fn_def(*sp, res, symb_tbl,
 						  !file_load,
-						  cur_file_name, line_nbr,
-						  NULL);
+						  cur_file_name, line_nbr);
 			}
 			free_buf(&var_buf);
 		    }
@@ -508,12 +506,10 @@ stmt		: expr
 		{
 		    if( $2.ok && $4.ok ) {
 			result_ptr res;
-			arg_names_ptr ap = Get_argument_names($4.expr);
-			res = Compile(symb_tbl, $4.expr, $2.type, TRUE) ;
+			res = Compile(symb_tbl, $4.expr, $2.type, TRUE, TRUE);
 			if( res != NULL ) {
 			    symb_tbl = New_fn_def($4.var, res, symb_tbl,
-						  !file_load, $4.file, $4.line,
-						  ap);
+						  !file_load, $4.file, $4.line);
 			    Free_result_ptr(res);
 			}
 		    }
@@ -1096,13 +1092,13 @@ type		: var_or_infix type_list
 		{
 		    if( $2.ok ) {
 			g_ptr e = Make_TYPE($1, Length_TypeList($2.tl));
-			result_ptr tmp_res = Compile(NULL, e, NULL, FALSE);
+			result_ptr tmp_res = Compile(NULL, e, NULL,FALSE,FALSE);
 			if( tmp_res != NULL ) {
 			    Unify_Constr(tmp_res->type, $2.tl);
 			    // Mk: let VAR a1 a2 . . . a$1 =
 			    //      "VAR",a1,a2,. . .,a$2;
 			    $$.fns = New_fn_def($1, tmp_res, NULL, FALSE,
-						cur_file_name, line_nbr, NULL);
+						cur_file_name, line_nbr);
 			    Free_result_ptr(tmp_res);
 			    $$.ok = TRUE;
 			} else {
@@ -1601,6 +1597,10 @@ expr2		: VART
 		{
 		    $$ = Make_VAR_leaf($1);
 		}
+		| VART FN_TYPE expr1
+		{
+		    $$ = Make_Named_Arg($1, $3);
+		}
                 | PRINTFT STRINGT
                 { 
 		    $$ = Make_Printf_Primitive(P_PRINTF, $2);
@@ -1686,12 +1686,54 @@ expr2		: VART
 		}
 		;
 
-let_top :	     LET   {$$.file = $1.file; $$.line = $1.line; $$.recursive = FALSE; $$.strict = FALSE; $$.cached = FALSE;}
-		| LETREC   {$$.file = $1.file; $$.line = $1.line; $$.recursive = TRUE ; $$.strict = FALSE; $$.cached = FALSE;}
-		| S_LET    {$$.file = $1.file; $$.line = $1.line; $$.recursive = FALSE; $$.strict = TRUE ; $$.cached = FALSE;}
-		| S_LETREC {$$.file = $1.file; $$.line = $1.line; $$.recursive = TRUE ; $$.strict = TRUE ; $$.cached = FALSE;}
-		| C_LET    {$$.file = $1.file; $$.line = $1.line; $$.recursive = FALSE; $$.strict = FALSE; $$.cached = TRUE ;}
-		| C_LETREC {$$.file = $1.file; $$.line = $1.line; $$.recursive = TRUE ; $$.strict = FALSE; $$.cached = TRUE ;}
+let_top :	LET  
+		{
+		    $$.file = $1.file;
+		    $$.line = $1.line;
+		    $$.recursive = FALSE;
+		    $$.strict = FALSE;
+		    $$.cached = FALSE;
+		}
+		| LETREC
+		{
+		    $$.file = $1.file;
+		    $$.line = $1.line;
+		    $$.recursive = TRUE ;
+		    $$.strict = FALSE;
+		    $$.cached = FALSE;
+		}
+		| S_LET    
+		{
+		    $$.file = $1.file;
+		    $$.line = $1.line;
+		    $$.recursive = FALSE;
+		    $$.strict = TRUE ;
+		    $$.cached = FALSE;
+		}
+		| S_LETREC 
+		{
+		    $$.file = $1.file;
+		    $$.line = $1.line;
+		    $$.recursive = TRUE ;
+		    $$.strict = TRUE ;
+		    $$.cached = FALSE;
+		}
+		| C_LET    
+		{
+		    $$.file = $1.file;
+		    $$.line = $1.line;
+		    $$.recursive = FALSE;
+		    $$.strict = FALSE;
+		    $$.cached = TRUE ;
+		}
+		| C_LETREC 
+		{
+		    $$.file = $1.file;
+		    $$.line = $1.line;
+		    $$.recursive = TRUE ;
+		    $$.strict = FALSE;
+		    $$.cached = TRUE ;
+		}
 		;
 %%
 
@@ -1786,8 +1828,8 @@ Install_BuiltIns()
     for(i = 0; i < nbr_functions; i++) {
         string name = wastrsave(&strings, functions[i].name);
 	g_ptr fn = Make_0inp_Primitive(functions[i].prim_fn);
-	result_ptr res = Compile(NULL, fn, NULL, FALSE);
-	symb_tbl = New_fn_def(name, res, symb_tbl, FALSE, NULL, -1, NULL);
+	result_ptr res = Compile(NULL, fn, NULL, FALSE,FALSE);
+	symb_tbl = New_fn_def(name, res, symb_tbl, FALSE, NULL, -1);
 	Free_result_ptr(res);
 	if( functions[i].infix > 0 )
 	    Insert_infix(name, functions[i].infix);

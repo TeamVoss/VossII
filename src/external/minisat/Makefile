@@ -62,6 +62,10 @@ SORELEASE?=.0#   Declare empty to leave out from library file name.
 MINISAT_CXXFLAGS = -I. -D __STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -Wall -Wno-parentheses -Wextra -Wclobbered -fpermissive
 MINISAT_LDFLAGS  = -Wall -lz
 
+ifeq ($(UNAME_S),Darwin)
+	## temporary workaround for macos linker bugs
+	MINISAT_LDFLAGS += -ld_classic
+endif
 ECHO=@echo
 ifeq ($(VERB),)
 VERB=@
@@ -157,12 +161,18 @@ $(BUILD_DIR)/release/bin/$(MINISAT_CORE) $(BUILD_DIR)/debug/bin/$(MINISAT_CORE) 
 	$(VERB) $(AR) -rcs $@ $^
 
 ## Shared Library rule
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+	shared_library_ld_flag = -Wl,-install_name
+else
+	shared_library_ld_flag = -Wl,-soname
+endif
 $(BUILD_DIR)/dynamic/lib/$(MINISAT_DLIB).$(SOMAJOR).$(SOMINOR)$(SORELEASE)\
  $(BUILD_DIR)/dynamic/lib/$(MINISAT_DLIB).$(SOMAJOR)\
  $(BUILD_DIR)/dynamic/lib/$(MINISAT_DLIB):
 	$(ECHO) Linking Shared Library: $@
 	$(VERB) mkdir -p $(dir $@)
-	$(VERB) $(CXX) $(MINISAT_LDFLAGS) $(LDFLAGS) -o $@ -shared -Wl,-soname,$(MINISAT_DLIB).$(SOMAJOR) $^
+	$(VERB) $(CXX) $(MINISAT_LDFLAGS) $(LDFLAGS) -o $@ -shared $(shared_library_ld_flag),$(MINISAT_DLIB).$(SOMAJOR) $^
 	$(VERB) ln -sf $(MINISAT_DLIB).$(SOMAJOR).$(SOMINOR)$(SORELEASE) $(BUILD_DIR)/dynamic/lib/$(MINISAT_DLIB).$(SOMAJOR)
 	$(VERB) ln -sf $(MINISAT_DLIB).$(SOMAJOR) $(BUILD_DIR)/dynamic/lib/$(MINISAT_DLIB)
 

@@ -5,14 +5,18 @@
 
 lettype *a hw_type =
     HW_TYPE
-	{hw_type_name:: *a -> string}
-	{hw_mk_var:: *a -> string -> wexpr}
-	{hw_is_arithmetic:: *a -> bool}
-	{hw_size:: *a -> int}
-	{hw_destr:: *a -> wexpr}
-	{hw_constr:: wexpr -> *a}
-	{hw_values:: *a -> string}
+      {hw_type_name:: *a -> string}
+      {hw_mk_var:: *a -> string -> wexpr}
+      {hw_is_arithmetic:: *a -> bool}
+      {hw_size:: *a -> int}
+      {hw_destr:: *a -> wexpr}
+      {hw_constr:: wexpr -> *a}
+      {hw_values:: *a -> string}
+      {hw_bundle_parts:: *a -> (((string#string) list)#((string#string) list))}
 ;
+
+//let my_PINST = base_PINST;
+let my_PINST = PINST;
 
 open_overload {hw_type_destr :: ({*a} hw_type)};
 
@@ -26,7 +30,7 @@ add_open_overload hw_type_destr dummy1_hw_type_destr dummy2_hw_type_destr;
 
 let hw_constr w =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values)
+		 hw_size hw_destr hw_constr hw_values hw_bparts)
 	= {hw_type_destr:: {*a} hw_type}
     in
     {hw_constr w:: *a}
@@ -34,7 +38,7 @@ let hw_constr w =
 
 let hw_type_name {o:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values)
+		 hw_size hw_destr hw_constr hw_values hw_bparts)
 	= {hw_type_destr:: {*a} hw_type}
     in
     hw_type_name o
@@ -43,7 +47,7 @@ let hw_type_name {o:: *a} =
 
 let hw_mk_var {o:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values)
+		 hw_size hw_destr hw_constr hw_values hw_bparts)
 	= {hw_type_destr:: {*a} hw_type}
     in
     hw_mk_var o
@@ -51,7 +55,7 @@ let hw_mk_var {o:: *a} =
 
 let hw_is_arithmetic {o:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values)
+		 hw_size hw_destr hw_constr hw_values hw_bparts)
 	= {hw_type_destr:: {*a} hw_type}
     in
     hw_is_arithmetic o
@@ -59,7 +63,7 @@ let hw_is_arithmetic {o:: *a} =
 
 let hw_size {o:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values)
+		 hw_size hw_destr hw_constr hw_values hw_bparts)
 	= {hw_type_destr:: {*a} hw_type}
     in
     hw_size o
@@ -67,7 +71,7 @@ let hw_size {o:: *a} =
 
 let hw_destr {o:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values)
+		 hw_size hw_destr hw_constr hw_values hw_bparts)
 	= {hw_type_destr:: {*a} hw_type}
     in
     hw_destr o
@@ -75,19 +79,68 @@ let hw_destr {o:: *a} =
 
 let hw_values {o:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values)
+		 hw_size hw_destr hw_constr hw_values hw_bparts)
 	= {hw_type_destr:: {*a} hw_type}
     in
     hw_values o
 ;
 
+let hw_bundle_pairs {o:: *a} =
+    val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
+		 hw_size hw_destr hw_constr hw_values hw_bparts)
+	= {hw_type_destr:: {*a} hw_type}
+    in
+    hw_bparts o
+;
 
+
+let hw_types_decl_ref = ref {[]::(string#(int#bool#string)) list};
+
+let is_hw_type name = mem name (map fst (deref hw_types_decl_ref));
+
+let get_hw_type_info name = assoc name (deref hw_types_decl_ref);
+non_lazy get_hw_type_info;
+
+let get_hw_type_size name =
+    val (sz,arithm,vlist) = assoc name (deref hw_types_decl_ref) then
+    sz
+;
+non_lazy get_hw_type_size;
+
+let bundle_decls =
+    ref {[] :: (string#(((string#string) list)# ((string#string) list))) list}
+;
+
+let get_bundle_info name =
+    assoc name (deref bundle_decls)
+;
+
+let bundle2field bundle field = bundle^"'"^field;
+
+let make_bundle_signals base type =
+    val (left_signals, right_signals) = get_bundle_info type then
+    let mk_sig (field,field_type) =
+	let sz = get_hw_type_size field_type then
+	let bn = sprintf "%s'%s" base field in
+	sz = 1 => bn | sprintf "%s[%d:0]" bn (sz-1)
+    in
+    map mk_sig (left_signals @ right_signals)
+;
+
+let get_bundle_var e =
+    let we = hw_destr e in
+    let get_var (W_VAR sz nm) = nm
+    /\  get_var other = eprintf "Non-variable bundle (%s)" (Pwexpr we)
+    in
+    get_var we
+; 
 
 let CELL {name::string} {body::pexlif list} =
     (PINST name [] F [] [] [] (P_HIER body))
 ;
 
 let ileq {i::int} {j::int} = i <= j;
+
 
 // Convert a positive integer to a hw type, or X, or variable.
 // E.g., if byte as an 8-bit hw type (TYPE "byte" 8;), then
@@ -102,24 +155,29 @@ let ileq {i::int} {j::int} = i <= j;
 //
 let make_const_or_var s =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*r} hw_type}
     in
     let sz = hw_size {undefined:: *r} in
+    let mk_CONST sz i =
+	let needed = bits_needed i in
+	sz < needed => eprintf "Constant %d does not fit in %d bits" i sz |
+	W_CONST sz i
+    in
     let w =
 	str_is_prefix "0x" s =>
 	    let i = sscanf "0x%x" s in
-	    W_CONST sz i
+	    mk_CONST sz i
 	|
 	str_is_prefix "0b" s =>
 	    let i = sscanf "0b%b" s in
-	    W_CONST sz i
+	    mk_CONST sz i
 	|
 	let s0 = string_hd s in
 	let os = ord s0 in
 	(ileq (ord "0") os) AND (ileq os (ord "9")) =>
 	    let i = sscanf "%d" s in
-	    W_CONST sz i
+	    mk_CONST sz i
 	|
 	s == "X" => W_X sz | hw_mk_var {undefined :: *r} s
     in
@@ -133,7 +191,7 @@ free_binder ';
 let neg_make_const_or_var s =
     let o = {undefined:: *r} in
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*r} hw_type}
     in
     let sz = hw_size {undefined:: *r} in
@@ -188,12 +246,25 @@ let is_wide_AND e  =
 
 (cload (DIR^"/simplify.fl")) fseq ();
 
+
+//let simplify_W_AND c1 c2 =
+//    wexpr_size c1 != 1 => W_AND c1 c2 |
+//    let b1 = wexpr2bool [] c1 in
+//    let b2 = wexpr2bool [] c2 in
+//    let default = W_AND c1 c2 in
+//    let both = wexpr2bool [] default in
+//    b1 == both => c1 |
+//    b2 == both => c2 |
+//    default
+//;
+let simplify_W_AND = W_AND;
+
 let get_cases e =
     letrec get_all_choices conds (W_ITE c t e) =
 	    conds != [] =>
 		let cond = hd conds in
-		(get_all_choices [(W_AND cond c)] t)@
-		(get_all_choices [(W_AND cond (W_NOT c))] e)
+		(get_all_choices [(simplify_W_AND cond c)] t)@
+		(get_all_choices [(simplify_W_AND cond (W_NOT c))] e)
 	    |
 		(get_all_choices [c] t)@(get_all_choices [W_NOT c] e)
      /\    get_all_choices conds other = [(hd conds, other)]
@@ -574,6 +645,7 @@ let base_assignment do_split lhs rhs =
 let w_CASE w_out cond_res_list w_default_value =
     let sz = wexpr_size w_default_value then
     let n = length cond_res_list then
+    let pwid = bits_needed (n-1) in
 //    n = 1 =>
 //	val (c,t) = hd cond_res_list in
 //	let e = w_default_value in
@@ -587,8 +659,8 @@ let w_CASE w_out cond_res_list w_default_value =
      /\ var2name other = []
     in
     letrec select cnt ((c,r):rem) =
-        let bc = sprintf "%sc%02d" BASE_TMP cnt then
-        let br = sprintf "%sr%02d" BASE_TMP cnt then
+        let bc = sprintf "%sc%0*d" BASE_TMP pwid cnt then
+        let br = sprintf "%sr%0*d" BASE_TMP pwid cnt then
         let lc = W_VAR 1 bc then
         let lr = W_VAR sz br then
         val (c_ints, c_act, c_extra) =
@@ -616,7 +688,7 @@ let w_CASE w_out cond_res_list w_default_value =
         let extras = c_extra@r_extra@extras then
         (fas, e, ints, extras)
      /\    select cnt [] =
-        let bd = sprintf "%sd%02d" BASE_TMP cnt then
+        let bd = sprintf "%sd%0*d" BASE_TMP pwid cnt then
         let ld = W_VAR sz bd then
         val (d_ints, d_act, d_extra) =
 	    let v = var2name w_default_value then
@@ -731,12 +803,42 @@ let get_tmp_outs pexlifs =
     all_aouts
 ;
 
+let is_bundle a =
+    val (left_signals, right_signals) = hw_bundle_pairs a in
+    (left_signals != []) OR (right_signals != [])
+;
+
 // Declare inputs to a unit.
 // Example:
 //	input a b c.
 //	    ...
 let input body_fun {fs::string} acc =
         \{aa:: *a}.
+	    is_bundle aa =>
+		val (lefts,rights) = hw_bundle_pairs aa in
+		let as = get_bundle_var aa in
+                let wf = hw_mk_var aa fs in
+                let f = {hw_constr wf:: *a} in
+		let mk (n,t) =
+		    let fn = mk_name (get_hw_type_size t) (bundle2field fs n) in
+		    let an = mk_name (get_hw_type_size t) (bundle2field as n) in
+		    (fn, [an])
+		in
+		let new_inps = map mk lefts in
+		let new_outs = map mk rights in
+		let acc' name bd =
+		    let p0 = acc name bd in
+		    val (PINST n attrs leaf inps outs ints body) = p0 in
+		    let attrs' =
+			("bundle",sprintf "{input %s %s}" fs (hw_type_name aa)):
+			attrs
+		    in
+		    let inps_n = inps@new_inps in
+		    let outs_n = outs@new_outs in
+		    PINST n attrs' leaf inps_n outs_n ints body
+		in
+		body_fun f acc'
+	    |
             let a = hw_destr aa in
             let sz = hw_size aa in
             let wf = hw_mk_var aa fs in
@@ -797,6 +899,44 @@ binder_with_accumulator input CELL;
 //	    ...
 let list_input body_fun {base_fs::string} acc =
         \{aa:: (*a list)}.
+	    is_bundle {undefined :: *a} =>
+		val (lefts,rights) = hw_bundle_pairs {undefined :: *a} in
+		let as = map get_bundle_var aa in
+		let fs =
+		    map (sprintf "%s[%d]" base_fs) ((length aa-1) downto 0)
+		in
+                let wf = map (hw_mk_var {undefined :: *a}) fs in
+                let f = map hw_constr wf in
+		let mkl fs as =
+		    let mk (n,t) =
+			let fn =
+			    mk_name (get_hw_type_size t) (bundle2field fs n)
+			in
+			let an =
+			    mk_name (get_hw_type_size t) (bundle2field as n)
+			in
+			(fn, [an])
+		    in
+		    let new_inps = map mk lefts in
+		    let new_outs = map mk rights in
+		    let attrs' = ("bundle", sprintf "{input %s %s}"
+					   fs (hw_type_name {undefined :: *a}))
+		    in
+		    (new_inps, new_outs, attrs')
+		in
+		val (new_inps_l,new_outs_l,n_attrs) = unzip3 (map2 mkl fs as) in
+		let new_inps = flat new_inps_l in
+		let new_outs = flat new_outs_l in
+		let acc' name bd =
+		    let p0 = acc name bd in
+		    val (PINST n attrs leaf inps outs ints body) = p0 in
+		    let attrs' = n_attrs @ attrs in
+		    let inps_n = inps@new_inps in
+		    let outs_n = outs@new_outs in
+		    PINST n attrs' leaf inps_n outs_n ints body
+		in
+		body_fun {f:: *a list} acc'
+	    |
             let a = map hw_destr {aa:: *a list} in
             let fs = map (sprintf "%s[%d]" base_fs) ((length aa-1) downto 0) in
 	    let sz = hw_size {undefined:: *a} in
@@ -856,6 +996,30 @@ binder_with_accumulator list_input CELL;
 //	    ...
 let output body_fun {fs::string} acc =
         \{aa:: *a}.
+            is_bundle aa =>
+                val (lefts,rights) = hw_bundle_pairs aa in
+		let as = get_bundle_var aa in
+                let wf = hw_mk_var aa fs in
+                let f = {hw_constr wf:: *a} in
+                let mk (n,t) =
+                    let fn = mk_name (get_hw_type_size t) (bundle2field fs n) in
+                    let an = mk_name (get_hw_type_size t) (bundle2field as n) in
+		    (fn, [an])
+                in
+                let new_inps = map mk rights in
+                let new_outs = map mk lefts in
+                let acc' name bd =
+                    let p0 = acc name bd in 
+                    val (PINST n attrs leaf inps outs ints body) = p0 in
+		    let attrs' = ("bundle", sprintf "{output %s %s}"
+						    fs (hw_type_name aa)):attrs
+		    in
+                    let inps_n = inps@new_inps in
+                    let outs_n = outs@new_outs in
+                    PINST n attrs' leaf inps_n outs_n ints body
+                in  
+                body_fun f acc'
+            |
             let a = hw_destr aa in
             let sz = hw_size aa in
             let wf = hw_mk_var aa fs in
@@ -916,6 +1080,44 @@ binder_with_accumulator output CELL;
 //	    ...
 let list_output body_fun {base_fs::string} acc =
         \{aa:: *a list}.
+	    is_bundle (hd aa) =>
+		val (lefts,rights) = hw_bundle_pairs (hd aa) in
+		let as = map get_bundle_var aa in
+		let fs =
+		    map (sprintf "%s[%d]" base_fs) ((length aa-1) downto 0)
+		in
+                let wf = map (hw_mk_var (hd aa)) fs in
+                let f = map hw_constr wf in
+		let mkl fs as =
+		    let mk (n,t) =
+			let fn =
+			    mk_name (get_hw_type_size t) (bundle2field fs n)
+			in
+			let an =
+			    mk_name (get_hw_type_size t) (bundle2field as n)
+			in
+			(fn, [an])
+		    in
+		    let new_inps = map mk rights in
+		    let new_outs = map mk lefts in
+		    let attrs' = ("bundle", sprintf "{output %s %s}"
+					   fs (hw_type_name {undefined :: *a}))
+		    in
+		    (new_inps, new_outs, attrs')
+		in
+		val (new_inps_l,new_outs_l,n_attrs) = unzip3 (map2 mkl fs as) in
+		let new_inps = flat new_inps_l in
+		let new_outs = flat new_outs_l in
+		let acc' name bd =
+		    let p0 = acc name bd in
+		    val (PINST n attrs leaf inps outs ints body) = p0 in
+		    let attrs' = n_attrs@attrs in
+		    let inps_n = inps@new_inps in
+		    let outs_n = outs@new_outs in
+		    PINST n attrs' leaf inps_n outs_n ints body
+		in
+		body_fun {f:: *a list} acc'
+	    |
             let a = map hw_destr {aa:: *a list} in
             let fs = map (sprintf "%s[%d]" base_fs) ((length aa-1) downto 0) in
 	    let sz = hw_size {undefined:: *a} in
@@ -1023,6 +1225,23 @@ binder_with_accumulator inout CELL;
 
 // Declare internal signals to a unit.
 let internal body_fun {fs::string} acc =
+    is_bundle {undefined :: *a} =>
+	val (lefts,rights) = hw_bundle_pairs {undefined :: *a} in
+	let mk (n,t) = mk_name (get_hw_type_size t) (bundle2field fs n) in
+	let new_ints = map mk (lefts@rights) in
+	let wf = hw_mk_var {undefined :: *a} fs in
+	let f = {hw_constr wf:: *a} in
+	let acc' name bd =
+	    let p0 = acc name bd then
+	    val (PINST n attrs leaf inps outs ints body) = p0 in
+	    let attrs' =
+		let tname = hw_type_name {undefined :: *a} in
+		("bundle",sprintf "{internal %s %s}" fs tname):attrs
+	    in
+	    my_PINST n attrs' leaf inps outs (ints@new_ints) body
+	in
+	body_fun {f:: *a} acc'
+    |
     let sz = hw_size {undefined :: *a} in
     let wf = hw_mk_var {undefined :: *a} fs in
     let f = {hw_constr wf:: *a} in
@@ -1045,7 +1264,7 @@ let internal body_fun {fs::string} acc =
 		let prev_expr_pexlifs = tl pexlifs in
 		let ints'' = fv:ints' in
 		let p_main' =
-		    base_PINST n' attrs'' leaf' inps' outs' ints'' body'
+		    my_PINST n' attrs'' leaf' inps' outs' ints'' body'
 		in
 		(p_main', prev_expr_pexlifs)
 	    |
@@ -1053,16 +1272,14 @@ let internal body_fun {fs::string} acc =
 		values = "" => attrs |
 		(sprintf "node_values_%s" fv, values):attrs
 	    in
-	    let p_main' =
-		base_PINST n attrs' leaf inps outs (fv:ints) body
-	    in
+	    let p_main' = my_PINST n attrs' leaf inps outs (fv:ints) body in
 	    (p_main', [])
 	in
 	p_exprs = [] => p_main |
 	let c_ints = get_tmp_outs p_exprs then
 	let c_inps = mk_wrap_inps c_ints (p_main:p_exprs) then
 	let c_outs = mk_wrap_outs [p_main] then
-	let res = base_PINST "_WrApPeR_" attrs F c_inps c_outs c_ints
+	let res = my_PINST "_WrApPeR_" attrs F c_inps c_outs c_ints
 		    (P_HIER (p_main:p_exprs)) then
 	res
     in
@@ -1098,6 +1315,27 @@ let add_internal new_int cell =
 
 // Declare internal array of signals to a unit.
 let list_internal cnt body_fun {base_fs::string} acc =
+    is_bundle {undefined :: *a} =>
+	val (lefts,rights) = hw_bundle_pairs {undefined :: *a} in
+	let fsl = map (sprintf "%s[%d]" base_fs) ((cnt-1) downto 0) in
+	let wf = map (hw_mk_var {undefined :: *a}) fsl in
+	let f = map hw_constr wf in
+	let mkl fs =
+	    let mk (n,t) = mk_name (get_hw_type_size t) (bundle2field fs n) in
+	    map mk (lefts@rights)
+	in
+	let new_ints = flatmap mkl fsl in
+	let tname = hw_type_name {undefined :: *a} in
+	let mk_attr fs = ("bundle",sprintf "{internal %s %s}" fs tname) in
+	let new_attrs = map mk_attr fsl in
+	let acc' name bd =
+	    let p0 = acc name bd then
+	    val (PINST n attrs leaf inps outs ints body) = p0 in
+	    let attrs' = new_attrs @ attrs in
+	    my_PINST n attrs' leaf inps outs (ints@new_ints) body
+	in
+	body_fun {f:: *a list} acc'
+    |
     let fs = map (sprintf "%s[%d]" base_fs) ((cnt-1) downto 0) in
     let sz = hw_size {undefined :: *a} in
     let wfs = map (hw_mk_var {undefined :: *a}) fs in
@@ -1121,7 +1359,7 @@ let list_internal cnt body_fun {base_fs::string} acc =
 		let prev_expr_pexlifs = tl pexlifs in
 		let ints'' = md_extract_vectors (fv@ints') in
 		let p_main' =
-		    base_PINST n' attrs'' leaf' inps' outs' ints'' body'
+		    my_PINST n' attrs'' leaf' inps' outs' ints'' body'
 		in
 		(p_main', prev_expr_pexlifs)
 	    |
@@ -1131,7 +1369,7 @@ let list_internal cnt body_fun {base_fs::string} acc =
 	    in
 	    let p_main' =
 		let ints' = md_extract_vectors (fv@ints) in
-		base_PINST n attrs' leaf inps outs ints' body
+		my_PINST n attrs' leaf inps outs ints' body
 	    in
 	    (p_main', [])
 	in
@@ -1139,7 +1377,7 @@ let list_internal cnt body_fun {base_fs::string} acc =
 	let c_ints = get_tmp_outs p_exprs in
 	let c_inps = mk_wrap_inps c_ints (p_main:p_exprs) in
 	let c_outs = mk_wrap_outs [p_main] in
-	let res = base_PINST "_WrApPeR_" attrs F c_inps c_outs c_ints
+	let res = my_PINST "_WrApPeR_" attrs F c_inps c_outs c_ints
 		    (P_HIER (p_main:p_exprs)) in
 	res
     in
@@ -1148,20 +1386,11 @@ let list_internal cnt body_fun {base_fs::string} acc =
 sized_binder_with_accumulator list_internal CELL;
 
 
-let hw_types_decl_ref = ref {[]::(string#int) list};
-
-let is_hw_type name = mem name (map fst (deref hw_types_decl_ref));
-
-let get_hw_type_size name =
-    assoc name (deref hw_types_decl_ref)
-;
-non_lazy get_hw_type_size;
-
 
 let eval_fl_code l =
     let fp = mktemp "eval_fl_code" then
     let fname = stream2filename  fp then
-    (map (fprintf fp "%s\n") l) fseq
+    (foreach (fprintf fp "%s\n") l) fseq
     (fclose fp) fseq
     (_load fname F) fseq
     // Comment out the next line to ease debugging...
@@ -1171,16 +1400,17 @@ let eval_fl_code l =
 non_lazy eval_fl_code;
 
 let core_TYPE name size is_arithmetic value_list =
-    let current = deref hw_types_decl_ref in
-    mem name (map fst current) =>
-	(fprintf stderr "A hw type called %s is already defined\n" name)
-	seq F
+    is_hw_type name => 
+	(get_hw_type_info name == (size,is_arithmetic,value_list)) => T |
+	eprintf "A hw type called %s is already defined\n" name
     |
-    let new = (name,size):current in
+    let current = deref hw_types_decl_ref in
+    let new = (name,(size,is_arithmetic, value_list)):current in
     (hw_types_decl_ref := new) fseq
+    //
     let ssz = sprintf "%d" size in
     let sarithm = is_arithmetic => "T" | "F" in
-    eval_fl_code
+    let pgm = 
     <{
 	lettype `name` = BV_`name` wexpr;
 	//
@@ -1191,6 +1421,7 @@ let core_TYPE name size is_arithmetic value_list =
 	let hw_`name`_size {bv::`name`} = `ssz`;
 	let hw_`name`_constr w = BV_`name` w;
 	let hw_`name`_destr (BV_`name` w) = w;
+	let hw_`name`_bundle_parts {bv::`name`} = [],[];
 	let {`name`_hw_type_destr:: {`name`} hw_type} =
 	    HW_TYPE hw_`name`_type_name
 		    hw_`name`_mk_var
@@ -1199,6 +1430,7 @@ let core_TYPE name size is_arithmetic value_list =
 		    hw_`name`_destr
 		    hw_`name`_constr
 		    hw_`name`_values
+		    hw_`name`_bundle_parts
 	;
 	add_open_overload hw_type_destr `name`_hw_type_destr;
 	let `name`_input body_fun {fs::string} acc {a::`name`} =
@@ -1269,6 +1501,8 @@ let core_TYPE name size is_arithmetic value_list =
 	;
 	install_print_function  P_`name`;
     }> "functor"
+    then
+    eval_fl_code pgm
 ;
 
 // Declare a new hw type with name 'name' and size number of bits as width.
@@ -1283,6 +1517,7 @@ let wexpr_hw_size {e::wexpr} = 0; // or (wexpr_size e) ????????????
 let wexpr_hw_destr {e::wexpr} = e;
 let wexpr_hw_constr {e::wexpr} = e;
 let wexpr_hw_values {e::wexpr} = "";
+let wexpr_hw_bundle_parts {e::wexpr} = [], [];
 let {wexpr_hw_type_destr :: {wexpr} hw_type} =
             HW_TYPE wexpr_hw_type_name
                     wexpr_hw_mk_var
@@ -1291,6 +1526,7 @@ let {wexpr_hw_type_destr :: {wexpr} hw_type} =
                     wexpr_hw_destr
                     wexpr_hw_constr
                     wexpr_hw_values
+                    wexpr_hw_bundle_parts
 ;
 add_open_overload hw_type_destr wexpr_hw_type_destr;
 
@@ -1313,7 +1549,7 @@ overload '' '' _i2_const _s2_var;
 
 let wNOT {a:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*a} hw_type}
     in
     let res = W_NOT (hw_destr a) in
@@ -1323,7 +1559,7 @@ let '~' a = wNOT a;
 
 let wAND {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*a} hw_type}
     in
     let res = W_AND (hw_destr a) (hw_destr b) in
@@ -1334,7 +1570,7 @@ infix 4 '&';
 
 let wITE {c::bit} {t:: *a} {e:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*a} hw_type}
     in
     let res = W_ITE (hw_bit_destr c) (hw_destr t) (hw_destr e) in
@@ -1359,7 +1595,7 @@ if_then_else_binder THEN ELSE;
 
 let wOR {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*a} hw_type}
     in
     let res = W_OR (hw_destr a) (hw_destr b) in
@@ -1370,7 +1606,7 @@ infix 3 '|';
 
 let wleq {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*a} hw_type}
     in
     let res = W_LAT_LEQ (hw_destr a) (hw_destr b) in
@@ -1387,7 +1623,7 @@ infix 4 '^';
 
 let wEQ {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*a} hw_type}
     in
     let res = W_EQ (hw_destr a) (hw_destr b) in
@@ -1400,7 +1636,7 @@ infix 5 '=';
 
 let wNEQ {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*a} hw_type}
     in
     let res = W_NOT (W_EQ (hw_destr a) (hw_destr b)) in
@@ -1411,7 +1647,7 @@ infix 5 '!=';
 
 let wGR {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*a} hw_type}
     in
     NOT (hw_is_arithmetic a) =>
@@ -1437,7 +1673,7 @@ infix 5 '<=';
 
 let wADD {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*a} hw_type}
     in
     NOT (hw_is_arithmetic a) =>
@@ -1451,7 +1687,7 @@ infix 7 '+';
 
 let wDIV {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*a} hw_type}
     in
     NOT (hw_is_arithmetic a) =>
@@ -1465,7 +1701,7 @@ infix 8 '/';
 
 let wMUL {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*a} hw_type}
     in
     NOT (hw_is_arithmetic a) =>
@@ -1480,7 +1716,7 @@ infix 8 '*';
 
 let wSUB {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*a} hw_type}
     in
     NOT (hw_is_arithmetic a) =>
@@ -1494,7 +1730,7 @@ infix 7 '-';
 
 let wMOD {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*a} hw_type}
     in
     NOT (hw_is_arithmetic a) =>
@@ -1508,7 +1744,7 @@ infix 8 '%';
 
 let wSHL {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*a} hw_type}
     in
     NOT (hw_is_arithmetic a) =>
@@ -1525,7 +1761,7 @@ infix 9 '<<';	    // Fixity???????
 
 let wSHR {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*a} hw_type}
     in
     NOT (hw_is_arithmetic a) =>
@@ -1542,7 +1778,7 @@ infix 9 '>>';	    // Fixity???????
 
 let wASHR {a:: *a} {b:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*a} hw_type}
     in
     NOT (hw_is_arithmetic a) =>
@@ -1559,11 +1795,11 @@ infix 9 '|>>';	    // Fixity???????
 
 let ZX {inp:: *a} =
     val (HW_TYPE ihw_type_name ihw_mk_var ihw_is_arithmetic
-		 ihw_size ihw_destr ihw_constr ihw_values) =
+		 ihw_size ihw_destr ihw_constr ihw_values hw_bparts) =
 	{hw_type_destr :: {*q} hw_type}
     in
     val (HW_TYPE ohw_type_name ohw_mk_var ohw_is_arithmetic
-		 ohw_size ohw_destr ohw_constr ohw_values) =
+		 ohw_size ohw_destr ohw_constr ohw_values hw_bparts) =
 	{hw_type_destr :: {*b} hw_type}
     in
     let sz_in = ihw_size inp in
@@ -1578,11 +1814,11 @@ let ZX {inp:: *a} =
 
 let SX {inp:: *a} =
     val (HW_TYPE ihw_type_name ihw_mk_var ihw_is_arithmetic
-		 ihw_size ihw_destr ihw_constr ihw_values) =
+		 ihw_size ihw_destr ihw_constr ihw_values hw_bparts) =
 	{hw_type_destr :: {*q} hw_type}
     in
     val (HW_TYPE ohw_type_name ohw_mk_var ohw_is_arithmetic
-		 ohw_size ohw_destr ohw_constr ohw_values) =
+		 ohw_size ohw_destr ohw_constr ohw_values hw_bparts) =
 	{hw_type_destr :: {*b} hw_type}
     in
     let sz_in = ihw_size inp in
@@ -1596,15 +1832,19 @@ let SX {inp:: *a} =
     {out :: *b}
 ;
 
+let binary_enum_defs = ref {[] :: (string # (string list)) list};
+
 // Binary encoded enum
 let ENUM_binary name name_list =
     name_list = [] => error "ENUM must have at least one element" |
+    mem (name,name_list) (deref binary_enum_defs) => () |
     let sz = bits_needed ((length name_list)-1) in
     let value_list =
 	let mk (i,n) = sprintf "{%d %s}" i n in
 	list2str T "{" "" "}" mk (zip (0 upto (length name_list-1)) name_list)
     in
     NOT (core_TYPE name sz F value_list) => () |
+    (binary_enum_defs := ((name,name_list):(deref binary_enum_defs))) fseq
     letrec add_item cnt (n:ns) =
         let cmd1 =
             sprintf "let %s_%s = hw_%s_constr (W_NAMED_CONST \"%s\" %d %d);"
@@ -1634,8 +1874,11 @@ let ENUM_binary name name_list =
     add_item 0 name_list
 ;
 
+let custom_enum_defs = ref {[] :: (string # ((string#int) list)) list};
+
 let ENUM_custom name name_encoding_list =
     name_encoding_list = [] => error "ENUM must have at least one element" |
+    mem (name,name_encoding_list) (deref custom_enum_defs) => () |
     let max_code = itlist (\(n,ec).\r. max ec r) name_encoding_list 0 then
     let sz = bits_needed max_code in
     let value_list =
@@ -1643,6 +1886,8 @@ let ENUM_custom name name_encoding_list =
 	list2str T "{" "" "}" mk name_encoding_list
     in
     NOT (core_TYPE name sz F value_list) => () |
+    (custom_enum_defs := ((name,name_encoding_list):(deref custom_enum_defs)))
+    fseq
     letrec add_item ((n,cnt):ns) =
         let cmd1 =
             sprintf "let %s_%s = hw_%s_constr (W_NAMED_CONST \"%s\" %d %d);"
@@ -1674,15 +1919,20 @@ let ENUM_custom name name_encoding_list =
 
 overload ENUM ENUM_binary ENUM_custom;
 
+
+let mutex_enum_defs = ref {[] :: (string # (string list)) list};
+
 // Unary encoded enum
 let MUTEX_ENUM name name_list =
     name_list = [] => error "MUTEX_ENUM must have at least one element" |
+    mem (name,name_list) (deref mutex_enum_defs) => () |
     let sz = length name_list in
     let value_list =
 	let mk (i,n) = sprintf "{%d %s}" (2**i) n in
 	list2str T "{" "" "}" mk (zip (0 upto (length name_list-1)) name_list)
     in
     NOT (core_TYPE name sz F value_list) => () |
+    (mutex_enum_defs := ((name,name_list):(deref mutex_enum_defs))) fseq
     letrec add_item cnt (n:ns) =
         let cmd1 =
             sprintf "let %s_%s = hw_%s_constr (W_NAMED_CONST \"%s\" %d %d);"
@@ -1746,7 +1996,27 @@ non_lazy eval1;
 
 let field_name_info_ref = ref {[]::(string#((string#string)list)) list};
 
+let struct_defs_ref =
+    ref {[] :: ((string# int# ((string#string#(int list)) list)# bool) list)}
+;
+
 let base_STRUCT_explicit name size field_list do_check =
+    let cur = deref struct_defs_ref then
+    let idx = find_first0 (\t. fst t = name) cur then
+    let bundle = (name,size,field_list,do_check) then
+    idx != 0 => ((el idx cur) == bundle) => () |
+	let prStr (nm,sz,flist,check_flag) =
+	    let ptr (f,t,s) = sprintf "%s:%s%S" f t (map int2str s) in
+	    let fls = list2str T "[" ", " "]" ptr flist in
+	    sprintf "STRUCT %s %d %s %B" nm sz fls check_flag
+	in
+	let old = prStr (el idx cur) then
+	let new = prStr bundle then
+	eprintf "Cannot redefine STRUCT.\nOld: %s\nNew: %s\n" old new
+    | 
+    let new = bundle:cur then
+    (struct_defs_ref := new) fseq
+    //
     letrec check ((field_name, type, bits):rem) =
         NOT (is_defined (sprintf "BV_%s" type)) =>
             eprintf "Type %s not defined!" type
@@ -1835,6 +2105,125 @@ let STRUCT_implicit name field_list =
 
 overload STRUCT STRUCT_explicit STRUCT_implicit;
 
+let bundle_exists name =
+    (find_first0 (\p. fst p = name) (deref bundle_decls)) != 0
+;
+
+
+let BUNDLE name left_signals right_signals =
+    let done = deref bundle_decls then
+    mem (name,left_signals,right_signals) done => () |
+    let current = deref hw_types_decl_ref in
+    mem name (map fst current) =>
+	(fprintf stderr "A hw type called %s is already defined\n" name)
+    |
+    let all_sigs = left_signals@right_signals in
+    let idx = find_first0 (\(_,t). NOT (is_hw_type t)) all_sigs then
+    idx != 0 =>
+	val (field,tp) = el idx all_sigs in
+	eprintf "Type '%s' for field '%s' not declared" tp field
+    |
+    let new = (name,(0,F,"")):current in
+    (hw_types_decl_ref := new) fseq
+    let pr (n,t) = sprintf "(\"%s\",\"%s\")" n t in
+    let ssz =
+	let sz = itlist (\(n,t).\r. get_hw_type_size t + r)
+			(left_signals@right_signals) 0
+	then
+	sprintf "%d" sz
+    then
+    let slefts = list2str T "[" "," "]" pr left_signals then
+    let srights = list2str T "[" "," "]" pr right_signals then
+    //
+    let pgm =
+    <{
+	lettype `name` = BUNDLE_`name` wexpr;
+	//
+	let hw_`name`_is_arithmetic {bv::`name`} = F;
+	let hw_`name`_mk_var {bv::`name`} base = W_VAR 0 base;
+	let hw_`name`_values {bv::`name`} = "";
+	let hw_`name`_type_name {bv::`name`} = "`name`";
+	let hw_`name`_size {bv::`name`} = `ssz`;
+	let hw_`name`_constr w = BUNDLE_`name` w;
+	let hw_`name`_destr (BUNDLE_`name` w) = w;
+	let hw_`name`_bundle_parts {b::`name`} = `slefts`, `srights`;
+	let {`name`_hw_type_destr:: {`name`} hw_type} =
+	    HW_TYPE hw_`name`_type_name
+		    hw_`name`_mk_var
+		    hw_`name`_is_arithmetic
+		    hw_`name`_size
+		    hw_`name`_destr
+		    hw_`name`_constr
+		    hw_`name`_values
+		    hw_`name`_bundle_parts
+	;
+	add_open_overload hw_type_destr `name`_hw_type_destr;
+	let `name`_input body_fun {fs::string} acc {a::`name`} =
+	    (defix input) body_fun fs acc a;
+	let `name`_output body_fun {fs::string} acc {a::`name`} =
+	    (defix output) body_fun fs acc a;
+	let `name`_internal {body_fun:: `name`->(string-> *a -> pexlif)-> *b}
+			    {fs::string} acc =
+	    (defix internal) body_fun fs acc;
+	;
+	let `name`_list_internal
+		    {cnt::int}
+		    {body_fun:: (`name` list) -> (string-> *a -> pexlif)-> *b}
+		    {fs::string} acc
+		=
+	    (defix list_internal) cnt  body_fun fs acc
+	;
+	let `name`_list_input
+		    {body_fun:: (`name` list) -> (string-> *a -> pexlif)-> *b}
+		    {fs::string} acc
+	    =
+		(defix list_input) body_fun fs acc
+	;
+	let `name`_list_output
+		    {body_fun:: (`name` list) -> (string-> *a -> pexlif)-> *b}
+		    {fs::string} acc
+	    =
+		(defix list_output) body_fun fs acc
+	;
+	binder_with_accumulator `name`_input CELL;
+	binder_with_accumulator `name`_output CELL;
+	binder_with_accumulator `name`_inout CELL;
+	binder_with_accumulator `name`_internal CELL;
+	sized_binder_with_accumulator `name`_list_internal CELL;
+	binder_with_accumulator `name`_list_input CELL;
+	binder_with_accumulator `name`_list_output CELL;
+	let P_`name` {b::`name`} =
+	    let bn = get_bundle_var b in
+	    (list2str T "{<" " " "> " (\\p. bundle2field bn (fst p)) `slefts`)^
+	    (list2str T "| <" " " ">}" (\\p. bundle2field bn (fst p)) `srights`)
+	;
+	install_print_function P_`name`;
+    }> "functor"
+    then
+    (eval_fl_code pgm) fseq
+    let declare_field (field, type) =
+	let cmd =
+	    let p1 = sprintf "let _%s {b::%s} = " field name in
+	    let p2 = sprintf "let bn = get_bundle_var b then " in
+	    let p3 = sprintf "BV_%s (W_VAR %d (bundle2field bn \"%s\"));\n"
+			    type (get_hw_type_size type) field
+	    in
+	    p1^p2^p3
+        then
+        (eval1 cmd) fseq
+        (is_defined field =>
+            eval1 (sprintf "overload %s %s _%s;" field field field)
+        |
+            eval1 (sprintf "let %s = _%s;" field field)
+        ) fseq ()
+    in
+    (foreach declare_field (left_signals @ right_signals))
+    fseq
+    let old = filter (\p. fst p != name) (deref bundle_decls) then
+    let new = (name,left_signals, right_signals):old then
+    (bundle_decls :=  new)
+;
+
 let MEMORY name size_list word_type =
     let width = get_hw_type_size word_type in
     let tot_size = itlist (\(lines,tp).\r. lines*r) size_list width in
@@ -1843,7 +2232,7 @@ let MEMORY name size_list word_type =
 	(fprintf stderr "A hw type called %s is already defined\n" name)
 	seq F
     |
-    let new = (name,tot_size):current in
+    let new = (name,(tot_size,F,"")):current in
     (hw_types_decl_ref := new) fseq
     let ssz = sprintf "%d" tot_size in
     let swidth = sprintf "%d" width in
@@ -1901,7 +2290,7 @@ let MEMORY name size_list word_type =
         in
         mk_expr (lsz) (rev size_list)
     in
-    eval_fl_code
+    let pgm = 
     <{
 	lettype `name` = BV_`name` wexpr;
 	let hw_`name`_is_arithmetic {bv::`name`} = F;
@@ -1911,6 +2300,7 @@ let MEMORY name size_list word_type =
 	let hw_`name`_size {bv::`name`} = `ssz`;
 	let hw_`name`_constr w = BV_`name` w;
 	let hw_`name`_destr (BV_`name` w) = w;
+	let hw_`name`_bundle_parts {b :: `name`} = [], [];
 	let `name`_hw_type_destr =
 	    HW_TYPE hw_`name`_type_name
 		    hw_`name`_mk_var
@@ -1919,6 +2309,7 @@ let MEMORY name size_list word_type =
 		    hw_`name`_destr
 		    hw_`name`_constr
 		    hw_`name`_values
+		    hw_`name`_bundle_parts
 	;
 	add_open_overload hw_type_destr `name`_hw_type_destr;
 	let `name`_input body_fun {fs::string} acc {a::`name`} =
@@ -1989,13 +2380,15 @@ let MEMORY name size_list word_type =
 	;
 	install_print_function  P_`name`;
     }> "functor"
+    then
+    eval_fl_code pgm
 ;
 
 let emit_hw_type_info filename =
     let fp = fopen filename "w" then
     let fields = deref field_name_info_ref in
     let types = rev (deref hw_types_decl_ref) in
-    let pr1 (name, sz) =
+    let pr1 (name, (sz,is_arithm,v_list)) =
 	(name = "bit") => () |
 	(fprintf fp "type %s => \"%s\";\n" name name) fseq
 	let fields = (assoc name fields) catch [] then
@@ -2132,6 +2525,18 @@ let base_re_ff_reset =
 	MUX reset '0 cur q
 ];
 
+let base_re_ff_set =
+    input	d.
+    bit_input	set.
+    bit_input	clk.
+    output	q.
+    internal	mid cur.
+    CELL "draw_ff_re_set" [
+	MUX set '1 d mid,
+	base_re_ff mid clk cur,
+	MUX set '1 cur q
+];
+
 let base_re_ff_sreset =
     input	d.
     bit_input	reset.
@@ -2204,6 +2609,9 @@ slet re_ff clk d q = base_re_ff d clk q;
 
 // A rising edge D flip-flop with asynchronous reset (active high).
 slet re_ff_reset clk reset d q = base_re_ff_reset d reset clk q;
+
+// A rising edge D flip-flop with asynchronous set (active high).
+slet re_ff_set clk set d q = base_re_ff_set d set clk q;
 
 // A rising edge D flip-flop with enable.
 slet re_ff_en clk en d q = base_re_ff_en d en clk q;
@@ -2289,6 +2697,7 @@ let fe_ff_en clk en d q = base_fe_ff_en d en clk q;
 let fe_ff_en_reset clk en reset d q = base_fe_ff_en_reset d en reset clk q;
 
 end_abstype re_ff re_ff_reset re_ff_en re_ff_en_reset re_ff_en_reset_with_value
+	    re_ff_set
 	    re_ff_sreset re_ff_en_sreset re_ff_en_sreset_with_value
 	    fe_ff fe_ff_reset fe_ff_en fe_ff_en_reset
 ;
@@ -2349,8 +2758,15 @@ let ++ a b =
 infix 1 ++;
 
 
+// Extract an element in a list
+let ~ l idx =
+    let len = length l in
+    el (len-idx) l
+;
+infix 9 ~;
+
 // Extract a single bit from a word
-let  ~~ = extract_bit;
+let ~~ = extract_bit;
 infix 9 ~~;
 
 // Extract a range from a word
@@ -2362,7 +2778,7 @@ let default = {'1::bit};
 // Covert a hardware type to a list of bits
 let tobits {t:: *a} =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*a} hw_type}
     in
     let sz = hw_size t in
@@ -2374,7 +2790,7 @@ let tobits {t:: *a} =
 // Covert a list of bits to a hardware type
 let frombits bl =
     val (HW_TYPE hw_type_name hw_mk_var hw_is_arithmetic
-		 hw_size hw_destr hw_constr hw_values) =
+		 hw_size hw_destr hw_constr hw_values hw_bparts) =
 	{hw_type_destr :: {*r} hw_type}
     in
     let rsz = hw_size {undefined:: *r} in
@@ -2516,18 +2932,20 @@ let draw_fsm reset S0 orig_trans base_inps =
     (foreach mk_state states) fseq
     let ptrans = partition fst trans in
     let emit_edge ((f,fv),on',(t,tv)) =
-        append (sprintf "%s -> %s [ label = \"%s\" ];\n" f t on')
+	    append (sprintf "%s -> %s [ label = \"%s\" ];\n" f t on')
     in
-    letrec mk_edges done ((f,on',t):rem) =
-	let cond = W_AND on' (W_NOT done) in
-	let scond = cond_simplify cond in
-	let s_cond = base_compact_wprint base_inps scond in
+    letrec mk_edges {pri::int} ((f,on',t):rem) =
+	let scond = cond_simplify on' in
+	let s_cond0 = base_compact_wprint base_inps scond in
+	let s_cond1 = strlen s_cond0 > 5 => "?" | s_cond0 in
 	let f_cond = Pwexpr scond in
+	let s_cond = (pri < 0 => "" | sprintf "%d:" pri)^s_cond1 in
 	(emit_edge (f,s_cond,t)) fseq
-	(s_cond,f_cond):(mk_edges (W_OR done on') rem)
-     /\    mk_edges done [] = []
+	(s_cond,f_cond):(mk_edges (pri+1) rem)
+     /\    mk_edges {pri::int} [] = []
     in
-    let edges = flatmap (mk_edges (W_CONST 1 0)) ptrans then
+    let top_mk_edges l = length l > 1 => mk_edges 1 l | mk_edges (-999999) l in
+    let edges = flatmap top_mk_edges ptrans then
     (emit_edge (("dummy_inp",0), reset, S0n)) fseq
     (append (sprintf "}\n")) fseq
     let code = accumulate (defix ^) (rev (deref res)) then
@@ -2635,6 +3053,7 @@ let CASE {out:: *a} {cond_res_list:: (bit # *a) list} {default_value:: *a} =
 let STATE {clk::bit} {state:: *a} {cond_res_list:: (bit # *a) list} =
     let sz = hw_size state in
     let n = length cond_res_list then
+    let pwid = bits_needed (n-1) in
     let w_clk = hw_destr clk then
     let n_clk = hd (w_depends w_clk) then
     let w_state = hw_mk_var {undefined :: *a} (sprintf "%ss" BASE_TMP) then
@@ -2656,8 +3075,8 @@ let STATE {clk::bit} {state:: *a} {cond_res_list:: (bit # *a) list} =
     let d_fas = [(nd,[nd])] in
     let default_p = (hw_constr ld) <- state then
     letrec select cnt ((c,r):rem) =
-        let bc = sprintf "%sc%02d" BASE_TMP cnt in
-        let br = sprintf "%sr%02d" BASE_TMP cnt in
+        let bc = sprintf "%sc%0*d" BASE_TMP pwid cnt in
+        let br = sprintf "%sr%0*d" BASE_TMP pwid cnt in
         let lc = W_VAR 1 bc in
         let lr = W_VAR sz br in
         val (c_ints, c_act, c_extra) =
@@ -2702,6 +3121,7 @@ let EN_STATE {clk::bit} {enable::bit} {state:: *a}
     =
     let sz = hw_size state in
     let n = length cond_res_list then
+    let pwid = bits_needed (n-1) in
     let w_clk = hw_destr clk then
     let n_clk = hd (w_depends w_clk) then
     let w_state = hw_mk_var {undefined :: *a} (sprintf "%ss" BASE_TMP) then
@@ -2723,8 +3143,8 @@ let EN_STATE {clk::bit} {enable::bit} {state:: *a}
     let d_fas = [(nd,[nd])] in
     let default_p = (hw_constr ld) <- state then
     letrec select cnt ((c,r):rem) =
-        let bc = sprintf "%sc%02d" BASE_TMP cnt in
-        let br = sprintf "%sr%02d" BASE_TMP cnt in
+        let bc = sprintf "%sc%0*d" BASE_TMP pwid cnt in
+        let br = sprintf "%sr%0*d" BASE_TMP pwid cnt in
         let lc = W_VAR 1 bc in
         let lr = W_VAR sz br in
         val (c_ints, c_act, c_extra) =
@@ -3137,6 +3557,8 @@ let hw__pair__mk_var p base =
 
 let hw__pair__values {p:: *a # *b} = "";
 
+let hw__pair__bundle_parts {p:: *a # *b} = [], [];
+
 let hw_pair_hw_type_destr =
 	    HW_TYPE hw__pair__type_name
 		    hw__pair__mk_var
@@ -3145,6 +3567,7 @@ let hw_pair_hw_type_destr =
 		    hw__pair__destr
 		    hw__pair__constr
 		    hw__pair__values
+		    hw__pair__bundle_parts
 ;
 add_open_overload hw_type_destr hw_pair_hw_type_destr;
 
@@ -3158,6 +3581,8 @@ let hw__list__constr (W_CAT l) = map hw_constr l
 
 let hw__list__values {p:: *a list} = "";
 
+let hw__list__bundle_parts {p:: *a list} = [], [];
+
 let hw_list_hw_type_destr =
 	    HW_TYPE (error "Not defined for lists")
 		    (error "Not defined for lists")
@@ -3166,6 +3591,7 @@ let hw_list_hw_type_destr =
 		    hw__list__destr
 		    hw__list__constr
 		    hw__list__values
+		    hw__list__bundle_parts
 ;
 add_open_overload hw_type_destr hw_list_hw_type_destr;
 
@@ -3264,6 +3690,66 @@ let XOR_n l =
 ;
 
 
+let w_MUTEX_CASE w_out cond_res_list =
+    let sz = wexpr_size w_out then
+    let n = length cond_res_list then
+    let pwid = bits_needed (n-1) in
+    let n_out = hd (w_depends w_out) then
+    let fa_outs = [(n_out,[n_out])] then
+    let var2name (W_VAR s b) = [mk_name s b]
+     /\ var2name (W_EXPLICIT_VAR s b) = [b]
+     /\ var2name other = []
+    in
+    letrec select cnt ((c,r):rem) =
+        let bc = sprintf "%sc%0*d" BASE_TMP pwid cnt then
+        let br = sprintf "%sr%0*d" BASE_TMP pwid cnt then
+        let lc = W_VAR 1 bc then
+        let lr = W_VAR sz br then
+        val (c_ints, c_act, c_extra) =
+	    let v = var2name c then
+	    v = [] =>
+		let en = mk_name 1 bc then
+		let p = base_assignment T lc c then
+		([en], en, [p])
+	    |
+	    ([], hd v, [])
+        in
+        val (r_ints, r_act, r_extra) =
+	    let v = var2name r then
+	    v = [] =>
+		let en = mk_name sz br then
+		let p = base_assignment T lr r then
+		([en], en, [p])
+	    |
+	    ([], hd v, [])
+        in
+        val (fas, e, ints, extras) = select (cnt+1) rem then
+        let fas = (mk_name 1 bc, [c_act]):(mk_name sz br, [r_act]):fas then
+        let e = W_OR (W_AND (W_SX sz lc) lr) e then
+        let ints = c_ints@r_ints@ints then
+        let extras = c_extra@r_extra@extras then
+        (fas, e, ints, extras)
+     /\    select cnt [] =
+	[], (W_CONST sz 0), [], []
+    in
+    val (fas, rhs, ints, extras) = select 1 cond_res_list then
+    let body = base_assignment F w_out rhs then
+    let pfn = sprintf "draw_MUTEX_CASE %d" n then
+    let mux = PINST pfn [] T fas fa_outs [] (P_HIER [body]) then
+    let children = mux:extras then
+    let get_acts (PINST _ _ _ ifa _ _ _) = flatmap snd ifa then
+    let inps = (setify (flatmap get_acts children)) subtract ints then
+    let fa_inps = map (\v.v,[v]) inps then
+    PINST "_WrApPeR_" [] F fa_inps fa_outs ints (P_HIER children)
+;
+
+let MUTEX_CASE {out:: *a} {cond_res_list:: (bit # *a) list} =
+    let w_out = hw_destr out then
+    let cnv (cond,res) = hw_bit_destr cond, hw_destr res then
+    let w_cond_res_list = map cnv cond_res_list then
+    w_MUTEX_CASE w_out w_cond_res_list
+;
+
 // User contribution: flip-flops that wish they were latches.
 // Flip-flops with bypass muxes.
 
@@ -3339,6 +3825,31 @@ let remove_wrappers p =
 let ` typed_result = hw_destr typed_result;
 
 
+let create_default_version fn =
+    let rtype = get_return_type fn then
+    rtype != "pexlif" =>
+	(fprintf stderr
+	 "Return type not pexlif (%s). create_default_version aborted\n" rtype)
+	fseq ()
+    |
+    let args = get_args fn then
+    let idx = find_first0 (\(a,tp). NOT (is_hw_type tp)) args in
+    idx != 0 =>
+	val (arg,tp) = el idx args in
+	(fprintf stderr
+	 "Arg. %s not a simple hw_type(%s). create_default_version aborted\n"
+	  arg tp
+	) fseq ()
+    |
+    // Now re-define the function with defaults
+    let mk_top_arg (nm,tp) = sprintf "{(%s->('%s)) :: %s}" nm nm tp in
+    let def = list2str T (sprintf "let %s " fn) " " " =\n" mk_top_arg args in
+    let body = list2str T (sprintf "%s " fn) " " ";\n" fst args in
+    let cmd = sprintf "%s%s\n" def body in
+    (eval_fl_code [cmd]) fseq ()
+;
+free_binder create_default_version;
+
 let pexlif_compile_dir = ref {(error "No pexlif cache directory"):: string};
 
 let set_pexlif_cache dir =
@@ -3363,7 +3874,7 @@ let mk_fas_for_simple_actuals name e =
     (mk_name sz name), (var2name (hw_destr e))
 ;
 
-let only_simple conns = (find_first0 (\(f,as). as = []) conns) = 0;
+let dangling_conns conns = (find_first0 (\(f,as). as = []) conns) != 0;
 
 clet pcompile_read_pexlif fn pexlif_file =
     (fprintf stdinfo "-- Loading pre-compiled version of %s--\n" fn) fseq
@@ -3388,7 +3899,7 @@ let pcompile fn =
 	) fseq ()
     |
     // Now re-define the function to load/store a compiled version
-    let mk_top_arg (nm,tp) = sprintf "{%s :: %s}" nm tp in
+    let mk_top_arg (nm,tp) = sprintf "{(%s->('%s)) :: %s}" nm nm tp in
     let top = list2str T (sprintf "let %s " fn) " " " =\n" mk_top_arg args in
     let mid1 =
       (sprintf "\tlet sig = get_symbol_signature \"%s\" in\n" fn)^
@@ -3402,12 +3913,11 @@ let pcompile fn =
     in
     let case1 =
 	let pre =
-	  (sprintf "\tNOT (only_simple conns) =>\n")^
+	  (sprintf "\t(dangling_conns conns) =>\n")^
 	  (sprintf "\t    (fprintf stdinfo \"-- Building %s--\\n\") fseq\n" fn)^
 	  (sprintf "\t    %s " fn)
 	in
-	let mk_arg (nm,tp) = nm in
-	list2str T pre " " "\n\t|\n" mk_arg args
+	list2str T pre " " "\n\t|\n" fst args
     in
     let case2 = 
       (sprintf "\texists =>\n")^
@@ -3433,10 +3943,11 @@ let pcompile fn =
       (sprintf "\t  (PINST nm attrs lf fa_inps' fa_outs' ints body)\n")
     in
     let cmd = top^mid1^mid2^case1^case2^case3^";\n" in
-    (eval cmd) fseq ()
+    (eval cmd) fseq
+    (eval (sprintf "%s fseq ();\n" fn)) fseq 
+    ()
 ;
 free_binder pcompile;
-
 
 let _pExLiF_ = ref {(error "No pexlif") :: pexlif};
 
@@ -3452,8 +3963,8 @@ let flfun2pexlif_core fn =
 	eprintf "Argument %s not a simple hw_type (%s). VIS for %s aborted\n"
 	      arg tp fn
     |
-    let pre = sprintf "let foo = %s " fn in
-    let post = " then (_pExLiF_ := foo);" in
+    let pre = sprintf "let foo = remove_wrappers (%s " fn in
+    let post = ") then (_pExLiF_ := foo);" in
     let cmd = list2str T pre " " post (sprintf "'%s") (map fst args) then
     (eval cmd) fseq (deref _pExLiF_)
 ;

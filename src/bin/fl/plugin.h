@@ -18,7 +18,7 @@
 
 #include "abi_version.h"
 #include "types.h"
-#include "strings.h"
+#include "voss_strings.h"
 #include "typecheck.h"
 
 extern g_ptr void_nd;

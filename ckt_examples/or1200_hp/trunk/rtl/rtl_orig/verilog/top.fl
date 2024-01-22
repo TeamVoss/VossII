@@ -1,0 +1,155 @@
+load "idv.fl";
+
+let p = verilog2pexlif F "-I../../rtl_virtex_orig/verilog/" "or1200_top" [
+	    "rf_sub.v",
+	    "or1200_alu.v",
+	    "or1200_cfgr.v",
+	    "or1200_cpu.v",
+	    "or1200_ctrl.v",
+	    "or1200_dc_fsm.v",
+	    "or1200_dc_ram.v",
+	    "or1200_dc_tag.v",
+	    "or1200_dc_top.v",
+	    "or1200_defines.v",
+	    "or1200_dmmu_tlb.v",
+	    "or1200_dmmu_top.v",
+	    "or1200_du.v",
+	    "or1200_except.v",
+	    "or1200_freeze.v",
+	    "or1200_genpc.v",
+	    "or1200_gmultp2_32x32.v",
+	    "or1200_ic_fsm.v",
+	    "or1200_ic_ram.v",
+	    "or1200_ic_tag.v",
+	    "or1200_ic_top.v",
+	    "or1200_if.v",
+	    "or1200_immu_tlb.v",
+	    "or1200_immu_top.v",
+	    "or1200_iwb_biu.v",
+	    "or1200_lsu.v",
+	    "or1200_mem2reg.v",
+	    "or1200_mult_mac.v",
+	    "or1200_operandmuxes.v",
+	    "or1200_pic.v",
+	    "or1200_pm.v",
+	    "or1200_qmem_top.v",
+	    "or1200_reg2mem.v",
+	    "or1200_rf.v",
+	    "or1200_sb.v",
+	    "or1200_sprs.v",
+	    "or1200_top.v",
+	    "or1200_tt.v",
+	    "or1200_wb_biu.v",
+	    "or1200_wbmux.v",
+	    //
+	    "dc_ram_blk.v",
+	    "dc_ram_sub.v",
+	    "dc_tag_blk.v",
+	    "dc_tag_sub.v",
+	    "dtlb_mr_blk.v",
+	    "dtlb_mr_sub.v",
+	    "dtlb_tr_blk.v",
+	    "dtlb_tr_sub.v",
+	    "ic_ram_blk.v",
+	    "ic_ram_sub.v",
+	    "ic_tag_blk.v",
+	    "ic_tag_sub.v",
+	    "itlb_mr_blk.v",
+	    "itlb_mr_sub.v",
+	    "itlb_tr_blk.v",
+	    "itlb_tr_sub.v",
+	    "rf_dist_model.v"
+	    //"rf_dist_xil.v",
+] []
+;
+
+wtime (p fseq 1);
+
+
+update_vossrc "RECURSION-CALL-LIMIT" "1000000";
+
+
+
+begin_abstype;
+
+let has_phase_delays_or_mem_ops_inside p =
+    letrec has_memop (W_AND a b) = has_memop a OR has_memop b
+     /\    has_memop (W_OR a b) = has_memop a OR has_memop b
+     /\    has_memop (W_NOT a) = has_memop a
+     /\    has_memop (W_PRED nm a) = has_memop a
+     /\    has_memop (W_EQ a b) = has_memop a OR has_memop b
+     /\    has_memop (W_GR a b) = has_memop a OR has_memop b
+     /\    has_memop (W_SUB a b) = has_memop a OR has_memop b
+     /\    has_memop (W_MUL a b) = has_memop a OR has_memop b
+     /\    has_memop (W_DIV a b) = has_memop a OR has_memop b
+     /\    has_memop (W_MOD a b) = has_memop a OR has_memop b
+     /\    has_memop (W_SHL a b) = has_memop a OR has_memop b
+     /\    has_memop (W_SHR a b) = has_memop a OR has_memop b
+     /\    has_memop (W_ASHR a b) = has_memop a OR has_memop b
+     /\    has_memop (W_ADD a b) = has_memop a OR has_memop b
+     /\    has_memop (W_SX sz a) = has_memop a
+     /\    has_memop (W_ZX sz a) = has_memop a
+     /\    has_memop (W_ITE c t e) = has_memop c OR has_memop t OR has_memop e
+     /\    has_memop (W_SLICE idx a) = has_memop a
+     /\    has_memop (W_NAMED_SLICE name idx a) = has_memop a
+     /\    has_memop (W_UPDATE_NAMED_SLICE a name idx b) =
+				    has_memop a OR has_memop b
+     /\    has_memop (W_CAT as) = itlist (\a.\r. r OR has_memop a) as F
+     /\    has_memop (W_MEM_READ info mem addr) = T
+     /\    has_memop (W_MEM_WRITE info mem addr data) = T
+     /\    has_memop (W_LAT_LEQ a b) = has_memop a OR has_memop b
+     /\    has_memop other = F
+    in
+    letrec check (PINST _ _ _ _ _ _ (P_HIER chs)) =
+	    let idx = find_first0 check chs in
+	    idx != 0
+	/\ check (PINST _ _ _ _ _ _ (P_LEAF fns)) =
+	    let is_phase_or_memops (W_PHASE_DELAY l r) = T
+	     /\ is_phase_or_memops (W_UPDATE_FN lhs rhs) = 
+					has_memop lhs OR has_memop rhs
+	in
+	let idx = find_first0 is_phase_or_memops fns in
+	idx != 0
+    in
+    check p
+;
+
+let pexliflist2pexlif name ps =
+    let get_io (PINST _ _ _ fa_inps fa_outs _ _) =
+	    (flatmap snd fa_inps), (flatmap snd fa_outs)
+    in
+    let clean nl = filter (\s. NOT (str_is_prefix "0b" s)) nl in
+    val (inpsl, outsl) = unzip (map get_io ps) then
+    let inps = clean(md_extract_vectors (flat inpsl)) then
+    let outs = clean (md_extract_vectors (flat outsl)) then
+    let real_inps = inps vec_subtract outs then
+    let real_outs = outs vec_subtract inps then
+    let ints =
+	(md_extract_vectors (inps@outs)) vec_subtract (real_inps@real_outs)
+    then
+    let fa_inps = map (\v. v,[v]) real_inps in
+    let fa_outs = map (\v. v,[v]) real_outs in
+    PINST name [] F fa_inps fa_outs ints (P_HIER ps)
+;
+
+
+let write_combinational_verilog name p =
+    (fprintf stdinfo "-I- Flattening pexlif\n") fseq
+    let pp = flatten_pexlif p then
+    (fprintf stdinfo "-I- Extracting combinational logig\n") fseq
+    let chs = pexlif_get_children pp in
+    val (seqs, comb) = split has_phase_delays_or_mem_ops_inside chs then
+    (fprintf stdinfo "-I- Build top-level combinational circuit\n") fseq
+    let ppp = pexliflist2pexlif name comb then
+    let file = sprintf "%s.v" name in
+    let fp = fopen file "w" then
+    (fprintf stdinfo "-I- Write out Verilog to %s\n" file) fseq
+    (safe_pexlif2verilog F fp ppp) fseq
+    (fclose fp) fseq
+    file
+;
+
+end_abstype write_combinational_verilog;
+
+wtime (write_combinational_verilog "new_top" p);
+

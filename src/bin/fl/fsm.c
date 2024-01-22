@@ -8,7 +8,7 @@
 /*		Original author: Carl-Johan Seger, 2019			*/
 /*									*/
 /************************************************************************/
-#include "strings.h"	// Need the vector/node name data structures
+#include "voss_strings.h"	// Need the vector/node name data structures
 #include "fsm.h"
 #include "graph.h"
 #include "pexlif.h"
@@ -311,7 +311,7 @@ static void           print_composites(odests fp);
 static string         anon2real(vstate_ptr vp, string aname);
 static void           print_sch_tree(vstate_ptr vp, int indent, sch_ptr sch);
 static string         vstate2str_fn(pointer p);
-static string         sch2tcl(vstate_ptr vp, g_ptr *tlp, sch_ptr sch);
+static string         sch2tcl(g_ptr *tlp, sch_ptr sch);
 static string         fsm2str_fn(pointer p);
 static string         compute_sha256_signature(fsm_ptr fsm);
 static formula        fsm_eq_fn(pointer p1, pointer p2, bool identical);
@@ -613,9 +613,11 @@ write_ncomp_rec(FILE *fp, pointer p)
     }
     else if( op == op_EQ ) {
 	write_int(fp, 7);
+	write_int(fp, vp->arg.extension_size);
     }
     else if( op == op_GR ) {
 	write_int(fp, 8);
+	write_int(fp, vp->arg.extension_size);
     }
     else if( op == op_ADD ) {
 	write_int(fp, 9);
@@ -707,8 +709,17 @@ read_ncomp_rec(FILE *fp, pointer p)
 	case 4: vp->op = op_AND; break;
 	case 5: vp->op = op_OR; break;
 	case 6: vp->op = op_NOT; break;
-	case 7: vp->op = op_EQ; break;
-	case 8: vp->op = op_GR; break;
+	case 7: {
+		    vp->op = op_EQ;
+		    read_int(fp, &(vp->arg.extension_size));
+		    break;
+		}
+	case 8: 
+		{
+		    vp->op = op_GR;
+		    read_int(fp, &(vp->arg.extension_size));
+		    break;
+		}
 	case 9: vp->op = op_ADD; break;
 	case 10: vp->op = op_SUB; break;
 	case 11: vp->op = op_MUL; break;
@@ -2072,7 +2083,7 @@ visualization_anon2real(g_ptr redex)
     push_fsm(vp->fsm);
     string aname = GET_STRING(g_aname);
     if( *aname == 'a' && *(aname+1) == 'n' ) {
-        uint idx = atoi(aname+2);
+        unint idx = atoi(aname+2);
 	if( idx >= COUNT_BUF(&(vp->anon_buf)) ) {
 	    MAKE_REDEX_FAILURE(redex, Fail_pr("Anon node %d out of range",idx));
 	    pop_fsm();
@@ -2104,7 +2115,7 @@ visualisation2tcl(g_ptr redex)
     MAKE_REDEX_CONS_ND(redex, NULL, Make_NIL());
     g_ptr pgm = GET_CONS_TL(redex);
     sch2tcl_cnt = 0;
-    string final = sch2tcl(vp, &pgm, vp->sch);
+    string final = sch2tcl(&pgm, vp->sch);
     SET_CONS_HD(redex, Make_STRING_leaf(final));
     pop_fsm();
     DEC_REF_CNT(l);
@@ -2297,7 +2308,7 @@ visualize_get_shown_anons(g_ptr redex)
     vstate_ptr vp = (vstate_ptr) GET_EXT_OBJ(g_vstate);
     MAKE_REDEX_NIL(redex);
     g_ptr tl = redex;
-    for(uint i = 0; i < COUNT_BUF(&(vp->anon_buf)); i++) {
+    for(unint i = 0; i < COUNT_BUF(&(vp->anon_buf)); i++) {
 	Sprintf(buf, "an%06d", i);
 	APPEND1(tl, Make_STRING_leaf(wastrsave(&strings, buf)));
     }
@@ -4101,7 +4112,7 @@ vstate2str_fn(pointer p)
 
 
 static string
-sch2tcl(vstate_ptr vp, g_ptr *tlp, sch_ptr sch)
+sch2tcl(g_ptr *tlp, sch_ptr sch)
 {
     if( sch == NULL ) {
 	DIE("Should never happen");
@@ -4128,7 +4139,7 @@ sch2tcl(vstate_ptr vp, g_ptr *tlp, sch_ptr sch)
     buffer child_names;
     new_buf(&child_names, 100, sizeof(string));
     for(sch_list_ptr sl = sch->children; sl != NULL; sl = sl->next) {
-	string ch = sch2tcl(vp, tlp, sl->sch);
+	string ch = sch2tcl(tlp, sl->sch);
 	push_buf(&child_names, (pointer) &ch);
     }
     Sprintf(buf, "tr_%d", sch2tcl_cnt);
@@ -5531,7 +5542,11 @@ do_combinational(ste_ptr ste)
     while( !empty ) {
 	int rank = COUNT_BUF(sim_wheel_bufp) - 1;
 	empty = TRUE;
-	if( --iterations < 0 ) { return -1; }
+	if( --iterations < 0 ) {
+//FP(err_fp, "Too many iterations...\n");
+	     return -1;
+	}
+//if( iterations < 5 ) { FP(err_fp, "\n\niteration: %d\n", iterations); }
 	do {
 	    buffer *bp = (buffer *) M_LOCATE_BUF(sim_wheel_bufp, rank);
 	    if( COUNT_BUF(bp) > 0 ) {
@@ -5539,6 +5554,7 @@ do_combinational(ste_ptr ste)
 		while( COUNT_BUF(bp) > 0 ) {
 		    ncomp_ptr cp;
 		    pop_buf(bp, &cp);
+//if( iterations < 5 ) { FP(err_fp, "Computing the result for output: "); DBG_print_ilist(cp->outs); }
 		    cp->flag = FALSE;
 		    if( quit_simulation_early ) return -1;
 		    todo += do_wl_op(ste, cp);
@@ -5630,7 +5646,8 @@ do_wl_op(ste_ptr ste, ncomp_ptr op)
 	FOREACH_NODE(idx, op->outs) {
 	    gbv newH = *(gbv_outs+i); i++;
 	    gbv newL = *(gbv_outs+i); i++;
-	    additional += update_node(ste, idx, newH, newL);
+	    int cnt = update_node(ste, idx, newH, newL);
+	    additional += cnt;
 	}
     }
     if( Do_gc_asap ) Garbage_collect();
@@ -6236,7 +6253,9 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
     for(g_ptr l = internals; !IS_NIL(l); l = GET_CONS_TL(l)) {
         string name = GET_STRING(GET_CONS_HD(l));
 	if( *name != '!' && strstr(name, "assert__") != NULL ) {
-	    push_buf(propsp, &name);
+	    string prop_name = strtemp(hier);
+	    prop_name = wastrsave(&strings, strappend(name));
+	    push_buf(propsp, &prop_name);
 	}
         string value_list = find_value_list(attrs, name);
         declare_vector(&vinfo_tbl, hier, name, FALSE, NULL, value_list);
@@ -6855,6 +6874,7 @@ update_node(ste_ptr ste, int idx, gbv Hnew, gbv Lnew)
     *(cur_buf+2*idx) = Hnew;
     *(cur_buf+2*idx+1) = Lnew;
     if( c_NEQ(Hnew,Hcur) || c_NEQ(Lnew,Lcur) ) {
+//FP(err_fp, "----> Node %s changed at time %d to ", idx2name(np->idx), ste->cur_time); cHL_Print(err_fp, Hnew, Lnew); FP(err_fp, "\n");
 	if( np->fanouts != NULL ) {
 	    for(idx_list_ptr il = np->fanouts; il != NULL; il = il->next) {
 		ncomp_ptr c;

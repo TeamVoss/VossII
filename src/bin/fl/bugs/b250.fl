@@ -1,0 +1,40 @@
+load "ste.fl";
+
+let tst =
+    bit_input	    s s1 s2.
+    bit_output	    out.
+    bit_internal    t1 t2 t3 d1 d2 m1 m2.
+    CELL "tst" [
+	t1 <- m2 '|' s2,
+	d1 <: t1,
+	m1 <- (IF s THEN t1 ELSE d1),
+	t2 <- '~' (m1 '&' s1),
+	d2 <: t2,
+	m2 <- (IF ('~' s) THEN t2 ELSE d2),
+	t3 <- '~'  m2,
+	out <- s '&' t3
+];
+
+let p = flfun2pexlif tst;
+
+update_vossrc "VERBOSE-FSM-PRINT" "YES";
+let ckt = pexlif2fsm p;
+ckt;
+
+let vis = STE_debug ckt;
+vis;
+
+let ant =
+    "s" is 0 for 3 phases followed_by 1 for 3 phases followed_by "s" for 3 phases
+  and
+    "s1" is 0 for 1 phase followed_by 1 for 8 phases
+  and
+    "s2" is 1 for 1 phase followed_by 0 for 8 phases
+;
+
+let ste = STE "-e" vis [] ant [] [];
+ste;
+
+get_trace ste "out";
+get_trace ste "m2";
+

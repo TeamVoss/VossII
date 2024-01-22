@@ -14,6 +14,7 @@
 /* --- Forward declarations that need to be exported to earlier .h files --- */
 typedef struct oll_rec		*oll_ptr;
 typedef struct arg_names_rec	*arg_names_ptr;
+typedef struct name_expr_rec	*name_expr_ptr;
 
 /* -------- Function prototypes for exported functions -------- */
 void		Init_symbol();
@@ -40,8 +41,7 @@ symbol_tbl_ptr	Make_forward_declare(string name, typeExp_ptr type,
 				     symbol_tbl_ptr stbl,
 				     string file, int start_line);
 symbol_tbl_ptr	New_fn_def(string name, result_ptr res, symbol_tbl_ptr stbl,
-			   bool print, string file, int start_line,
-			   arg_names_ptr arg_names);
+			   bool print, string file, int start_line);
 symbol_tbl_ptr	InsertOverloadDef(string name, bool open_overload, oll_ptr alts,
 				  typeExp_ptr type, symbol_tbl_ptr stbl,
 				  string file, int start_line);
@@ -80,6 +80,8 @@ void		Sweep_ext_objs();
 string		Get_ExtAPI_Object_name(int class);
 arg_names_ptr	Get_argument_names(g_ptr node);
 string		Get_userdef_name(g_ptr node);
+void		DBG_check(string msg);
+
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */
@@ -89,6 +91,7 @@ string		Get_userdef_name(g_ptr node);
 
 typedef struct arg_names_rec {
     string	    name;
+    g_ptr	    default_value;
     arg_names_ptr   next;
 } arg_names_rec;
 
@@ -123,11 +126,24 @@ typedef struct fn_rec {
         typeExp_ptr	    type;
         oll_ptr		    overload_list;
 	impl_arg_ptr	    implicit_args;
+	bool		    has_default_values;
 	arg_names_ptr	    arg_names;
         string		    signature;
         fn_ptr		    next;
 } fn_rec;
 
+typedef struct name_expr_rec {
+	string		var;
+	g_ptr		expr;
+} name_expr_rec;
+
+typedef struct arg_info_rec *arg_info_ptr;
+
+typedef struct arg_info_rec {
+	g_ptr	    spine;
+	string	    arg_name;
+	g_ptr	    arg_expr;
+} arg_info_rec;
 
 #endif /* SYMBOL_H */
 #endif /* EXPORT_FORWARD_DECL */

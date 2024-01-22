@@ -9,12 +9,18 @@
 ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../)
 SRC_DIR := $(ROOT_DIR)/src
 REPO_OWNER := `stat --printf "%u:%g" .`
+UNAME_S := $(shell uname -s)
 
 #
 # Tools (wih flags)
 #
-YACC   ='bison -y'
-LEX    ='flex -l'
+ifeq ($(UNAME_S), Darwin)
+	YACC   :="`brew --prefix`/opt/bison/bin/bison -y"
+	LEX    :="`brew --prefix`/bin/flex -l"
+else
+	YACC   :="bison -y"
+	LEX    :="flex -l"
+endif
 RANLIB = ranlib
 CC     ?= gcc
 CX     ?= g++
@@ -47,12 +53,18 @@ PLUGIN_DIR := $(LIB_DIR)
 #
 # Flags
 #
-FL_OPTIONS = '-D__STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS'
+
+ifeq ($(UNAME_S), Darwin)
+	FL_OPTIONS = '-ld_classic -D__STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS -Wno-unused-command-line-argument -Wno-unknown-warning-option -Wno-error=clobbered -Wno-error=format-overflow -Wno-error=maybe-uninitialized -Wno-error=builtin-declaration-mismatch -Wno-single-bit-bitfield-constant-conversion'
+else
+    FL_OPTIONS = '-D__STDC_LIMIT_MACROS -D __STDC_FORMAT_MACROS'
+endif
+
 
 COMPATIBILITY_FLAG = '-std=gnu99'
 
 
-TCL_INCLUDE = '-I/usr/include/tcl8.6/'
+TCL_INCLUDE := "`pkg-config --cflags --libs tk`"
 
 #
 # Version control
@@ -125,7 +137,7 @@ library:
 	CC=$(CC) CX=$(CX) \
 	DEBUG_FLAG=$(DEBUG_FLAG) OPTIMIZATION_FLAG=$(OPTIMIZATION_FLAG) \
 	COMPATIBILITY_FLAG=$(COMPATIBILITY_FLAG) \
-	LIB_DIR=$(LIB_DIR) RANLIB=$(RANLIB) $(TCL_INCLUDE)
+	LIB_DIR=$(LIB_DIR) RANLIB=$(RANLIB) TCL_INCLUDE=$(TCL_INCLUDE)
 
 fl: library minisat visualization
 	@make -C bin/fl \
@@ -152,7 +164,7 @@ functor:
 	@cd ./bin/functor; make \
 	CC=$(CC) LINKFLAG=$(LINKFLAG) DEBUG_FLAG=$(DEBUG_FLAG) \
 	OPTIMIZATION_FLAG=$(OPTIMIZATION_FLAG) \
-	COMPATIBILITY_FLAG=$(COMPATIBILITY_FLAG) $(TCL_INCLUDE)
+	COMPATIBILITY_FLAG=$(COMPATIBILITY_FLAG) TCL_INCLUDE=$(TCL_INCLUDE)
 
 
 ignore_signals:

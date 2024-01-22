@@ -1,0 +1,165 @@
+// Must be outside abstype...
+let attrs_ref = ref {[] :: (string#string) list};
+//
+
+let get_io_bundles name =
+    (eval_fl_code [
+	    sprintf "%s fseq ();" name,
+	    sprintf "val (PINST _ attrs _ _ _ _ _) = %s then attrs_ref := attrs"
+		    name
+    ]) fseq
+    let bundles = filter (\p. fst p = "bundle") (deref attrs_ref) then
+    let mk1 s =
+        val [io,nm,tp] = str_split (hd (tcl2list (snd s))) " " then
+	io = "internal" => [] |
+        [(io,nm,tp)]
+    in
+    flatmap mk1 bundles
+;
+
+
+let mk_load_file fp name mutually_exclusive units =
+    let input_bundle = ((sprintf "S_%s" name), (sprintf "B_%s" name)) then
+    let mk1 fn = (fn, get_io_bundles fn) then
+    let info = map mk1 units then
+    let bundles = flatmap snd info then
+    let raw_inps = filter (\t. fst t = "input") bundles then
+    let raw_outs = filter (\t. fst t = "output") bundles then
+    let inps = (map snd raw_inps) then
+    let outs = (map snd raw_outs) then
+    let top_level_inps = setify (inps subtract outs) then
+    length top_level_inps != 1 =>
+	eprintf "Can only create single input unit (%S)"
+		(map (\(nm,tp). sprintf "%s::%s" nm tp) top_level_inps)
+    |
+    let top_level_inp = hd top_level_inps then
+    // Ensure top-level bundle for the unit is declared
+    let pr_bundle_def bname (lefts,rights) =
+	let pr_pair (nm,tp) = sprintf "(\"%s\", \"%s\")" nm tp then
+	let left = list2str T "\n\t[" ", " "]" pr_pair lefts then
+	let right = list2str T "\n\t[" ", " "]" pr_pair rights then
+	fprintf fp "BUNDLE \"%s\" %s %s\n;\n" bname left right
+    in
+    val (lefts, rights) = get_bundle_info (snd top_level_inp) then
+    (pr_bundle_def (snd input_bundle) (lefts,rights)) fseq
+    // and the assignments
+    let conversion =
+	let new = fst input_bundle then
+	let old = fst top_level_inp then
+	let ls =
+	    map (\(nm,tp). sprintf "%s-->%s <- %s-->%s" old nm new nm) lefts
+	then
+	let rs =
+	    map (\(nm,tp). sprintf "%s-->%s <- %s-->%s" new nm old nm) rights
+	then
+	list2str T "\n    " ",\n    " "" id (ls@rs)
+    then
+    //
+    let top_level_outs = setify (outs subtract inps) then
+    let base_internals = inps intersect outs then
+    //
+    let bundles = ref [] then
+    let bundle_mk = ref [] then
+    let add_mkb tp =
+	let code = make_bundle_merge_arb tp "ackpulse" then
+	(bundle_mk := (code:(deref bundle_mk)))
+    then
+    let merge_code = ref [] then
+    let use_names = ref [] then
+    let merge_cmd = mutually_exclusive => "merge" | "arbiter" then
+    let process1 l =
+        let e1 = hd l then
+        val (name,tp) = e1 then
+	(bundles := (tp:(deref bundles))) fseq
+        let sz = length l then
+	sz = 1 => l |
+        let use =
+	    (add_mkb tp) fseq
+            let tmp_names = map (\i. sprintf "%s_%d" name i) (1 upto sz) then
+            let merge = sprintf "%s_ack_pulse_%s clk reset\n\t\t%S\n\t\t%s"
+                            tp merge_cmd tmp_names name
+            then
+            (merge_code := (merge : (deref merge_code))) fseq
+            (name, ref tmp_names)
+        then
+        (use_names := (use:(deref use_names))) fseq
+        (e1:(map (\i. sprintf "%s_%d" name i, tp) (1 upto (length l))))
+    in
+    let internals =
+	(flatmap process1 (partition id outs)) subtract
+	(top_level_outs @ top_level_inps)
+    then
+    // 
+    // Emit bundle declarations
+    let emit_bundle bname = pr_bundle_def bname (get_bundle_info bname) then
+    (foreach emit_bundle (setify (deref bundles))) fseq
+    // Create needed mergers/arbiters
+    (foreach (fprintf fp "%s") (setify (deref bundle_mk))) fseq
+    // Main function
+    (fprintf fp "\nlet %s =\n    bit_input clk.\n    bit_input reset."
+                name
+    ) fseq
+    let pr dir fp (name,tp) = fprintf fp "%s %s." (tp^"_"^dir) name in
+    (list2fp fp T "\n    " "\n    " "" (pr "input") [input_bundle]) fseq
+    (list2fp fp T "\n    " "\n    " "" (pr "output") top_level_outs) fseq
+    (fprintf fp "\n    //\n    // Internals\n    //") fseq
+    (list2fp fp T "\n    " "\n    " "" (pr "internal")
+		(top_level_inp:internals)
+    ) fseq
+    (fprintf fp "\n    CELL \"%s\" [" name) fseq
+    // Connect top-level bundles
+    (fprintf fp "%s," conversion) fseq
+    // Now emit the instantiation functions
+    let mk_call fp fn =
+        let bundles = assoc fn info then
+        let mk1 (dir,nm,tp) =
+            dir = "input" => "" |
+            (
+                let alts_ref = assoc nm (deref use_names) then
+                let use = hd (deref alts_ref) then
+                (alts_ref := (tl (deref alts_ref))) fseq
+                sprintf "%s->%s" nm use
+            ) catch ""
+        in
+        let conns = filter (\s. s != "") (map mk1 bundles) then
+        let p1 fp s = fprintf fp "%s" s in
+        (fprintf fp "%s" fn) fseq
+        (list2fp fp F ("\n\t\t") "\n\t\t" "" p1 conns)
+    in
+    (list2fp fp T "\n\t  " "\n\t, " "" mk_call units) fseq
+    // And the arbitration/merging functions
+    let pr1 s = fprintf fp "\n\t, %s" s in
+    (foreach pr1 (deref merge_code)) fseq
+    // And the conclusion
+    (fprintf fp "\n];\ncreate_default_version %s;\n" name)
+;
+
+let mk_interconnect_fub name load_files mutually_exclusive units replace->F =
+    let file = sprintf "%s.bfl" name then
+    NOT replace AND file_exists file =>
+	eprintf "File %s exists already and replace argument is F\n" file
+    |
+    (foreach (\f. (_load f F) fseq ()) load_files) fseq
+    let fp = fopen file "w" then
+    (foreach (\f.fprintf fp "cload \"%s\";\n" f) load_files) fseq
+    (fprintf fp "\n\n") fseq
+    (mk_load_file fp name mutually_exclusive units) fseq
+    (fclose fp)
+;
+
+let get_bundle_interfaces name load_files units =
+    (foreach (\f. (_load f F) fseq ()) load_files) fseq
+    let fp = stdout in
+    (fprintf fp "For new model %s, the units have bundle interfaces:\n" name)seq
+    let mk1 fn =
+	(fprintf fp "%s:\n" fn) fseq
+	let bundles = get_io_bundles fn then
+	let inps = filter (\t. fst t = "input") bundles then
+	let outs = filter (\t. fst t = "output") bundles then
+	let pr fp (dir, nm, tp) = fprintf fp "\t%s :: %s" nm tp in
+	(list2fp fp F "    inputs:\n" "\n" "\n" pr inps) fseq
+	(list2fp fp F "    outputs:\n" "\n" "\n\n" pr outs)
+    in
+    foreach  mk1 units
+;
+

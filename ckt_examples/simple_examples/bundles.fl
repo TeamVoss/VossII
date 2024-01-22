@@ -1,0 +1,84 @@
+load "idv.fl";
+
+TYPE "word" 8;
+
+STRUCT "ctrl" [
+	("Clk",   "bit"),
+	("Reset", "bit")
+];
+
+STRUCT "bundle" [
+	("Data", "word"),
+	("Req",  "bit"),
+	("Ack",  "bit")
+];
+
+ENUM "fourphase" ["IDLE", "REQ", "ACK"];
+
+
+
+let adder =
+    ctrl_input	    ctrl.
+    bundle_input    a.
+    bundle_input    b.
+    bundle_output   res.
+    //
+    bit_internal    clk reset done.
+    bit_internal    a_req a_ack.
+    bit_internal    b_req b_ack.
+    bit_internal    res_req res_ack.
+    bit_internal    inps_ready.
+    word_internal   a_w.
+    word_internal   b_w.
+    fourphase_internal	a_ifc b_ifc res_ifc.
+    CELL "adder" [
+	clk <- ctrl-->Clk,
+	reset <- ctrl-->Reset,
+	a_req <- a-->Req,
+	b_req <- b-->Req,
+	Moore_FSM "A_inp" clk a_ifc (reset, IDLE) [
+	    (IDLE  --- a_req --- REQ),
+	    (REQ   --- done  --- ACK),
+	    (ACK   --- '~' a_req --- IDLE)
+	],
+	a<--Ack ? (is_ACK a_ifc),
+	Moore_FSM "B_inp" clk b_ifc (reset, IDLE) [
+	    (IDLE  --- b_req --- REQ),
+	    (REQ   --- done  --- ACK),
+	    (ACK   --- '~' b_req --- IDLE)
+	],
+	b<--Ack ? (is_ACK b_ifc),
+	res_ack <-- res-->Ack,
+	inps_ready <- (is_REQ a_ifc) '&' (is_REQ b_ifc),
+	Moore_FSM "B_inp" clk b_ifc (reset, IDLE) [
+	    (IDLE  --- inps_ready --- REQ),
+	    (REQ   --- res-->Ack  --- ACK),
+	    (ACK   --- '~' b_req --- IDLE)
+	],
+	b<--Ack ? (is_Ack b_ifc),
+
+
+
+	done <- (is_
+
+];
+
+let p = flfun2pexlif "adder";
+
+IDV p "DB_qqq" [];
+
+
+
+
+
+let para_eval modules join_module = 
+    bit_input	    clk.
+    bit_input	    reset.
+    input	    inp.
+    output	    res.
+    list_internal (length modules) mids.
+    CELL "para_eval" (
+	(map2 (\m.\o. m clk reset inp o) modules mids)@
+	join_module clk reset mids res
+);
+

@@ -825,7 +825,7 @@ bexpr_save(g_ptr redex)
     bool res = Save_bexprs(GET_STRING(arg1), &roots);
     free_buf(&roots);
     if( !res ) {
-	MAKE_REDEX_FAILURE(redex, FailBuf);
+	MAKE_REDEX_FAILURE(redex, wastrsave(&strings, FailBuf));
 	return;
     }
     MAKE_REDEX_VOID(redex);
@@ -843,7 +843,7 @@ bexpr_load(g_ptr redex)
     new_buf(&results, 100, sizeof(bexpr));
     if( !Load_bexprs(GET_STRING(arg1), &results) ) {
 	free_buf(&results);
-	MAKE_REDEX_FAILURE(redex, FailBuf);
+	MAKE_REDEX_FAILURE(redex, wastrsave(&strings, FailBuf));
 	return;
     }
     SET_TYPE(redex, CONS_ND);

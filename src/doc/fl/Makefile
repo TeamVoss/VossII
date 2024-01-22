@@ -21,7 +21,7 @@ fl_tutorial.html: fl_tutorial.md $(FIGS) tut_img/*.jpg
 	@-mkdir -p tut_code
 	@-gawk -v code_cnt=`ls tut_code | egrep .fl$ | wc -l` -f tut_pre_process.awk < $< > fl_tutorial_tmp.md
 	pandoc -i fl_tutorial_tmp.md -o fl_tutorial_tmp.html
-	awk '/<\/main>/{while(getline line<"fl_tutorial_tmp.html"){print line}} //' fl_tutorial_template.html > fl_tutorial.html
+	gawk '/<\/main>/{while(getline line<"fl_tutorial_tmp.html"){print line}} //' fl_tutorial_template.html > fl_tutorial.html
 
 preview: fl_guide.pdf
 	xpdf fl_guide.pdf

@@ -47,12 +47,12 @@ make "adlatch_1_0" (adlatch T F 'clk 'arst (W_VAR 0 "d") (W_VAR 0 "q"));
 make "adlatch_1_1" (adlatch T T 'clk 'arst (W_VAR 0 "d") (W_VAR 0 "q"));
 
 let aldff p_clk p_aload =
-    input	    ad.
+    input	    {ad :: *a}.
     bit_input	    aload.
-    input	    d.
+    input	    {d :: *a}.
     bit_input	    clk.
-    output	    q.
-    internal	    md fq.
+    output	    {q :: *a}.
+    internal	    {md:: *a} {fq:: *a}.
     CELL (sprintf "draw_aldff %s %s" (p_clk=>"1"|"0") (p_aload=>"1"|"0")) [
 	md <- (IF aload THEN ad ELSE d),
 	re_ff clk md fq,

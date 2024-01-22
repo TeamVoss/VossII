@@ -764,7 +764,8 @@ forward_declare{pretty_pexlif_h::bool->string->pexlif->(description list)};
 
 let module_name_store_ref = ref {[]::string list};
 
-let find_insert_module_name name =
+let find_insert_module_name netlist name =
+    netlist AND (str_is_prefix "draw_stdcell " name) => el 2 (tcl2list name) |
     let extract_name s =
 	let s' = 
 	    str_is_prefix "draw_hier" s => el 2 (tcl2list s) |
@@ -855,19 +856,22 @@ let find_insert_module netlist p i =
     in
     let found = search candidates then
     found != [] => hd found |
-    let module_name = find_insert_module_name name then
-    let descr = hd (pretty_pexlif_h netlist module_name p) then
-    // Migth have updated the table during the hierarchy conversion.
-    // Thus, read in the table entry again.
-    let cur_tbl = deref module_store_tbl_ref then
-    let first = NOT (tbl_member cur_tbl sig) then
-    let candidates = first => [] | tbl_get cur_tbl sig then
-    let candidates' = (needle,module_name):candidates then
-    let tbl' = first => cur_tbl | tbl_delete cur_tbl sig then
-    let tbl'' = tbl_insert tbl' sig candidates' then
-    (module_store_tbl_ref := tbl'') fseq
-    (module_store_descr_list_ref :=
-	((module_name, descr):(deref module_store_descr_list_ref))) fseq
+    let module_name = find_insert_module_name netlist name then
+    let opt_descr = pretty_pexlif_h netlist module_name p then
+    (opt_descr = [] => () |
+	let descr = hd opt_descr then
+	// Migth have updated the table during the hierarchy conversion.
+	// Thus, read in the table entry again.
+	let cur_tbl = deref module_store_tbl_ref then
+	let first = NOT (tbl_member cur_tbl sig) then
+	let candidates = first => [] | tbl_get cur_tbl sig then
+	let candidates' = (needle,module_name):candidates then
+	let tbl' = first => cur_tbl | tbl_delete cur_tbl sig then
+	let tbl'' = tbl_insert tbl' sig candidates' then
+	(module_store_tbl_ref := tbl'') fseq
+	(module_store_descr_list_ref :=
+	    ((module_name, descr):(deref module_store_descr_list_ref)))
+    ) fseq
     let mk_io (f,as) = connect_ports f as in
     let res = NPM_Item (MOGI_module (Module_instantiation (ID module_name)
 		    [Module_instance (ID instance_name) NONE
