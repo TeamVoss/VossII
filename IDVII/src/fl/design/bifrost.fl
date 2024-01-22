@@ -212,7 +212,7 @@ let bifrost_rx_fourphase =
   bit_internal was_req.
   CELL "bifrost_rx_fourphase" [
     re_ff_sreset clk reset req was_req,
-    ack <- done,
+    ack <- done '&' was_req,
     start <- req '^' was_req,
     may_continue <- '~' req
 ];
@@ -266,7 +266,7 @@ let bifrost_rx_ackpulse =
     re_ff_sreset clk reset done was_done,
     re_ff_sreset clk reset req was_req,
     re_ff_sreset clk reset ack was_ack,
-    ack <- done '&' '~' was_done,
+    ack <- done '&' req,
     start <- req '&' (was_ack '|' ('~' was_req)),
     may_continue <- '1
 ];
