@@ -95,10 +95,13 @@ proc sch:show_values_on_canvas {c} {
 }
 
 proc sc:inform_time_change {w args} {
+    i_am_busy
     set root [w2root $w]
     set t $::vstatus(time,$root)
-    if { $t == "" } { set t 0 }
-    set ::vstatus(time_shadow,$root) $t
+    if { $t == "" } {
+	set t 0;
+	set ::vstatus(time_shadow,$root) $t
+    }
     fl_set_global_time $root $t
     foreach c [fl_get_active_sch_tab_windows $root] {
 	sch:show_values_on_canvas $c
@@ -107,6 +110,7 @@ proc sc:inform_time_change {w args} {
 	val {c vec} $c_vec
 	fsm:show_current_state $c $root $vec
     }
+    i_am_free
 }
 
 proc sc:inform_canvas_change {w} {
