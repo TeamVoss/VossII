@@ -969,8 +969,14 @@ proc idv:write_verilog {w only_netlist} {
 	    -confirmoverwrite 1]
     if { $file != "" } {
 	set name [file rootname [file tail $file]]
-	fl_save_verilog $w.c $name $file $only_netlist
+	idv:do_save_verilog $w.c $name $file $only_netlist
     }
+}
+
+proc idv:do_save_verilog {c name file only_netlist} {
+    i_am_busy
+    catch {fl_save_verilog $c $name $file $only_netlist}
+    i_am_free
 }
 
 proc idv:save_pexlif {w} {

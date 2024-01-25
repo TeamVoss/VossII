@@ -130,7 +130,7 @@ Rank_order_tree(sch_draw_ptr tree, int pos)
     tree->bin_num = pos; // Assign each element its bin number
     if( pos > 1000 ) {
 	// Should not happen.....
-	fprintf(stderr, "WHAT????\n");
+	fprintf(stderr, "Rank-ordering of tree faile. WHAT????\n");
 	return;
     }
     for(sch_draw_list_ptr lp = tree->fanins; lp != NULL; lp = lp->next) {

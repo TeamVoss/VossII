@@ -763,3 +763,31 @@ let sanity_check_pexlif p =
     (test "" p) fseq T
 ;
 
+// Code for blackboxing an instance.
+// The instance to blackbox is given by its path in the instance hierarchy.
+let blackbox_pexlif1 p hier_list =
+    letrec bb (PINST nm attrs lf fa_inps fa_outs ints (P_HIER cls)) (idx:idxs) =
+	let cls' = (firstn (idx-1) cls)@
+		   [bb (el idx cls) idxs]@
+		   (butfirstn idx cls)
+	in
+	PINST nm attrs lf fa_inps fa_outs ints (P_HIER cls')
+     /\    bb (PINST nm attrs lf fa_inps fa_outs ints body) [] =
+	PINST nm attrs lf fa_inps fa_outs [] (P_HIER [])
+     /\    bb (PINST nm attrs lf fa_inps fa_outs ints body) other =
+	eprintf "Hierarchy mismatch in blackbox_pexlif1"
+    in
+    bb p hier_list
+;
+    
+
+// Code for blackboxing some instances.
+// Instances are given as a list of (integer lists), where each index list
+// describes the sequence of instances to be traversed until the final
+// instance is cleared of its content.
+let blackbox_pexlif p selection_lists =
+    itlist (\hl.\p. blackbox_pexlif1 p hl) selection_lists p
+;
+    
+
+

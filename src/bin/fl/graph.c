@@ -2518,6 +2518,16 @@ Emit_profile_data()
 	push_buf(&out_buf, pd);
     }
     sz += 3;
+    char    tmp_name[30];
+    int	    tmp_cnt = 0;
+    sprintf(tmp_name, "gmon.out");
+    while( access(tmp_name, F_OK) == 0) {
+	sprintf(tmp_name, "gmon.out.%d", ++tmp_cnt);
+    }
+    if( tmp_cnt != 0 ) {
+	sprintf(tmp_name, "/bin/mv gmon.out gmon.out.%d", tmp_cnt);
+	system(tmp_name);
+    }
     FILE *fp = fopen("gmon.out", "w");
     if( fp == NULL ) {
 	fprintf(stderr, "Failed to open gmon.out for writing\n");

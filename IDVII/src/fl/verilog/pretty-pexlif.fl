@@ -982,6 +982,10 @@ let make_verilog_safe p =
 	(fa_inps', fa_outs', ints', sub)
     in
     letrec clean (PINST nm attrs lf fa_inps fa_outs ints (P_HIER chs)) =
+	chs = [] =>
+	    // Blackboxed unit. Keep signals as is
+	    PINST nm attrs lf fa_inps fa_outs [] (P_HIER [])
+	|
 	val (fa_inps',fa_outs',ints',sub) = make_subs ints fa_inps fa_outs then
         let rename (PINST lnm lattrs llf lfa_inps lfa_outs linst lbody) =
             let tr a = (vec_assoc a sub) catch [a] in

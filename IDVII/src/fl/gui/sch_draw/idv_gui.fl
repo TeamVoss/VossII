@@ -1093,28 +1093,7 @@ let generate_hfl_template fp p basename pexlif_file include_file =
     (fprintf fp "quit;\n")
 ;
 
-//let make_anon_names top_name p =
-//    letrec mk_anon inst (PINST nm attrs lf fa_inps fa_outs ints (P_HIER chs)) =
-//	let nm' = inst in
-//	letrec do i (c:cs) =
-//	    let inst' = sprintf "%s_%d" inst i in
-//	    let c' = mk_anon inst' c then
-//	    c' : (do (i+1) cs)
-//	 /\   do i [] = []
-//	in
-//	let chs' = do 1 chs then
-//	let nm'' =
-//	    (str_is_prefix "draw_" nm) AND NOT (str_is_prefix "draw_hier" nm) =>
-//	    nm | nm'
-//	in
-//	PINST nm'' attrs lf fa_inps fa_outs ints (P_HIER chs')
-//     /\   mk_anon inst (PINST nm attrs lf fa_inps fa_outs ints leaf) =
-//	PINST inst attrs lf fa_inps fa_outs ints leaf
-//    in
-//    mk_anon top_name p
-//;
-
-let make_anon_names top_name p =
+let rename_toplevel_pexlif top_name p =
     val (PINST nm attrs lf fa_inps fa_outs ints body) = p in
     PINST top_name attrs lf fa_inps fa_outs ints body
 ;
@@ -1154,7 +1133,7 @@ let do_synthesis file bname pexlif_file p synth_type synth_script =
     status = "SIGKILL" => "" |
     // Rename Verilog hierarchy to sane names
     // Toplevel name is `bname`
-    let p' = make_anon_names bname p then
+    let p' = rename_toplevel_pexlif bname p then
     val (PINST nm attrs lf fa_inps fa_outs ints body) = p' then
     let ios = map fst (fa_inps @ fa_outs) then
     // Write out a Verilog version of the pexlif
@@ -2280,9 +2259,9 @@ let fl_save_verilog canvas name file only_netlist =
     let vfsm = w2vfsm canvas in
     let p = get_idv_current_pexlif canvas then
     let netlist = only_netlist = "1" then
-    let p' = netlist => p | make_anon_names name p then
+    let p' = netlist => p | rename_toplevel_pexlif name p then
     let fp = fopen file "w" then
-    (pexlif2verilog netlist fp p') fseq
+    (safe_pexlif2verilog netlist fp p') fseq
     (fclose fp)
   ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
 ;

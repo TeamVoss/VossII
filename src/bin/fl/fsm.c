@@ -5543,8 +5543,8 @@ do_combinational(ste_ptr ste)
 	int rank = COUNT_BUF(sim_wheel_bufp) - 1;
 	empty = TRUE;
 	if( --iterations < 0 ) {
-//FP(err_fp, "Too many iterations...\n");
-	     return -1;
+	    FP(err_fp,"Combinational relaxtion failed. 0-delay loop likely.\n");
+	    return -1;
 	}
 //if( iterations < 5 ) { FP(err_fp, "\n\niteration: %d\n", iterations); }
 	do {
