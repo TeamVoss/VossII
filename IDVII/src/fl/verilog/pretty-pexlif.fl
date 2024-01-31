@@ -246,10 +246,7 @@ let binary_exp op a b =
 let zero_extend_exp sz a =
       let a'   = fst $ pretty_expression a in
       let sz'  = wexpr_size a in
-      let zero =
-            Exp_primary (Prim_mcat (MCAT (cdec (sz-sz'))
-              (CAT [prim_str (as_bin 1 0)])))
-      in
+      let zero = Exp_primary (Prim_str (sprintf "%d'b0" (sz-sz'))) in
       (Exp_primary (Prim_cat (CAT [zero, a'])), 14)
 ;
 
@@ -258,8 +255,10 @@ let unwrap_prim tp (Exp_primary (Prim_hier (HID NONE (ID i)) rng)) = i
 ;
 
 let sign_extend_exp sz a =
-      let a'  = fst (pretty_expression a) in
+      let raw = pretty_expression a in
+      let a'  = fst raw in
       let sz' = wexpr_size a in
+      sz == sz' => raw | 
       let id  = unwrap_prim "SX" a' in
       let rng = sz' > 1 => let x = sz' - 1 in [(x,x)] | [] in
       let ext =
@@ -439,7 +438,10 @@ let pretty_expression {we::wexpr} =
 	letrec mk_cat_list idx nidx =
 	    idx < 0 => [] |
 	    mem idx indices =>
-		(W_SLICE [nidx] nv):(mk_cat_list (idx-1) (nidx-1))
+		n_sz == 1 =>
+		    nv:(mk_cat_list (idx-1) (nidx-1))
+		|
+		    (W_SLICE [nidx] nv):(mk_cat_list (idx-1) (nidx-1))
 	    |
 		(W_SLICE [idx] bv):(mk_cat_list (idx-1) nidx)
 	in
@@ -764,6 +766,21 @@ forward_declare{pretty_pexlif_h::bool->string->pexlif->(description list)};
 
 let module_name_store_ref = ref {[]::string list};
 
+let mk_valid_module_name name =
+    let ok1 s =
+	let c = ord s in
+	((c >= 65) AND (c <= 90)) OR // A-Z
+	((c >= 97) AND (c <= 122)) OR // a-z
+	(c == 36) OR // $
+	(c == 95) // _
+    in
+    let name' = 
+	let c1 = string_hd name in
+	ok1 c1 => name | "TmP_"^name
+    in
+    string_filter name' valid_ident
+; 
+
 let find_insert_module_name netlist name =
     netlist AND (str_is_prefix "draw_stdcell " name) => el 2 (tcl2list name) |
     let extract_name s =
@@ -773,7 +790,7 @@ let find_insert_module_name netlist name =
 	in
 	let n1 = s' = "" => "m" | s' in
 	let n2 = string_replace n1 " " "_" in
-	string_filter n2 valid_ident
+	mk_valid_module_name n2
     in
     let pot_name = extract_name name then
     let cur = deref module_name_store_ref then
