@@ -111,16 +111,22 @@ let directed f1 f2 s = all (\(u,t). elem u f1 <==> elem t f2) s;
 //  alpha::wexpr->wexpr->(subst opt)
 letrec
     alpha (W_X _)       (W_X _)       = SOME []
-/\  alpha (W_CONST _ _) (W_CONST _ _) = SOME []
-/\  alpha (W_NAMED_CONST n _ _) (W_NAMED_CONST m _ _) = SOME []
+/\  alpha (W_CONST sz1 c1) (W_CONST sz2 c2) =
+	sz1 != sz2 => NONE |
+	c1 != c2 => NONE |
+	SOME []
+/\  alpha (W_NAMED_CONST n1 sz1 c1) (W_NAMED_CONST n2 sz2 c2) =
+	n1 != n2 => NONE |
+	sz1 != sz2 => NONE |
+	c1 != c2 => NONE |
+	SOME []
 /\  alpha (W_VAR sz1 n)   (W_VAR sz2 m)   =
     sz1 != sz2 => NONE |
     let v1 = (sz1 = 1) => n | sprintf "%s[%d:0]" n (sz1-1) in
     let v2 = (sz2 = 1) => m | sprintf "%s[%d:0]" m (sz2-1) in
     (SOME [(v1,v2)])
 /\  alpha (W_EXPLICIT_VAR sz1 n)  (W_EXPLICIT_VAR sz2 m)  =
-    sz1 != sz2 => NONE |
-    (SOME [(n,m)])
+    sz1 != sz2 => NONE | (SOME [(n,m)])
 /\  alpha (W_AND a b)   (W_AND x y)   = alpha a x @@ alpha b y
 /\  alpha (W_OR a b)    (W_OR x y)    = alpha a x @@ alpha b y
 /\  alpha (W_NOT a)     (W_NOT x)     = alpha a x
