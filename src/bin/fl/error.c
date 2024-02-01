@@ -14,10 +14,8 @@
 extern bool		RCadd_debug_info;
 extern jmp_buf		*start_envp;
 extern bool		file_load;
-extern FILE		*yyin;
 extern bool             gui_mode;
 extern bool             use_stdout;
-extern old_yyin_ptr	cur_file;
 extern string		cur_file_name;
 extern int		line_nbr;
 extern char		FailBuf[4096];

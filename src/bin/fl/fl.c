@@ -55,7 +55,6 @@ FILE        *callback_from_tcl_fp_res;
 
 /* ===================== Global variables referenced ===================== */
 extern int		LG_TBL_SIZE;
-extern old_yyin_ptr	cur_file;
 extern bool		file_load;
 extern string		binary_location;
 extern bool		RCadd_debug_info;

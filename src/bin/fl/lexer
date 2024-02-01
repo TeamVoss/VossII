@@ -75,6 +75,7 @@ static void		end_extern_parsing(string cmd);
 
 static hash_record  define_tbl;
 static buffer	    define_polarity;
+static buffer	    extern_parse_fps;
 static void	    hash_define(char *id);
 static void	    hash_undefine(char *id);
 static bool	    is_defined(char *id);
@@ -184,7 +185,10 @@ static hash_record      symbword_tbl;
 
 <<EOF>>				    {
 					if( reading_external_parse_inps ) {
+					    FILE *efp;
 					    yypop_buffer_state();
+					    pop_buf(&extern_parse_fps, &efp);
+					    fclose(efp);
 					    line_nbr = pre_ext_parse_line_nbr;
 					    reading_external_parse_inps = FALSE;
 					} else {
@@ -547,6 +551,7 @@ Init_lexer()
     cur_file_name = wastrsave(&strings, "stdin");
     create_hash(&define_tbl, 1000, str_hash, str_equ);
     new_buf(&define_polarity, 100, sizeof(int));
+    new_buf(&extern_parse_fps, 10, sizeof(FILE *));
     int init_polarity = 0;
     push_buf(&define_polarity, &init_polarity);
 }
@@ -764,6 +769,7 @@ end_extern_parsing(string cmd)
     }
     reading_external_parse_inps = TRUE;
     pre_ext_parse_line_nbr = line_nbr;
+    push_buf(&extern_parse_fps, &res_fid);
     yypush_buffer_state(yy_create_buffer(res_fid, YY_BUF_SIZE));
 }
 
@@ -832,6 +838,7 @@ Return_to_old_fid()
     FILE *ret;
     old_yyin_ptr tmp;
     yy_delete_buffer(YY_CURRENT_BUFFER);
+    fclose(yyin);
     if( cur_file->remove_after )
 	unlink(cur_file_name);
     tmp = cur_file;
