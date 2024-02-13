@@ -210,6 +210,11 @@ proc idv:perform_model_save {w npw version} {
     }
 }
 
+proc idv:get_model_info {w} {
+    set info [fl_get_model_info $w.c]
+    post_popup_window $w.c $info "Celltypes"
+}
+
 proc idv:name_and_save_model {w version {default ""} } {
     set npw .idv_name_prompt
     catch {destroy $npw}
@@ -246,6 +251,8 @@ proc idv:create_idv_menu {nb w} {
         pack $w.menu.file -side left -padx 5
 	set m $w.menu.file.menu
 	menu $m
+        $m add command -label "Get model info" \
+            -command "idv:get_model_info $w"
         $m add command -label "Name current model" \
             -command "idv:name_and_save_model $w implementation"
         $m add command -label "Name initial model" \

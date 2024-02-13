@@ -539,3 +539,53 @@ end_abstype `name`;
  
 }> "functor";
 
+#ifdef LATCHBASED_CLOCKGATING
+
+let clockgate =
+    bit_input	    clk.
+    bit_input	    clkgate.
+    bit_output	    eclk.
+    bit_internal    en.
+    CELL "clockgate" [
+	al_latch clk clkgate en,
+	eclk <- en '&' clk
+];
+
+let clockgate_with_reset =
+    bit_input	    clk.
+    bit_input	    reset.
+    bit_input	    clkgate.
+    bit_output	    eclk.
+    bit_internal    en.
+    CELL "clockgate" [
+	al_latch clk clkgate en,
+	eclk <- (reset '|' en) '&' clk
+];
+
+#else
+
+let clockgate =
+    bit_input	    clk.
+    bit_input	    clkgate.
+    bit_output	    eclk.
+    bit_internal    en nclk.
+    CELL "clockgate" [
+	nclk <- '~' clk,
+	re_ff nclk clkgate en,
+	eclk <- en '&' clk
+];
+
+let clockgate_with_reset =
+    bit_input	    clk.
+    bit_input	    reset.
+    bit_input	    clkgate.
+    bit_output	    eclk.
+    bit_internal    en nclk.
+    CELL "clockgate" [
+	nclk <- '~' clk,
+	re_ff nclk clkgate en,
+	eclk <- (reset '|' en) '&' clk
+];
+
+
+#endif

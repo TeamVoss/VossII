@@ -649,10 +649,10 @@ proc sch:destroy_canvas {w nb tw} {
     if [fl_remove_active_sch_tab_window $c] {
 	if [info exists ::sc(parent_frame,$c)] {
 	    set parent_frame $::sc(parent_frame,$c) 
-	    set parent_index [$nb index $parent_frame]
 	    destroy $tw
-	    ;# update idletasks
-	    $nb select $parent_index
+	    if { [catch {$nb index $parent_frame} parent_index] == 0 } {
+		$nb select $parent_index
+	    }
 	    unset ::sc(parent_frame,$c)
 	} else {
 	    destroy $tw

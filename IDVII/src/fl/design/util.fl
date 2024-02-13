@@ -31,6 +31,19 @@ let diff = sym_diff res old in
 diff != [] => (fprintf stderr "DIFFERENCE: %S\n" diff) fseq res | res
 ;
 
+// Determines if the pexlif p contains any state holding element.
+let has_state p =
+    letrec has_state (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) =
+	(find_first0 has_state cs) != 0
+     /\ has_state (PINST name attrs lf fa_inps fa_outs ints (P_LEAF fs)) =
+	let is_state (W_PHASE_DELAY lhs rhs) = T
+	 /\ is_state _ = F
+	in
+	(find_first0 is_state fs) != 0
+    in
+    has_state p
+;
+
 // Create a (potential vector) name given size and base.
 let mk_name sz base = sz = 1 => base | sprintf "%s[%d:0]" base (sz-1);
 
@@ -1153,5 +1166,41 @@ let mk_draw_cmd phase_delay rhs =
     |
     let base = opt_base_compact_wprint inps rhs then
     NOT phase_delay => base | sprintf "draw_phase_delay_on_output {%s}" base
+;
+
+// Create a summary of cell usage in a synthesized pexlif.
+let get_mapped_cell_info p =
+    val (PINST nm attrs lf fai fao ints (P_HIER cells)) = p in
+    let get_cell pp =
+        val (PINST cnm _ _ _ _ _ _) = pp in
+        NOT (str_is_prefix "draw_stdcell " cnm) => F,"_unmapped_" |
+        let cell_name = el 2 (str_split cnm " ") in
+        (has_state pp), cell_name
+    in
+    let classes = partition id (map get_cell cells) in
+    let mk1 l = (hd l, length l) in
+    let raw_res = map mk1 classes in
+    val (unmapped,mapped) = split (\((st,nm),cnt). nm = "_unmapped_") raw_res in
+    let unmapped_cnt = itlist (\((st,nm),cnt).\r. cnt+r) unmapped 0 in
+    val (state,comb) = split (\((st,nm),c). st) mapped in
+    let clean ((st,nm),cnt) = nm, cnt in
+    let state_list = map clean state in
+    let comb_list  = map clean comb in
+    let cmp (nm1,c1) (nm2,c2) = strcmp nm1 nm2 in
+    let all = state_list @ comb_list @ [("_unmapped_",0)] in
+    let name_size = (itlist (\(nm,c).\r. max r (strlen nm)) all 0)+2 then
+    let sep = implode (replicate (name_size+1+6) "-") in
+    let Plist type l =
+        let total = itlist (\(nm,cnt).\r. cnt+r) l 0 in
+        let pr (nm,cnt) = sprintf "%*s %6d" name_size nm cnt in
+        let pre = sprintf "%s cells:\n" type in
+        let post = sprintf "\n%s\n%*s %6d\n\n" sep name_size "Total:" total in
+        total, (list2str T pre "\n" post pr (qsort cmp l))
+    in
+    val (combs, comb_msg) = Plist "Combinational" comb_list in
+    val (states, state_msg) = Plist "State-holding" state_list in
+    let unmapped_msg = sprintf "\nUnmapped modules: %d\n\n" unmapped_cnt in
+    let summary = sprintf "%*s %6d\n" name_size "TOTAL:" (combs+states) in
+    unmapped_msg ^ comb_msg ^ state_msg ^ summary
 ;
 

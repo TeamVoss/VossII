@@ -145,6 +145,7 @@ static rec_mgr		profile_data_rec_mgr;
 static buffer		global_gc_buf;
 static formula		current_bdd_cond;
 static formula		cur_eval_cond;
+static char		tmp_name[50];
 
 static struct prim_fun_name_rec {
 				    int	    pfn;
@@ -2518,7 +2519,6 @@ Emit_profile_data()
 	push_buf(&out_buf, pd);
     }
     sz += 3;
-    char    tmp_name[30];
     int	    tmp_cnt = 0;
     sprintf(tmp_name, "gmon.out");
     while( access(tmp_name, F_OK) == 0) {

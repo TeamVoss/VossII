@@ -25,6 +25,7 @@ let split_bifrost_name (nm,tp) =
 	length l = 3 =>
 	    field = "req" => "input" |
 	    field = "ack" => "output" |
+	    field = "clkenb" => "input" |
 	    eprintf "Expected req or ack but got '%s'" field
 	|
 	let dir = el 3 l in
@@ -61,28 +62,31 @@ let make_bundle_version fn =
     (el 2 args) != ("reset", "bit") =>
 	eprintf "Second argument is not 'reset' of type 'bit'"
     |
-    (el 3 args) != ("req", "bit") =>
-	eprintf "Third argument is not 'req' of type 'bit'"
-    |
-    (el 4 args) != ("ack", "bit") =>
-	eprintf "Fourth argument is not 'ack' of type 'bit'"
-    |
+    let args = butfirstn 2 args in
     let idx = find_first0 (\(nm,_). str_is_prefix "a'" nm) args in
     // Define the top-level bundle
-    let my_signals = gather args (5 upto (idx = 0 => length args | idx-1)) in
-    val (inps,outs) = split (\(nm,_).str_is_prefix "i'" nm) my_signals in
-    let pr_pair (nm,tp) =
-	sprintf "(\"%s\", \"%s\")" (string_butfirstn 2 nm) tp
+    let my_signals = idx = 0 => args | firstn (idx-1) args in
+    let is_inp (nm,tp) =
+	(nm = "req") OR (nm = "clkenb") OR (str_is_prefix "i'" nm)
     in
-    let left = list2str T "\n\t[" ", " "]" pr_pair (("..req", "bit"):inps) in
-    let right = list2str T "\n\t[" ", " "]" pr_pair (("..ack", "bit"):outs) in
+    val (inps,outs) = split is_inp my_signals in
+    let pr_pair (nm,tp) =
+	str_is_substr "'" nm =>
+	    sprintf "(\"%s\", \"%s\")" (string_butfirstn 2 nm) tp
+	|
+	    sprintf "(\"%s\", \"%s\")" nm tp
+    in
+    let left = list2str T "\n\t[" ", " "]" pr_pair inps in
+    let right = list2str T "\n\t[" ", " "]" pr_pair outs in
     let top_bundle = sprintf "BUNDLE \"B_%s\" %s %s\n;\n" fn left right then
     let bundle_defs = ref [top_bundle] in
     // Now produce bundles, declarations and instantiations
     let mk_arg direction (nm,tp) = sprintf "\t%s_%s\t%s.\n" tp direction nm in
-    let bundle_args = ref (map (mk_arg "input") (firstn 2 args)) then
-    let call_args = ref (map fst (firstn 2 args)) then
-    let my_signals = gather args (3 upto (idx = 0 => length args | idx-1)) in
+    let bundle_args =
+	ref (map (mk_arg "input") [("clk","bit"), ("reset","bit")])
+    then
+    let call_args = ref ["clk", "reset"] then
+    let my_signals = gather args (1 upto (idx = 0 => length args | idx-1)) in
     let rem_signals = idx = 0 => [] | butfirstn (idx-1) args in
     let new_call_args =
 	    let get_field nm = last (str_split nm "'") in

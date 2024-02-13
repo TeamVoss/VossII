@@ -1186,6 +1186,7 @@ let do_synthesis file bname pexlif_file p synth_type synth_script =
     (list2fp fp T "\n\t[" ",\n\t" "\n\t])) 1);\n" pr1 io_sub) fseq
     (fprintf fp "\np fseq ();\n") seq
     (fprintf fp "write_pexlif \"%s\" p;\n" pexlif_file) seq
+    (fprintf fp "print (get_mapped_cell_info p);\n") seq
     (fprintf fp "\"===SuCcEsS===\";\n") seq
     (fprintf fp "quit;\n") seq
     (fclose fp) seq
@@ -1205,6 +1206,13 @@ let fl_do_synthesis canvas file basename synth_type synth_script =
     [pexlif_file, load_file]
 ;
 export_to_tcl fl_do_synthesis;
+
+let fl_get_model_info canvas =
+    let p = get_idv_current_pexlif canvas then
+    get_mapped_cell_info p
+;
+export_to_tcl fl_get_model_info;
+    
 
 
 let fl_run_fl_loader file =
@@ -2349,15 +2357,6 @@ let fl_do_selection_command canvas cmd =
   ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
 ;
 export_to_tcl fl_do_selection_command;
-
-letrec has_state (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) =
-    (find_first0 has_state cs) != 0
- /\ has_state (PINST name attrs lf fa_inps fa_outs ints (P_LEAF fs)) =
-    let is_state (W_PHASE_DELAY lhs rhs) = T
-     /\ is_state _ = F
-    in
-    (find_first0 is_state fs) != 0
-;
 
 let get_type_and_clock NONE = "",""
  /\ get_type_and_clock (SOME (type,base,p,clk, d, q, other)) = type,clk

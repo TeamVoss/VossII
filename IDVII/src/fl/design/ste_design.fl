@@ -113,7 +113,7 @@ overload for gfor
 ;
 infix 5 for;
 
-let followed_by vtl1 vtl2 =
+let followed_by1 vtl1 vtl2 =
     let M = itlist (\(fixed, v,f,t).\m. max m t) vtl1 0 in
     let move tpl =
 	val (fixed,v,f,t) = tpl in
@@ -122,6 +122,14 @@ let followed_by vtl1 vtl2 =
     in 
     vtl1 @ (map move vtl2)
 ;
+
+let followed_by2 ftl1 ftl2 =
+    let M = itlist (\(w,n,v,f,t).\m. max m t) ftl1 0 in
+    let move (w,n,v,f,t) = (w, n, v, f+M, t+M) in
+    ftl1 @ (map move ftl2)
+;
+
+overload followed_by followed_by1 followed_by2;
 infix 4 followed_by;
 
 let gen_otherwise vt (v,end) =
