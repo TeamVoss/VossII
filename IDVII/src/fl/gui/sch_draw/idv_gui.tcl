@@ -14,6 +14,7 @@ proc idv:create_idv_gui {w rw_db read_only} {
     set nb $w.nb
     set ::idv(code_dir) "$rw_db/code"
     ttk::notebook $nb -width 1200 -height 700
+    ttk::notebook::enableTraversal $nb
     bind $nb <<NotebookTabChanged>> [list idv:inform_canvas_change $w]
     pack $nb -side top -expand y -fill both
     set ::sch_window_cnt($w) 0
@@ -887,6 +888,7 @@ proc idv:do_fev {ww} {
 	    pack $w.f5.sat.verify -side left -padx 5 -fill x -expand yes
 
     ttk::notebook $w.vossframe
+    ttk::notebook::enableTraversal $w.vossframe
     pack $w.vossframe -side bottom -fill both -expand yes
     set ::idv(info_window_cnt) 0
     set ::idv(info_window) $w.vossframe
@@ -902,6 +904,7 @@ proc idv:make_top_info_window { title } {
     button $w.b -text Close -command [list destroy $w]
     pack $w.b -side bottom -fill x
     ttk::notebook $w.vossframe
+    ttk::notebook::enableTraversal $w.vossframe
     pack $w.vossframe -side bottom -fill both -expand yes
     set ::idv(info_window_cnt) 0
     set ::idv(info_window) $w.vossframe

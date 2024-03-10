@@ -125,6 +125,7 @@ proc create_ste_debugger {w} {
     wm geometry $w -20+100
     set nb $w.nb
     ttk::notebook $nb -width 1200 -height 700
+    ttk::notebook::enableTraversal $nb
     bind $nb <<NotebookTabChanged>> [list sc:inform_canvas_change $w]
     pack $nb -side top -expand y -fill both
     set ::sch_window_cnt($w) 0

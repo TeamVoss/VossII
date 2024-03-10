@@ -539,6 +539,29 @@ end_abstype `name`;
  
 }> "functor";
 
+#ifdef NO_CLOCKGATING
+
+let clockgate =
+    bit_input	    clk.
+    bit_input	    clkgate.
+    bit_output	    eclk.
+    bit_internal    en.
+    CELL "clockgate" [
+	eclk <- clk
+];
+
+let clockgate_with_reset =
+    bit_input	    clk.
+    bit_input	    reset.
+    bit_input	    clkgate.
+    bit_output	    eclk.
+    bit_internal    en.
+    CELL "clockgate" [
+	eclk <- clk
+];
+
+#else
+
 #ifdef LATCHBASED_CLOCKGATING
 
 let clockgate =
@@ -587,5 +610,7 @@ let clockgate_with_reset =
 	eclk <- (reset '|' en) '&' clk
 ];
 
+
+#endif
 
 #endif

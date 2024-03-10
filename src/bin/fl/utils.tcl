@@ -506,9 +506,10 @@ proc display_dot {dot_pgm {w ""} {close_fun ""} {logfile ""}} {
     $c configure -width $wid -height $ht
     update
     $w.c configure -scrollregion [$w.c bbox all]
-    bind $w.c <KeyPress-q> "destroy $w"
     if { $close_fun != "" } {
-	bind $c <Destroy> [list $close_fun $w]
+	bind $w.c <KeyPress-q> [list $close_fun $w]
+    } else {
+	bind $w.c <KeyPress-q> "destroy $w"
     }
     focus $w.c
     return $w

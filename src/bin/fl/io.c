@@ -926,6 +926,7 @@ Printf(g_ptr *rootp, g_ptr **spp, int *depthp)
             } else
             if( strcmp(ip->name, "stdinfo") == 0 ) {
                 FP(warning_fp, "%s", res);
+		Flush(warning_fp);
             } else {
                 fprintf(ip->fp, "%s", res);
                 fflush(ip->fp);

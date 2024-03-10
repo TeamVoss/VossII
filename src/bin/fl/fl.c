@@ -208,6 +208,10 @@ fl_main(int argc, char *argv[])
     rand_str = NULL;
     stdin_buf[0] = 0;
     while( argc > 1 && argv[1][0] == '-' ) {
+        if( strcmp(argv[1], "--") == 0 ) {
+            argc -= 1; argv += 1;
+	    break;
+	}
 #if DBG_TRACE_AND_SAVE
         if( strcmp(argv[1], "--dummy_graph_compare") == 0 ) {
 	    dbg_dummy_graph_comparison = TRUE;
