@@ -1,0 +1,45 @@
+//
+// The example creates a buffer for a stream of bits that support valid-ready handshaking.
+// Currently it doesn't prove anything useful, but what I'd like to prove is:
+//   `i_sent_data` is the sequence of values of `i_data` where both `i_valid` and `i_ready` are high.
+//   `o_sent_data` is the sequence of values of `o_data` where both `o_valid` and `o_ready` are high.
+//   o_sent_data should be equal to i_sent_data, except perhaps it doesn't include the final element.
+//   i_sent_data and o_sent_data should be have a minimum length that is described by how often i_valid and o_ready were high.
+//
+// Hopefully I'll get the hang of VossII enough to be able to prove this properties.
+//
+load "ste.fl";
+
+let valid_ready_buffer =
+    bit_input	    clk reset i_valid i_ready i_data.
+    bit_output	    o_valid o_ready o_data.
+    bit_internal    en_data.
+    CELL "valid_ready_buffer" [
+	i_ready <- o_ready '|' '~' o_valid,
+	always_ff (posedge clk) [
+            o_valid <== (IF reset THEN '0 ELSE (IF i_ready THEN i_valid ELSE o_valid)),
+            o_data <== (IF i_ready '&' i_valid THEN i_data ELSE o_data)
+        ]
+    ];
+
+let p = valid_ready_buffer 'clk 'reset 'i_valid 'i_ready 'i_data 'o_valid 'o_ready 'o_data;
+
+let ckt = pexlif2fsm p;
+let vis = STE_debug ckt;
+vis;
+
+// This is just a basic stimulus so that I can have a look at a waveform that does something.
+let ant =
+    "clk" is_clock 10 
+  and
+    "reset" is "1" for 1 cycle followed_by "0" for 8 cycle
+  and
+    "i_valid" is "1" for 1 cycle followed_by "0" for 1 cycle followed_by "1" for 1 cycle followed_by "0" for 1 cycle
+  and
+    "o_ready" is "1" for 1 cycle followed_by "0" for 1 cycle followed_by "1" for 1 cycle followed_by "0" for 1 cycle
+  and
+    "i_data" is "1" for 1 cycle followed_by "0" for 1 cycle followed_by "1" for 1 cycle followed_by "0" for 1 cycle
+;
+
+STE "-e" vis [] ant [] [];
+
