@@ -3,11 +3,43 @@
 // Currently it doesn't prove anything useful, but what I'd like to prove is:
 //   `i_sent_data` is the sequence of values of `i_data` where both `i_valid` and `i_ready` are high.
 //   `o_sent_data` is the sequence of values of `o_data` where both `o_valid` and `o_ready` are high.
-//   o_sent_data should be equal to i_sent_data, except perhaps it doesn't include the final element.
-//   i_sent_data and o_sent_data should be have a minimum length that is described by how often i_valid and o_ready were high.
+//   I want to prove that `o_sent_data == i_sent_data + buffered_dat` where buffered_data is a sequence of max length 1.
 //
-// Hopefully I'll get the hang of VossII enough to be able to prove this properties.
+// Hopefully I'll get the hang of VossII enough to be able to prove these properties.
 //
+//  The proof should look something like:
+//
+//  Let S[x], I[x], O[x] be state, inputs and outputs at time x.
+//  Assume reset[0] = 0
+//  Assume reset[x] = 1 for x > 0
+//  Define i_sent_data[1] = []
+//  Define o_sent_data[1] = []
+//  Assert buffered_data[1] = [] (buffered_data[x] is a function of S[x])
+//  Define i_sent_data[x] = i_sent_data[x-1] + (if i_valid[x-1]&i_ready[x-1] then [i_data[x-1]] else [])
+//  Define o_sent_data[x] = o_sent_data[x-1] + (if o_valid[x-1]&o_ready[x-1] then [o_data[x-1]] else [])
+//  Assert (i_sent_data[x] == o_sent_data[x] + buffered_data[x]) ==> (i_sent_data[x+1] == o_sent_data[x+1] + buffered_data[x+1])
+//
+//  It feels like what I need to prove with STE is straightforward and only needs to step one cycle.
+//  1) Show that one cycle after a reset that buffered_data is [].
+//  2) Show that additional_o_data + new_buffered_data = additional_i_data + old_buffered_data
+//     additional_o_data is a function of the O[x].o_valid O[x].o_data and I[x].o_ready
+//     additional_i_data is a function of the I[x].i_valid I[x].i_data and O[x].i_ready
+//     new_buffered_data is a function of S[x+1] and old_buffered_data is a function of S[x].
+//
+//  What I'm not sure of is:
+//  1) How do I actually use the STE to prove the above two points.  If a could extract from the fsm functions for
+//     (I, S) -> O and (I, S) -> S, then I could do this manually as described in the fl tutorial, but presumably there are
+//     better ways.
+//  2) I'm not sure how to prove the recursion in fl, and how I should define the things I want to prove so that I can use them
+//     when I compose larger circuits whose proofs need these properties.
+
+let {buffered_data::bool->bool->bool list} {o_valid::bool} {o_data::bool} = o_valid => [o_data] | [] ;
+let additional_data valid ready data = valid AND ready => [data] | [];
+
+// I'm not sure how to connect this up to the hardware model that I've made.
+let buffered_data_correct i_valid i_ready i_data o_valid o_ready o_data i_valid_n i_ready_n i_data_n o_valid_n o_ready_n o_data_n =
+  ((additional_data o_valid o_ready o_data) @ (buffered_data o_valid_n o_data_n) == (additional_data i_valid i_ready i_data) @ (buffered_data o_valid o_data));
+
 load "ste.fl";
 
 let valid_ready_buffer =
@@ -21,12 +53,10 @@ let valid_ready_buffer =
             o_data <== (IF i_ready '&' i_valid THEN i_data ELSE o_data)
         ]
     ];
+print "valid_ready_buffer is ";
+valid_ready_buffer;
 
 let p = valid_ready_buffer 'clk 'reset 'i_valid 'i_ready 'i_data 'o_valid 'o_ready 'o_data;
-
-let ckt = pexlif2fsm p;
-let vis = STE_debug ckt;
-vis;
 
 // This is just a basic stimulus so that I can have a look at a waveform that does something.
 let ant =
@@ -40,6 +70,13 @@ let ant =
   and
     "i_data" is "1" for 1 cycle followed_by "0" for 1 cycle followed_by "1" for 1 cycle followed_by "0" for 1 cycle
 ;
+
+let ckt = pexlif2fsm p;
+print "ckt is ";
+ckt;
+
+let vis = STE_debug ckt;
+vis;
 
 STE "-e" vis [] ant [] [];
 
