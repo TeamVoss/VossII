@@ -33,12 +33,15 @@
 //  2) I'm not sure how to prove the recursion in fl, and how I should define the things I want to prove so that I can use them
 //     when I compose larger circuits whose proofs need these properties.
 
-let {buffered_data::bool->bool->bool list} {o_valid::bool} {o_data::bool} = o_valid => [o_data] | [] ;
-let additional_data valid ready data = valid AND ready => [data] | [];
+// The below expression doesn't work.  I think the length of the list can't be variable.
+// Maybe I need to use normal booleans for this function.  Do they even exist in fl?
+// let {buffered_data::bool->bool->bool list} {o_valid::bool} {o_data::bool} = o_valid => [o_data] | [] ;
+// let {additional_data::bool->bool->bool->bool list} {valid::bool} {ready::bool} {data::bool} = valid AND ready => [data] | [];
 
 // I'm not sure how to connect this up to the hardware model that I've made.
-let buffered_data_correct i_valid i_ready i_data o_valid o_ready o_data i_valid_n i_ready_n i_data_n o_valid_n o_ready_n o_data_n =
-  ((additional_data o_valid o_ready o_data) @ (buffered_data o_valid_n o_data_n) == (additional_data i_valid i_ready i_data) @ (buffered_data o_valid o_data));
+// Probably something like this?
+// let buffered_data_correct i_valid i_ready i_data o_valid o_ready o_data i_valid_n i_ready_n i_data_n o_valid_n o_ready_n o_data_n =
+//  ((additional_data o_valid o_ready o_data) @ (buffered_data o_valid_n o_data_n) == (additional_data i_valid i_ready i_data) @ (buffered_data o_valid o_data));
 
 load "ste.fl";
 
@@ -58,25 +61,75 @@ valid_ready_buffer;
 
 let p = valid_ready_buffer 'clk 'reset 'i_valid 'i_ready 'i_data 'o_valid 'o_ready 'o_data;
 
-// This is just a basic stimulus so that I can have a look at a waveform that does something.
-let ant =
-    "clk" is_clock 10 
-  and
-    "reset" is "1" for 1 cycle followed_by "0" for 8 cycle
-  and
-    "i_valid" is "1" for 1 cycle followed_by "0" for 1 cycle followed_by "1" for 1 cycle followed_by "0" for 1 cycle
-  and
-    "o_ready" is "1" for 1 cycle followed_by "0" for 1 cycle followed_by "1" for 1 cycle followed_by "0" for 1 cycle
-  and
-    "i_data" is "1" for 1 cycle followed_by "0" for 1 cycle followed_by "1" for 1 cycle followed_by "0" for 1 cycle
-;
-
 let ckt = pexlif2fsm p;
-print "ckt is ";
-ckt;
 
 let vis = STE_debug ckt;
-vis;
 
-STE "-e" vis [] ant [] [];
+//  1) Show that one cycle after a reset that buffered_data is [].
 
+let ant =
+  "clk"  is_clock (10/2) and
+  "reset" is "1" in_cycle 0;
+
+let cons =
+  "o_valid" is "0" in_cycle 1;
+
+let ste  = STE "-e" vis [] ant cons [];
+let ok = get_ste_result ste "strong";
+"Result is:";
+ok;
+
+//  2) Show that additional_o_data + new_buffered_data = additional_i_data + old_buffered_data
+//     additional_o_data is a function of the O[x].o_valid O[x].o_data and I[x].o_ready
+//     additional_i_data is a function of the I[x].i_valid I[x].i_data and O[x].i_ready
+//     new_buffered_data is a function of S[x+1] and old_buffered_data is a function of S[x].
+
+// new i_data cycle 0 
+// buffer_data cycle 0
+// new o_data cycle 0
+
+let i_valid_1 = variable "i_valid_1";
+let i_valid_2 = variable "i_valid_2";
+let i_ready_1 = variable "i_ready_1";
+let i_ready_2 = variable "i_ready_2";
+let i_data_1 = variable "i_data_1";
+let i_data_2 = variable "i_data_2";
+
+let o_valid_1 = variable "o_valid_1";
+let o_valid_2 = variable "o_valid_2";
+let o_ready_1 = variable "o_ready_1";
+let o_ready_2 = variable "o_ready_2";
+let o_data_1 = variable "o_data_1";
+let o_data_2 = variable "o_data_2";
+
+let ant =
+  "clk" is_clock (10/2) and
+  "reset" is "0" in_cycle 0 and
+  "i_valid" is i_valid_1 in_cycle 1 and
+  "i_ready" is i_ready_1 in_cycle 1 and
+  "i_data" is i_data_1 in_cycle 1 and
+  "o_valid" is o_valid_1 in_cycle 1 and
+  "o_ready" is o_ready_1 in_cycle 1 and
+  "o_data" is o_data_1 in_cycle 1 and
+  "o_valid" is o_valid_2 in_cycle 2 and
+  "o_data" is o_data_2 in_cycle 2
+  ;
+
+let cons = [];
+
+let ste  = STE "-e" vis [] ant cons [];
+let constraint = get_ste_result ste "strong";
+
+// The below doesn't work because of the problem with `bool list`.
+
+//let additional_i_data = additional_data i_ready_1 i_valid_1 i_data_1;
+//let additional_o_data = additional_data o_ready_1 o_valid_1 o_data_1;
+//
+//let init_buffered_data = buffered_data o_valid_1 o_data_1;
+//let final_buffered_data = buffered_data o_valid_2 o_data_2;
+//
+//let correct = (init_buffered_data @ additional_i_data = additional_o_data @ final_buffered_data);
+
+"Result is:";
+ok;
+//correct;
