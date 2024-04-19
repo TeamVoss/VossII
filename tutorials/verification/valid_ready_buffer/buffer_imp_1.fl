@@ -1,0 +1,77 @@
+load "idv.fl";
+
+let BUF_SIZE = 4;
+let DATA_SZ = 8;	// Just to have something sligthly non-trivial
+
+let dname base = sprintf "%s[%d:0]" base (DATA_SZ-1);
+
+TYPE "data" DATA_SZ;
+
+let addr_sz = bits_needed (BUF_SIZE-1);
+
+TYPE "addr" addr_sz;
+TYPE "eaddr" (addr_sz+1);
+let eaddr2addr {ea :: eaddr} =
+    let a = frombits (tl (tobits ea)) in
+    {a :: addr}
+;
+
+MEMORY "buf_mem" [(BUF_SIZE, "addr")] "data";
+
+BUNDLE "data_bundle"
+        [("valid", "bit"), ("d", "data")]
+	[("ready", "bit")]
+;
+
+let mem =
+    bit_input	clk.
+    addr_input	r_addr.
+    addr_input	w_addr.
+    bit_input	write.
+    data_input	din.
+    data_output	dout.
+    //
+    buf_mem_internal	mem new_mem.
+    CELL "mem" [
+	Read_buf_mem mem r_addr dout,
+	Write_buf_mem mem w_addr din new_mem,
+	STATE clk mem [(write, new_mem)]
+];
+
+
+let buffer =
+    bit_input		clk.
+    bit_input		reset.
+    data_bundle_input	i.
+    data_bundle_output	o.
+    //
+    eaddr_internal	head tail.
+    bit_internal	empty full enqueue dequeue.
+    //    
+    CELL "buffer" [
+	STATE clk head [
+	    (reset, '0),
+	    (enqueue, head '+' '1)
+	],
+	STATE clk tail [
+	    (reset, '0),
+	    (dequeue, tail '+' '1)
+	    
+	],
+	empty     <- head '=' tail,
+	full      <- (head '-' tail) '=' ''BUF_SIZE,
+	enqueue   <- '~' full '&' i-->valid,
+	dequeue   <- '~' empty '&' o-->ready,
+	o-->valid <- '~' empty,
+	i-->ready <- enqueue,
+	mem clk (eaddr2addr tail) (eaddr2addr head) enqueue (i-->d) (o-->d)
+];
+
+create_default_version buffer;
+
+let ckt = pexlif2fsm buffer;
+//ckt;
+
+let vis = STE_debug ckt;
+//vis;
+

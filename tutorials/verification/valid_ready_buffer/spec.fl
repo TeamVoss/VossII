@@ -1,0 +1,82 @@
+cload (DIR^"slists.fl");
+
+lettype buf_state = BUF_STATE
+			{maxsize :: int}	// Max size of buffer (depth)
+			{width::int}		// Width of data word
+			{content :: {bv} slist}	// Buffer content
+;
+
+
+let get_buf_max_size (BUF_STATE msz wid sl)   = msz;
+let get_buf_width    (BUF_STATE msz wid sl)   = wid;
+let get_buf_sl       (BUF_STATE msz wid sl)   = sl;
+let update_buf_sl    (BUF_STATE msz wid _) sl = BUF_STATE msz wid sl;
+
+let Pbuf_state buf =
+    depends buf != [] =>
+	eprintf "Cannot print symbolic buf (%S)\n"
+		(md_extract_vectors (depends buf))
+    |
+    let sl = get_buf_sl buf in
+    let l = slist2list sl in
+    let pr bv =
+	sprintf "0x%x" (bv2int bv)
+    in
+    list2str T "[" ", " "]" pr l
+;
+install_print_function Pbuf_state;
+
+
+// Potentially symbolic functions
+let get_buf_size buf = s_length (get_buf_sl buf);
+
+let add_element_to_buffer d buf = update_buf_sl buf (s_CONS d (get_buf_sl buf));
+
+let remove_element_from_buffer buf =
+    let sl = get_buf_sl buf in
+    is_s_NIL sl => error "Cannot remove an element from an empty buffer" |
+    let sl' = s_butlast sl in
+    update_buf_sl buf sl'
+;
+
+let get_last_element_in_buffer buf = s_last (get_buf_sl buf);
+
+let get_buf_element buf idx =
+    let sz = get_buf_size buf in
+    (sz = (int2bv 0)) => error "Cannot get an element from an empty buffer" |
+    (idx >= sz) => error "Index idx is larger than buffer" |
+    s_el (idx + (int2bv 1)) (get_buf_sl buf)
+;
+
+// Create a symbolic buffer in which cnt entries are initialized
+// Note that cnt can be symbolic.
+let mk_buf max_size width {cnt::bv} =
+    letrec mk i =
+	(int2bv i) >= cnt => s_NIL |
+	let d = bv_variable (sprintf "D%d[%d:0]" (i+1) (width-1)) in
+	s_CONS d (mk (i+1))
+    in
+    BUF_STATE max_size width (mk 0)
+;
+
+// Specification function:
+//
+// Given inputs: i_valid, i_data and o_ready
+// and internal buffer buf
+// Return:
+//  Outputs: i_ready, o_valid, and dout
+// and new internal buffer buf2
+//
+let spec i_valid i_data o_ready buf =
+    let BUF_SIZE = get_buf_max_size buf in
+    let cnt = get_buf_size buf in
+    let i_ready = i_valid AND (cnt < (int2bv BUF_SIZE)) in
+    let o_valid = cnt > int2bv 0 in
+    let dout = o_valid => get_last_element_in_buffer buf | (int2bv 0) in
+    let enq = i_ready AND i_valid in
+    let deq = o_valid AND o_ready in
+    let buf1 = enq => add_element_to_buffer i_data buf | buf in
+    let buf2 = deq => remove_element_from_buffer buf1 | buf1 in
+    (i_ready, o_valid, dout, buf2)
+;
+

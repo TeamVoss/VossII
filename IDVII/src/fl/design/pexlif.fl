@@ -440,7 +440,8 @@ let gen_flatten_pexlif stop_pred p =
     letrec do_flat sub pref p =
         let tr n = (str_is_prefix "0b" n) => [n] |
 	    (vec_assoc n sub) gen_catch (\msg.
-		eprintf "Cannot find node %s while processing %s\nList %S\n%s" n pref (map (\(f,t). sprintf "%s->%s" f t) sub) msg
+		eprintf "Cannot find node %s while processing %s\nList %S\n%s"
+			n pref (map (\(f,t). sprintf "%s->%s" f t) sub) msg
 	    )
 	in
         val (PINST name attrs leaf fa_inps fa_outs ints content) = p in
@@ -464,11 +465,12 @@ let gen_flatten_pexlif stop_pred p =
     in
     val (PINST name attrs leaf fa_inps fa_outs ints content) = p in
     leaf => p |
-    val (P_HIER chs) = content in
-    let prefs = map (mk_pref "") (1 upto length chs) in
-    let io_sub = flatmap (\(f,as).zip as as) (fa_inps @ fa_outs) in
-    let int_sub = map (\f. f,f) ints in
-    let sub = io_sub @ int_sub in
+    val (P_HIER chs) = content then
+    let prefs = map (mk_pref "") (1 upto length chs) then
+//    let io_sub = flatmap (\(f,as).zip as as) (fa_inps @ fa_outs) then
+    let io_sub = map (\(f,as).(f,f)) (fa_inps @ fa_outs) then
+    let int_sub = map (\f. f,f) ints then
+    let sub = io_sub @ int_sub then
     let children = flat (map2 (do_flat sub) prefs chs) in
     let wires_used (PINST _ _ _ fa_inps fa_outs _ _) =
         (flatmap snd (fa_inps @ fa_outs))

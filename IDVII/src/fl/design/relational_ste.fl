@@ -9,13 +9,12 @@ infix 9 at_phase;
 
 let at_cycle vec cyc =
     let sz = md_size vec in
-    W_EXPLICIT_VAR sz (sprintf "@%d_%s" (2*cyc) vec)
+    hw_constr (W_EXPLICIT_VAR sz (sprintf "@%d_%s" (2*cyc) vec))
 ;
 infix 9 at_cycle;
 
 let rel_ASSERT {name::string} {b::bit} =
-    let we = hw_destr b in
-    (name, we)
+    (name, b)
 ;
 
 let mk_phase_delays n i o =
@@ -30,18 +29,19 @@ let mk_phase_delays n i o =
 	map2 (\i.\o. W_PHASE_DELAY (W_EXPLICIT_VAR sz o) (W_EXPLICIT_VAR sz i))
 	     (o:mids) (mids@[i])
     in
-    PINST (sprintf "draw_hfl phase_delay(%d)" n) [] T
+    PINST (sprintf "phase_delay(%d)" n) [] T
 	    [(fi,[i])] [(fo,[o])] mids (P_LEAF fns)
 ;
 
 
 clet prop2pexlif nwe =
-    val (name, we) = nwe in
+    val (name, c) = nwe in
+    let we = hw_destr {c::bit} in
     let timed_inps = setify (map (sscanf "@%d_%s") (w_depends we)) in
     let min_time = itlist (\(t,_).\m. min t m) timed_inps 100000 in
     let max_time = itlist (\(t,_).\m. max t m) timed_inps (-1000) in
     let vecs = setify (map snd timed_inps) then
-    let pfn = sprintf "draw_hier %s" name in
+    let pfn = name in
     let mk_fa pin idx =
 	    let sz = md_size pin in
 	    let f = mk_name sz (sprintf "i%d" idx) in
@@ -71,8 +71,8 @@ clet prop2pexlif nwe =
     let wsub = map mk_sub timed_inps in
     let we' = w_substitute wsub we in
     let comb = base_assignment T (W_VAR 1 ok) we' in
-    let monitor = PINST (sprintf "draw_hier %s" name) [] F
-			fa_inps fa_outs internals (P_HIER (comb:delays))
+    let monitor =
+	PINST name [] F fa_inps fa_outs internals (P_HIER (comb:delays))
     in
     let connections = map (\(f,[a]). f,a) fa_inps in
     let mk_ant (t,v) =
@@ -86,7 +86,13 @@ clet prop2pexlif nwe =
 ;
 
 
-let rels2STE {ckt::pexlif} assumes asserts =
+let rels2STE {ckt::pexlif} assumes asserts symb_consts->[] =
+    let sconsts = setify (md_expand_vectors symb_consts) then
+    let gen_param c =
+	sconsts = [] => param c |
+	let vs = depends c in
+	fparam (vs subtract sconsts) c
+    in
     let assumes = map2 (\i. \(n,e). sprintf "assume_%d_%s" i n, e)
 		       (1 upto (length assumes)) assumes
     in
@@ -98,7 +104,7 @@ let rels2STE {ckt::pexlif} assumes asserts =
     let get_ckt (cond, ant, cons, (p,conns)) = p,conns in
     let monitors = map get_ckt (assume_dta @ assert_dta) in
     let ckt' = itlist (\(p,conns).\cur. add_monitor cur p conns) monitors ckt in
-    let get_assume_ant (cond,ant,cons,_) = substitute (param cond) ant in
+    let get_assume_ant (cond,ant,cons,_) = substitute (gen_param cond) ant in
     let assume_ants = flatmap get_assume_ant assume_dta in
     let get_assert_cons (cond,ant,cons,_) = cons in
     let assert_cons = flatmap get_assert_cons assert_dta in

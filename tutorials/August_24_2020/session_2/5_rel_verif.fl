@@ -61,7 +61,7 @@ vis;
 
 
 let CSA_property i1 i2 i3 c s =
-    let sum1 = i1 at_cycle 0 '+'
+    let {sum1::word} = i1 at_cycle 0 '+'
 	       i2 at_cycle 0 '+'
 	       i3 at_cycle 0
     in

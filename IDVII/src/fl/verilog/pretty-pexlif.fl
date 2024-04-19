@@ -871,9 +871,8 @@ let find_insert_module netlist p i =
     let cur_tbl = deref module_store_tbl_ref then
     let candidates = (tbl_get cur_tbl sig) catch [] then
     letrec search ((c,module_name):rem) =
-        let raw_matches = isomatch needle c then
-        raw_matches = [] => search rem |
-	length raw_matches > 1 => eprintf "More than one raw_matches!" |
+        let raw_matches = (isomatch needle c) catch [] then
+	length raw_matches != 1 => search rem |
         val (ni, hi, match) = hd (hd raw_matches) then
         let sub = get_match_sub match then
 	val (PINST _ _ _ _ _ _ (P_HIER mi)) = c in

@@ -1,0 +1,89 @@
+
+lettype {*a} slist = S_LIST {leaf::bool} ({*a} opt) ({{ *a} slist} opt);
+
+// Define "constructors"
+let s_NIL = S_LIST T NONE NONE;
+let s_CONS e l = S_LIST F (SOME e) (SOME l);
+
+// and discriminators and destructors.
+let is_s_NIL (S_LIST type opt_hd opt_tail) = type;
+let is_s_CONS (S_LIST type opt_hd opt_tail) = NOT type;
+let destr_s_CONS (S_LIST type (SOME hd) (SOME tl)) =  hd, tl;
+
+// Useful for debugging non-symbolic slists 
+let slist2list sl =
+    depends sl != [] =>
+	eprintf "Cannot print symbolic slists (%S)\n"
+		(md_extract_vectors (depends sl))
+    |
+    letrec slist2list sl =
+	    is_s_NIL sl => [] |
+	    val (h,rem) = destr_s_CONS sl in
+	    h:(slist2list rem)
+    in
+    slist2list sl
+;
+
+letrec s_append sl1 sl2 =
+    is_s_NIL sl1 => sl2 |
+    val (h,t) = destr_s_CONS sl1 in
+    s_CONS h (s_append t sl2)
+;
+
+letrec s_length sl =
+    is_s_NIL sl => int2bv 0 |
+    let rem = s_length (snd (destr_s_CONS sl)) in
+    rem + (int2bv 1)
+;
+
+letrec s_rev sl =
+    is_s_NIL sl => sl |
+    val (h,t) = destr_s_CONS sl in
+    s_append (s_rev t) (s_CONS h s_NIL)
+;
+
+let s_last sl =
+    is_s_NIL sl => error "Cannot get s_last on an empty slist" |
+    letrec get_last sl =
+	val (h,rem) = destr_s_CONS sl in
+	is_s_NIL rem => h | get_last rem
+    in
+    get_last sl
+;
+
+let s_butlast sl =
+    is_s_NIL sl => error "Cannot get s_butlast on an empty slist" |
+    letrec get_all_byt_last sl =
+	val (h,rem) = destr_s_CONS sl in
+	is_s_NIL rem => s_NIL | s_CONS h (get_all_byt_last rem)
+    in
+    get_all_byt_last sl
+;
+
+letrec s_el idx sl =
+    is_s_NIL sl => error "s_el with idx larger than length of slist" |
+    val (h,sl') = destr_s_CONS sl in
+    (idx = (int2bv 1)) => h | s_el (idx - (int2bv 1)) sl'
+;
+
+letrec s_map fn sl =
+    is_s_NIL sl => s_NIL |
+    val (h,rem) = destr_s_CONS sl in
+    s_CONS (fn h) (s_map fn rem)
+;
+
+letrec s_filter pred sl =
+    is_s_NIL sl => s_NIL |
+    val (h,rem) = destr_s_CONS sl in
+    let keep = pred h in
+    keep => s_CONS h (s_filter pred rem) | s_filter pred rem
+;
+
+letrec s_itlist fn sl base =
+    is_s_NIL sl => base |
+    val (h,rem) = destr_s_CONS sl in
+    fn h (s_itlist fn rem base)
+;
+    
+let s_accumulate fn sl = s_itlist fn (s_butlast sl) (s_last sl);
+

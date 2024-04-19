@@ -208,10 +208,7 @@ let base_is nds vtlist =
 	let vs = map (\s. s = "1") (explode s) in
 	map2 (\n.\v. (T,n,v,f,t)) nds vs
      /\ cnv (fixed, (BV_VAL bv), f, t) =
-	bv_size bv > sz =>
-	    eprintf "Length mismatch in is (|%s| != |%s|)" vec (bv2str 3 bv)
-	|
-	let vs = fixed_bv2list sz F bv in
+	let vs = fixed_bv2list sz F bv T in
 	map2 (\n.\v. (T,n,v,f,t)) nds vs
      /\ cnv (fixed, (BL_VAL vs), f, t) =
 	length vs != sz =>
