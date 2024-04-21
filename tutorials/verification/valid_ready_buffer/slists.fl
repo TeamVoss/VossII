@@ -24,6 +24,15 @@ let slist2list sl =
     slist2list sl
 ;
 
+// Convert a scalar list to a symbolic list.
+let list2slist l =
+    letrec build l = 
+	l = [] => s_NIL |
+	s_CONS (hd l) (build (tl l))
+    in
+    build l
+;
+
 letrec s_append sl1 sl2 =
     is_s_NIL sl1 => sl2 |
     val (h,t) = destr_s_CONS sl1 in
@@ -86,4 +95,21 @@ letrec s_itlist fn sl base =
 ;
     
 let s_accumulate fn sl = s_itlist fn (s_butlast sl) (s_last sl);
+
+
+let s_upto {from::bv} {to::bv} =
+    letrec build cur =
+	cur > to => s_NIL |
+	s_CONS cur (build (cur + (int2bv 1)))
+    in
+    build from
+;
+
+let s_downto {from::bv} {to::bv} =
+    letrec build cur =
+	cur < to => s_NIL |
+	s_CONS cur (build (cur - (int2bv 1)))
+    in
+    build from
+;
 

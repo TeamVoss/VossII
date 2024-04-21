@@ -1,0 +1,148 @@
+load "idv.fl";
+
+let BUF_SIZE = 4;
+let DATA_SZ = 8;	// Just to have something sligthly non-trivial
+
+let dname base = sprintf "%s[%d:0]" base (DATA_SZ-1);
+
+TYPE "data" DATA_SZ;
+
+
+let ctrl_bit =
+    bit_input	    clk.
+    bit_input	    reset.
+    bit_input	    add.
+    bit_input	    rm.
+    bit_input	    prev.
+    bit_input	    next.
+    bit_output	    cur.
+    //
+    bit_internal    new.
+    CELL "ctrl_bit" [
+	CASE new [
+	    (reset,			    '0),
+	    (prev '&' add '&' '~' rm,	    '1),
+	    (next '&' '~' add '&' rm,	    '1),
+	    (cur '&' '~' add '&' '~' rm,    '1),
+	    (cur '&' add '&' rm,	    '1)
+	] '0,
+	re_ff clk new cur
+];
+
+let initial_ctrl_bit =
+    bit_input	    clk.
+    bit_input	    reset.
+    bit_input	    add.
+    bit_input	    rm.
+    bit_input	    next.
+    bit_output	    cur.
+    //
+    bit_internal    new.
+    CELL "inti_ctrl" [
+	CASE new [
+	    (reset,			    '1),
+	    (next '&' '~' add '&' rm,	    '1),
+	    (cur '&' '~' add '&' '~' rm,    '1)
+	] '0,
+	re_ff clk new cur
+];
+
+
+BUNDLE "data_bundle"
+        [("valid", "bit"), ("d", "data")]
+	[("ready", "bit")]
+;
+
+let buffer =
+    bit_input		clk.
+    bit_input		reset.
+    data_bundle_input	i.
+    data_bundle_output	o.
+    //
+    data_list_internal	BUF_SIZE    data_l.
+    bit_list_internal	BUF_SIZE    ctrl_l.
+    bit_internal		    init.
+    bit_internal		    add rm.
+    //    
+    CELL "buffer" (
+	(map3 (ctrl_bit clk reset add rm)
+		(init:(butlast ctrl_l)) ((tl ctrl_l)@['0]) ctrl_l)
+	@
+	(map2 (re_ff_en clk add) ((i-->d):(butlast data_l)) data_l)
+	@
+	[
+	    initial_ctrl_bit clk reset add rm (hd ctrl_l) init,
+	    add <- i-->valid '&' '~' (last ctrl_l),
+	    i-->ready <- add,
+	    o-->valid <- '~' init,
+	    rm <- o-->valid '&' o-->ready,
+	    MUTEX_CASE (o-->d) (zip ctrl_l data_l)
+	]
+);
+
+create_default_version buffer;
+
+let ckt = pexlif2fsm buffer;
+//ckt;
+
+let vis = STE_debug ckt;
+//vis;
+
+#ifdef DO_SIMULATE;
+
+let N = 30;
+
+let ant =
+    "clk" is_clock N
+  and
+    "reset" is 1 in_cycle 0 otherwise 0 until N cycles
+  and
+    "i'valid" is 1 in_cycle 2 followed_by
+		 1 in_cycle 3 followed_by
+		 1 in_cycle 7 followed_by
+		 1 in_cycle 8 followed_by
+		 1 in_cycle 13 followed_by
+		 1 in_cycle 14 followed_by
+		 1 in_cycle 15 followed_by
+		 1 in_cycle 16 followed_by
+		 1 in_cycle 17 followed_by
+		 1 in_cycle 18 otherwise 0 until N cycles
+  and
+    "i'd[7:0]" is 1 in_cycle 2 followed_by
+		  2 in_cycle 3 followed_by
+		  3 in_cycle 7 followed_by
+		  4 in_cycle 8 followed_by
+		  5 in_cycle 13 followed_by
+		  6 in_cycle 14 followed_by
+		  7 in_cycle 15 followed_by
+		  8 in_cycle 16 followed_by
+		  9 in_cycle 17 followed_by
+		  9 in_cycle 18 otherwise 0 until N cycles
+  and
+    "o'ready" is 1 in_cycle 4 followed_by
+		 1 in_cycle 5 followed_by
+		 1 in_cycle 8 followed_by
+		 1 in_cycle 12 followed_by
+		 1 in_cycle 17 followed_by
+		 1 in_cycle 19 followed_by
+		 1 in_cycle 21 followed_by
+		 1 in_cycle 23 followed_by
+		 1 in_cycle 26 otherwise 0 until N cycles
+;
+
+STE "-e" vis [] ant [] [];
+
+let tab_1 = draw_fanin vis (0) 100 ["i'ready","o'valid","o'd[7:0]"];
+tab_1;
+draw_set_time vis 0;
+add_waveform vis ["clk"];
+add_waveform vis ["reset"];
+add_waveform vis ["i'valid"];
+add_waveform vis ["i'd[7:0]"];
+add_waveform vis ["o'ready"];
+add_waveform vis ["i'ready"];
+add_waveform vis ["o'valid"];
+add_waveform vis ["o'd[7:0]"];
+add_waveform vis ["init", "ctrl_l[3]", "ctrl_l[2]", "ctrl_l[1]", "ctrl_l[0]" ];
+
+#endif

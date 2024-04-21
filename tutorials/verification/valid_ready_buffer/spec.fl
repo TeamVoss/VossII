@@ -17,12 +17,13 @@ let Pbuf_state buf =
 	eprintf "Cannot print symbolic buf (%S)\n"
 		(md_extract_vectors (depends buf))
     |
-    let sl = get_buf_sl buf in
+    val (BUF_STATE maxsize width sl) = buf in
     let l = slist2list sl in
     let pr bv =
 	sprintf "0x%x" (bv2int bv)
     in
-    list2str T "[" ", " "]" pr l
+    sprintf "BUFFER: maxsize:%d width:%d content:%s\n" maxsize width
+		(list2str T "[" ", " "]" pr l)
 ;
 install_print_function Pbuf_state;
 

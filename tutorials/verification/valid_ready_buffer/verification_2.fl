@@ -1,0 +1,82 @@
+cload (DIR^"buffer_imp_2.fl");
+cload (DIR^"spec.fl");
+
+
+// Signal names
+let I_valid = "i'valid";
+let I_ready = "i'ready";
+let O_valid = "o'valid";
+let O_ready = "o'ready";
+let Din     = dname "i'd";
+let Dout    = dname "o'd";
+let Init    = "init";
+let Ctrl i  = sprintf "ctrl_l[%d]" i;
+let Data i  = dname (sprintf "data_l[%d]" i);
+
+
+// Mapping function...
+
+let internal_state_mapping {buf::buf_state} {cyc::int} =
+    let cnt = get_buf_size buf in
+    let map_state idx =
+	let bidx = int2bv idx in
+	let w = bidx <= cnt in
+	let v = w => get_buf_element buf (int2bv (idx-1)) | (int2bv 0) in
+	((Data (BUF_SIZE-idx)) is v in_cycle cyc when w)
+	and
+	((Ctrl (BUF_SIZE-idx)) is ((int2bv idx) = cnt) in_cycle cyc)
+    in
+    (Init is (cnt = (int2bv 0)) in_cycle cyc) and
+    (flatmap map_state (1 upto BUF_SIZE))
+;
+
+// Variables to parameterize verification
+let cnt = bv_constrained_variable "cnt[3:0]" (\v. '0 <= v AND v <= ''BUF_SIZE);
+let i_data = bv_variable (dname "D0");
+let i_valid = variable "i_valid";
+let o_ready = variable "o_ready";
+
+// Create a fully symbolic abstract buffer.
+let init_buf = mk_buf BUF_SIZE DATA_SZ cnt;
+
+let base_ant =
+    "clk" is_clock 2
+  and
+    "reset" is 0 for 2 cycles
+;
+
+let inp_ant =
+    "i'valid" is i_valid in_cycle 0
+  and
+    (dname "i'd") is i_data in_cycle 0
+  and
+    "o'ready" is o_ready in_cycle 0
+;
+
+// Assume this
+let ant = base_ant @ inp_ant @ (internal_state_mapping init_buf 0);
+
+// Check this
+let cons =
+    val (i_ready, o_valid, dout, new_buf) =
+	spec i_valid i_data o_ready init_buf
+    then
+    let cons =
+	I_ready is i_ready in_cycle 0
+      and
+	O_valid is o_valid in_cycle 0
+      and
+	(Dout is dout in_cycle 0) when o_valid
+      and
+	(internal_state_mapping new_buf 1)
+    in
+    cons
+;
+
+let ste = STE "-e" ckt [] ant cons [];
+//let ste = STE "-e" vis [] ant cons [];    // Use this if yo want circuit GUI
+
+let ok = get_ste_result ste "strong";
+
+ok;
+

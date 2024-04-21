@@ -22,6 +22,7 @@ let M_is {addr::bv} {v::bv} {cyc::int} =
     flatmap M1 (0 upto (BUF_SIZE-1))
 ;
 
+// Needed to make the symbolic if-then-else over similar structures.
 let dummy_ant cyc =
     map (\(w,n,v,f,t).F,n,F,f,t) (M_is (bv_variable Tail) (bv_variable Din) cyc)
 ;
