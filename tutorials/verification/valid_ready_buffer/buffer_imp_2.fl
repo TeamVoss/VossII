@@ -7,6 +7,7 @@ let dname base = sprintf "%s[%d:0]" base (DATA_SZ-1);
 
 TYPE "data" DATA_SZ;
 
+let addr_sz = bits_needed (BUF_SIZE-1);
 
 let ctrl_bit =
     bit_input	    clk.

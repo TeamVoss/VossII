@@ -1,7 +1,6 @@
 cload (DIR^"buffer_imp_2.fl");
 cload (DIR^"spec.fl");
 
-
 // Signal names
 let I_valid = "i'valid";
 let I_ready = "i'ready";
@@ -31,7 +30,10 @@ let internal_state_mapping {buf::buf_state} {cyc::int} =
 ;
 
 // Variables to parameterize verification
-let cnt = bv_constrained_variable "cnt[3:0]" (\v. '0 <= v AND v <= ''BUF_SIZE);
+let cnt =
+    let vname = sprintf "cnt[%d:0]" addr_sz in
+    bv_constrained_variable vname (\v. '0 <= v AND v <= ''BUF_SIZE)
+;
 let i_data = bv_variable (dname "D0");
 let i_valid = variable "i_valid";
 let o_ready = variable "o_ready";

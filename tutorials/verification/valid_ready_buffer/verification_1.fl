@@ -56,7 +56,10 @@ let internal_state_mapping {cur_tail::bv} {buf::buf_state} {cyc::int} =
     state_ant @ mem_ant
 ;
 
-let cnt = bv_constrained_variable "cnt[3:0]" (\v. '0 <= v AND v <= ''BUF_SIZE);
+let cnt =
+    let vname = sprintf "cnt[%d:0]" addr_sz in
+    bv_constrained_variable vname (\v. '0 <= v AND v <= ''BUF_SIZE)
+;
 let cur_tail = bv_variable (sprintf "t[%d:0]" addr_sz);
 let i_data = bv_variable (dname "D0");
 let i_valid = variable "i_valid";
