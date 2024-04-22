@@ -1,4 +1,4 @@
-cload (DIR^"slists.fl");
+cload "symbolic_lists.fl";
 
 lettype buf_state = BUF_STATE
 			{maxsize :: int}	// Max size of buffer (depth)

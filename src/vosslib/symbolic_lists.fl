@@ -24,6 +24,20 @@ let slist2list sl =
     slist2list sl
 ;
 
+// Useful for debugging symbolic slists 
+// Returns a list of pairs (cond,val), where
+// cond is the condition for this list element to exist.
+let slist2guarded_list sl =
+    let vs = depends sl then
+    vs = [] => map (\e. T, e) (slist2list sl) |
+    letrec exp cond (S_LIST leaf h rem) =
+	leaf == T => [] |
+	let cond' = cond AND NOT leaf in
+	(cond', get_value h):(exp cond' (get_value rem))
+    in
+    exp T sl
+;
+
 // Convert a scalar list to a symbolic list.
 let list2slist l =
     letrec build l = 
@@ -112,4 +126,5 @@ let s_downto {from::bv} {to::bv} =
     in
     build from
 ;
+
 
