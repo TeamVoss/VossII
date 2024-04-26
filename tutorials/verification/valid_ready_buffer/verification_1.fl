@@ -57,7 +57,7 @@ let internal_state_mapping {cur_tail::bv} {buf::buf_state} {cyc::int} =
 ;
 
 let cnt =
-    let vname = sprintf "cnt[%d:0]" addr_sz in
+    let vname = sprintf "cnt[%d:0]" (addr_sz+1) in
     bv_constrained_variable vname (\v. '0 <= v AND v <= ''BUF_SIZE)
 ;
 let cur_tail = bv_variable (sprintf "t[%d:0]" addr_sz);

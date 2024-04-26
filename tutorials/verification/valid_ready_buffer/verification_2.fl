@@ -31,7 +31,7 @@ let internal_state_mapping {buf::buf_state} {cyc::int} =
 
 // Variables to parameterize verification
 let cnt =
-    let vname = sprintf "cnt[%d:0]" addr_sz in
+    let vname = sprintf "cnt[%d:0]" (addr_sz+1) in
     bv_constrained_variable vname (\v. '0 <= v AND v <= ''BUF_SIZE)
 ;
 let i_data = bv_variable (dname "D0");
