@@ -2796,7 +2796,7 @@ abstract_rec(string var, g_ptr node)
 		    ASSERT(cached_is_free(var, e2));
 		    e2 = abstract_rec(var, e2);
 		    if( is_I(e2) )
-			return(e1); // <<<< IS THIS CORRECT??????
+			return(e1);
 		    if( GET_TYPE(e2) == APPLY_ND ) {
 			g_ptr r = GET_APPLY_RIGHT(e2);
 			cur = GET_APPLY_LEFT(e2);

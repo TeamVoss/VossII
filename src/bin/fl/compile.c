@@ -3,6 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
+// I think this is a no-op.....
+#if 0
+#define USE_LIFT_LETS_AND_LETRECT
+#endif
+
 #include "compile.h"
 #include "graph.h"
 #include "prefs_ext.h"
@@ -24,7 +29,9 @@ static char		buf[20];
 /* -----Function prototypes for local functions-----*/
 static g_ptr		mk_uniq_names(g_ptr node);
 static g_ptr		remove_aliases(g_ptr node);
+#ifdef USE_LIFT_LETS_AND_LETRECT
 static g_ptr		lift_lets_and_letrecs(g_ptr node);
+#endif
 static g_ptr		substitute(string old, g_ptr new_var, g_ptr node);
 static int		is_let_or_letrec(g_ptr node, string *namep,
 					 g_ptr *exprp, g_ptr *inexprp);
@@ -52,8 +59,10 @@ Optimise(g_ptr node)
 
     Check_Ref_Cnts(node);
 
+#ifdef USE_LIFT_LETS_AND_LETRECT
     node = lift_lets_and_letrecs(node);
     Check_Ref_Cnts(node);
+#endif
 
     return(node);
 }
@@ -158,6 +167,7 @@ remove_aliases(g_ptr node)
 }
 
 
+#ifdef USE_LIFT_LETS_AND_LETRECT
 static g_ptr
 lift_lets_and_letrecs(g_ptr node)
 {
@@ -221,6 +231,7 @@ lift_lets_and_letrecs(g_ptr node)
             DIE("Impossible");
     }
 }
+#endif
 
 static g_ptr
 substitute(string old, g_ptr new_var, g_ptr node)
@@ -282,7 +293,7 @@ substitute(string old, g_ptr new_var, g_ptr node)
 static int
 is_let_or_letrec(g_ptr node, string *namep, g_ptr *exprp, g_ptr *inexprp)
 {
-    g_ptr t1, t2, t3;
+    g_ptr t1, t2, t3, t4;
     ASSERT( IS_APPLY(node) );
     t1 = GET_APPLY_LEFT(node);
     if( IS_LAMBDA(t1) ) {
@@ -293,8 +304,8 @@ is_let_or_letrec(g_ptr node, string *namep, g_ptr *exprp, g_ptr *inexprp)
 	if( IS_APPLY(t2) ) {
 	    t3 = GET_APPLY_LEFT(t2);
             if(IS_LEAF(t3) && IS_PRIM_FN(t3) && GET_PRIM_FN(t3)==P_Y) {
-		t3 = GET_APPLY_RIGHT(t2);
-		*exprp = GET_LAMBDA_BODY(t3);
+		t4 = GET_APPLY_RIGHT(t2);
+		*exprp = GET_LAMBDA_BODY(t4);
 		return(2);
 	    }
 	}

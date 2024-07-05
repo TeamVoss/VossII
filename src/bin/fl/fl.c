@@ -527,23 +527,23 @@ fl_main(int argc, char *argv[])
 		source_cnt = 3;
 		fp = stdin;
 	    }
-            int res;
+            int poll_res;
 
           restart_inp:
-	    while( (res = poll(fds, source_cnt, -1)) < 1 ) {
+	    while( (poll_res = poll(fds, source_cnt, -1)) < 1 ) {
 		CHECK_FOR_INTERRUPT;
 	    }
 	  process_more:
-            res = 99;
+            poll_res = 99;
             for(int i = 0; i < source_cnt; i++) {
-                if( res == 99 && fds[i].revents == POLLIN ) {
-                    res = i;
+                if( poll_res == 99 && fds[i].revents == POLLIN ) {
+                    poll_res = i;
 		    break;
 		}
             }
-	    if( res == 99 ) { goto restart_inp; }
+	    if( poll_res == 99 ) { goto restart_inp; }
 	    CHECK_FOR_INTERRUPT;
-            switch( res ) {
+            switch( poll_res ) {
                 case 0: {
                     // Command(s) to be executed (coming from cmd_from_tcl_fp)
 		    string cur_start = strtemp("");
@@ -570,16 +570,13 @@ fl_main(int argc, char *argv[])
 		    free_temp_str_mgr(tstrings);
 		    strcpy(parse_buf, cur_start);
 
+		    clearerr(cmd_from_tcl_fp);
 		    if( !process_commands(parse_buf, FALSE) ) {
-			clearerr(cmd_from_tcl_fp);
 			fprintf(cmd_from_tcl_fp, "{0 0 0}\n");
-			fflush(cmd_from_tcl_fp);
-			parse_buf[0] = 0;
-			goto process_more;
+		    } else {
+			fprintf(cmd_from_tcl_fp, "{1 0 %d}\n",
+						 (int) strlen(stdin_buf));
 		    }
-                    clearerr(cmd_from_tcl_fp);
-                    fprintf(cmd_from_tcl_fp, "{1 0 %d}\n",
-					     (int) strlen(stdin_buf));
                     fflush(cmd_from_tcl_fp);
                 }
                 break;
