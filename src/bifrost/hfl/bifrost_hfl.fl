@@ -1,0 +1,81 @@
+// Shared HFL code used by Bifrost circuits.
+// Hopefully synchronized between the Bifrost and VossII projects...
+
+cload "ste.fl";
+
+let bifrost_adapter_twophase =
+  bit_input clk.
+  bit_input reset.
+  bit_input run.
+  bit_input hold.
+  bit_input ack.
+  bit_output req.
+  bit_output latch.
+  bit_output done.
+  bit_internal was_req.
+  bit_internal was_ack.
+  bit_internal sent.
+  CELL "bifrost_adapter_twophase" [
+    re_ff_sreset clk reset ack was_ack,
+    re_ff_sreset clk reset req was_req,
+    re_ff_sreset clk reset ((run '|' sent) '&' hold) sent,
+    req <- was_req '^' (run '&' ('~' sent)),
+    latch <- ack '^' was_ack,
+    done <- run '&' ('~' (req '^' ack))
+    ];
+
+let bifrost_adapter_fourphase =
+  bit_input clk.
+  bit_input reset.
+  bit_input run.
+  bit_input hold.
+  bit_input ack.
+  bit_output req.
+  bit_output latch.
+  bit_output done.
+  bit_internal was_ack.
+  bit_internal still_done.
+  CELL "bifrost_adapter_fourphase" [
+    re_ff_sreset clk reset ack was_ack,
+    re_ff_sreset clk reset (done '&' hold) still_done,
+    req <- run '&' ('~' was_ack) '&' (ack '|' ('~' done)),
+    latch <- ack '&' ('~' was_ack),
+    done <- still_done '|' latch
+    ];
+
+let bifrost_adapter_pulseecho =
+  bit_input clk.
+  bit_input reset.
+  bit_input run.
+  bit_input hold.
+  bit_input ack.
+  bit_output req.
+  bit_output latch.
+  bit_output done.
+  bit_internal sent.
+  bit_internal still_done.
+  CELL "bifrost_adapter_pulseecho" [
+    re_ff_sreset clk reset ((sent '|' req) '&' hold) sent,
+    re_ff_sreset clk reset (done '&' hold) still_done,
+    req <- run '&' ('~' sent),
+    latch <- ack,
+    done <- still_done '|' ack
+    ];
+
+let bifrost_adapter_validready =
+  bit_input clk.
+  bit_input reset.
+  bit_input run.
+  bit_input hold.
+  bit_input ack.
+  bit_output req.
+  bit_output latch.
+  bit_output done.
+  bit_internal still_done.
+  CELL "bifrost_adapter_validready" [
+    re_ff_sreset clk reset (done '&' hold) still_done,
+    req <- run '&' ('~' still_done),
+    latch <- req '&' ack,
+    done <- still_done '|' latch
+    ];
+

@@ -1,0 +1,88 @@
+Immediate to-do:
+- Smarter arbiters, and arbiters for other protocols than FourPhase
+- BUG: if you share an array action, it probably will explode
+- BUG: it is currently allowed to doubly share, e.g. ("foo" myadder myadder), producing wrong stuff
+- BUG: generation of combinational hardware might not play nice with the arbiters
+- Labeling: bit signals label as control, other signals label as data.
+- let bflabel lbl (PINST nm attrs lf fa_inps fa_outs ints body) = PINST nm (("bflabel",lbl):attrs) lf fa_inps fa_outs ints body;
+- Line wrapping.
+- Contradictory condition detection and SMT while remaining sound.
+- Warning for unused actions.
+- Allow operators that map to actions, e.g. :+: to use "do add" rather than FL +.
+- Fix combinational action in combinational module.
+- Fix redundancy in chomped programs caused by empty blocks messing up memoization.
+- For state dependencies, we may want to consider "writing [FOO]" to also imply "reading [FOO]". We don't care about the distinction between R+W (i.e. modifying) and W (overwriting) since (1) we probably can't do cool information flow tracking stuff where this would matter since it's too coarse grained, and (2) we can't do any optimizations with this. For example the fact that mem_reset writes MEM but doesn't read MEM doesn't allow us to do any clever optimizations; if we used this as a basis to skip earlier memory writes because they "won't matter" due to a later call to mem_reset (as one can do with liveness analysis on variables) this would be a disaster since other components could read memory in the time between.
+- Try to simplify merged expressions when merging bitefuls. For example "if x then 3+y else 3+z" should turn into "3 + (if x then y else z)" if the types work out.
+- Support hexadecimal
+- move reading/writing stuff to action rather than actiontype?
+- rename valid-ready protocol AGAIN: the typical valid-ready protocol seems to name signals based on which way the data flows (it's unidirectional), whereas we have more of a client-server sense of direction (since request data flows one way, and the response flows the other way).
+- make modules able to receive requests via valid-ready protocol (not just make them)
+- figure out assumptions about valid-ready in terms of signals being held
+- check for halt-and-catch-fire (NBHCF) in Chomp etc
+- make makeShare skip sharing things with non-data type?
+- bugfix: chomp spins forever when dealing with:
+    while(1)
+    {
+        for(i = 0; i < 10; i = i + 1)
+        {
+            --%<--
+        }
+    }
+    ...ah this is because it's not sure the for-loop will run at all, and considers the path where i=0 but i<10 doesn't hold... how to avoid this in the most general case?
+- Change `type foo => "foo"` to `type foo => !`
+- Change `type foo` (no compile type) to `type foo => ?`
+- "implements <interface>" line
+- Strawberry pulseecho / auto-strawberry
+- Multiple actions provided by one module? (Massive change.)
+- Variables that persist between runs?
+- Recursive power management. No! Well-behaved modules about not using the clock.
+- alwayson => parentpower
+- no guarantees of being on whatsoever
+- needclock signal up to power-managed parent (or root)
+- Default to chocolate.
+- Don't need clock wire.
+- Add enum values to the language.
+- Latch inputs for pulse-echo with chocolate flavor (vanilla should already flop them immediately).
+- Check timing of power sleep stuff very carefully.
+- Consider nesting of components with and without power management re: passing of clock and reset signals (sleepy annotation = will accept gated clock and reset?).
+- Find a solution to the striking issue with resetting one end of a two-phase link.
+- Add "features" declaration to enable compile options (vanilla vs chocolate for example).
+- Create gated clocks for variable flops--either coarse grained (using the "update" signal, so same clock for all variable flops) or fine grained (using individual enable signals). To-do: read Alam 2015.
+- Make power managers more abstract.
+- Approximate depth computation.
+- Look into other HLS systems.
+- Think about pipelining.
+- Enums without checking anything.
+
+
+Later todo:
+- Don't use a register for main's return address, as it's constant.
+- Identification of constants in general.
+- Dummy protocol wires, use type to prevent mis-plugs.
+- Generate interface files for timing, protocols, power management.
+- Make Chomp only unroll tight loops so far.
+- Check for parameter name duplication between inputs and outputs (esp w/ actions).
+- Consider making liveness analysis fail more gracefully when control flow is unknown (specifically, make successors return *all* the bites if we don't know for certain which can come next).
+
+Compilation pipeline, eventually:
+- Parse input into AST (following "#include" directives) {DONE}
+- Build up StructuredProgram and Environment, in the process: {DONE}
+  - Expanding macros (if not already done) {DONE}
+  - Keeping track of declared types {DONE}
+  - Resolving variable references (global versus local) {DONE}
+  - Checking things are declared before they are referenced (except subroutines and goto-labels) {DONE}
+- Check for existence of main. {DONE}
+- Check references: gotos, actions, subroutines. {DONE}
+- Check for recursion among subroutines, and failure to reach return statements. {DONE}
+- Check for tight loops that will make the compiler go crazy. {TODO}
+- Sanity-check environment (EnvCheck), just to be cautious. {TODO}
+- Typecheck. {DONE}
+- Decomplexify, producing a more verbose but well-behaved StructuredProgram. {DONE}
+- Blockify, producing a BlockProgram. {DONE}
+- Chomp, producing a synchronous BiteProgram. {DONE}
+- Liveness analysis. {DONE I HOPE}
+- Inlining of certain shared expressions (Unshare.hs). {DONE}
+- Turn the BiteProgram into a Hardware. {DRAFT}
+- Print the Hardware as FL. {DRAFT}
+
+

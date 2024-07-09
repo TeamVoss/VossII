@@ -189,7 +189,8 @@ install_fixed_address: fl functor
 install_all: fl functor \
 			ignore_signals \
 			install_visualization \
-			install_write_pexlif
+			install_write_pexlif \
+    			bifrost
 	@-mkdir -p $(BIN_DIR)
 	@-unlink $(BIN_DIR)/fl
 	@cp ./bin/fl/fl $(BIN_DIR)/fl
@@ -214,6 +215,7 @@ install_all: fl functor \
 	cp -r vosslib/* $(LIB_DIR)
 	chmod -R a+rX $(LIB_DIR)
 	@cd ../IDVII/src/fl/design; make
+	@-cd bifrost; make install
 
 install_visualization: visualization
 	cp external/visualization/schematic_draw_module.so ../IDVII/
@@ -244,4 +246,5 @@ clean:
 	@-make -C external/visualization clean
 	@-make -C $(YOSYS_WRITE_PEXLIF) clean
 	@-make -C ../IDVII/src/fl/design clean
+	@-make -C bifrost clean
 

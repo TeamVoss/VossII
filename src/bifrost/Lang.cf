@@ -1,0 +1,205 @@
+comment "//" ;
+comment "/*" "*/" ;
+
+
+-- Top-level
+
+Prog.   Program ::= [TopLevel] ;
+separator TopLevel "" ;
+
+TopDecl. TopLevel ::= Decl ";" ;
+TopSub.  TopLevel ::= SubDef ;
+
+
+-- Declarations
+
+NameDecl. Decl ::= "module" Ident ;
+ProtocolDecl. Decl ::= "protocol" Protocol;
+FlavorDecl. Decl ::= "flavor" String;
+StateDecl. Decl ::= "state" [StateAspect] ;
+ActionTypeDecl. Decl ::= "actiontype" ActionTypeName "=" ActionType;
+ActionDecl. Decl ::= "action" ActionName ":" ActionType1 ActionArrayInfo "provided" "by" Provider "via" Protocol;
+GlobalVarDecl. Decl ::= VarDecl ;
+TypeDecl. Decl ::= "type" TypeName TypeCompileDefinition ;
+TypeAliasDecl. Decl ::= "alias" TypeName "=" Type ;
+FieldsDecl. Decl ::= "fields" TypeName "[" [FieldDef] "]" ;
+separator FieldDef "," ;
+NumericDecl. Decl ::= "numeric" TypeName "unsigned" Integer;
+DefineDecl. Decl ::= "define" DefineName [DefineParam] "=" Exp ;
+separator DefineParam "" ;
+
+-- Declaration details
+
+MkVarDecl. VarDecl ::= "var" Type1 [VarName] ;
+separator nonempty VarName "," ;
+
+StateAspectList. StateAspects ::= "[" [StateAspect] "]" ;
+separator StateAspect "," ;
+
+ActionSingle. ActionArrayInfo ::= ;
+ActionArray. ActionArrayInfo ::= "[" Exp "]";
+
+ProviderExternal. Provider ::= "external" ;
+ProviderModule. Provider ::= String ;
+ProviderModuleShare. Provider ::= "(" String [ActionName] ")" ;
+separator ActionName "" ;
+
+ProtocolAuto.  Protocol ::= "auto" ;
+ProtocolGiven. Protocol ::= Exp ;
+
+-- CommProtocolTwoPhase. CommProtocol ::= "twophase" ;
+-- CommProtocolFourPhase. CommProtocol ::= "fourphase" ;
+-- CommProtocolPulseEcho. CommProtocol ::= "pulseecho" ;
+-- CommProtocolValidReady. CommProtocol ::= "validready" ;
+-- CommProtocolCombinational. CommProtocol ::= "combinational" ;
+
+-- PowerProtocolAlwaysOn. PowerProtocol ::= "alwayson";
+-- PowerProtocolPowerShake. PowerProtocol ::= "powershake";
+
+TypeCompileString. TypeCompileDefinition ::= "=>" String ;
+TypeCompileInfer. TypeCompileDefinition ::= ;
+
+MkFieldDef. FieldDef ::= FieldName ":" Type ;
+
+FieldNameIdent. FieldName ::= Ident ;
+FieldNameString. FieldName ::= String ;  -- kludge for field names like "type"
+
+-- Patterns etc
+
+FunPatPat. FunPat ::= Pattern ;
+FunPatFun. FunPat ::= Pattern "->" FunPat ;
+PatternParam. Pattern ::= Param ;
+PatternTupleEmpty. Pattern ::= "()" ;
+PatternTupleTwoPlus. Pattern ::= "(" Pattern "," [Pattern] ")" ;
+separator Pattern "," ;
+MkParam. Param ::= Ident ":" Type1 ;
+
+
+-- Action Types
+
+ActionTypeRaw.   ActionType ::= FunPat "reading" StateAspects "writing" StateAspects ;
+ActionTypeNamed. ActionType1 ::= ActionTypeName ;
+coercions ActionType 2 ;
+
+-- Types
+
+FunType. Type ::= Type1 "->" Type ;
+NamedType. Type1 ::= Ident ;
+TupleZeroType. Type1 ::= "()" ;
+TupleTwoPlusType. Type1 ::= "(" Type "," [Type] ")" ;
+separator nonempty Type "," ;
+coercions Type 1;
+
+
+-- Subroutines and code
+
+MkSub. SubDef ::= [SubFlag] "function" SubroutineName ":" FunPat "{" [SubLine] "}" ;
+
+separator SubFlag "" ;
+separator SubLine "" ;
+Inline. SubFlag ::= "inline" ;
+SubVarDecl. SubLine ::= VarDecl ";" ;
+SubStm. SubLine ::= Stm ;
+
+Normal. Stm ::= NormalStm ";" ;
+Abnormal. Stm ::= AbnormalStm ;
+
+Assign. NormalStm ::= Assignish ;
+Return. NormalStm ::= "return" ;
+Goto. NormalStm ::= "goto" GotoLabel ;
+HintPower. NormalStm ::= "setpower" Power ActionName ;
+
+PowerOn. Power ::= "on";
+PowerOff. Power ::= "off";
+
+WithLhs. Assignish ::= Exp "=" Exp ;
+WithoutLhs. Assignish ::= Exp ;
+PlusEquals. Assignish ::= Exp "+=" Exp ;
+MinusEquals. Assignish ::= Exp "-=" Exp ;
+Increment. Assignish ::= Exp "++" ;
+Decrement. Assignish ::= Exp "--" ;
+
+Label. AbnormalStm ::= "label" GotoLabel ":" ;
+Scissors. AbnormalStm ::= "--%<--" ;
+While. AbnormalStm ::= "while" "(" Exp ")" StmBlock ;
+For. AbnormalStm ::= "for" "(" Assignish ";" Exp ";" Assignish ")" StmBlock ;
+ForEach. AbnormalStm ::= "foreach" "(" VarName "in" Exp "..." Exp ")" StmBlock ;
+Block. AbnormalStm ::= StmBlock ;
+IfLike. AbnormalStm ::= IfLikeStm;
+
+IfElse. IfLikeStm ::= "if" "(" Exp ")" StmBlock "else" PostElseStm ;
+IfOnly. IfLikeStm ::= "if" "(" Exp ")" StmBlock ;
+
+ElseIf. PostElseStm ::= IfLikeStm;
+ElseBlock. PostElseStm ::= StmBlock;
+
+MkBlock. StmBlock ::= "{" [Stm] "}" ;
+separator Stm "" ;
+
+
+-- Proxies for Ident
+
+MkStateAspect. StateAspect ::= Ident ;
+MkTypeName. TypeName ::= Ident ;
+MkVarName. VarName ::= Ident ;
+MkActionTypeName. ActionTypeName ::= Ident ;
+MkActionName. ActionName ::= Ident ;
+MkDefineName. DefineName ::= Ident ;
+MkDefineParam. DefineParam ::= Ident ;
+MkSubroutineName. SubroutineName ::= Ident ;
+MkGotoLabel. GotoLabel ::= Ident ;
+
+
+-- Action and subroutine calls. Keep in sync with Exp rules.
+
+ActionCall. Call ::= "do" ActionName Args ;
+SubCall. Call ::= "call" SubroutineName Args ;
+MkArgs. Args ::= [Exp12] ;                           -- Exp10 == level of EVar!
+separator Exp12 "" ;
+
+
+-- Dictionaries
+
+-- DictEmpty. Dict ::= "{}" ;
+MkDict. Dict ::= "{{" [DictAssig] "}}" ;
+
+MkDictAssig. DictAssig ::= Ident "=" Exp ;
+separator DictAssig "," ;
+
+-- Expressions. Generated by grammar_generators/expgrammar.hs. Do not change.
+
+EIfThenElse. Exp ::= "if" Exp "then" Exp "else" Exp ;
+EOr. Exp1 ::= Exp1 "|" Exp2 ;
+EAnd. Exp2 ::= Exp2 "&" Exp3 ;
+EXor. Exp2 ::= Exp2 "^" Exp3 ;
+EEq. Exp3 ::= Exp4 "==" Exp4 ;
+ENeq. Exp3 ::= Exp4 "!=" Exp4 ;
+ELt. Exp3 ::= Exp4 "<" Exp4 ;
+EGt. Exp3 ::= Exp4 ">" Exp4 ;
+ELte. Exp3 ::= Exp4 "<=" Exp4 ;
+EGte. Exp3 ::= Exp4 ">=" Exp4 ;
+EPlus. Exp4 ::= Exp4 "+" Exp5 ;
+EMinus. Exp4 ::= Exp4 "-" Exp5 ;
+ETimes. Exp5 ::= Exp5 "*" Exp6 ;
+EDiv. Exp5 ::= Exp5 "/" Exp6 ;
+EMod. Exp5 ::= Exp5 "%" Exp6 ;
+EShiftL. Exp6 ::= Exp6 "<<" Exp7 ;
+EShiftR. Exp6 ::= Exp6 ">>" Exp7 ;
+EArithShiftR. Exp6 ::= Exp6 "|>>" Exp7 ;
+ENot. Exp7 ::= "~" Exp7 ;
+ECall. Exp8 ::= Call ;
+EApp. Exp9 ::= Exp9 Exp10 ;
+ETypeAnn. Exp10 ::= Exp10 "::" Type ;
+EBlob. Exp11 ::= "fl" String ;
+EVar. Exp12 ::= VarName ;
+EIntLit. Exp12 ::= Integer ;
+EField. Exp12 ::= Exp12 "-->" FieldName ;
+ETupleZero. Exp12 ::= "()" ;
+ETupleTwoPlus. Exp12 ::= "(" Exp "," [Exp] ")" ;
+EProj. Exp12 ::= Exp12 "." Integer ;
+EIgnore. Exp12 ::= "_" ;
+EStr. Exp12 ::= String ;
+EDict. Exp12 ::= Dict ;
+coercions Exp 13 ;
+separator nonempty Exp "," ;
+

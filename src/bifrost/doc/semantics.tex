@@ -1,0 +1,142 @@
+\documentclass[a4paper]{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+\title{Semantics draft}
+\author{Jeremy}
+
+
+\newcommand{\cskip}{\textbf{skip}}
+\newcommand{\cret}{\textbf{return}}
+\newcommand{\mem}{\rho}
+\newcommand{\glob}{\sigma}
+\newcommand{\bkt}[1]{\langle #1\rangle}
+\newcommand{\intp}[1]{[\![#1]\!]}
+\newcommand{\eval}{\Downarrow}
+%\newcommand{\evolve}{\Rightarrow}
+%\newcommand{\evals}{\Downarrow^*}
+%\newcommand{\evolves}{\Rightarrow^*}
+\newcommand{\also}{\,\,\,\,\,}
+\newcommand{\semrule}[3]{\[\dfrac{#2}{#3}\,\,\text{#1}\]}
+
+\begin{document}
+\maketitle
+
+Configuration: \(\bkt{e,\mem,\glob}\) for the evaluation of an expression \(e\), \(\bkt{c,\mem,\glob}\) for the running of a program \(c\). \(\mem\) denotes the variable store, \(\glob\) denotes the state of the outside world.
+%
+Metavariable naming convention:
+\begin{itemize}
+\item \(e\) -- expressions
+\item \(x\) -- variables
+\item \(v\) -- values (including functions and tuples of values)
+\item \(l\) -- left-hand sides (subset of expressions: variables, don't-care symbol ``\texttt{\_}'', tuple of left-hand sides)
+\item \(f\) -- struct fields
+\item \(c\) -- program (code)
+\item \(a\) -- action that interacts with outside world state
+\end{itemize}
+%
+\(\intp{\cdot}\) is used to signify the interpretation of a binary/unary operator or an action.
+
+\section*{Expressions}
+
+\semrule{Var}{}{\bkt{x,\mem,\glob} \eval \bkt{\mem(x),\mem,\glob}}
+
+\semrule{Field}
+{\bkt{e,\mem,\glob} \eval \bkt{v,\mem',\glob'}
+\also v'=v.f}
+{\bkt{e\,\texttt{-->}f,\mem,\glob} \eval \bkt{v',\mem',\glob'}}
+
+\semrule{Binary}
+{\bkt{e_1,\mem,\glob} \eval \bkt{v_1,\mem',\glob'}
+\also \bkt{e_2,\mem',\glob'} \eval \bkt{v_2,\mem'',\glob''}
+\also v_3 = \intp{\Box}(v_1,v_2)}
+{\bkt{e_1 \Box e_2,\mem,\glob} \eval \bkt{e_3,\mem'',\glob''}}
+
+\semrule{Unary}
+{\bkt{e,\mem,\glob} \eval \bkt{v,\mem',\glob'}
+\also v' = \intp{\Box}(v)}
+{\bkt{\Box e,\mem,\glob} \eval \bkt{v',\mem',\glob'}}
+
+\semrule{Tuple}
+{\bkt{e_1,\mem,\glob} \eval \bkt{v_1,\mem',\glob'}
+\also \bkt{(e_2,\ldots,e_n),\mem',\glob'} \eval \bkt{(v_2,\ldots,v_n),\mem'',\glob''}}
+{\bkt{(e_1,\ldots,e_n),\mem,\glob} \eval \bkt{(v_1,\ldots,v_n),\mem'',\glob''}}
+
+\semrule{App}
+{\bkt{e_1,\mem,\glob} \eval \bkt{v_1,\mem',\glob'}
+\also \bkt{e_2,\mem',\glob'} \eval \bkt{v_2,\mem'',\glob''}
+\also v_3 = v_1(v_2)}
+{\bkt{e_1\,e_2,\mem,\glob} \eval \bkt{e_3,\mem'',\glob''}}
+
+\semrule{Do}
+{\bkt{(e_1,\ldots,e_n),\mem,\glob} \eval \bkt{(v_1,\ldots,v_n),\mem',\glob'}
+\also (\glob'',v') = \intp{a}(\glob',v_1,\ldots,v_n)}
+{\bkt{\texttt{do}\,a\,e_1\,\ldots\,e_n,\mem,\glob} \eval \bkt{v',\mem',\glob''}}
+
+\section*{Programs}
+
+%\semrule{rhs}
+%{\bkt{e,\mem,\glob} \eval \bkt{v,\mem',\glob'}}
+%{\bkt{l=e,\mem,\glob} \eval \bkt{l=v,\mem',\glob'}}
+
+\semrule{Assign}
+{\bkt{e,\mem,\glob} \eval \bkt{v,\mem',\glob'}
+\also \bkt{l=v,\mem',\glob'} \eval \bkt{\cskip,\mem'',\glob'}}
+{\bkt{l=e,\mem,\glob} \eval \bkt{\cskip,\mem'',\glob'}}
+
+\semrule{AssignVar}
+{}
+{\bkt{x=v,\mem,\glob} \eval \bkt{\cskip,\mem [ x \mapsto v ],\glob}}
+
+% <blah,M,sigma> => <foo,M,sigma>  <blah=blah[f \mapsto v],M,sigma> => <skip,M',sigma>
+% --------------------------------------------------------------
+% <blah.f=v,M,sigma> => <skip,M',sigma>
+
+\semrule{AssignField}
+{\bkt{l,\mem,\glob} \eval \bkt{v',\mem,\glob}
+\also \bkt{l=v' [ f \mapsto  v ],\mem,\glob} \eval \bkt{\cskip,\mem',\glob}}
+{\bkt{l\,\texttt{-->}f=v,\mem,\glob} \eval \bkt{\cskip,\mem',\glob}}
+
+\semrule{AssignTuple}
+{\bkt{l_1=v_1,\mem,\glob} \eval \bkt{\cskip,\mem',\glob}
+\also \bkt{(l_2,\ldots,l_n)=(v_2,\ldots,v_n),\mem',\glob} \eval \bkt{\cskip,\mem'',\glob}}
+{\bkt{(l_1,\ldots,l_n)=(v_1,\ldots,v_n),\mem,\glob} \eval \bkt{\cskip,\mem'',\glob}}
+
+\semrule{AssignEmpty}
+{}
+{\bkt{()=(),\mem,\glob} \eval \bkt{\cskip,\mem,\glob}}
+
+\semrule{AssignIgnore}
+{}
+{\bkt{\texttt{\_}=v,\mem,\glob} \eval \bkt{\cskip,\mem,\glob}}
+
+\semrule{Seq}
+{\bkt{c_1,\mem,\glob} \eval \bkt{\cskip,\mem',\glob'}
+\also \bkt{c_2,\mem',\glob'} \eval \bkt{c,\mem'',\glob''}}
+{\bkt{c_1;c_2,\mem,\glob} \eval \bkt{c,\mem'',\glob''}}
+
+\semrule{Return}
+{\bkt{c_1,\mem,\glob} \eval \bkt{\cret,\mem',\glob'}}
+{\bkt{c_1;c_2,\mem,\glob} \eval \bkt{\cret,\mem',\glob'}}
+
+\semrule{IfElse}
+{\bkt{e,\mem,\glob} \eval \bkt{i,\mem',\glob'}
+\also \bkt{c_i,\mem',\glob'} \eval \bkt{c,\mem'',\glob''}}
+{\bkt{\texttt{if}\,e\,c_1\,c_0,\mem,\glob} \eval \bkt{c,\mem'',\glob''}}
+
+\semrule{WhileTrue}
+{\bkt{e,\mem,\glob} \eval \bkt{1,\mem',\glob'}
+\also \bkt{c;\texttt{while}\,e\,c,\mem',\glob'} \eval \bkt{c',\mem'',\glob''}}
+{\bkt{\texttt{while}\,e\,c} \eval \bkt{c',\mem'',\glob''}}
+
+\semrule{WhileFalse}
+{\bkt{e,\mem,\glob} \eval \bkt{0,\mem',\glob'}}
+{\bkt{\texttt{while}\,e\,c} \eval \bkt{\cskip,\mem',\glob'}}
+
+\semrule{Scissors}
+{}
+{\bkt{\texttt{--\%<--},\mem,\glob} \eval \bkt{\cskip,\mem,\glob}}
+
+\end{document}
+
+

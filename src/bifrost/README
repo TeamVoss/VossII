@@ -1,0 +1,37 @@
+Bifröst: an imperative language -> hardware compiler.
+
+Named after the bridge connecting Midgard and Asgard. You are free to  decide
+which end is which in the context of HFL and the language created here...
+
+--------------------------------------------------------------------------------
+QUICK EXAMPLE
+$ make
+$ ./bifrost examples/fib/*.bfst
+$ fl -f examples/fib/simulate.fl
+$ make distclean
+--------------------------------------------------------------------------------
+
+Dependencies:
+- Haskell platform
+
+Optional dependencies:
+- bnfc ("The BNF Converter", on Ubuntu: apt install bnfc) and its dependencies
+  if one wants to mess with the grammar via `make grammar`
+
+Build:
+$ make
+
+Usage:
+$ ./bifrost [FILE...]
+
+Examples:
+See the "examples" directory.
+
+Clean up everything for git:
+$ make distclean
+
+Troubleshooting:
+- An apparent bug in BNFC causes a crash (e.g. "compile: Lang/LexLang.x:(81,13)-
+  (87,20): Non-exhaustive patterns in case") if one feeds it certain sequences
+  of symbols involving "$". One such sequence is the mistyped scissors "--$<--"
+  (should be "--%<--").
