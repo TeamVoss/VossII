@@ -744,8 +744,11 @@ let base_phase_delay lhs rhs =
     NOT (valid_lhs lhs) =>
 	eprintf "%s is not a valid lhs expression" (Pwexpr lhs)
     |
-    let body = P_LEAF [W_PHASE_DELAY lhs rhs ] in
-    let outs = map (\n.n,[n]) (get_lhs_vars lhs) in
+    let driven = base_get_lhs_vars lhs in
+    let sz = special_md_sizes driven in
+    let lhs' = W_VAR sz "o" in
+    let body = P_LEAF [W_PHASE_DELAY lhs' rhs ] in
+    let outs = [(mk_name sz "o", driven)] in
     let inps = map (\n.n,[n]) (w_depends rhs) in
     PINST (mk_draw_cmd T rhs) [] T inps outs [] body
 ;
