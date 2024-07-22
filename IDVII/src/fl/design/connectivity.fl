@@ -87,7 +87,7 @@ let ranges_overlap rl1 rl2 =
     (find_first0 tst1 rl1) != 0
 ;
 
-let vec_overlap vn1 vn2 =
+let vinfo_overlap vn1 vn2 =
     letrec tst ((TXT t1):rem1) ((TXT t2):rem2) = t1 != t2 => F | tst rem1 rem2
      /\    tst ((RANGES rl1):rem1) ((RANGES rl2):rem2) =
 	ranges_overlap rl1 rl2 => tst rem1 rem2 | F
@@ -168,7 +168,7 @@ let get_pt_fanin ios vec =
     letrec check ((av,avi,apt):rem) =
 	let rest = check rem then
 	av = vec => apt:rest |
-	vec_overlap vi avi => apt:rest | rest
+	vinfo_overlap vi avi => apt:rest | rest
      /\    check [] = []
     in
     check alts
@@ -182,7 +182,7 @@ let get_pt_fanout ios vec =
     letrec check ((av,avi,apt):rem) =
 	let rest = check rem then
 	av = vec => apt:rest |
-	vec_overlap vi avi => apt:rest | rest
+	vinfo_overlap vi avi => apt:rest | rest
      /\    check [] = []
     in
     check alts

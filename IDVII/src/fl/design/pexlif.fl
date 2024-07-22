@@ -143,10 +143,10 @@ let fold_pexlif p il new_name = fold_pexlif_with_label p il new_name [];
 let foldn_pexlif p grl =
     let all_sel = flatmap snd grl in
     letrec select used ((lbl,sel):sels) =
-	let overlap = sel intersect used then
-	overlap == [] => (lbl,sel):(select (sel@used) sels) |
+	let matches = sel intersect used then
+	matches == [] => (lbl,sel):(select (sel@used) sels) |
 	(fprintf stdinfo "Overlapping selection in foldn_pexlif (%S)\n"
-		(map int2str overlap)) fseq
+		(map int2str matches)) fseq
 	select used sels
      /\    select used [] = []
     in
@@ -275,12 +275,18 @@ sletrec pexlif_group_by_label p =
 // are lifted up one level in the hierarchy. All the internal wires
 // inside instance id is given new names (prefix #<number>-).
 //  unfold_pexlif::PINST->int->PINST
-let
-    unfold_pexlif pex id =
-        val (PINST n a l i o t (P_HIER cs)) = unfold_pexlif pex id in
-        let lbl (PINST n a l i o t c) = PINST n a l i o t c in
-        PINST n a l i o t (P_HIER (map lbl cs))
+let unfold_pexlif pex id =
+    val (PINST n a l i o t (P_HIER cs)) = unfold_pexlif pex id in
+    // Make sure signatures are recomputed since the C code does not do that!
+    let lbl (PINST n a l i o t c) = PINST n a l i o t c in
+    PINST n a l i o t (P_HIER (map lbl cs))
 ;
+
+let get_number_of_children (PINST _ _ _ _ _ _ (P_HIER chs)) =
+    length chs
+ /\ get_number_of_children other = 0
+;
+
 
 // -----------------------------------------------------------------------------
 
@@ -562,6 +568,13 @@ let get_unique_name name_db original_name =
 // Code for constant propagation
 // =============================================================
 
+let silent_STE opts ckt wl ant cons trl =
+    let old = update_vossrc "PRINT-TIME" "NO" then
+    let res = STE opts ckt wl ant cons trl then
+    (update_vossrc "PRINT-TIME" old) fseq
+    res
+;
+
 // Perform constant propagation and simplify the pexlif hiearchically.
 // Note that we only propagate constants through combinational units.
 let hier_constant_propagation p =
@@ -570,7 +583,7 @@ let hier_constant_propagation p =
     let a_nds = assertions ckt then
     let a_deps = filter (is_input ckt) (fanin_dfs ckt (\n.F) a_nds) then
     let a_ant = map (\n. T,n, variable n, 0, 1) a_deps then
-    let ste1 = STE "" ckt [] a_ant [] (map (\n.n,0,1) a_nds) then
+    let ste1 = silent_STE "" ckt [] a_ant [] (map (\n.n,0,1) a_nds) then
     let get_cond nd =
 	val (H,L) = get_trace_val ste1 nd 0 then
 	NOT (H == NOT L) => [] |
@@ -581,7 +594,7 @@ let hier_constant_propagation p =
     let psub = param cond then
     let a_ant' = substitute psub a_ant then
     //
-    let ste = STE "-e" ckt [] a_ant' [] [] then
+    let ste = silent_STE "-e" ckt [] a_ant' [] [] then
     letrec simp hier p =
         val (PINST name attrs lf fa_inps fa_outs ints body) = p in
 	let get_v f =
@@ -685,7 +698,7 @@ let constant_propagation p =
     let a_nds = assertions ckt then
     let a_deps = filter (is_input ckt) (fanin_dfs ckt (\n.F) a_nds) then
     let a_ant = map (\n. T,n, variable n, 0, 1) a_deps then
-    let ste1 = STE "" ckt [] a_ant [] (map (\n.n,0,1) a_nds) then
+    let ste1 = silent_STE "" ckt [] a_ant [] (map (\n.n,0,1) a_nds) then
     let get_cond nd =
 	val (H,L) = get_trace_val ste1 nd 0 then
 	NOT (H == NOT L) => [] |
@@ -696,7 +709,7 @@ let constant_propagation p =
     let psub = param cond then
     let a_ant' = substitute psub a_ant then
     //
-    let ste = STE "-e" ckt [] a_ant' [] [] then
+    let ste = silent_STE "-e" ckt [] a_ant' [] [] then
     val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
     let get_v nd =
 	(str_is_substr "assert__" nd) => "X" |
@@ -721,6 +734,94 @@ let constant_propagation p =
     in
     let cs' = map transf cs then
     (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs'))
+;
+
+// Remove all "wires" selected by il.
+// Note that a buffer, two inverters in series, etc. are all
+// considered wires.
+// Only "wires" not removed are wires that, if removed, would mean
+// that an input is connected directly to an output in the PINST.
+//
+let remove_wire p il =
+    il = [] => p |
+    NOT (pexlif_is_hier p) => error "remove_wire on a leaf instance" |
+    // This code relies on fold_pexlif putting the new instance first!!!!
+    let p' = fold_pexlif p il "_TMP_" then
+    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p' in
+    let top_inps = md_expand_vectors (map fst fa_inps) then
+    let block = wrap_pexlif (hd cs) then
+    let remain = tl cs then
+    has_state block => eprintf "Selection is not all wires" |
+    let inps = pexlif_get_inps_actuals block in
+    let outs = pexlif_get_outs_actuals block in
+    let ckt = pexlif2fsm block then
+    let ant = map (\n.T,n,variable n, 0, 1) (setify (md_expand_vectors inps)) in
+    let ste = silent_STE "-e" ckt [] ant [] [] then
+    let cur_inps = md_expand_vectors (map fst fa_inps) then
+    let cur_outs = md_expand_vectors (map fst fa_outs) then
+    let mk_sub o =
+        val (H,L) = get_trace_val ste o 0 then
+        NOT (H == NOT L) => eprintf "Node %s is not a wire (non binary)" o |
+        let dep = depends H in
+        length dep != 1 => eprintf "Node %s is not a wire (function)" o |
+        let v = hd dep in
+        NOT (H == (variable v)) =>
+	    eprintf "Node %s is not a wire (inverted)" o
+	|
+	// Do not rename signals driven internally but
+	// connected to top-level output
+	(mem o cur_outs) AND NOT (mem v cur_inps) => (v,o) | (o, v)
+    in
+    let sub = map mk_sub (md_expand_vectors outs) then
+    let rename1 (PINST sname sattrs slf sfa_inps sfa_outs sints sbody) =
+        let rename_act (f,as) =
+            let eas = map (\a. (assoc a sub) catch a) (md_expand_vectors as) in
+            let as' = md_merge_vectors eas then
+            (f, as')
+        in
+        let sfa_inps' = map rename_act sfa_inps then
+        let sfa_outs' = map rename_act sfa_outs then
+        (PINST sname sattrs slf sfa_inps' sfa_outs' sints sbody)
+    in
+    let remain' = ref (map rename1 remain) then
+    let last = length (deref remain') then
+    let fa_outs' =
+        let rename_formal (f,as) =
+            let fs = md_expand_vector f in
+            let fs' = map (\f. (assoc f sub) catch f) fs in
+            fs' == fs => [(f,as)] |
+            let f' = md_merge_vectors fs' then
+            (fs' intersect top_inps) != [] =>
+                // Not allowed to have primary inputs to primary outputs
+                // Must insert a buffer
+                let sz = length fs' in
+                let fa_inps = [((mk_name sz "i"),f')] in
+                let fa_outs = [((mk_name sz "o"), [f])] in
+                let lfs = [(W_UPDATE_FN (W_VAR sz "o") (W_VAR sz "i"))] in
+                let buf =
+                    PINST "draw_buffer" [] T fa_inps fa_outs [] (P_LEAF lfs)
+                then
+                (remain' := (buf:(deref remain'))) fseq
+                [(f,as)]
+            |
+            length f' = 1 => [((hd f'),as)] |
+            let eas = md_expand_vectors as in
+            let fa = zip fs' eas then
+            letrec pr (f:fs) eas =
+                let sz = md_size f in
+                let as = firstn sz eas then
+                (f,md_merge_vectors as):
+                pr fs (butfirstn sz eas)
+             /\   pr [] [] = []
+             /\   pr [] _ = eprintf "f/a length mismatch!"
+            in
+            pr f' eas
+        in
+        flatmap rename_formal fa_outs
+    then
+    let cs' = deref remain' then
+    let res = (PINST name attrs lf fa_inps fa_outs' ints (P_HIER cs')) then
+    res
 ;
 
 

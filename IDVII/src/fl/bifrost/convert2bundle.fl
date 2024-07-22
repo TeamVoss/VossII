@@ -117,12 +117,12 @@ let make_bundle_version fn =
 	list2str T (sprintf "\t%s " fn) "\n\t\t" "\n];\n" id (deref call_args)
     then
     let pcomp = sprintf "pcompile %s;\n" fn in
-    let bundles = list2str T "\n" "\n" "\n" id (deref bundle_defs) in
+    let bundles = list2str T "\n" "\n" "\n" id (setify (deref bundle_defs)) in
     let final = sprintf "\ncreate_default_version %s;\n" fn in
     bundles, (sprintf "%s%s%s" pcomp decl body), final
 ;
 
-let bifrostfl2bundle unit_name load_files replace->F =
+let bifrostfl2bundle unit_name load_files replace->F separate_bundle_file->F =
     NOT (file_exists (unit_name^".bfst")) =>
 	eprintf "There is no Bifrost program called %s.bfst" unit_name
     |
@@ -131,6 +131,7 @@ let bifrostfl2bundle unit_name load_files replace->F =
     |
     let ifile = sprintf "%s.bfst.fl" unit_name then
     let ofile = sprintf "%s.bfl" unit_name then
+    let bfile = sprintf "%s.bundle" unit_name then
     NOT replace AND file_exists ofile =>
         eprintf "File %s exists already and replace argument is F\n" ofile
     |
@@ -141,7 +142,11 @@ let bifrostfl2bundle unit_name load_files replace->F =
     let fp = fopen ofile "w" then
     (foreach (\f. fprintf fp "cload \"%s\";\n" f) load_files) fseq
     (fprintf fp "\n\n") fseq
-    (fprintf fp "%s\n\n" bundle_decls) fseq
+    (separate_bundle_file => 
+	(fprintf fp "load (DIR^\"%s\");\n\n" bfile)
+	|
+	(fprintf fp "%s\n\n" bundle_decls)
+    ) fseq
     (fprintf fp "begin_abstype;\n") fseq
     (fclose fp) fseq
     (system (sprintf "/bin/cat %s >> %s" ifile ofile)) != 0 =>
@@ -151,7 +156,12 @@ let bifrostfl2bundle unit_name load_files replace->F =
     (fprintf fp ";\n%s\n" bundle_info) fseq
     (fprintf fp "\nend_abstype %s;\n\n" unit_name) fseq
     (fprintf fp "%s\n" final) fseq
-    (fclose fp)
+    (fclose fp) fseq
+    (NOT separate_bundle_file => () |
+	let fp = fopen bfile "w" then
+	(fprintf fp "%s\n\n" bundle_decls) fseq
+	(fclose fp)
+    )
 ;
 
 end_abstype bifrostfl2bundle;

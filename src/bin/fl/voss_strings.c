@@ -14,6 +14,11 @@
 #include <stdlib.h>
 #include <fnmatch.h>
 #include <ctype.h>
+#include <time.h>
+#include <regex.h>
+
+#define NBR_REGEXP_CACHED   10
+#define REG_ERR_BUF_SZ	    300
 
 /* ------------- Global variables ------------- */
 
@@ -22,6 +27,12 @@ extern str_mgr     strings;
 extern jmp_buf     *start_envp;
 
 /***** PRIVATE VARIABLES *****/
+//
+static string	    reg_cache_expr[NBR_REGEXP_CACHED];
+static regex_t	    reg_cache_cexpr[NBR_REGEXP_CACHED];
+static uint64_t	    reg_cache_timestamp[NBR_REGEXP_CACHED];
+static char	    reg_error_buf[REG_ERR_BUF_SZ];
+//
 static string	    s_TXT;
 static string	    s_RANGES;
 static char         path_buf[PATH_MAX+1];
@@ -41,48 +52,51 @@ static rec_mgr	    *merge_list_rec_mgrp;
 static rec_mgr	    vector_db_rec_mgr;
 
 /* ----- Forward definitions local functions ----- */
-static void           begin_vector_ops();
-static void           end_vector_ops();
-static vec_ptr        split_name(string name);
-static range_ptr      make_range_canonical(range_ptr rp);
-static vec_ptr        make_vector_ranges_canonical(vec_ptr vp);
-static range_ptr      compress_ranges(range_ptr r1, range_ptr r2);
-static void           buffer_vectors_list(
+static void		begin_vector_ops();
+static void		end_vector_ops();
+static vec_ptr		split_name(string name);
+static range_ptr	make_range_canonical(range_ptr rp);
+static vec_ptr		make_vector_ranges_canonical(vec_ptr vp);
+static range_ptr	compress_ranges(range_ptr r1, range_ptr r2);
+static void		buffer_vectors_list(
                           vec_list_ptr vs, buffer_ptr vec_buf,
                           bool range_canonical);
-static void           buffer_vectors_fl(
+static void		buffer_vectors_fl(
                           g_ptr r, buffer_ptr vec_buf, bool range_canonical);
 static bool	          same_range(range_ptr r1, range_ptr r2);
-static int            vec_name_cmp(vec_ptr v1, vec_ptr v2);
-static int            nn_cmp(const void *pi, const void *pj);
-static merge_list_ptr gen_extract_vectors(buffer_ptr vec_buf);
-static merge_list_ptr gen_merge_vectors(buffer_ptr vec_buf);
-static void           record_names_fl(sname_list_ptr nlp, g_ptr redex);
-static void           merge_vectors_fl(
+static int		vec_name_cmp(vec_ptr v1, vec_ptr v2);
+static int		nn_cmp(const void *pi, const void *pj);
+static merge_list_ptr	gen_extract_vectors(buffer_ptr vec_buf);
+static merge_list_ptr	gen_merge_vectors(buffer_ptr vec_buf);
+static void		record_names_fl(sname_list_ptr nlp, g_ptr redex);
+static void		merge_vectors_fl(
                           g_ptr list, g_ptr res, bool non_contig_vecs);
-static void           extract_vectors_fl(
+static void		extract_vectors_fl(
                           g_ptr list, g_ptr res, bool non_contig_vecs,
                           bool range_canonical);
 static int	          vec_size(vec_ptr vec);
-static string         show_non_contig_vector(tstr_ptr tstrings, vec_ptr vp);
-static sname_list_ptr show_non_contig_vectors(
+static string		show_non_contig_vector(tstr_ptr tstrings, vec_ptr vp);
+static sname_list_ptr	show_non_contig_vectors(
                           rec_mgr *sname_list_mgrp, tstr_ptr tstrings,
                           vec_list_ptr vlp);
-static sname_list_ptr show_contig_vector(
+static sname_list_ptr	show_contig_vector(
                           rec_mgr *sname_list_mgrp,
                           tstr_ptr tstrings, vec_ptr vp);
-static sname_list_ptr show_contig_vectors(
+static sname_list_ptr	show_contig_vectors(
                           rec_mgr *sname_list_mgrp, tstr_ptr tstrings,
                           vec_list_ptr vp);
-static sname_list_ptr show_merge_list(
+static sname_list_ptr	show_merge_list(
                           rec_mgr *sname_list_mgrp, tstr_ptr tstrings,
                           merge_list_ptr mlp, bool non_contig_vecs);
+
+static string		mk_name_signature(vec_ptr vp);
+static uint64_t		get_timestamp();
+static regex_t		*compile_regexp(string pattern, int flags);
 
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
 /********************************************************/
 
-static string		mk_name_signature(vec_ptr vp);
 
 void
 Strings_Init()
@@ -91,6 +105,9 @@ Strings_Init()
     s_TXT = Mk_constructor_name("TXT");
     s_RANGES = Mk_constructor_name("RANGES");
     new_mgr(&vector_db_rec_mgr, sizeof(vector_db_rec));
+    for(int i = 0; i < NBR_REGEXP_CACHED; i++) {
+	reg_cache_expr[i] = NULL;
+    }
 }
 
 vec_ptr
@@ -496,6 +513,74 @@ vec_equ(pointer k1, pointer k2)
 /********************************************************/
 /*	    EXPORTED EXTAPI FUNCTIONS    		*/
 /********************************************************/
+
+static void
+str_reg_match(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_pat, g_s;
+    EXTRACT_2_ARGS(redex, g_pat, g_s);
+    string pat = GET_STRING(g_pat);
+    regex_t *pat_ptr = compile_regexp(pat, REG_EXTENDED);
+    if( pat_ptr == NULL ) {
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+        MAKE_REDEX_FAILURE(redex, wastrsave(&strings, reg_error_buf));
+        return;
+    }
+    if( regexec(pat_ptr, GET_STRING(g_s), (size_t) 0, NULL, 0) == 0 ) {
+	MAKE_REDEX_BOOL(redex, B_One());
+    } else {
+	MAKE_REDEX_BOOL(redex, B_Zero());
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+    return;
+}
+
+static void
+str_reg_extract(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_pat, g_s;
+    EXTRACT_2_ARGS(redex, g_pat, g_s);
+    string pat = GET_STRING(g_pat);
+    string str = GET_STRING(g_s);
+    MAKE_REDEX_NIL(redex);
+    g_ptr tail = redex;
+
+    regex_t *pat_ptr = compile_regexp(pat, REG_EXTENDED);
+    if( pat_ptr == NULL ) {
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+        MAKE_REDEX_FAILURE(redex, wastrsave(&strings, reg_error_buf));
+        return;
+    }
+    int patterns = pat_ptr->re_nsub;
+    regmatch_t pmatch[patterns+2];
+    string tmp = strtemp(str);
+    if( regexec(pat_ptr, str, patterns+1, pmatch, 0) == 0 ) {
+	for(int i = 0; i <= patterns; i++) {
+	    if( pmatch[i].rm_so != -1 ) {
+		string sp = tmp + pmatch[i].rm_so;
+		string ep = tmp + pmatch[i].rm_eo;
+		char c = *ep;
+		*ep = 0;
+		APPEND1(tail, Make_STRING_leaf(wastrsave(&strings, sp)));
+		*ep = c;
+	    }
+	}
+    } else {
+	MAKE_REDEX_FAILURE(redex,
+	    Fail_pr("str_reg_extract: No match for pattern:%s & string:%s\n", 
+		      pat, str) );
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+    return;
+}
 
 static void
 tcl2list(g_ptr redex)
@@ -1140,6 +1225,24 @@ Strings_Install_Functions()
     typeExp_ptr vec_info_tp = Get_Type("vec_info",NULL,TP_INSERT_PLACE_HOLDER);
 
     // Add builtin functions
+
+    Add_ExtAPI_Function("str_reg_match", "11", FALSE,
+			GLmake_arrow(
+			    GLmake_string(),
+			    GLmake_arrow(
+				GLmake_string(),
+				GLmake_bool())),
+			str_reg_match);
+
+    Add_ExtAPI_Function("str_reg_extract", "11", FALSE,
+			GLmake_arrow(
+			    GLmake_string(),
+			    GLmake_arrow(
+				GLmake_string(),
+				GLmake_list(GLmake_string()))),
+			str_reg_extract);
+
+
     Add_ExtAPI_Function("tcl2list", "1", FALSE,
 			GLmake_arrow(GLmake_string(),
 				     GLmake_list(GLmake_string())),
@@ -2269,3 +2372,58 @@ void DBG_print_vec_list(vec_list_ptr vlp) { DBG_PRINT_VEC_LIST(vlp); }
 void DBG_print_merge_list(merge_list_ptr mlp) { DBG_PRINT_MRG_LIST(mlp); }
 void DBG_print_sname_list(sname_list_ptr slp) { DBG_PRINT_STR_LIST(slp); }
 #endif
+
+static uint64_t
+get_timestamp() {
+    struct timespec tr;
+    if( clock_gettime(CLOCK_REALTIME, &tr) ) {
+	DIE("Cannot get clock??????");
+    }
+    return( tr.tv_sec * 1000 + tr.tv_nsec/1000000 );
+}
+
+static regex_t *
+compile_regexp(string pattern, int flags)
+{
+    // See if pattern is in cache
+    uint64_t	oldest = 0;
+    int		oldest_idx = -1;
+    int		hole = -1;
+    for(int i = 0; i < NBR_REGEXP_CACHED; i++) {
+	string old_pat = reg_cache_expr[i];
+	if( old_pat != NULL ) {
+	    // Cache in use
+	    if( STREQ(pattern, old_pat) ) {
+		reg_cache_timestamp[i] = get_timestamp();
+		return( &(reg_cache_cexpr[i]) );
+	    }
+	    uint64_t used = reg_cache_timestamp[i];
+	    if( oldest == 0 || (used < oldest) ) {
+		oldest = used;
+		oldest_idx = i;
+	    }
+	} else {
+	    // Empty cache line
+	    hole = i;
+	}
+    }
+    // No cached version available.
+    int new_idx = -1;
+    if( hole == -1 ) {
+	new_idx = hole;
+    } else {
+	regfree(&(reg_cache_cexpr[oldest_idx]));
+	new_idx = oldest_idx;
+    }
+    reg_cache_expr[new_idx] = pattern;
+    reg_cache_timestamp[new_idx] = get_timestamp();
+    int ret = regcomp(&(reg_cache_cexpr[new_idx]), pattern, flags);
+    if( ret == 0 ) {
+	return( &(reg_cache_cexpr[new_idx]) );
+    }
+    // Failed to compile pattern
+    reg_cache_expr[new_idx] = NULL;
+    regerror(ret, &(reg_cache_cexpr[new_idx]), reg_error_buf, REG_ERR_BUF_SZ);
+    return( NULL );
+}
+

@@ -27,6 +27,36 @@ let vec_intersect vl1 vl2 =
 ;
 infix 7 vec_intersect;
 
+// Determine if the intersection of two lists of vectors is non-empty.
+// The result is equivalent to
+//	    ((md_expand_vectors vl1) intersect (md_expand_vectors vl1)) != []
+// but (hopefully) a lot faster.
+//
+let vec_overlap vl1 vl2 =
+    vl1 overlap vl2 => T |
+    //
+    let mk l =
+        let base = fst (hd l) then
+        let vs = map snd l then
+        (base,vs)
+    in
+    let p1 =
+	map mk (partition fst (map (\v. get_vector_signature v, v) vl1))
+    then
+    let p2 =
+	map mk (partition fst (map (\v. get_vector_signature v, v) vl2))
+    then
+    NOT ((map fst p1) overlap (map fst p2)) => F |
+    letrec tst ((b1,vs1):rem)  =
+	let vs2 = (assoc b1 p2) catch [] in
+	vs2 = [] => tst rem |
+	(md_expand_vectors vs1) overlap (md_expand_vectors vs2) => T |
+	tst rem
+    in
+    tst p1
+;
+infix 7 vec_overlap;
+
 // Compute the subtraction of a list of vectors from another list of vectors.
 // The result is equivalent to
 //	md_extract_vectors

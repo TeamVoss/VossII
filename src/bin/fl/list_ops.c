@@ -1180,6 +1180,46 @@ intersect(g_ptr redex)
 }
 
 static void
+overlap(g_ptr redex)
+{
+    g_ptr set1, set2;
+    EXTRACT_2_ARGS(redex, set1, set2);
+    if( IS_NIL(set1) ) {
+	MAKE_REDEX_BOOL(redex, B_Zero());
+	return;
+    }
+    if( IS_NIL(set2) ) {
+	MAKE_REDEX_BOOL(redex, B_Zero());
+	return;
+    }
+    hash_record set;
+    create_hash(&set, 100, Graph_hash, Graph_equ);
+    while( !IS_NIL(set1) ) {
+	g_ptr d = GET_CONS_HD(set1);
+	if( find_hash(&set, d) == NULL ) {
+	    insert_hash(&set, d, d);
+	}
+	set1 = GET_CONS_TL(set1);
+    }
+    bool found = FALSE;
+    bool done = FALSE;
+    while( !done && !IS_NIL(set2) ) {
+	g_ptr d = GET_CONS_HD(set2);
+	if( find_hash(&set, d) != NULL ) {
+	    found = TRUE;
+	    done = TRUE;
+	}
+	set2 = GET_CONS_TL(set2);
+    }
+    if( found ) {
+	MAKE_REDEX_BOOL(redex, B_One());
+    } else {
+	MAKE_REDEX_BOOL(redex, B_Zero());
+    }
+    dispose_hash(&set, NULLFCN);
+}
+
+static void
 subtract(g_ptr redex)
 {
     g_ptr set1, set2;
@@ -1618,6 +1658,12 @@ List_ops_Install_Functions()
 			    GLmake_list(tv1),
 			    GLmake_arrow(GLmake_list(tv1), GLmake_list(tv1))),
                         intersect);
+
+    Add_ExtAPI_Function("overlap", "11", FALSE,
+                        GLmake_arrow(
+			    GLmake_list(tv1),
+			    GLmake_arrow(GLmake_list(tv1), GLmake_bool())),
+                        overlap);
 
     Add_ExtAPI_Function("subtract", "11", FALSE,
                         GLmake_arrow(

@@ -1,0 +1,46 @@
+str_reg_match "a[0-9]+b" "aa323b";
+str_reg_match "a[0-9]+b" "aa323cb";
+str_reg_match "a[0-9]+b" "aa";
+str_reg_match "a[0-9]+b" "q";
+
+str_reg_match "a\\{[0-9]+\\}b" "a{12}b";
+str_reg_match "a\\{[0-9]+\\}b" "a{12}b";
+
+
+str_reg_extract "a\\{[0-9]+\\}b" "a{12}b";
+
+str_reg_extract "(a\\{)([0-9]+)(\\}b)" "a{12}b";
+
+str_reg_extract "(a\\{)([0-9]+)(\\}b)" "qqa{12}bzz";
+str_reg_extract "(a\\{)([0-9]+)(\\}b)" "qqa{12}bzza{12}bZ";
+
+
+str_reg_extract "([a-zA-Z][a-z0-9A-Z]*)\\(([0-9]+)\\)" "abba(3)";
+str_reg_match "a\\([0-9]+\\)" "a(3)";
+
+
+let scalar_pat = "^[a-zA-Z][a-zA-Z0-9_]*$";
+let vec_pat    = "^([a-zA-Z][a-zA-Z0-9_]*)\\[([0-9]+)\\]$";
+let range_pat  = "^([a-zA-Z][a-zA-Z0-9_]*)\\[([0-9]+):([0-9]+)\\]$";
+
+let vsplit s =
+    str_reg_match scalar_pat s => SOME (s,[]) |
+    str_reg_match vec_pat s => 
+	val [base,sidx] = tl (str_reg_extract vec_pat s) then
+	let idx = sscanf "%d" sidx in
+	SOME (base, [(idx,idx)])
+    |
+    str_reg_match range_pat s =>
+	val [base,slidx,sridx] = tl (str_reg_extract range_pat s) then
+	let lidx = sscanf "%d" slidx in
+	let ridx = sscanf "%d" sridx in
+	SOME (base, [(lidx,ridx)])
+    |
+    NONE
+;
+
+
+get_value (vsplit "abc");
+get_value (vsplit "abc[1]");
+get_value (vsplit "abc[1:0]");
+

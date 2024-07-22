@@ -351,6 +351,20 @@ let system cmd = defix system cmd;
 let tcl_eval pgm = defix tcl_eval pgm;
 non_lazy tcl_eval;
 
+// Check if the string s matches the extended regular expression re_pattern.
+// The regular expressions supported are POSIX extended regular expression.
+// Note that if you want to match (,), {, or }, they need to be
+// escaped with two back slashes.
+let str_reg_match re_pattern s = str_reg_match re_pattern s;
+
+// Check if the string s matches the extended regular expression re_pattern
+// and if so, return a list of each substring that matches parenthesis
+// enclosed expressions.
+// The regular expressions supported are POSIX extended regular expression.
+// Note that if you want to match (,), {, or }, they need to be
+// escaped with two back slashes.
+let str_reg_extract re_pattern s = str_reg_extract re_pattern s;
+
 // Return the tail of the list l.
 // If l is empty, an exception will be raised.
 let tl l = defix tl l;
@@ -706,6 +720,10 @@ infix 6 union;
 // It is assumed the lists l1 and l2 do not have duplicates.
 let intersect l1 l2 = defix intersect l1 l2;
 infix 7 intersect;
+
+// Determine if there is (at least) one common element in two lists
+let overlap l1 l2 = defix overlap l1 l2;
+infix 7 overlap;
 
 // Remove every element in l1 that is in l2
 // It is assumed the lists l1 and l2 do not have duplicates.

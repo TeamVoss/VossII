@@ -1,0 +1,15 @@
+// Module to create an ack pulse from a request signal using the ackpulse
+// protocol when the logic inside the module is meant to take cycs cycles.
+// (If cycs is 0, then the ack is immediate.)
+let ackpulse_delay cycs =
+    bit_input   clk.
+    bit_input   reset.
+    bit_input   req.
+    bit_output  ack.
+    bit_list_internal (cycs-1)  mid.
+    CELL (sprintf "%d-cycle-delay" cycs) (
+        cycs == 0 => [ack <- req] |
+        (map2 (\i.\o. re_ff_reset clk reset (i '&' '~' ack) o)
+            (req:mid) (mid@[ack]))
+);
+

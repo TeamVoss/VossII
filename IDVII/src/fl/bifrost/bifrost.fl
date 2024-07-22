@@ -13,13 +13,76 @@ let bifrost_simplify fn =
     let args = get_args fn then
     let pre1 = sprintf "let %s " fn in
     let lhs = list2str T pre1 " " " = " fst args in
-    let pre2 = sprintf "pexlif_group_by_label (%s " fn in
+    let pre2 = sprintf "bifrost_clean_pexlif (%s " fn in
     let post2 = ");" in
     let rhs = list2str T pre2 " " post2 fst args in
     let cmd = lhs^rhs in
     (eval cmd) fseq ()
 ;
 free_binder bifrost_simplify;
+
+//begin_abstype;
+
+let is_buffer (PINST cnm _ _ _ _ _ _) =
+    str_is_substr "draw_phase_delay_on_" cnm => F |
+    str_is_substr "draw_buffer" cnm
+;
+
+let mk_sub fa =
+    flatmap (\(f,as). zip (md_expand_vector f) (md_expand_vectors as)) fa
+;
+
+let map_io sub ({f::string},as) =
+    (f, (md_merge_vectors (map (\s. assoc s sub) (md_expand_vectors as))))
+;
+
+let lift_buffers p assuming (pexlif_is_hier p) =
+    val (PINST name attrs lf fa_inp fa_out ints (P_HIER chs)) = p in
+    val (bufs, other) = split is_buffer chs in
+    bufs = [] => [p] |
+    // Lift the buffers
+    let isub = mk_sub fa_inp then
+    let osub = mk_sub fa_out then
+    let map_buf (PINST bname battrs blf bfa_inp bfa_out bint bbody) =
+	let bfa_inp' = map (map_io isub) bfa_inp then
+	let bfa_out' = map (map_io osub) bfa_out then
+	(PINST bname battrs blf bfa_inp' bfa_out' bint bbody)
+    in
+    let lifted_buffers = map map_buf bufs in
+    other = [] => lifted_buffers |
+    // Now remove signals no longer needed
+    let used = flatmap pexlif_get_inps_actuals other then
+    let is_used (f,as) = [f] vec_overlap used in
+    let fa_inp' = filter is_used fa_inp then
+    let driven = flatmap pexlif_get_outs_actuals other then
+    let is_driven (f,as) = [f] vec_overlap driven in
+    let fa_out' = filter is_driven fa_out then
+    let remain = (PINST name attrs lf fa_inp' fa_out' ints (P_HIER other)) in
+    remain:lifted_buffers
+ /\ lift_buffers other = [other]
+;
+
+
+let remove_all_buffers p =
+    letrec remove_rec top p assuming (pexlif_is_hier p) =
+	val (PINST name attrs leaf fai fao ints (P_HIER chs)) = p in
+	let chs' = flatmap (remove_rec F) chs in
+	let il = find_all is_buffer chs' then
+	let p = PINST name attrs leaf fai fao ints (P_HIER chs') in
+	let p' = remove_wire p il then
+	top => [p'] |
+	lift_buffers p'
+     /\   remove_rec top other = [other]
+    in
+    hd (remove_rec T p)
+;
+
+//end_abstype remove_all_buffers;
+
+let bifrost_clean_pexlif p =
+    let p = remove_all_buffers p then
+    pexlif_group_by_label p
+;
 
 letrec bifrost_get_dependent_files file =
     let cmd = sprintf "gawk -e '/^#include/ { print $2;}' < %s"  file in

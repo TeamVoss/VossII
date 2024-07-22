@@ -1,3 +1,5 @@
+cload (DIR^"ack_pulse_delay.fl") fseq
+fprintf stdinfo ".";
 cload (DIR^"mk_bundle_arb_merge.fl") fseq 
 fprintf stdinfo ".";
 cload (DIR^"ack_pulse_arbiter.fl") fseq

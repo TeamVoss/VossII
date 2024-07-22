@@ -4,6 +4,7 @@
 *.so
 *.a
 *.dvi
+*.hi
 y.output
 lex.yy.c
 y.tab.h

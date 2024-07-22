@@ -6,6 +6,11 @@ fprintf stdinfo ".";
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
 
+let get_number_of_children (PINST _ _ _ _ _ _ (P_HIER chs)) =
+    length chs
+ /\ get_number_of_children other = 0
+;
+
 let special_md_size v =
     let res = md_size v then
     res != 2 => res |
@@ -1172,36 +1177,54 @@ let mk_draw_cmd phase_delay rhs =
 // Create a summary of cell usage in a synthesized pexlif.
 let get_mapped_cell_info p =
     val (PINST nm attrs lf fai fao ints (P_HIER cells)) = p in
-    let get_cell pp =
-        val (PINST cnm _ _ _ _ _ _) = pp in
-        NOT (str_is_prefix "draw_stdcell " cnm) => F,"_unmapped_" |
-        let cell_name = el 2 (str_split cnm " ") in
-        (has_state pp), cell_name
+    let nm_size_r = ref 2 in
+    let update_size s =
+	let l = strlen s in
+	(l > (deref nm_size_r) => (nm_size_r := l) | ()) fseq s
     in
-    let classes = partition id (map get_cell cells) in
-    let mk1 l = (hd l, length l) in
-    let raw_res = map mk1 classes in
-    val (unmapped,mapped) = split (\((st,nm),cnt). nm = "_unmapped_") raw_res in
-    let unmapped_cnt = itlist (\((st,nm),cnt).\r. cnt+r) unmapped 0 in
-    val (state,comb) = split (\((st,nm),c). st) mapped in
-    let clean ((st,nm),cnt) = nm, cnt in
-    let state_list = map clean state in
-    let comb_list  = map clean comb in
-    let cmp (nm1,c1) (nm2,c2) = strcmp nm1 nm2 in
-    let all = state_list @ comb_list @ [("_unmapped_",0)] in
-    let name_size = (itlist (\(nm,c).\r. max r (strlen nm)) all 0)+2 then
-    let sep = implode (replicate (name_size+1+6) "-") in
+    let get_cell pp =
+	let state = has_state pp in
+        val (PINST cnm _ _ _ _ _ _) = pp in
+        str_is_prefix "draw_stdcell " cnm =>
+	    let cell_name = update_size (el 2 (str_split cnm " ")) then
+	    T, state, cell_name
+	|
+	    (F, state, update_size cnm)
+    in
+    val (raw_mapped, raw_unmapped) = split fst (map get_cell cells) then
+    let TOT = length raw_mapped + length raw_unmapped in
+    let name_size = deref nm_size_r then
+    let sep = implode (replicate (name_size+16) "-") in
+    let mapped = map snd raw_mapped in
+    let unmapped = map snd raw_unmapped in
+    //
     let Plist type l =
         let total = itlist (\(nm,cnt).\r. cnt+r) l 0 in
         let pr (nm,cnt) = sprintf "%*s %6d" name_size nm cnt in
-        let pre = sprintf "%s cells:\n" type in
+        let pre = sprintf "%s:\n" type in
         let post = sprintf "\n%s\n%*s %6d\n\n" sep name_size "Total:" total in
+	let cmp (nm1,c1) (nm2,c2) = strcmp nm1 nm2 in
         total, (list2str T pre "\n" post pr (qsort cmp l))
     in
-    val (combs, comb_msg) = Plist "Combinational" comb_list in
-    val (states, state_msg) = Plist "State-holding" state_list in
-    let unmapped_msg = sprintf "\nUnmapped modules: %d\n\n" unmapped_cnt in
-    let summary = sprintf "%*s %6d\n" name_size "TOTAL:" (combs+states) in
-    unmapped_msg ^ comb_msg ^ state_msg ^ summary
+    let mk_info state_name_list =
+	let classes = partition id state_name_list in
+	let mk1 l =
+	    val (st, nm) = hd l in
+	    (st, nm, length l)
+	in
+	let raw_res = map mk1 classes in
+	val (state,comb) = split fst raw_res in
+	let state_list = map snd state in
+	let comb_list  = map snd comb in
+	val (st_cnt, st_txt) = Plist "state holding:" state_list in
+	val (cb_cnt, cb_txt) = Plist "combinational:" comb_list in
+	let sum = st_cnt + cb_cnt in
+        let post = sprintf "\n%s\n%*s %6d\n\n" sep name_size "Total:" sum in
+	(cb_txt^st_txt^post)
+    in
+    let summary = sprintf "%*s %6d\n" name_size "TOTAL:" TOT in
+    (mapped = [] => "" | (sprintf "Mapped std cells:\n")^(mk_info mapped))^
+    (unmapped = [] => "" | (sprintf "Unmapped cells:\n")^(mk_info unmapped))^
+    summary
 ;
 
