@@ -13,19 +13,19 @@ jobs:
     strategy:
       matrix:
         os:
-          - { id: ubuntu-20.04, name: focal }
+          - { id: ubuntu-22.04, name: focal }
         compiler:
-          - 'gcc-11'
+          - 'gcc-13'
           - 'clang-15'
         yosys:
-          - 'yosys-0.26'
+          - 'yosys-0.43'
       fail-fast: false
 
     steps:
       - name: install dependency
         run: |
           sudo apt update
-          sudo apt-get install -y doxygen flex bison gawk libz-dev tcl-dev tk-dev libstdc++-11-dev graphviz libedit-dev
+          sudo apt-get install -y doxygen flex bison gawk libz-dev tcl-dev tk-dev libstdc++-12-dev graphviz libedit-dev
 
       - name: Setup GCC
         shell: bash
@@ -91,6 +91,7 @@ jobs:
           if [[ ${CC%-*} == 'gcc' ]] ; then
               make config-gcc
           fi
+          git submodule update --init
           make PREFIX=~/.local -j${{ env.procs }}
           make PREFIX=~/.local install
 
