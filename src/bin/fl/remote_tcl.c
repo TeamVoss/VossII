@@ -20,6 +20,7 @@ extern void PR(g_ptr np);
 extern FILE     *to_tcl_fp;
 extern bool     gui_mode;
 extern g_ptr	void_nd;
+extern buffer   ext_obj_buf;
 
 /************************************************************************/
 /*			Local Variables					*/
@@ -27,6 +28,8 @@ extern g_ptr	void_nd;
 static int	    tcl_initialized = 0;
 static buffer	    tcl_callback_buf;
 static tstr_ptr	    tmp_str_buf;
+static hash_record  gptr2tclid;
+static buffer	    tclids;
 
 /************************************************************************/
 /*			Local Functions					*/
@@ -36,9 +39,10 @@ static bool     parse_bool(string s, formula *resp);
 static bool     get_end_of_item(string s, string *endp);
 static bool     tcl_to_g_ptr(string txt, typeExp_ptr arg_type, g_ptr *resp);
 static void     g_ptr2tcl(g_ptr np, typeExp_ptr type, FILE *tcl_fp);
+static void	g_ptr2str4tcl(g_ptr np, typeExp_ptr type, tstr_ptr tmp_str_mgr);
 static bool     ok_tcl_callback_type(typeExp_ptr type);
-static bool	can_be_sent_to_tcl(g_ptr np, typeExp_ptr type);
-
+static unint	g_ptr_hash(pointer p, unint n);
+static bool	g_ptr_equ(pointer p1, pointer p2);
 
 /************************************************************************/
 /*			Public Functions				*/
@@ -49,6 +53,8 @@ Init_tcl()
     tcl_initialized = TCL_MAGIC_NUMBER;
     new_buf(&tcl_callback_buf, 100, sizeof(tcl_callback_rec));
     tmp_str_buf = new_temp_str_mgr();
+    new_buf(&tclids, 100, sizeof(g_ptr));
+    create_hash(&gptr2tclid, 100, g_ptr_hash, g_ptr_equ);
 }
 
 bool
@@ -107,6 +113,78 @@ get_callback_fun(string cmd) {
     }
     return(-1);
 }
+
+static void
+call_tcl_fun(g_ptr redex)
+{
+    // Find the EXTAPI id and collect the arguments
+    buffer args;
+    new_buf(&args, 100, sizeof(g_ptr));
+    g_ptr cur = redex;
+    while( IS_APPLY(cur) ) {
+	g_ptr arg = GET_APPLY_RIGHT(cur);
+	push_buf(&args, &arg);
+	cur = GET_APPLY_LEFT(cur);
+    }
+    //
+    ASSERT( IS_LEAF(cur) && IS_PRIM_FN(cur) && IS_EXTAPI_FN(cur) );
+    int id = GET_EXTAPI_FN(cur);
+    string fun_name  = Get_ExtAPI_Function_Name(id);
+    typeExp_ptr type = Get_ExtAPI_Type(id);
+    //
+    tstr_ptr tmp_str_mgr = new_temp_str_mgr();
+    string cmd = gen_tprintf(tmp_str_mgr, "%s", fun_name);
+    while( type->typeOp == arrow_tp ) {
+	g_ptr arg;
+	pop_buf(&args, &arg);
+	typeExp_ptr arg_type = type->typelist->type;
+	gen_tappend(tmp_str_mgr, " ");
+	g_ptr2str4tcl(arg, arg_type, tmp_str_mgr);
+	type = Get_Real_Type(type->typelist->next->type);
+    }
+    string str_res = NULL;
+    if( !Send_to_tcl(cmd, &str_res) ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Tcl function %s failed", fun_name));
+	free_temp_str_mgr(tmp_str_mgr);
+	free_buf(&args);
+	free(str_res);
+	return;
+    }
+    int len = strlen(str_res);
+    if( *(str_res+len-1) == '\n' ) {
+	*(str_res+len-1) = 0;
+    }
+    g_ptr g_res;
+    if( !tcl_to_g_ptr(str_res, type, &g_res) ) {
+	MAKE_REDEX_FAILURE(redex,
+		Fail_pr("Return value for function %s failed", fun_name));
+	free_temp_str_mgr(tmp_str_mgr);
+	free_buf(&args);
+	free(str_res);
+	return;
+    }
+    OVERWRITE(redex, g_res);
+    //
+    free_temp_str_mgr(tmp_str_mgr);
+    free_buf(&args);
+    free(str_res);
+    return;
+}
+
+
+bool
+Import_tcl_function(string name, typeExp_ptr type)
+{
+    typeExp_ptr ctype = type;
+    string strictness = strtemp("");
+    while( ctype->typeOp == arrow_tp ) {
+	charappend('1');
+	ctype = Get_Real_Type(ctype->typelist->next->type);
+    }
+    Add_ExtAPI_Function(name, strictness, FALSE, type, call_tcl_fun);
+    return TRUE;
+}
+
 
 void
 Tcl_callback_eval(string cmd, int rid, FILE *tcl_fp)
@@ -174,13 +252,6 @@ Tcl_callback_eval(string cmd, int rid, FILE *tcl_fp)
 	while( type->typeOp == arrow_tp ) {
 	    type = Get_Real_Type(type->typelist->next->type);
 	}
-	if( !can_be_sent_to_tcl(redex, type) ) {
-	    fprintf(tcl_fp, "%d 0", rid);
-	    Tcl_printf(tcl_fp, "%s\nIn fl callback function %s\n",
-			       FailBuf, tcp->name);
-	    fprintf(tcl_fp, "\n");
-	    return;
-	}
 	fprintf(tcl_fp, "%d 1", rid);
 	g_ptr2tcl(redex, type, tcl_fp);
 	fprintf(tcl_fp, "\n");
@@ -198,6 +269,11 @@ Mark_tcl_callbacks()
         Mark(tp->fun);
         SET_REFCNT(tp->fun, MAX_REF_CNT);
     }
+    g_ptr *gpp;
+    FOR_BUF(&tclids, g_ptr, gpp) {
+	Mark(*gpp);
+    }
+
 }
 
 /************************************************************************/
@@ -399,55 +475,19 @@ tcl_to_g_ptr(string txt, typeExp_ptr type, g_ptr *resp)
                 return TRUE;
             }
         default:
-            DIE("Should never happen");
-    }
-}
-
-static bool
-can_be_sent_to_tcl(g_ptr np, typeExp_ptr type)
-{
-    type = Get_Real_Type(type);
-    switch( type->typeOp ) {
-        case string_tp: { return TRUE; }
-        case void_tp: { return TRUE; }
-        case int_tp: { return TRUE; }
-        case bool_tp:
-            {
-                formula f = GET_BOOL(np);
-                if( f == B_Zero() ) {
-                    return TRUE;
-                } else
-                if( f == B_One() ) {
-                    return TRUE;
-                }
-                Fail_pr("Cannot return a symbolic expression to tcl");
-                return FALSE;
-            }
-        case list_tp:
-            {
-                g_ptr li, el;
-                typeExp_ptr etype = Get_Real_Type(type->typelist->type);
-                FOR_CONS(np, li, el) {
-                    if( !can_be_sent_to_tcl(el, etype) ) { return FALSE; }
-                }
-                return TRUE;
-            }
-        case tuple_tp:
-            {
-                typeExp_ptr ftype = Get_Real_Type(type->typelist->type);
-                if( !can_be_sent_to_tcl(GET_CONS_HD(np), ftype) ) {
-                    return FALSE;
-                }
-                typeExp_ptr stype = Get_Real_Type(type->typelist->next->type);
-                if( !can_be_sent_to_tcl(GET_CONS_TL(np), stype) ) {
-                    return FALSE;
-                }
-                return TRUE;
-            }
-        default:
-            FP(err_fp, "Unexpected type: ");
-            Print_Type(type, err_fp, TRUE, TRUE);
-            DIE("Should never happen");
+	    {
+		unint	obj_id;
+		if( sscanf(txt, "_FlObJeCt_%d", &obj_id) != 1 ) {
+		    Fail_pr("Not a valid object id (%s)", txt);
+		    return FALSE;
+		}
+		if( obj_id > COUNT_BUF(&tclids) ) {
+		    Fail_pr("Not a valid object id (%s)", txt);
+		    return FALSE;
+		}
+		*resp = *((g_ptr *) M_LOCATE_BUF(&tclids, obj_id-1));
+		return TRUE;
+	    }
     }
 }
 
@@ -458,7 +498,7 @@ g_ptr2tcl(g_ptr np, typeExp_ptr type, FILE *tcl_fp)
     switch( type->typeOp ) {
         case string_tp:
             {
-		Tcl_printf(tcl_fp, "{%s}", GET_STRING(np));
+		Tcl_printf(tcl_fp, "%s", protect(GET_STRING(np)));
                 return;
             }
         case void_tp:
@@ -493,7 +533,6 @@ g_ptr2tcl(g_ptr np, typeExp_ptr type, FILE *tcl_fp)
                 FOR_CONS(np, li, el) {
                     if( !first ) Tcl_printf(tcl_fp, " ");
                     first = FALSE;
-		    
                     g_ptr2tcl(el, etype, tcl_fp);
                 }
 		Tcl_printf(tcl_fp, "}");
@@ -511,7 +550,92 @@ g_ptr2tcl(g_ptr np, typeExp_ptr type, FILE *tcl_fp)
 		return;
             }
         default:
-            DIE("Should never happen");
+	    {
+		int obj_id = PTR2UINT(find_hash(&gptr2tclid, np));
+		if( obj_id != 0 ) {
+		    Tcl_printf(tcl_fp, "_FlObJeCt_%06d", obj_id);
+		    return;
+		}
+		push_buf(&tclids, &np);
+		obj_id = COUNT_BUF(&tclids);
+		insert_hash(&gptr2tclid, np, INT2PTR(obj_id));
+		Tcl_printf(tcl_fp, "_FlObJeCt_%06d", obj_id);
+		return;
+	    }
+    }
+}
+
+static void
+g_ptr2str4tcl(g_ptr np, typeExp_ptr type, tstr_ptr tmp_str_mgr)
+{
+    type = Get_Real_Type(type);
+    switch( type->typeOp ) {
+        case string_tp:
+            {
+		gen_tappend(tmp_str_mgr, "%s", protect(GET_STRING(np)));
+                return;
+            }
+        case void_tp:
+	    {
+		gen_tappend(tmp_str_mgr, "{}");
+                return;
+	    }
+        case int_tp:
+            {
+		gen_tappend(tmp_str_mgr, "%s", Arbi_ToString(GET_AINT(np),10));
+                return;
+            }
+        case bool_tp:
+            {
+                formula f = GET_BOOL(np);
+                if( f == B_Zero() ) {
+		    gen_tappend(tmp_str_mgr, "0");
+                    return;
+                } else
+                if( f == B_One() ) {
+		    gen_tappend(tmp_str_mgr, "1");
+                    return;
+                }
+		DIE("Should never happen!");
+            }
+        case list_tp:
+            {
+                g_ptr li, el;
+                bool first = TRUE;
+		gen_tappend(tmp_str_mgr, "{");
+                typeExp_ptr etype = Get_Real_Type(type->typelist->type);
+                FOR_CONS(np, li, el) {
+                    if( !first ) gen_tappend(tmp_str_mgr, " ");
+                    first = FALSE;
+                    g_ptr2str4tcl(el, etype, tmp_str_mgr);
+                }
+		gen_tappend(tmp_str_mgr, "}");
+                return;
+            }
+        case tuple_tp:
+            {
+                typeExp_ptr ftype = Get_Real_Type(type->typelist->type);
+		gen_tappend(tmp_str_mgr, "{");
+                g_ptr2str4tcl(GET_CONS_HD(np), ftype, tmp_str_mgr);
+                typeExp_ptr stype = Get_Real_Type(type->typelist->next->type);
+                gen_tappend(tmp_str_mgr, " ");
+                g_ptr2str4tcl(GET_CONS_TL(np), stype, tmp_str_mgr);
+		gen_tappend(tmp_str_mgr, "}");
+		return;
+            }
+        default:
+	    {
+		int obj_id = PTR2UINT(find_hash(&gptr2tclid, np));
+		if( obj_id != 0 ) {
+		    gen_tappend(tmp_str_mgr, "_FlObJeCt_%06d", obj_id);
+		    return;
+		}
+		push_buf(&tclids, &np);
+		obj_id = COUNT_BUF(&tclids);
+		insert_hash(&gptr2tclid, np, INT2PTR(obj_id));
+		gen_tappend(tmp_str_mgr, "_FlObJeCt_%06d", obj_id);
+		return;
+	    }
     }
 }
 
@@ -533,8 +657,10 @@ ok_tcl_callback_type_rec(typeExp_ptr type)
                     return(FALSE);
             }
             return( TRUE );
-        default:
+	case arrow_tp:
             return FALSE;
+        default:
+            return TRUE;
     }
 }
 
@@ -549,3 +675,138 @@ ok_tcl_callback_type(typeExp_ptr type)
     }   
     return( ok_tcl_callback_type_rec(type) );
 }
+
+static unint
+g_ptr_hash(pointer p, unint n)
+{
+    if( n == 0 ) { return 13; }
+    g_ptr nd = (g_ptr) p;
+    if( nd == NULL ) return( 1 );
+    switch( GET_TYPE(nd) ) {
+        case CONS_ND:
+            return( (931*g_ptr_hash(GET_CONS_HD(nd),n) +
+                     137*g_ptr_hash(GET_CONS_TL(nd),n)) % n);
+        case APPLY_ND:
+            return( (931*(PTR2UINT(GET_APPLY_LEFT(nd))) +
+                         (PTR2UINT(GET_APPLY_RIGHT(nd)))) % n );
+        case LEAF:
+            switch( GET_LEAF_TYPE(nd) ) {
+                case INT:
+                    return( Arbi_hash(GET_AINT(nd), n) );
+                case STRING:
+                    return( (PTR2UINT(GET_STRING(nd))) % n );
+                case BOOL:
+                    return( (((unsigned int) GET_BOOL(nd))) % n );
+                case BEXPR:
+                    return( (((unsigned long int) GET_BEXPR(nd))) % n );
+                case PRIM_FN:
+		    // Do not go into reference variables!!!
+		    return( (((unsigned int) GET_PRIM_FN(nd))) % n );
+                case EXT_OBJ:
+                    return( (((unsigned long int)GET_EXT_OBJ(nd))) % n);
+                default:
+                    DIE("Unexpected cache argument value. Consult guru 3!");
+            }
+            break;
+        default:
+            DPR(nd);
+            DIE("Unexpected cache argument value. GURU\n");
+    }
+}
+
+// Almost the same as G_rec_equ except it does not go into reference variables.
+static bool
+g_ptr_equ(pointer p1, pointer p2)
+{
+    int         type, ltype;
+    arbi_T      ai1, ai2;
+    g_ptr n1 = (g_ptr) p1;
+    g_ptr n2 = (g_ptr) p2;
+
+  restart_g_rec_equ: 
+    if( n1 == n2 )
+        return( TRUE );
+    if( n1 == NULL || n2 == NULL )
+        return( FALSE );
+    if( (type = GET_TYPE(n1)) != GET_TYPE(n2))
+        return( FALSE );
+    switch( type ) {
+        case CONS_ND:
+            if( !g_ptr_equ(GET_CONS_HD(n1), GET_CONS_HD(n2)) ) {return(FALSE);}
+            n1 = GET_CONS_TL(n1);
+            n2 = GET_CONS_TL(n2);
+            goto restart_g_rec_equ;
+        case APPLY_ND:
+            return( n1 == n2 );
+        case LEAF:
+            if( (ltype = GET_LEAF_TYPE(n1)) != GET_LEAF_TYPE(n2) )
+                return(FALSE);
+            switch( ltype ) {
+                case INT:
+                    ai1 = GET_AINT(n1);
+                    ai2 = GET_AINT(n2);
+                    if( ai1 == ai2 )
+                        return( TRUE );
+                    if( Arbi_cmp(ai1, ai2) == arbi_EQ )
+                        return( TRUE );
+                    return( FALSE );
+                case STRING:
+                    return( STREQ(GET_STRING(n1), GET_STRING(n2)) );
+                case BOOL:
+                    return( B_Equal(GET_BOOL(n1), GET_BOOL(n2)) );
+                case BEXPR:
+                    return( BE_Equal(GET_BEXPR(n1), GET_BEXPR(n2)) );
+                case PRIM_FN:
+                    if( GET_PRIM_FN(n1) != GET_PRIM_FN(n2) ) { return FALSE; }
+                    switch( GET_PRIM_FN(n1) ) {
+                        case P_REF_VAR:
+                            n1 = Get_RefVar(GET_REF_VAR(n1));
+                            n2 = Get_RefVar(GET_REF_VAR(n2));
+			    return( n1 == n2 );
+                        case P_PRINTF:
+                        case P_FPRINTF:
+                        case P_SPRINTF:
+                        case P_EPRINTF:
+                        case P_SSCANF:
+                            return(
+                                GET_PRINTF_STRING(n1) == GET_PRINTF_STRING(n2)
+                            );
+                        case P_EXTAPI_FN:
+                            return( GET_EXTAPI_FN(n1) == GET_EXTAPI_FN(n2) );
+                        case P_FILEFP:
+                            return(GET_FILE_IO_PTR(n1) == GET_FILE_IO_PTR(n2));
+                        case P_FAIL:
+                            return(
+                                M_GET_FAIL_STRING(n1) == M_GET_FAIL_STRING(n2)
+                            );
+                        case P_DEBUG:
+                            return(
+                                M_GET_DEBUG_STRING(n1) == M_GET_DEBUG_STRING(n2)
+                            );
+                        default:
+                            return( TRUE );
+                    }
+                case EXT_OBJ:
+                    {
+                        unint class = GET_EXT_OBJ_CLASS(n1);
+                        ASSERT( class == GET_EXT_OBJ_CLASS(n2) );
+                        ext_obj_ptr op = M_LOCATE_BUF(&ext_obj_buf, class);
+                        formula eq = op->eq_fn(GET_EXT_OBJ(n1),
+                                               GET_EXT_OBJ(n2),
+                                               TRUE);
+                        if( eq == B_One() ) {
+                            return TRUE;
+                        } else {
+                            return FALSE;
+                        }
+                    }
+                default:
+                    DIE("Should never happen!");
+            }
+            break;
+        default:
+            DIE("Should never happen!");
+    }
+}
+
+

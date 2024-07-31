@@ -262,6 +262,7 @@ extern int dbg_tst_line_cnt;
 %token <loc_t>	C_LETREC
 %token <loc_t>	END_ADT
 %token <loc_t>	EXPORT_TO_TCL
+%token <loc_t>	IMPORT_FROM_TCL
 %token <loc_t>	FORWARD_DECLARE
 %token <loc_t>	INFIX
 %token <loc_t>	INFIX_UNARY
@@ -546,6 +547,14 @@ stmt		: expr
                         FP(err_fp, "-E-: Cannot find symbol %s\n", $2);
                     }
                 }
+		| IMPORT_FROM_TCL LCURL var_or_infix TYPE_SEP simple_type RCURL
+		{
+		    if( $5.ok ) {
+			if( !Import_tcl_function($3, $5.type) ) {
+			    FP(err_fp, "-E-: Cannot import function %s\n", $3);
+			}
+		    }
+		}
 		| FORWARD_DECLARE LCURL var_or_infix TYPE_SEP simple_type RCURL
 		{
 		    if( $5.ok ) {

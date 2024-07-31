@@ -51,7 +51,7 @@ symbol_tbl_ptr	AddToOpenOverloadDef(string name, oll_ptr alts,
 void		Begin_ADT(symbol_tbl_ptr stbl);
 symbol_tbl_ptr	End_ADT(symbol_tbl_ptr stbl, var_list_ptr vlp);
 string		Get_Help(string fun);
-void		Add_ExtAPI_Function(string name, string strictness,
+g_ptr		Add_ExtAPI_Function(string name, string strictness,
 				    bool non_lazy,
 				    typeExp_ptr type, eval_fun_tp fun);
 typeExp_ptr	Get_ExtAPI_Type(int id);

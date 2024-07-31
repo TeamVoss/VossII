@@ -309,17 +309,14 @@ let best {w0 :: int} {r0 :: int} {d :: doc} = nice w0 r0 d;
 
 // -----------------------------------------------------------------------------
 
-let display {l :: int} {r :: int} {end :: string} {fp :: stream} {d :: doc} =
-    let d' = best l r (reduce d) then
+// Render a doc to stdout.
+//   fp:         stream to emit output to.
+//   line_width: denotes the maximum line to print (if possible)
+//   r:		 is line width/ribbons per line, as suggested by paper.
+//   end:	 text associated Nil (an empty doc.), arbitrary choice.
+//
+let render {d :: doc} fp->stdout line_width->100 r->67 end->"" =
+    let d' = best line_width r (reduce d) then
     do_layout 0 end d' fp
 ;
 
-let frender {fp :: stream} {d :: doc} = display 100 67 "" fp d;
-// note: magic numbers are
-//   100 = line width, arbitrary choice.
-//   67 = round (100/1.5) = line width/ribbons per line, as suggested by paper.
-//   "" = text associated Nil (an empty doc.), arbitrary choice.
-
-let render {d :: doc} = frender stdout d;
-
-// =============================================================================

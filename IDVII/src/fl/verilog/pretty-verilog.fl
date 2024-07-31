@@ -1,5 +1,5 @@
 (cload (DIR^"grammar.fl")) fseq
-(cload (DIR^"pretty.fl")) fseq
+(cload "pretty.fl") fseq
 ();
 
 // =============================================================================

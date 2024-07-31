@@ -813,26 +813,39 @@ Serve_Interrupt()
     if( gui_mode ) {
         if( use_stdout ) FP(err_fp, "\n\n---- Interrupt raised ----\n");
         while(1) {
-            string res = strtemp("");
+	    string res = NULL;
             Sprintf(buf, "voss2_interrupt_action");
             Send_to_tcl(buf, &res);
             switch( *res ) {
-                    case 'c':
+                    case 'c': {
+			    free(res);
                             return;
-                    case 'x':
+		    }
+                    case 'x': {
+			    free(res);
                             Exit(2);
 			    break;
-                    case 'r':
+		    }
+                    case 'r': {
+			    free(res);
+			    res = NULL;
 			    Reset_eval_context();
                             Emit_prompt("\n");
                             longjmp(toplevel_eval_env, 2);
 			    break;
-		    case 's':
+		    }
+		    case 's': {
+			    free(res);
+			    res = NULL;
 			    FP(err_fp, "%s\n",
 			       Get_stack_trace(RCmax_stack_trace_entries));
 			    break;
-                    default:
+		    }
+                    default: {
+			    free(res);
+			    res = NULL;
                             break;
+		    }
             }
         }
     } else {
@@ -1081,7 +1094,10 @@ Send_to_tcl(string cmd, string *resp)
 	    ASSERT(rid <= tcl_eval_depth);
 	    store_buf(&tcl_eval_done_buf, rid, &ok);
 	    string res = unprotect(p);
-	    store_buf(&tcl_eval_result_buf, rid, &res);
+	    int len = strlen(res);
+	    string fres = Malloc(len+1);
+	    strncpy(fres, res, len+1);
+	    store_buf(&tcl_eval_result_buf, rid, &fres);
 	}
 	if( (s = fgets(buf, TCL_CMD_BUF_SZ-1, callback_from_tcl_fp)) != NULL ) {
             buf[strlen(s)-1] = 0;

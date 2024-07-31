@@ -3278,14 +3278,13 @@ do_draw_bdds(formula *bdds, int cnt)
     fclose(fp);
     dispose_hash(&draw_tbl, NULLFCN);
     Sprintf(draw_cmd, "display_dot %s", filename);
-    tstr_ptr ts = new_temp_str_mgr();
-    string res = strtemp("");
+    string res = NULL;
     if( !Send_to_tcl(draw_cmd, &res) ) {
 	Fail_pr("display_dot failure: %s", res);
-	free_temp_str_mgr(ts);
+	free(res);
 	return FALSE;
     }
-    free_temp_str_mgr(ts);
+    free(res);
     return TRUE;
 }
 

@@ -115,6 +115,7 @@ static struct keyword_rec {
     {"clet", C_LET},
     {"cletrec", C_LETREC},
     {"end_abstype", END_ADT},
+    {"import_from_tcl", IMPORT_FROM_TCL},
     {"export_to_tcl", EXPORT_TO_TCL},
     {"forward_declare", FORWARD_DECLARE},
     {"free_binder", FREE_BINDER},

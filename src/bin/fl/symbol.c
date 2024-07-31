@@ -1381,8 +1381,7 @@ Sweep_ext_objs()
     }
 }
 
-
-void
+g_ptr
 Add_ExtAPI_Function(string name, string strictness,
                     bool non_lazy, typeExp_ptr type, eval_fun_tp fun)
 {
@@ -1415,8 +1414,10 @@ Add_ExtAPI_Function(string name, string strictness,
     ret->name           = name;
     ret->expr           = expr;
     ret->signature	= Get_SHA256_signature(expr);
-    ret->expr_init      = cephalopode_mode? Cephalopde_Reflect_expr(ret->expr) : NULL;
-    ret->expr_comb      = cephalopode_mode? Cephalopde_Reflect_expr(ret->expr) : NULL;
+    ret->expr_init      = cephalopode_mode? Cephalopde_Reflect_expr(ret->expr)
+					  : NULL;
+    ret->expr_comb      = cephalopode_mode? Cephalopde_Reflect_expr(ret->expr)
+					  : NULL;
     ret->super_comb     = NULL;
     ret->overload       = FALSE;
     ret->open_overload  = FALSE;
@@ -1426,6 +1427,7 @@ Add_ExtAPI_Function(string name, string strictness,
     ret->next           = symb_tbl->def_list;
     symb_tbl->def_list  = ret;
     update_stbl(symb_tbl, ret);
+    return(expr);
 }
 
 

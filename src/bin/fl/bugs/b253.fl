@@ -1,0 +1,43 @@
+lettype tr = BR tr tr | LF int;
+
+letrec Ptr (BR t1 t2) = "(BR "^(Ptr t1)^" "^(Ptr t2)^")"
+ /\    Ptr (LF i) = int2str i
+;
+install_print_function Ptr;
+
+letrec tr_size (BR t1 t2) = tr_size t1 + tr_size t2
+ /\    tr_size (LF i) = 1
+;
+export_to_tcl tr_size;
+
+let merge_tree t1 t2 = BR t1 t2;
+export_to_tcl merge_tree;
+
+
+tcl_eval ["proc m2 {t1 t2} { if [expr [tr_size $t1] < [tr_size $t2]] { merge_tree $t2 $t1 } else { merge_tree $t1 $t2 } }"];
+
+import_from_tcl {m2 :: tr -> tr -> tr};
+
+
+let tree1 = BR (BR (LF 1) (LF 2)) (LF 3);
+let tree2 = LF 4;
+
+tree1;
+tree2;
+
+merge_tree tree2 tree1;
+
+m2 tree2 tree1;
+
+
+
+//tcl_eval ["proc foo {a b} { return [expr $a+$b] }"];
+//
+//
+//tcl_eval ["proc baar {obj a b} { return [expr $a+$b] }"];
+//
+//import_from_tcl {foo :: int -> int -> int};
+//
+//
+//foo 1 2;
+

@@ -1,0 +1,189 @@
+lettype pvis = PVIS 
+		    {vec2anons :: (string#string) list}
+		    {final :: string}
+		    {pgm :: string list}
+;
+
+
+begin_abstype;
+
+new_type_abbrev io_tp = (string#(string list)) list;
+new_type_abbrev info_tp = int#string#io_tp;
+
+
+let insert_into_tbl tbl {info::info_tp} {l::string list} =
+    let add1 v tbl =
+	tbl_member tbl v => 
+	    let l' = info:(tbl_get tbl v) then
+	    let tbl' = tbl_delete tbl v then
+	    tbl_insert tbl' v l'
+	|
+	    tbl_insert tbl v [info]
+    in
+    itlist add1 l tbl
+;
+
+
+let extract_fifo_info p assuming (pexlif_is_hier p) =
+    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
+    let fi_tbl_r = ref (tbl_create 100) then 
+    let bfi_tbl_r = ref (tbl_create 100) then 
+    let mk (idx,(PINST lname lattrs llf lfa_inps lfa_outs lints lbody)) =
+	let pre_pfn = 
+	    str_is_substr "draw_hfl" lname =>
+		let nbr_inps = length lfa_inps in
+		val [_,pre,txt] = str_reg_extract "^(.*draw_)hfl (.*)$" lname in
+		sprintf "%shfl_code %d %d %s" pre nbr_inps idx txt
+	    |
+	    str_is_substr "draw_hier" lname =>
+		val [_,pre,txt] =
+		    str_reg_extract "^(.*draw_)hier (.*)$" lname
+		in
+		let module = txt = "" => "_dummy_" |
+		    str_is_substr " " txt => sprintf "{%s}" txt | txt
+		in
+		let iname = (assoc "instance" lattrs) catch "" then
+		let inst = sprintf "i%d:%s" idx iname then
+		let mk_fa (f,as) = 
+		    list2str T (sprintf "{%s {" f) " " "}}" id as
+		in
+		let mk_fas fas = list2str T "{" " " "}" mk_fa fas in
+		let inames = mk_fas lfa_inps then
+		let onames = mk_fas lfa_outs then
+		sprintf "draw_fub %s %s %d %s %s" module inst idx inames onames
+	    |
+	    NOT (str_is_prefix "draw_" lname) =>
+		let module = lname = "" => "_dummy_" |
+		    str_is_substr " " lname => sprintf "{%s}" lname | lname
+		in
+		let iname = (assoc "instance" lattrs) catch "" then
+		let inst = sprintf "i%d:%s" idx iname then
+		let mk_fa (f,as) = 
+		    list2str T (sprintf "{%s {" f) " " "}}" id as
+		in
+		let mk_fas fas = list2str T "{" " " "}" mk_fa fas in
+		let inames = mk_fas lfa_inps then
+		let onames = mk_fas lfa_outs then
+		sprintf "draw_fub %s %s %d %s %s" module inst idx inames onames
+	    |
+	    lname
+	in
+	let pfn = sprintf "add_inst %d %s" idx pre_pfn in
+	let info = (idx, pfn, lfa_outs) in
+	let outs = md_extract_vectors (flatmap snd lfa_outs) then
+	(fi_tbl_r := (insert_into_tbl (deref fi_tbl_r) info outs)) fseq
+	let bouts = setify (map get_vector_signature outs) then
+	(bfi_tbl_r := (insert_into_tbl (deref bfi_tbl_r) info bouts))
+    in
+    (foreach mk (zip (1 upto (length cs)) cs)) fseq
+    (deref fi_tbl_r), (deref bfi_tbl_r)    
+ /\ extract_fifo_info p =
+    error "Cannot extract_fifo_info for leaf cells"
+;
+
+
+let fanins fi_tbl bfi_tbl v =
+    tbl_member fi_tbl v => tbl_get fi_tbl v |
+    let bv = get_vector_signature v then
+    NOT (tbl_member bfi_tbl bv) => [] |
+    let alts = tbl_get bfi_tbl v then
+    let member (idx,pfn,fa_outs) =
+	(find_first0 (\(f,as). [v] vec_overlap as) fa_outs) != 0
+    in
+    filter member alts
+;
+
+clet mk_all_outs fa_outs = list2str T "" "\n" "" id (flatmap snd fa_outs);
+
+let pexlif2tcl p =
+    NOT (pexlif_is_hier p) => error "pexlif2tcl called with leaf node" |
+    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
+    let inps = map fst fa_inps in
+    let outs = map fst fa_outs in
+    val (fi_tbl, bfi_tbl) = extract_fifo_info p then
+    let done = ref (tbl_create 100) then
+    let cnt = ref 0 in
+    let res = ref [] in
+    let anon_cnt = ref 0 in
+    let get_anon_name v =
+	let c = deref anon_cnt then
+	(anon_cnt := (c+1)) fseq
+	let an = sprintf "an%06d" c then
+	(done := (tbl_insert (deref done) v an)) fseq
+	an
+    in
+    let add1 anon pfn chs =
+	let tid =
+	    let c = deref cnt then
+	    (cnt := (c+1)) fseq
+	    (sprintf "tr_%d" c)
+	then
+	let line = chs = [] =>
+	    sprintf "set %s [add_sch_object LEAF {{%s}} {%s} {}]" tid anon pfn
+	|
+	    let pre = sprintf "set %s [add_sch_object NODE {{%s}} {%s} [list "
+			      tid anon pfn
+	    then
+	    list2str T pre " " "]]" (sprintf " $%s") chs
+	then
+	(res := (line:(deref res))) fseq
+	tid
+    in
+    letrec build v =
+	tbl_member (deref done) v =>
+	    let anon = tbl_get (deref done) v in
+	    add1 anon "draw_repeat_nd" []
+	|
+	let anon = get_anon_name v then
+	let drivers = fanins fi_tbl bfi_tbl v then
+	drivers = [] =>
+	    [v] vec_overlap inps =>
+		add1 anon (sprintf "draw_ifc_input {%s}" v) []
+	    |
+		add1 anon (sprintf "draw_dangling_input {%s}" v) []
+	|
+	length drivers = 1 =>
+	    val (idx,name,fa_outs) = hd drivers in
+	    let all_outs = mk_all_outs fa_outs then
+	    v == all_outs =>
+		let fi = pexlif_get_inps_actuals (el idx cs) in
+		add1 anon name (map build fi)
+	    |
+	    let pfn = sprintf "draw_tap" in
+	    add1 anon pfn [build all_outs]
+	|
+	// Multiple drivers
+	let get_overlap (_,_,fas) = hd ([v] vec_intersect (flatmap snd fas)) in
+	let parts = map get_overlap drivers then
+	let pfn = sprintf "draw_concat %d" (length drivers) in
+	add1 anon pfn (map build parts)
+    in
+    let final = map build outs then
+    let dummy_args = replicate (length final) "{}" in
+    let anon = get_anon_name "DummyOut" then
+    let pfn = list2str T "draw_output {" " " "}" id dummy_args then
+    let final = add1 anon pfn final then
+    let anon_map = tbl2list (deref done) then
+    PVIS anon_map final (rev (deref res))
+;
+
+let anon2vecs pvis anon =
+    val (PVIS vec2anon final pgm) = pvis in
+    str_split (rev_assoc anon vec2anon) "\n"
+;
+
+let vec2anons pvis vec =
+    val (PVIS vec2anon final pgm) = pvis in
+    let an = (assoc vec vec2anon) catch "" then 
+    let complete = an = "" => [] | [an] in
+    let tst (v,a) =
+	let vs = str_split v "\n" in
+	let idx = find_first0 (\n. [n] vec_overlap [vec]) vs in
+	idx = 0 => [] | [a]
+    in
+    let partial = flatmap tst vec2anon then
+    complete, (partial subtract complete)
+;
+
+end_abstype pexlif2tcl anon2vecs vec2anons;
+

@@ -2035,6 +2035,8 @@ proc draw_split {c tag x y} {
     return [list $inp_locs [list $x [expr round($y1)]]]
 }
 
+proc draw_tap {c tag x y} { draw_split $c $tag $x $y }
+
 proc draw_field {name c tag x y} {
     draw_hfl_code 1 -1 ">$name" $c $tag $x $y
 }

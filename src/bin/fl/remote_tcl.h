@@ -19,6 +19,7 @@ void        Init_tcl();
 bool	    Register_tcl_callback(string name, symbol_tbl_ptr stbl);
 void        Tcl_callback_eval(string cmd, int rid, FILE *tcl_fp);
 void        Mark_tcl_callbacks();
+bool	    Import_tcl_function(string name, typeExp_ptr type);
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */

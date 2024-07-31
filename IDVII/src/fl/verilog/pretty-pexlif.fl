@@ -1,5 +1,5 @@
 (cload (DIR^"grammar.fl")) fseq
-(cload (DIR^"pretty.fl")) fseq
+(cload "pretty.fl") fseq
 (cload (DIR^"pretty-verilog.fl")) fseq
 (cload (DIR^"../design/misc.fl")) fseq
 (cload (DIR^"../design/util.fl")) fseq
@@ -1068,7 +1068,7 @@ let pexlif2verilog netlist {fp::stream} {pex::pexlif} =
     (find_insert_module netlist pex' 1) fseq
     let results = pexlif2verilog_end () then
     let do1 (module_name, descr) =
-	(frender fp (p_source_text (Source_text [descr]))) fseq
+	(render (p_source_text (Source_text [descr])) fp) fseq
 	(fprintf fp "\n\n")
     in
     (foreach do1 results)
@@ -1102,7 +1102,7 @@ let separated_pexlif2verilog netlist {path::string} {pex::pexlif} =
     let do1 (module_name, descr) =
 	let file = sprintf "%s%s.v" path module_name in
 	let fp = fopen file "w" in
-	(frender fp (p_source_text (Source_text [descr]))) fseq
+	(render (p_source_text (Source_text [descr])) fp) fseq
 	(fprintf fp "\n") fseq
 	(fclose fp)
     in

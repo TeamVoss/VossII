@@ -2997,10 +2997,25 @@ Handle_Recursion_Limits()
 	sprintf(buf, "voss2_recursion_limit_override");
 	Send_to_tcl(buf, &s);
 	switch( *s ) {
-		case 'd': return TRUE;
-		case 'x': Exit(2); break;
-		case 'a': return FALSE;
-		default: break;
+		case 'd':
+		{
+		    free(s);
+		    return TRUE;
+		}
+		case 'x': 
+		{
+		    free(s);
+		    Exit(2); break;
+		}
+		case 'a': 
+		{
+		    free(s);
+		    return FALSE;
+		}
+		default: {
+		    free(s);
+		    break;
+		}
 	}
     }
 }
@@ -3821,13 +3836,16 @@ traverse_left(g_ptr oroot)
                         if( is_fail(arg1) )
                             goto arg1_fail1;
                         g_ptr cur = arg1;
-			tstr_ptr ts = new_temp_str_mgr();
-                        string res = gen_strtemp(ts, "");
+                        string res = NULL;
                         while( !IS_NIL(cur) ) {
+			    if( res != NULL ) {
+				free(res);
+				res = NULL;
+			    }
                             string cmd = GET_STRING(GET_CONS_HD(cur));
                             if( !Send_to_tcl(cmd, &res) ) {
                                 Fail_pr("Tcl failure: %s", res);
-				free_temp_str_mgr(ts);
+				free(res);
 				goto fail1;
                             }
 			    cur = GET_CONS_TL(cur);
@@ -3839,7 +3857,7 @@ traverse_left(g_ptr oroot)
 			    *(res+len-1) = 0;
 			}
                         SET_STRING(redex, wastrsave(&strings, res));
-			free_temp_str_mgr(ts);
+			free(res);
                         goto finish1; 
                     }
 

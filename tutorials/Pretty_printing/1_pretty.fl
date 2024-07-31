@@ -4,8 +4,8 @@
 
 // -----------------------------------------------------------------------------
 // The pretty printing combinators.
+load "pretty.fl";
 
-load (DIR^"../../IDVII/src/fl/verilog/pretty.fl");
 // The above pretty printing library provides a collection of pretty printer
 // combinators, following the pretty printer library Hughes originally wrote for
 // Haskell. In fact, the original paper
@@ -16,7 +16,7 @@ load (DIR^"../../IDVII/src/fl/verilog/pretty.fl");
 // At its base is the 'Doc' type, the abstract type of documents, which actually
 // represents a _set_ of layouts. The "best" of which is chosen by 'render' when
 // displaying the document as a string.
-render;
+help "render";
 
 // The construction of documents is done through the aformentioned combinators.
 // Simplest of all is 'nil' which constructs an empty document, that is, a
