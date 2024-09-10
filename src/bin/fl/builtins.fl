@@ -1047,22 +1047,21 @@ non_lazy tbl_create;
 let tbl_member tbl key = defix tbl_member tbl key;
 
 // Return the data associated with key in table tbl.
-// Usage: tbl_get tbl key;
 let tbl_get tbl key = defix tbl_get tbl key;
 
 // Insert data under key in table tbl.
-// Note that the function returns the new table.
-// Usage: tbl_insert tbl key data;
+// Note that the function returns the new table and
+// that the original table is no longer accessible.
 let tbl_insert tbl key data = defix tbl_insert tbl key data;
 
 // Delete the data under key in table tbl.
-// Note that the function returns the new table.
-// Usage: tbl_delete tbl key;
+// Note that the function returns the new table and
+// that the original table is no longer accessible.
 let tbl_delete tbl key = defix tbl_delete tbl key;
 
 // Clean the table tbl.
-// Note that the function returns the new table.
-// Usage: tbl_clear tbl;
+// Note that the function returns the new table and
+// that the original table is no longer accessible.
 let tbl_clear tbl = defix tbl_clear tbl;
 
 // Given a table, return a list of all (key,data) pairs in the table.
@@ -1430,6 +1429,14 @@ let visualization_nodes ckt draw_level =
 	defix visualization_nodes ckt draw_level
 ;
 
+// Compute the visualization information at drawing level 'draw_level'
+// for `levels' back from the vectors 'vecs' stopping at nodes in
+/// 'stop_list' and nides in 'ifc_vecs'.
+//
+let visualize_fanin ckt stop_list ifc_vecs levels vecs draw_level =
+    (defix visualize_fanin) ckt stop_list ifc_vecs levels vecs draw_level
+;
+
 // Return T if the node nd in circuit ckt is a phase delay node.
 // Usage: is_phase_delay ckt nd;
 let is_phase_delay ckt nd = defix is_phase_delay ckt nd;
@@ -1572,5 +1579,274 @@ let get_symbol_signature fn = (defix get_symbol_signature) fn;
 
 // The id of the user invoking fl.
 let USER = (defix USER);
+
+
+// Get the arity of function 'fn_name'.
+let get_arity fn_name = (defix get_arity) fn_name;
+
+// Get the definition for function 'fn_name'.
+// Note: Function only available if fl is invoked with -C.
+let get_definition fn_name = (defix get_definition) fn_name;
+
+// Get the combinator expression for function 'fn_name'.
+// Note: Function only available if fl is invoked with -C.
+let get_combinator_expression fn_name =
+    (defix get_combinator_expression) fn_name;
+
+// Return the (internal) id of function fn_name;
+let get_userdef_id fn_name = (defix get_userdef_id) fn_name;
+
+// Return the expression for the function with (internal) id 'fn_id'.
+// Note: Function only available if fl is invoked with -C.
+let get_userdef_expression fn_id = (defix get_userdef_expression) fn_id;
+
+// Get the combinator expression for the function with (internal) id 'fn_id'.
+// Note: Function only available if fl is invoked with -C.
+let get_userdef_combinator_expression fn_id =
+    (defix get_userdef_combinator_expression) fn_id;
+
+// Convert the bexpr 'be' to a BDD.
+let prim_bexpr2bdd be = (defix prim_bexpr2bdd) be;
+
+// Break a tcl string s into a list of strings.
+let tcl2list s = (defix tcl2list) s;
+
+// Return the size of the multi-dimensional vector s.
+// Equivalient to length (md_expand_vector s)
+let md_sizes s = (defix md_sizes) s;
+
+// Remove any leading or trailing white space from s and return the result.
+let trim s = (defix trim) s;
+
+// Return the signature of the vector v.
+// The signature is the same name as the vector but in which any indices
+// inside brackets have been removed.
+let get_vector_signature v = (defix get_vector_signature) v;
+
+// Return the process-id of the current fl process.
+let pid = (defix pid);
+
+// Return the resolved path for 'file_name'.
+let normalize_file file_name = (defix normalize_file) file_name;
+
+// Return a pair of lists. The first list consists of all the elements
+// in 'l' selected by 'indices' and the second list are all the other
+// elements in 'l'.
+let separate l indices = (defix separate) l indices;
+
+// Do a lexicographic comparison between e1 and e2.
+// Return an integer < 0, 0, or > 0 based on the ordering.
+let gcmp e1 e2 = (defix gcmp) e1 e2;
+
+
+// Create an fsm for only the top-level PINST in the pexlif p.
+let toplevel_pexlif2fsm p = (defix toplevel_pexlif2fsm) p;
+
+// Create an fsm for the pexlif p but black box all the instances
+// in 'black_box_list'
+let pexlif2fsm2 p black_box_list = (defix pexlif2fsm2) p black_box_list;
+
+// Return all assertion nodes in ckt.
+let assertions ckt = (defix assertions) ckt;
+
+// Return a list of pairs in which each pair represents two nodes
+// in the fsm in which the second node depends directly on the first node.
+// Dependency is based on the next-state functions. 
+let edges ckt = (defix edges) ckt;
+
+// Determine if node 'nd' in fsm 'ckt' is a latch/flip-flop or not.
+let is_latch ckt nd = (defix is_latch) ckt nd ;
+
+// Determine if node 'nd' in fsm 'ckt' is an input node.
+let is_input ckt nd = (defix is_input) ckt nd ;
+
+// If 'nd' in 'ckt' is a latch/flop, return its type.
+// Type is one of:
+//	draw_adff
+//	draw_adffe
+//	draw_ah_latch
+//	draw_al_latch
+//	draw_dff
+//	draw_dffe
+//	draw_dffsr
+//	draw_dffsre
+//	draw_elastic_re_ff
+//	draw_ff_fe
+//	draw_ff_fe_reset
+//	draw_ff_fe_reset_set
+//	draw_ff_fe_set
+//	draw_ff_fe_with_en
+//	draw_ff_fe_with_en_reset
+//	draw_ff_fe_with_en_reset_set
+//	draw_ff_fe_with_en_set
+//	draw_ff_re
+//	draw_ff_re_reset
+//	draw_ff_re_reset2
+//	draw_ff_re_reset_set
+//	draw_ff_re_set
+//	draw_ff_re_with_en
+//	draw_ff_re_with_en_reset
+//	draw_ff_re_with_en_reset_set
+//	draw_ff_re_with_en_set
+//	draw_master_slave
+//	draw_neg_d_latch
+//	draw_pos_d_latch
+//	draw_pos_d_latchbig
+//	draw_pos_d_latchen
+//	draw_pos_d_latch_reset
+//	draw_sdff
+//	draw_sdffce
+//	draw_sdffe
+let get_latch_type ckt nd = (defix get_latch_type) ckt nd ;
+
+// Get the visualization-id for node nd in fsm ckt at draw level 'level'.
+let get_visualization_id ckt nd level = 
+	(defix get_visualization_id) ckt nd level ;
+
+// Get the visualization pinst-cnt for node nd in fsm ckt at
+// draw level 'level'.
+let get_visualization_pinst_cnt ckt nd level = 
+	(defix get_visualization_pinst_cnt) ckt nd level ;
+
+// Get the visualization draw command for node nd in fsm ckt at
+// draw level 'level'.
+let get_visualization_pfn ckt nd level = 
+	(defix get_visualization_pfn) ckt nd level ;
+
+// Get the visualization attributes for node nd in fsm ckt at
+let get_visualization_attributes ckt nd level = 
+	(defix get_visualization_attributes) ckt nd level ;
+
+// Get the visualization fanins for node nd in fsm ckt at
+let get_visualization_fanins ckt nd level = 
+	(defix get_visualization_fanins) ckt nd level ;
+
+// Get the visualization fanouts for node nd in fsm ckt at
+let get_visualization_outputs ckt nd level = 
+	(defix get_visualization_outputs) ckt nd level ;
+
+
+// Get the name of the excitation function that drives nd in ckt.
+let excitation_function ckt nd = (defix excitation_function) ckt nd;
+
+// Determine whether nd is a valid node name in ckt.
+let is_node ckt nd = (defix is_node) ckt nd ;
+
+// Return the changes in the value of nd recorded in 'ste' (as returned by STE)
+// but limited to changes from min to max times.
+// Returns a list of (time, High, Low) values.
+let limited_get_trace ste min max nd =
+    (defix limited_get_trace) ste min max nd;
+
+// Return the changes in the value of nd recorded in 'ste' (as returned by bSTE)
+// but limited to changes from min to max times.
+// Returns a list of (time, High, Low) values.
+let limited_bget_trace ste min max nd =
+    (defix limited_bget_trace) ste min max nd;
+
+// Return the real node/vector name corresponding to the anonymous name aname
+// in the visualization vis.
+let visualization_anon2real vis aname =
+    (defix visualization_anon2real) vis aname;
+
+// Return a pair of lists of anonymous names. The first list are anonymous
+// names whose corresponding real names are fully included in the vecs list.
+// The second list are anonymous names that are only partially covered.
+// The 'ignore' flag determines whether all the vectors in vecs must be
+// valid vectors in the visualization state vis or not.
+let visualization_vecs2tags vis ignore vecs =
+    (defix visualization_vecs2tags) vis ignore vecs;
+
+// Given a visualization state vis, returns a pair consisting of a
+// tcl identifier representing the output node, and a list of
+// tcl commands representing the tcl code that needs to be executed to
+// draw the schematics.
+let visualisation2tcl vis = (defix visualisation2tcl) vis;
+
+// Add the vectors in vlist to the list of stop nodes in the visualization
+// state vis.
+// Note this is a destructive update of vis!
+let visualization_set_stop_nodes vis vlist =
+    (defix visualization_set_stop_nodes) vis vlist;
+
+// Return the previous visualization state.
+let visualize_undo vis = (defix visualize_undo) vis;
+
+// Return a list of all anonnymous names used in the visualization state vis.
+let visualize_get_shown_anons vis = (defix visualize_get_shown_anons) vis;
+
+// Return the visualization state resulting from expanding all incomplete
+// nodes by 'levels' in the fanin cone of the anonymous node 'aname' at
+// the drawing level 'draw_level'.
+let visualize_expand_fanin vis aname levels draw_level =
+    (defix visualize_expand_fanin) vis aname levels draw_level;
+
+// Return the visualization state resulting from making the anonymous node
+// 'aname' an incomplete at the drawing level 'draw_level'.
+let visualize_hide_fanin vis aname draw_level =
+    (defix visualize_hide_fanin) vis aname draw_level;
+
+// Return the table obtained by adding all the elements in key_data_list
+// to tbl.
+// Note that the original table is no longer accessible.
+let tbl_insertn tbl key_data_list = (defix tbl_insertn) tbl key_data_list;
+
+// Return the table obtained by adding all the elements in keys.
+// Similar to tbl_insertn but uses only keys.
+// Note that the original table is no longer accessible.
+let set_tbl_insertn tbl keys = (defix set_tbl_insertn) tbl keys;
+
+// Return a list of all the keys in the table tbl.
+let tbl2keys tbl = (defix tbl2keys) tbl;
+
+// Return a list of all the data-items in the table tbl.
+let tbl2data tbl = (defix tbl2data) tbl;
+
+// Read an .xpm image file and return the image object.
+let import_xpm_image file = (defix import_xpm_image) file;
+
+// Return the image that results by applying the HSV filter
+// determined by the hue range 'h_range', saturation range 's_range' and
+// brightness range 'v_range'. 
+// Rather than a black and white resulting image, a black and res_color
+// image is returned.
+let hsv_filter image h_range s_range v_range res_color =
+    (defix hsv_filter) image h_range s_range v_range res_color ;
+
+// Write out image to file in the .ppm format.
+let export_to_ppm image file = (defix export_to_ppm) image file;
+
+// Return the size of image.
+let image_size image = (defix image_size) image;
+
+// Return a pair (valid,(r,g,b)) for the color values a the pixel at (row,col).
+let image_get_pixel image row col = (defix image_get_pixel) image row col ;
+
+//// Return the pexlif obtained by grouping the instances in ids and
+//// given the resulting instance the name 'name'.
+//// The newly created child will be first in the resulting list of children.
+//let fold_pexlif p ids name = (defix fold_pexlif) p ids name;
+
+// Unfold element idx in pexlif p.
+let unfold_pexlif p idx = (defix unfold_pexlif) p idx;
+
+// Construct a PINST structure but first:
+//  1) Add all assertion nodes to the internal node list
+//  2) Add both the fp and the SHA256 signatures to the attribute list.
+//
+let mk_pinst name attrs is_leaf fa_inps fa_outs ints body =
+    (defix mk_pinst) name attrs is_leaf fa_inps fa_outs ints body;
+
+// Return a list of indices for all child instances that are wrapper instances.
+let get_wrappers body = (defix get_wrappers) body;
+
+
+// Emit the formatted document 'doc' to the stream fp.
+// The width argument provides the desired maximum width of the output
+// and end_str provides the string that will be appended after
+// the formatted text.
+let do_layout width end_str doc fp = (defix do_layout) width end_str doc fp;
+
+
 
 (update_vossrc "ADD-DEBUG-INFO" __old_debug_on__) fseq ();

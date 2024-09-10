@@ -1741,7 +1741,6 @@ get_combinator_expression(g_ptr redex)
 		MAKE_REDEX_FAILURE(redex,
 		       Fail_pr("Function %s is mplicitly overloaded", name));
 	    } else {
-		OVERWRITE(redex, fp->expr_init);
 		OVERWRITE(redex, fp->expr_comb);
 	    }
 	}

@@ -1,0 +1,51 @@
+load "idv.fl";
+
+let Booth_recode N i =
+    input           {a::wexpr}.
+    input           {b::wexpr}.
+    output          {res::wexpr}.
+    //
+    internal        a2 na na2 tmp neg.
+    //
+    let xim1 = (i == 0) => {'0::bit} | b~~(2*i-1) then
+    let xi = b~~(2*i) then
+    let xip1 = ((2*i+1) >= N) => {'0::bit} | b~~(2*i+1) then
+    CELL "BoothRecode" [
+        na <- '~' a,
+        a2 <- a '<<' '1,
+        na2 <- '~' a2,
+        CASE tmp [
+            (( '~' xip1 '&' (xi '^' xim1)),     a),
+            (( '~' xip1 '&' xi '&' xim1),       a2),
+            (( xip1 '&' '~' xi '&' '~' xim1),   na2),
+            (( xip1 '&' (xi '^' xim1)),         na)
+        ] '0,
+        neg <- (IF (xip1 '&' '~' (xi '&' xim1)) THEN '1 ELSE '0),
+        res <- (tmp '+' neg) '<<' ''(2*i)
+];
+
+let mul_Booth4_impl N =
+    input   {a:: wexpr} {b:: wexpr}.
+    output  {o:: wexpr}.
+    list_internal ((N+1)/2) {psums:: wexpr list}.
+    CELL "mul_impl" (
+        let mk_psum i = Booth_recode N i a b (el (i+1) psums) in
+        (map mk_psum ((((N+1)/2)-1) downto 0)) @
+        [ o <- accumulate (defix '+') psums ]
+);
+
+let pw = mul_Booth4_impl 3 {'a::wexpr} {'b::wexpr} {'o::wexpr};
+//pw;
+
+let p = resize_pexlif 3 pw;
+//p;
+
+let ckt = pexlif2fsm p;
+
+//update_vossrc "VERBOSE-FSM-PRINT" "YES";
+ckt;
+
+STE_debug ckt;
+
+STE "-e" ckt [] [] [] [];
+

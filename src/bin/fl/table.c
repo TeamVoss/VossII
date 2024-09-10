@@ -86,6 +86,7 @@ table_insert(g_ptr redex)
 	SET_REFCNT(g_key, MAX_REF_CNT);
 	SET_REFCNT(g_data, MAX_REF_CNT);
 	MAKE_REDEX_EXT_OBJ(redex, table_oidx, tp);
+	MAKE_REDEX_FAILURE(g_tbl, Fail_pr("Trying to access a changed table"));
     }
 }
 
@@ -110,6 +111,7 @@ table_insertn(g_ptr redex)
 	kd_list = GET_CONS_TL(kd_list);
     }
     MAKE_REDEX_EXT_OBJ(redex, table_oidx, tp);
+    MAKE_REDEX_FAILURE(g_tbl, Fail_pr("Trying to access a changed table"));
 }
 
 static void
@@ -131,6 +133,7 @@ set_table_insertn(g_ptr redex)
 	k_list = GET_CONS_TL(k_list);
     }
     MAKE_REDEX_EXT_OBJ(redex, table_oidx, tp);
+    MAKE_REDEX_FAILURE(g_tbl, Fail_pr("Trying to access a changed table"));
 }
 
 static void
@@ -144,6 +147,7 @@ table_delete(g_ptr redex)
     } else {
 	delete_hash(&(tp->tbl), (pointer) g_key);
 	MAKE_REDEX_EXT_OBJ(redex, table_oidx, tp);
+	MAKE_REDEX_FAILURE(g_tbl, Fail_pr("Trying to access a changed table"));
     }
 }
 
@@ -157,6 +161,7 @@ table_clear(g_ptr redex)
     dispose_hash(&(tp->tbl), NULLFCN);
     create_hash(&(tp->tbl), sz, G_rec_hash, G_rec_equ);
     MAKE_REDEX_EXT_OBJ(redex, table_oidx, tp);
+    MAKE_REDEX_FAILURE(g_tbl, Fail_pr("Trying to access a changed table"));
 }
 
 static void
