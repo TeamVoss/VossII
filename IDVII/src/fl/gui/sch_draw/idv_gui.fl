@@ -1486,7 +1486,9 @@ let use_separate_process_evaluation_r = ref T;
 
 slet BDD_EQ_1 p1 p2 order_file =
     NOT (deref use_separate_process_evaluation_r) =>
-	(order_file != "{}" => (_load order_file T) | T) fseq
+	((order_file != "{}") AND (order_file != "")
+	    => (_load order_file T) | T)
+	fseq
 	noX => fst (BDD_EQ_base p1 p2) |
 	val (res, opt_cex) = BDD_EQ_base p1 p2 then
 	res == T => res |

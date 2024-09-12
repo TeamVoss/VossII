@@ -12,28 +12,17 @@ let get_number_of_children (PINST _ _ _ _ _ _ (P_HIER chs)) =
 ;
 
 let special_md_size v =
-    let res = md_size v then
-    res != 2 => res |
-    // Possibly wrong for xyz[-1:0] nodes
-    (str_is_substr "[-1:0]" v) => 0 | res
+    str_is_substr "[-1:0]" v => 0 |
+    md_size v
 ;
 
-let special_md_sizes l =
-    let res = md_sizes l then
-    res != 2 => res |
-    // Possibly wrong for xyz[-1:0] nodes
-    let idx = find_first0 (str_is_substr "[-1:0]") l in
-    idx != 0 => 0 | res
+let special_md_sizes vs =
+    md_sizes (filter (\v. NOT (str_is_substr "[-1:0]" v)) vs)
 ;
 
 let special_md_extract_vectors vs =
     val (special, other) = split (str_is_substr "[-1:0]") vs in
-//    (setify special)@(md_extract_vectors other)
-let res = (setify special)@(md_extract_vectors other) then
-let old = md_extract_vectors vs then
-let sym_diff s1 s2 = (s1 subtract s2) @ (s2 subtract s1) in
-let diff = sym_diff res old in
-diff != [] => (fprintf stderr "DIFFERENCE: %S\n" diff) fseq res | res
+    (setify special)@(md_extract_vectors other)
 ;
 
 // Determines if the pexlif p contains any state holding element.
@@ -55,7 +44,13 @@ let mk_name sz base = sz = 1 => base | sprintf "%s[%d:0]" base (sz-1);
 // Function to determine if a node is a user given or automatically created.
 let is_user_given s = NOT (str_is_substr "_$" s);
 
-clet get_base_name s = hd (str_split (get_vector_signature s) "[");
+
+clet get_base_name s = 
+    (
+	let l = str_reg_extract "(.*)(\\[[-0-9:]+\\])$" s in
+	el 2 l
+    ) catch s
+;
 
 // todo: Pexlif's generated randomly doesn't follow this name schema.
 
@@ -621,7 +616,7 @@ let w_substitute sub we =
 	    let mk1 v =
 		let base = get_base_name v then
 		let v_sz = special_md_size v then
-		let decl_sz = assoc base decls then
+		let decl_sz = (assoc base decls) catch v_sz then
 		let w_base = W_VAR decl_sz base then
 		v_sz = decl_sz => w_base |
 		val [(l,r)] = get_range v then
@@ -798,6 +793,7 @@ let resize_pexlif sz {p::pexlif} =
      /\    trwexpr (W_SX osz e) = W_SX (tri osz) (trwexpr e)
      /\    trwexpr (W_ZX osz e) = W_ZX (tri osz) (trwexpr e)
      /\    trwexpr (W_SLICE indices w) = W_SLICE indices (trwexpr w)
+     /\    trwexpr (W_CAT ws) = W_CAT (map trwexpr ws)
      /\    trwexpr e assuming (is_binary e) =
 	val (op, l, r) = split_binary e in
 	op (trwexpr l) (trwexpr r)
@@ -824,8 +820,6 @@ let resize_pexlif sz {p::pexlif} =
     trp p
 ;
 
-
-clet get_base_name s = hd (str_split (get_vector_signature s) "[");
 
 let BASE_TMP = "_$";
 

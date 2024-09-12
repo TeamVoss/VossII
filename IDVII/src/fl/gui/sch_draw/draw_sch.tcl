@@ -951,6 +951,11 @@ proc add_font_tags {c tag type_tag} {
     $c addtag $type_tag withtag $tag
 }
 
+proc is_vector_name {name} {
+    return [regexp {.*\[[0-9][0-9]*(:[0-9][0-9]*)*\]} $name]
+    
+}
+
 proc add_value_field {c aname x y {special_tag ""}} {
     global mfont sfont
     if { $special_tag != "" } {
@@ -3410,6 +3415,18 @@ proc get_txt_width {c tag cur_max} {
     return $cur_max
 }
 
+proc get_accurate_text_width {c txt} {
+    set ttag [$::dummy_canvas create text 0 0 -font $::mfont($c) -text $txt]
+    val {x1 y1 x2 y2} [$::dummy_canvas bbox $ttag]
+    $::dummy_canvas delete all
+    return [expr abs($x2-$x1)]
+}
+
+proc get_text_width {c txt cur_max} {
+    set new_wid [get_accurate_text_width $c $txt]
+    if { $new_wid > $cur_max } { return $new_wid } else { return $cur_max; }
+}
+
 proc extract_name_draw_hfl_code {inputs inst_nbr type args} {
     if { $inst_nbr == "-1" } {
 	return "N/A"
@@ -3478,39 +3495,19 @@ proc draw_fub {module inst inst_nbr inames onames c tag x y} {
     # Compute the needed width
     #
     set twid [rect_wid $c]
-    set txt(module) [$c create text $x $y -anchor n -justify center \
-			    -font $::mfont($c) -text $module]
-    add_font_tags $c $txt(module) _IsTeXt_
-    set twid [get_txt_width $c $txt(module) $twid]
-    set txt(inst) [$c create text $x $y -anchor s -justify center \
-	    -font $::mfont($c) -text $inst]
-    add_font_tags $c $txt(inst) _IsTeXt_
-    set twid [get_txt_width $c $txt(inst) $twid]
+    set twid [get_text_width $c $module $twid]
+    set twid [get_text_width $c $inst $twid]
     #
     set iwid [letter_sz $c]
-    set icnt 0
     foreach name $inames {
 	val {fname anames} $name
-	set nm "inp_$icnt"
-	incr icnt
-	set txt($nm) [$c create text $x $y -anchor w -justify left \
-		-font $::mfont($c) -text $fname]
-	add_font_tags $c $txt($nm) _IsTeXt_
-	set iwid [get_txt_width $c $txt($nm) $iwid]
+	set iwid [get_text_width $c $fname $iwid]
     }
-    #
     set owid [letter_sz $c]
-    set ocnt 0
     foreach name $onames {
 	val {fname anames} $name
-	set nm "out_$ocnt"
-	incr ocnt
-	set txt($nm) [$c create text $x $y -anchor e -justify right \
-			-font $::mfont($c) -text $fname]
-	add_font_tags $c $txt($nm) _IsTeXt_
-	set owid [get_txt_width $c $txt($nm) $owid]
+	set owid [get_text_width $c $fname $owid]
     }
-    #
     set rwid [max $twid [expr $iwid + $owid + 5*[letter_sz $c]]]
     set xr [expr $x-5*[min_sep $c]]
     set rht [expr round(([max $inps $outs]+1)*[rect_ht $c])] 
@@ -3521,12 +3518,17 @@ proc draw_fub {module inst inst_nbr inames onames c tag x y} {
     set dr [$c create rectangle [expr ($xr-$rwid)] [expr ($y+$erht/2)] \
 		$xr [expr ($y-$erht/2)] -outline $gcolor -fill $fc -tags $tag]
     $c lower $dr all
-
     set mid_x [expr ($xr-$rwid/2)]
     set top_y [expr $y-$erht/2]
-    $c move $txt(module) [expr $mid_x-$x] [expr $top_y-$y]
-    $c move $txt(inst) [expr $mid_x-$x] [expr $top_y-$y]
+    set txt(module) [$c create text $mid_x $top_y -anchor n \
+		    -justify center -font $::mfont($c) -text $module]
+    add_font_tags $c $txt(module) _IsTeXt_
+    set txt(inst) [$c create text $mid_x $top_y -anchor s -justify center \
+	    -font $::mfont($c) -text $inst]
+    add_font_tags $c $txt(inst) _IsTeXt_
+    #
     # Inputs
+    #
     if { $inps == 0 } {
 	set inp_locs {}
     } else {
@@ -3534,15 +3536,22 @@ proc draw_fub {module inst inst_nbr inames onames c tag x y} {
 	set lowy [expr ($y-$rht/2+$rht/($inps*2))]
 	set sep [expr ($rht/$inps)]
 	set xl [expr ($nx)]
-	for {set i 0} {$i < $inps} {incr i} {
+	set i 0
+	foreach name $inames {
+	    val {fname anames} $name
 	    set yl [expr ($lowy+$i*$sep)]
 	    set nm "inp_$i"
-	    $c move $txt($nm) [expr $nx-$x] [expr $yl-$y]
+	    set txt($nm) [$c create text $nx $yl -anchor w -justify left \
+		    -font $::mfont($c) -text $fname]
+	    add_font_tags $c $txt($nm) _IsTeXt_
 	    $c create line $xl $yl $nx $yl -fill $gcolor
 	    lappend inp_locs [expr round($xl)] [expr round($yl)]
+	    incr i
 	}
     }
+    #
     # Outputs
+    #
     set nx $xr
     set lowy [expr ($y-$rht/2+$rht/($outs*2))]
     set sep [expr ($rht/$outs)]
@@ -3552,13 +3561,16 @@ proc draw_fub {module inst inst_nbr inames onames c tag x y} {
     $c create rectangle $m_x $m_lo_y $x $m_hi_y \
 	    -outline $gcolor -fill $fc -tags "$tag _WiRe_"
     set xl [expr $xr]
-    for {set i 0} {$i < $outs} {incr i} {
+    set i 0
+    foreach name $onames {
+	val {fname anames} $name
 	set yl [expr round($lowy+$i*$sep)]
 	set nm "out_$i"
-	$c move $txt($nm) [expr $nx-$x] [expr $yl-$y]
-	val {fname anames} [lindex $onames $i]
+	set txt($nm) [$c create text $nx $yl -anchor e -justify right \
+			-font $::mfont($c) -text $fname]
+	add_font_tags $c $txt($nm) _IsTeXt_
 	set wtag [fl_vecs2tags $c $anames]
-	if [fl_is_vector_name $fname] {
+	if [is_vector_name $fname] {
 	    $c create line $xl $yl $m_x $yl -fill $gcolor -width 3 \
 		-tags "$wtag _WiRe_"
 	} else {
@@ -3567,6 +3579,7 @@ proc draw_fub {module inst inst_nbr inames onames c tag x y} {
 	}
 	add_value_field $c $wtag $xl $yl
 	lappend out_locs [expr round($x)] [expr round($yl)]
+	incr i
     }
     return [list $inp_locs $out_locs]
 }
@@ -4729,7 +4742,7 @@ proc draw_fsm {name code states edges inps c tag x y} {
     $c create line [expr $x1-$sep] $y1 \
 		   [expr $x1-$rad] $y1 \
 		   -arrow last \
-		   -tags [list _Is_Hierarchical_ $tag $dotfile]] \
+		   -tags [list _Is_Hierarchical_ $tag $dotfile] \
 		   -fill $gcolor
     # 1->2
     $c create line [expr round($x1+$rad/1.4142)] \
@@ -4737,7 +4750,7 @@ proc draw_fsm {name code states edges inps c tag x y} {
 		   [expr round($x2-$rad/1.4142)] \
 		   [expr round($y2+$rad/1.4142)] \
 		   -arrow last \
-		   -tags [list _Is_Hierarchical_ $tag $dotfile]] \
+		   -tags [list _Is_Hierarchical_ $tag $dotfile] \
 		   -fill $gcolor
     # 4->1
     $c create line [expr round($x4-$rad/1.4142)] \
@@ -4745,7 +4758,7 @@ proc draw_fsm {name code states edges inps c tag x y} {
 		   [expr round($x1+$rad/1.4142)] \
 		   [expr round($y1+$rad/1.4142)] \
 		   -arrow last \
-		   -tags [list _Is_Hierarchical_ $tag $dotfile]] \
+		   -tags [list _Is_Hierarchical_ $tag $dotfile] \
 		   -fill $gcolor
     # 2->3
     $c create line [expr round($x2+$rad/1.4142)] \
@@ -4753,13 +4766,13 @@ proc draw_fsm {name code states edges inps c tag x y} {
 		   [expr round($x3-$rad/1.4142)] \
 		   [expr round($y3-$rad/1.4142)] \
 		   -arrow last \
-		   -tags [list _Is_Hierarchical_ $tag $dotfile]] \
+		   -tags [list _Is_Hierarchical_ $tag $dotfile] \
 		   -fill $gcolor
     # 2->4
     $c create line $x2 [expr $y2+$rad] \
 		   $x4 [expr $y4-$rad] \
 		   -arrow last \
-		   -tags [list _Is_Hierarchical_ $tag $dotfile]] \
+		   -tags [list _Is_Hierarchical_ $tag $dotfile] \
 		   -fill $gcolor
     #
     set g [$c create rectangle [expr $x-$wid] [expr round($y+$rht/2)] \
@@ -4881,9 +4894,9 @@ proc draw_lat_leq {c tag x y} {
     set yb1 [expr round($y+0.5*[rtl_rad $c]-0.5*[min_sep $c])]
     set yb2 [expr round($y+0.5*[rtl_rad $c]+0.5*[min_sep $c])]
     $c create line $xr $yt $xl $yt $xl $yb1 $xr $yb1 \
-		-tags [list _Is_Hierarchical_ $tag]]
+		-tags [list _Is_Hierarchical_ $tag]
     $c create line $xr $yb2 $xl $yb2 \
-		-tags [list _Is_Hierarchical_ $tag]]
+		-tags [list _Is_Hierarchical_ $tag]
 
     set xi [expr round($x-[rtl_rad $c]-0.866*[rtl_rad $c])]
     set y1 [expr round($y-[rtl_rad $c]/2)]

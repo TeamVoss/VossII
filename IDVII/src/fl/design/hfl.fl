@@ -159,9 +159,12 @@ let make_const_or_var s =
 	{hw_type_destr :: {*r} hw_type}
     in
     let sz = hw_size {undefined:: *r} in
+    let not_wexpr = (hw_type_name {undefined:: *r}) != "wexpr" in
     let mk_CONST sz i =
 	let needed = bits_needed i in
-	sz < needed => eprintf "Constant %d does not fit in %d bits" i sz |
+	not_wexpr AND (sz < needed) =>
+	    eprintf "Constant %d does not fit in %d bits" i sz
+	|
 	W_CONST sz i
     in
     let w =
@@ -308,26 +311,26 @@ forward_declare {w_CASE :: wexpr ->
 // internal signals (so all same leaves will have identical SHA signatures)
 let mk_pinst opt_pfn {lhs::wexpr} {rhs::wexpr} =
     let dep_vars = (w_depends rhs) in
-    let nsub =
-	let mk_sub n i =
-	    let anon = mk_name (special_md_sizes [n]) (sprintf "i%d" i) in
+    let sub =
+	let mk_sub n i = 
+	    NOT (str_is_substr "[-1:0]" n) =>
+		let anon = mk_name (special_md_sizes [n]) (sprintf "i%d" i) in
+		(n,anon)
+	    |
+	    let parts = str_split n "[-1:0]" in
+	    length parts > 2 => eprintf "Cannot anonymize %s\n" n |
+	    let pre = mk_name (md_size (el 1 parts)) (sprintf "i%d" i) in
+	    let anon = list2str T (pre^"[-1:0]") "" "" id (tl parts) in
 	    (n,anon)
 	in
 	map2 mk_sub dep_vars (1 upto (length dep_vars))
     then
-    let wsub =
-	let mk_sub n i =
-	    let anon = mk_name (special_md_sizes [n]) (sprintf "i%d" i) in
-	    (n,anon)
-	in
-	map2 mk_sub dep_vars (1 upto (length dep_vars))
-    then
-    let inps = map (\(a,f).(f,[a])) nsub in
+    let inps = map (\(a,f).(f,[a])) sub in
     let driven = base_get_lhs_vars lhs in
     let sz = special_md_sizes driven in
     let lhs' = W_VAR sz "o" in
     let outs = [(mk_name sz "o", driven)] in
-    let rhs' = w_substitute wsub rhs then
+    let rhs' = w_substitute sub rhs then
     let body = P_LEAF [W_UPDATE_FN lhs' rhs'] then
     let pfn = has_value opt_pfn => get_value opt_pfn | mk_draw_cmd F rhs then
     PINST pfn [] T inps outs [] body
@@ -629,7 +632,9 @@ let base_assignment do_split lhs rhs =
 		let p2 = split mid n then
 		(mid, p2)
 	    in
-	    let p = mk_pinst NONE lhs (W_UPDATE_NAMED_SLICE b' name indices n') then
+	    let p =
+		mk_pinst NONE lhs (W_UPDATE_NAMED_SLICE b' name indices n')
+	    then
 	    p1@p2@[p]
      /\    split lhs rhs = [mk_pinst NONE lhs rhs]
     in

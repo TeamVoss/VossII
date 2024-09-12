@@ -1301,7 +1301,10 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
                 tbl = inputs_tbl_ptr;
                 fa  = &outs_set;
             }
-            for(adj_bkt_ptr adj = find_hash(tbl, sig); adj != NULL; adj = adj->next) {
+            for(adj_bkt_ptr adj = find_hash(tbl, sig);
+		adj != NULL;
+		adj = adj->next)
+	    {
                 if(Check_vector_overlap(vec, adj->vec)) {
                     if(IS_IN(INT2PTR(adj->index), ids_set)) {
                         insert_check_hash(&ints_set, act, act);

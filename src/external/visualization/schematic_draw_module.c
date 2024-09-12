@@ -8,6 +8,8 @@
 ************************************************/
     
 #include <sys/time.h>
+#include <time.h>
+#include <ctype.h>
 
 #include <tcl.h>
 #include <tk.h>
@@ -54,6 +56,15 @@ max(int x, int y)
     return( ( x > y )? x : y );
 }
 
+static char *
+strip_add_inst(char *pfn)
+{
+    if( strncmp(pfn, "add_inst ", 9) != 0 ) { return pfn; }
+    pfn += 9;
+    while( isdigit(*pfn) || *pfn == ' ') { pfn++; }
+    return pfn;
+}
+
 int
 add_sch_object(ClientData clientData, Tcl_Interp *interp,
 	       int objc, Tcl_Obj *const objv[])
@@ -69,14 +80,15 @@ add_sch_object(ClientData clientData, Tcl_Interp *interp,
     char *type     = Tcl_GetString(objv[1]);
     char *name     = Tcl_GetString(objv[2]);
     char *pfn      = Tcl_GetString(objv[3]);
+    char *cpfn	   = strip_add_inst(pfn);
     Tcl_Obj *fanins = objv[4];
 
     
     int width, height;
-    if( (height = PTR2INT(find_hash(&pfn2height, pfn))) == 0 ) {
-	sprintf(cmd_buf, "get_width_height {%s}", pfn);
+    if( (height = PTR2INT(find_hash(&pfn2height, cpfn))) == 0 ) {
+	sprintf(cmd_buf, "get_width_height {%s}", cpfn);
 	if( Tcl_Eval(interp, cmd_buf) != TCL_OK ) {
-	    Tcl_AppendResult(interp, "Failed to evaluate '", pfn, "'", NULL);
+	    Tcl_AppendResult(interp, "Failed to evaluate '", cpfn, "'", NULL);
 	    return TCL_ERROR;
 	}
 	const char *res = Tcl_GetStringResult(interp);
@@ -86,21 +98,21 @@ add_sch_object(ClientData clientData, Tcl_Interp *interp,
 				     res, NULL);
 	    return TCL_ERROR;
 	}
-	if( strstr(pfn, "draw_output") != NULL ) {
+	if( strstr(cpfn, "draw_output") != NULL ) {
 	    width = 20;
-	} else if( strstr(pfn, "draw_loop_source") != NULL ) {
+	} else if( strstr(cpfn, "draw_loop_source") != NULL ) {
 	    width = 0;
 	} else {
 	    width = ux-lx+20;
 	}
 	height = max((uy-ly+2),10);
-	if( strstr(pfn, "draw_repeat_nd") != NULL ) {
+	if( strstr(cpfn, "draw_repeat_nd") != NULL ) {
 	    height = max(height,20);
 	}
-	insert_hash(&pfn2width, pfn, INT2PTR(width));
-	insert_hash(&pfn2height, pfn, INT2PTR(height));
+	insert_hash(&pfn2width, cpfn, INT2PTR(width));
+	insert_hash(&pfn2height, cpfn, INT2PTR(height));
     } else {
-	width = PTR2INT(find_hash(&pfn2width, pfn));
+	width = PTR2INT(find_hash(&pfn2width, cpfn));
     }
 
     int nbr_fanins;
@@ -394,7 +406,7 @@ draw_network(ClientData clientData, Tcl_Interp *interp,
     //Print_network("After Move_driver_leftmost", tree);
 
     Rank_order_tree(tree, 0); // Initial pos 0
-//    Remove_drive_repeat_overlaps(tree);
+    //    Remove_drive_repeat_overlaps(tree);
 
     Equalize_width(tree);
     //Print_network("After Equalize width tree", tree);

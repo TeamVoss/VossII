@@ -287,7 +287,7 @@ hsv_filter(g_ptr redex)
     int min_v = GET_INT(GET_CONS_HD(v_range));
     int max_v = GET_INT(GET_CONS_TL(v_range));
     if( max_v < min_v ) {
-	string msg = Fail_pr("H_max(%d) < H_min(%d) in bsv_filter",max_v,min_v);
+	string msg = Fail_pr("V_max(%d) < V_min(%d) in bsv_filter",max_v,min_v);
 	MAKE_REDEX_FAILURE(redex,msg);
 	return;
     }

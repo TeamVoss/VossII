@@ -5,15 +5,15 @@
 
 let DBG_timing = F;
 
-let visualize_fanin ckt l1 l2 i1 l3 i2 =
-    DBG_timing => 
-	(fprintf stderr "start visualize_fanin\n") fseq
-	val (res,t) = wtime (visualize_fanin ckt l1 l2 i1 l3 i2) then
-	(fprintf stderr "visualize_fanin: %s\n" t) fseq
-	res
-    |
-	visualize_fanin ckt l1 l2 i1 l3 i2
-;
+//let visualize_fanin ckt l1 l2 i1 l3 i2 =
+//    DBG_timing => 
+//	(fprintf stderr "start visualize_fanin\n") fseq
+//	val (res,t) = wtime (visualize_fanin ckt l1 l2 i1 l3 i2) then
+//	(fprintf stderr "visualize_fanin: %s\n" t) fseq
+//	res
+//    |
+//	visualize_fanin ckt l1 l2 i1 l3 i2
+//;
 
 clet accurate_toplevel_pexlif2fsm p =
     let old1 = update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" "TRUE" then
@@ -102,12 +102,13 @@ let Create_Dummy_Placement =
     (tcl_eval ["catch {destroy .c9999999}",
           "frame .c9999999",
           "frame .c9999999.cc",
-          "canvas .c9999999.cc.c",
+          "set ::dummy_canvas [canvas .c9999999.cc.c]",
           "set cur_zoom_factor(.c9999999.cc.c) 100.0",
           "set ::sc(.c9999999.cc.c) $::base_sc",
           "set ::tfont(.c9999999.cc.c) $::base_tfont",
           "set ::mfont(.c9999999.cc.c) $::base_mfont",
-          "set ::sfont(.c9999999.cc.c) $::base_sfont"
+          "set ::sfont(.c9999999.cc.c) $::base_sfont",
+	  "set ::avg_char_width [get_accurate_text_width .c9999999.cc.c x]"
          ]) fseq
     ()
 ;

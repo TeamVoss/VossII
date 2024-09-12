@@ -235,6 +235,41 @@ let mul_impl N =
 	]
 );
 
+let Booth_recode N i =
+    input           {a::wexpr}.
+    input           {b::wexpr}.
+    output          {res::wexpr}.
+    //
+    internal        a2 na na2 tmp neg.
+    //
+    let xim1 = (i == 0) => {'0::bit} | b~~(2*i-1) then
+    let xi = b~~(2*i) then
+    let xip1 = ((2*i+1) >= N) => {'0::bit} | b~~(2*i+1) then
+    CELL "BoothRecode" [
+        na <- '~' a,
+        a2 <- a '<<' '1,
+        na2 <- '~' a2,
+        CASE tmp [
+            (( '~' xip1 '&' (xi '^' xim1)),     a),
+            (( '~' xip1 '&' xi '&' xim1),       a2),
+            (( xip1 '&' '~' xi '&' '~' xim1),   na2),
+            (( xip1 '&' (xi '^' xim1)),         na)
+        ] '0,
+        neg <- (IF (xip1 '&' '~' (xi '&' xim1)) THEN '1 ELSE '0),
+        res <- (tmp '+' neg) '<<' ''(2*i)
+];
+
+let mul_Booth4_impl N =
+    input   {a:: wexpr} {b:: wexpr}.
+    output  {o:: wexpr}.
+    list_internal ((N+1)/2) {psums:: wexpr list}.
+    CELL "mul_impl" (
+        let mk_psum i = Booth_recode N i a b (el (i+1) psums) in
+        (map mk_psum ((((N+1)/2)-1) downto 0)) @
+        [ o <- accumulate (defix '+') psums ]
+);
+
+
 // ----------------------------------------------------------------
 
 // ----------------------------------------------------------------
@@ -306,6 +341,7 @@ name_model "(a*b)+(a*c)"  (distr2 {'a::wexpr} 'b 'c 'o);
 name_model "(b+c)*a"	  (distr1_rev {'a::wexpr} 'b 'c 'o);
 name_model "(b*a)+(c*a)"  (distr2_rev {'a::wexpr} 'b 'c 'o);
 name_param_model "Sum((a*2^i)&b[i])" (\N. mul_impl N 'a 'b 'o);
+name_param_model "BoothMult" (\N. mul_Booth4_impl N 'a 'b 'o);
 
 
 // Now state all theorems
@@ -323,9 +359,9 @@ name_theorem "mul_a1_is_wire" "a*1" "wire";
 name_theorem "mul_1b_is_wire" "1*a" "wire";
 name_theorem "mul_assoc_21_is_12" "(a*b)*c" "a*(b*c)";
 name_theorem "mul_expand_to_sum_of_partial_products" "a*b" "Sum((a*2^i)&b[i])";
+name_theorem "mul_expand_to_BoothMult" "a*b" "BoothMult";
 name_theorem "mul_distributes_over_add" "a*(b+c)" "(a*b)+(a*c)";
 name_theorem "mul_distributes_over_add" "(b+c)*a" "(b*a)+(c*a)";
-
 name_theorem "mul_definition" "a*b" "Sum((a*2^i)&b[i])";
 
 let do_import_model sz (name,BASE_MODEL w_p) =
@@ -379,7 +415,7 @@ let make_models_and_theorems sz =
 
 
 let MIN_SZ = 1;
-let MAX_SZ = 33;
+let MAX_SZ = 34;
 //let MIN_SZ = 3;
 //let MAX_SZ = 8;
 
@@ -390,3 +426,90 @@ foreach make_models_and_theorems (MIN_SZ upto MAX_SZ);
 fl_save_idv_db "exit";
 
 quit;
+
+//
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//
+//system "/bin/rm -rf DB_arithm";
+//IDV "DB_arithm" [];
+//
+//make_models_and_theorems 3;
+//
+//let sz = 3;
+//val (transform_name, spec_name, imp_name) = el 4 (deref thms_todo);
+//let imp  = get_current_model (sprintf "%d:%s" sz imp_name);
+//imp;
+//
+//DBGwexpr {'a::wexpr};
+//
+//let as = [W_VAR 0 "a[1]", W_VAR 0 "a[0]"];
+//let sub = zip (w_depends (accumulate (defix '+') as)) ["i1[1:0][-1:0]"];
+//sub;
+//
+//let n = mk_name 0 "a[1]";
+//let vs = vec_assoc n sub;
+//
+//let v = hd vs;
+//v;
+//
+//let decls = map (\v. get_base_name v, special_md_size v)
+//                    (special_md_extract_vectors (map snd sub))
+//;
+//decls;
+//
+//let base = get_base_name v;
+//base;
+//let v_sz = special_md_size v;
+//v_sz;
+//let decl_sz = assoc base decls;
+//decl_sz;
+//
+//decls;
+//
+//base;
+//
+//let w_base = W_VAR decl_sz base;
+//
+//v_sz = decl_sz => w_base |
+//val [(l,r)] = get_range v;
+//l; r;
+//
+//let indices = l--r then
+//(W_SLICE indices w_base)
+//
+//
+//
+//DBGwexpr  (accumulate (defix '+') as);
+//
+//
+//
+//
+//w_substitute sub (accumulate (defix '+') as);
+//
+//
+//let q =
+//    list_input	{as:: wexpr list}.
+//    output	{o :: wexpr}.
+//    CELL "q" [
+//	o <- accumulate (defix '+') as
+//];
+//q ['a,'b] 'o;
+//
+//let qq =
+//    list_input	{as:: wexpr list}.
+//    output	{o :: wexpr}.
+//    CELL "qq" [
+//	o <- (el 1 as) '+' (el 2 as)
+//];
+//qq ['a,'b] 'o;
+//
+//
+//let qqq =
+//    input	{a :: wexpr}.
+//    input	{b :: wexpr}.
+//    output	{o :: wexpr}.
+//    CELL "qqq" [
+//	o <- a '+' b
+//];
+//qqq 'a 'b 'o;
+//

@@ -2122,7 +2122,7 @@ visualisation2tcl(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
-// visualize_fanin fsm stop_list levels vecs
+// visualize_fanin fsm stop_list ifc_vecs levels vecs draw_level
 static void
 visualize_fanin(g_ptr redex)
 {
@@ -5546,7 +5546,7 @@ do_combinational(ste_ptr ste)
 	    FP(err_fp,"Combinational relaxtion failed. 0-delay loop likely.\n");
 	    return -1;
 	}
-//if( iterations < 5 ) { FP(err_fp, "\n\niteration: %d\n", iterations); }
+//FP(err_fp, "\n\niteration: %d\n", iterations);
 	do {
 	    buffer *bp = (buffer *) M_LOCATE_BUF(sim_wheel_bufp, rank);
 	    if( COUNT_BUF(bp) > 0 ) {
@@ -5554,7 +5554,7 @@ do_combinational(ste_ptr ste)
 		while( COUNT_BUF(bp) > 0 ) {
 		    ncomp_ptr cp;
 		    pop_buf(bp, &cp);
-//if( iterations < 5 ) { FP(err_fp, "Computing the result for output: "); DBG_print_ilist(cp->outs); }
+//FP(err_fp, "Computing the result for output: "); DBG_print_ilist(cp->outs);
 		    cp->flag = FALSE;
 		    if( quit_simulation_early ) return -1;
 		    todo += do_wl_op(ste, cp);
