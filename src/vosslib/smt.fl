@@ -1,0 +1,295 @@
+begin_abstype;
+
+lettype smt_solver = SMT
+			{name :: string}
+			{ifp :: stream}
+			{ofp :: stream}
+			{pids:: int list}
+			{wexpr2id_r :: int ref}
+			{wexpr2id_tbl :: ({wexpr,string} tbl) ref}
+			{mapping :: ({string,string} tbl) ref}
+;
+
+let start_SMT_solver exec_name preamble =
+    let dir = mktempd "SMT_solver" then
+    let ifile = sprintf "%s/ifile.smt2" dir then
+    (system (sprintf "touch %s" ifile)) fseq
+    let ofile = sprintf "%s/ofile" dir then
+    let pids = 
+	let cmd = sprintf "exec tail -f < %s | %s >& %s &"
+			  ifile exec_name ofile
+	then
+	map (sscanf "%d") (tcl2list (tcl_eval [cmd]))
+	gen_catch (\msg.
+	    NOT (str_is_substr "while executing" msg) => error msg |
+	    let msg = hd (str_split msg "while executing") then
+	    error msg
+	)
+    then
+    let ifp = fopen ifile "a" then
+    let ofp = fopen (sprintf "tail -f %s" ofile) "|r" then
+    (foreach (fprintf ifp "%s\n") preamble) fseq
+    SMT exec_name ifp ofp pids (ref 0)
+	(ref (tbl_create 10)) (ref (tbl_create 10))
+;
+
+let kill_SMT_solver solver =
+    val (SMT name ifp ofp pids wexpr2id_r wexpr2id_tbl map_tbl) = solver in
+    let kill pid = (system (sprintf "kill -9 %d" pid)) fseq () in
+    (foreach kill pids) fseq
+    ()
+;
+
+let merge_indices indices =
+    indices = [] => [] |
+    letrec merge cur_start cur_end (n:ns) =
+        n == (cur_end-1) => merge cur_start n ns |
+        (cur_start, cur_end):(merge n n ns)
+     /\    merge cur_start cur_end [] = [(cur_start, cur_end)]
+    in
+    val (n:ns) = indices in
+    merge n n ns
+;
+
+let wexpr2smtbv map_tbl wexpr2id_r wexpr2id_tbl merge_indices fp es =
+    let insert_mapping var const =
+	tbl_member (deref map_tbl) var =>
+	    let old = tbl_get (deref map_tbl) var in
+	    old != const =>
+		eprintf "Mapping mismatch: %s -> %s and %s\n" var old const
+	    |
+	    ()
+	|
+	(map_tbl := (tbl_insert (deref map_tbl) var const))
+    in
+    letrec cnv e =
+	tbl_member (deref wexpr2id_tbl) e => tbl_get (deref wexpr2id_tbl) e | 
+	let wid = (deref wexpr2id_r) then
+	(wexpr2id_r := (wid + 1)) fseq
+	let res = sprintf "w%05d" wid then
+	let sz = wexpr_size e in
+	(wexpr2id_tbl := (tbl_insert (deref wexpr2id_tbl) e res)) fseq
+	(sz = 1 => (fprintf fp "(declare-const %s Bool)\n" res) |
+	           (fprintf fp "(declare-const %s (_ BitVec %d))\n" res sz))
+	fseq
+	//
+	let emit (W_X sz) = error "Cannot convert W_X"
+	 /\ emit (W_CONST sz v) = 
+	    (fprintf fp "(assert (= %s #%0*b))\n" res sz v) fseq res
+	 /\ emit (W_NAMED_CONST nm sz v) = 
+	    (fprintf fp "(assert (= %s #%0*b))\n" res sz v) fseq res
+         /\  emit (W_VAR sz base) =
+		(insert_mapping (mk_name sz base) res) fseq res
+         /\  emit (W_EXPLICIT_VAR sz n) =
+		(insert_mapping n res) fseq res
+         /\  emit (W_AND e1 e2) = 
+	    let n1 = cnv e1 then
+	    let n2 = cnv e2 then
+	    let op = (wexpr_size e1) = 1 => "and" | "bvand" in
+	    (fprintf fp "(assert (= %s (%s %s %s)))\n" res op n1 n2) fseq res
+         /\  emit (W_OR e1 e2) = 
+	    let n1 = cnv e1 then
+	    let n2 = cnv e2 then
+	    let op = (wexpr_size e1) = 1 => "or" | "bvor" in
+	    (fprintf fp "(assert (= %s (%s %s %s)))\n" res op n1 n2) fseq res
+         /\  emit (W_NOT e) = 
+	    let n = cnv e then
+	    let op = (wexpr_size e) = 1 => "not" | "bvnot" in
+	    (fprintf fp "(assert (= %s (%s %s)))\n" res op n) fseq res
+         /\  emit (W_EQ e1 e2) = 
+	    let n1 = cnv e1 then
+	    let n2 = cnv e2 then
+	    (fprintf fp "(assert (= %s (= %s %s)))\n" res n1 n2) fseq res
+         /\  emit (W_GR e1 e2) = 
+	    let n1 = cnv e1 then
+	    let n2 = cnv e2 then
+	    (fprintf fp "(assert (= %s (bvsgt %s %s)))\n" res n1 n2) fseq res
+         /\  emit (W_PRED name e) = 
+	    let n = cnv e then
+	    (fprintf fp "(assert %s)\n" n) fseq ""  // <<<<<  ????????
+         /\  emit (W_ADD e1 e2) = 
+	    let n1 = cnv e1 then
+	    let n2 = cnv e2 then
+	    (fprintf fp "(assert (= %s (bvadd %s %s)))\n" res n1 n2) fseq res
+         /\  emit (W_SUB e1 e2) = 
+	    let n1 = cnv e1 then
+	    let n2 = cnv e2 then
+	    (fprintf fp "(assert (= %s (bvsub %s %s)))\n" res n1 n2) fseq res
+         /\  emit (W_MUL e1 e2) = 
+	    let n1 = cnv e1 then
+	    let n2 = cnv e2 then
+	    (fprintf fp "(assert (= %s (bvmul %s %s)))\n" res n1 n2) fseq res
+         /\  emit (W_DIV e1 e2) = 
+	    let n1 = cnv e1 then
+	    let n2 = cnv e2 then
+	    (fprintf fp "(assert (= %s (bvsdiv %s %s)))\n" res n1 n2) fseq res
+         /\  emit (W_MOD e1 e2) = 
+	    let n1 = cnv e1 then
+	    let n2 = cnv e2 then
+	    (fprintf fp "(assert (= %s (bvsmod %s %s)))\n" res n1 n2) fseq res
+         /\  emit (W_SHL e1 e2) = 
+	    let n1 = cnv e1 then
+	    let n2 = cnv e2 then
+	    (fprintf fp "(assert (= %s (bvshl %s %s)))\n" res n1 n2) fseq res
+         /\  emit (W_SHR e1 e2) = 
+	    let n1 = cnv e1 then
+	    let n2 = cnv e2 then
+	    (fprintf fp "(assert (= %s (bvlshr %s %s)))\n" res n1 n2) fseq res
+         /\  emit (W_ASHR e1 e2) = 
+	    let n1 = cnv e1 then
+	    let n2 = cnv e2 then
+	    (fprintf fp "(assert (= %s (bvashr %s %s)))\n" res n1 n2) fseq res
+         /\  emit (W_SX sz e) = 
+	    let n = cnv e then
+	    (fprintf fp "(assert (= %s ((_ sign_extend %d) %s)))\n" res sz n)
+	    fseq res
+         /\  emit (W_ZX sz e) = 
+	    let n = cnv e then
+	    (fprintf fp "(assert (= %s ((_ zero_extend %d) %s)))\n" res sz n)
+	    fseq res
+	 /\  emit (W_ITE cond t e) =
+	    let nc = cnv cond then
+	    let nt = cnv t then
+	    let ne = cnv e then
+	    (fprintf fp "(assert (= %s (ite %s %s %s)))\n" res nc nt ne)
+	    fseq res
+	 /\  emit (W_SLICE indices e) =
+	    let n = cnv e then
+	    let chunks = merge_indices indices then
+	    (
+	      length chunks = 1 =>
+		val (f,t) = hd chunks in
+		fprintf fp "(assert (= %s ((_ extract %d %d) %s)))\n" res f t n
+	      |
+		let pr fp (f,t) = fprintf fp "((_ extract %d %d) %s)" f t n in
+		let pre = sprintf "(assert (= %s (concat " res in
+		list2fp fp T pre " " ")))\n" pr chunks
+	    ) fseq
+	    res
+         /\  emit (W_NAMED_SLICE name indices e) =
+	    let n = cnv e then
+	    let chunks = merge_indices indices then
+	    (
+	      length chunks = 1 =>
+		val (f,t) = hd chunks in
+		fprintf fp "(assert (= %s ((_ extract %d %d) %s)))\n" res f t n
+	      |
+		let pr fp (f,t) = fprintf fp "((_ extract %d %d) %s)" f t n in
+		let pre = sprintf "(assert (= %s (concat " res in
+		list2fp fp T pre " " ")))\n" pr chunks
+	    ) fseq
+	    res
+         /\  emit (W_UPDATE_NAMED_SLICE base name indices e) =
+	    error "W_UPDATE_NAMED_SLICE not supported yet"
+         /\  emit (W_CAT el) =
+	    let nl = map cnv el then
+	    let pr fp s = fprintf fp "%s" s in
+	    let pre = sprintf "(assert (= %s (concat " res in
+	    (list2fp fp T pre " " ")))\n" pr nl) fseq res
+	 /\  emit (W_MEM_READ info mem addr) =
+	    error "W_MEM_READ not supported yet"
+	 /\  emit (W_MEM_WRITE info mem addr data) =
+	    error "W_MEM_WRITE not supported yet"
+	 /\  emit (W_LAT_LEQ a b) =
+	    error "W_LAT_LEQ cannot be translated to SMT format"	
+	in
+	emit e
+    in
+    let ns = map cnv es then
+    let mappings = tbl2list (deref map_tbl) then
+    (ns,mappings)
+;
+
+let read_model fp =
+    let init = fgets fp then
+    init != "(\n" => error "Incorrect initial value |%s|\n" init |
+    letrec read cnt =
+	let line = fgets fp then
+	line = "" => eprintf "End of file after line %d\n" cnt |
+	line = ")\n" => [] |
+	str_is_substr "Bool" line =>
+	    let fs = str_reg_extract
+		    "^\\(define-fun ([a-zA-Z0-9_]+) \\(\\) Bool ([A-Za-z]*)\\)"
+		    line
+	    then
+	    (el 2 fs, [((el 3 fs) = "true")]):(read (cnt+1))
+	|
+	    let fs = str_reg_extract
+    "^\\(define-fun ([a-zA-Z0-9_]+) \\(\\) \\(_ BitVec [0-9]+\\) #b([0-1]+)\\)"
+		    line
+	    then
+	    let vs = map (\s. s = "1") (explode (el 3 fs)) in
+	    (el 2 fs, vs):(read (cnt+1))
+    in
+    read 0
+;
+
+
+let wget_model solver conds time_limit->10000 =
+    val (SMT name ifp ofp pids wexpr2id_r wexpr2id_tbl map_tbl) = solver in
+    val (ns, mapping) =
+	wexpr2smtbv map_tbl wexpr2id_r wexpr2id_tbl merge_indices ifp conds 
+    then
+    let pr fp s = fprintf fp "%s" s in
+    (fprintf ifp "(push)\n") fseq
+    (fprintf ifp "(set-option :tlimit-per %d)\n" time_limit) fseq
+    (list2fp ifp T "(assert " " " ")\n" pr ns) fseq
+    (fprintf ifp "(check-sat)\n") fseq
+    let res = fgets ofp then
+    let result = 
+	str_is_prefix "unsat" res => [] |
+	str_is_prefix "sat" res => (
+	    (fprintf ifp "(get-model)\n") fseq
+	    let subst = read_model ofp then
+	    let do_map (wname, vl) =
+		[((rev_assoc wname mapping), vl)] catch []
+	    in
+	    flatmap do_map subst
+	) |
+	str_is_prefix "unknown" res =>
+	    eprintf "Solver ran out of time"
+	|
+	eprintf "Ubrecognized return message: |%s|\n" res
+    then
+    (fprintf ifp "(pop)\n") fseq
+    let cmp (v1,bl1) (v2,bl2) = node_name_cmp v1 v2 in
+    qsort cmp result
+;
+
+
+let make_CVC5_solver default_time_limit->10000 =
+    let exec_name = "cvc5 --incremental" in
+    let preamble = [
+	"(set-logic QF_BV)",
+	"(set-option :produce-models true)",
+	sprintf "(set-option :tlimit %d)" default_time_limit
+    ] in
+    start_SMT_solver exec_name preamble
+;
+
+end_abstype start_SMT_solver kill_SMT_solver make_CVC5_solver wget_model;
+
+
+//// Example of use
+//
+//let solver = make_CVC5_solver;
+//solver;
+//
+//TYPE "word" 64;
+//
+//let a = {'a::word};
+//let b = {'b::word};
+//let c = {'c::word};
+//
+//let e1 = a '*' (b '+' c);
+//let e2 = a '*' b '+' a '*' c;
+//let e3 = a '*' b '+' a '*' b;
+//
+//let tst1 = hw_destr (e1 '!=' e2);
+//let tst2 = hw_destr (e1 '!=' e3);
+//let tst3 = hw_destr (e1 '>=' e2);
+//
+//wget_model solver [tst1];
+//wget_model solver [tst2];
+//wget_model solver [tst3];
+//

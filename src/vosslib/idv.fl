@@ -8,4 +8,5 @@ cload (DIR^"vector_names.fl");
 cload (DIR^"../IDVII/src/fl/design/load.fl");
 fprintf stdinfo ".";
 cload (DIR^"../IDVII/src/fl/gui/sch_draw/load.fl");
+cload (DIR^"smt.fl");
 fprintf stdinfo " done --\n";
