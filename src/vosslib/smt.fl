@@ -51,6 +51,17 @@ let merge_indices indices =
     merge n n ns
 ;
 
+letrec is_relation (W_EQ e1 e2) = T
+ /\    is_relation (W_GR e1 e2) = T
+ /\    is_relation (W_PRED name e2) = T
+ /\    is_relation (W_NOT e) = is_relation e
+ /\    is_relation (W_AND e1 e2) = is_relation e1 OR is_relation e2
+ /\    is_relation (W_OR e1 e2) = is_relation e1 OR is_relation e2
+ /\    is_relation (W_ITE c e1 e2) = is_relation e1 OR is_relation e2
+ /\    is_relation other = F
+;
+
+
 let wexpr2smtbv map_tbl wexpr2id_r wexpr2id_tbl merge_indices fp es =
     let insert_mapping var const =
 	tbl_member (deref map_tbl) var =>
@@ -69,15 +80,16 @@ let wexpr2smtbv map_tbl wexpr2id_r wexpr2id_tbl merge_indices fp es =
 	let res = sprintf "w%05d" wid then
 	let sz = wexpr_size e in
 	(wexpr2id_tbl := (tbl_insert (deref wexpr2id_tbl) e res)) fseq
-	(sz = 1 => (fprintf fp "(declare-const %s Bool)\n" res) |
-	           (fprintf fp "(declare-const %s (_ BitVec %d))\n" res sz))
+	let relation = is_relation e in
+	(relation => (fprintf fp "(declare-const %s Bool)\n" res)
+		   | (fprintf fp "(declare-const %s (_ BitVec %d))\n" res sz))
 	fseq
 	//
 	let emit (W_X sz) = error "Cannot convert W_X"
 	 /\ emit (W_CONST sz v) = 
-	    (fprintf fp "(assert (= %s #%0*b))\n" res sz v) fseq res
+	    (fprintf fp "(assert (= %s #b%0*b))\n" res sz v) fseq res
 	 /\ emit (W_NAMED_CONST nm sz v) = 
-	    (fprintf fp "(assert (= %s #%0*b))\n" res sz v) fseq res
+	    (fprintf fp "(assert (= %s #b%0*b))\n" res sz v) fseq res
          /\  emit (W_VAR sz base) =
 		(insert_mapping (mk_name sz base) res) fseq res
          /\  emit (W_EXPLICIT_VAR sz n) =
@@ -85,16 +97,16 @@ let wexpr2smtbv map_tbl wexpr2id_r wexpr2id_tbl merge_indices fp es =
          /\  emit (W_AND e1 e2) = 
 	    let n1 = cnv e1 then
 	    let n2 = cnv e2 then
-	    let op = (wexpr_size e1) = 1 => "and" | "bvand" in
+	    let op = relation => "and" | "bvand" in
 	    (fprintf fp "(assert (= %s (%s %s %s)))\n" res op n1 n2) fseq res
          /\  emit (W_OR e1 e2) = 
 	    let n1 = cnv e1 then
 	    let n2 = cnv e2 then
-	    let op = (wexpr_size e1) = 1 => "or" | "bvor" in
+	    let op = relation => "or" | "bvor" in
 	    (fprintf fp "(assert (= %s (%s %s %s)))\n" res op n1 n2) fseq res
          /\  emit (W_NOT e) = 
 	    let n = cnv e then
-	    let op = (wexpr_size e) = 1 => "not" | "bvnot" in
+	    let op = relation => "not" | "bvnot" in
 	    (fprintf fp "(assert (= %s (%s %s)))\n" res op n) fseq res
          /\  emit (W_EQ e1 e2) = 
 	    let n1 = cnv e1 then
@@ -151,7 +163,11 @@ let wexpr2smtbv map_tbl wexpr2id_r wexpr2id_tbl merge_indices fp es =
 	    let nc = cnv cond then
 	    let nt = cnv t then
 	    let ne = cnv e then
-	    (fprintf fp "(assert (= %s (ite %s %s %s)))\n" res nc nt ne)
+	    (NOT relation AND ((wexpr_size cond) = 1) =>
+		(fprintf fp "(assert (= %s (ite (= %s #b1) %s %s)))\n" res nc nt ne)
+	    |
+		(fprintf fp "(assert (= %s (ite %s %s %s)))\n" res nc nt ne)
+	    )
 	    fseq res
 	 /\  emit (W_SLICE indices e) =
 	    let n = cnv e then
@@ -226,6 +242,8 @@ let read_model fp =
 
 
 let wget_model solver conds time_limit->10000 =
+    let idx = find_first0 (\w. wexpr_size w != 1) conds in
+    idx != 0 => eprintf "Element %d in conds is not of size 1!" idx |
     val (SMT name ifp ofp pids wexpr2id_r wexpr2id_tbl map_tbl) = solver in
     val (ns, mapping) =
 	wexpr2smtbv map_tbl wexpr2id_r wexpr2id_tbl merge_indices ifp conds 
