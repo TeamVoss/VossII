@@ -1,0 +1,55 @@
+load "idv.fl";
+
+
+let solver = make_CVC5_solver;
+
+//let N = 62;
+let N = 16;
+TYPE "word" N;
+
+let a = {'a::word};
+let b = {'b::word};
+let c = {'c::word};
+let d = {'d::word};
+let e = {'e::word};
+
+
+let e1 = a '*' (b '-' (c '-' d));
+let e2 = a '*' b '-' c '*' a '+' d '*' a;
+
+let same1 = e1 '!=' e2;
+
+wget_model solver [hw_destr same1];
+
+
+let Booth_recode i {a::word} b =
+    let xim1 = (i == 0) => {'0::bit} | b~~(2*i-1) then
+    let xi = b~~(2*i) then
+    let xip1 = ((2*i+1) >= N) => {'0::bit} | b~~(2*i+1) then
+    let na = '~' a in
+    let a2 = a '<<' '1 in
+    let na2 = '~' a2 in
+    let tmp =
+	    IF ('~' xip1 '&' (xi '^' xim1)) THEN a ELSE (
+	    IF ('~' xip1 '&' xi '&' xim1) THEN a2 ELSE (
+	    IF ( xip1 '&' '~' xi '&' '~' xim1) THEN na2 ELSE (
+            IF ( xip1 '&' (xi '^' xim1)) THEN na ELSE
+	    '0))) in
+	let neg = IF (xip1 '&' '~' (xi '&' xim1)) THEN '1 ELSE '0 in
+        (tmp '+' neg) '<<' ''(2*i)
+;
+
+let mul_Booth4_impl {a:: word} {b:: word} =
+    let mk_psum i = Booth_recode i a b in
+    let psums = map (\i. Booth_recode i a b) ((((N+1)/2)-1) downto 0) in
+    accumulate (defix '+') psums
+;
+
+
+let imp = mul_Booth4_impl a b;
+let spec = a '*' b;
+
+let hard = imp '!=' spec;
+
+wget_model solver [hw_destr hard] 1000000;
+
