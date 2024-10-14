@@ -460,6 +460,7 @@ Init_symbol()
     symb_tbl->def_list = dummy;
     update_stbl(symb_tbl, dummy);
     dummy->visible        = TRUE;
+    dummy->exported       = FALSE;
     dummy->in_use         = TRUE;
     dummy->file_name      = wastrsave(&strings, "_dummy_");;
     dummy->start_line_nbr = 1;
@@ -669,6 +670,7 @@ Add_Destructors(string name, typeExp_ptr new_type,
         tmp                = (fn_ptr) get_fn_rec();
         tmp->ADT_level     = ADT_level;
         tmp->visible       = TRUE;
+	tmp->exported      = FALSE;
 	tmp->in_use        = TRUE;
         tmp->non_lazy      = FALSE;
         tmp->forward       = FALSE;
@@ -711,6 +713,7 @@ Add_Destructors(string name, typeExp_ptr new_type,
         fn_ptr  save_fun;
         save_fun = (fn_ptr) get_fn_rec();
         save_fun->visible        = TRUE;
+	save_fun->exported       = FALSE;
 	save_fun->in_use         = TRUE;
         save_fun->ADT_level      = ADT_level;
         save_fun->non_lazy       = FALSE;
@@ -745,6 +748,7 @@ Add_Destructors(string name, typeExp_ptr new_type,
         load_fun = (fn_ptr) get_fn_rec();
         load_fun->ADT_level      = ADT_level;
         load_fun->visible        = TRUE;
+	load_fun->exported       = FALSE;
 	load_fun->in_use         = TRUE;
         load_fun->non_lazy       = FALSE;
         load_fun->forward        = FALSE;
@@ -831,6 +835,7 @@ InsertOverloadDef(string name, bool open_overload, oll_ptr alts,
     ret->comments       = NULL;
     ret->arg_names      = NULL;
     ret->visible        = TRUE;
+    ret->exported       = FALSE;
     ret->in_use         = TRUE;
     ret->non_lazy       = FALSE;
     ret->forward        = FALSE;
@@ -886,6 +891,7 @@ Make_forward_declare(string name, typeExp_ptr type, symbol_tbl_ptr stbl,
     ret->ADT_level      = ADT_level;
     ret->forward        = TRUE;
     ret->visible        = TRUE;
+    ret->exported       = FALSE;
     ret->in_use         = TRUE;
     ret->file_name      = file;
     ret->start_line_nbr = start_line;
@@ -971,6 +977,7 @@ New_fn_def(string name, result_ptr res, symbol_tbl_ptr stbl, bool print,
     }
     //
     ret->visible            = TRUE;
+    ret->exported	    = FALSE;
     ret->in_use             = TRUE;
     ret->file_name          = file;
     ret->start_line_nbr     = start_line;
@@ -1014,6 +1021,15 @@ Begin_ADT(symbol_tbl_ptr stbl)
 {
     push_buf(&ADT_buf, (pointer) &(stbl->def_list));
     ADT_level++;
+}
+
+bool
+Export_Fun(string name, symbol_tbl_ptr stbl)
+{
+    fn_ptr fp = Find_Function_Def(stbl, name);
+    if( fp == NULL ) { return FALSE; }
+    fp->exported = TRUE;
+    return TRUE;
 }
 
 symbol_tbl_ptr
@@ -1061,7 +1077,11 @@ End_ADT(symbol_tbl_ptr stbl, var_list_ptr vlp)
     fn_ptr flp = stbl->def_list;
 
     while( flp != last ) {
-        if( find_hash(&keep_tbl, (pointer) flp->name) != NULL ) {
+        if(flp->exported  ) {
+            flp->visible = TRUE;
+            flp->ADT_level = ADT_level;
+            insert_hash(stbl->tbl_ptr, (pointer) flp->name, (pointer) flp);
+	} else if( find_hash(&keep_tbl, (pointer) flp->name) != NULL ) {
             flp->visible = TRUE;
             flp->ADT_level = ADT_level;
             insert_hash(stbl->tbl_ptr, (pointer) flp->name, (pointer) flp);
@@ -1403,6 +1423,7 @@ Add_ExtAPI_Function(string name, string strictness,
     fn_ptr ret = (fn_ptr) get_fn_rec();
     ret->ADT_level      = ADT_level;
     ret->visible        = TRUE;
+    ret->exported       = FALSE;
     ret->in_use         = TRUE;
     ret->file_name      = wastrsave(&strings, "builtin");
     ret->start_line_nbr = 0;

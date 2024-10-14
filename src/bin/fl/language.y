@@ -261,6 +261,7 @@ extern int dbg_tst_line_cnt;
 %token <loc_t>	C_LET
 %token <loc_t>	C_LETREC
 %token <loc_t>	END_ADT
+%token <loc_t>	EXPORT
 %token <loc_t>	EXPORT_TO_TCL
 %token <loc_t>	IMPORT_FROM_TCL
 %token <loc_t>	FORWARD_DECLARE
@@ -541,6 +542,12 @@ stmt		: expr
 		{
 		    Remove_Infix($2);
 		}
+                | EXPORT var_or_infix
+		{
+		    if( !Export_Fun($2, symb_tbl) ) {
+                        FP(err_fp, "-E-: Cannot export symbol %s\n", $2);
+		    }
+		}
                 | EXPORT_TO_TCL var_or_infix
                 {
                     if( !Register_tcl_callback($2, symb_tbl) ) {
@@ -661,6 +668,10 @@ stmt		: expr
 		| END_ADT var_list
 		{
 		    symb_tbl = End_ADT(symb_tbl, $2);
+		}
+		| END_ADT
+		{
+		    symb_tbl = End_ADT(symb_tbl, NULL);
 		}
 		;
 

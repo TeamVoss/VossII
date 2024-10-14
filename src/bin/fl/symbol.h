@@ -49,6 +49,7 @@ symbol_tbl_ptr	AddToOpenOverloadDef(string name, oll_ptr alts,
 				     symbol_tbl_ptr stbl,
 				     string file, int start_line);
 void		Begin_ADT(symbol_tbl_ptr stbl);
+bool		Export_Fun(string name, symbol_tbl_ptr stbl);
 symbol_tbl_ptr	End_ADT(symbol_tbl_ptr stbl, var_list_ptr vlp);
 string		Get_Help(string fun);
 g_ptr		Add_ExtAPI_Function(string name, string strictness,
@@ -109,11 +110,12 @@ typedef struct fn_rec {
 	int		    id;
         string		    file_name;
 	int		    ADT_level;
-        int		    start_line_nbr:29;
-        int		    end_line_nbr:29;
+        int		    start_line_nbr:28;
+        bool		    exported:1;
         bool		    visible:1;
         bool		    in_use:1;
         bool		    non_lazy:1;
+        int		    end_line_nbr:29;
         bool		    forward:1;
         bool		    overload:1;
         bool		    open_overload:1;
