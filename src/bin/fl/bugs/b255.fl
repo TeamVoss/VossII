@@ -4,7 +4,7 @@ load "idv.fl";
 let solver = make_CVC5_solver;
 
 //let N = 62;
-let N = 16;
+let N = 8;
 TYPE "word" N;
 
 let a = {'a::word};

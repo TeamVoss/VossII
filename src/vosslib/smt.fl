@@ -153,11 +153,15 @@ let wexpr2smtbv map_tbl wexpr2id_r wexpr2id_tbl merge_indices fp es =
 	    (fprintf fp "(assert (= %s (bvashr %s %s)))\n" res n1 n2) fseq res
          /\  emit (W_SX sz e) = 
 	    let n = cnv e then
-	    (fprintf fp "(assert (= %s ((_ sign_extend %d) %s)))\n" res sz n)
+	    let esz = wexpr_size e in
+	    (fprintf fp "(assert (= %s ((_ sign_extend %d) %s)))\n"
+		     res (sz-esz) n)
 	    fseq res
          /\  emit (W_ZX sz e) = 
 	    let n = cnv e then
-	    (fprintf fp "(assert (= %s ((_ zero_extend %d) %s)))\n" res sz n)
+	    let esz = wexpr_size e in
+	    (fprintf fp "(assert (= %s ((_ zero_extend %d) %s)))\n"
+		     res (sz-esz) n)
 	    fseq res
 	 /\  emit (W_ITE cond t e) =
 	    let nc = cnv cond then
