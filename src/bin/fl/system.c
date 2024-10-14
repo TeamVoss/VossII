@@ -259,17 +259,25 @@ get_binary_directory()
     ssize_t sz = readlink(buf, path_buf, 1000);
     (void) sz;
 #else
-	uint32_t size = sizeof(path_buf);
-	if (_NSGetExecutablePath(path_buf, &size) != 0)
-		printf("buffer too small; need size %u\n", size);
-	else
-		printf("VossII path is %s\n", path_buf);
+    uint32_t size = sizeof(path_buf);
+    if (_NSGetExecutablePath(path_buf, &size) != 0)
+	printf("buffer too small; need size %u\n", size);
+    else
+	printf("VossII path is %s\n", path_buf);
 #endif
     tmp = rindex(path_buf, '/');
     if( tmp == NULL ) {
         Eprintf("readlink did not find full path. WHAT???");
     }
     *tmp = 0;
+
+    int plen = strlen(path_buf);
+    if( plen >= 11 && strcmp(path_buf+plen-11, "/src/bin/fl") == 0 ) {
+	// Change the binary path to the bin directory if you are running
+	// fl from the source directory.
+	path_buf[plen-11] = 0;
+	strcat(path_buf, "/bin");
+    }
     string res = wastrsave(&strings, path_buf);
     return res;
 }
