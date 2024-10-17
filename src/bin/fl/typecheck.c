@@ -2674,16 +2674,16 @@ print_type_rec(typeExp_ptr type, odests fp, int prec)
 	case tuple_tp:
 	    if( prec > 2 )
 		FP(fp, "(");
-	    print_type_rec(type->typelist->type, fp, 3);
+	    print_type_rec(type->typelist->type, fp, 2);
 	    FP(fp, "#");
-	    print_type_rec(type->typelist->next->type, fp, 3);
+	    print_type_rec(type->typelist->next->type, fp, 2);
 	    if( prec > 2 )
 		FP(fp, ")");
 	    break;
 	case list_tp:
 	    if( prec > 0 )
 		FP(fp, "(");
-	    print_type_rec(type->typelist->type, fp, 1);
+	    print_type_rec(type->typelist->type, fp, 9);
 	    FP(fp, " list");
 	    if( prec > 0 )
 		FP(fp, ")");
