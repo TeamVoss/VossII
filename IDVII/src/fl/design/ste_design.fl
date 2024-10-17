@@ -176,7 +176,7 @@ let base_is nds vtlist =
     let nds = md_expand_vectors nds in
     let vec = list2str T "" "," "" id (md_merge_vectors nds) in
     let sz = length nds in
-    let cnv (fixed, (STR_VAL v), f , t) =
+    let cnv ({fixed::bool}, (STR_VAL v), {f::int} , {t::int}) =
 	let vs = (
 	    let s2l s = map (\s. s = "1") (explode s) in
 	    str_is_prefix "0x" v =>
@@ -229,11 +229,64 @@ let base_is nds vtlist =
 
 let s_is vec vtlist = base_is [vec] vtlist;
 
+let wbase_is vec vtlist =
+    let sz = md_size vec in
+    let wT = W_CONST 1 1 in
+    let wF = W_CONST 1 0 in
+    let cnv ({fixed::bool}, (STR_VAL v), {f::int} , {t::int}) =
+        let vs = (
+            let s2l s = map (\s. s = "1") (explode s) in
+            str_is_prefix "0x" v =>
+                W_CONST sz (sscanf "0x%x" v)
+            |
+            str_is_prefix "0b" v =>
+                W_CONST sz (sscanf "0b%b" v)
+            |
+            is_number v => 
+                W_CONST sz (sscanf "%d" v)
+            |
+            (sz = 1) AND (v = "T") => wT |
+            (sz = 1) AND (v = "F") => wF |
+            md_size v != sz => error "nope" |
+            W_EXPLICIT_VAR sz v
+        ) catch
+            eprintf "Length mismatch in is (|%s| != |%s|)" vec v
+        in
+        wexpr_size vs != sz =>
+            eprintf "Length mismatch in is (|%s| != |%s|)" vec v
+        |
+        [(wT,vec,vs,f,t)]
+     /\ cnv (fixed, (INT_VAL i), f, t) =
+        i < (-1*2**(sz-1)) =>
+            eprintf "Integer %d too small to fit %s" i vec
+        |
+        i > (2**sz-1) =>
+            eprintf "Integer %d too large to fit %s" i vec
+        |
+        let vs = W_CONST sz i in
+        wexpr_size vs != sz =>
+            eprintf "Length mismatch in is (|%s| != |%d|)" vec i
+        |
+        [(wT,vec,vs,f,t)]
+     /\ cnv (fixed, (BV_VAL bv), f, t) =
+        eprintf "Cannot use bv's for wSTE statements"
+     /\ cnv (fixed, (BL_VAL vs), f, t) =
+        eprintf "Cannot use bool lists for wSTE statements"
+     /\ cnv (fixed, (WEXPR_VAL e), f, t) =
+        sz != wexpr_size e =>
+            eprintf "Length mismatch in is (|%s| != |%s|)" vec (Pwexpr e)
+        |
+        [(wT,vec,e,f,t)]
+     /\ cnv (fixed, UNC, f, t) = []
+    in
+    flatmap cnv vtlist
+;
+
 let hw_is v vtlist =
     base_is (md_expand_vectors (base_get_lhs_vars (hw_destr v))) vtlist
 ;
 
-overload is s_is hw_is;
+overload is s_is hw_is wbase_is;
 infix 2 is;
 
 // Casting function
@@ -241,3 +294,6 @@ let bool_ant {l::(bool#string#bool#int#int) list} = l;
 
 // Casting function
 let bexpr_ant {l::(bexpr#string#bexpr#int#int) list} = l;
+
+// Casting function
+let wexpr_ant {l::(wexpr#string#wexpr#int#int) list} = l;

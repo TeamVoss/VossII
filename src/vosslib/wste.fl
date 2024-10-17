@@ -1,0 +1,164 @@
+cload "idv.fl";
+
+new_type_abbrev w5tuple = wexpr#string#wexpr#int#int;
+new_type_abbrev w5tuples = w5tuple list;
+
+
+begin_abstype;
+
+// ----------------------------------------------------------------------
+//
+// Placeholder code for the real WSTE function that hopefully is coming.
+//
+// ----------------------------------------------------------------------
+
+clet w4tuple2bool4tuple (ww,n,f,t) =
+    let w = last (bv2list (w2bv [] ww)) in
+    let ns = md_expand_vector n in
+    map (\n. w, n, {f::int}, {t::int}) ns
+;
+
+
+clet w5tuple2bool5tuple (ww,n,wv,f,t) =
+    let w = last (bv2list (w2bv [] ww)) in
+    let ns = md_expand_vector n in
+    let nlen = length ns in
+    let vs = bv2list (w2bv [] wv) in
+    let vlen = length vs in
+    let vs' = nlen <= vlen => lastn nlen vs |
+		    (replicate (nlen-vlen) F)@vs
+    in
+    map2 (\n.\v. (w,n,v,{f::int},{t::int})) ns vs'
+;
+
+
+// Placeholder for the real WSTE function that hopefully is coming.
+let WSTE opts ckt wwl want wcons wtrl =
+    let wl = flatmap w4tuple2bool4tuple wwl in
+    let ant = flatmap w5tuple2bool5tuple want in
+    let cons = flatmap w5tuple2bool5tuple wcons in
+    let trl = 
+	let exp (vec,f,t) = map (\n. n,f,t) (md_expand_vector vec) in
+	flatmap exp wtrl
+    in
+    STE opts ckt wl ant cons trl
+;
+export WSTE;
+
+new_type_abbrev nwv = (string#wexpr#wexpr);
+new_type_abbrev nwvs = wnv list;
+
+lettype w_events = W_BEGIN {idx::int} | W_END {idx::int};
+
+let Pw_events (W_BEGIN idx) = sprintf "+%d " idx
+ /\ Pw_events (W_END idx)   = sprintf "-%d " idx
+;
+install_print_function Pw_events;
+
+let w5tuples2events {fs::w5tuples} =
+    let idx2fs = zip (1 upto (length fs)) fs in
+    let mk (idx,(w,n,v,f,t)) = [(f,(W_BEGIN idx)), (t,(W_END idx))] in
+    let raw = flatmap mk idx2fs in
+    let mk2 l = 
+	let t = fst (hd l) in
+	t,(map snd l)
+    in
+    let cmp (t1,d1) (t2,d2) = t1-t2 in
+    let event_list = qsort cmp (map mk2 (partition fst raw)) in
+    letrec active cur ((t,events):rem) =
+	let add_sub (W_BEGIN i) = [i],[]
+	 /\ add_sub (W_END i)   = [], [i]
+	in
+	val (ladds, lsubs) = unzip (map add_sub events) in
+	let adds = flat ladds in
+	let subs = flat lsubs in
+	let new = (cur subtract subs) union adds in
+	let fts = map (\i. assoc i idx2fs) new in
+	let strip (w,n,v,f,t) = (n, w, v) in
+	
+	(t, map strip fts):active new rem
+     /\   active cur [] = []
+    in
+    active [] (qsort cmp (map mk2 (partition fst raw)))
+;
+
+let w_AND (W_CONST 1 0) e2 = W_CONST 1 0
+ /\ w_AND (W_CONST 1 1) e2 = e2
+ /\ w_AND e1 (W_CONST 1 0) = W_CONST 1 0
+ /\ w_AND e1 (W_CONST 1 1) = e1
+ /\ w_AND e1 e2 = W_AND e1 e2
+;
+
+let w_EQ e1 e2 = (e1 == e2) => W_CONST 1 1 | W_EQ e1 e2;
+
+
+let leq1 el1 el2 =
+    let leq_v1 (n1,w1,v1) =
+	let ok (n2,w2,v2) r = n1 != n2 => r | w_AND (w_AND w2 (w_EQ v1 v2)) r in
+	itlist ok el2 (W_CONST 1 1)
+    in
+    itlist (\tr.\r. w_AND (leq_v1 tr) r) el1 (W_CONST 1 1)
+;
+
+letrec fill_in cur (et:ets) ((t,el):rem) =
+    et < t => (et,cur):(fill_in cur ets (({t::int},el):rem))
+	    | (t,el):(fill_in el ets rem)
+ /\    fill_in cur [] [] = []
+;
+
+let w_leq {f1::w5tuples} {f2::w5tuples} =
+    let el1 = w5tuples2events f1 in
+    let el2 = w5tuples2events f2 in
+    let time_points = qsort (defix -) (setify ((map fst el1)@(map fst el2))) in
+    let ext_el1 = fill_in [] time_points el1 in
+    let ext_el2 = fill_in [] time_points el2 in
+    letrec cmp ((_,el1):rem1) ((_,el2):rem2) =
+	w_AND (leq1 el1 el2) (cmp rem1 rem2)
+     /\    cmp [] [] = W_CONST 1 1
+    in
+    cmp ext_el1 ext_el2
+;
+export w_leq;
+
+end_abstype;
+
+//
+//
+//TYPE "word" 16;
+//TYPE "byte" 8;
+//
+//let ant1 = wexpr_ant (
+//    "b1[7:0]" is {'a::byte} for 2 cycles followed_by
+//               0xab for 2 cycles
+//  and
+//    "b2[7:0]" is {'b::byte} for 2 cycles followed_by
+//               0xba for 2 cycles
+//  and
+//    "w1[15:0]" is 0xabba for 4 cycles
+//);
+//
+//let ant2 = wexpr_ant (
+//    "b1[7:0]" is {'c::byte} for 3 cycles followed_by
+//               0xab for 1 cycles
+//  and
+//    "b2[7:0]" is {'b::byte} for 3 cycles followed_by
+//               0xba for 1 cycles
+//  and
+//    "w1[15:0]" is 0xabba for 4 cycles
+//);
+//
+//
+//w_leq ant1 ant2;
+//
+//
+//
+//let tst =
+//    word_input  w1.
+//    byte_input  b1 b2.
+//    word_output res.
+//    CELL "tst" [
+//        res <- w1 '+' (b1 ++ b2)
+//];
+//
+//let ckt = pexlif2fsm (tst 'w1 'b1 'b2 'res);
+//
