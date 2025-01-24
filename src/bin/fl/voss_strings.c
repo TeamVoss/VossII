@@ -1116,6 +1116,7 @@ string_trim(g_ptr redex)
     } else {
 	string t = tmp + strlen(tmp)-1;
 	while( t > f && (isspace(*t) || (*t == 10))) { t--; }
+	t++;
 	*t = 0;
 	MAKE_REDEX_STRING(redex, wastrsave(&strings, f));
     }

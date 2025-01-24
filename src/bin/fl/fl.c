@@ -15,6 +15,7 @@
 #include <sys/resource.h>
 #include <signal.h>
 #include <poll.h>
+#include <X11/Xresource.h>
 
 #define FL_VERSION "1.0"
 
@@ -84,6 +85,8 @@ static buffer		tcl_eval_done_buf;
 static buffer		tcl_eval_result_buf;
 static string		s_empty_string;
 static string		scaling_factor = "";
+static string		default_font =
+				"-*-courier-bold-r-normal-*-14-*-*-*-*-*-*-*";
 
 /* ===================== Local functions defined ===================== */
 static void	busy(bool busy);
@@ -91,7 +94,8 @@ static void	break_handler(int sig);
 static void     setup_sockets();
 static void	print_help();
 static bool	process_commands(string bufp, bool verbose);
-static int	call_setjmp(string cur_start, bool *okp);
+static int	call_fl_inside_setjmp(string cur_start, bool *okp);
+static string	get_xresource(string resource, string default_res);
 
 /* ===================== Global functions defined ===================== */
 void
@@ -195,6 +199,7 @@ fl_main(int argc, char *argv[])
     FILE *	input_file_for_cmds_fp = NULL;
     bool	exit_on_failure = FALSE;
     bool	unbuf_stdout = FALSE;
+    bool	ok;
 
 #ifndef __APPLE__
     // Unlimit stacksize
@@ -482,20 +487,21 @@ fl_main(int argc, char *argv[])
                 Eprintf("Failed to load  %s\n", cmd+5);
             };
         }
+	string font_cmd = tprintf("set_font \"%s\";\n", 
+				  get_xresource("VossII.font", default_font));
+	busy(TRUE);
+	call_fl_inside_setjmp(font_cmd, &ok);
+	busy(FALSE);
 
         if( start_file != NULL ) {
-            string cmd = strtemp("((_load ");
-            charappend('"');
-            strappend(start_file);
-            charappend('"');
-	    strappend(" F) fseq ())");
+            string cmd = tprintf("((_load \"%s\" F) fseq ())", start_file);
 	    if( exit_on_failure ) {
 		strappend(" catch (exit 1)");
 	    }
             charappend(';');
 	    busy(TRUE);
 	    bool ok;
-	    if( call_setjmp(cmd, &ok) != 0 ) {
+	    if( call_fl_inside_setjmp(cmd, &ok) != 0 ) {
 		if( exit_on_failure ) {
 		    exit(1);
 		}
@@ -1124,7 +1130,7 @@ busy(bool busy)
 }
 
 static int
-call_setjmp(string cur_start, bool *okp)
+call_fl_inside_setjmp(string cur_start, bool *okp)
 {
     switch( setjmp(toplevel_eval_env) ) {
 	case 0:
@@ -1213,7 +1219,7 @@ process_commands(string bufp, bool verbose)
 			fflush(to_tcl_fp);
 		    }
 		    busy(TRUE);
-		    if( call_setjmp(cur_start, &ok) != 0 ) {
+		    if( call_fl_inside_setjmp(cur_start, &ok) != 0 ) {
 			// User interrupt with
 			// "return to top" answer
 			busy(FALSE);
@@ -1270,4 +1276,39 @@ print_help()
  P("    -C			    Cephalopode mode\n");
  P("    -cephalopode		    Cephalopode mode\n");
 
+}
+
+static string
+get_xresource(string resource, string default_res)
+{
+    XrmInitialize();
+
+    Display *display = XOpenDisplay(NULL);
+    if( display == NULL ) Eprintf("Can't open display\n");
+
+    char *resource_manager = XResourceManagerString(display);
+    if( resource_manager == NULL ) Eprintf("Can't obtain RESOURCE_MANAGER\n");
+
+    XrmDatabase db = XrmGetStringDatabase(resource_manager);
+    if (db == NULL) Eprintf("Can't open resource database\n");
+
+    XrmValue value;
+    string type;
+    if (XrmGetResource(db, resource, resource, &type, &value)) {
+	buf[TCL_CMD_BUF_SZ-1] = 0;
+	strncpy(buf, value.addr, TCL_CMD_BUF_SZ-2);
+	ui len = strlen(buf);
+	if(buf[0] == '"' && buf[len-1] == '"' ) {
+	    buf[len-1] = 0;
+	    XCloseDisplay(display);
+	    return( wastrsave(&strings, &(buf[1])) );
+	} else {
+	    XCloseDisplay(display);
+	    return( wastrsave(&strings, buf) );
+	}
+    } else {
+	// Resource not found so use default
+	XCloseDisplay(display);
+	return( wastrsave(&strings, default_res) );
+    }
 }

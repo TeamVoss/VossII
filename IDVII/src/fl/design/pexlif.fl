@@ -438,10 +438,10 @@ let rename_internals p =
 
 // Flatten the pexlif until the stop_pred is satisfied.
 // Intermediate wire names are created on demand and are named
-// i<number>/i<number>/.../<name> where the i<number>s refere to
+// i<number>/i<number>/.../<name> where the i<number>s refer to
 // the cardinality of a subfub.
 //
-let gen_flatten_pexlif stop_pred p =
+let gen_flatten_pexlif stop_pred p record_insts_attr_name->"" =
     let mk_pref pref i = sprintf "%si%d/" pref i in
     letrec do_flat sub pref p =
         let tr n = (str_is_prefix "0b" n) => [n] |
@@ -458,7 +458,10 @@ let gen_flatten_pexlif stop_pred p =
             in
             let fa_inps' = map tr_io fa_inps in
             let fa_outs' = map tr_io fa_outs in
-            [(PINST name attrs leaf fa_inps' fa_outs' ints content)]
+	    let attrs' = record_insts_attr_name == "" => attrs |
+			 (record_insts_attr_name, pref):attrs
+	    in
+            [(PINST name attrs' leaf fa_inps' fa_outs' ints content)]
         |
             val (P_HIER children) = content in
             let mk_io_sub (f,as) = vec_zip [f] (flatmap tr as) in
@@ -473,7 +476,6 @@ let gen_flatten_pexlif stop_pred p =
     leaf => p |
     val (P_HIER chs) = content then
     let prefs = map (mk_pref "") (1 upto length chs) then
-//    let io_sub = flatmap (\(f,as).zip as as) (fa_inps @ fa_outs) then
     let io_sub = map (\(f,as).(f,f)) (fa_inps @ fa_outs) then
     let int_sub = map (\f. f,f) ints then
     let sub = io_sub @ int_sub then
@@ -498,15 +500,17 @@ let is_draw_leaf p =
 ;
 
 // A function to flatten a pexlif to basic drawing components.
-let flatten_pexlif p = gen_flatten_pexlif is_draw_leaf p;
+let flatten_pexlif p record_insts_attr_name->"" =
+	gen_flatten_pexlif is_draw_leaf p record_insts_attr_name
+;
 
 // A function to flatten recursively defined pexlifs
-let flatten_recursive_pexlif recursion_name p =
+let flatten_recursive_pexlif recursion_name p record_insts_attr_name->"" =
     let stop_pred p =
 	val (PINST name _ _ _ _ _ _) = p in
 	NOT (name = recursion_name)
     in
-    gen_flatten_pexlif stop_pred p
+    gen_flatten_pexlif stop_pred p record_insts_attr_name
 ;
 
 // Extract the relevant information for a re_ff (if possible)

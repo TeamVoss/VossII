@@ -1593,7 +1593,7 @@ let wTHEN {c::wexpr} ({t::wexpr},{e::wexpr}) = W_ITE c t e;
 let IF c = c;
 let ELSE {t:: *a} {e:: *a} = (t,e);
 let bitTHEN c (t,e) = c '?' t ':' e;
-overload tmp_THEN bTHEN bevTHEN bitTHEN wTHEN;
+overload tmp_THEN bTHEN bexprTHEN bevTHEN bitTHEN wTHEN;
 
 let THEN {c:: *b} ({te:: *a # *a}) =
     let res = tmp_THEN c te in
@@ -3492,6 +3492,8 @@ let rst_delay N = N = 0 => rst_delay_0 | rst_delay_n N;
 end_abstype rst_delay;
 
 
+begin_abstype;
+
 let phase_delay_non_zero N =
     input   din.
     output  dout.
@@ -3510,6 +3512,8 @@ let phase_delay_zero =
 let phase_delay N =
     N = 0 => phase_delay_zero | phase_delay_non_zero N
 ;
+export phase_delay;
+
 
 let rst_phase_delay_non_zero N =
     bit_input	reset.
@@ -3530,6 +3534,32 @@ let rst_phase_delay_zero =
 
 let rst_phase_delay N =
     N = 0 => rst_phase_delay_zero | rst_phase_delay_non_zero N
+;
+export rst_phase_delay;
+
+end_abstype;
+
+// An inertial delay component with min/max rise and fall delays
+let idelay min_rise max_rise min_fall max_fall =
+    input	{inp:: *a}.
+    output	{out:: *a}.
+    //
+    let M = max max_rise max_fall in
+    internal		{cur:: *a}.
+    list_internal M	{dels:: *a list}.
+    //
+    let rise = (min_rise, max_rise) in
+    let fall = (min_fall, max_fall) in
+    CELL (sprintf "draw_idelay %d %d %d %d" min_rise max_rise min_fall max_fall)
+    (
+	(map2 (\i.\o. o <: i) (inp:(butlast dels)) dels) @
+	[
+	cur <: out,
+	base_assignment F (hw_destr out)
+		(W_IDELAY (hw_size inp) rise fall (hw_destr cur)
+			(map hw_destr dels))
+	]
+    )
 ;
 
 let hw__pair__type_name {p:: *a # *b} =

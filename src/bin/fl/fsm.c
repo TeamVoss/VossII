@@ -74,6 +74,7 @@ extern string s_W_SLICE;
 extern string s_W_NAMED_SLICE;
 extern string s_W_UPDATE_NAMED_SLICE;
 extern string s_W_CAT;
+extern string s_W_IDELAY;
 extern string s_W_MEM_READ;
 extern string s_W_MEM_WRITE;
 extern string s_MEM;
@@ -390,6 +391,7 @@ static void           op_UPDATE_SLICE(ncomp_ptr op);
 static void           op_WIRE(ncomp_ptr op);
 static void           op_MEM_READ(ncomp_ptr op);
 static void           op_MEM_WRITE(ncomp_ptr op);
+static void	      op_IDELAY(ncomp_ptr op);
 static bool           traverse_pexlif(hash_record *parent_tblp, g_ptr p,
                                       string hier, bool top_level,
                                       int draw_level, int inst_cnt,
@@ -4269,10 +4271,10 @@ ste2str_fn(pointer p)
 static int
 get_wexpr_size(g_ptr we)
 {
-    int sz;
+    int sz, mr, Mr, mf, Mf;
     arbi_T ai;
     string s;
-    g_ptr  b, c, l, r;
+    g_ptr  b, c, l, r, cur;
     wl_op  op;
   size_start:
     if( is_W_X(we, &sz) ) { return sz; }
@@ -4306,6 +4308,9 @@ get_wexpr_size(g_ptr we)
     if( is_W_UPDATE_NAMED_SLICE(we, &b, &s, &l, &r) ) {
 	we = b;
 	goto size_start;
+    }
+    if( is_W_IDELAY(we, &sz, &mr, &Mr, &mf, &Mf, &cur, &l) ) {
+	return sz;
     }
     if( is_W_CAT(we, &l) ) {
 	sz = 0;
@@ -4405,11 +4410,11 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 {
     arbi_T value;
     string name;
-    int sz;
+    int sz, mr, Mr, mf, Mf;
     string base;
     wl_op op;
     g_ptr b, l, r;
-    g_ptr cond;
+    g_ptr cond, cur_state;
     int comp_idx = COUNT_BUF(compositesp);
     int osz = 0;
     FOREACH_NODE(nd, outs) {
@@ -4660,6 +4665,42 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	}
 	cp->arg.idx_list = idx_list;
         return( TRUE );
+    }
+    if( is_W_IDELAY(we, &sz, &mr, &Mr, &mf, &Mf, &cur_state, &l) ) {
+	cr.op = op_IDELAY;
+	cr.size = sz;
+	cr.arg.del.min_rise = mr;
+	cr.arg.del.max_rise = Mr;
+	cr.arg.del.min_fall = mf;
+	cr.arg.del.max_fall = Mf;
+	push_buf(compositesp, (pointer) &cr);
+	int osz = get_wexpr_size(cur_state);
+	if( osz != sz ) {
+	    FP(err_fp, "W_IDELAY with invalid current state size (%d!=%d)\n",
+		       osz, sz);
+	    report_source_locations(err_fp);
+	    Rprintf("");
+	}
+	ilist_ptr inps = make_input_arg(cur_state, sz, vtblp, hier, FALSE);
+	ilist_ptr cur = inps;
+	while( !IS_NIL(l) ) {
+	    g_ptr e = GET_CONS_HD(l);
+	    int osz = get_wexpr_size(e);
+	    if( osz != sz ) {
+		FP(err_fp, "W_IDELAY with invalid input size (%d!=%d)\n",
+			   osz, sz);
+		report_source_locations(err_fp);
+		Rprintf("");
+	    }
+	    ilist_ptr tmp = make_input_arg(e, sz, vtblp, hier, FALSE);
+	    while( cur->next != NULL ) { cur = cur->next; }
+	    cur->next = tmp;
+	    l = GET_CONS_TL(l);
+	}
+	ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, comp_idx);
+	cp->inps = inps;
+	add_fanouts(inps, comp_idx);
+	return( TRUE );
     }
     if( is_W_CAT(we, &l) ) {
 	cr.op = op_WIRE;
@@ -5719,6 +5760,44 @@ op_AND(ncomp_ptr op)
 	gbv bL = INP_L(i+op->size);
 	OUT_H(i) = c_AND(aH, bH);
 	OUT_L(i) = c_OR(aL, bL);
+    }
+}
+
+static void
+op_IDELAY(ncomp_ptr op)
+{
+    int sz = op->size;
+    ui mr = op->arg.del.min_rise;
+    ui Mr = op->arg.del.max_rise;
+    ui mf = op->arg.del.min_fall;
+    ui Mf = op->arg.del.max_fall;
+    FROM_MSB_TO_LSB(op->size,i) {
+	// Process the H computation
+	// 0->1 needs mr
+	// 1->0 needs Mf
+	gbv to1 = c_ONE;
+	for(ui idx = 0; idx < mr; idx++) {
+	    to1 = c_AND(to1, INP_H((1+idx)*sz+i));
+	}
+	gbv to0 = c_ZERO;
+	for(ui idx = 0; idx < Mf; idx++) {
+	    to0 = c_OR(to0, INP_H((1+idx)*sz+i));
+	}
+	gbv cur = INP_H(i);
+	OUT_H(i) = c_OR(to1, c_AND(cur, to0));
+	// Process the L computation
+	// 0->1 needs mf
+	// 1->0 needs MR
+	to1 = c_ONE;
+	for(ui idx = 0; idx < mf; idx++) {
+	    to1 = c_AND(to1, INP_L((1+idx)*sz+i));
+	}
+	to0 = c_ZERO;
+	for(ui idx = 0; idx < Mr; idx++) {
+	    to0 = c_OR(to0, INP_L((1+idx)*sz+i));
+	}
+	cur = INP_L(i);
+	OUT_L(i) = c_OR(to1, c_AND(cur, to0));
     }
 }
 

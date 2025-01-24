@@ -135,11 +135,12 @@ let IF c = c;
 let ELSE {t:: *a} {e:: *a} = (t,e);
 
 let bTHEN c (t,e) = c => t | e;
+let bexprTHEN {c::bexpr} (t,e) = (c bAND t) bOR (bNOT c bAND e);
 let bevTHEN {c::bexpr} ({t::bev},{e::bev}) =
     let cb = list2bev [c] then
     bev_OR (bev_AND cb t) (bev_AND (bev_NOT cb) e)
 ;
-overload THEN bTHEN bevTHEN;
+overload THEN bTHEN bexprTHEN bevTHEN;
 if_then_else_binder THEN ELSE;
 
 // Convert a BDD to a bexpr.
@@ -1861,6 +1862,29 @@ lettype wexpr =
         |   W_MEM_READ {info::mem} {mem::wexpr} {addr::wexpr}
         |   W_MEM_WRITE {info::mem} {mem::wexpr} {addr::wexpr} {data::wexpr}
         |   W_LAT_LEQ {a::wexpr} {b::wexpr} // Lattice less-or-equal
+	// Inertial delay for rTBD analysis
+	// See Brzozowski/Seger "Asynchronous Circuits" pages 290-297
+        |   W_IDELAY {sz::int}
+		     {rise_bound :: (int#int)}
+		     {fall_bound :: (int#int)}
+		     {cur_state  :: wexpr}
+		     {delayed_inps::wexpr list}	   
+;
+
+// Add sanity checking for W_IDELAY
+let W_IDELAY sz rise fall cur delayed_inps =
+    val (mr, Mr) = rise in
+    val (mf, Mf) = fall in
+    mr < 1 => eprintf "Min rise delay (%d) < 1" mr |
+    mf < 1 => eprintf "Min fall delay (%d) < 1" mf |
+    Mr < mr => eprintf "Max rise delay (%d) < min rise delay (%d)" Mr mr |
+    Mf < mf => eprintf "Max fall delay (%d) < min fall delay (%d)" Mf mf |
+    let M = max Mr Mf in
+    length delayed_inps != M =>
+	eprintf "Number delayed inputs (%d) != max rise/fall delay (%d)"
+		(length delayed_inps) M
+    |
+    W_IDELAY sz rise fall cur delayed_inps
 ;
 
 begin_abstype;
@@ -1920,6 +1944,13 @@ letrec Pwexpr (W_X sz) = sprintf "X[%d:0]" (sz-1)
 	sprintf "%s[%s]" (Pwexpr mem) (Pwexpr addr)
  /\    Pwexpr (W_MEM_WRITE info mem addr d) =
 	sprintf "(%s[%s]<-%s)" (Pwexpr mem) (Pwexpr addr) (Pwexpr d)
+ /\    Pwexpr (W_IDELAY sz rise fall cur delayed_inps) =
+	let pre = sprintf "(IDEL %d ^[%d,%d) v[%d,%d) %s ["
+			  sz (fst rise) (snd rise)
+			     (fst fall) (snd fall)
+			  (Pwexpr cur)
+	in
+	list2str T pre "," "])" Pwexpr delayed_inps
 ;
 install_print_function Pwexpr;
 
@@ -1994,8 +2025,15 @@ letrec DBGwexpr (W_X sz) =
 	    sprintf "(W_MEM_READ %s %s %s)" (DBGmem info)
 					    (DBGwexpr mem) (DBGwexpr addr)
  /\    DBGwexpr (W_MEM_WRITE info mem addr d) =
-	    sprintf "(W_MEM_WRITE %s %s %s %s)" (DBGmem info)
-				(DBGwexpr mem) (DBGwexpr addr) (DBGwexpr d)
+	    sprintf "(W_MEM_WRITE %s %s %s %s)"
+		    (DBGmem info) (DBGwexpr mem) (DBGwexpr addr) (DBGwexpr d)
+ /\    DBGwexpr (W_IDELAY sz rise fall cur delayed_inps) =
+	let pre = sprintf "(IDEL %d ^[%d,%d) v[%d,%d) %s ["
+			  sz (fst rise) (snd rise)
+			     (fst fall) (snd fall)
+			     (DBGwexpr cur)
+	in
+	list2str T pre "," "])" DBGwexpr delayed_inps
 ;
 
 end_abstype Pwexpr DBGwexpr;
@@ -2074,6 +2112,8 @@ let bexpr2bdd_pair  (a,b) =
     ((bexpr2bdd a), (bexpr2bdd b))
 ;
 add_open_overload bexpr2bdd bexpr2bdd_pair;
+let bexpr2bdd_bev {bev::bev} = list2bv (map prim_bexpr2bdd (bev2list bev));
+add_open_overload bexpr2bdd bexpr2bdd_bev;
 
 let gen_bexpr2bdd sub e =
     let e' = bsubstitute sub e then

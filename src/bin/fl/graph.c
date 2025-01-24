@@ -4000,7 +4000,7 @@ traverse_left(g_ptr oroot)
 			    SET_INT(redex, *(GET_STRING(arg1)));
 			    break;
                         case P_CHR:
-                            if( GET_INT(arg1) < 0 || GET_INT(arg1) > 127 ) {
+                            if( GET_INT(arg1) < 0 || GET_INT(arg1) > 255 ) {
                                 Fail_pr("Range error in CHR (%d)",
 					GET_INT(arg1));
                                 goto fail1;

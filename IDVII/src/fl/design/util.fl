@@ -321,6 +321,8 @@ let w_get_names we =
      /\    dep (W_NAMED_SLICE name indices w) = dep w
      /\    dep (W_UPDATE_NAMED_SLICE b name indices w) = (dep b) fseq (dep w)
      /\    dep (W_CAT parts) = foreach dep parts
+     /\    dep (W_IDELAY sz rise fall cur delayed_inps) =
+		(dep cur) fseq (foreach dep delayed_inps)
      /\    dep (W_MEM_READ info mem addr) = (dep mem) fseq (dep addr)
      /\    dep (W_MEM_WRITE info mem addr data) =
             (dep mem) fseq (dep addr) fseq (dep data)
@@ -385,6 +387,7 @@ cletrec wexpr_size wexpr =
      /\ wsz (W_NAMED_SLICE name indices w) = length indices
      /\ wsz (W_UPDATE_NAMED_SLICE base name indices w) = wexpr_size base
      /\ wsz (W_CAT wl) = itlist (\w.\r. wexpr_size w + r) wl 0
+     /\ wsz (W_IDELAY sz rise fall cur delayed_inps) = sz
      /\ wsz (W_MEM_READ info mem addr) =
 	val (MEM a_sz lines d_sz) = info in
 	d_sz
@@ -457,6 +460,8 @@ letrec wexpr_is_binary (W_X sz) = F
 	    wexpr_is_binary base AND wexpr_is_binary w
  /\     wexpr_is_binary (W_CAT wl) =
 	    itlist (\w.\l. (wexpr_is_binary w) AND l) wl T
+ /\     wexpr_is_binary (W_IDELAY sz rise fall cur dinps) =
+	    itlist (\w.\l. wexpr_is_binary w AND l) dinps (wexpr_is_binary cur)
  /\     wexpr_is_binary (W_MEM_READ info mem addr) =
 	    wexpr_is_binary mem AND wexpr_is_binary addr
  /\     wexpr_is_binary (W_MEM_WRITE info mem addr d) =
@@ -491,6 +496,7 @@ letrec w2bv sub w =
      /\ w2bv (W_EXPLICIT_VAR sz n) = bv_ZX (substitute sub (bv_variable n))
      /\ w2bv (W_AND a b) = bv_AND (w2bv sub a) (w2bv sub b)
      /\ w2bv (W_LAT_LEQ a b) = error "W_LAT_LEQ cannot be converted"
+     /\ w2bv (W_IDELAY sz _ _ _ _) = error "W_IDELAY cannot be converted"
      /\ w2bv (W_OR a b) = bv_OR (w2bv sub a) (w2bv sub b)
      /\ w2bv (W_NOT a) = bv_NOT (w2bv sub a)
      /\ w2bv (W_PRED name cond) = w2bv sub cond
@@ -670,6 +676,8 @@ let w_substitute sub we =
      /\     do (W_UPDATE_NAMED_SLICE base name indices w) =
 	    (W_UPDATE_NAMED_SLICE (do base) name indices (do w))
      /\     do (W_CAT wl) = W_CAT (map do wl)
+     /\     do (W_IDELAY sz rise fall cur d_inps) =
+		(W_IDELAY sz rise fall (do cur) (map do d_inps))
      /\     do (W_MEM_READ info mem addr) =
 		W_MEM_READ info (do mem) (do addr)
      /\     do (W_MEM_WRITE info mem addr d) =
@@ -796,6 +804,8 @@ let resize_pexlif sz {p::pexlif} =
      /\    trwexpr (W_ZX osz e) = W_ZX (tri osz) (trwexpr e)
      /\    trwexpr (W_SLICE indices w) = W_SLICE indices (trwexpr w)
      /\    trwexpr (W_CAT ws) = W_CAT (map trwexpr ws)
+     /\    trwexpr (W_IDELAY sz rise fall cur d_inps) =
+		(W_IDELAY sz rise fall (trwexpr cur) (map trwexpr d_inps))
      /\    trwexpr e assuming (is_binary e) =
 	val (op, l, r) = split_binary e in
 	op (trwexpr l) (trwexpr r)
@@ -868,7 +878,9 @@ letrec dep (W_X sz) = []
  /\     dep (W_SLICE indices w) = dep w
  /\     dep (W_NAMED_SLICE name indices w) = dep w
  /\     dep (W_UPDATE_NAMED_SLICE base name indices w) = (dep base) union (dep w)
- /\     dep (W_CAT parts) =itlist (\e.\r. dep e union r) parts []
+ /\     dep (W_CAT parts) = itlist (\e.\r. dep e union r) parts []
+ /\     dep (W_IDELAY sz rise fall cur d_inps) =
+	    itlist (\e.\r. dep e union r) d_inps (dep cur)
  /\     dep (W_MEM_READ info mem addr) = (dep mem) union (dep addr)
  /\     dep (W_MEM_WRITE info mem addr data) =
 	    (dep mem) union (dep addr) union (dep data)
@@ -990,6 +1002,12 @@ let base_compact_wprint inps rhs =
 		let in_one = list2str T "{" "," "}" id ivs then
 		strlen in_one <= 10 => in_one |
 		list2str T "{" ",\n" "}" id ivs
+     /\    P pri (W_IDELAY sz rise fall cur d_inps) =
+		let pre = sprintf "IDEL^[%d,%d)v[%d,%d) %s ["
+				  (fst rise) (snd rise) (fst fall) (snd fall)
+				  (P 1 cur)
+		in
+		list2str T pre ", " "]" (P 1) d_inps
      /\    P pri (W_MEM_READ info mem addr) =
 	    sprintf "%s[%s]" (P pri mem) (P pri addr)
      /\    P pri (W_MEM_WRITE info mem addr d) =

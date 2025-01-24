@@ -696,6 +696,40 @@ bdepends(g_ptr redex)
 }
 
 static void
+bexpr_is_unsat(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr gb, gt;
+    EXTRACT_2_ARGS(redex, gb, gt);
+    bexpr be = GET_BEXPR(gb);
+    if( BE_IS_FALSE(be) ) {
+	MAKE_REDEX_BOOL(redex, B_One());
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
+    if( BE_IS_TRUE(be) ) {
+	MAKE_REDEX_BOOL(redex, B_Zero());
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
+    bool neg = BE_IS_NEG(be);
+    bexpr b = BE_POS(be);
+    int a = neg? -1*(b->sat_idx) : b->sat_idx;
+    int time_limit = GET_INT(gt);
+    int res = Find_model(&a, 1, time_limit);
+    if( res <= 0 ) {
+	MAKE_REDEX_BOOL(redex, B_One());
+    } else {
+	MAKE_REDEX_BOOL(redex, B_Zero());
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
 bget_model(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
@@ -1128,6 +1162,12 @@ Bexpr_Install_Functions()
     Add_ExtAPI_Function("bexpr_signature", "1", FALSE,
 			GLmake_arrow(GLmake_bexpr(),GLmake_int()),
 			bexpr_signature);
+
+    Add_ExtAPI_Function("bexpr_is_unsat", "11", FALSE,
+			GLmake_arrow(
+			    GLmake_bexpr(),
+			    GLmake_arrow(GLmake_int(), GLmake_bool())),
+			bexpr_is_unsat);
 
     Add_ExtAPI_Function("bNOT", "1", FALSE,
 			GLmake_arrow(GLmake_bexpr(),GLmake_bexpr()),

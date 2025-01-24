@@ -1,0 +1,20 @@
+
+trim "abc";
+
+trim " abc";
+
+trim "  abc";
+
+trim "	    abc";
+
+trim "abc ";
+
+trim " abc  ";
+
+trim "  abc	 ";
+
+trim "	    abc		    ";
+
+
+
+gen_trim "{" "}" "      {abc}             ";

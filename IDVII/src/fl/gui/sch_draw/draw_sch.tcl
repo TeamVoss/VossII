@@ -4145,6 +4145,44 @@ proc draw_observation_delays {min_cnt max_cnt c tag x y} {
     return [list $inp_locs [list $x $y1]]
 }
 
+proc draw_idelay {min_rise max_rise min_fall max_fall c tag x y} {
+    global gcolor mfont sfont
+    global fc
+    add_value_field $c $tag $x $y
+    set ht [expr (2*[min_sep $c])]
+    set y1 [expr round($y-$ht)]
+    set y2 [expr round($y+$ht)]
+    set x1 [expr round($x-[rect_wid $c])]
+    $c create rectangle  $x1 [expr $y1-$ht] $x [expr $y2+$ht] \
+	    -outline $gcolor -fill $fc -tags $tag
+    $c create polygon \
+                [expr $x-7*[rect_wid $c]/8] [expr $y2-$ht/6] \
+                [expr $x-1*[rect_wid $c]/2] [expr $y1+$ht/6] \
+                [expr $x-1*[rect_wid $c]/8] [expr $y2-$ht/6] \
+                -tags $tag \
+                -outline $gcolor -fill yellow
+    set rtxt [format {[%d,%d)} $min_rise $max_rise]
+    set ftxt [format {[%d,%d)} $min_fall $max_fall]
+    set xt [expr round($x1+[min_sep $c])]
+    set yr [expr $y1-[min_sep $c]]
+    set rt [$c create text $xt  $yr -tags $tag -text $rtxt -anchor w \
+		-justify left -font $sfont($c)]
+    add_font_tags $c $rt _IsTeXt_
+    $c create line $xt [expr round($yr+3.0*[min_sep $c]/4.0)] \
+    		   $xt [expr round($yr-3.0*[min_sep $c]/4.0)] \
+		    -arrow last -width 3
+    set yf [expr $y2+[min_sep $c]]
+    set ft [$c create text $xt $yf -tags $tag -text $ftxt -anchor w \
+		-justify left -font $sfont($c)]
+    $c create line $xt [expr round($yf-3.0*[min_sep $c]/4.0)] \
+		   $xt [expr round($yf+3.0*[min_sep $c]/4.0)] \
+		    -arrow last -width 3
+    add_font_tags $c $ft _IsTeXt_
+    set inp_locs {}
+    lappend inp_locs $x1 $y
+    return [list $inp_locs [list $x $y1]]
+}
+
 proc Delta {c x y tag} {
     global gcolor mfont fc
     set s [expr [rect_wid $c]/20]
@@ -4157,6 +4195,7 @@ proc Delta {c x y tag} {
 }
 
 proc draw_delay {c tag x y} { return [draw_box_pat 1 {Delta} {} $c $tag $x $y] }
+
 
 proc draw_buffer {c tag x y} { return [draw_buf_pat "" "" $c $tag $x $y] }
 proc draw_inverter {c tag x y} { return [draw_buf_pat "" "Y" $c $tag $x $y] }

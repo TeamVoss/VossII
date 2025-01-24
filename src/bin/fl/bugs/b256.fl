@@ -1,0 +1,67 @@
+
+cletrec bev_truth_cover vars bev =
+    vars = [] => (bev == bT) => 1 | 0 |
+    bexpr_is_unsat bev 1 => 0 |
+    bexpr_is_unsat (bNOT bev) 1 => 2**(length vars) |
+    val (v:vs) = vars in
+    (bev_truth_cover vs (bsubstitute [(v,bF)] bev))+
+    (bev_truth_cover vs (bsubstitute [(v,bT)] bev))
+;
+
+letrec bev_sub_ITE {c::bexpr} ((tn,tv):rt) ((en,ev):re) =
+    tn != en => eprintf "Substition mismatch in bev_sub_ITE (%s!=%s)" tn en |
+    (tn, (c bAND tv bOR bNOT c bAND ev)):(bev_sub_ITE c rt re)
+ /\    bev_sub_ITE c [] [] = []
+ /\    bev_sub_ITE c _ _ =
+            error "Substitution list length mismatch in bev_sub_ITE"
+;
+
+letrec bev_upar idx vars f =
+    vars = [] => [] |
+    val (v:vs) = vars in
+    let L = bsubstitute [(v,bF)] f in
+    let H = bsubstitute [(v,bT)] f in
+    let Lcnt = bev_ZX (int2bev (bev_truth_cover vs L)) in
+    bev_sub_ITE (bev_geq Lcnt idx)
+                ((v,bF):(bev_upar idx vs L))
+                ((v,bT):(bev_upar (bev_sub idx Lcnt) vs H))
+;
+    
+let bev_uniform_param expansion_factor vars f =
+    expansion_factor < 1 =>
+        eprintf "Expandsion_factor (%d) must be >= 1" expansion_factor
+    |
+    f == bF =>
+        error "bev_uniform_param called for F"
+    |
+    (bdepends f) subtract vars != [] =>
+        eprintf "bev_uniform_param: f depends on variable(s) not in vars (%S)"
+        ((bdepends f) subtract vars)
+    |
+    let cnt      = bev_truth_cover vars f in
+    let needed   = (bits_needed (cnt-1))+(expansion_factor-1) in
+    letrec mk_vars i vars =
+        i = 0 => [] |
+        vars != [] => (hd vars):(mk_vars (i-1) (tl vars)) |
+        let new = sprintf "_T%d" i in
+        (bvariable new) fseq
+        new:(mk_vars (i-1) []) 
+    in 
+    let sel_vars = map bvariable (mk_vars needed vars) then
+    let raw_idx  = bev_ZX (list2bev sel_vars) in
+    let bcnt     = bev_ZX (int2bev cnt) in
+    let idx = bev_add (bev_mod raw_idx bcnt) (bev_ZX (int2bev 1)) in
+    let res = bev_upar idx vars f then
+    res
+;
+
+
+
+let a = bvariable "a" in
+let b = bvariable "b" in
+let c = bvariable "c" in
+let d = bvariable "d" in
+let e = bvariable "e" in
+let f = bvariable "f" in
+bev_uniform_param 3 (bdepends[a,b,c,d,e,f]) (a bOR (b bXNOR c) bAND (c bXNOR d) bAND (e bXNOR f) bAND f);
+

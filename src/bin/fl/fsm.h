@@ -147,12 +147,21 @@ typedef struct mem_data_rec {
     int         data_size;
 } mem_data_rec;
 
+typedef struct delay_bounds_rec     *delay_bounds_ptr;
+typedef struct delay_bounds_rec {
+    int         min_rise;
+    int         max_rise;
+    int         min_fall;
+    int         max_fall;
+} delay_bounds_rec;
+
 typedef union {
-	    arbi_T       value;
-	    string       name;
-	    int          extension_size;
-	    mem_data_rec mem;
-	    idx_list_ptr idx_list;
+	    arbi_T		value;
+	    string		name;
+	    int			extension_size;
+	    mem_data_rec	mem;
+	    delay_bounds_rec	del;
+	    idx_list_ptr	idx_list;
 } ncomp_args;
 
 // Individual composites

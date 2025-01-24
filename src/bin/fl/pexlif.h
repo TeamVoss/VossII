@@ -52,6 +52,8 @@ g_ptr mk_W_ZX(g_ptr sz, g_ptr w);
 g_ptr mk_W_ITE(g_ptr cond, g_ptr t, g_ptr e);
 g_ptr mk_W_SLICE(g_ptr indices, g_ptr w);
 g_ptr mk_W_CAT(g_ptr parts);
+g_ptr mk_W_IDELAY(g_ptr sz, g_ptr mr, g_ptr Mr, g_ptr mf, g_ptr Mf,
+		  g_ptr cur, g_ptr del_inps);
 g_ptr mk_W_MEM_READ(g_ptr info, g_ptr mem, g_ptr addr);
 g_ptr mk_W_MEM_WRITE(g_ptr info, g_ptr mem, g_ptr addr, g_ptr data);
 g_ptr mk_W_UPDATE_FN(g_ptr lhs, g_ptr rhs);
@@ -76,6 +78,8 @@ bool is_W_SLICE(g_ptr node, g_ptr *idxlistp, g_ptr *ep);
 bool is_W_NAMED_SLICE(g_ptr node, string *namep, g_ptr *idxlistp, g_ptr *ep);
 bool is_W_UPDATE_NAMED_SLICE(g_ptr node, g_ptr *basep, string *namep, g_ptr *idxlistp, g_ptr *ep);
 bool is_W_CAT(g_ptr node, g_ptr *listp);
+bool is_W_IDELAY(g_ptr node, int *sz, int *mr, int *Mr, int *mf, int *Mf,
+		 g_ptr *curp, g_ptr *del_inps);
 bool is_W_MEM_READ(g_ptr node, int *a_szp, int *linesp, int *d_szp, g_ptr *memp, g_ptr *addrp);
 bool is_W_MEM_WRITE(g_ptr node, int *a_szp, int *linesp, int *d_szp, g_ptr *memp, g_ptr *addrp, g_ptr *datap);
 // ...

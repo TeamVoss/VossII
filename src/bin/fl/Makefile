@@ -16,9 +16,9 @@ CFLAGS += $(BASE_FLAGS) $(COMPATIBILITY_FLAG) -Wno-unused-command-line-argument 
 CXXFLAGS += $(BASE_FLAGS) -fpermissive -Wno-error
 
 ifeq '' '$(findstring clang++,$(CX))'
-  FL_LIB_FLAGS = -lncurses -ldl -ledit
+  FL_LIB_FLAGS = -lncurses -ldl -ledit -lX11
 else
-  FL_LIB_FLAGS = -lncurses -ldl -ledit -fuse-ld=$(subst clang++,lld,$(CX))
+  FL_LIB_FLAGS = -lncurses -ldl -ledit -fuse-ld=$(subst clang++,lld,$(CX)) -lX11
 endif
 
 INC = -I../../include -I$(MINISAT_DIR)/include $(TCL_INCLUDE) -DROOT_DIR='"$(ROOT_DIR)"'

@@ -54,6 +54,7 @@ string s_W_MEM_READ;
 string s_W_MEM_WRITE;
 string s_MEM;
 string s_WrApPeR;
+string s_W_IDELAY;
 // /
 string s_no_instance;
 
@@ -1882,6 +1883,25 @@ is_W_CAT(g_ptr node, g_ptr *listp)
 }
 
 bool
+is_W_IDELAY(g_ptr node, int *sz, int *mr, int *Mr, int *mf, int *Mf,
+	    g_ptr *curp, g_ptr *del_inps)
+{
+    g_ptr rise_bounds, fall_bounds, size;
+    EXTRACT(*del_inps);
+    EXTRACT(*curp);
+    EXTRACT(fall_bounds);
+    EXTRACT(rise_bounds);
+    EXTRACT(size);
+    if( !IS_CONSTRUCTOR(W_IDELAY, node) ) { return FALSE; }
+    *mr = GET_INT(GET_FST(rise_bounds));
+    *Mr = GET_INT(GET_SND(rise_bounds));
+    *mf = GET_INT(GET_FST(fall_bounds));
+    *Mf = GET_INT(GET_SND(fall_bounds));
+    *sz = GET_INT(size);
+    return TRUE;
+}
+
+bool
 is_W_MEM_READ(g_ptr node, int *a_szp, int *linesp, int *d_szp, g_ptr *memp, g_ptr *addrp)
 {
     g_ptr info;
@@ -2174,6 +2194,19 @@ mk_W_CAT(g_ptr parts)
 }
 
 g_ptr
+mk_W_IDELAY(g_ptr sz, g_ptr mr, g_ptr Mr, g_ptr mf, g_ptr Mf,
+	    g_ptr cur, g_ptr del_inps)
+{
+    g_ptr res = Make_STRING_leaf(s_W_IDELAY);
+    res = Make_CONS_ND(res, sz);
+    res = Make_CONS_ND(res, Make_PAIR_ND(mr, Mr));
+    res = Make_CONS_ND(res, Make_PAIR_ND(mf, Mf));
+    res = Make_CONS_ND(res, cur);
+    res = Make_CONS_ND(res, del_inps);
+    return res;
+}
+
+g_ptr
 mk_MEM(g_ptr addr_size, g_ptr lines, g_ptr data_size)
 {
     g_ptr res = Make_STRING_leaf(s_MEM);
@@ -2240,6 +2273,7 @@ Pexlif_Init()
     s_W_NAMED_SLICE        = Mk_constructor_name("W_NAMED_SLICE");
     s_W_UPDATE_NAMED_SLICE = Mk_constructor_name("W_UPDATE_NAMED_SLICE");
     s_W_CAT                = Mk_constructor_name("W_CAT");
+    s_W_IDELAY             = Mk_constructor_name("W_IDELAY");
     s_W_MEM_READ           = Mk_constructor_name("W_MEM_READ");
     s_W_MEM_WRITE          = Mk_constructor_name("W_MEM_WRITE");
     s_MEM                  = Mk_constructor_name("MEM");
@@ -2660,8 +2694,10 @@ fp_mem(g_ptr node)
 static ui
 fp_w_rec(g_ptr node)
 {
-    g_ptr argn_0, argn_1, argn_2, argn_3;
+    g_ptr argn_0, argn_1, argn_2, argn_3, argn_4;
+    //
     // Arity 1
+    //
     if( GET_TYPE(node) != CONS_ND ) {
 	fp_status = FALSE;
 	return 0;
@@ -2688,6 +2724,7 @@ fp_w_rec(g_ptr node)
     }
     //
     // Arity 2
+    //
     if( GET_TYPE(node) != CONS_ND ) {
 	fp_status = FALSE;
 	return 0;
@@ -2764,6 +2801,7 @@ fp_w_rec(g_ptr node)
     }
     //
     // Arity 3
+    //
     if( GET_TYPE(node) != CONS_ND ) {
 	fp_status = FALSE;
 	return 0;
@@ -2799,6 +2837,7 @@ fp_w_rec(g_ptr node)
     }
     //
     // Arity 4
+    //
     if( GET_TYPE(node) != CONS_ND ) {
 	fp_status = FALSE;
 	return 0;
@@ -2819,6 +2858,33 @@ fp_w_rec(g_ptr node)
 	    sum = sum + pm_val(idx, GET_INT(GET_CONS_HD(argn_1)));
 	    idx++;
 	    argn_1 = GET_CONS_TL(argn_1);
+	}
+	return sum;
+    }
+
+    //
+    // Arity 5
+    //
+    if( GET_TYPE(node) != CONS_ND ) {
+	fp_status = FALSE;
+	return 0;
+    }
+    argn_4  = GET_SND(node);
+    node = GET_FST(node);
+    if( IS_CONSTRUCTOR(W_IDELAY, node) ) {
+	ui sum = 0;
+	sum += pm_val(60, GET_INT(argn_4));		// sz
+	sum += pm_val(61, GET_INT(GET_FST(argn_3)));	// mr
+	sum += pm_val(62, GET_INT(GET_SND(argn_3)));	// Mr
+	sum += pm_val(63, GET_INT(GET_FST(argn_2)));	// mf
+	sum += pm_val(64, GET_INT(GET_SND(argn_2)));	// Mf
+	sum = sum + pm_val(65, fp_w_rec(argn_1));
+	ui idx = 66;
+	while( !IS_NIL(argn_0) ) {
+	    ui r = fp_w_rec(GET_CONS_HD(argn_0));
+	    sum = sum + pm_val(idx, r);
+	    idx++;
+	    argn_0 = GET_CONS_TL(argn_0);
 	}
 	return sum;
     }

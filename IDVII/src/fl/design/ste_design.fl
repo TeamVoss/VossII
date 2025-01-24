@@ -12,33 +12,52 @@ let bdd_when {ant::(bool#string#bool#int#int) list} {cond::bool} =
     map (\(w,n,v,f,t). (cond AND w),n,v,f,t) ant
 ;
 
+begin_abstype;
+
+let PL = ref 1;
+
+let set_phase_duration cnt =
+    cnt <= 0 => eprintf "Phase duration (%d) must be > 0\n" cnt |
+    (PL := cnt)
+;
+export set_phase_duration;
+
+
 // A simple interface for defining 5-tuple lists for STE runs.
 // This function conjucts the condition cond into every five-tuple.
 // Usage:  five_tuple_list when cond;
 let when = bdd_when;
 infix 2 when;
+export when;
 
 let bdd_is_clock nd cycles =
-    map (\i. T, nd, (i%2=0), i, i+1) (0--(2*cycles-1));
+    let D = deref PL in
+    map (\i. T, nd, (i%2=0), D*i, D*(i+1)) (0--(2*cycles-1))
+;
 
 // A simple interface for defining 5-tuple lists for (b)STE runs.
 // Define a node nd to be a clock and generate cycs cycles of values.
 // Usage: nd is_clock cycs;
 let is_clock = bdd_is_clock;
 infix 2 is_clock;
+export is_clock;
 
 
-let phase cnt = cnt;
+let phase cnt = (deref PL)*cnt;
 postfix phase;
+export phase;
 
-let phases cnt = cnt;
+let phases cnt = (deref PL)*cnt;
 postfix phases;
+export phases;
 
-let cycles cnt = 2*cnt;
+let cycles cnt = (deref PL)*2*cnt;
 postfix cycles;
+export cycles;
 
-let cycle cnt = 2*cnt;
+let cycle cnt = (deref PL)*2*cnt;
 postfix cycle;
+export cycle;
 
 lettype values =  STR_VAL   {v::string}
 		| INT_VAL   {i::int}
@@ -50,6 +69,7 @@ lettype values =  STR_VAL   {v::string}
 
 // A shorthand for an unconstrained value
 let X = UNC;
+export X;
 
 let s_in_phase v ph = [(T,STR_VAL v,ph,ph+1)];
 let i_in_phase v ph = [(T,INT_VAL v,ph,ph+1)];
@@ -62,6 +82,7 @@ overload in_phase s_in_phase i_in_phase bv_in_phase bool_in_phase
 		  bl_in_phase w_in_phase u_in_phase
 ;
 infix 6 in_phase;
+export in_phase;
 
 let s_in_cycle v cyc    = [(T,STR_VAL v,2*cyc,2*cyc+2)];
 let i_in_cycle v cyc    = [(T,INT_VAL v,2*cyc,2*cyc+2)];
@@ -74,8 +95,8 @@ overload in_cycle s_in_cycle i_in_cycle bv_in_cycle bool_in_cycle
 			     bl_in_cycle w_in_cycle u_in_cycle
 ;
 infix 6 in_cycle;
+export in_cycle;
 
-begin_abstype;
 let mk_in_cycs v cycs = map (\cyc. (T,v,2*cyc, 2*cyc+2)) cycs;
 let s_in_cycles v cycs    = mk_in_cycs (STR_VAL v) cycs;
 let i_in_cycles v cycs    = mk_in_cycs (INT_VAL v) cycs;
@@ -88,7 +109,7 @@ overload in_cycles s_in_cycles i_in_cycles bv_in_cycles bool_in_cycles
 			     bl_in_cycles w_in_cycles u_in_cycles
 ;
 infix 6 in_cycles;
-end_abstype in_cycles;
+export in_cycles;
 
 let gfor [({fixed::bool}, {v::values}, {start::int}, {end::int})] cnt =
     [(fixed, v, start, start+cnt)]
@@ -112,6 +133,7 @@ overload for gfor
 	     ufor
 ;
 infix 5 for;
+export for;
 
 let followed_by1 vtl1 vtl2 =
     let M = itlist (\(fixed, v,f,t).\m. max m t) vtl1 0 in
@@ -131,6 +153,7 @@ let followed_by2 ftl1 ftl2 =
 
 overload followed_by followed_by1 followed_by2;
 infix 4 followed_by;
+export followed_by;
 
 let gen_otherwise vt (v,end) =
     let is_def (fx,v,f,t) = f upto (t-1) in
@@ -160,9 +183,11 @@ overload otherwise s_otherwise
 		   u_otherwise
 ;
 infix 3 otherwise;
+export otherwise;
 
 let until v cyc = (v,cyc);
 infix 4 until;
+export until;
 
 let is_number str =
     let non_digit s = 
@@ -288,12 +313,18 @@ let hw_is v vtlist =
 
 overload is s_is hw_is wbase_is;
 infix 2 is;
+export is;
 
 // Casting function
 let bool_ant {l::(bool#string#bool#int#int) list} = l;
+export bool_ant;
 
 // Casting function
 let bexpr_ant {l::(bexpr#string#bexpr#int#int) list} = l;
+export bexpr_ant;
 
 // Casting function
 let wexpr_ant {l::(wexpr#string#wexpr#int#int) list} = l;
+export wexpr_ant;
+
+end_abstype;
