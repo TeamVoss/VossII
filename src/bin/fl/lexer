@@ -494,7 +494,7 @@ defix\ [\ \t]*{symbol}({symbol})* {
 			    RETURN(HEX_NUMBER, "_HEX_NUMBER");
 			}
 
-{dig}*\.{dig}{dig}*(e\-?{dig}{dig}*)?    {
+{dig}*\.{dig}{dig}*(e[\-\+]?{dig}{dig}*)?    {
 			    lvalp->str_t = wastrsave(&strings, (string) yytext);
 			    RETURN(FLOAT_NUMBER, "_FLOAT_NUMBER");
 			}

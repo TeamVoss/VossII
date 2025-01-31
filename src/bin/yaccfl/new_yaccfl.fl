@@ -3,11 +3,11 @@ length ARGS  != 1 => error "Usage: fl -f new_yaccfl.fl <yfl_file>" | ();
 
 let do_debug = mem "-debug" ARGS;
 
-let yfl_file_ref = ref "";
+let base_name = ref "";
 
 let err line msg =
-    eprintf "Syntax error around line %d in file %s\n%s\n" line 
-	    (deref yfl_file_ref) msg
+    eprintf "Syntax error around line %d in file %s.yfl\n%s\n" line 
+	    (deref base_name) msg
 ;
 
 let read_file file = 
@@ -53,8 +53,8 @@ let extract_scanner start_line lines =
     ridx = 0 => err start_line "Missing %% in SCANNER section" |
     let base = firstn ridx res in
     let rules = butfirstn ridx res in
-    let tokens = ref [] in
-    let add_token token = tokens := (token:(deref tokens)) in
+    let tokensr = ref [] in
+    let add_token token = tokensr := (token:(deref tokensr)) in
     let process s =
 	let pat3 = "^([^ \t]*)[ \t]+([^ \t]+)[ \t]+([^ \t]+)$" in
 	let pat2 = "^([^ \t]*)[ \t]+([^ \t]+)$" in
@@ -98,8 +98,13 @@ let extract_scanner start_line lines =
 	    "}"
 	] in
     let res' = prelude @ (map process res) @ postlude in
-    let all_tokens = rev (setify (deref tokens)) in
-    (all_tokens, res', rem)
+    let all_tokens = rev (setify (deref tokensr)) in
+    let base = deref base_name then
+    let pr fp s = fprintf fp "%s" s in
+    let lfp = fopen (base^".l") "w" then
+    (list2fp lfp T "" "\n" "\n" pr res') fseq
+    (fclose lfp) fseq
+    (all_tokens, rem)
 ;
 
 
@@ -112,10 +117,10 @@ let mk_bison_rule fun_name used ids =
     let pre = list2str T "" " " "" id ids in
     let body =
 	letrec build_call idx =
-	    idx = 0 => sprintf " $$ = FN(\"%s\");" fun_name
+	    idx = 0 => sprintf "\n\t    $$ = FUN(\"%s\");" fun_name
 	    |
 	    (build_call (idx-1))^
-	    (mem idx used => (sprintf " $$ = AP($$, $%d);" idx) | "")
+	    (mem idx used => (sprintf "\n\t    $$ = APPLY($$, $%d);" idx) | "")
 	in
 	"\n\t{ "^(build_call (length ids))^"\n\t}"
     in
@@ -198,7 +203,7 @@ let extract_parser tokens start_line lines =
 	    "#include <stdio.h>",
 	    "#include <stdlib.h>",
 	    "#include <string.h>",
-	    "#include \"yaccfl.h\",
+	    "#include \"yaccfl.h\"",
 	    "",
 	    "extern int yylex();",
 	    "extern int yylineno;",
@@ -217,26 +222,26 @@ let extract_parser tokens start_line lines =
 	    "int",
 	    "yyerror()",
 	    "{",
-	    "    FILE *fp;"
+	    "    FILE *fp;",
 	    "    extern int start_line;",
 	    "    extern char *error_file;",
 	    "    int file_write = 1;",
 	    "    if( strcmp(error_file, \"stderr\") == 0 ) {",
 	    "        fp = stderr;",
 	    "        file_write = 0;",
-	    "	 } else if( (fp = fopen(error_file, "w")) == NULL ) {",
+	    "	 } else if( (fp = fopen(error_file, \"w\")) == NULL ) {",
 	    "        fp = stderr;",
 	    "        file_write = 0;",
 	    "    }",
-	    (sprintf "    fprintf(fp, \"When parsing %s syntax around line %%d\n\", start_line+yylineno);" (deref yfl_file_ref)),
+	    (sprintf "    fprintf(fp, \"When parsing %s.yfl syntax around line %%d\n\", start_line+yylineno);" (deref base_name)),
 	    "    if( file_write == 1 ) { fclose(fp); }",
 	    "}"
 	]
     in
-    let get_rule start_line lines =
+    letrec get_rules lines =
 	let sidx = find_first0 (str_reg_match ";") lines in
-	sidx = 0 => err start_line "Missing ;" |
-	let rem = butfirstn sidx lines in
+	sidx = 0 => ([], [], []) |
+	val (lhss, rem_ycodes, all_funs) = get_rules (butfirstn sidx lines) in
 	let rule = implode (firstn sidx lines) in
 	val [lhs,rem] =
 	    rget "[ \t]*([a-zA-Z][a-zA-Z0-9_]*)[ \t]*:(.*)$" rule
@@ -245,11 +250,21 @@ let extract_parser tokens start_line lines =
 	let ycode =
 	    list2str T (sprintf "%s:\n\t" lhs) "\n\t| " "\n\t;\n" id ycodes
 	in
-	(ycode, funs)
+	(lhs:lhss, ycode:rem_ycodes, funs@all_funs)
     in
-%%%%%%
-
-    res, []
+    val (lhss, ycodes, all_funs) = get_rules res then
+    let bison_code = parser_prelude @
+	    (map (\t. sprintf "%%type <nd_t> %s" t) lhss)@[""]@
+	    ycodes @ parser_postlude
+    in
+    let base = deref base_name then
+    let pr fp s = fprintf fp "%s" s in
+    let yfp = fopen (base^".y") "w" then
+    (list2fp yfp T "" "\n" "\n" pr bison_code) fseq
+    (fclose yfp) fseq
+    let flfp = fopen (base^".fl") "w" then
+    (list2fp flfp T "" "\n\n" "\n" pr all_funs) fseq
+    (fclose flfp)
 ;
 
 
@@ -264,18 +279,13 @@ let emit_outputs global local scanner parser =
 
 
 let parse_yfl yfl_file =
-    (yfl_file_ref := yfl_file) fseq
+    (base_name := (gen_trim "" ".yfl" yfl_file)) fseq
     let lines = read_file yfl_file then
     let get_line rem = length lines - length rem in
     val (global, rem) = extract_global 1 lines then
     val (local, rem)  = extract_local (get_line rem) rem then
-    val (tokens, scanner, rem) = extract_scanner (get_line rem) rem then
-    val (parser, rem)  = extract_parser tokens (get_line rem) rem then
-    rem != [] => eprintf "Syntax error near line %d in file %s"
-		 (length lines - length rem) yfl_file
-    |
-//    emit_outputs global local scanner parser
-    emit_outputs [] [] scanner []
+    val (tokens, rem) = extract_scanner (get_line rem) rem then
+    (extract_parser tokens (get_line rem) rem)
 ;
 
 
