@@ -3984,6 +3984,13 @@ op2str(ncomp_ptr cp)
 					      cp->arg.mem.data_size,
 					      cp->arg.mem.lines);
 	return( strtemp(buf) );
+    } else if( op == op_IDELAY ) {
+	Sprintf(buf, "op_IDELAY %d %d %d %d", cp->arg.del.min_rise,
+					      cp->arg.del.max_rise,
+					      cp->arg.del.min_fall,
+					      cp->arg.del.max_fall);
+	return( strtemp(buf) );
+
     } else {
 	return( strtemp("UNKNOWN op????") );
     }
