@@ -393,8 +393,9 @@ negate_bv_list(g_ptr l)
     PUSH_GLOBAL_GC(zero);
     PUSH_GLOBAL_GC(l);
     g_ptr res = trim_bv(gen_add(TRUE, zero, l));
+    PUSH_GLOBAL_GC(res);
     if( Do_gc_asap ) Garbage_collect();
-    POP_GLOBAL_GC(2);
+    POP_GLOBAL_GC(3);
     return( res );
 }
 
@@ -406,8 +407,9 @@ decrement_bv_list(g_ptr l)
     PUSH_GLOBAL_GC(one);
     PUSH_GLOBAL_GC(l);
     g_ptr res = trim_bv(gen_add(TRUE, l, one));
+    PUSH_GLOBAL_GC(res);
     if( Do_gc_asap ) Garbage_collect();
-    POP_GLOBAL_GC(2);
+    POP_GLOBAL_GC(3);
     return( res );
 }
 
@@ -440,8 +442,9 @@ abs_bv_list(g_ptr l)
     g_ptr l_neg = negate_bv_list(l);
     PUSH_GLOBAL_GC(l_neg);
     g_ptr res = trim_bv(ite_bv_list(neg, l_neg, l));
+    PUSH_GLOBAL_GC(res);
     if( Do_gc_asap ) Garbage_collect();
-    POP_GLOBAL_GC(2);
+    POP_GLOBAL_GC(3);
     return( res );
 }
 
@@ -487,7 +490,8 @@ less_rec(g_ptr l1, g_ptr l2)
     formula a = GET_BOOL(GET_CONS_HD(l1));
     formula b = GET_BOOL(GET_CONS_HD(l2));
     formula rem = less_rec(GET_CONS_TL(l1),GET_CONS_TL(l2));
-    PUSH_BDD_GC(rem); if( Do_gc_asap ) Garbage_collect();
+    PUSH_BDD_GC(rem);
+    if( Do_gc_asap ) Garbage_collect();
     formula ab = B_Xnor(a,b);
     PUSH_BDD_GC(ab); if( Do_gc_asap ) Garbage_collect();
     formula abrem = B_And(ab,rem);
@@ -510,8 +514,9 @@ less_than_bv_list(g_ptr l1, g_ptr l2)
     PUSH_BDD_GC(raw_res);
     formula res = B_Ite(neg1, B_Ite(neg2, raw_res, B_One()),
 	   	        B_Ite(neg2, B_Zero(), raw_res));
+    PUSH_BDD_GC(res);
     if( Do_gc_asap ) Garbage_collect();
-    POP_BDD_GC(1);
+    POP_BDD_GC(2);
     return( res );
 }
 

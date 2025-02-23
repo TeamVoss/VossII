@@ -311,10 +311,10 @@ proc remove_window_always_alive {w} {
     catch {unset ::always_alive_tbl}
     foreach w $::always_alive {
 	set ::always_alive_tbl($w) 1
-	set pw [winfo parent $w]
+	if [catch {winfo parent $w} pw] { set pw "" }
 	while { $pw != "" } {
 	    set ::always_alive_tbl($pw) 1
-	    set pw [winfo parent $pw]
+	    if [catch {winfo parent $pw} pw] { set pw "" }
 	}
     }
 }
