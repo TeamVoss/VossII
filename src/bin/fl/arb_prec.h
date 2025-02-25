@@ -110,7 +110,7 @@ typedef short Length_T;
         ((l += (w) & Hmask), (h += (unsigned s_Word)(w) >> HalfSize))
 #define Carry(l, h) (h += (l) >> HalfSize)
 
-#define MaxBlock 1000
+#define MaxBlock 10000
 #define BlockSize ((1 << 16)*sizeof(void *))
 
 
