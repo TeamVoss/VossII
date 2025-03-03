@@ -1816,6 +1816,8 @@ nn_cmp(const void *pi, const void *pj)
 {
     vec_ptr vi = *((vec_ptr *) pi);
     vec_ptr vj = *((vec_ptr *) pj);
+    int res = strcmp(mk_name_signature(vi), mk_name_signature(vj));
+    if( res != 0 ) { return res; }
     return( vec_name_cmp(vi, vj) );
 }
 
