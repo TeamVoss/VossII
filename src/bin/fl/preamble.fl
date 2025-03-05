@@ -191,7 +191,7 @@ infix 9 @;
 // Usage: atmost cnt l trunc_list;
 let atmost cnt l trunc_list = length l <= cnt => l | (firstn cnt l)@trunc_list;
 
-// (replicate n x) -- Create a list of length n with x the value of every element.
+// (replicate n x) -- Create a list with x repeated n times
 letrec replicate n x =
     n < 0 => eprintf "replicate with count < 0 (%d)" n |
     n=0 => [] | x:(replicate (n-1) x)
@@ -376,6 +376,143 @@ letrec unzip3 pl =
 	val (e1,e2,e3) = hd pl in
 	(e1:r1), (e2:r2), (e3:r3)
 ;
+
+
+// Replace all current state variables (not ending in _n) with their
+// corresponding next-state variables in all the BDDs in fs.
+// All other variables remain as they were.
+// NOTE: If fs already depends on one of the new next-state variables,
+// you will likely not get what you expect, so beware!
+// Usage: bdd_current2next fs;
+let bdd_current2next f =
+    let vs = depends f in
+    val (next,cur) = split (str_is_suffix "_n") vs in
+    let sub = map (\n.n, variable (n^"_n")) cur in
+    let new = depends sub in
+    let common = new intersect next in
+    common != [] =>
+	eprintf "bdd_current2next with overlapping names (%S)" common
+    |
+    substitute sub f
+;
+
+
+// Replace all next-state variables (ending in _n) with their
+// corresponding current-state variables in all the BDDs in fs.
+// All other variables remain as they were.
+// NOTE: If fs already depends on one of the new current-state variables,
+// you will likely not get what you expect, so beware!
+// Usage: bdd_next2current fs;
+let bdd_next2current f =
+    let vs = depends f in
+    val (next,cur) = split (str_is_suffix "_n") vs in
+    let sub = map (\n.n, variable (string_butlastn n 2)) next in
+    let new = depends sub in
+    let common = new intersect cur in
+    common != [] =>
+        eprintf "bdd_next2current with overlapping names (%S)" common
+    |
+    substitute sub f
+;
+
+// Existentially quantify out all the variables in 'vars' from f.
+// Usage: Quant_thereis vars f;
+let Quant_thereis vars f =
+    let qv = sitlist (\n.\r. variable n AND r) vars T in
+    quant_thereis qv f
+;
+
+// Existentially quantify out all the variables in vars from f.
+// Usage: Quant_forall vars f;
+let Quant_forall vars f =
+    let qv = sitlist (\n.\r. variable n AND r) vars T in
+    quant_forall qv f
+;
+
+
+begin_abstype;
+
+cletrec parametric rem_vars f =
+    rem_vars = [] => [] |
+    f == T => (map variable rem_vars) |
+    val (v,H,L) = top_cofactor f then
+    let idx = find_first (\n. n = v) rem_vars then
+    let unconstrained = firstn (idx-1) rem_vars then
+    let rem_vars' = butfirstn idx rem_vars then
+    (map variable unconstrained)@
+    (
+        H == F => F:(parametric rem_vars' L) |
+        L == F => T:(parametric rem_vars' H) |
+        let vn = variable v then
+        let Hres = parametric rem_vars' H then
+        let Lres = parametric rem_vars' L then
+        vn:(vn => Hres | Lres)
+    )
+;
+
+// Return the parametric representation for a condition cond.
+clet param cond =
+    cond == F => error "Param called with F condition." |
+    let old = update_vossrc "DYNAMIC-ORDERING" "NO" then
+    let vars = depends [cond] then
+    let res = zip vars (parametric vars cond) then
+    (update_vossrc "DYNAMIC-ORDERING" old) fseq
+    res
+;
+
+cletrec fparam_rec vars f = vars = [] => [] |
+    let Quant_thereis vs f =
+        quant_thereis (sitlist (\v.\r. variable v OR r) vs F) f
+    in
+    let nvariable s = bdd_current2next (variable s) in
+    val (v:vs) = vars in
+    f == T => map (\v. v, nvariable v) (v:vs) |
+    let hi = substitute [(v,T)] f in
+    hi == F =>
+        // Must be 0
+        let lo = substitute [(v,F)] f in
+        (v,F):(fparam_rec vs lo)
+    |
+    hi == f =>
+        // Does not depend on v
+        let hq = Quant_thereis vs hi in
+        let pv = nvariable v in
+        let bit = pv AND hq in
+        (v,bit):(fparam_rec vs f)
+    |
+    let lo = substitute [(v,F)] f in
+    lo == F =>
+        // Must be 1
+        (v,T):(fparam_rec vs hi)
+    |
+    let hq = Quant_thereis vs hi in
+    let lq = Quant_thereis vs lo in
+    let pv = nvariable v in
+    let bit = (hq => (lq => pv | T) | F) in
+    bit == T => (v,T):(fparam_rec vs hi) |
+    bit == F => (v,F):(fparam_rec vs lo) |
+    let Hres = fparam_rec vs hi then
+    let Lres = fparam_rec vs lo then
+    (v,bit):(bit => Hres | Lres)
+;
+
+// Generalized param that only solves for some variables. The other
+// variables are treated as symbolic constants.
+//
+// Usage: fparam vars_to_solve_for function.
+//
+let fparam vars f =
+    f fseq vars fseq
+    ((depends f) subtract vars) != [] => fparam_rec vars f |
+    let sub = param f then
+    let cnv v = (v,(bdd_current2next (assoc v sub)))
+		catch
+		(v,(bdd_current2next (variable v)))
+    in
+    map cnv vars
+;
+
+end_abstype param fparam;
 
 
 // Convert a list to a string
@@ -564,6 +701,35 @@ let bv_shr n amount =
 // Compute n arithmetically shifted right by amount.
 let bv_ashr_bvbv n amount =
     bv_div n (bv_pow (int2bv 2) amount)
+;
+
+// Return the negation of bv
+let bv_neg bv = bv_add (bv_NOT bv) (int2bv 1);
+
+forward_declare {bv_min :: bv -> int};
+
+// Compute the maximum value bv can represent
+let bv_max bv =
+    bv < (int2bv 0) => -1*(bv_min (bv_neg bv)) |
+    letrec try (b:bs) =
+        b == F => "0":(try bs) |
+        let sub = param b in
+        "1":(try (substitute sub bs))
+     /\   try [] = []
+    in
+    sscanf "%b" (implode (try (bv2list bv)))
+;
+
+// Compute the minimum value bv can represent
+let bv_min bv =
+    bv < (int2bv 0) => -1*(bv_max (bv_neg bv)) |
+    letrec try (b:bs) =
+        b == T => "1":(try bs) |
+        let sub = param (NOT b) in
+        "0":(try (substitute sub bs))
+     /\   try [] = []
+    in
+    sscanf "%b" (implode (try (bv2list bv)))
 ;
 
 overload bv_ashr bv_ashr bv_ashr_bvbv;
@@ -758,65 +924,6 @@ let cload filename =
 ;
 non_lazy cload;
 end_abstype get_cloaded_files cload;
-
-// Replace all current state variables (not ending in _n) with their
-// corresponding next-state variables in all the BDDs in fs.
-// All other variables remain as they were.
-// NOTE: If fs already depends on one of the new next-state variables,
-// you will likely not get what you expect, so beware!
-// Usage: bdd_current2next fs;
-let bdd_current2next f =
-    let vs = depends [f] in
-    let mk_c2n n = str_is_suffix "_n" n => [] | [(n, variable (n^"_n"))] in
-    let sub = flatmap mk_c2n vs in
-    substitute sub f
-;
-
-
-// Replace all next-state variables (ending in _n) with their
-// corresponding current-state variables in all the BDDs in fs.
-// All other variables remain as they were.
-// NOTE: If fs already depends on one of the new current-state variables,
-// you will likely not get what you expect, so beware!
-// Usage: bdd_next2current fs;
-let bdd_next2current f =
-    let vs = depends [f] in
-    let mk_n2c n =
-	NOT (str_is_suffix "_n" n) => [] |
-	[(n, variable (string_butlastn n 2))]
-    in
-    let sub = flatmap mk_n2c vs in
-    substitute sub f
-;
-
-// Existentially quantify out all the variables in 'vars' from f.
-// Usage: Quant_thereis vars f;
-let Quant_thereis vars f =
-    let qv = sitlist (\n.\r. variable n AND r) vars T in
-    quant_thereis qv f
-;
-
-// Existentially quantify out all the variables in vars from f.
-// Usage: Quant_forall vars f;
-let Quant_forall vars f =
-    let qv = sitlist (\n.\r. variable n AND r) vars T in
-    quant_forall qv f
-;
-
-// Return the number of bits required to represent n as a
-// binary (unsigned) vector.
-let bits_needed n =
-    n == 0 => 1 |
-    let r = log2 n then
-    2**r <= n => r+1 | r
-;
-
-// Return a number 2**k such that 2**k >= n and 2**(k-1) < n.
-// Usage: nearest_power_of_2 n;
-let nearest_power_of_2 n =
-    let lg2n = log2 n in
-    (2**lg2n) == n => n | 2**(lg2n+1)
-;
 
 
 // Return a random integer between min and max (inclusive).
@@ -1175,7 +1282,6 @@ let cVARS s cond =
     idx != 0 =>
         eprintf "Cannot declare %s twice." (hd (el idx p))
     |
-//    (var_order ss) fseq
     let cmd1 =
 	list2str T "val (" "," ") =\n" fst (bools@bvs)
     then
@@ -1366,102 +1472,6 @@ let early_quant_thereis qvars fns =
 ;
 
 end_abstype early_quant_thereis;
-
-begin_abstype;
-
-//cletrec parametric [] f = []
-// /\    parametric (n:r) f =
-//    f == T => map variable (n:r) |
-//    let high = substitute [(n,T)] f in
-//    let low  = substitute [(n,F)] f in
-//    (high == F) => F:(parametric r low) |
-//    (low == F) => T:(parametric r high) |
-//    let vn = variable n in
-//    vn:(vn => (parametric r high) | (parametric r low))
-//;
-//
-//// Return the parametric representation for a condition cond.
-//clet param cond =
-//    cond == F => error "Param called with F condition." |
-//    let vars = depends [cond] in
-//    zip vars (parametric vars cond)
-//;
-
-cletrec parametric rem_vars f =
-    rem_vars = [] => [] |
-    f == T => (map variable rem_vars) |
-    val (v,H,L) = top_cofactor f then
-    let idx = find_first (\n. n = v) rem_vars then
-    let unconstrained = firstn (idx-1) rem_vars then
-    let rem_vars' = butfirstn idx rem_vars then
-    (map variable unconstrained)@
-    (
-        H == F => F:(parametric rem_vars' L) |
-        L == F => T:(parametric rem_vars' H) |
-        let vn = variable v then
-        vn:(vn => (parametric rem_vars' H) | (parametric rem_vars' L))
-    )
-;
-
-// Return the parametric representation for a condition cond.
-clet param cond =
-    cond == F => error "Param called with F condition." |
-    let old = update_vossrc "DYNAMIC-ORDERING" "NO" then
-    let vars = depends [cond] then
-    let res = zip vars (parametric vars cond) then
-    (update_vossrc "DYNAMIC-ORDERING" old) fseq
-    res
-;
-
-cletrec fparam_rec vars f = vars = [] => [] |
-    let Quant_thereis vs f =
-        quant_thereis (sitlist (\v.\r. variable v OR r) vs F) f
-    in
-    let nvariable s = bdd_current2next (variable s) in
-    val (v:vs) = vars in
-    f == T => map (\v. v, nvariable v) (v:vs) |
-    let hi = substitute [(v,T)] f in
-    hi == F =>
-        // Must be 0
-        let lo = substitute [(v,F)] f in
-        (v,F):(fparam_rec vs lo)
-    |
-    hi == f =>
-        // Does not depend on v
-        let hq = Quant_thereis vs hi in
-        let pv = nvariable v in
-        let bit = pv AND hq in
-        (v,bit):(fparam_rec vs f)
-    |
-    let lo = substitute [(v,F)] f in
-    lo == F =>
-        // Must be 1
-        (v,T):(fparam_rec vs hi)
-    |
-    let hq = Quant_thereis vs hi in
-    let lq = Quant_thereis vs lo in
-    let pv = nvariable v in
-    let bit = (hq => (lq => pv | T) | F) in
-    (v,bit):(bit => (fparam_rec vs hi) | (fparam_rec vs lo))
-;
-
-// Generalized param that only solves for some variables. The other
-// variables are treated as symbolic constants.
-//
-// Usage: fparam vars_to_solve_for function.
-//
-let fparam vars f =
-    f fseq vars fseq
-    ((depends f) subtract vars) != [] => fparam_rec vars f |
-    let sub = param f then
-    let cnv v = (v,(bdd_current2next (assoc v sub)))
-		catch
-		(v,(bdd_current2next (variable v)))
-    in
-    map cnv vars
-;
-
-end_abstype param fparam;
 
 let iabs i = i < 0 => -1*i | i;
 let fabs f = f < 0.0 => -1.0*f | f;
@@ -1957,18 +1967,14 @@ install_print_function Pwexpr;
 letrec DBGwexpr (W_X sz) =
 	    sprintf "(W_X %d)" sz
  /\    DBGwexpr (W_NAMED_CONST name sz v) =
-	    (sprintf "(W_NAMED_CONST \"%s\" %d 0b%0*b)" name sz sz v) catch
+	    (sprintf "(W_NAMED_CONST \"%s\" %d %d (0b%0*b))" name sz v sz v)
+	    catch
 	    (
 		(fprintf stderr "Named constant %s does not fit!" name) fseq
 		(sprintf "(W_NAMED_CONST \"%s\" %d 0b%b)" name sz v)
 	    )
  /\    DBGwexpr (W_CONST sz v) =
-	    (sprintf "(W_CONST %d 0b%0*b)" sz sz v) catch
-	    (
-		(fprintf stderr "Constant 0x%x does not fit in %d bits" v sz) fseq
-		(sprintf "(W__CONST %d 0b%b)" sz v)
-	    )
-
+	    (sprintf "(W_CONST %d %d)" sz v)
  /\    DBGwexpr (W_VAR sz base) =
 	    sprintf "(W_VAR %d \"%s\")" sz base
  /\    DBGwexpr (W_EXPLICIT_VAR sz name) =
@@ -2284,3 +2290,41 @@ let file_modified_time file =
     sscanf "%d" date
 ;
 non_lazy file_modified_time;
+
+// Return the number of bits required to represent n as a
+// binary signed vector.
+let sbits_needed n =
+    n == 0 => 1 |
+    n > 0 => 
+	let r = log2 n then
+	(2**r <= n) => r+2 | r+1
+    |
+	let n = -1*n in
+	let r = log2 n then
+	(2**r < n) => r+2 | r+1
+;
+
+// Return the number of bits required to represent n as a
+// binary unsigned vector.
+let ubits_needed n =
+    n < 0 => eprintf "ubits_needed: negative argument (%d)" n |
+    n == 0 => 1 |
+    let r = log2 n then
+    2**r <= n => r+1 | r
+;
+
+// Depricated function. Use ubits_needed or sbits_needed depending on
+// the resulting vector should be unsigned or signed.
+let bits_needed n =
+    (fprintf stdinfo
+	"WARNING: bits_needed depricated. Use ubits_needed or sbits_needed\n")
+    fseq
+    ubits_needed n
+;
+
+// Return a number 2**k such that 2**k >= n and 2**(k-1) < n.
+// Usage: nearest_power_of_2 n;
+let nearest_power_of_2 n =
+    let lg2n = log2 n in
+    (2**lg2n) == n => n | 2**(lg2n+1)
+;
