@@ -109,6 +109,7 @@ package: clean
 	install -m 755 -t ../voss/bin ../bin/functor
 	install -m 755 -t ../voss/bin ../bin/write_pexlif.so
 	install -m 755 -t ../voss/bin ../bin/front_end.tcl
+	install -m 755 -t ../voss/bin ../bin/front_end_debug.tcl
 	install -m 644 -t ../voss/bin ../bin/prefs.tcl
 	install -m 644 -t ../voss/bin ../bin/utils.tcl
 	install -m 644 -t ../voss/bin ../bin/builtins.fl
@@ -201,6 +202,8 @@ install_all: fl functor \
 	@chmod ugo+r $(BIN_DIR)/preamble.fl
 	@cp ./bin/fl/front_end.tcl $(BIN_DIR)/front_end.tcl
 	@chmod ugo+r $(BIN_DIR)/front_end.tcl
+	@cp ./bin/fl/front_end_debug.tcl $(BIN_DIR)/front_end_debug.tcl
+	@chmod ugo+r $(BIN_DIR)/front_end_debug.tcl
 	@cp ./bin/fl/utils.tcl $(BIN_DIR)/utils.tcl
 	@chmod ugo+r $(BIN_DIR)/utils.tcl
 	@cp ./bin/fl/prefs.tcl $(BIN_DIR)/prefs.tcl
