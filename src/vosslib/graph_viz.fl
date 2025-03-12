@@ -1,0 +1,32 @@
+// A function to visualize a directed graph given its nodes and edges.
+let draw_graph {nodes::(int#string) list} {edges::(int#string#int) list} =
+    let tmp_dir = mktempd "draw_graph" then
+    let dot_file = sprintf "%s/graph.dot" tmp_dir then
+    let fp = fopen dot_file "w" then
+    (fprintf fp "digraph G {\n") fseq
+    (fprintf fp "node [shape=circle];\n") fseq
+    (fprintf fp "size = \"8.5,11.0\";\n") fseq
+    (fprintf fp "center = 1;\n") fseq
+    (fprintf fp "margin = 0.5;\n") fseq
+    (fprintf fp "ordering=out;\n") fseq
+    let rcnt = ref 0 then
+    let emit_node (n,name) = fprintf fp "n%d [label = \"%s\"];\n" n name in
+    (foreach emit_node nodes) fseq
+    let emit_edge (f,lbl,t) =
+	lbl = "" =>
+	    fprintf fp "n%d -> n%d [style=solid];\n" f t
+	|
+	    fprintf fp "n%d -> n%d [style=solid, label = \"%s\"];\n" f t lbl
+    in
+    (foreach emit_edge edges) fseq
+    (fprintf fp "\n}\n") fseq
+    (fclose fp) fseq
+    let w = tcl_eval [sprintf "display_dot %s {} {}" dot_file] then
+    (system (sprintf "/bin/rm -f %s" dot_file)) fseq
+    ()
+;
+
+// Example 
+//draw_graph [ (1,"a"), (2,"b"), (3,"b"), (4,"c"), (5,"d"), (6,"T"), (7,"F")] 
+//    [(1,"0",2), (1,"1",3), (2,"0",5), (2,"1",4), (3,"0",4), (3,"1",6),
+//     (4,"0",5), (4,"1",7), (5,"0",6), (5,"1",7)];
