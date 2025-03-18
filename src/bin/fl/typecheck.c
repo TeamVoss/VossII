@@ -1771,7 +1771,7 @@ get_prim_fun_type(g_ptr node)
 	    type = (make_arrow(string_op, make_list(bool_op)));
 	    break;
 	case P_BDD_REORDER:
-	    type = (make_arrow(int_op, bool_op));
+	    type = (make_arrow(int_op, make_tuple(int_op,int_op)));
 	    break;
 	case P_RELPROD_THEREIS:
 	case P_RELPROD_FORALL:

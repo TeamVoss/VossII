@@ -1,0 +1,78 @@
+let N = 23;
+
+update_vossrc "VERBOSE-GARBAGE-COLLECTION" "YES";
+
+let as = map variable (md_expand_vector (sprintf "a[%d:0]" (N-1)));
+let bs = bdd_current2next as;
+
+let build_sub vars bv =
+    let n = length vars in
+    let raw = (replicate n F)@(bv2list bv) in
+    zip vars (lastn n raw) 
+;
+
+clet mk_idx0 sel_vars = list2bv (F:(map variable sel_vars));
+
+cletrec upar2 sel_vars idx vars f =
+    vars = [] => [] |
+    f == T => build_sub vars (bv_sub idx (int2bv 1)) |
+    val (v:vs) = vars in
+    let idx0 = mk_idx0 sel_vars then
+    let Lsub = build_sub sel_vars idx then
+    let L = substitute [(v,F)] f in
+    let H = substitute [(v,T)] f in
+    L == F => (v,T):(substitute Lsub (upar2 sel_vars idx0 vs H)) |
+    H == F => (v,F):(substitute Lsub (upar2 sel_vars idx0 vs L)) |
+    let Lcnt = int2bv (truth_cover vs L) in
+    let Hsub = build_sub sel_vars (bv_sub idx Lcnt) then
+    let in_low = idx <= Lcnt then
+    let Lres = substitute Lsub (upar2 sel_vars idx0 vs L) then
+    let Hres = substitute Hsub (upar2 sel_vars idx0 vs H) then
+    (v,NOT in_low):(in_low => Lres | Hres)
+;
+
+let uniform_param expansion_factor vars f =
+    expansion_factor < 1 =>
+	eprintf "Expandsion_factor (%d) must be >= 1" expansion_factor
+    |
+    f == F =>
+	error "uniform_param called for F"
+    |
+    (depends f) subtract vars != [] => 
+	eprintf "uniform_param: f depends on variable(s) not in vars (%S)"
+	((depends f) subtract vars)
+    |
+    // Make sure variable are in BDD order
+    f fseq
+    let vars = depends (itlist (\v.\r. variable v AND r) vars T) then
+    //
+    let cnt      = truth_cover vars f in
+    let needed   = (ubits_needed (cnt-1))+(expansion_factor-1) in
+    letrec mk_vars i vars =
+	i = 0 => [] |
+	vars != [] =>
+	    let v = hd vars in
+	    // Don't use next-state variables....
+	    str_is_suffix "_n" v => mk_vars i (tl vars) |
+	    v:(mk_vars (i-1) (tl vars))
+	|
+	let new = sprintf "_T%d" i in
+	(variable new) fseq
+	new:(mk_vars (i-1) [])
+    in
+    let sel_vars = mk_vars needed vars then
+    let raw_idx  = bv_ZX (list2bv (map variable sel_vars)) in
+    let bcnt     = int2bv cnt in
+    let idx = bv_ZX (bv_add (bv_mod raw_idx bcnt) (int2bv 1)) in
+    let res = upar2 sel_vars idx vars f then
+    res
+;
+
+
+let adds = bv_geq (bv_add (list2bv as) (list2bv bs)) (int2bv (2**(N-1)));
+bdd_size adds;
+let vars = (depends adds);
+truth_cover vars adds;
+let res = uniform_param 1 vars adds verbose->F;
+wtime (res fseq 1);
+bdd_size res;

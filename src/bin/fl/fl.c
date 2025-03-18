@@ -87,6 +87,7 @@ static string		s_empty_string;
 static string		scaling_factor = "";
 static string		default_font =
 				"-*-courier-bold-r-normal-*-14-*-*-*-*-*-*-*";
+static string		display = NULL;
 
 /* ===================== Local functions defined ===================== */
 static void	busy(bool busy);
@@ -253,6 +254,11 @@ fl_main(int argc, char *argv[])
 	    scaling_factor = argv[2];
             argc -= 2; argv += 2;
         } else
+        if( strcmp(argv[1], "-display") == 0 ) {
+	    display = argv[2];
+            argc -= 2; argv += 2;
+        } else
+
         if( strcmp(argv[1], "--read_input_from_file") == 0 ) {
             input_file_for_cmds = argv[2];
             argc -= 2; argv += 2;
@@ -353,7 +359,7 @@ fl_main(int argc, char *argv[])
 
     if( unbuf_stdout ) { setbuf(stdout, NULL); }
 
-    LG_TBL_SIZE = 18;
+    LG_TBL_SIZE = 20;
     if( size_str != NULL && !str2int(size_str, &LG_TBL_SIZE) )
     {
 	Eprintf("Size flag takes a number between 12 and 24.\n");
@@ -891,7 +897,7 @@ Serve_Interrupt()
 static void
 setup_sockets()
 {
-    struct sockaddr_in serv_addr = {0};
+    struct sockaddr_in serv_addr;
 
     socklen_t len = sizeof(serv_addr);
     memset(&serv_addr, 0, len);
@@ -925,13 +931,26 @@ setup_sockets()
     pid_t fl_pid = getpid();
 
     if( use_window != NULL ) {
-	Sprintf(buf, "wish %s/front_end.tcl %d %d %d %s %s -use %s &",
-		     binary_location, fl_pid, addr, port, Voss_tmp_dir,
-		     scaling_factor, use_window);
+	if( display != NULL  ) {
+	    Sprintf(buf,
+		   "wish %s/front_end.tcl %d %d %d %s %s -use %s -display %s &",
+		    binary_location, fl_pid, addr, port, Voss_tmp_dir,
+		    scaling_factor, use_window, display);
+	} else {
+	    Sprintf(buf, "wish %s/front_end.tcl %d %d %d %s %s -use %s &",
+			 binary_location, fl_pid, addr, port, Voss_tmp_dir,
+			 scaling_factor, use_window);
+	}
     } else {
-	Sprintf(buf, "wish %s/front_end.tcl %d %d %d %s %s &",
-		     binary_location, fl_pid, addr, port, Voss_tmp_dir,
-		     scaling_factor);
+	if( display != NULL ) {
+	    Sprintf(buf, "wish %s/front_end.tcl %d %d %d %s %s -display %s &",
+			 binary_location, fl_pid, addr, port,
+			 Voss_tmp_dir, scaling_factor, display);
+	} else {
+	    Sprintf(buf, "wish %s/front_end.tcl %d %d %d %s %s &",
+			 binary_location, fl_pid, addr, port, Voss_tmp_dir,
+			 scaling_factor);
+	}
     }
     if( system(buf) != 0 ) {
         Eprintf("Failed to execute %s/front_end.tcl\n", binary_location);
@@ -1287,7 +1306,10 @@ get_xresource(string resource, string default_res)
     if( display == NULL ) Eprintf("Can't open display\n");
 
     char *resource_manager = XResourceManagerString(display);
-    if( resource_manager == NULL ) Eprintf("Can't obtain RESOURCE_MANAGER\n");
+    if( resource_manager == NULL ) {
+	XCloseDisplay(display);
+	return( wastrsave(&strings, default_res) );
+    }
 
     XrmDatabase db = XrmGetStringDatabase(resource_manager);
     if (db == NULL) Eprintf("Can't open resource database\n");

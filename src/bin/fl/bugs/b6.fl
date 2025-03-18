@@ -14,11 +14,6 @@ let e4 = (bNOT a) bAND (bNOT b);
 let e5 = (bNOT a) bAND b;
 let eqs = [e1,e2,e3];
 
-//gen_bexpr2bdd [] [e1,e2,e3];
-//gen_bexpr2bdd [("c",T)] [e1,e2,e3];
-//gen_bexpr2bdd [("c",F)] [e1,e2,e3];
-//gen_bexpr2bdd [("c",variable "a")] [e1,e2,e3];
-
 //bsize [e1];
 //bsize [e2];
 //bsize [e3];

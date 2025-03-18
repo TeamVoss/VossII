@@ -97,9 +97,11 @@ static print_types      print_format;
 
 
 static rec_mgr		subst_rec_mgr;
+static bool		subst_rec_mgr_in_use = FALSE;
 static rec_mgr		cache_rec_mgr;
 static hash_record	cache_tbl;
 static rec_mgr		subst_cache_rec_mgr;
+static bool		subst_cache_rec_mgr_in_use = FALSE;
 static hash_record	subs_tbl;
 static hash_record	bdd_size_tbl;
 static hash_record	bdd_save_tbl;
@@ -121,6 +123,7 @@ static subst_ptr	bdd_subs;
 static buffer           bdd_gc_buf;
 
 /* ----- Forward definitions local functions ----- */
+static void		gc_update_ref_cnt(bdd_ptr bp);
 static formula		prim_B_Var(string name);
 static formula		find_insert_bdd(var_ptr vp, formula lson, formula rson);
 static formula		bdd_step(int fn, formula f1, formula f2);
@@ -407,6 +410,21 @@ B_Clean()
 	    if( *fp != ONE && *fp != ZERO ) {
 		bdd_ptr bp = GET_BDDP(*fp);
 		gc_update_ref_cnt(bp);
+	    }
+	}
+	// Mark all substition records if a substitution is underway
+	if( subst_rec_mgr_in_use ) {
+	    subst_ptr sp;
+	    FOR_REC(&subst_rec_mgr, subst_ptr, sp) {
+		B_Mark(sp->var);
+		B_Mark(sp->expr);
+	    }
+	}
+	if( subst_cache_rec_mgr_in_use ) {
+	    subst_cache_ptr sp;
+	    FOR_REC(&subst_cache_rec_mgr, subst_cache_ptr, sp) {
+		B_Mark(sp->f);
+		B_Mark(sp->result);
 	    }
 	}
 	bdd_ptr bp = MainTbl;
@@ -1040,8 +1058,9 @@ Add_ordering_var(string var)
 }
 
 void
-Reorder(int times)
+Reorder(g_ptr redex, int times)
 {
+    lunint	    before, after;
     unint           o_dyn_var_repetitions;
     unint           o_minsize_for_dyn_ordering;
     bool            o_do_dynamic_var_order;
@@ -1051,6 +1070,13 @@ Reorder(int times)
     o_optimal_dynamic_var_order = RCoptimal_dynamic_var_order;
     o_dyn_var_repetitions = (unint) RCdyn_var_repetitions;
     o_minsize_for_dyn_ordering = (unint) RCminsize_for_dyn_ordering;
+    // Do a regular garbage collection first to get initial BDD count
+    RCdo_dynamic_var_order = FALSE;
+    insist_on_reorder = FALSE;
+    Do_gc_asap = TRUE;
+    Garbage_collect();
+    // Now do the reordering
+    before = nodes_used;
     RCdo_dynamic_var_order = TRUE;
     RCoptimal_dynamic_var_order = TRUE;
     RCdyn_var_repetitions = times;
@@ -1058,11 +1084,19 @@ Reorder(int times)
     RCminsize_for_dyn_ordering = 0;
     Do_gc_asap = TRUE;
     Garbage_collect();
+    // Do a regular garbage collection to get an accurate final BDD count
+    RCdo_dynamic_var_order = FALSE;
+    insist_on_reorder = FALSE;
+    Do_gc_asap = TRUE;
+    Garbage_collect();
+    after = nodes_used;
     insist_on_reorder = FALSE;
     RCdo_dynamic_var_order = o_do_dynamic_var_order;
     RCoptimal_dynamic_var_order = o_optimal_dynamic_var_order;
     RCdyn_var_repetitions = (int) o_dyn_var_repetitions;
     RCminsize_for_dyn_ordering = (int) o_minsize_for_dyn_ordering;
+    if( redex != NULL )
+	MAKE_REDEX_PAIR(redex, Make_INT_leaf(before), Make_INT_leaf(after));
 }
 
 g_ptr
@@ -1565,7 +1599,9 @@ do_substitute(g_ptr redex)
     g_ptr arg1 = GET_APPLY_RIGHT(l);
     g_ptr arg2 = GET_APPLY_RIGHT(redex);
     new_mgr(&subst_rec_mgr, sizeof(subst_rec));
+    subst_rec_mgr_in_use = TRUE;
     new_mgr(&subst_cache_rec_mgr, sizeof(subst_cache_rec));
+    subst_cache_rec_mgr_in_use = TRUE;
     create_hash(&subs_tbl, 100, subst_hash, subst_eq);
     bdd_subs = NULL;
     while( !IS_NIL(arg1) ) {
@@ -1579,7 +1615,9 @@ do_substitute(g_ptr redex)
     OVERWRITE(redex, res);
     dispose_hash(&subs_tbl, NULLFCN);
     free_mgr(&subst_rec_mgr);
+    subst_rec_mgr_in_use = FALSE;
     free_mgr(&subst_cache_rec_mgr);
+    subst_cache_rec_mgr_in_use = FALSE;
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
@@ -2296,7 +2334,7 @@ garbage_collect()
 
     
     static lunint limit1, limit2;
-    limit1 = 2*nodes_used;
+    limit1 = 16*nodes_used;
     limit2 = (lunint) sz_MainTbl/2;
     gc_limit = (limit1 > limit2)? limit1 : limit2;
 
@@ -3090,7 +3128,8 @@ top_b_subst(g_ptr np)
 {
     ASSERT(IS_LEAF(np));
     if( !IS_BOOL(np) ) return np;
-    return( Make_BOOL_leaf(b_substitute(GET_BOOL(np), bdd_subs)) );
+    g_ptr res = Make_BOOL_leaf(b_substitute(GET_BOOL(np), bdd_subs));
+    return( res );
 }
 
 static g_ptr
@@ -3127,6 +3166,7 @@ add_to_subs(subst_ptr start, formula v, formula e)
     rson = GET_RSON(bp);
     if( ((lson != ONE) && (lson != ZERO)) || ((rson != ONE) && (rson != ZERO)) )
         Rprintf("First element in substitution pair is an expression");
+    ASSERT(subst_rec_mgr_in_use);
     new = (subst_ptr) new_rec(&subst_rec_mgr);
     new->var  = v;
     new->expr = e;

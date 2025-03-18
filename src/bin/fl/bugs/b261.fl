@@ -1,0 +1,134 @@
+
+//let N = 6;
+let N = 16;
+//let N = 20;
+//let N = 23;
+//let N = 25;
+//let N = 32;
+//let N = 50;
+
+let as = map variable (md_expand_vector (sprintf "a[%d:0]" (N-1)));
+let bs = bdd_current2next as;
+
+
+let build_sub {vars::string list} bv =
+    let n = length vars in
+    let raw = (replicate n F)@(bv2list bv) in
+    zip vars (lastn n raw) 
+;
+
+let be_build_sub {vars::string list} bv =
+    let n = length vars in
+    let raw = (replicate n bF)@(bev2list bv) in
+    zip vars (lastn n raw) 
+;
+
+clet be_mk_idx0 sel_vars = list2bev (bF:(map bvariable sel_vars));
+
+
+cletrec be_upar2 sel_vars idx vars f =
+    vars = [] => [] |
+    f == T => be_build_sub vars idx |
+    val (v:vs) = vars in
+    let L = substitute [(v,F)] f in
+    let H = substitute [(v,T)] f in
+    L == F => (v,bT):(be_upar2 sel_vars idx vs H) |
+    H == F => (v,bF):(be_upar2 sel_vars idx vs L) |
+    let Lcnt = int2bev (truth_cover vs L) in
+    let Lsub = be_build_sub sel_vars idx then
+    let Hsub = be_build_sub sel_vars (bev_sub idx Lcnt) then
+    let in_low = idx < Lcnt then
+    let idx0 = be_mk_idx0 sel_vars then
+    let Lres = bsubstitute Lsub (be_upar2 sel_vars idx0 vs L) then
+    let Hres = bsubstitute Hsub (be_upar2 sel_vars idx0 vs H) then
+    (v,bNOT in_low):(IF in_low THEN Lres ELSE Hres)
+;
+
+
+let uniform_param expansion_factor vars f =
+    expansion_factor < 1 =>
+	eprintf "Expandsion_factor (%d) must be >= 1" expansion_factor
+    |
+    f == F =>
+	error "uniform_param called for F"
+    |
+    (depends f) subtract vars != [] => 
+	eprintf "uniform_param: f depends on variable(s) not in vars (%S)"
+	((depends f) subtract vars)
+    |
+    // Make sure variable are in BDD order
+    f fseq
+    let vars = depends (itlist (\v.\r. variable v AND r) vars T) then
+    //
+    let cnt      = truth_cover vars f in
+    let needed   = (ubits_needed (cnt-1))+(expansion_factor-1) in
+    letrec mk_vars i vars =
+	i = 0 => [] |
+	vars != [] =>
+	    let v = hd vars in
+	    // Don't use next-state variables....
+	    str_is_suffix "_n" v => mk_vars i (tl vars) |
+	    v:(mk_vars (i-1) (tl vars))
+	|
+	let new = sprintf "_T%d" i in
+	(variable new) fseq
+	new:(mk_vars (i-1) [])
+    in
+    let sel_vars = mk_vars needed vars then
+    let raw_idx  = bv_ZX (list2bv (map variable sel_vars)) in
+    let bcnt     = int2bv cnt in
+    let idx = bv_ZX (bv_mod raw_idx bcnt) in
+    let sub = build_sub sel_vars idx then
+    let idx0 = be_mk_idx0 sel_vars then
+    let bres = be_upar2 sel_vars idx0 vars f then
+//(fprintf stderr "be_res %S\n" (map (\(v,be).sprintf "(%s->%s)" v (bexpr2str 100 be)) bres)) fseq
+//(fprintf stderr "with sub: %S\n" (map (\(v,b). sprintf "(%s->%s)" v (bool2str 100 b)) sub)) fseq
+    bexpr2bdd sub bres
+;
+
+
+
+let test_distribution {sub:: (string#bool) list} =
+    let vecs = qsort node_name_cmp (md_extract_vectors (map fst sub)) in
+    let nds = md_expand_vectors vecs in
+    let bvec = bv_ZX (list2bv (map (\n. assoc n sub) nds)) in
+    let vars = depends bvec in
+    let n = bv_ZX (list2bv (map variable vars)) in
+    let cnv i =
+        let cond = (n = (int2bv i)) in
+        let fsub = forcing cond in
+        bv2int (substitute fsub bvec)
+    in
+    let res = map cnv (0 upto (2**(length vars)-1)) in
+    let mk l = (hd l, length l) in
+    let raw_res = map mk (partition id res) in
+    let cmp (p1,l1) (p2,l2) = p1-p2 in
+    let res = qsort cmp raw_res in
+    let ranges =
+        letrec mk_range (v:vs) =
+            (2**(md_sizes vs), 2**(md_size v)):(mk_range vs)
+         /\    mk_range [] = []
+        in
+        mk_range vecs
+    in
+    let szs = map2 (\v.\(d,m). max (strlen v+2) (1+log2 m)) vecs ranges in
+    let pr_res (p,cnt) =
+        let parts = map2 (\sz.\(d,m). sprintf "%*x" sz ((p/d)%m)) szs ranges in
+        list2str T "" "" (sprintf ": %d" cnt) id parts
+    in
+    let pre = 
+        let parts = map2 (\v.\sz. sprintf "%*s" sz v) vecs szs in
+        list2str T "" "" "\n" id parts
+    in
+    list2fp stdout T pre "\n" "\n" pr_res res
+;
+
+
+let same = as = bs;
+let vars = (depends (as,bs));
+vars fseq same fseq ();
+truth_cover vars same;
+let res = uniform_param 1  vars same verbose->F;
+wtime (res fseq 1);
+//test_distribution res;
+

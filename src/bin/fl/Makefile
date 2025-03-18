@@ -12,10 +12,14 @@ BASE_FLAGS = $(DEBUG_FLAG) $(OPTIMIZATION_FLAG) $(FL_OPTIONS) \
 	-DVERSION_DATE='"$(VERSION_DATE)"' \
 	-DDEFAULT_PLUGIN_DIR='"$(PLUGIN_DIR)"' -DFL_BINARY=1
 
-CFLAGS += $(BASE_FLAGS) $(COMPATIBILITY_FLAG) -Wno-unused-command-line-argument -Wno-unused-but-set-variable 
+ifeq ($(CC), clang)
+	CFLAGS += $(BASE_FLAGS) $(COMPATIBILITY_FLAG) -Wno-unused-command-line-argument -Wno-unused-const-variable
+else
+	CFLAGS += $(BASE_FLAGS) $(COMPATIBILITY_FLAG) -Wno-unused-command-line-argument -Wno-unused-but-set-variable 
+endif
 CXXFLAGS += $(BASE_FLAGS) -fpermissive -Wno-error
 
-ifeq '' '$(findstring clang++,$(CX))'
+ifeq ($(CC), clang)
   FL_LIB_FLAGS = -lncurses -ldl -ledit -lX11
 else
   FL_LIB_FLAGS = -lncurses -ldl -ledit -fuse-ld=$(subst clang++,lld,$(CX)) -lX11

@@ -131,17 +131,7 @@ let OR_list l = sitlist (defix OR) l F;
 // Identity function
 let id a = a;
 
-let IF c = c;
-let ELSE {t:: *a} {e:: *a} = (t,e);
 
-let bTHEN c (t,e) = c => t | e;
-let bexprTHEN {c::bexpr} (t,e) = (c bAND t) bOR (bNOT c bAND e);
-let bevTHEN {c::bexpr} ({t::bev},{e::bev}) =
-    let cb = list2bev [c] then
-    bev_OR (bev_AND cb t) (bev_AND (bev_NOT cb) e)
-;
-overload THEN bTHEN bexprTHEN bevTHEN;
-if_then_else_binder THEN ELSE;
 
 // Convert a BDD to a bexpr.
 // NOTE: The bexpr will (usually) be much larger than necessary since
@@ -1204,6 +1194,18 @@ let primes =
     sieve (nat 2)
 ;
 
+// Factor n into prime factors. 
+let factor n =
+    n <= 0 => eprintf "factor called with non-positive number (%d)" n |
+    letrec factor_rec n =
+	n == 1 => [] |
+	letrec try (p:ps) = n % p == 0 => p:(factor_rec (n/p)) | try ps in
+	try primes
+    in
+    factor_rec n
+;
+
+
 // Draw a profile of the BDDs in the expression e.
 let draw_bdd_profile e =
     let data = profile e then
@@ -2094,37 +2096,35 @@ let wrap_pexlif p =
 ;
 
 // Convert any bexpr occurring in "e" to a BDD.
+// If a variable occurs in the substitution list, the corresponding
+// (BDD) expression will be used in the substitution.
 // Currently only defined to bexprs, lists, pairs and list of pairs of bexprs.
 // Usage: bexpr2bdd e;
-open_overload {bexpr2bdd :: *a -> *b};
-let bexpr2bdd_be {b::bexpr} =
-    let res = prim_bexpr2bdd b in
+open_overload {bexpr2bdd :: ((string#bool) list) -> *a -> *b};
+let bexpr2bdd_be sub {b::bexpr} =
+    let res = base_bexpr2bdd sub b in
     {res::bool}
 ;
 add_open_overload bexpr2bdd bexpr2bdd_be;
-let bexpr2bdd_bool {b::bool} = b;
+let bexpr2bdd_bool sub {b::bool} = b;
 add_open_overload bexpr2bdd bexpr2bdd_bool;
-let bexpr2bdd_int  {b::int} = b;
+let bexpr2bdd_int  sub {b::int} = b;
 add_open_overload bexpr2bdd bexpr2bdd_int;
-let bexpr2bdd_float  {b::float} = b;
+let bexpr2bdd_float  sub {b::float} = b;
 add_open_overload bexpr2bdd bexpr2bdd_float;
-let bexpr2bdd_string  {b::string} = b;
+let bexpr2bdd_string  sub {b::string} = b;
 add_open_overload bexpr2bdd bexpr2bdd_string;
-let bexpr2bdd_void  {b::void} = b;
+let bexpr2bdd_void  sub {b::void} = b;
 add_open_overload bexpr2bdd bexpr2bdd_void;
-let bexpr2bdd_list  l = map (bexpr2bdd ) l;
+let bexpr2bdd_list  sub l = map (bexpr2bdd sub) l;
 add_open_overload bexpr2bdd bexpr2bdd_list;
-let bexpr2bdd_pair  (a,b) =
-    ((bexpr2bdd a), (bexpr2bdd b))
+let bexpr2bdd_pair  sub (a,b) =
+    ((bexpr2bdd sub a), (bexpr2bdd sub b))
 ;
 add_open_overload bexpr2bdd bexpr2bdd_pair;
-let bexpr2bdd_bev {bev::bev} = list2bv (map prim_bexpr2bdd (bev2list bev));
+let bexpr2bdd_bev sub {bev::bev} =
+    list2bv (map (base_bexpr2bdd sub) (bev2list bev));
 add_open_overload bexpr2bdd bexpr2bdd_bev;
-
-let gen_bexpr2bdd sub e =
-    let e' = bsubstitute sub e then
-    bexpr2bdd e'
-;
 
 begin_abstype;
 
@@ -2328,3 +2328,37 @@ let nearest_power_of_2 n =
     let lg2n = log2 n in
     (2**lg2n) == n => n | 2**(lg2n+1)
 ;
+
+let IF c = c;
+let ELSE {t:: *a} {e:: *a} = (t,e);
+open_overload {THEN :: *a -> (*b # *b) -> *b};
+
+
+let bTHEN c (t,e) = c => t | e;
+add_open_overload THEN bTHEN;
+let bexprTHEN {c::bexpr} (t,e) = (c bAND t) bOR (bNOT c bAND e);
+add_open_overload THEN bexprTHEN;
+let bevTHEN {c::bexpr} ({t::bev},{e::bev}) =
+    let cb = list2bev [c] then
+    bev_OR (bev_AND cb t) (bev_AND (bev_NOT cb) e)
+;
+add_open_overload THEN bevTHEN;
+let lTHEN {c::bexpr} (t,e) = map (THEN c) (zip t e);
+add_open_overload THEN lTHEN;
+let pTHEN {c::bexpr} ((t1,t2),(e1,e2)) = (THEN c (t1,e1)), (THEN c (t2,e2));
+add_open_overload THEN pTHEN;
+
+let iTHEN {c::bexpr} ({t::int}, {e::int}) =
+    t == e => t |
+    eprintf "Type clash in THEN for ints (%d!=%d)"  t e
+;
+add_open_overload THEN iTHEN;
+
+let sTHEN {c::bexpr} ({t::string}, {e::string}) =
+    t == e => t |
+    eprintf "Type clash in THEN for strings (%s!=%s)"  t e
+;
+add_open_overload THEN sTHEN;
+
+if_then_else_binder THEN ELSE;
+

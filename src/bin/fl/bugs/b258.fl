@@ -1,0 +1,194 @@
+//load "idv.fl";
+
+
+let N = 6;
+
+let squares = 
+    letrec mk i = (i*i):(mk (i+1)) in
+    mk 1
+;
+
+let select_square bv =
+    letrec sel i (sq:sqs) =
+	(int2bv i) = bv => int2bv sq |
+	sel (i+1) sqs
+    in
+    sel 0 squares
+;
+
+let is_square bv =
+    letrec tst (sq:sqs) =
+(fprintf stderr "test %d\n" sq) fseq
+	let bsq = int2bv sq then
+	(bsq = bv) => T |
+	(bsq > bv) => F |
+	tst sqs
+    in
+    tst squares
+;
+
+
+
+//var_order (interleave [
+//		md_expand_vector (sprintf "a[%d:0]" (N-1)),
+//		md_expand_vector (sprintf "b[%d:0]" (N-1)),
+//		md_expand_vector (sprintf "c[%d:0]" (N-1)),
+//		md_expand_vector (sprintf "d[%d:0]" (N-1))])
+//;
+
+var_order ["b[8]","c[8]","d[8,0,6:7]","c[6]","a[8:7]","b[7]","a[6]","c[7]","b[6]","a[5:4]","b[5]","a[3:0]","b[4:0]","c[5:0]","d[5:1]"];
+
+
+update_vossrc "DYNAMIC-ORDERING" "NO";
+
+let av = bv_ZX (bv_variable (sprintf "a[%d:0]" (N-1)));
+let bv = bv_constrained_variable (sprintf "b[%d:0]" (N-1)) (\b. b > av);
+let cv = bv_constrained_variable (sprintf "c[%d:0]" (N-1)) (\c. c > bv);
+let dv = bv_constrained_variable (sprintf "d[%d:0]" (N-1)) (\d. d > cv);
+
+bdd_size av;
+bdd_size bv;
+bdd_size cv;
+bdd_size dv;
+
+let A = select_square av;
+let B = select_square bv;
+let C = select_square cv;
+let D = select_square dv;
+
+bdd_size A;
+bdd_size B;
+bdd_size C;
+bdd_size D;
+
+let D1 = A + B + C;
+bdd_size D1;
+
+let y1 = B + C - D;
+let y2 = A + B - D;
+let y3 = A + C - D;
+let y4 = B + D - A;
+let y5 = A + D - B;
+
+//     A     y     y                        
+//            4     3     
+//                        
+//     y     B     y                                
+//      1           5     
+//                        
+//     D     y     C                                     
+//            2           
+//
+//
+// y1 = A+B+C-A-D     = B+C-D
+// y2 = A+B+C-C-D     = A+B-D
+// y3 = A+B+C-D-B     = A+C-D
+// y4 = A+B+C-A-A-C+D = B+D-A
+// y5 = A+B+C-B-B-C+D = A+D-B
+//
+// Conditions:
+// Row 1:  A+y4+y3 = A+B+D-A+A+C-D = A+B+C == A+B+C (trivial)
+// Row 2:  B+C-D+B+A+D-B = A+B+C == A+B+C (trivial)
+// Row 3:  D+A+B-D+C = A+B+C == A+B+C (trivial)
+// Col 1:  A+B+C-D+D = A+B+C == A+B+C (trivial)
+// Col 2:  B+D-A+B+A+B-D = 3B == A+B+C  (Condition 1)
+// Col 3:  A+C-D+A+D-B+C = 2A-B+2C == A+B+C (Condition 2)
+// Dia 1:  A+B+C == A+B+C (trivial)
+// Dia 2:  D+B+A+C-D = A+B+C == A+B+C (trivial)
+// is_square y1 (Condition 3)
+// is_square y2 (Condition 4)
+// is_square y3 (Condition 5)
+// is_square y4 (Condition 6)
+// is_square y5 (Condition 7)
+
+
+let Cond1 = bv_eq ((int2bv 3)*B) (A+B+C);
+let Cond2 = bv_eq ((int2bv 2)*A - B + (int2bv 2)*C) (A+B+C);
+let Cond3 = is_square y1;
+let Cond4 = is_square y2;
+let Cond5 = is_square y3;
+let Cond6 = is_square y4;
+let Cond7 = is_square y5;
+let Cond8 = (A != B) AND
+	    (A != C) AND
+	    (A != D) AND
+	    (A != y1) AND
+	    (A != y2) AND
+	    (A != y3) AND
+	    (A != y4) AND
+	    (A != y5) AND
+	    (B != C) AND
+	    (B != D) AND
+	    (B != y1) AND
+	    (B != y2) AND
+	    (B != y3) AND
+	    (B != y4) AND
+	    (B != y5) AND
+	    (C != D) AND
+	    (C != y1) AND
+	    (C != y2) AND
+	    (C != y3) AND
+	    (C != y4) AND
+	    (C != y5) AND
+	    (D != y1) AND
+	    (D != y2) AND
+	    (D != y3) AND
+	    (D != y4) AND
+	    (D != y5) AND
+	    (y1 != y2) AND
+	    (y1 != y3) AND
+	    (y1 != y4) AND
+	    (y1 != y5) AND
+	    (y2 != y3) AND
+	    (y2 != y4) AND
+	    (y2 != y5) AND
+	    (y3 != y4) AND
+	    (y3 != y5) AND
+	    (y4 != y5)
+;
+
+bdd_size Cond1;
+bdd_size Cond2;
+rvariable "a";
+11111111111111111111111111111111111;
+Cond3;
+2222222222222222222;
+bdd_size Cond3;
+
+bdd_size Cond4;
+bdd_size Cond5;
+bdd_size Cond6;
+bdd_size Cond7;
+bdd_size Cond8;
+
+
+let Cond = Cond1 AND Cond2 AND Cond3 AND Cond4 AND
+	   Cond5 AND Cond6 AND Cond7 AND Cond8
+;
+bdd_size Cond;
+
+let vars = depends (A,B,C,D);
+
+let sub = full_example F vars Cond;
+
+let A' = substitute sub A;
+let B' = substitute sub B;
+let C' = substitute sub C;
+let D' = substitute sub D;
+let y1 = B' + C' - D';
+let y2 = A' + B' - D';
+let y3 = A' + C' - D';
+let y4 = B' + D' - A';
+let y5 = A' + D' - B';
+
+bv2int A';
+bv2int B';
+bv2int C';
+bv2int D';
+
+bv2int y1;
+bv2int y2;
+bv2int y3;
+bv2int y4;
+bv2int y5;
+

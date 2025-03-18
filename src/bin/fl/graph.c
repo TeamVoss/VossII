@@ -2198,6 +2198,7 @@ gen_map_rec(gmap_info_ptr ip, g_ptr node)
 		g_ptr old_r = GET_APPLY_RIGHT(node);
 		g_ptr r = gen_map_rec(ip, old_r);
 		SET_APPLY_RIGHT(res, r);
+		if( do_gc_asap || Do_gc_asap ) { Garbage_collect(); }
 		POP_GLOBAL_GC(1);
 		if( old_l == l && old_r == r ) {
 		    delete_hash(&(ip->gen_map_tbl), (pointer) node);
@@ -2222,6 +2223,7 @@ gen_map_rec(gmap_info_ptr ip, g_ptr node)
 		g_ptr old_r = GET_CONS_TL(node);
 		g_ptr r = gen_map_rec(ip, old_r);
 		SET_CONS_TL(res, r);
+		if( do_gc_asap || Do_gc_asap ) { Garbage_collect(); }
 		POP_GLOBAL_GC(1);
 		if( old_l == l && old_r == r ) {
 		    delete_hash(&(ip->gen_map_tbl), (pointer) node);
@@ -3578,10 +3580,7 @@ traverse_left(g_ptr oroot)
 		    arg1  = traverse_left(GET_APPLY_RIGHT(*sp));
 		    if( is_fail(arg1) )
 			goto arg1_fail1;
-		    Reorder(GET_INT(arg1));
-		    SET_TYPE(redex, LEAF);
-		    SET_LEAF_TYPE(redex, BOOL);
-		    SET_BOOL(redex, B_One());
+		    Reorder(redex, GET_INT(arg1));
                     goto finish1;
 
                 case P_UNTYPE:
@@ -3874,7 +3873,7 @@ traverse_left(g_ptr oroot)
 			Add_ordering_var(GET_STRING(GET_CONS_HD(ntmp)));
 			ntmp = GET_CONS_TL(ntmp);
 		    }
-		    Reorder(1);
+		    Reorder(NULL, 1);
 		    arg5 = End_ordering();
 		    OVERWRITE(redex, arg5);
                     goto finish1;

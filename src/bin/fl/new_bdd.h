@@ -83,7 +83,7 @@ void		Begin_RelProd();
 formula		Rel_prod(formula qv, formula a, formula b, bool existential);
 void		New_ordering();
 void		Add_ordering_var(string var);
-void            Reorder(int times);
+void            Reorder(g_ptr redex, int times);
 bool		Save_BDDs(string filename, buffer *roots);
 bool		Load_BDDs(string filename, buffer *results);
 g_ptr		End_ordering();

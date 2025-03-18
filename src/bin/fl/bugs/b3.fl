@@ -14,17 +14,17 @@ let e4 = (bNOT a) bAND (bNOT b);
 let e5 = (bNOT a) bAND b;
 let eqs = [e1,e2,e3];
 
-gen_bexpr2bdd [] [e1,e2,e3];
-gen_bexpr2bdd [("c",T)] [e1,e2,e3];
-gen_bexpr2bdd [("c",F)] [e1,e2,e3];
-gen_bexpr2bdd [("c",variable "a")] [e1,e2,e3];
+bexpr2bdd [] [e1,e2,e3];
+bexpr2bdd [("c",T)] [e1,e2,e3];
+bexpr2bdd [("c",F)] [e1,e2,e3];
+bexpr2bdd [("c",variable "a")] [e1,e2,e3];
 
-gen_bexpr2bdd [] e3;
-gen_bexpr2bdd [("c",T)] e3;
-gen_bexpr2bdd [("c",F)] e3;
-gen_bexpr2bdd [("c",variable "a")] e3;
+bexpr2bdd [] e3;
+bexpr2bdd [("c",T)] e3;
+bexpr2bdd [("c",F)] e3;
+bexpr2bdd [("c",variable "a")] e3;
 
-gen_bexpr2bdd [] ((e3,e2),e1);
+bexpr2bdd [] ((e3,e2),e1);
 
 bsize [e1];
 bsize [e2];

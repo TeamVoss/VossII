@@ -33,6 +33,7 @@ static int	    bsize_cnt;
 static char	    buf[1024];
 static hash_record  depend_tbl;
 static hash_record  gl_subst_tbl;
+static hash_record  bexpr2bdd_sub_tbl;
 static hash_record  res_tbl;
 static hash_record  bdd2bexpr_tbl;
 static buffer	    bvar_buf;
@@ -548,9 +549,19 @@ bexpr2bdd(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr bf;
-    EXTRACT_1_ARG(redex, bf);
+
+    g_ptr sub, bf;
+    EXTRACT_2_ARGS(redex, sub, bf);
+    create_hash(&bexpr2bdd_sub_tbl, 100, str_hash, str_equ);
+    while( !IS_NIL(sub) ) {
+        g_ptr pair = GET_CONS_HD(sub);
+        string v = GET_STRING(GET_CONS_HD(pair));
+        g_ptr e = GET_CONS_TL(pair);
+	insert_hash(&bexpr2bdd_sub_tbl, v, e);
+        sub = GET_CONS_TL(sub);
+    }
     MAKE_REDEX_BOOL(redex, be2bdd(GET_BEXPR(bf)));
+    dispose_hash(&bexpr2bdd_sub_tbl, NULLFCN);
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
@@ -1201,8 +1212,11 @@ Bexpr_Install_Functions()
 			bXNOR);
     Insert_infix("bXNOR", 4);
 
-    Add_ExtAPI_Function("prim_bexpr2bdd", "1", FALSE,
-			GLmake_arrow(GLmake_bexpr(), GLmake_bool()),
+    Add_ExtAPI_Function("base_bexpr2bdd", "11", FALSE,
+			GLmake_arrow(
+			    GLmake_list(
+			      GLmake_tuple(GLmake_string(),GLmake_bool())),
+			      GLmake_arrow( GLmake_bexpr(), GLmake_bool())),
 			bexpr2bdd);
 
     Add_ExtAPI_Function("bsize", "1", FALSE,
@@ -1394,11 +1408,18 @@ be2bdd(bexpr be)
     }
     formula res;
     if( BE_IS_VAR(b) )  {
-	res = B_Var(BE_GET_VAR(b));
+	string v = BE_GET_VAR(b);
+	g_ptr old;
+	if( (old = find_hash(&bexpr2bdd_sub_tbl, v)) != NULL ) {
+	    res = GET_BOOL(old);
+	} else {
+	    res = B_Var(BE_GET_VAR(b));
+	}
     } else {
 	res = B_And(be2bdd(BE_GET_LEFT(b)), be2bdd(BE_GET_RIGHT(b)));
-// BUGGY!!    if( Do_gc_asap )
-//            Garbage_collect();
+	PUSH_BDD_GC(res);
+	if( Do_gc_asap ) Garbage_collect();
+	POP_BDD_GC(1);
     }
     b->bdd = res;
     b->has_bdd = 1;

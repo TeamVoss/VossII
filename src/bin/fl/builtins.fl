@@ -29,6 +29,7 @@ let bdd_size e = defix bdd_size e;
 let bdd_load filename = defix bdd_load filename;
 
 // Perform cnt dynamic reordering of the BDDs in memory.
+// Returns a pair of BDD-nodes before and after re-ordering.
 // See the Preference manual for options controlling the re-ordering process.
 let bdd_reorder cnt = defix bdd_reorder cnt;
 non_lazy bdd_reorder;
@@ -1604,6 +1605,14 @@ let get_userdef_expression fn_id = (defix get_userdef_expression) fn_id;
 // Note: Function only available if fl is invoked with -C.
 let get_userdef_combinator_expression fn_id =
     (defix get_userdef_combinator_expression) fn_id;
+
+// Convert the bexpr 'be' to a BDD.
+// If a variable occurs in the substitution list, the corresponding
+// (BDD) expression will be used in the substitution.
+let base_bexpr2bdd sub be = (defix base_bexpr2bdd) sub be;
+
+// Convert the bexpr 'be' to a BDD.
+let prim_bexpr2bdd be = base_bexpr2bdd [] be;
 
 // Convert the bexpr 'be' to a BDD.
 let prim_bexpr2bdd be = (defix prim_bexpr2bdd) be;
