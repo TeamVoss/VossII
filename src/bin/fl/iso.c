@@ -965,6 +965,7 @@ Iso_Init()
       , NULL
       , NULL
       , NULL
+      , NULL
     );
     search_mem_tp = Get_Type("internal_search_state", NULL, TP_INSERT_FULL_TYPE);
     // Init. generics.

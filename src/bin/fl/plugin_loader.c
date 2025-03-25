@@ -123,6 +123,7 @@ register_types(int num_types, fl_plugin_types types)
                              , types[i].load
                              , types[i].obj2string
                              , types[i].equals
+			     , NULL		// Hash function???
                              , types[i].gmap
                              , types[i].gmap2
 			     , NULL		// No SHA256 computation

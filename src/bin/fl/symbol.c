@@ -1313,6 +1313,12 @@ default_eq_fn(pointer p1, pointer p2, bool identical)
     }
 }
 
+static unint
+default_hash_fn(pointer p, unint n)
+{
+    return( PTR2UINT(p) % n );
+}
+
 int
 Add_ExtAPI_Object(
             string name,
@@ -1322,6 +1328,7 @@ Add_ExtAPI_Object(
             pointer (*load_fn)(FILE *fp),
             string  (*obj2string)(pointer p),
             formula (*eq_fn)(pointer a, pointer b, bool identical),
+	    unint   (*hash_fn)(pointer a, unint n),
             pointer (*gmap_fn)(gmap_info_ptr ip, pointer a),
             pointer (*gmap2_fn)(gmap_info_ptr ip, pointer a, pointer b),
 	    int	    (*sha256_fn)(int *g_cntp, hash_record *g_tblp,
@@ -1341,6 +1348,11 @@ Add_ExtAPI_Object(
         obj.eq_fn = default_eq_fn;
     } else {
         obj.eq_fn = eq_fn;
+    }
+    if( hash_fn == NULL ) {
+        obj.hash_fn = default_hash_fn;
+    } else {
+        obj.hash_fn = hash_fn;
     }
     obj.gmap_fn = gmap_fn;
     obj.gmap2_fn = gmap2_fn;

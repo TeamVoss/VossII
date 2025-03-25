@@ -760,6 +760,7 @@ typedef struct ext_obj_rec {
 	void	    (*save_fn)(FILE *fp, pointer p);
 	pointer	    (*load_fn)(FILE *fp);
 	string	    (*obj2string)(pointer p);
+	unint	    (*hash_fn)(pointer a, unint n);
 	formula	    (*eq_fn)(pointer a, pointer b, bool identical);
 	pointer	    (*gmap_fn)(gmap_info_ptr ip, pointer a);
 	pointer	    (*gmap2_fn)(gmap_info_ptr ip, pointer a, pointer b);

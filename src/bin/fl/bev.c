@@ -191,6 +191,19 @@ bev_eq_fn(pointer p1, pointer p2, bool identical)
     return( B_One() );
 }
 
+static unint
+bev_hash_fn(pointer p, unint n)
+{
+    bev_ptr bp = (bev_ptr) p;
+    g_ptr   l = bp->u.l;
+    unint res = 7;
+    while( !IS_NIL(l) ) {
+	res = (3*res+ G_rec_hash(GET_CONS_HD(l), n)) % n;
+	l = GET_CONS_TL(l);
+    }
+    return( res );
+}
+
 static int
 bev_sha256_fn(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha, pointer a)
 {
@@ -1170,6 +1183,7 @@ Bev_Init()
 				 load_bev_fn,
 				 bev2str_fn,
 				 bev_eq_fn,
+				 bev_hash_fn,
 				 bev_gmap_fn,
 				 bev_gmap2_fn,
 				 bev_sha256_fn);

@@ -302,6 +302,7 @@ static void           sweep_vstate_fn(void);
 static void           sweep_fsm_fn(void);
 static void           sweep_ste_fn(void);
 static formula        ste_eq_fn(pointer p1, pointer p2, bool identical);
+static unint	      ste_hash_fn(pointer p, unint n);
 static pointer        ste_gmap_fn(gmap_info_ptr ip, pointer a);
 static pointer        ste_gmap2_fn(gmap_info_ptr ip, pointer a, pointer b);
 static unint          idx_list_hash(pointer key, unint n);
@@ -316,6 +317,7 @@ static string         sch2tcl(g_ptr *tlp, sch_ptr sch);
 static string         fsm2str_fn(pointer p);
 static string         compute_sha256_signature(fsm_ptr fsm);
 static formula        fsm_eq_fn(pointer p1, pointer p2, bool identical);
+static unint	      fsm_hash_fn(pointer p, unint n);
 static string         ste2str_fn(pointer p);
 static int            get_wexpr_size(g_ptr we);
 static ilist_ptr      ilist_copy(ilist_ptr ip);
@@ -506,6 +508,7 @@ Fsm_Init()
                                   load_fsm_fn,
                                   fsm2str_fn,
                                   fsm_eq_fn,
+                                  fsm_hash_fn,
                                   NULL,
                                   NULL,
 				  fsm_sha256_fn);
@@ -518,6 +521,7 @@ Fsm_Init()
                                   load_ste_fn,
                                   ste2str_fn,
                                   ste_eq_fn,
+                                  ste_hash_fn,
                                   ste_gmap_fn,
                                   ste_gmap2_fn,
 				  NULL);
@@ -530,6 +534,7 @@ Fsm_Init()
                                   load_vstate_fn,
                                   vstate2str_fn,
                                   NULL, //vstate_eq_fn,
+                                  NULL, //vstate_hash_fn,
                                   NULL, //vstate_gmap_fn,
                                   NULL, //vstate_gmap2_fn
 				  NULL);
@@ -3869,6 +3874,12 @@ sweep_ste_fn(void)
     }
 }
 
+static unint
+ste_hash_fn(pointer p, unint n)
+{
+    return( PTR2UINT(p) % n );
+}
+
 static formula
 ste_eq_fn(pointer p1, pointer p2, bool identical)
 {
@@ -4253,6 +4264,13 @@ compute_sha256_signature(fsm_ptr fsm)
     return( res );
 }
 
+
+static unint
+fsm_hash_fn(pointer p, unint n)
+{
+    fsm_ptr fsm = (fsm_ptr) p;
+    return( str_hash(fsm->sha256_sig, n) );
+}
 
 static formula
 fsm_eq_fn(pointer p1, pointer p2, bool identical)

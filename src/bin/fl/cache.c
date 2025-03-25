@@ -292,7 +292,11 @@ g_rec_hash_rec(pointer p, unint n, unint sz)
 			return( (((unsigned int) GET_PRIM_FN(nd))) % n );
 		    nd = Get_RefVar(GET_REF_VAR(nd));
 		    goto repeat_g_rec_hash;
-		case EXT_OBJ:
+		case EXT_OBJ: {
+                        unint class = GET_EXT_OBJ_CLASS(nd);
+                        ext_obj_ptr op = M_LOCATE_BUF(&ext_obj_buf, class);
+                        return( op->hash_fn(GET_EXT_OBJ(nd), n) );
+		    }
 		    return( (((unsigned long int)GET_EXT_OBJ(nd))) % n);
                 default:
                     DIE("Unexpected cache argument value. Consult guru 3!");

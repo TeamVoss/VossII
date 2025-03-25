@@ -20,9 +20,9 @@ endif
 CXXFLAGS += $(BASE_FLAGS) -fpermissive -Wno-error
 
 ifeq ($(CC), clang)
-  FL_LIB_FLAGS = -lncurses -ldl -ledit -lX11
-else
   FL_LIB_FLAGS = -lncurses -ldl -ledit -fuse-ld=$(subst clang++,lld,$(CX)) -lX11
+else
+  FL_LIB_FLAGS = -lncurses -ldl -ledit -lX11
 endif
 
 INC = -I../../include -I$(MINISAT_DIR)/include $(TCL_INCLUDE) -DROOT_DIR='"$(ROOT_DIR)"'

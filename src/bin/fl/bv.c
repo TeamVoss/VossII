@@ -222,6 +222,20 @@ bv_eq_fn(pointer p1, pointer p2, bool identical)
     return result;
 }
 
+static unint                     
+bv_hash_fn(pointer p, unint n)  
+{    
+    bv_ptr bp = (bv_ptr) p;    
+    g_ptr   l = bp->u.l;
+    unint res = 13;
+    while( !IS_NIL(l) ) {
+        res = (3*res+ G_rec_hash(GET_CONS_HD(l), n)) % n;
+        l = GET_CONS_TL(l);
+    }   
+    return( res ); 
+}
+
+
 static int
 bv_sha256_fn(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha, pointer a)
 {
@@ -1234,6 +1248,7 @@ Bv_Init()
 				 load_bv_fn,
 				 bv2str_fn,
 				 bv_eq_fn,
+				 bv_hash_fn,
 				 bv_gmap_fn,
 				 bv_gmap2_fn,
 				 bv_sha256_fn);

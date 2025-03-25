@@ -306,6 +306,13 @@ table_load_fn(FILE *fp)
     return( (pointer) tp);
 }
 
+static unint
+table_hash_fn(pointer p, unint n)
+{
+    return( PTR2UINT(p) % n );
+}
+
+
 static formula
 table_eq_fn(pointer p1, pointer p2, bool identical)
 {
@@ -359,6 +366,7 @@ Table_Init()
                                    table_load_fn,
                                    NULL,
                                    table_eq_fn,
+                                   table_hash_fn,
                                    NULL,
 				   NULL,
 				   table_sha256_fn);

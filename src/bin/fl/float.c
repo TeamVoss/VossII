@@ -170,6 +170,13 @@ float_eq_fn(pointer p1, pointer p2, bool identical)
     }
 }
 
+static unint
+float_hash_fn(pointer p, unint n)
+{
+    float_ptr	fp = (float_ptr) p;
+    return( ((unint) fp->u.f) % n );
+}
+
 static void
 str2float(g_ptr redex)
 {
@@ -354,6 +361,7 @@ Float_Init()
 				    load_float_fn,
 				    float2str_fn,
 				    float_eq_fn,
+				    float_hash_fn,
 				    NULL,
 				    NULL,
 				    float_sha256_fn);

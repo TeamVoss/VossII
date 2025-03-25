@@ -70,6 +70,7 @@ int		Add_ExtAPI_Object(
 		    pointer (*load_fn)(FILE *fp),
 		    string  (*obj2string)(pointer p),
 		    formula (*eq_fn)(pointer a, pointer b, bool identical),
+		    unint   (*hash_fn)(pointer a, unint n),
 		    pointer (*gmap_fn)(gmap_info_ptr ip, pointer a),
 		    pointer (*gmap2_fn)(gmap_info_ptr ip,pointer a,pointer b),
 		    int     (*sha256_fn)(int *g_cntp, hash_record *g_tblp,

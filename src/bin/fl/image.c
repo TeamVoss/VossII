@@ -41,6 +41,7 @@ static void      save_image_fn(FILE *fp, pointer p);
 static pointer   load_image_fn(FILE *fp);
 static string    image2str_fn(pointer p);
 static formula   image_eq_fn(pointer p1, pointer p2, bool identical);
+static unint	 image_hash_fn(pointer p, unint n);
 static image_ptr create_image(string name, int rows, int cols);
 static color_ptr mk_rgb(int r, int g, int b);
 static void      create_X11_color_map();
@@ -65,6 +66,7 @@ Image_Init()
                                    load_image_fn,
                                    image2str_fn,
                                    image_eq_fn,
+                                   image_hash_fn,
                                    NULL,
                                    NULL,
 				   image_sha256_fn);
@@ -483,6 +485,13 @@ image2str_fn(pointer p)
 	}
     }
     return( msg );
+}
+
+static unint
+image_hash_fn(pointer p, unint n)
+{
+    image_ptr ip = (image_ptr) p;
+    return( (((unint) ip->rows)+((unint) ip->cols)) % n );
 }
 
 static formula

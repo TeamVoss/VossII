@@ -18,8 +18,6 @@
 #define Sprintf(...)	sprintf(__VA_ARGS__);
 #endif
 
-#define class myclass
-
 /********************************************************************/
 /*	    Version control (debug, paranoia, etc.)		    */
 /********************************************************************/
