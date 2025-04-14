@@ -445,17 +445,17 @@ let MEM_SIZE  = `sMEM_SIZE`;
 let RAM_LATENCY  = `sRAM_LATENCY`;
  
 let MEM_LINES = MEM_SIZE / MEM_BANKS;
-TYPE "`maddr`" (addr_sz -(bits_needed (MEM_BANKS-1)));
+TYPE "`maddr`" (addr_sz -(ubits_needed (MEM_BANKS-1)));
  
 let addr2maddr {a::`addr`} =
     let res =
-	frombits (butlastn (bits_needed (MEM_BANKS-1)) (tobits a))
+	frombits (butlastn (ubits_needed (MEM_BANKS-1)) (tobits a))
     in
     {res::`maddr`}
 ;
  
-TYPE "`rd_id`" (bits_needed (MEM_BANKS-1));
-TYPE "`rd_age`" (bits_needed (MEM_BANKS * RAM_LATENCY/2));
+TYPE "`rd_id`" (ubits_needed (MEM_BANKS-1));
+TYPE "`rd_age`" (ubits_needed (MEM_BANKS * RAM_LATENCY/2));
  
 MEMORY "`RAM`" [(MEM_LINES, "`maddr`")]  "`data`";
  

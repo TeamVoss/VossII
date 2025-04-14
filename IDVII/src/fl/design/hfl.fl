@@ -94,7 +94,7 @@ let hw_bundle_pairs {o:: *a} =
 ;
 
 
-let hw_types_decl_ref = ref {[]::(string#(int#bool#string)) list};
+let hw_types_decl_ref = ref {[]::(string#(int#bool#bool#string)) list};
 
 let is_hw_type name = mem name (map fst (deref hw_types_decl_ref));
 
@@ -102,10 +102,18 @@ let get_hw_type_info name = assoc name (deref hw_types_decl_ref);
 non_lazy get_hw_type_info;
 
 let get_hw_type_size name =
-    val (sz,arithm,vlist) = assoc name (deref hw_types_decl_ref) then
+    val (sz,arithm,signed,vlist) = assoc name (deref hw_types_decl_ref) then
     sz
 ;
 non_lazy get_hw_type_size;
+
+let is_signed typename =
+    val (sz,arithm,signed,vlist) = assoc typename (deref hw_types_decl_ref) then
+    signed
+;
+non_lazy is_signed;
+
+let hw_is_signed {a:: *a} = is_signed (hw_type_name a);
 
 let bundle_decls =
     ref {[] :: (string#(((string#string) list)# ((string#string) list))) list}
@@ -159,28 +167,40 @@ let make_const_or_var s =
 	{hw_type_destr :: {*r} hw_type}
     in
     let sz = hw_size {undefined:: *r} in
-    let not_wexpr = (hw_type_name {undefined:: *r}) != "wexpr" in
-    let mk_CONST sz i =
-	let needed = bits_needed i in
-	not_wexpr AND (sz < needed) =>
-	    eprintf "Constant %d does not fit in %d bits" i sz
-	|
-	W_CONST sz i
-    in
+    let signed = is_signed (hw_type_name {undefined:: *r}) in
+    let is_wexpr = (hw_type_name {undefined:: *r}) == "wexpr" in
     let w =
 	str_is_prefix "0x" s =>
 	    let i = sscanf "0x%x" s in
-	    mk_CONST sz i
+	    is_wexpr => W_CONST sz i |
+	    let cs = (sprintf "%0*b" sz i) catch
+		    eprintf "1: Constant %s does not fit in %d bits" s sz
+	    in
+	    NOT signed => W_CONST sz i |
+	    (string_hd cs != "1") => W_CONST sz i |
+	    W_CONST sz (-1*(2**sz-i))
 	|
 	str_is_prefix "0b" s =>
 	    let i = sscanf "0b%b" s in
-	    mk_CONST sz i
+	    is_wexpr => W_CONST sz i |
+	    let cs = (sprintf "%0*b" sz i) catch
+		    eprintf "2: Constant %s does not fit in %d bits" s sz
+	    in
+	    NOT signed => W_CONST sz i |
+	    (string_hd cs != "1") => W_CONST sz i |
+	    W_CONST sz (-1*(2**sz-i))
 	|
 	let s0 = string_hd s in
 	let os = ord s0 in
 	(ileq (ord "0") os) AND (ileq os (ord "9")) =>
 	    let i = sscanf "%d" s in
-	    mk_CONST sz i
+	    is_wexpr => W_CONST sz i |
+	    let cs = (sprintf "%0*b" sz i) catch
+		    eprintf "3: Constant %s does not fit in %d bits" s sz
+	    in
+	    NOT signed => W_CONST sz i |
+	    (string_hd cs != "1") => W_CONST sz i |
+	    W_CONST sz (-1*(2**sz-i))
 	|
 	s == "X" => W_X sz | hw_mk_var {undefined :: *r} s
     in
@@ -650,7 +670,7 @@ let base_assignment do_split lhs rhs =
 let w_CASE w_out cond_res_list w_default_value =
     let sz = wexpr_size w_default_value then
     let n = length cond_res_list then
-    let pwid = bits_needed (n-1) in
+    let pwid = ubits_needed (n-1) in
 //    n = 1 =>
 //	val (c,t) = hd cond_res_list in
 //	let e = w_default_value in
@@ -1407,13 +1427,13 @@ let eval_fl_code l =
 ;
 non_lazy eval_fl_code;
 
-let core_TYPE name size is_arithmetic value_list =
+let core_TYPE name size is_arithmetic is_signed value_list =
     is_hw_type name => 
-	(get_hw_type_info name == (size,is_arithmetic,value_list)) => T |
-	eprintf "A hw type called %s is already defined\n" name
+	(get_hw_type_info name == (size,is_arithmetic,is_signed,value_list))
+	=> T | eprintf "A hw type called %s is already defined\n" name
     |
     let current = deref hw_types_decl_ref in
-    let new = (name,(size,is_arithmetic, value_list)):current in
+    let new = (name,(size,is_arithmetic, is_signed, value_list)):current in
     (hw_types_decl_ref := new) fseq
     //
     let ssz = sprintf "%d" size in
@@ -1514,9 +1534,15 @@ let core_TYPE name size is_arithmetic value_list =
 ;
 
 // Declare a new hw type with name 'name' and size number of bits as width.
-let TYPE name size = (core_TYPE name size T "") fseq ();
+let TYPE name size =
+    (fprintf stdinfo "TYPE is deprecated. Use SIGNED or UNSIGNED instead\n")
+    fseq (core_TYPE name size T F "") fseq ()
+;
 
-TYPE "bit" 1;
+let SIGNED name size = (core_TYPE name size T T "") fseq ();
+let UNSIGNED name size = (core_TYPE name size T F "") fseq ();
+
+UNSIGNED "bit" 1;
 
 let wexpr_hw_type_name {bv::wexpr} = "wexpr";
 let wexpr_hw_mk_var {we::wexpr} base = W_VAR 0 base;
@@ -1661,7 +1687,18 @@ let wGR {a:: *a} {b:: *a} =
     NOT (hw_is_arithmetic a) =>
 	eprintf "Cannot perform > on vectors of type %s\n" (hw_type_name a)
     |
-    let res = W_GR (hw_destr a) (hw_destr b) in
+    let res =
+	let wa = hw_destr a in
+	let wb = hw_destr b in
+	hw_is_signed a =>
+	    W_OR (W_AND (W_NOT (W_SLICE [(hw_size a) -1] wa))
+			(W_SLICE [(hw_size b) -1] wb))
+		 (W_AND (W_EQ   (W_SLICE [(hw_size a) -1] wa)
+				(W_SLICE [(hw_size b) -1] wb))
+			(W_GR wa wb))
+	|
+	    W_GR wa wb
+    in
     {hw_bit_constr res:: bit}
 ;
 let '>' = wGR;
@@ -1846,12 +1883,12 @@ let binary_enum_defs = ref {[] :: (string # (string list)) list};
 let ENUM_binary name name_list =
     name_list = [] => error "ENUM must have at least one element" |
     mem (name,name_list) (deref binary_enum_defs) => () |
-    let sz = bits_needed ((length name_list)-1) in
+    let sz = ubits_needed ((length name_list)-1) in
     let value_list =
 	let mk (i,n) = sprintf "{%d %s}" i n in
 	list2str T "{" "" "}" mk (zip (0 upto (length name_list-1)) name_list)
     in
-    NOT (core_TYPE name sz F value_list) => () |
+    NOT (core_TYPE name sz F F value_list) => () |
     (binary_enum_defs := ((name,name_list):(deref binary_enum_defs))) fseq
     letrec add_item cnt (n:ns) =
         let cmd1 =
@@ -1888,12 +1925,12 @@ let ENUM_custom name name_encoding_list =
     name_encoding_list = [] => error "ENUM must have at least one element" |
     mem (name,name_encoding_list) (deref custom_enum_defs) => () |
     let max_code = itlist (\(n,ec).\r. max ec r) name_encoding_list 0 then
-    let sz = bits_needed max_code in
+    let sz = ubits_needed max_code in
     let value_list =
 	let mk (n,i) = sprintf "{%d %s}" i n in
 	list2str T "{" "" "}" mk name_encoding_list
     in
-    NOT (core_TYPE name sz F value_list) => () |
+    NOT (core_TYPE name sz F F value_list) => () |
     (custom_enum_defs := ((name,name_encoding_list):(deref custom_enum_defs)))
     fseq
     letrec add_item ((n,cnt):ns) =
@@ -1939,7 +1976,7 @@ let MUTEX_ENUM name name_list =
 	let mk (i,n) = sprintf "{%d %s}" (2**i) n in
 	list2str T "{" "" "}" mk (zip (0 upto (length name_list-1)) name_list)
     in
-    NOT (core_TYPE name sz F value_list) => () |
+    NOT (core_TYPE name sz F F value_list) => () |
     (mutex_enum_defs := ((name,name_list):(deref mutex_enum_defs))) fseq
     letrec add_item cnt (n:ns) =
         let cmd1 =
@@ -2043,7 +2080,7 @@ let base_STRUCT_explicit name size field_list do_check =
      /\     check [] = ()
     in
     (do_check => check field_list | ()) fseq
-    NOT (core_TYPE name size F "") => () |
+    NOT (core_TYPE name size F F "") => () |
     let info = (name, map (\(field,type,_). (field,type)) field_list) in
     (field_name_info_ref := (info:(deref field_name_info_ref))) fseq
     let declare_field (fn, type, bits) =
@@ -2131,7 +2168,7 @@ let BUNDLE name left_signals right_signals =
 	val (field,tp) = el idx all_sigs in
 	eprintf "Type '%s' for field '%s' not declared" tp field
     |
-    let new = (name,(0,F,"")):current in
+    let new = (name,(0,F,F,"")):current in
     (hw_types_decl_ref := new) fseq
     let pr (n,t) = sprintf "(\"%s\",\"%s\")" n t in
     let ssz =
@@ -2240,7 +2277,7 @@ let MEMORY name size_list word_type =
 	(fprintf stderr "A hw type called %s is already defined\n" name)
 	seq F
     |
-    let new = (name,(tot_size,F,"")):current in
+    let new = (name,(tot_size,F,F,"")):current in
     (hw_types_decl_ref := new) fseq
     let ssz = sprintf "%d" tot_size in
     let swidth = sprintf "%d" width in
@@ -2396,7 +2433,7 @@ let emit_hw_type_info filename =
     let fp = fopen filename "w" then
     let fields = deref field_name_info_ref in
     let types = rev (deref hw_types_decl_ref) in
-    let pr1 (name, (sz,is_arithm,v_list)) =
+    let pr1 (name, (sz,is_arithm,is_signed,v_list)) =
 	(name = "bit") => () |
 	(fprintf fp "type %s => \"%s\";\n" name name) fseq
 	let fields = (assoc name fields) catch [] then
@@ -3061,7 +3098,7 @@ let CASE {out:: *a} {cond_res_list:: (bit # *a) list} {default_value:: *a} =
 let STATE {clk::bit} {state:: *a} {cond_res_list:: (bit # *a) list} =
     let sz = hw_size state in
     let n = length cond_res_list then
-    let pwid = bits_needed (n-1) in
+    let pwid = ubits_needed (n-1) in
     let w_clk = hw_destr clk then
     let n_clk = hd (w_depends w_clk) then
     let w_state = hw_mk_var {undefined :: *a} (sprintf "%ss" BASE_TMP) then
@@ -3129,7 +3166,7 @@ let EN_STATE {clk::bit} {enable::bit} {state:: *a}
     =
     let sz = hw_size state in
     let n = length cond_res_list then
-    let pwid = bits_needed (n-1) in
+    let pwid = ubits_needed (n-1) in
     let w_clk = hw_destr clk then
     let n_clk = hd (w_depends w_clk) then
     let w_state = hw_mk_var {undefined :: *a} (sprintf "%ss" BASE_TMP) then
@@ -3325,7 +3362,7 @@ let list_ENCODER =
     output      addr.
     CELL "draw_hier ENCODER" [
         let lbl = length bl in
-        let n = bits_needed (lbl-1) in
+        let n = ubits_needed (lbl-1) in
         encode_rec ((replicate (2**n-lbl) {'0::bit})@bl) valid addr
 ];
 
@@ -3731,7 +3768,7 @@ let XOR_n l =
 let w_MUTEX_CASE w_out cond_res_list =
     let sz = wexpr_size w_out then
     let n = length cond_res_list then
-    let pwid = bits_needed (n-1) in
+    let pwid = ubits_needed (n-1) in
     let n_out = hd (w_depends w_out) then
     let fa_outs = [(n_out,[n_out])] then
     let var2name (W_VAR s b) = [mk_name s b]

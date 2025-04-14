@@ -1394,11 +1394,12 @@ let make_binary ant =
 
 let BDD_EQ_base p1 p2 =
     val (miter_pexlif, ant) = mk_miter p1 p2 then 
-    let cons = [(T,"_OK_",T,0,1)] in
+    let PD = get_phase_duration () then
+    let cons = [(T,"_OK_",T,0,PD)] in
     let ckt = pexlif2fsm miter_pexlif then
     val (assumes,asserts) = split (str_is_prefix "i1/") (assertions ckt) then
     let phdels = setify (filter (is_phase_delay ckt) (nodes ckt)) then
-    let trl = map (\n. n,0,2) (assumes@asserts@phdels) then
+    let trl = map (\n. n,0,PD+1) (assumes@asserts@phdels) then
     phdels = [] =>
 	//
 	// Combinational circuits
@@ -1587,12 +1588,12 @@ let SAT_comb_EQ p1 p2 =
     ok == bT => bT |
     let bcex = bget_model [bNOT ok] 1000 then
     bcex = [] => bT |
-    let cex = bexpr2bdd bcex then
+    let cex = bexpr2bdd [] bcex then
     let ant' = substitute cex ant then
     let vis = STE_debug ckt then
     let tab_1 = draw_fanin vis (0) 100 ["_OK_"] then
     tab_1 fseq
-    (STE "-e" vis [] ant' (bexpr2bdd bcons) []) fseq
+    (STE "-e" vis [] ant' (bexpr2bdd [] bcons) []) fseq
     ok
 ;
 

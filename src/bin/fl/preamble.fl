@@ -1740,6 +1740,20 @@ let draw_term e =
 ;
 end_abstype base_draw_term draw_term;
 
+// Return a bitvector representing an unsigned vector defined by v.
+// If a signed variable is needed use bv_variable.
+let bv_uvariable v = bv_ZX (bv_variable v);
+
+// Return a bitvector representing an unsigned vector given base_name and size.
+let bv_uvector base_name bits =
+    bv_uvariable (sprintf "%s[%d:0]" base_name (bits-1))
+;
+
+// Return a bitvector representing an signed vector given base_name and size.
+let bv_vector base_name bits =
+    bv_variable (sprintf "%s[%d:0]" base_name (bits-1))
+;
+
 // Create a bv that satisfies the constraint pred_fun.
 // Pred_fun is given as a function of the generated bv_variable.
 // For example:
@@ -1814,25 +1828,69 @@ let bv_range bv =
     min,max
 ;
 
-// Function for printing at most cnt examples that bv can denote.
+// Return the number of decimal digits (plus possible sign) needed to
+// represent the number n.
+clet decimal_digits_needed n =
+    let neg = n < 0 in
+    neg =>
+        1+(ceil (log10 ((int2float (-1*n))+0.999)))
+    |
+        (ceil (log10 ((int2float n)+0.999)))
+;
+
+begin_abstype;
+
+clet dsz bits = decimal_digits_needed (2**bits-1);
 //
-let bv_examples cnt bv =
-    let vs = depends bv then
+// Function for printing at most cnt examples that the bvs can denote.
+//
+let bv_examples_n cnt bvs =
+    let vs = depends bvs then
     letrec get_example n cond =
         cond == F => [] |
         n == 0 => [] |
         let sub = full_example F vs cond then
-        let bvi = substitute sub bv then
-        let cond' = cond AND (bv != bvi) then
-        (bv2int bvi):(get_example (n-1) cond')
+        let bvis = substitute sub bvs then
+        let cond' = cond AND (bvs != bvis) then
+        (map bv2int bvis):(get_example ({n::int}-{1::int}) cond')
     in
     let res = get_example (cnt+1) T then
-    let exs = qsort (defix -) res then
-    let sz = bv_size bv in
-    let p1 fp i = fprintf fp "%0*b (%d)" sz i i in
+    let maxl l = itlist (\v.\r. max v r) (tl l) (hd l) in
+    let lcmp l1 l2 =
+        let m1 = maxl l1 in
+        let m2 = maxl l2 in
+        m1 < m2 => -1 |
+        m1 > m2 => 1 |
+        letrec lcmp (a:as) (b:bs) =
+            a < b => -1 |
+            a > b => 1 |
+            lcmp as bs
+         /\    lcmp [] [] = 0
+        in
+        lcmp l1 l2
+    in
+    let exs = qsort lcmp res then
+    let szs = map bv_size bvs in
+    let p1 fp {ls::int list} =
+        let pp fp (sz,i) = fprintf fp "%0*b(%*d) " sz i (dsz sz) i in
+        list2fp fp T "" " " "" pp (zip szs ls)
+    in
     let end = length exs > cnt => "\n...\n" | "\n" in
     list2fp stdout T "" "\n" end p1 exs
 ;
+
+//
+// Function for printing at most cnt examples that bv can denote.
+//
+let bv_examples1 cnt bv = bv_examples_n cnt [bv];
+    
+//
+// Function for printing at most cnt examples 
+//
+overload bv_examples bv_examples_n bv_examples1;
+export bv_examples;
+
+end_abstype;
 
 
 lettype mem = MEM
@@ -2328,6 +2386,7 @@ let nearest_power_of_2 n =
     let lg2n = log2 n in
     (2**lg2n) == n => n | 2**(lg2n+1)
 ;
+
 
 let IF c = c;
 let ELSE {t:: *a} {e:: *a} = (t,e);

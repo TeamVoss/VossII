@@ -740,6 +740,10 @@ let constant_propagation p =
     (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs'))
 ;
 
+// =============================================================
+// Code for "wire" removal
+// =============================================================
+
 // Remove all "wires" selected by il.
 // Note that a buffer, two inverters in series, etc. are all
 // considered wires.
@@ -828,6 +832,18 @@ let remove_wire p il =
     res
 ;
 
+// =============================================================
+// Find function for pexlif
+// =============================================================
+
+// Returns the list of instances that satisfies pred
+let pexlif_find pred p =
+    NOT (pexlif_is_hier p) => [] |
+    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
+    find_all pred cs
+;
+
+let pexlif_name_is name (PINST n attrs lf fa_inps fa_outs ints body) = name = n;
 
 // =============================================================
 // Code for sanity check a pexlif

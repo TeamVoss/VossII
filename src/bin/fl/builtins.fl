@@ -1149,8 +1149,8 @@ let bv_size bv = defix bv_size bv;
 let bv_sub av bv = defix bv_sub av bv;
 
 // Return a bitvector defined by the vector v.
-// NOTE: the bitvector is a signed number. If a positive variable is needed
-// use  bv_ZX (bv_variable v);
+// NOTE: the bitvector is a signed number.
+// If a positive variable is needed use bv_uvariable (or bv_ZX (bv_variable v)).
 // Usage: bv_variable v;
 let bv_variable vec = defix bv_variable vec;
 
@@ -1538,7 +1538,10 @@ let relprod_forall qvars e1 e2 = (defix relprod_forall) qvars e1 e2;
 // Returns the (complete) variable order obtained after the re-ordering.
 // Tips: If you just want to get the current variable order, use: var_order [];
 //
-let var_order l = md_merge_vectors (var_order (md_expand_vectors l));
+let var_order l compress->T =
+    let res = var_order (md_expand_vectors l) then
+    compress => md_merge_vectors res | res
+;
 non_lazy var_order;
 
 

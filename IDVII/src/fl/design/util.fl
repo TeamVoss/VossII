@@ -412,7 +412,7 @@ let check_memory a_sz lines d_sz addr mem =
 	    eprintf "Memory size %d not same as declaration %d"
 		    (mem_sz/d_sz) lines
 	|
-	let n = bits_needed (lines-1) in
+	let n = ubits_needed (lines-1) in
 	a_sz < n =>
 	    eprintf "Write address too small for memory (%d<%d)" a_sz n
 	|
@@ -478,22 +478,28 @@ let mk_xvars sz =
 ;
 
 letrec w2bv sub w =
+    let bv_trim bits b = bv_mod b (int2bv (2**bits)) in
+    let bin_op op a b =
+	let sza = wexpr_size a in
+	let szb = wexpr_size a in
+	sza != szb => eprintf "Size mismatch (%d != %d)" sza szb |
+	bv_trim sza (op (w2bv sub a) (w2bv sub b))
+    in
     let w2bl w =
 	let sz = wexpr_size w in
 	let base = bv2list (w2bv sub w) in
 	lastn sz ((replicate sz (hd base))@base)
     in
-    let w2bv (W_NAMED_CONST name sz v) = 
-		v >= 0 => bv_ZX (int2bv v) | (int2bv v)
+    let w2bv (W_NAMED_CONST name sz v) = int2bv v
      /\ w2bv (W_X sz) =
 		// Generate new unique BDD variables for X's
 		// A bit of a hack, but there is no clean solution to this
 		// that I can think of. The rigth answer would probably have
 		// a wexpr2dualrail but that's pretty cumbersome too
 		mk_xvars sz
-     /\ w2bv (W_CONST sz v) = v >= 0 => bv_ZX (int2bv v) | (int2bv v)
-     /\ w2bv (W_VAR sz b) = bv_ZX (substitute sub (bv_variable (mk_name sz b)))
-     /\ w2bv (W_EXPLICIT_VAR sz n) = bv_ZX (substitute sub (bv_variable n))
+     /\ w2bv (W_CONST sz v) = int2bv v
+     /\ w2bv (W_VAR sz b) = substitute sub (bv_variable (mk_name sz b))
+     /\ w2bv (W_EXPLICIT_VAR sz n) = substitute sub (bv_variable n)
      /\ w2bv (W_AND a b) = bv_AND (w2bv sub a) (w2bv sub b)
      /\ w2bv (W_LAT_LEQ a b) = error "W_LAT_LEQ cannot be converted"
      /\ w2bv (W_IDELAY sz _ _ _ _) = error "W_IDELAY cannot be converted"
@@ -501,29 +507,27 @@ letrec w2bv sub w =
      /\ w2bv (W_NOT a) = bv_NOT (w2bv sub a)
      /\ w2bv (W_PRED name cond) = w2bv sub cond
      /\ w2bv (W_EQ a b) =
-	    (bv_eq (bv_ZX (w2bv sub a)) (bv_ZX (w2bv sub b)))
-		    => (int2bv (-1)) | (int2bv 0)
+	    (bv_eq (w2bv sub a) (w2bv sub b)) => (int2bv (-1)) | (int2bv 0)
      /\ w2bv (W_GR a b) =
-	    (bv_greater (bv_ZX (w2bv sub a)) (bv_ZX (w2bv sub b)))
-		    => (int2bv (-1)) | (int2bv 0)
-     /\ w2bv (W_ADD a b) = bv_add (w2bv sub a) (w2bv sub b)
-     /\ w2bv (W_SUB a b) = bv_sub (w2bv sub a) (w2bv sub b)
-     /\ w2bv (W_MUL a b) = bv_mul (w2bv sub a) (w2bv sub b)
-     /\ w2bv (W_DIV a b) = bv_div (w2bv sub a) (w2bv sub b)
-     /\ w2bv (W_MOD a b) = bv_mod (w2bv sub a) (w2bv sub b)
-     /\ w2bv (W_SHL a b) = bv_shl (w2bv sub a) (w2bv sub b)
-     /\ w2bv (W_SHR a b) = bv_shr (w2bv sub a) (w2bv sub b)
-     /\ w2bv (W_ASHR a b) = bv_ashr (w2bv sub a) (w2bv sub b)
+	    (bv_greater (w2bv sub a) (w2bv sub b)) => (int2bv (-1)) | (int2bv 0)
+     /\ w2bv (W_ADD a b) = bin_op bv_add a b
+     /\ w2bv (W_SUB a b) = bin_op bv_sub a b
+     /\ w2bv (W_MUL a b) = bin_op bv_mul a b
+     /\ w2bv (W_DIV a b) = bin_op bv_div a b
+     /\ w2bv (W_MOD a b) = bin_op bv_mod a b
+     /\ w2bv (W_SHL a b) = bin_op bv_shl a b
+     /\ w2bv (W_SHR a b) = bin_op bv_shr a b
+     /\ w2bv (W_ASHR a b) = bin_op bv_ashr a b
      /\ w2bv (W_SX sz w) = w2bv sub w
      /\ w2bv (W_ZX sz w) = bv_ZX (w2bv sub w)
      /\ w2bv (W_ITE c t e) =
 	    (w2bv sub c) = (int2bv (-1)) => (w2bv sub t) | (w2bv sub e)
      /\ w2bv (W_SLICE indices w) =
 		let sz = wexpr_size w in
-		list2bv (map (\idx. el (sz-idx) (w2bl w)) indices)
+		(list2bv (F:(map (\idx. el (sz-idx) (w2bl w)) indices)))
      /\ w2bv (W_NAMED_SLICE name indices w) =
 		let sz = wexpr_size w in
-		list2bv (map (\idx. el (sz-idx) (w2bl w)) indices)
+		(list2bv (F:(map (\idx. el (sz-idx) (w2bl w)) indices)))
      /\ w2bv (W_UPDATE_NAMED_SLICE old name indices new) =
 		let old_bv = w2bl old in
 		let new_bv = w2bl new in
@@ -551,8 +555,10 @@ letrec w2bv sub w =
 		let r =
 		    collect (mem start indices) start start ((start-1) downto 0)
 		in
-		list2bv r
-     /\  w2bv (W_CAT wl) = list2bv (itlist (\w.\l. (w2bl w)@l) wl [])
+		(list2bv r)
+     /\  w2bv (W_CAT wl) = 
+		let sz = wexpr_size (W_CAT wl) in
+		list2bv (F:(itlist (\w.\l. (w2bl w)@l) wl []))
      /\  w2bv (W_MEM_READ info mem addr) =
 		val (MEM a_sz lines d_sz) = info in
 		(check_memory a_sz lines d_sz addr mem) fseq

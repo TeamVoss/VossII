@@ -2,7 +2,7 @@ load "idv.fl";
 
 let N = 16;
 TYPE "word" N;
-TYPE "addr" (bits_needed N);
+TYPE "addr" (ubits_needed N);
 
 letrec ff_rec cnt (b:bs) = IF {b::bit} THEN ''cnt ELSE ff_rec (cnt+1) bs
  /\    ff_rec cnt [] = '0

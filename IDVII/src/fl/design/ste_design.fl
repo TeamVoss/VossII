@@ -22,6 +22,10 @@ let set_phase_duration cnt =
 ;
 export set_phase_duration;
 
+let get_phase_duration {dummy::void} = deref PL;
+non_lazy get_phase_duration;
+export get_phase_duration;
+
 
 // A simple interface for defining 5-tuple lists for STE runs.
 // This function conjucts the condition cond into every five-tuple.
