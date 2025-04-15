@@ -1560,9 +1560,9 @@ slet BDD_EQ_1 p1 p2 order_file =
 let BDD_EQ_2 p1 p2 variable_order =
     let fp = mktemp "var_order" then
     let order_file = stream2filename fp then
-    (fprintf fp "var_order ") fseq
+    (fprintf fp "(var_order ") fseq
     let pfn fp s = fprintf fp "\"%s\"" s in
-    (list2fp fp T "[\n\t" ",\n\t" "\n];\n" pfn variable_order) fseq
+    (list2fp fp T "[\n\t" ",\n\t" "\n]) fseq ();\n" pfn variable_order) fseq
     (fclose fp) fseq
     BDD_EQ_1 p1 p2 order_file
 ;
