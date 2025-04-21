@@ -297,7 +297,6 @@ g_rec_hash_rec(pointer p, unint n, unint sz)
                         ext_obj_ptr op = M_LOCATE_BUF(&ext_obj_buf, class);
                         return( op->hash_fn(GET_EXT_OBJ(nd), n) );
 		    }
-		    return( (((unsigned long int)GET_EXT_OBJ(nd))) % n);
                 default:
                     DIE("Unexpected cache argument value. Consult guru 3!");
 	    }
@@ -543,8 +542,11 @@ cache_hash(g_ptr nd, unint n)
 		    return( ((unsigned long int) GET_BEXPR(nd)) % n );
 		case PRIM_FN:
 		    return( ((unsigned int) GET_PRIM_FN(nd)) % n );
-		case EXT_OBJ:
-		    return( ((unsigned long int) GET_EXT_OBJ(nd)) % n );
+		case EXT_OBJ: {
+                        unint class = GET_EXT_OBJ_CLASS(nd);
+                        ext_obj_ptr op = M_LOCATE_BUF(&ext_obj_buf, class);
+                        return( op->hash_fn(GET_EXT_OBJ(nd), n) );
+		    }
                 default:
                     DIE("Unexpected cache argument value. Consult guru 3!");
 	    }

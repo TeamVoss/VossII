@@ -1873,6 +1873,9 @@ grow_MainTbl()
 	i--;
     }
     FP(warning_fp, " Done.\n");
+    Do_gc_asap = TRUE;
+    if( RCdo_dynamic_var_order )
+	insist_on_reorder = TRUE;
 }
 
 static void

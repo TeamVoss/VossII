@@ -84,6 +84,7 @@ bool		    perform_fl_command(string txt, bool restore_line_nbr);
 /************************************************************************/
 /*			Local Variables					*/
 /************************************************************************/
+static string		reason = NULL;
 static int		Call_level = 0;
 static g_ptr		free_list = NULL;
 static g_ptr		print_nd;
@@ -4979,15 +4980,25 @@ Is_equal(g_ptr l1, g_ptr l2, bool identical)
     l2 = reduce(l2, FALSE);
     if( l1 == l2 )
         return( B_One() );
-    if( l1 == NULL || l2 == NULL )
+    if( l1 == NULL ) {
+	reason = strtemp("Arg1 is NULL but Arg2 is not");
         return( B_Zero() );
+    }
+    if( l2 == NULL ) {
+	reason = strtemp("Arg1 is NULL but Arg2 is not");
+        return( B_Zero() );
+    }
+
     switch( GET_TYPE(l1) ) {
         case APPLY_ND:
             /* Functions are always deemed unequal */
+	    reason = strtemp("Function are deemed unequal");
             return( B_Zero() );
         case CONS_ND:
-            if( GET_TYPE( l2 ) != CONS_ND )
+            if( GET_TYPE( l2 ) != CONS_ND ) {
+		reason = strtemp("Arg1 is CONS_ND and Arg2 is not");
                 return( B_Zero() );
+	    }
             res = Is_equal(GET_CONS_HD(l1), GET_CONS_HD(l2), identical);
 	    if( res == B_Zero() )
 		return(res);
@@ -4997,10 +5008,15 @@ Is_equal(g_ptr l1, g_ptr l2, bool identical)
 	    POP_BDD_GC(1);
             return( res );
         case LEAF:
-            if( GET_TYPE( l2 ) != LEAF )
+            if( GET_TYPE( l2 ) != LEAF ) {
+		reason = strtemp("Arg1 is a LEAF and Arg2 is not");
                 return( B_Zero() );
-            if( GET_LEAF_TYPE(l1) != GET_LEAF_TYPE(l2) )
+	    }
+            if( GET_LEAF_TYPE(l1) != GET_LEAF_TYPE(l2) ) {
+		reason = tprintf("Arg1 is a %s Arg2 is a %s",
+			    Get_pfn_name(l1, FALSE), Get_pfn_name(l2, FALSE));
                 return( B_Zero() );
+	    }
             switch( GET_LEAF_TYPE(l1) ) {
                 case INT:
 		    ai1 = GET_AINT(l1);
@@ -5009,22 +5025,31 @@ Is_equal(g_ptr l1, g_ptr l2, bool identical)
 			return( B_One() );
 		    if( Arbi_cmp(ai1, ai2) == arbi_EQ )
 			return( B_One() );
+		    reason = tprintf("Arg1 is %s but Arg2 is %s", 
+				Arbi_ToString(ai1,10), Arbi_ToString(ai2,10));
 		    return( B_Zero() );
                 case STRING:
-                    return( (STREQ(GET_STRING(l1), GET_STRING(l2)))?
-				B_One(): B_Zero() );
+		    if( STREQ(GET_STRING(l1), GET_STRING(l2)) ) {
+			return( B_One() );
+		    }
+		    reason = tprintf("Arg1 = \"%s\" but Arg2 = \"%s\"",
+				      GET_STRING(l1), GET_STRING(l2));
+                    return( B_Zero() );
                 case BOOL:
 		    if( identical )
 			if( B_Equal(GET_BOOL(l1), GET_BOOL(l2)) )
 			    return( B_One() );
-			else
+			else {
+			    reason = strtemp("Arg1 !== Arg2");
 			    return( B_Zero() );
+			}
 		    else
 			return(B_Xnor(GET_BOOL(l1), GET_BOOL(l2)));
                 case BEXPR:
 		    if( BE_Equal(GET_BEXPR(l1), GET_BEXPR(l2)) )
 			return( B_One() );
 		    if( identical ) {
+			reason = strtemp("Unequal bexprs");
 			return( B_Zero() );
 		     } else {
 			Rprintf("Equality over complex bexprs not defined.");
@@ -5044,6 +5069,7 @@ Is_equal(g_ptr l1, g_ptr l2, bool identical)
 			if( IS_VOID(l1) && IS_VOID(l2) ) {
 			    return( B_One() );
 			} else {
+			    reason = strtemp("Primitive funs deemed unequal");
 			    return( B_Zero() );
 			}
 		    }
@@ -6019,8 +6045,10 @@ g_b_ite(g_ptr l, g_ptr r)
     if( !IS_BOOL(l) ) {
         if( Is_equal(l, r, TRUE) != B_One() ) {
             res = Make_0inp_Primitive(P_FAIL);
-            string m = wastrsave(&strings,
-				 "if-then-else over non-matching structures");
+	    string m;
+	    m = Fail_pr("if-then-else over non-matching structures\n%s\n",
+			reason);
+            m = wastrsave(&strings, m);
             SET_FAIL_STRING(res, m);
             return( res );
         }
