@@ -1,0 +1,12 @@
+
+
+clet f bv1 i =
+    (fprintf stderr "Miss\n") fseq
+    bv1 + int2bv i
+;
+
+let bv = int2bv 2;
+
+f (int2bv 2) 1;
+f (int2bv 2) 1;
+

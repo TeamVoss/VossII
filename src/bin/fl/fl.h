@@ -148,7 +148,7 @@ unsigned int	Ustr_hash(pointer np, unsigned int n);
 bool		Ustr_equ(pointer p1, pointer p2);
 void            Set_default_break_handler();
 void            Exit(int status);
-string          protect(string txt);
+string          protect(string txt, bool *changep);
 string          unprotect(string txt);
 void            Info_to_tcl(string cmd);
 bool            Send_to_tcl(string cmd, string *resp);

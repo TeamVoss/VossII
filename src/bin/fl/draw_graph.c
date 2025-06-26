@@ -16,6 +16,7 @@
 
 extern symbol_tbl_ptr		symb_tbl;
 extern g_ptr			void_nd;
+extern bool			RCinclude_line_nbr_in_GR;
 
 
 /**** PRIVATE VARIABLES ****/
@@ -235,14 +236,21 @@ draw_graph_rec(FILE *fp, hash_record *hp, int depth, bool do_addr,
     switch( GET_TYPE(node) ) {
 	case LAMBDA_ND:
 	    {
+		char	opt_line_nbr[10];
+		if( RCinclude_line_nbr_in_GR ) {
+		    int line_nbr = GET_LAMBDA_LINE_NBR(node);
+		    sprintf(opt_line_nbr, "@%d", line_nbr);
+		} else {
+		    opt_line_nbr[0] = 0;
+		}
 		if( do_addr )
 		    fprintf(fp, "n%u [label = \"\\\\%s,%p\", ordering=out];\n",
 				res, th, node);
 		else
 		    fprintf(fp, "n%u [label = \"\\\\%s\", ordering=out];\n",
 				res, th);
-		fprintf(fp, "lbl%u [shape=plaintext, label = \"%s(%d)\"];\n",
-		   res, GET_LAMBDA_VAR(node), GET_LAMBDA_LINE_NBR(node));
+		fprintf(fp, "lbl%u [shape=plaintext, label = \"%s%s\"];\n",
+		   res, GET_LAMBDA_VAR(node), opt_line_nbr);
 		int l = draw_graph_rec(fp, hp, depth, do_addr,
 				       GET_LAMBDA_BODY(node));
 		fprintf(fp, "n%u -> lbl%u [color=black];\n", res, res);
@@ -280,29 +288,36 @@ draw_graph_rec(FILE *fp, hash_record *hp, int depth, bool do_addr,
 		fprintf(fp, "n%u -> n%u [color=blue];\n", res, r);
 		return res;
 	    }
-	case LEAF:
+	case LEAF: {
+	    char	opt_line_nbr[10];
+	    if( RCinclude_line_nbr_in_GR ) {
+		int line_nbr = GET_LINE_NBR(node);
+		sprintf(opt_line_nbr, "@%d", line_nbr);
+	    } else {
+		opt_line_nbr[0] = 0;
+	    }
 	    switch( GET_LEAF_TYPE(node) ) {
 		case INT:
 		    s = Arbi_ToString(GET_AINT(node),10);
 		    if( do_addr )
 			fprintf(fp,
-				"n%u [shape=plaintext, label = \"%s%s,%p\"];\n",
-				 res, s, th, node);
+			    "n%u [shape=plaintext, label = \"%s%s%s,%p\"];\n",
+			     res, s, th, opt_line_nbr, node);
 		    else
 			fprintf(fp,
-				"n%u [shape=plaintext, label = \"%s%s\"];\n",
-				 res, s, th);
+				"n%u [shape=plaintext, label = \"%s%s%s\"];\n",
+				 res, s, th, opt_line_nbr);
 		    return res;
 		case STRING:
 		    s = make_string_safe(GET_STRING(node));
 		    if( do_addr )
 			fprintf(fp,
-		        "n%u [shape=plaintext, label = \"\\\"%s\\\"%s,%p\"];\n",
-			   res, s, th, node);
+		    "n%u [shape=plaintext, label = \"\\\"%s\\\"%s%s,%p\"];\n",
+			   res, s, th, opt_line_nbr, node);
 		    else
 			fprintf(fp,
-			  "n%u [shape=plaintext, label = \"\\\"%s\\\"%s\"];\n",
-			   res, s, th);
+		         "n%u [shape=plaintext, label = \"\\\"%s\\\"%s%s\"];\n",
+			   res, s, th, opt_line_nbr);
 		    return res;
 		case BOOL:
 		    {
@@ -318,12 +333,12 @@ draw_graph_rec(FILE *fp, hash_record *hp, int depth, bool do_addr,
 			}
 			if( do_addr )
 			    fprintf(fp,
-			        "n%u [shape=plaintext, label = \"%s%s,%p\"];\n",
-				res, txt, th, node);
+			    "n%u [shape=plaintext, label = \"%s%s%s,%p\"];\n",
+			    res, txt, th, opt_line_nbr, node);
 			else
 			    fprintf(fp,
-				"n%u [shape=plaintext, label = \"%s%s\"];\n",
-				     res, txt, th);
+				"n%u [shape=plaintext, label = \"%s%s%s\"];\n",
+				     res, txt, th, opt_line_nbr);
 			return res;
 		    }
 		case BEXPR:
@@ -340,12 +355,12 @@ draw_graph_rec(FILE *fp, hash_record *hp, int depth, bool do_addr,
 			}
 			if( do_addr )
 			    fprintf(fp,
-			        "n%u [shape=plaintext, label = \"%s%s,%p\"];\n",
-				res, txt, th, node);
+			    "n%u [shape=plaintext, label = \"%s%s%s,%p\"];\n",
+				res, txt, th, opt_line_nbr, node);
 			else
 			    fprintf(fp,
-				"n%u [shape=plaintext, label = \"%s%s\"];\n",
-				 res, txt, th);
+				"n%u [shape=plaintext, label = \"%s%s%s\"];\n",
+				 res, txt, th, opt_line_nbr);
 			return res;
 		    }
 		case EXT_OBJ:
@@ -355,13 +370,13 @@ draw_graph_rec(FILE *fp, hash_record *hp, int depth, bool do_addr,
 						    GET_EXT_OBJ_CLASS(node)));
 			if( do_addr )
 			    fprintf(fp, "n%u [shape=plaintext, %s label "
-					"= \"%s%s,%p\"];\n", res,
+					"= \"%s%s%s,%p\"];\n", res,
 					"color=red,",
-					txt, th, node);
+					txt, th, opt_line_nbr, node);
 			else
 			    fprintf(fp,
-				"n%u [shape=plaintext, %s label = \"%s%s\"];\n",
-				 res, "color=red,", txt, th);
+			      "n%u [shape=plaintext, %s label = \"%s%s%s\"];\n",
+				 res, "color=red,", txt, th, opt_line_nbr);
 			return res;
 		    }
 
@@ -372,38 +387,39 @@ draw_graph_rec(FILE *fp, hash_record *hp, int depth, bool do_addr,
 			bool hili = FALSE;
 			switch ( GET_PRIM_FN(node) ) {
 			    case P_EXTAPI_FN:
-				Sprintf(txt, "[%s]", Get_ExtAPI_Function_Name(
-							GET_EXTAPI_FN(node)));
+				Sprintf(txt, "[%s]%s", Get_ExtAPI_Function_Name(
+							GET_EXTAPI_FN(node)),
+						       opt_line_nbr);
 				hili = TRUE;
 				break;
 			    case P_SSCANF:
-				Sprintf(txt, "sscanf \\\"%s\\\"\n)",
-					     GET_PRINTF_STRING(node));
+				Sprintf(txt, "sscanf \\\"%s\\\"$%s\n)",
+					 GET_PRINTF_STRING(node), opt_line_nbr);
 				break;
 			    case P_PRINTF:
-				Sprintf(txt, "printf \\\"%s\\\"\n)",
-					     GET_PRINTF_STRING(node));
+				Sprintf(txt, "printf \\\"%s\\\"%s\n)",
+					 GET_PRINTF_STRING(node), opt_line_nbr);
 				break;
 			    case P_SPRINTF:
-				Sprintf(txt, "srintf \\\"%s\\\"\n)",
-					     GET_PRINTF_STRING(node));
+				Sprintf(txt, "srintf \\\"%s\\\"%s\n)",
+					 GET_PRINTF_STRING(node), opt_line_nbr);
 				break;
 			    case P_EPRINTF:
-				Sprintf(txt, "eprintf \\\"%s\\\"\n)",
-					     GET_PRINTF_STRING(node));
+				Sprintf(txt, "eprintf \\\"%s\\\"%s\n)",
+					 GET_PRINTF_STRING(node), opt_line_nbr);
 				break;
 			    case P_FPRINTF:
-				Sprintf(txt, "fprintf \\\"%s\\\"\n)",
-					     GET_PRINTF_STRING(node));
+				Sprintf(txt, "fprintf \\\"%s\\\"%s\n)",
+					 GET_PRINTF_STRING(node), opt_line_nbr);
 				break;
 			    case P_REF_VAR: {
 				if( do_addr )
 				    fprintf(fp,
-					    "n%u [label = \"ref%s,%p\"];\n",
-					    res, th, node);
+					    "n%u [label = \"ref%s%s,%p\"];\n",
+					    res, th, opt_line_nbr, node);
 				else
-				    fprintf(fp, "n%u [label = \"ref%s\"];\n",
-						res, th);
+				    fprintf(fp, "n%u [label = \"ref%s%s\"];\n",
+						res, th, opt_line_nbr);
 				int ref_var = GET_REF_VAR(node);
 				int l = draw_graph_rec(fp, hp, depth, do_addr,
 						       Get_RefVar(ref_var));
@@ -412,11 +428,12 @@ draw_graph_rec(FILE *fp, hash_record *hp, int depth, bool do_addr,
 				return res;
 			    }
 			    case P_FAIL:
-				Sprintf(txt, "P_FAIL \\\"%s\\\"\n)",
-					     str_trunc(GET_FAIL_STRING(node)));
+				Sprintf(txt, "P_FAIL \\\"%s\\\"%s\n)",
+				 str_trunc(GET_FAIL_STRING(node)),opt_line_nbr);
 				break;
 			    default:
-				Sprintf(txt, "%s", Get_pfn_name(node, TRUE));
+				Sprintf(txt, "%s%s",
+					Get_pfn_name(node, TRUE), opt_line_nbr);
 				break;
 			}
 			if( do_addr )
@@ -434,19 +451,22 @@ draw_graph_rec(FILE *fp, hash_record *hp, int depth, bool do_addr,
 		case VAR:
 		{
 		    s = GET_VAR(node);
-#if 0
 		    version = GET_VERSION(node);
-#else
-		    version = GET_LINE_NBR(node);
-#endif
+		    char ver_buf[1024];
+		    if( version == 0 ) {
+			ver_buf[0] = 0;
+		    } else {
+			sprintf(ver_buf, "(%d=%s)", version,
+					get_version_name(node));
+		    }
 		    if( do_addr ) {
 			fprintf(fp, "n%u [shape=plaintext, label = ", res);
-			fprintf(fp, "\"V\\\"%s\\\"(%d=%s)%s,%p\"];\n", s,
-				version, get_version_name(node), th, node);
+			fprintf(fp, "\"V\\\"%s\\\"%s%s%s,%p\"];\n", s,
+			ver_buf,th,opt_line_nbr,node);
 		    } else {
 			fprintf(fp, "n%u [shape=plaintext, label = ", res);
-			fprintf(fp, "\"V\\\"%s\\\"(%d=%s)%s\"];\n", s,
-				version, get_version_name(node), th);
+			fprintf(fp, "\"V\\\"%s\\\"%s%s%s\"];\n", s,
+			    ver_buf, th, opt_line_nbr);
 		    }
 		    return res;
 		}
@@ -456,14 +476,21 @@ draw_graph_rec(FILE *fp, hash_record *hp, int depth, bool do_addr,
 		    fn_ptr fn = GET_USERDEF(node);
 		    s = fn->name;
 		    version = GET_VERSION(node);
+		    char ver_buf[1024];
+		    if( version == 0 ) {
+			ver_buf[0] = 0;
+		    } else {
+			sprintf(ver_buf, "(%d=%s)", version,
+					get_version_name(node));
+		    }
 		    if( do_addr ) {
 			fprintf(fp, "n%u [shape=plaintext, label = ", res);
-			fprintf(fp, "\"UD\\\"%s\\\"(%d=%s)%s,%p\"];\n", s,
-				version, get_version_name(node), th, node);
+			fprintf(fp, "\"UD\\\"%s\\\"%s%s%s,%p\"];\n", s,
+			ver_buf,th,opt_line_nbr, node);
 		    } else {
 			fprintf(fp, "n%u [shape=plaintext, label = ", res);
-			fprintf(fp, "\"UD\\\"%s\\\"(%d=%s)%s\"];\n", s,
-				version, get_version_name(node), th);
+			fprintf(fp, "\"UD\\\"%s\\\"%s%s%s\"];\n", s,
+			    ver_buf, th, opt_line_nbr);
 		    }
 		    return res;
 		}
@@ -471,6 +498,7 @@ draw_graph_rec(FILE *fp, hash_record *hp, int depth, bool do_addr,
 		default:
 		    DIE("Unknown LEAF type");
 	    }
+	}
 
 	default:
 	    DIE("Should never happen");

@@ -309,8 +309,8 @@ typedef struct g_rec {
 #define SET_VAR(np,s)           SET_RIGHT(np, (ui) s)
 #define GET_VERSION(np)         ((GET_LEFT(np) >>6)&0x3ff)
 #define SET_VERSION(np,f)       ((np)->L = \
-                                      (ui)((((ui)((np)->L))&0xffff003f) | \
-                                      (((ui) f)<<6)))
+                                      (ui)((((ui)((np)->L))& ~((ui) 0x3ff<<6)) \
+					| (((ui) f)<<6)))
 
 
 #define IS_EXT_OBJ(np)          (IS_LEAF(np) && (GET_LEAF_TYPE(np) == EXT_OBJ))
@@ -331,8 +331,8 @@ typedef struct g_rec {
 #define IS_PRIM_FN(np)          (GET_LEAF_TYPE(np) == PRIM_FN)
 #define GET_PRIM_FN(np)         ((GET_LEFT(np) >>6)&0x3ff)
 #define SET_PRIM_FN(np,f)       ((np)->L = \
-                                      (ui)((((ui)((np)->L))&0xffff003f) | \
-                                      (((ui) f)<<6)))
+                                      (ui)((((ui)((np)->L))& ~((ui) 0x3ff<<6)) \
+					| (((ui) f)<<6)))
 
 #define IS_P_Y(np)		(IS_LEAF(np) &&				    \
 				 IS_PRIM_FN(np) &&			    \
@@ -401,13 +401,14 @@ typedef struct g_rec {
 #define IS_EXTAPI_FN(np)	(GET_PRIM_FN(np) == P_EXTAPI_FN)
 #define GET_EXTAPI_FN(np)       ((GET_LEFT(np) >> 16) & 0xffffffff)
 #define SET_EXTAPI_FN(np,f)     ((np)->L = \
-                                   (ui)((((ui)((np)->L))&0xffff00000000ffff) | \
-                                   (((ui) f)<<16)))
+                                   (ui)((((ui)((np)->L))& \
+					~((ui) 0xffffffff << 16)) \
+				    | (((ui) f)<<16)))
 
 #define GET_LINE_NBR(np)        ((int) (GET_LEFT(np) >>48))
 #define SET_LINE_NBR(np,ln)     ((np)->L = \
-                                      (ui)((((ui)((np)->L))&0xffffffffffff) | \
-                                      (((ui) ln)<<48)))
+				  (ui)((((ui)((np)->L))& ~((ui) 0xffff << 48)) \
+				    | (((ui) ln)<<48)))
 
 #define GET_LAMBDA_LINE_NBR(np)	    GET_LINE_NBR(GET_LAMBDA_VAR_LEAF(np))
 #define SET_LAMBDA_LINE_NBR(np,ln)  SET_LINE_NBR(GET_LAMBDA_VAR_LEAF(np),ln)

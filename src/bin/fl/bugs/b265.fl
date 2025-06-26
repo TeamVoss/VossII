@@ -1,0 +1,24 @@
+
+let sum i j = {i::int} + j;
+
+lettype tr = BR tr tr | LF int;
+
+rvariable "a";
+
+let f x y =
+    let double i = sum i i in
+    let problem i = i^"a" in
+    double (problem "b")
+;
+
+let g x (LF y) =
+    let double i = sum i i in
+    let problem i = i^"a" in
+    double (problem "b")
+;
+
+let h x y =
+    let double (LF i) = sum i i in
+    let problem i = i^"a" in
+    double (problem "b")
+;

@@ -1328,6 +1328,43 @@ mismatch_fun_arg(typeExp_ptr *t1p, typeExp_ptr *t2p)
     return TRUE;
 }
 
+static string
+find_actual_arg_name_and_print_context(g_ptr node, string old_name)
+{
+    if( strncmp(".Arg", old_name, 3) != 0 ) {
+	return old_name;
+    }
+    // Find context
+    while( IS_LAMBDA(node) ) {
+	node = GET_LAMBDA_BODY(node);
+    }
+    if( !IS_APPLY(node) ) {
+	return old_name;
+    }
+    if( !IS_DEBUG(GET_APPLY_LEFT(node)) ) {
+	return old_name;
+    }
+    string info = GET_DEBUG_STRING(GET_APPLY_LEFT(node));
+    string tmp = strtemp(info);
+    string blank = strchr(tmp, ' ');
+    if( blank != NULL ) {
+	*blank = 0;
+    }
+    FP(err_fp, "In the definition of %s the argument ", tmp);
+    // Try to find the name of the argument the user used
+    node = GET_APPLY_RIGHT(node);
+    while( IS_APPLY(node) &&
+	   IS_LAMBDA(GET_APPLY_LEFT(node)) &&
+	   IS_LEAF_VAR(GET_APPLY_RIGHT(node)) )
+    {
+	if( STREQ(old_name, GET_VAR(GET_APPLY_RIGHT(node))) ) {
+	    return( GET_LAMBDA_VAR(GET_APPLY_LEFT(node)) );
+	}
+	node = GET_LAMBDA_BODY(GET_APPLY_LEFT(node));
+    }
+    return old_name;
+}
+
 static void
 report_failure(node_type_ptr cur, typeExp_ptr type, typeExp_ptr expected_type)
 {
@@ -1452,6 +1489,7 @@ report_failure(node_type_ptr cur, typeExp_ptr type, typeExp_ptr expected_type)
 	    FP(err_fp, "===Type error around line %d\n",
 		    GET_LINE_NBR(var));
 	string name = GET_VAR(var);
+	name = find_actual_arg_name_and_print_context(node, name);
 	name = (*name == '.')? name+1 : name;
 	FP(err_fp, "%s is of type:\n\t", name);
 	Print_Type(get_real_type(expected_type), err_fp, TRUE,TRUE);

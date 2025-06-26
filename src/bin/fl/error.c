@@ -56,7 +56,7 @@ FP_va(odests fp, const string format, va_list arg)
         }
         if( gui_mode ) {
 	    string safe_buf = make_tcl_safe(fbuf);
-            string tmp = protect(safe_buf);
+            string tmp = protect(safe_buf, NULL);
             switch( fp ) {
                 case stdout_fp:
                     fprintf(to_tcl_fp, "WriteStdOut {%s}\n", tmp); break;

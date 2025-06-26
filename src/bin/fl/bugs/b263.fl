@@ -1,0 +1,565 @@
+load "idv.fl";
+update_vossrc "VERBOSE-GARBAGE-COLLECTION" "YES";
+
+//let _USE_DELAYS_ = F;
+let _USE_DELAYS_ = T;
+
+let phase_duration = (_USE_DELAYS_ => 1000 | 1);
+
+//let SZ = 4;
+//let SZ = 8;
+let SZ = 16;
+
+UNSIGNED "word" SZ;
+
+let half_adder =
+    bit_input	a b cin.
+    bit_output	sum cout.
+    CELL "half_adder" [
+	sum <- a '^' b '^' cin,
+	cout <- a '&' b '|' a '&' cin '|' cin '&' b 
+];
+
+
+let dummy_idelay {mr::int} {Mr::int} {mf::int} {Mf::int} =
+    input   i.
+    output  o.
+    CELL "wire" [
+	o <- i
+];
+let opt_idelay mr Mr mf Mf i o =
+    _USE_DELAYS_ => 
+	idelay mr Mr mf Mf i o
+    |
+	dummy_idelay mr Mr mf Mf i o
+;
+
+// ====================================================================
+// Some "standard cells" with inertial output delays
+// Not meant to be realistic....
+// ====================================================================
+
+let xor2_cell =
+    bit_input	    a b.
+    bit_output	    o.
+    bit_internal    mid.
+    CELL "Draw_xor2" [
+	mid <- a '^' b,
+	opt_idelay 3 3 5 5 mid o
+];
+
+let nand2_cell =
+    bit_input	    a b.
+    bit_output	    o.
+    bit_internal    mid.
+    CELL "Draw_nand2" [
+	mid <- '~' (a '&' b),
+	opt_idelay 3 3 2 2 mid o
+];
+
+let nand3_cell =
+    bit_input	    a b c.
+    bit_output	    o.
+    bit_internal    mid.
+    CELL "Draw_nand3" [
+	mid <- '~' (a '&' b '&' c),
+	opt_idelay 5 5 3 3 mid o
+];
+
+let mux_cell =
+    bit_input	    c.
+    bit_input	    t e.
+    bit_output	    o.
+    bit_internal    mid.
+    CELL "Draw_mux" [
+	MUX c t e mid,
+	opt_idelay 5 5 4 4 mid o
+];
+
+
+// =====================================================================
+//		    Ripple-carry adder
+// =====================================================================
+begin_abstype;
+
+let half_adder =
+    bit_input	a b cin.
+    bit_output	sum cout.
+    //
+    bit_internal    smid cmid1 cmid2 cmid3 cmid.
+    CELL "half_adder" [
+	xor2_cell a b smid,
+	xor2_cell cin smid sum,
+	nand2_cell a b cmid1,
+	nand2_cell a cin cmid2,
+	nand2_cell cin b cmid3,
+	nand3_cell cmid1 cmid2 cmid3 cout
+];
+
+letrec add_rec =
+    bit_input	    cin.
+    list_input	    al bl.
+    list_output	    ol.
+    bit_output	    cout.
+    //
+    bit_internal    tmp.
+    CELL (sprintf "add_%d" (length al)) (
+	al = [] => [] |
+	val (a:as) = al in
+	val (b:bs) = bl in
+	val (o:os) = ol in
+	[
+	    half_adder a b cin o cout,
+	    add_rec cout as bs os tmp
+	]
+);
+export add_rec;
+
+let ripple_carry_adder =
+    word_input    a b.
+    word_output   res.
+    //
+    bit_internal  dummy.
+    CELL "ripple_carry_adder" [
+	add_rec '0 (rev (tobits a)) (rev (tobits b)) (rev (tobits res)) dummy
+];
+
+end_abstype ripple_carry_adder;
+
+
+// =====================================================================
+//		    Carry-select adder
+// =====================================================================
+begin_abstype;
+
+letrec cs_add_rec size =
+    bit_input	    cin.
+    bit_list_input  as bs.
+    bit_list_output os.
+    bit_output	    cout.
+    //
+    let l = length as in
+    let l2 = l/2 in
+    //
+    bit_list_internal l2    os0 os1.
+    bit_internal	    cout0 cout1 cmid.
+    //
+    CELL (sprintf "cs_add_rec_%d" (length as)) (
+	l <= size => [ add_rec cin (rev as) (rev bs) (rev os) cout ] |
+	[
+	    cs_add_rec size cin (butfirstn l2 as) (butfirstn l2 bs)
+			     (butfirstn l2 os) cmid,
+	    cs_add_rec size '0 (firstn l2 as) (firstn l2 bs) os0 cout0,
+	    cs_add_rec size '1 (firstn l2 as) (firstn l2 bs) os1 cout1,
+	    mux_cell cmid cout1 cout0 cout
+	]
+	@
+	(map3 (\o1.\o0.\ot. mux_cell cmid o1 o0 ot) os1 os0 (firstn l2 os))
+);
+
+let carry_select_adder size =
+    word_input    a b.
+    word_output   res.
+    //
+    bit_internal  dummy.
+    CELL (sprintf "carry_select_adder_%d" size) [
+	cs_add_rec size '0 (tobits a) (tobits b) (tobits res) dummy
+];
+
+end_abstype carry_select_adder;
+
+
+// Code to clean up generated circuits for visualization etc.
+let my_clean p =
+    let p1 = flatten_pexlif p in
+    _USE_DELAYS_ => p1 |
+    let il = pexlif_find (pexlif_name_is "draw_buffer") p1 in
+    remove_wire p1 il
+;
+
+begin_abstype;
+
+// Function to get all the nodes that are outputs of inertial dealys
+// as well the fanout count for each node.
+let get_del_nodes_and_fanout_cnt p =
+    let io_info = build_io_tbl p then
+    let chs = io2children io_info then
+    let is_delay p = str_is_substr "draw_idelay " (pexlif_get_name p) in
+    let del_insts = _USE_DELAYS_ => find_all is_delay chs
+				  | (1 upto (length chs))
+    in
+    let get_info inst =
+	let nds = md_expand_vectors (pexlif_get_outs_actuals (el inst chs)) in
+	length nds != 1 =>
+	    eprintf "Instance %d is not single output (%S)" inst nds
+	|
+	let nd = hd nds in
+	let fo = length (get_pt_fanout io_info nd) in
+	(nd, fo)
+    in
+    map get_info del_insts
+;
+
+// Compute the probability that a function f is high assuming all
+// the variables it depends on are high with 0.5 probabilty.
+cletrec b2p f = 
+    f == F => 0.0 |
+    f == T => 1.0 |
+    val (v,H,L) = top_cofactor f in
+    0.5*(b2p L) + 0.5*(b2p H)
+;
+
+// Compute the expected value of a bv if all the variable it
+// depends on are high with 0.5 probabilty.
+cletrec bv2p bv =
+    letrec compute pow (b:bs) =
+	pow * b2p b + (compute (2.0*pow) bs)
+     /\    compute pow [] = 0.0
+    in
+    compute 1.0 (rev (bv2list bv))
+;
+
+// ======================================================================
+// Function to compute average power given a pexlif p and a list
+// of input substitutions,
+//
+// Works for both scalar and symbolic input substitutions.
+// ======================================================================
+let compute_avg_power p inp_subs phase_duration->100 =
+    letrec mk_ant t (sub:subs) =
+	(map (\(n,v). T, n, v, t*phase_duration, (t+1)*phase_duration) sub) @
+	(mk_ant (t+1) subs)
+     /\    mk_ant t [] = []
+    in
+    let ant = mk_ant 0 inp_subs in
+    let ckt = pexlif2fsm p then
+    let max_time = (length inp_subs)*phase_duration in
+    let del_nds_and_fanouts = get_del_nodes_and_fanout_cnt p in
+    let trl = map (\(n,_). n,0,max_time) del_nds_and_fanouts in
+    (update_vossrc "PRINT-TIME" "NO") fseq
+    let ste = STE "-e" ckt [] ant [] trl then
+    let power1 (nd,fout) =
+	let raw_changes = get_trace ste nd in
+	// Remove initial X->binary and last binary->X changes.
+	let changes = tl (butlast raw_changes) in
+	letrec do_one_change ((tb,Hb,Lb):(ta,Ha,La):rem) =
+	    NOT (Hb == NOT Lb) => eprintf "X value at time %d" tb |
+	    NOT (Ha == NOT La) => eprintf "X value at time %d" ta |
+	    // Power estimate: propotional to |events| * (fanout count)
+	    ((Hb XOR Ha) => int2bv fout | int2bv 0):
+	    (do_one_change ((ta,Ha,La):rem))
+	 /\   do_one_change oher = []
+	in
+	do_one_change changes
+    in
+    let pwr_events = flatmap power1 del_nds_and_fanouts in
+    depends pwr_events = [] =>
+	// Scalar run
+	let sum = sitlist (\bv.\r. bv2int bv + r) pwr_events 0 then
+	(int2float sum)/(int2float (length inp_subs))
+    |
+	// Symbolic run
+	length inp_subs != 2 =>
+	    error "Symbolic compute_avg_power needs exactly two vectors"
+	| 
+	let sum = accumulate (defix +) (map bv2p pwr_events) then
+	sum
+;
+
+end_abstype compute_avg_power;
+
+
+// =====================================================================
+// Code from the paper:
+// =====================================================================
+let bv_unsigned = bv_uvector;
+let bv_signed = bv_vector;
+
+
+
+cletrec tc vars f =
+    IF (f == F) THEN 0 ELSE
+    IF (f == T) THEN 2**(length vars) ELSE
+    val (v,H,L) = top_cofactor f in
+    let idx = find_first0 (\s. s = v) vars in
+    let vars' = butfirstn idx vars in
+    let m = 2**(idx-1) in
+    m*((tc vars' H)+(tc vars' L));
+
+clet tc vars f = truth_cover vars f;
+
+// VARS "a b";
+// tc ["a", "b"] (a OR b); // returns 3
+// tc ["a", "b"] T; // returns 4
+// tc ["a", "b"] F; // returns 0
+// tc ["a"] b; // Undefined, crashes
+
+
+letrec random_walk vars bdd =
+  IF vars == [] THEN [] ELSE
+  val (var:rem) = vars in
+  let L = substitute [(var, F)] bdd in
+  let H = substitute [(var, T)] bdd in
+  let Ltc = tc rem L in
+  let Htc = tc rem H in
+  let branch_to_low =
+    (random 0 (Ltc+Htc-1)) < Ltc in
+  IF branch_to_low THEN
+    (var,F) : random_walk rem L
+  ELSE
+    (var,T) : random_walk rem H;
+
+
+letrec sol_i idx vars bdd =
+  IF vars = [] THEN [] ELSE
+  val (v:rem) = vars in
+  let L = substitute [(v, F)] bdd in
+  let H = substitute [(v, T)] bdd in
+  let Ltc = tc rem L in
+  IF (idx < Ltc)
+    THEN (v,F):(sol_i idx rem L)
+    ELSE (v,T):(sol_i (idx-Ltc) rem H);
+
+let tctree vars bdd =
+  let tcov = tc vars bdd in
+  let i = random 0 (tcov-1) in
+  sol_i i vars bdd;
+
+non_lazy tctree;    // <<< Needed to make multiple tctree calls!
+
+
+cletrec ssol_i idx vars bdd =
+  IF (vars = []) THEN [] ELSE
+  val (v:vs) = vars in
+  let L = substitute [(v,F)] bdd in
+  let H = substitute [(v,T)] bdd in
+  let Ltc = int2bv (tc vs L) in
+  IF (idx < Ltc)
+    THEN (v,F):(ssol_i idx vs L)
+    ELSE (v,T):(ssol_i (idx-Ltc) vs H);
+
+let uparam m vars bdd =
+  let tc_bv = int2bv (tc vars bdd) in
+  let idx = (bv_unsigned "u" m) % tc_bv in
+  ssol_i idx vars bdd;
+
+
+
+let cmd = bv_unsigned "cmd" 4;
+let v0001 = int2bv 1; let v0010 = int2bv 2;
+let {fbv1 :: bv} =
+  IF (cmd = v0001) THEN '5 ELSE
+  IF (cmd = v0010) THEN '1 ELSE
+  IF (mutex cmd) THEN '2 ELSE '0;
+
+// let subst [v3,v2,v1,v0] =
+//   substitute [
+//     ("cmd[3]", v3), ("cmd[2]", v2),
+//     ("cmd[1]", v1), ("cmd[0]", v0)
+//   ] fbv1;
+// subst [F,T,F,F]; // <F,T,F>, i.e. 2
+// subst [F,F,F,T]; // <F,T,F,T>, i.e. 5
+// subst [F,F,F,F]; // <F>, i.e. 0
+
+
+let a = bv_signed "a" 8;
+let {fbv2 :: bv} =
+  IF (a >= '-64) AND (a < '63)
+    THEN '2 ELSE '1;
+
+
+let weighted_switch pairs =
+  val (weights, conds) = unzip pairs in
+  let GCD  = accumulate gcd weights in
+  let vars = depends conds in
+  let tcs  = map (truth_cover vars) conds in
+  let TOT  = accumulate lcm tcs in
+  letrec select [] = '0 // pattern matching
+  /\     select ((w,c):rem) =
+    IF c THEN int2bv ((w/GCD)*TOT/(tc vars c))
+         ELSE select rem
+  in
+  select pairs;
+
+let get_new_vars n in_use =
+    letrec try i =
+	let vs = md_expand_vector (sprintf "_s%d[%d:0]" i (n-1)) in
+	vs overlap in_use => try (i+1) | list2bv (F: map variable vs)
+    in
+    try 0
+;
+	
+
+let weighted_switch2 pairs =
+  val (weights, conds) = unzip pairs in
+  let GCD  = accumulate gcd weights in
+  let weights' = map (\n. n/GCD) weights in
+  let tot = accumulate (defix +) weights' in
+  let bits = ubits_needed (tot-1) in
+  let sel_var = get_new_vars bits (depends pairs) then
+  letrec sel cur (w:ws) (c:cs) =
+    let bw = int2bv w in
+    (sel_var < (cur+bw)) => c => int2bv 1 | int2bv 0
+			  | sel (cur+bw) ws cs
+   /\    sel cur [] [] = int2bv 0
+  in
+  sel (int2bv 0) weights' conds
+;
+
+
+let a = bv_unsigned "a" 8;
+let {fbv_fixed :: bv} =
+  weighted_switch [
+    (90, a = '0),
+    (10, a != '0)];
+
+fbv_fixed;
+bv_examples 30 fbv_fixed;
+
+let a = bv_unsigned "a" 8;
+let fbv3 = weighted_switch [
+  (40, a = '0),
+  (25, a = '1),
+  (20, a < '16),
+  (10, a < '64),
+  (5,  a < '256)
+];
+
+
+clet bv_tc vars bv =
+  letrec add_slice pos bits =
+    IF bits = [] THEN '0 ELSE
+    val (b:bs) = bits in
+    (('2**pos)*(tc vars b))+
+    (add_slice (pos + '1) bs)
+  in
+  add_slice '0 (rev (bv2list bv));
+
+
+
+cletrec bv_sol_i idx vars fbv =
+  IF vars = [] THEN [] ELSE
+  val (v:vs) = vars in
+  let L = substitute [(v,F)] fbv in
+  let H = substitute [(v,T)] fbv in
+  let Ltc = bv_tc vs L in
+  IF (idx < Ltc)
+    THEN (v,F):(bv_sol_i idx vs L)
+    ELSE (v,T):(bv_sol_i (idx-Ltc) vs H);
+
+
+let bv_tctree vars fbv =
+  let tc = bv_tc vars fbv in
+  let i = random 0 (tc-1) in
+  bv_sol_i i vars fbv;
+
+non_lazy bv_tctree;
+
+let use_reorder = ref T;
+let reorder_trigger = ref 1000;
+
+let do_reorder_on_demand idx fbv =
+    NOT (deref use_reorder) OR (bdd_size (idx,fbv) < (deref reorder_trigger))
+    => () |
+    val (before, after) = bdd_reorder 2 then
+    (reorder_trigger := (max (max before after) (deref reorder_trigger)))
+;
+
+
+cletrec bv_ssol_i {idx::bv} vars fbv =
+  IF vars = [] THEN [] ELSE
+(do_reorder_on_demand idx fbv) fseq
+  val (v:vs) = vars then
+  let L = substitute [(v,F)] fbv then
+  let H = substitute [(v,T)] fbv then
+  let Ltc = int2bv (bv_tc vs L) then
+  let cmp = idx < Ltc then
+  cmp == T =>
+	let Lres = bv_ssol_i idx vs L then
+	(v,F):Lres
+  |
+  cmp == F =>
+	let rem = idx-Ltc then
+	let Hres = bv_ssol_i rem vs H then
+	(v,T):Hres
+  |
+  let Lres = bv_ssol_i idx vs L then
+  let rem = idx-Ltc then
+  let Hres = bv_ssol_i rem vs H then
+  IF cmp THEN  (v,F):Lres ELSE (v,T):Hres
+;
+
+let bv_uparam m vars fbv =
+  let tc = bv_tc vars fbv then
+  2**m < tc => eprintf "Insufficient m (need at least %d)" (ubits_needed tc)|
+  let idx = (bv_uvector "u" m) % (int2bv tc) then
+  bv_ssol_i idx vars fbv;
+
+
+// ===================================================================
+//	    Examples of using the functions on two adder types
+// ===================================================================
+
+let generate N vars fbv =
+    map (\i. bv_tctree vars fbv) (1 upto N)
+;
+
+
+
+let av = bv_unsigned "a" SZ;
+let bv = bv_unsigned "b" SZ;
+
+var_order (interleave [depends av, depends bv]);
+
+let fbv0 = weighted_switch [(1,T)];
+
+let fbv = weighted_switch [
+			      (30, (av = '0) OR (bv = '0)),
+			      (60, (av < '16) AND (bv < '16)),
+			      (10, T)
+			 ]
+;
+
+
+let vars = depends (av,bv);
+
+
+let inp_subs0 = generate 1000 vars fbv0;
+let inp_subs = generate 1000 vars fbv;
+
+// wtime (inp_subs fseq printf "Time to compute inp_subs\n");
+
+// For Ripple-carry adder
+let rc_add_ckt = my_clean (ripple_carry_adder 'a 'b 'res);
+
+// // For our distribution
+// wtime (compute_avg_power rc_add_ckt inp_subs);
+// // For uniform distribution
+// wtime (compute_avg_power rc_add_ckt inp_subs0);
+
+
+
+// For Carry-select adder
+let cs_add_ckt = my_clean (carry_select_adder 4 'a 'b 'res);
+
+// // For our distribution
+// wtime (compute_avg_power cs_add_ckt inp_subs);
+// // For uniform distribution
+// wtime (compute_avg_power cs_add_ckt inp_subs0);
+
+
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
+let s_inp_subs =
+    let sub0 = bv_uparam 53 vars fbv then
+    let sub1 = bdd_current2next sub0 then
+    [sub0, sub1]
+;
+
+wtime (bdd_size s_inp_subs);
+

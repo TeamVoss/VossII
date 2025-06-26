@@ -73,6 +73,10 @@ set voss2_preferences {
         "Print out information about g.c." "bool"  "FALSE"}
     {"VERBOSE-DYNAMIC-ORDERING" "RCverbose_dynamic_ordering"
         "Print out information about dynamic BDD reordering" "bool"  "TRUE"}
+
+    {"INCLUDE-LINE_NBR-IN-GRAPH-DRAW" "RCinclude_line_nbr_in_GR"
+        "Include line number info during graph visualization" "bool"  "TRUE"}
+
     {"MAXIMUM-NUMBER-ERRORS-REPORTED" "RCmax_nbr_errors"
         "Limit number of error messages for a single command" "int" "5"}
     {"VERBOSE-EVAL-COMMAND" "RCverbose_eval_command"
@@ -104,6 +108,8 @@ set voss2_preferences {
     {"TMP_FILE_DIR" "RC_TMP_FILE_DIR"
         "Directory in which temporary directory will be created"
         "string" "/tmp"}
+
+
 };
 
 lappend voss2_preferences [list "VOSS-LIBRARY-DIRECTORY" "RCDefault_dir" \

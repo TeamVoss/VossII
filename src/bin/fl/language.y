@@ -920,7 +920,7 @@ lhs_expr_list	: arg_expr lhs_expr_list
 			g_ptr res;
 			res = TrArg($1, $2.expr, FALSE);
 			if( res != NULL ) {
-			    Sprintf(buf, "_Q_%d", $2.cnt+1);
+			    Sprintf(buf, "Arg%d", $2.cnt+1);
 			    $$.expr = Make_APPL_ND(res,
 					   Make_VAR_leaf(
 						wastrsave(&strings, buf)));
@@ -1293,7 +1293,7 @@ expr		: LCURL expr TYPE_SEP simple_type RCURL
                     g_ptr res;
                     res = TrArg($2, $6, FALSE);
                     if( res != NULL ) {
-                        Sprintf(buf, "_Q_1");
+                        Sprintf(buf, "Arg1");
                         res = Make_APPL_ND(res,
                                        Make_VAR_leaf(wastrsave(&strings, buf)));
                         Sprintf(buf, "No pattern matched for val expression\n");
@@ -1323,7 +1323,7 @@ expr		: LCURL expr TYPE_SEP simple_type RCURL
                     g_ptr res;
                     res = TrArg($2, $6, FALSE);
                     if( res != NULL ) {
-                        Sprintf(buf, "_Q_1");
+                        Sprintf(buf, "Arg1");
                         res = Make_APPL_ND(res,
                                        Make_VAR_leaf(wastrsave(&strings, buf)));
                         Sprintf(buf, "No pattern matched for val expression\n");
@@ -1344,7 +1344,7 @@ expr		: LCURL expr TYPE_SEP simple_type RCURL
                     g_ptr res;
                     res = TrArg($2, $4, FALSE);
                     if( res != NULL ) {
-                        Sprintf(buf, "_Q_1");
+                        Sprintf(buf, "Arg1");
                         res = Make_APPL_ND(res,
                                        Make_VAR_leaf(wastrsave(&strings, buf)));
                         Sprintf(buf,
@@ -2311,7 +2311,7 @@ make_project_fun(string name, g_ptr pexpr)
     g_ptr res;
     res = TrArg(pexpr, var_expr, FALSE);
     if( res != NULL ) {
-	Sprintf(buf, "_Q_1");
+	Sprintf(buf, "Arg1");
 	res = Make_APPL_ND(res,
 		       Make_VAR_leaf(wastrsave(&strings, buf)));
 	Sprintf(buf, "No pattern matched for val expression\n");

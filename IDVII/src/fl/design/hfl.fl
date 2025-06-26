@@ -1539,7 +1539,12 @@ let TYPE name size =
     fseq (core_TYPE name size T F "") fseq ()
 ;
 
+// Declare a new hw type with name 'name' and size number of bits as width
+// that will be interpreted as a 2-s complement signed bitvector.
 let SIGNED name size = (core_TYPE name size T T "") fseq ();
+
+// Declare a new hw type with name 'name' and size number of bits as width.
+// that will be interpreted as an unsigned bitvector.
 let UNSIGNED name size = (core_TYPE name size T F "") fseq ();
 
 UNSIGNED "bit" 1;
@@ -1921,11 +1926,7 @@ let ENUM_binary name name_list =
 
 let custom_enum_defs = ref {[] :: (string # ((string#int) list)) list};
 
-let ENUM_custom name name_encoding_list =
-    name_encoding_list = [] => error "ENUM must have at least one element" |
-    mem (name,name_encoding_list) (deref custom_enum_defs) => () |
-    let max_code = itlist (\(n,ec).\r. max ec r) name_encoding_list 0 then
-    let sz = ubits_needed max_code in
+let gen_ENUM_custom name name_encoding_list sz =
     let value_list =
 	let mk (n,i) = sprintf "{%d %s}" i n in
 	list2str T "{" "" "}" mk name_encoding_list
@@ -1962,7 +1963,26 @@ let ENUM_custom name name_encoding_list =
     add_item name_encoding_list
 ;
 
-overload ENUM ENUM_binary ENUM_custom;
+let ENUM_custom name name_encoding_list =
+    name_encoding_list = [] => error "ENUM must have at least one element" |
+    mem (name,name_encoding_list) (deref custom_enum_defs) => () |
+    let max_code = itlist (\(n,ec).\r. max ec r) name_encoding_list 0 then
+    let sz = ubits_needed max_code in
+    gen_ENUM_custom name name_encoding_list sz
+;
+
+let ENUM_custom_with_sz name min_sz name_encoding_list =
+    name_encoding_list = [] => error "ENUM must have at least one element" |
+    mem (name,name_encoding_list) (deref custom_enum_defs) => () |
+    let max_code = itlist (\(n,ec).\r. max ec r) name_encoding_list 0 then
+    let sz = ubits_needed max_code in
+    sz > min_sz =>
+	eprintf "ENUM with too small size (needs at least %d)" sz
+    |
+    gen_ENUM_custom name name_encoding_list min_sz
+;
+
+overload ENUM ENUM_binary ENUM_custom ENUM_custom_with_sz;
 
 
 let mutex_enum_defs = ref {[] :: (string # (string list)) list};
@@ -2007,6 +2027,25 @@ let MUTEX_ENUM name name_list =
     add_item 0 name_list
 ;
 
+// Given a name (as a string) for one of the enumerated items, return
+// its value. The return type determines which ENUM value that is selected.
+let enum_value {name::string} =
+    let raw = map tcl2list
+                 (tcl2list (hd (tcl2list (hw_values {'0:: *a}))))
+    in
+    let cnv l =
+        let i = sscanf "%d" (el 1 l) in
+        let name = el 2 l in
+        (name, i)
+    in
+    let sub = map cnv raw in
+    let v = assoc name sub in
+    let sz = hw_size {undefined:: *a} in
+    let w = W_NAMED_CONST name sz v in
+    {hw_constr w:: *a}
+;
+
+
 let --> obj field_fn = field_fn obj;
 infix 9 -->;
 
@@ -2045,20 +2084,13 @@ let struct_defs_ref =
     ref {[] :: ((string# int# ((string#string#(int list)) list)# bool) list)}
 ;
 
-let base_STRUCT_explicit name size field_list do_check =
+let base_STRUCT_explicit type name size field_list do_check =
     let cur = deref struct_defs_ref then
     let idx = find_first0 (\t. fst t = name) cur then
     let bundle = (name,size,field_list,do_check) then
     idx != 0 => ((el idx cur) == bundle) => () |
-	let prStr (nm,sz,flist,check_flag) =
-	    let ptr (f,t,s) = sprintf "%s:%s%S" f t (map int2str s) in
-	    let fls = list2str T "[" ", " "]" ptr flist in
-	    sprintf "STRUCT %s %d %s %B" nm sz fls check_flag
-	in
-	let old = prStr (el idx cur) then
-	let new = prStr bundle then
-	eprintf "Cannot redefine STRUCT.\nOld: %s\nNew: %s\n" old new
-    | 
+	eprintf "Cannot redefine %s.\n" type
+    |
     let new = bundle:cur then
     (struct_defs_ref := new) fseq
     //
@@ -2129,7 +2161,7 @@ let base_STRUCT_explicit name size field_list do_check =
 ;
 
 let STRUCT_explicit name size field_list =
-	base_STRUCT_explicit name size field_list T
+	base_STRUCT_explicit "STRUCT" name size field_list T
 ;
 
 let STRUCT_implicit name field_list =
@@ -2145,10 +2177,28 @@ let STRUCT_implicit name field_list =
      /\     build [] = (0,[])
     in
     val (size, ftb_list) = build field_list then
-    base_STRUCT_explicit name size ftb_list F
+    base_STRUCT_explicit "STRUCT" name size ftb_list F
 ;
 
 overload STRUCT STRUCT_explicit STRUCT_implicit;
+
+let UNION name alternatives =
+    let get_size (field_name, type) =
+        NOT (is_defined (sprintf "BV_%s" type)) =>
+            eprintf "Type %s not defined!" type
+        |
+        get_hw_type_size type
+    in
+    let size = accumulate max (map get_size alternatives) then
+    let build (field_name, type) =
+	let tsize = get_hw_type_size type then
+	let bits = (size-1) downto (size-tsize) in
+	(field_name, type, bits)
+    in
+    let ftb_list = map build alternatives then
+    base_STRUCT_explicit "UNION" name size ftb_list F
+;
+
 
 let bundle_exists name =
     (find_first0 (\p. fst p = name) (deref bundle_decls)) != 0
@@ -3701,18 +3751,8 @@ let INSERT =
         out <- frombits (flatmap mk ((lines-1) -- 0))
 ];
 
-
-
-
-
-let posedge clk = (T,clk);
-let negedge clk = (F,clk);
-
-let always_ff gclk assignments =
-    val (rising,clk) = gclk in
-    let mk (lhs,rhs) =
-        rising => re_ff clk rhs lhs | fe_ff clk rhs lhs
-    in
+let ff_block ff_fn assignments =
+    let mk (lhs,rhs) = ff_fn rhs lhs in
     let ffs = map mk assignments then
     let get_outs (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd fa_outs in
     let raw_outs = setify (md_expand_vectors (flatmap get_outs ffs)) then
@@ -3721,7 +3761,7 @@ let always_ff gclk assignments =
     let outs = md_extract_vectors raw_outs then
     let inps = md_extract_vectors (raw_inps subtract raw_outs) then
     let mk_fa v = (v,[v]) in
-    PINST "always_ff" [] F (map mk_fa inps) (map mk_fa outs) [] (P_HIER ffs)
+    PINST "_WrApPeR_" [] F (map mk_fa inps) (map mk_fa outs) [] (P_HIER ffs)
 ;
 
 let <== {lhs:: *a} {rhs:: *a} = (lhs,rhs);

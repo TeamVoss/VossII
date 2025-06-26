@@ -194,7 +194,7 @@ Tcl_callback_eval(string cmd, int rid, FILE *tcl_fp)
     int fun_idx = get_callback_fun(cmd);
     if( fun_idx < 0 ) {
 	Fail_pr("Not a valid callback function format (%s). WHAT????", cmd);
-	fprintf(tcl_fp,"%d 0%s\n", rid, protect(FailBuf));
+	fprintf(tcl_fp,"%d 0%s\n", rid, protect(FailBuf, NULL));
 	return;
     }
     tstr_ptr tstrings = new_temp_str_mgr();
@@ -214,7 +214,7 @@ Tcl_callback_eval(string cmd, int rid, FILE *tcl_fp)
 	if( *start == 0 ) {
             Fail_pr("Argument %d missing for callback function %s",
 		    arg_cnt+1, tcp->name);
-	    fprintf(tcl_fp,"%d 0%s\n", rid, protect(FailBuf));
+	    fprintf(tcl_fp,"%d 0%s\n", rid, protect(FailBuf, NULL));
             free_temp_str_mgr(tstrings);
 	    return;
 	}
@@ -230,7 +230,7 @@ Tcl_callback_eval(string cmd, int rid, FILE *tcl_fp)
         if( !tcl_to_g_ptr(arg_s, arg_type, &arg) ) {
             Fail_pr("Argument %d is of wrong type in tcl function %s",
                     arg_cnt, tcp->name);
-	    fprintf(tcl_fp,"%d 0%s\n", rid, protect(FailBuf));
+	    fprintf(tcl_fp,"%d 0%s\n", rid, protect(FailBuf, NULL));
             free_temp_str_mgr(tstrings);
 	    return;
         }
@@ -498,7 +498,13 @@ g_ptr2tcl(g_ptr np, typeExp_ptr type, FILE *tcl_fp)
     switch( type->typeOp ) {
         case string_tp:
             {
-		Tcl_printf(tcl_fp, "%s", protect(GET_STRING(np)));
+		string s = GET_STRING(np);
+		bool changed;
+		string s2 = protect(s, &changed);
+		if( changed )
+		    Tcl_printf(tcl_fp, "{%s}", s2);
+		else
+		    Tcl_printf(tcl_fp, "%s", s2);
                 return;
             }
         case void_tp:
@@ -572,7 +578,13 @@ g_ptr2str4tcl(g_ptr np, typeExp_ptr type, tstr_ptr tmp_str_mgr)
     switch( type->typeOp ) {
         case string_tp:
             {
-		gen_tappend(tmp_str_mgr, "%s", protect(GET_STRING(np)));
+		string s = GET_STRING(np);
+		bool changed;
+		string s2 = protect(s, &changed);
+		if( changed )
+		    gen_tappend(tmp_str_mgr, "{%s}", s2);
+		else
+		    gen_tappend(tmp_str_mgr, "%s", s2);
                 return;
             }
         case void_tp:

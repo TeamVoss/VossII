@@ -238,13 +238,6 @@ let STE_debug fsm =
     res
 ;
 
-let VIS fl_function_name =
-    let p = flfun2pexlif_core fl_function_name then
-    let ckt = pexlif2fsm p then
-    STE_debug ckt
-;
-free_binder VIS;
-
 let fl_destroy_vfsm w =
     let raw = deref cur_vfsm then
     let rem = filter (\vfsm. vfsm2id vfsm != w) raw then
@@ -833,7 +826,11 @@ let fl_wv_get_short w vec t =
 	    HL == (T,T) => "X" |
 	    HL == (F,F) => "OVERCONSTRAINED" |
 	    val (H,L) = HL in
-	    (H == NOT L) => "S" |
+	    (H == NOT L) =>
+		let s = bool2str 2 H in
+		NOT (str_is_substr " " s) AND (strlen s < 5) => s |
+		"S"
+	    |
 	    (NOT L AND NOT H) == F =>
 	       H == T => "0X" | 
 	       L == T => "X1" | 
@@ -923,7 +920,10 @@ let fl_get_short_value w vecs compute_alternatives =
 	    HL == (T,T) => "X" |
 	    HL == (F,F) => "OVERCONSTRAINED" |
 	    val (H,L) = HL in
-	    (H == NOT L) => "S" |
+	    (H == NOT L) =>
+		let s = bool2str 2 H in
+		NOT (str_is_substr " " s) AND (strlen s < 5) => s |
+		"S" |
 	    (NOT L AND NOT H) == F =>
 	       H == T => "0X" | 
 	       L == T => "X1" | 
@@ -1152,18 +1152,6 @@ let HL_is_var (H,L) =
     h == T AND l == F
 ;
 
-let trim s =
-    let es = explode s in
-    letrec trim (" ":" ":r) = trim (" ":r)
-     /\    trim (c:cs) = c:trim cs
-     /\    trim [] = []
-    in
-    let es' = trim es in
-    let es' = hd es' = " " => tl es' | es' in
-    let es' = last es' = " " => butlast es' | es' in
-    (implode es')
-;
-
 
 let base_get_complete_value ste vectors t =
     let type = get_ste_type ste then
@@ -1220,7 +1208,9 @@ let base_get_complete_value ste vectors t =
 		[mk_range cur]
 	    in
 	    let raw_res = group [] nds vals then
-	    length raw_res = 1 => list2str T "" "\n" "" id (snd (hd raw_res)) |
+	    length raw_res = 1 =>
+		list2str T "" "\n" "" id (snd (hd raw_res))
+	    |
 	    let slen = (itlist (\p.\m. max (strlen (fst p)) m) raw_res 0)+3 then
 	    let slen = (slen > 40) => 40 | slen in
 	    let p_range (vec,exprs) =
@@ -1307,16 +1297,25 @@ let base_get_complete_value ste vectors t =
 	new_vectors = [] => [] |  flatmap split_multi_dim new_vectors
     in
     vecs = [] => [""] |
-    let len = sitlist (\v.\r. max r (strlen v)) vecs 0 in
-    let do1 v =
-	let res = process v then
-	str_is_substr "\n" res =>
-	    sprintf "%-*s:\n%s" len v res
-	|
-	    sprintf "%-*s: %s" len v res
+    let raw_res = map (\v. v, process v) vecs then
+    letrec compress vecs cres ((v,r):rem) =
+	cres = r => compress (v:vecs) cres rem |
+	vecs = [] => (compress [v] r rem) |
+	((hd (md_merge_vectors (rev vecs))),cres):(compress [v] r rem)
+      /\   compress vecs cres [] = vecs = [] => [] |
+		[((hd (md_merge_vectors (rev vecs))), cres)]
     in
-    map do1 vecs
+    let cres = compress [] "" raw_res then
+    let len = 1+(sitlist (\(v,_).\r. max r (strlen v)) cres 0) in
+    let do1 (v,res) =
+	str_is_substr "\n" res =>
+	    sprintf "%-*s\n%s" len (v^":") res
+	|
+	    sprintf "%-*s %s" len (v^":") res
+    in
+    map do1 cres
 ;
+
 
 let fl_get_complete_value canvas tag =
     let ste = canvas2ste canvas then
@@ -1558,7 +1557,10 @@ let base_get_waveform w vec min_time max_time show_depend =
                 HL == (T,T) => "X" |
                 HL == (F,F) => "*" |
                 val (H,L) = HL in
-                (H == NOT L) => "S" |
+                (H == NOT L) =>
+		    let s = bool2str 2 H in
+		    NOT (str_is_substr " " s) AND (strlen s < 5) => s |
+		    "S" |
                 (NOT L AND NOT H) == F =>
                    H == T => "S0X" |
                    L == T => "SX1" |
@@ -2101,3 +2103,50 @@ let draw_show_dependencies {vis::vfsm} c show =
 	"update"]
     ) fseq ())
 ;
+
+
+
+
+begin_abstype;
+let current_vis_r = ref {[] :: (pexlif#vfsm) list};
+
+let update_current_vis p vis =
+    let old = filter (\c. fst c != p) (deref current_vis_r) then
+    let new = (p,vis):old then
+    (current_vis_r := new)
+;
+
+let get_current_vis p =
+    let idx = find_first0 (\c. fst c == p) (deref current_vis_r) then
+    idx = 0 => eprintf "No visualization for this circuit is active" |
+    snd (el idx (deref current_vis_r))
+;
+
+end_abstype update_current_vis get_current_vis;
+
+// Visualize an pexlif provided as a fl function that return a pexlif.
+// If pre_load is T, then start with top-level visualized and
+// inputs & outputs added to the waveform viewer.
+let VIS fl_function_name pre_load->T =
+    let p = flfun2pexlif_core fl_function_name then
+    let ckt = pexlif2fsm p then
+    let vis = STE_debug ckt then
+    NOT pre_load => vis |
+    let inps = qsort node_name_cmp (md_extract_vectors (inputs ckt)) then
+    let outs = qsort node_name_cmp (md_extract_vectors (outputs ckt)) then
+    (draw_fanin vis (0) 100 (md_extract_vectors (outputs ckt))) fseq
+    (add_waveform vis inps) fseq
+    (add_waveform vis outs) fseq
+    (update_current_vis p vis) fseq
+    vis
+;
+free_binder VIS;
+
+
+let simulate fl_function_name ant =
+    let p = flfun2pexlif_core fl_function_name then
+    let vis = get_current_vis p then
+    STE "-e" vis [] ant [] []
+;
+free_binder simulate;
+

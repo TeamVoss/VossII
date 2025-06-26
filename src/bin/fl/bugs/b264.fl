@@ -1,0 +1,193 @@
+let build_sub {vars::string list} bv =
+    let n = length vars in
+    let raw = (replicate n F)@(bv2list bv) in
+    zip vars (lastn n raw)
+;
+
+clet mk_idx0 sel_vars = list2bv (F:(map variable sel_vars));
+
+clet substitute1 sub {f::bool} = substitute sub f;
+
+let use_reorder = ref T;
+let reorder_trigger = ref 10000;
+
+clet sub_substitute sub {l:: (string#bool) list} =
+    (NOT (deref use_reorder) OR
+         (bdd_size (sub,l) < (deref reorder_trigger))
+        => ()
+    |
+        val (before, after) = bdd_reorder 2 then
+        (reorder_trigger := (max (max before after) (deref reorder_trigger)))
+    ) fseq
+//    substitute sub l
+    map (\(v,e). v, substitute1 sub e) l
+;
+
+let memo_tbl = ref {(tbl_create 1000) :: {((string list)#bool),((string#bool) list)} tbl};
+
+forward_declare {upar::(string list)->bv->(string list)->bool->((string#bool) list)};
+
+
+let upar sel_vars idx vars f =
+    let tbl = deref memo_tbl then
+    let key = (vars,f) in
+    tbl_member tbl key => tbl_get tbl key |
+    let record res =
+        let tbl = deref memo_tbl then
+        let tbl' = tbl_insert tbl key res then
+        (memo_tbl := tbl') fseq
+        res
+    in
+    vars = [] => record [] |
+    f == T => record (build_sub vars idx) |
+    val (v:vs) = vars in
+    let idx0 = mk_idx0 sel_vars then
+    let L = substitute [(v,F)] f in
+    let H = substitute [(v,T)] f in
+    L == F => record ((v,T):(upar sel_vars idx0 vs H)) |
+    H == F => record ((v,F):(upar sel_vars idx0 vs L)) |
+    let Ltc = truth_cover vs L in
+    let Htc = truth_cover vs H in
+    Ltc >= Htc =>
+        let Lcnt = int2bv Ltc in
+        let Hsub = build_sub sel_vars (bv_sub idx Lcnt) then
+        let in_low = idx < Lcnt then
+        let Lres = upar sel_vars idx0 vs L then
+        let Hres = sub_substitute Hsub (upar sel_vars idx0 vs H) then
+        record ((v,NOT in_low):(in_low => Lres | Hres))
+    |
+        let Hcnt = int2bv Htc in
+        let Lsub = build_sub sel_vars (bv_sub idx Hcnt) then
+        let in_low = idx < Hcnt then
+        let Hres = upar sel_vars idx0 vs H then
+        let Lres = sub_substitute Lsub (upar sel_vars idx0 vs L) then
+        record ((v,in_low):(in_low => Hres | Lres))
+;
+
+forward_declare {mk_sub_rec :: (string list)->int->bv};
+clet mk_sub_rec vars M =
+    M == 0 => int2bv 0 |
+    let mid = M/2 in
+    val (v:vs) = vars in
+    let Hres = mk_sub_rec vs mid then
+    let Lres = bv_add (int2bv (mid+1)) (mk_sub_rec vs (M-mid-1)) then
+    variable v => Hres | Lres
+;
+
+let mk_sub vars n =
+    let half = (length vars)/2 in
+    let sel_vars = interleave [firstn half vars, butfirstn half vars] in
+    (var_order sel_vars) fseq
+    let bv = mk_sub_rec vars (n-1) then
+    zip {vars::string list} (tl (bv2list bv))
+;
+
+
+let uniform_param expansion_factor vars f =
+    expansion_factor < 1 =>
+        eprintf "Expandsion_factor (%d) must be >= 1" expansion_factor
+    |
+    f == F =>
+        error "uniform_param called for F"
+    |
+    (depends f) subtract vars != [] =>
+        eprintf "uniform_param: f depends on variable(s) not in vars (%S)"
+        ((depends f) subtract vars)
+    |
+    // Make sure variable are in BDD order
+    (memo_tbl := tbl_create 1000) fseq
+    f fseq
+    let vars = depends (itlist (\v.\r. variable v AND r) vars T) then
+    //
+    let cnt      = truth_cover vars f in
+    let needed   = (ubits_needed (cnt-1))+(expansion_factor-1) in
+    let sel_vars = map (sprintf "_T[%d]") (1--needed) then
+    let idx0 = mk_idx0 sel_vars then
+    let raw_res = upar sel_vars idx0 vars f in
+    (memo_tbl := tbl_create 1000) fseq
+    let sub = mk_sub sel_vars cnt then
+    let sub = build_sub sel_vars (bv_mod idx0 (int2bv cnt)) then
+    let res = sub_substitute sub raw_res then
+    (memo_tbl := tbl_create 1000) fseq
+    res
+;
+
+let make_conds_mutex weigth_cond_list =
+    let GCD = accumulate gcd (map fst weigth_cond_list) in
+    letrec update cond ((w,c):rem) =
+        (w/GCD, cond AND c):(update (cond AND NOT c) rem)
+     /\    update cond [] = []
+    in
+    update T weigth_cond_list
+;
+
+let non_uniform_param expansion_factor vars weigth_cond_list =
+    let missing = (depends weigth_cond_list) subtract vars in
+    missing != [] => eprintf "Missing variables (%S)\n" missing |
+    let wcl = make_conds_mutex weigth_cond_list in
+    let tot = itlist (\(w,_).\r. w+r) wcl 0 in
+    let bits = ubits_needed (tot-1) in
+    2**bits != tot => eprintf "Sum of weights (%d) not a power of 2.\n" tot |
+    let choice = bv_uvector "_Sel" bits in
+    let subs = map (\(w,c). uniform_param expansion_factor vars c) wcl then
+    letrec mk_sel cur ((w,c):rem) =
+        ((int2bv cur <= choice) AND (choice < int2bv (cur+w))):
+        (mk_sel (cur+w) rem)
+     /\    mk_sel cur [] = []
+    in
+    let sels = mk_sel 0 wcl then
+    letrec mk_res (sel:sels) (sub:subs) =
+        sel => sub | mk_res sels subs
+     /\    mk_res [] [] = []
+    in
+    mk_res sels subs
+;
+
+// Experiment...
+
+let x = bv_uvector "x" 8;
+let y = bv_uvector "y" 8;
+let vars = depends (x,y);
+
+let wcl = [
+            (1, x <= '2),
+            (5, (x > '2) AND (x < y)),
+            (10, (x > '2) AND (x >= y))
+];
+
+let result2 = non_uniform_param 1 vars wcl;
+
+//wtime (result2 fseq 1);
+
+
+
+// SIMPLER...
+let non_uniform_param sel_bits vars wcl =
+    let choice = bv_uvector "_Sel" sel_bits in
+    letrec mk_res lower ((w,c):rem) =
+	let sub = uniform_param 1 vars c then
+	let sel = (int2bv lower <= choice)
+		  AND
+		  (choice < int2bv (lower+w))
+	in
+	let rem_res = mk_res (lower+w) rem in
+	sel => sub | rem_res
+      /\  mk_res lower [] = []
+    in
+    mk_res 0 wcl
+;
+
+let x = bv_uvector "x" 8;
+let y = bv_uvector "y" 8;
+let vars = depends (x,y);
+
+let wcl = [
+            (1, x <= '2),
+            (5, (x > '2) AND (x < y)),
+            (10, (x > '2) AND (x >= y))
+];
+
+let result2 = non_uniform_param 1 vars wcl;
+
+wtime (result2 fseq 1);
+

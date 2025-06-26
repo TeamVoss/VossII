@@ -996,8 +996,9 @@ setup_sockets()
 
 
 string
-protect(string txt)
+protect(string txt, bool *changedp)
 {
+    bool changed = FALSE;
     tstr_ptr tp = new_temp_str_mgr();
     char tbuf[10];
     string p = txt;
@@ -1022,6 +1023,7 @@ protect(string txt)
                 Sprintf(tbuf, "\\u%04x", ((unsigned int) *p));
                 res = gen_strappend(tp, tbuf);
                 p++;
+		changed = TRUE;
                 break;
             case '\\':
                 p++;
@@ -1041,6 +1043,7 @@ protect(string txt)
                 Sprintf(tbuf, "\\u%04x", ((unsigned int) *p));
                 res = gen_strappend(tp, tbuf);
                 p++;
+		changed = TRUE;
                 break;
             default:
                 res = gen_charappend(tp, *p);
@@ -1050,6 +1053,7 @@ protect(string txt)
     }
     res = strtemp(res);
     free_temp_str_mgr(tp);
+    if( changedp != NULL ) { *changedp = changed; }
     return res;
 }
 
@@ -1078,7 +1082,7 @@ unprotect(string txt)
 void
 Info_to_tcl(string cmd)
 {
-    fprintf(to_tcl_fp, "%s\n", protect(cmd));
+    fprintf(to_tcl_fp, "%s\n", protect(cmd, NULL));
     fflush(to_tcl_fp);
 }
 
@@ -1089,7 +1093,7 @@ Send_to_tcl(string cmd, string *resp)
     int tcl_eval_depth = COUNT_BUF(&tcl_eval_done_buf);
     push_buf(&tcl_eval_done_buf, &done);
     push_buf(&tcl_eval_result_buf, &s_empty_string);
-    fprintf(sync_to_tcl_fp, "%d %s\n", tcl_eval_depth, protect(cmd));
+    fprintf(sync_to_tcl_fp, "%d %s\n", tcl_eval_depth, protect(cmd, NULL));
     fflush(sync_to_tcl_fp);
     // Now enter an event loop processing (potential) fl callbacks while
     // waiting for the return result
@@ -1224,14 +1228,14 @@ process_commands(string bufp, bool verbose)
 			string nb = cur_start;
 			while( *nb && isspace(*nb) ) nb++;
 			if( strncmp(nb, "set_file_name \"", 15) == 0 ) {
-			    string pcmd = protect(nb);
+			    string pcmd = protect(nb, NULL);
 			    fprintf(to_tcl_fp, "WriteInfo {%s}\n", pcmd);
 			} else
 			if( strncmp(nb, "set_line_number ", 16) == 0 ) {
-			    string pcmd = protect(nb);
+			    string pcmd = protect(nb, NULL);
 			    fprintf(to_tcl_fp, "WriteInfo {%s}\n", pcmd);
 			} else {
-			    string pcmd = protect(make_tcl_safe(nb));
+			    string pcmd = protect(make_tcl_safe(nb), NULL);
 			    fprintf(to_tcl_fp, "WriteStdIn {%s}\n", pcmd);
 			    fprintf(to_tcl_fp, "WriteNewLine {}\n");
 			}

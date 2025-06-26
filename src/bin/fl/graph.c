@@ -187,6 +187,7 @@ static struct prim_fun_name_rec {
 		    {P_FORALL, "P_FORALL", ""},
 		    {P_THEREIS, "P_THEREIS", ""},
 		    {P_PRINT, "P_PRINT", ""},
+		    {P_DEBUG, "P_DEBUG", ""},
 		    {P_IDENTICAL, "P_IDENTICAL", "=="},
 		    {P_STRING_HD, "P_STRING_HD", ""},
 		    {P_STRING_TL, "P_STRING_TL", ""},
@@ -256,7 +257,6 @@ static struct prim_fun_name_rec {
 		    {P_NAMED_ARG, "P_NAMED_ARG", ""},
 		    // Empty
 };
-static char pfn2str_buf[512];
 
 /************************************************************************/
 /*			Local Functions					*/
@@ -924,7 +924,7 @@ Make_arglist(int cnt)
 
     if( cnt == 0 )
 	return(Make_NIL());
-    Sprintf(buf, "_Q_%d", cnt);
+    Sprintf(buf, "Arg%d", cnt);
     name = wastrsave(&strings, buf);
     return( Make_2inp_Primitive(P_STRICT_TUPLE, Make_VAR_leaf(name),
 					 Make_arglist(cnt-1)) );
@@ -939,7 +939,7 @@ Add_args(int cnt, g_ptr expr)
     if( cnt == 0 )
 	return(expr);
 
-    Sprintf(buf, "_Q_%d", cnt);
+    Sprintf(buf, "Arg%d", cnt);
     name = wastrsave(&strings, buf);
     return( Make_Lambda(name, Add_args(cnt-1,expr)) );
 }
@@ -1889,15 +1889,18 @@ type2str(int type)
 }
 
 static string
-leaftype2str(int leaftype)
+leaftype2str(g_ptr np)
 {
+    int leaftype = GET_LEAF_TYPE(np);
     switch (leaftype ) {
 	case INT: return s_INT;
 	case STRING: return s_STRING;
 	case BOOL: return s_BOOL;
 	case BEXPR: return s_BEXPR;
 	case EXT_OBJ: return s_EXT_OBJ;
-	case PRIM_FN: return s_PRIM_FN;
+	case PRIM_FN: {
+	    return( Get_pfn_name(np, FALSE) );
+	}
 	case VAR: return s_VAR;
 	case USERDEF: return s_USERDEF;
 	default: DIE("Illegal type");
@@ -1914,7 +1917,7 @@ leaftype2str(int leaftype)
 #else
 #define FAIL_GM2(l,r,msg) {						    \
 			res = Make_0inp_Primitive(P_FAIL);		    \
-   SET_FAIL_STRING(res,wastrsave(&strings, Fail_pr("Structural mismatch in %s\n", ip->parent_op)));\
+   SET_FAIL_STRING(res,wastrsave(&strings, Fail_pr("Structural mismatch in %s\n(%s)\n", ip->parent_op, (msg))));\
 			return res;					    \
 		      }
 #endif
@@ -1927,7 +1930,7 @@ gen_map2_rec(gmap_info_ptr ip, g_ptr l, g_ptr r)
 	if( r == NULL )
 	    return NULL;
 	else {
-	    FAIL_GM2(l,r,"l = NULL but r != NULL");
+	    FAIL_GM2(l,r, "l = NULL but r != NULL");
 	}
     }
     if( r == NULL ) {
@@ -1937,17 +1940,14 @@ gen_map2_rec(gmap_info_ptr ip, g_ptr l, g_ptr r)
     if( IS_NONE(l) ) { l = r; } else if( IS_NONE(r) ) { r = l; }
     //
     if( GET_TYPE(l) != GET_TYPE(r) ) {
-	char msg[100];
-	Sprintf(msg, "TYPE(l)=%s but TYPE(r)=%s", type2str(GET_TYPE(l)),
-						  type2str(GET_TYPE(r)));
-	FAIL_GM2(l,r,msg);
+	Fail_pr("Structural mismatch in %s\nTYPE(l)=%s but TYPE(r)=%s\n",
+		ip->parent_op, type2str(GET_TYPE(l)), type2str(GET_TYPE(r)));
+	FAIL_GM2(l,r,FailBuf);
     }
     if( IS_LEAF(l) && (GET_LEAF_TYPE(l) != GET_LEAF_TYPE(r)) ) {
-	char msg[100];
-	Sprintf(msg, "LEAFTYPE(l)=%s but LEAFTYPE(r)=%s",
-		     leaftype2str(GET_LEAF_TYPE(l)),
-		     leaftype2str(GET_LEAF_TYPE(r)));
-	FAIL_GM2(l,r,msg);
+	Fail_pr("Structural mismatch in %s\nLEAFTYPE(l)=%s but LEAFTYPE(r)=%s",
+		ip->parent_op, leaftype2str(l), leaftype2str(r));
+	FAIL_GM2(l, r, FailBuf);
     }
     // Was this combination of l and r already computed
     gmap2_rec tmp;
@@ -2009,10 +2009,10 @@ gen_map2_rec(gmap_info_ptr ip, g_ptr l, g_ptr r)
 			INC_REFCNT(l);
 			return( l );
 		    }
-		    FAIL_GM2(l,r,"IS_NIL(l) but IS_CONS(r)");
+		    FAIL_GM2(l,r,"Arg1 = [] but Arg2 != []");
 		}
 		if( IS_NIL(r) ) {
-		    FAIL_GM2(l,r,"IS_CONS(l) but IS_NIL(r)");
+		    FAIL_GM2(l,r,"Arg1 != [] but Arg2 = []");
 		}
 		res = Make_CONS_ND(NULL, NULL);
 		PUSH_GLOBAL_GC(res);
@@ -2285,30 +2285,61 @@ gen_map_rec(gmap_info_ptr ip, g_ptr node)
 string
 Get_pfn_name(g_ptr np, bool verbose_debug)
 {
+    string pfn2str_buf = NULL;
     int pfn = GET_PRIM_FN(np);
     switch ( pfn ) {
+	case P_FAIL: {
+	    string s = GET_FAIL_STRING(np);
+	    int len = strlen(s);
+	    pfn2str_buf = Calloc(len+20);
+	    Sprintf(pfn2str_buf, " (P_FAIL \"%s\"\n)", GET_FAIL_STRING(np));
+	    return pfn2str_buf;
+	}
 	case P_DEBUG:
 	    if( verbose_debug ) {
+		string s = GET_DEBUG_STRING(np);
+		int len = strlen(s);
+		pfn2str_buf = Calloc(len+4);
 		Sprintf(pfn2str_buf, "<%s>", GET_DEBUG_STRING(np));
+		return pfn2str_buf;
 	    } else {
-		Sprintf(pfn2str_buf, "P_DEBUG");
+		break;
 	    }
-	    return pfn2str_buf;
-	case P_PRINTF:
+	case P_PRINTF: {
+	    string s = GET_PRINTF_STRING(np);
+	    int len = strlen(s);
+	    pfn2str_buf = Calloc(len+20);
 	    Sprintf(pfn2str_buf, " (printf \"%s\"\n)", GET_PRINTF_STRING(np));
 	    return pfn2str_buf;
-	case P_SPRINTF:
+	}
+	case P_SPRINTF: {
+	    string s = GET_PRINTF_STRING(np);
+	    int len = strlen(s);
+	    pfn2str_buf = Calloc(len+20);
 	    Sprintf(pfn2str_buf, " (Sprintf \"%s\"\n)", GET_PRINTF_STRING(np));
 	    return pfn2str_buf;
-	case P_EPRINTF:
+	}
+	case P_EPRINTF: {
+	    string s = GET_PRINTF_STRING(np);
+	    int len = strlen(s);
+	    pfn2str_buf = Calloc(len+20);
 	    Sprintf(pfn2str_buf, " (Eprintf \"%s\"\n)", GET_PRINTF_STRING(np));
 	    return pfn2str_buf;
-	case P_FPRINTF:
+	}
+	case P_FPRINTF: {
+	    string s = GET_PRINTF_STRING(np);
+	    int len = strlen(s);
+	    pfn2str_buf = Calloc(len+20);
 	    Sprintf(pfn2str_buf, " (fprintf \"%s\"\n)", GET_PRINTF_STRING(np));
 	    return pfn2str_buf;
-	case P_SSCANF:
+	}
+	case P_SSCANF: {
+	    string s = GET_PRINTF_STRING(np);
+	    int len = strlen(s);
+	    pfn2str_buf = Calloc(len+20);
 	    Sprintf(pfn2str_buf, " (sscanf \"%s\"\n)", GET_PRINTF_STRING(np));
 	    return pfn2str_buf;
+	}
 	default:
 	    break;
     }
@@ -2668,7 +2699,7 @@ type_constr_rec(int cnt, int arg_cnt, g_ptr constr)
 
     if( cnt > arg_cnt )
 	return( constr );
-    Sprintf(buf, "_Q_%d", cnt);
+    Sprintf(buf, "Arg%d", cnt);
     name = wastrsave(&strings, buf);
     return(Make_2inp_Primitive(P_TUPLE,
 			       type_constr_rec(cnt+1, arg_cnt, constr),
@@ -5480,7 +5511,7 @@ pat_match_rec(g_ptr arg, g_ptr E, int cnt, string *name, int *tot_cnt)
 	res = TrArg(GET_APPLY_RIGHT(arg), E, FALSE);
 	if( res == NULL )
 	    return( NULL );
-	Sprintf(buf, "_Q_%d", cnt);
+	Sprintf(buf, "Arg%d", cnt);
 	res = Make_APPL_ND(res, Make_VAR_leaf(wastrsave(&strings, buf)));
 	return( pat_match_rec(GET_APPLY_LEFT(arg), res, cnt+1, name, tot_cnt) );
     }

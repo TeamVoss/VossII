@@ -2326,6 +2326,54 @@ proc draw_ram {name n c tag x y} {
     return [list $inp_locs [list $x $y]]
 }
 
+proc draw_RAM {name n c tag x y} {
+    global gcolor mfont sfont fc
+    #
+    set d [expr (1.3*[min_sep $c])]
+    # 
+    add_value_field $c $tag $x $y
+    #
+    set x1 [expr round($x-10*$d)]
+    set x2 [expr round($x-8*$d)]
+    set x25 [expr round($x-6*$d)]
+    set x3 [expr round($x-4*$d)]
+    set x3b [expr round($x-4*$d)]
+    set x4 [expr round($x-2*$d)]
+    set y1 [expr round($y-9*$d)]
+    set y2 [expr round($y-7*$d)]
+    set y3 [expr round($y-5*$d)]
+    set y4 [expr round($y+5*$d)]
+    set y5 [expr round($y+7*$d)]
+    set y6 [expr round($y+9*$d)]
+    set y7 [expr round($y+11*$d)]
+    #
+    $c create rectangle $x2 $y4 $x $y2 -outline $gcolor -fill $fc -tags $tag
+    $c create rectangle $x1 $y5 $x4 $y3 -outline $gcolor -fill $fc -tags $tag
+    $c create line $x1 $y6 $x2 $y6 $x2 $y5 -fill $gcolor
+    $c create line $x1 $y1 $x3b $y1 $x3b $y2 -fill $gcolor -width 3
+    add_font_tags $c [$c create text $x1 $y -anchor w \
+			-font $mfont($c) -text di -tags $tag] _IsTeXt_
+    add_font_tags $c [$c create text $x $y -anchor e \
+			-font $mfont($c) -text do -tags $tag] _IsTeXt_
+    add_font_tags $c [$c create text $x2 $y5 -anchor s \
+			-font $mfont($c) -text wr -tags $tag] _IsTeXt_
+    add_font_tags $c [$c create text $x3b $y2 -anchor w \
+			-font $mfont($c) -text " addr" -tags $tag \
+			-angle 270] _IsTeXt_
+    add_font_tags $c [$c create text $x1 $y3 -anchor nw \
+			-font $sfont($c) -text 0 -tags $tag] _IsTeXt_
+    add_font_tags $c [$c create text $x2 $y2 -anchor nw \
+			-font $sfont($c) -text [expr $n-1] -tags $tag] _IsTeXt_
+    add_font_tags $c [$c create text $x25 [expr $y+2*$d] \
+			-anchor n -justify center \
+			-font $mfont($c) -text $name -tags $tag] _IsTeXt_
+    lappend inp_locs $x1 $y1 $x1 $y $x1 $y6
+    draw_three_dots $c $x1 $y3 $x2 $y2 $tag
+    draw_three_dots $c $x4 $y5 $x $y4 $tag
+    draw_three_dots $c $x4 $y3 $x $y2 $tag
+    return [list $inp_locs [list $x $y]]
+}
+
 proc draw_mem_write {n c tag x y} {
     global gcolor mfont fc
     #
