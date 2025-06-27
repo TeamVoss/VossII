@@ -1,3 +1,6 @@
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+let ARGS = [];	// TO BE REMOVED!!!!
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 length ARGS  != 1 => error "Usage: fl -f new_yaccfl.fl <yfl_file>" | ();
 
@@ -61,14 +64,14 @@ let extract_scanner start_line lines =
 	str_reg_match pat3 s =>
 	    val [_,pat,token,init] = str_reg_extract pat3 s in
 	    (add_token token) fseq
-	    sprintf "%s  { BEGIN %s; RET(%s); }" pat init token
+	    pat, (sprintf "{ BEGIN %s; RET(%s); }" init token)
 	|
 	str_reg_match pat2 s =>
 	    val [_,pat,token] = str_reg_extract pat2 s in
 	    (add_token token) fseq
-	    sprintf "%s  { RET(%s); }" pat token
+	    pat, (sprintf "{ RET(%s); }" token)
 	|
-	s
+	(s,"")
     in
     let prelude =
 	[
@@ -97,7 +100,10 @@ let extract_scanner start_line lines =
 	    "    return(1);",
 	    "}"
 	] in
-    let res' = prelude @ (map process res) @ postlude in
+    let raw_out = map process res in
+    let max_len = itlist (\(p,c).\r. max r (strlen p)) raw_out 1 in
+    let out = map (\(p,r). sprintf "%*s  %s" max_len p r) raw_out in
+    let res' = prelude @ out @ postlude in
     let all_tokens = rev (setify (deref tokensr)) in
     let base = deref base_name then
     let pr fp s = fprintf fp "%s" s in
@@ -289,10 +295,5 @@ let parse_yfl yfl_file =
 ;
 
 
-parse_yfl "ex/dot.yfl";
+parse_yfl "tmp/dot.yfl";
  
-
-
-
-
-

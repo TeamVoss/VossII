@@ -1,3 +1,87 @@
+let do_debug = F;
+
+let base_name = ref "/tmp/_qQq";
+
+let err line msg =
+    eprintf "Syntax error around line %d in file %s.yfl\n%s\n" line
+            (deref base_name) msg
+;
+
+rvariable "a";
+
+let extract_scanner start_line lines =
+    let sidx = find_first0 (str_reg_match "%%SCANNER") lines in
+    sidx = 0 => err start_line "Missing %%SCANNER" |
+    let pidx = find_first0 (str_reg_match "%%PARSER") lines in
+    pidx = 0 => err start_line "Missing %%PARSER" |
+    let res = butfirstn sidx (firstn (pidx-1) lines) in
+    let rem = butfirstn (pidx-1) lines in
+    let ridx = find_first0 (str_reg_match "^%%") res in
+    ridx = 0 => err start_line "Missing %% in SCANNER section" |
+    let base = firstn ridx res in
+    let rules = butfirstn ridx res in
+    let tokensr = ref [] in
+    let add_token token = tokensr := (token:(deref tokensr)) in
+    let process s =
+        let pat3 = "^([^ \t]*)[ \t]+([^ \t]+)[ \t]+([^ \t]+)$" in
+        let pat2 = "^([^ \t]*)[ \t]+([^ \t]+)$" in
+        str_reg_match pat3 s =>
+            val [_,pat,token,init] = str_reg_extract pat3 s in
+            (add_token token) fseq
+            pat, (sprintf "{ BEGIN %s; RET(%s); }" init token)
+        |
+        str_reg_match pat2 s =>
+            val [_,pat,token] = str_reg_extract pat2 s in
+            (add_token token) fseq
+            pat, (sprintf "{ RET(%s); }" token)
+        |
+        (s,"")
+    in
+    let prelude =
+        [
+            "%{",
+            "#include <stdlib.h>",
+            "#include \"y.tab.h\"",
+            "",
+            "extern nd_ptr yylval;",
+            "nd_ptr SaveStr(char *s);",
+            (do_debug =>
+                "#define RET(tk) fprintf(stderr, \"Lex: |%%s| -> %%d in state %%d\\n\",yytext, tk, YY_START); yylval = SaveStr(yytext); return(tk);"
+            |
+                "#define RET(tk) yylval = SaveStr(yytext); return(tk);"
+            ),
+            "%}",
+            ""
+        ]
+    in
+    let postlude =
+        [
+            "%%",
+            "",
+            "int",
+            "yywrap()",
+            "{",
+            "    return(1);",
+            "}"
+        ] in
+    let raw_out = map process res in
+    let max_len = itlist (\(p,_).\r. max r (strlen p)) raw_out 1 in
+    let out = map (\(p,r). sprintf "%*%s  %s" p max_len r) raw_out in
+    let res' = prelude @ out @ postlude in
+    let all_tokens = rev (setify (deref tokensr)) in
+    let base = deref base_name then
+    let pr fp s = fprintf fp "%s" s in
+    let lfp = fopen (base^".l") "w" then
+    (list2fp lfp T "" "\n" "\n" pr res') fseq
+    (fclose lfp) fseq
+    (all_tokens, rem)
+;
+
+
+
+
+
+
 
 let sum i j = {i::int} + j;
 

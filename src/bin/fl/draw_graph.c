@@ -401,7 +401,7 @@ draw_graph_rec(FILE *fp, hash_record *hp, int depth, bool do_addr,
 					 GET_PRINTF_STRING(node), opt_line_nbr);
 				break;
 			    case P_SPRINTF:
-				Sprintf(txt, "srintf \\\"%s\\\"%s\n)",
+				Sprintf(txt, "sprintf \\\"%s\\\"%s\n)",
 					 GET_PRINTF_STRING(node), opt_line_nbr);
 				break;
 			    case P_EPRINTF:

@@ -4,5 +4,5 @@ break abort
 break Dbg_stop
 break Rand_Var
 r -noX -f bugs/b265.fl
-break find_actual_arg_name_and_print_context
+break report_failure
 c

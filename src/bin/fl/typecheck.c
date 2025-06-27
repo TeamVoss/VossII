@@ -1365,6 +1365,46 @@ find_actual_arg_name_and_print_context(g_ptr node, string old_name)
     return old_name;
 }
 
+static g_ptr
+find_near_leaf(g_ptr node) {
+    if( node == NULL ) return node;
+    switch ( GET_TYPE(node) ) {
+	case LEAF: { return node; }
+	case LAMBDA_ND: { return( GET_LAMBDA_VAR_LEAF(node) ); }
+        case APPLY_ND: {
+	    g_ptr lres = find_near_leaf(GET_APPLY_LEFT(node));
+	    g_ptr rres = find_near_leaf(GET_APPLY_RIGHT(node));
+	    if( lres != NULL && IS_LEAF(lres) ) {
+		if( rres != NULL && IS_LEAF(rres) ) {
+		    if( GET_LINE_NBR(lres) < GET_LINE_NBR(rres) ) {
+			return lres;
+		    } else {
+			return rres;
+		    }
+		}
+		return lres;
+	    }
+	    return rres;
+	}
+	case CONS_ND: {
+	    g_ptr lres = find_near_leaf(GET_CONS_HD(node));
+	    g_ptr rres = find_near_leaf(GET_CONS_TL(node));
+	    if( lres != NULL && IS_LEAF(lres) ) {
+		if( rres != NULL && IS_LEAF(rres) ) {
+		    if( GET_LINE_NBR(lres) < GET_LINE_NBR(rres) ) {
+			return lres;
+		    } else {
+			return rres;
+		    }
+		}
+		return lres;
+	    }
+	    return rres;
+	}
+	default:
+	    DIE("Cannot happen");
+    }
+}
 static void
 report_failure(node_type_ptr cur, typeExp_ptr type, typeExp_ptr expected_type)
 {
@@ -1499,31 +1539,7 @@ report_failure(node_type_ptr cur, typeExp_ptr type, typeExp_ptr expected_type)
     }
 
     // Try to find a leaf node to get a line number
-    while( !IS_LEAF(node) && !IS_NIL(node) ) {
-	if( IS_APPLY(node) ) {
-	    node = GET_APPLY_LEFT(node);
-	} else if( IS_CONS(node) ) {
-	    node = GET_CONS_HD(node);
-	} else if( IS_LAMBDA(node) ) {
-	    node = GET_LAMBDA_BODY(node);
-	} else {
-	    DIE("Could not happen");
-	}
-    }
-    if( !IS_LEAF(node) ) {
-	node = cur->parent->node;
-	while( !IS_LEAF(node) && !IS_NIL(node) ) {
-	    if( IS_APPLY(node) ) {
-		node = GET_APPLY_LEFT(node);
-	    } else if( IS_CONS(node) ) {
-		node = GET_CONS_HD(node);
-	    } else if( IS_LAMBDA(node) ) {
-		node = GET_LAMBDA_BODY(node);
-	    } else {
-		DIE("Could not happen");
-	    }
-	}
-    }
+    node = find_near_leaf(node);
     if( IS_LEAF(node) ) {
 	if( file_load )
 	    FP(err_fp, "===Type error around line %d in file %s\n",
