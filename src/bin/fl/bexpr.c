@@ -16,7 +16,7 @@
 /* ------------- Global variables ------------- */
 
 /********* Global variables referenced ***********/
-extern str_mgr  strings;
+extern str_mgr  *stringsp;
 extern char	FailBuf[4096];
 extern FILE     *odests_fp;
 extern g_ptr	void_nd;
@@ -124,7 +124,7 @@ BE_Var(string name)
 {
     bexpr_rec b;
     b.type = BE_VAR;
-    b.l.name = wastrsave(&strings, name);
+    b.l.name = wastrsave(stringsp, name);
     b.height = 1;
     return( be_find_insert(&b) );
 }
@@ -378,7 +378,7 @@ Load_bexprs(string filename, buffer *results)
 		if( fscanf(fp, "v %s\n", buf) != 1 )
 		    goto parse_error;
 		line_cnt++;
-		string name = wastrsave(&strings, buf);
+		string name = wastrsave(stringsp, buf);
 		bexpr b = BE_Var(name);
 		push_buf(&work_buf, (pointer) &b);
 		break;
@@ -669,7 +669,7 @@ bexpr2str(g_ptr redex)
 	be_print(FILE_fp, f, GET_INT(arg1));
     fclose(odests_fp);
     odests_fp = NULL;
-    MAKE_REDEX_STRING(redex, wastrsave(&strings, buf));
+    MAKE_REDEX_STRING(redex, wastrsave(stringsp, buf));
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
@@ -774,7 +774,7 @@ bget_model(g_ptr redex)
 	SET_TYPE(redex, CONS_ND);
 	SET_CONS_HD(redex,
 		    Make_CONS_ND(
-			Make_STRING_leaf(wastrsave(&strings,"")),
+			Make_STRING_leaf(wastrsave(stringsp,"")),
 			Make_BEXPR_leaf(BE_One())));
 	SET_CONS_TL(redex, Make_NIL());
 	DEC_REF_CNT(l);
@@ -870,7 +870,7 @@ bexpr_save(g_ptr redex)
     bool res = Save_bexprs(GET_STRING(arg1), &roots);
     free_buf(&roots);
     if( !res ) {
-	MAKE_REDEX_FAILURE(redex, wastrsave(&strings, FailBuf));
+	MAKE_REDEX_FAILURE(redex, wastrsave(stringsp, FailBuf));
 	return;
     }
     MAKE_REDEX_VOID(redex);
@@ -888,7 +888,7 @@ bexpr_load(g_ptr redex)
     new_buf(&results, 100, sizeof(bexpr));
     if( !Load_bexprs(GET_STRING(arg1), &results) ) {
 	free_buf(&results);
-	MAKE_REDEX_FAILURE(redex, wastrsave(&strings, FailBuf));
+	MAKE_REDEX_FAILURE(redex, wastrsave(stringsp, FailBuf));
 	return;
     }
     SET_TYPE(redex, CONS_ND);
@@ -1133,16 +1133,16 @@ BE_Init()
     BE_TRUE->same_sig_list = 0;
     BE_FALSE = BE_NOT(BE_TRUE);
 
-    s_const_0 = wastrsave(&strings, "const_0");
-    s_const_1 = wastrsave(&strings, "const_1");
-    s_variable = wastrsave(&strings, "variable");
-    s_not_variable = wastrsave(&strings, "not-variable");
-    s_and = wastrsave(&strings, "and");
-    s_not_and = wastrsave(&strings, "not-and");
-    s_gen_bOR = wastrsave(&strings, "gen_bOR");
-    s_gen_bAND = wastrsave(&strings, "gen_bAND");
-    s_bITE = wastrsave(&strings, "bITE");
-    s_bEqual = wastrsave(&strings, "bEqual");
+    s_const_0 = wastrsave(stringsp, "const_0");
+    s_const_1 = wastrsave(stringsp, "const_1");
+    s_variable = wastrsave(stringsp, "variable");
+    s_not_variable = wastrsave(stringsp, "not-variable");
+    s_and = wastrsave(stringsp, "and");
+    s_not_and = wastrsave(stringsp, "not-and");
+    s_gen_bOR = wastrsave(stringsp, "gen_bOR");
+    s_gen_bAND = wastrsave(stringsp, "gen_bAND");
+    s_bITE = wastrsave(stringsp, "bITE");
+    s_bEqual = wastrsave(stringsp, "bEqual");
 }
 
 static void
@@ -1815,7 +1815,7 @@ g_be_or(g_ptr l, g_ptr r)
 	if( Is_equal(l, r, TRUE) != B_One() ) {
 	    res = Make_0inp_Primitive(P_FAIL);
 	    string m =
-		wastrsave(&strings, "gen_bOR over non-matching structures");
+		wastrsave(stringsp, "gen_bOR over non-matching structures");
 	    SET_FAIL_STRING(res, m);
 	    return( res );
 	}
@@ -1847,7 +1847,7 @@ g_be_and(g_ptr l, g_ptr r)
 	if( Is_equal(l, r, TRUE) != B_One() ) {
 	    res = Make_0inp_Primitive(P_FAIL);
 	    string m =
-		wastrsave(&strings, "gen_bOR over non-matching structures");
+		wastrsave(stringsp, "gen_bOR over non-matching structures");
 	    SET_FAIL_STRING(res, m);
 	    return( res );
 	}
@@ -1878,7 +1878,7 @@ g_be_ite(g_ptr l, g_ptr r)
     if( !IS_BEXPR(l) ) {
 	if( Is_equal(l, r, TRUE) != B_One() ) {
 	    res = Make_0inp_Primitive(P_FAIL);
-	    string m = wastrsave(&strings, "bITE over non-matching structures");
+	    string m = wastrsave(stringsp, "bITE over non-matching structures");
 	    SET_FAIL_STRING(res, m);
 	    return( res );
 	}

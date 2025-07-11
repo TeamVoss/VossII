@@ -16,7 +16,7 @@
 /* ------------- Global variables ------------- */
 
 /********* Global variables referenced ***********/
-extern str_mgr     strings;
+extern str_mgr     *stringsp;
 
 /***** PRIVATE VARIABLES *****/
 
@@ -154,7 +154,7 @@ float2str_fn(pointer p)
     char buf[20];
     float_ptr fp = (float_ptr) p;
     Sprintf(buf, "%g", fp->u.f);
-    return( wastrsave(&strings, buf) );
+    return( wastrsave(stringsp, buf) );
 }
 
 static formula

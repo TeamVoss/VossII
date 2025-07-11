@@ -21,7 +21,7 @@
 // ...
 
 // Global variables referenced -------------------------------------------------
-extern str_mgr strings;
+extern str_mgr *stringsp;
 extern g_ptr void_nd;
 
 /******************************************************************************/
@@ -114,7 +114,7 @@ sprint_row(mat_ptr m, unint r)
         gen_strappend(ts, m->mat[r][j] ? "T" : ".");
     }
     gen_strappend(ts, "]");
-    string res = wastrsave(&strings, buf);
+    string res = wastrsave(stringsp, buf);
     free_temp_str_mgr(ts);
     return res;
 }
@@ -130,7 +130,7 @@ sprint_mat(mat_ptr m)
     }
     gen_strappend(ts, sprint_row(m, m->rows-1));
     gen_strappend(ts, "]");
-    string res = wastrsave(&strings, buf);
+    string res = wastrsave(stringsp, buf);
     free_temp_str_mgr(ts);
     return res;
 }

@@ -31,24 +31,29 @@ LIB = ../../lib/fl_lib.a $(MINISAT_DIR)/lib/libminisat.a
 # All headers that affect fl's plugin ABI.
 ABI_HEADERS = float.h graph.h plugin.h voss_strings.h typecheck.h ../../include/types.h
 
-OBJ = new_bdd.o error.o arb_prec.o file_ops.o initialize.o symbol_tbl.o \
+LOBJ = new_bdd.o error.o arb_prec.o file_ops.o initialize.o symbol_tbl.o \
 	y.tab.o lex.yy.o \
 	graph.o fl.o typecheck.o emit.o lp.o cache.o compile.o \
-	expand_cursor.o io.o remote_tcl.o bexpr.o minisat_ifc.o main.o \
+	expand_cursor.o io.o remote_tcl.o bexpr.o \
 	draw_graph.o debug.o symbol.o voss_strings.o int_ops.o list_ops.o \
 	system.o float.o bv.o bev.o fsm.o sha256.o table.o image.o \
 	plugin.o plugin_loader.o plugin_checker.o plugin_errlog.o \
 	iso.o pexlif.o doc.o serialize.o
 
-fl: $(OBJ) $(LIB)
-	$(CX) $(CXXFLAGS) $(INC) $(LINKFLAG) -o fl $(OBJ) $(LIB) \
+OBJ = main.o minisat_ifc.o
+
+fl: libfl.so $(OBJ) $(LIB)
+	$(CX) $(CXXFLAGS) $(INC) $(LINKFLAG) -ldl -Wl,-rpath,$(BIN_DIR) -o fl $(OBJ) libfl.so $(LIB) \
 	$(COMPAT_LIB) $(FL_LIB_FLAGS)
+
+libfl.so: $(LOBJ)
+	$(CC) -shared -fPIC -o libfl.so $(LOBJ)
 
 #
 # compilation with includes
 #
 .c.o:
-	$(CC) $(CFLAGS) $(INC) -c $<
+	$(CC) -shared -fPIC $(CFLAGS) $(INC) -c $<
 
 .cc.o:
 	$(CXX) $(CXXFLAGS) $(CXXFLAGS) $(INC) -c $<
@@ -61,7 +66,7 @@ lex.yy.c: lexer y.tab.c graph.h fl.h y.tab.c
 
 clean:
 	-@touch .q
-	-@/bin/rm -f *.o fl y.tab.c y.tab.h y.output lex.yy.c .q
+	-@/bin/rm -f *.o libfl.so fl y.tab.c y.tab.h y.output lex.yy.c .q
 	-@/bin/rm -f prefs_ext.h prefs.h abi_version.h
 	@make -C scripts clean
 

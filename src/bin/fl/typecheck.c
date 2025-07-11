@@ -17,7 +17,7 @@
 /*			Global Variables				*/
 /************************************************************************/
 extern jmp_buf		*start_envp;
-extern str_mgr          strings;
+extern str_mgr          *stringsp;
 extern FILE		*odests_fp;
 extern int		line_nbr;
 extern bool		file_load;
@@ -175,15 +175,15 @@ TC_Init()
     string_op = &string_op_rec;
     string_op->typeOp = string_tp;
     string_op->typelist = NULL;
-    s_int = wastrsave(&strings, "int");
-    s_string = wastrsave(&strings, "string");
-    s_bexpr = wastrsave(&strings, "bexpr");
-    s_bool = wastrsave(&strings, "bool");
-    s_fsm = wastrsave(&strings, "obsolete_fsm");
-    s_void = wastrsave(&strings, "void");
-    s_fp = wastrsave(&strings, "stream");
-    s_ref = wastrsave(&strings, "ref");
-    s_tbl = wastrsave(&strings, "tbl");
+    s_int = wastrsave(stringsp, "int");
+    s_string = wastrsave(stringsp, "string");
+    s_bexpr = wastrsave(stringsp, "bexpr");
+    s_bool = wastrsave(stringsp, "bool");
+    s_fsm = wastrsave(stringsp, "obsolete_fsm");
+    s_void = wastrsave(stringsp, "void");
+    s_fp = wastrsave(stringsp, "stream");
+    s_ref = wastrsave(stringsp, "ref");
+    s_tbl = wastrsave(stringsp, "tbl");
     // 
     new_mgr(&tc_context_mgr, sizeof(tc_context_rec));
     current_tc_context = NULL;
@@ -259,7 +259,7 @@ TypeCheck(g_ptr *ondp, bool delayed, impl_arg_ptr *impl_argsp)
 		fn_ptr fp = GET_USERDEF(ntp->node);
 		result = make_arrow(ntp->type, result);
 		string vname = tprintf(".impl_arg.%d", cnt);
-		vname = wastrsave(&strings, vname);
+		vname = wastrsave(stringsp, vname);
 		MAKE_REDEX_VAR(ntp->node, vname);
 		g_ptr body = Get_node();
 		*body = *nd;
@@ -454,7 +454,7 @@ typeExp_ptr
 Get_Type(string name, typeList_ptr tvars, int insert_missing)
 {
     typeExp_ptr type;
-    name = wastrsave(&strings, name);
+    name = wastrsave(stringsp, name);
     type = (typeExp_ptr) find_hash(&ConcreteTypeTable, (pointer) name);
     if( type != NULL ) {
 	if( type->typelist != NULL ) {
@@ -589,7 +589,7 @@ Type2String(typeExp_ptr type, bool reset)
 	    p--;
 	}
     }
-    return( wastrsave(&strings, type_buf) );
+    return( wastrsave(stringsp, type_buf) );
 }
 
 typeExp_ptr
@@ -1405,6 +1405,7 @@ find_near_leaf(g_ptr node) {
 	    DIE("Cannot happen");
     }
 }
+
 static void
 report_failure(node_type_ptr cur, typeExp_ptr type, typeExp_ptr expected_type)
 {
@@ -1539,13 +1540,16 @@ report_failure(node_type_ptr cur, typeExp_ptr type, typeExp_ptr expected_type)
     }
 
     // Try to find a leaf node to get a line number
-    node = find_near_leaf(node);
-    if( IS_LEAF(node) ) {
+    g_ptr nnode = find_near_leaf(node);
+    if( nnode == NULL ) {
+	nnode = find_near_leaf(cur->parent->node);
+    }
+    if( IS_LEAF(nnode) ) {
 	if( file_load )
 	    FP(err_fp, "===Type error around line %d in file %s\n",
-		       GET_LINE_NBR(node), cur_file_name);
+		       GET_LINE_NBR(nnode), cur_file_name);
 	else
-	    FP(err_fp, "===Type error around line %d\n", GET_LINE_NBR(node));
+	    FP(err_fp, "===Type error around line %d\n", GET_LINE_NBR(nnode));
     }
     FP(err_fp, "Inferred type is:\n\t");
     Print_Type(get_real_type(expected_type), err_fp, TRUE,TRUE);

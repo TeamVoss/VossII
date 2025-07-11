@@ -37,7 +37,7 @@ int		dbg_indent;
 
 
 extern g_ptr    void_nd;
-extern str_mgr  strings;
+extern str_mgr  *stringsp;
 extern char     FailBuf[4096];
 extern string	Voss_tmp_dir;
 extern int	RCmax_stack_trace_entries;
@@ -156,25 +156,25 @@ Fopen(g_ptr *rootp, g_ptr **spp, int *depthp)
         fp = stdin;
         is_pipe = FALSE;
         writable = FALSE;
-        mode = wastrsave(&strings, "r");
+        mode = wastrsave(stringsp, "r");
     } else
     if( strcmp(name, "stdout") == 0 ) {
         fp = stdout;
         is_pipe = FALSE;
         writable = TRUE;
-        mode = wastrsave(&strings, "w");
+        mode = wastrsave(stringsp, "w");
     } else
     if( strcmp(name, "stderr") == 0 ) {
         fp = stderr;
         is_pipe = FALSE;
         writable = TRUE;
-        mode = wastrsave(&strings, "w");
+        mode = wastrsave(stringsp, "w");
     } else
     if( strcmp(name, "stdinfo") == 0 ) {
         fp = stdout;
         is_pipe = FALSE;
         writable = TRUE;
-        mode = wastrsave(&strings, "w");
+        mode = wastrsave(stringsp, "w");
     } else
     if( *mode == '|' ) {
         fp = popen(name, (mode+1));
@@ -552,7 +552,7 @@ Sscanf(g_ptr *rootp, g_ptr **spp, int *depthp)
 			}
 			tmp = *inp;
 			*inp = 0;
-			g_ptr res =Make_STRING_leaf(wastrsave(&strings, start));
+			g_ptr res =Make_STRING_leaf(wastrsave(stringsp, start));
 			*inp = tmp;
 			size = 0;
 			push_buf(&scanf_result_buf, &res);
@@ -896,7 +896,7 @@ Printf(g_ptr *rootp, g_ptr **spp, int *depthp)
         case P_SPRINTF: {
             SET_TYPE(redex, LEAF);
             SET_LEAF_TYPE(redex, STRING);
-            SET_STRING(redex, wastrsave(&strings, res));
+            SET_STRING(redex, wastrsave(stringsp, res));
             break;
         }
         case P_EPRINTF: {
@@ -1012,13 +1012,13 @@ Save_graph(string type_sig, string file_name, g_ptr node)
 {
     Serialize_Begin();
     Sprintf(buf, "%s/tmp_save_XXXXXX", Voss_tmp_dir);
-    string dir = wastrsave(&strings, mkdtemp(buf));
+    string dir = wastrsave(stringsp, mkdtemp(buf));
     Sprintf(buf, "%s/signature", dir);
-    string sig_file_name = wastrsave(&strings, buf);
+    string sig_file_name = wastrsave(stringsp, buf);
     Sprintf(buf, "%s/bexprs", dir);
-    string bexpr_file_name = wastrsave(&strings, buf);
+    string bexpr_file_name = wastrsave(stringsp, buf);
     Sprintf(buf, "%s/bools", dir);
-    string bool_file_name = wastrsave(&strings, buf);
+    string bool_file_name = wastrsave(stringsp, buf);
     new_uniq_buf(&bexpr_buf, 100, sizeof(bexpr));
     new_uniq_buf(&bool_buf, 100, sizeof(formula));
     new_uniq_buf(&string_buf, 100, sizeof(string));
@@ -1086,18 +1086,18 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 {
     Unserialize_Begin();
     Sprintf(buf, "%s/tmp_load_XXXXXX", Voss_tmp_dir);
-    string dir = wastrsave(&strings, mkdtemp(buf));
+    string dir = wastrsave(stringsp, mkdtemp(buf));
     // Make files
     Sprintf(buf, "%s/signature", dir);
-    string sig_file_name = wastrsave(&strings, buf);
+    string sig_file_name = wastrsave(stringsp, buf);
     Sprintf(buf, "%s/bexprs", dir);
-    string bexpr_file_name = wastrsave(&strings, buf);
+    string bexpr_file_name = wastrsave(stringsp, buf);
     Sprintf(buf, "%s/bools", dir);
-    string bool_file_name = wastrsave(&strings, buf);
+    string bool_file_name = wastrsave(stringsp, buf);
     Sprintf(buf, "%s/strings", dir);
-    string str_file_name = wastrsave(&strings, buf);
+    string str_file_name = wastrsave(stringsp, buf);
     Sprintf(buf, "%s/graph", dir);
-    string graph_file_name = wastrsave(&strings, buf);
+    string graph_file_name = wastrsave(stringsp, buf);
     // ------------- Untar file into tmp directory ------------------
     Sprintf(buf, " tar -C %s -x -z -f %s", dir, file_name);
     if( system(buf) != 0 ) {
@@ -1179,7 +1179,7 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
 	    }
 	    charappend(c);
 	}
-	r = wastrsave(&strings, r);
+	r = wastrsave(stringsp, r);
 	push_buf(&str_results, &r);
 	// Absorb newline
 	fgetc(fp);
@@ -1234,7 +1234,7 @@ c_mktemp(g_ptr redex)
     ip->name = name;
     ip->fp = fp;
     ip->is_pipe = FALSE;
-    ip->mode = wastrsave(&strings, "w");
+    ip->mode = wastrsave(stringsp, "w");
     ip->writable = TRUE;
     ip->next = open_ios;
     open_ios = ip;
@@ -1264,7 +1264,7 @@ c_mktempd(g_ptr redex)
 			   Fail_pr("Failed to create temporary directory"));
 	return;
     }
-    MAKE_REDEX_STRING(redex, wastrsave(&strings, res));
+    MAKE_REDEX_STRING(redex, wastrsave(stringsp, res));
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
@@ -1323,9 +1323,9 @@ Fgets(g_ptr redex)
 	string tmp = strtemp("");
 	tmp = fgets(tmp, STR_BLOCK_SIZE-1, ip->fp);
 	if( tmp != NULL ) {
-	    MAKE_REDEX_STRING(redex, wastrsave(&strings, tmp));
+	    MAKE_REDEX_STRING(redex, wastrsave(stringsp, tmp));
 	} else {
-	    MAKE_REDEX_STRING(redex, wastrsave(&strings, ""));
+	    MAKE_REDEX_STRING(redex, wastrsave(stringsp, ""));
 	}
     }
     DEC_REF_CNT(l);
@@ -1345,9 +1345,9 @@ Fget(g_ptr redex)
         string tmp = strtemp("");
         size_t size;
         if(getdelim(&tmp, &size, '\0', ip->fp) != -1) {
-            MAKE_REDEX_STRING(redex, wastrsave(&strings, tmp));
+            MAKE_REDEX_STRING(redex, wastrsave(stringsp, tmp));
         } else {
-            MAKE_REDEX_STRING(redex, wastrsave(&strings, ""));
+            MAKE_REDEX_STRING(redex, wastrsave(stringsp, ""));
         }
     }
     DEC_REF_CNT(l);
@@ -1427,7 +1427,7 @@ make_redex_failure(g_ptr redex)
     SET_TYPE(redex, LEAF);
     SET_LEAF_TYPE(redex, PRIM_FN);
     SET_PRIM_FN(redex, P_FAIL);
-    SET_FAIL_STRING(redex, wastrsave(&strings, FailBuf));
+    SET_FAIL_STRING(redex, wastrsave(stringsp, FailBuf));
 }
 
 #define PFN2NAME(pfn) ((pfn == P_PRINTF)? "printf" : \

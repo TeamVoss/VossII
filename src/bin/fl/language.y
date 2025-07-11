@@ -13,7 +13,7 @@ extern bool	file_load;
 extern bool	RCadd_debug_info;
 extern char	*space_const;
 extern char	*prompt;
-extern str_mgr	strings;
+extern str_mgr	*stringsp;
 extern int	line_nbr;
 extern string	cur_file_name;
 extern bool	gui_mode;
@@ -876,7 +876,7 @@ fn_defs		: fn_def CONJ fn_defs
 			    $$.expr = Make_2inp_Primitive(P_PCATCH, $1.expr,
 					  Make_1inp_Primitive(P_ERROR, 
 						Make_STRING_leaf(
-						     wastrsave(&strings,buf))));
+						     wastrsave(stringsp,buf))));
 			} else {
 			    $$.expr = $1.expr;
 			}
@@ -923,7 +923,7 @@ lhs_expr_list	: arg_expr lhs_expr_list
 			    Sprintf(buf, "Arg%d", $2.cnt+1);
 			    $$.expr = Make_APPL_ND(res,
 					   Make_VAR_leaf(
-						wastrsave(&strings, buf)));
+						wastrsave(stringsp, buf)));
 			    $$.cnt = $2.cnt+1;
 			    $$.ok = TRUE;
 			} else {
@@ -1295,13 +1295,13 @@ expr		: LCURL expr TYPE_SEP simple_type RCURL
                     if( res != NULL ) {
                         Sprintf(buf, "Arg1");
                         res = Make_APPL_ND(res,
-                                       Make_VAR_leaf(wastrsave(&strings, buf)));
+                                       Make_VAR_leaf(wastrsave(stringsp, buf)));
                         Sprintf(buf, "No pattern matched for val expression\n");
 			if( Can_Fail_Pat_Match(res) ) {
 			    res = Make_2inp_Primitive(P_PCATCH, res,
                                       Make_1inp_Primitive(P_ERROR, 
                                             Make_STRING_leaf(
-                                                     wastrsave(&strings,buf))));
+                                                     wastrsave(stringsp,buf))));
 			}
                         res = Add_args(1, res);
                         $$ = Make_APPL_ND(res, $4);
@@ -1325,13 +1325,13 @@ expr		: LCURL expr TYPE_SEP simple_type RCURL
                     if( res != NULL ) {
                         Sprintf(buf, "Arg1");
                         res = Make_APPL_ND(res,
-                                       Make_VAR_leaf(wastrsave(&strings, buf)));
+                                       Make_VAR_leaf(wastrsave(stringsp, buf)));
                         Sprintf(buf, "No pattern matched for val expression\n");
 			if( Can_Fail_Pat_Match(res) ) {
 			    res = Make_2inp_Primitive(P_PCATCH, res,
                                       Make_1inp_Primitive(P_ERROR, 
                                             Make_STRING_leaf(
-                                                     wastrsave(&strings,buf))));
+                                                     wastrsave(stringsp,buf))));
 			}
                         res = Add_args(1, res);
 			$$ = Make_2inp_Primitive(P_THEN, $4, res);
@@ -1346,14 +1346,14 @@ expr		: LCURL expr TYPE_SEP simple_type RCURL
                     if( res != NULL ) {
                         Sprintf(buf, "Arg1");
                         res = Make_APPL_ND(res,
-                                       Make_VAR_leaf(wastrsave(&strings, buf)));
+                                       Make_VAR_leaf(wastrsave(stringsp, buf)));
                         Sprintf(buf,
 				"No pattern matched for lambda expression\n");
 			if( Can_Fail_Pat_Match(res) ) {
 			    res = Make_2inp_Primitive(P_PCATCH, res,
                                       Make_1inp_Primitive(P_ERROR, 
                                             Make_STRING_leaf(
-                                                     wastrsave(&strings,buf))));
+                                                     wastrsave(stringsp,buf))));
 			}
                         $$ = Add_args(1, res);
                     } else {
@@ -1364,7 +1364,7 @@ expr		: LCURL expr TYPE_SEP simple_type RCURL
 		{
 		    var_list_ptr vp;
 		    Sprintf(buf, "_sz_bind_cnt_");
-		    string scnt = wastrsave(&strings, buf);
+		    string scnt = wastrsave(stringsp, buf);
 		    g_ptr e = $5;
 		    string acc = find_hash(&Binder_Acc_Table, (pointer) $1);
 		    for(vp = $3; vp != NULL; vp = vp->next) {
@@ -1686,7 +1686,7 @@ expr2		: VART
 		{
 		    string tmp = strtemp("0b");
 		    tmp = strappend($2);
-		    tmp = wastrsave(&strings, tmp);
+		    tmp = wastrsave(stringsp, tmp);
 		    $$ = Make_APPL_ND(Make_VAR_leaf($1), Make_STRING_leaf(tmp));
 		}
 		| FREE_BINDER_VAR DEC_NUMBER
@@ -1701,7 +1701,7 @@ expr2		: VART
 		{
 		    string tmp = strtemp("0x");
 		    tmp = strappend($2);
-		    tmp = wastrsave(&strings, tmp);
+		    tmp = wastrsave(stringsp, tmp);
 		    $$ = Make_APPL_ND(Make_VAR_leaf($1), Make_STRING_leaf(tmp));
 		}
 		;
@@ -1795,50 +1795,50 @@ Parse_Init()
     create_hash(&Binder_Acc_Table, 100, str_hash, str_equ);
     create_hash(&type_var_tbl, 100, str_hash, str_equ);
     new_mgr(&tvarl_rec_mgr, sizeof(tvar_list_rec));
-    it	              = wastrsave(&strings, "it");
-    eq_string         = wastrsave(&strings, "=");
-    s_crossprod       = wastrsave(&strings, "#");
-    s_str2float       = wastrsave(&strings, "str2float");
-    s_prefix_0        = wastrsave(&strings, "prefix 0");
-    s_prefix_1        = wastrsave(&strings, "prefix 1");
-    s_infix_0         = wastrsave(&strings, "infix 0");
-    s_infix_1         = wastrsave(&strings, "infix 1");
-    s_infix_2         = wastrsave(&strings, "infix 2");
-    s_infix_3         = wastrsave(&strings, "infix 3");
-    s_infix_4         = wastrsave(&strings, "infix 4");
-    s_infix_5         = wastrsave(&strings, "infix 5");
-    s_infix_6         = wastrsave(&strings, "infix 6");
-    s_infix_7         = wastrsave(&strings, "infix 7");
-    s_infix_8         = wastrsave(&strings, "infix 8");
-    s_infix_9         = wastrsave(&strings, "infix 9");
-    s_infixr_0        = wastrsave(&strings, "infixr 0");
-    s_infixr_1        = wastrsave(&strings, "infixr 1");
-    s_infixr_2        = wastrsave(&strings, "infixr 2");
-    s_infixr_3        = wastrsave(&strings, "infixr 3");
-    s_infixr_4        = wastrsave(&strings, "infixr 4");
-    s_infixr_5        = wastrsave(&strings, "infixr 5");
-    s_infixr_6        = wastrsave(&strings, "infixr 6");
-    s_infixr_7        = wastrsave(&strings, "infixr 7");
-    s_infixr_8        = wastrsave(&strings, "infixr 8");
-    s_infixr_9        = wastrsave(&strings, "infixr 9");
-    s_infix_unary_0   = wastrsave(&strings, "infix_unary 0");
-    s_infix_unary_1   = wastrsave(&strings, "infix_unary 1");
-    s_infix_unary_2   = wastrsave(&strings, "infix_unary 2");
-    s_infix_unary_3   = wastrsave(&strings, "infix_unary 3");
-    s_infix_unary_4   = wastrsave(&strings, "infix_unary 4");
-    s_infix_unary_5   = wastrsave(&strings, "infix_unary 5");
-    s_infix_unary_6   = wastrsave(&strings, "infix_unary 6");
-    s_infix_unary_7   = wastrsave(&strings, "infix_unary 7");
-    s_infix_unary_8   = wastrsave(&strings, "infix_unary 8");
-    s_infix_unary_9   = wastrsave(&strings, "infix_unary 9");
-    s_postfix         = wastrsave(&strings, "postfix");
-    s_binder          = wastrsave(&strings, "binder");
-    s_nonfix          = wastrsave(&strings, "nonfix");
-    s_then_binder     = wastrsave(&strings, "then_binder");
-    s_else_binder     = wastrsave(&strings, "else_binder");
-    s_binder_with_acc = wastrsave(&strings, "binder_with_accumulator");
-    s_sz_binder_with_acc = wastrsave(&strings, "size_binder_with_accumulator");
-    s_free_binder     = wastrsave(&strings, "free_binder");
+    it	              = wastrsave(stringsp, "it");
+    eq_string         = wastrsave(stringsp, "=");
+    s_crossprod       = wastrsave(stringsp, "#");
+    s_str2float       = wastrsave(stringsp, "str2float");
+    s_prefix_0        = wastrsave(stringsp, "prefix 0");
+    s_prefix_1        = wastrsave(stringsp, "prefix 1");
+    s_infix_0         = wastrsave(stringsp, "infix 0");
+    s_infix_1         = wastrsave(stringsp, "infix 1");
+    s_infix_2         = wastrsave(stringsp, "infix 2");
+    s_infix_3         = wastrsave(stringsp, "infix 3");
+    s_infix_4         = wastrsave(stringsp, "infix 4");
+    s_infix_5         = wastrsave(stringsp, "infix 5");
+    s_infix_6         = wastrsave(stringsp, "infix 6");
+    s_infix_7         = wastrsave(stringsp, "infix 7");
+    s_infix_8         = wastrsave(stringsp, "infix 8");
+    s_infix_9         = wastrsave(stringsp, "infix 9");
+    s_infixr_0        = wastrsave(stringsp, "infixr 0");
+    s_infixr_1        = wastrsave(stringsp, "infixr 1");
+    s_infixr_2        = wastrsave(stringsp, "infixr 2");
+    s_infixr_3        = wastrsave(stringsp, "infixr 3");
+    s_infixr_4        = wastrsave(stringsp, "infixr 4");
+    s_infixr_5        = wastrsave(stringsp, "infixr 5");
+    s_infixr_6        = wastrsave(stringsp, "infixr 6");
+    s_infixr_7        = wastrsave(stringsp, "infixr 7");
+    s_infixr_8        = wastrsave(stringsp, "infixr 8");
+    s_infixr_9        = wastrsave(stringsp, "infixr 9");
+    s_infix_unary_0   = wastrsave(stringsp, "infix_unary 0");
+    s_infix_unary_1   = wastrsave(stringsp, "infix_unary 1");
+    s_infix_unary_2   = wastrsave(stringsp, "infix_unary 2");
+    s_infix_unary_3   = wastrsave(stringsp, "infix_unary 3");
+    s_infix_unary_4   = wastrsave(stringsp, "infix_unary 4");
+    s_infix_unary_5   = wastrsave(stringsp, "infix_unary 5");
+    s_infix_unary_6   = wastrsave(stringsp, "infix_unary 6");
+    s_infix_unary_7   = wastrsave(stringsp, "infix_unary 7");
+    s_infix_unary_8   = wastrsave(stringsp, "infix_unary 8");
+    s_infix_unary_9   = wastrsave(stringsp, "infix_unary 9");
+    s_postfix         = wastrsave(stringsp, "postfix");
+    s_binder          = wastrsave(stringsp, "binder");
+    s_nonfix          = wastrsave(stringsp, "nonfix");
+    s_then_binder     = wastrsave(stringsp, "then_binder");
+    s_else_binder     = wastrsave(stringsp, "else_binder");
+    s_binder_with_acc = wastrsave(stringsp, "binder_with_accumulator");
+    s_sz_binder_with_acc = wastrsave(stringsp, "size_binder_with_accumulator");
+    s_free_binder     = wastrsave(stringsp, "free_binder");
 }
 
 void
@@ -1846,7 +1846,7 @@ Install_BuiltIns()
 {
     int		i;
     for(i = 0; i < nbr_functions; i++) {
-        string name = wastrsave(&strings, functions[i].name);
+        string name = wastrsave(stringsp, functions[i].name);
 	g_ptr fn = Make_0inp_Primitive(functions[i].prim_fn);
 	result_ptr res = Compile(NULL, fn, NULL, FALSE,FALSE);
 	symb_tbl = New_fn_def(name, res, symb_tbl, FALSE, NULL, -1);
@@ -1888,12 +1888,12 @@ Remove_Infix(string s)
 void
 Insert_if_then_else(string then_fun, string else_fun)
 {
-    then_fun = wastrsave(&strings, then_fun);
+    then_fun = wastrsave(stringsp, then_fun);
     if( Get_Infix(then_fun) != VART ) {
 	delete_hash(&Infix_Table, (pointer) then_fun);
     }
     insert_hash(&Infix_Table, (pointer) then_fun, (pointer) THEN_COND_VAR);
-    else_fun = wastrsave(&strings, else_fun);
+    else_fun = wastrsave(stringsp, else_fun);
     if( Get_Infix(else_fun) != VART ) {
 	delete_hash(&Infix_Table, (pointer) else_fun);
     }
@@ -1903,7 +1903,7 @@ Insert_if_then_else(string then_fun, string else_fun)
 void
 Insert_then_binder(string fun)
 {
-    fun = wastrsave(&strings, fun);
+    fun = wastrsave(stringsp, fun);
     if( Get_Infix(fun) != VART ) {
 	delete_hash(&Infix_Table, (pointer) fun);
     }
@@ -1913,7 +1913,7 @@ Insert_then_binder(string fun)
 void
 Insert_else_binder(string fun)
 {
-    fun = wastrsave(&strings, fun);
+    fun = wastrsave(stringsp, fun);
     if( Get_Infix(fun) != VART ) {
 	delete_hash(&Infix_Table, (pointer) fun);
     }
@@ -1923,8 +1923,8 @@ Insert_else_binder(string fun)
 void
 Insert_binder_with_acc(string name, string acc_name)
 {
-    name = wastrsave(&strings, name);
-    acc_name = wastrsave(&strings, acc_name);
+    name = wastrsave(stringsp, name);
+    acc_name = wastrsave(stringsp, acc_name);
     if( Get_Infix(name) != VART ) {
 	delete_hash(&Infix_Table, (pointer) name);
     }
@@ -1937,8 +1937,8 @@ Insert_binder_with_acc(string name, string acc_name)
 void
 Insert_size_binder_with_acc(string name, string acc_name)
 {
-    name = wastrsave(&strings, name);
-    acc_name = wastrsave(&strings, acc_name);
+    name = wastrsave(stringsp, name);
+    acc_name = wastrsave(stringsp, acc_name);
     if( Get_Infix(name) != VART ) {
 	delete_hash(&Infix_Table, (pointer) name);
     }
@@ -1951,7 +1951,7 @@ Insert_size_binder_with_acc(string name, string acc_name)
 void
 Insert_infix(string s, int precedence)
 {
-    s = wastrsave(&strings, s);
+    s = wastrsave(stringsp, s);
     if( Get_Infix(s) != VART ) {
 	delete_hash(&Infix_Table, (pointer) s);
     }
@@ -1992,8 +1992,8 @@ Get_Unary(string s)
 void
 Insert_infix_unary(string s, int precedence, string unary_function)
 {
-    s = wastrsave(&strings, s);
-    unary_function = wastrsave(&strings, unary_function);
+    s = wastrsave(stringsp, s);
+    unary_function = wastrsave(stringsp, unary_function);
     if( Get_Infix(s) != VART ) {
 	delete_hash(&Infix_Table, (pointer) s);
     }
@@ -2050,7 +2050,7 @@ Insert_infix_unary(string s, int precedence, string unary_function)
 void
 Insert_prefix(string s, int precedence)
 {
-    s = wastrsave(&strings, s);
+    s = wastrsave(stringsp, s);
     if( Get_Infix(s) != VART ) {
 	delete_hash(&Infix_Table, (pointer) s);
     }
@@ -2065,7 +2065,7 @@ Insert_prefix(string s, int precedence)
 void
 Insert_infixr(string s, int precedence)
 {
-    s = wastrsave(&strings, s);
+    s = wastrsave(stringsp, s);
     if( Get_Infix(s) != VART ) {
 	delete_hash(&Infix_Table, (pointer) s);
     }
@@ -2096,7 +2096,7 @@ Insert_infixr(string s, int precedence)
 void
 Insert_postfix(string s)
 {
-    s = wastrsave(&strings, s);
+    s = wastrsave(stringsp, s);
     if( Get_Infix(s) != VART ) {
 	delete_hash(&Infix_Table, (pointer) s);
     }
@@ -2106,7 +2106,7 @@ Insert_postfix(string s)
 void
 Insert_binder(string s)
 {
-    s = wastrsave(&strings, s);
+    s = wastrsave(stringsp, s);
     if( Get_Infix(s) != VART ) {
 	delete_hash(&Infix_Table, (pointer) s);
     }
@@ -2116,7 +2116,7 @@ Insert_binder(string s)
 void
 Insert_free_binder(string s)
 {
-    s = wastrsave(&strings, s);
+    s = wastrsave(stringsp, s);
     if( Get_Infix(s) != VART ) {
 	delete_hash(&Infix_Table, (pointer) s);
     }
@@ -2313,13 +2313,13 @@ make_project_fun(string name, g_ptr pexpr)
     if( res != NULL ) {
 	Sprintf(buf, "Arg1");
 	res = Make_APPL_ND(res,
-		       Make_VAR_leaf(wastrsave(&strings, buf)));
+		       Make_VAR_leaf(wastrsave(stringsp, buf)));
 	Sprintf(buf, "No pattern matched for val expression\n");
 	if( Can_Fail_Pat_Match(res) ) {
 	    res = Make_2inp_Primitive(P_PCATCH, res,
 		      Make_1inp_Primitive(P_ERROR, 
 			    Make_STRING_leaf(
-				     wastrsave(&strings,buf))));
+				     wastrsave(stringsp,buf))));
 	}
 	res = Add_args(1, res);
 	return( Make_APPL_ND(res, def_expr) );
@@ -2337,5 +2337,5 @@ get_base_name(string name)
     }
     string base = strtemp(name);
     *(base+(tmp-name)) = 0;
-    return( wastrsave(&strings, base) );
+    return( wastrsave(stringsp, base) );
 }

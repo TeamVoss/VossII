@@ -59,7 +59,7 @@ string s_W_IDELAY;
 string s_no_instance;
 
 // Global variables referenced -------------------------------------------------
-extern str_mgr strings;
+extern str_mgr *stringsp;
 
 /******************************************************************************/
 /*                              PRIVATE VARIABLES                             */
@@ -1546,11 +1546,11 @@ unfold_pexlif(g_ptr p, unint id)
 	while( VDB_has_name_collision(vdp, new, TRUE) ) {
 	    int cnt;
 	    if( sscanf(new, "_$%d_", &cnt) != 1 ) {
-		new = wastrsave(&strings, gen_tprintf(ts, "_$1_%s", old));
+		new = wastrsave(stringsp, gen_tprintf(ts, "_$1_%s", old));
 	    } else {
 		string p = new+2;
 		while( *p && isdigit(*p) ) p++;
-		new = wastrsave(&strings, gen_tprintf(ts, "_$%d%s", cnt+1, p));
+		new = wastrsave(stringsp, gen_tprintf(ts, "_$%d%s", cnt+1, p));
 	    }
 	}
 	VDB_Insert_vector(vdp, new);
@@ -2278,11 +2278,11 @@ Pexlif_Init()
     s_W_MEM_WRITE          = Mk_constructor_name("W_MEM_WRITE");
     s_MEM                  = Mk_constructor_name("MEM");
     // /
-    s_no_instance = wastrsave(&strings, "{}");
-    s_EMPTY_STRING  = wastrsave(&strings, "");
-    s_FP	    = wastrsave(&strings, "FP");
-    s_SHA	    = wastrsave(&strings, "SHA");
-    s_WrApPeR       = wastrsave(&strings, "_WrApPeR_");
+    s_no_instance = wastrsave(stringsp, "{}");
+    s_EMPTY_STRING  = wastrsave(stringsp, "");
+    s_FP	    = wastrsave(stringsp, "FP");
+    s_SHA	    = wastrsave(stringsp, "SHA");
+    s_WrApPeR       = wastrsave(stringsp, "_WrApPeR_");
     // /
     new_ustrmgr(&lstrings);
     new_mgr(&vec_mgr, sizeof(vec_rec));
@@ -2423,7 +2423,7 @@ split_vector(string name)
     vec_ptr vp = Split_vector_name(&lstrings, &vec_mgr, &rng_mgr, name);
     for(vec_ptr p = vp; p != NULL; p = p->next) {
         if(p->type == TXT) {
-            p->u.name = wastrsave(&strings, p->u.name);
+            p->u.name = wastrsave(stringsp, p->u.name);
         }
     }
     return vp;
@@ -2661,7 +2661,7 @@ subst_fa_list(hash_record_ptr tbl, g_ptr fa_list)
             sname_list_ptr names = subst_formal(tbl, actual);
             for(; names != NULL; names = names->next) {
                 APPEND1(as_tail,
-			Make_STRING_leaf(wastrsave(&strings, names->name)));
+			Make_STRING_leaf(wastrsave(stringsp, names->name)));
             }
         }
 	as = Merge_Vectors(as, FALSE);
@@ -3075,7 +3075,7 @@ compute_fp_pinst(g_ptr inps, g_ptr outs, g_ptr ints, g_ptr content)
     if( fp_content(content, &sig) ) {
 	res += sig;
 	sprintf(str_buf, "%ld", res);
-	return( wastrsave(&strings, str_buf) );
+	return( wastrsave(stringsp, str_buf) );
     }
     Fail_pr("fp_pinst failed....");
     return NULL;

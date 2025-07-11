@@ -15,7 +15,7 @@
 /*			Global Variables				*/
 /************************************************************************/
 extern bool		compile_to_C_flag;
-extern str_mgr  	strings;
+extern str_mgr  	*stringsp;
 
 /************************************************************************/
 /*			Local Variables					*/
@@ -106,7 +106,7 @@ mk_uniq_names(g_ptr node)
 	    return( res );
         case LAMBDA_ND:
 	    Sprintf(buf, "_ZZ'%d", uniq_name_cnt++);
-	    var2 = wastrsave(&strings, buf);
+	    var2 = wastrsave(stringsp, buf);
 	    var = GET_LAMBDA_VAR(node);
 	    line = GET_LAMBDA_LINE_NBR(node);
 	    g_ptr body = rm_P_NAMED_ARG(GET_LAMBDA_BODY(node));
@@ -267,7 +267,7 @@ substitute(string old, g_ptr new_var, g_ptr node)
 	    }
 	    /* Name capture so rename lambda variable */
 	    Sprintf(buf, "_Z'%d", uniq_name_cnt++);
-	    var2 = wastrsave(&strings, buf);
+	    var2 = wastrsave(stringsp, buf);
 	    E = substitute(var, Make_VAR_leaf(var2), GET_LAMBDA_BODY(node));
 	    E = substitute(old, new_var, E);
 	    res = Make_Lambda(var2, E);

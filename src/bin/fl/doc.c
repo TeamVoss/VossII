@@ -18,7 +18,7 @@
 
 
 // Global variables referenced -------------------------------------------------
-extern		str_mgr strings;
+extern str_mgr	*stringsp;
 extern char     FailBuf[4096];
 extern g_ptr	void_nd;
 
@@ -227,7 +227,7 @@ do_layout(g_ptr redex)
     string end = GET_STRING(g_end);
     io_ptr ip = GET_FILE_IO_PTR(g_fp);
     if( !doc2print(k, end, d, ip) ) {
-	MAKE_REDEX_FAILURE(redex, wastrsave(&strings, FailBuf));
+	MAKE_REDEX_FAILURE(redex, wastrsave(stringsp, FailBuf));
 	return;
     }
     MAKE_REDEX_VOID(redex);

@@ -15,7 +15,9 @@
 
 /***** GLOBAL VARIABLES ACCESSED *****/
 void        Init_lexer();
-extern str_mgr	strings;
+str_mgr     strings;
+str_mgr	    *stringsp = &strings;
+
 extern string	default_vosslib_dir;
 extern bool	cephalopode_mode;
 extern bool     RCadd_debug_info;
@@ -30,7 +32,7 @@ VOID
 Init()
 {
     Init_strmgr();
-    new_strmgr(&strings);
+    new_strmgr(stringsp);
 
     Init_symb_tbl();
     Init_Paths(NULL, NULL);

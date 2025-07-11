@@ -16,7 +16,7 @@
 
 /********* Global variables referenced ***********/
 extern symbol_tbl_ptr	symb_tbl;
-extern str_mgr		strings;
+extern str_mgr		*stringsp;
 extern jmp_buf		*start_envp;
 extern char		FailBuf[4096];
 extern g_ptr		void_nd;

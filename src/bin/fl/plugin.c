@@ -7,7 +7,7 @@
 #include "plugin.h"
 #include "float.h"
 
-extern str_mgr strings;
+extern str_mgr *stringsp;
 extern char FailBuf[4096];
 
 /* Return failure, with the given error message.
@@ -29,7 +29,7 @@ fail(bool append_trace, g_ptr redex, const char* fmt, ...)
     SET_TYPE(redex, LEAF);
     SET_LEAF_TYPE(redex, PRIM_FN);
     SET_PRIM_FN(redex, P_FAIL);
-    SET_FAIL_STRING(redex, wastrsave(&strings, FailBuf));
+    SET_FAIL_STRING(redex, wastrsave(stringsp, FailBuf));
 }
 
 static void
@@ -44,7 +44,7 @@ die(const char* fmt, ...)
 }
 
 static string
-wastrsave_strings(string s) { return wastrsave(&strings, s); }
+wastrsave_strings(string s) { return wastrsave(stringsp, s); }
 static void
 make_redex_small_int(g_ptr redex, long int i) { MAKE_REDEX_AINT(redex, Arbi_FromInt(i)); }
 static void

@@ -45,7 +45,7 @@ extern int          write_graph_line_nbr;
 extern int          read_graph_line_nbr;
 extern int          dbg_indent;
 extern buffer	    ext_obj_buf;
-extern str_mgr      strings;
+extern str_mgr      *stringsp;
 
 /***** PRIVATE VARIABLES *****/
 static bool unserialize_in_process = FALSE;

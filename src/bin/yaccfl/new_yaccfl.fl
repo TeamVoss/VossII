@@ -41,7 +41,20 @@ let read_file file =
     lines
 ;
 
-let extract_fl_code start_line lines = lines;
+let extract_fl_code start_line lines =
+    let act_dir = 
+	let dirs = butlast (str_split (file_fullname yfl_file) "/") in
+	list2str T "" "/" "/" id dirs
+    in
+    let pat = "^(.*[^A-Za-z_])DIR([^A-Za-z0-9_].*)$" in
+    letrec do_replace old =
+	NOT (str_reg_match pat old) => old |
+	val [_,pre,post] = str_reg_extract pat old then
+	let new = sprintf "%s\"%s\"%s" pre act_dir post then
+	do_replace new
+    in
+    map do_replace lines
+;
 
 
 let tokensr = ref [""];
@@ -130,7 +143,7 @@ let mk_bison_rule tokens fun_name used ids =
 	    (NOT (mem idx used) => "" |
 		let arg = NOT (mem (el idx ids) tokens)
 		    => sprintf "$%d" idx
-		     | sprintf "Make_STRING_leaf(wastrsave(&strings,$%d))" idx
+		     | sprintf "Make_STRING_leaf(wastrsave(stringsp,$%d))" idx
 		in
 		(sprintf "\n\t    $$ = Make_APPL_ND($$, %s);" arg)
 	    )
@@ -285,8 +298,9 @@ let extract_parser tokens start_line lines =
 	    PREF "extern int	    yylex();",
 	    PREF "extern int	    yylineno;",
 	    "extern g_ptr	    _parser_res;",
-	    "extern str_mgr	    strings;",
-	    "extern symbol_tbl_ptr   symb_tbl;",
+	    "extern str_mgr	    *stringsp;",
+	    "extern symbol_tbl_ptr  symb_tbl;",
+	    PREF "static int        yyerror(const char *msg);",
 	    "",
 	    "%}",
 	    "",
@@ -304,21 +318,9 @@ let extract_parser tokens start_line lines =
 	    "%%",
 	    "",
 	    "int",
-	    PREF "yyerror()",
+	    PREF "yyerror(const char *msg)",
 	    "{",
-	    "    FILE *fp;",
-	    "    extern int start_line;",
-	    "    extern char *error_file;",
-	    "    int file_write = 1;",
-	    "    if( strcmp(error_file, \"stderr\") == 0 ) {",
-	    "        fp = stderr;",
-	    "        file_write = 0;",
-	    "	 } else if( (fp = fopen(error_file, \"w\")) == NULL ) {",
-	    "        fp = stderr;",
-	    "        file_write = 0;",
-	    "    }",
-	    PREF (sprintf "    fprintf(fp, \"When parsing %s syntax around line %%d\\n\", start_line+yylineno);" yfl_file),
-	    "    if( file_write == 1 ) { fclose(fp); }",
+	    PREF (sprintf "    fprintf(stderr, \"When parsing %s syntax around line %%d\\n\", yylineno);" yfl_file),
 	    "}"
 	]
     in
@@ -398,7 +400,7 @@ let emit_code fl_code tokens flex_code parser_res =
     (fprintf Cfp "#include \"graph.h\"\n") fseq
     (fprintf Cfp "#include \"%s.tab.h\"\n\n" prefix_name) fseq
     (fprintf Cfp "FILE *%sin;\n" prefix_name) fseq
-    (fprintf Cfp "extern str_mgr     strings;\n") fseq
+    (fprintf Cfp "extern str_mgr     *stringsp;\n") fseq
     (fprintf Cfp "extern symbol_tbl_ptr   symb_tbl;\n") fseq
     (fprintf Cfp "static char fl_defs[] = {\n  ") fseq
     let put line = 
@@ -477,12 +479,13 @@ let emit_code fl_code tokens flex_code parser_res =
 let compile_c suffix_name =
     let src_dir = (get_vossrc "VOSS-BINARY-DIRECTORY")^"/../src" then
     let output = (string_butlastn (base_name^suffix_name) 2)^".o" in
-    let c_cmd = sprintf "gcc -I%s/bin/fl -I%s/include -c -fPIC -o %s %s%s"
+    let c_cmd = sprintf "gcc -I%s/bin/fl -I%s/include -c -g -fPIC -o %s %s%s"
 		    src_dir src_dir output base_name suffix_name
     then
     (system c_cmd) != 0 =>
 	eprintf "Failed to compile %s%s\nCommand: %s\n"
 		base_name suffix_name c_cmd |
+    (fprintf stdinfo "Succesfully compiled %s\n" output) fseq
     ()
 ;
 
@@ -522,8 +525,11 @@ let parse_yfl {dummy::void} =
     (compile_c ".lex.c") fseq
     (compile_c ".tab.c") fseq
     // Create dynamic library
-    let lcmd = sprintf "gcc -o lib%s.so -shared -fPIC %s.lex.o  %s.o  %s.tab.o"
-		    prefix_name base_name base_name base_name
+    let bin_dir = get_vossrc "VOSS-BINARY-DIRECTORY" then
+    let lib_dir = bin_dir^"/../src/lib" then
+    let lcmd = sprintf
+	"gcc -o lib%s.so -shared -fPIC %s.lex.o %s.o %s.tab.o %s/libfl.so"
+	prefix_name base_name base_name base_name bin_dir
     then
     (system lcmd) != 0 =>
 	eprintf "Failed to build shared library!\nCommand: %s\n" lcmd

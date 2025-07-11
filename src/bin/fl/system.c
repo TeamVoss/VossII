@@ -23,7 +23,7 @@
 string binary_location;
 
 /********* Global variables referenced ***********/
-extern str_mgr     strings;
+extern str_mgr     *stringsp;
 extern bool	   gui_mode;
 extern string      *fl_args;
 extern char	   FailBuf[4096];
@@ -33,7 +33,8 @@ static char buf [4096];
 static char path_buf [PATH_MAX+1];
 
 /* ----- Forward definitions local functions ----- */
-static string get_binary_directory();
+static string	get_binary_directory();
+static void	load_shared_library(g_ptr redex);
 
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
@@ -58,12 +59,12 @@ Init_Paths(string bin_path, string lib_path)
     } else {
         binary_location = bin_path;
     }
-    binary_location = wastrsave(&strings, binary_location);
+    binary_location = wastrsave(stringsp, binary_location);
     setenv("VOSS-BINARY-DIRECTORY", binary_location, 0);
 
     if(lib_path == NULL) {
         Sprintf(buf, "%s/../vosslib", binary_location);
-        setenv("VOSS-LIBRARY-DIRECTORY", wastrsave(&strings, buf), 0);
+        setenv("VOSS-LIBRARY-DIRECTORY", wastrsave(stringsp, buf), 0);
     } else {
         setenv("VOSS-LIBRARY-DIRECTORY", lib_path, 0);
     }
@@ -88,7 +89,7 @@ my_exec(g_ptr redex)
     g_ptr tail  = output;
     while (fgets(buf, sizeof (buf), fp) != NULL) {
 	buf[strlen(buf)-1] = 0;
-	SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, buf)));
+	SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(stringsp, buf)));
 	SET_CONS_TL(tail, Make_NIL());
 	tail = GET_CONS_TL(tail);
     }
@@ -122,7 +123,7 @@ ARGS(g_ptr redex)
     g_ptr tail = redex;
     int i = 0;
     while( fl_args[i] != NULL ) {
-	SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, fl_args[i])));
+	SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(stringsp, fl_args[i])));
 	SET_CONS_TL(tail, Make_NIL());
 	tail = GET_CONS_TL(tail);
 	i++;
@@ -148,7 +149,7 @@ etime(g_ptr redex)
     if( is_fail(res) ) {
 	MAKE_REDEX_FAILURE(redex, FailBuf);
     } else {
-	MAKE_REDEX_PAIR(redex, res, Make_STRING_leaf(wastrsave(&strings, buf)));
+	MAKE_REDEX_PAIR(redex, res, Make_STRING_leaf(wastrsave(stringsp, buf)));
     }
 }
 
@@ -167,7 +168,7 @@ wtime(g_ptr redex)
     } else {
 	Sprintf(buf, "%d.%d", Get_wseconds(&timer),
 			      Get_wmicroseconds(&timer)/100000);
-	MAKE_REDEX_PAIR(redex, res, Make_STRING_leaf(wastrsave(&strings, buf)));
+	MAKE_REDEX_PAIR(redex, res, Make_STRING_leaf(wastrsave(stringsp, buf)));
     }
 }
 
@@ -187,7 +188,7 @@ get_cur_eval_cond(g_ptr redex)
 static void
 get_USER(g_ptr redex)
 {
-    MAKE_REDEX_STRING(redex, wastrsave(&strings, getenv("USER")));
+    MAKE_REDEX_STRING(redex, wastrsave(stringsp, getenv("USER")));
 }
 
 static void
@@ -196,7 +197,7 @@ normalize_file(g_ptr redex)
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     realpath(GET_STRING(r), path_buf);
-    MAKE_REDEX_STRING(redex, wastrsave(&strings, path_buf));
+    MAKE_REDEX_STRING(redex, wastrsave(stringsp, path_buf));
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
@@ -227,6 +228,10 @@ System_Install_Functions()
     Add_ExtAPI_Function("etime", "-", FALSE,
 		GLmake_arrow(tv1, GLmake_tuple(tv1,GLmake_string())),
 		etime);
+
+    Add_ExtAPI_Function("load_shared_library", "1", FALSE,
+			 GLmake_arrow(GLmake_string(), GLmake_string()),
+			 load_shared_library);
 
     Add_ExtAPI_Function("get_stack_trace", "1", FALSE,
 			 GLmake_arrow(GLmake_void(),
@@ -278,6 +283,67 @@ get_binary_directory()
 	path_buf[plen-11] = 0;
 	strcat(path_buf, "/bin");
     }
-    string res = wastrsave(&strings, path_buf);
+    string res = wastrsave(stringsp, path_buf);
     return res;
 }
+
+// Code to load yaccfl parsers
+
+#include <dlfcn.h>  // Load last to avoid clashes with other .h definitions
+
+static void
+load_shared_library(g_ptr redex)
+{
+    bool    (*Install_function)();
+    g_ptr   glibname;
+    string  libname;
+    const char *err_msgs = NULL;
+
+    EXTRACT_1_ARG(redex, glibname);
+    libname = GET_STRING(glibname);
+    
+
+    string shared_lib_name = realpath(tprintf("lib%s.so", libname), path_buf);
+    if(  !shared_lib_name ) {
+	shared_lib_name =
+		realpath(tprintf("%s/lib%s.so",RCBinary_dir,libname),path_buf);
+	if( !shared_lib_name ) {
+	    string msg = Fail_pr("Cannot find shared library: lib%s.so\n",
+					      libname);
+	    MAKE_REDEX_FAILURE(redex,msg);
+	    return;
+	}
+    }
+FP(err_fp, "shared_lib_name: |%s|\n", shared_lib_name);
+    void *handle = dlopen(shared_lib_name, RTLD_NOW);
+
+    if( !handle ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("load_shared_library failed: %s\n",
+					  dlerror()));
+	return;
+    }
+    dlerror();
+
+    string fun_name = tprintf("Install_%s", libname);
+    Install_function = (bool (*)()) dlsym(handle, fun_name);
+
+    err_msgs = dlerror();
+
+    if( err_msgs ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot find %s: %s\n",
+					  fun_name, err_msgs));
+	return;
+    }
+    dlerror();
+
+    if( Install_function() == FALSE ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Install function %s failed: %s\n",
+					  fun_name, FailBuf));
+	return;
+    }
+    
+    MAKE_REDEX_STRING(redex,
+		      Make_STRING_leaf(wastrsave(stringsp, shared_lib_name)));
+    return;
+}
+

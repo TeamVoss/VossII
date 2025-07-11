@@ -11,7 +11,7 @@
 /************************************************************************/
 /*			Global Variables				*/
 /************************************************************************/
-extern str_mgr  strings;
+extern str_mgr  *stringsp;
 extern char     FailBuf[4096];
 extern jmp_buf  *start_envp;
 extern g_ptr    root_node;
@@ -411,8 +411,8 @@ tcl_to_g_ptr(string txt, typeExp_ptr type, g_ptr *resp)
             }
         case string_tp:
             {
-                string res = wastrsave(&strings, txt);
-                *resp = Make_STRING_leaf(wastrsave(&strings, res));
+                string res = wastrsave(stringsp, txt);
+                *resp = Make_STRING_leaf(wastrsave(stringsp, res));
                 return TRUE;
             }
         case int_tp:

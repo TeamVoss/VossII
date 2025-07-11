@@ -23,7 +23,7 @@ extern bool		RCadd_debug_info;
 extern bool		Do_gc_asap;
 extern bool		Interrupt_asap;
 extern bool		print_warnings;
-extern str_mgr		strings;
+extern str_mgr		*stringsp;
 extern FILE		*odests_fp;
 extern FILE		*yyin;
 extern old_yyin_ptr	cur_file;
@@ -501,8 +501,8 @@ G_Init()
     new_buf(&fn_trace_buf, 1000, sizeof(string));
     new_buf(&global_gc_buf, 100, sizeof(g_ptr));
     do_gc_asap = FALSE;
-    space_const = wastrsave(&strings, " ");
-    quantifier_name = wastrsave(&strings, "q");
+    space_const = wastrsave(stringsp, " ");
+    quantifier_name = wastrsave(stringsp, "q");
     create_hash(&gc_protect_tbl, 100, ptr_hash, ptr_equ);
     create_hash(&Constructor_Table, 100, Ustr_hash, Ustr_equ);
     create_hash(&TypeSignatureTbl, 100, Ustr_hash, Ustr_equ);
@@ -517,41 +517,41 @@ G_Init()
 #endif
     s = strtemp(RC_TMP_FILE_DIR);
     s = strappend("/FL_BOOL2STR_XXXXXX");
-    tmp_file_template1 = wastrsave(&strings, s);
+    tmp_file_template1 = wastrsave(stringsp, s);
     if( profiling_active ) {
 	new_buf(&profiling_buf, 100, sizeof(prof_timing_rec));
 	create_hash(&profiling_tbl, 100, Ustr_hash, Ustr_equ);
 	new_mgr(&profile_data_rec_mgr, sizeof(profile_data_rec));
     }
     /* Place strings in unique table */
-    s_T = wastrsave(&strings, "T");
-    s_F = wastrsave(&strings, "F");
-    s_colon = wastrsave(&strings, ":");
-    s_seq = wastrsave(&strings, "seq");
-    s_fseq = wastrsave(&strings, "fseq");
-    s_catch = wastrsave(&strings, "catch");
-    s_gen_catch = wastrsave(&strings, "gen_catch");
-    s_hd = wastrsave(&strings, "hd");
-    s_tl = wastrsave(&strings, "tl");
-    s_fst = wastrsave(&strings, "fst");
-    s_snd = wastrsave(&strings, "snd");
-    s_ite = wastrsave(&strings, "symbolic if-the-else");
-    s_update_ref_var = wastrsave(&strings, "symbolic :=");
+    s_T = wastrsave(stringsp, "T");
+    s_F = wastrsave(stringsp, "F");
+    s_colon = wastrsave(stringsp, ":");
+    s_seq = wastrsave(stringsp, "seq");
+    s_fseq = wastrsave(stringsp, "fseq");
+    s_catch = wastrsave(stringsp, "catch");
+    s_gen_catch = wastrsave(stringsp, "gen_catch");
+    s_hd = wastrsave(stringsp, "hd");
+    s_tl = wastrsave(stringsp, "tl");
+    s_fst = wastrsave(stringsp, "fst");
+    s_snd = wastrsave(stringsp, "snd");
+    s_ite = wastrsave(stringsp, "symbolic if-the-else");
+    s_update_ref_var = wastrsave(stringsp, "symbolic :=");
     //
-    s_APPLY       = wastrsave(&strings, "APPLY");
-    s_VAR         = wastrsave(&strings, "VAR");
-    s_USERDEF     = wastrsave(&strings, "USERDEF");
-    s_LAMBDA      = wastrsave(&strings, "LAMBDA");
-    s_LEAF        = wastrsave(&strings, "LEAF");
-    s_CONS        = wastrsave(&strings, "CONS");
-    s_NIL         = wastrsave(&strings, "NIL");
-    s_INT         = wastrsave(&strings, "INT");
-    s_STRING      = wastrsave(&strings, "STRING");
-    s_BOOL        = wastrsave(&strings, "BOOL");
-    s_BEXPR       = wastrsave(&strings, "BEXPR");
-    s_EXT_OBJ     = wastrsave(&strings, "EXT_OBJ");
-    s_PRIM_FN     = wastrsave(&strings, "PRIM_FN");
-    s_EXT_PRIM_FN = wastrsave(&strings, "EXT_PRIM_FN");
+    s_APPLY       = wastrsave(stringsp, "APPLY");
+    s_VAR         = wastrsave(stringsp, "VAR");
+    s_USERDEF     = wastrsave(stringsp, "USERDEF");
+    s_LAMBDA      = wastrsave(stringsp, "LAMBDA");
+    s_LEAF        = wastrsave(stringsp, "LEAF");
+    s_CONS        = wastrsave(stringsp, "CONS");
+    s_NIL         = wastrsave(stringsp, "NIL");
+    s_INT         = wastrsave(stringsp, "INT");
+    s_STRING      = wastrsave(stringsp, "STRING");
+    s_BOOL        = wastrsave(stringsp, "BOOL");
+    s_BEXPR       = wastrsave(stringsp, "BEXPR");
+    s_EXT_OBJ     = wastrsave(stringsp, "EXT_OBJ");
+    s_PRIM_FN     = wastrsave(stringsp, "PRIM_FN");
+    s_EXT_PRIM_FN = wastrsave(stringsp, "EXT_PRIM_FN");
     s_NONE        = Mk_constructor_name("NONE");
     s_SOME        = Mk_constructor_name("SOME");
 }
@@ -560,14 +560,14 @@ string
 Mk_constructor_name(string constr_name)
 {
     string name = strtemp("!,.:");
-    name = wastrsave(&strings, strappend(constr_name));
+    name = wastrsave(stringsp, strappend(constr_name));
     return name;
 }
 
 void
 AddComment(string s)
 {
-    comment_list_ptr clp = (comment_list_ptr) new_rec(&comment_list_rec_mgr);	    clp->comment = wastrsave(&strings, s);
+    comment_list_ptr clp = (comment_list_ptr) new_rec(&comment_list_rec_mgr);	    clp->comment = wastrsave(stringsp, s);
     clp->line = line_nbr;
     clp->next = cur_doc_comments;
     cur_doc_comments = clp;
@@ -729,7 +729,7 @@ Make_Printf_Primitive(int pr_fn, string pat)
 	SET_TYPE(fn_node, LEAF);
 	SET_LEAF_TYPE(fn_node, PRIM_FN);
 	SET_PRIM_FN(fn_node, P_PRINT);
-	res = Make_APPL_ND(fn_node, Make_STRING_leaf(wastrsave(&strings, pat)));
+	res = Make_APPL_ND(fn_node, Make_STRING_leaf(wastrsave(stringsp, pat)));
 	return( res );
     }
     res = Get_node();
@@ -737,7 +737,7 @@ Make_Printf_Primitive(int pr_fn, string pat)
     SET_LEAF_TYPE(res, PRIM_FN);
     SET_PRIM_FN(res, pr_fn);
     SET_LINE_NBR(res,line_nbr);
-    string spat = wastrsave(&strings, pat);
+    string spat = wastrsave(stringsp, pat);
     SET_PRINTF_STRING(res, spat);
     return( res );
 }
@@ -752,7 +752,7 @@ Make_Debug_Primitive(string name, string file, int line)
     SET_PRIM_FN(fn_node, P_DEBUG);
     SET_LINE_NBR(fn_node,line_nbr);
     sprintf(buf, "%s at line %d in file %s", name, line, file);
-    string res = wastrsave(&strings, buf);
+    string res = wastrsave(stringsp, buf);
     SET_DEBUG_STRING(fn_node, res);
     return( fn_node );
 }
@@ -877,7 +877,7 @@ Make_PAIR_ND(g_ptr fst, g_ptr snd)
 g_ptr
 Make_Named_Arg(string name, g_ptr expr)
 {
-    string pname = wastrsave(&strings, name);
+    string pname = wastrsave(stringsp, name);
     return( Make_PAIR_ND(Make_0inp_Primitive(P_NAMED_ARG),
 			 Make_PAIR_ND(Make_STRING_leaf(pname), expr)) );
 }
@@ -913,7 +913,7 @@ Find_new_free_var(g_ptr expr)
     do {
 	Sprintf(buf, "_q_%d", find_new_var_cnt++);
     } while( is_free(buf, expr) );
-    return( wastrsave(&strings, buf) );
+    return( wastrsave(stringsp, buf) );
 }
 
 g_ptr
@@ -925,7 +925,7 @@ Make_arglist(int cnt)
     if( cnt == 0 )
 	return(Make_NIL());
     Sprintf(buf, "Arg%d", cnt);
-    name = wastrsave(&strings, buf);
+    name = wastrsave(stringsp, buf);
     return( Make_2inp_Primitive(P_STRICT_TUPLE, Make_VAR_leaf(name),
 					 Make_arglist(cnt-1)) );
 }
@@ -940,7 +940,7 @@ Add_args(int cnt, g_ptr expr)
 	return(expr);
 
     Sprintf(buf, "Arg%d", cnt);
-    name = wastrsave(&strings, buf);
+    name = wastrsave(stringsp, buf);
     return( Make_Lambda(name, Add_args(cnt-1,expr)) );
 }
 
@@ -1080,7 +1080,7 @@ Print_Result(result_ptr res, odests fp, bool print)
 	SET_TYPE(res->expr, LEAF);
 	SET_LEAF_TYPE(res->expr, PRIM_FN);
 	SET_PRIM_FN(res->expr, P_FAIL);
-	SET_FAIL_STRING(res->expr, wastrsave(&strings, FailBuf));
+	SET_FAIL_STRING(res->expr, wastrsave(stringsp, FailBuf));
 	FP(err_fp, "Failure:    %s", FailBuf);
 	FailBuf[0] = 0;
 	ok = FALSE;
@@ -1783,7 +1783,7 @@ Gen_map2(string parent_op, g_ptr (*fun2)(g_ptr,g_ptr),
     if( read_only ) {
 	if( !walk2_graph(&ir, l, r) ) {
 	    res = Make_0inp_Primitive(P_FAIL);
-	    SET_FAIL_STRING(res, wastrsave(&strings, FailBuf));
+	    SET_FAIL_STRING(res, wastrsave(stringsp, FailBuf));
 	} else {
 	    res = NULL;
 	}
@@ -1910,14 +1910,14 @@ leaftype2str(g_ptr np)
 #if 0
 #define FAIL_GM2(l,r,msg) {						    \
 			res = Make_0inp_Primitive(P_FAIL);		    \
-   SET_FAIL_STRING(res,wastrsave(&strings, Fail_pr("Structural mismatch in %s\n(%s)\n", ip->parent_op, (msg))));\
+   SET_FAIL_STRING(res,wastrsave(stringsp, Fail_pr("Structural mismatch in %s\n(%s)\n", ip->parent_op, (msg))));\
    GRl(l); GRl(r);							    \
 			return res;					    \
 		      }
 #else
 #define FAIL_GM2(l,r,msg) {						    \
 			res = Make_0inp_Primitive(P_FAIL);		    \
-   SET_FAIL_STRING(res,wastrsave(&strings, Fail_pr("Structural mismatch in %s\n(%s)\n", ip->parent_op, (msg))));\
+   SET_FAIL_STRING(res,wastrsave(stringsp, Fail_pr("Structural mismatch in %s\n(%s)\n", ip->parent_op, (msg))));\
 			return res;					    \
 		      }
 #endif
@@ -2061,7 +2061,7 @@ gen_map2_rec(gmap_info_ptr ip, g_ptr l, g_ptr r)
 			if( lref_var != rref_var ) {
 			    res = Make_0inp_Primitive(P_FAIL);
 			    SET_FAIL_STRING(res,
-				wastrsave(&strings, 
+				wastrsave(stringsp, 
 				    Fail_pr("Different ref vars in gen_map2")));
 			    return res;
 			}
@@ -2390,7 +2390,7 @@ Get_fl_stack_trace()
     string *namep;
     g_ptr res = Make_NIL();
     FOR_BUF(&fn_trace_buf, string, namep) {
-	g_ptr nm = Make_STRING_leaf(wastrsave(&strings, *namep));
+	g_ptr nm = Make_STRING_leaf(wastrsave(stringsp, *namep));
 	res = Make_CONS_ND(nm, res);
     }
     return res;
@@ -2441,11 +2441,11 @@ Get_stack_trace(int max_entries)
 		i++;
 	    }
 	}
-	res = wastrsave(&strings, res);
+	res = wastrsave(stringsp, res);
 	free_temp_str_mgr(ts);
 	return( res );
     } else {
-	return( wastrsave(&strings, "") );
+	return( wastrsave(stringsp, "") );
     }
 }
 
@@ -2453,7 +2453,7 @@ g_ptr
 Append_string_to_tail(g_ptr tail, string name)
 {
     ASSERT(IS_CONS(tail));
-    SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, name)));
+    SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(stringsp, name)));
     g_ptr n_tail = Make_NIL();
     SET_CONS_TL(tail, n_tail);
     return( n_tail );
@@ -2700,7 +2700,7 @@ type_constr_rec(int cnt, int arg_cnt, g_ptr constr)
     if( cnt > arg_cnt )
 	return( constr );
     Sprintf(buf, "Arg%d", cnt);
-    name = wastrsave(&strings, buf);
+    name = wastrsave(stringsp, buf);
     return(Make_2inp_Primitive(P_TUPLE,
 			       type_constr_rec(cnt+1, arg_cnt, constr),
 			       Make_VAR_leaf(name)));
@@ -3683,7 +3683,7 @@ traverse_left(g_ptr oroot)
 			SET_CONS_HD(redex, arg1);
 			INC_REFCNT(arg1);
 			SET_CONS_TL(redex,
-				    Make_STRING_leaf(wastrsave(&strings,buf)));
+				    Make_STRING_leaf(wastrsave(stringsp,buf)));
 			goto finish1;
 		    }
 
@@ -3733,7 +3733,7 @@ traverse_left(g_ptr oroot)
                     (void) updateRCvalue(GET_STRING(arg1),GET_STRING(arg2));
                     SET_TYPE(redex, LEAF);
                     SET_LEAF_TYPE(redex, STRING);
-                    SET_STRING(redex, wastrsave(&strings, s));
+                    SET_STRING(redex, wastrsave(stringsp, s));
 		    goto finish2;
 
 		case P_SUC:
@@ -3826,7 +3826,7 @@ traverse_left(g_ptr oroot)
                         s = strappend(GET_STRING(GET_CONS_HD(ntmp)));
                         ntmp = GET_CONS_TL(ntmp);
                     }
-		    arg2 = Make_STRING_leaf(wastrsave(&strings, s));
+		    arg2 = Make_STRING_leaf(wastrsave(stringsp, s));
 		    OVERWRITE(redex, arg2);
 		    goto finish1;
 
@@ -3887,7 +3887,7 @@ traverse_left(g_ptr oroot)
 			if( *(res+len-1) == '\n' ) {
 			    *(res+len-1) = 0;
 			}
-                        SET_STRING(redex, wastrsave(&strings, res));
+                        SET_STRING(redex, wastrsave(stringsp, res));
 			free(res);
                         goto finish1; 
                     }
@@ -3996,7 +3996,7 @@ traverse_left(g_ptr oroot)
 		    odests_fp = NULL;
 		    SET_TYPE(redex, LEAF);
 		    SET_LEAF_TYPE(redex, STRING);
-		    SET_STRING(redex, wastrsave(&strings,buf));
+		    SET_STRING(redex, wastrsave(stringsp,buf));
 		    goto finish2;
 
 		case P_EMPTY:
@@ -4019,7 +4019,7 @@ traverse_left(g_ptr oroot)
                             s = getRCvalue(GET_STRING(arg1));
 			    SET_TYPE(redex, LEAF);
                             SET_LEAF_TYPE(redex, STRING);
-                            SET_STRING(redex, wastrsave(&strings, s));
+                            SET_STRING(redex, wastrsave(stringsp, s));
                             break;
 			case P_ORD:
 			    if( strlen(GET_STRING(arg1)) != 1 ) {
@@ -4040,7 +4040,7 @@ traverse_left(g_ptr oroot)
                             SET_LEAF_TYPE(redex, STRING);
 			    buf[0] = GET_INT(arg1);
 			    buf[1] = 0;
-                            SET_STRING(redex, wastrsave(&strings, buf));
+                            SET_STRING(redex, wastrsave(stringsp, buf));
                             break;
 			case P_EVAL:
 			    if( perform_fl_command(GET_STRING(arg1), TRUE) ) {
@@ -4053,7 +4053,7 @@ traverse_left(g_ptr oroot)
 			    Sprintf(buf, "%s",Arbi_ToString(GET_AINT(arg1),10));
 			    SET_TYPE(redex, LEAF);
 			    SET_LEAF_TYPE(redex, STRING);
-			    SET_STRING(redex, wastrsave(&strings, buf));
+			    SET_STRING(redex, wastrsave(stringsp, buf));
 			    break;
 			case P_IS_CONS:
 			    if( !IS_CONS(arg1) || GET_CONS_HD(arg1) == NULL ) {
@@ -4124,7 +4124,7 @@ traverse_left(g_ptr oroot)
                     if( is_fail(arg2) )
                         goto arg2_fail2;
 		    Sprintf(buf, "%%%s%d", GET_STRING(arg2), uniq_quant_cnt++);
-		    arg3 = Make_BOOL_leaf(B_Var(wastrsave(&strings, buf)));
+		    arg3 = Make_BOOL_leaf(B_Var(wastrsave(stringsp, buf)));
 		    SET_APPLY_LEFT(redex, Make_1inp_Primitive(
 						(pfn == P_FORALL)?
 							P_QUANT_FORALL:
@@ -4347,7 +4347,7 @@ traverse_left(g_ptr oroot)
 		    SET_LEAF_TYPE(redex, STRING);
 		    s = strtemp(GET_STRING(arg1));
 		    s = strappend(GET_STRING(arg2));
-		    SET_STRING(redex, wastrsave(&strings, s));
+		    SET_STRING(redex, wastrsave(stringsp, s));
 		    goto finish2;
 
 		case P_HELP:
@@ -4389,11 +4389,11 @@ traverse_left(g_ptr oroot)
 			t = GET_STRING(arg1);
 			buf[0] = *t;
 			buf[1] = 0;
-			SET_STRING(redex, wastrsave(&strings, buf));
+			SET_STRING(redex, wastrsave(stringsp, buf));
 		    } else {
 			char *t;
 			t = GET_STRING(arg1);
-			SET_STRING(redex, wastrsave(&strings, t+1));
+			SET_STRING(redex, wastrsave(stringsp, t+1));
 		    }
 		    goto finish1;
 
@@ -4698,10 +4698,10 @@ traverse_left(g_ptr oroot)
                     arg1  = traverse_left(GET_APPLY_RIGHT(*sp));
                     if( is_fail(arg1) ) goto arg1_fail1;
                     if(!load_plugin(GET_STRING(arg1), &s)) {
-                        Fail_pr(wastrsave(&strings, s));
+                        Fail_pr(wastrsave(stringsp, s));
                         goto fail1;
                     }
-                    MAKE_REDEX_STRING(redex, wastrsave(&strings, s));
+                    MAKE_REDEX_STRING(redex, wastrsave(stringsp, s));
                     goto finish1;
 
 		case P_NAMED_ARG:
@@ -4795,7 +4795,7 @@ traverse_left(g_ptr oroot)
         SET_TYPE(redex, LEAF);
         SET_LEAF_TYPE(redex, PRIM_FN);
         SET_PRIM_FN(redex, P_FAIL);
-	SET_FAIL_STRING(redex, wastrsave(&strings, FailBuf));
+	SET_FAIL_STRING(redex, wastrsave(stringsp, FailBuf));
         sp = sp + 1; depth = depth - 1;
         root = redex;
 	DO_TRACE_DBG();
@@ -4804,7 +4804,7 @@ traverse_left(g_ptr oroot)
         SET_TYPE(redex, LEAF);
         SET_LEAF_TYPE(redex, PRIM_FN);
         SET_PRIM_FN(redex, P_FAIL);
-	SET_FAIL_STRING(redex, wastrsave(&strings, FailBuf));
+	SET_FAIL_STRING(redex, wastrsave(stringsp, FailBuf));
         sp = sp + 2; depth = depth - 2;
         root = redex;
 	DO_TRACE_DBG();
@@ -4813,7 +4813,7 @@ traverse_left(g_ptr oroot)
         SET_TYPE(redex, LEAF);
         SET_LEAF_TYPE(redex, PRIM_FN);
         SET_PRIM_FN(redex, P_FAIL);
-	SET_FAIL_STRING(redex, wastrsave(&strings, FailBuf));
+	SET_FAIL_STRING(redex, wastrsave(stringsp, FailBuf));
         sp = sp + 3; depth = depth - 3;
         root = redex;
 	DO_TRACE_DBG();
@@ -5471,7 +5471,7 @@ do_explode(string s)
     buf[0] = *s;
     buf[1] = 0;
     s++;
-    new = wastrsave(&strings, buf);
+    new = wastrsave(stringsp, buf);
     return( Make_CONS_ND(Make_STRING_leaf(new), do_explode(s)) );
 }
 
@@ -5512,7 +5512,7 @@ pat_match_rec(g_ptr arg, g_ptr E, int cnt, string *name, int *tot_cnt)
 	if( res == NULL )
 	    return( NULL );
 	Sprintf(buf, "Arg%d", cnt);
-	res = Make_APPL_ND(res, Make_VAR_leaf(wastrsave(&strings, buf)));
+	res = Make_APPL_ND(res, Make_VAR_leaf(wastrsave(stringsp, buf)));
 	return( pat_match_rec(GET_APPLY_LEFT(arg), res, cnt+1, name, tot_cnt) );
     }
     ASSERT( GET_TYPE(arg) == LEAF );
@@ -5702,7 +5702,7 @@ trarg(g_ptr node, g_ptr E, bool constructor)
 					Make_2inp_Primitive(P_NOT_EQUAL,
 					    Make_VAR_leaf(new),
 					    Make_STRING_leaf(
-						      wastrsave(&strings, ""))),
+						      wastrsave(stringsp, ""))),
 					Make_APPL_ND(
 					    trarg(
 						a,
@@ -5889,7 +5889,7 @@ make_Destructor(g_ptr np)
 	Rprintf("Illegal pattern in function definition(5)");
     string ret = strtemp("__DeStRuCtOr");
     ret = strappend(GET_VAR(np));
-    ret = wastrsave(&strings, ret);
+    ret = wastrsave(stringsp, ret);
     if( Find_Function(symb_tbl, np) == NULL ) {
 	Rprintf(
        "Illegal pattern in function definition(6). %s is not a type constructor\n",
@@ -6079,7 +6079,7 @@ g_b_ite(g_ptr l, g_ptr r)
 	    string m;
 	    m = Fail_pr("if-then-else over non-matching structures\n%s\n",
 			reason);
-            m = wastrsave(&strings, m);
+            m = wastrsave(stringsp, m);
             SET_FAIL_STRING(res, m);
             return( res );
         }

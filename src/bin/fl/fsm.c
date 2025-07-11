@@ -19,7 +19,7 @@ value_type		old_type;
 
 /********* Global variables referenced ***********/
 extern symbol_tbl_ptr	symb_tbl;
-extern str_mgr		strings;
+extern str_mgr		*stringsp;
 extern jmp_buf		*start_envp;
 extern bool		gui_mode;
 extern bool		use_stdout;
@@ -489,15 +489,15 @@ Fsm_Init()
     new_mgr(&fsm_rec_mgr, sizeof(fsm_rec));
     new_mgr(&ste_rec_mgr, sizeof(ste_rec));
     new_mgr(&vstate_rec_mgr, sizeof(vstate_rec));
-    s_draw_repeat =   wastrsave(&strings, "draw_repeat_nd");
+    s_draw_repeat =   wastrsave(stringsp, "draw_repeat_nd");
 
-    s_ES =	    wastrsave(&strings, "");
-    s_use_bdds =    wastrsave(&strings, "bdd");
-    s_use_bexprs =  wastrsave(&strings, "bexpr");
-    s_use_ints =    wastrsave(&strings, "int");
-    s_DummyOut =    wastrsave(&strings, "DummyOut");
-    s_fsm =	    wastrsave(&strings, "fsm");
-    s_ste =	    wastrsave(&strings, "ste");
+    s_ES =	    wastrsave(stringsp, "");
+    s_use_bdds =    wastrsave(stringsp, "bdd");
+    s_use_bexprs =  wastrsave(stringsp, "bexpr");
+    s_use_ints =    wastrsave(stringsp, "int");
+    s_DummyOut =    wastrsave(stringsp, "DummyOut");
+    s_fsm =	    wastrsave(stringsp, "fsm");
+    s_ste =	    wastrsave(stringsp, "ste");
     s_SCH_INT =	    Mk_constructor_name("SCH_INT");
     s_SCH_LEAF =    Mk_constructor_name("SCH_LEAF");
     //
@@ -547,7 +547,7 @@ Fsm_Init()
     create_hash(&state_holding_tbl, 50, str_hash, str_equ);
     string *p = state_holding_names;
     for (unsigned int i = 0; i < sizeof(state_holding_names) / sizeof(string) ; i++) {
-	string n = wastrsave(&strings, *p);
+	string n = wastrsave(stringsp, *p);
 	insert_hash(&state_holding_tbl, n, n);
 	p++;
     }
@@ -936,7 +936,7 @@ nodes(g_ptr redex)
 	int start = np->vec->map->from;
 	string nname = get_real_name(np->vec, np->idx-start);
 	if( *nname != '!' ) {
-	    nname = wastrsave(&strings, nname);
+	    nname = wastrsave(stringsp, nname);
 	    int idx = name2idx(nname);
 	    if( idx >= 0 ) { 
 		push_buf(&res_buf, &nname);
@@ -989,12 +989,12 @@ edges(g_ptr redex)
         int start = np->vec->map->from;
         string sname = get_real_name(np->vec, np->idx-start);
         if(*sname != '!') {
-	    g_ptr from = Make_STRING_leaf(wastrsave(&strings, sname));
+	    g_ptr from = Make_STRING_leaf(wastrsave(stringsp, sname));
 	    for(idx_list_ptr ilp = np->fanouts; ilp != NULL; ilp = ilp->next) {
                 ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, ilp->idx);
 	        FOREACH_NODE(nd, cp->outs) {
                     string tname = idx2name(nd);
-		    g_ptr to = Make_STRING_leaf(wastrsave(&strings, tname));
+		    g_ptr to = Make_STRING_leaf(wastrsave(stringsp, tname));
                     g_ptr pair = Make_PAIR_ND(from, to);
                     APPEND1(tail, pair);
 	        }
@@ -1023,7 +1023,7 @@ vectors(g_ptr redex)
 	    string vec = strtemp(vip->hierarchy);
 	    vec = strappend(vip->local_name);
 	    if( *vec != '!' ) {
-		vec = wastrsave(&strings, vec);
+		vec = wastrsave(stringsp, vec);
 		push_buf(&res_buf, &vec);
 	    }
 	}
@@ -1101,7 +1101,7 @@ visualization_nodes(g_ptr redex)
 	    int start = np->vec->map->from;
 	    string nname = get_real_name(np->vec, np->idx-start);
 	    if( *nname != '!' ) {
-		g_ptr s = Make_STRING_leaf(wastrsave(&strings, nname));
+		g_ptr s = Make_STRING_leaf(wastrsave(stringsp, nname));
 		APPEND1(tail, s);
 	    }
 	}
@@ -1359,8 +1359,8 @@ get_visualization_attributes(g_ptr redex)
     g_ptr tail = redex;
     attr_list_ptr ap = vp->attrs;
     while( ap != NULL ) {
-	g_ptr nm = Make_STRING_leaf(wastrsave(&strings, ap->name));
-	g_ptr vl = Make_STRING_leaf(wastrsave(&strings, ap->value));
+	g_ptr nm = Make_STRING_leaf(wastrsave(stringsp, ap->name));
+	g_ptr vl = Make_STRING_leaf(wastrsave(stringsp, ap->value));
 	APPEND1(tail, Make_PAIR_ND(nm, vl));
 	ap = ap->next;
     }
@@ -1468,7 +1468,7 @@ fanin(g_ptr redex)
     if( composite >= 0 ) {
 	ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, composite);
 	FOREACH_NODE(nd, cp->inps) {
-	    g_ptr s = Make_STRING_leaf(wastrsave(&strings, idx2name(nd)));
+	    g_ptr s = Make_STRING_leaf(wastrsave(stringsp, idx2name(nd)));
 	    APPEND1(tail, s);
 	}
     }
@@ -1497,10 +1497,10 @@ excitation_function(g_ptr redex)
     MAKE_REDEX_NIL(redex);
     int composite = np->composite;
     if( composite < 0 ) {
-	MAKE_REDEX_STRING(redex, wastrsave(&strings, "Constant or input"));
+	MAKE_REDEX_STRING(redex, wastrsave(stringsp, "Constant or input"));
     } else {
 	ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, composite);
-	MAKE_REDEX_STRING(redex, wastrsave(&strings, op2str(cp)));
+	MAKE_REDEX_STRING(redex, wastrsave(stringsp, op2str(cp)));
     }
     pop_fsm();
     DEC_REF_CNT(l);
@@ -1541,7 +1541,7 @@ fanin_dfs(g_ptr redex)
 	cnt--;
 	if( find_hash(&done_tbl, INT2PTR(nd_idx)) == NULL ) {
 	    insert_hash(&done_tbl, INT2PTR(nd_idx), INT2PTR(1));
-	    string name = wastrsave(&strings, idx2name(nd_idx));
+	    string name = wastrsave(stringsp, idx2name(nd_idx));
 	    APPEND1(tail, Make_STRING_leaf(name));
 	    bool keep_going = TRUE;
 	    if( cnt < 0 ) {
@@ -1595,7 +1595,7 @@ fanout(g_ptr redex)
     for(idx_list_ptr ilp = np->fanouts; ilp != NULL; ilp = ilp->next) {
 	ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, ilp->idx);
 	FOREACH_NODE(nd, cp->outs) {
-	    g_ptr s = Make_STRING_leaf(wastrsave(&strings, idx2name(nd)));
+	    g_ptr s = Make_STRING_leaf(wastrsave(stringsp, idx2name(nd)));
 	    APPEND1(tail, s);
 	}
     }
@@ -1633,7 +1633,7 @@ fanout_dfs(g_ptr redex)
 	cnt--;
 	if( find_hash(&done_tbl, INT2PTR(nd_idx)) == NULL ) {
 	    insert_hash(&done_tbl, INT2PTR(nd_idx), INT2PTR(1));
-	    string name = wastrsave(&strings, idx2name(nd_idx));
+	    string name = wastrsave(stringsp, idx2name(nd_idx));
 	    APPEND1(tail, Make_STRING_leaf(name));
 	    bool keep_going = TRUE;
 	    if( cnt < 0 ) {
@@ -1682,7 +1682,7 @@ node2vector(g_ptr redex)
     nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
     string vec = strtemp(np->vec->hierarchy);
     vec = strappend(np->vec->local_name);
-    vec = wastrsave(&strings, vec);
+    vec = wastrsave(stringsp, vec);
     MAKE_REDEX_STRING(redex, vec);
     pop_fsm();
     DEC_REF_CNT(l);
@@ -1720,7 +1720,7 @@ node2value_list(g_ptr redex)
 	    s = space+1;
 	    string end = index(s,'}');
 	    *end = '\0';
-	    string name = wastrsave(&strings, s);
+	    string name = wastrsave(stringsp, s);
 	    g_ptr pair = Make_CONS_ND(Make_INT_leaf(code),
 				      Make_STRING_leaf(name));
 	    APPEND1(tail, pair)
@@ -1779,7 +1779,7 @@ basename(g_ptr redex)
 	return;
     }
     string bname = idx2name(idx);
-    MAKE_REDEX_STRING(redex, wastrsave(&strings, bname));
+    MAKE_REDEX_STRING(redex, wastrsave(stringsp, bname));
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -1841,7 +1841,7 @@ get_weak_expressions(g_ptr redex)
 	char nm[20];
 	sprintf(nm, "_%d", idx);
 	idx++;
-	string name = wastrsave(&strings, nm);
+	string name = wastrsave(stringsp, nm);
 	g_ptr pair = Make_PAIR_ND(Make_STRING_leaf(name), Make_BOOL_leaf(*fp));
 	APPEND1(tail, pair);
     }
@@ -1872,7 +1872,7 @@ get_abstract_depends(g_ptr redex)
 	char nm[20];
 	sprintf(nm, "_%d", idx);
 	idx++;
-	string name = wastrsave(&strings, nm);
+	string name = wastrsave(stringsp, nm);
 	insert_hash(&abs_tbl, name, FORMULA2PTR(*fp));
     }
     Get_abstract_depends(redex, &abs_tbl, obj);
@@ -2049,7 +2049,7 @@ visualization_vecs2tags(g_ptr redex)
 	}
 	if( used ) {
 	    Sprintf(buf, "an%06d", anon);
-	    string an = wastrsave(&strings, buf);
+	    string an = wastrsave(stringsp, buf);
 	    if( exact_found ) {
 		SET_CONS_HD(ftail, Make_STRING_leaf(an));
 		SET_CONS_TL(ftail, Make_NIL());
@@ -2067,7 +2067,7 @@ visualization_vecs2tags(g_ptr redex)
 	int anon_cnt = COUNT_BUF(&(vp->anon_buf));
 	push_buf(&(vp->anon_buf), &full_list);
 	Sprintf(buf, "an%06d", anon_cnt);
-	string anon = wastrsave(&strings, buf);
+	string anon = wastrsave(stringsp, buf);
 	SET_CONS_HD(ftail, Make_STRING_leaf(anon));
 	SET_CONS_TL(ftail, Make_NIL());
 	ftail = GET_CONS_TL(ftail);
@@ -2208,7 +2208,7 @@ visualize_fanin(g_ptr redex)
 	vecs = GET_CONS_TL(vecs);
     }
     pfn = gen_strappend(tmp_strs, "}");
-    res->pfn = wastrsave(&strings, pfn);
+    res->pfn = wastrsave(stringsp, pfn);
     res->vec = s_DummyOut;
     free_temp_str_mgr(tmp_strs);
     vp->sch = res;
@@ -2317,7 +2317,7 @@ visualize_get_shown_anons(g_ptr redex)
     g_ptr tl = redex;
     for(unint i = 0; i < COUNT_BUF(&(vp->anon_buf)); i++) {
 	Sprintf(buf, "an%06d", i);
-	APPEND1(tl, Make_STRING_leaf(wastrsave(&strings, buf)));
+	APPEND1(tl, Make_STRING_leaf(wastrsave(stringsp, buf)));
     }
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -2978,7 +2978,7 @@ ilist2nds(ilist_ptr il)
     g_ptr res = Make_NIL();
     g_ptr tail = res;
     FOREACH_NODE(nd, il) {
-	g_ptr s = Make_STRING_leaf(wastrsave(&strings, idx2name(nd)));
+	g_ptr s = Make_STRING_leaf(wastrsave(stringsp, idx2name(nd)));
 	SET_CONS_HD(tail, s);
 	SET_CONS_TL(tail, Make_NIL());
 	tail = GET_CONS_TL(tail);
@@ -2995,7 +2995,7 @@ split_vector_name(rec_mgr *vec_rec_mgrp, rec_mgr *range_rec_mgrp, string name)
     // Make strings permanent
     for(vec_ptr p = vp; p != NULL; p = p->next) {
 	if( p->type == TXT ) {
-	    p->u.name = wastrsave(&strings, p->u.name);
+	    p->u.name = wastrsave(stringsp, p->u.name);
 	}
     }
     return vp;
@@ -3006,7 +3006,7 @@ static string
 get_vector_signature(vec_ptr vp)
 {
     string sig = Get_vector_signature(&lstrings, vp);
-    return( wastrsave(&strings, sig) );
+    return( wastrsave(stringsp, sig) );
 }
 
 static fsm_ptr
@@ -4127,7 +4127,7 @@ vstate2str_fn(pointer p)
     } 
     print_sch_tree(vp, 1, vp->sch);
     pop_fsm();
-    return( wastrsave(&strings, "") );
+    return( wastrsave(stringsp, "") );
 }
 
 
@@ -4140,7 +4140,7 @@ sch2tcl(g_ptr *tlp, sch_ptr sch)
     if( sch->children == NULL ) {
 	Sprintf(buf, "tr_%d", sch2tcl_cnt);
 	sch2tcl_cnt++;
-	string res = wastrsave(&strings, buf);
+	string res = wastrsave(stringsp, buf);
 	//
 	string cmd = strtemp("set ");
 	strappend(res);
@@ -4149,7 +4149,7 @@ sch2tcl(g_ptr *tlp, sch_ptr sch)
 	strappend("} {");
 	strappend(sch->pfn);
 	strappend("} {}]");
-	cmd = wastrsave(&strings, cmd);
+	cmd = wastrsave(stringsp, cmd);
 	g_ptr nd = Make_STRING_leaf(cmd);
 	SET_CONS_HD(*tlp, nd);
 	SET_CONS_TL(*tlp, Make_NIL());
@@ -4164,7 +4164,7 @@ sch2tcl(g_ptr *tlp, sch_ptr sch)
     }
     Sprintf(buf, "tr_%d", sch2tcl_cnt);
     sch2tcl_cnt++;
-    string res = wastrsave(&strings, buf);
+    string res = wastrsave(stringsp, buf);
     string cmd = strtemp("set ");
     strappend(res);
     strappend(" [add_sch_object NODE {");
@@ -4178,7 +4178,7 @@ sch2tcl(g_ptr *tlp, sch_ptr sch)
 	strappend(*sp);
     }
     strappend("]]");
-    cmd = wastrsave(&strings, cmd);
+    cmd = wastrsave(stringsp, cmd);
     g_ptr nd = Make_STRING_leaf(cmd);
     SET_CONS_HD(*tlp, nd);
     SET_CONS_TL(*tlp, Make_NIL());
@@ -4380,7 +4380,7 @@ make_input_arg(g_ptr we, int sz, hash_record *vtblp, string hier, bool pdel)
 	// Make a temporary vector
 	Sprintf(buf, "__tmp%d", ++temporary_node_cnt);
 	string tname = mk_vec_name(buf, sz);
-	tname = wastrsave(&strings, tname);
+	tname = wastrsave(stringsp, tname);
 	inps = declare_vector(vtblp, hier, tname, FALSE, NULL, s_ES);
 	if( !compile_expr(vtblp, hier, inps, we, pdel) ) {
 	    return NULL;
@@ -4602,7 +4602,7 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	if( sz != sel_sz ) {
 	    FP(err_fp, "Slice operation has inconsistent output size");
 	    FP(err_fp, " (%d!=%d)\n", sz, sel_sz);
-	    g_ptr pp = Make_VAR_leaf(wastrsave(&strings, "Pwexpr"));
+	    g_ptr pp = Make_VAR_leaf(wastrsave(stringsp, "Pwexpr"));
 	    pp = Find_Function(symb_tbl, pp);
 	    g_ptr res = Make_APPL_ND(pp, we);
 	    INC_REFCNT(we);
@@ -4884,7 +4884,7 @@ declare_vector(hash_record *vtblp, string hier, string name,
     ip->declaration = vp;
     string sig = get_vector_signature(vp);
     ip->signature = sig;
-    ip->hierarchy = wastrsave(&strings, hier);
+    ip->hierarchy = wastrsave(stringsp, hier);
     int sz = vec_size(vp);
     ip->size = sz;
     if( transient ) {
@@ -4932,7 +4932,7 @@ declare_vector(hash_record *vtblp, string hier, string name,
     }
     string full_vname = strtemp(hier);
     strappend(sig);
-    full_vname = wastrsave(&strings, full_vname);
+    full_vname = wastrsave(stringsp, full_vname);
 
     vec_info_ptr cip = (vec_info_ptr) new_rec(vec_info_rec_mgrp);
     *cip = *ip;
@@ -5091,7 +5091,7 @@ map_vector(hash_record *vtblp, string hier, string name, bool ignore_missing)
 	} else {
 	    sprintf(tmp_name_buf, "_$$%d_%s", undeclared_node_cnt, name);
 	    undeclared_node_cnt++;
-	    new_name = wastrsave(&strings, tmp_name_buf);
+	    new_name = wastrsave(stringsp, tmp_name_buf);
 	}
         if( !ignore_missing && !is_assertion ) {
             FP(warning_fp, "Replaced %s with %s\n\n", name, new_name);
@@ -6350,7 +6350,7 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
         return FALSE;
     }
     attrs = Make_CONS_ND(
-		 Make_CONS_ND(Make_STRING_leaf(wastrsave(&strings,"module")),
+		 Make_CONS_ND(Make_STRING_leaf(wastrsave(stringsp,"module")),
 			      Make_STRING_leaf(name)), attrs);
     push_buf(&attr_buf, &attrs);
     // Declare new nodes (internal)
@@ -6358,7 +6358,7 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
         string name = GET_STRING(GET_CONS_HD(l));
 	if( *name != '!' && strstr(name, "assert__") != NULL ) {
 	    string prop_name = strtemp(hier);
-	    prop_name = wastrsave(&strings, strappend(name));
+	    prop_name = wastrsave(stringsp, strappend(name));
 	    push_buf(propsp, &prop_name);
 	}
         string value_list = find_value_list(attrs, name);
@@ -6452,7 +6452,7 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
                     string phier = strtemp(hier);
                     string last = rindex(phier, '/');
                     if( last != NULL ) { *last = 0; }
-                    phier = wastrsave(&strings, phier);
+                    phier = wastrsave(stringsp, phier);
                     Wprintf("Signal %s not declared in %s.", actual, phier);
                     tmp = declare_vector(&vinfo_tbl, hier, actual,
                                          FALSE, NULL, s_ES);
@@ -6494,7 +6494,7 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
                     string phier = strtemp(hier);
                     string last = rindex(phier, '/');
                     if( last != NULL ) { *last = '0'; }
-                    phier = wastrsave(&strings, phier);
+                    phier = wastrsave(stringsp, phier);
                     Wprintf("Signal %s not declared in %s", actual, phier);
                     tmp = declare_vector(&vinfo_tbl, hier, actual,
                                          FALSE, NULL, s_ES);
@@ -6635,7 +6635,7 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
 	// Finally prepend "add_inst <inst_nbr> " to pfn
 	sprintf(buf, "add_inst %d ", inst_cnt);
 	pfn = gen_strprepend(sm, buf);
-	vp->pfn = wastrsave(&strings, pfn);
+	vp->pfn = wastrsave(stringsp, pfn);
 	free_temp_str_mgr(sm);
     }
 
@@ -6814,7 +6814,7 @@ BDD_c_limited_AND(gbv a, gbv b)
 	    push_buf(weakening_bufp, &r);
 	    char nm[20];
 	    sprintf(nm, "_%d", idx+1);
-	    string name = wastrsave(&strings, nm);
+	    string name = wastrsave(stringsp, nm);
 	    res.f = B_Var(name);
 	} else {
 	    // Dynamic weakening
@@ -6839,7 +6839,7 @@ BDD_c_limited_OR(gbv a, gbv b)
 	    push_buf(weakening_bufp, &r);
 	    char nm[20];
 	    sprintf(nm, "_%d", idx+1);
-	    string name = wastrsave(&strings, nm);
+	    string name = wastrsave(stringsp, nm);
 	    res.f = B_Var(name);
 	} else {
 	    // Dynamic weakening
@@ -7172,14 +7172,14 @@ limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
 
     push_buf(&(vsp->anon_buf), &il);
     Sprintf(buf, "an%06d", anon_cnt);
-    anon = wastrsave(&strings, buf);
+    anon = wastrsave(stringsp, buf);
     insert_hash(&(vsp->done), il, anon);
     ilist_ptr stop_ilist, rem_ilist;
     if( has_stop_nodes(vsp, il, &stop_ilist, &rem_ilist) ) {
 	if( rem_ilist == NULL ) {
 	    // Just a stop node
 	    string pfn = strtemp("draw_stop_symbol {}");
-	    pfn = wastrsave(&strings, pfn);
+	    pfn = wastrsave(stringsp, pfn);
 	    sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 	    res->vec = anon;
 	    res->pfn = pfn;
@@ -7190,7 +7190,7 @@ limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
 	// Must create a draw_concat 2 symbol and
 	// call draw_fanin recursively.
 	string pfn = strtemp("draw_concat 2");
-	pfn = wastrsave(&strings, pfn);
+	pfn = wastrsave(stringsp, pfn);
 	sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 	res->vec = anon;
 	res->pfn = pfn;
@@ -7229,7 +7229,7 @@ limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
 		vecs = GET_CONS_TL(vecs);
 	    }
 	    strappend(" }");
-	    pfn = wastrsave(&strings, pfn);
+	    pfn = wastrsave(stringsp, pfn);
 	    sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 	    res->vec = anon;
 	    res->pfn = pfn;
@@ -7253,7 +7253,7 @@ limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
 	    vecs = GET_CONS_TL(vecs);
 	}
 	strappend("}");
-	pfn = wastrsave(&strings, pfn);
+	pfn = wastrsave(stringsp, pfn);
 	sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 	res->vec = anon;
 	res->pfn = pfn;
@@ -7325,7 +7325,7 @@ limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
 		vecs = GET_CONS_TL(vecs);
 	    }
 	    strappend("}");
-	    pfn = wastrsave(&strings, pfn);
+	    pfn = wastrsave(stringsp, pfn);
 	    sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 	    res->vec = anon;
 	    res->pfn = pfn;
@@ -7347,7 +7347,7 @@ limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
 		vecs = GET_CONS_TL(vecs);
 	    }
 	    strappend(" }");
-	    pfn = wastrsave(&strings, pfn);
+	    pfn = wastrsave(stringsp, pfn);
 	    sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 	    res->vec = anon;
 	    res->pfn = pfn;
@@ -7361,7 +7361,7 @@ limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
                     new_il = ilist_append(new_il, ilist_copy(vp->acts));
                 }
                 string pfn = strtemp("draw_split");
-                pfn = wastrsave(&strings, pfn);
+                pfn = wastrsave(stringsp, pfn);
                 sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
                 res->vec = anon;
                 res->pfn = pfn;
@@ -7419,7 +7419,7 @@ limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
 	}
 	Sprintf(buf, "%d", len);
 	strappend(buf);
-	res->pfn = wastrsave(&strings, pfn);
+	res->pfn = wastrsave(stringsp, pfn);
 	res->children = cur_children;
 	return res;
     }
@@ -7487,7 +7487,7 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
     }
     push_buf(&(vsp->anon_buf), &il);
     Sprintf(buf, "an%06d", anon_cnt);
-    anon = wastrsave(&strings, buf);
+    anon = wastrsave(stringsp, buf);
     insert_hash(&(vsp->done), il, anon);
     ilist_ptr stop_ilist, rem_ilist;
 
@@ -7495,7 +7495,7 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	if( rem_ilist == NULL ) {
 	    // Just a stop node
 	    string pfn = strtemp("draw_stop_symbol {}");
-	    pfn = wastrsave(&strings, pfn);
+	    pfn = wastrsave(stringsp, pfn);
 	    sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 	    res->vec = anon;
 	    res->pfn = pfn;
@@ -7506,7 +7506,7 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	// Must create a draw_concat 2 symbol and
 	// call draw_fanin recursively.
 	string pfn = strtemp("draw_concat 2");
-	pfn = wastrsave(&strings, pfn);
+	pfn = wastrsave(stringsp, pfn);
 	sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 	res->vec = anon;
 	res->pfn = pfn;
@@ -7543,7 +7543,7 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 		vecs = GET_CONS_TL(vecs);
 	    }
 	    strappend(" }");
-	    pfn = wastrsave(&strings, pfn);
+	    pfn = wastrsave(stringsp, pfn);
 	    sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 	    res->vec = anon;
 	    res->pfn = pfn;
@@ -7568,7 +7568,7 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	    vecs = GET_CONS_TL(vecs);
 	}
 	strappend("}");
-	pfn = wastrsave(&strings, pfn);
+	pfn = wastrsave(stringsp, pfn);
 	sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 	res->vec = anon;
 	res->pfn = pfn;
@@ -7638,7 +7638,7 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 		vecs = GET_CONS_TL(vecs);
 	    }
 	    strappend("}");
-	    pfn = wastrsave(&strings, pfn);
+	    pfn = wastrsave(stringsp, pfn);
 	    sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 	    res->vec = anon;
 	    res->pfn = pfn;
@@ -7660,7 +7660,7 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 		vecs = GET_CONS_TL(vecs);
 	    }
 	    strappend(" }");
-	    pfn = wastrsave(&strings, pfn);
+	    pfn = wastrsave(stringsp, pfn);
 	    sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 	    res->vec = anon;
 	    res->pfn = pfn;
@@ -7675,7 +7675,7 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 		    new_il = ilist_append(new_il, ilist_copy(vp->acts));
 		}
 		string pfn = strtemp("draw_split");
-		pfn = wastrsave(&strings, pfn);
+		pfn = wastrsave(stringsp, pfn);
 		sch_ptr res = (sch_ptr) new_rec(&(vsp->sch_rec_mgr));
 		res->vec = anon;
 		res->pfn = pfn;
@@ -7730,7 +7730,7 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	}
 	Sprintf(buf, "%d", len);
 	strappend(buf);
-	res->pfn = wastrsave(&strings, pfn);
+	res->pfn = wastrsave(stringsp, pfn);
 	res->children = cur_children;
 	return( res );
     }
@@ -7775,20 +7775,20 @@ mk_fresh_anon_name(g_ptr internals, g_ptr fa_inps, g_ptr fa_outs, int *cur_cntp)
 
     }
     *cur_cntp = cur_cnt;
-    return( wastrsave(&strings, buf) );
+    return( wastrsave(stringsp, buf) );
 }
 
 static string
 mk_vector_name(string base, int size)
 {
     if( size == 1 ) {
-	    return( wastrsave(&strings, base) );
+	    return( wastrsave(stringsp, base) );
     } else {
 	string res = strtemp(base);
 	char buf[20];
 	Sprintf(buf, "[%d:0]", size-1);
 	strappend(buf);
-	return( wastrsave(&strings, res) );
+	return( wastrsave(stringsp, res) );
     }
 }
 
@@ -7867,7 +7867,7 @@ create_constant(int sz, int *ccnt, g_ptr ints, g_ptr fa_inps, g_ptr fa_outs,
 	string pfn = strtemp("");
 	strappend("draw_constant ");
 	strappend( cnst );
-	pfn = wastrsave(&strings, pfn);
+	pfn = wastrsave(stringsp, pfn);
 	g_ptr res = mk_PINST(
 			Make_STRING_leaf(pfn), 
 			Make_NIL(),
@@ -7886,7 +7886,7 @@ create_constant(int sz, int *ccnt, g_ptr ints, g_ptr fa_inps, g_ptr fa_outs,
 	string pfn = strtemp("");
 	strappend("draw_constant 0x");
 	strappend( Arbi_ToString(v, 16) );
-	pfn = wastrsave(&strings, pfn);
+	pfn = wastrsave(stringsp, pfn);
 	// PINST pfn T [] [] [(t,[t])] [] (P_LEAF (W_UPDATE_FN t e))
 	g_ptr res = mk_PINST(
 			    Make_STRING_leaf(pfn), 
@@ -8025,12 +8025,12 @@ create_merge_component(int sz, int *ccnt, g_ptr *intsp,
 	    // SX
 	    if( cnt == len ) {
 		// SX of single bit
-		string pfn = wastrsave(&strings, "draw_unary_arithm {SX}");
+		string pfn = wastrsave(stringsp, "draw_unary_arithm {SX}");
 		g_ptr c_ints = Make_NIL();
 		g_ptr c_outs =
 			mk_list1(mk_pair(Make_STRING_leaf(out),
 					 mk_list1(Make_STRING_leaf(out))));
-		string i1 = wastrsave(&strings, "i1");
+		string i1 = wastrsave(stringsp, "i1");
 		g_ptr c_inps =
 			mk_list1(mk_pair(Make_STRING_leaf(i1),
 					 mk_list1(Make_STRING_leaf(msb))));
@@ -8050,14 +8050,14 @@ create_merge_component(int sz, int *ccnt, g_ptr *intsp,
 		return( out );
 	    } else {
 		// SX of vector
-		string pfn = wastrsave(&strings, "draw_unary_arithm {SX}");
+		string pfn = wastrsave(stringsp, "draw_unary_arithm {SX}");
 		g_ptr c_ints = Make_NIL();
 		g_ptr c_outs = mk_list1(mk_pair(Make_STRING_leaf(out),
 					      mk_list1(Make_STRING_leaf(out))));
 		char iv[30];
 		sprintf(iv, "i1[%d:0]", sz-cnt);
-		string i1 = wastrsave(&strings, iv);
-		string w1 = wastrsave(&strings, "i1");
+		string i1 = wastrsave(stringsp, iv);
+		string w1 = wastrsave(stringsp, "i1");
 		g_ptr c_inps =
 			mk_list1(mk_pair(Make_STRING_leaf(i1), base_inp));
 		g_ptr rhs = mk_W_SX(Make_INT_leaf(sz),
@@ -8080,7 +8080,7 @@ create_merge_component(int sz, int *ccnt, g_ptr *intsp,
     string pfn = strtemp("draw_concat ");
     Sprintf(buf, "%d", len);
     strappend(buf);
-    pfn = wastrsave(&strings, pfn);
+    pfn = wastrsave(stringsp, pfn);
     g_ptr c_ints = Make_NIL();
     g_ptr c_outs = mk_list1(mk_pair(Make_STRING_leaf(out),
 				    mk_list1(Make_STRING_leaf(out))));
@@ -8102,7 +8102,7 @@ create_merge_component(int sz, int *ccnt, g_ptr *intsp,
 	    g_ptr fa = mk_pair(f, mk_list1(Make_STRING_leaf(t)));
 	    APPEND1(tail_inps, fa);
 	    g_ptr part = mk_W_VAR(Make_INT_leaf(csz),
-				  Make_STRING_leaf(wastrsave(&strings, buf)));
+				  Make_STRING_leaf(wastrsave(stringsp, buf)));
 	    APPEND1(tail_cats, part);
 	} else {
 	    csz = Get_Vector_Size(act);
@@ -8111,7 +8111,7 @@ create_merge_component(int sz, int *ccnt, g_ptr *intsp,
 	    g_ptr fa = mk_pair(f, mk_list1(Make_STRING_leaf(act)));
 	    APPEND1(tail_inps, fa);
 	    g_ptr part = mk_W_VAR(Make_INT_leaf(csz),
-				  Make_STRING_leaf(wastrsave(&strings, buf)));
+				  Make_STRING_leaf(wastrsave(stringsp, buf)));
 	    APPEND1(tail_cats, part);
 	}
 	inp_cnt++;
@@ -8675,7 +8675,7 @@ DBG_print_ints(g_ptr il)
 void
 DBG_pexlif(g_ptr pexlif)
 {
-    string pr_fn = wastrsave(&strings, "pretty_pexlif");
+    string pr_fn = wastrsave(stringsp, "pretty_pexlif");
     g_ptr fn = Make_VAR_leaf(pr_fn);
     fn = Find_Function(symb_tbl, fn);
     g_ptr res = Make_APPL_ND(fn, pexlif);
@@ -8747,10 +8747,10 @@ gen_pexlif2fsm(g_ptr p, g_ptr black_box_list, int max_depth)
     // 1    == constant 1
     // 2    == constant X
     // 3    == constant top
-    declare_vector(&parent_tbl, "", wastrsave(&strings, "!0"),FALSE,NULL,s_ES);
-    declare_vector(&parent_tbl, "", wastrsave(&strings, "!1"),FALSE,NULL,s_ES);
-    declare_vector(&parent_tbl, "", wastrsave(&strings, "!X"),FALSE,NULL,s_ES);
-    declare_vector(&parent_tbl, "", wastrsave(&strings, "!T"),FALSE,NULL,s_ES);
+    declare_vector(&parent_tbl, "", wastrsave(stringsp, "!0"),FALSE,NULL,s_ES);
+    declare_vector(&parent_tbl, "", wastrsave(stringsp, "!1"),FALSE,NULL,s_ES);
+    declare_vector(&parent_tbl, "", wastrsave(stringsp, "!X"),FALSE,NULL,s_ES);
+    declare_vector(&parent_tbl, "", wastrsave(stringsp, "!T"),FALSE,NULL,s_ES);
     ihier_buf[0] = 0;
     if( traverse_pexlif(&parent_tbl, p, "", TRUE, 0, 1, max_depth) ) {
         fsm->top_name = get_top_name(p);

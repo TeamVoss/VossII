@@ -19,7 +19,7 @@ bool		Do_gc_asap;
 int             LG_TBL_SIZE;
 
 /********* Global variables referenced ***********/
-extern str_mgr  strings;
+extern str_mgr  *stringsp;
 extern FILE	*v_order_fp;
 extern FILE     *odests_fp;
 extern g_ptr    void_nd;
@@ -248,18 +248,18 @@ B_Var(string name)
 	/* Make sure base name has been declared */
 	string b_name = strtemp(name);
 	*(b_name+len-2) = 0;
-	b_name = wastrsave(&strings, b_name);
+	b_name = wastrsave(stringsp, b_name);
 	prim_B_Var(b_name);
-	name = wastrsave(&strings, name);
+	name = wastrsave(stringsp, name);
 	ret = prim_B_Var(name);
 	return( ret );
     } else {
 	/* Declare both basename and next-state name */
-	name = wastrsave(&strings, name);
+	name = wastrsave(stringsp, name);
 	ret = prim_B_Var(name);
 	string n_name = strtemp(name);
 	n_name = strappend("_n");
-	n_name = wastrsave(&strings, n_name);
+	n_name = wastrsave(stringsp, n_name);
 	prim_B_Var(n_name);
 	return ret;
     }
@@ -288,7 +288,7 @@ prim_B_Var(string name)
     }
     vp = VarTbl + nbr_VarTbl;
     vp->variable = nbr_VarTbl;
-    vp->var_name = wastrsave(&strings, name);
+    vp->var_name = wastrsave(stringsp, name);
     vp->sz_uniq_tbl = 1019;
     vp->nbr_uniq_tbl = 0;
     vp->uniq_tbl = (formula *) Malloc(vp->sz_uniq_tbl*sizeof(formula));
@@ -353,7 +353,7 @@ Get_top_cofactor(formula b, string *varp, formula *Hp, formula *Lp)
 {
     bdd_ptr bp = GET_BDDP(b);
     var_ptr vp = VarTbl + BDD_GET_VAR(bp);
-    *varp = wastrsave(&strings, vp->var_name);
+    *varp = wastrsave(stringsp, vp->var_name);
     *Hp = GET_LSON(bp);
     *Lp = GET_RSON(bp);
 }
@@ -859,7 +859,7 @@ Load_BDDs(string filename, buffer *results)
     buffer var_map;
     new_buf(&var_map, 100, sizeof(formula));
     while( fscanf(fp, "v %s\n", buf) == 1 ) {
-	string name = wastrsave(&strings, buf);
+	string name = wastrsave(stringsp, buf);
 	formula b = B_Var(name);
 	push_buf(&var_map, (pointer) &b);
     }
@@ -1474,7 +1474,7 @@ top_cofactor(g_ptr redex)
     }
     bdd_ptr bp = GET_BDDP(b);
     var_ptr vp = VarTbl + BDD_GET_VAR(bp);
-    string name = wastrsave(&strings, vp->var_name);
+    string name = wastrsave(stringsp, vp->var_name);
     formula L, R;
     if( ISNOT(b) ) {
 	L = NOT(GET_LSON(bp));

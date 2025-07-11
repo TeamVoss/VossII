@@ -16,7 +16,7 @@
 
 /********* Global variables referenced ***********/
 extern symbol_tbl_ptr	symb_tbl;
-extern str_mgr		strings;
+extern str_mgr		*stringsp;
 extern jmp_buf		*start_envp;
 extern char		FailBuf[4096];
 extern g_ptr		void_nd;
@@ -118,7 +118,7 @@ import_xpm_image(g_ptr redex)
 	return;
     }
     *end = '\0';
-    string name = wastrsave(&strings, start+2);
+    string name = wastrsave(stringsp, start+2);
     int cols, rows, colors, chars;
     line = get_non_comment_line(fp);
     if( sscanf(line,"\"%d %d %d %d\",\n",&cols,&rows,&colors,&chars) != 4 ) {
@@ -467,7 +467,7 @@ image2str_fn(pointer p)
 {
     image_ptr ip = (image_ptr) p;
     sprintf(im_read_buf, "Image with %d rows and %d columns\n",ip->rows,ip->cols);
-    string msg = wastrsave(&strings, im_read_buf);
+    string msg = wastrsave(stringsp, im_read_buf);
     if( RCverbose_image_print ) {
         FP(stdout_fp, "%s", msg);
 	color_ptr cp;
@@ -529,7 +529,7 @@ create_image(string name, int rows, int cols)
     }
     ip->next = NULL;
     ip->mark = 1;
-    ip->name = wastrsave(&strings, name);
+    ip->name = wastrsave(stringsp, name);
     ip->rows = rows;
     ip->cols = cols;
     buffer *cbp = &(ip->cbuf);
@@ -567,1516 +567,1516 @@ create_X11_color_map()
     // Insert None (alpha=0)
     color_ptr	cp = mk_rgb(0,0,0);
     cp->valid = FALSE;
-    insert_hash(&X11_colors, wastrsave(&strings, "None"), cp);
+    insert_hash(&X11_colors, wastrsave(stringsp, "None"), cp);
     //
     //
     // Generated from /etc/X11/rgb.txt
     //
-    insert_hash(&X11_colors, wastrsave(&strings, "snow"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "snow"),
                              mk_rgb(255,250,250));
-    insert_hash(&X11_colors, wastrsave(&strings, "ghost white"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "ghost white"),
                              mk_rgb(248,248,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "GhostWhite"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "GhostWhite"),
                              mk_rgb(248,248,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "white smoke"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "white smoke"),
                              mk_rgb(245,245,245));
-    insert_hash(&X11_colors, wastrsave(&strings, "WhiteSmoke"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "WhiteSmoke"),
                              mk_rgb(245,245,245));
-    insert_hash(&X11_colors, wastrsave(&strings, "gainsboro"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gainsboro"),
                              mk_rgb(220,220,220));
-    insert_hash(&X11_colors, wastrsave(&strings, "floral white"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "floral white"),
                              mk_rgb(255,250,240));
-    insert_hash(&X11_colors, wastrsave(&strings, "FloralWhite"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "FloralWhite"),
                              mk_rgb(255,250,240));
-    insert_hash(&X11_colors, wastrsave(&strings, "old lace"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "old lace"),
                              mk_rgb(253,245,230));
-    insert_hash(&X11_colors, wastrsave(&strings, "OldLace"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "OldLace"),
                              mk_rgb(253,245,230));
-    insert_hash(&X11_colors, wastrsave(&strings, "linen"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "linen"),
                              mk_rgb(250,240,230));
-    insert_hash(&X11_colors, wastrsave(&strings, "antique white"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "antique white"),
                              mk_rgb(250,235,215));
-    insert_hash(&X11_colors, wastrsave(&strings, "AntiqueWhite"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "AntiqueWhite"),
                              mk_rgb(250,235,215));
-    insert_hash(&X11_colors, wastrsave(&strings, "papaya whip"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "papaya whip"),
                              mk_rgb(255,239,213));
-    insert_hash(&X11_colors, wastrsave(&strings, "PapayaWhip"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PapayaWhip"),
                              mk_rgb(255,239,213));
-    insert_hash(&X11_colors, wastrsave(&strings, "blanched almond"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "blanched almond"),
                              mk_rgb(255,235,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "BlanchedAlmond"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "BlanchedAlmond"),
                              mk_rgb(255,235,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "bisque"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "bisque"),
                              mk_rgb(255,228,196));
-    insert_hash(&X11_colors, wastrsave(&strings, "peach puff"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "peach puff"),
                              mk_rgb(255,218,185));
-    insert_hash(&X11_colors, wastrsave(&strings, "PeachPuff"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PeachPuff"),
                              mk_rgb(255,218,185));
-    insert_hash(&X11_colors, wastrsave(&strings, "navajo white"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "navajo white"),
                              mk_rgb(255,222,173));
-    insert_hash(&X11_colors, wastrsave(&strings, "NavajoWhite"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "NavajoWhite"),
                              mk_rgb(255,222,173));
-    insert_hash(&X11_colors, wastrsave(&strings, "moccasin"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "moccasin"),
                              mk_rgb(255,228,181));
-    insert_hash(&X11_colors, wastrsave(&strings, "cornsilk"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "cornsilk"),
                              mk_rgb(255,248,220));
-    insert_hash(&X11_colors, wastrsave(&strings, "ivory"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "ivory"),
                              mk_rgb(255,255,240));
-    insert_hash(&X11_colors, wastrsave(&strings, "lemon chiffon"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "lemon chiffon"),
                              mk_rgb(255,250,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "LemonChiffon"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LemonChiffon"),
                              mk_rgb(255,250,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "seashell"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "seashell"),
                              mk_rgb(255,245,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "honeydew"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "honeydew"),
                              mk_rgb(240,255,240));
-    insert_hash(&X11_colors, wastrsave(&strings, "mint cream"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "mint cream"),
                              mk_rgb(245,255,250));
-    insert_hash(&X11_colors, wastrsave(&strings, "MintCream"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MintCream"),
                              mk_rgb(245,255,250));
-    insert_hash(&X11_colors, wastrsave(&strings, "azure"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "azure"),
                              mk_rgb(240,255,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "alice blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "alice blue"),
                              mk_rgb(240,248,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "AliceBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "AliceBlue"),
                              mk_rgb(240,248,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "lavender"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "lavender"),
                              mk_rgb(230,230,250));
-    insert_hash(&X11_colors, wastrsave(&strings, "lavender blush"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "lavender blush"),
                              mk_rgb(255,240,245));
-    insert_hash(&X11_colors, wastrsave(&strings, "LavenderBlush"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LavenderBlush"),
                              mk_rgb(255,240,245));
-    insert_hash(&X11_colors, wastrsave(&strings, "misty rose"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "misty rose"),
                              mk_rgb(255,228,225));
-    insert_hash(&X11_colors, wastrsave(&strings, "MistyRose"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MistyRose"),
                              mk_rgb(255,228,225));
-    insert_hash(&X11_colors, wastrsave(&strings, "white"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "white"),
                              mk_rgb(255,255,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "black"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "black"),
                              mk_rgb(0,0,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "dark slate gray"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dark slate gray"),
                              mk_rgb(47,79,79));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkSlateGray"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkSlateGray"),
                              mk_rgb(47,79,79));
-    insert_hash(&X11_colors, wastrsave(&strings, "dark slate grey"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dark slate grey"),
                              mk_rgb(47,79,79));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkSlateGrey"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkSlateGrey"),
                              mk_rgb(47,79,79));
-    insert_hash(&X11_colors, wastrsave(&strings, "dim gray"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dim gray"),
                              mk_rgb(105,105,105));
-    insert_hash(&X11_colors, wastrsave(&strings, "DimGray"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DimGray"),
                              mk_rgb(105,105,105));
-    insert_hash(&X11_colors, wastrsave(&strings, "dim grey"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dim grey"),
                              mk_rgb(105,105,105));
-    insert_hash(&X11_colors, wastrsave(&strings, "DimGrey"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DimGrey"),
                              mk_rgb(105,105,105));
-    insert_hash(&X11_colors, wastrsave(&strings, "slate gray"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "slate gray"),
                              mk_rgb(112,128,144));
-    insert_hash(&X11_colors, wastrsave(&strings, "SlateGray"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SlateGray"),
                              mk_rgb(112,128,144));
-    insert_hash(&X11_colors, wastrsave(&strings, "slate grey"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "slate grey"),
                              mk_rgb(112,128,144));
-    insert_hash(&X11_colors, wastrsave(&strings, "SlateGrey"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SlateGrey"),
                              mk_rgb(112,128,144));
-    insert_hash(&X11_colors, wastrsave(&strings, "light slate gray"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "light slate gray"),
                              mk_rgb(119,136,153));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightSlateGray"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightSlateGray"),
                              mk_rgb(119,136,153));
-    insert_hash(&X11_colors, wastrsave(&strings, "light slate grey"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "light slate grey"),
                              mk_rgb(119,136,153));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightSlateGrey"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightSlateGrey"),
                              mk_rgb(119,136,153));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray"),
                              mk_rgb(190,190,190));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey"),
                              mk_rgb(190,190,190));
-    insert_hash(&X11_colors, wastrsave(&strings, "light grey"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "light grey"),
                              mk_rgb(211,211,211));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightGrey"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightGrey"),
                              mk_rgb(211,211,211));
-    insert_hash(&X11_colors, wastrsave(&strings, "light gray"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "light gray"),
                              mk_rgb(211,211,211));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightGray"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightGray"),
                              mk_rgb(211,211,211));
-    insert_hash(&X11_colors, wastrsave(&strings, "midnight blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "midnight blue"),
                              mk_rgb(25,25,112));
-    insert_hash(&X11_colors, wastrsave(&strings, "MidnightBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MidnightBlue"),
                              mk_rgb(25,25,112));
-    insert_hash(&X11_colors, wastrsave(&strings, "navy"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "navy"),
                              mk_rgb(0,0,128));
-    insert_hash(&X11_colors, wastrsave(&strings, "navy blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "navy blue"),
                              mk_rgb(0,0,128));
-    insert_hash(&X11_colors, wastrsave(&strings, "NavyBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "NavyBlue"),
                              mk_rgb(0,0,128));
-    insert_hash(&X11_colors, wastrsave(&strings, "cornflower blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "cornflower blue"),
                              mk_rgb(100,149,237));
-    insert_hash(&X11_colors, wastrsave(&strings, "CornflowerBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "CornflowerBlue"),
                              mk_rgb(100,149,237));
-    insert_hash(&X11_colors, wastrsave(&strings, "dark slate blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dark slate blue"),
                              mk_rgb(72,61,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkSlateBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkSlateBlue"),
                              mk_rgb(72,61,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "slate blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "slate blue"),
                              mk_rgb(106,90,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "SlateBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SlateBlue"),
                              mk_rgb(106,90,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "medium slate blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "medium slate blue"),
                              mk_rgb(123,104,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "MediumSlateBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MediumSlateBlue"),
                              mk_rgb(123,104,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "light slate blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "light slate blue"),
                              mk_rgb(132,112,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightSlateBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightSlateBlue"),
                              mk_rgb(132,112,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "medium blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "medium blue"),
                              mk_rgb(0,0,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "MediumBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MediumBlue"),
                              mk_rgb(0,0,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "royal blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "royal blue"),
                              mk_rgb(65,105,225));
-    insert_hash(&X11_colors, wastrsave(&strings, "RoyalBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "RoyalBlue"),
                              mk_rgb(65,105,225));
-    insert_hash(&X11_colors, wastrsave(&strings, "blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "blue"),
                              mk_rgb(0,0,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "dodger blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dodger blue"),
                              mk_rgb(30,144,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "DodgerBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DodgerBlue"),
                              mk_rgb(30,144,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "deep sky blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "deep sky blue"),
                              mk_rgb(0,191,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "DeepSkyBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DeepSkyBlue"),
                              mk_rgb(0,191,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "sky blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "sky blue"),
                              mk_rgb(135,206,235));
-    insert_hash(&X11_colors, wastrsave(&strings, "SkyBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SkyBlue"),
                              mk_rgb(135,206,235));
-    insert_hash(&X11_colors, wastrsave(&strings, "light sky blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "light sky blue"),
                              mk_rgb(135,206,250));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightSkyBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightSkyBlue"),
                              mk_rgb(135,206,250));
-    insert_hash(&X11_colors, wastrsave(&strings, "steel blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "steel blue"),
                              mk_rgb(70,130,180));
-    insert_hash(&X11_colors, wastrsave(&strings, "SteelBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SteelBlue"),
                              mk_rgb(70,130,180));
-    insert_hash(&X11_colors, wastrsave(&strings, "light steel blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "light steel blue"),
                              mk_rgb(176,196,222));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightSteelBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightSteelBlue"),
                              mk_rgb(176,196,222));
-    insert_hash(&X11_colors, wastrsave(&strings, "light blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "light blue"),
                              mk_rgb(173,216,230));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightBlue"),
                              mk_rgb(173,216,230));
-    insert_hash(&X11_colors, wastrsave(&strings, "powder blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "powder blue"),
                              mk_rgb(176,224,230));
-    insert_hash(&X11_colors, wastrsave(&strings, "PowderBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PowderBlue"),
                              mk_rgb(176,224,230));
-    insert_hash(&X11_colors, wastrsave(&strings, "pale turquoise"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "pale turquoise"),
                              mk_rgb(175,238,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "PaleTurquoise"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PaleTurquoise"),
                              mk_rgb(175,238,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "dark turquoise"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dark turquoise"),
                              mk_rgb(0,206,209));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkTurquoise"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkTurquoise"),
                              mk_rgb(0,206,209));
-    insert_hash(&X11_colors, wastrsave(&strings, "medium turquoise"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "medium turquoise"),
                              mk_rgb(72,209,204));
-    insert_hash(&X11_colors, wastrsave(&strings, "MediumTurquoise"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MediumTurquoise"),
                              mk_rgb(72,209,204));
-    insert_hash(&X11_colors, wastrsave(&strings, "turquoise"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "turquoise"),
                              mk_rgb(64,224,208));
-    insert_hash(&X11_colors, wastrsave(&strings, "cyan"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "cyan"),
                              mk_rgb(0,255,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "light cyan"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "light cyan"),
                              mk_rgb(224,255,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightCyan"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightCyan"),
                              mk_rgb(224,255,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "cadet blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "cadet blue"),
                              mk_rgb(95,158,160));
-    insert_hash(&X11_colors, wastrsave(&strings, "CadetBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "CadetBlue"),
                              mk_rgb(95,158,160));
-    insert_hash(&X11_colors, wastrsave(&strings, "medium aquamarine"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "medium aquamarine"),
                              mk_rgb(102,205,170));
-    insert_hash(&X11_colors, wastrsave(&strings, "MediumAquamarine"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MediumAquamarine"),
                              mk_rgb(102,205,170));
-    insert_hash(&X11_colors, wastrsave(&strings, "aquamarine"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "aquamarine"),
                              mk_rgb(127,255,212));
-    insert_hash(&X11_colors, wastrsave(&strings, "dark green"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dark green"),
                              mk_rgb(0,100,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkGreen"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkGreen"),
                              mk_rgb(0,100,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "dark olive green"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dark olive green"),
                              mk_rgb(85,107,47));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkOliveGreen"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkOliveGreen"),
                              mk_rgb(85,107,47));
-    insert_hash(&X11_colors, wastrsave(&strings, "dark sea green"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dark sea green"),
                              mk_rgb(143,188,143));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkSeaGreen"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkSeaGreen"),
                              mk_rgb(143,188,143));
-    insert_hash(&X11_colors, wastrsave(&strings, "sea green"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "sea green"),
                              mk_rgb(46,139,87));
-    insert_hash(&X11_colors, wastrsave(&strings, "SeaGreen"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SeaGreen"),
                              mk_rgb(46,139,87));
-    insert_hash(&X11_colors, wastrsave(&strings, "medium sea green"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "medium sea green"),
                              mk_rgb(60,179,113));
-    insert_hash(&X11_colors, wastrsave(&strings, "MediumSeaGreen"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MediumSeaGreen"),
                              mk_rgb(60,179,113));
-    insert_hash(&X11_colors, wastrsave(&strings, "light sea green"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "light sea green"),
                              mk_rgb(32,178,170));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightSeaGreen"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightSeaGreen"),
                              mk_rgb(32,178,170));
-    insert_hash(&X11_colors, wastrsave(&strings, "pale green"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "pale green"),
                              mk_rgb(152,251,152));
-    insert_hash(&X11_colors, wastrsave(&strings, "PaleGreen"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PaleGreen"),
                              mk_rgb(152,251,152));
-    insert_hash(&X11_colors, wastrsave(&strings, "spring green"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "spring green"),
                              mk_rgb(0,255,127));
-    insert_hash(&X11_colors, wastrsave(&strings, "SpringGreen"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SpringGreen"),
                              mk_rgb(0,255,127));
-    insert_hash(&X11_colors, wastrsave(&strings, "lawn green"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "lawn green"),
                              mk_rgb(124,252,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "LawnGreen"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LawnGreen"),
                              mk_rgb(124,252,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "green"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "green"),
                              mk_rgb(0,255,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "chartreuse"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "chartreuse"),
                              mk_rgb(127,255,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "medium spring green"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "medium spring green"),
                              mk_rgb(0,250,154));
-    insert_hash(&X11_colors, wastrsave(&strings, "MediumSpringGreen"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MediumSpringGreen"),
                              mk_rgb(0,250,154));
-    insert_hash(&X11_colors, wastrsave(&strings, "green yellow"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "green yellow"),
                              mk_rgb(173,255,47));
-    insert_hash(&X11_colors, wastrsave(&strings, "GreenYellow"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "GreenYellow"),
                              mk_rgb(173,255,47));
-    insert_hash(&X11_colors, wastrsave(&strings, "lime green"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "lime green"),
                              mk_rgb(50,205,50));
-    insert_hash(&X11_colors, wastrsave(&strings, "LimeGreen"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LimeGreen"),
                              mk_rgb(50,205,50));
-    insert_hash(&X11_colors, wastrsave(&strings, "yellow green"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "yellow green"),
                              mk_rgb(154,205,50));
-    insert_hash(&X11_colors, wastrsave(&strings, "YellowGreen"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "YellowGreen"),
                              mk_rgb(154,205,50));
-    insert_hash(&X11_colors, wastrsave(&strings, "forest green"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "forest green"),
                              mk_rgb(34,139,34));
-    insert_hash(&X11_colors, wastrsave(&strings, "ForestGreen"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "ForestGreen"),
                              mk_rgb(34,139,34));
-    insert_hash(&X11_colors, wastrsave(&strings, "olive drab"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "olive drab"),
                              mk_rgb(107,142,35));
-    insert_hash(&X11_colors, wastrsave(&strings, "OliveDrab"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "OliveDrab"),
                              mk_rgb(107,142,35));
-    insert_hash(&X11_colors, wastrsave(&strings, "dark khaki"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dark khaki"),
                              mk_rgb(189,183,107));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkKhaki"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkKhaki"),
                              mk_rgb(189,183,107));
-    insert_hash(&X11_colors, wastrsave(&strings, "khaki"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "khaki"),
                              mk_rgb(240,230,140));
-    insert_hash(&X11_colors, wastrsave(&strings, "pale goldenrod"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "pale goldenrod"),
                              mk_rgb(238,232,170));
-    insert_hash(&X11_colors, wastrsave(&strings, "PaleGoldenrod"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PaleGoldenrod"),
                              mk_rgb(238,232,170));
-    insert_hash(&X11_colors, wastrsave(&strings, "light goldenrod yellow"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "light goldenrod yellow"),
                              mk_rgb(250,250,210));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightGoldenrodYellow"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightGoldenrodYellow"),
                              mk_rgb(250,250,210));
-    insert_hash(&X11_colors, wastrsave(&strings, "light yellow"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "light yellow"),
                              mk_rgb(255,255,224));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightYellow"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightYellow"),
                              mk_rgb(255,255,224));
-    insert_hash(&X11_colors, wastrsave(&strings, "yellow"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "yellow"),
                              mk_rgb(255,255,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "gold"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gold"),
                              mk_rgb(255,215,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "light goldenrod"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "light goldenrod"),
                              mk_rgb(238,221,130));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightGoldenrod"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightGoldenrod"),
                              mk_rgb(238,221,130));
-    insert_hash(&X11_colors, wastrsave(&strings, "goldenrod"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "goldenrod"),
                              mk_rgb(218,165,32));
-    insert_hash(&X11_colors, wastrsave(&strings, "dark goldenrod"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dark goldenrod"),
                              mk_rgb(184,134,11));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkGoldenrod"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkGoldenrod"),
                              mk_rgb(184,134,11));
-    insert_hash(&X11_colors, wastrsave(&strings, "rosy brown"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "rosy brown"),
                              mk_rgb(188,143,143));
-    insert_hash(&X11_colors, wastrsave(&strings, "RosyBrown"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "RosyBrown"),
                              mk_rgb(188,143,143));
-    insert_hash(&X11_colors, wastrsave(&strings, "indian red"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "indian red"),
                              mk_rgb(205,92,92));
-    insert_hash(&X11_colors, wastrsave(&strings, "IndianRed"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "IndianRed"),
                              mk_rgb(205,92,92));
-    insert_hash(&X11_colors, wastrsave(&strings, "saddle brown"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "saddle brown"),
                              mk_rgb(139,69,19));
-    insert_hash(&X11_colors, wastrsave(&strings, "SaddleBrown"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SaddleBrown"),
                              mk_rgb(139,69,19));
-    insert_hash(&X11_colors, wastrsave(&strings, "sienna"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "sienna"),
                              mk_rgb(160,82,45));
-    insert_hash(&X11_colors, wastrsave(&strings, "peru"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "peru"),
                              mk_rgb(205,133,63));
-    insert_hash(&X11_colors, wastrsave(&strings, "burlywood"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "burlywood"),
                              mk_rgb(222,184,135));
-    insert_hash(&X11_colors, wastrsave(&strings, "beige"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "beige"),
                              mk_rgb(245,245,220));
-    insert_hash(&X11_colors, wastrsave(&strings, "wheat"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "wheat"),
                              mk_rgb(245,222,179));
-    insert_hash(&X11_colors, wastrsave(&strings, "sandy brown"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "sandy brown"),
                              mk_rgb(244,164,96));
-    insert_hash(&X11_colors, wastrsave(&strings, "SandyBrown"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SandyBrown"),
                              mk_rgb(244,164,96));
-    insert_hash(&X11_colors, wastrsave(&strings, "tan"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "tan"),
                              mk_rgb(210,180,140));
-    insert_hash(&X11_colors, wastrsave(&strings, "chocolate"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "chocolate"),
                              mk_rgb(210,105,30));
-    insert_hash(&X11_colors, wastrsave(&strings, "firebrick"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "firebrick"),
                              mk_rgb(178,34,34));
-    insert_hash(&X11_colors, wastrsave(&strings, "brown"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "brown"),
                              mk_rgb(165,42,42));
-    insert_hash(&X11_colors, wastrsave(&strings, "dark salmon"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dark salmon"),
                              mk_rgb(233,150,122));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkSalmon"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkSalmon"),
                              mk_rgb(233,150,122));
-    insert_hash(&X11_colors, wastrsave(&strings, "salmon"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "salmon"),
                              mk_rgb(250,128,114));
-    insert_hash(&X11_colors, wastrsave(&strings, "light salmon"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "light salmon"),
                              mk_rgb(255,160,122));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightSalmon"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightSalmon"),
                              mk_rgb(255,160,122));
-    insert_hash(&X11_colors, wastrsave(&strings, "orange"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "orange"),
                              mk_rgb(255,165,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "dark orange"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dark orange"),
                              mk_rgb(255,140,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkOrange"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkOrange"),
                              mk_rgb(255,140,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "coral"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "coral"),
                              mk_rgb(255,127,80));
-    insert_hash(&X11_colors, wastrsave(&strings, "light coral"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "light coral"),
                              mk_rgb(240,128,128));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightCoral"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightCoral"),
                              mk_rgb(240,128,128));
-    insert_hash(&X11_colors, wastrsave(&strings, "tomato"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "tomato"),
                              mk_rgb(255,99,71));
-    insert_hash(&X11_colors, wastrsave(&strings, "orange red"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "orange red"),
                              mk_rgb(255,69,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "OrangeRed"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "OrangeRed"),
                              mk_rgb(255,69,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "red"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "red"),
                              mk_rgb(255,0,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "hot pink"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "hot pink"),
                              mk_rgb(255,105,180));
-    insert_hash(&X11_colors, wastrsave(&strings, "HotPink"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "HotPink"),
                              mk_rgb(255,105,180));
-    insert_hash(&X11_colors, wastrsave(&strings, "deep pink"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "deep pink"),
                              mk_rgb(255,20,147));
-    insert_hash(&X11_colors, wastrsave(&strings, "DeepPink"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DeepPink"),
                              mk_rgb(255,20,147));
-    insert_hash(&X11_colors, wastrsave(&strings, "pink"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "pink"),
                              mk_rgb(255,192,203));
-    insert_hash(&X11_colors, wastrsave(&strings, "light pink"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "light pink"),
                              mk_rgb(255,182,193));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightPink"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightPink"),
                              mk_rgb(255,182,193));
-    insert_hash(&X11_colors, wastrsave(&strings, "pale violet red"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "pale violet red"),
                              mk_rgb(219,112,147));
-    insert_hash(&X11_colors, wastrsave(&strings, "PaleVioletRed"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PaleVioletRed"),
                              mk_rgb(219,112,147));
-    insert_hash(&X11_colors, wastrsave(&strings, "maroon"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "maroon"),
                              mk_rgb(176,48,96));
-    insert_hash(&X11_colors, wastrsave(&strings, "medium violet red"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "medium violet red"),
                              mk_rgb(199,21,133));
-    insert_hash(&X11_colors, wastrsave(&strings, "MediumVioletRed"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MediumVioletRed"),
                              mk_rgb(199,21,133));
-    insert_hash(&X11_colors, wastrsave(&strings, "violet red"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "violet red"),
                              mk_rgb(208,32,144));
-    insert_hash(&X11_colors, wastrsave(&strings, "VioletRed"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "VioletRed"),
                              mk_rgb(208,32,144));
-    insert_hash(&X11_colors, wastrsave(&strings, "magenta"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "magenta"),
                              mk_rgb(255,0,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "violet"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "violet"),
                              mk_rgb(238,130,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "plum"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "plum"),
                              mk_rgb(221,160,221));
-    insert_hash(&X11_colors, wastrsave(&strings, "orchid"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "orchid"),
                              mk_rgb(218,112,214));
-    insert_hash(&X11_colors, wastrsave(&strings, "medium orchid"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "medium orchid"),
                              mk_rgb(186,85,211));
-    insert_hash(&X11_colors, wastrsave(&strings, "MediumOrchid"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MediumOrchid"),
                              mk_rgb(186,85,211));
-    insert_hash(&X11_colors, wastrsave(&strings, "dark orchid"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dark orchid"),
                              mk_rgb(153,50,204));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkOrchid"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkOrchid"),
                              mk_rgb(153,50,204));
-    insert_hash(&X11_colors, wastrsave(&strings, "dark violet"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dark violet"),
                              mk_rgb(148,0,211));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkViolet"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkViolet"),
                              mk_rgb(148,0,211));
-    insert_hash(&X11_colors, wastrsave(&strings, "blue violet"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "blue violet"),
                              mk_rgb(138,43,226));
-    insert_hash(&X11_colors, wastrsave(&strings, "BlueViolet"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "BlueViolet"),
                              mk_rgb(138,43,226));
-    insert_hash(&X11_colors, wastrsave(&strings, "purple"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "purple"),
                              mk_rgb(160,32,240));
-    insert_hash(&X11_colors, wastrsave(&strings, "medium purple"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "medium purple"),
                              mk_rgb(147,112,219));
-    insert_hash(&X11_colors, wastrsave(&strings, "MediumPurple"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MediumPurple"),
                              mk_rgb(147,112,219));
-    insert_hash(&X11_colors, wastrsave(&strings, "thistle"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "thistle"),
                              mk_rgb(216,191,216));
-    insert_hash(&X11_colors, wastrsave(&strings, "snow1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "snow1"),
                              mk_rgb(255,250,250));
-    insert_hash(&X11_colors, wastrsave(&strings, "snow2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "snow2"),
                              mk_rgb(238,233,233));
-    insert_hash(&X11_colors, wastrsave(&strings, "snow3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "snow3"),
                              mk_rgb(205,201,201));
-    insert_hash(&X11_colors, wastrsave(&strings, "snow4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "snow4"),
                              mk_rgb(139,137,137));
-    insert_hash(&X11_colors, wastrsave(&strings, "seashell1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "seashell1"),
                              mk_rgb(255,245,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "seashell2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "seashell2"),
                              mk_rgb(238,229,222));
-    insert_hash(&X11_colors, wastrsave(&strings, "seashell3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "seashell3"),
                              mk_rgb(205,197,191));
-    insert_hash(&X11_colors, wastrsave(&strings, "seashell4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "seashell4"),
                              mk_rgb(139,134,130));
-    insert_hash(&X11_colors, wastrsave(&strings, "AntiqueWhite1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "AntiqueWhite1"),
                              mk_rgb(255,239,219));
-    insert_hash(&X11_colors, wastrsave(&strings, "AntiqueWhite2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "AntiqueWhite2"),
                              mk_rgb(238,223,204));
-    insert_hash(&X11_colors, wastrsave(&strings, "AntiqueWhite3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "AntiqueWhite3"),
                              mk_rgb(205,192,176));
-    insert_hash(&X11_colors, wastrsave(&strings, "AntiqueWhite4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "AntiqueWhite4"),
                              mk_rgb(139,131,120));
-    insert_hash(&X11_colors, wastrsave(&strings, "bisque1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "bisque1"),
                              mk_rgb(255,228,196));
-    insert_hash(&X11_colors, wastrsave(&strings, "bisque2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "bisque2"),
                              mk_rgb(238,213,183));
-    insert_hash(&X11_colors, wastrsave(&strings, "bisque3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "bisque3"),
                              mk_rgb(205,183,158));
-    insert_hash(&X11_colors, wastrsave(&strings, "bisque4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "bisque4"),
                              mk_rgb(139,125,107));
-    insert_hash(&X11_colors, wastrsave(&strings, "PeachPuff1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PeachPuff1"),
                              mk_rgb(255,218,185));
-    insert_hash(&X11_colors, wastrsave(&strings, "PeachPuff2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PeachPuff2"),
                              mk_rgb(238,203,173));
-    insert_hash(&X11_colors, wastrsave(&strings, "PeachPuff3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PeachPuff3"),
                              mk_rgb(205,175,149));
-    insert_hash(&X11_colors, wastrsave(&strings, "PeachPuff4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PeachPuff4"),
                              mk_rgb(139,119,101));
-    insert_hash(&X11_colors, wastrsave(&strings, "NavajoWhite1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "NavajoWhite1"),
                              mk_rgb(255,222,173));
-    insert_hash(&X11_colors, wastrsave(&strings, "NavajoWhite2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "NavajoWhite2"),
                              mk_rgb(238,207,161));
-    insert_hash(&X11_colors, wastrsave(&strings, "NavajoWhite3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "NavajoWhite3"),
                              mk_rgb(205,179,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "NavajoWhite4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "NavajoWhite4"),
                              mk_rgb(139,121,94));
-    insert_hash(&X11_colors, wastrsave(&strings, "LemonChiffon1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LemonChiffon1"),
                              mk_rgb(255,250,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "LemonChiffon2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LemonChiffon2"),
                              mk_rgb(238,233,191));
-    insert_hash(&X11_colors, wastrsave(&strings, "LemonChiffon3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LemonChiffon3"),
                              mk_rgb(205,201,165));
-    insert_hash(&X11_colors, wastrsave(&strings, "LemonChiffon4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LemonChiffon4"),
                              mk_rgb(139,137,112));
-    insert_hash(&X11_colors, wastrsave(&strings, "cornsilk1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "cornsilk1"),
                              mk_rgb(255,248,220));
-    insert_hash(&X11_colors, wastrsave(&strings, "cornsilk2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "cornsilk2"),
                              mk_rgb(238,232,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "cornsilk3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "cornsilk3"),
                              mk_rgb(205,200,177));
-    insert_hash(&X11_colors, wastrsave(&strings, "cornsilk4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "cornsilk4"),
                              mk_rgb(139,136,120));
-    insert_hash(&X11_colors, wastrsave(&strings, "ivory1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "ivory1"),
                              mk_rgb(255,255,240));
-    insert_hash(&X11_colors, wastrsave(&strings, "ivory2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "ivory2"),
                              mk_rgb(238,238,224));
-    insert_hash(&X11_colors, wastrsave(&strings, "ivory3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "ivory3"),
                              mk_rgb(205,205,193));
-    insert_hash(&X11_colors, wastrsave(&strings, "ivory4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "ivory4"),
                              mk_rgb(139,139,131));
-    insert_hash(&X11_colors, wastrsave(&strings, "honeydew1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "honeydew1"),
                              mk_rgb(240,255,240));
-    insert_hash(&X11_colors, wastrsave(&strings, "honeydew2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "honeydew2"),
                              mk_rgb(224,238,224));
-    insert_hash(&X11_colors, wastrsave(&strings, "honeydew3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "honeydew3"),
                              mk_rgb(193,205,193));
-    insert_hash(&X11_colors, wastrsave(&strings, "honeydew4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "honeydew4"),
                              mk_rgb(131,139,131));
-    insert_hash(&X11_colors, wastrsave(&strings, "LavenderBlush1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LavenderBlush1"),
                              mk_rgb(255,240,245));
-    insert_hash(&X11_colors, wastrsave(&strings, "LavenderBlush2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LavenderBlush2"),
                              mk_rgb(238,224,229));
-    insert_hash(&X11_colors, wastrsave(&strings, "LavenderBlush3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LavenderBlush3"),
                              mk_rgb(205,193,197));
-    insert_hash(&X11_colors, wastrsave(&strings, "LavenderBlush4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LavenderBlush4"),
                              mk_rgb(139,131,134));
-    insert_hash(&X11_colors, wastrsave(&strings, "MistyRose1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MistyRose1"),
                              mk_rgb(255,228,225));
-    insert_hash(&X11_colors, wastrsave(&strings, "MistyRose2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MistyRose2"),
                              mk_rgb(238,213,210));
-    insert_hash(&X11_colors, wastrsave(&strings, "MistyRose3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MistyRose3"),
                              mk_rgb(205,183,181));
-    insert_hash(&X11_colors, wastrsave(&strings, "MistyRose4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MistyRose4"),
                              mk_rgb(139,125,123));
-    insert_hash(&X11_colors, wastrsave(&strings, "azure1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "azure1"),
                              mk_rgb(240,255,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "azure2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "azure2"),
                              mk_rgb(224,238,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "azure3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "azure3"),
                              mk_rgb(193,205,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "azure4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "azure4"),
                              mk_rgb(131,139,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "SlateBlue1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SlateBlue1"),
                              mk_rgb(131,111,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "SlateBlue2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SlateBlue2"),
                              mk_rgb(122,103,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "SlateBlue3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SlateBlue3"),
                              mk_rgb(105,89,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "SlateBlue4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SlateBlue4"),
                              mk_rgb(71,60,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "RoyalBlue1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "RoyalBlue1"),
                              mk_rgb(72,118,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "RoyalBlue2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "RoyalBlue2"),
                              mk_rgb(67,110,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "RoyalBlue3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "RoyalBlue3"),
                              mk_rgb(58,95,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "RoyalBlue4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "RoyalBlue4"),
                              mk_rgb(39,64,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "blue1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "blue1"),
                              mk_rgb(0,0,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "blue2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "blue2"),
                              mk_rgb(0,0,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "blue3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "blue3"),
                              mk_rgb(0,0,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "blue4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "blue4"),
                              mk_rgb(0,0,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "DodgerBlue1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DodgerBlue1"),
                              mk_rgb(30,144,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "DodgerBlue2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DodgerBlue2"),
                              mk_rgb(28,134,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "DodgerBlue3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DodgerBlue3"),
                              mk_rgb(24,116,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "DodgerBlue4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DodgerBlue4"),
                              mk_rgb(16,78,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "SteelBlue1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SteelBlue1"),
                              mk_rgb(99,184,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "SteelBlue2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SteelBlue2"),
                              mk_rgb(92,172,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "SteelBlue3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SteelBlue3"),
                              mk_rgb(79,148,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "SteelBlue4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SteelBlue4"),
                              mk_rgb(54,100,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "DeepSkyBlue1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DeepSkyBlue1"),
                              mk_rgb(0,191,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "DeepSkyBlue2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DeepSkyBlue2"),
                              mk_rgb(0,178,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "DeepSkyBlue3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DeepSkyBlue3"),
                              mk_rgb(0,154,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "DeepSkyBlue4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DeepSkyBlue4"),
                              mk_rgb(0,104,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "SkyBlue1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SkyBlue1"),
                              mk_rgb(135,206,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "SkyBlue2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SkyBlue2"),
                              mk_rgb(126,192,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "SkyBlue3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SkyBlue3"),
                              mk_rgb(108,166,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "SkyBlue4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SkyBlue4"),
                              mk_rgb(74,112,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightSkyBlue1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightSkyBlue1"),
                              mk_rgb(176,226,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightSkyBlue2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightSkyBlue2"),
                              mk_rgb(164,211,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightSkyBlue3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightSkyBlue3"),
                              mk_rgb(141,182,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightSkyBlue4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightSkyBlue4"),
                              mk_rgb(96,123,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "SlateGray1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SlateGray1"),
                              mk_rgb(198,226,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "SlateGray2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SlateGray2"),
                              mk_rgb(185,211,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "SlateGray3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SlateGray3"),
                              mk_rgb(159,182,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "SlateGray4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SlateGray4"),
                              mk_rgb(108,123,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightSteelBlue1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightSteelBlue1"),
                              mk_rgb(202,225,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightSteelBlue2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightSteelBlue2"),
                              mk_rgb(188,210,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightSteelBlue3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightSteelBlue3"),
                              mk_rgb(162,181,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightSteelBlue4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightSteelBlue4"),
                              mk_rgb(110,123,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightBlue1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightBlue1"),
                              mk_rgb(191,239,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightBlue2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightBlue2"),
                              mk_rgb(178,223,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightBlue3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightBlue3"),
                              mk_rgb(154,192,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightBlue4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightBlue4"),
                              mk_rgb(104,131,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightCyan1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightCyan1"),
                              mk_rgb(224,255,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightCyan2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightCyan2"),
                              mk_rgb(209,238,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightCyan3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightCyan3"),
                              mk_rgb(180,205,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightCyan4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightCyan4"),
                              mk_rgb(122,139,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "PaleTurquoise1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PaleTurquoise1"),
                              mk_rgb(187,255,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "PaleTurquoise2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PaleTurquoise2"),
                              mk_rgb(174,238,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "PaleTurquoise3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PaleTurquoise3"),
                              mk_rgb(150,205,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "PaleTurquoise4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PaleTurquoise4"),
                              mk_rgb(102,139,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "CadetBlue1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "CadetBlue1"),
                              mk_rgb(152,245,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "CadetBlue2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "CadetBlue2"),
                              mk_rgb(142,229,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "CadetBlue3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "CadetBlue3"),
                              mk_rgb(122,197,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "CadetBlue4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "CadetBlue4"),
                              mk_rgb(83,134,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "turquoise1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "turquoise1"),
                              mk_rgb(0,245,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "turquoise2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "turquoise2"),
                              mk_rgb(0,229,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "turquoise3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "turquoise3"),
                              mk_rgb(0,197,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "turquoise4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "turquoise4"),
                              mk_rgb(0,134,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "cyan1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "cyan1"),
                              mk_rgb(0,255,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "cyan2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "cyan2"),
                              mk_rgb(0,238,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "cyan3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "cyan3"),
                              mk_rgb(0,205,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "cyan4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "cyan4"),
                              mk_rgb(0,139,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkSlateGray1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkSlateGray1"),
                              mk_rgb(151,255,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkSlateGray2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkSlateGray2"),
                              mk_rgb(141,238,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkSlateGray3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkSlateGray3"),
                              mk_rgb(121,205,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkSlateGray4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkSlateGray4"),
                              mk_rgb(82,139,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "aquamarine1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "aquamarine1"),
                              mk_rgb(127,255,212));
-    insert_hash(&X11_colors, wastrsave(&strings, "aquamarine2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "aquamarine2"),
                              mk_rgb(118,238,198));
-    insert_hash(&X11_colors, wastrsave(&strings, "aquamarine3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "aquamarine3"),
                              mk_rgb(102,205,170));
-    insert_hash(&X11_colors, wastrsave(&strings, "aquamarine4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "aquamarine4"),
                              mk_rgb(69,139,116));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkSeaGreen1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkSeaGreen1"),
                              mk_rgb(193,255,193));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkSeaGreen2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkSeaGreen2"),
                              mk_rgb(180,238,180));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkSeaGreen3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkSeaGreen3"),
                              mk_rgb(155,205,155));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkSeaGreen4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkSeaGreen4"),
                              mk_rgb(105,139,105));
-    insert_hash(&X11_colors, wastrsave(&strings, "SeaGreen1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SeaGreen1"),
                              mk_rgb(84,255,159));
-    insert_hash(&X11_colors, wastrsave(&strings, "SeaGreen2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SeaGreen2"),
                              mk_rgb(78,238,148));
-    insert_hash(&X11_colors, wastrsave(&strings, "SeaGreen3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SeaGreen3"),
                              mk_rgb(67,205,128));
-    insert_hash(&X11_colors, wastrsave(&strings, "SeaGreen4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SeaGreen4"),
                              mk_rgb(46,139,87));
-    insert_hash(&X11_colors, wastrsave(&strings, "PaleGreen1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PaleGreen1"),
                              mk_rgb(154,255,154));
-    insert_hash(&X11_colors, wastrsave(&strings, "PaleGreen2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PaleGreen2"),
                              mk_rgb(144,238,144));
-    insert_hash(&X11_colors, wastrsave(&strings, "PaleGreen3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PaleGreen3"),
                              mk_rgb(124,205,124));
-    insert_hash(&X11_colors, wastrsave(&strings, "PaleGreen4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PaleGreen4"),
                              mk_rgb(84,139,84));
-    insert_hash(&X11_colors, wastrsave(&strings, "SpringGreen1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SpringGreen1"),
                              mk_rgb(0,255,127));
-    insert_hash(&X11_colors, wastrsave(&strings, "SpringGreen2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SpringGreen2"),
                              mk_rgb(0,238,118));
-    insert_hash(&X11_colors, wastrsave(&strings, "SpringGreen3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SpringGreen3"),
                              mk_rgb(0,205,102));
-    insert_hash(&X11_colors, wastrsave(&strings, "SpringGreen4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "SpringGreen4"),
                              mk_rgb(0,139,69));
-    insert_hash(&X11_colors, wastrsave(&strings, "green1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "green1"),
                              mk_rgb(0,255,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "green2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "green2"),
                              mk_rgb(0,238,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "green3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "green3"),
                              mk_rgb(0,205,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "green4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "green4"),
                              mk_rgb(0,139,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "chartreuse1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "chartreuse1"),
                              mk_rgb(127,255,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "chartreuse2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "chartreuse2"),
                              mk_rgb(118,238,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "chartreuse3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "chartreuse3"),
                              mk_rgb(102,205,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "chartreuse4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "chartreuse4"),
                              mk_rgb(69,139,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "OliveDrab1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "OliveDrab1"),
                              mk_rgb(192,255,62));
-    insert_hash(&X11_colors, wastrsave(&strings, "OliveDrab2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "OliveDrab2"),
                              mk_rgb(179,238,58));
-    insert_hash(&X11_colors, wastrsave(&strings, "OliveDrab3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "OliveDrab3"),
                              mk_rgb(154,205,50));
-    insert_hash(&X11_colors, wastrsave(&strings, "OliveDrab4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "OliveDrab4"),
                              mk_rgb(105,139,34));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkOliveGreen1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkOliveGreen1"),
                              mk_rgb(202,255,112));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkOliveGreen2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkOliveGreen2"),
                              mk_rgb(188,238,104));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkOliveGreen3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkOliveGreen3"),
                              mk_rgb(162,205,90));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkOliveGreen4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkOliveGreen4"),
                              mk_rgb(110,139,61));
-    insert_hash(&X11_colors, wastrsave(&strings, "khaki1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "khaki1"),
                              mk_rgb(255,246,143));
-    insert_hash(&X11_colors, wastrsave(&strings, "khaki2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "khaki2"),
                              mk_rgb(238,230,133));
-    insert_hash(&X11_colors, wastrsave(&strings, "khaki3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "khaki3"),
                              mk_rgb(205,198,115));
-    insert_hash(&X11_colors, wastrsave(&strings, "khaki4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "khaki4"),
                              mk_rgb(139,134,78));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightGoldenrod1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightGoldenrod1"),
                              mk_rgb(255,236,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightGoldenrod2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightGoldenrod2"),
                              mk_rgb(238,220,130));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightGoldenrod3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightGoldenrod3"),
                              mk_rgb(205,190,112));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightGoldenrod4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightGoldenrod4"),
                              mk_rgb(139,129,76));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightYellow1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightYellow1"),
                              mk_rgb(255,255,224));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightYellow2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightYellow2"),
                              mk_rgb(238,238,209));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightYellow3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightYellow3"),
                              mk_rgb(205,205,180));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightYellow4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightYellow4"),
                              mk_rgb(139,139,122));
-    insert_hash(&X11_colors, wastrsave(&strings, "yellow1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "yellow1"),
                              mk_rgb(255,255,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "yellow2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "yellow2"),
                              mk_rgb(238,238,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "yellow3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "yellow3"),
                              mk_rgb(205,205,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "yellow4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "yellow4"),
                              mk_rgb(139,139,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "gold1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gold1"),
                              mk_rgb(255,215,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "gold2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gold2"),
                              mk_rgb(238,201,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "gold3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gold3"),
                              mk_rgb(205,173,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "gold4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gold4"),
                              mk_rgb(139,117,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "goldenrod1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "goldenrod1"),
                              mk_rgb(255,193,37));
-    insert_hash(&X11_colors, wastrsave(&strings, "goldenrod2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "goldenrod2"),
                              mk_rgb(238,180,34));
-    insert_hash(&X11_colors, wastrsave(&strings, "goldenrod3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "goldenrod3"),
                              mk_rgb(205,155,29));
-    insert_hash(&X11_colors, wastrsave(&strings, "goldenrod4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "goldenrod4"),
                              mk_rgb(139,105,20));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkGoldenrod1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkGoldenrod1"),
                              mk_rgb(255,185,15));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkGoldenrod2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkGoldenrod2"),
                              mk_rgb(238,173,14));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkGoldenrod3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkGoldenrod3"),
                              mk_rgb(205,149,12));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkGoldenrod4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkGoldenrod4"),
                              mk_rgb(139,101,8));
-    insert_hash(&X11_colors, wastrsave(&strings, "RosyBrown1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "RosyBrown1"),
                              mk_rgb(255,193,193));
-    insert_hash(&X11_colors, wastrsave(&strings, "RosyBrown2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "RosyBrown2"),
                              mk_rgb(238,180,180));
-    insert_hash(&X11_colors, wastrsave(&strings, "RosyBrown3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "RosyBrown3"),
                              mk_rgb(205,155,155));
-    insert_hash(&X11_colors, wastrsave(&strings, "RosyBrown4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "RosyBrown4"),
                              mk_rgb(139,105,105));
-    insert_hash(&X11_colors, wastrsave(&strings, "IndianRed1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "IndianRed1"),
                              mk_rgb(255,106,106));
-    insert_hash(&X11_colors, wastrsave(&strings, "IndianRed2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "IndianRed2"),
                              mk_rgb(238,99,99));
-    insert_hash(&X11_colors, wastrsave(&strings, "IndianRed3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "IndianRed3"),
                              mk_rgb(205,85,85));
-    insert_hash(&X11_colors, wastrsave(&strings, "IndianRed4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "IndianRed4"),
                              mk_rgb(139,58,58));
-    insert_hash(&X11_colors, wastrsave(&strings, "sienna1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "sienna1"),
                              mk_rgb(255,130,71));
-    insert_hash(&X11_colors, wastrsave(&strings, "sienna2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "sienna2"),
                              mk_rgb(238,121,66));
-    insert_hash(&X11_colors, wastrsave(&strings, "sienna3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "sienna3"),
                              mk_rgb(205,104,57));
-    insert_hash(&X11_colors, wastrsave(&strings, "sienna4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "sienna4"),
                              mk_rgb(139,71,38));
-    insert_hash(&X11_colors, wastrsave(&strings, "burlywood1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "burlywood1"),
                              mk_rgb(255,211,155));
-    insert_hash(&X11_colors, wastrsave(&strings, "burlywood2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "burlywood2"),
                              mk_rgb(238,197,145));
-    insert_hash(&X11_colors, wastrsave(&strings, "burlywood3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "burlywood3"),
                              mk_rgb(205,170,125));
-    insert_hash(&X11_colors, wastrsave(&strings, "burlywood4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "burlywood4"),
                              mk_rgb(139,115,85));
-    insert_hash(&X11_colors, wastrsave(&strings, "wheat1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "wheat1"),
                              mk_rgb(255,231,186));
-    insert_hash(&X11_colors, wastrsave(&strings, "wheat2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "wheat2"),
                              mk_rgb(238,216,174));
-    insert_hash(&X11_colors, wastrsave(&strings, "wheat3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "wheat3"),
                              mk_rgb(205,186,150));
-    insert_hash(&X11_colors, wastrsave(&strings, "wheat4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "wheat4"),
                              mk_rgb(139,126,102));
-    insert_hash(&X11_colors, wastrsave(&strings, "tan1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "tan1"),
                              mk_rgb(255,165,79));
-    insert_hash(&X11_colors, wastrsave(&strings, "tan2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "tan2"),
                              mk_rgb(238,154,73));
-    insert_hash(&X11_colors, wastrsave(&strings, "tan3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "tan3"),
                              mk_rgb(205,133,63));
-    insert_hash(&X11_colors, wastrsave(&strings, "tan4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "tan4"),
                              mk_rgb(139,90,43));
-    insert_hash(&X11_colors, wastrsave(&strings, "chocolate1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "chocolate1"),
                              mk_rgb(255,127,36));
-    insert_hash(&X11_colors, wastrsave(&strings, "chocolate2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "chocolate2"),
                              mk_rgb(238,118,33));
-    insert_hash(&X11_colors, wastrsave(&strings, "chocolate3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "chocolate3"),
                              mk_rgb(205,102,29));
-    insert_hash(&X11_colors, wastrsave(&strings, "chocolate4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "chocolate4"),
                              mk_rgb(139,69,19));
-    insert_hash(&X11_colors, wastrsave(&strings, "firebrick1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "firebrick1"),
                              mk_rgb(255,48,48));
-    insert_hash(&X11_colors, wastrsave(&strings, "firebrick2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "firebrick2"),
                              mk_rgb(238,44,44));
-    insert_hash(&X11_colors, wastrsave(&strings, "firebrick3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "firebrick3"),
                              mk_rgb(205,38,38));
-    insert_hash(&X11_colors, wastrsave(&strings, "firebrick4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "firebrick4"),
                              mk_rgb(139,26,26));
-    insert_hash(&X11_colors, wastrsave(&strings, "brown1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "brown1"),
                              mk_rgb(255,64,64));
-    insert_hash(&X11_colors, wastrsave(&strings, "brown2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "brown2"),
                              mk_rgb(238,59,59));
-    insert_hash(&X11_colors, wastrsave(&strings, "brown3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "brown3"),
                              mk_rgb(205,51,51));
-    insert_hash(&X11_colors, wastrsave(&strings, "brown4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "brown4"),
                              mk_rgb(139,35,35));
-    insert_hash(&X11_colors, wastrsave(&strings, "salmon1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "salmon1"),
                              mk_rgb(255,140,105));
-    insert_hash(&X11_colors, wastrsave(&strings, "salmon2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "salmon2"),
                              mk_rgb(238,130,98));
-    insert_hash(&X11_colors, wastrsave(&strings, "salmon3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "salmon3"),
                              mk_rgb(205,112,84));
-    insert_hash(&X11_colors, wastrsave(&strings, "salmon4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "salmon4"),
                              mk_rgb(139,76,57));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightSalmon1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightSalmon1"),
                              mk_rgb(255,160,122));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightSalmon2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightSalmon2"),
                              mk_rgb(238,149,114));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightSalmon3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightSalmon3"),
                              mk_rgb(205,129,98));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightSalmon4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightSalmon4"),
                              mk_rgb(139,87,66));
-    insert_hash(&X11_colors, wastrsave(&strings, "orange1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "orange1"),
                              mk_rgb(255,165,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "orange2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "orange2"),
                              mk_rgb(238,154,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "orange3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "orange3"),
                              mk_rgb(205,133,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "orange4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "orange4"),
                              mk_rgb(139,90,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkOrange1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkOrange1"),
                              mk_rgb(255,127,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkOrange2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkOrange2"),
                              mk_rgb(238,118,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkOrange3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkOrange3"),
                              mk_rgb(205,102,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkOrange4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkOrange4"),
                              mk_rgb(139,69,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "coral1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "coral1"),
                              mk_rgb(255,114,86));
-    insert_hash(&X11_colors, wastrsave(&strings, "coral2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "coral2"),
                              mk_rgb(238,106,80));
-    insert_hash(&X11_colors, wastrsave(&strings, "coral3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "coral3"),
                              mk_rgb(205,91,69));
-    insert_hash(&X11_colors, wastrsave(&strings, "coral4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "coral4"),
                              mk_rgb(139,62,47));
-    insert_hash(&X11_colors, wastrsave(&strings, "tomato1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "tomato1"),
                              mk_rgb(255,99,71));
-    insert_hash(&X11_colors, wastrsave(&strings, "tomato2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "tomato2"),
                              mk_rgb(238,92,66));
-    insert_hash(&X11_colors, wastrsave(&strings, "tomato3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "tomato3"),
                              mk_rgb(205,79,57));
-    insert_hash(&X11_colors, wastrsave(&strings, "tomato4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "tomato4"),
                              mk_rgb(139,54,38));
-    insert_hash(&X11_colors, wastrsave(&strings, "OrangeRed1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "OrangeRed1"),
                              mk_rgb(255,69,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "OrangeRed2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "OrangeRed2"),
                              mk_rgb(238,64,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "OrangeRed3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "OrangeRed3"),
                              mk_rgb(205,55,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "OrangeRed4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "OrangeRed4"),
                              mk_rgb(139,37,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "red1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "red1"),
                              mk_rgb(255,0,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "red2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "red2"),
                              mk_rgb(238,0,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "red3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "red3"),
                              mk_rgb(205,0,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "red4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "red4"),
                              mk_rgb(139,0,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "DebianRed"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DebianRed"),
                              mk_rgb(215,7,81));
-    insert_hash(&X11_colors, wastrsave(&strings, "DeepPink1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DeepPink1"),
                              mk_rgb(255,20,147));
-    insert_hash(&X11_colors, wastrsave(&strings, "DeepPink2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DeepPink2"),
                              mk_rgb(238,18,137));
-    insert_hash(&X11_colors, wastrsave(&strings, "DeepPink3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DeepPink3"),
                              mk_rgb(205,16,118));
-    insert_hash(&X11_colors, wastrsave(&strings, "DeepPink4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DeepPink4"),
                              mk_rgb(139,10,80));
-    insert_hash(&X11_colors, wastrsave(&strings, "HotPink1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "HotPink1"),
                              mk_rgb(255,110,180));
-    insert_hash(&X11_colors, wastrsave(&strings, "HotPink2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "HotPink2"),
                              mk_rgb(238,106,167));
-    insert_hash(&X11_colors, wastrsave(&strings, "HotPink3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "HotPink3"),
                              mk_rgb(205,96,144));
-    insert_hash(&X11_colors, wastrsave(&strings, "HotPink4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "HotPink4"),
                              mk_rgb(139,58,98));
-    insert_hash(&X11_colors, wastrsave(&strings, "pink1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "pink1"),
                              mk_rgb(255,181,197));
-    insert_hash(&X11_colors, wastrsave(&strings, "pink2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "pink2"),
                              mk_rgb(238,169,184));
-    insert_hash(&X11_colors, wastrsave(&strings, "pink3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "pink3"),
                              mk_rgb(205,145,158));
-    insert_hash(&X11_colors, wastrsave(&strings, "pink4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "pink4"),
                              mk_rgb(139,99,108));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightPink1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightPink1"),
                              mk_rgb(255,174,185));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightPink2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightPink2"),
                              mk_rgb(238,162,173));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightPink3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightPink3"),
                              mk_rgb(205,140,149));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightPink4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightPink4"),
                              mk_rgb(139,95,101));
-    insert_hash(&X11_colors, wastrsave(&strings, "PaleVioletRed1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PaleVioletRed1"),
                              mk_rgb(255,130,171));
-    insert_hash(&X11_colors, wastrsave(&strings, "PaleVioletRed2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PaleVioletRed2"),
                              mk_rgb(238,121,159));
-    insert_hash(&X11_colors, wastrsave(&strings, "PaleVioletRed3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PaleVioletRed3"),
                              mk_rgb(205,104,137));
-    insert_hash(&X11_colors, wastrsave(&strings, "PaleVioletRed4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "PaleVioletRed4"),
                              mk_rgb(139,71,93));
-    insert_hash(&X11_colors, wastrsave(&strings, "maroon1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "maroon1"),
                              mk_rgb(255,52,179));
-    insert_hash(&X11_colors, wastrsave(&strings, "maroon2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "maroon2"),
                              mk_rgb(238,48,167));
-    insert_hash(&X11_colors, wastrsave(&strings, "maroon3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "maroon3"),
                              mk_rgb(205,41,144));
-    insert_hash(&X11_colors, wastrsave(&strings, "maroon4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "maroon4"),
                              mk_rgb(139,28,98));
-    insert_hash(&X11_colors, wastrsave(&strings, "VioletRed1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "VioletRed1"),
                              mk_rgb(255,62,150));
-    insert_hash(&X11_colors, wastrsave(&strings, "VioletRed2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "VioletRed2"),
                              mk_rgb(238,58,140));
-    insert_hash(&X11_colors, wastrsave(&strings, "VioletRed3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "VioletRed3"),
                              mk_rgb(205,50,120));
-    insert_hash(&X11_colors, wastrsave(&strings, "VioletRed4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "VioletRed4"),
                              mk_rgb(139,34,82));
-    insert_hash(&X11_colors, wastrsave(&strings, "magenta1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "magenta1"),
                              mk_rgb(255,0,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "magenta2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "magenta2"),
                              mk_rgb(238,0,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "magenta3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "magenta3"),
                              mk_rgb(205,0,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "magenta4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "magenta4"),
                              mk_rgb(139,0,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "orchid1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "orchid1"),
                              mk_rgb(255,131,250));
-    insert_hash(&X11_colors, wastrsave(&strings, "orchid2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "orchid2"),
                              mk_rgb(238,122,233));
-    insert_hash(&X11_colors, wastrsave(&strings, "orchid3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "orchid3"),
                              mk_rgb(205,105,201));
-    insert_hash(&X11_colors, wastrsave(&strings, "orchid4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "orchid4"),
                              mk_rgb(139,71,137));
-    insert_hash(&X11_colors, wastrsave(&strings, "plum1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "plum1"),
                              mk_rgb(255,187,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "plum2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "plum2"),
                              mk_rgb(238,174,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "plum3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "plum3"),
                              mk_rgb(205,150,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "plum4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "plum4"),
                              mk_rgb(139,102,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "MediumOrchid1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MediumOrchid1"),
                              mk_rgb(224,102,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "MediumOrchid2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MediumOrchid2"),
                              mk_rgb(209,95,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "MediumOrchid3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MediumOrchid3"),
                              mk_rgb(180,82,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "MediumOrchid4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MediumOrchid4"),
                              mk_rgb(122,55,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkOrchid1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkOrchid1"),
                              mk_rgb(191,62,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkOrchid2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkOrchid2"),
                              mk_rgb(178,58,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkOrchid3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkOrchid3"),
                              mk_rgb(154,50,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkOrchid4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkOrchid4"),
                              mk_rgb(104,34,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "purple1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "purple1"),
                              mk_rgb(155,48,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "purple2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "purple2"),
                              mk_rgb(145,44,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "purple3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "purple3"),
                              mk_rgb(125,38,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "purple4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "purple4"),
                              mk_rgb(85,26,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "MediumPurple1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MediumPurple1"),
                              mk_rgb(171,130,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "MediumPurple2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MediumPurple2"),
                              mk_rgb(159,121,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "MediumPurple3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MediumPurple3"),
                              mk_rgb(137,104,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "MediumPurple4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "MediumPurple4"),
                              mk_rgb(93,71,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "thistle1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "thistle1"),
                              mk_rgb(255,225,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "thistle2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "thistle2"),
                              mk_rgb(238,210,238));
-    insert_hash(&X11_colors, wastrsave(&strings, "thistle3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "thistle3"),
                              mk_rgb(205,181,205));
-    insert_hash(&X11_colors, wastrsave(&strings, "thistle4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "thistle4"),
                              mk_rgb(139,123,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray0"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray0"),
                              mk_rgb(0,0,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey0"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey0"),
                              mk_rgb(0,0,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray1"),
                              mk_rgb(3,3,3));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey1"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey1"),
                              mk_rgb(3,3,3));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray2"),
                              mk_rgb(5,5,5));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey2"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey2"),
                              mk_rgb(5,5,5));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray3"),
                              mk_rgb(8,8,8));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey3"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey3"),
                              mk_rgb(8,8,8));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray4"),
                              mk_rgb(10,10,10));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey4"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey4"),
                              mk_rgb(10,10,10));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray5"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray5"),
                              mk_rgb(13,13,13));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey5"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey5"),
                              mk_rgb(13,13,13));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray6"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray6"),
                              mk_rgb(15,15,15));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey6"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey6"),
                              mk_rgb(15,15,15));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray7"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray7"),
                              mk_rgb(18,18,18));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey7"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey7"),
                              mk_rgb(18,18,18));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray8"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray8"),
                              mk_rgb(20,20,20));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey8"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey8"),
                              mk_rgb(20,20,20));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray9"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray9"),
                              mk_rgb(23,23,23));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey9"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey9"),
                              mk_rgb(23,23,23));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray10"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray10"),
                              mk_rgb(26,26,26));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey10"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey10"),
                              mk_rgb(26,26,26));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray11"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray11"),
                              mk_rgb(28,28,28));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey11"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey11"),
                              mk_rgb(28,28,28));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray12"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray12"),
                              mk_rgb(31,31,31));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey12"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey12"),
                              mk_rgb(31,31,31));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray13"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray13"),
                              mk_rgb(33,33,33));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey13"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey13"),
                              mk_rgb(33,33,33));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray14"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray14"),
                              mk_rgb(36,36,36));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey14"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey14"),
                              mk_rgb(36,36,36));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray15"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray15"),
                              mk_rgb(38,38,38));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey15"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey15"),
                              mk_rgb(38,38,38));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray16"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray16"),
                              mk_rgb(41,41,41));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey16"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey16"),
                              mk_rgb(41,41,41));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray17"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray17"),
                              mk_rgb(43,43,43));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey17"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey17"),
                              mk_rgb(43,43,43));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray18"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray18"),
                              mk_rgb(46,46,46));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey18"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey18"),
                              mk_rgb(46,46,46));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray19"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray19"),
                              mk_rgb(48,48,48));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey19"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey19"),
                              mk_rgb(48,48,48));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray20"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray20"),
                              mk_rgb(51,51,51));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey20"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey20"),
                              mk_rgb(51,51,51));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray21"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray21"),
                              mk_rgb(54,54,54));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey21"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey21"),
                              mk_rgb(54,54,54));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray22"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray22"),
                              mk_rgb(56,56,56));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey22"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey22"),
                              mk_rgb(56,56,56));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray23"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray23"),
                              mk_rgb(59,59,59));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey23"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey23"),
                              mk_rgb(59,59,59));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray24"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray24"),
                              mk_rgb(61,61,61));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey24"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey24"),
                              mk_rgb(61,61,61));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray25"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray25"),
                              mk_rgb(64,64,64));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey25"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey25"),
                              mk_rgb(64,64,64));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray26"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray26"),
                              mk_rgb(66,66,66));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey26"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey26"),
                              mk_rgb(66,66,66));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray27"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray27"),
                              mk_rgb(69,69,69));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey27"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey27"),
                              mk_rgb(69,69,69));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray28"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray28"),
                              mk_rgb(71,71,71));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey28"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey28"),
                              mk_rgb(71,71,71));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray29"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray29"),
                              mk_rgb(74,74,74));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey29"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey29"),
                              mk_rgb(74,74,74));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray30"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray30"),
                              mk_rgb(77,77,77));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey30"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey30"),
                              mk_rgb(77,77,77));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray31"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray31"),
                              mk_rgb(79,79,79));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey31"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey31"),
                              mk_rgb(79,79,79));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray32"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray32"),
                              mk_rgb(82,82,82));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey32"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey32"),
                              mk_rgb(82,82,82));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray33"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray33"),
                              mk_rgb(84,84,84));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey33"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey33"),
                              mk_rgb(84,84,84));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray34"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray34"),
                              mk_rgb(87,87,87));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey34"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey34"),
                              mk_rgb(87,87,87));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray35"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray35"),
                              mk_rgb(89,89,89));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey35"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey35"),
                              mk_rgb(89,89,89));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray36"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray36"),
                              mk_rgb(92,92,92));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey36"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey36"),
                              mk_rgb(92,92,92));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray37"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray37"),
                              mk_rgb(94,94,94));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey37"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey37"),
                              mk_rgb(94,94,94));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray38"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray38"),
                              mk_rgb(97,97,97));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey38"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey38"),
                              mk_rgb(97,97,97));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray39"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray39"),
                              mk_rgb(99,99,99));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey39"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey39"),
                              mk_rgb(99,99,99));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray40"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray40"),
                              mk_rgb(102,102,102));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey40"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey40"),
                              mk_rgb(102,102,102));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray41"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray41"),
                              mk_rgb(105,105,105));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey41"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey41"),
                              mk_rgb(105,105,105));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray42"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray42"),
                              mk_rgb(107,107,107));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey42"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey42"),
                              mk_rgb(107,107,107));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray43"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray43"),
                              mk_rgb(110,110,110));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey43"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey43"),
                              mk_rgb(110,110,110));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray44"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray44"),
                              mk_rgb(112,112,112));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey44"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey44"),
                              mk_rgb(112,112,112));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray45"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray45"),
                              mk_rgb(115,115,115));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey45"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey45"),
                              mk_rgb(115,115,115));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray46"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray46"),
                              mk_rgb(117,117,117));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey46"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey46"),
                              mk_rgb(117,117,117));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray47"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray47"),
                              mk_rgb(120,120,120));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey47"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey47"),
                              mk_rgb(120,120,120));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray48"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray48"),
                              mk_rgb(122,122,122));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey48"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey48"),
                              mk_rgb(122,122,122));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray49"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray49"),
                              mk_rgb(125,125,125));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey49"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey49"),
                              mk_rgb(125,125,125));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray50"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray50"),
                              mk_rgb(127,127,127));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey50"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey50"),
                              mk_rgb(127,127,127));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray51"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray51"),
                              mk_rgb(130,130,130));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey51"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey51"),
                              mk_rgb(130,130,130));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray52"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray52"),
                              mk_rgb(133,133,133));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey52"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey52"),
                              mk_rgb(133,133,133));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray53"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray53"),
                              mk_rgb(135,135,135));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey53"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey53"),
                              mk_rgb(135,135,135));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray54"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray54"),
                              mk_rgb(138,138,138));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey54"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey54"),
                              mk_rgb(138,138,138));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray55"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray55"),
                              mk_rgb(140,140,140));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey55"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey55"),
                              mk_rgb(140,140,140));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray56"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray56"),
                              mk_rgb(143,143,143));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey56"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey56"),
                              mk_rgb(143,143,143));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray57"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray57"),
                              mk_rgb(145,145,145));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey57"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey57"),
                              mk_rgb(145,145,145));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray58"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray58"),
                              mk_rgb(148,148,148));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey58"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey58"),
                              mk_rgb(148,148,148));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray59"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray59"),
                              mk_rgb(150,150,150));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey59"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey59"),
                              mk_rgb(150,150,150));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray60"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray60"),
                              mk_rgb(153,153,153));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey60"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey60"),
                              mk_rgb(153,153,153));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray61"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray61"),
                              mk_rgb(156,156,156));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey61"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey61"),
                              mk_rgb(156,156,156));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray62"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray62"),
                              mk_rgb(158,158,158));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey62"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey62"),
                              mk_rgb(158,158,158));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray63"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray63"),
                              mk_rgb(161,161,161));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey63"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey63"),
                              mk_rgb(161,161,161));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray64"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray64"),
                              mk_rgb(163,163,163));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey64"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey64"),
                              mk_rgb(163,163,163));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray65"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray65"),
                              mk_rgb(166,166,166));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey65"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey65"),
                              mk_rgb(166,166,166));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray66"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray66"),
                              mk_rgb(168,168,168));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey66"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey66"),
                              mk_rgb(168,168,168));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray67"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray67"),
                              mk_rgb(171,171,171));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey67"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey67"),
                              mk_rgb(171,171,171));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray68"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray68"),
                              mk_rgb(173,173,173));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey68"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey68"),
                              mk_rgb(173,173,173));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray69"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray69"),
                              mk_rgb(176,176,176));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey69"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey69"),
                              mk_rgb(176,176,176));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray70"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray70"),
                              mk_rgb(179,179,179));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey70"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey70"),
                              mk_rgb(179,179,179));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray71"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray71"),
                              mk_rgb(181,181,181));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey71"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey71"),
                              mk_rgb(181,181,181));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray72"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray72"),
                              mk_rgb(184,184,184));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey72"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey72"),
                              mk_rgb(184,184,184));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray73"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray73"),
                              mk_rgb(186,186,186));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey73"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey73"),
                              mk_rgb(186,186,186));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray74"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray74"),
                              mk_rgb(189,189,189));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey74"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey74"),
                              mk_rgb(189,189,189));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray75"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray75"),
                              mk_rgb(191,191,191));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey75"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey75"),
                              mk_rgb(191,191,191));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray76"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray76"),
                              mk_rgb(194,194,194));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey76"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey76"),
                              mk_rgb(194,194,194));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray77"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray77"),
                              mk_rgb(196,196,196));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey77"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey77"),
                              mk_rgb(196,196,196));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray78"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray78"),
                              mk_rgb(199,199,199));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey78"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey78"),
                              mk_rgb(199,199,199));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray79"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray79"),
                              mk_rgb(201,201,201));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey79"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey79"),
                              mk_rgb(201,201,201));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray80"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray80"),
                              mk_rgb(204,204,204));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey80"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey80"),
                              mk_rgb(204,204,204));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray81"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray81"),
                              mk_rgb(207,207,207));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey81"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey81"),
                              mk_rgb(207,207,207));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray82"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray82"),
                              mk_rgb(209,209,209));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey82"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey82"),
                              mk_rgb(209,209,209));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray83"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray83"),
                              mk_rgb(212,212,212));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey83"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey83"),
                              mk_rgb(212,212,212));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray84"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray84"),
                              mk_rgb(214,214,214));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey84"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey84"),
                              mk_rgb(214,214,214));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray85"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray85"),
                              mk_rgb(217,217,217));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey85"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey85"),
                              mk_rgb(217,217,217));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray86"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray86"),
                              mk_rgb(219,219,219));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey86"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey86"),
                              mk_rgb(219,219,219));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray87"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray87"),
                              mk_rgb(222,222,222));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey87"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey87"),
                              mk_rgb(222,222,222));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray88"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray88"),
                              mk_rgb(224,224,224));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey88"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey88"),
                              mk_rgb(224,224,224));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray89"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray89"),
                              mk_rgb(227,227,227));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey89"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey89"),
                              mk_rgb(227,227,227));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray90"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray90"),
                              mk_rgb(229,229,229));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey90"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey90"),
                              mk_rgb(229,229,229));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray91"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray91"),
                              mk_rgb(232,232,232));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey91"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey91"),
                              mk_rgb(232,232,232));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray92"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray92"),
                              mk_rgb(235,235,235));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey92"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey92"),
                              mk_rgb(235,235,235));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray93"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray93"),
                              mk_rgb(237,237,237));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey93"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey93"),
                              mk_rgb(237,237,237));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray94"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray94"),
                              mk_rgb(240,240,240));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey94"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey94"),
                              mk_rgb(240,240,240));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray95"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray95"),
                              mk_rgb(242,242,242));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey95"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey95"),
                              mk_rgb(242,242,242));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray96"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray96"),
                              mk_rgb(245,245,245));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey96"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey96"),
                              mk_rgb(245,245,245));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray97"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray97"),
                              mk_rgb(247,247,247));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey97"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey97"),
                              mk_rgb(247,247,247));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray98"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray98"),
                              mk_rgb(250,250,250));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey98"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey98"),
                              mk_rgb(250,250,250));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray99"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray99"),
                              mk_rgb(252,252,252));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey99"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey99"),
                              mk_rgb(252,252,252));
-    insert_hash(&X11_colors, wastrsave(&strings, "gray100"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "gray100"),
                              mk_rgb(255,255,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "grey100"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "grey100"),
                              mk_rgb(255,255,255));
-    insert_hash(&X11_colors, wastrsave(&strings, "dark grey"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dark grey"),
                              mk_rgb(169,169,169));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkGrey"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkGrey"),
                              mk_rgb(169,169,169));
-    insert_hash(&X11_colors, wastrsave(&strings, "dark gray"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dark gray"),
                              mk_rgb(169,169,169));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkGray"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkGray"),
                              mk_rgb(169,169,169));
-    insert_hash(&X11_colors, wastrsave(&strings, "dark blue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dark blue"),
                              mk_rgb(0,0,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkBlue"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkBlue"),
                              mk_rgb(0,0,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "dark cyan"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dark cyan"),
                              mk_rgb(0,139,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkCyan"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkCyan"),
                              mk_rgb(0,139,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "dark magenta"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dark magenta"),
                              mk_rgb(139,0,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkMagenta"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkMagenta"),
                              mk_rgb(139,0,139));
-    insert_hash(&X11_colors, wastrsave(&strings, "dark red"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "dark red"),
                              mk_rgb(139,0,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "DarkRed"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "DarkRed"),
                              mk_rgb(139,0,0));
-    insert_hash(&X11_colors, wastrsave(&strings, "light green"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "light green"),
                              mk_rgb(144,238,144));
-    insert_hash(&X11_colors, wastrsave(&strings, "LightGreen"),
+    insert_hash(&X11_colors, wastrsave(stringsp, "LightGreen"),
                              mk_rgb(144,238,144));
 }
 

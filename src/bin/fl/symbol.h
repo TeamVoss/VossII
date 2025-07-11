@@ -18,6 +18,7 @@ typedef struct name_expr_rec	*name_expr_ptr;
 
 /* -------- Function prototypes for exported functions -------- */
 void		Init_symbol();
+symbol_tbl_ptr  Create_empty_symb_tbl();
 void		Symbols_Install_Functions();
 void		Mark_symbols();
 g_ptr		Get_Fun_Expr(fn_ptr fp);

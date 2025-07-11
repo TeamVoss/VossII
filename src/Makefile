@@ -145,6 +145,7 @@ fl: library minisat visualization
 	FL_OPTIONS=$(FL_OPTIONS) DEBUG_FLAG=$(DEBUG_FLAG) \
 	OPTIMIZATION_FLAG=$(OPTIMIZATION_FLAG) \
 	COMPATIBILITY_FLAG=$(COMPATIBILITY_FLAG) \
+	BIN_DIR=$(BIN_DIR) \
 	LIB_DIR=$(LIB_DIR) YACC=$(YACC) \
 	LINKFLAG=$(LINKFLAG) ROOT_DIR=$(ROOT_DIR) VERSION_DATE=$(VERSION_DATE) \
 	MINISAT_DIR=$(MINISAT_DIR) \
@@ -193,8 +194,11 @@ install_all: fl functor \
     			bifrost
 	@-mkdir -p $(BIN_DIR)
 	@-unlink $(BIN_DIR)/fl
+	@-unlink $(BIN_DIR)/libfl.so
 	@cp ./bin/fl/fl $(BIN_DIR)/fl
 	@chmod ugo+rx $(BIN_DIR)/fl
+	@cp ./bin/fl/libfl.so $(BIN_DIR)/libfl.so
+	@chmod ugo+r $(BIN_DIR)/libfl.so
 	@cp ./bin/fl/builtins.fl $(BIN_DIR)/builtins.fl
 	@chmod ugo+r $(BIN_DIR)/builtins.fl
 	@cp ./bin/fl/preamble.fl $(BIN_DIR)/preamble.fl

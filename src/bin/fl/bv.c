@@ -16,7 +16,7 @@
 /* ------------- Global variables ------------- */
 
 /********* Global variables referenced ***********/
-extern str_mgr     strings;
+extern str_mgr     *stringsp;
 extern FILE        *odests_fp;
 extern bool     Do_gc_asap;
 
@@ -158,7 +158,7 @@ bv_list2str(g_ptr l, int depth)
     FP(FILE_fp, ">");
     fclose(odests_fp);
     odests_fp = NULL;
-    return( wastrsave(&strings, bv_str_buf) );
+    return( wastrsave(stringsp, bv_str_buf) );
 }
 
 static string

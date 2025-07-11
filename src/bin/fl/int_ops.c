@@ -14,7 +14,7 @@
 /* ------------- Global variables ------------- */
 
 /********* Global variables referenced ***********/
-extern str_mgr	    strings;
+extern str_mgr	    *stringsp;
 extern g_ptr	    void_nd;
 
 /***** PRIVATE VARIABLES *****/

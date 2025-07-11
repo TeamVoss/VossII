@@ -45,7 +45,7 @@ typedef struct old_yyin_rec {
 extern bool		file_load;
 extern bool	        gui_mode;
 extern int		line_nbr;
-extern str_mgr		strings;
+extern str_mgr		*stringsp;
 extern string		prompt;
 extern bool		RCverbose_eval_command;
 
@@ -203,7 +203,7 @@ __FILE__			    {
 				    }
 __LINE__			    {
 					sprintf(lbuf, "%d", line_nbr);
-                                        lvalp->str_t = wastrsave(&strings,lbuf);
+                                        lvalp->str_t = wastrsave(stringsp,lbuf);
 					RETURN(DEC_NUMBER, "_DEC_NUMBER");
 				    }
 
@@ -349,20 +349,20 @@ sscanf                              { RETURN(SSCANFT,  "SSCANF"); }
 				    }
 <EXTERN_PARSING>.		    { fputc(yytext[0],ext_parse_fp); }
 
-set_line_number\ [0-9]+;	    {
+set_line_number\ [0-9]+		    {
 					line_nbr = atoi(&yytext[16])-1;
 					prev_line[0] = '\0';
 					prev_line_used = 0;
 					last_inp = 0;
 				    }
 
-set_file_name\ \"[^"]+\";	    {
+set_file_name\ \"[^"]+\"	    {
 					string start = index(yytext, '"');
 					string end = rindex(yytext, '"');
 					char tmp = *end;
 					*end = 0;
 					cur_file_name =
-						wastrsave(&strings, start+1);
+						wastrsave(stringsp, start+1);
 					*end = tmp;
 					prev_line[0] = '\0';
 					prev_line_used = 0;
@@ -382,7 +382,7 @@ set_file_name\ \"[^"]+\";	    {
 					q++;
 				    }
 				    *q = '\0';
-				    prompt = wastrsave(&strings, pbuf);
+				    prompt = wastrsave(stringsp, pbuf);
 				    if( file_load ) {
 					line_nbr++; 
 				    } else {
@@ -413,7 +413,7 @@ defix\ [\ \t]*{let}({nowhite})* {
 				lvalp->loc_t.line = line_nbr;
 				RETURN(*tokenp, yytext);
 			    }
-			    lvalp->str_t = wastrsave(&strings, s);
+			    lvalp->str_t = wastrsave(stringsp, s);
 			    RETURN(VART, "_VART"); 
 			}
 
@@ -426,7 +426,7 @@ defix\ [\ \t]*{let}({nowhite})* {
 				lvalp->loc_t.line = line_nbr;
 				RETURN(*tokenp, yytext);
 			    }
-			    lvalp->str_t = wastrsave(&strings, (string) yytext);
+			    lvalp->str_t = wastrsave(stringsp, (string) yytext);
 			    RETURN(Get_Infix(lvalp->str_t), "_VART"); 
 			}
 
@@ -459,7 +459,7 @@ defix\ [\ \t]*{symbol}({symbol})* {
                                                        (pointer) s);
                             if( tokenp != NULL )
                                 RETURN(*tokenp, yytext);
-                            lvalp->str_t = wastrsave(&strings, s);
+                            lvalp->str_t = wastrsave(stringsp, s);
                             RETURN(VART, "_VART");
 			}
 
@@ -469,7 +469,7 @@ defix\ [\ \t]*{symbol}({symbol})* {
 						       (pointer) yytext);
 			    if( tokenp != NULL )
 				RETURN(*tokenp, yytext);
-			    lvalp->str_t = wastrsave(&strings, (string) yytext);
+			    lvalp->str_t = wastrsave(stringsp, (string) yytext);
 			    RETURN(Get_Infix(lvalp->str_t), "_VART"); 
 			}
 
@@ -485,22 +485,22 @@ defix\ [\ \t]*{symbol}({symbol})* {
 \]			{ RETURN(RBRACK, "_RBRACK"); }
 
 "0b"{bindig}({bindig})*	{
-			    lvalp->str_t = wastrsave(&strings, &(yytext[2]));
+			    lvalp->str_t = wastrsave(stringsp, &(yytext[2]));
 			    RETURN(BIN_NUMBER, "_BIN_NUMBER");
 			}
 
 "0x"{hexdig}({hexdig})*	{
-			    lvalp->str_t = wastrsave(&strings, &(yytext[2]));
+			    lvalp->str_t = wastrsave(stringsp, &(yytext[2]));
 			    RETURN(HEX_NUMBER, "_HEX_NUMBER");
 			}
 
 {dig}*\.{dig}{dig}*(e[\-\+]?{dig}{dig}*)?    {
-			    lvalp->str_t = wastrsave(&strings, (string) yytext);
+			    lvalp->str_t = wastrsave(stringsp, (string) yytext);
 			    RETURN(FLOAT_NUMBER, "_FLOAT_NUMBER");
 			}
 
 {dig}({dig})*		{
-			    lvalp->str_t = wastrsave(&strings, (string) yytext);
+			    lvalp->str_t = wastrsave(stringsp, (string) yytext);
 			    RETURN(DEC_NUMBER, "_DEC_NUMBER");
 			}
 
@@ -549,8 +549,8 @@ Init_lexer()
     last_inp = 0;
     static char path[1024];
     strtemp(getcwd(path,1024));
-    DIR = wastrsave(&strings, charappend('/'));
-    cur_file_name = wastrsave(&strings, "stdin");
+    DIR = wastrsave(stringsp, charappend('/'));
+    cur_file_name = wastrsave(stringsp, "stdin");
     create_hash(&define_tbl, 1000, str_hash, str_equ);
     new_buf(&define_polarity, 100, sizeof(int));
     new_buf(&extern_parse_fps, 10, sizeof(FILE *));
@@ -567,7 +567,7 @@ hash_define(char *id)
 		   line_nbr, cur_file_name);
 	return;
     }
-    id = wastrsave(&strings, id);
+    id = wastrsave(stringsp, id);
     if( find_hash(&define_tbl, id) == NULL ) {
 	insert_hash(&define_tbl, id, id);
     }
@@ -582,7 +582,7 @@ hash_undefine(char *id)
 		   line_nbr, cur_file_name);
 	return;
     }
-    id = wastrsave(&strings, id);
+    id = wastrsave(stringsp, id);
     if( find_hash(&define_tbl, id) != NULL ) {
 	delete_hash(&define_tbl, id);
     }
@@ -597,7 +597,7 @@ is_defined(char *id)
 		   line_nbr, cur_file_name);
 	return FALSE;
     }
-    id = wastrsave(&strings, id);
+    id = wastrsave(stringsp, id);
     if( find_hash(&define_tbl, id) != NULL ) {
 	return TRUE;
     } else {
@@ -628,7 +628,7 @@ expand_string(string s)
 	}
 	s++;
     }
-    return(wastrsave(&strings, res));
+    return(wastrsave(stringsp, res));
 }
 
 bool

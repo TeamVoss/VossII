@@ -27,7 +27,7 @@
 /* ------------- Global variables ------------- */
 
 /********* Global variables referenced ***********/
-extern str_mgr	    strings;
+extern str_mgr	    *stringsp;
 extern buffer	    ext_obj_buf;
 extern jmp_buf      *start_envp;
 extern char	    FailBuf[4096];
@@ -339,7 +339,7 @@ Get_SHA256_signature(g_ptr node)
     } else {
 	char buf[10];
 	sprintf(buf, "%p", node);
-	sig = wastrsave(&strings, buf);
+	sig = wastrsave(stringsp, buf);
     }
     End_SHA256(sha);
     start_envp = old_start_envp;
@@ -386,7 +386,7 @@ Get_SHA256_hash(SHA256_ptr ctx)
         Sprintf(buf, "%x%x", res[i]/16, res[i]%16);
 	strappend(buf);
     }
-    return( wastrsave(&strings, sig) );
+    return( wastrsave(stringsp, sig) );
 }
 
 int

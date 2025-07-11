@@ -23,7 +23,7 @@
 /* ------------- Global variables ------------- */
 
 /********* Global variables referenced ***********/
-extern str_mgr     strings;
+extern str_mgr     *stringsp;
 extern jmp_buf     *start_envp;
 
 /***** PRIVATE VARIABLES *****/
@@ -187,7 +187,7 @@ Vec2nodes(string name)
     sname_list_ptr nlp =
         show_non_contig_vectors(sname_list_rec_mgrp, tstrings, vlp);
     while( nlp != NULL ) {
-        SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, nlp->name)));
+        SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(stringsp, nlp->name)));
         SET_CONS_TL(tail, Make_NIL());
         tail = GET_CONS_TL(tail);
         nlp = nlp->next;
@@ -526,7 +526,7 @@ str_reg_match(g_ptr redex)
     if( pat_ptr == NULL ) {
 	DEC_REF_CNT(l);
 	DEC_REF_CNT(r);
-        MAKE_REDEX_FAILURE(redex, wastrsave(&strings, reg_error_buf));
+        MAKE_REDEX_FAILURE(redex, wastrsave(stringsp, reg_error_buf));
         return;
     }
     if( regexec(pat_ptr, GET_STRING(g_s), (size_t) 0, NULL, 0) == 0 ) {
@@ -555,7 +555,7 @@ str_reg_extract(g_ptr redex)
     if( pat_ptr == NULL ) {
 	DEC_REF_CNT(l);
 	DEC_REF_CNT(r);
-        MAKE_REDEX_FAILURE(redex, wastrsave(&strings, reg_error_buf));
+        MAKE_REDEX_FAILURE(redex, wastrsave(stringsp, reg_error_buf));
         return;
     }
     int patterns = pat_ptr->re_nsub;
@@ -568,7 +568,7 @@ str_reg_extract(g_ptr redex)
 		string ep = tmp + pmatch[i].rm_eo;
 		char c = *ep;
 		*ep = 0;
-		APPEND1(tail, Make_STRING_leaf(wastrsave(&strings, sp)));
+		APPEND1(tail, Make_STRING_leaf(wastrsave(stringsp, sp)));
 		*ep = c;
 	    }
 	}
@@ -598,7 +598,7 @@ tcl2list(g_ptr redex)
 	    case ' ':
 		if( level == 0 ) {
 		    *c = 0;
-		    string element = wastrsave(&strings, start);
+		    string element = wastrsave(stringsp, start);
 		    APPEND1(tail, Make_STRING_leaf(element));
 		    c++;
 		    start = c;
@@ -626,7 +626,7 @@ tcl2list(g_ptr redex)
 		} else {
 		    level--;
 		    *c = 0;
-		    string element = wastrsave(&strings, start);
+		    string element = wastrsave(stringsp, start);
 		    APPEND1(tail, Make_STRING_leaf(element));
 		    c++;
 		    if( *c == ' ' ) {
@@ -641,7 +641,7 @@ tcl2list(g_ptr redex)
 	}
     }
     if( start != c ) {
-	string element = wastrsave(&strings, start);
+	string element = wastrsave(stringsp, start);
 	APPEND1(tail, Make_STRING_leaf(element));
     }
     DEC_REF_CNT(l);
@@ -659,7 +659,7 @@ file_fullname(g_ptr redex)
                            Fail_pr("Cannot find file %s\n", GET_STRING(r)));
         return;
     }
-    MAKE_REDEX_STRING(redex, wastrsave(&strings, tmp));
+    MAKE_REDEX_STRING(redex, wastrsave(stringsp, tmp));
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
@@ -783,7 +783,7 @@ str_split(g_ptr redex)
         buf[1] = 0;
         while( *s != 0) {
             buf[0] = *s;
-            SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, buf)));
+            SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(stringsp, buf)));
             SET_CONS_TL(tail, Make_NIL());
             tail = GET_CONS_TL(tail);
             s++;
@@ -791,13 +791,13 @@ str_split(g_ptr redex)
     } else {
         while( (next = strstr(cur, split_str)) != NULL ) {
             *next = 0;
-            SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, cur)));
+            SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(stringsp, cur)));
             SET_CONS_TL(tail, Make_NIL());
             tail = GET_CONS_TL(tail);
             cur = next+lsplit;
         }
         if( *cur != 0 ) {
-            SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, cur)));
+            SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(stringsp, cur)));
             SET_CONS_TL(tail, Make_NIL());
             tail = GET_CONS_TL(tail);
         }
@@ -821,7 +821,7 @@ md_split_vector(g_ptr redex)
 	    // Text
 	    cur = Make_STRING_leaf(s_TXT);
 	    cur = Make_CONS_ND(cur,
-			      Make_STRING_leaf(wastrsave(&strings,vp->u.name)));
+			      Make_STRING_leaf(wastrsave(stringsp,vp->u.name)));
 	} else {
 	    // Range
 	    cur = Make_STRING_leaf(s_RANGES);
@@ -866,7 +866,7 @@ md_expand_vectors(g_ptr redex)
         sname_list_ptr nlp =
             show_non_contig_vectors(sname_list_rec_mgrp, tstrings, vlp);
         while( nlp != NULL ) {
-            SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, nlp->name)));
+            SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(stringsp, nlp->name)));
             SET_CONS_TL(tail, Make_NIL());
             tail = GET_CONS_TL(tail);
             nlp = nlp->next;
@@ -898,7 +898,7 @@ md_expand_vector(g_ptr redex)
     sname_list_ptr nlp =
         show_non_contig_vectors(sname_list_rec_mgrp, tstrings, vlp);
     while( nlp != NULL ) {
-        SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(&strings, nlp->name)));
+        SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(stringsp, nlp->name)));
         SET_CONS_TL(tail, Make_NIL());
         tail = GET_CONS_TL(tail);
         nlp = nlp->next;
@@ -987,10 +987,10 @@ string_lastn(g_ptr redex)
     string tmp = strtemp(s);
     int len = strlen(s);
     if( len <= cnt ) {
-        MAKE_REDEX_STRING(redex, wastrsave(&strings, tmp));
+        MAKE_REDEX_STRING(redex, wastrsave(stringsp, tmp));
     } else {
         tmp = tmp+len-cnt;
-        MAKE_REDEX_STRING(redex, wastrsave(&strings, tmp));
+        MAKE_REDEX_STRING(redex, wastrsave(stringsp, tmp));
     }
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -1006,10 +1006,10 @@ string_butlastn(g_ptr redex)
     string tmp = strtemp(s);
     int len = strlen(s);
     if( len <= cnt ) {
-	MAKE_REDEX_STRING(redex, wastrsave(&strings, ""));
+	MAKE_REDEX_STRING(redex, wastrsave(stringsp, ""));
     } else {
 	*(tmp+len-cnt) = 0;
-	MAKE_REDEX_STRING(redex, wastrsave(&strings, tmp));
+	MAKE_REDEX_STRING(redex, wastrsave(stringsp, tmp));
     }
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -1070,13 +1070,13 @@ string_substr(g_ptr redex)
     }
     int len  = strlen(s);
     if( loc > len ) {
-	MAKE_REDEX_STRING(redex, wastrsave(&strings, ""));
+	MAKE_REDEX_STRING(redex, wastrsave(stringsp, ""));
 	DEC_REF_CNT(l);
 	DEC_REF_CNT(r);
 	return;
     }
     if( cnt < 0 ) {
-	string res = wastrsave(&strings, s+loc-1);
+	string res = wastrsave(stringsp, s+loc-1);
 	MAKE_REDEX_STRING(redex, res);
 	DEC_REF_CNT(l);
 	DEC_REF_CNT(r);
@@ -1093,7 +1093,7 @@ string_substr(g_ptr redex)
     }
     string tmp = strtemp(s+loc-1);
     *(tmp+cnt) = '\0';
-    string res = wastrsave(&strings, tmp);
+    string res = wastrsave(stringsp, tmp);
     MAKE_REDEX_STRING(redex, res);
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -1112,13 +1112,13 @@ string_trim(g_ptr redex)
     string f = tmp;
     while( *f && (isspace(*f) || (*f == 10)) ) { f++; }
     if( *f == 0 ) {
-	MAKE_REDEX_STRING(redex, wastrsave(&strings, ""));
+	MAKE_REDEX_STRING(redex, wastrsave(stringsp, ""));
     } else {
 	string t = tmp + strlen(tmp)-1;
 	while( t > f && (isspace(*t) || (*t == 10))) { t--; }
 	t++;
 	*t = 0;
-	MAKE_REDEX_STRING(redex, wastrsave(&strings, f));
+	MAKE_REDEX_STRING(redex, wastrsave(stringsp, f));
     }
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -1161,7 +1161,7 @@ string_gen_trim(g_ptr redex)
 	return;
     }
     *last = 0;
-    string res = wastrsave(&strings, s);
+    string res = wastrsave(stringsp, s);
     MAKE_REDEX_STRING(redex, res);
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -1191,7 +1191,7 @@ string_str_cluster(g_ptr redex)
     while( *t ) {
 	char c = *(t+sz);
 	*(t+sz) = 0;
-	string item = wastrsave(&strings, t);
+	string item = wastrsave(stringsp, t);
 	SET_CONS_HD(tail, Make_STRING_leaf(item));
         SET_CONS_TL(tail, Make_NIL());
         tail = GET_CONS_TL(tail);
@@ -1213,7 +1213,7 @@ get_vector_signature(g_ptr redex)
     begin_vector_ops();
     vec_ptr vp = split_name(s);
     string res = mk_name_signature(vp);
-    MAKE_REDEX_STRING(redex, wastrsave(&strings, res));
+    MAKE_REDEX_STRING(redex, wastrsave(stringsp, res));
     end_vector_ops();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -2115,7 +2115,7 @@ show_non_contig_vector(tstr_ptr tstrings, vec_ptr vp)
             }
         }
     }
-    return wastrsave(&strings, str_buf);
+    return wastrsave(stringsp, str_buf);
 }
 
 static sname_list_ptr
@@ -2160,7 +2160,7 @@ show_contig_vector(rec_mgr *sname_list_mgrp, tstr_ptr tstrings, vec_ptr vp)
         }
     }
     sname_list_ptr slp = (sname_list_ptr) new_rec(sname_list_mgrp);
-    slp->name = wastrsave(&strings, str_buf);
+    slp->name = wastrsave(stringsp, str_buf);
     slp->next = NULL;
     return slp;
 }

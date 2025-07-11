@@ -25,7 +25,6 @@ char        *prompt = ": ";
 bool        compile_to_C_flag = FALSE;
 FILE        *v_order_fp = NULL;
 FILE        *odests_fp = NULL;
-str_mgr	    strings;
 bool	    implication_only = FALSE;
 jmp_buf	    toplevel_eval_env;
 bool	    gui_mode = TRUE;
@@ -59,6 +58,7 @@ extern int		LG_TBL_SIZE;
 extern bool		file_load;
 extern string		binary_location;
 extern bool		RCadd_debug_info;
+extern str_mgr		*stringsp;
 
 bool	do_parse(bool flush);
 bool	do_parse_stdin(bool flush);
@@ -118,7 +118,7 @@ Get_DIR(string file_fullname)
     } else {
 	DIE("Should never happen");
     }
-    return( wastrsave(&strings, tmp) );
+    return( wastrsave(stringsp, tmp) );
 }
 
 FILE *
@@ -130,7 +130,7 @@ Tryopen(string name, string mode, string *fullnamep)
     if( (ret = fopen(name, mode)) != NULL ) {
         if( fullnamep != NULL) {
 	    char *tmp = realpath(name, path_buf);
-            *fullnamep = wastrsave(&strings, tmp);
+            *fullnamep = wastrsave(stringsp, tmp);
         }
 	return ret;
     }
@@ -140,7 +140,7 @@ Tryopen(string name, string mode, string *fullnamep)
     if( (ret = fopen(new_name, mode)) != NULL ) {
         if( fullnamep != NULL) {
 	    char *tmp = realpath(new_name, path_buf);
-            *fullnamep = wastrsave(&strings, tmp);
+            *fullnamep = wastrsave(stringsp, tmp);
         }
     }
     return( ret );
@@ -171,7 +171,7 @@ Mk_output_file_in_tmp_dir(string prefix, FILE **fpp, string *filename)
         fprintf(stderr, "Could not create tempfile for '%s'\n", buf);
 	return( FALSE );
     }
-    string name = wastrsave(&strings, buf);
+    string name = wastrsave(stringsp, buf);
     setbuf(fp, NULL);
     *fpp = fp;
     *filename = name;
@@ -375,12 +375,12 @@ fl_main(int argc, char *argv[])
     Init();
     new_buf(&tcl_eval_done_buf, 10, sizeof(int));
     new_buf(&tcl_eval_result_buf, 10, sizeof(string));
-    s_empty_string = wastrsave(&strings, "");
+    s_empty_string = wastrsave(stringsp, "");
 
     fl_args = argv+1;
 
     if( new_default_dir != NULL )
-	RCDefault_dir = wastrsave(&strings, new_default_dir);
+	RCDefault_dir = wastrsave(stringsp, new_default_dir);
     if( v_order_file != NULL ) {
 	if( (v_order_fp = fopen(v_order_file, "w+")) == NULL )
 	    Eprintf("Cannot open file %s for writing\n", v_order_file);
@@ -388,7 +388,7 @@ fl_main(int argc, char *argv[])
 	v_order_fp = fopen("/dev/null", "w");
     }
     if( input_file_for_cmds != NULL ) {
-	input_file_for_cmds = wastrsave(&strings, input_file_for_cmds);
+	input_file_for_cmds = wastrsave(stringsp, input_file_for_cmds);
     }
     Set_default_break_handler();
 
@@ -1312,7 +1312,7 @@ get_xresource(string resource, string default_res)
     char *resource_manager = XResourceManagerString(display);
     if( resource_manager == NULL ) {
 	XCloseDisplay(display);
-	return( wastrsave(&strings, default_res) );
+	return( wastrsave(stringsp, default_res) );
     }
 
     XrmDatabase db = XrmGetStringDatabase(resource_manager);
@@ -1327,14 +1327,14 @@ get_xresource(string resource, string default_res)
 	if(buf[0] == '"' && buf[len-1] == '"' ) {
 	    buf[len-1] = 0;
 	    XCloseDisplay(display);
-	    return( wastrsave(&strings, &(buf[1])) );
+	    return( wastrsave(stringsp, &(buf[1])) );
 	} else {
 	    XCloseDisplay(display);
-	    return( wastrsave(&strings, buf) );
+	    return( wastrsave(stringsp, buf) );
 	}
     } else {
 	// Resource not found so use default
 	XCloseDisplay(display);
-	return( wastrsave(&strings, default_res) );
+	return( wastrsave(stringsp, default_res) );
     }
 }

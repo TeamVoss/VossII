@@ -16,7 +16,7 @@
 
 /* ------------- Global variables ------------- */
 /********* Global variables referenced ***********/
-extern str_mgr      strings;
+extern str_mgr      *stringsp;
 extern char         FailBuf[4096];
 
 /***** PRIVATE VARIABLES *****/

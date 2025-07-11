@@ -12,7 +12,7 @@
 /*                      Global Variables Referenced                     */
 /************************************************************************/
 extern bool             cephalopode_mode;
-extern str_mgr          strings;
+extern str_mgr          *stringsp;
 extern hash_record      Constructor_Table;
 extern hash_record      TypeSignatureTbl;
 extern int              line_nbr;
@@ -403,7 +403,6 @@ static char sscanf_help[] = "\n"
 /************************************************************************/
 /*                      Local Functions                                 */
 /************************************************************************/
-static symbol_tbl_ptr   create_empty_symb_tbl();
 static g_ptr            add_non_lazy_context_rec(buffer *ctxt,
                                                  symbol_tbl_ptr stbl,
                                                  g_ptr node);
@@ -448,11 +447,11 @@ Init_symbol()
     new_mgr(&name_list_rec_mgr, sizeof(name_list_rec));
     new_mgr(&impl_arg_rec_mgr, sizeof(impl_arg_rec));
     new_mgr(&arg_names_rec_mgr, sizeof(arg_names_rec));
-    symb_tbl = create_empty_symb_tbl();
-    s_star = wastrsave(&strings, "*");
-    s_CELL = wastrsave(&strings, "CELL");
-    s_dummy = wastrsave(&strings, "//DuMmY");
-    s_empty = wastrsave(&strings, "");
+    symb_tbl = Create_empty_symb_tbl();
+    s_star = wastrsave(stringsp, "*");
+    s_CELL = wastrsave(stringsp, "CELL");
+    s_dummy = wastrsave(stringsp, "//DuMmY");
+    s_empty = wastrsave(stringsp, "");
     fn_ptr dummy = (fn_ptr) get_fn_rec();
     dummy->ADT_level = ADT_level;
     dummy->name = s_dummy;
@@ -462,7 +461,7 @@ Init_symbol()
     dummy->visible        = TRUE;
     dummy->exported       = FALSE;
     dummy->in_use         = TRUE;
-    dummy->file_name      = wastrsave(&strings, "_dummy_");;
+    dummy->file_name      = wastrsave(stringsp, "_dummy_");;
     dummy->start_line_nbr = 1;
     dummy->end_line_nbr   = 1;
     dummy->comments       = NULL;
@@ -480,6 +479,17 @@ Init_symbol()
     dummy->type           = NULL;
     dummy->implicit_args  = NULL;
     builtins_len = strlen("builtins.fl");
+}
+
+symbol_tbl_ptr
+Create_empty_symb_tbl()
+{
+    symbol_tbl_ptr stbl = (symbol_tbl_ptr) new_rec(&symb_tbl_mgr);
+    stbl->def_list = NULL;
+    hash_record_ptr tbl = (hash_record_ptr) new_rec(&hash_table_mgr);
+    create_hash(tbl, 100, str_hash, str_equ);
+    stbl->tbl_ptr = tbl;
+    return stbl;
 }
 
 void
@@ -666,7 +676,7 @@ Add_Destructors(string name, typeExp_ptr new_type,
         // Create destructor function
         dest_name          = strtemp("__DeStRuCtOr");
         dest_name          = strappend(fnp->name);
-        dest_name          = wastrsave(&strings, dest_name);
+        dest_name          = wastrsave(stringsp, dest_name);
         tmp                = (fn_ptr) get_fn_rec();
         tmp->ADT_level     = ADT_level;
         tmp->visible       = TRUE;
@@ -697,7 +707,7 @@ Add_Destructors(string name, typeExp_ptr new_type,
         insert_hash(&Constructor_Table, (pointer) (fnp->name),
                                         (pointer) (fnp->name));
     }
-    string type_sig = wastrsave(&strings, gen_strappend(tmp_strings, ""));
+    string type_sig = wastrsave(stringsp, gen_strappend(tmp_strings, ""));
     if( find_hash(&TypeSignatureTbl, (pointer) name) != NULL )
         delete_hash(&TypeSignatureTbl, (pointer) name);
     insert_hash(&TypeSignatureTbl, (pointer) name, type_sig);
@@ -705,7 +715,7 @@ Add_Destructors(string name, typeExp_ptr new_type,
     if( Is_monomorphic(new_type) ) {
         // Save function
         Sprintf(buf, "write_%s", name);
-        string save_fun_name = wastrsave(&strings, buf);
+        string save_fun_name = wastrsave(stringsp, buf);
         g_ptr save_expr = Make_1inp_Primitive(P_SAVE_GRAPH,
                                               Make_STRING_leaf(type_sig));
         typeExp_ptr save_type = GLmake_arrow(GLmake_string(),
@@ -740,7 +750,7 @@ Add_Destructors(string name, typeExp_ptr new_type,
         newfnp               = save_fun;
         // Load function
         Sprintf(buf, "read_%s", name);
-        string load_fun_name = wastrsave(&strings, buf);
+        string load_fun_name = wastrsave(stringsp, buf);
         g_ptr load_expr = Make_1inp_Primitive(P_LOAD_GRAPH,
                                               Make_STRING_leaf(type_sig));
         typeExp_ptr load_type = GLmake_arrow(GLmake_string(), new_type);
@@ -881,7 +891,7 @@ Make_forward_declare(string name, typeExp_ptr type, symbol_tbl_ptr stbl,
 {
     g_ptr err = Make_0inp_Primitive(P_FAIL);
     Fail_pr("%s is forward_declared but used before it is defined\n", name);
-    SET_FAIL_STRING(err, wastrsave(&strings, FailBuf));
+    SET_FAIL_STRING(err, wastrsave(stringsp, FailBuf));
     int ref_var = Make_RefVar();
     Set_RefVar(ref_var, err);
     g_ptr rv = Make_0inp_Primitive(P_REF_VAR);
@@ -928,7 +938,7 @@ New_fn_def(string name, result_ptr res, symbol_tbl_ptr stbl, bool print,
     if( res == NULL )
         return( stbl );
     //
-    if( stbl == NULL ) { stbl = create_empty_symb_tbl(); }
+    if( stbl == NULL ) { stbl = Create_empty_symb_tbl(); }
     if( cur_doc_comments != NULL ) {
         // If there are comments, reverse the list (to get it in right order)
         comment_list_ptr clp = cur_doc_comments;
@@ -1185,7 +1195,7 @@ do_special_help(string name)
     if( strcmp(name, "sprintf") == 0 ) res = sprintf_help;
     if( strcmp(name, "sscanf") == 0 ) res = sscanf_help;
     if( res == NULL ) return NULL;
-    return( wastrsave(&strings, res) );
+    return( wastrsave(stringsp, res) );
 }
 
 
@@ -1299,7 +1309,7 @@ Get_Help(string fun)
     }
     fclose(odests_fp);
     odests_fp = NULL;
-    return( wastrsave(&strings, help_buf) );
+    return( wastrsave(stringsp, help_buf) );
 }
 
 static formula
@@ -1334,7 +1344,7 @@ Add_ExtAPI_Object(
 	    int	    (*sha256_fn)(int *g_cntp, hash_record *g_tblp,
 				 SHA256_ptr sha, pointer obj) )
 {
-    name = wastrsave(&strings, name);
+    name = wastrsave(stringsp, name);
     ext_obj_rec obj;
     obj.name = name;
     obj.class = COUNT_BUF(&ext_obj_buf);
@@ -1417,11 +1427,11 @@ g_ptr
 Add_ExtAPI_Function(string name, string strictness,
                     bool non_lazy, typeExp_ptr type, eval_fun_tp fun)
 {
-    name = wastrsave(&strings, name);
+    name = wastrsave(stringsp, name);
     ext_fun_rec efr;
     efr.name = name;
     efr.arg_cnt = strlen(strictness);
-    efr.strict_args = wastrsave(&strings, strictness);
+    efr.strict_args = wastrsave(stringsp, strictness);
     efr.type = type;
     efr.fun = fun;
     push_buf(&ext_fun_buf, (pointer) &efr);
@@ -1437,7 +1447,7 @@ Add_ExtAPI_Function(string name, string strictness,
     ret->visible        = TRUE;
     ret->exported       = FALSE;
     ret->in_use         = TRUE;
-    ret->file_name      = wastrsave(&strings, "builtin");
+    ret->file_name      = wastrsave(stringsp, "builtin");
     ret->start_line_nbr = 0;
     ret->end_line_nbr   = 0;
     ret->comments       = NULL;
@@ -1940,7 +1950,7 @@ get_matching_functions(g_ptr redex)
 	max_cnt--;
     }
     if( max_cnt <= 0 ) {
-	APPEND1(tail, Make_STRING_leaf(wastrsave(&strings, "...")));
+	APPEND1(tail, Make_STRING_leaf(wastrsave(stringsp, "...")));
     }
     free_buf (&rbuf); 
     DEC_REF_CNT(l);
@@ -2081,18 +2091,6 @@ Get_argument_names(g_ptr onode)
 /*                      Local Functions                                 */
 /************************************************************************/
 
-static symbol_tbl_ptr
-create_empty_symb_tbl()
-{
-    symbol_tbl_ptr stbl = 
-    stbl = (symbol_tbl_ptr) new_rec(&symb_tbl_mgr);
-    stbl->def_list = NULL;
-    hash_record_ptr tbl = (hash_record_ptr) new_rec(&hash_table_mgr);
-    create_hash(tbl, 100, str_hash, str_equ);
-    stbl->tbl_ptr = tbl;
-    return stbl;
-}
-
 static bool
 is_non_lazy(symbol_tbl_ptr stbl, string name)
 {
@@ -2160,7 +2158,7 @@ get_overloaded_calls_rec(impl_arg_ptr l, symbol_tbl_ptr stbl, g_ptr node)
             if( GET_VERSION(node) != 0 ) return( l );
             overloaded_calls++;
             string new_name = tprintf(".impl_arg.%d", overloaded_calls);
-            new_name = wastrsave(&strings, new_name);
+            new_name = wastrsave(stringsp, new_name);
             SET_VAR(node, new_name);
             impl_arg_ptr np = (impl_arg_ptr) new_rec(&impl_arg_rec_mgr);
             np->name = name;
@@ -2252,7 +2250,7 @@ add_non_lazy_context_rec(buffer *ctxt, symbol_tbl_ptr stbl, g_ptr node)
 		if( has_named_arg ) { goto err_named_arg; }
                 // Rename bound variables to ensure no name capture happens
                 // when implicit arguments for overloaded identifiers are added
-                string new_name = wastrsave(&strings, tprintf(".%s", name));
+                string new_name = wastrsave(stringsp, tprintf(".%s", name));
                 SET_VAR(node, new_name);
 		goto wrap_up;
             }
@@ -2357,7 +2355,7 @@ add_non_lazy_context_rec(buffer *ctxt, symbol_tbl_ptr stbl, g_ptr node)
             name = GET_LAMBDA_VAR(node);
             // Rename lambda variables to ensure no name capture happens
             // when implicit arguments for overloaded identifiers are added
-            new_name = wastrsave(&strings, tprintf(".%s", name));
+            new_name = wastrsave(stringsp, tprintf(".%s", name));
             line = GET_LAMBDA_LINE_NBR(node);
             add_binding(name);
 	    bool innermost = !IS_LAMBDA(GET_LAMBDA_BODY(node));
@@ -2403,7 +2401,7 @@ add_non_lazy_context_rec(buffer *ctxt, symbol_tbl_ptr stbl, g_ptr node)
             if( is_bound(name) ) {
                 // Rename bound variables to ensure no name capture happens
                 // when implicit arguments for overloaded identifiers are added
-                string new_name = wastrsave(&strings, tprintf(".%s", name));
+                string new_name = wastrsave(stringsp, tprintf(".%s", name));
                 SET_VAR(node, new_name);
                 return( node );
             }

@@ -16,7 +16,7 @@
 /* ------------- Global variables ------------- */
 
 /********* Global variables referenced ***********/
-extern str_mgr     strings;
+extern str_mgr     *stringsp;
 extern FILE        *odests_fp;
 
 /***** PRIVATE VARIABLES *****/
@@ -160,7 +160,7 @@ bev_list2str(g_ptr l, int depth)
     FP(FILE_fp, ">");
     fclose(odests_fp);
     odests_fp = NULL;
-    return( wastrsave(&strings, bev_str_buf) );
+    return( wastrsave(stringsp, bev_str_buf) );
 }
 
 static string
