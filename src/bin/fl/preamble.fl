@@ -1550,7 +1550,7 @@ let prim_fns = [
 		(49, "P_QUANT_THEREIS"), (50, "P_PFAIL"), (51, "P_PCATCH"),
 		(52, "P_ORD"), (53, "P_CHR"), (54, "P_TUPLE"), (55, "P_FST"),
 		(56, "P_SND"), (58, "P_EXPLODE"),
-		(59, "P_IMPLODE"), (60, "P_DEPENDS"), (61, "P_BOOL2STR"),
+		(60, "P_DEPENDS"), (61, "P_BOOL2STR"),
 		(62, "P_INT2STR"), (63, "P_TIME"), (64, "P_BDD_SIZE"),
 		(65, "P_SUBSTITUTE"), (66, "P_LOAD_EXE"),
 		(68, "P_PRINT_STE"), (69, "P_BPRIME"), (70, "P_FANIN_LIST"),
@@ -2324,6 +2324,30 @@ let gui_exec {window::string} {title::string} {cmd::string} {workdir::string} =
     (status, emsg, log_file)
 ;
 non_lazy gui_exec;
+
+// Like the system function, except it returns the return code and both
+// the stdout and stderr results as lists of strings.
+// Contrary to exec, the outputs retain the newline characters.
+let system2 cmd =
+    let tdir = mktempd "system2" then
+    let ofile = sprintf "%s/stdout" tdir then
+    let efile = sprintf "%s/stderr" tdir then
+    let cmd2 = sprintf "%s 1> %s 2> %s" cmd ofile efile then
+    let ret = system cmd2 then
+    letrec read fp = 
+        let line = fgets fp then
+        line = "" => [] |
+        line:(read fp)
+    in
+    let ofp = fopen ofile "r" then
+    let out = read ofp then
+    (fclose ofp) fseq
+    let efp = fopen efile "r" then
+    let err = read efp then
+    (fclose efp) fseq
+    (ret, out, err)
+;
+
 
 // Execute a Linux command and return the status and name of output file
 // Intended for -noX mode.

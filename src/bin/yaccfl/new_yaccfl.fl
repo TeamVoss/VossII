@@ -1,8 +1,9 @@
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-let ARGS = ["tmp/dot.yfl"];	// TO BE REMOVED!!!!
+//let ARGS = ["-debug", "tmp/dot.yfl"];	// TO BE REMOVED!!!!
+let ARGS = ["-debug", "tmp/iexpr.yfl"];	// TO BE REMOVED!!!!
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-length ARGS  != 1 => error "Usage: fl -f new_yaccfl.fl <yfl_file>" | ();
+//length ARGS  != 1 => error "Usage: fl -f new_yaccfl.fl <yfl_file>" | ();
 
 let do_debug = mem "-debug" ARGS;
 
@@ -10,6 +11,8 @@ let yfl_file = (last ARGS);
 let base_name = gen_trim "" ".yfl" yfl_file;
 
 let prefix_name = gen_trim "" ".yfl" (last (str_split yfl_file "/"));
+
+let sl2s sl = list2str T "" "" "" id sl;
 
 let PREF s =
     let pat_yy = "^(.*)yy(.*)$" in
@@ -133,7 +136,7 @@ let mk_bison_rule tokens fun_name used ids =
     let body =
 	letrec build_call idx =
 	    idx = 0 =>
-		(sprintf "\n\t    $$ = Make_VAR_leaf(\"%s\");" fun_name)^
+		(sprintf "\n\t    $$ = Make_VAR_leaf(wastrsave(stringsp, \"%s\"));" fun_name)^
 		(mem (-1) used
 		    => PREF (sprintf "\n\t    $$ = Make_APPL_ND($$, Make_INT_leaf(yylineno));")
 		     | ""
@@ -320,7 +323,7 @@ let extract_parser tokens start_line lines =
 	    "int",
 	    PREF "yyerror(const char *msg)",
 	    "{",
-	    PREF (sprintf "    fprintf(stderr, \"When parsing %s syntax around line %%d\\n\", yylineno);" yfl_file),
+	    PREF (sprintf "    fprintf(stderr, \"When parsing %s syntax around line %%d\\n\", yylineno);" prefix_name),
 	    "}"
 	]
     in
@@ -379,8 +382,9 @@ let emit_code fl_code tokens flex_code parser_res =
     (fprintf tfp "quit;\n") fseq
     (fclose tfp) fseq
     // =============== Extract the return type ===============
-    (system (sprintf "fl -noX -F %s" filename)) != 0 =>
-	error "Typechecking failed."
+    val (ret, outs, errs) = system2 (sprintf "fl -noX -F %s" filename) then
+    ret != 0 =>
+	eprintf "Typechecking of %s failed.\n%s\n" yfl_file (sl2s errs)
     |
     let fp = fopen (sprintf "%s.return_type" base_name) "r" then
     let return_type = string_butlastn (fgets fp) 1 then
@@ -396,6 +400,7 @@ let emit_code fl_code tokens flex_code parser_res =
     (fclose yfp) fseq
     // =============== Emit C code ===============
     let Cfp = fopen (base_name^".c") "w" then
+    let flfp = fopen (base_name^".fl") "w" then
     (fprintf Cfp "#include \"fl.h\"\n") fseq
     (fprintf Cfp "#include \"graph.h\"\n") fseq
     (fprintf Cfp "#include \"%s.tab.h\"\n\n" prefix_name) fseq
@@ -404,12 +409,14 @@ let emit_code fl_code tokens flex_code parser_res =
     (fprintf Cfp "extern symbol_tbl_ptr   symb_tbl;\n") fseq
     (fprintf Cfp "static char fl_defs[] = {\n  ") fseq
     let put line = 
+	(fprintf flfp "%s\n" line) fseq
 	(foreach (\c. fprintf Cfp "%d, " (ord c)) (explode line)) fseq
 	(fprintf Cfp "%d,\n  " (ord "\n"))
     in
     (foreach put fl_code) fseq
     (fprintf Cfp "  /* --------------------------------------------- */\n") fseq
     (foreach put all_funs) fseq
+    (fclose flfp) fseq
     (fprintf Cfp "0};\n") fseq
     (fprintf Cfp "\n\ng_ptr   _parser_res;\n\n") fseq
     //
@@ -482,9 +489,11 @@ let compile_c suffix_name =
     let c_cmd = sprintf "gcc -I%s/bin/fl -I%s/include -c -g -fPIC -o %s %s%s"
 		    src_dir src_dir output base_name suffix_name
     then
-    (system c_cmd) != 0 =>
-	eprintf "Failed to compile %s%s\nCommand: %s\n"
-		base_name suffix_name c_cmd |
+    val (ret, outs, errs) = system2 c_cmd then
+    ret != 0 =>
+	eprintf "Failed to compile %s%s with command: %s\n%s\n"
+		base_name suffix_name c_cmd (sl2s errs)
+    |
     (fprintf stdinfo "Succesfully compiled %s\n" output) fseq
     ()
 ;
@@ -516,10 +525,16 @@ let parse_yfl {dummy::void} =
     let bison_cmd = sprintf "bison --defines=%s.tab.h -o %s.tab.c -p %s %s.y"
 		    base_name base_name prefix_name base_name
     then
-    (system bison_cmd) != 0 => eprintf "bison failed" |
+    val (ret, outs, errs) = system2 bison_cmd then
+    ret != 0 =>
+	eprintf "bison failed for command %s\n%s" bison_cmd (sl2s errs)
+    |
     let flex_cmd = sprintf "flex -o %s.lex.c -P %s %s.l"
 		base_name prefix_name base_name then
-    (system flex_cmd) != 0 => eprintf "flex failed" |
+    val (ret, outs, errs) = system2 flex_cmd then
+    ret != 0 =>
+	eprintf "flex failed for command %s\n%s\n" flex_cmd (sl2s errs)
+    |
     // Now compile the C files
     (compile_c ".c") fseq
     (compile_c ".lex.c") fseq
@@ -531,8 +546,10 @@ let parse_yfl {dummy::void} =
 	"gcc -o lib%s.so -shared -fPIC %s.lex.o %s.o %s.tab.o %s/libfl.so"
 	prefix_name base_name base_name base_name bin_dir
     then
-    (system lcmd) != 0 =>
-	eprintf "Failed to build shared library!\nCommand: %s\n" lcmd
+    val (ret, outs, errs) = system2 lcmd then
+    ret != 0 =>
+	eprintf "Failed to build shared library!\nCommand: %s\n%s\n"
+		lcmd (sl2s errs)
     |
     ()
 ;

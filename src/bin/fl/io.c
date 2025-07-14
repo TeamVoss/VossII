@@ -324,10 +324,11 @@ Fclose(g_ptr *rootp, g_ptr **spp, int *depthp)
 	return( TRUE );
     }
     *prev_io = cur->next;
+    int ret = 0;
     if( ip->is_pipe ) {
-        pclose(ip->fp);
+        ret = pclose(ip->fp);
     } else {
-        fclose(ip->fp);
+        ret = fclose(ip->fp);
     }
 #if 0
     // This does not really work since there can still be 
@@ -337,7 +338,7 @@ Fclose(g_ptr *rootp, g_ptr **spp, int *depthp)
 #endif
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
-    OVERWRITE(redex, void_nd);
+    MAKE_REDEX_INT(redex, ret);
     DEC_REF_CNT( l );
     DEC_REF_CNT( r );
     *spp = *spp+1;

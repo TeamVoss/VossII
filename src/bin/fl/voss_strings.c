@@ -1219,6 +1219,35 @@ get_vector_signature(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
+static void
+implode(g_ptr redex)
+{
+    g_ptr l    = GET_APPLY_LEFT(redex);
+    g_ptr r    = GET_APPLY_RIGHT(redex);
+    g_ptr sl;
+    EXTRACT_1_ARG(redex, sl);
+    int len = 0;
+    int	max_strlen = Get_max_strlen();
+    string res = strtemp("");
+    while( !IS_NIL(sl) ) {
+	string s = GET_STRING(GET_CONS_HD(sl));
+	len += strlen(s);
+	if( len > max_strlen ) {
+	    MAKE_REDEX_FAILURE(redex,
+			       Fail_pr("Resulting string too long in implode"));
+	    DEC_REF_CNT(l);
+	    DEC_REF_CNT(r);
+	    return;
+	}
+	res = strappend(s);
+	sl = GET_CONS_TL(sl);
+    }
+    MAKE_REDEX_STRING(redex, wastrsave(stringsp, res));
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+    return;
+}
+
 void
 Strings_Install_Functions()
 {
@@ -1226,6 +1255,12 @@ Strings_Install_Functions()
     typeExp_ptr vec_info_tp = Get_Type("vec_info",NULL,TP_INSERT_PLACE_HOLDER);
 
     // Add builtin functions
+
+    Add_ExtAPI_Function("implode", "1", FALSE,
+			GLmake_arrow(GLmake_list(GLmake_string()),
+				     GLmake_string()),
+			implode);
+
 
     Add_ExtAPI_Function("str_reg_match", "11", FALSE,
 			GLmake_arrow(

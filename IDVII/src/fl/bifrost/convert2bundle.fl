@@ -160,7 +160,7 @@ let bifrostfl2bundle unit_name load_files replace->F separate_bundle_file->F =
     (NOT separate_bundle_file => () |
 	let fp = fopen bfile "w" then
 	(fprintf fp "%s\n\n" bundle_decls) fseq
-	(fclose fp)
+	(fclose fp) fseq ()
     )
 ;
 

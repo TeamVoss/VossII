@@ -1,0 +1,16 @@
+// Testing implode.
+
+let l1 = replicate 1000 "a";
+strlen (implode l1);
+
+
+let l1 = replicate 32748 "a";
+strlen (implode l1);
+
+let l1 = replicate 32749 "a";
+strlen (implode l1);
+
+let l1 = replicate 32750 "a";
+strlen (implode l1);
+
+

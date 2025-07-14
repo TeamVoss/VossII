@@ -112,7 +112,6 @@ static struct function_rec {
             {"get_vossrc", P_GET_VOSSRC,	-1, -1, FALSE,FALSE,FALSE},
             {"hd", P_HEAD,			-1, -1, FALSE,FALSE,FALSE},
             {"help", P_HELP,			-1, -1, FALSE,FALSE,FALSE},
-            {"implode", P_IMPLODE,		-1, -1, FALSE,FALSE,FALSE},
             {"int2str", P_INT2STR,		-1, -1, FALSE,FALSE,FALSE},
             {"_load", P_LOAD,			-1, -1, FALSE,FALSE,FALSE},
             {"load_plugin", P_LOAD_PLUGIN,	-1, -1, FALSE,FALSE,FALSE},

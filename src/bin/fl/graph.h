@@ -467,7 +467,7 @@ typedef struct g_rec {
 #define P_FST		    55
 #define P_SND		    56
 #define P_EXPLODE	    58
-#define P_IMPLODE	    59
+#define P_IMPLODE	    59	// Not used anymore
 #define P_DEPENDS	    60
 #define P_BOOL2STR	    61
 #define P_INT2STR	    62

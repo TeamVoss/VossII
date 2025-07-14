@@ -206,7 +206,6 @@ static struct prim_fun_name_rec {
 		    {P_FST, "P_FST", "fst"},
 		    {P_SND, "P_SND", "snd"},
 		    {P_EXPLODE, "P_EXPLODE", "explode"},
-		    {P_IMPLODE, "P_IMPLODE", "implode"},
 		    {P_DEPENDS, "P_DEPENDS", "depends"},
 		    {P_BOOL2STR, "P_BOOL2STR", "bool2str"},
 		    {P_INT2STR, "P_INT2STR", "int2str"},
@@ -3810,23 +3809,6 @@ traverse_left(g_ptr oroot)
                     if( is_fail(arg1) )
                         goto arg1_fail1;
 		    arg2  = do_explode(GET_STRING(arg1));
-		    OVERWRITE(redex, arg2);
-		    goto finish1;
-
-		case P_IMPLODE:
-		    if( depth < 1 )
-			goto clean_up;
-		    redex = *sp;
-		    arg1  = force(GET_APPLY_RIGHT(*sp), FALSE);
-		    if( is_fail(arg1) )
-			goto arg1_fail1;
-		    s = strtemp("");
-                    ntmp = arg1;
-                    while( GET_CONS_HD(ntmp) != NULL ) {
-                        s = strappend(GET_STRING(GET_CONS_HD(ntmp)));
-                        ntmp = GET_CONS_TL(ntmp);
-                    }
-		    arg2 = Make_STRING_leaf(wastrsave(stringsp, s));
 		    OVERWRITE(redex, arg2);
 		    goto finish1;
 

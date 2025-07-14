@@ -29,6 +29,12 @@ Init_strmgr()
     initialized = STRMGR_MAGIC_NBR;
 }
 
+int
+Get_max_strlen()
+{
+    return( STR_BLOCK_SIZE-1 );
+}
+
 void
 new_strmgr(str_mgr_ptr smp)
 {

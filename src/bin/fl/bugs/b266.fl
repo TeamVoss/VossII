@@ -1,0 +1,332 @@
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+let ARGS = [];	// TO BE REMOVED!!!!
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+//length ARGS  != 1 => error "Usage: fl -f new_yaccfl.fl <yfl_file>" | ();
+
+let do_debug = mem "-debug" ARGS;
+
+let base_name = ref "";
+
+let err line msg =
+    eprintf "Syntax error around line %d in file %s.yfl\n%s\n" line 
+	    (deref base_name) msg
+;
+
+let read_file file = 
+    letrec rd fp = 
+	let s = fgets fp then
+	s = "" => [] |
+	(string_butlastn s 1):(rd fp)
+    in
+    let fp = fopen file "r" then
+    let lines = rd fp then
+    (fclose fp) fseq
+    lines
+;
+
+let extract_global start_line lines =
+    let gidx = find_first0 (str_reg_match "%%GLOBAL") lines in
+    gidx = 0 => err start_line "Missing %%GLOBAL" |
+    let lidx = find_first0 (str_reg_match "%%LOCAL") lines in
+    lidx = 0 => err start_line "Missing %%LOCAL" |
+    let res = butfirstn gidx (firstn (lidx-1) lines) in
+    let rem = butfirstn (lidx-1) lines in
+    (res, rem)
+;
+
+let extract_local start_line lines =
+    let lidx = find_first0 (str_reg_match "%%LOCAL") lines in
+    lidx = 0 => err start_line "Missing %%LOCAL" |
+    let sidx = find_first0 (str_reg_match "%%SCANNER") lines in
+    sidx = 0 => err start_line "Missing %%SCANNER" |
+    let res = butfirstn lidx (firstn (sidx-1) lines) in
+    let rem = butfirstn (sidx-1) lines in
+    (res, rem)
+;
+
+let extract_scanner start_line lines =
+    let sidx = find_first0 (str_reg_match "%%SCANNER") lines in
+    sidx = 0 => err start_line "Missing %%SCANNER" |
+    let pidx = find_first0 (str_reg_match "%%PARSER") lines in
+    pidx = 0 => err start_line "Missing %%PARSER" |
+    let res = butfirstn sidx (firstn (pidx-1) lines) in
+    let rem = butfirstn (pidx-1) lines in
+    let ridx = find_first0 (str_reg_match "^%%") res in
+    ridx = 0 => err start_line "Missing %% in SCANNER section" |
+    let base = firstn ridx res in
+    let rules = butfirstn ridx res in
+    let tokensr = ref [] in
+    let add_token token = tokensr := (token:(deref tokensr)) in
+    let process s =
+	let pat3 = "^([^ \t]*)[ \t]+([^ \t]+)[ \t]+([^ \t]+)$" in
+	let pat2 = "^([^ \t]*)[ \t]+([^ \t]+)$" in
+	str_reg_match pat3 s =>
+	    val [_,pat,token,init] = str_reg_extract pat3 s in
+	    (add_token token) fseq
+	    pat, (sprintf "{ BEGIN %s; RET(%s); }" init token)
+	|
+	str_reg_match pat2 s =>
+	    val [_,pat,token] = str_reg_extract pat2 s in
+	    (add_token token) fseq
+	    pat, (sprintf "{ RET(%s); }" token)
+	|
+	(s,"")
+    in
+    let prelude =
+	[
+	    "%{",
+	    "#include <stdlib.h>",
+	    "#include \"y.tab.h\"",
+	    "",
+	    "extern nd_ptr yylval;",
+	    "nd_ptr SaveStr(char *s);",
+	    (do_debug =>
+		"#define RET(tk) fprintf(stderr, \"Lex: |%%s| -> %%d in state %%d\\n\",yytext, tk, YY_START); yylval = SaveStr(yytext); return(tk);"
+	    |
+		"#define RET(tk) yylval = SaveStr(yytext); return(tk);"
+	    ),
+	    "%}",
+	    ""
+	]
+    in
+    let postlude =
+	[
+	    "%%",
+	    "",
+	    "int",
+	    "yywrap()",
+	    "{",
+	    "    return(1);",
+	    "}"
+	] in
+    let raw_out = map process res in
+    let max_len = itlist (\(p,c).\r. max r (strlen p)) raw_out 1 in
+    let out = map (\(p,r). sprintf "%-*s  %s" max_len p r) raw_out in
+    let res' = prelude @ out @ postlude in
+    let all_tokens = rev (setify (deref tokensr)) in
+    let base = deref base_name then
+    let pr fp s = fprintf fp "%s" s in
+    let lfp = fopen (base^".l") "w" then
+    (list2fp lfp T "" "\n" "\n" pr res') fseq
+    (fclose lfp) fseq
+    (all_tokens, rem)
+;
+
+
+let rget pat s =
+    str_reg_match pat s => tl (str_reg_extract pat s) |
+    eprintf "No match for pattern:\n|%s|\nin string |%s|\n" pat s
+;
+
+let mk_bison_rule fun_name used ids =
+    let pre = list2str T "" " " "" id ids in
+    let body =
+	letrec build_call idx =
+	    idx = 0 =>
+		(sprintf "\n\t    $$ = FUN(\"%s\");" fun_name)^
+		(mem (-1) used
+		    => sprintf "\n\t    $$ = APPLY($$, MKINT(yylineno));"
+		     | ""
+		)
+	    |
+	    (build_call (idx-1))^
+	    (mem idx used => (sprintf "\n\t    $$ = APPLY($$, $%d);" idx) | "")
+	in
+	"\n\t{ "^(build_call (length ids))^"\n\t}"
+    in
+    pre^body
+;
+
+let get_idx cs =
+    letrec get cur (c:cs) =
+	let co = ord c in
+	(co < ord "0") OR (co > ord "9") => cur |
+	get (10*cur + (co - ord "0")) cs
+     /\    get cur [] = cur
+    in
+    get 0 cs
+;
+
+let mk_type_code line fun_name used ids =
+    let pre1 = sprintf "\nset_line_number %d;\n    (" line in
+    let pre2 = fun_name^" "^(mem (-1) used => " _line_ " | "") in
+    let post = ")" in
+    let pr i = mem i used => sprintf "%s" (el i ids) | "" in
+    list2str T (pre1^pre2) " " post pr (1 upto length ids)
+;
+
+letrec get_rhs s line ids sofar (c:cs) =
+    c = "\n" => get_rhs s (line+1) ids (c:sofar) cs
+    |
+    c = "{" =>
+	let ids = sofar = [] => ids | (implode (rev sofar)):ids in
+	line, (rev ids), (c:cs)
+    |
+    (c == " ") OR (c == "\t") =>
+	let ids = sofar = [] => ids | (implode (rev sofar)):ids in
+	get_rhs s line ids [] cs
+    |
+    get_rhs s line ids (c:sofar) cs
+ /\   get_rhs s line ids sofar [] =
+	eprintf "Cannot extract rule in |%s|\n" s
+;
+
+let extract_rule sline lhs s =
+    let fn = sprintf "fn_%s" lhs in
+(fprintf stderr "\n\nextract_rule <{%s}> <{%s}>\n" fn s) fseq
+    let ls = explode "$line$" in
+    let lls = length ls in
+    letrec get_rules idx es =
+	val (rule_line, ids, rems) = get_rhs s [] [] es in
+	letrec get_body used sofar ccnt (c:cs) =
+	    c = "{" => 
+		let sofar' = (ccnt > 0) => c:sofar | sofar in
+		let ccnt' = ccnt + 1 in
+		get_body used sofar' ccnt' cs
+	    |
+	    c = "}" =>
+		let sofar' = (ccnt > 1) => c:sofar | sofar in
+		let ccnt' = ccnt - 1 in
+		ccnt' = 0 => (setify used), (implode (rev sofar')), cs
+			   | get_body used sofar' ccnt' cs
+	    |
+	    (atmost lls (c:cs) []) == ls =>
+		let sofar' = "_line_":sofar in
+		let used' = -1:used in
+		get_body used' sofar' ccnt (butfirstn (lls-1) cs)
+	    |
+	    c = "$" =>
+		let sofar' = "ARG":sofar in
+		let used' = (get_idx cs):used in
+		get_body used' sofar' ccnt cs
+	    |
+		let sofar' = c:sofar in
+		get_body used sofar' ccnt cs
+	 /\   get_body used sofar ccnt [] = 
+		eprintf "Cannot extract body in |%s|\n" s
+	in
+	val (used, body,rems') = get_body [] [] 0 rems in
+	//
+	let fun_name = sprintf "%s_%d" fn idx in
+	let fun =
+	    let pre = "let "^fun_name^" "^(mem (-1) used => " _line_ " | "") in
+	    let post = sprintf " = %s;" (trim body) in
+	    let pr i = mem i used => sprintf "ARG%d" i | "" in
+	    list2str T pre " " post pr (1 upto length ids)
+	then 
+	//
+	let ycode = mk_bison_rule fun_name used ids then
+	//
+	let type_code = mk_type_code rule_line fun_name used ids then
+	let bidx = find_first0 (\s. s = "|") rems' in
+	bidx = 0 => [ycode],[fun] |
+	val (ycodes, funs) = get_rules (idx+1) (butfirstn bidx rems') in
+	(ycode:ycodes), (fun:funs)
+    in
+    val (ycodes, funs) = get_rules 1 (explode s) then
+(fprintf stderr "    ycodes: %S\n    funs: %S\n" ycodes funs) fseq
+    (ycodes, funs)
+;
+
+
+let extract_parser tokens start_line lines =
+    let pidx = find_first0 (str_reg_match "%%PARSER") lines in
+    pidx = 0 => err start_line "Missing %%PARSER" |
+    let res = butfirstn pidx lines in
+    let parser_prelude =
+	[
+	    "%{",
+	    "#include <stdio.h>",
+	    "#include <stdlib.h>",
+	    "#include <string.h>",
+	    "#include \"yaccfl.h\"",
+	    "",
+	    "extern int yylex();",
+	    "extern int yylineno;",
+	    "",
+	    "%}",
+	    "",
+	    "%union {node_ptr nd_t;}"
+	]@
+	(map (\tk. sprintf "%%token <nd_t> %s" tk) tokens)
+    in
+    let parser_postlude =
+	[
+	    "",
+	    "%%",
+	    "",
+	    "int",
+	    "yyerror()",
+	    "{",
+	    "    FILE *fp;",
+	    "    extern int start_line;",
+	    "    extern char *error_file;",
+	    "    int file_write = 1;",
+	    "    if( strcmp(error_file, \"stderr\") == 0 ) {",
+	    "        fp = stderr;",
+	    "        file_write = 0;",
+	    "	 } else if( (fp = fopen(error_file, \"w\")) == NULL ) {",
+	    "        fp = stderr;",
+	    "        file_write = 0;",
+	    "    }",
+	    (sprintf "    fprintf(fp, \"When parsing %s.yfl syntax around line %%d\\n\", start_line+yylineno);" (deref base_name)),
+	    "    if( file_write == 1 ) { fclose(fp); }",
+	    "}"
+	]
+    in
+    letrec get_rules sline lines =
+	let sidx = find_first0 (str_reg_match ";") lines in
+	sidx = 0 => ([], [], []) |
+	val (lhss, rem_ycodes, all_funs) =
+	    get_rules (sline+sidx)(butfirstn sidx lines)
+	in
+	let rule = implode (firstn sidx lines) in
+	val [lhs,rem] =
+	    rget "[ \t]*([a-zA-Z][a-zA-Z0-9_]*)[ \t]*:(.*)$" rule
+	in
+	val (ycodes, funs) = extract_rule sline lhs rem in 
+	let ycode =
+	    list2str T (sprintf "%s:\n\t" lhs) "\n\t| " "\n\t;\n" id ycodes
+	in
+	(lhs:lhss, ycode:rem_ycodes, funs@all_funs)
+    in
+    val (lhss, ycodes, all_funs) = get_rules start_line res then
+    let bison_code = parser_prelude @
+	    (map (\t. sprintf "%%type <nd_t> %s" t) lhss)@["", "%%", ""]@
+	    ycodes @ parser_postlude
+    in
+    let base = deref base_name then
+    let pr fp s = fprintf fp "%s" s in
+    let yfp = fopen (base^".y") "w" then
+    (list2fp yfp T "" "\n" "\n" pr bison_code) fseq
+    (fclose yfp) fseq
+    let flfp = fopen (base^".fl") "w" then
+    (list2fp flfp T "" "\n\n" "\n" pr all_funs) fseq
+    (fclose flfp)
+;
+
+
+let emit_outputs global local scanner parser =
+    let pr fp s = fprintf fp "%s" s in
+    (list2fp stdout F "----GLOBAL----\n" "\n" "\n" pr global) fseq
+    (list2fp stdout F "----LOCAL----\n" "\n" "\n" pr local) fseq
+    (list2fp stdout F "----SCANNER----\n" "\n" "\n" pr scanner) fseq
+    (list2fp stdout F "----PARSER----\n" "\n" "\n" pr parser) fseq
+    ()
+;
+
+
+let parse_yfl yfl_file =
+    (base_name := (gen_trim "" ".yfl" yfl_file)) fseq
+    let lines = read_file yfl_file then
+    let get_line rem = length lines - length rem in
+    val (global, rem) = extract_global 1 lines then
+    val (local, rem)  = extract_local (get_line rem) rem then
+    val (tokens, rem) = extract_scanner (get_line rem) rem then
+    (extract_parser tokens (get_line rem) rem)
+;
+
+
+parse_yfl "tmp/dot.yfl";
+ 

@@ -1104,7 +1104,7 @@ let separated_pexlif2verilog netlist {path::string} {pex::pexlif} =
 	let fp = fopen file "w" in
 	(render (p_source_text (Source_text [descr])) fp) fseq
 	(fprintf fp "\n") fseq
-	(fclose fp)
+	(fclose fp) fseq ()
     in
     (foreach do1 results)
 ;

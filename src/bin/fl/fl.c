@@ -502,7 +502,9 @@ fl_main(int argc, char *argv[])
         if( start_file != NULL ) {
             string cmd = tprintf("((_load \"%s\" F) fseq ())", start_file);
 	    if( exit_on_failure ) {
-		strappend(" catch (exit 1)");
+		FP(err_fp,
+		    " gen_catch (\\m. fprintf stderr \"%%s\" m) fseq (exit 1)"
+		);
 	    }
             charappend(';');
 	    busy(TRUE);
@@ -666,7 +668,9 @@ fl_main(int argc, char *argv[])
 			binary_location);
 	    fprintf(fp, "((_load \"%s\" F) fseq ())", start_file);
 	    if( exit_on_failure ) {
-		fprintf(fp, " catch (exit 1)");
+		fprintf(fp,
+		    " gen_catch (\\m. fprintf stderr \"%%s\" m) fseq (exit 1)"
+		);
 	    }
 	    fprintf(fp, ";\n");
 	    fclose(fp);

@@ -1806,9 +1806,6 @@ get_prim_fun_type(g_ptr node)
 	case P_EXPLODE:
 	    type = (make_arrow(string_op,make_list(string_op)));
 	    break;
-	case P_IMPLODE:
-	    type = (make_arrow(make_list(string_op),string_op));
-	    break;
 	case P_BOOL2STR:
 	    type = (make_arrow(int_op,
 			make_arrow(bool_op,string_op)));
@@ -1911,7 +1908,7 @@ get_prim_fun_type(g_ptr node)
 			      make_arrow(string_op, fp_op));
 	    break; 
 	case P_FCLOSE:
-	    type = make_arrow(fp_op, void_op);
+	    type = make_arrow(fp_op, int_op);
 	    break; 
 	case P_FFLUSH:
 	    type = make_arrow(fp_op, void_op);

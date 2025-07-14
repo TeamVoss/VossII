@@ -41,6 +41,7 @@ typedef struct tstr_rec {
 } tstr_rec;
 
 void            Init_strmgr();
+int		Get_max_strlen();
 void		new_strmgr(str_mgr_ptr smp);
 void		free_strmgr(str_mgr_ptr smp);
 void		new_ustrmgr(ustr_mgr_ptr smp);

@@ -1249,7 +1249,7 @@ let fl_make_template canvas type file include_file basename create =
     let p = get_idv_current_pexlif canvas then
     let load_file =
 	type = "hfl" =>
-	    (create = 0 => () |
+	    (create = 0 => 0 |
 		let fp = fopen file "w" then
 		(generate_hfl_template fp p
 				       basename pexlif_file include_file)
@@ -1263,7 +1263,7 @@ let fl_make_template canvas type file include_file basename create =
 	    let load_file =
 		create_verilog_load_file basename file pexlif_file
 	    then
-	    (create = 0 => () |
+	    (create = 0 => 0 |
 	      let p' = PINST basename attrs lf fa_inps fa_outs [] (P_HIER []) in
 	      let fp = fopen file "w" then
 	      (include_file != "-" =>
@@ -2291,7 +2291,8 @@ let fl_save_verilog canvas name file only_netlist =
     let p' = netlist => p | rename_toplevel_pexlif name p then
     let fp = fopen file "w" then
     (safe_pexlif2verilog netlist fp p') fseq
-    (fclose fp)
+    (fclose fp) fseq
+    ()
   ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
 ;
 export_to_tcl fl_save_verilog;
