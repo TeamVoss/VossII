@@ -652,11 +652,13 @@ fl_main(int argc, char *argv[])
         }
     } else {
         /* noX mode */
-        FP(stdout_fp, "     /\\           \n");
-        FP(stdout_fp, "    /  \\ /\\       \n");
-        FP(stdout_fp, "   /    VossII %s (%s)\n", FL_VERSION, VERSION_DATE);
-        FP(stdout_fp, "VOSS-LIBRARY-DIRECTORY = %s\n", RCDefault_dir);
-        FP(stdout_fp, "Temporary files directory = %s\n", Voss_tmp_dir);
+	if( !hide_window ) {
+	    FP(stdout_fp, "     /\\           \n");
+	    FP(stdout_fp, "    /  \\ /\\       \n");
+	    FP(stdout_fp, "   /    VossII %s (%s)\n", FL_VERSION, VERSION_DATE);
+	    FP(stdout_fp, "VOSS-LIBRARY-DIRECTORY = %s\n", RCDefault_dir);
+	    FP(stdout_fp, "Temporary files directory = %s\n", Voss_tmp_dir);
+	}
         if( start_file != NULL ) {
 	    // Create a dummy file that loads preamble.fl and start_file
 	    FILE *fp;

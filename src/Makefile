@@ -219,6 +219,7 @@ install_all: fl functor \
 	cp -r vosslib/* $(LIB_DIR)
 	chmod -R a+rX $(LIB_DIR)
 	@cd ../IDVII/src/fl/design; make
+	@make -C bin/yaccfl BIN_DIR=$(BIN_DIR) LIB_DIR=$(LIB_DIR)
 	@-cd bifrost; make install
 
 install_visualization: visualization

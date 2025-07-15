@@ -1,13 +1,9 @@
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-//let ARGS = ["-debug", "tmp/dot.yfl"];	// TO BE REMOVED!!!!
-let ARGS = ["-debug", "tmp/iexpr.yfl"];	// TO BE REMOVED!!!!
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-//length ARGS  != 1 => error "Usage: fl -f new_yaccfl.fl <yfl_file>" | ();
-
-let do_debug = mem "-debug" ARGS;
+let do_debug = (length ARGS > 1) AND (hd ARGS == "DO_DEBUG");
 
 let yfl_file = (last ARGS);
+(str_is_suffix ".yfl" yfl_file) => () | error "Usage: yaccfl [--debug] file.yfl"
+;
+
 let base_name = gen_trim "" ".yfl" yfl_file;
 
 let prefix_name = gen_trim "" ".yfl" (last (str_split yfl_file "/"));
@@ -85,7 +81,7 @@ let extract_scanner start_line lines =
 	    (add_token token) fseq
 	    pat, (sprintf "{ RET(%s); }" token)
 	|
-	(s,"")
+	(s,"{}")
     in
     let prelude =
 	[
@@ -103,7 +99,11 @@ let extract_scanner start_line lines =
 	    |
 		"#define RET(tk) lvalp->str_t = yytext; return(tk);"
 	    ),
+	    (sprintf "int %sline_nbr = 1;" prefix_name),
 	    "%}",
+	    "",
+	    "%%",
+	    (sprintf "\\n { %sline_nbr++; }" prefix_name),
 	    ""
 	]
     in
@@ -117,7 +117,7 @@ let extract_scanner start_line lines =
 	    "    return(1);",
 	    "}"
 	] in
-    let raw_out = map process lines then
+    let raw_out = map process rules then
     let max_len = itlist (\(p,c).\r. max r (strlen p)) raw_out 1 then
     let out = map (\(p,r). sprintf "%-*s  %s" max_len p r) raw_out then
     let res = prelude @ out @ postlude then
@@ -138,7 +138,9 @@ let mk_bison_rule tokens fun_name used ids =
 	    idx = 0 =>
 		(sprintf "\n\t    $$ = Make_VAR_leaf(wastrsave(stringsp, \"%s\"));" fun_name)^
 		(mem (-1) used
-		    => PREF (sprintf "\n\t    $$ = Make_APPL_ND($$, Make_INT_leaf(yylineno));")
+		    => "\n\t    "^
+		       sprintf "$$=Make_APPL_ND($$,Make_INT_leaf(%sline_nbr));"
+			prefix_name
 		     | ""
 		)
 	    |
@@ -298,11 +300,13 @@ let extract_parser tokens start_line lines =
 	    "#include \"fl.h\"",
 	    "#include \"graph.h\"",
 	    "",
+	    PREF "int yyget_lineno  (void);",
 	    PREF "extern int	    yylex();",
-	    PREF "extern int	    yylineno;",
+	    (sprintf "extern int	    %sline_nbr;" prefix_name),
 	    "extern g_ptr	    _parser_res;",
 	    "extern str_mgr	    *stringsp;",
 	    "extern symbol_tbl_ptr  symb_tbl;",
+	    (sprintf "extern string	    %s_filename;" prefix_name),
 	    PREF "static int        yyerror(const char *msg);",
 	    "",
 	    "%}",
@@ -323,7 +327,7 @@ let extract_parser tokens start_line lines =
 	    "int",
 	    PREF "yyerror(const char *msg)",
 	    "{",
-	    PREF (sprintf "    fprintf(stderr, \"When parsing %s syntax around line %%d\\n\", yylineno);" prefix_name),
+	    PREF (sprintf "    Fail_pr(\"Syntax error when parsing %s file around line %%d in file %%s\\n\", %sline_nbr, %s_filename);" prefix_name prefix_name prefix_name),
 	    "}"
 	]
     in
@@ -407,6 +411,7 @@ let emit_code fl_code tokens flex_code parser_res =
     (fprintf Cfp "FILE *%sin;\n" prefix_name) fseq
     (fprintf Cfp "extern str_mgr     *stringsp;\n") fseq
     (fprintf Cfp "extern symbol_tbl_ptr   symb_tbl;\n") fseq
+    (fprintf Cfp "extern char         FailBuf[4096];\n") fseq
     (fprintf Cfp "static char fl_defs[] = {\n  ") fseq
     let put line = 
 	(fprintf flfp "%s\n" line) fseq
@@ -419,6 +424,7 @@ let emit_code fl_code tokens flex_code parser_res =
     (fclose flfp) fseq
     (fprintf Cfp "0};\n") fseq
     (fprintf Cfp "\n\ng_ptr   _parser_res;\n\n") fseq
+    (fprintf Cfp "\n\nstring %s_filename;\n" prefix_name) fseq
     //
     (fprintf Cfp "static void\n") fseq
     (fprintf Cfp "do_parse_%s(g_ptr redex)\n" prefix_name) fseq
@@ -428,15 +434,21 @@ let emit_code fl_code tokens flex_code parser_res =
     (fprintf Cfp "\n") fseq
     (fprintf Cfp "    EXTRACT_1_ARG(redex, gfile);\n") fseq
     (fprintf Cfp "    filename = GET_STRING(gfile);\n") fseq
+    (fprintf Cfp "    %s_filename = filename;\n" prefix_name) fseq
     (fprintf Cfp "\n") fseq
     (fprintf Cfp "    // Call the bison/flex parser on the file given\n") fseq
     (fprintf Cfp "    if( (%sin = fopen(filename, \"r\")) == NULL ) {\n" prefix_name) fseq
     (fprintf Cfp "        MAKE_REDEX_FAILURE(redex,Fail_pr(\"Cannot open file %%s\\n\", filename));\n") fseq
     (fprintf Cfp "        return;\n") fseq
     (fprintf Cfp "    }\n") fseq
-    (fprintf Cfp "    %sparse();\n" prefix_name) fseq
+    (fprintf Cfp "    int ret = %sparse();\n" prefix_name) fseq
     (fprintf Cfp "    fclose(%sin);\n" prefix_name) fseq
     (fprintf Cfp "\n") fseq
+    (fprintf Cfp "    if( ret != 0 ) {\n") fseq
+    (fprintf Cfp "        MAKE_REDEX_FAILURE(redex, FailBuf);\n") fseq
+    (fprintf Cfp "        return;\n") fseq
+    (fprintf Cfp "    }\n") fseq
+
     (fprintf Cfp "    // Result of parsing is in _parser_res\n") fseq
     (fprintf Cfp "    // Should we provide the type????\n") fseq
     (fprintf Cfp "    result_ptr res = Compile(symb_tbl, _parser_res, NULL, FALSE, FALSE);\n") fseq
@@ -494,8 +506,8 @@ let compile_c suffix_name =
 	eprintf "Failed to compile %s%s with command: %s\n%s\n"
 		base_name suffix_name c_cmd (sl2s errs)
     |
-    (fprintf stdinfo "Succesfully compiled %s\n" output) fseq
-    ()
+    NOT do_debug => () |
+    (fprintf stdinfo "Succesfully compiled %s\n" output)
 ;
 
 
@@ -556,5 +568,28 @@ let parse_yfl {dummy::void} =
 
 parse_yfl ();
 
+do_debug => () |
+    let rm1 f =
+	let cmd = sprintf "/bin/rm -f %s%s" base_name f in
+	(system cmd) fseq ()
+    in
+    foreach rm1 [".fl",
+		 ".l",
+		 ".tab.c",
+		 ".typecheck",
+		 ".y",
+		 ".c",
+		 ".lex.c",
+		 ".tab.h",
+		 ".return_type",
+		 ".o",
+		 ".lex.c",
+		 ".lex.o",
+		 ".tab.o"
+];
 
+
+fprintf stdinfo "Successfully built the dynamic libarary lib%s.so that installs the function parse_%s.\n" prefix_name prefix_name;
+
+quit;
  

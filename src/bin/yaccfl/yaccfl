@@ -1,0 +1,50 @@
+#!/bin/bash
+
+## Parse command-line options
+OPTS=$(getopt -o hd --long help,debug -n 'simple_getopt.sh' -- "$@")
+
+if [ $? -ne 0 ]; then
+  echo "Failed to parse options" >&2
+  exit 1
+fi
+
+## Reset the positional parameters to the parsed options
+eval set -- "$OPTS"
+
+## Initialize variables
+HELP=false
+DEBUG=false
+
+## Process the options
+while true; do
+  case "$1" in
+    -h | --help)
+      HELP=true
+      shift
+      ;;
+    -d | --debug)
+      DEBUG=true
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      echo "Internal error!"
+      exit 1
+      ;;
+  esac
+done
+
+## Display the results
+if [ "$HELP" = true ]; then
+    echo "Usage: yaccfl [-d|--debug] file.yfl"
+    exit 0;
+fi
+
+if [ "$DEBUG" = true ]; then
+    fl -noX -hide-window -F yaccfl.fl DO_DEBUG $@
+else
+    fl -noX -hide-window -F yaccfl.fl $@
+fi

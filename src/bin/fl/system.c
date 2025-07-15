@@ -314,7 +314,6 @@ load_shared_library(g_ptr redex)
 	    return;
 	}
     }
-FP(err_fp, "shared_lib_name: |%s|\n", shared_lib_name);
     void *handle = dlopen(shared_lib_name, RTLD_NOW);
 
     if( !handle ) {
