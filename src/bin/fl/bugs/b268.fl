@@ -1,0 +1,61 @@
+
+let im = import_ppm_image "/media/sf_SharedFolder/StreetSigns/German_Photos/FullIJCNN2013/00000.ppm";
+
+image_crop im 100 300 200 400;
+
+
+rgb2hsv (255,255,0);
+
+let ROWS = 960;
+let lgROWS = ubits_needed (ROWS-1);
+let COLS = 1280;
+let lgCOLS = ubits_needed (COLS-1);
+let r = bv_uvector "r" lgROWS;
+let c = bv_uvector "c" lgCOLS;
+
+
+let IDIR = "/media/sf_SharedFolder/StreetSigns/Swedish/seventy_signs_in_traffic/xpms/";
+let images = map (\s. import_xpm_image (IDIR^s)) [
+                "1277381680Image000004.xpm",
+                "1277381680Image000009.xpm",
+                "1277381708Image000002.xpm",
+                "1277381708Image000007.xpm",
+                "1277381708Image000012.xpm",
+                "1277381949Image000018.xpm"
+];
+
+//display_image "First image" (el 1 images);
+
+//display_image "Second image" (el 2 images);
+
+
+let im1' = update_image (el 1 images) [];
+
+let im1'' = update_image (el 1 images) 
+    (flatmap (\x. map (\y. ((x,y), (255,255,255))) (100--400)) (100--200))
+;
+
+//export_to_ppm im1'' "/tmp/_Q.ppm";
+//system "display /tmp/_Q.ppm";
+
+im1'';
+
+
+
+let image2 i = hsv_filter (el i images) (-20,20) (0,100) (0,100) (255,255,255);
+let image2 i = hsv_filter (el i images) (-35,35) (0,100) (0,100) (255,255,255);
+
+let sbitmap i = image2symbolic_bitmap (image2 i) r c;
+
+let smat i = image2bv (el i images) r c;
+
+update_vossrc "VERBOSE-GARBAGE-COLLECTION" "YES";
+
+let q = smat 1;
+bdd_size q;
+
+
+let q = sbitmap 1;
+bdd_size q;
+
+

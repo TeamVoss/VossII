@@ -35,6 +35,7 @@ static rec_mgr	    	color_rec_mgr;
 static rec_mgr	    	image_rec_mgr;
 
 /* ----- Forward definitions local functions ----- */
+static string	 get_non_comment_line(FILE *fp);
 static void      mark_image_fn(pointer p);
 static void      sweep_image_fn(void);
 static void      save_image_fn(FILE *fp, pointer p);
@@ -77,14 +78,117 @@ Image_Init()
 /*	    EXPORTED EXTAPI FUNCTIONS    		*/
 /********************************************************/
 
-static string
-get_non_comment_line(FILE *fp)
+static void
+display_image(g_ptr redex)
 {
-    string line;
-    do {
-	line = fgets(im_read_buf, READ_BUF_SIZE, fp);
-    } while ( strncmp(line, "/*", 2) == 0 );
-    return line;
+    g_ptr g_image, g_name;
+    EXTRACT_2_ARGS(redex, g_name, g_image);
+    string name = GET_STRING(g_name);
+    image_ptr ip = (image_ptr) GET_EXT_OBJ(g_image);
+
+    FILE *fp;
+    string filename;
+    if( !Mk_output_file_in_tmp_dir("image_draw", &fp, &filename) ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot create image_draw file."));
+        return;
+    }
+
+    string res = NULL;
+    fprintf(fp, "catch {unset _image_};\n");
+    for(int r = 0; r < ip->rows; r++) {
+	fprintf(fp, "lappend _image_ {\n");
+	for(int c = 0; c < ip->cols; c++) {
+	    color_ptr cp = GET_PIXEL(ip, c, r);
+	    fprintf(fp, " #%02x%02x%02x", cp->r, cp->g, cp->b);
+	}
+	fprintf(fp, "};\n");
+    }
+
+    fprintf(fp, "display_image {%s} %d %d $_image_;\n",name,ip->rows,ip->cols);
+    fprintf(fp, "catch {unset _image_};\n");
+    fclose(fp);
+
+    string tcl_cmd = tprintf("source %s;\n", filename);
+    if( !Send_to_tcl(tcl_cmd, &res) ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Tcl command failed: %s", tcl_cmd));
+        return;
+    }
+    MAKE_REDEX_VOID(redex);
+    return;
+}
+
+static void
+color2rgb(g_ptr redex)
+{
+    g_ptr gcolor;
+    EXTRACT_1_ARG(redex, gcolor);
+    string color = GET_STRING(gcolor);
+    color_ptr cp;
+    if( (cp = find_hash(&X11_colors, color)) == NULL ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot find color '%s'\n", color));
+	return;
+    }
+    MAKE_REDEX_PAIR(redex, Make_INT_leaf(cp->r),
+			   Make_PAIR_ND(
+				Make_INT_leaf(cp->g),
+				Make_INT_leaf(cp->b)));
+    return;
+}
+
+static void
+do_rgb2hsv(g_ptr redex)
+{
+    g_ptr rgb;
+    EXTRACT_1_ARG(redex, rgb);
+    int R = GET_INT(GET_FST(rgb));
+    int G = GET_INT(GET_FST(GET_SND(rgb)));
+    int B = GET_INT(GET_SND(GET_SND(rgb)));
+    int h, s, v;
+    rgb2hsv(R, G, B, &h, &s, &v);
+    MAKE_REDEX_PAIR(redex, Make_INT_leaf(h),
+			   Make_PAIR_ND(
+				Make_INT_leaf(s),
+				Make_INT_leaf(v)));
+    return;
+}
+
+static void
+do_hsv2rgb(g_ptr redex)
+{
+    g_ptr hsv;
+    EXTRACT_1_ARG(redex, hsv);
+    int Hi = GET_INT(GET_FST(hsv));
+    int Si = GET_INT(GET_FST(GET_SND(hsv)));
+    int Vi = GET_INT(GET_SND(GET_SND(hsv)));
+    double  H, S, V, h, s, v, i, f, p, q, t, r, g, b;
+    int R, G, B;
+    H = (double) Hi;
+    S = (double) Si;
+    V = (double) Vi;
+    h = H/360.0;
+    s = S/100.0;
+    v = V/100.0;
+    i = floor(h * 6.0);
+    f = h*6.0-i;
+    p = v * (1.0 - s);
+    q = v * (1.0 - f * s);
+    t = v * (1 - (1 - f) * s);
+    switch( ((int) i) % 6) {
+	case 0: { r = v; g = t; b = p; break; }
+	case 1: { r = q; g = v; b = p; break; }
+	case 2: { r = p; g = v; b = t; break; }
+	case 3: { r = p; g = q; b = v; break; }
+	case 4: { r = t; g = p; b = v; break; }
+	case 5: { r = v; g = p; b = q; break; }
+    }
+    R = (int) (round(r*255));
+    G = (int) (round(g*255));
+    B = (int) (round(b*255));
+    MAKE_REDEX_PAIR(redex, Make_INT_leaf(R),
+			   Make_PAIR_ND(
+				Make_INT_leaf(G),
+				Make_INT_leaf(B)));
+    return;
 }
 
 static void
@@ -196,6 +300,51 @@ import_xpm_image(g_ptr redex)
     MAKE_REDEX_EXT_OBJ(redex, image_oidx, ip);
 }
 
+
+
+static void
+import_ppm_image(g_ptr redex)
+{
+    g_ptr g_file;
+    EXTRACT_1_ARG(redex, g_file);
+    string file = GET_STRING(g_file);
+    FILE *fp = fopen(file, "rb");
+    if( fp == NULL ) {
+	MAKE_REDEX_FAILURE(redex,
+			   Fail_pr("Cannot open file %s for reading", file));
+	return;
+    }
+    string line = fgets(im_read_buf, READ_BUF_SIZE, fp);
+
+    int cols, rows, color_sz;
+    if( sscanf(line, "P6 %d %d %d", &cols, &rows, &color_sz) != 3 ) {
+	MAKE_REDEX_FAILURE(redex,
+			   Fail_pr("Incorrect format\nGot %s\nExpected: %s\n",
+				   line, "P6 <cols> <rows> 256\n"));
+	fclose(fp);
+	return;
+    }
+    image_ptr ip = create_image(file, rows, cols);
+    for(int r = 0; r < rows; r++) {
+	for(int c = 0; c < cols; c++) {
+	    unsigned char buf[3];
+	    if( fread(buf, 3, 1, fp) != 1 ) {
+		MAKE_REDEX_FAILURE(redex, "Incorrect format in image data");
+		fclose(fp);
+		return;
+	    }
+	    color_rec cr;
+	    cr.valid = TRUE;
+	    cr.r = buf[0];
+	    cr.g = buf[1];
+	    cr.b = buf[2];
+	    SET_PIXEL(ip, c, r, &cr);
+	}
+    }
+    fclose(fp);
+    MAKE_REDEX_EXT_OBJ(redex, image_oidx, ip);
+}
+
 static void
 image_size(g_ptr redex)
 {
@@ -203,6 +352,16 @@ image_size(g_ptr redex)
     EXTRACT_1_ARG(redex, g_image);
     image_ptr ip = (image_ptr) GET_EXT_OBJ(g_image);
     MAKE_REDEX_CONS_ND(redex, Make_INT_leaf(ip->rows), Make_INT_leaf(ip->cols));
+    return;
+}
+
+static void
+image_name(g_ptr redex)
+{
+    g_ptr g_image;
+    EXTRACT_1_ARG(redex, g_image);
+    image_ptr ip = (image_ptr) GET_EXT_OBJ(g_image);
+    MAKE_REDEX_STRING(redex, ip->name);
     return;
 }
 
@@ -221,7 +380,7 @@ image_get_pixel(g_ptr redex)
 			     Make_CONS_ND(Make_INT_leaf(cp->g),
 					  Make_INT_leaf(cp->b)));
     g_ptr vld = Make_BOOL_leaf(cp->valid? B_One() : B_Zero());
-    MAKE_REDEX_CONS_ND(redex, vld, rgb);
+    MAKE_REDEX_PAIR(redex, vld, rgb);
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
     return;
@@ -272,39 +431,76 @@ hsv_filter(g_ptr redex)
 {
     g_ptr g_image, h_range, s_range, v_range, res_color;
     EXTRACT_5_ARGS(redex, g_image, h_range, s_range, v_range, res_color);
+    //
+    // ----- Get and check H range
+    //
     int min_h = GET_INT(GET_CONS_HD(h_range));
     int max_h = GET_INT(GET_CONS_TL(h_range));
     if( max_h < min_h ) {
-	string msg = Fail_pr("H_max(%d) < H_min(%d) in bsv_filter",max_h,min_h);
+	string msg = Fail_pr("H_max(%d) < H_min(%d) in hsv_filter",max_h,min_h);
 	MAKE_REDEX_FAILURE(redex,msg);
 	return;
     }
+    if( max_h < 0 ) {
+	string msg = Fail_pr("hsv_filter: H_max(%d) should be >= 0\n", max_h);
+	MAKE_REDEX_FAILURE(redex, msg);
+	return;
+    }
+    if( min_h < -360 || max_h > 360 ) {
+	string msg =
+	 Fail_pr("hsv_filter: Range of H is [%d,%d] but should be [-360,360]\n",
+		 min_h, max_h);
+	MAKE_REDEX_FAILURE(redex, msg);
+	return;
+    }
+    if( min_h < 0 && max_h < 0 ) {
+	min_h += 360;
+	max_h += 360;
+    }
+    bool split_h = min_h < 0;
+    //
+    // ----- Get and check S range
+    //
     int min_s = GET_INT(GET_CONS_HD(s_range));
     int max_s = GET_INT(GET_CONS_TL(s_range));
     if( max_s < min_s ) {
-	string msg = Fail_pr("S_max(%d) < S_min(%d) in bsv_filter",max_s,min_s);
+	string msg = Fail_pr("S_max(%d) < S_min(%d) in hsv_filter",max_s,min_s);
 	MAKE_REDEX_FAILURE(redex,msg);
 	return;
     }
+    if( min_s < 0 || max_s > 100 ) {
+	string msg =
+	    Fail_pr("hsv_filter: Range of S is [%d,%d] but should be [0,100]\n",
+		    min_s, max_s);
+	MAKE_REDEX_FAILURE(redex, msg);
+	return;
+    }
+    //
+    // ----- Get and check V range
+    //
     int min_v = GET_INT(GET_CONS_HD(v_range));
     int max_v = GET_INT(GET_CONS_TL(v_range));
     if( max_v < min_v ) {
-	string msg = Fail_pr("V_max(%d) < V_min(%d) in bsv_filter",max_v,min_v);
+	string msg = Fail_pr("V_max(%d) < V_min(%d) in hsv_filter",max_v,min_v);
 	MAKE_REDEX_FAILURE(redex,msg);
 	return;
     }
-    if( max_v < 0 ) {
-	min_v = min_v % 360;
-	max_v = max_v % 360;
-    }
-    if( max_v < min_v ) {
-	string msg = Fail_pr("H_max(%d) < H_min(%d) in bsv_filter",max_v,min_v);
-	MAKE_REDEX_FAILURE(redex,msg);
+    if( min_v < 0 || max_v > 100 ) {
+	string msg =
+	    Fail_pr("hsv_filter: Range of V is [%d,%d] but should be [0,100]\n",
+		    min_v, max_v);
+	MAKE_REDEX_FAILURE(redex, msg);
 	return;
     }
+    //
+    // Get result color
+    //
     int res_r = GET_INT(GET_CONS_HD(res_color));
     int res_g = GET_INT(GET_CONS_HD(GET_CONS_TL(res_color)));
     int res_b = GET_INT(GET_CONS_TL(GET_CONS_TL(res_color)));
+    //
+    // And perform the filter function
+    //
     image_ptr ip = (image_ptr) GET_EXT_OBJ(g_image);
     image_ptr nip = create_image(ip->name, ip->rows, ip->cols);
     for(int r = 0; r < ip->rows; r++) {
@@ -312,17 +508,20 @@ hsv_filter(g_ptr redex)
 	    color_ptr cp = GET_PIXEL(ip, c, r);
 	    color_ptr ncp = GET_PIXEL(nip, c, r);
 	    ncp->valid = FALSE;
+	    ncp->r = 0;
+	    ncp->g = 0;
+	    ncp->b = 0;
 	    if( cp->valid ) {
 		int h, s, v;
 		rgb2hsv(cp->r, cp->g, cp->b, &h, &s, &v);
-		if( min_v > v ) continue;
+		if( v < min_v ) continue;
 		if( max_v < v ) continue;
-		if( min_s > s ) continue;
+		if( s < min_s ) continue;
 		if( max_s < s ) continue;
-		if( min_h < 0 ) {
-		    if( max_h < h && h < (min_h+360) ) continue;
+		if( split_h ) {
+		    if( max_h < h && h < (360+min_h) ) continue;
 		} else {
-		    if( min_h > h ) continue;
+		    if( h < min_h ) continue;
 		    if( max_h < h ) continue;
 		}
 		ncp->valid = TRUE;
@@ -335,15 +534,364 @@ hsv_filter(g_ptr redex)
     MAKE_REDEX_EXT_OBJ(redex, image_oidx, nip);
 }
 
+static bool
+check_range(g_ptr redex, string name, int min_v, int max_v,
+				      int min_range, int max_range)
+{
+    if( min_v > max_v ) {
+	string msg = Fail_pr("max_%s(%d) < min_%s(%d)",
+			     name, max_v, name, min_v);
+	MAKE_REDEX_FAILURE(redex,msg);
+	return FALSE;
+    }
+    if( min_v < min_range ) {
+	string msg = Fail_pr("%s_min(%d) should be >= %d\n",
+			     name, min_v, min_range);
+	MAKE_REDEX_FAILURE(redex, msg);
+	return FALSE;
+    }
+    if( max_v > max_range ) {
+	string msg = Fail_pr("%s_max(%d) should be <= %d\n",
+			     name, max_v, max_range);
+	MAKE_REDEX_FAILURE(redex, msg);
+	return FALSE;
+    }
+    return TRUE;
+}
+
+static void
+image_crop(g_ptr redex)
+{
+    g_ptr g_image, g_min_r, g_max_r, g_min_c, g_max_c;;
+    EXTRACT_5_ARGS(redex, g_image, g_min_r, g_max_r, g_min_c, g_max_c);
+    int min_r = GET_INT(g_min_r);
+    int max_r = GET_INT(g_max_r);
+    int min_c = GET_INT(g_min_c);
+    int max_c = GET_INT(g_max_c);
+    image_ptr ip = (image_ptr) GET_EXT_OBJ(g_image);
+    if( min_r < 0 || max_r > ip->rows ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Row range out of bounds!"));
+	return;
+    }
+    if( min_c < 0 || max_c > ip->cols ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Column range out of bounds!"));
+	return;
+    }
+    image_ptr nip = create_image(ip->name, max_r-min_r+1, max_c-min_c+1);
+    for(int r = min_r; r <= max_r; r++) {
+	for(int c = min_c; c <= max_c; c++) {
+	    color_ptr cp = GET_PIXEL(ip, c, r);
+	    color_ptr ncp = GET_PIXEL(nip, c-min_c, r-min_r);
+	    *ncp = *cp;
+	}
+    }
+    MAKE_REDEX_EXT_OBJ(redex, image_oidx, nip);
+}
+
+static void
+rgb_filter(g_ptr redex)
+{
+    g_ptr g_image, r_range, g_range, b_range, res_color;
+    EXTRACT_5_ARGS(redex, g_image, r_range, g_range, b_range, res_color);
+    //
+    // ----- Get and check ranges
+    //
+    int min_r = GET_INT(GET_CONS_HD(r_range));
+    int max_r = GET_INT(GET_CONS_TL(r_range));
+    if( !check_range(redex, "R",  min_r, max_r, 0, 255) ) { return; }
+    int min_g = GET_INT(GET_CONS_HD(g_range));
+    int max_g = GET_INT(GET_CONS_TL(g_range));
+    if( !check_range(redex, "G",  min_g, max_g, 0, 255) ) { return; }
+    int min_b = GET_INT(GET_CONS_HD(b_range));
+    int max_b = GET_INT(GET_CONS_TL(b_range));
+    if( !check_range(redex, "B",  min_b, max_b, 0, 255) ) { return; }
+    //
+    // Get result color
+    //
+    int res_r = GET_INT(GET_CONS_HD(res_color));
+    int res_g = GET_INT(GET_CONS_HD(GET_CONS_TL(res_color)));
+    int res_b = GET_INT(GET_CONS_TL(GET_CONS_TL(res_color)));
+    //
+    // And perform the filter function
+    //
+    image_ptr ip = (image_ptr) GET_EXT_OBJ(g_image);
+    image_ptr nip = create_image(ip->name, ip->rows, ip->cols);
+    for(int r = 0; r < ip->rows; r++) {
+	for(int c = 0; c < ip->cols; c++) {
+	    color_ptr cp = GET_PIXEL(ip, c, r);
+	    color_ptr ncp = GET_PIXEL(nip, c, r);
+	    ncp->valid = FALSE;
+	    ncp->r = 0;
+	    ncp->g = 0;
+	    ncp->b = 0;
+	    if( cp->valid ) {
+		int r, g, b;
+		r = cp->r;
+		g = cp->g;
+		b = cp->b;
+		if( r < min_r ) continue;
+		if( r > max_r ) continue;
+		if( g < min_g ) continue;
+		if( g > max_g ) continue;
+		if( b < min_b ) continue;
+		if( b > max_b ) continue;
+		ncp->valid = TRUE;
+		ncp->r = res_r;
+		ncp->g = res_g;
+		ncp->b = res_b;
+	    }
+	}
+    }
+    MAKE_REDEX_EXT_OBJ(redex, image_oidx, nip);
+}
+
+static void
+update_image(g_ptr redex)
+{
+    g_ptr g_image, change_list;
+    EXTRACT_2_ARGS(redex, g_image, change_list);
+
+    image_ptr ip = (image_ptr) GET_EXT_OBJ(g_image);
+    image_ptr nip = create_image(ip->name, ip->rows, ip->cols);
+    // First, copy current image
+    for(int r = 0; r < ip->rows; r++) {
+	for(int c = 0; c < ip->cols; c++) {
+	    color_ptr cp = GET_PIXEL(ip, c, r);
+	    color_ptr ncp = GET_PIXEL(nip, c, r);
+	    ncp->valid = cp->valid;
+	    ncp->r = cp->r;
+	    ncp->g = cp->g;
+	    ncp->b = cp->b;
+	}
+    }
+    // Now process the update list
+    while( !IS_NIL(change_list) ) {
+	g_ptr p = GET_CONS_HD(change_list);
+	int x, y, R, G, B;
+	x = GET_INT(GET_FST((GET_FST(p))));
+	y = GET_INT(GET_SND((GET_FST(p))));
+	if( x < 0 || x > ip->cols ) {
+	    MAKE_REDEX_FAILURE(redex,
+			       Fail_pr("x-coordinate (%d) outside image", x));
+	    return;
+	}
+	if( y < 0 || y > ip->rows ) {
+	    MAKE_REDEX_FAILURE(redex,
+			       Fail_pr("y-coordinate (%d) outside image", y));
+	    return;
+	}
+	p = GET_SND(p);
+	R = GET_INT(GET_FST(p));
+	p = GET_SND(p);
+	G = GET_INT(GET_FST(p));
+	B = GET_INT(GET_SND(p));
+	color_ptr ncp = GET_PIXEL(nip, x, y);
+	ncp->valid = TRUE;
+	ncp->r = R;
+	ncp->g = G;
+	ncp->b = B;
+	change_list = GET_CONS_TL(change_list);
+    }
+    MAKE_REDEX_EXT_OBJ(redex, image_oidx, nip);
+}
+
+static formula
+bl_is_i(g_ptr vs, int pvs, int i)
+{
+    formula res = B_One();
+    pvs = pvs/2;
+    while( !IS_NIL(vs) ) {
+	if( (i/pvs)%2 == 1 ) {
+	    res = B_And(res, GET_BOOL(GET_CONS_HD(vs)));
+	} else {
+	    res = B_And(res, B_Not(GET_BOOL(GET_CONS_HD(vs))));
+	}
+	pvs /= 2;
+	vs = GET_CONS_TL(vs);
+    }
+    return res;
+}
+
+
+static void
+image2bv(g_ptr redex)
+{
+    g_ptr g_image, g_bvrow, g_bvcol;
+    EXTRACT_3_ARGS(redex, g_image, g_bvrow, g_bvcol);
+    image_ptr ip = (image_ptr) GET_EXT_OBJ(g_image);
+    g_ptr blrow = Bv_get_list((bv_ptr) GET_EXT_OBJ(g_bvrow));
+    g_ptr blcol  = Bv_get_list((bv_ptr) GET_EXT_OBJ(g_bvcol));
+
+    int prow = 1;
+    for(g_ptr cur = blrow; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
+	prow *= 2;
+    }
+    if( prow < ip->rows ) {
+	MAKE_REDEX_FAILURE(redex,
+			   Fail_pr("ridx cannot select all of the rows\n"));
+	return;
+    }
+    int pcol = 1;
+    for(g_ptr cur = blcol; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
+	pcol *= 2;
+    }
+    if( pcol < ip->cols ) {
+	MAKE_REDEX_FAILURE(redex,
+			   Fail_pr("cidx cannot select all of the columns\n"));
+	return;
+    }
+
+    g_ptr res = Make_CONS_ND(Make_BOOL_leaf(B_Zero()), Make_NIL());
+    PUSH_GLOBAL_GC(res);
+    for(int r = 0; r < ip->rows; r++) {
+	for(int c = 0; c < ip->cols; c++) {
+	    color_ptr cp = GET_PIXEL(ip, c, r);
+	    if( !cp->valid ) continue;
+	    if( cp->r != 0 || cp->g != 0 || cp->b != 0 ) {
+		formula r_cond = bl_is_i(blrow, prow, r);
+		formula c_cond = bl_is_i(blcol, pcol, c);
+		formula cond = B_And(r_cond, c_cond);
+		arbi_T ai = Arbi_FromInt(65536*cp->r+256*cp->g+cp->b);
+		res = Ite_bv_list(cond, Aint2bv(ai), res);
+	    }
+	}
+    }
+    POP_GLOBAL_GC(1);
+    MAKE_REDEX_BV(redex, res);
+}
+
+static void
+image2symbolic_bitmap(g_ptr redex)
+{
+    g_ptr g_image, g_bvrow, g_bvcol;
+    EXTRACT_3_ARGS(redex, g_image, g_bvrow, g_bvcol);
+    image_ptr ip = (image_ptr) GET_EXT_OBJ(g_image);
+    g_ptr blrow = Bv_get_list((bv_ptr) GET_EXT_OBJ(g_bvrow));
+    g_ptr blcol  = Bv_get_list((bv_ptr) GET_EXT_OBJ(g_bvcol));
+
+    int prow = 1;
+    for(g_ptr cur = blrow; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
+	prow *= 2;
+    }
+    if( prow < ip->rows ) {
+	MAKE_REDEX_FAILURE(redex,
+			   Fail_pr("ridx cannot select all of the rows\n"));
+	return;
+    }
+    int pcol = 1;
+    for(g_ptr cur = blcol; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
+	pcol *= 2;
+    }
+    if( pcol < ip->cols ) {
+	MAKE_REDEX_FAILURE(redex,
+			   Fail_pr("cidx cannot select all of the columns\n"));
+	return;
+    }
+
+    formula res = B_Zero();
+    PUSH_BDD_GC(res);
+    for(int r = 0; r < ip->rows; r++) {
+	for(int c = 0; c < ip->cols; c++) {
+	    color_ptr cp = GET_PIXEL(ip, c, r);
+	    if( !cp->valid ) continue;
+	    if( cp->r == 0xff && cp->g == 0xff && cp->b == 0xff ) {
+		formula r_cond = bl_is_i(blrow, prow, r);
+		formula c_cond = bl_is_i(blcol, pcol, c);
+		formula cond = B_And(r_cond, c_cond);
+		res = B_Or(res, cond);
+		continue;
+	    }
+	    if( cp->r != 0 || cp->g != 0 || cp->b != 0 ) {
+		POP_BDD_GC(1);
+		string msg =
+		    Fail_pr("Neither black nor white in location (%d,%d)",r,c);
+		MAKE_REDEX_FAILURE(redex, msg);
+		return;
+	    }
+	}
+    }
+    POP_BDD_GC(1);
+    MAKE_REDEX_BOOL(redex, res);
+}
+
 
 void
 Image_Install_Functions()
 {
-   Add_ExtAPI_Function("import_xpm_image", "1", FALSE,
+    typeExp_ptr bv_type = Get_Type("bv", NULL, TP_DONT_INSERT);
+
+    Add_ExtAPI_Function("display_image", "11", FALSE,
+			GLmake_arrow(
+			  GLmake_string(),
+			  GLmake_arrow(image_handle_tp, GLmake_void())),
+			display_image);
+
+    Add_ExtAPI_Function("image2symbolic_bitmap", "111", FALSE,
+			GLmake_arrow(
+			  image_handle_tp,
+			  GLmake_arrow(
+			    bv_type,
+			    GLmake_arrow(bv_type, GLmake_bool()))),
+			image2symbolic_bitmap);
+
+    Add_ExtAPI_Function("image2bv", "111", FALSE,
+			GLmake_arrow(
+			  image_handle_tp,
+			  GLmake_arrow(
+			    bv_type,
+			    GLmake_arrow(bv_type,bv_type))),
+			image2bv);
+
+    Add_ExtAPI_Function("color2rgb", "1", FALSE,
+                        GLmake_arrow(GLmake_string(), 
+			    GLmake_tuple(
+				GLmake_int(),
+				GLmake_tuple(GLmake_int(), GLmake_int()))),
+                        color2rgb);
+
+    Add_ExtAPI_Function("rgb2hsv", "1", FALSE,
+                        GLmake_arrow(
+			    GLmake_tuple(
+				GLmake_int(),
+				GLmake_tuple(GLmake_int(), GLmake_int())),
+			    GLmake_tuple(
+				GLmake_int(),
+				GLmake_tuple(GLmake_int(), GLmake_int()))),
+                        do_rgb2hsv);
+
+    Add_ExtAPI_Function("hsv2rgb", "1", FALSE,
+                        GLmake_arrow(
+			    GLmake_tuple(
+				GLmake_int(),
+				GLmake_tuple(GLmake_int(), GLmake_int())),
+			    GLmake_tuple(
+				GLmake_int(),
+				GLmake_tuple(GLmake_int(), GLmake_int()))),
+                        do_hsv2rgb);
+
+    Add_ExtAPI_Function("import_xpm_image", "1", FALSE,
                         GLmake_arrow(GLmake_string(), image_handle_tp),
                         import_xpm_image);
 
-   Add_ExtAPI_Function("hsv_filter", "11111", FALSE,
+    Add_ExtAPI_Function("import_ppm_image", "1", FALSE,
+                        GLmake_arrow(GLmake_string(), image_handle_tp),
+                        import_ppm_image);
+
+    Add_ExtAPI_Function("image_crop", "11111", FALSE,
+                        GLmake_arrow(
+			  image_handle_tp,
+			  GLmake_arrow(
+			    GLmake_int(),
+			    GLmake_arrow(
+			      GLmake_int(),
+			      GLmake_arrow(
+				GLmake_int(),
+				GLmake_arrow(
+				  GLmake_int(),
+				  image_handle_tp))))),
+                        image_crop);
+
+    Add_ExtAPI_Function("hsv_filter", "11111", FALSE,
                         GLmake_arrow(
 			  image_handle_tp,
 			  GLmake_arrow(
@@ -359,19 +907,54 @@ Image_Install_Functions()
 				  image_handle_tp))))),
                         hsv_filter);
 
-   Add_ExtAPI_Function("export_to_ppm", "11", FALSE,
+    Add_ExtAPI_Function("rgb_filter", "11111", FALSE,
+                        GLmake_arrow(
+			  image_handle_tp,
+			  GLmake_arrow(
+			    GLmake_tuple(GLmake_int(), GLmake_int()),
+			    GLmake_arrow(
+			      GLmake_tuple(GLmake_int(), GLmake_int()),
+			      GLmake_arrow(
+				GLmake_tuple(GLmake_int(), GLmake_int()),
+				GLmake_arrow(
+				  GLmake_tuple(
+				    GLmake_int(),
+				    GLmake_tuple(GLmake_int(), GLmake_int())),
+				  image_handle_tp))))),
+                        rgb_filter);
+
+    Add_ExtAPI_Function("update_image", "11", FALSE,
+                        GLmake_arrow(
+			  image_handle_tp,
+			    GLmake_arrow(
+			      GLmake_list(
+			        GLmake_tuple(
+				  GLmake_tuple(GLmake_int(), GLmake_int()),
+				  GLmake_tuple(
+			  	    GLmake_int(),
+				    GLmake_tuple(
+				      GLmake_int(),
+				      GLmake_int())))),
+			      image_handle_tp)),
+			update_image);
+		    
+    Add_ExtAPI_Function("export_to_ppm", "11", FALSE,
                         GLmake_arrow(
 			    image_handle_tp,
 			    GLmake_arrow(GLmake_string(), GLmake_void())),
                         export_to_ppm);
 
-   Add_ExtAPI_Function("image_size", "1", FALSE,
+    Add_ExtAPI_Function("image_size", "1", FALSE,
                         GLmake_arrow(
 			    image_handle_tp,
 			    GLmake_tuple(GLmake_int(), GLmake_int())),
                         image_size);
 
-   Add_ExtAPI_Function("image_get_pixel", "111", FALSE,
+    Add_ExtAPI_Function("image_name", "1", FALSE,
+                        GLmake_arrow(image_handle_tp, GLmake_string()),
+                        image_name);
+
+    Add_ExtAPI_Function("image_get_pixel", "111", FALSE,
                         GLmake_arrow(
 			  image_handle_tp,
 			  GLmake_arrow(
@@ -393,6 +976,16 @@ Image_Install_Functions()
 /********************************************************/
 /*                    LOCAL FUNCTIONS    		*/
 /********************************************************/
+
+static string
+get_non_comment_line(FILE *fp)
+{
+    string line;
+    do {
+	line = fgets(im_read_buf, READ_BUF_SIZE, fp);
+    } while ( strncmp(line, "/*", 2) == 0 );
+    return line;
+}
 
 static void
 mark_image_fn(pointer p)
@@ -466,7 +1059,8 @@ static string
 image2str_fn(pointer p)
 {
     image_ptr ip = (image_ptr) p;
-    sprintf(im_read_buf, "Image with %d rows and %d columns\n",ip->rows,ip->cols);
+    sprintf(im_read_buf, "Image with %d rows and %d columns\n",
+			ip->rows, ip->cols);
     string msg = wastrsave(stringsp, im_read_buf);
     if( RCverbose_image_print ) {
         FP(stdout_fp, "%s", msg);
@@ -2096,11 +2690,16 @@ rgb2hsv(int r, int g, int b, int *hp, int *sp, int *vp)
     } else {
 	*sp = (int) round((100.0 * delta) / Cmax);
     }
-    double tmp =  (Cmax == Cmin)? 0.0 :
-		  (Cmax == R)? (G-B)/delta :
-		  (Cmax == G)? 2.0+(B-R)/delta :
-		  4.0 + (R-G)/delta;
-    *hp = ((int) (round(60.0*tmp))) % 360;
+    if( Cmax == Cmin ) {
+	*hp = 0;
+    } else if( Cmax == R) {
+	*hp = ((int) round(60.0*(G-B)/delta + 360.0)) % 360;
+    } else if( Cmax == G) {
+	*hp = ((int) round(60.0*((B-R)/delta) + 120.0)) % 360;
+    } else {
+	*hp = ((int) round(60.0*((R-G)/delta) + 240.0)) % 360;
+    }
+    return;
 }
 
 static int

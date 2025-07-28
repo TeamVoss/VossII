@@ -3323,8 +3323,7 @@ do_draw_bdds(formula *bdds, int cnt)
     Sprintf(draw_cmd, "display_dot %s", filename);
     string res = NULL;
     if( !Send_to_tcl(draw_cmd, &res) ) {
-	Fail_pr("display_dot failure: %s", res);
-	free(res);
+	Fail_pr("display_dot failure for command %s", draw_cmd);
 	return FALSE;
     }
     free(res);

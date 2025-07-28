@@ -349,6 +349,7 @@ let draw_bdds draw_neg bool_list = defix draw_bdds draw_neg bool_list;
 // Note: The output of cmd will go to 'stdout' (whatever that may be).
 //       To capture the output of cmd, use: fopen (with "|r" mode) or exec.
 let system cmd = defix system cmd;
+non_lazy system;
 
 // Send the list of statement in pgm to the remote tcl process.
 // Return the result of the last statement.
@@ -481,7 +482,7 @@ let == a b = defix == a b;
 // Determine if 'a' is not identical to 'b'.
 // For all data types except bool, '!=' and '!==' are the same.
 // However, for bools (BDDS) '!==' returns T iff 'a' and 'b' are not identical,
-// and '!=' returns the condition under which 'a' is the different from 'b'.
+// and '!=' returns the condition under which 'a' is different from 'b'.
 let !== a b = NOT (a == b);
 infix 0 !==;
 
@@ -1817,25 +1818,67 @@ let tbl2keys tbl = (defix tbl2keys) tbl;
 // Return a list of all the data-items in the table tbl.
 let tbl2data tbl = (defix tbl2data) tbl;
 
+// Given a name of a color, return its rgb encoding.
+let color2rgb color = (defix color2rgb) color;
+
+// Given an RGB color tripple, return the corresponding HSV tripple
+let rgb2hsv rgb = (defix rgb2hsv) rgb;
+
 // Read an .xpm image file and return the image object.
 let import_xpm_image file = (defix import_xpm_image) file;
+
+// Read an .ppm image file and return the image object.
+let import_ppm_image file = (defix import_ppm_image) file;
+
+// Crop an image
+let image_crop im min_row max_row min_col max_col =
+    (defix image_crop) im min_row max_row min_col max_col;
 
 // Return the image that results by applying the HSV filter
 // determined by the hue range 'h_range', saturation range 's_range' and
 // brightness range 'v_range'. 
+//
+// h_range should be a subset of [-360,360]
+// s_range should be a subset of [0,100]
+// v_range should be a subset of [0,100]
+//
 // Rather than a black and white resulting image, a black and res_color
 // image is returned.
 let hsv_filter image h_range s_range v_range res_color =
     (defix hsv_filter) image h_range s_range v_range res_color ;
 
+// Return a new imgae formed by replacing all colors in the pixels
+// given in the change-list chl.
+// The change-list consists of ((x,y),(R,G,B)) tuples where
+// x and y are the coordinates of the pixel to be replaced and
+// RGB is the new color of the pixel.
+//let update_image im chl = (defix update_image) im chl;
+
 // Write out image to file in the .ppm format.
 let export_to_ppm image file = (defix export_to_ppm) image file;
 
-// Return the size of image.
+// Return the size of image as a (rows,cols) pair.
 let image_size image = (defix image_size) image;
 
 // Return a pair (valid,(r,g,b)) for the color values a the pixel at (row,col).
 let image_get_pixel image row col = (defix image_get_pixel) image row col ;
+
+// Convert a black-and-white image to a BDD in which the
+// ridx and cidx bvs serve as row and column indices. 
+// Noramally, ridx and cidx are created by the bv_uvector command
+// with sufficient number of bits to allow all elements in the
+// image to be selected.
+let image2symbolic_bitmap image ridx cidx =
+	    (defix  image2symbolic_bitmap) image ridx cidx;
+
+// Convert an image to a bv in which the ridx and cidx bvs serve as
+// row and column indices. 
+// Noramally, ridx and cidx are created by the bv_uvector command
+// with sufficient number of bits to allow all elements in the
+// image to be selected.
+let image2bv image ridx cidx =
+	    (defix  image2bv) image ridx cidx;
+
 
 //// Return the pexlif obtained by grouping the instances in ids and
 //// given the resulting instance the name 'name'.

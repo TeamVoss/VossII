@@ -2445,3 +2445,9 @@ add_open_overload THEN sTHEN;
 
 if_then_else_binder THEN ELSE;
 
+let fl_color2rgbhsv color =
+    val (r,g,b) = sscanf "#%02x%02x%02x" color in
+    val (h,s,v) = rgb2hsv (r,g,b) in
+    [r,g,b,h,s,v]
+;
+export_to_tcl fl_color2rgbhsv;

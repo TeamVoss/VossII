@@ -3,6 +3,7 @@
 let     [a-zA-Z\_]
 bindig  [0-1]
 dig     [0-9]
+octdig  [0-7]
 hexdig  [0-9a-fA-F]
 white	[\ \t]
 nowhite	[a-zA-Z0-9'\_]
@@ -492,6 +493,11 @@ defix\ [\ \t]*{symbol}({symbol})* {
 "0x"{hexdig}({hexdig})*	{
 			    lvalp->str_t = wastrsave(stringsp, &(yytext[2]));
 			    RETURN(HEX_NUMBER, "_HEX_NUMBER");
+			}
+
+"0o"{octdig}({octdig})*	{
+			    lvalp->str_t = wastrsave(stringsp, &(yytext[2]));
+			    RETURN(OCT_NUMBER, "_OCT_NUMBER");
 			}
 
 {dig}*\.{dig}{dig}*(e[\-\+]?{dig}{dig}*)?    {

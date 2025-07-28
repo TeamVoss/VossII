@@ -29,9 +29,36 @@ static char	    bv_str_buf[4096];
 static g_ptr	    Zero;
 static g_ptr	    One;
 
+/* ----- Forward definitions local functions ----- */
+static int	    sx2(g_ptr *lp1, g_ptr *lp2);
+static g_ptr	    trim_bv(g_ptr l);
+
 /********************************************************/
 /*                    LOCAL FUNCTIONS    		*/
 /********************************************************/
+
+static g_ptr
+ite_bv_list(formula cond, g_ptr l1, g_ptr l2)
+{
+    sx2(&l1, &l2);
+    PUSH_BDD_GC(cond);
+    g_ptr res = Make_NIL();
+    PUSH_GLOBAL_GC(l1);
+    PUSH_GLOBAL_GC(l2);
+    PUSH_GLOBAL_GC(res);
+    g_ptr tail = res;
+    g_ptr n1, n2;
+    for(n1=l1, n2=l2; !IS_NIL(n1); n1=GET_CONS_TL(n1), n2=GET_CONS_TL(n2)) {
+	formula nb = GET_BOOL(GET_CONS_HD(n1));
+	formula pb = GET_BOOL(GET_CONS_HD(n2));
+	formula b = B_Or(B_And(cond, nb), B_And(B_Not(cond), pb));
+	APPEND1(tail, Make_BOOL_leaf(b));
+	if( Do_gc_asap ) Garbage_collect();
+    }
+    POP_BDD_GC(1);
+    POP_GLOBAL_GC(3);
+    return( trim_bv(res) );
+}
 
 static g_ptr
 trim_bv(g_ptr l)
@@ -428,34 +455,13 @@ decrement_bv_list(g_ptr l)
 }
 
 static g_ptr
-ite_bv_list(formula cond, g_ptr l1, g_ptr l2)
-{
-    sx2(&l1, &l2);
-    g_ptr res = Make_NIL();
-    PUSH_GLOBAL_GC(l1);
-    PUSH_GLOBAL_GC(l2);
-    PUSH_GLOBAL_GC(res);
-    g_ptr tail = res;
-    g_ptr n1, n2;
-    for(n1=l1, n2=l2; !IS_NIL(n1); n1=GET_CONS_TL(n1), n2=GET_CONS_TL(n2)) {
-	formula nb = GET_BOOL(GET_CONS_HD(n1));
-	formula pb = GET_BOOL(GET_CONS_HD(n2));
-	formula b = B_Or(B_And(cond, nb), B_And(B_Not(cond), pb));
-	APPEND1(tail, Make_BOOL_leaf(b));
-	if( Do_gc_asap ) Garbage_collect();
-    }
-    POP_GLOBAL_GC(3);
-    return( trim_bv(res) );
-}
-
-static g_ptr
 abs_bv_list(g_ptr l)
 {
     PUSH_GLOBAL_GC(l);
     formula neg = GET_BOOL(GET_CONS_HD(l));
     g_ptr l_neg = negate_bv_list(l);
     PUSH_GLOBAL_GC(l_neg);
-    g_ptr res = trim_bv(ite_bv_list(neg, l_neg, l));
+    g_ptr res = ite_bv_list(neg, l_neg, l);
     PUSH_GLOBAL_GC(res);
     if( Do_gc_asap ) Garbage_collect();
     POP_GLOBAL_GC(3);
@@ -686,7 +692,7 @@ fixed_ext_bvdiv(g_ptr av, g_ptr bv, g_ptr *Qp, g_ptr *Rp)
 /********************************************************/
 
 static void
-bv_construct(g_ptr redex)
+list2bv(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
@@ -698,7 +704,7 @@ bv_construct(g_ptr redex)
 }
 
 static void
-bv_destruct(g_ptr redex)
+bv2list(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
@@ -793,43 +799,13 @@ bv2int(g_ptr redex)
 }
 
 static void
-int2bv(g_ptr redex)
+do_int2bv(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr arg1 = GET_APPLY_RIGHT(redex);
     arbi_T ai = GET_AINT(arg1);
-    string s;
-    bool is_neg;
-    if( Arbi_IsNegative(ai) ) {
-	is_neg = TRUE;
-	s = Arbi_ToString(Arbi_neg(ai), 2);
-	string p = rindex(s, '1');
-	p--;
-	while( p >= s ) {
-	    if( *p == '1' ) {
-		*p = '0';
-	    } else {
-		ASSERT( *p == '0' );
-		*p = '1';
-	    }
-	    p--;
-	}
-    } else {
-	is_neg = FALSE;
-	s = Arbi_ToString(ai, 2);
-    }
-    g_ptr res = Make_NIL();
-    g_ptr tail = res;
-    APPEND1(tail, (is_neg? One : Zero));
-    while( *s ) {
-	if( *s == '1' ) {
-	    APPEND1(tail, One);
-	} else {
-	    APPEND1(tail, Zero);
-	}
-	s++;
-    }
+    g_ptr res = Aint2bv(ai);
     MAKE_REDEX_EXT_OBJ(redex, bv_oidx, get_bv_rec(res));
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -1262,11 +1238,11 @@ Bv_Install_Functions()
 
     Add_ExtAPI_Function("list2bv", "1", FALSE,
 			GLmake_arrow(GLmake_list(GLmake_bool()), bv_handle_tp),
-			bv_construct);
+			list2bv);
 
     Add_ExtAPI_Function("bv2list", "1", FALSE,
 			GLmake_arrow(bv_handle_tp, GLmake_list(GLmake_bool())),
-			bv_destruct);
+			bv2list);
 
     Add_ExtAPI_Function("bv_size", "1", FALSE,
 			GLmake_arrow(bv_handle_tp, GLmake_int()),
@@ -1274,7 +1250,7 @@ Bv_Install_Functions()
 
     Add_ExtAPI_Function("int2bv", "1", FALSE,
 			GLmake_arrow(GLmake_int(), bv_handle_tp),
-			int2bv);
+			do_int2bv);
 
     Add_ExtAPI_Function("bv2int", "1", FALSE,
 			GLmake_arrow(bv_handle_tp, GLmake_int()),
@@ -1374,3 +1350,58 @@ Bv_Install_Functions()
 
 }
 
+g_ptr
+Ite_bv_list(formula cond, g_ptr l1, g_ptr l2)
+{
+    return( ite_bv_list(cond, l1, l2) );
+}
+
+g_ptr
+Bv_get_list(bv_ptr bp)
+{
+    return( bp->u.l );
+}
+
+void
+MAKE_REDEX_BV(g_ptr redex, g_ptr list)
+{
+    INC_REFCNT(list);
+    MAKE_REDEX_EXT_OBJ(redex, bv_oidx, get_bv_rec(list));
+}
+
+g_ptr
+Aint2bv(arbi_T ai)
+{
+    string s;
+    bool is_neg;
+    if( Arbi_IsNegative(ai) ) {
+	is_neg = TRUE;
+	s = Arbi_ToString(Arbi_neg(ai), 2);
+	string p = rindex(s, '1');
+	p--;
+	while( p >= s ) {
+	    if( *p == '1' ) {
+		*p = '0';
+	    } else {
+		ASSERT( *p == '0' );
+		*p = '1';
+	    }
+	    p--;
+	}
+    } else {
+	is_neg = FALSE;
+	s = Arbi_ToString(ai, 2);
+    }
+    g_ptr res = Make_NIL();
+    g_ptr tail = res;
+    APPEND1(tail, (is_neg? One : Zero));
+    while( *s ) {
+	if( *s == '1' ) {
+	    APPEND1(tail, One);
+	} else {
+	    APPEND1(tail, Zero);
+	}
+	s++;
+    }
+    return res;
+}

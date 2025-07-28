@@ -429,6 +429,93 @@ proc draw_bdd_profile {vws} {
     $w.c configure -scrollregion [$w.c bbox all]
 }
 
+set ::img_color_display_cnt 0
+
+proc img:display_color {row col color} {
+    incr ::img_color_display_cnt
+    set w .color_$::img_color_display_cnt
+    toplevel $w
+    val {r g b h s v} [fl_color2rgbhsv $color]
+    label $w.l -text "Row $row and Column $col:"
+    frame $w.cols -relief flat
+    frame $w.cols.rgb -relief flat
+    frame $w.cols.hsv -relief flat
+    label $w.cols.rgb.lR -text "R: $r"
+    label $w.cols.rgb.lG -text "G: $g"
+    label $w.cols.rgb.lB -text "B: $b"
+    label $w.cols.hsv.lH -text "H: $h"
+    label $w.cols.hsv.lS -text "S: $s"
+    label $w.cols.hsv.lV -text "V: $v"
+    button $w.b -text Ok -command [list destroy $w]
+    pack $w.l -side top -fill x -expand yes
+    pack $w.cols -side top -fill x -expand yes
+    pack $w.b -side top -fill x -expand yes
+    pack $w.cols.rgb -side left -fill both -expand yes
+    pack $w.cols.hsv -side right -fill both -expand yes
+    pack $w.cols.rgb.lR -side top -fill x -expand yes
+    pack $w.cols.rgb.lG -side top -fill x -expand yes
+    pack $w.cols.rgb.lB -side top -fill x -expand yes
+    pack $w.cols.hsv.lH -side top -fill x -expand yes
+    pack $w.cols.hsv.lS -side top -fill x -expand yes
+    pack $w.cols.hsv.lV -side top -fill x -expand yes
+}
+
+
+proc display_image {name rows cols ll} {
+    incr ::img_displays
+    set w .img$::img_displays
+    catch {destroy $w}
+    toplevel $w
+    set c $w.c
+
+    set scale [expr min(1,(round(900.0/(max($rows,$cols)))))]
+
+    scrollbar $w.yscroll -command "$c yview"
+    scrollbar $w.xscroll -orient horizontal -command "$c xview"
+    canvas $c -background black \
+	    -yscrollcommand "$w.yscroll set" \
+	    -xscrollcommand "$w.xscroll set" \
+	    -width [expr $cols*$scale+10] -height [expr $rows*$scale+10]
+    pack $w.yscroll -side right -fill y
+    pack $w.xscroll -side bottom -fill x
+    pack $c -side top -fill both -expand yes
+
+    bind $c <2> "%W scan mark %x %y"
+    bind $c <B2-Motion> "%W scan dragto %x %y"
+
+    # Zoom bindings
+    bind $c <ButtonPress-3> "zoom_lock %W %x %y"
+    bind $c <B3-Motion> "zoom_move %W %x %y"
+    bind $c <ButtonRelease-3> "zoom_execute %W %x %y %X %Y {}"
+
+    # Mouse-wheel bindings for zooming in/out
+    bind $c <Button-4> "zoom_out $c 1.1 %x %y"
+    bind $c <Button-5> "zoom_out $c [expr {1.0/1.1}] %x %y"
+
+    set ::cur_zoom_factor($w) 100.0
+    set ::cur_zoom_factor($c) 100.0
+
+    set ri 0
+    foreach row $ll {
+	set ci 0
+	foreach col $row {
+	    incr ci
+	    set x1 [expr $ci*$scale]
+	    set y1 [expr $ri*$scale]
+	    set x2 [expr ($ci+1)*$scale]
+	    set y2 [expr ($ri+1)*$scale]
+	    set b [$c create rectangle $x1 $y1 $x2 $y2 -fill $col -outline $col]
+	    $c bind $b <ButtonPress-1> [list img:display_color $ri $ci $col]
+	}
+	incr ri;
+    }
+    update
+    $w.c configure -scrollregion [$w.c bbox all]
+    bind $w.c <KeyPress-q> "destroy $w"
+    focus $w.c
+    return $w
+}
+
 proc display_dot {dot_pgm {w ""} {close_fun ""} {logfile ""}} {
     if { $w == "" } {
 	incr ::dot_displays

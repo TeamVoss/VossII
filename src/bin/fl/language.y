@@ -306,7 +306,7 @@ extern int dbg_tst_line_cnt;
 
 %token		BEGIN_QUOTE END_QUOTE UNQUOTE
 
-%token <str_t>	DEC_NUMBER BIN_NUMBER HEX_NUMBER FLOAT_NUMBER
+%token <str_t>	DEC_NUMBER BIN_NUMBER HEX_NUMBER OCT_NUMBER FLOAT_NUMBER
 %token <str_t>	VART STRINGT
 %token <str_t>	POSTFIX_VAR BINDER_VAR BINDER_WITH_ACC_VAR
 %token <str_t>	SZ_BINDER_WITH_ACC_VAR
@@ -1580,7 +1580,7 @@ expr1		: LBRACK expr_list RBRACK
 		| BEGIN_QUOTE expr END_QUOTE
 		{
 		    g_ptr term = Reflect_expr($2);
-		    TypeHint(term, Get_Type("term", NULL, FALSE));
+		    TypeHint(term, Get_Type("term", NULL, TP_DONT_INSERT));
 		    $$ = term;
 		}
 		| expr2
@@ -1648,6 +1648,10 @@ expr2		: VART
 		{
 		    $$ = Make_AINT_leaf(Arbi_FromString($1,16));
 		}
+		| OCT_NUMBER
+		{
+		    $$ = Make_AINT_leaf(Arbi_FromString($1,8));
+		}
 		| DEC_NUMBER
 		{
 		    $$ = Make_AINT_leaf(Arbi_FromString($1,10));
@@ -1699,6 +1703,13 @@ expr2		: VART
 		| FREE_BINDER_VAR HEX_NUMBER
 		{
 		    string tmp = strtemp("0x");
+		    tmp = strappend($2);
+		    tmp = wastrsave(stringsp, tmp);
+		    $$ = Make_APPL_ND(Make_VAR_leaf($1), Make_STRING_leaf(tmp));
+		}
+		| FREE_BINDER_VAR OCT_NUMBER
+		{
+		    string tmp = strtemp("0o");
 		    tmp = strappend($2);
 		    tmp = wastrsave(stringsp, tmp);
 		    $$ = Make_APPL_ND(Make_VAR_leaf($1), Make_STRING_leaf(tmp));

@@ -44,9 +44,9 @@ typedef struct image_rec {
 } image_rec;
 
 #define GET_PIXEL(im,x,y)						    \
-		    (color_ptr) M_LOCATE_BUF(&(im->cbuf),(y*im->cols)+x)
+		    (color_ptr) M_LOCATE_BUF(&(im->cbuf),((y)*im->cols)+(x))
 #define SET_PIXEL(im,x,y,cp)						    \
-		    store_buf(&(im->cbuf),(y*im->cols)+x, cp)
+		    store_buf(&(im->cbuf),((y)*im->cols)+(x), cp)
 
 #endif /* IMAGE_H */
 #endif /* EXPORT_FORWARD_DECL */
