@@ -13,6 +13,7 @@
 /* --- Forward declarations that need to be exported to earlier .h files --- */
 
 /* ----- Function prototypes for public functions ----- */
+g_ptr	    Str2float(string s);
 void	    Float_Init();
 void	    Float_Install_Functions();
 

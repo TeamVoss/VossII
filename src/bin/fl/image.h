@@ -48,5 +48,11 @@ typedef struct image_rec {
 #define SET_PIXEL(im,x,y,cp)						    \
 		    store_buf(&(im->cbuf),((y)*im->cols)+(x), cp)
 
+typedef struct ppm_color {
+    uchar	r;
+    uchar	g;
+    uchar	b;
+} ppm_color;
+
 #endif /* IMAGE_H */
 #endif /* EXPORT_FORWARD_DECL */

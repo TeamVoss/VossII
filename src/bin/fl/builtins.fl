@@ -1818,6 +1818,12 @@ let tbl2keys tbl = (defix tbl2keys) tbl;
 // Return a list of all the data-items in the table tbl.
 let tbl2data tbl = (defix tbl2data) tbl;
 
+// Return all named colors in the system
+// To gets its RGB values, see color2rgb
+let colors = 
+    qsort strcmp (defix colors)
+;
+
 // Given a name of a color, return its rgb encoding.
 let color2rgb color = (defix color2rgb) color;
 
@@ -1846,6 +1852,28 @@ let image_crop im min_row max_row min_col max_col =
 // image is returned.
 let hsv_filter image h_range s_range v_range res_color =
     (defix hsv_filter) image h_range s_range v_range res_color ;
+
+
+// Return the image that results by applying the RGB filter
+// determined by the red range 'r_range', green range 'g_range' and
+// blue range 'b_range'. 
+//
+// ALl the ranges should be within [0,255]
+//
+// Rather than a black and white resulting image, a black and res_color
+// image is returned.
+let rgb_filter image r_range g_range b_range res_color =
+    (defix rgb_filter) image r_range g_range b_range res_color;
+
+// A simplistic denoising transformation for images.
+// Given a black-and-white image, the function will count all the
+// white pixels around a white pixel and turn the white pixel black
+// unless threshold other pixels are also white
+// For a pixel (x,y), all the pixels in the rectangle defined by
+// (x-width,y-height) and (x+width, y+height) are considered.
+// Pixels outside the image are treated as black.
+let image_denoise image width height threshold =
+    (defix image_denoise) image width height threshold;
 
 // Return a new imgae formed by replacing all colors in the pixels
 // given in the change-list chl.

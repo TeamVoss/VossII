@@ -349,6 +349,16 @@ float_sha256_fn(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha, pointer a)
 /*                    PUBLIC FUNCTIONS    		*/
 /********************************************************/
 
+g_ptr
+Str2float(string s)
+{
+    double d;
+    if( sscanf(s, "%lf", &d) != 1 ) { return( NULL ); }
+    g_ptr nd = Get_node();
+    MAKE_REDEX_EXT_OBJ(nd, float_oidx, get_float_rec(d));
+    return nd;
+}
+
 void
 Float_Init()
 {

@@ -35,6 +35,7 @@ static rec_mgr	    	color_rec_mgr;
 static rec_mgr	    	image_rec_mgr;
 
 /* ----- Forward definitions local functions ----- */
+static void	 export_to_ppm(FILE *fp, image_ptr ip);
 static string	 get_non_comment_line(FILE *fp);
 static void      mark_image_fn(pointer p);
 static void      sweep_image_fn(void);
@@ -79,45 +80,6 @@ Image_Init()
 /********************************************************/
 
 static void
-display_image(g_ptr redex)
-{
-    g_ptr g_image, g_name;
-    EXTRACT_2_ARGS(redex, g_name, g_image);
-    string name = GET_STRING(g_name);
-    image_ptr ip = (image_ptr) GET_EXT_OBJ(g_image);
-
-    FILE *fp;
-    string filename;
-    if( !Mk_output_file_in_tmp_dir("image_draw", &fp, &filename) ) {
-	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot create image_draw file."));
-        return;
-    }
-
-    string res = NULL;
-    fprintf(fp, "catch {unset _image_};\n");
-    for(int r = 0; r < ip->rows; r++) {
-	fprintf(fp, "lappend _image_ {\n");
-	for(int c = 0; c < ip->cols; c++) {
-	    color_ptr cp = GET_PIXEL(ip, c, r);
-	    fprintf(fp, " #%02x%02x%02x", cp->r, cp->g, cp->b);
-	}
-	fprintf(fp, "};\n");
-    }
-
-    fprintf(fp, "display_image {%s} %d %d $_image_;\n",name,ip->rows,ip->cols);
-    fprintf(fp, "catch {unset _image_};\n");
-    fclose(fp);
-
-    string tcl_cmd = tprintf("source %s;\n", filename);
-    if( !Send_to_tcl(tcl_cmd, &res) ) {
-	MAKE_REDEX_FAILURE(redex, Fail_pr("Tcl command failed: %s", tcl_cmd));
-        return;
-    }
-    MAKE_REDEX_VOID(redex);
-    return;
-}
-
-static void
 color2rgb(g_ptr redex)
 {
     g_ptr gcolor;
@@ -158,22 +120,25 @@ do_hsv2rgb(g_ptr redex)
     g_ptr hsv;
     EXTRACT_1_ARG(redex, hsv);
     int Hi = GET_INT(GET_FST(hsv));
+    if( Hi < 0 ) {
+	Hi += 360;
+    }
     int Si = GET_INT(GET_FST(GET_SND(hsv)));
     int Vi = GET_INT(GET_SND(GET_SND(hsv)));
-    double  H, S, V, h, s, v, i, f, p, q, t, r, g, b;
-    int R, G, B;
+    double  H, S, V, h, s, v, f, p, q, t, r, g, b;
+    int R, G, B, i;
     H = (double) Hi;
     S = (double) Si;
     V = (double) Vi;
     h = H/360.0;
     s = S/100.0;
     v = V/100.0;
-    i = floor(h * 6.0);
+    i = (int) floor(h * 6.0);
     f = h*6.0-i;
     p = v * (1.0 - s);
     q = v * (1.0 - f * s);
     t = v * (1 - (1 - f) * s);
-    switch( ((int) i) % 6) {
+    switch( i % 6 ) {
 	case 0: { r = v; g = t; b = p; break; }
 	case 1: { r = q; g = v; b = p; break; }
 	case 2: { r = p; g = v; b = t; break; }
@@ -386,42 +351,20 @@ image_get_pixel(g_ptr redex)
     return;
 }
 
-typedef struct ppm_color {
-    uchar	r;
-    uchar	g;
-    uchar	b;
-} ppm_color;
-
 static void
-export_to_ppm(g_ptr redex)
+do_export_to_ppm(g_ptr redex)
 {
     g_ptr g_image, g_file;
     EXTRACT_2_ARGS(redex, g_image, g_file);
-    string file = GET_STRING(g_file);
     image_ptr ip = (image_ptr) GET_EXT_OBJ(g_image);
+    string file = GET_STRING(g_file);
     FILE *fp = fopen(file, "w");
     if( fp == NULL ) {
 	MAKE_REDEX_FAILURE(redex,
 			   Fail_pr("Cannot open file %s for writing", file));
 	return;
     }
-    fprintf(fp, "P6\n%d %d\n255\n", ip->cols, ip->rows);
-    for(int r = 0; r < ip->rows; r++) {
-	for(int c = 0; c < ip->cols; c++) {
-	    color_ptr cp = GET_PIXEL(ip, c, r);
-	    ppm_color pmc;
-	    if( cp->valid ) {
-		pmc.r = cp->r;
-		pmc.g = cp->g;
-		pmc.b = cp->b;
-	    } else {
-		pmc.r = 0;
-		pmc.g = 0;
-		pmc.b = 0;
-	    }
-	    fwrite(&pmc, sizeof(ppm_color), 1, fp);
-	}
-    }
+    export_to_ppm(fp, ip);
     fclose(fp);
     MAKE_REDEX_VOID(redex);
 }
@@ -437,9 +380,7 @@ hsv_filter(g_ptr redex)
     int min_h = GET_INT(GET_CONS_HD(h_range));
     int max_h = GET_INT(GET_CONS_TL(h_range));
     if( max_h < min_h ) {
-	string msg = Fail_pr("H_max(%d) < H_min(%d) in hsv_filter",max_h,min_h);
-	MAKE_REDEX_FAILURE(redex,msg);
-	return;
+	min_h -= 360;
     }
     if( max_h < 0 ) {
 	string msg = Fail_pr("hsv_filter: H_max(%d) should be >= 0\n", max_h);
@@ -560,35 +501,6 @@ check_range(g_ptr redex, string name, int min_v, int max_v,
 }
 
 static void
-image_crop(g_ptr redex)
-{
-    g_ptr g_image, g_min_r, g_max_r, g_min_c, g_max_c;;
-    EXTRACT_5_ARGS(redex, g_image, g_min_r, g_max_r, g_min_c, g_max_c);
-    int min_r = GET_INT(g_min_r);
-    int max_r = GET_INT(g_max_r);
-    int min_c = GET_INT(g_min_c);
-    int max_c = GET_INT(g_max_c);
-    image_ptr ip = (image_ptr) GET_EXT_OBJ(g_image);
-    if( min_r < 0 || max_r > ip->rows ) {
-	MAKE_REDEX_FAILURE(redex, Fail_pr("Row range out of bounds!"));
-	return;
-    }
-    if( min_c < 0 || max_c > ip->cols ) {
-	MAKE_REDEX_FAILURE(redex, Fail_pr("Column range out of bounds!"));
-	return;
-    }
-    image_ptr nip = create_image(ip->name, max_r-min_r+1, max_c-min_c+1);
-    for(int r = min_r; r <= max_r; r++) {
-	for(int c = min_c; c <= max_c; c++) {
-	    color_ptr cp = GET_PIXEL(ip, c, r);
-	    color_ptr ncp = GET_PIXEL(nip, c-min_c, r-min_r);
-	    *ncp = *cp;
-	}
-    }
-    MAKE_REDEX_EXT_OBJ(redex, image_oidx, nip);
-}
-
-static void
 rgb_filter(g_ptr redex)
 {
     g_ptr g_image, r_range, g_range, b_range, res_color;
@@ -640,6 +552,141 @@ rgb_filter(g_ptr redex)
 		ncp->g = res_g;
 		ncp->b = res_b;
 	    }
+	}
+    }
+    MAKE_REDEX_EXT_OBJ(redex, image_oidx, nip);
+}
+
+static int
+limit_color_range(double f)
+{
+    int i = (int) round(f);
+    if( i < 0 ) { return 0; }
+    else if (i > 255) { return 255; }
+    return i;
+}
+
+static void
+image_change_contrast(g_ptr redex)
+{
+    g_ptr g_image, g_rcontrast, g_gcontrast, g_bcontrast;
+    EXTRACT_4_ARGS(redex, g_image, g_rcontrast, g_gcontrast, g_bcontrast);
+    int rcontrast  = GET_INT(g_rcontrast);
+    int gcontrast  = GET_INT(g_gcontrast);
+    int bcontrast  = GET_INT(g_bcontrast);
+    if( (rcontrast == 100) && (gcontrast == 100) && (bcontrast == 100) ) {
+	OVERWRITE(redex, g_image);
+	return;
+    }
+    //
+    // And perform the filter function
+    //
+    double ralpha = ((double) rcontrast)/100.0;
+    double galpha = ((double) gcontrast)/100.0;
+    double balpha = ((double) bcontrast)/100.0;
+    image_ptr ip = (image_ptr) GET_EXT_OBJ(g_image);
+    image_ptr nip = create_image(ip->name, ip->rows, ip->cols);
+    for(int r = 0; r < ip->rows; r++) {
+	for(int c = 0; c < ip->cols; c++) {
+	    color_ptr cp = GET_PIXEL(ip, c, r);
+	    color_ptr ncp = GET_PIXEL(nip, c, r);
+	    ncp->valid = cp->valid;
+	    ncp->r = limit_color_range(((double) (cp->r))*ralpha);
+	    ncp->g = limit_color_range(((double) (cp->g))*galpha);
+	    ncp->b = limit_color_range(((double) (cp->b))*balpha);
+	}
+    }
+    MAKE_REDEX_EXT_OBJ(redex, image_oidx, nip);
+}
+
+#define IS_BLACK(c) (!(c)->valid || (((c)->r==0)&&((c)->g==0)&&((c)->b==0)))
+#define IS_WHITE(c) ((c)->valid && ((c)->r==255)&&((c)->g==255)&&((c)->b==255))
+
+static void
+image_denoise(g_ptr redex)
+{
+    g_ptr g_image, g_width, g_height, g_threshold;
+    EXTRACT_4_ARGS(redex, g_image, g_width, g_height, g_threshold);
+    int width     = GET_INT(g_width);
+    int height    = GET_INT(g_height);
+    int threshold = GET_INT(g_threshold);
+    if( width == 0 && height == 0 ) {
+	OVERWRITE(redex, g_image);
+	return;
+    }
+    //
+    // And perform the filter function
+    //
+    image_ptr ip = (image_ptr) GET_EXT_OBJ(g_image);
+    image_ptr nip = create_image(ip->name, ip->rows, ip->cols);
+    for(int r = 0; r < ip->rows; r++) {
+	for(int c = 0; c < ip->cols; c++) {
+	    // Simplistic algorithm.
+	    // A sweep-line approach would be a lot faster...
+	    color_ptr cp = GET_PIXEL(ip, c, r);
+	    color_ptr ncp = GET_PIXEL(nip, c, r);
+	    ncp->valid = cp->valid;
+	    ncp->r = 0;
+	    ncp->g = 0;
+	    ncp->b = 0;
+	    if( !cp->valid ) { continue; }
+	    if( !IS_BLACK(cp) && !IS_WHITE(cp) ) {
+		MAKE_REDEX_FAILURE(redex,
+		   Fail_pr(
+		   "image not black/white at row %d and col %d (#%02x%02x%02x)",
+		   r, c, cp->r, cp->g, cp->b));
+		return;
+	    }
+	    int cnt = 0;
+	    for(int deltax = -1*width; deltax <= width; deltax++) {
+		for(int deltay = -1*height; deltay <= height; deltay++) {
+		    int rx = c+deltax;
+		    int ry = r+deltay;
+		    // Pixels outside the image are treated as black
+		    if( rx < 0 || rx >= ip->cols || ry < 0 || ry >= ip->rows ) {
+			continue;
+		    }
+		    color_ptr lcp = GET_PIXEL(ip, rx, ry);
+		    if( IS_WHITE(lcp) ) { cnt++; }
+		}
+	    }
+fprintf(stderr, "%d %d --> %d\n", r, c, cnt);
+	    if( cnt >= threshold ) {
+		ncp->valid = 255;
+		ncp->r = 255;
+		ncp->g = 255;
+		ncp->b = 255;
+	    }
+	}
+    }
+    MAKE_REDEX_EXT_OBJ(redex, image_oidx, nip);
+}
+
+
+static void
+image_crop(g_ptr redex)
+{
+    g_ptr g_image, g_min_r, g_max_r, g_min_c, g_max_c;;
+    EXTRACT_5_ARGS(redex, g_image, g_min_r, g_max_r, g_min_c, g_max_c);
+    int min_r = GET_INT(g_min_r);
+    int max_r = GET_INT(g_max_r);
+    int min_c = GET_INT(g_min_c);
+    int max_c = GET_INT(g_max_c);
+    image_ptr ip = (image_ptr) GET_EXT_OBJ(g_image);
+    if( min_r < 0 || max_r > ip->rows ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Row range out of bounds!"));
+	return;
+    }
+    if( min_c < 0 || max_c > ip->cols ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Column range out of bounds!"));
+	return;
+    }
+    image_ptr nip = create_image(ip->name, max_r-min_r+1, max_c-min_c+1);
+    for(int r = min_r; r < max_r; r++) {
+	for(int c = min_c; c < max_c; c++) {
+	    color_ptr cp = GET_PIXEL(ip, c, r);
+	    color_ptr ncp = GET_PIXEL(nip, c-min_c, r-min_r);
+	    *ncp = *cp;
 	}
     }
     MAKE_REDEX_EXT_OBJ(redex, image_oidx, nip);
@@ -815,16 +862,56 @@ image2symbolic_bitmap(g_ptr redex)
 }
 
 
+static g_ptr                color_scan_tail;
+
+static void
+color_scan_fn(pointer pkey, pointer pdata)
+{
+    string name = (string) pkey;
+    (void) pdata;
+    APPEND1(color_scan_tail, Make_STRING_leaf(wastrsave(stringsp, name)));
+}
+
+static void
+colors(g_ptr redex)
+{
+    MAKE_REDEX_NIL(redex);
+    color_scan_tail = redex;
+    scan_hash(&X11_colors, color_scan_fn);
+    return;
+}
+
 void
 Image_Install_Functions()
 {
     typeExp_ptr bv_type = Get_Type("bv", NULL, TP_DONT_INSERT);
 
-    Add_ExtAPI_Function("display_image", "11", FALSE,
+    
+    Add_ExtAPI_Function("colors", "", FALSE,
+			GLmake_list(GLmake_string()),
+			colors);
+
+    Add_ExtAPI_Function("image_change_contrast", "1111", FALSE,
 			GLmake_arrow(
-			  GLmake_string(),
-			  GLmake_arrow(image_handle_tp, GLmake_void())),
-			display_image);
+			  image_handle_tp,
+			  GLmake_arrow(
+			    GLmake_int(),
+			    GLmake_arrow(
+			      GLmake_int(),
+			      GLmake_arrow(GLmake_int(), image_handle_tp)))),
+			image_change_contrast);
+
+    Add_ExtAPI_Function("image_denoise", "1111", FALSE,
+			GLmake_arrow(
+			  image_handle_tp,
+			  GLmake_arrow(
+			    GLmake_int(),
+			    GLmake_arrow(
+			      GLmake_int(),
+			      GLmake_arrow(
+				GLmake_int(),
+			        image_handle_tp)))),
+			image_denoise);
 
     Add_ExtAPI_Function("image2symbolic_bitmap", "111", FALSE,
 			GLmake_arrow(
@@ -942,7 +1029,7 @@ Image_Install_Functions()
                         GLmake_arrow(
 			    image_handle_tp,
 			    GLmake_arrow(GLmake_string(), GLmake_void())),
-                        export_to_ppm);
+                        do_export_to_ppm);
 
     Add_ExtAPI_Function("image_size", "1", FALSE,
                         GLmake_arrow(
@@ -976,6 +1063,29 @@ Image_Install_Functions()
 /********************************************************/
 /*                    LOCAL FUNCTIONS    		*/
 /********************************************************/
+
+static void
+export_to_ppm(FILE *fp, image_ptr ip)
+{
+    fprintf(fp, "P6\n%d %d\n255\n", ip->cols, ip->rows);
+    for(int r = 0; r < ip->rows; r++) {
+	for(int c = 0; c < ip->cols; c++) {
+	    color_ptr cp = GET_PIXEL(ip, c, r);
+	    ppm_color pmc;
+	    if( cp->valid ) {
+		pmc.r = cp->r;
+		pmc.g = cp->g;
+		pmc.b = cp->b;
+	    } else {
+		pmc.r = 0;
+		pmc.g = 0;
+		pmc.b = 0;
+	    }
+	    fwrite(&pmc, sizeof(ppm_color), 1, fp);
+	}
+    }
+}
+
 
 static string
 get_non_comment_line(FILE *fp)

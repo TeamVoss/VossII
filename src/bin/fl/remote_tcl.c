@@ -476,6 +476,12 @@ tcl_to_g_ptr(string txt, typeExp_ptr type, g_ptr *resp)
             }
         default:
 	    {
+		if( Type_eq(type, Get_Type("float", NULL, TP_DONT_INSERT)) ) {
+		    g_ptr res = Str2float(txt);
+		    if( res == NULL ) { return FALSE; }
+		    *resp = res;
+		    return TRUE;
+		}
 		unint	obj_id;
 		if( sscanf(txt, "_FlObJeCt_%d", &obj_id) != 1 ) {
 		    Fail_pr("Not a valid object id (%s)", txt);

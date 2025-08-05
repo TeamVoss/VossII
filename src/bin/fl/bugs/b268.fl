@@ -1,10 +1,30 @@
 
-let im = import_ppm_image "/media/sf_SharedFolder/StreetSigns/German_Photos/FullIJCNN2013/00000.ppm";
+colors;
 
-image_crop im 100 300 200 400;
+let image =
+    "/media/sf_SharedFolder/StreetSigns/German_Photos/FullIJCNN2013/00003.ppm"
+;
+
+let im = import_ppm_image image;
+
+image_crop im 0 800 0 1360;
+
+let im = import_ppm_image "/media/sf_SharedFolder/StreetSigns/German_Photos/FullIJCNN2013/00003.ppm";
+
+let im' = hsv_filter im  (340,360) (15,100) (15,100) (color2rgb "white");
+im';
+
+let im'' = image_denoise im' 1 1 1;
+im'';
+
+//display_image "bitmap" im'';
 
 
-rgb2hsv (255,255,0);
+
+//display_image "First ppm image" im;
+
+
+//rgb2hsv (255,255,0);
 
 let ROWS = 960;
 let lgROWS = ubits_needed (ROWS-1);
@@ -24,9 +44,9 @@ let images = map (\s. import_xpm_image (IDIR^s)) [
                 "1277381949Image000018.xpm"
 ];
 
-//display_image "First image" (el 1 images);
+//display_image "First xpm image" (el 1 images);
 
-//display_image "Second image" (el 2 images);
+//display_image "Second xpm image" (el 2 images);
 
 
 let im1' = update_image (el 1 images) [];

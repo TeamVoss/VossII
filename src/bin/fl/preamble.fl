@@ -1740,6 +1740,21 @@ let draw_term e =
 ;
 end_abstype base_draw_term draw_term;
 
+// Display an image in a canvas.
+// If no canvas object is given, a new top-level window is created.
+let display_image image name->"image" canvas->"" =
+    let tdir = mktempd "image" then
+    let file = sprintf "%s/image.ppm" tdir in
+    val (rows, cols) = image_size image in
+    (export_to_ppm image file) fseq
+    let cmd = sprintf "im:display_image {%s} %d %d %s %s"
+		      name rows cols file canvas
+    then
+    let c = tcl_eval [cmd] then
+    (system (sprintf "/bin/rm -rf %s" tdir)) fseq
+    c
+;
+
 // Return a bitvector representing an unsigned vector defined by v.
 // If a signed variable is needed use bv_variable.
 let bv_uvariable v = bv_ZX (bv_variable v);
@@ -2451,3 +2466,13 @@ let fl_color2rgbhsv color =
     [r,g,b,h,s,v]
 ;
 export_to_tcl fl_color2rgbhsv;
+
+let fl_float2rat f scale->10 =
+    let tf = round ((int2float scale)*f) in
+    let common = gcd tf scale in
+    let num = tf/common in
+    let den = (scale/common) in
+    [num, den]
+;
+export_to_tcl fl_float2rat;
+

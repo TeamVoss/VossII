@@ -1,8 +1,8 @@
 set pagination off
+break fl_main
+r -f bugs/b268.fl
 break exit
 break abort
 break Dbg_stop
-break fl_main
-r -noX -f bugs/b268.fl
-break image_crop
+break colors
 c

@@ -431,10 +431,16 @@ proc draw_bdd_profile {vws} {
 
 set ::img_color_display_cnt 0
 
-proc img:display_color {row col color} {
+proc img:display_color {im c wx wy} {
     incr ::img_color_display_cnt
     set w .color_$::img_color_display_cnt
     toplevel $w
+
+    set col [expr round([$c canvasx $wx])]
+    set row [expr round([$c canvasy $wy])]
+    val {R G B} [$im get $col $row]
+    set color [format {#%02x%02x%02x} $R $G $B]
+
     val {r g b h s v} [fl_color2rgbhsv $color]
     label $w.l -text "Row $row and Column $col:"
     frame $w.cols -relief flat
@@ -458,15 +464,86 @@ proc img:display_color {row col color} {
     pack $w.cols.hsv.lH -side top -fill x -expand yes
     pack $w.cols.hsv.lS -side top -fill x -expand yes
     pack $w.cols.hsv.lV -side top -fill x -expand yes
+
+    bind $c <Destroy> +[list catch [list destroy $w]]
+}
+
+proc im:show_location {im c wx wy} {
+    set x [expr round([$c canvasx $wx])]
+    set y [expr round([$c canvasy $wy])]
+
+    WriteStdErr "wx:$wx wy:$wy x:$x y:$y\n"
+    WriteStdErr "    col: [$im get $x $y]\n"
 }
 
 
-proc display_image {name rows cols ll} {
+proc im:display_image {name rows cols filename {c ""}} {
+    
+    if { $c == "" } {
+	incr ::img_displays
+	set w .img$::img_displays
+	catch {destroy $w}
+	toplevel $w
+	wm title $w $name
+	set c $w.c
+
+	set scale [expr min(1,(round(900.0/(max($rows,$cols)))))]
+
+	scrollbar $w.yscroll -command "$c yview"
+	scrollbar $w.xscroll -orient horizontal -command "$c xview"
+	canvas $c -background black \
+		-yscrollcommand "$w.yscroll set" \
+		-xscrollcommand "$w.xscroll set" \
+		-width [expr $cols*$scale+10] -height [expr $rows*$scale+10]
+	pack $w.yscroll -side right -fill y
+	pack $w.xscroll -side bottom -fill x
+	pack $c -side top -fill both -expand yes
+
+	bind $c <2> "%W scan mark %x %y"
+	bind $c <B2-Motion> "%W scan dragto %x %y"
+
+	# Zoom bindings
+	bind $c <ButtonPress-3> "zoom_lock %W %x %y"
+	bind $c <B3-Motion> "zoom_move %W %x %y"
+	bind $c <ButtonRelease-3> "zoom_execute %W %x %y %X %Y {}"
+
+	# Mouse-wheel bindings for zooming in/out
+	bind $c <Button-4> "zoom_out $c 1.1 %x %y"
+	bind $c <Button-5> "zoom_out $c [expr {1.0/1.1}] %x %y"
+	  
+	set ::cur_zoom_factor($w) 100.0
+	set ::cur_zoom_factor($c) 100.0
+
+	bind $c <KeyPress-q> "destroy $w"
+
+    } else {
+	$c delete all
+	set ::cur_zoom_factor($c) 100.0
+    }
+
+    set im [image create photo -format ppm -file $filename]
+    set orig [image create photo ORIG_$im]
+    $orig copy $im -compositingrule set
+
+    $c create image 0 0 -image $im -anchor nw
+
+    bind $c <ButtonPress-1> "img:display_color $im %W %x %y"
+
+    update
+    $c configure -scrollregion [$c bbox all]
+    focus $c
+    return $c
+}
+
+
+proc OLD_display_image {name rows cols ll} {
     incr ::img_displays
     set w .img$::img_displays
     catch {destroy $w}
     toplevel $w
     set c $w.c
+
+puts stderr "display_image START....";
 
     set scale [expr min(1,(round(900.0/(max($rows,$cols)))))]
 
@@ -504,15 +581,22 @@ proc display_image {name rows cols ll} {
 	    set y1 [expr $ri*$scale]
 	    set x2 [expr ($ci+1)*$scale]
 	    set y2 [expr ($ri+1)*$scale]
-	    set b [$c create rectangle $x1 $y1 $x2 $y2 -fill $col -outline $col]
-	    $c bind $b <ButtonPress-1> [list img:display_color $ri $ci $col]
+	    $c create rectangle $x1 $y1 $x2 $y2 -fill $col \
+		-outline $col -tags "CoL$ri-$ci"
+;#	    set b [$c create rectangle $x1 $y1 $x2 $y2 -fill $col \
+;#		-outline $col -tags "CoL$ri-$ci"]
+#	    $c bind $b <ButtonPress-1> [list img:display_color $ri $ci $col]
 	}
+puts stderr "   row $ri";
 	incr ri;
     }
+puts stderr " Done creating boxes.";
     update
+puts stderr " Done update.";
     $w.c configure -scrollregion [$w.c bbox all]
     bind $w.c <KeyPress-q> "destroy $w"
     focus $w.c
+puts stderr "DONE.";
     return $w
 }
 
@@ -923,6 +1007,29 @@ proc set_text_font_according_to_zoom {c zoom_factor} {
     scale_text_objects $c "_IsVaLuE_" $new_ssize $sfont($c) $zoom_factor
 }
 
+proc my_scale_image {im scale} {
+    if { $scale == 1 } { return; }
+    val {num den} [fl_float2rat $scale 2]
+    set tmp [image create photo]
+    $tmp copy ORIG_$im -zoom $num $num -compositingrule set
+    $im blank
+    $im copy $tmp -shrink -subsample $den $den -compositingrule set
+    image delete $tmp
+}
+
+
+proc scale_all_images_on_canvas {c scale} {
+    foreach item [$c find all] {
+        if { [$c type $item] == "image" } {
+            set im [$c itemcget $item -image]
+            my_scale_image $im $scale
+        }
+    }
+    update
+    $c configure -scrollregion [$c bbox all]
+}
+
+
 proc set_zoom_factor {c zoom_factor {xc 0} {yc 0} {reset_scroll 1}} {
     global cur_zoom_factor
     global base_mfont mfont base_sfont sfont base_sc sc
@@ -943,6 +1050,7 @@ proc set_zoom_factor {c zoom_factor {xc 0} {yc 0} {reset_scroll 1}} {
     scale_text_objects $c "_IsTeXt_"  $new_msize $mfont($c) $zoom_factor
     scale_text_objects $c "_IsVaLuE_" $new_ssize $sfont($c) $zoom_factor
     $c scale all $xc $yc $scale $scale
+    scale_all_images_on_canvas $c [expr $zoom_factor/100.0]
     if { $reset_scroll == 1 } {
 	$c config -scrollregion [$c bbox all]
     }
