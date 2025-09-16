@@ -47,6 +47,17 @@ table_create(g_ptr redex)
 }
 
 static void
+table_size(g_ptr redex)
+{
+    g_ptr   g_tbl;
+    EXTRACT_1_ARG(redex, g_tbl);
+    table_ptr tp = (table_ptr) GET_EXT_OBJ(g_tbl);
+    int sz = hash_size(&(tp->tbl));
+    MAKE_REDEX_INT(redex, sz);
+    return;
+}
+
+static void
 table_member(g_ptr redex)
 {
     g_ptr   g_tbl, g_key;
@@ -382,6 +393,10 @@ Table_Install_Functions()
     Add_ExtAPI_Function("tbl_create", "1", TRUE,
 			GLmake_arrow(GLmake_int(), GLmake_tbl(tv1, tv2)),
 			table_create);
+
+    Add_ExtAPI_Function("table_size", "1", FALSE,
+			GLmake_arrow(GLmake_tbl(tv1, tv2), GLmake_int()),
+			table_size);
 
     Add_ExtAPI_Function("tbl_member", "11", FALSE,
 			GLmake_arrow(

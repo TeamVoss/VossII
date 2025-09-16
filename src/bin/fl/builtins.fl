@@ -1840,6 +1840,12 @@ let import_ppm_image file = (defix import_ppm_image) file;
 let image_crop im min_row max_row min_col max_col =
     (defix image_crop) im min_row max_row min_col max_col;
 
+// Return an image in which each RGB component has been
+// updated according to:  clamper(contrast/100*old + brightness)
+// where clamped ensures the final value is between 0 and 255.
+let image_change_contrast_and_brightness image contrast brightness =
+    (defix image_change_contrast_and_brightness) image contrast brightness;
+
 // Return the image that results by applying the HSV filter
 // determined by the hue range 'h_range', saturation range 's_range' and
 // brightness range 'v_range'. 

@@ -558,6 +558,65 @@ rgb_filter(g_ptr redex)
 }
 
 static int
+euclidian_distance(int r1, int g1, int b1, int r2, int g2, int b2) {
+    int dr = r1-r2;
+    int dg = g1-g2;
+    int db = b1-b2;
+    return( dr*dr + dg*dg + db*db );
+}
+
+static void
+color_distance_filter(g_ptr redex)
+{
+    g_ptr g_image, g_rgb, g_distance, res_color;
+    EXTRACT_4_ARGS(redex, g_image, g_rgb, g_distance, res_color);
+    //
+    // ----- Get and check ranges
+    //
+    int c_r = GET_INT(GET_FST(g_rgb));
+    int c_g = GET_INT(GET_FST(GET_SND(g_rgb)));
+    int c_b = GET_INT(GET_SND(GET_SND(g_rgb)));
+    int dist = GET_INT(g_distance);
+    if( !check_range(redex, "R", c_r, c_r, 0, 255) ) { return; }
+    if( !check_range(redex, "G", c_g, c_g, 0, 255) ) { return; }
+    if( !check_range(redex, "B", c_b, c_b, 0, 255) ) { return; }
+    //
+    // Get result color
+    //
+    int res_r = GET_INT(GET_CONS_HD(res_color));
+    int res_g = GET_INT(GET_CONS_HD(GET_CONS_TL(res_color)));
+    int res_b = GET_INT(GET_CONS_TL(GET_CONS_TL(res_color)));
+    //
+    // And perform the filter function
+    //
+    image_ptr ip = (image_ptr) GET_EXT_OBJ(g_image);
+    image_ptr nip = create_image(ip->name, ip->rows, ip->cols);
+    for(int r = 0; r < ip->rows; r++) {
+	for(int c = 0; c < ip->cols; c++) {
+	    color_ptr cp = GET_PIXEL(ip, c, r);
+	    color_ptr ncp = GET_PIXEL(nip, c, r);
+	    ncp->valid = FALSE;
+	    ncp->r = 0;
+	    ncp->g = 0;
+	    ncp->b = 0;
+	    if( cp->valid ) {
+		int r, g, b;
+		r = cp->r;
+		g = cp->g;
+		b = cp->b;
+		if( euclidian_distance(r,g,b, c_r, c_g, c_b) <= dist ) {
+		    ncp->valid = TRUE;
+		    ncp->r = res_r;
+		    ncp->g = res_g;
+		    ncp->b = res_b;
+		}
+	    }
+	}
+    }
+    MAKE_REDEX_EXT_OBJ(redex, image_oidx, nip);
+}
+
+static int
 limit_color_range(double f)
 {
     int i = (int) round(f);
@@ -567,23 +626,21 @@ limit_color_range(double f)
 }
 
 static void
-image_change_contrast(g_ptr redex)
+image_change_contrast_and_brightness(g_ptr redex)
 {
-    g_ptr g_image, g_rcontrast, g_gcontrast, g_bcontrast;
-    EXTRACT_4_ARGS(redex, g_image, g_rcontrast, g_gcontrast, g_bcontrast);
-    int rcontrast  = GET_INT(g_rcontrast);
-    int gcontrast  = GET_INT(g_gcontrast);
-    int bcontrast  = GET_INT(g_bcontrast);
-    if( (rcontrast == 100) && (gcontrast == 100) && (bcontrast == 100) ) {
+    g_ptr g_image, g_contrast, g_brightness;
+    EXTRACT_3_ARGS(redex, g_image, g_contrast, g_brightness);
+    int contrast   = GET_INT(g_contrast);
+    int brightness = GET_INT(g_brightness);
+    if( (contrast == 100) && (brightness == 0) ) {
 	OVERWRITE(redex, g_image);
 	return;
     }
     //
     // And perform the filter function
     //
-    double ralpha = ((double) rcontrast)/100.0;
-    double galpha = ((double) gcontrast)/100.0;
-    double balpha = ((double) bcontrast)/100.0;
+    double alpha = ((double) contrast)/100.0;
+    double beta  = ((double) brightness);
     image_ptr ip = (image_ptr) GET_EXT_OBJ(g_image);
     image_ptr nip = create_image(ip->name, ip->rows, ip->cols);
     for(int r = 0; r < ip->rows; r++) {
@@ -591,9 +648,9 @@ image_change_contrast(g_ptr redex)
 	    color_ptr cp = GET_PIXEL(ip, c, r);
 	    color_ptr ncp = GET_PIXEL(nip, c, r);
 	    ncp->valid = cp->valid;
-	    ncp->r = limit_color_range(((double) (cp->r))*ralpha);
-	    ncp->g = limit_color_range(((double) (cp->g))*galpha);
-	    ncp->b = limit_color_range(((double) (cp->b))*balpha);
+	    ncp->r = limit_color_range(((double) (cp->r))*alpha+beta);
+	    ncp->g = limit_color_range(((double) (cp->g))*alpha+beta);
+	    ncp->b = limit_color_range(((double) (cp->b))*alpha+beta);
 	}
     }
     MAKE_REDEX_EXT_OBJ(redex, image_oidx, nip);
@@ -891,15 +948,13 @@ Image_Install_Functions()
 			GLmake_list(GLmake_string()),
 			colors);
 
-    Add_ExtAPI_Function("image_change_contrast", "1111", FALSE,
+    Add_ExtAPI_Function("image_change_contrast_and_brightness", "111", FALSE,
 			GLmake_arrow(
 			  image_handle_tp,
 			  GLmake_arrow(
 			    GLmake_int(),
-			    GLmake_arrow(
-			      GLmake_int(),
-			      GLmake_arrow(GLmake_int(), image_handle_tp)))),
-			image_change_contrast);
+			    GLmake_arrow(GLmake_int(), image_handle_tp))),
+			image_change_contrast_and_brightness);
 
     Add_ExtAPI_Function("image_denoise", "1111", FALSE,
 			GLmake_arrow(
@@ -1009,6 +1064,23 @@ Image_Install_Functions()
 				    GLmake_tuple(GLmake_int(), GLmake_int())),
 				  image_handle_tp))))),
                         rgb_filter);
+
+    Add_ExtAPI_Function("color_distance_filter", "1111", FALSE,
+                        GLmake_arrow(
+			  image_handle_tp,
+			  GLmake_arrow(
+			    GLmake_tuple(
+				GLmake_int(),
+				GLmake_tuple(GLmake_int(), GLmake_int())
+			    ),
+			    GLmake_arrow(
+			      GLmake_int(),
+			      GLmake_arrow(
+				  GLmake_tuple(
+				    GLmake_int(),
+				    GLmake_tuple(GLmake_int(), GLmake_int())),
+				  image_handle_tp)))),
+                        color_distance_filter);
 
     Add_ExtAPI_Function("update_image", "11", FALSE,
                         GLmake_arrow(

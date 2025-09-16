@@ -524,9 +524,9 @@ proc im:display_image {name rows cols filename {c ""}} {
     set im [image create photo -format ppm -file $filename]
     set orig [image create photo ORIG_$im]
     $orig copy $im -compositingrule set
-
     $c create image 0 0 -image $im -anchor nw
 
+    set ::im($c,im) $im
     bind $c <ButtonPress-1> "img:display_color $im %W %x %y"
 
     update
