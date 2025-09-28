@@ -2246,6 +2246,7 @@ let font_normal  = "-*-courier-bold-r-normal-*-14-*-*-*-*-*-*-*";
 let font_large     = "-*-courier-bold-r-normal-*-16-*-*-*-*-*-*-*";
 let font_larger  = "-*-courier-bold-r-normal-*-18-*-*-*-*-*-*-*";
 let font_largest = "-*-courier-bold-r-normal-*-20-*-*-*-*-*-*-*";
+let font_huge    = "-*-courier-bold-r-normal-*-24-*-*-*-*-*-*-*";
 
 // Change the text font used in the fl gui.
 let set_font font_name =

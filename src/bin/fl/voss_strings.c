@@ -690,6 +690,21 @@ do_strcmp(g_ptr redex)
 }
 
 static void
+do_strcasecmp(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr arg1 = GET_APPLY_RIGHT(l);
+    g_ptr arg2 = GET_APPLY_RIGHT(redex);
+    string s1  = GET_STRING(arg1);
+    string s2  = GET_STRING(arg2);
+    int res = strcasecmp(s1,s2);
+    MAKE_REDEX_INT(redex, res);
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
 str_is_prefix(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
@@ -1297,6 +1312,12 @@ Strings_Install_Functions()
 				     GLmake_arrow(GLmake_string(),
 						  GLmake_int())),
 			do_strcmp);
+
+    Add_ExtAPI_Function("strcasecmp", "11", FALSE,
+			GLmake_arrow(GLmake_string(),
+				     GLmake_arrow(GLmake_string(),
+						  GLmake_int())),
+			do_strcasecmp);
 
     Add_ExtAPI_Function("str_is_prefix", "11", FALSE,
 			GLmake_arrow(GLmake_string(),

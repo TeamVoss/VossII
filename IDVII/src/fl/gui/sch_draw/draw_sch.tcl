@@ -170,14 +170,14 @@ proc nb:create_mandatory_tabs {w} {
 }
 
 
-proc nb:create_node_browser {w p} {
+proc nb:create_basic_node_browser {p {default_limit Outputs}} {
     ttk::labelframe $p.search -text "Search:"
         ttk::labelframe $p.search.lbl -relief flat -text "Limit search to: " \
                 -labelanchor w
         ttk::combobox $p.search.lbl.c -textvariable ::nodebrowser(source,$p) \
             -state readonly \
             -values {Inputs Outputs {User Given} All} -font $::voss2_txtfont
-        set ::nodebrowser(source,$p) Outputs
+        set ::nodebrowser(source,$p) $default_limit
  
         ttk::labelframe $p.search.pat_lbl -relief flat -text "Pattern: " \
                 -labelanchor w
@@ -208,7 +208,27 @@ proc nb:create_node_browser {w p} {
     pack $f.list -side top -fill both -expand yes
  
     pack $f -side top -fill both -expand yes
+
+    ttk::entry $p.sel -textvariable ::nb_selection($p)
+    pack $p.sel -side top -fill x -expand yes
  
+    bind $f.list <<ListboxSelect>> \
+	"sch:update_nodebrowser_selection $p $f.list $p.sel"
+    
+}
+
+proc sch:update_nodebrowser_selection {p lb e} {
+    foreach idx [$lb curselection] {
+	lappend sel [$lb get $idx]
+    }
+    set ::nb_selection($p) $sel
+}
+
+proc nb:create_node_browser {w p} {
+
+    nb:create_basic_node_browser $p Outputs
+
+    set f $p.lf
     ttk::labelframe $p.opts -text "Options:"
 
 	tk_optionMenu $p.opts.choice ::nodebrowser(type_of_drawing,$p) \
@@ -709,6 +729,8 @@ proc create_circuit_canvas {nb mw} {
     if [fl_is_IDV_ENV $w] {
 	idv:create_idv_menu $nb $w
     } else {
+	button $w.menu.find -text Search -command "sch:search $w $c"
+	pack $w.menu.find -side left -padx 10
 	sch:create_time_point $c
     }
 
@@ -4990,4 +5012,21 @@ proc draw_lat_leq {c tag x y} {
     set y2 [expr round($y+[rtl_rad $c]/2)]
     lappend inp_locs $xi $y1 $xi $y2
     return [list $inp_locs [list $x $y]]
+}
+
+proc sch:search {pw c} {
+    fl_reset_find_all_nodes $c
+    foreach t [$c find all] {
+	set tags [$c gettags $t]
+	foreach nd [get_anon_name $tags] {
+	    fl_reset_all_nodes_add $c $nd
+	}
+    }
+    set all_vecs [fl_reset_all_nodes_get_vecs $c]
+
+    set w ".search"
+    catch {destroy $w}
+    toplevel $w
+    nb:create_basic_node_browser $w.nb "User Given"
+    
 }

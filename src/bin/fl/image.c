@@ -707,7 +707,6 @@ image_denoise(g_ptr redex)
 		    if( IS_WHITE(lcp) ) { cnt++; }
 		}
 	    }
-fprintf(stderr, "%d %d --> %d\n", r, c, cnt);
 	    if( cnt >= threshold ) {
 		ncp->valid = 255;
 		ncp->r = 255;

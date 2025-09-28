@@ -30,4 +30,6 @@ let p = verilog2pexlif F "" "M32632" [
 
 wtime (p fseq 1);
 
-IDV p "DB_m32632" [];
+VIS p;
+
+//IDV p "DB_m32632" [];

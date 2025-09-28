@@ -93,49 +93,41 @@ let vfsm2fsm (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = fsm
 /\  vfsm2fsm idv_env = error "vfsm2fsm not defined for IDV_ENV"
 ;
 
-let vfsm2ste_r (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = ster
+let vfsm2ste_r (STEV_ENV id fsm ster _ _ _ _ _ _ _ _) = ster
 /\  vfsm2ste_r (IDV_ENV id selr hlr cvsr fsmr cmds) = error "No STE in IDV_ENV"
 ;
 
-let vfsm2wvr (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = wvr
+let vfsm2wvr (STEV_ENV id fsm ster wvr _ _ _ _ _ _ _) = wvr
 /\  vfsm2wvr (IDV_ENV id selr hlr cvsr fsmr cmds) = error "No wv in IDV_ENV"
 ;
 
-let vfsm2cur_time_r (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) =
-	tr
+let vfsm2cur_time_r (STEV_ENV id fsm ster wvr tr _ _ _ _ _ _) = tr
 /\  vfsm2cur_time_r (IDV_ENV id selr hlr cvsr fsmr cmds) =
 	error "No cur_t in IDV_ENV"
 ;
 
-let vfsm2stop_list_r (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) =
-	stopr
+let vfsm2stop_list_r (STEV_ENV _ _ _ _ _ stopr selr hlr cvsr fsmr cmd) = stopr
 /\  vfsm2stop_list_r (IDV_ENV id selr hlr cvsr fsmr cmds) =
 	error "No stopr in IDV_ENV"
 ;
 
-let vfsm2selection_r (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) =
-	selr
+let vfsm2selection_r (STEV_ENV _ _ _ _ _ stopr selr hlr cvsr fsmr cmd) = selr
 /\  vfsm2selection_r (IDV_ENV id selr hlr cvsr fsmr cmds) = selr
 ;
 
-let vfsm2canvases_r (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) =
-	cvsr
+let vfsm2canvases_r (STEV_ENV _ _ _ wvr tr stopr selr hlr cvsr fsmr cmd) = cvsr
 /\  vfsm2canvases_r (IDV_ENV id selr hlr cvsr fsmr cmds) = cvsr
 ;
 
-let vfsm2fsms_r (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) =
-	fsmr
-/\  vfsm2fsms_r (IDV_ENV id selr hlr cvsr fsmr cmds) =
-	fsmr
+let vfsm2fsms_r (STEV_ENV _ _ ster wvr tr stopr selr hlr cvsr fsmr cmd) = fsmr
+/\  vfsm2fsms_r (IDV_ENV id selr hlr cvsr fsmr cmds) = fsmr
 ;
 
-let vfsm2hll_r (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) =
-	hlr
+let vfsm2hll_r (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) = hlr
 /\  vfsm2hll_r (IDV_ENV id selr hlr cvsr fsmr cmds) = hlr
 ;
 
-let vfsm2cmds_r (STEV_ENV id fsm ster wvr tr stopr selr hlr cvsr fsmr cmd) =
-	cmd
+let vfsm2cmds_r (STEV_ENV _ _ _ _ tr stopr selr hlr cvsr fsmr cmd) = cmd
 /\  vfsm2cmds_r (IDV_ENV id selr hlr cvsr fsmr cmds) = cmds
 ;
 

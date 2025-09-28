@@ -87,7 +87,7 @@ let verilog2pexlif no_popup flags top_level_module file_list additional_files =
 	    (system cmd) != 0 =>
 		eprintf "yosys failed. See %s/yosys.log for datails" tmp_dir
 	    |
-	    fprintf stderr "-W- Check %s/yosys.log for Verilog warnings!\n"
+	    fprintf stdinfo "-W- Check %s/yosys.log for Verilog warnings!\n"
 		    tmp_dir
 	|
 	    let tcmd =

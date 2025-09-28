@@ -2150,3 +2150,20 @@ let simulate fl_function_name ant =
 ;
 free_binder simulate;
 
+let find_all_nodes_r = ref [""];
+let fl_reset_find_all_nodes {canvas::string} =
+    (find_all_nodes_r := [])
+;
+export_to_tcl fl_reset_find_all_nodes;
+
+let fl_reset_all_nodes_add canvas tag =
+    let vs = fl_tag2vec canvas tag then
+    (find_all_nodes_r := (vs@(deref find_all_nodes_r))) fseq
+    ()
+;
+export_to_tcl fl_reset_all_nodes_add;
+
+let fl_reset_all_nodes_get_vecs {canvas::string} =
+    qsort strcasecmp (extract_vectors (deref find_all_nodes_r))
+;
+export_to_tcl fl_reset_all_nodes_get_vecs;

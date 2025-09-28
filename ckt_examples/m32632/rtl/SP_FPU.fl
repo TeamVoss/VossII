@@ -1,6 +1,34 @@
 load "idv.fl";
 
-let p = verilog2pexlif F "" "SP_FPU" ["SP_FPU.v"] [];
+let p = verilog2pexlif T "" "SP_FPU" ["SP_FPU.v"] [];
 time (p fseq 1);
 
-IDV p "DB_sp_fpu" [];
+//IDV p "DB_sp_fpu" [];
+
+    
+
+
+VIS p;
+
+let N = 10;
+
+let ant =
+    "BCLK" is_clock N
+  and
+    "START" is 1 in_cycle 0 otherwise 0 until N cycles
+  and
+    "BWD[1:0]" is 0x3 for N cycles // SP FP addition
+  and
+    "FSR[5:0]" is 0 for N cycles // Round to Zero
+  and
+    "OPCODE[7:0]" is 0 for N cycles
+  and
+    "FL" is 1 for N cycle
+  and
+    "SRC1[31:0]" is 0b01111111000000000000000000000011 for N cycles
+  and
+    "SRC2[31:0]" is 0b01111111100000000000000000000001 for N cycles
+;
+
+
+simulate p ant;
