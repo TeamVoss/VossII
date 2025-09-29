@@ -22,10 +22,10 @@ else
 	LEX    :="flex -l"
 endif
 RANLIB = ranlib
-CC     ?= gcc
-CX     ?= g++
-# CC     = clang
-# CX     = clang++
+# CC     ?= gcc
+# CX     ?= g++
+CC     = clang
+CX     = clang++
 
 #
 # Names of executables

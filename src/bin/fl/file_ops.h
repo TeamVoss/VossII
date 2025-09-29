@@ -16,7 +16,7 @@
 /* ----- Function prototypes for public functions ----- */
 void		Init_file_ops(void);
 void 		Quit_file_ops(void);
-int 		LL_Open(char *, char);
+bool 		LL_Open(char *, char);
 void 		LL_Close(void);
 void 		LL_Write(pointer p, unsigned int);
 pointer         LL_Read(int);

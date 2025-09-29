@@ -136,26 +136,12 @@ typedef struct ovl_inf_rec {
 } ovl_inf_rec;
 
 
-// For debugging only....
-#if 1
-#define BV_SIZE		16
-#else
-#define BV_SIZE		4
-#endif
-
-typedef struct bv_rec	    *bv_ptr;
-typedef struct bv_rec {
-    int	    bv[BV_SIZE];
-} bv_rec;
-
 typedef struct ovl_alt_rec  *ovl_alt_ptr;
 typedef struct ovl_alt_rec {
     string	    name;
     bool	    open_overload;
     typeExp_ptr	    type;
     int		    version;
-    bv_ptr	    bv;
-    bv_ptr	    solution;
     ovl_inf_ptr	    alts;
     ovl_alt_ptr	    next;
 } ovl_alt_rec;

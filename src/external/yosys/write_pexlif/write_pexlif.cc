@@ -253,17 +253,17 @@ struct PexlifDumper
 	void dump_const(std::ostream &f, const RTLIL::Const &data, int width = -1, int offset = 0)
 	{
 		if (width < 0)
-			width = data.bits.size() - offset;
-		if ((data.flags & RTLIL::CONST_FLAG_STRING) == 0 || width != (int)data.bits.size()) {
+			width = data.size() - offset;
+		if ((data.flags & RTLIL::CONST_FLAG_STRING) == 0 || width != (int)data.size()) {
 			f << stringf("\"");
 			bool first = true;
 			for (int i = offset+width-1; i >= offset; i--) {
-				log_assert(i < (int)data.bits.size());
+				log_assert(i < (int)data.size());
 				if( first ) {
 				    f << stringf("0b");
 				    first = false;
 				}
-				switch (data.bits[i]) {
+				switch (data[i]) {
 				    case RTLIL::S0: f << stringf("0"); break;
 				    case RTLIL::S1: f << stringf("1"); break;
 				    case RTLIL::Sx: f << stringf("x"); break; 
@@ -298,7 +298,7 @@ struct PexlifDumper
 			   int size, int width)
 	{
 		log_assert(width > 0);
-		log_assert ((data.flags & RTLIL::CONST_FLAG_STRING) == 0 || width != (int)data.bits.size());
+		log_assert ((data.flags & RTLIL::CONST_FLAG_STRING) == 0 || width != (int)data.size());
 		if( data.is_fully_undef() ) {
 		    f << "[]\n";
 		} else {
@@ -314,8 +314,8 @@ struct PexlifDumper
 			f << "\"";
 			for(int c = width-1; c >= 0; c--) {
 			    int i = line*width+ c;
-			    log_assert(i < (int)data.bits.size());
-			    switch (data.bits[i]) {
+			    log_assert(i < (int)data.size());
+			    switch (data[i]) {
 				case RTLIL::S0: f << stringf("0"); break;
 				case RTLIL::S1: f << stringf("1"); break;
 				case RTLIL::Sx: f << stringf("x"); break; 
@@ -505,6 +505,9 @@ struct PexlifDumper
 		start = true;
 		for (auto cell : module->cells())
 		{
+		    if( cell->type == "$scopeinfo" ) {
+			continue;
+		    }
 		    string src = "";
 		    if (cell->attributes.count("\\src")) {
 			Const si = cell->attributes.at("\\src");
@@ -1275,7 +1278,6 @@ struct PexlifDumper
 		    if (config->attr_mode)
 			    dump_params(".attr", cell->attributes);
 		    if (config->param_mode)
-
 			    dump_params(".param", cell->parameters);
 		}
 
@@ -1465,7 +1467,6 @@ struct PexlifBackend : public Backend {
 					top_module_name = mod_it.first.str();
 
 		std::vector<RTLIL::Module*> mod_list;
-		std::vector<RTLIL::Module*>::iterator first;
 		RTLIL::Module *my_top_module = NULL;
 
 		design->sort();

@@ -35,7 +35,7 @@ extern int		RCStep_limit;
 extern bool		RCprint_failures;
 extern bool		RCverbose_ste_run;
 extern bool		RCprint_time;
-extern bool		RCprint_time_mod;
+extern int		RCprint_time_mod;
 extern bool		RCaccurate_ite_comp;
 extern bool		RCaccurate_hierachy_visualization;
 extern g_ptr		void_nd;

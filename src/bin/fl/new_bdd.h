@@ -64,7 +64,7 @@ formula		B_forall(formula, formula);
 formula		B_thereis(formula, formula);
 formula		B_Depends(formula);
 string		B_DependencyList(formula);
-int 		B_Equal(formula, formula);
+bool 		B_Equal(formula, formula);
 void 		B_Print(odests, formula, int);
 void		BP(formula f);
 void 		HL_Print(odests, formula, formula);

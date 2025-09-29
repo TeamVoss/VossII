@@ -23,7 +23,7 @@ typedef unsigned long int   lunint;
 typedef unsigned int	    *mword_ptr;
 typedef void	            *pointer;
 typedef unsigned char       *bpointer;
-typedef int		    bool;
+typedef unsigned int	    bool;
 typedef unsigned char	    flag;
 typedef unsigned char	    uchar;
 
