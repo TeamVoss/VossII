@@ -75,7 +75,7 @@ let verilog2pexlif no_popup flags top_level_module file_list additional_files =
     (fprintf sfp "memory -nomap\n") fseq
     (fprintf sfp "opt_clean -purge\n") fseq
     //(fprintf sfp "clean select *;\n") fseq
-    (fprintf sfp "write_pexlif -noalias -icells -gates -impltf _out.fl\n") fseq
+    (fprintf sfp "write_pexlif -noalias -icells -gates -impltf _tmp.fl\n") fseq
     (fclose sfp) fseq
     // Run yosys
     let wr_pexlif = (get_vossrc "VOSS-BINARY-DIRECTORY")^"/write_pexlif.so" in
@@ -105,6 +105,11 @@ let verilog2pexlif no_popup flags top_level_module file_list additional_files =
 	    |
 	    ()
     ) fseq
+    // Clean the temporary node names (remove full pathame)
+    let cmd = sprintf "sed -e 's@_%s@_@g' < %s/_tmp.fl > %s/_out.fl"
+		    tmp_dir tmp_dir tmp_dir
+    in
+    (system cmd) != 0 => eprintf "Sed command failed" |
     // Covert fl to pexlif
     (load (sprintf "%s/_out.fl" tmp_dir)) fseq
     let fl_cmd = 

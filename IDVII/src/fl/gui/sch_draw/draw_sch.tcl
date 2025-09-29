@@ -37,8 +37,6 @@ set inst_col	"green"		;# Instance number color
 
 set hdl_src_cnt	0		;# Window counter for iHDL windows
 
-set hdl_font	[font actual -*-Courier-Medium-B-Normal--*-120-*]
-
 set base_sc	0.85		;# Scale factor
 
 proc conn_rad	 {c} { return  [expr  1.0*$::sc($c)] }
@@ -122,12 +120,16 @@ proc sc:inform_canvas_change {w} {
 proc create_ste_debugger {w} {
     catch {destroy $w}
     toplevel $w
-    wm geometry $w -20+100
+    set ht  [expr round(0.8*[winfo screenheight .])]
+    set wid [expr round(0.8*[winfo screenwidth .])]
+    wm geometry $w -10+100
+
     set nb $w.nb
-    ttk::notebook $nb -width 1200 -height 700
+    ttk::notebook $nb -width $wid -height $ht
     ttk::notebook::enableTraversal $nb
     bind $nb <<NotebookTabChanged>> [list sc:inform_canvas_change $w]
     pack $nb -side top -expand y -fill both
+
     set ::sch_window_cnt($w) 0
     set root [w2root $w]
     set ::vstatus(time,$root) 0
@@ -209,8 +211,9 @@ proc nb:create_basic_node_browser {p {default_limit Outputs}} {
  
     pack $f -side top -fill both -expand yes
 
-    ttk::entry $p.sel -textvariable ::nb_selection($p)
-    pack $p.sel -side top -fill x -expand yes
+    ttk::entry $p.sel -textvariable ::nb_selection($p) \
+	    -font $::voss2_txtfont
+    pack $p.sel -side top -fill x
  
     bind $f.list <<ListboxSelect>> \
 	"sch:update_nodebrowser_selection $p $f.list $p.sel"
@@ -218,10 +221,14 @@ proc nb:create_basic_node_browser {p {default_limit Outputs}} {
 }
 
 proc sch:update_nodebrowser_selection {p lb e} {
+    set sep ""
     foreach idx [$lb curselection] {
-	lappend sel [$lb get $idx]
+	append res $sep [$lb get $idx]
+	set sep " "
     }
-    set ::nb_selection($p) $sel
+    if [info exists res] {
+	set ::nb_selection($p) $res
+    }
 }
 
 proc nb:create_node_browser {w p} {
@@ -250,11 +257,11 @@ proc nb:create_node_browser {w p} {
  
     ttk::labelframe $p.operations -text "Operation:"
         ttk::button $p.operations.fanin -text Fanin \
-            -command [list nb:draw_fanin $p $f.list]
+            -command [list nb:draw_fanin $p $p]
         ttk::button $p.operations.waveform -text Waveform \
-            -command [list nb:add_waveform $w.nb.waveform $f.list]
+            -command [list nb:add_waveform $w.nb.waveform $p]
         ttk::button $p.operations.stop -text Stop \
-            -command [list sl:add_stop_node $p $f.list]
+            -command [list sl:add_stop_node $p $p]
     pack $p.operations -side top -fill x
         pack $p.operations.fanin -side left -expand yes
         pack $p.operations.waveform -side left -expand yes
@@ -357,12 +364,13 @@ proc cmd:update_cmds {w} {
     }
 }
 
-proc sl:add_stop_node {w nlb} {
-    foreach idx [$nlb curselection] {
-	set nd [$nlb get $idx]
-	fl_top_level_add_stop_nd $w $nd
+proc sl:add_stop_node {w p} {
+    if [info exists ::nb_selection($p)] {
+	foreach nd $::nb_selection($p) {
+	    fl_top_level_add_stop_nd $w $nd
+	}
+	sl:update_stop_node_list $w
     }
-    sl:update_stop_node_list $w
 }
 
 proc sl:delete_stop_nd {w lb} {
@@ -391,9 +399,9 @@ proc nb:drawing_type_tracer {w args} {
     }
 }
 
-proc nb:draw_fanin {w lb} {
-    foreach idx [$lb curselection] { lappend sel [$lb get $idx] }
-    if [info exists sel] {
+proc nb:draw_fanin {w p} {
+    if [info exists ::nb_selection($p)] {
+	set sel $::nb_selection($p)
 	if { $::nodebrowser(type_of_drawing,$w) == "Hierarchical" } {
 	    set draw_level 0
 	    set levels 100
@@ -405,11 +413,13 @@ proc nb:draw_fanin {w lb} {
     }
 }
 
-proc nb:add_waveform {w lb} {
-    foreach idx [$lb curselection] {
-	set vec [$lb get $idx]
-	wv:add_waveform $w $vec
-	fl_record_waveform_addition $w $vec
+proc nb:add_waveform {w p} {
+    if [info exists ::nb_selection($p)] {
+	set sel $::nb_selection($p)
+	foreach vec $sel {
+	    wv:add_waveform $w $vec
+	    fl_record_waveform_addition $w $vec
+	}
     }
 }
 
@@ -4912,10 +4922,10 @@ proc draw_fsm {name code states edges inps c tag x y} {
 set ::rtl_visualizatin_cnt 0
 
 proc rtl:open_editor {file line} {
-    if [info exists ::env(EDITOR)] {"
+    if [info exists ::env(EDITOR)] {
 	eval exec $::env(EDITOR) $file &
     } else {
-	exec xterm -e vi +$line $file &"
+	exec xterm -e vi -R +$line $file &
     }
 }
 

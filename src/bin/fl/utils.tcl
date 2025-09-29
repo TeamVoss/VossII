@@ -819,7 +819,7 @@ proc post_big_popup_window {host_window lines {title popup_data}} {
 		    -yscrollcommand "$w.txt.yscroll set" \
 		    -xscrollcommand "$w.txt.xscroll set" \
 		    -setgrid 1  -height 30 -width 80 \
-		    -font $::hdl_font
+		    -font $::voss2_txtfont
 	scrollbar $w.txt.yscroll -command "$w.txt.t yview"
 	scrollbar $w.txt.xscroll -orient horizontal -command "$w.txt.t xview"
 	pack $w.txt.xscroll -side bottom -fill x
@@ -848,7 +848,7 @@ proc post_popup_window {host_window text_item {title popup_data}} {
 		    -yscrollcommand "$w.txt.yscroll set" \
 		    -xscrollcommand "$w.txt.xscroll set" \
 		    -setgrid 1  -height 30 -width 80 \
-		    -font $::hdl_font
+		    -font $::voss2_txtfont
 	scrollbar $w.txt.yscroll -command "$w.txt.t yview"
 	scrollbar $w.txt.xscroll -orient horizontal -command "$w.txt.t xview"
 	pack $w.txt.xscroll -side bottom -fill x
@@ -946,7 +946,7 @@ proc post_popup {c text_item x y {keep_formatting 0}} {
 	}
     }
     set r1 [$c create text $cx $cy -text $txt -anchor $anch \
-		-font $base_mfont -fill red -justify left \
+		-font $::voss2_txtfont -fill red -justify left \
 		-tag pOpUp_TxT]
     val {x1 y1 x2 y2} [$c bbox $r1]
     set r2 [$c create rectangle \
