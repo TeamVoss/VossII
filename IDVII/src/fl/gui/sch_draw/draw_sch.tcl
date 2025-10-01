@@ -172,14 +172,18 @@ proc nb:create_mandatory_tabs {w} {
 }
 
 
-proc nb:create_basic_node_browser {p {default_limit Outputs}} {
+proc nb:create_basic_node_browser {p update_fun {default_limit Outputs}} {
     ttk::labelframe $p.search -text "Search:"
-        ttk::labelframe $p.search.lbl -relief flat -text "Limit search to: " \
+	if { $default_limit != "" } {
+	    ttk::labelframe $p.search.lbl -relief flat \
+		-text "Limit search to: " \
                 -labelanchor w
-        ttk::combobox $p.search.lbl.c -textvariable ::nodebrowser(source,$p) \
-            -state readonly \
-            -values {Inputs Outputs {User Given} All} -font $::voss2_txtfont
-        set ::nodebrowser(source,$p) $default_limit
+	    ttk::combobox $p.search.lbl.c \
+		-textvariable ::nodebrowser(source,$p) \
+		-state readonly \
+		-values {Inputs Outputs {User Given} All} -font $::voss2_txtfont
+	    set ::nodebrowser(source,$p) $default_limit
+	}
  
         ttk::labelframe $p.search.pat_lbl -relief flat -text "Pattern: " \
                 -labelanchor w
@@ -189,10 +193,12 @@ proc nb:create_basic_node_browser {p {default_limit Outputs}} {
 		[list $p.search.refresh invoke]
         set ::nodebrowser(pattern,$p) {*}
         ttk::button $p.search.refresh -text Refresh \
-                -command [list nb:update_nb_list $p $p.lf.list]
+                -command [list $update_fun $p $p.lf.list]
     pack $p.search -side top -pady 10 -fill x
-        pack $p.search.lbl -side top -fill x
-            pack $p.search.lbl.c -side left -fill x -expand yes
+	if { $default_limit != "" } {
+	    pack $p.search.lbl -side top -fill x
+		pack $p.search.lbl.c -side left -fill x -expand yes
+	}
         pack $p.search.pat_lbl -side top -fill x
             pack $p.search.pat_lbl.c -side left -fill x -expand yes
         pack $p.search.refresh -side top -fill x
@@ -233,7 +239,7 @@ proc sch:update_nodebrowser_selection {p lb e} {
 
 proc nb:create_node_browser {w p} {
 
-    nb:create_basic_node_browser $p Outputs
+    nb:create_basic_node_browser $p nb:update_nb_list Outputs
 
     set f $p.lf
     ttk::labelframe $p.opts -text "Options:"
@@ -5025,6 +5031,14 @@ proc draw_lat_leq {c tag x y} {
 }
 
 proc sch:search {pw c} {
+    set w [winfo parent $c].search
+    catch {destroy $w}
+    frame $w -relief flat
+    pack $w -before $c -side left -fill y
+    nb:create_basic_node_browser $w "sch:search_fun $c" ""
+}
+
+proc sch:search_fun {c p lf} {
     fl_reset_find_all_nodes $c
     foreach t [$c find all] {
 	set tags [$c gettags $t]
@@ -5032,11 +5046,17 @@ proc sch:search {pw c} {
 	    fl_reset_all_nodes_add $c $nd
 	}
     }
+    set pat $::nodebrowser(pattern,$w)
     set all_vecs [fl_reset_all_nodes_get_vecs $c]
+}
 
-    set w ".search"
-    catch {destroy $w}
-    toplevel $w
-    nb:create_basic_node_browser $w.nb "User Given"
-    
+proc nb:search_update_nb_list {w lb} {
+    $lb delete 0 end
+    set src $::nodebrowser(source,$w)
+    set pat $::nodebrowser(pattern,$w)
+    set max_cnt $::nodebrowser(max_cnt,$w)
+    set vecs [fl_get_vectors $w $src $pat $max_cnt]
+    foreach v $vecs {
+        $lb insert end $v
+    }
 }
