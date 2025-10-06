@@ -173,7 +173,7 @@ proc nb:create_mandatory_tabs {w} {
 
 
 proc nb:create_basic_node_browser {p update_fun {default_limit Outputs}} {
-    ttk::labelframe $p.search -text "Search:"
+    ttk::labelframe $p.search -text "Node search:"
 	if { $default_limit != "" } {
 	    ttk::labelframe $p.search.lbl -relief flat \
 		-text "Limit search to: " \
@@ -193,7 +193,7 @@ proc nb:create_basic_node_browser {p update_fun {default_limit Outputs}} {
 		[list $p.search.refresh invoke]
         set ::nodebrowser(pattern,$p) {*}
         ttk::button $p.search.refresh -text Refresh \
-                -command [list $update_fun $p $p.lf.list]
+                -command [concat $update_fun $p $p.lf.list]
     pack $p.search -side top -pady 10 -fill x
 	if { $default_limit != "" } {
 	    pack $p.search.lbl -side top -fill x
@@ -5035,10 +5035,10 @@ proc sch:search {pw c} {
     catch {destroy $w}
     frame $w -relief flat
     pack $w -before $c -side left -fill y
-    nb:create_basic_node_browser $w "sch:search_fun $c" ""
+    nb:create_basic_node_browser $w "sch:search_fun $pw $c" ""
 }
 
-proc sch:search_fun {c p lf} {
+proc sch:search_fun {w c p lb} {
     fl_reset_find_all_nodes $c
     foreach t [$c find all] {
 	set tags [$c gettags $t]
@@ -5048,15 +5048,11 @@ proc sch:search_fun {c p lf} {
     }
     set pat $::nodebrowser(pattern,$w)
     set all_vecs [fl_reset_all_nodes_get_vecs $c]
-}
-
-proc nb:search_update_nb_list {w lb} {
     $lb delete 0 end
-    set src $::nodebrowser(source,$w)
     set pat $::nodebrowser(pattern,$w)
-    set max_cnt $::nodebrowser(max_cnt,$w)
-    set vecs [fl_get_vectors $w $src $pat $max_cnt]
-    foreach v $vecs {
-        $lb insert end $v
+    foreach v $all_vecs {
+	if [string match $pat $v] {
+	    $lb insert end $v
+	}
     }
 }
