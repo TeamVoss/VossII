@@ -78,6 +78,7 @@ proc change_fonts {new_font} {
     ttk::style configure TLabel -font $new_font
     ttk::style configure TEntry -font $new_font
     ttk::style configure TCheckbutton -font $new_font
+    ttk::style configure TMenubutton -font $new_font
     option add *TCombobox*Listbox.font $new_font
     option add *TCombobox*Entry.font $new_font
     option add *TCombobox*TEntry.font $new_font

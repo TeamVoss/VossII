@@ -7,6 +7,18 @@
 # Dependencies
 # ---------------------------------------------------
 
+set ::selection_colors {DarkOrchid1 \
+			DarkSlateBlue \
+			DarkOrange1 \
+			green \
+			gold3 \
+			yellow \
+		        cyan \
+			purple \
+			brown \
+}
+
+
 # Put all icons in the (global) array ::icons()
 foreach gfile [glob $::imagedir/*.gif] {
     set name [string range [lindex [split $gfile /] end] 0 end-4]
@@ -745,7 +757,7 @@ proc create_circuit_canvas {nb mw} {
     if [fl_is_IDV_ENV $w] {
 	idv:create_idv_menu $nb $w
     } else {
-	button $w.menu.find -text Search -command "sch:search $w $c"
+	button $w.menu.find -text Search -command "sch:search $c"
 	pack $w.menu.find -side left -padx 10
 	sch:create_time_point $c
     }
@@ -759,17 +771,12 @@ proc create_circuit_canvas {nb mw} {
     set ::sfont($c)	    $::base_sfont
 
     # Local highlights (this canvas only)
-    $c bind all 1 { cb:set_sel_ws_to_col %W DarkOrchid1 }
-    $c bind all 2 { cb:set_sel_ws_to_col %W magenta2 }
-    $c bind all 3 { cb:set_sel_ws_to_col %W DarkOrange1 }
-    $c bind all 4 { cb:set_sel_ws_to_col %W green }
-    $c bind all 5 { cb:set_sel_ws_to_col %W gold3 }
-    $c bind all 6 { cb:set_sel_ws_to_col %W yellow }
-    $c bind all 7 { cb:set_sel_ws_to_col %W cyan }
-    $c bind all 8 { cb:set_sel_ws_to_col %W purple }
-    $c bind all 9 { cb:set_sel_ws_to_col %W brown }
+    set ccnt 1
+    foreach col $::selection_colors {
+	$c bind all $ccnt [list cb:set_sel_ws_to_col %W $col]
+	incr ccnt
+    }
     $c bind all 0 { cb:set_sel_ws_to_col %W _OrIgInAlCoLoR_ }
-
     $c bind RePeAt <ButtonRelease-2> {
 	set_screen_view %W $old_repeat_loc %x %y
     }
@@ -889,8 +896,7 @@ proc cb:sch_canvas_menu {c wx wy sx sy} {
 	menu $mm -tearoff 0
 	$m add cascade -label "Mark" -menu $mm
 
-	set cols {DarkOrchid1 magenta2 DarkOrange1 green gold3 yellow \
-		  cyan purple brown}
+	set cols $::selection_colors
 	set laccs { "1" "2" "3" "4" "5" "6" "7" "8" "9" }
 
 	foreach col $cols lacc $laccs {
@@ -919,8 +925,7 @@ proc cb:sch_canvas_menu {c wx wy sx sy} {
 	menu $mm -tearoff 0
 	$m add cascade -label "Mark" -menu $mm
 
-	set cols {DarkOrchid1 magenta2 DarkOrange1 green gold3 yellow \
-		  cyan purple brown}
+	set cols $::selection_colors
 	set laccs { "1" "2" "3" "4" "5" "6" "7" "8" "9" }
 
 	foreach col $cols lacc $laccs {
@@ -5030,12 +5035,64 @@ proc draw_lat_leq {c tag x y} {
     return [list $inp_locs [list $x $y]]
 }
 
-proc sch:search {pw c} {
+proc sch:search {c} {
     set w [winfo parent $c].search
     catch {destroy $w}
     frame $w -relief flat
     pack $w -before $c -side left -fill y
-    nb:create_basic_node_browser $w "sch:search_fun $pw $c" ""
+    nb:create_basic_node_browser $w "sch:search_fun $w $c" ""
+    ttk::labelframe $w.operations -text "Operation:"
+
+        ttk::button $w.operations.select -text Select \
+            -command [list sch:center_sel select $w $c]
+
+        ttk::menubutton $w.operations.menu -text Mark \
+	    -menu $w.operations.menu.col -direction right
+
+        set m $w.operations.menu.col
+        menu $m -tearoff 0
+        foreach col $::selection_colors {
+            $m add command -label "  " -background $col \
+                    -command "sch:mark_node $c $w $col"
+        }
+
+        ttk::button $w.operations.close -text Close -command [list destroy $w]
+
+	pack $w.operations.select -side left -padx 2
+        pack $w.operations.menu -side left
+	pack $w.operations.close -side left -padx 2
+    pack $w.operations -side top -fill x
+    $w.search.refresh invoke
+}
+
+proc sch:mark_node {c w col} {
+    if [info exists ::nb_selection($w)] {
+	set nodes $::nb_selection($w)
+	if { $nodes == "" } { return; }
+	foreach node $nodes {
+	    fl_set_wv_highlight_color $w $col $node
+	}
+puts stderr "cb:set_wire_color $c $nodes $col"
+    }
+}
+
+proc sch:center_sel {op w c} {
+    if [info exists ::nb_selection($w)] {
+	set nodes $::nb_selection($w)
+	if { $nodes == "" } { return; }
+	if { $op == "center" } {
+	} elseif { $op == "select" } {
+	    fl_clear_selection_list {};
+	    foreach nd $nodes {
+		fl_add_to_selection_list $nd
+	    }
+	    fl_set_selection $c "SET_SELECTION"
+	}
+
+
+
+puts stderr "search with operation $op on nodes $nodes"
+    }
 }
 
 proc sch:search_fun {w c p lb} {
