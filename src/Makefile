@@ -15,10 +15,10 @@ UNAME_S := $(shell uname -s)
 # Tools (wih flags)
 #
 ifeq ($(UNAME_S), Darwin)
-	YACC   :="`brew --prefix`/opt/bison/bin/bison -y"
+	YACC   :="`brew --prefix`/opt/bison/bin/bison"
 	LEX    :="`brew --prefix`/bin/flex -l"
 else
-	YACC   :="bison -y"
+	YACC   :="bison"
 	LEX    :="flex -l"
 endif
 RANLIB = ranlib

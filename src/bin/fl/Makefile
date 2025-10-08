@@ -33,7 +33,7 @@ LIB = ../../lib/fl_lib.a $(MINISAT_DIR)/lib/libminisat.a
 ABI_HEADERS = float.h graph.h plugin.h voss_strings.h typecheck.h ../../include/types.h
 
 LOBJ = new_bdd.o error.o arb_prec.o file_ops.o initialize.o symbol_tbl.o \
-	y.tab.o lex.yy.o \
+	language.tab.o lex.yy.o \
 	graph.o fl.o typecheck.o emit.o lp.o cache.o compile.o \
 	expand_cursor.o io.o remote_tcl.o bexpr.o \
 	draw_graph.o debug.o symbol.o voss_strings.o int_ops.o list_ops.o \
@@ -59,15 +59,15 @@ libfl.so: $(LOBJ)
 .cc.o:
 	$(CXX) $(CXXFLAGS) $(CXXFLAGS) $(INC) -c $<
 
-y.tab.c: language.y fl.h language.h graph.h prefs_ext.h
+language.tab.c: language.y fl.h language.h graph.h prefs_ext.h
 	@$(YACC) -d -v language.y
 
-lex.yy.c: lexer y.tab.c graph.h fl.h y.tab.c
+lex.yy.c: lexer language.tab.c graph.h fl.h language.tab.c
 	@$(LEX) lexer
 
 clean:
 	-@touch .q
-	-@/bin/rm -f *.o libfl.so fl y.tab.c y.tab.h y.output lex.yy.c .q
+	-@/bin/rm -f *.o libfl.so fl language.tab.c language.tab.h language.output lex.yy.c .q
 	-@/bin/rm -f prefs_ext.h prefs.h abi_version.h
 	@make -C scripts clean
 
@@ -84,7 +84,7 @@ emit.o:		    emit.h fl.h
 error.o:	    error.h fl.h
 expand_cursor.o:    expand_cursor.h fl.h
 file_ops.o:	    file_ops.h fl.h
-fl.o:		    fl.h y.tab.c prefs_ext.h fl.h
+fl.o:		    fl.h language.tab.c prefs_ext.h fl.h
 graph.o:	    graph.h prefs_ext.h typecheck.h fl.h
 initialize.o:	    initialize.h prefs.h fl.h
 io.o:		    io.h graph.h fl.h

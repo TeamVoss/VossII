@@ -126,7 +126,7 @@ add_sch_object(ClientData clientData, Tcl_Interp *interp,
     for(int i = 0; i < nbr_fanins; i++) {
 	Tcl_Obj *opp;
 	if( Tcl_ListObjIndex(interp, fanins, i, &opp) != TCL_OK ) {
-	    char idx[10];
+	    char idx[20];
 	    sprintf(idx, "%d", i);
 	    Tcl_AppendResult(interp,
 			     "Cannot access element ", idx,  "in fanins", NULL);

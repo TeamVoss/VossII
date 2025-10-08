@@ -4,7 +4,7 @@
 //-------------------------------------------------------------------
 
 #include "fl.h"
-#include "y.tab.h"
+#include "language.tab.h"
 #include <ctype.h>
 #include <limits.h>
 #include "prefs_ext.h"

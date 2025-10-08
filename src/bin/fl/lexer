@@ -16,7 +16,7 @@ symbol	[!%&$#+\-*/:<=>?@\\~`'^|\_]
 
 #include <strings.h>
 #include "fl.h"
-#include "y.tab.h"
+#include "language.tab.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <editline/readline.h>

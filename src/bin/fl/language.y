@@ -169,7 +169,7 @@ extern int dbg_tst_line_cnt;
 
 %}
 
-%pure-parser
+%define api.pure
 
 %define parse.lac full
 %define parse.error verbose
