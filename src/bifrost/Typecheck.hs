@@ -30,7 +30,6 @@ instance Applicative TC where
       (Right h, Right x) -> Right (h x)
 
 instance Monad TC where
-  return x = TC (\_ -> Right x)
   (TC f) >>= g = TC $ \e ->
     case f e of
       Left err -> Left err

@@ -1398,23 +1398,23 @@ proc gui_execute_sub_process {w cmd logfile comment {cmd_file ""}} {
         frame $sw -relief flat
         pack $sw -side top -fill both -expand yes
 
-        label $sw.l -text $comment -relief flat -font {Helvetica -12 bold}
+        ttk::label $sw.l -text $comment -relief flat -font {Helvetica -12 bold}
         pack $sw.l -side top -pady 2 -fill x
 
-        button $sw.b -text Interrupt -command "subproc:interrupt $w $pids"
+        ttk::button $sw.b -text Interrupt -command "subproc:interrupt $w $pids"
         pack $sw.b -side bottom -pady 10
 	
         scrollbar $sw.yscroll -command "$sw.t yview"
         scrollbar $sw.xscroll -orient horizontal -command "$sw.t xview"
         text $sw.t -setgrid 1 \
             -yscroll "$sw.yscroll set" -xscroll "$sw.xscroll set" \
-            -font $::voss2_txtfont1 -bg white
+            -font $::voss2_txtfont -bg white
         pack $sw.yscroll -side right -fill y
         pack $sw.xscroll -side bottom -fill x
         pack $sw.t -side top -fill both -expand yes
         update idletasks
     } else {
-        button $sw.b -text Interrupt -command "subproc:interrupt $w $pids"
+        ttk::button $sw.b -text Interrupt -command "subproc:interrupt $w $pids"
         pack $sw.b -side bottom -pady 10
 	$sw.t delete 1.0 end
         update idletasks

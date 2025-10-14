@@ -1,0 +1,23 @@
+
+let Q_synth_97 {attrs::(string#string) list} conns =
+    let inps = [ "i1",
+                 "i2[1:0]" ] in
+    let outs = [ "o1[11:0]" ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        QDFFPOSX1 [("instance","inst_13.inst_1.o1_DFFPOSX1_Q"), ("src", "DB_271/code/_synth_97.v:69.2-69.32")] [
+                ("CLK",["i1"]),
+                ("D",["i2[1]"]),
+                ("Q",["o1[11]"])],
+        QDFFPOSX1 [("instance","inst_6.inst_1.o1_DFFPOSX1_Q"), ("src", "DB_271/code/_synth_97.v:69.2-69.32")] [
+                ("CLK",["i1"]),
+                ("D",["i2[0]"]),
+                ("Q",["o1[3]"])],
+        _buf 10 "" ["o1[10:4]", "o1[2:0]"] ["o1[11]", "o1[11]", "o1[11]", "o1[11]", "o1[11]", "o1[11]", "o1[11]", "o1[11]", "o1[3]", "o1[3]"]
+    ] in
+    yosys_PINST "_synth_97" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+

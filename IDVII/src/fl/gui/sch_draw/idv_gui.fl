@@ -558,8 +558,8 @@ let get_selected_pinsts canvas =
     let vfsm = w2vfsm canvas in
     let selection = deref (vfsm2selection_r vfsm) then
     let p = get_idv_current_pexlif canvas then
-    let tst pp = ((pexlif_get_outs_actuals pp) vec_intersect selection) != [] in
-    find_all tst (pexlif_get_children p)
+    let tst4 pp = ((pexlif_get_outs_actuals pp) vec_overlap selection) in
+    find_all tst4 (pexlif_get_children p)
 ;
 
 
@@ -1941,10 +1941,10 @@ let check_eq_by_sim p1 p2 =
     let trl = map (\n.n,0,1) outs1 then
     let ste1 = bSTE "-s" ckt1 [] ant [] trl then
     let ste2 = bSTE "-s" ckt2 [] ant [] trl then
-    let tst n r = 
+    let tst5 n r = 
 	r AND ((bget_trace_val ste1 n 0) == (bget_trace_val ste2 n 0))
     in
-    itlist tst outs1 T
+    itlist tst5 outs1 T
 ;
 
 let pexlif_ifc_substitute sub p =
@@ -2169,6 +2169,13 @@ let IDV_pattern_replace repeat tr tr_sequence =
     TRANSFORM p_name p_sha_spec (idv_save_pexlif p_imp') (p_just@[just])
 ;
 
+let rewire_insides spec imp =
+    val (PINST sname sattrs slf sfa_inps sfa_outs sints sbody) = spec in
+    val (PINST iname iattrs ilf ifa_inps ifa_outs iints ibody) = imp in
+    let ifa_inps' = map (\(f,as). f, assoc f sfa_inps) ifa_inps in
+    let ifa_outs' = map (\(f,as). f, assoc f sfa_outs) ifa_outs in
+    (PINST iname iattrs ilf ifa_inps' ifa_outs' iints ibody)
+;
 
 // Invoked from fl_remove_active_sch_tab_window in draw_sch.fl
 let idv_finish_transformation canvas =
@@ -2209,7 +2216,8 @@ let idv_finish_transformation canvas =
 		      (length sell)
 	    |
 	    let sel = hd sell then
-	    let cs' = (firstn (sel-1) cs)@[imp]@(butfirstn sel cs) then
+	    let imp' = rewire_insides spec imp in
+	    let cs' = (firstn (sel-1) cs)@[imp']@(butfirstn sel cs) then
 	    let p' = PINST nm attrs leaf fa_inps fa_outs ints (P_HIER cs') then
 	    (add_transform parent p' (REPLACE sell tr)) fseq
 	    let cmd = sprintf "replace vis %s \"%s\";"

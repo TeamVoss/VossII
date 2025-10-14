@@ -88,13 +88,13 @@ let ranges_overlap rl1 rl2 =
 ;
 
 let vinfo_overlap vn1 vn2 =
-    letrec tst ((TXT t1):rem1) ((TXT t2):rem2) = t1 != t2 => F | tst rem1 rem2
-     /\    tst ((RANGES rl1):rem1) ((RANGES rl2):rem2) =
-	ranges_overlap rl1 rl2 => tst rem1 rem2 | F
-     /\    tst [] [] = T
-     /\    tst _ _ = F
+    letrec test ((TXT t1):rem1) ((TXT t2):rem2) = t1 != t2 => F | test rem1 rem2
+     /\    test ((RANGES rl1):rem1) ((RANGES rl2):rem2) =
+	ranges_overlap rl1 rl2 => test rem1 rem2 | F
+     /\    test [] [] = T
+     /\    test _ _ = F
     in
-    tst vn1 vn2
+    test vn1 vn2
 ;
 
 clet build_io_tbl p =

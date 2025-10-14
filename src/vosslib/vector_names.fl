@@ -52,6 +52,7 @@ let vec_overlap vl1 vl2 =
 	vs2 = [] => tst rem |
 	(md_expand_vectors vs1) overlap (md_expand_vectors vs2) => T |
 	tst rem
+     /\   tst [] = F
     in
     tst p1
 ;

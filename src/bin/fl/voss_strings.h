@@ -17,31 +17,27 @@ typedef struct vec_list_rec   *vec_list_ptr;
 typedef struct sname_list_rec *sname_list_ptr;
 typedef struct vector_db_rec  *vector_db_ptr;
 typedef struct merge_list_rec *merge_list_ptr;
+typedef struct string_op_rec  *string_op_ptr;
 
 /* ----- Function prototypes for public functions ----- */
 void	       Strings_Init();
+string_op_ptr  Begin_string_ops();
+void	       End_string_ops(string_op_ptr sop);
 void	       Strings_Install_Functions();
 g_ptr	       Vec2nodes(string name);
-vec_ptr	       Split_vector_name(
-                   ustr_mgr *string_mgrp, rec_mgr *vector_mgrp,
-                   rec_mgr *range_mgrp, string vec);
-string         Get_vector_signature(ustr_mgr *string_mgrp, vec_ptr vp);
+vec_ptr	       Split_vector_name(string_op_ptr sop, string name);
+string	       Get_vector_signature(string_op_ptr sop, vec_ptr vp);
 int	       Get_Vector_Size(string vec);
-vec_list_ptr   Expand_constant(rec_mgr *vector_list_mgr, rec_mgr *vector_mgr,
-			       string s);
-vec_list_ptr   Expand_vector(rec_mgr *vector_list_mgr, rec_mgr *vector_mgr,
-			     rec_mgr *range_mgr, vec_ptr vec);
-vec_list_ptr   Merge_Vectors_gen(rec_mgr *vec_list_mgr, vec_list_ptr vecs);
+vec_list_ptr   Expand_vector(string_op_ptr sop, vec_ptr vec);
+sname_list_ptr Get_expanded_version(string_op_ptr sop, string name);
 g_ptr	       Merge_Vectors(g_ptr nds, bool non_contig_vecs);
 g_ptr	       Extract_Vectors(g_ptr nds, bool non_contig_vecs);
 bool           Check_vector_overlap(vec_ptr v1, vec_ptr v2);
 bool           Check_range_overlap(range_ptr r1, range_ptr r2);
-sname_list_ptr Show_vector(
-                   rec_mgr *sname_list_mgrp, vec_ptr vec,
-                   bool non_contig_vec);
-sname_list_ptr Show_vectors(
-                   rec_mgr *sname_list_mgrp, vec_list_ptr vecs,
-                   bool non_contig_vecs);
+sname_list_ptr Show_vector(string_op_ptr sop, vec_ptr vec, bool non_contig_vec);
+sname_list_ptr Show_vectors(string_op_ptr sop,
+			    vec_list_ptr vecs, bool non_contig_vecs);
+
 unint          range_hash(pointer k, unint n);
 int            range_cmp(pointer k1, pointer k2);
 bool           range_equ(pointer k1, pointer k2);
@@ -53,13 +49,13 @@ void	       VDB_destroy(vector_db_ptr vdbp);
 void	       VDB_Insert_vector(vector_db_ptr vdbp, string vec);
 bool	       VDB_has_name_collision(vector_db_ptr vdbp, string vec,
 				      bool basename_only);
-vec_ptr	       Copy_vector(rec_mgr *vector_mgr_ptr, rec_mgr *range_mgr_ptr,
-			   vec_ptr old);
+#if 1
 void           DBG_print_range(range_ptr rp);
 void           DBG_print_vec(vec_ptr vp);
 void           DBG_print_vec_list(vec_list_ptr vlp);
 void           DBG_print_merge_list(merge_list_ptr mlp);
 void           DBG_print_sname_list(sname_list_ptr slp);
+#endif
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */
@@ -82,7 +78,7 @@ typedef union  {
 
 typedef struct vec_rec {
     vec_type		type;
-    vec_rec_content	u;  // SEL: ->type -> TXT INDEX
+    vec_rec_content	u;		    // SEL: ->type -> TXT INDEX
     vec_ptr		next;
 } vec_rec;
 
@@ -103,12 +99,19 @@ typedef struct merge_list_rec {
     merge_list_ptr next;
 } merge_list_rec;
 
-typedef struct vector_db_rec	{
-	ustr_mgr    ustring_mgr;
-	rec_mgr	    vec_rec_mgr;	    // TYPE: vec_rec
-	rec_mgr	    range_rec_mgr;	    // TYPE: range_rec
+typedef struct string_op_rec {
+	bool	    in_use;
+	ustr_mgr    tmp_string_mgr;
+	rec_mgr	    vector_rec_mgr;	    // TYPE: vec_rec
 	rec_mgr	    vec_list_rec_mgr;	    // TYPE: vec_list_rec
-	hash_record sig2vec_list;	    // TYPE: string -> vec_list_ptr
+	rec_mgr	    range_rec_mgr;	    // TYPE: range_rec
+	rec_mgr	    sname_list_rec_mgr;	    // TYPE: sname_list_rec
+	rec_mgr	    merge_list_rec_mgr;	    // TYPE: merge_list_rec
+} string_op_rec;
+
+typedef struct vector_db_rec	{
+	string_op_ptr	sop;
+	hash_record	sig2vec_list;	    // TYPE: string -> vec_list_ptr
 } vector_db_rec;
 
 

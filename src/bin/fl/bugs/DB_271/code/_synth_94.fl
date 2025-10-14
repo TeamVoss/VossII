@@ -1,0 +1,14 @@
+
+let Q_synth_94 {attrs::(string#string) list} conns =
+    let inps = [ "i1" ] in
+    let outs = [ "o1" ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _buf 1 "DB_271/code/_synth_94.v:3.12-3.14" ["o1"] ["0b0"]
+    ] in
+    yosys_PINST "_synth_94" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+

@@ -1344,3 +1344,9 @@ get_xresource(string resource, string default_res)
 	return( wastrsave(stringsp, default_res) );
     }
 }
+
+void
+voss_abort()
+{
+    abort();
+}

@@ -68,11 +68,8 @@ extern str_mgr *stringsp;
 static int anon_cnt = 1;
 #endif
 
+static string_op_ptr	sop;
 static char str_buf[1024];
-// Global managers.
-static ustr_mgr        lstrings;
-static rec_mgr         vec_mgr;
-static rec_mgr         rng_mgr;
 // Folding/Un-folding construction.
 static rec_mgr         subst_hash_record_mgr;
 static rec_mgr         vector_list_mgr;
@@ -1205,6 +1202,7 @@ get_top_inst(g_ptr p, unint inst)
 g_ptr
 get_top_adjacencies(g_ptr p)
 {
+    sop = Begin_string_ops();
     debug_print("%p\n", (void *) p);
     new_adj_mem();
     // /
@@ -1250,6 +1248,7 @@ get_top_adjacencies(g_ptr p)
     }
     // /
     rem_adj_mem();
+    End_string_ops(sop);
     return res;
 }
 
@@ -1265,6 +1264,7 @@ get_top_adjacencies(g_ptr p)
 g_ptr
 fold_pexlif(g_ptr p, g_ptr ids, string name)
 {
+    sop = Begin_string_ops();
     new_fold_mem();
     new_adj_mem();
     // /
@@ -1389,6 +1389,7 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
     // /
     rem_fold_mem();
     rem_adj_mem();
+    End_string_ops(sop);
     return new_pinst;
 }
 
@@ -1463,6 +1464,7 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
 g_ptr
 unfold_pexlif(g_ptr p, unint id)
 {
+    sop = Begin_string_ops();
     new_fold_mem();
     new_adj_mem();
     // /
@@ -1475,6 +1477,7 @@ unfold_pexlif(g_ptr p, unint id)
     );
     if( !is_P_HIER(old_cont, &old_children) ) {
 	Fail_pr("Cannot unfold a leaf node");
+	End_string_ops(sop);
 	return(NULL);
     }
     // Create wirename database to ensure no name capture
@@ -1509,6 +1512,7 @@ unfold_pexlif(g_ptr p, unint id)
     if( unfolded == NULL ) {
 	Fail_pr("Out of range (%d) in unfold_pexlif. Only %d instances",id,ix);
 	VDB_destroy(vdp);
+	End_string_ops(sop);
 	return(NULL);
     }
     // Pick apart 'unfolded' (un) to get at its components.
@@ -1520,6 +1524,7 @@ unfold_pexlif(g_ptr p, unint id)
 	Fail_pr("Cannot unfold a sub-leaf node");
 	VDB_destroy(vdp);
 	free_mgr(&subst_hash_record_mgr);
+	End_string_ops(sop);
 	return(NULL);
     }
 
@@ -1530,11 +1535,13 @@ unfold_pexlif(g_ptr p, unint id)
     if( !mk_formal_actuals_substitution(&sub, un_fa_inps) ) {
 	VDB_destroy(vdp);
 	free_mgr(&subst_hash_record_mgr);
+	End_string_ops(sop);
 	return(NULL);
     }
     if( !mk_formal_actuals_substitution(&sub, un_fa_outs) ) {
 	VDB_destroy(vdp);
 	free_mgr(&subst_hash_record_mgr);
+	End_string_ops(sop);
 	return(NULL);
     }
     g_ptr inter_sub = Make_NIL();
@@ -1564,6 +1571,7 @@ unfold_pexlif(g_ptr p, unint id)
     VDB_destroy(vdp);
     free_temp_str_mgr(ts);
     if( !mk_formal_actuals_substitution(&sub, inter_sub) ) {
+	End_string_ops(sop);
 	return(NULL);
     }
 
@@ -1600,6 +1608,7 @@ unfold_pexlif(g_ptr p, unint id)
     rem_adj_mem();
     dispose_hash(&sub, NULLFCN);
     free_mgr(&subst_hash_record_mgr);
+    End_string_ops(sop);
     return new_pinst;
 }
 
@@ -2284,9 +2293,6 @@ Pexlif_Init()
     s_SHA	    = wastrsave(stringsp, "SHA");
     s_WrApPeR       = wastrsave(stringsp, "_WrApPeR_");
     // /
-    new_ustrmgr(&lstrings);
-    new_mgr(&vec_mgr, sizeof(vec_rec));
-    new_mgr(&rng_mgr, sizeof(range_rec));
 }
 
 void
@@ -2420,7 +2426,7 @@ rem_adj_mem()
 static vec_ptr
 split_vector(string name)
 {
-    vec_ptr vp = Split_vector_name(&lstrings, &vec_mgr, &rng_mgr, name);
+    vec_ptr vp = Split_vector_name(sop, name);
     for(vec_ptr p = vp; p != NULL; p = p->next) {
         if(p->type == TXT) {
             p->u.name = wastrsave(stringsp, p->u.name);
@@ -2433,7 +2439,7 @@ static void
 record_vector_signatures(adj_key_ptr *tail, unint index, string name, bool input)
 {
     vec_ptr vec = split_vector(name);
-    string key = Get_vector_signature(&lstrings, vec);
+    string key = Get_vector_signature(sop, vec);
     debug_print("##### record_vector_signatures: %d %s %s\n", index, key, name);
     // Record signature as we'll need it later again.
     adj_key_ptr n = (adj_key_ptr) new_rec(adj_key_mgr_ptr);
@@ -2563,14 +2569,6 @@ rem_fold_mem()
     fa_subst_mgr_ptr = NULL;
 }
 
-static sname_list_ptr
-get_expanded_version(string n)
-{
-    vec_ptr nv = Split_vector_name(&lstrings, vector_mgr_ptr, range_mgr_ptr, n);
-    vec_list_ptr nds;
-    nds = Expand_vector(vector_list_mgr_ptr,vector_mgr_ptr,range_mgr_ptr,nv);
-    return( Show_vectors(sname_list_mgr_ptr, nds, FALSE) );
-}
 
 static bool
 mk_formal_actuals_substitution(hash_record_ptr tbl, g_ptr fa)
@@ -2589,10 +2587,10 @@ mk_formal_actuals_substitution(hash_record_ptr tbl, g_ptr fa)
             insert_hash(tbl, f, a);
 	}
         // Walk down the expanded version of f and a and add to mapping
-	sname_list_ptr fv = get_expanded_version(f);
+	sname_list_ptr fv = Get_expanded_version(sop, f);
         FOR_CONS(actuals, lj, actual) {
 	    string a = GET_STRING(actual);
-	    sname_list_ptr av = get_expanded_version(a);
+	    sname_list_ptr av = Get_expanded_version(sop, a);
 	    while( av != NULL ) {
 		if( fv == NULL ) {
 		    Fail_pr("Actual larger than formal (%s)!", f);
@@ -2625,10 +2623,9 @@ subst_formal(hash_record_ptr tbl, g_ptr gf)
 	return sp;
     }
     // Must do one bit at a time
-    vec_ptr fv = Split_vector_name(&lstrings, vector_mgr_ptr, range_mgr_ptr, f);
-    vec_list_ptr fe = Expand_vector(vector_list_mgr_ptr, vector_mgr_ptr,
-				    range_mgr_ptr, fv);
-    sname_list_ptr fl = Show_vectors(sname_list_mgr_ptr, fe, FALSE);
+    vec_ptr fv = Split_vector_name(sop, f);
+    vec_list_ptr fe = Expand_vector(sop, fv);
+    sname_list_ptr fl = Show_vectors(sop, fe, FALSE);
     sname_list_ptr res = NULL;
     sname_list_ptr *res_tl = &res;
     while( fl != NULL ) {

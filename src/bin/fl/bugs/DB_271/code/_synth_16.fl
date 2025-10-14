@@ -1,0 +1,43 @@
+
+let Q_synth_16 {attrs::(string#string) list} conns =
+    let inps = [ "i1",
+                 "i2",
+                 "i3",
+                 "i4",
+                 "i5",
+                 "i6[1:0]" ] in
+    let outs = [ "o1" ] in
+    let ints = md_extract_vectors [ "i2_OAI21X1_A_Y",
+                 "i3_OAI22X1_C_Y",
+                 "i6_INVX1_A_Y",
+                 "inst_7.i1" ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        QDFFPOSX1 [("instance","i1_DFFPOSX1_CLK"), ("src", "DB_sp_fpu/code/_synth_16.v:77.2-77.32")] [
+                ("CLK",["i1"]),
+                ("D",["inst_7.i1"]),
+                ("Q",["o1"])],
+        QOAI21X1 [("instance","i2_OAI21X1_A"), ("src", "")] [
+                ("A",["i2"]),
+                ("B",["i4"]),
+                ("C",["i6_INVX1_A_Y"]),
+                ("Y",["i2_OAI21X1_A_Y"])],
+        QOAI22X1 [("instance","i3_OAI22X1_C"), ("src", "")] [
+                ("A",["i6_INVX1_A_Y"]),
+                ("B",["i6[0]"]),
+                ("C",["i3"]),
+                ("D",["i5"]),
+                ("Y",["i3_OAI22X1_C_Y"])],
+        QINVX1 [("instance","i6_INVX1_A"), ("src", "")] [
+                ("A",["i6[1]"]),
+                ("Y",["i6_INVX1_A_Y"])],
+        QNAND2X1 [("instance","inst_7.i1_NAND2X1_Y"), ("src", "")] [
+                ("A",["i2_OAI21X1_A_Y"]),
+                ("B",["i3_OAI22X1_C_Y"]),
+                ("Y",["inst_7.i1"])]
+    ] in
+    yosys_PINST "_synth_16" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+

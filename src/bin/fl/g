@@ -2,7 +2,6 @@ set pagination off
 break fl_main
 r -f bugs/b268.fl
 break exit
-break abort
+break voss_abort
 break Dbg_stop
-break colors
 c

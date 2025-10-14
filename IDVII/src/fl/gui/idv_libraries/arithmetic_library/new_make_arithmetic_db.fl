@@ -37,12 +37,12 @@ let name_param_model name pfn =
 let name_theorem name spec imp =
     let old = deref thms_todo then
     let models = deref models_todo then
-    let tst n =
+    let tst9 n =
 	((assoc n models) fseq ()) catch
 	eprintf "Cannot find model %s for theorem %s" n name
     in
-    (tst spec) fseq
-    (tst imp) fseq
+    (tst9 spec) fseq
+    (tst9 imp) fseq
     //
     let new = (name,spec,imp):old then 
     thms_todo := new

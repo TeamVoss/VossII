@@ -46,7 +46,7 @@ typedef unsigned char	    uchar;
                         __LINE__, __FILE__);                            \
             fflush(stdout);                                             \
             fflush(stderr);                                             \
-            abort();							\
+            voss_abort();						\
 	}
 #else /* DEBUG */
 #define ASSERT(cond)

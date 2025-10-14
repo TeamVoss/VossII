@@ -1,0 +1,72 @@
+
+// Tests after the major rewrite of voss_strings.{h,c}
+
+let nds0 = [];
+let nds1 = ["a", "b", "c"];
+let nds2 = ["a[1]", "b", "a[0]"];
+let nds3 = ["a[0]", "b", "a[0]"];
+let nds4 = ["a[0]", "b", "a[1]"];
+let nds5 = ["a[2:1]", "b", "a[0]"];
+let nds6 = ["a[1:2]", "b", "a[0]"];
+let nds7 = ["b", "a[1]", "a[0]"];
+let nds8 = ["b", "a[0]", "a[0]"];
+let nds9 = ["b", "a[0]", "a[1]"];
+let nds10 = ["b", "a[2:1]", "a[0]"];
+let nds11 = ["b", "a[1:2]", "a[0]"];
+let nds12 = ["a[1:2]", "b[1:0]", "a[0]", "b[4]"];
+
+nds0;  md_merge_vectors nds0;
+nds1;  md_merge_vectors nds1;
+nds2;  md_merge_vectors nds2;
+nds3;  md_merge_vectors nds3;
+nds4;  md_merge_vectors nds4;
+nds5;  md_merge_vectors nds5;
+nds6;  md_merge_vectors nds6;
+nds7;  md_merge_vectors nds7;
+nds8;  md_merge_vectors nds8;
+nds9;  md_merge_vectors nds9;
+nds10; md_merge_vectors nds10;
+nds11; md_merge_vectors nds11;
+nds12; md_merge_vectors nds12;
+
+nds0;  merge_vectors nds0;
+nds1;  merge_vectors nds1;
+nds2;  merge_vectors nds2;
+nds3;  merge_vectors nds3;
+nds4;  merge_vectors nds4;
+nds5;  merge_vectors nds5;
+nds6;  merge_vectors nds6;
+nds7;  merge_vectors nds7;
+nds8;  merge_vectors nds8;
+nds9;  merge_vectors nds9;
+nds10; merge_vectors nds10;
+nds11; merge_vectors nds11;
+nds12; merge_vectors nds12;
+
+nds0;  md_extract_vectors nds0;
+nds1;  md_extract_vectors nds1;
+nds2;  md_extract_vectors nds2;
+nds3;  md_extract_vectors nds3;
+nds4;  md_extract_vectors nds4;
+nds5;  md_extract_vectors nds5;
+nds6;  md_extract_vectors nds6;
+nds7;  md_extract_vectors nds7;
+nds8;  md_extract_vectors nds8;
+nds9;  md_extract_vectors nds9;
+nds10; md_extract_vectors nds10;
+nds11; md_extract_vectors nds11;
+nds12; md_extract_vectors nds12;
+
+nds0;  extract_vectors nds0;
+nds1;  extract_vectors nds1;
+nds2;  extract_vectors nds2;
+nds3;  extract_vectors nds3;
+nds4;  extract_vectors nds4;
+nds5;  extract_vectors nds5;
+nds6;  extract_vectors nds6;
+nds7;  extract_vectors nds7;
+nds8;  extract_vectors nds8;
+nds9;  extract_vectors nds9;
+nds10; extract_vectors nds10;
+nds11; extract_vectors nds11;
+nds12; extract_vectors nds12;

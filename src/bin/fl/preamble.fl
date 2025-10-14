@@ -2162,7 +2162,11 @@ slet PINST n a l i o t c =
 // Create a wrapper for a pexlif so that formal/actuals are the same.
 let wrap_pexlif p =
     val (PINST _ _ _ l_fa_inps l_fa_outs _ _) = p in
-    let mk_io fa = map (\v. v, [v]) (md_extract_vectors (flatmap snd fa)) in
+    let mk_io fa =
+	let act = flatmap snd fa in
+	let real = filter (\n. NOT (str_is_prefix "0b" n)) act in
+	map (\v. v, [v]) (md_extract_vectors real)
+    in
     let fa_inps = mk_io l_fa_inps in
     let fa_outs = mk_io l_fa_outs in
     (PINST "wrapper" [] F fa_inps fa_outs [] (P_HIER [p]))

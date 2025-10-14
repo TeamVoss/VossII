@@ -82,6 +82,7 @@ extern string s_MEM;
 extern string s_no_instance;
 
 /***** PRIVATE VARIABLES *****/
+static string_op_ptr	sop;
 static bool	    print_failures;
 static int	    event_id_cnt = 0;
 static int	    undeclared_node_cnt;
@@ -122,10 +123,9 @@ static hash_record  node_comp_pair_tbl;
 static hash_record  *all_name_tblp;
 static rec_mgr      *vec_info_rec_mgrp;
 static rec_mgr      *ilist_rec_mgrp;
+static rec_mgr      *vec_rec_mgrp;	// %%%%%%%%%%%%%%%%%%%%
+static rec_mgr      *range_rec_mgrp;	// %%%%%%%%%%%%%%%%%%%%
 static rec_mgr      *idx_list_rec_mgrp;
-static ustr_mgr	    lstrings;
-static rec_mgr	    *vec_rec_mgrp;
-static rec_mgr	    *range_rec_mgrp;
 static rec_mgr	    *vis_io_rec_mgrp;
 static rec_mgr	    *vis_rec_mgrp;
 static rec_mgr	    *vis_list_rec_mgrp;
@@ -139,9 +139,9 @@ static buffer	    *propsp;
 static hash_record  *old_all_name_tblp;
 static rec_mgr      *old_vec_info_rec_mgrp;
 static rec_mgr      *old_ilist_rec_mgrp;
+static rec_mgr      *old_vec_rec_mgrp;
+static rec_mgr      *old_range_rec_mgrp;
 static rec_mgr      *old_idx_list_rec_mgrp;
-static rec_mgr	    *old_vec_rec_mgrp;
-static rec_mgr	    *old_range_rec_mgrp;
 static rec_mgr	    *old_vis_io_rec_mgrp;
 static rec_mgr	    *old_vis_rec_mgrp;
 static rec_mgr	    *old_vis_list_rec_mgrp;
@@ -266,8 +266,7 @@ static void           push_undo_point(vstate_ptr vp);
 static void           pop_undo_point(vstate_ptr vp);
 static vstate_ptr     mk_vstate(fsm_ptr fsm);
 static g_ptr          ilist2nds(ilist_ptr il);
-static vec_ptr        split_vector_name(rec_mgr *vec_rec_mgrp,
-                                        rec_mgr *range_rec_mgrp, string name);
+static vec_ptr        split_vector_name(string_op_ptr sop, string name);
 static string         get_vector_signature(vec_ptr vp);
 static fsm_ptr        create_fsm();
 static gbv            GET_GBV(g_ptr nd);
@@ -923,6 +922,7 @@ pexlif2fsm2(g_ptr redex)
 static void
 nodes(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm;
@@ -953,6 +953,7 @@ nodes(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
@@ -976,6 +977,7 @@ assertions(g_ptr redex)
 static void
 edges(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm;
@@ -1004,6 +1006,7 @@ edges(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
@@ -1211,6 +1214,7 @@ is_input(g_ptr redex)
 static void
 is_phase_delay(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm, g_node;
@@ -1222,6 +1226,7 @@ is_phase_delay(g_ptr redex)
     if( idx < 0 ) {
         pop_fsm();
         MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	End_string_ops(sop);
         return;
     }
     nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
@@ -1239,11 +1244,13 @@ is_phase_delay(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
 get_visualization_id(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm, g_node, g_level;
@@ -1255,6 +1262,7 @@ get_visualization_id(g_ptr redex)
     if( idx < 0 ) {
 	pop_fsm();
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	End_string_ops(sop);
 	return;
     }
     nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
@@ -1263,17 +1271,20 @@ get_visualization_id(g_ptr redex)
 	pop_fsm();
 	MAKE_REDEX_FAILURE(redex,
 			   Fail_pr("Node %s has no drawing information", node));
+	End_string_ops(sop);
 	return;
     }
     MAKE_REDEX_INT(redex, vp->id);
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
 get_visualization_pinst_cnt(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm, g_node, g_level;
@@ -1285,6 +1296,7 @@ get_visualization_pinst_cnt(g_ptr redex)
     if( idx < 0 ) {
 	pop_fsm();
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	End_string_ops(sop);
 	return;
     }
     nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
@@ -1293,17 +1305,20 @@ get_visualization_pinst_cnt(g_ptr redex)
 	pop_fsm();
 	MAKE_REDEX_FAILURE(redex,
 			   Fail_pr("Node %s has no drawing information", node));
+	End_string_ops(sop);
 	return;
     }
     MAKE_REDEX_INT(redex, vp->pinst_cnt);
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
 get_visualization_pfn(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm, g_node, g_level;
@@ -1315,6 +1330,7 @@ get_visualization_pfn(g_ptr redex)
     if( idx < 0 ) {
 	pop_fsm();
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	End_string_ops(sop);
 	return;
     }
     nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
@@ -1323,17 +1339,20 @@ get_visualization_pfn(g_ptr redex)
 	pop_fsm();
 	MAKE_REDEX_FAILURE(redex,
 			   Fail_pr("Node %s has no drawing information", node));
+	End_string_ops(sop);
 	return;
     }
     MAKE_REDEX_STRING(redex, vp->pfn);
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
 get_visualization_attributes(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm, g_node, g_level;
@@ -1345,6 +1364,7 @@ get_visualization_attributes(g_ptr redex)
     if( idx < 0 ) {
 	pop_fsm();
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	End_string_ops(sop);
 	return;
     }
     nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
@@ -1353,6 +1373,7 @@ get_visualization_attributes(g_ptr redex)
 	pop_fsm();
 	MAKE_REDEX_FAILURE(redex,
 			   Fail_pr("Node %s has no drawing information", node));
+	End_string_ops(sop);
 	return;
     }
     MAKE_REDEX_NIL(redex);
@@ -1367,11 +1388,13 @@ get_visualization_attributes(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
 get_visualization_fanins(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm, g_node, g_level;
@@ -1383,6 +1406,7 @@ get_visualization_fanins(g_ptr redex)
     if( idx < 0 ) {
 	pop_fsm();
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	End_string_ops(sop);
 	return;
     }
     nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
@@ -1391,6 +1415,7 @@ get_visualization_fanins(g_ptr redex)
 	pop_fsm();
 	MAKE_REDEX_FAILURE(redex,
 			   Fail_pr("Node %s has no drawing information", node));
+	End_string_ops(sop);
 	return;
     }
     MAKE_REDEX_NIL(redex);
@@ -1405,11 +1430,13 @@ get_visualization_fanins(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
 get_visualization_outputs(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm, g_node, g_level;
@@ -1421,6 +1448,7 @@ get_visualization_outputs(g_ptr redex)
     if( idx < 0 ) {
 	pop_fsm();
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	End_string_ops(sop);
 	return;
     }
     nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
@@ -1429,6 +1457,7 @@ get_visualization_outputs(g_ptr redex)
 	pop_fsm();
 	MAKE_REDEX_FAILURE(redex,
 			   Fail_pr("Node %s has no drawing information", node));
+	End_string_ops(sop);
 	return;
     }
     MAKE_REDEX_NIL(redex);
@@ -1443,11 +1472,13 @@ get_visualization_outputs(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
 fanin(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm, g_node;
@@ -1459,6 +1490,7 @@ fanin(g_ptr redex)
     if( idx < 0 ) {
 	pop_fsm();
 	MAKE_REDEX_FAILURE(redex, FailBuf);
+	End_string_ops(sop);
 	return;
     }
     MAKE_REDEX_NIL(redex);
@@ -1475,11 +1507,13 @@ fanin(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
 excitation_function(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm, g_node;
@@ -1491,6 +1525,7 @@ excitation_function(g_ptr redex)
     if( idx < 0 ) {
 	pop_fsm();
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	End_string_ops(sop);
 	return;
     }
     nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
@@ -1505,11 +1540,13 @@ excitation_function(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
 fanin_dfs(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr g_fsm, pred, nodes;
     EXTRACT_3_ARGS(redex, g_fsm, pred, nodes);
     fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
@@ -1525,6 +1562,7 @@ fanin_dfs(g_ptr redex)
 	if( idx < 0 ) {
 	    pop_fsm();
 	    MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	    End_string_ops(sop);
 	    return;
 	}
 	push_buf(&todo_buf, &idx);
@@ -1571,11 +1609,13 @@ fanin_dfs(g_ptr redex)
     POP_GLOBAL_GC(1);
     free_buf(&todo_buf);
     dispose_hash(&done_tbl, NULLFCN);
+    End_string_ops(sop);
 }
 
 static void
 fanout(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm, g_node;
@@ -1587,6 +1627,7 @@ fanout(g_ptr redex)
     if( idx < 0 ) {
 	pop_fsm();
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	End_string_ops(sop);
 	return;
     }
     MAKE_REDEX_NIL(redex);
@@ -1602,11 +1643,13 @@ fanout(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
 fanout_dfs(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr g_fsm, pred, nodes;
     EXTRACT_3_ARGS(redex, g_fsm, pred, nodes);
     fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
@@ -1661,11 +1704,13 @@ fanout_dfs(g_ptr redex)
     POP_GLOBAL_GC(1);
     free_buf(&todo_buf);
     dispose_hash(&done_tbl, NULLFCN);
+    End_string_ops(sop);
 }
 
 static void
 node2vector(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm, g_node;
@@ -1677,6 +1722,7 @@ node2vector(g_ptr redex)
     if( idx < 0 ) {
 	pop_fsm();
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	End_string_ops(sop);
 	return;
     }
     nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
@@ -1687,11 +1733,13 @@ node2vector(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
 node2value_list(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm, g_node;
@@ -1703,6 +1751,7 @@ node2value_list(g_ptr redex)
     if( idx < 0 ) {
 	pop_fsm();
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	End_string_ops(sop);
 	return;
     }
     nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
@@ -1730,6 +1779,7 @@ node2value_list(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
@@ -1765,6 +1815,7 @@ emit_fsm(g_ptr redex)
 static void
 basename(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm, g_node;
@@ -1783,11 +1834,13 @@ basename(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
 is_node(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm, g_node;
@@ -1804,6 +1857,7 @@ is_node(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
@@ -1921,6 +1975,7 @@ get_btrace_val(g_ptr redex)
 static void
 visualization_set_stop_nodes(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_vstate, vecs;
@@ -1949,6 +2004,7 @@ visualization_set_stop_nodes(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
@@ -1993,6 +2049,7 @@ get_ste_maxtime(g_ptr redex)
 static void
 visualization_vecs2tags(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_vstate, g_ignore_missing, vecs;
@@ -2010,6 +2067,7 @@ visualization_vecs2tags(g_ptr redex)
 	    if( !ignore_missing ) {
 		pop_fsm();
 		MAKE_REDEX_FAILURE(redex,Fail_pr("Cannot find vector %s", vec));
+		End_string_ops(sop);
 		return;
 	    }
 	} else {
@@ -2077,6 +2135,7 @@ visualization_vecs2tags(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
@@ -2133,6 +2192,7 @@ visualisation2tcl(g_ptr redex)
 static void
 visualize_fanin(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm, stop_vecs, ifc_vecs, g_levels, vecs, g_draw_level;
@@ -2147,6 +2207,7 @@ visualize_fanin(g_ptr redex)
 	if( il == NULL ) {
 	    pop_fsm();
 	    MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot find vector %s", vec));
+	    End_string_ops(sop);
 	    return;
 	}
 	FOREACH_NODE(nd, il) {
@@ -2162,6 +2223,7 @@ visualize_fanin(g_ptr redex)
 	if( il == NULL ) {
 	    pop_fsm();
 	    MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot find vector %s", vec));
+	    End_string_ops(sop);
 	    return;
 	}
 	FOREACH_NODE(nd, il) {
@@ -2185,6 +2247,7 @@ visualize_fanin(g_ptr redex)
 	if( il == NULL ) {
 	    pop_fsm();
 	    MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot find vector %s", vec));
+	    End_string_ops(sop);
 	    return;
 	}
 	pfn = gen_strappend(tmp_strs, " {");
@@ -2193,6 +2256,7 @@ visualize_fanin(g_ptr redex)
 	if( fanin == NULL ) {
 	    pop_fsm();
 	    MAKE_REDEX_FAILURE(redex, Fail_pr("Failed to draw %s", vec));
+	    End_string_ops(sop);
 	    return;
 	}
 	sch_list_ptr sl = (sch_list_ptr) new_rec(&(vp->sch_list_rec_mgr));
@@ -2216,12 +2280,14 @@ visualize_fanin(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 // visualize_expand_fanin vfsm anon levels
 static void
 visualize_expand_fanin(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_vstate, g_aname, g_levels, g_draw_level;
@@ -2240,6 +2306,7 @@ visualize_expand_fanin(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 
@@ -2247,6 +2314,7 @@ visualize_expand_fanin(g_ptr redex)
 static void
 visualize_hide_fanin(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_vstate, g_aname, g_draw_level;
@@ -2287,11 +2355,13 @@ visualize_hide_fanin(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
 visualize_undo(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_vstate;
@@ -2303,6 +2373,7 @@ visualize_undo(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
@@ -2989,23 +3060,50 @@ ilist2nds(ilist_ptr il)
 
 // Wrapper function to store strings permanently
 static vec_ptr
-split_vector_name(rec_mgr *vec_rec_mgrp, rec_mgr *range_rec_mgrp, string name)
+split_vector_name(string_op_ptr sop, string name)
 {
-    vec_ptr vp = Split_vector_name(&lstrings,vec_rec_mgrp,range_rec_mgrp,name);
-    // Make strings permanent
+    vec_ptr vp = Split_vector_name(sop,name);
+    // Make vector list permanent
+    vec_ptr res = NULL;
+    vec_ptr cur = NULL;
     for(vec_ptr p = vp; p != NULL; p = p->next) {
+	vec_ptr tmp = (vec_ptr) new_rec(vec_rec_mgrp);
+	tmp->type = p->type;
+	tmp->next = NULL;
+	if( cur == NULL ) {
+	    res = tmp;
+	    cur = tmp;
+	} else {
+	    cur->next = tmp;
+	    cur = tmp;
+	}
 	if( p->type == TXT ) {
-	    p->u.name = wastrsave(stringsp, p->u.name);
+	    tmp->u.name = wastrsave(stringsp, p->u.name);
+	} else {
+	    range_ptr cur_range = NULL;
+	    for(range_ptr rp = p->u.ranges; rp != NULL; rp = rp->next) {
+		range_ptr tr = (range_ptr) new_rec(range_rec_mgrp);
+		tr->next = NULL;
+		tr->upper = rp->upper;
+		tr->lower = rp->lower;
+		if( cur_range == NULL ) {
+		    tmp->u.ranges = tr;
+		    cur_range = tr;
+		} else {
+		    cur_range->next = tr;
+		    cur_range = tr;
+		}
+	    }
 	}
     }
-    return vp;
+    return res;
 }
 
 // Wrapper function to store strings permanently
 static string
 get_vector_signature(vec_ptr vp)
 {
-    string sig = Get_vector_signature(&lstrings, vp);
+    string sig = Get_vector_signature(sop, vp);
     return( wastrsave(stringsp, sig) );
 }
 
@@ -3015,9 +3113,9 @@ create_fsm()
     hash_record	*_all_name_tblp;
     rec_mgr     *_vec_info_rec_mgrp;
     rec_mgr     *_ilist_rec_mgrp;
+    rec_mgr     *_vec_rec_mgrp;
+    rec_mgr     *_range_rec_mgrp;
     rec_mgr     *_idx_list_rec_mgrp;
-    rec_mgr	*_vec_rec_mgrp;
-    rec_mgr	*_range_rec_mgrp;
     buffer	*_nodesp;
     buffer	*_compositesp;
     buffer	*_top_inpsp;
@@ -3041,14 +3139,14 @@ create_fsm()
     _ilist_rec_mgrp = &(fsm->ilist_rec_mgr);
     new_mgr(_ilist_rec_mgrp, sizeof(ilist_rec));
     //
-    _idx_list_rec_mgrp = &(fsm->idx_list_rec_mgr);
-    new_mgr(_idx_list_rec_mgrp, sizeof(idx_list_rec));
-    //
     _vec_rec_mgrp = &(fsm->vec_rec_mgr);
     new_mgr(_vec_rec_mgrp, sizeof(vec_rec));
     //
     _range_rec_mgrp = &(fsm->range_rec_mgr);
     new_mgr(_range_rec_mgrp, sizeof(range_rec));
+    //
+    _idx_list_rec_mgrp = &(fsm->idx_list_rec_mgr);
+    new_mgr(_idx_list_rec_mgrp, sizeof(idx_list_rec));
     //
     _nodesp = &(fsm->nodes);
     new_buf(_nodesp, 100, sizeof(nnode_rec));
@@ -3624,9 +3722,9 @@ push_fsm_env(fsm_ptr fsm)
     old_all_name_tblp = all_name_tblp;
     old_vec_info_rec_mgrp = vec_info_rec_mgrp;
     old_ilist_rec_mgrp = ilist_rec_mgrp;
-    old_idx_list_rec_mgrp = idx_list_rec_mgrp;
     old_vec_rec_mgrp = vec_rec_mgrp;
     old_range_rec_mgrp = range_rec_mgrp;
+    old_idx_list_rec_mgrp = idx_list_rec_mgrp;
     old_nodesp = nodesp;
     old_compositesp = compositesp;
     old_top_inpsp = top_inpsp;
@@ -3639,9 +3737,9 @@ push_fsm_env(fsm_ptr fsm)
     all_name_tblp = &(fsm->all_name_tbl);
     vec_info_rec_mgrp = &(fsm->vec_info_rec_mgr);
     ilist_rec_mgrp = &(fsm->ilist_rec_mgr);
-    idx_list_rec_mgrp = &(fsm->idx_list_rec_mgr);
     vec_rec_mgrp = &(fsm->vec_rec_mgr);
     range_rec_mgrp = &(fsm->range_rec_mgr);
+    idx_list_rec_mgrp = &(fsm->idx_list_rec_mgr);
     nodesp = &(fsm->nodes);
     compositesp = &(fsm->composites);
     top_inpsp = &(fsm->top_inps);
@@ -3659,9 +3757,9 @@ pop_fsm_env()
     all_name_tblp = old_all_name_tblp;
     vec_info_rec_mgrp = old_vec_info_rec_mgrp;
     ilist_rec_mgrp = old_ilist_rec_mgrp;
-    idx_list_rec_mgrp = old_idx_list_rec_mgrp;
     vec_rec_mgrp = old_vec_rec_mgrp;
     range_rec_mgrp = old_range_rec_mgrp;
+    idx_list_rec_mgrp = old_idx_list_rec_mgrp;
     nodesp = old_nodesp;
     compositesp = old_compositesp;
     top_inpsp = old_top_inpsp;
@@ -3673,14 +3771,12 @@ static void
 push_fsm(fsm_ptr fsm)
 {
     push_fsm_env(fsm);
-    new_ustrmgr(&lstrings);
 }
 
 static void
 pop_fsm()
 {
     pop_fsm_env();
-    free_ustrmgr(&lstrings);
 }
 
 static void
@@ -3820,9 +3916,9 @@ sweep_fsm_fn(void)
 		dispose_hash(&(fsm->all_name_tbl), NULLFCN);
 		free_mgr(&(fsm->vec_info_rec_mgr));
 		free_mgr(&(fsm->ilist_rec_mgr));
-		free_mgr(&(fsm->idx_list_rec_mgr));
 		free_mgr(&(fsm->vec_rec_mgr));
 		free_mgr(&(fsm->range_rec_mgr));
+		free_mgr(&(fsm->idx_list_rec_mgr));
 		free_buf(&(fsm->nodes));
 		free_buf(&(fsm->composites));
 		free_mgr(&(fsm->vis_io_rec_mgr));
@@ -4880,7 +4976,7 @@ declare_vector(hash_record *vtblp, string hier, string name,
     ip->value_list = value_list;
     ip->transient = transient;
     ip->local_name = name;
-    vec_ptr vp = split_vector_name(vec_rec_mgrp,range_rec_mgrp,name);
+    vec_ptr vp = split_vector_name(sop,name);
     ip->declaration = vp;
     string sig = get_vector_signature(vp);
     ip->signature = sig;
@@ -5016,7 +5112,7 @@ ilist_is_user_defined(ilist_ptr il)
 static ilist_ptr
 vec2indices(string name)
 {
-   vec_ptr vp0 = split_vector_name(vec_rec_mgrp, range_rec_mgrp, name);
+   vec_ptr vp0 = split_vector_name(sop, name);
     string sig = get_vector_signature(vp0);
     vec_info_ptr ip = (vec_info_ptr) find_hash(all_name_tblp, sig);
     while( ip != NULL ) {
@@ -5043,7 +5139,7 @@ vec2indices(string name)
 static int
 name2idx(string name)
 {
-    vec_ptr vp = split_vector_name(vec_rec_mgrp, range_rec_mgrp, name);
+    vec_ptr vp = split_vector_name(sop, name);
     string sig = get_vector_signature(vp);
     vec_info_ptr ip = (vec_info_ptr) find_hash(all_name_tblp, sig);
     while( ip != NULL ) {
@@ -5076,7 +5172,7 @@ map_vector(hash_record *vtblp, string hier, string name, bool ignore_missing)
         }
         return res;
     }
-    vec_ptr vp = split_vector_name(vec_rec_mgrp,range_rec_mgrp, name);
+    vec_ptr vp = split_vector_name(sop, name);
     string sig = get_vector_signature(vp);
     vec_info_ptr oip = (vec_info_ptr) find_hash(vtblp,sig);
     if( oip == NULL ) {
@@ -5098,7 +5194,7 @@ map_vector(hash_record *vtblp, string hier, string name, bool ignore_missing)
         }
         name = new_name;
         declare_vector(vtblp, hier, name, FALSE, NULL, s_ES);
-        vp = split_vector_name(vec_rec_mgrp,range_rec_mgrp, name);
+        vp = split_vector_name(sop, name);
         sig = get_vector_signature(vp);
         oip = (vec_info_ptr) find_hash(vtblp,sig);
     }
@@ -5120,10 +5216,7 @@ map_vector(hash_record *vtblp, string hier, string name, bool ignore_missing)
         }
     }
 
-    rec_mgr vec_list_rec_mgr;
-    new_mgr(&vec_list_rec_mgr, sizeof(vec_list_rec));
-    vec_list_ptr vl = Expand_vector(&vec_list_rec_mgr,
-				    vec_rec_mgrp, range_rec_mgrp, vp);
+    vec_list_ptr vl = Expand_vector(sop, vp);
     ilist_ptr final_idx_map_result = NULL;
     ilist_ptr *next_list = &final_idx_map_result; 
 
@@ -5157,14 +5250,12 @@ map_vector(hash_record *vtblp, string hier, string name, bool ignore_missing)
 	    }
             FP(err_fp, "\n%s\n", FailBuf);
             report_source_locations(err_fp);
-	    free_mgr(&vec_list_rec_mgr);
             Rprintf("");
 	}
 	*next_list = idx_map_result;
 	next_list = &(idx_map_result->next);
 	vl = vl->next;
     }
-    free_mgr(&vec_list_rec_mgr);
     return( final_idx_map_result );
 }
 
@@ -8320,6 +8411,7 @@ gSTE(g_ptr redex, value_type type)
 {
     void    (*old_handler)();
 
+    sop = Begin_string_ops();
     // STE opts fsm wl ant cons trl
     g_ptr g_opts, g_fsm, wl, ant, cons, trl;
     nbr_errors_reported = 0;
@@ -8398,6 +8490,7 @@ gSTE(g_ptr redex, value_type type)
     if( !ok || quit_simulation_early ) {
 	ste->max_time = 0;
 	pop_fsm();
+	End_string_ops(sop);
 	signal(SIGINT, old_handler);
 	return;
     }
@@ -8417,6 +8510,7 @@ gSTE(g_ptr redex, value_type type)
 	ste->max_time = 0;
 	ste->active = FALSE;
 	pop_fsm();
+	End_string_ops(sop);
 	signal(SIGINT, old_handler);
 	return;
     }
@@ -8428,6 +8522,7 @@ gSTE(g_ptr redex, value_type type)
 	ste->max_time = 0;
 	free_ste_buffers();
 	ste->active = FALSE;
+	End_string_ops(sop);
 	pop_fsm();
 	signal(SIGINT, old_handler);
 	return;
@@ -8570,6 +8665,7 @@ gSTE(g_ptr redex, value_type type)
 	Info_to_tcl(buf);
     }
     signal(SIGINT, old_handler);
+    End_string_ops(sop);
     pop_fsm();
 }
 
@@ -8710,6 +8806,7 @@ DBG_print_sch(string title, sch_ptr sch)
 static void
 fl_clean_pexlif_ios(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr p = GET_APPLY_RIGHT(redex);
@@ -8717,11 +8814,13 @@ fl_clean_pexlif_ios(g_ptr redex)
     OVERWRITE(redex, p);
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static fsm_ptr
 gen_pexlif2fsm(g_ptr p, g_ptr black_box_list, int max_depth)
 {
+    sop = Begin_string_ops();
     p = clean_pexlif_ios(p);
     //
     fsm_ptr fsm = create_fsm();
@@ -8767,6 +8866,7 @@ gen_pexlif2fsm(g_ptr p, g_ptr black_box_list, int max_depth)
     dispose_hash(&bb_tbl, NULLFCN);
     free_buf(&attr_buf);
     pop_fsm();
+    End_string_ops(sop);
     return fsm;
 }
 
@@ -8827,6 +8927,7 @@ value_type2string(value_type type)
 static void
 gen_get_trace(g_ptr redex, value_type type)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_ste, g_node;
@@ -8836,6 +8937,7 @@ gen_get_trace(g_ptr redex, value_type type)
 	string msg = Fail_pr("Asking for %s values when STE run created %ss",
 			      value_type2string(type),
 			      value_type2string(ste->type));
+	End_string_ops(sop);
 	MAKE_REDEX_FAILURE(redex, msg);
 	return;
     }
@@ -8846,6 +8948,7 @@ gen_get_trace(g_ptr redex, value_type type)
     if( idx < 0 ) {
 	pop_ste();
 	pop_fsm();
+	End_string_ops(sop);
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
 	return;
     }
@@ -8853,6 +8956,7 @@ gen_get_trace(g_ptr redex, value_type type)
     if( tp == NULL ) {
 	pop_ste();
 	pop_fsm();
+	End_string_ops(sop);
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not traced", node));
 	return;
     }
@@ -8868,11 +8972,13 @@ gen_get_trace(g_ptr redex, value_type type)
     pop_ste();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
 gen_limited_get_trace(g_ptr redex, value_type type)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_ste, g_node, g_min, g_max;
@@ -8884,6 +8990,7 @@ gen_limited_get_trace(g_ptr redex, value_type type)
 	string msg = Fail_pr("Asking for %s values when STE run created %ss",
 			      value_type2string(type),
 			      value_type2string(ste->type));
+	End_string_ops(sop);
 	MAKE_REDEX_FAILURE(redex, msg);
 	return;
     }
@@ -8894,6 +9001,7 @@ gen_limited_get_trace(g_ptr redex, value_type type)
     if( idx < 0 ) {
 	pop_ste();
 	pop_fsm();
+	End_string_ops(sop);
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
 	return;
     }
@@ -8901,6 +9009,7 @@ gen_limited_get_trace(g_ptr redex, value_type type)
     if( tp == NULL ) {
 	pop_ste();
 	pop_fsm();
+	End_string_ops(sop);
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not traced", node));
 	return;
     }
@@ -8932,11 +9041,13 @@ gen_limited_get_trace(g_ptr redex, value_type type)
     pop_ste();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
 gen_get_trace_val(g_ptr redex, value_type type)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_ste, g_node, g_time;
@@ -8946,6 +9057,7 @@ gen_get_trace_val(g_ptr redex, value_type type)
 	string msg = Fail_pr("Asking for %s values when STE run created %ss",
 			      value_type2string(type),
 			      value_type2string(ste->type));
+	End_string_ops(sop);
 	MAKE_REDEX_FAILURE(redex, msg);
 	return;
     }
@@ -8957,6 +9069,7 @@ gen_get_trace_val(g_ptr redex, value_type type)
     if( idx < 0 ) {
 	pop_ste();
 	pop_fsm();
+	End_string_ops(sop);
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in ste-fsm", node));
 	return;
     }
@@ -8964,6 +9077,7 @@ gen_get_trace_val(g_ptr redex, value_type type)
     if( tp == NULL ) {
 	pop_ste();
 	pop_fsm();
+	End_string_ops(sop);
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not traced", node));
 	return;
     }
@@ -8982,6 +9096,7 @@ gen_get_trace_val(g_ptr redex, value_type type)
     pop_ste();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void

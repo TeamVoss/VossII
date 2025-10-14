@@ -3,6 +3,7 @@ module Plan (plan) where
 import Data.List (findIndex)
 import qualified Data.Map as M
 import qualified Data.Set as S
+import Control.Monad
 import Control.Monad.State
 
 import Types

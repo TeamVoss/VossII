@@ -140,7 +140,7 @@ typedef struct typeExp_rec	*typeExp_ptr;
 /* Simulation status types */
 typedef enum {Stable, Unstable, Abort}  step_ret_vals;
 
-
+void		voss_abort();
 string		Get_DIR(string fullname);
 FILE*		Tryopen(string name, string mode, string *full_name);
 void            Emit_prompt(const char *pre);

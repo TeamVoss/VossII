@@ -1,0 +1,15 @@
+cload "osu018_stdcells.fl";
+(update_vossrc "RECURSION-CALL-LIMIT" "100000") seq ();
+load "DB_271/code/_synth_112.fl";
+
+
+let p = rename_stdcells (unfold_pexlif (wrap_pexlif (Q_synth_112 [("instance", "_synth_112")]
+	[("i1[7:0]", ["OPCODE[7:0]"]),
+	("o1[2:0]", ["select[3,1:0]"])
+	])) 1);
+
+p fseq ();
+write_pexlif "/home/cseger/VossII/src/bin/fl/bugs/DB_271/pexlifs/_synth_112.pexlif" p;
+print (get_mapped_cell_info p);
+"===SuCcEsS===";
+quit;

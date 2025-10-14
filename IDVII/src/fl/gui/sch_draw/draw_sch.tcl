@@ -134,7 +134,7 @@ proc create_ste_debugger {w} {
     toplevel $w
     set ht  [expr round(0.8*[winfo screenheight .])]
     set wid [expr round(0.8*[winfo screenwidth .])]
-    wm geometry $w -10+100
+    wm geometry $w -20+100
 
     set nb $w.nb
     ttk::notebook $nb -width $wid -height $ht
@@ -5072,7 +5072,6 @@ proc sch:mark_node {c w col} {
 	foreach node $nodes {
 	    fl_set_wv_highlight_color $w $col $node
 	}
-puts stderr "cb:set_wire_color $c $nodes $col"
     }
 }
 
@@ -5088,10 +5087,6 @@ proc sch:center_sel {op w c} {
 	    }
 	    fl_set_selection $c "SET_SELECTION"
 	}
-
-
-
-puts stderr "search with operation $op on nodes $nodes"
     }
 }
 

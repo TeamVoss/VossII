@@ -3,7 +3,7 @@ load "idv.fl";
 let p = verilog2pexlif T "" "SP_FPU" ["SP_FPU.v"] [];
 time (p fseq 1);
 
-//IDV p "DB_sp_fpu" [];
+IDV p "DB_sp_fpu" [];
 
     
 

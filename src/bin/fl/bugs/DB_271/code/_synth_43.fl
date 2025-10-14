@@ -1,0 +1,23 @@
+
+let Q_synth_43 {attrs::(string#string) list} conns =
+    let inps = [ "i1[1:0]",
+                 "i2" ] in
+    let outs = [ "o1[11:0]",
+                 "o2[1:0]",
+                 "o3",
+                 "o4[14:0]",
+                 "o5" ] in
+    let ints = md_extract_vectors [ ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        _buf 12 "DB_sp_fpu/code/_synth_43.v:4.21-4.23" ["o1[11:0]"] ["i1[1]", "i1[1]", "i1[1]", "i1[1]", "i1[1]", "i1[1]", "i1[1]", "i1[1:0]", "i1[1:0]", "i1[0]"],
+        _buf 2 "DB_sp_fpu/code/_synth_43.v:5.20-5.22" ["o2[1:0]"] ["0b0", "i2"],
+        _buf 1 "DB_sp_fpu/code/_synth_43.v:6.12-6.14" ["o3"] ["0b0"],
+        _buf 15 "DB_sp_fpu/code/_synth_43.v:7.21-7.23" ["o4[14:0]"] ["0b000000000000000"],
+        _buf 1 "DB_sp_fpu/code/_synth_43.v:8.12-8.14" ["o5"] ["0b1"]
+    ] in
+    yosys_PINST "_synth_43" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+

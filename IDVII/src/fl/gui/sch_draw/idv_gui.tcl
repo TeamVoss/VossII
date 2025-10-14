@@ -10,16 +10,19 @@
 proc idv:create_idv_gui {w rw_db read_only} {
     catch {destroy $w}
     toplevel $w
+    set ht  [expr round(0.8*[winfo screenheight .])]
+    set wid [expr round(0.8*[winfo screenwidth .])]
     wm geometry $w -20+100
+
     set nb $w.nb
-    set ::idv(code_dir) "$rw_db/code"
-    ttk::notebook $nb -width 1200 -height 700
+    ttk::notebook $nb -width $wid -height $ht
     ttk::notebook::enableTraversal $nb
     bind $nb <<NotebookTabChanged>> [list idv:inform_canvas_change $w]
+    set ::idv(code_dir) "$rw_db/code"
     pack $nb -side top -expand y -fill both
     set ::sch_window_cnt($w) 0
     bindtags $w top_level_idv_window
-    bind top_level_idv_window <Destroy> "list idv:close_idv_gui $read_only"
+    bind top_level_idv_window <Destroy> [list idv:close_idv_gui $read_only]
     $nb add [frame $nb.idv] -text "IDV Home"
 
     # Now make the front page
@@ -39,7 +42,7 @@ proc idv:create_idv_gui {w rw_db read_only} {
         set c $ww.c
 	frame $ww.tf
 	pack $ww.tf -side top -fill x
-	    label $ww.tf.shn_lbl -text "Show anon model names"
+	    ttk::label $ww.tf.shn_lbl -text "Show anon model names"
 	    set ::idv(show_anon_model_names) 0
 	    ttk::checkbutton $ww.tf.shn_cb \
 		-variable ::idv(show_anon_model_names) \
@@ -48,7 +51,7 @@ proc idv:create_idv_gui {w rw_db read_only} {
 	    pack $ww.tf.shn_cb -side left 
 	    frame $ww.tf.sp -width 10
 	    pack $ww.tf.sp -side left
-	    label $ww.tf.she_lbl -text "Show transformation name"
+	    ttk::label $ww.tf.she_lbl -text "Show transformation name"
 	    set ::idv(show_transform_name) 1
 	    ttk::checkbutton $ww.tf.she_cb \
 		-variable ::idv(show_transform_name) \
@@ -134,14 +137,14 @@ proc idv:create_idv_gui {w rw_db read_only} {
 	pack $f -side top -fill both -expand yes
 	set b $p.buttons
 	frame $b -relief flat
-	    button $b.quit -text Exit -command "destroy $w"
+	    ttk::button $b.quit -text Exit -command "destroy $w"
 	    frame $b.sp1 -relief flat
-	    button $b.save -text Save -command "fl_save_idv_db save"
+	    ttk::button $b.save -text Save -command "fl_save_idv_db save"
 	    frame $b.sp2 -relief flat
-	    button $b.import -text "Import model" \
+	    ttk::button $b.import -text "Import model" \
 		    -command "idv:import_model $w"
 	    frame $b.sp3 -relief flat
-	    button $b.new -text "New transform" \
+	    ttk::button $b.new -text "New transform" \
 		    -command "idv:new_toplevel_transf $w $f.list"
 	    pack $b.quit -side left -expand yes
 	    pack $b.sp1 -side left -expand yes
@@ -157,6 +160,7 @@ proc idv:create_idv_gui {w rw_db read_only} {
 }
 
 proc idv:close_idv_gui {readonly} {
+WriteStdErr "idv:close_idv_gui $readonly\n"
     catch {unset ::idv}
     if { $readonly == 1 } { return }
     fl_save_idv_db exit
@@ -224,7 +228,7 @@ proc idv:name_and_save_model {w version {default ""} } {
     vis_toplevel $npw $w {} {} "Name current $version model"
         frame $npw.t -relief flat
         pack $npw.t -side top -fill x
-            label $npw.t.l -text "Name of $version model: "
+            ttk::label $npw.t.l -text "Name of $version model: "
             ttk::entry $npw.t.e -textvariable ::idv_prompt_name -width 20
             bind $npw.t.e <KeyPress-Return> \
 		"idv:perform_model_save $w $npw $version"
@@ -232,14 +236,14 @@ proc idv:name_and_save_model {w version {default ""} } {
             pack $npw.t.e -side left -fill x -expand yes
         frame $npw.error -relief flat
         pack $npw.error -side top -fill x
-	    label $npw.error.l -text ""
+	    ttk::label $npw.error.l -text ""
 	    pack $npw.error.l -side left -fill x
 
         frame $npw.b -relief flat
         pack $npw.b -side top -fill x
-            button $npw.b.cancel -text Cancel -command "destroy $npw"
+            ttk::button $npw.b.cancel -text Cancel -command "destroy $npw"
             frame $npw.b.sep -relief flat
-            button $npw.b.ok -text Ok -command \
+            ttk::button $npw.b.ok -text Ok -command \
 		"idv:perform_model_save $w $npw $version"
             pack $npw.b.cancel -side left -fill x
             pack $npw.b.sep -side left -fill x -expand yes
@@ -267,6 +271,9 @@ proc idv:create_idv_menu {nb w} {
         $m add command -label "Write out Verilog netlist" \
             -command "idv:write_verilog $w 1"
 
+	ttk::button $w.menu.search -text Search -command "sch:search $w.c"
+        pack $w.menu.search -side left -padx 5
+
 	ttk::menubutton $w.menu.select -text Select -menu $w.menu.select.menu
         pack $w.menu.select -side left -padx 5
 	set m $w.menu.select.menu
@@ -285,69 +292,69 @@ proc idv:create_idv_menu {nb w} {
         $m add command -label "Invert selection" \
             -command "idv:selection_command $w invert"
 
-        button $w.menu.new_transf -image $::icon(new_transf) \
+        ttk::button $w.menu.new_transf -image $::icon(new_transf) \
                 -command "idv:new_transf $w"
         balloon $w.menu.new_transf \
 		"Start new transformation sequence from selected instances"
         pack $w.menu.new_transf -side left -padx 5
 
-        button $w.menu.db_replace -image $::icon(db_replace) \
+        ttk::button $w.menu.db_replace -image $::icon(db_replace) \
                 -command "idv:db_replace $w"
         balloon $w.menu.db_replace \
 		"Find and apply a database transformation"
         pack $w.menu.db_replace -side left -padx 5
 
-        button $w.menu.fold -image $::icon(fold) \
+        ttk::button $w.menu.fold -image $::icon(fold) \
                 -command "idv:fold $w"
         balloon $w.menu.fold "Fold selected instances"
         pack $w.menu.fold -side left -padx 5
 
-        button $w.menu.unfold -image $::icon(unfold) \
+        ttk::button $w.menu.unfold -image $::icon(unfold) \
                 -command "idv:unfold $w"
         balloon $w.menu.unfold "Unfold selected instance"
         pack $w.menu.unfold -side left -padx 5
 
-        button $w.menu.flatten -image $::icon(flatten) \
+        ttk::button $w.menu.flatten -image $::icon(flatten) \
                 -command "idv:flatten $w"
         balloon $w.menu.flatten "Flatten model"
         pack $w.menu.flatten -side left -padx 5
 
-        button $w.menu.duplicate -image $::icon(duplicate) \
+        ttk::button $w.menu.duplicate -image $::icon(duplicate) \
                 -command "idv:duplicate $w"
         balloon $w.menu.duplicate "Duplicate selected instance to every fanout"
         pack $w.menu.duplicate -side left -padx 5
 
-        button $w.menu.merge -image $::icon(merge) \
+        ttk::button $w.menu.merge -image $::icon(merge) \
                 -command "idv:merge $w"
         balloon $w.menu.merge "Merge selected identical instances"
         pack $w.menu.merge -side left -padx 5
 
-        button $w.menu.wire2bufs_w -image $::icon(wire2bufs) \
+        ttk::button $w.menu.wire2bufs_w -image $::icon(wire2bufs) \
                 -command "idv:do_wire2bufs $w"
         balloon $w.menu.wire2bufs_w "Add buffers in wire(s)"
         pack $w.menu.wire2bufs_w -side left -padx 5
 
-        button $w.menu.bufs2wire_w -image $::icon(bufs2wire) \
+        ttk::button $w.menu.bufs2wire_w -image $::icon(bufs2wire) \
                 -command "idv:do_bufs2wires $w"
         balloon $w.menu.bufs2wire_w "Remove selected buffer(s)"
         pack $w.menu.bufs2wire_w -side left -padx 5
 
-        button $w.menu.rename_w -image $::icon(rename_wires) \
+        ttk::button $w.menu.rename_w -image $::icon(rename_wires) \
                 -command "idv:do_rename_wires $w"
         balloon $w.menu.rename_w "Rename selected wires"
         pack $w.menu.rename_w -side left -padx 5
 
-        button $w.menu.retime_fwd -image $::icon(retime_fwd) \
+        ttk::button $w.menu.retime_fwd -image $::icon(retime_fwd) \
                 -command "idv:retime_fwd $w"
         balloon $w.menu.retime_fwd "Retime selected instance forward"
         pack $w.menu.retime_fwd -side left -padx 5
 
-        button $w.menu.const_prop -image $::icon(const_prop) \
+        ttk::button $w.menu.const_prop -image $::icon(const_prop) \
                 -command "idv:constant_prop $w"
         balloon $w.menu.const_prop "Propagate constants and simplify model"
         pack $w.menu.const_prop -side left -padx 5
 
-        button $w.menu.fev -image $::icon(fev) \
+        ttk::button $w.menu.fev -image $::icon(fev) \
                 -command "idv:do_fev $w"
         balloon $w.menu.fev "Replace with new design that has been FEV-ed"
         pack $w.menu.fev -side left -padx 5
@@ -367,16 +374,16 @@ proc idv:fold {w} {
     vis_toplevel $npw $w {} {} "Fold name"
 	frame $npw.t -relief flat
 	pack $npw.t -side top
-	    label $npw.t.l -text "Name of folded hierarchy: "
+	    ttk::label $npw.t.l -text "Name of folded hierarchy: "
 	    ttk::entry $npw.t.e -textvariable ::idv_prompt_name -width 20
 	    bind $npw.t.e <KeyPress-Return> "idv:perform_fold $w $npw"
 	    pack $npw.t.l -side left
 	    pack $npw.t.e -side left -fill x -expand yes
 	frame $npw.b -relief flat
 	pack $npw.b -side top
-	    button $npw.b.cancel -text Cancel -command "destroy $npw"
+	    ttk::button $npw.b.cancel -text Cancel -command "destroy $npw"
 	    frame $npw.b.sep -relief flat
-	    button $npw.b.ok -text Ok -command "idv:perform_fold $w $npw"
+	    ttk::button $npw.b.ok -text Ok -command "idv:perform_fold $w $npw"
 	    pack $npw.b.cancel -side left -fill x
 	    pack $npw.b.sep -side left -fill x -expand yes
 	    pack $npw.b.ok -side left -fill x
@@ -443,16 +450,16 @@ proc idv:select_replacement {c alts} {
     set b $w.buttons
     frame $b
     pack $b -side top
-	button $b.cancel -text Cancel \
+	ttk::button $b.cancel -text Cancel \
 	    -command "idv:return_select_replacement $w Cancel"
 	pack $b.cancel -side left -padx 10
-	button $b.appl1 -text "Apply Once" \
+	ttk::button $b.appl1 -text "Apply Once" \
 	    -command "idv:return_select_replacement $w ApplyOnce"
 	pack $b.appl1 -side left -padx 10
-	button $b.appln -text "Apply Everywhere" \
+	ttk::button $b.appln -text "Apply Everywhere" \
 	    -command "idv:return_select_replacement $w ApplyEverywhere"
 	pack $b.appln -side left -padx 10
-	button $b.repappln -text "Repeatedly Apply Everywhere" \
+	ttk::button $b.repappln -text "Repeatedly Apply Everywhere" \
 	    -command "idv:return_select_replacement $w RepeatApplyEverywhere"
 	pack $b.repappln -side left -padx 10
     #
@@ -495,46 +502,46 @@ proc idv:name_transform_and_use {inside c tr_name model_name} {
     #
     frame $w.namef
     pack $w.namef -side top -fill x
-	label $w.namef.l -text "Name of transformation: "
-	entry $w.namef.e -textvariable ::idv(transf_name) -width 30
+	ttk::label $w.namef.l -text "Name of transformation: "
+	ttk::entry $w.namef.e -textvariable ::idv(transf_name) -width 30
 	pack $w.namef.e -side right
 	pack $w.namef.l -side left -fill x -anchor w
     #
 #    frame $w.imp_name
 #    pack $w.imp_name -side top -fill x
-#	label $w.imp_name.l -text "Name of final model: "
-#	entry $w.imp_name.e -textvariable ::idv(imp_name) -width 30
+#	ttk::label $w.imp_name.l -text "Name of final model: "
+#	ttk::entry $w.imp_name.e -textvariable ::idv(imp_name) -width 30
 #	pack $w.imp_name.e -side right
 #	pack $w.imp_name.l -side left -fill x -anchor w
     #
     frame $w.buttons
     pack $w.buttons -side top
-	button $w.buttons.cancel -text Cancel \
+	ttk::button $w.buttons.cancel -text Cancel \
 	    -command "idv:perform_name_transf $w $c Cancel"
 	pack $w.buttons.cancel -side left -padx 10
-	button $w.buttons.discard -text Discard \
+	ttk::button $w.buttons.discard -text Discard \
 	    -command "idv:perform_name_transf $w $c Discard"
 	pack $w.buttons.discard -side left -padx 10
-	button $w.buttons.save -text Save \
+	ttk::button $w.buttons.save -text Save \
 	    -command "idv:perform_name_transf $w $c Save"
 	pack $w.buttons.save -side left -padx 10
 	# Only if started from a transformation window
 	if { $toplevel_transf == 0 } {
 	    if { $inside == "1" } {
-		button $w.buttons.appl1 -text "Save & Apply" \
+		ttk::button $w.buttons.appl1 -text "Save & Apply" \
 		 -command "idv:perform_name_transf $w $c SaveAndApplyOnce"
 		pack $w.buttons.appl1 -side left -padx 10
 	    } else {
-		button $w.buttons.appl1 -text "Save & Apply Once" \
+		ttk::button $w.buttons.appl1 -text "Save & Apply Once" \
 		 -command "idv:perform_name_transf $w $c SaveAndApplyOnce"
 		pack $w.buttons.appl1 -side left -padx 10
-		button $w.buttons.appln -text "Save & Apply Everywhere" \
+		ttk::button $w.buttons.appln -text "Save & Apply Everywhere" \
 		 -command "idv:perform_name_transf $w $c SaveAndApplyEverywhere"
 		pack $w.buttons.appln -side left -padx 10
 	    }
 	}
     frame $w.errors
-	label $w.errors.l -text ""
+	ttk::label $w.errors.l -text ""
 	pack $w.errors.l -side top -fill x
     pack $w.errors -side top
     tkwait window $w
@@ -617,19 +624,19 @@ proc idv:ask_for_model_name {w} {
     vis_toplevel $npw $w {} {} "Name model"
         frame $npw.t -relief flat
         pack $npw.t -side top -fill x
-            label $npw.t.l -text "Name of model: "
+            ttk::label $npw.t.l -text "Name of model: "
             ttk::entry $npw.t.e -textvariable ::idv_prompt_name -width 20
             bind $npw.t.e <KeyPress-Return> "destroy $npw"
             pack $npw.t.l -side left
             pack $npw.t.e -side left -fill x -expand yes
         frame $npw.error -relief flat
         pack $npw.error -side top -fill x
-            label $npw.error.l -text ""
+            ttk::label $npw.error.l -text ""
             pack $npw.error.l -side left -fill x
 
         frame $npw.b -relief flat
         pack $npw.b -side top -fill x
-            button $npw.b.ok -text Ok -command "destroy $npw"
+            ttk::button $npw.b.ok -text Ok -command "destroy $npw"
             pack $npw.b.ok -side left -fill x
 
     tkwait window $npw
@@ -700,6 +707,7 @@ proc idv:make_template {w c type args} {
 	}
 	set create_file 1
 	if { [file exists $file] } {
+	    option add *Dialog.msg.font $::voss2_txtfont
 	    set reply [tk_messageBox \
 			    -message "File exists. Overwrite it?:" \
 			    -icon question -default no -type yesnocancel \
@@ -745,9 +753,9 @@ proc idv:mark_progress {ew name1 name2 op} {
     if ![winfo exists $ew] { return; }
     set pexlif_file $::idv(fev_imp_file) 
     if [file exists $pexlif_file] {
-	$ew configure -bg "light green"
+	$ew configure -background "light green"
     } else {
-	$ew configure -bg white
+	$ew configure -background white
     }
 }
 
@@ -760,12 +768,14 @@ proc idv:do_verify {w canvas type} {
 	set ::idv(fev_template_file) ""
 	set ::idv(fev_imp_file) ""
     } elseif { $res == "cex" } {
+	option add *Dialog.msg.font $::voss2_txtfont
 	tk_messageBox \
 	    -message "Verification failed.\nCounterexample simulated." \
 	    -type ok -parent $w
     } elseif { $res == "already_dealt_with_cex" } {
 	# Do nothing here
     } else {
+	option add *Dialog.msg.font $::voss2_txtfont
 	tk_messageBox \
 	    -message "Verification failed.\n$res." -type ok -parent $w
     }
@@ -778,32 +788,36 @@ proc idv:do_fev {ww} {
 
     frame $w.f1 -relief flat 
     pack $w.f1 -side top -fill x -pady 10
-        label $w.f1.l -text FEV -font $::voss2_txtfont6
-        button $w.f1.cancel -text Cancel -command "destroy $w"
+        ttk::label $w.f1.l -text FEV -font $::voss2_txtfont6
+        ttk::button $w.f1.cancel -text Cancel -command "destroy $w"
         pack $w.f1.cancel -side right -padx 10
         pack $w.f1.l -side left -fill x
 
 
-    labelframe $w.f2 -relief groove -text Manual
+    ttk::labelframe $w.f2 -relief groove -text Manual
     pack $w.f2 -side top -fill x -pady 10
 	frame $w.f2.f1 -relief flat
 	frame $w.f2.f2 -relief flat
 	pack $w.f2.f1 -side top -fill x
 	pack $w.f2.f2 -side top -fill x
-	    label $w.f2.f1.l -text "Make template in:" -width 20 -justify left \
+	    ttk::label $w.f2.f1.l -text "Make template in:" \
+			    -width 20 -justify left \
 		-anchor w
-	    entry $w.f2.f1.e -textvariable ::idv(fev_template_file) -width 30
-	    button $w.f2.f1.dir -image $::icon(folder) \
+	    ttk::entry $w.f2.f1.e -textvariable ::idv(fev_template_file) \
+			    -width 30
+	    ttk::button $w.f2.f1.dir -image $::icon(folder) \
 		-command "idv:fev_template_file $::idv(code_dir) $w $ww.c"
-	    label $w.f2.f2.l -text "Include file:" -width 20 -justify left \
+	    ttk::label $w.f2.f2.l -text "Include file:" -width 20 \
+			    -justify left \
 		-anchor w
-	    entry $w.f2.f2.e -textvariable ::idv(fev_include_file) -width 30
+	    ttk::entry $w.f2.f2.e -textvariable ::idv(fev_include_file) \
+			    -width 30
 
-	    button $w.f2.f2.dir -image $::icon(folder) \
+	    ttk::button $w.f2.f2.dir -image $::icon(folder) \
 		-command "idv:fev_include_file $::idv(code_dir) $w $ww.c"
-	    button $w.f2.f1.verilog -text "Verilog" \
+	    ttk::button $w.f2.f1.verilog -text "Verilog" \
 		-command "idv:make_template $w $ww.c verilog"
-	    button $w.f2.f1.hfl -text "HFL" \
+	    ttk::button $w.f2.f1.hfl -text "HFL" \
 		-command "idv:make_template $w $ww.c hfl"
 	    pack $w.f2.f1.l -side left -anchor w
 	    pack $w.f2.f1.e -side left -fill x -expand yes
@@ -814,7 +828,7 @@ proc idv:do_fev {ww} {
 	    pack $w.f2.f1.verilog -side left -padx 5
 	    pack $w.f2.f1.hfl -side left -padx 5
 
-    labelframe $w.f2b -relief groove -text Synthesis
+    ttk::labelframe $w.f2b -relief groove -text Synthesis
     pack $w.f2b -side top -fill x -pady 10
 	ttk::labelframe $w.f2b.lbl1 -relief flat -text \
 		"Synthesis type: " \
@@ -834,7 +848,7 @@ proc idv:do_fev {ww} {
 	eval tk_optionMenu $w.f2b.scripts ::idv(synthesis_script) \
 		$synthesis_scripts
 
-	button $w.f2b.synth -text "Synthesize" -command \
+	ttk::button $w.f2b.synth -text "Synthesize" -command \
 	    "idv:make_template $w $ww.c synthesis"
 	pack $w.f2b.lbl1 -side left -padx 5
 	pack $w.f2b.type -side left -padx 5
@@ -842,28 +856,30 @@ proc idv:do_fev {ww} {
 	pack $w.f2b.scripts -side left -padx 5
 	pack $w.f2b.synth -side right -padx 5
 
-    labelframe $w.f3 -relief groove -text Implementation
+    ttk::labelframe $w.f3 -relief groove -text Implementation
     pack $w.f3 -side top -fill x -pady 10
-	label $w.f3.l -text "Load pexlif:" -width 20 -justify left \
+	ttk::label $w.f3.l -text "Load pexlif:" -width 20 -justify left \
 	    -anchor w
-	entry $w.f3.e -textvariable ::idv(fev_imp_file) -width 30 -bg white
-	button $w.f3.dir -image $::icon(folder) -command "idv:fev_pexlif $w"
+	ttk::entry $w.f3.e -textvariable ::idv(fev_imp_file) \
+			    -width 30 -background  white
+	ttk::button $w.f3.dir -image $::icon(folder) \
+			    -command "idv:fev_pexlif $w"
 	pack $w.f3.l -side left -anchor w -anchor w
 	pack $w.f3.e -side left -fill x -expand yes
 	pack $w.f3.dir -side left
 
     trace add variable ::idv(fev_imp_file) write "idv:mark_progress $w.f3.e"
 
-    labelframe $w.f4 -relief groove -text Check
+    ttk::labelframe $w.f4 -relief groove -text Check
     pack $w.f4 -side top -fill x -pady 10
-	labelframe $w.f4.sim -relief groove -text Simulation
-	    button $w.f4.sim.none -text "None" \
+	ttk::labelframe $w.f4.sim -relief groove -text Simulation
+	    ttk::button $w.f4.sim.none -text "None" \
 		-command "idv:do_verify $w $ww.c Sim_None"
-	    button $w.f4.sim.light -text "Light" \
+	    ttk::button $w.f4.sim.light -text "Light" \
 		-command "idv:do_verify $w $ww.c Sim_Light"
-	    button $w.f4.sim.medium -text "Medium" \
+	    ttk::button $w.f4.sim.medium -text "Medium" \
 		-command "idv:do_verify $w $ww.c Sim_Medium"
-	    button $w.f4.sim.heavy -text "Heavy" \
+	    ttk::button $w.f4.sim.heavy -text "Heavy" \
 		-command "idv:do_verify $w $ww.c Sim_Heavy"
 	pack $w.f4.sim -side left -padx 10 -fill x -expand yes
 	    pack $w.f4.sim.none -side left -padx 5 -fill x -expand yes
@@ -871,15 +887,15 @@ proc idv:do_fev {ww} {
 	    pack $w.f4.sim.medium -side left -padx 5 -fill x -expand yes
 	    pack $w.f4.sim.heavy -side left -padx 5 -fill x -expand yes
 
-    labelframe $w.f5 -relief groove -text Verify
+    ttk::labelframe $w.f5 -relief groove -text Verify
     pack $w.f5 -side top -fill x -pady 10
-	labelframe $w.f5.bdd -relief groove -text BDD
-	    button $w.f5.bdd.order -text "Variable ordering" \
+	ttk::labelframe $w.f5.bdd -relief groove -text BDD
+	    ttk::button $w.f5.bdd.order -text "Variable ordering" \
 		-command "idv:do_bdd_var_order $w $ww.c"
-	    button $w.f5.bdd.verify -text "Verify" \
+	    ttk::button $w.f5.bdd.verify -text "Verify" \
 		-command "idv:do_verify $w $ww.c BDD"
-	labelframe $w.f5.sat -relief groove -text SAT
-	    button $w.f5.sat.verify -text "Verify" \
+	ttk::labelframe $w.f5.sat -relief groove -text SAT
+	    ttk::button $w.f5.sat.verify -text "Verify" \
 		-command "idv:do_verify $w $ww.c SAT"
 	pack $w.f5.bdd -side left -padx 10 -fill x -expand yes
 	pack $w.f5.sat -side left -padx 10 -fill x -expand yes
@@ -899,9 +915,9 @@ proc idv:make_top_info_window { title } {
     set w .exec
     catch {destroy $w}
     toplevel $w
-    label $w.l -text $title -font $::voss2_txtfont3
+    ttk::label $w.l -text $title -font $::voss2_txtfont
     pack $w.l -side top -fill x
-    button $w.b -text Close -command [list destroy $w]
+    ttk::button $w.b -text Close -command [list destroy $w]
     pack $w.b -side bottom -fill x
     ttk::notebook $w.vossframe
     ttk::notebook::enableTraversal $w.vossframe

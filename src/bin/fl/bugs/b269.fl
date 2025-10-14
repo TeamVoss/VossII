@@ -1,0 +1,1159 @@
+load "idv.fl";
+load (DIR^"../../../../IDVII/lib/osu018_stdcells/stdcells.fl");
+
+let Q_synth_49 {attrs::(string#string) list} conns =
+    let inps = [ "i1[35:0]",
+                 "i2[35:0]",
+                 "i3" ] in
+    let outs = [ "o1[35:0]" ] in
+    let ints = md_extract_vectors [ "i2_MUX2X1_S_Y",
+                 "i2_MUX2X1_S_Y_OAI21X1_A_C",
+                 "i2_XOR2X1_A_Y",
+                 "i3_INVX1_A_Y",
+                 "i3_XNOR2X1_A_10_Y",
+                 "i3_XNOR2X1_A_11_Y",
+                 "i3_XNOR2X1_A_12_Y",
+                 "i3_XNOR2X1_A_13_Y",
+                 "i3_XNOR2X1_A_14_Y",
+                 "i3_XNOR2X1_A_15_Y",
+                 "i3_XNOR2X1_A_16_Y",
+                 "i3_XNOR2X1_A_17_Y",
+                 "i3_XNOR2X1_A_18_Y",
+                 "i3_XNOR2X1_A_18_Y_OR2X1_B_Y",
+                 "i3_XNOR2X1_A_19_Y",
+                 "i3_XNOR2X1_A_1_Y",
+                 "i3_XNOR2X1_A_20_Y",
+                 "i3_XNOR2X1_A_21_Y",
+                 "i3_XNOR2X1_A_22_Y",
+                 "i3_XNOR2X1_A_23_Y",
+                 "i3_XNOR2X1_A_24_Y",
+                 "i3_XNOR2X1_A_25_Y",
+                 "i3_XNOR2X1_A_25_Y_OR2X1_B_Y",
+                 "i3_XNOR2X1_A_26_Y",
+                 "i3_XNOR2X1_A_27_Y",
+                 "i3_XNOR2X1_A_28_Y",
+                 "i3_XNOR2X1_A_29_Y",
+                 "i3_XNOR2X1_A_2_Y",
+                 "i3_XNOR2X1_A_30_Y",
+                 "i3_XNOR2X1_A_31_Y",
+                 "i3_XNOR2X1_A_32_Y",
+                 "i3_XNOR2X1_A_32_Y_NAND2X1_B_Y",
+                 "i3_XNOR2X1_A_3_Y",
+                 "i3_XNOR2X1_A_3_Y_AND2X1_B_Y",
+                 "i3_XNOR2X1_A_3_Y_NOR2X1_B_Y",
+                 "i3_XNOR2X1_A_4_Y",
+                 "i3_XNOR2X1_A_5_Y",
+                 "i3_XNOR2X1_A_6_Y",
+                 "i3_XNOR2X1_A_6_Y_AND2X1_B_Y",
+                 "i3_XNOR2X1_A_6_Y_NOR2X1_B_Y",
+                 "i3_XNOR2X1_A_7_Y",
+                 "i3_XNOR2X1_A_7_Y_NAND2X1_B_Y",
+                 "i3_XNOR2X1_A_7_Y_OR2X1_B_Y",
+                 "i3_XNOR2X1_A_8_Y",
+                 "i3_XNOR2X1_A_8_Y_NAND2X1_B_Y",
+                 "i3_XNOR2X1_A_8_Y_NAND2X1_B_Y_AND2X1_A_Y",
+                 "i3_XNOR2X1_A_9_Y",
+                 "i3_XNOR2X1_A_Y",
+                 "i3_XNOR2X1_B_Y",
+                 "i3_XNOR2X1_B_Y_NAND2X1_B_Y",
+                 "i3_XNOR2X1_B_Y_OR2X1_B_Y",
+                 "i3_XNOR2X1_B_Y_OR2X1_B_Y_OAI21X1_C_B",
+                 "i3_XOR2X1_A_Y",
+                 "i3_XOR2X1_A_Y_OR2X1_B_Y",
+                 "o1_XNOR2X1_Y_10_A",
+                 "o1_XNOR2X1_Y_10_B",
+                 "o1_XNOR2X1_Y_10_B_NAND2X1_Y_A",
+                 "o1_XNOR2X1_Y_11_A",
+                 "o1_XNOR2X1_Y_11_B",
+                 "o1_XNOR2X1_Y_11_B_NAND2X1_Y_A",
+                 "o1_XNOR2X1_Y_12_A",
+                 "o1_XNOR2X1_Y_12_A_AOI21X1_Y_C",
+                 "o1_XNOR2X1_Y_13_A",
+                 "o1_XNOR2X1_Y_13_B",
+                 "o1_XNOR2X1_Y_13_B_NAND2X1_Y_A",
+                 "o1_XNOR2X1_Y_13_B_NAND2X1_Y_B",
+                 "o1_XNOR2X1_Y_14_A",
+                 "o1_XNOR2X1_Y_14_A_OAI21X1_A_B",
+                 "o1_XNOR2X1_Y_14_A_OAI21X1_A_C",
+                 "o1_XNOR2X1_Y_14_B",
+                 "o1_XNOR2X1_Y_15_A",
+                 "o1_XNOR2X1_Y_15_A_OAI21X1_Y_C",
+                 "o1_XNOR2X1_Y_15_B",
+                 "o1_XNOR2X1_Y_16_A",
+                 "o1_XNOR2X1_Y_16_A_NOR2X1_Y_A",
+                 "o1_XNOR2X1_Y_16_A_NOR2X1_Y_B",
+                 "o1_XNOR2X1_Y_16_B",
+                 "o1_XNOR2X1_Y_16_B_NOR2X1_Y_B",
+                 "o1_XNOR2X1_Y_17_A",
+                 "o1_XNOR2X1_Y_17_A_OAI21X1_Y_A",
+                 "o1_XNOR2X1_Y_17_B",
+                 "o1_XNOR2X1_Y_18_A",
+                 "o1_XNOR2X1_Y_18_B",
+                 "o1_XNOR2X1_Y_19_A",
+                 "o1_XNOR2X1_Y_19_B",
+                 "o1_XNOR2X1_Y_1_A",
+                 "o1_XNOR2X1_Y_1_A_OR2X1_Y_A",
+                 "o1_XNOR2X1_Y_1_B",
+                 "o1_XNOR2X1_Y_1_B_OR2X1_Y_A",
+                 "o1_XNOR2X1_Y_2_A",
+                 "o1_XNOR2X1_Y_2_A_NAND2X1_Y_B",
+                 "o1_XNOR2X1_Y_2_B",
+                 "o1_XNOR2X1_Y_2_B_NAND2X1_Y_A",
+                 "o1_XNOR2X1_Y_2_B_NAND2X1_Y_B",
+                 "o1_XNOR2X1_Y_3_A",
+                 "o1_XNOR2X1_Y_3_A_OAI21X1_B_A",
+                 "o1_XNOR2X1_Y_3_A_OAI21X1_B_C",
+                 "o1_XNOR2X1_Y_3_B",
+                 "o1_XNOR2X1_Y_4_A",
+                 "o1_XNOR2X1_Y_4_A_NAND2X1_Y_A",
+                 "o1_XNOR2X1_Y_4_A_NAND2X1_Y_B",
+                 "o1_XNOR2X1_Y_4_B",
+                 "o1_XNOR2X1_Y_4_B_AOI21X1_B_C",
+                 "o1_XNOR2X1_Y_5_A",
+                 "o1_XNOR2X1_Y_5_A_OAI21X1_B_A",
+                 "o1_XNOR2X1_Y_5_A_OAI21X1_B_C",
+                 "o1_XNOR2X1_Y_5_B",
+                 "o1_XNOR2X1_Y_6_A",
+                 "o1_XNOR2X1_Y_6_A_NAND2X1_Y_A",
+                 "o1_XNOR2X1_Y_6_A_NAND2X1_Y_B",
+                 "o1_XNOR2X1_Y_6_B",
+                 "o1_XNOR2X1_Y_6_B_AOI21X1_B_C",
+                 "o1_XNOR2X1_Y_7_A",
+                 "o1_XNOR2X1_Y_7_A_NAND2X1_Y_A",
+                 "o1_XNOR2X1_Y_7_B",
+                 "o1_XNOR2X1_Y_8_A",
+                 "o1_XNOR2X1_Y_8_B",
+                 "o1_XNOR2X1_Y_8_B_NAND2X1_Y_A",
+                 "o1_XNOR2X1_Y_9_A",
+                 "o1_XNOR2X1_Y_9_A_NAND2X1_Y_A",
+                 "o1_XNOR2X1_Y_9_B",
+                 "o1_XNOR2X1_Y_A",
+                 "o1_XNOR2X1_Y_A_OR2X1_Y_A",
+                 "o1_XNOR2X1_Y_B",
+                 "o1_XNOR2X1_Y_B_OR2X1_Y_A",
+                 "o1_XNOR2X1_Y_B_OR2X1_Y_B",
+                 "o1_XOR2X1_Y_10_B",
+                 "o1_XOR2X1_Y_12_A",
+                 "o1_XOR2X1_Y_12_B",
+                 "o1_XOR2X1_Y_12_B_AOI21X1_Y_A",
+                 "o1_XOR2X1_Y_12_B_AOI21X1_Y_B",
+                 "o1_XOR2X1_Y_12_B_AOI21X1_Y_C",
+                 "o1_XOR2X1_Y_13_A",
+                 "o1_XOR2X1_Y_13_A_NAND3X1_B_Y",
+                 "o1_XOR2X1_Y_13_B",
+                 "o1_XOR2X1_Y_13_B_AND2X1_Y_B",
+                 "o1_XOR2X1_Y_14_A",
+                 "o1_XOR2X1_Y_14_B",
+                 "o1_XOR2X1_Y_15_A",
+                 "o1_XOR2X1_Y_15_A_NOR3X1_A_Y",
+                 "o1_XOR2X1_Y_15_B",
+                 "o1_XOR2X1_Y_15_B_OR2X1_Y_B",
+                 "o1_XOR2X1_Y_1_A",
+                 "o1_XOR2X1_Y_1_A_NOR3X1_A_Y",
+                 "o1_XOR2X1_Y_1_B",
+                 "o1_XOR2X1_Y_1_B_OR2X1_Y_A",
+                 "o1_XOR2X1_Y_1_B_OR2X1_Y_B",
+                 "o1_XOR2X1_Y_2_A",
+                 "o1_XOR2X1_Y_2_A_OR2X1_Y_A",
+                 "o1_XOR2X1_Y_2_A_OR2X1_Y_B",
+                 "o1_XOR2X1_Y_2_B",
+                 "o1_XOR2X1_Y_2_B_NOR2X1_Y_A",
+                 "o1_XOR2X1_Y_3_A",
+                 "o1_XOR2X1_Y_3_B",
+                 "o1_XOR2X1_Y_3_B_OR2X1_Y_A",
+                 "o1_XOR2X1_Y_3_B_OR2X1_Y_B",
+                 "o1_XOR2X1_Y_4_A",
+                 "o1_XOR2X1_Y_4_A_AOI21X1_A_C",
+                 "o1_XOR2X1_Y_4_B",
+                 "o1_XOR2X1_Y_5_A",
+                 "o1_XOR2X1_Y_5_A_OAI21X1_A_C",
+                 "o1_XOR2X1_Y_5_B",
+                 "o1_XOR2X1_Y_5_B_AOI21X1_Y_C",
+                 "o1_XOR2X1_Y_6_A",
+                 "o1_XOR2X1_Y_6_A_OAI21X1_A_C",
+                 "o1_XOR2X1_Y_6_B",
+                 "o1_XOR2X1_Y_6_B_AOI21X1_Y_B",
+                 "o1_XOR2X1_Y_6_B_AOI21X1_Y_C",
+                 "o1_XOR2X1_Y_7_A",
+                 "o1_XOR2X1_Y_7_A_OAI21X1_A_C",
+                 "o1_XOR2X1_Y_7_B",
+                 "o1_XOR2X1_Y_7_B_AOI21X1_Y_A",
+                 "o1_XOR2X1_Y_7_B_AOI21X1_Y_C",
+                 "o1_XOR2X1_Y_8_A",
+                 "o1_XOR2X1_Y_8_A_OAI21X1_A_C",
+                 "o1_XOR2X1_Y_8_B",
+                 "o1_XOR2X1_Y_8_B_AOI21X1_Y_B",
+                 "o1_XOR2X1_Y_8_B_AOI21X1_Y_C",
+                 "o1_XOR2X1_Y_9_A",
+                 "o1_XOR2X1_Y_9_A_OAI21X1_A_C",
+                 "o1_XOR2X1_Y_9_B",
+                 "o1_XOR2X1_Y_9_B_AOI21X1_Y_B",
+                 "o1_XOR2X1_Y_9_B_AOI21X1_Y_C",
+                 "o1_XOR2X1_Y_A",
+                 "o1_XOR2X1_Y_A_NOR3X1_A_Y",
+                 "o1_XOR2X1_Y_B",
+                 "o1_XOR2X1_Y_B_OR2X1_Y_A",
+                 "o1_XOR2X1_Y_B_OR2X1_Y_B" ] in
+    let _mk_fa f = (f, ((assoc f conns) catch [f])) in
+    let _fa_inps = map _mk_fa inps in
+    let _fa_outs = map _mk_fa outs in
+    let _body = [
+        QMUX2X1 [("instance","i2_MUX2X1_S"), ("src", "")] [
+                ("A",["i1[0]"]),
+                ("B",["i3_INVX1_A_Y"]),
+                ("S",["i2[0]"]),
+                ("Y",["i2_MUX2X1_S_Y"])],
+        QOAI21X1 [("instance","i2_MUX2X1_S_Y_OAI21X1_A"), ("src", "")] [
+                ("A",["i2_MUX2X1_S_Y"]),
+                ("B",["o1_XOR2X1_Y_10_B"]),
+                ("C",["i2_MUX2X1_S_Y_OAI21X1_A_C"]),
+                ("Y",["o1_XNOR2X1_Y_11_A"])],
+        QXOR2X1 [("instance","i2_XOR2X1_A"), ("src", "")] [
+                ("A",["i2[35]"]),
+                ("B",["i1[35]"]),
+                ("Y",["i2_XOR2X1_A_Y"])],
+        QINVX1 [("instance","i3_INVX1_A"), ("src", "")] [
+                ("A",["i3"]),
+                ("Y",["i3_INVX1_A_Y"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2_XOR2X1_A_Y"]),
+                ("Y",["i3_XNOR2X1_A_Y"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_1"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[34]"]),
+                ("Y",["i3_XNOR2X1_A_1_Y"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_10"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[2]"]),
+                ("Y",["i3_XNOR2X1_A_10_Y"])],
+        QOR2X1 [("instance","i3_XNOR2X1_A_10_Y_OR2X1_B"), ("src", "")] [
+                ("A",["i1[2]"]),
+                ("B",["i3_XNOR2X1_A_10_Y"]),
+                ("Y",["o1_XOR2X1_Y_9_B_AOI21X1_Y_B"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_11"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[3]"]),
+                ("Y",["i3_XNOR2X1_A_11_Y"])],
+        QNAND2X1 [("instance","i3_XNOR2X1_A_11_Y_NAND2X1_B"), ("src", "")] [
+                ("A",["i1[3]"]),
+                ("B",["i3_XNOR2X1_A_11_Y"]),
+                ("Y",["o1_XOR2X1_Y_9_A_OAI21X1_A_C"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_12"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[4]"]),
+                ("Y",["i3_XNOR2X1_A_12_Y"])],
+        QOR2X1 [("instance","i3_XNOR2X1_A_12_Y_OR2X1_B"), ("src", "")] [
+                ("A",["i1[4]"]),
+                ("B",["i3_XNOR2X1_A_12_Y"]),
+                ("Y",["o1_XOR2X1_Y_8_B_AOI21X1_Y_B"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_13"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[5]"]),
+                ("Y",["i3_XNOR2X1_A_13_Y"])],
+        QNAND2X1 [("instance","i3_XNOR2X1_A_13_Y_NAND2X1_B"), ("src", "")] [
+                ("A",["i1[5]"]),
+                ("B",["i3_XNOR2X1_A_13_Y"]),
+                ("Y",["o1_XOR2X1_Y_8_A_OAI21X1_A_C"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_14"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[6]"]),
+                ("Y",["i3_XNOR2X1_A_14_Y"])],
+        QOR2X1 [("instance","i3_XNOR2X1_A_14_Y_OR2X1_B"), ("src", "")] [
+                ("A",["i1[6]"]),
+                ("B",["i3_XNOR2X1_A_14_Y"]),
+                ("Y",["o1_XOR2X1_Y_7_B_AOI21X1_Y_A"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_15"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[7]"]),
+                ("Y",["i3_XNOR2X1_A_15_Y"])],
+        QNAND2X1 [("instance","i3_XNOR2X1_A_15_Y_NAND2X1_B"), ("src", "")] [
+                ("A",["i1[7]"]),
+                ("B",["i3_XNOR2X1_A_15_Y"]),
+                ("Y",["o1_XOR2X1_Y_7_A_OAI21X1_A_C"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_16"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[8]"]),
+                ("Y",["i3_XNOR2X1_A_16_Y"])],
+        QOR2X1 [("instance","i3_XNOR2X1_A_16_Y_OR2X1_B"), ("src", "")] [
+                ("A",["i1[8]"]),
+                ("B",["i3_XNOR2X1_A_16_Y"]),
+                ("Y",["o1_XOR2X1_Y_6_B_AOI21X1_Y_B"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_17"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[9]"]),
+                ("Y",["i3_XNOR2X1_A_17_Y"])],
+        QNAND2X1 [("instance","i3_XNOR2X1_A_17_Y_NAND2X1_B"), ("src", "")] [
+                ("A",["i1[9]"]),
+                ("B",["i3_XNOR2X1_A_17_Y"]),
+                ("Y",["o1_XOR2X1_Y_6_A_OAI21X1_A_C"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_18"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[10]"]),
+                ("Y",["i3_XNOR2X1_A_18_Y"])],
+        QNAND2X1 [("instance","i3_XNOR2X1_A_18_Y_NAND2X1_B"), ("src", "")] [
+                ("A",["i1[10]"]),
+                ("B",["i3_XNOR2X1_A_18_Y"]),
+                ("Y",["o1_XNOR2X1_Y_7_A_NAND2X1_Y_A"])],
+        QOR2X1 [("instance","i3_XNOR2X1_A_18_Y_OR2X1_B"), ("src", "")] [
+                ("A",["i1[10]"]),
+                ("B",["i3_XNOR2X1_A_18_Y"]),
+                ("Y",["i3_XNOR2X1_A_18_Y_OR2X1_B_Y"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_19"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[11]"]),
+                ("Y",["i3_XNOR2X1_A_19_Y"])],
+        QNAND2X1 [("instance","i3_XNOR2X1_A_19_Y_NAND2X1_B"), ("src", "")] [
+                ("A",["i1[11]"]),
+                ("B",["i3_XNOR2X1_A_19_Y"]),
+                ("Y",["o1_XOR2X1_Y_5_A_OAI21X1_A_C"])],
+        QAND2X1 [("instance","i3_XNOR2X1_A_1_Y_AND2X1_B"), ("src", "")] [
+                ("A",["i1[34]"]),
+                ("B",["i3_XNOR2X1_A_1_Y"]),
+                ("Y",["o1_XNOR2X1_Y_12_A_AOI21X1_Y_C"])],
+        QOR2X1 [("instance","i3_XNOR2X1_A_1_Y_OR2X1_B"), ("src", "")] [
+                ("A",["i1[34]"]),
+                ("B",["i3_XNOR2X1_A_1_Y"]),
+                ("Y",["o1_XNOR2X1_Y_13_B_NAND2X1_Y_B"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_2"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[33]"]),
+                ("Y",["i3_XNOR2X1_A_2_Y"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_20"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[12]"]),
+                ("Y",["i3_XNOR2X1_A_20_Y"])],
+        QOR2X1 [("instance","i3_XNOR2X1_A_20_Y_OR2X1_B"), ("src", "")] [
+                ("A",["i1[12]"]),
+                ("B",["i3_XNOR2X1_A_20_Y"]),
+                ("Y",["o1_XNOR2X1_Y_6_A_NAND2X1_Y_B"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_21"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[13]"]),
+                ("Y",["i3_XNOR2X1_A_21_Y"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_22"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[14]"]),
+                ("Y",["i3_XNOR2X1_A_22_Y"])],
+        QOR2X1 [("instance","i3_XNOR2X1_A_22_Y_OR2X1_B"), ("src", "")] [
+                ("A",["i1[14]"]),
+                ("B",["i3_XNOR2X1_A_22_Y"]),
+                ("Y",["o1_XNOR2X1_Y_4_A_NAND2X1_Y_B"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_23"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[15]"]),
+                ("Y",["i3_XNOR2X1_A_23_Y"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_24"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[16]"]),
+                ("Y",["i3_XNOR2X1_A_24_Y"])],
+        QNAND2X1 [("instance","i3_XNOR2X1_A_24_Y_NAND2X1_B"), ("src", "")] [
+                ("A",["i1[16]"]),
+                ("B",["i3_XNOR2X1_A_24_Y"]),
+                ("Y",["o1_XNOR2X1_Y_2_B_NAND2X1_Y_A"])],
+        QXOR2X1 [("instance","i3_XNOR2X1_A_24_Y_XOR2X1_B"), ("src", "")] [
+                ("A",["i1[16]"]),
+                ("B",["i3_XNOR2X1_A_24_Y"]),
+                ("Y",["o1_XOR2X1_Y_4_A"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_25"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[17]"]),
+                ("Y",["i3_XNOR2X1_A_25_Y"])],
+        QNAND2X1 [("instance","i3_XNOR2X1_A_25_Y_NAND2X1_B"), ("src", "")] [
+                ("A",["i1[17]"]),
+                ("B",["i3_XNOR2X1_A_25_Y"]),
+                ("Y",["o1_XNOR2X1_Y_2_A_NAND2X1_Y_B"])],
+        QOR2X1 [("instance","i3_XNOR2X1_A_25_Y_OR2X1_B"), ("src", "")] [
+                ("A",["i1[17]"]),
+                ("B",["i3_XNOR2X1_A_25_Y"]),
+                ("Y",["i3_XNOR2X1_A_25_Y_OR2X1_B_Y"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_26"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[18]"]),
+                ("Y",["i3_XNOR2X1_A_26_Y"])],
+        QAND2X1 [("instance","i3_XNOR2X1_A_26_Y_AND2X1_B"), ("src", "")] [
+                ("A",["i1[18]"]),
+                ("B",["i3_XNOR2X1_A_26_Y"]),
+                ("Y",["o1_XOR2X1_Y_2_A_OR2X1_Y_A"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_27"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[19]"]),
+                ("Y",["i3_XNOR2X1_A_27_Y"])],
+        QAND2X1 [("instance","i3_XNOR2X1_A_27_Y_AND2X1_B"), ("src", "")] [
+                ("A",["i1[19]"]),
+                ("B",["i3_XNOR2X1_A_27_Y"]),
+                ("Y",["o1_XOR2X1_Y_2_B_NOR2X1_Y_A"])],
+        QNOR2X1 [("instance","i3_XNOR2X1_A_27_Y_NOR2X1_B"), ("src", "")] [
+                ("A",["i1[19]"]),
+                ("B",["i3_XNOR2X1_A_27_Y"]),
+                ("Y",["o1_XOR2X1_Y_1_B_OR2X1_Y_A"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_28"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[20]"]),
+                ("Y",["i3_XNOR2X1_A_28_Y"])],
+        QAND2X1 [("instance","i3_XNOR2X1_A_28_Y_AND2X1_B"), ("src", "")] [
+                ("A",["i1[20]"]),
+                ("B",["i3_XNOR2X1_A_28_Y"]),
+                ("Y",["o1_XNOR2X1_Y_1_A_OR2X1_Y_A"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_29"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[21]"]),
+                ("Y",["i3_XNOR2X1_A_29_Y"])],
+        QAND2X1 [("instance","i3_XNOR2X1_A_29_Y_AND2X1_B"), ("src", "")] [
+                ("A",["i1[21]"]),
+                ("B",["i3_XNOR2X1_A_29_Y"]),
+                ("Y",["o1_XNOR2X1_Y_1_B_OR2X1_Y_A"])],
+        QNOR2X1 [("instance","i3_XNOR2X1_A_29_Y_NOR2X1_B"), ("src", "")] [
+                ("A",["i1[21]"]),
+                ("B",["i3_XNOR2X1_A_29_Y"]),
+                ("Y",["o1_XOR2X1_Y_B_OR2X1_Y_A"])],
+        QNOR2X1 [("instance","i3_XNOR2X1_A_2_Y_NOR2X1_B"), ("src", "")] [
+                ("A",["i1[33]"]),
+                ("B",["i3_XNOR2X1_A_2_Y"]),
+                ("Y",["o1_XNOR2X1_Y_14_A_OAI21X1_A_B"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_3"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[32]"]),
+                ("Y",["i3_XNOR2X1_A_3_Y"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_30"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[22]"]),
+                ("Y",["i3_XNOR2X1_A_30_Y"])],
+        QAND2X1 [("instance","i3_XNOR2X1_A_30_Y_AND2X1_B"), ("src", "")] [
+                ("A",["i1[22]"]),
+                ("B",["i3_XNOR2X1_A_30_Y"]),
+                ("Y",["o1_XNOR2X1_Y_A_OR2X1_Y_A"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_31"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[23]"]),
+                ("Y",["i3_XNOR2X1_A_31_Y"])],
+        QAND2X1 [("instance","i3_XNOR2X1_A_31_Y_AND2X1_B"), ("src", "")] [
+                ("A",["i1[23]"]),
+                ("B",["i3_XNOR2X1_A_31_Y"]),
+                ("Y",["o1_XNOR2X1_Y_B_OR2X1_Y_A"])],
+        QNOR2X1 [("instance","i3_XNOR2X1_A_31_Y_NOR2X1_B"), ("src", "")] [
+                ("A",["i1[23]"]),
+                ("B",["i3_XNOR2X1_A_31_Y"]),
+                ("Y",["o1_XNOR2X1_Y_B_OR2X1_Y_B"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_32"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[24]"]),
+                ("Y",["i3_XNOR2X1_A_32_Y"])],
+        QNAND2X1 [("instance","i3_XNOR2X1_A_32_Y_NAND2X1_B"), ("src", "")] [
+                ("A",["i1[24]"]),
+                ("B",["i3_XNOR2X1_A_32_Y"]),
+                ("Y",["i3_XNOR2X1_A_32_Y_NAND2X1_B_Y"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_32_Y_XNOR2X1_B"), ("src", "")] [
+                ("A",["i1[24]"]),
+                ("B",["i3_XNOR2X1_A_32_Y"]),
+                ("Y",["o1_XOR2X1_Y_15_A"])],
+        QAND2X1 [("instance","i3_XNOR2X1_A_3_Y_AND2X1_B"), ("src", "")] [
+                ("A",["i1[32]"]),
+                ("B",["i3_XNOR2X1_A_3_Y"]),
+                ("Y",["i3_XNOR2X1_A_3_Y_AND2X1_B_Y"])],
+        QNOR2X1 [("instance","i3_XNOR2X1_A_3_Y_NOR2X1_B"), ("src", "")] [
+                ("A",["i1[32]"]),
+                ("B",["i3_XNOR2X1_A_3_Y"]),
+                ("Y",["i3_XNOR2X1_A_3_Y_NOR2X1_B_Y"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_4"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[31]"]),
+                ("Y",["i3_XNOR2X1_A_4_Y"])],
+        QNOR2X1 [("instance","i3_XNOR2X1_A_4_Y_NOR2X1_B"), ("src", "")] [
+                ("A",["i1[31]"]),
+                ("B",["i3_XNOR2X1_A_4_Y"]),
+                ("Y",["o1_XOR2X1_Y_12_B_AOI21X1_Y_C"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_5"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[30]"]),
+                ("Y",["i3_XNOR2X1_A_5_Y"])],
+        QAND2X1 [("instance","i3_XNOR2X1_A_5_Y_AND2X1_B"), ("src", "")] [
+                ("A",["i1[30]"]),
+                ("B",["i3_XNOR2X1_A_5_Y"]),
+                ("Y",["o1_XNOR2X1_Y_16_A_NOR2X1_Y_A"])],
+        QNOR2X1 [("instance","i3_XNOR2X1_A_5_Y_NOR2X1_B"), ("src", "")] [
+                ("A",["i1[30]"]),
+                ("B",["i3_XNOR2X1_A_5_Y"]),
+                ("Y",["o1_XNOR2X1_Y_16_A_NOR2X1_Y_B"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_6"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[29]"]),
+                ("Y",["i3_XNOR2X1_A_6_Y"])],
+        QAND2X1 [("instance","i3_XNOR2X1_A_6_Y_AND2X1_B"), ("src", "")] [
+                ("A",["i1[29]"]),
+                ("B",["i3_XNOR2X1_A_6_Y"]),
+                ("Y",["i3_XNOR2X1_A_6_Y_AND2X1_B_Y"])],
+        QNOR2X1 [("instance","i3_XNOR2X1_A_6_Y_NOR2X1_B"), ("src", "")] [
+                ("A",["i1[29]"]),
+                ("B",["i3_XNOR2X1_A_6_Y"]),
+                ("Y",["i3_XNOR2X1_A_6_Y_NOR2X1_B_Y"])],
+        QAOI21X1 [("instance","i3_XNOR2X1_A_6_Y_NOR2X1_B_Y_AOI21X1_C"), ("src", "")] [
+                ("A",["i3_XOR2X1_A_Y_OR2X1_B_Y"]),
+                ("B",["o1_XOR2X1_Y_13_A_NAND3X1_B_Y"]),
+                ("C",["i3_XNOR2X1_A_6_Y_NOR2X1_B_Y"]),
+                ("Y",["o1_XNOR2X1_Y_16_B_NOR2X1_Y_B"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_7"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[27]"]),
+                ("Y",["i3_XNOR2X1_A_7_Y"])],
+        QNAND2X1 [("instance","i3_XNOR2X1_A_7_Y_NAND2X1_B"), ("src", "")] [
+                ("A",["i1[27]"]),
+                ("B",["i3_XNOR2X1_A_7_Y"]),
+                ("Y",["i3_XNOR2X1_A_7_Y_NAND2X1_B_Y"])],
+        QOR2X1 [("instance","i3_XNOR2X1_A_7_Y_OR2X1_B"), ("src", "")] [
+                ("A",["i1[27]"]),
+                ("B",["i3_XNOR2X1_A_7_Y"]),
+                ("Y",["i3_XNOR2X1_A_7_Y_OR2X1_B_Y"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_8"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[26]"]),
+                ("Y",["i3_XNOR2X1_A_8_Y"])],
+        QNAND2X1 [("instance","i3_XNOR2X1_A_8_Y_NAND2X1_B"), ("src", "")] [
+                ("A",["i1[26]"]),
+                ("B",["i3_XNOR2X1_A_8_Y"]),
+                ("Y",["i3_XNOR2X1_A_8_Y_NAND2X1_B_Y"])],
+        QAND2X1 [("instance","i3_XNOR2X1_A_8_Y_NAND2X1_B_Y_AND2X1_A"), ("src", "")] [
+                ("A",["i3_XNOR2X1_A_8_Y_NAND2X1_B_Y"]),
+                ("B",["i3_XNOR2X1_A_7_Y_NAND2X1_B_Y"]),
+                ("Y",["i3_XNOR2X1_A_8_Y_NAND2X1_B_Y_AND2X1_A_Y"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_8_Y_XNOR2X1_B"), ("src", "")] [
+                ("A",["i1[26]"]),
+                ("B",["i3_XNOR2X1_A_8_Y"]),
+                ("Y",["o1_XOR2X1_Y_14_A"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_9"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[1]"]),
+                ("Y",["i3_XNOR2X1_A_9_Y"])],
+        QNAND2X1 [("instance","i3_XNOR2X1_A_9_Y_NAND2X1_B"), ("src", "")] [
+                ("A",["i1[1]"]),
+                ("B",["i3_XNOR2X1_A_9_Y"]),
+                ("Y",["i2_MUX2X1_S_Y_OAI21X1_A_C"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_A_9_Y_XNOR2X1_B"), ("src", "")] [
+                ("A",["i1[1]"]),
+                ("B",["i3_XNOR2X1_A_9_Y"]),
+                ("Y",["o1_XOR2X1_Y_10_B"])],
+        QXNOR2X1 [("instance","i3_XNOR2X1_B"), ("src", "")] [
+                ("A",["i2[25]"]),
+                ("B",["i3"]),
+                ("Y",["i3_XNOR2X1_B_Y"])],
+        QNAND2X1 [("instance","i3_XNOR2X1_B_Y_NAND2X1_B"), ("src", "")] [
+                ("A",["i1[25]"]),
+                ("B",["i3_XNOR2X1_B_Y"]),
+                ("Y",["i3_XNOR2X1_B_Y_NAND2X1_B_Y"])],
+        QNAND2X1 [("instance","i3_XNOR2X1_B_Y_NAND2X1_B_Y_NAND2X1_B"), ("src", "")] [
+                ("A",["i3_XNOR2X1_A_32_Y_NAND2X1_B_Y"]),
+                ("B",["i3_XNOR2X1_B_Y_NAND2X1_B_Y"]),
+                ("Y",["i3_XNOR2X1_B_Y_OR2X1_B_Y_OAI21X1_C_B"])],
+        QOR2X1 [("instance","i3_XNOR2X1_B_Y_OR2X1_B"), ("src", "")] [
+                ("A",["i1[25]"]),
+                ("B",["i3_XNOR2X1_B_Y"]),
+                ("Y",["i3_XNOR2X1_B_Y_OR2X1_B_Y"])],
+        QOAI21X1 [("instance","i3_XNOR2X1_B_Y_OR2X1_B_Y_OAI21X1_C"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_15_A_NOR3X1_A_Y"]),
+                ("B",["i3_XNOR2X1_B_Y_OR2X1_B_Y_OAI21X1_C_B"]),
+                ("C",["i3_XNOR2X1_B_Y_OR2X1_B_Y"]),
+                ("Y",["o1_XOR2X1_Y_14_B"])],
+        QXOR2X1 [("instance","i3_XOR2X1_A"), ("src", "")] [
+                ("A",["i3"]),
+                ("B",["i2[28]"]),
+                ("Y",["i3_XOR2X1_A_Y"])],
+        QOR2X1 [("instance","i3_XOR2X1_A_Y_OR2X1_B"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_17_A_OAI21X1_Y_A"]),
+                ("B",["i3_XOR2X1_A_Y"]),
+                ("Y",["i3_XOR2X1_A_Y_OR2X1_B_Y"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_A"]),
+                ("B",["o1_XNOR2X1_Y_B"]),
+                ("Y",["o1[23]"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_1"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_1_A"]),
+                ("B",["o1_XNOR2X1_Y_1_B"]),
+                ("Y",["o1[21]"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_10"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_10_A"]),
+                ("B",["o1_XNOR2X1_Y_10_B"]),
+                ("Y",["o1[4]"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_10_B_NAND2X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_10_B_NAND2X1_Y_A"]),
+                ("B",["o1_XOR2X1_Y_8_B_AOI21X1_Y_B"]),
+                ("Y",["o1_XNOR2X1_Y_10_B"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_10_B_NAND2X1_Y_A_NAND2X1_Y"), ("src", "")] [
+                ("A",["i1[4]"]),
+                ("B",["i3_XNOR2X1_A_12_Y"]),
+                ("Y",["o1_XNOR2X1_Y_10_B_NAND2X1_Y_A"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_11"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_11_A"]),
+                ("B",["o1_XNOR2X1_Y_11_B"]),
+                ("Y",["o1[2]"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_11_B_NAND2X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_11_B_NAND2X1_Y_A"]),
+                ("B",["o1_XOR2X1_Y_9_B_AOI21X1_Y_B"]),
+                ("Y",["o1_XNOR2X1_Y_11_B"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_11_B_NAND2X1_Y_A_NAND2X1_Y"), ("src", "")] [
+                ("A",["i1[2]"]),
+                ("B",["i3_XNOR2X1_A_10_Y"]),
+                ("Y",["o1_XNOR2X1_Y_11_B_NAND2X1_Y_A"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_12"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_12_A"]),
+                ("B",["i3_XNOR2X1_A_Y"]),
+                ("Y",["o1[35]"])],
+        QAOI21X1 [("instance","o1_XNOR2X1_Y_12_A_AOI21X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_13_A"]),
+                ("B",["o1_XNOR2X1_Y_13_B_NAND2X1_Y_B"]),
+                ("C",["o1_XNOR2X1_Y_12_A_AOI21X1_Y_C"]),
+                ("Y",["o1_XNOR2X1_Y_12_A"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_13"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_13_A"]),
+                ("B",["o1_XNOR2X1_Y_13_B"]),
+                ("Y",["o1[34]"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_13_B_NAND2X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_13_B_NAND2X1_Y_A"]),
+                ("B",["o1_XNOR2X1_Y_13_B_NAND2X1_Y_B"]),
+                ("Y",["o1_XNOR2X1_Y_13_B"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_13_B_NAND2X1_Y_A_NAND2X1_Y"), ("src", "")] [
+                ("A",["i1[34]"]),
+                ("B",["i3_XNOR2X1_A_1_Y"]),
+                ("Y",["o1_XNOR2X1_Y_13_B_NAND2X1_Y_A"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_14"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_14_A"]),
+                ("B",["o1_XNOR2X1_Y_14_B"]),
+                ("Y",["o1[33]"])],
+        QOAI21X1 [("instance","o1_XNOR2X1_Y_14_A_OAI21X1_A"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_14_A"]),
+                ("B",["o1_XNOR2X1_Y_14_A_OAI21X1_A_B"]),
+                ("C",["o1_XNOR2X1_Y_14_A_OAI21X1_A_C"]),
+                ("Y",["o1_XNOR2X1_Y_13_A"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_14_A_OAI21X1_A_C_NAND2X1_Y"), ("src", "")] [
+                ("A",["i1[33]"]),
+                ("B",["i3_XNOR2X1_A_2_Y"]),
+                ("Y",["o1_XNOR2X1_Y_14_A_OAI21X1_A_C"])],
+        QXOR2X1 [("instance","o1_XNOR2X1_Y_14_B_XOR2X1_Y"), ("src", "")] [
+                ("A",["i1[33]"]),
+                ("B",["i3_XNOR2X1_A_2_Y"]),
+                ("Y",["o1_XNOR2X1_Y_14_B"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_15"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_15_A"]),
+                ("B",["o1_XNOR2X1_Y_15_B"]),
+                ("Y",["o1[31]"])],
+        QOAI21X1 [("instance","o1_XNOR2X1_Y_15_A_OAI21X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_16_A_NOR2X1_Y_B"]),
+                ("B",["o1_XNOR2X1_Y_16_B"]),
+                ("C",["o1_XNOR2X1_Y_15_A_OAI21X1_Y_C"]),
+                ("Y",["o1_XNOR2X1_Y_15_A"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_15_A_OAI21X1_Y_C_NAND2X1_Y"), ("src", "")] [
+                ("A",["i1[30]"]),
+                ("B",["i3_XNOR2X1_A_5_Y"]),
+                ("Y",["o1_XNOR2X1_Y_15_A_OAI21X1_Y_C"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_15_B_XNOR2X1_Y"), ("src", "")] [
+                ("A",["i1[31]"]),
+                ("B",["i3_XNOR2X1_A_4_Y"]),
+                ("Y",["o1_XNOR2X1_Y_15_B"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_16"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_16_A"]),
+                ("B",["o1_XNOR2X1_Y_16_B"]),
+                ("Y",["o1[30]"])],
+        QNOR2X1 [("instance","o1_XNOR2X1_Y_16_A_NOR2X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_16_A_NOR2X1_Y_A"]),
+                ("B",["o1_XNOR2X1_Y_16_A_NOR2X1_Y_B"]),
+                ("Y",["o1_XNOR2X1_Y_16_A"])],
+        QOAI21X1 [("instance","o1_XNOR2X1_Y_16_A_OAI21X1_C"), ("src", "")] [
+                ("A",["i3_XNOR2X1_A_6_Y_AND2X1_B_Y"]),
+                ("B",["o1_XNOR2X1_Y_16_B_NOR2X1_Y_B"]),
+                ("C",["o1_XNOR2X1_Y_16_A"]),
+                ("Y",["o1_XOR2X1_Y_12_B_AOI21X1_Y_A"])],
+        QNOR2X1 [("instance","o1_XNOR2X1_Y_16_B_NOR2X1_Y"), ("src", "")] [
+                ("A",["i3_XNOR2X1_A_6_Y_AND2X1_B_Y"]),
+                ("B",["o1_XNOR2X1_Y_16_B_NOR2X1_Y_B"]),
+                ("Y",["o1_XNOR2X1_Y_16_B"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_17"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_17_A"]),
+                ("B",["o1_XNOR2X1_Y_17_B"]),
+                ("Y",["o1[29]"])],
+        QOAI21X1 [("instance","o1_XNOR2X1_Y_17_A_OAI21X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_17_A_OAI21X1_Y_A"]),
+                ("B",["i3_XOR2X1_A_Y"]),
+                ("C",["o1_XOR2X1_Y_13_A_NAND3X1_B_Y"]),
+                ("Y",["o1_XNOR2X1_Y_17_A"])],
+        QINVX1 [("instance","o1_XNOR2X1_Y_17_A_OAI21X1_Y_A_INVX1_Y"), ("src", "")] [
+                ("A",["i1[28]"]),
+                ("Y",["o1_XNOR2X1_Y_17_A_OAI21X1_Y_A"])],
+        QOR2X1 [("instance","o1_XNOR2X1_Y_17_B_OR2X1_Y"), ("src", "")] [
+                ("A",["i3_XNOR2X1_A_6_Y_AND2X1_B_Y"]),
+                ("B",["i3_XNOR2X1_A_6_Y_NOR2X1_B_Y"]),
+                ("Y",["o1_XNOR2X1_Y_17_B"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_18"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_18_A"]),
+                ("B",["o1_XNOR2X1_Y_18_B"]),
+                ("Y",["o1[27]"])],
+        QOAI21X1 [("instance","o1_XNOR2X1_Y_18_A_OAI21X1_Y"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_14_A"]),
+                ("B",["o1_XOR2X1_Y_14_B"]),
+                ("C",["i3_XNOR2X1_A_8_Y_NAND2X1_B_Y"]),
+                ("Y",["o1_XNOR2X1_Y_18_A"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_18_B_NAND2X1_Y"), ("src", "")] [
+                ("A",["i3_XNOR2X1_A_7_Y_NAND2X1_B_Y"]),
+                ("B",["i3_XNOR2X1_A_7_Y_OR2X1_B_Y"]),
+                ("Y",["o1_XNOR2X1_Y_18_B"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_19"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_19_A"]),
+                ("B",["o1_XNOR2X1_Y_19_B"]),
+                ("Y",["o1[25]"])],
+        QOAI21X1 [("instance","o1_XNOR2X1_Y_19_A_OAI21X1_Y"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_15_A"]),
+                ("B",["o1_XOR2X1_Y_15_B"]),
+                ("C",["i3_XNOR2X1_A_32_Y_NAND2X1_B_Y"]),
+                ("Y",["o1_XNOR2X1_Y_19_A"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_19_B_NAND2X1_Y"), ("src", "")] [
+                ("A",["i3_XNOR2X1_B_Y_NAND2X1_B_Y"]),
+                ("B",["i3_XNOR2X1_B_Y_OR2X1_B_Y"]),
+                ("Y",["o1_XNOR2X1_Y_19_B"])],
+        QOR2X1 [("instance","o1_XNOR2X1_Y_1_A_OR2X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_1_A_OR2X1_Y_A"]),
+                ("B",["o1_XOR2X1_Y_1_A_NOR3X1_A_Y"]),
+                ("Y",["o1_XNOR2X1_Y_1_A"])],
+        QOR2X1 [("instance","o1_XNOR2X1_Y_1_B_OR2X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_1_B_OR2X1_Y_A"]),
+                ("B",["o1_XOR2X1_Y_B_OR2X1_Y_A"]),
+                ("Y",["o1_XNOR2X1_Y_1_B"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_2"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_2_A"]),
+                ("B",["o1_XNOR2X1_Y_2_B"]),
+                ("Y",["o1[17]"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_2_A_NAND2X1_Y"), ("src", "")] [
+                ("A",["i3_XNOR2X1_A_25_Y_OR2X1_B_Y"]),
+                ("B",["o1_XNOR2X1_Y_2_A_NAND2X1_Y_B"]),
+                ("Y",["o1_XNOR2X1_Y_2_A"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_2_B_NAND2X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_2_B_NAND2X1_Y_A"]),
+                ("B",["o1_XNOR2X1_Y_2_B_NAND2X1_Y_B"]),
+                ("Y",["o1_XNOR2X1_Y_2_B"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_2_B_NAND2X1_Y_A_NAND2X1_A"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_2_B_NAND2X1_Y_A"]),
+                ("B",["o1_XNOR2X1_Y_2_A_NAND2X1_Y_B"]),
+                ("Y",["o1_XOR2X1_Y_4_A_AOI21X1_A_C"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_3"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_3_A"]),
+                ("B",["o1_XNOR2X1_Y_3_B"]),
+                ("Y",["o1[15]"])],
+        QOAI21X1 [("instance","o1_XNOR2X1_Y_3_A_OAI21X1_B"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_3_A_OAI21X1_B_A"]),
+                ("B",["o1_XNOR2X1_Y_3_A"]),
+                ("C",["o1_XNOR2X1_Y_3_A_OAI21X1_B_C"]),
+                ("Y",["o1_XOR2X1_Y_4_B"])],
+        QNOR2X1 [("instance","o1_XNOR2X1_Y_3_A_OAI21X1_B_A_NOR2X1_Y"), ("src", "")] [
+                ("A",["i1[15]"]),
+                ("B",["i3_XNOR2X1_A_23_Y"]),
+                ("Y",["o1_XNOR2X1_Y_3_A_OAI21X1_B_A"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_3_A_OAI21X1_B_C_NAND2X1_Y"), ("src", "")] [
+                ("A",["i1[15]"]),
+                ("B",["i3_XNOR2X1_A_23_Y"]),
+                ("Y",["o1_XNOR2X1_Y_3_A_OAI21X1_B_C"])],
+        QXOR2X1 [("instance","o1_XNOR2X1_Y_3_B_XOR2X1_Y"), ("src", "")] [
+                ("A",["i1[15]"]),
+                ("B",["i3_XNOR2X1_A_23_Y"]),
+                ("Y",["o1_XNOR2X1_Y_3_B"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_4"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_4_A"]),
+                ("B",["o1_XNOR2X1_Y_4_B"]),
+                ("Y",["o1[14]"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_4_A_NAND2X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_4_A_NAND2X1_Y_A"]),
+                ("B",["o1_XNOR2X1_Y_4_A_NAND2X1_Y_B"]),
+                ("Y",["o1_XNOR2X1_Y_4_A"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_4_A_NAND2X1_Y_A_NAND2X1_Y"), ("src", "")] [
+                ("A",["i1[14]"]),
+                ("B",["i3_XNOR2X1_A_22_Y"]),
+                ("Y",["o1_XNOR2X1_Y_4_A_NAND2X1_Y_A"])],
+        QAOI21X1 [("instance","o1_XNOR2X1_Y_4_B_AOI21X1_B"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_4_A_NAND2X1_Y_B"]),
+                ("B",["o1_XNOR2X1_Y_4_B"]),
+                ("C",["o1_XNOR2X1_Y_4_B_AOI21X1_B_C"]),
+                ("Y",["o1_XNOR2X1_Y_3_A"])],
+        QAND2X1 [("instance","o1_XNOR2X1_Y_4_B_AOI21X1_B_C_AND2X1_Y"), ("src", "")] [
+                ("A",["i1[14]"]),
+                ("B",["i3_XNOR2X1_A_22_Y"]),
+                ("Y",["o1_XNOR2X1_Y_4_B_AOI21X1_B_C"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_5"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_5_A"]),
+                ("B",["o1_XNOR2X1_Y_5_B"]),
+                ("Y",["o1[13]"])],
+        QOAI21X1 [("instance","o1_XNOR2X1_Y_5_A_OAI21X1_B"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_5_A_OAI21X1_B_A"]),
+                ("B",["o1_XNOR2X1_Y_5_A"]),
+                ("C",["o1_XNOR2X1_Y_5_A_OAI21X1_B_C"]),
+                ("Y",["o1_XNOR2X1_Y_4_B"])],
+        QNOR2X1 [("instance","o1_XNOR2X1_Y_5_A_OAI21X1_B_A_NOR2X1_Y"), ("src", "")] [
+                ("A",["i1[13]"]),
+                ("B",["i3_XNOR2X1_A_21_Y"]),
+                ("Y",["o1_XNOR2X1_Y_5_A_OAI21X1_B_A"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_5_A_OAI21X1_B_C_NAND2X1_Y"), ("src", "")] [
+                ("A",["i1[13]"]),
+                ("B",["i3_XNOR2X1_A_21_Y"]),
+                ("Y",["o1_XNOR2X1_Y_5_A_OAI21X1_B_C"])],
+        QXOR2X1 [("instance","o1_XNOR2X1_Y_5_B_XOR2X1_Y"), ("src", "")] [
+                ("A",["i1[13]"]),
+                ("B",["i3_XNOR2X1_A_21_Y"]),
+                ("Y",["o1_XNOR2X1_Y_5_B"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_6"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_6_A"]),
+                ("B",["o1_XNOR2X1_Y_6_B"]),
+                ("Y",["o1[12]"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_6_A_NAND2X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_6_A_NAND2X1_Y_A"]),
+                ("B",["o1_XNOR2X1_Y_6_A_NAND2X1_Y_B"]),
+                ("Y",["o1_XNOR2X1_Y_6_A"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_6_A_NAND2X1_Y_A_NAND2X1_Y"), ("src", "")] [
+                ("A",["i1[12]"]),
+                ("B",["i3_XNOR2X1_A_20_Y"]),
+                ("Y",["o1_XNOR2X1_Y_6_A_NAND2X1_Y_A"])],
+        QAOI21X1 [("instance","o1_XNOR2X1_Y_6_B_AOI21X1_B"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_6_A_NAND2X1_Y_B"]),
+                ("B",["o1_XNOR2X1_Y_6_B"]),
+                ("C",["o1_XNOR2X1_Y_6_B_AOI21X1_B_C"]),
+                ("Y",["o1_XNOR2X1_Y_5_A"])],
+        QAND2X1 [("instance","o1_XNOR2X1_Y_6_B_AOI21X1_B_C_AND2X1_Y"), ("src", "")] [
+                ("A",["i1[12]"]),
+                ("B",["i3_XNOR2X1_A_20_Y"]),
+                ("Y",["o1_XNOR2X1_Y_6_B_AOI21X1_B_C"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_7"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_7_A"]),
+                ("B",["o1_XNOR2X1_Y_7_B"]),
+                ("Y",["o1[10]"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_7_A_NAND2X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_7_A_NAND2X1_Y_A"]),
+                ("B",["i3_XNOR2X1_A_18_Y_OR2X1_B_Y"]),
+                ("Y",["o1_XNOR2X1_Y_7_A"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_8"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_8_A"]),
+                ("B",["o1_XNOR2X1_Y_8_B"]),
+                ("Y",["o1[8]"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_8_B_NAND2X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_8_B_NAND2X1_Y_A"]),
+                ("B",["o1_XOR2X1_Y_6_B_AOI21X1_Y_B"]),
+                ("Y",["o1_XNOR2X1_Y_8_B"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_8_B_NAND2X1_Y_A_NAND2X1_Y"), ("src", "")] [
+                ("A",["i1[8]"]),
+                ("B",["i3_XNOR2X1_A_16_Y"]),
+                ("Y",["o1_XNOR2X1_Y_8_B_NAND2X1_Y_A"])],
+        QXNOR2X1 [("instance","o1_XNOR2X1_Y_9"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_9_A"]),
+                ("B",["o1_XNOR2X1_Y_9_B"]),
+                ("Y",["o1[6]"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_9_A_NAND2X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_9_A_NAND2X1_Y_A"]),
+                ("B",["o1_XOR2X1_Y_7_B_AOI21X1_Y_A"]),
+                ("Y",["o1_XNOR2X1_Y_9_A"])],
+        QNAND2X1 [("instance","o1_XNOR2X1_Y_9_A_NAND2X1_Y_A_NAND2X1_Y"), ("src", "")] [
+                ("A",["i1[6]"]),
+                ("B",["i3_XNOR2X1_A_14_Y"]),
+                ("Y",["o1_XNOR2X1_Y_9_A_NAND2X1_Y_A"])],
+        QOR2X1 [("instance","o1_XNOR2X1_Y_A_OR2X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_A_OR2X1_Y_A"]),
+                ("B",["o1_XOR2X1_Y_A_NOR3X1_A_Y"]),
+                ("Y",["o1_XNOR2X1_Y_A"])],
+        QOR2X1 [("instance","o1_XNOR2X1_Y_B_OR2X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_B_OR2X1_Y_A"]),
+                ("B",["o1_XNOR2X1_Y_B_OR2X1_Y_B"]),
+                ("Y",["o1_XNOR2X1_Y_B"])],
+        QNOR3X1 [("instance","o1_XNOR2X1_Y_B_OR2X1_Y_A_NOR3X1_A"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_B_OR2X1_Y_A"]),
+                ("B",["o1_XNOR2X1_Y_A_OR2X1_Y_A"]),
+                ("C",["o1_XOR2X1_Y_A_NOR3X1_A_Y"]),
+                ("Y",["o1_XOR2X1_Y_15_B_OR2X1_Y_B"])],
+        QXOR2X1 [("instance","o1_XOR2X1_Y"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_A"]),
+                ("B",["o1_XOR2X1_Y_B"]),
+                ("Y",["o1[22]"])],
+        QXOR2X1 [("instance","o1_XOR2X1_Y_1"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_1_A"]),
+                ("B",["o1_XOR2X1_Y_1_B"]),
+                ("Y",["o1[20]"])],
+        QXOR2X1 [("instance","o1_XOR2X1_Y_10"), ("src", "")] [
+                ("A",["i2_MUX2X1_S_Y"]),
+                ("B",["o1_XOR2X1_Y_10_B"]),
+                ("Y",["o1[1]"])],
+        QXOR2X1 [("instance","o1_XOR2X1_Y_11"), ("src", "")] [
+                ("A",["i2[0]"]),
+                ("B",["i1[0]"]),
+                ("Y",["o1[0]"])],
+        QXOR2X1 [("instance","o1_XOR2X1_Y_12"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_12_A"]),
+                ("B",["o1_XOR2X1_Y_12_B"]),
+                ("Y",["o1[32]"])],
+        QAOI21X1 [("instance","o1_XOR2X1_Y_12_A_AOI21X1_A"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_12_A"]),
+                ("B",["o1_XOR2X1_Y_12_B"]),
+                ("C",["i3_XNOR2X1_A_3_Y_AND2X1_B_Y"]),
+                ("Y",["o1_XNOR2X1_Y_14_A"])],
+        QNOR2X1 [("instance","o1_XOR2X1_Y_12_A_NOR2X1_Y"), ("src", "")] [
+                ("A",["i3_XNOR2X1_A_3_Y_AND2X1_B_Y"]),
+                ("B",["i3_XNOR2X1_A_3_Y_NOR2X1_B_Y"]),
+                ("Y",["o1_XOR2X1_Y_12_A"])],
+        QAOI21X1 [("instance","o1_XOR2X1_Y_12_B_AOI21X1_Y"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_12_B_AOI21X1_Y_A"]),
+                ("B",["o1_XOR2X1_Y_12_B_AOI21X1_Y_B"]),
+                ("C",["o1_XOR2X1_Y_12_B_AOI21X1_Y_C"]),
+                ("Y",["o1_XOR2X1_Y_12_B"])],
+        QAOI21X1 [("instance","o1_XOR2X1_Y_12_B_AOI21X1_Y_B_AOI21X1_Y"), ("src", "")] [
+                ("A",["i1[31]"]),
+                ("B",["i3_XNOR2X1_A_4_Y"]),
+                ("C",["o1_XNOR2X1_Y_16_A_NOR2X1_Y_A"]),
+                ("Y",["o1_XOR2X1_Y_12_B_AOI21X1_Y_B"])],
+        QXOR2X1 [("instance","o1_XOR2X1_Y_13"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_13_A"]),
+                ("B",["o1_XOR2X1_Y_13_B"]),
+                ("Y",["o1[28]"])],
+        QNAND3X1 [("instance","o1_XOR2X1_Y_13_A_NAND3X1_B"), ("src", "")] [
+                ("A",["i3_XNOR2X1_A_7_Y_OR2X1_B_Y"]),
+                ("B",["o1_XOR2X1_Y_13_A"]),
+                ("C",["o1_XOR2X1_Y_13_B_AND2X1_Y_B"]),
+                ("Y",["o1_XOR2X1_Y_13_A_NAND3X1_B_Y"])],
+        QXNOR2X1 [("instance","o1_XOR2X1_Y_13_A_XNOR2X1_Y"), ("src", "")] [
+                ("A",["i1[28]"]),
+                ("B",["i3_XOR2X1_A_Y"]),
+                ("Y",["o1_XOR2X1_Y_13_A"])],
+        QAND2X1 [("instance","o1_XOR2X1_Y_13_B_AND2X1_Y"), ("src", "")] [
+                ("A",["i3_XNOR2X1_A_7_Y_OR2X1_B_Y"]),
+                ("B",["o1_XOR2X1_Y_13_B_AND2X1_Y_B"]),
+                ("Y",["o1_XOR2X1_Y_13_B"])],
+        QOAI21X1 [("instance","o1_XOR2X1_Y_13_B_AND2X1_Y_B_OAI21X1_Y"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_14_A"]),
+                ("B",["o1_XOR2X1_Y_14_B"]),
+                ("C",["i3_XNOR2X1_A_8_Y_NAND2X1_B_Y_AND2X1_A_Y"]),
+                ("Y",["o1_XOR2X1_Y_13_B_AND2X1_Y_B"])],
+        QXOR2X1 [("instance","o1_XOR2X1_Y_14"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_14_A"]),
+                ("B",["o1_XOR2X1_Y_14_B"]),
+                ("Y",["o1[26]"])],
+        QXOR2X1 [("instance","o1_XOR2X1_Y_15"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_15_A"]),
+                ("B",["o1_XOR2X1_Y_15_B"]),
+                ("Y",["o1[24]"])],
+        QNOR3X1 [("instance","o1_XOR2X1_Y_15_A_NOR3X1_A"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_15_A"]),
+                ("B",["o1_XNOR2X1_Y_B_OR2X1_Y_B"]),
+                ("C",["o1_XOR2X1_Y_15_B_OR2X1_Y_B"]),
+                ("Y",["o1_XOR2X1_Y_15_A_NOR3X1_A_Y"])],
+        QOR2X1 [("instance","o1_XOR2X1_Y_15_B_OR2X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_B_OR2X1_Y_B"]),
+                ("B",["o1_XOR2X1_Y_15_B_OR2X1_Y_B"]),
+                ("Y",["o1_XOR2X1_Y_15_B"])],
+        QNOR3X1 [("instance","o1_XOR2X1_Y_1_A_NOR3X1_A"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_1_A"]),
+                ("B",["o1_XOR2X1_Y_1_B_OR2X1_Y_A"]),
+                ("C",["o1_XOR2X1_Y_1_B_OR2X1_Y_B"]),
+                ("Y",["o1_XOR2X1_Y_1_A_NOR3X1_A_Y"])],
+        QXNOR2X1 [("instance","o1_XOR2X1_Y_1_A_XNOR2X1_Y"), ("src", "")] [
+                ("A",["i1[20]"]),
+                ("B",["i3_XNOR2X1_A_28_Y"]),
+                ("Y",["o1_XOR2X1_Y_1_A"])],
+        QOR2X1 [("instance","o1_XOR2X1_Y_1_B_OR2X1_Y"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_1_B_OR2X1_Y_A"]),
+                ("B",["o1_XOR2X1_Y_1_B_OR2X1_Y_B"]),
+                ("Y",["o1_XOR2X1_Y_1_B"])],
+        QXOR2X1 [("instance","o1_XOR2X1_Y_2"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_2_A"]),
+                ("B",["o1_XOR2X1_Y_2_B"]),
+                ("Y",["o1[19]"])],
+        QOR2X1 [("instance","o1_XOR2X1_Y_2_A_OR2X1_Y"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_2_A_OR2X1_Y_A"]),
+                ("B",["o1_XOR2X1_Y_2_A_OR2X1_Y_B"]),
+                ("Y",["o1_XOR2X1_Y_2_A"])],
+        QNOR3X1 [("instance","o1_XOR2X1_Y_2_A_OR2X1_Y_A_NOR3X1_B"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_2_B_NOR2X1_Y_A"]),
+                ("B",["o1_XOR2X1_Y_2_A_OR2X1_Y_A"]),
+                ("C",["o1_XOR2X1_Y_2_A_OR2X1_Y_B"]),
+                ("Y",["o1_XOR2X1_Y_1_B_OR2X1_Y_B"])],
+        QNOR2X1 [("instance","o1_XOR2X1_Y_2_B_NOR2X1_Y"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_2_B_NOR2X1_Y_A"]),
+                ("B",["o1_XOR2X1_Y_1_B_OR2X1_Y_A"]),
+                ("Y",["o1_XOR2X1_Y_2_B"])],
+        QXOR2X1 [("instance","o1_XOR2X1_Y_3"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_3_A"]),
+                ("B",["o1_XOR2X1_Y_3_B"]),
+                ("Y",["o1[18]"])],
+        QNOR3X1 [("instance","o1_XOR2X1_Y_3_A_NOR3X1_A"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_3_A"]),
+                ("B",["o1_XOR2X1_Y_3_B_OR2X1_Y_A"]),
+                ("C",["o1_XOR2X1_Y_3_B_OR2X1_Y_B"]),
+                ("Y",["o1_XOR2X1_Y_2_A_OR2X1_Y_B"])],
+        QXNOR2X1 [("instance","o1_XOR2X1_Y_3_A_XNOR2X1_Y"), ("src", "")] [
+                ("A",["i1[18]"]),
+                ("B",["i3_XNOR2X1_A_26_Y"]),
+                ("Y",["o1_XOR2X1_Y_3_A"])],
+        QOR2X1 [("instance","o1_XOR2X1_Y_3_B_OR2X1_Y"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_3_B_OR2X1_Y_A"]),
+                ("B",["o1_XOR2X1_Y_3_B_OR2X1_Y_B"]),
+                ("Y",["o1_XOR2X1_Y_3_B"])],
+        QINVX1 [("instance","o1_XOR2X1_Y_3_B_OR2X1_Y_A_INVX1_Y"), ("src", "")] [
+                ("A",["i3_XNOR2X1_A_25_Y_OR2X1_B_Y"]),
+                ("Y",["o1_XOR2X1_Y_3_B_OR2X1_Y_A"])],
+        QXOR2X1 [("instance","o1_XOR2X1_Y_4"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_4_A"]),
+                ("B",["o1_XOR2X1_Y_4_B"]),
+                ("Y",["o1[16]"])],
+        QAOI21X1 [("instance","o1_XOR2X1_Y_4_A_AOI21X1_A"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_4_A"]),
+                ("B",["o1_XOR2X1_Y_4_B"]),
+                ("C",["o1_XOR2X1_Y_4_A_AOI21X1_A_C"]),
+                ("Y",["o1_XOR2X1_Y_3_B_OR2X1_Y_B"])],
+        QNAND2X1 [("instance","o1_XOR2X1_Y_4_A_NAND2X1_A"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_4_A"]),
+                ("B",["o1_XOR2X1_Y_4_B"]),
+                ("Y",["o1_XNOR2X1_Y_2_B_NAND2X1_Y_B"])],
+        QXOR2X1 [("instance","o1_XOR2X1_Y_5"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_5_A"]),
+                ("B",["o1_XOR2X1_Y_5_B"]),
+                ("Y",["o1[11]"])],
+        QOAI21X1 [("instance","o1_XOR2X1_Y_5_A_OAI21X1_A"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_5_A"]),
+                ("B",["o1_XOR2X1_Y_5_B"]),
+                ("C",["o1_XOR2X1_Y_5_A_OAI21X1_A_C"]),
+                ("Y",["o1_XNOR2X1_Y_6_B"])],
+        QXNOR2X1 [("instance","o1_XOR2X1_Y_5_A_XNOR2X1_Y"), ("src", "")] [
+                ("A",["i1[11]"]),
+                ("B",["i3_XNOR2X1_A_19_Y"]),
+                ("Y",["o1_XOR2X1_Y_5_A"])],
+        QAOI21X1 [("instance","o1_XOR2X1_Y_5_B_AOI21X1_Y"), ("src", "")] [
+                ("A",["i3_XNOR2X1_A_18_Y_OR2X1_B_Y"]),
+                ("B",["o1_XNOR2X1_Y_7_B"]),
+                ("C",["o1_XOR2X1_Y_5_B_AOI21X1_Y_C"]),
+                ("Y",["o1_XOR2X1_Y_5_B"])],
+        QINVX1 [("instance","o1_XOR2X1_Y_5_B_AOI21X1_Y_C_INVX1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_7_A_NAND2X1_Y_A"]),
+                ("Y",["o1_XOR2X1_Y_5_B_AOI21X1_Y_C"])],
+        QXOR2X1 [("instance","o1_XOR2X1_Y_6"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_6_A"]),
+                ("B",["o1_XOR2X1_Y_6_B"]),
+                ("Y",["o1[9]"])],
+        QOAI21X1 [("instance","o1_XOR2X1_Y_6_A_OAI21X1_A"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_6_A"]),
+                ("B",["o1_XOR2X1_Y_6_B"]),
+                ("C",["o1_XOR2X1_Y_6_A_OAI21X1_A_C"]),
+                ("Y",["o1_XNOR2X1_Y_7_B"])],
+        QXNOR2X1 [("instance","o1_XOR2X1_Y_6_A_XNOR2X1_Y"), ("src", "")] [
+                ("A",["i1[9]"]),
+                ("B",["i3_XNOR2X1_A_17_Y"]),
+                ("Y",["o1_XOR2X1_Y_6_A"])],
+        QAOI21X1 [("instance","o1_XOR2X1_Y_6_B_AOI21X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_8_A"]),
+                ("B",["o1_XOR2X1_Y_6_B_AOI21X1_Y_B"]),
+                ("C",["o1_XOR2X1_Y_6_B_AOI21X1_Y_C"]),
+                ("Y",["o1_XOR2X1_Y_6_B"])],
+        QAND2X1 [("instance","o1_XOR2X1_Y_6_B_AOI21X1_Y_C_AND2X1_Y"), ("src", "")] [
+                ("A",["i1[8]"]),
+                ("B",["i3_XNOR2X1_A_16_Y"]),
+                ("Y",["o1_XOR2X1_Y_6_B_AOI21X1_Y_C"])],
+        QXOR2X1 [("instance","o1_XOR2X1_Y_7"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_7_A"]),
+                ("B",["o1_XOR2X1_Y_7_B"]),
+                ("Y",["o1[7]"])],
+        QOAI21X1 [("instance","o1_XOR2X1_Y_7_A_OAI21X1_A"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_7_A"]),
+                ("B",["o1_XOR2X1_Y_7_B"]),
+                ("C",["o1_XOR2X1_Y_7_A_OAI21X1_A_C"]),
+                ("Y",["o1_XNOR2X1_Y_8_A"])],
+        QXNOR2X1 [("instance","o1_XOR2X1_Y_7_A_XNOR2X1_Y"), ("src", "")] [
+                ("A",["i1[7]"]),
+                ("B",["i3_XNOR2X1_A_15_Y"]),
+                ("Y",["o1_XOR2X1_Y_7_A"])],
+        QAOI21X1 [("instance","o1_XOR2X1_Y_7_B_AOI21X1_Y"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_7_B_AOI21X1_Y_A"]),
+                ("B",["o1_XNOR2X1_Y_9_B"]),
+                ("C",["o1_XOR2X1_Y_7_B_AOI21X1_Y_C"]),
+                ("Y",["o1_XOR2X1_Y_7_B"])],
+        QAND2X1 [("instance","o1_XOR2X1_Y_7_B_AOI21X1_Y_C_AND2X1_Y"), ("src", "")] [
+                ("A",["i1[6]"]),
+                ("B",["i3_XNOR2X1_A_14_Y"]),
+                ("Y",["o1_XOR2X1_Y_7_B_AOI21X1_Y_C"])],
+        QXOR2X1 [("instance","o1_XOR2X1_Y_8"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_8_A"]),
+                ("B",["o1_XOR2X1_Y_8_B"]),
+                ("Y",["o1[5]"])],
+        QOAI21X1 [("instance","o1_XOR2X1_Y_8_A_OAI21X1_A"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_8_A"]),
+                ("B",["o1_XOR2X1_Y_8_B"]),
+                ("C",["o1_XOR2X1_Y_8_A_OAI21X1_A_C"]),
+                ("Y",["o1_XNOR2X1_Y_9_B"])],
+        QXNOR2X1 [("instance","o1_XOR2X1_Y_8_A_XNOR2X1_Y"), ("src", "")] [
+                ("A",["i1[5]"]),
+                ("B",["i3_XNOR2X1_A_13_Y"]),
+                ("Y",["o1_XOR2X1_Y_8_A"])],
+        QAOI21X1 [("instance","o1_XOR2X1_Y_8_B_AOI21X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_10_A"]),
+                ("B",["o1_XOR2X1_Y_8_B_AOI21X1_Y_B"]),
+                ("C",["o1_XOR2X1_Y_8_B_AOI21X1_Y_C"]),
+                ("Y",["o1_XOR2X1_Y_8_B"])],
+        QAND2X1 [("instance","o1_XOR2X1_Y_8_B_AOI21X1_Y_C_AND2X1_Y"), ("src", "")] [
+                ("A",["i1[4]"]),
+                ("B",["i3_XNOR2X1_A_12_Y"]),
+                ("Y",["o1_XOR2X1_Y_8_B_AOI21X1_Y_C"])],
+        QXOR2X1 [("instance","o1_XOR2X1_Y_9"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_9_A"]),
+                ("B",["o1_XOR2X1_Y_9_B"]),
+                ("Y",["o1[3]"])],
+        QOAI21X1 [("instance","o1_XOR2X1_Y_9_A_OAI21X1_A"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_9_A"]),
+                ("B",["o1_XOR2X1_Y_9_B"]),
+                ("C",["o1_XOR2X1_Y_9_A_OAI21X1_A_C"]),
+                ("Y",["o1_XNOR2X1_Y_10_A"])],
+        QXNOR2X1 [("instance","o1_XOR2X1_Y_9_A_XNOR2X1_Y"), ("src", "")] [
+                ("A",["i1[3]"]),
+                ("B",["i3_XNOR2X1_A_11_Y"]),
+                ("Y",["o1_XOR2X1_Y_9_A"])],
+        QAOI21X1 [("instance","o1_XOR2X1_Y_9_B_AOI21X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_11_A"]),
+                ("B",["o1_XOR2X1_Y_9_B_AOI21X1_Y_B"]),
+                ("C",["o1_XOR2X1_Y_9_B_AOI21X1_Y_C"]),
+                ("Y",["o1_XOR2X1_Y_9_B"])],
+        QAND2X1 [("instance","o1_XOR2X1_Y_9_B_AOI21X1_Y_C_AND2X1_Y"), ("src", "")] [
+                ("A",["i1[2]"]),
+                ("B",["i3_XNOR2X1_A_10_Y"]),
+                ("Y",["o1_XOR2X1_Y_9_B_AOI21X1_Y_C"])],
+        QNOR3X1 [("instance","o1_XOR2X1_Y_A_NOR3X1_A"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_A"]),
+                ("B",["o1_XOR2X1_Y_B_OR2X1_Y_A"]),
+                ("C",["o1_XOR2X1_Y_B_OR2X1_Y_B"]),
+                ("Y",["o1_XOR2X1_Y_A_NOR3X1_A_Y"])],
+        QXNOR2X1 [("instance","o1_XOR2X1_Y_A_XNOR2X1_Y"), ("src", "")] [
+                ("A",["i1[22]"]),
+                ("B",["i3_XNOR2X1_A_30_Y"]),
+                ("Y",["o1_XOR2X1_Y_A"])],
+        QOR2X1 [("instance","o1_XOR2X1_Y_B_OR2X1_Y"), ("src", "")] [
+                ("A",["o1_XOR2X1_Y_B_OR2X1_Y_A"]),
+                ("B",["o1_XOR2X1_Y_B_OR2X1_Y_B"]),
+                ("Y",["o1_XOR2X1_Y_B"])],
+        QNOR3X1 [("instance","o1_XOR2X1_Y_B_OR2X1_Y_B_NOR3X1_Y"), ("src", "")] [
+                ("A",["o1_XNOR2X1_Y_1_B_OR2X1_Y_A"]),
+                ("B",["o1_XNOR2X1_Y_1_A_OR2X1_Y_A"]),
+                ("C",["o1_XOR2X1_Y_1_A_NOR3X1_A_Y"]),
+                ("Y",["o1_XOR2X1_Y_B_OR2X1_Y_B"])]
+    ] in
+    yosys_PINST "_synth_49" attrs F _fa_inps _fa_outs ints (P_HIER _body)
+;
+
+
+let q = verilog2pexlif T "" "_synth_49" ["b269.v"] [];
+q fseq 0;
+val (PINST name0 attrs0 leaf0 fa_inps0 fa_outs0 ints0 (P_HIER chs0)) = q;
+//fa_inps0;
+
+
+let p = Q_synth_49 [] [("i1[35:0]", ["0b0", "muxsrc2[31:0]", "0b000"]),
+        ("i2[35:0]", ["0b000000000", "brshifte[32:7]", "lsb"]),
+        ("i3", ["addflag"]),
+        ("o1[35:0]", ["vresult[35:0]"])
+        ]
+;
+p fseq 1;
+
+val (PINST name1 attrs1 leaf1 fa_inps1 fa_outs1 ints1 (P_HIER chs1)) = p;
+fa_inps1;
+
+let p2 = wrap_pexlif  p;
+p2 fseq 2;
+val (PINST name2 attrs2 leaf2 fa_inps2 fa_outs2 ints2 (P_HIER chs2)) = p2;
+fa_inps2;
+
+let p3 = unfold_pexlif p2 1;
+p3 fseq 3;
