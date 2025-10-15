@@ -503,13 +503,6 @@ let gen_draw_fanin vfsm draw_level levels vecs =
 //    (PINST name attrs lf fa_inps' fa_outs' ints'(P_HIER chs'))
 //;
 
-let get_inside p =
-    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER chs)) = p in
-    let fa_inps' = map (\(f,as). f, [f]) fa_inps in
-    let fa_outs' = map (\(f,as). f, [f]) fa_outs in
-    (PINST name attrs lf fa_inps' fa_outs' ints (P_HIER chs))
-;
-
 let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
     let w = vfsm2id vfsm then
     is_IDV_ENV vfsm =>
@@ -518,9 +511,10 @@ let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
 	    tcl_eval [sprintf "set ::sch_info(instance_hier,%s)" canvas]
 	then
 	let hier = sprintf "%si%d/" phier inst_nbr then
-	let p = el inst_nbr (pexlif_get_children parent) then
-	let pclean = get_inside p then
-	let vis = idv_visualize_fanin pclean then
+	let p =
+	    pexlif_extract_inside (el inst_nbr (pexlif_get_children parent))
+	then
+	let vis = idv_visualize_fanin p then
 	val (tab_window, c) = get_new_sch_canvas w 0 "" hier then
 	(start_draw_op c) fseq
 	let cmd = "OBSOLETE" in

@@ -204,6 +204,14 @@ let find_next_anon_transform_name signature class =
 ;
 non_lazy find_next_anon_transform_name;
 
+let rewire_outside_connections spec imp =
+    val (PINST sname sattrs slf sfa_inps sfa_outs sints sbody) = spec in
+    val (PINST iname iattrs ilf ifa_inps ifa_outs iints ibody) = imp in
+    let ifa_inps' = map (\(f,as). f, assoc f sfa_inps) ifa_inps in
+    let ifa_outs' = map (\(f,as). f, assoc f sfa_outs) ifa_outs in
+    (PINST iname iattrs ilf ifa_inps' ifa_outs' iints ibody)
+;
+
 //
 // Much too simplistic and (fatally) not guaranteed to be valid!
 //
@@ -1958,6 +1966,20 @@ let pexlif_ifc_substitute sub p =
     (PINST nm attrs lf fa_inps' fa_outs' ints body)
 ;
 
+// 
+let trivial_get_specialized_imp spec imp p =
+    let specl = [rewire_outside_connections p spec] catch [] then
+    specl = [] => NONE |
+    let spec' = hd specl in
+    let ok = check_eq_by_sim p spec' then
+    NOT ok => NONE |
+    pexlif_get_inps_formals spec' != pexlif_get_inps_formals imp => NONE |
+    pexlif_get_outs_formals spec' != pexlif_get_outs_formals imp => NONE |
+    SOME (rewire_outside_connections p imp)
+;
+
+
+
 // Try by simply swapping actuals.
 let simple_get_specialized_imp spec imp p =
     val (PINST nm_s attr_s lf_s in_s out_s int_s sckt_s) = spec in
@@ -2001,6 +2023,8 @@ let lcmp l1 l2 =
 // Find a substitution that makes spec == p.
 // If such is found, return imp after applying the same substitution.
 let get_specialized_imp spec imp p =
+    let tres = trivial_get_specialized_imp spec imp p then
+    has_value tres => tres |
     let ores = simple_get_specialized_imp spec imp p then
     has_value ores => ores |
     val (PINST nm1 attr1 lf1 in1 out1 int1 sckt1) = spec in
@@ -2040,24 +2064,45 @@ let get_specialized_imp spec imp p =
 ;
 
 
-let do_replace_first parent spec imp =
-    val (PINST nm attrs leaf fa_inps fa_outs ints (P_HIER (cp:cps))) = parent in
+let do_replace_child idx parent spec imp =
+    val (PINST nm attrs leaf fa_inps fa_outs ints (P_HIER cs)) = parent in
+    val (pre,cp,post) = split_list idx cs in
     let o_imp' = get_specialized_imp spec imp cp then
     NOT (has_value o_imp') =>
 	eprintf "Transformation spec not an exact match in replace\n"
     |
     let new = get_value o_imp' then
-    let p' = PINST nm attrs leaf fa_inps fa_outs ints (P_HIER (new:cps)) then
-    unfold_pexlif p' 1
+    let cs' = pre@[new]@post in
+    let p' = PINST nm attrs leaf fa_inps fa_outs ints (P_HIER cs') then
+    unfold_pexlif p' idx
 ;
 
+//let dbg_parent = ref {(error "not yet")::pexlif};
+//let dbg_spec = ref {(error "not yet")::pexlif};
+//let dbg_imp = ref {(error "not yet")::pexlif};
+
 let replace_all parent spec imp =
+//(dbg_parent := parent) fseq
+//(dbg_spec := spec) fseq
+//(dbg_imp := imp) fseq
     let raw_matches = isomatch spec parent then
+    raw_matches = [] => parent |
     let matches = map (\l. map (\(si,(ii,_)). si,ii) l) raw_matches then
     let groups = map (map snd) matches then
     let nbr_groups = length groups then
     let lbl = "_#*&_&*#_" in
-    let parent' = foldn_pexlif_anon parent groups lbl then
+    let parent' =
+	let single = length (hd matches) = 1 in
+	single =>
+	    val (PINST n ats lf fa_inps fa_outs ints (P_HIER cs)) = parent then
+	    let sel = flat groups in
+	    let non_sel = (1 upto (length cs)) subtract sel in
+	    let first = gather cs sel then
+	    let rem =  gather cs non_sel then
+	    (PINST n ats lf fa_inps fa_outs ints (P_HIER (first@rem)))
+	|
+	    foldn_pexlif_anon parent groups lbl
+    then
     let children' = pexlif_get_children parent' then
     let to_be_replaced = firstn nbr_groups children' then
     let remain = butfirstn nbr_groups children' then
@@ -2091,10 +2136,19 @@ let fl_do_replacement canvas =
     let vfsm = w2vfsm canvas then
     let w = vfsm2id vfsm then
     let il = get_selected_pinsts canvas then
+    il = [] => () |
+    let single = length il = 1 in
     let parent = get_idv_current_pexlif canvas then
-    // This code relies on fold_pexlif putting the new instance first!!!!
-    let p' = fold_pexlif parent il "_TMP_" then
-    val (PINST nm attrs leaf fa_inps fa_outs ints (P_HIER (p:ps))) = p' in
+    let p =
+	single => 
+	    // For single selections, search for the "inside" pexlif
+	    pexlif_extract_inside (el (hd il) (pexlif_get_children parent))
+	|
+	    // This code relies on fold_pexlif putting the new instance first!
+	    let p' = fold_pexlif parent il "_TMP_" then
+	    el 1 (pexlif_get_children p')
+    in
+    let cidx = single => hd il | 1 in
     let signature = pexlif_get_FP p then
     let dbs = (deref cur_idv_rw_transform_db)@
 	      (deref cur_idv_readonly_transform_dbs)
@@ -2116,13 +2170,14 @@ let fl_do_replacement canvas =
     let spec = idv_load_pexlif (db_sname db) sha_spec then
     let imp  = idv_load_pexlif (db_sname db) sha_imp then
     op = "ApplyOnce" =>
-	let p'' = do_replace_first p' spec imp then
+	let p'' = do_replace_child cidx parent spec imp then
 	(add_transform canvas p'' (REPLACE il tr)) fseq
 	let cmd = sprintf "replace vis %s \"%s\";"
 		      (list2str T "[" "," "]" int2str il) name
 	in
 	(refresh_idv_canvas canvas cmd)
     |
+    let spec = single => wrap_pexlif spec | spec in
     op = "ApplyEverywhere" =>
 	let res = do_replace_everywhere F parent spec imp then
 	(add_transform canvas res (REPLACE_ALL F tr)) fseq
@@ -2152,7 +2207,7 @@ let IDV_replace_selected il tr tr_sequence =
     val (TRANSFORM e_name e_sha_spec e_sha_imp e_just) = tr then
     let spec = idv_load_pexlif (db_sname db) e_sha_spec then
     let imp  = idv_load_pexlif (db_sname db) e_sha_imp then
-    let p_imp'' = do_replace_first p_imp' spec imp then
+    let p_imp'' = do_replace_child 1 p_imp' spec imp then
     let just = REPLACE il tr then
     TRANSFORM p_name p_sha_spec (idv_save_pexlif p_imp'') (p_just@[just])
 ;
@@ -2167,14 +2222,6 @@ let IDV_pattern_replace repeat tr tr_sequence =
     let p_imp' = do_replace_everywhere repeat p_imp spec imp then
     let just = REPLACE_ALL repeat tr then
     TRANSFORM p_name p_sha_spec (idv_save_pexlif p_imp') (p_just@[just])
-;
-
-let rewire_insides spec imp =
-    val (PINST sname sattrs slf sfa_inps sfa_outs sints sbody) = spec in
-    val (PINST iname iattrs ilf ifa_inps ifa_outs iints ibody) = imp in
-    let ifa_inps' = map (\(f,as). f, assoc f sfa_inps) ifa_inps in
-    let ifa_outs' = map (\(f,as). f, assoc f sfa_outs) ifa_outs in
-    (PINST iname iattrs ilf ifa_inps' ifa_outs' iints ibody)
 ;
 
 // Invoked from fl_remove_active_sch_tab_window in draw_sch.fl
@@ -2216,7 +2263,7 @@ let idv_finish_transformation canvas =
 		      (length sell)
 	    |
 	    let sel = hd sell then
-	    let imp' = rewire_insides spec imp in
+	    let imp' = rewire_outside_connections (el sel cs) imp in
 	    let cs' = (firstn (sel-1) cs)@[imp']@(butfirstn sel cs) then
 	    let p' = PINST nm attrs leaf fa_inps fa_outs ints (P_HIER cs') then
 	    (add_transform parent p' (REPLACE sell tr)) fseq

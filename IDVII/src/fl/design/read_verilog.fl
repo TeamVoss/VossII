@@ -120,5 +120,5 @@ let verilog2pexlif no_popup flags top_level_module file_list additional_files =
     (eval fl_cmd) fseq
     let p = deref last_pexlif_ref then
     (last_pexlif_ref := error "No pexlif read") seq
-    p
+    pexlif_isolate_constants p
 ;

@@ -3,10 +3,12 @@ load "idv.fl";
 let p = verilog2pexlif T "" "SP_FPU" ["SP_FPU.v"] [];
 time (p fseq 1);
 
+let z {dummy :: void} = get_idv_current_pexlif (get_current_canvas dummy);
+non_lazy z;
+
 IDV p "DB_sp_fpu" [];
 
-    
-
+%%%%%%%%%%%%%%%%%%%%%%%%
 
 VIS p;
 

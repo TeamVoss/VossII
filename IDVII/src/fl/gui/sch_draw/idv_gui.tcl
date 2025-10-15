@@ -229,7 +229,8 @@ proc idv:name_and_save_model {w version {default ""} } {
         frame $npw.t -relief flat
         pack $npw.t -side top -fill x
             ttk::label $npw.t.l -text "Name of $version model: "
-            ttk::entry $npw.t.e -textvariable ::idv_prompt_name -width 20
+            ttk::entry $npw.t.e -textvariable ::idv_prompt_name -width 20 \
+		-font $::voss2_txtfont
             bind $npw.t.e <KeyPress-Return> \
 		"idv:perform_model_save $w $npw $version"
             pack $npw.t.l -side left
@@ -375,7 +376,8 @@ proc idv:fold {w} {
 	frame $npw.t -relief flat
 	pack $npw.t -side top
 	    ttk::label $npw.t.l -text "Name of folded hierarchy: "
-	    ttk::entry $npw.t.e -textvariable ::idv_prompt_name -width 20
+	    ttk::entry $npw.t.e -textvariable ::idv_prompt_name -width 20 \
+		-font $::voss2_txtfont
 	    bind $npw.t.e <KeyPress-Return> "idv:perform_fold $w $npw"
 	    pack $npw.t.l -side left
 	    pack $npw.t.e -side left -fill x -expand yes
@@ -503,7 +505,8 @@ proc idv:name_transform_and_use {inside c tr_name model_name} {
     frame $w.namef
     pack $w.namef -side top -fill x
 	ttk::label $w.namef.l -text "Name of transformation: "
-	ttk::entry $w.namef.e -textvariable ::idv(transf_name) -width 30
+	ttk::entry $w.namef.e -textvariable ::idv(transf_name) -width 30 \
+		-font $::voss2_txtfont
 	pack $w.namef.e -side right
 	pack $w.namef.l -side left -fill x -anchor w
     #
@@ -625,7 +628,8 @@ proc idv:ask_for_model_name {w} {
         frame $npw.t -relief flat
         pack $npw.t -side top -fill x
             ttk::label $npw.t.l -text "Name of model: "
-            ttk::entry $npw.t.e -textvariable ::idv_prompt_name -width 20
+            ttk::entry $npw.t.e -textvariable ::idv_prompt_name -width 20 \
+		-font $::voss2_txtfont
             bind $npw.t.e <KeyPress-Return> "destroy $npw"
             pack $npw.t.l -side left
             pack $npw.t.e -side left -fill x -expand yes
@@ -804,14 +808,14 @@ proc idv:do_fev {ww} {
 			    -width 20 -justify left \
 		-anchor w
 	    ttk::entry $w.f2.f1.e -textvariable ::idv(fev_template_file) \
-			    -width 30
+			    -width 30 -font $::voss2_txtfont
 	    ttk::button $w.f2.f1.dir -image $::icon(folder) \
 		-command "idv:fev_template_file $::idv(code_dir) $w $ww.c"
 	    ttk::label $w.f2.f2.l -text "Include file:" -width 20 \
 			    -justify left \
 		-anchor w
 	    ttk::entry $w.f2.f2.e -textvariable ::idv(fev_include_file) \
-			    -width 30
+			    -width 30 -font $::voss2_txtfont
 
 	    ttk::button $w.f2.f2.dir -image $::icon(folder) \
 		-command "idv:fev_include_file $::idv(code_dir) $w $ww.c"
@@ -861,7 +865,7 @@ proc idv:do_fev {ww} {
 	ttk::label $w.f3.l -text "Load pexlif:" -width 20 -justify left \
 	    -anchor w
 	ttk::entry $w.f3.e -textvariable ::idv(fev_imp_file) \
-			    -width 30 -background  white
+			    -width 30 -background  white -font $::voss2_txtfont
 	ttk::button $w.f3.dir -image $::icon(folder) \
 			    -command "idv:fev_pexlif $w"
 	pack $w.f3.l -side left -anchor w -anchor w

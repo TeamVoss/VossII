@@ -35,10 +35,21 @@ let pexlif_get_children (PINST _ _ _ _ _ _ (P_HIER cs)) = cs
 let pexlif_get_inps_actuals (PINST _ _ _ fa_inps fa_outs _ _) =
         md_extract_vectors (flatmap snd fa_inps)
 ;
+let pexlif_get_inps_formals (PINST _ _ _ fa_inps fa_outs _ _) = map fst fa_inps;
+let pexlif_get_outs_formals (PINST _ _ _ fa_inps fa_outs _ _) = map fst fa_outs;
 let pexlif_get_outs_actuals (PINST _ _ _ fa_inps fa_outs _ _) =
         md_extract_vectors (flatmap snd fa_outs)
 ;
 let pexlif_get_name (PINST nm _ _ _ _ _ _) = nm;
+
+// Return the pexlif in which all externally connections have been removed.
+let pexlif_extract_inside p =
+    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER chs)) = p in
+    let fa_inps' = map (\(f,as). f, [f]) fa_inps in
+    let fa_outs' = map (\(f,as). f, [f]) fa_outs in
+    (PINST name attrs lf fa_inps' fa_outs' ints (P_HIER chs))
+;  
+
 
 //------------------------------------------------------------------------------
 let not_const n = NOT (str_is_prefix "0b" n);
@@ -864,6 +875,43 @@ let blackbox_pexlif1 p hier_list =
 let blackbox_pexlif p selection_lists =
     itlist (\hl.\p. blackbox_pexlif1 p hl) selection_lists p
 ;
-    
 
+// Remove constants from the actuals in interfaces and make
+// them separate instances (with additional new wires).
+letrec pexlif_isolate_constants p =
+    NOT (pexlif_is_hier p) => p |
+    let nameDB = build_name_db p in
+    val (PINST nm attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
+    let consts_r = ref [] in
+    let process sp =
+        let sp' = pexlif_isolate_constants sp in
+        val (PINST lnm lattrs llf lfa_inps lfa_outs lints lbody) = sp' in
+        let cnv (f,as) =
+            let mk_tmp_vire a =
+                NOT (str_is_prefix "0b" a) => a,[] |
+                let tmp_name = mk_name (strlen a - 2) "const" then
+                let a' = get_unique_name nameDB tmp_name then
+                (a', [(a',a)])
+            in
+            val (as',constsl) = unzip (map mk_tmp_vire as) in
+            let consts = flat constsl then
+            (consts_r := (consts @ (deref consts_r))) fseq
+            (f,as')
+        in
+        let lfa_inps' = map cnv lfa_inps then
+        (PINST lnm lattrs llf lfa_inps' lfa_outs lints lbody)
+    in
+    let cs' = map process cs then
+    let consts = deref consts_r then
+    let ints' = ints @ (map fst consts) then
+    let mk_const_block (out,value) =
+        let sz = md_size out in
+        let v = sscanf "0b%b" value in
+        let lhs = W_EXPLICIT_VAR sz out in
+        let rhs = W_CONST sz v in
+        base_assignment F lhs rhs
+    in
+    let cs'' = cs' @ (map mk_const_block consts) then
+    (PINST nm attrs lf fa_inps fa_outs ints' (P_HIER cs''))
+;
 
