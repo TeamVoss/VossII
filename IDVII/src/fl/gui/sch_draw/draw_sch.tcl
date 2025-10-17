@@ -521,8 +521,14 @@ proc draw_hier_boundingbox {c name} {
     val {lx ly ux uy} [grow_bbox $c]
     $c create rectangle  $lx $ly $ux $uy -outline blue -fill ""
     set t [$c create text $lx $uy -text $name -anchor nw -justify left \
-		-font $::sfont($c)]
+		-font $::mfont($c)]
     add_font_tags $c $t _IsTeXt_
+    set w [winfo parent $c]
+    if { $name != "N/A" } {
+	set nw $w.menu.name
+	label $nw -text [format {Inside: %s} $name]
+	pack $nw -side left -expand yes -fill x
+    }
 }
 
 

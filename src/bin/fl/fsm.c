@@ -6250,7 +6250,7 @@ op_ASHR(ncomp_ptr op)
 	gbv bL = INP_L(i+op->size);
 	sashr_fun(op->size, cur, shift, tmp);
 	ITE_fn(op->size, bH, bL, tmp, cur, cur);
-	if( shift >= op->size ) break;
+	if( shift > op->size ) break;
 	shift *= 2;
     }
     FROM_LSB_TO_MSB(op->size, i) {

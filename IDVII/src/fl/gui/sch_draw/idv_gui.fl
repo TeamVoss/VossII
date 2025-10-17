@@ -64,6 +64,9 @@ lettype idv_rw_db =
 let cur_idv_rw_transform_db = ref {[]:: idv_rw_db list};
 let cur_idv_readonly_transform_dbs = ref {[]:: idv_rw_db list};
 
+let get_current_db {dummy::void} = hd (deref cur_idv_rw_transform_db);
+non_lazy get_current_db;
+
 let db_sname (IDV_RW_DB sname fname mnames tbl) = sname;
 
 let db_fname (IDV_RW_DB sname fname mnames tbl) = fname;
@@ -73,7 +76,7 @@ let db_mnames (IDV_RW_DB sname fname mnames tbl) = mnames;
 let db_tbl (IDV_RW_DB sname fname mnames tbl) = tbl;
 
 let DBG_get_tbl_entries {dummy::void} =
-    tbl2list (db_tbl (hd (deref cur_idv_rw_transform_db)))
+    tbl2list (db_tbl (get_current_db ()))
 ;
 non_lazy DBG_get_tbl_entries;
 
@@ -94,28 +97,24 @@ let CHECK_FOR_RW_DB {dummy::void} =
 
 let add_model_in_rw_db top_level name sha_name =
     (CHECK_FOR_RW_DB ()) fseq
-    val (IDV_RW_DB sname fname mnames tbl) =
-	hd (deref cur_idv_rw_transform_db)
+    val (IDV_RW_DB sname fname mnames tbl) = get_current_db () then
+    let nidx = find_first0 (\(top,mname,sha). mname = name) mnames then
+    let sidx = find_first0 (\(top,mname,sha). sha_name = sha) mnames then
+    // Already stored under this name?
+    (nidx != 0) AND (nidx = sidx) => () |
+    // Another circuit stored with this name?
+    let msg = sprintf "A model named %s already exists. Replace it?" name in
+    (nidx != 0) AND NOT (window_yes_no (get_current_idv_window ()) msg) => () |
+    // This circuit stored under a different name?
+    let oldname = (sidx == 0) => "" |
+	val (top,mname,sha) = el sidx mnames in
+	mname
     in
-    ((find_first0 (\(top,mname,sha). mname = name) mnames) != 0)
-    AND (
-	let msg =
-	    sprintf "A model named %s already exists. Replace it?" name
-	in
-	NOT (window_yes_no (get_current_idv_window ()) msg) 
-    ) => () |
-    let idx =
-	let same_sha (top,mname,sha) = sha = sha_name in
-	(find_first0 same_sha mnames)
-    then
-    (idx != 0) AND
-    (
-	val (top,mname,sha) = el idx mnames then
-	let msg = (sprintf "This circuit is alrady named %s." mname)^
-		  "  Do you still want to save it?"
-	in 
-	NOT (window_yes_no (get_current_idv_window ()) msg)
-    ) => () |
+    let msg = (sprintf "This circuit is alrady named %s." oldname)^
+	      "  Do you still want to save it?"
+    in
+    sidx != 0 AND NOT (window_yes_no (get_current_idv_window ()) msg) => () |
+    // Save it
     let mnames' = filter (\(top,mn,sn). mn != name) mnames then
     let mnames'' = (top_level, name, sha_name):mnames' then
     (cur_idv_rw_transform_db := [(IDV_RW_DB sname fname mnames'' tbl)])
@@ -140,9 +139,7 @@ let model2sha db model_name =
 
 let delete_model_in_rw_db model_name =
     (CHECK_FOR_RW_DB ()) fseq
-    val (IDV_RW_DB sname fname mnames tbl) =
-	hd (deref cur_idv_rw_transform_db)
-    in
+    val (IDV_RW_DB sname fname mnames tbl) = get_current_db () in
     let mnames' = filter (\(top,mname,sname). mname != model_name) mnames then
     (cur_idv_rw_transform_db := [(IDV_RW_DB sname fname mnames' tbl)])
 ;
@@ -154,9 +151,7 @@ let get_transform_tbl db =
 
 let update_rw_transform_tbl tbl' =
     (CHECK_FOR_RW_DB ()) fseq
-    val (IDV_RW_DB sname fname mnames tbl) =
-	hd (deref cur_idv_rw_transform_db)
-    in
+    val (IDV_RW_DB sname fname mnames tbl) = get_current_db () in
     (cur_idv_rw_transform_db := [(IDV_RW_DB sname fname mnames tbl')])
 ;
 non_lazy update_rw_transform_tbl;
@@ -204,7 +199,12 @@ let find_next_anon_transform_name signature class =
 ;
 non_lazy find_next_anon_transform_name;
 
+let dbg_spec = ref {(error "not yet")::pexlif};
+let dbg_imp = ref {(error "not yet")::pexlif};
+
 let rewire_outside_connections spec imp =
+(dbg_spec := spec) fseq
+(dbg_imp := imp) fseq
     val (PINST sname sattrs slf sfa_inps sfa_outs sints sbody) = spec in
     val (PINST iname iattrs ilf ifa_inps ifa_outs iints ibody) = imp in
     let ifa_inps' = map (\(f,as). f, assoc f sfa_inps) ifa_inps in
@@ -2699,7 +2699,7 @@ let IDV_get_imp tr_sequence =
 
 let IDV_show_pexlif p =
     let w = get_new_idv_window () then
-    let rw_database = db_sname (hd (deref cur_idv_rw_transform_db)) then
+    let rw_database = db_sname (get_current_db ()) then
     (tcl_eval [sprintf "idv:create_idv_gui %s %s 1" w rw_database]) fseq
     let vfsm = IDV_ENV w (ref []) (ref []) (ref []) (ref []) (ref []) in
     (cur_vfsm := (vfsm:(deref cur_vfsm))) fseq
