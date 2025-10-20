@@ -3576,6 +3576,27 @@ proc sc:double_draw_inside {c levels inst_nbr tag} {
     fl_draw_inside $c $levels $tag $inst_nbr
 }
 
+proc draw_pred {name c tag x y} {
+    #
+    # Compute the needed width
+    #
+    set rwid [expr round([get_text_width $c $name [rect_wid $c]])]
+    #
+    set xl [expr round($x - $rwid - 4*[min_sep $c])]
+    set yt [expr round($y - 4*[min_sep $c])]
+    set yt1 [expr round($yt + 1*[min_sep $c])]
+    set yb [expr round($y + 4*[min_sep $c])]
+    set yb1 [expr round($yb - 1*[min_sep $c])]
+    $c create rectangle $xl $yb $x $yt -tags $tag \
+	-outline $::gcolor -fill $::fc
+    $c create line $xl $yt1 $x $yt1 -fill $::gcolor -tags $tag
+    $c create line $xl $yb1 $x $yb1 -fill $::gcolor -tags $tag
+    set tt [$c create text [expr round(($xl+$x)/2)] $y -anchor center \
+		-justify center -font $::mfont($c) -text $name -tags $tag]
+    add_font_tags $c $tt _IsTeXt_
+    return [list [list $xl $y] [list $x $y]]
+}
+
 proc draw_fub {module inst inst_nbr inames onames c tag x y} {
     global gcolor fc sfont
     set ::tag2inst_nbr($c,$tag) $inst_nbr

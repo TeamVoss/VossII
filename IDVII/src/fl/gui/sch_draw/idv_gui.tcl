@@ -160,7 +160,6 @@ proc idv:create_idv_gui {w rw_db read_only} {
 }
 
 proc idv:close_idv_gui {readonly} {
-WriteStdErr "idv:close_idv_gui $readonly\n"
     catch {unset ::idv}
     if { $readonly == 1 } { return }
     fl_save_idv_db exit

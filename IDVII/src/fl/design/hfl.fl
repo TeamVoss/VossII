@@ -656,6 +656,14 @@ let base_assignment do_split lhs rhs =
 		mk_pinst NONE lhs (W_UPDATE_NAMED_SLICE b' name indices n')
 	    then
 	    p1@p2@[p]
+     /\    split lhs (W_PRED name e) =
+	    val (e',p0) = is_var e => (e,[]) |
+		let mid = mk_tmp (wexpr_size e) then
+		let p0 = split mid e then
+		(mid, p0)
+	    in
+	    let p = mk_pinst NONE lhs (W_PRED name e') in
+	    p0@[p]
      /\    split lhs rhs = [mk_pinst NONE lhs rhs]
     in
     let subfubs = split lhs rhs then
@@ -1837,6 +1845,10 @@ let wASHR {a:: *a} {b:: *a} =
     NOT (hw_is_arithmetic b) =>
 	eprintf "Cannot perform |>> on vectors of type %s\n" (hw_type_name b)
     |
+    (hw_is_signed b) =>
+	eprintf "Second argument to |>> must be unsigned. %s is signed.\n"
+		(hw_type_name b)
+    |
     let res = W_ASHR (hw_destr a) (hw_destr b) in
     {hw_constr res:: *a}
 ;
@@ -2145,7 +2157,7 @@ let base_STRUCT_explicit type name size field_list do_check =
     in
     let def =
 	letrec mk_anon cnt ((field,type,bits):fs) =
-	    ((sprintf "a%d" cnt), type ):(mk_anon (cnt+1) fs)
+	    (field, type ):(mk_anon (cnt+1) fs)
 	 /\    mk_anon cnt [] = []
 	in
 	let ft_list = mk_anon 1 field_list in
@@ -3751,7 +3763,7 @@ let INSERT =
         out <- frombits (flatmap mk ((lines-1) -- 0))
 ];
 
-let ff_block ff_fn assignments =
+let ff_block ff_fn {assignments:: (*a # *a) list} =
     let mk (lhs,rhs) = ff_fn rhs lhs in
     let ffs = map mk assignments then
     let get_outs (PINST _ _ _ fa_inps fa_outs _ _) = flatmap snd fa_outs in
@@ -4087,6 +4099,13 @@ let flfun2pexlif_core fn =
 let flfun2pexlif fn = flfun2pexlif_core fn;
 free_binder flfun2pexlif;
 
+// Rename the top-level pexlif instance.
+let pexlif_rename p new_name =
+    val (PINST _ attrs lf fa_inps fa_outs ints content) = p in
+    PINST new_name attrs lf fa_inps fa_outs ints content 
+;
+
+
 let ASSERT {name::string} {expr::bit} =
     let oa = ord "a" in
     let oz = ord "z" in
@@ -4106,8 +4125,32 @@ let ASSERT {name::string} {expr::bit} =
     let name' = sprintf "{%s}" name then
     let pred = hw_bit_constr (W_PRED name' (hw_destr expr)) then
     let lhs = hw_bit_constr (W_VAR 1 assert_wire) in
-    lhs <- pred
+    let pfn = sprintf "draw_pred {%s}" name then
+    pexlif_rename (lhs <- pred) pfn
 ;
+
+begin_abstype;
+let base_is_mutex b strong =
+    letrec is_all_zero bs =
+	bs = [] => '1 |
+	('~' (hd bs)) '&' (is_all_zero (tl bs))
+    in
+    letrec one_high (b:bs) = b '&' is_all_zero bs '|' '~' b '&' one_high bs
+     /\    one_high []     = strong => '0 | '1
+    in
+    one_high (tobits b)
+;
+    
+// Return the expression that at most one bit in b is 1.
+let is_mutex b = base_is_mutex b F;
+export is_mutex;
+
+// Return the expression that one and only one of the bits in b is 1.
+let is_strong_mutex b = base_is_mutex b T;
+export is_strong_mutex;
+
+end_abstype;
+
 
 // Create a balanced tree of 'op' functions.
 // op needs to be of type *a->*a->*a.
