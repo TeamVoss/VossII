@@ -1,0 +1,50 @@
+load "idv.fl";
+
+UNSIGNED "word" 8;
+
+BUNDLE "b1" 
+	[("req","bit"),("d1", "word"), ("d2", "word")]
+	[("ack","bit"),("o", "word")]
+;
+
+let inp =
+    bit_input		clk.
+    bit_input		ask.
+    word_input		a b.
+    b1_output		bb.
+    word_output		res.
+    CELL "inp" [
+	bb-->req <- ask,
+	bb-->d1  <- a,
+	bb-->d2  <- b,
+	re_ff_en clk (bb-->ack) (bb-->o) res
+];
+
+
+let arb =
+    bit_input	    clk.
+    bit_input	    reset.
+    b1_input	    AA.
+    b1_input	    BB.
+    // 
+    bit_internal    last.
+    word_internal   arg1 arg2 res.
+    CELL "arb" [
+	AA-->ack <- (AA-->req '&' ('~' (BB-->req) '|' '~' last)),
+	BB-->ack <- (BB-->req '&' ('~' (AA-->req) '|' last)),
+	re_ff_reset clk reset (AA-->ack) last,
+	arg1   <- (IF (AA-->ack) THEN (AA-->d1) ELSE (BB-->d1)),
+	arg2   <- (IF (AA-->ack) THEN (AA-->d2) ELSE (BB-->d2)),
+	res    <- arg1 '+' arg2,
+	AA-->o <- res,
+	BB-->o <- res
+];
+
+let a1 = {'clk :: bit};
+let a2 = {'reset :: bit};
+let a3 = {'AA :: b1};
+a3;
+let a4 = {'BB :: b1};
+a4;
+(arb a1 a2 a3 a4) fseq 0;
+

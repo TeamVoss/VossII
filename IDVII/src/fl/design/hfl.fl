@@ -809,6 +809,7 @@ let get_act_args fn a =
 	let res = base_get_lhs_vars we then
 	([], res)
     ) catch (
+(fprintf stderr "get_act_args %s failed for |%s|\n" fn (DBGwexpr (hw_destr a))) fseq
 	let cnt = deref anon_arg_cnt then
 	(anon_arg_cnt := (i_plus cnt 1)) fseq
 	let nm = sprintf "%s%d_%s" BASE_TMP cnt fn then
