@@ -15,6 +15,8 @@ lettype *a hw_type =
       {hw_bundle_parts:: *a -> (((string#string) list)#((string#string) list))}
 ;
 
+let anon_arg_cnt = ref 0;
+
 //let my_PINST = base_PINST;
 let my_PINST = PINST;
 
@@ -144,6 +146,7 @@ let get_bundle_var e =
 ; 
 
 let CELL {name::string} {body::pexlif list} =
+    (anon_arg_cnt := 0) fseq
     (PINST name [] F [] [] [] (P_HIER body))
 ;
 
@@ -792,8 +795,6 @@ infix 1 <:;
 
 
 
-let anon_arg_cnt = ref 0;
-
 
 let get_act_args fn a =
     (
@@ -802,6 +803,7 @@ let get_act_args fn a =
 	([], res)
     ) catch (
 	let cnt = deref anon_arg_cnt then
+(fprintf stderr "New get_act_args %d for %s and expression %s\n" cnt fn (DBGwexpr (hw_destr a))) fseq
 	(anon_arg_cnt := (i_plus cnt 1)) fseq
 	let nm = sprintf "%s%d_%s" BASE_TMP cnt fn then
 	let tmp = hw_mk_var a nm then
