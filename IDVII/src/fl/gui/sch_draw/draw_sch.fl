@@ -505,6 +505,8 @@ let gen_draw_fanin vfsm draw_level levels vecs =
 
 let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
     let w = vfsm2id vfsm then
+    let fsm_pat = ".*draw_fsm \\{([^}]*)\\} " in
+    let fub_pat = ".*draw_fub ([^ ]*) "  in
     is_IDV_ENV vfsm =>
 	let parent = get_idv_current_pexlif canvas then
 	let phier =
@@ -513,6 +515,13 @@ let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
 	let hier = sprintf "%si%d/" phier inst_nbr then
 	let p =
 	    pexlif_extract_inside (el inst_nbr (pexlif_get_children parent))
+	then
+	let name = 
+	    let oname = pexlif_get_name p in
+	    str_reg_match fsm_pat oname =>
+		sprintf "{FSM %s}" (el 2 (str_reg_extract fsm_pat oname))
+	    |
+	    str_is_substr "draw_" oname => "N/A" | oname
 	then
 	let vis = idv_visualize_fanin p then
 	val (tab_window, c) = get_new_sch_canvas w 0 "" hier then
@@ -527,6 +536,7 @@ let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
 	(tcl_eval [
 		    sprintf "%s delete all" c,
 		    sprintf "draw_network %s $%s" c final_res,
+		    sprintf "draw_hier_boundingbox %s {%s}" c name,
 		    "update",
 		    sprintf "set_scrollregion %s" c,
 		    sprintf "sc:remove_draw_info %s" c
@@ -545,14 +555,10 @@ let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
     let hier = sprintf "%si%d/" phier inst_nbr then
     let name =
 	let pfn = get_visualization_pfn fsm (hd nds) cur_draw_level then
-	str_is_prefix "draw_fub" pfn =>
-	    let cmd = "extract_name_"^pfn then
-	    tcl_eval [cmd]
+	str_reg_match fub_pat pfn => el 2 (str_reg_extract fub_pat pfn) |
+	str_reg_match fsm_pat pfn =>
+	    sprintf "{FSM %s}" (el 2 (str_reg_extract fsm_pat pfn))
 	|
-	str_is_prefix "draw_hfl_code" pfn =>
-	    let cmd = "extract_name_"^pfn then
-	    tcl_eval [cmd]
-	| 
 	"N/A"
     then
     let draw_level = cur_draw_level+1 in

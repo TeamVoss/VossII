@@ -3364,6 +3364,14 @@ mk_pinst(g_ptr redex)
 		}
 		cur = GET_CONS_TL(cur);
 	    }
+	    cur = outs;
+	    while( !IS_NIL(cur) ) {
+		string wname = GET_STRING(GET_CONS_HD(GET_CONS_HD(cur)));
+		if( find_hash(&assertion_tbl, wname) != NULL ) {
+		    delete_hash(&assertion_tbl, wname);
+		}
+		cur = GET_CONS_TL(cur);
+	    }
 	    cur_ints = ints;
 	    scan_hash(&assertion_tbl, add_assertion_declarations);
 	    ints = cur_ints;

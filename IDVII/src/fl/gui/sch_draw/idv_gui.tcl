@@ -160,7 +160,6 @@ proc idv:create_idv_gui {w rw_db read_only} {
 }
 
 proc idv:close_idv_gui {readonly} {
-WriteStdErr "idv:close_idv_gui $readonly\n"
     catch {unset ::idv}
     if { $readonly == 1 } { return }
     fl_save_idv_db exit
@@ -652,17 +651,17 @@ proc idv:edit_and_load {w file load_file pexlif_file type} {
     while 1 {
         catch {destroy $ew}
 	if { $type != "synthesis" } {
-	    toplevel $ew -container 1 -width 580 -height 564
 	    set x [winfo x $w]
 	    set y [winfo y $w]
-	    wm geometry $ew +$x+$y
-	    update idletasks
-	    set wid [expr [winfo id $ew]]
-	    set edit "/usr/bin/X11/xterm -into $wid -sb -sl 20000 -j \
-		      -rw -ls -bg white -fg black -fn 7x14 -geometry 80x40 \
-		      -e /usr/bin/vi $file"
-	    # Edit the file
-	    util:bg_exec $edit 0 {} $w
+	    set edit0 "/usr/bin/X11/xterm -sb -sl 20000 -j \
+		      -rw -ls -bg white -fg black -fn 7x14 \
+		      -geometry [format {80x40+%d+%d} $x $y] \
+		      -e /usr/bin/vi $file & "
+	    set ::editor_active 1
+	    set editor_pid [eval exec $edit0]
+	    update
+	    util:watch_process $editor_pid 300 "set ::editor_active 0"
+	    tkwait variable ::editor_active
 	    # Try compile the model
 	    set tmp_dir [fl_mktempd "loading"]
 	    set res [util:try_program $w "Loading failed" \
@@ -727,8 +726,10 @@ proc idv:make_template {w c type args} {
 						     $::idv(synthesis_type)   \
 						     $::idv(synthesis_script)]
 	} else {
-	    set include_file $::idv(fev_include_file)
-	    if { $include_file == "" } { set include_file "-"; }
+	    set include_file "-";
+	    if [info exists ::idv(fev_include_file)] {
+		set include_file $::idv(fev_include_file)
+	    }
 	    val {pexlif_file load_file} \
 	      [fl_make_template $c $type $file $include_file $base $create_file]
 	}

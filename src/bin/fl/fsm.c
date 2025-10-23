@@ -6245,12 +6245,13 @@ op_ASHR(ncomp_ptr op)
 	*(cur+2*i+1) = INP_L(i);
     }
     unint shift = 1;
+    // Not very efficient....
+    // If the shift amount is >= #bits, we could be more efficient.
     FROM_LSB_TO_MSB(op->size, i) {
 	gbv bH = INP_H(i+op->size);
 	gbv bL = INP_L(i+op->size);
 	sashr_fun(op->size, cur, shift, tmp);
 	ITE_fn(op->size, bH, bL, tmp, cur, cur);
-	if( shift >= op->size ) break;
 	shift *= 2;
     }
     FROM_LSB_TO_MSB(op->size, i) {

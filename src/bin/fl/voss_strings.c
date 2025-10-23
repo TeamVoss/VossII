@@ -605,9 +605,11 @@ str_reg_match(g_ptr redex)
     string pat = GET_STRING(g_pat);
     regex_t *pat_ptr = compile_regexp(pat, REG_EXTENDED);
     if( pat_ptr == NULL ) {
+	string msg = Fail_pr("Illegal pattern in str_reg_match '%s'\n%s\n",
+			     pat, reg_error_buf);
 	DEC_REF_CNT(l);
 	DEC_REF_CNT(r);
-        MAKE_REDEX_FAILURE(redex, wastrsave(stringsp, reg_error_buf));
+        MAKE_REDEX_FAILURE(redex, msg);
         return;
     }
     if( regexec(pat_ptr, GET_STRING(g_s), (size_t) 0, NULL, 0) == 0 ) {
@@ -634,9 +636,11 @@ str_reg_extract(g_ptr redex)
 
     regex_t *pat_ptr = compile_regexp(pat, REG_EXTENDED);
     if( pat_ptr == NULL ) {
+	string msg = Fail_pr("Illegal pattern in str_reg_extract '%s'\n%s\n",
+			     pat, reg_error_buf);
 	DEC_REF_CNT(l);
 	DEC_REF_CNT(r);
-        MAKE_REDEX_FAILURE(redex, wastrsave(stringsp, reg_error_buf));
+        MAKE_REDEX_FAILURE(redex, msg);
         return;
     }
     int patterns = pat_ptr->re_nsub;

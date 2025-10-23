@@ -329,11 +329,6 @@ end_abstype decorate_pexlif_hiers;
 //------------------------------------------------------------------------------
 // Fin.
 
-let pexlif_rename p new_name =
-    val (PINST _ attrs lf fa_inps fa_outs ints content) = p in
-    PINST new_name attrs lf fa_inps fa_outs ints content
-;
-
 let try_assoc key l =
     (
 	let res = assoc key l then
