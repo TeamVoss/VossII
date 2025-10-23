@@ -1714,6 +1714,10 @@ expr2		: VART
 		    tmp = wastrsave(stringsp, tmp);
 		    $$ = Make_APPL_ND(Make_VAR_leaf($1), Make_STRING_leaf(tmp));
 		}
+		| FREE_BINDER_VAR STRINGT
+		{
+		    $$ = Make_APPL_ND(Make_VAR_leaf($1), Make_STRING_leaf($2));
+		}
 		;
 
 let_top :	LET  
