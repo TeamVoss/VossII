@@ -62,6 +62,21 @@ let tcl_eval l =
 non_lazy tcl_eval;
 
 
+let Create_Dummy_Placement =
+    (tcl_eval ["catch {destroy .c9999999}",
+          "frame .c9999999",
+          "frame .c9999999.cc",
+          "set ::dummy_canvas [canvas .c9999999.cc.c]",
+          "set cur_zoom_factor(.c9999999.cc.c) 100.0",
+          "set ::sc(.c9999999.cc.c) $::base_sc",
+          "set ::tfont(.c9999999.cc.c) $::base_tfont",
+          "set ::mfont(.c9999999.cc.c) $::base_mfont",
+          "set ::sfont(.c9999999.cc.c) $::base_sfont"
+         ]) fseq
+    ()
+;
+NOT noX => Create_Dummy_Placement | ();
+
 let Init_sch_draw =
   (tcl_eval [
    sprintf "set ::imagedir %s%s" DIR "images",
@@ -97,22 +112,6 @@ let big_tcl_eval l =
     cmd
 ;
 non_lazy big_tcl_eval;
-
-let Create_Dummy_Placement =
-    (tcl_eval ["catch {destroy .c9999999}",
-          "frame .c9999999",
-          "frame .c9999999.cc",
-          "set ::dummy_canvas [canvas .c9999999.cc.c]",
-          "set cur_zoom_factor(.c9999999.cc.c) 100.0",
-          "set ::sc(.c9999999.cc.c) $::base_sc",
-          "set ::tfont(.c9999999.cc.c) $::base_tfont",
-          "set ::mfont(.c9999999.cc.c) $::base_mfont",
-          "set ::sfont(.c9999999.cc.c) $::base_sfont",
-	  "set ::avg_char_width [get_accurate_text_width .c9999999.cc.c x]"
-         ]) fseq
-    ()
-;
-NOT noX => Create_Dummy_Placement | ();
 
 // -------------------------------------------------------------
 
@@ -414,9 +413,9 @@ let fl_get_active_sch_tab_windows canvas =
 ;
 export_to_tcl fl_get_active_sch_tab_windows;
 
-let fl_record_waveform_addition w vec =
+let fl_record_waveform_addition w vec show_name =
     let vfsm = w2vfsm w then
-    let cmd = sprintf "add_waveform vis [\"%s\"];" vec in
+    let cmd = sprintf "add_waveform1 vis \"%s\" \"%s\";" vec show_name in
     add_command vfsm cmd
 ;
 export_to_tcl fl_record_waveform_addition;
@@ -2003,23 +2002,30 @@ let draw_hide {vfsm::vfsm} tab vecs stop =
 ;
 
 
+// Add the waveform for the vector vec.
+// Arguments:
+// vfsm:    A visualization GUI started with STE_debug.
+// vec:	    The vector for which a waveform should be drawn.
+//
+let add_waveform1 vfsm vec show_name->"" =
+    (check_valid_vectors vfsm "add_waveform" [vec]) fseq
+    let w = vfsm2id vfsm then
+    let ww = sprintf "%s.nb.waveform" w then
+    let cmd = sprintf "wv:prim_add_waveform %s {%s} {%s}" ww vec show_name in
+    (fl_record_waveform_addition w vec show_name) fseq
+    (tcl_eval (cmd:[sprintf "wv:set_time_pointer %s {}" ww, "update"])) fseq
+    ()
+;
+
 // Add the waveforms for the vectors in vecs.
 //
 // Arguments:
 // vfsm:	    A visualization GUI started with STE_debug.
+// vecs:	    The vectors for which a waveform should be drawn.
 //
-//
-// vecs:	    The list of vectors to end at (whose fanins to draw)
-//
-let add_waveform vfsm vecs =
-    (check_valid_vectors vfsm "add_waveform" vecs) fseq
-    let w = vfsm2id vfsm then
-    let ww = sprintf "%s.nb.waveform" w then
-    let cmds = map (\v. sprintf "wv:prim_add_waveform %s {%s}" ww v) vecs in
-    (foreach (fl_record_waveform_addition w) vecs) fseq
-    (tcl_eval (cmds@[sprintf "wv:set_time_pointer %s {}" ww, "update"])) fseq
-    ()
-;
+let add_waveformn vfsm vecs = foreach (\v. add_waveform1 vfsm v) vecs;
+
+overload add_waveform add_waveform1 add_waveformn;
 
 // Delete waveform 
 //
@@ -2116,21 +2122,21 @@ let draw_show_dependencies {vis::vfsm} c show =
 
 
 begin_abstype;
-let current_vis_r = ref {[] :: (pexlif#vfsm) list};
+let current_visualization_r = ref {[] :: (pexlif#vfsm) list};
 
-let update_current_vis p vis =
-    let old = filter (\c. fst c != p) (deref current_vis_r) then
+let update_current_visualization p vis =
+    let old = filter (\c. fst c != p) (deref current_visualization_r) then
     let new = (p,vis):old then
-    (current_vis_r := new)
+    (current_visualization_r := new)
 ;
 
-let get_current_vis p =
-    let idx = find_first0 (\c. fst c == p) (deref current_vis_r) then
+let get_current_visualization p =
+    let idx = find_first0 (\c. fst c == p) (deref current_visualization_r) then
     idx = 0 => eprintf "No visualization for this circuit is active" |
-    snd (el idx (deref current_vis_r))
+    snd (el idx (deref current_visualization_r))
 ;
 
-end_abstype update_current_vis get_current_vis;
+end_abstype update_current_visualization get_current_visualization;
 
 // Visualize an pexlif provided as a fl function that return a pexlif.
 // If pre_load is T, then start with top-level visualized and
@@ -2145,7 +2151,7 @@ let VIS fl_function_name pre_load->T =
     (draw_fanin vis (0) 100 (md_extract_vectors (outputs ckt))) fseq
     (add_waveform vis inps) fseq
     (add_waveform vis outs) fseq
-    (update_current_vis p vis) fseq
+    (update_current_visualization p vis) fseq
     vis
 ;
 free_binder VIS;
@@ -2153,7 +2159,7 @@ free_binder VIS;
 
 let simulate fl_function_name ant =
     let p = flfun2pexlif_core fl_function_name then
-    let vis = get_current_vis p then
+    let vis = get_current_visualization p then
     STE "-e" vis [] ant [] []
 ;
 free_binder simulate;

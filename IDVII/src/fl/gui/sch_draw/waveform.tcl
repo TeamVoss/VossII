@@ -4,7 +4,7 @@
 ;#########################################################################
 
 set ::wv_phase_width	    15
-set ::wv_height		    20
+set ::wv_height		    [get_accurate_text_height $::voss2_txtfont {bj}]
 set ::wv_sep		    5
 
 image create bitmap ::bitmap::zoom_out -data "#define zoom_out_width 16
@@ -57,8 +57,8 @@ proc wv:save_waveform_vectors {f} {
             return
         }
 	puts $fp "let vis = get_current_vis ();"
-	foreach vec $::wv_info(vectors,$f) {
-	    puts $fp "add_waveform vis \[\"$vec\"\];"
+	foreach vec $::wv_info(vectors,$f) show_name $::wv_info(show_names,$f) {
+	    puts $fp "add_waveform1 vis \"$vec\" \"$show_name\";"
 	}
         close $fp
     }
@@ -170,12 +170,14 @@ proc wv:create_waveform_viewer {w maxtime} {
 	ttk::panedwindow $pw -orient horizontal 
 	frame $nf -relief flat
 	    canvas $nl -height 30 -background white
+	    set bwid [expr round([get_accurate_text_width \
+					$::voss2_txtfont "Vectors"])]
 	    $nl create text 20 15 -text "Vectors:" -anchor w -justify left \
 				-font $::voss2_txtfont
 	    button $nl.save -text Save -command "wv:save_waveform_vectors $f"
 	    button $nl.load -text Load -command "wv:load_waveform_vectors $f"
-	    $nl create window 100 15 -window $nl.save
-	    $nl create window 150 15 -window $nl.load
+	    $nl create window [expr $bwid+35] 15 -window $nl.save -anchor w
+	    $nl create window [expr 2*$bwid+30] 15 -window $nl.load -anchor w
 
 	    pack $nl -side top -fill x
 	    scrollbar $sb -orient vertical \
@@ -638,9 +640,13 @@ proc wv:move_waveform {nn idx dir} {
 
     # Swap the names
     set vec [lindex $::wv_info(vectors,$f) $idx]
+    set show_name [lindex $::wv_info(show_names,$f) $idx]
     set swap_vec [lindex $::wv_info(vectors,$f) $swap_idx]
+    set swap_show_name [lindex $::wv_info(show_names,$f) $swap_idx]
     lset ::wv_info(vectors,$f) $idx $swap_vec
     lset ::wv_info(vectors,$f) $swap_idx $vec
+    lset ::wv_info(show_names,$f) $idx $swap_show_name
+    lset ::wv_info(show_names,$f) $swap_idx $show_name
     val {blx bly bux buy} [$nn bbox all]
     set ytop [expr $idx*($::wv_height + $::wv_sep)+$::wv_sep]
     set ybot [expr $ytop + $::wv_height]
@@ -789,7 +795,7 @@ proc wv:set_sel_to_col {w color} {
     }
 }
 
-proc wv:prim_add_waveform {w vec} {
+proc wv:prim_add_waveform {w vec {show_name ""}} {
     set f $w.f
     set pw $f.panes
     set nf $pw.name_frame
@@ -821,6 +827,7 @@ proc wv:prim_add_waveform {w vec} {
 	set cnt 0
     }
     lappend ::wv_info(vectors,$f) $vec
+    lappend ::wv_info(show_names,$f) $show_name
     set ytop [expr $cnt*($::wv_height + $::wv_sep)+$::wv_sep]
     set ybot [expr $ytop + $::wv_height]
 
@@ -829,8 +836,15 @@ proc wv:prim_add_waveform {w vec} {
     set w1 [$nn create rectangle 0 $ybot 400 $ytop -fill white -outline "" \
 	    -tags "$bgtag $vec"]
     set w2 [$nn create line 0 $ybot 400 $ybot -fill lightblue -dash . ]
-    set w3 [$nn create text 15 $ybot -text $vec -anchor sw -justify left \
-	    -tags "TxTxT $vec" -font $::voss2_txtfont]
+    if { $show_name == "" } {
+	set w3 [$nn create text 15 $ybot -text $vec \
+		-anchor sw -justify left \
+		-tags "TxTxT $vec" -font $::voss2_txtfont]
+    } else {
+	set w3 [$nn create text 15 $ybot -text $show_name \
+		-anchor sw -justify left \
+		-tags "TxTxT $vec" -font $::voss2_txtfont]
+    }
 
     incr ::wv_info(anon_cnt)
     set vtag [format {VtAg_%06d} $::wv_info(anon_cnt)]
@@ -1017,10 +1031,13 @@ proc wv:set_new_max_time {w force} {
     set ::wv_info($f,maxtime) $new_maxtime
     if [info exists ::wv_info(vectors,$f)] {
 	set vectors $::wv_info(vectors,$f)
+	set show_names $::wv_info(show_names,$f)
     } else {
 	set vectors {}
+	set show_names {}
     }
     set ::wv_info(vectors,$f) {}
+    set ::wv_info(show_names,$f) {}
 
     $wt delete all
     $ww delete all
@@ -1028,9 +1045,10 @@ proc wv:set_new_max_time {w force} {
 
     wv:draw_time_line $f
 
-    foreach vec $vectors {
-	wv:add_waveform $w $vec
+    foreach vec $vectors show_name $show_names {
+	wv:prim_add_waveform $w $vec $show_name
     }
+    wv:set_time_pointer $w {}
 }
 
 proc wv:get_waveform_vectors {w} {
@@ -1056,10 +1074,13 @@ proc wv:toggle_show_depend {w} {
     set ::wv_info($f,maxtime) $new_maxtime
     if [info exists ::wv_info(vectors,$f)] {
 	set vectors $::wv_info(vectors,$f)
+	set show_names $::wv_info(show_names,$f)
     } else {
 	set vectors {}
+	set show_names {}
     }
     set ::wv_info(vectors,$f) {}
+    set ::wv_info(show_names,$f) {}
 
     $wt delete all
     $ww delete all
@@ -1067,7 +1088,8 @@ proc wv:toggle_show_depend {w} {
 
     wv:draw_time_line $f
 
-    foreach vec $vectors {
-	wv:add_waveform $w $vec
+    foreach vec $vectors show_name $show_names {
+	wv:prim_add_waveform $w $vec $show_name
     }
+    wv:set_time_pointer $w {}
 }

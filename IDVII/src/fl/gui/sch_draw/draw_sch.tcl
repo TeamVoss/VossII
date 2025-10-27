@@ -436,7 +436,7 @@ proc nb:add_waveform {w p} {
 	set sel $::nb_selection($p)
 	foreach vec $sel {
 	    wv:add_waveform $w $vec
-	    fl_record_waveform_addition $w $vec
+	    fl_record_waveform_addition $w $vec {}
 	}
     }
 }
@@ -969,7 +969,7 @@ proc sc:add_waveforms {c nodes} {
     set vecs [fl_tag2vec $c $nodes]
     foreach vec $vecs {
 	wv:add_waveform $w $vec
-	fl_record_waveform_addition $w $vec
+	fl_record_waveform_addition $w $vec {}
     }
 }
 
@@ -3512,15 +3512,22 @@ proc get_txt_width {c tag cur_max} {
     return $cur_max
 }
 
-proc get_accurate_text_width {c txt} {
-    set ttag [$::dummy_canvas create text 0 0 -font $::mfont($c) -text $txt]
+proc get_accurate_text_height {font txt} {
+    set ttag [$::dummy_canvas create text 0 0 -font $font -text $txt]
+    val {x1 y1 x2 y2} [$::dummy_canvas bbox $ttag]
+    $::dummy_canvas delete all
+    return [expr abs($y2-$y1)]
+}
+
+proc get_accurate_text_width {font txt} {
+    set ttag [$::dummy_canvas create text 0 0 -font $font -text $txt]
     val {x1 y1 x2 y2} [$::dummy_canvas bbox $ttag]
     $::dummy_canvas delete all
     return [expr abs($x2-$x1)]
 }
 
 proc get_text_width {c txt cur_max} {
-    set new_wid [get_accurate_text_width $c $txt]
+    set new_wid [get_accurate_text_width $::mfont($c) $txt]
     if { $new_wid > $cur_max } { return $new_wid } else { return $cur_max; }
 }
 
