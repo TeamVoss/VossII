@@ -1921,8 +1921,8 @@ let ENUM_binary name name_list =
 	NOT (eval_fl_code cmds) => eprintf "Failed to evaluate: %S" cmds |
         let cmd1 =
            (sprintf "let %s_is_%s i = hw_bit_constr " name n)^
-	   (sprintf "(W_PRED \"is_%s\" (W_EQ (hw_%s_destr i) (W_CONST %d %d)));"
-		    n  name sz cnt)
+	   (sprintf "(W_EQ (hw_%s_destr i) (W_NAMED_CONST \"%s\" %d %d));"
+		    name n sz cnt)
         then
 	let cmd2 =
 	    (is_defined ("is_"^n))
@@ -1960,8 +1960,8 @@ let gen_ENUM_custom name name_encoding_list sz =
 	NOT (eval_fl_code cmds) => eprintf "Failed to evaluate: %S" cmds |
         let cmd1 =
            (sprintf "let %s_is_%s i = hw_bit_constr " name n)^
-	   (sprintf "(W_PRED \"is_%s\" (W_EQ (hw_%s_destr i) (W_CONST %d %d)));"
-		    n name sz cnt)
+	   (sprintf "(W_EQ (hw_%s_destr i) (W_NAMED_CONST \"%s\" %d %d));"
+		    name n sz cnt)
         then
 	let cmd2 =
 	    (is_defined ("is_"^n))
