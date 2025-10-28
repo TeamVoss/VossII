@@ -17,7 +17,7 @@
 #include <poll.h>
 #include <X11/Xresource.h>
 
-#define FL_VERSION "1.0"
+#define FL_VERSION "4.0"
 
 /* ======================== Global variables ======================== */
 string      Voss_tmp_dir = NULL;

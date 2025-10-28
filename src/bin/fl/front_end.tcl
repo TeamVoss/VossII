@@ -1492,8 +1492,9 @@ namespace eval voss2_help {
 	if { $idx == 0 } {
 	    set tw $::voss2_top_level.voss2_help
 	    if { $embedded_window == 1 } {
+		regexp {(\d+)x(\d+)} [winfo geometry $tw] -> xwid yht
 		wm manage $tw
-		wm geometry $w 900x500
+		wm geometry $w [format {%dx%d} [expr round($xwid*1.1)] $yht]
 		$nb select 1
 		set embedded_window 0
 		$::voss2_info(txtwin) see end
