@@ -47,8 +47,8 @@ let is_user_given s = NOT (str_is_substr "_$" s);
 
 clet get_base_name s = 
     (
-	let l = str_reg_extract "(.*)(\\[[-0-9:]+\\])$" s in
-	el 2 l
+	val ((TXT base):rem) = md_split_vector s in
+	str_is_suffix "[" base => string_butlastn base 1 | base
     ) catch s
 ;
 
@@ -795,7 +795,7 @@ let pexlif_is_hier (PINST nm attrs lf fa_inps fa_outs ints (P_HIER cs)) = T
 // For example:  resize_pexlif 12 (re_ff 'clk {'d::wexpr} 'o)
 // returns a re_ff pexlif where data input (and output) will be of size 12(11:0)
 //
-let resize_pexlif sz {p::pexlif} =
+clet resize_pexlif sz {p::pexlif} =
     let tri i = i = 0 => sz | i in
     let tr1 n =
 	NOT (str_is_substr "[-1:0]" n) => n |

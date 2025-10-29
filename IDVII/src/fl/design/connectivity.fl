@@ -97,6 +97,11 @@ let vinfo_overlap vn1 vn2 =
     test vn1 vn2
 ;
 
+letrec extract_first_txt ((TXT b):rem) = b
+ /\    extract_first_txt ((RANGES rl):rem) = extract_first_txt rem
+ /\    extract_first_txt [] = eprintf "Vec_info with no TXT field???"
+;
+
 clet build_io_tbl p =
     NOT (pexlif_is_hier p) =>
 	FANIN_OUT_TBLS p [] [] (tbl_create 10) (tbl_create 10) 
@@ -104,8 +109,8 @@ clet build_io_tbl p =
     val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
     let fanin0 =
 	let mk (f,as) =
-	    let b = get_base_name f in
 	    let vi = md_split_vector f in
+	    let b = extract_first_txt vi in
 	    (b, (f, vi, PT_INP f))
 	in
 	map mk fa_inps
@@ -113,8 +118,8 @@ clet build_io_tbl p =
     //
     let fanout0 =
 	let mk (f,as) =
-	    let b = get_base_name f in
 	    let vi = md_split_vector f in
+	    let b = extract_first_txt vi in
 	    (b, (f, vi, PT_OUT f))
 	in
 	map mk fa_outs
@@ -123,8 +128,8 @@ clet build_io_tbl p =
     let do_fi1 idx (PINST cname cattrs clf cfa_inps cfa_outs cints cbody) =
 	let written = filter not_const (flatmap snd cfa_outs) then
 	let mk1 v =
-	    let b = get_base_name v in
 	    let vi = md_split_vector v in
+	    let b = extract_first_txt vi in
 	    (b, (v, vi, PT_INST idx))
 	in
 	map mk1 written
@@ -135,8 +140,8 @@ clet build_io_tbl p =
     let do_fo1 idx (PINST cname cattrs clf cfa_inps cfa_outs cints cbody) =
 	let read = filter not_const (flatmap snd cfa_inps) then
 	let mk1 v =
-	    let b = get_base_name v in
 	    let vi = md_split_vector v in
+	    let b = extract_first_txt vi in
 	    (b, (v, vi, PT_INST idx))
 	in
 	map mk1 read
@@ -162,8 +167,8 @@ clet build_io_tbl p =
 
 let get_pt_fanin ios vec =
     val (FANIN_OUT_TBLS p cs assertions fi_tbl fo_tbl) = ios then
-    let b = get_base_name vec in    
     let vi = md_split_vector vec in
+    let b = extract_first_txt vi in
     let alts = (tbl_get fi_tbl b) catch [] then
     letrec check ((av,avi,apt):rem) =
 	let rest = check rem then
@@ -176,8 +181,8 @@ let get_pt_fanin ios vec =
 
 let get_pt_fanout ios vec =
     val (FANIN_OUT_TBLS p cs assertions fi_tbl fo_tbl) = ios then
-    let b = get_base_name vec in    
     let vi = md_split_vector vec in
+    let b = extract_first_txt vi in
     let alts = (tbl_get fo_tbl b) catch [] then
     letrec check ((av,avi,apt):rem) =
 	let rest = check rem then
