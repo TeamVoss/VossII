@@ -40,6 +40,8 @@ typedef unsigned char	    uchar;
 
 #define NULLSTR '\0'
 
+void            voss_abort();
+
 #ifdef DEBUG
 #define ASSERT(cond) if( !(cond) ) {                                    \
             fprintf(stderr, "Assertion failed on line %d in \"%s\"\n",  \
