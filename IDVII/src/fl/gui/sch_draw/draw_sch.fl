@@ -1635,6 +1635,20 @@ let fl_add_to_selection_list vec =
 export_to_tcl fl_add_to_selection_list;
 
 
+let tcl_protect s =
+    let tr c =
+	c = "[" => "\\[" |
+	c = "]" => "\\]" |
+	c = ":" => "\\:" |
+	c = "$" => "\\$" |
+	c = "{" => "\\{" |
+	c = "}" => "\\}" |
+	c = "\"" => "\\\"" |
+	c
+    in
+    implode (map tr (explode s))
+;
+
 let set_selection canvas {op::string} {vecs:: string list} =
     let vfsm = w2vfsm canvas then
     let active_canvases = deref (vfsm2canvases_r vfsm) then
@@ -1644,10 +1658,17 @@ let set_selection canvas {op::string} {vecs:: string list} =
 	(rselection := vsel) fseq
 	(fl_update_colors canvas) fseq
 	let rnds = extract_vectors vsel then
-	let set1 v = sprintf "lappend ::x_selection {%s}" v in
-	let cmds = ["selection clear", "catch {unset ::x_selection}"]
-		   @ (map set1 rnds)
-		   @ ["selection own ."]
+	let setcmd =
+	    rnds = [] => "" |
+	    length rnds = 1 =>
+		sprintf "set ::x_selection %s" (tcl_protect (hd rnds))
+	    |
+	    list2str T "set ::x_selection {" " " "}" tcl_protect rnds
+	then
+	let cmds = ["selection clear",
+		    setcmd,
+		    "selection own ."
+		   ]
 	in
 	(big_tcl_eval cmds) fseq ()
     in

@@ -339,6 +339,11 @@ proc idv:create_idv_menu {nb w} {
         balloon $w.menu.bufs2wire_w "Remove selected buffer(s)"
         pack $w.menu.bufs2wire_w -side left -padx 5
 
+        ttk::button $w.menu.cleanffs -image $::icon(clean_ff) \
+                -command "idv:clean_ffs $w"
+        balloon $w.menu.cleanffs "Remove dangling outputs on ffs"
+        pack $w.menu.cleanffs -side left -padx 5
+
         ttk::button $w.menu.rename_w -image $::icon(rename_wires) \
                 -command "idv:do_rename_wires $w"
         balloon $w.menu.rename_w "Rename selected wires"
@@ -380,6 +385,7 @@ proc idv:fold {w} {
 	    bind $npw.t.e <KeyPress-Return> "idv:perform_fold $w $npw"
 	    pack $npw.t.l -side left
 	    pack $npw.t.e -side left -fill x -expand yes
+	    focus $npw.t.e
 	frame $npw.b -relief flat
 	pack $npw.b -side top
 	    ttk::button $npw.b.cancel -text Cancel -command "destroy $npw"
@@ -411,6 +417,8 @@ proc idv:do_rename_wires {w} { fl_rename_wires $w.c }
 proc idv:do_wire2bufs {w} { fl_do_wire2buffer $w.c }
 
 proc idv:do_bufs2wires {w} { fl_do_remove_wires $w.c }
+
+proc idv:clean_ffs   {w} { fl_do_clean_ffs $w.c }
 
 proc idv:new_toplevel_transf {w sl} {
     set idx [$sl curselection]

@@ -910,3 +910,48 @@ letrec pexlif_isolate_constants p =
     (PINST nm attrs lf fa_inps fa_outs ints' (P_HIER cs''))
 ;
 
+// Try to extract connectivity and type information for a ff.
+// Returns an option type.
+// If successful, returns:
+//	base	a template for the type of ff
+//	sz	the size of the ff
+//	clk	the clock signal
+//	en	either an empty list of a singelton name of the enable signal
+//	reset	either an empty list of a singelton name of the reset signal
+//	set	either an empty list of a singelton name of the set signal
+//	din	returns a list of the inputs to the ff
+//	dout	returns a list of the outputs to the ff
+//
+let extract_ff_info p =
+    NOT (pexlif_is_hier p) => NONE |
+    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
+    let sz = md_sizes (snd (hd fa_outs)) then
+    letrec try (base:bases) =
+        let master = resize_pexlif sz base then
+        NOT ((pexlif_get_SHA p) == (pexlif_get_SHA master)) => try bases |
+        let type = pexlif_get_name master in
+        let raw_isub =
+            map (\(f,_). f, assoc f fa_inps) (pexlif_get_fa_inps master)
+        then
+        let clk   = hd (assoc "clk" fa_inps) in
+        let din   = assoc (mk_name sz "d") fa_inps in
+        let en    = (assoc "en" fa_inps) catch [] in
+        let reset = (assoc "reset" fa_inps) catch [] in
+        let set   = (assoc "set" fa_inps) catch [] in
+        let dout  = assoc (mk_name sz "q") fa_outs in
+        SOME (base, sz, clk, en, reset, set, din, dout)
+     /\   try [] = NONE
+    in
+    try [
+        re_ff 'clk {'d :: wexpr} {'q :: wexpr},
+        re_ff_en 'clk 'en {'d :: wexpr} {'q :: wexpr},
+        re_ff_en_reset 'clk 'en 'reset {'d :: wexpr} {'q :: wexpr},
+        re_ff_reset 'clk 'reset {'d :: wexpr} {'q :: wexpr},
+        re_ff_set 'clk 'set {'d :: wexpr} {'q :: wexpr},
+        fe_ff 'clk {'d :: wexpr} {'q :: wexpr},
+        fe_ff_en 'clk 'en {'d :: wexpr} {'q :: wexpr},
+        fe_ff_en_reset 'clk 'en 'reset {'d :: wexpr} {'q :: wexpr},
+        fe_ff_reset 'clk 'reset {'d :: wexpr} {'q :: wexpr}
+    ]
+;
+

@@ -2618,6 +2618,75 @@ let fl_do_remove_wires canvas =
 ;
 export_to_tcl fl_do_remove_wires;
 
+let remove_unused_ffs_aux idx p =
+    NOT (pexlif_is_hier p) => p |
+    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
+    let pp = el idx cs in
+    let o_ff = extract_ff_info pp in
+    NOT (has_value o_ff) => eprintf "Selected item not a flop/latch" |
+    val (template_ff, sz, clk, en, reset, set, dinp, dout) = get_value o_ff in
+    let io_tbl = build_io_tbl p in
+    let dout_nds = md_expand_vectors dout in
+    let dinp_nds = md_expand_vectors dinp in
+    let is_used nd = (get_pt_fanout io_tbl nd) != [] in
+    let used = find_all is_used dout_nds in
+    used = [] =>
+        let cs' = (firstn (idx-1) cs)@(butfirstn idx cs) in
+        PINST name attrs lf fa_inps fa_outs ints (P_HIER cs')
+    |
+    let act_outs = gather dout_nds used in
+    let act_inps = gather dinp_nds used in
+    let act_out_vecs = merge_vectors act_outs in
+    letrec mk_inp_vecs inp_nds (ov:ovs) =
+        let cnt = md_size ov in
+        let iv = merge_vectors (firstn cnt inp_nds) in
+        (ov,iv):(mk_inp_vecs (butfirstn cnt inp_nds) ovs)
+     /\    mk_inp_vecs _ [] = []
+    in
+    let splits = mk_inp_vecs act_inps act_out_vecs in
+    let mk1_ff (ov,ivs) =
+        let sz = md_size ov in
+        let pp' = resize_pexlif sz template_ff in
+        let isub = [("clk",[clk]),
+                    ("reset", reset),
+                    ("en", en),
+                    ("set", set),
+                    (mk_name sz "d", ivs)]
+        in
+        let osub = [(mk_name sz "q", [ov])] in
+        val (PINST name attrs lf fa_inps fa_outs ints body) = pp' in
+        let fa_inps' = map (\(f,as). f, assoc f isub) fa_inps in
+        let fa_outs' = map (\(f,as). f, assoc f osub) fa_outs in
+        (PINST name attrs lf fa_inps' fa_outs' ints body)
+    in
+    let new_ffs = map mk1_ff splits in
+    let cs' = (firstn (idx-1) cs)@new_ffs@(butfirstn idx cs) in
+    PINST name attrs lf fa_inps fa_outs ints (P_HIER cs')
+;
+
+let remove_unused_ffs il p =
+    il = [] => p |
+    let il' = qsort (defix -) il in
+    itlist (\idx.\np. remove_unused_ffs_aux idx np) il' p
+;
+
+
+let fl_do_clean_ffs canvas =
+  (
+    let vfsm = w2vfsm canvas in
+    let il = get_selected_pinsts canvas then
+    il = [] => () |
+    let p = get_idv_current_pexlif canvas then
+    let p' =  remove_unused_ffs il p then
+    (add_transform canvas p' (CLEAN_FFS il)) fseq
+    let cmd =
+	sprintf "remove_unused_ffs vis %s;" (list2str T "[" "," "]" int2str il)
+    in
+    refresh_idv_canvas canvas cmd
+  ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
+;
+export_to_tcl fl_do_clean_ffs;
+
 let extract_pexlif p il =
     let p' = fold_pexlif p il "_TMP_" then
     val (PINST _ _ _ _ _ _ (P_HIER (c:cs))) = p' then

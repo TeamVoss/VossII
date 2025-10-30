@@ -1,0 +1,8 @@
+load "idv.fl";
+
+update_vossrc "VERBOSE-FSM-PRINT" "YES";
+let ckt1 = read_pexlif (DIR^"b273.pexlif");
+ckt1 fseq ();
+let fsm1 = pexlif2fsm ckt1;
+
+fsm1;
