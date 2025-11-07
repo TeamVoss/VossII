@@ -95,7 +95,7 @@ let CHECK_FOR_RW_DB {dummy::void} =
     eprintf "No IDV r/w database open."
 ;
 
-let add_model_in_rw_db top_level name sha_name =
+let add_model_in_rw_db top_level name sha_name accept_dups->F =
     (CHECK_FOR_RW_DB ()) fseq
     val (IDV_RW_DB sname fname mnames tbl) = get_current_db () then
     let nidx = find_first0 (\(top,mname,sha). mname = name) mnames then
@@ -113,7 +113,8 @@ let add_model_in_rw_db top_level name sha_name =
     let msg = (sprintf "This circuit is alrady named %s." oldname)^
 	      "  Do you still want to save it?"
     in
-    sidx != 0 AND NOT (window_yes_no (get_current_idv_window ()) msg) => () |
+    sidx != 0 AND NOT accept_dups
+	      AND NOT (window_yes_no (get_current_idv_window ()) msg) => () |
     // Save it
     let mnames' = filter (\(top,mn,sn). mn != name) mnames then
     let mnames'' = (top_level, name, sha_name):mnames' then
@@ -170,20 +171,25 @@ let get_selected_wires vfsm =
     setify (md_expand_vectors selection)
 ;
 
-let find_next_anon_name {dummy::void} =
+let find_next_anon_name tr_name =
     val (IDV_RW_DB sname fname mnames tbl) = get_rw_db () then
+    let tr_name' = string_replace tr_name " " "_" in
+    //
     let get_mname (top,mname,sha_name) = mname in
-    let anons =
-	map get_mname (filter (\p. str_is_prefix "anon_" (get_mname p)) mnames)
+    let in_use = map get_mname mnames in
+    letrec mk_uniq try =
+	NOT (mem try in_use) => try |
+	let pat = "^(.*)_([0-9]+)$" in
+	val (base,cnt) = NOT (str_reg_match pat try) => (try,0) |
+		let sl = str_reg_extract pat try in
+		((el 2 sl), sscanf "%d" (el 3 sl))
+	in
+	(mk_uniq (sprintf "%s_%d" base (cnt+1)))
     in
-    let next = 
-	anons = [] => 1 |
-	let indices = qsort (defix -) (map (sscanf "anon_%d") anons) in
-	(last indices) + 1
-    in
-    sprintf "anon_%d" next
+    let spec_name = mk_uniq (sprintf "%s.spec" tr_name') then
+    let imp_name  = mk_uniq (sprintf "%s.imp" tr_name') in
+    (spec_name, imp_name)
 ;
-non_lazy find_next_anon_name;
 
 let find_next_anon_transform_name signature class =
     val (IDV_RW_DB sname fname mnames tbl) = get_rw_db () then
@@ -483,6 +489,7 @@ let start_new_transform p w =
 		sprintf "%s delete all" c,
 		sprintf "draw_network %s $%s" c final_res,
 		"update",
+		sprintf "zoom_to_fit %s" c,
 		sprintf "set_scrollregion %s" c,
                 sprintf "sc:remove_draw_info %s" c
 	      ]
@@ -963,9 +970,11 @@ let fl_display_transform_tree canvas dbname name =
 	let ext_name = sprintf "%s:%s" dbname name in
 	(vertex_map := ((vertex_name,ext_name):(deref vertex_map))) fseq
 	let sz = float2str (int2float (1+strlen ext_name)*0.1) then
-	let dc = sprintf
-      "%s [shape=box, fixedsize=shape, label = \"%s\", fontname=\"Courer New\", fontsize=\"12\"]\n"
-			vertex_name vertex_name
+	let dc = sprintf "%s [shape=box, fixedsize=shape, label = \"%s\", "\
+			 "fontname=\"Courer New\", "\
+			 "fillcolor=\"lightcyan\" style=filled "\
+			 "fontsize=\"12\"]\n"
+			 vertex_name vertex_name
 	then
 	(vertices := (dc:(deref vertices))) fseq
 	(done := ((deref done)@[(p,vertex_name)])) fseq
@@ -975,11 +984,14 @@ let fl_display_transform_tree canvas dbname name =
 	    let edge_name =
 		let name = clean_name (trim_leading_space trans_name) in
 		let len = strlen name in
-		let name' = len <= 200 => name | string_butlastn name (len-20) in
+		let name' =
+		    len <= 200 => name | string_butlastn name (len-20)
+		in
 		sprintf "e%d-%s" (length (deref edges)) name'
 	    then
 	    (edge_map := ((edge_name, trans_name):(deref edge_map))) fseq
-	    let edge = sprintf "%s -> %s [ label = \"%s\", fontname=\"Courier New\", fontsize=\"12\"];\n"
+	    let edge = sprintf "%s -> %s [ label = \"%s\", "\
+			       "fontname=\"Courier New\", fontsize=\"12\"];\n"
 			       vertex_name dest edge_name
 	    then
 	    (edges := (edge:(deref edges)))
@@ -2131,6 +2143,8 @@ let do_replace_everywhere repeat parent spec imp =
     do_replace 1 parent
 ;
 
+import_from_tcl {idv_select_replacement :: string->(string list)->(string#int)};
+
 let fl_do_replacement canvas =
   (
     let vfsm = w2vfsm canvas then
@@ -2160,11 +2174,9 @@ let fl_do_replacement canvas =
     then
     let alts = flatmap get_alts dbs then
     let tr_names = map (\(db,(TRANSFORM name _ _ _)). name) alts then
-    let pre = sprintf "idv:select_replacement %s {" canvas in
-    let cmd = list2str T pre " " "}" id tr_names then
-    val [op, sidx] = tcl2list (tcl_eval [cmd]) then
+    val (op,oidx) = idv_select_replacement canvas tr_names then
     op = "Cancel" => () |
-    let idx = (sscanf "%d" sidx)+1 then
+    let idx = oidx+1 then
     val (db,tr) = el idx alts then
     val (TRANSFORM name sha_spec sha_imp just) = tr then
     let spec = idv_load_pexlif (db_sname db) sha_spec then
@@ -2231,25 +2243,27 @@ let idv_finish_transformation canvas =
     let trfs = get_idv_info canvas then
     let just = map (\(p,j).j) (butlast trfs) then
     just = [] => T |
-    let imp = fst (hd trfs) in
+    let raw_imp = fst (hd trfs) in
+    let imp = inside => wrap_pexlif raw_imp | raw_imp in
     let spec = fst (last trfs) in
     let spec_sig = pexlif_get_FP spec then
-    let tr_name = find_next_anon_transform_name spec_sig "trfs" then
-    let model_name = find_next_anon_name () then
-    let cmd = sprintf "idv:name_transform_and_use %s %s %s %s"
-		       (inside => "1" | "0") canvas tr_name model_name
+    let cmd = sprintf "idv:name_transform_and_use %s %s"
+		       (inside => "1" | "0") canvas
     then
-    let resl = tcl2list (tcl_eval [cmd]) then
-    let op = el 1 resl in
-    let transform_name = el 2 resl in
-    let model_name = el 3 resl in
+    val [op, transform_name] = tcl2list (tcl_eval [cmd]) then
+    let tr_name =
+	transform_name != "" => tcl_protect transform_name |
+	find_next_anon_transform_name spec_sig ""
+    then
+    val (spec_model_name, imp_model_name) = find_next_anon_name tr_name then
     op = "Cancel" => F |
     op = "Discard" => T |
     let imp_sha  = idv_save_pexlif imp then
     let spec_sha = idv_save_pexlif spec then
-    // Name the implementation pexlif
+    // Name the specification and implementation pexlifs
     val (IDV_RW_DB sname fname mnames tbl) = get_rw_db () then
-    (add_model_in_rw_db F model_name imp_sha) fseq
+    (add_model_in_rw_db F spec_model_name spec_sha T) fseq
+    (add_model_in_rw_db F imp_model_name imp_sha T) fseq
     // Now save the transformation
     let tr = TRANSFORM transform_name spec_sha imp_sha just then
     (record_transformation spec_sig tr) fseq
@@ -2263,7 +2277,7 @@ let idv_finish_transformation canvas =
 		      (length sell)
 	    |
 	    let sel = hd sell then
-	    let imp' = rewire_outside_connections (el sel cs) imp in
+	    let imp' = rewire_outside_connections (el sel cs) raw_imp in
 	    let cs' = (firstn (sel-1) cs)@[imp']@(butfirstn sel cs) then
 	    let p' = PINST nm attrs leaf fa_inps fa_outs ints (P_HIER cs') then
 	    (add_transform parent p' (REPLACE sell tr)) fseq

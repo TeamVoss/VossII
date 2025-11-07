@@ -10,12 +10,9 @@
 proc idv:create_idv_gui {w rw_db read_only} {
     catch {destroy $w}
     toplevel $w
-    set ht  [expr round(0.8*[winfo screenheight .])]
-    set wid [expr round(0.8*[winfo screenwidth .])]
-    wm geometry $w -20+100
 
     set nb $w.nb
-    ttk::notebook $nb -width $wid -height $ht
+    ttk::notebook $nb
     ttk::notebook::enableTraversal $nb
     bind $nb <<NotebookTabChanged>> [list idv:inform_canvas_change $w]
     set ::idv(code_dir) "$rw_db/code"
@@ -25,13 +22,14 @@ proc idv:create_idv_gui {w rw_db read_only} {
     bind top_level_idv_window <Destroy> [list idv:close_idv_gui $read_only]
     $nb add [frame $nb.idv] -text "IDV Home"
 
+
     # Now make the front page
     $nb select 0
     set pw $nb.idv.pw
     panedwindow $pw -orient horizontal -showhandle yes
     pack $pw -side top -fill both -expand y
         frame $pw.model_browser
-        $pw add $pw.model_browser -width 400
+        $pw add $pw.model_browser
         frame $pw.tr_dag
         $pw add $pw.tr_dag
 	set ww $pw.tr_dag
@@ -157,6 +155,13 @@ proc idv:create_idv_gui {w rw_db read_only} {
 
 	# Populate listbox (probably need to limit thenumber of models...)
 	idv:update_idv_list
+    #
+    # Set the size of the transformation window
+    #
+    wm grid $w "" "" "" ""
+    set ht  [expr round(0.5*[winfo screenheight .])]
+    set wid [expr round(0.5*[winfo screenwidth .])]
+    wm geometry $w [format {=%dx%d-40+100} $wid $ht]
 }
 
 proc idv:close_idv_gui {readonly} {
@@ -440,7 +445,7 @@ proc idv:return_select_replacement {w op} {
     destroy $w
 }
 
-proc idv:select_replacement {c alts} {
+proc idv_select_replacement {c alts} {
     set w .select_transf
     catch {destroy $w}
     vis_toplevel $w $c {} {} "Select transform"
@@ -480,34 +485,24 @@ proc idv:select_replacement {c alts} {
 }
 
 
-proc idv:perform_name_transf {w c op} {
+proc idv:record_transf_op {w op} {
     set ::idv(transf_op) $op
-    if { $op == "Cancel" } {
-	destroy $w
-	return
-    }
-    if { $::idv(transf_name) == "" } {
-	$w.errors.l configure \
-	    -text "Error: Must provide a name for the transformation" \
-			-fg red
-    } elseif { [fl_is_toplevel_transform $c] \
-		&& $::idv(imp_name) == "" } {
-	$w.errors.l configure \
-	    -text "Error: Must provide a name for toplevel models" -fg red
-    
-    } else {
-	destroy $w
-    }
+    destroy $w
 }
 
-proc idv:name_transform_and_use {inside c tr_name model_name} {
+;#    if { $::idv(transf_name) == "" } {
+;#	$w.errors.l configure \
+;#	    -text "Error: Must provide a name for the transformation" \
+;#			-fg red
+;#    }
+
+proc idv:name_transform_and_use {inside c} {
     set w .idv_name
     catch {destroy $w}
     i_am_busy
     vis_toplevel $w $c {} {} "Name and apply transform"
     set toplevel_transf [fl_is_toplevel_transform $c]
-    set ::idv(transf_name) $tr_name
-    set ::idv(imp_name) $model_name
+    set ::idv(transf_name) ""
     #
     frame $w.namef
     pack $w.namef -side top -fill x
@@ -517,36 +512,30 @@ proc idv:name_transform_and_use {inside c tr_name model_name} {
 	pack $w.namef.e -side right
 	pack $w.namef.l -side left -fill x -anchor w
     #
-#    frame $w.imp_name
-#    pack $w.imp_name -side top -fill x
-#	ttk::label $w.imp_name.l -text "Name of final model: "
-#	ttk::entry $w.imp_name.e -textvariable ::idv(imp_name) -width 30
-#	pack $w.imp_name.e -side right
-#	pack $w.imp_name.l -side left -fill x -anchor w
-    #
     frame $w.buttons
     pack $w.buttons -side top
 	ttk::button $w.buttons.cancel -text Cancel \
-	    -command "idv:perform_name_transf $w $c Cancel"
+	    -command "idv:record_transf_op $w Cancel"
 	pack $w.buttons.cancel -side left -padx 10
 	ttk::button $w.buttons.discard -text Discard \
-	    -command "idv:perform_name_transf $w $c Discard"
+	    -command "idv:record_transf_op $w Discard"
 	pack $w.buttons.discard -side left -padx 10
 	ttk::button $w.buttons.save -text Save \
-	    -command "idv:perform_name_transf $w $c Save"
+	    -command "idv:record_transf_op $w Save"
 	pack $w.buttons.save -side left -padx 10
 	# Only if started from a transformation window
 	if { $toplevel_transf == 0 } {
 	    if { $inside == "1" } {
 		ttk::button $w.buttons.appl1 -text "Save & Apply" \
-		 -command "idv:perform_name_transf $w $c SaveAndApplyOnce"
+		 -command "idv:record_transf_op $w SaveAndApplyOnce"
 		pack $w.buttons.appl1 -side left -padx 10
 	    } else {
 		ttk::button $w.buttons.appl1 -text "Save & Apply Once" \
-		 -command "idv:perform_name_transf $w $c SaveAndApplyOnce"
+		 -command "idv:record_transf_op $w SaveAndApplyOnce"
 		pack $w.buttons.appl1 -side left -padx 10
 		ttk::button $w.buttons.appln -text "Save & Apply Everywhere" \
-		 -command "idv:perform_name_transf $w $c SaveAndApplyEverywhere"
+		 -command "idv:record_transf_op $w \
+				SaveAndApplyEverywhere"
 		pack $w.buttons.appln -side left -padx 10
 	    }
 	}
@@ -556,7 +545,7 @@ proc idv:name_transform_and_use {inside c tr_name model_name} {
     pack $w.errors -side top
     tkwait window $w
     i_am_free
-    return [list $::idv(transf_op) $::idv(transf_name) $::idv(imp_name)]
+    return [list $::idv(transf_op) $::idv(transf_name)]
 }
 
 proc idv:update_transf_canvas {c} {
@@ -612,6 +601,8 @@ proc idv:show_transformations {dot_file w} {
 	$c bind $txt_tag <ButtonPress-3> \
 	    "idv:show_model_menu $c $node %X %Y; break"
     }
+    update
+    zoom_to_fit $c
 }
 
 proc idv:import_model {w} {

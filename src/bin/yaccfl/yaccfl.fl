@@ -498,7 +498,7 @@ let emit_code fl_code tokens flex_code parser_res =
 let compile_c suffix_name =
     let src_dir = (get_vossrc "VOSS-BINARY-DIRECTORY")^"/../src" then
     let output = (string_butlastn (base_name^suffix_name) 2)^".o" in
-    let c_cmd = sprintf "gcc -I%s/bin/fl -I%s/include -c -g -fPIC -o %s %s%s"
+    let c_cmd = sprintf "clang -I%s/bin/fl -I%s/include -c -g -fPIC -o %s %s%s"
 		    src_dir src_dir output base_name suffix_name
     then
     val (ret, outs, errs) = system2 c_cmd then
@@ -555,7 +555,7 @@ let parse_yfl {dummy::void} =
     let bin_dir = get_vossrc "VOSS-BINARY-DIRECTORY" then
     let lib_dir = bin_dir^"/../src/lib" then
     let lcmd = sprintf
-	"gcc -o lib%s.so -shared -fPIC %s.lex.o %s.o %s.tab.o %s/libfl.so"
+	"clang -o lib%s.so -shared -fPIC %s.lex.o %s.o %s.tab.o %s/libfl.so"
 	prefix_name base_name base_name base_name bin_dir
     then
     val (ret, outs, errs) = system2 lcmd then

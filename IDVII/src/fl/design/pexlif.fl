@@ -716,6 +716,7 @@ let remove_wire p il =
     let p' = fold_pexlif p il "_TMP_" then
     val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p' in
     let top_inps = md_expand_vectors (map fst fa_inps) then
+    let top_outs = md_expand_vectors (map fst fa_outs) then
     let block = wrap_pexlif (hd cs) then
     let remain = tl cs then
     has_state block => eprintf "Selection is not all wires" |
@@ -724,25 +725,20 @@ let remove_wire p il =
     let ckt = pexlif2fsm block then
     let ant = map (\n.T,n,variable n, 0, 1) (setify (md_expand_vectors inps)) in
     let ste = silent_STE "-e" ckt [] ant [] [] then
-    let cur_inps = md_expand_vectors (map fst fa_inps) then
-    let cur_outs = md_expand_vectors (map fst fa_outs) then
     let mk_sub o =
         val (H,L) = get_trace_val ste o 0 then
         NOT (H == NOT L) => eprintf "Node %s is not a wire (non binary)" o |
         let dep = depends H in
         length dep != 1 => eprintf "Node %s is not a wire (function)" o |
         let v = hd dep in
-        NOT (H == (variable v)) =>
-	    eprintf "Node %s is not a wire (inverted)" o
-	|
-	// Do not rename signals driven internally but
-	// connected to top-level output
-	(mem o cur_outs) AND NOT (mem v cur_inps) => (v,o) | (o, v)
+        H !== (variable v) => eprintf "Node %s is not a wire (inverted)" o |
+	(o, v)
     in
     let sub = map mk_sub (md_expand_vectors outs) then
+    val (osub, isub) = split (\(o,i). mem o top_outs) sub in
     let rename1 (PINST sname sattrs slf sfa_inps sfa_outs sints sbody) =
         let rename_act (f,as) =
-            let eas = map (\a. (assoc a sub) catch a) (md_expand_vectors as) in
+            let eas = map (\a. (assoc a isub) catch a) (md_expand_vectors as) in
             let as' = md_merge_vectors eas then
             (f, as')
         in
@@ -757,34 +753,19 @@ let remove_wire p il =
             let fs = md_expand_vector f in
             let fs' = map (\f. (assoc f sub) catch f) fs in
             fs' == fs => [(f,as)] |
+	    // Not allowed to rename internal names
+	    let sz = length fs' in
             let f' = md_merge_vectors fs' then
-            (fs' intersect top_inps) != [] =>
-                // Not allowed to have primary inputs to primary outputs
-                // Must insert a buffer
-                let sz = length fs' in
-                let fa_inps = [((mk_name sz "i"),f')] in
-                let fa_outs = [((mk_name sz "o"), [f])] in
-                let lfs = [(W_UPDATE_FN (W_VAR sz "o") (W_VAR sz "i"))] in
-                let buf =
-                    PINST "draw_buffer" [] T fa_inps fa_outs [] (P_LEAF lfs)
-                then
-                (remain' := (buf:(deref remain'))) fseq
-                [(f,as)]
-            |
-            length f' = 1 => [((hd f'),as)] |
-            let eas = md_expand_vectors as in
-            let fa = zip fs' eas then
-            letrec pr (f:fs) eas =
-                let sz = md_size f in
-                let as = firstn sz eas then
-                (f,md_merge_vectors as):
-                pr fs (butfirstn sz eas)
-             /\   pr [] [] = []
-             /\   pr [] _ = eprintf "f/a length mismatch!"
-            in
-            pr f' eas
-        in
-        flatmap rename_formal fa_outs
+	    let fa_inps = [((mk_name sz "i"),f')] in
+	    let fa_outs = [((mk_name sz "o"), [f])] in
+	    let lfs = [(W_UPDATE_FN (W_VAR sz "o") (W_VAR sz "i"))] in
+	    let buf =
+		PINST "draw_buffer" [] T fa_inps fa_outs [] (P_LEAF lfs)
+	    then
+	    (remain' := (buf:(deref remain'))) fseq
+	    [(f,as)]
+	in
+	flatmap rename_formal fa_outs
     then
     let cs' = deref remain' then
     let res = (PINST name attrs lf fa_inps fa_outs' ints (P_HIER cs')) then

@@ -968,6 +968,23 @@ let file_signature file =
     sscanf " %x" (el 2 (str_split (hd resl) "="))
 ;
 
+// Escape specal characters in a string so that tcl will not
+// interpret the characters.
+let tcl_protect s =
+    let tr c = 
+        c = "[" => "\\[" |
+        c = "]" => "\\]" |
+        c = ":" => "\\:" |
+        c = "$" => "\\$" |
+        c = "{" => "\\{" |
+        c = "}" => "\\}" |
+        c = " " => "\\ " |
+        c = "\"" => "\\\"" |
+        c
+    in
+    implode (map tr (explode s))
+;  
+
 lettype window = WINDOW {window_name::string};
 
 // Takes a handle to a prompt window waits for a button to be pressed.

@@ -537,6 +537,7 @@ let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
 		    sprintf "draw_network %s $%s" c final_res,
 		    sprintf "draw_hier_boundingbox %s {%s}" c name,
 		    "update",
+		    sprintf "zoom_to_fit %s" c,
 		    sprintf "set_scrollregion %s" c,
 		    sprintf "sc:remove_draw_info %s" c
 		  ]) fseq
@@ -1633,21 +1634,6 @@ let fl_add_to_selection_list vec =
     (selection_list := (vec : (deref selection_list)))
 ;
 export_to_tcl fl_add_to_selection_list;
-
-
-let tcl_protect s =
-    let tr c =
-	c = "[" => "\\[" |
-	c = "]" => "\\]" |
-	c = ":" => "\\:" |
-	c = "$" => "\\$" |
-	c = "{" => "\\{" |
-	c = "}" => "\\}" |
-	c = "\"" => "\\\"" |
-	c
-    in
-    implode (map tr (explode s))
-;
 
 let set_selection canvas {op::string} {vecs:: string list} =
     let vfsm = w2vfsm canvas then

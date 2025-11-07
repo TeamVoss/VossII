@@ -70,6 +70,7 @@ static string		ext_parse_tmp_file;
 #define MAX_QUOTE_SIZE	16000
 static char		cmd_buf[1024];
 
+static string		merge_strings(string s);
 static string		expand_string(string s);
 static void		start_extern_parsing();
 static void		end_extern_parsing(string cmd);
@@ -515,6 +516,13 @@ defix\ [\ \t]*{symbol}({symbol})* {
 			    lvalp->str_t=expand_string((string)(&(yytext[1])));
 			    RETURN(STRINGT, "_STRINGT");
 			}
+
+(\"([^\"\\]|(\\.))*(\"\\\n[ \t]*\"([^\"\\]|(\\.))*)*\") { 
+			    yytext[yyleng-1] = 0;
+			    lvalp->str_t= merge_strings((string)(&(yytext[1])));
+			    RETURN(STRINGT, "_STRINGT");
+			}
+
 \n			{
 			    prev_line[0] = '\0';
 			    prev_line_used = 0;
@@ -612,6 +620,44 @@ is_defined(char *id)
 }
 
 int yywrap() { return 1; }
+
+static string
+merge_strings(string s)
+{
+    string res;
+    bool   outside = FALSE;
+    res = strtemp("");
+    while(*s) {
+	if( outside ) {
+	    if( *s == '"' ) { 
+		outside = FALSE;
+	    }
+	    s++;
+	} else {
+	    if( *s == '\n' )
+		line_nbr++;
+	    if( *s == '\\' ) {
+		s++;
+		switch( *s ) {
+		    case 'n': res = charappend('\n'); break;
+		    case '"': res = charappend('"'); break;
+		    case 't': res = charappend('\t'); break;
+		    default:  res = charappend(*s); break;
+		}
+		s++;
+	    } else {
+		if( strncmp(s, "\"\\\n", 3) == 0 ) {
+		    outside = TRUE;
+		    s += 3;
+		} else {
+		    res = charappend(*s);
+		    s++;
+		}
+	    }
+	}
+    }
+    return(wastrsave(stringsp, res));
+}
 
 static string
 expand_string(string s)
