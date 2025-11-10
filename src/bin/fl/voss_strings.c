@@ -1112,6 +1112,28 @@ string_butlastn(g_ptr redex)
 }
 
 static void
+string_butfirstn(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    string s = GET_STRING(GET_APPLY_RIGHT(l));
+    int cnt = GET_INT(r);
+    int len = strlen(s);
+    if( len < cnt ) {
+	string msg =
+	    Fail_pr("string_butfirstn %d greater than string length %d (%s)",
+		    cnt, len, s);
+	MAKE_REDEX_FAILURE(redex, msg);
+	return;
+    }
+
+    string tmp = wastrsave(stringsp, s + cnt);
+    MAKE_REDEX_STRING(redex, wastrsave(stringsp, tmp));
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
 string_strstr(g_ptr redex)
 {
     g_ptr l    = GET_APPLY_LEFT(redex);
@@ -1490,6 +1512,13 @@ Strings_Install_Functions()
 			    GLmake_arrow(GLmake_int(),
 					 GLmake_string())),
 			string_butlastn);
+
+    Add_ExtAPI_Function("string_butfirstn", "11", FALSE,
+			GLmake_arrow(
+			    GLmake_string(),
+			    GLmake_arrow(GLmake_int(),
+					 GLmake_string())),
+			string_butfirstn);
 
     Add_ExtAPI_Function("strstr", "11", FALSE,
 			GLmake_arrow(GLmake_string(),

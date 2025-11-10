@@ -2602,13 +2602,13 @@ let fl_do_wire2buffer canvas =
   (
     let vfsm = w2vfsm canvas in
     let p = get_idv_current_pexlif canvas then
-    let selected_wires = md_extract_vectors (get_selected_wires vfsm) then
-    selected_wires = [] => () |
-    let p' = itlist do_wire2buffer selected_wires p then
-    (add_transform canvas p' (WIRE2BUFFER selected_wires)) fseq
+    let wires = fl_get_anon_selected canvas then
+    wires = [] => () |
+    let p' = itlist do_wire2buffer wires p then
+    (add_transform canvas p' (WIRE2BUFFER (wires))) fseq
     let cmd =
 	sprintf "wire2buffer vis %s;"
-		(list2str T "[" "," "]" (sprintf "\"%s\"") selected_wires)
+		(list2str T "[" "," "]" (sprintf "\"%s\"") wires)
     then
     refresh_idv_canvas canvas cmd
   ) gen_catch (\msg. window_ok canvas (clean_error_message msg))
