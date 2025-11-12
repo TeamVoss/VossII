@@ -889,14 +889,16 @@ str_split(g_ptr redex)
             s++;
         }
     } else {
+	bool at_least_one = FALSE;
         while( (next = strstr(cur, split_str)) != NULL ) {
+	    at_least_one = TRUE;
             *next = 0;
             SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(stringsp, cur)));
             SET_CONS_TL(tail, Make_NIL());
             tail = GET_CONS_TL(tail);
             cur = next+lsplit;
         }
-        if( *cur != 0 ) {
+        if( *cur != 0 || at_least_one ) {
             SET_CONS_HD(tail, Make_STRING_leaf(wastrsave(stringsp, cur)));
             SET_CONS_TL(tail, Make_NIL());
             tail = GET_CONS_TL(tail);
