@@ -357,15 +357,14 @@ struct PexlifDumper
 	{
 		f << stringf("[");
 		if (sig.is_chunk()) {
-			dump_sigchunk(f, sig.as_chunk());
+		    dump_sigchunk(f, sig.as_chunk());
 		} else {
-			bool first = true;
-			for (auto it = sig.chunks().rbegin(); it != sig.chunks().rend(); ++it) {
-				if( !first )
-				    f << stringf(", ");
-				first = false;
-				dump_sigchunk(f, *it);
-			}
+		    auto chunks = sig.chunks();
+		    for (auto it = chunks.rbegin(); it != chunks.rend(); ++it) {
+			if (it != chunks.rbegin())
+			    f << stringf(", ");
+			dump_sigchunk(f, *it);
+		    }
 		}
 		f << stringf("]");
 	}
