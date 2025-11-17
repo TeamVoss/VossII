@@ -94,10 +94,11 @@ let extract_scanner start_line lines =
 	    sprintf "#define YY_DECL                 int %slex (YYSTYPE *lvalp)"
 		prefix_name,
 	    "",
+	    "char *copy_str(char *txt) { char *res = malloc(strlen(txt+1)); strcpy(res, txt); return res; }",
 	    (do_debug =>
-		sprintf "#define RET(tk) fprintf(stderr, \"Lex: |%%s| -> %%d in state %%d\\n\",yytext, tk, YY_START); lvalp->str_t = yytext; return(tk);"
+		sprintf "#define RET(tk) fprintf(stderr, \"Lex: |%%s| -> %%d in state %%d\\n\",yytext, tk, YY_START); lvalp->str_t = copy_str(yytext); return(tk);"
 	    |
-		"#define RET(tk) lvalp->str_t = yytext; return(tk);"
+		"#define RET(tk) lvalp->str_t = copy_str(yytext); return(tk);"
 	    ),
 	    (sprintf "int %sline_nbr = 1;" prefix_name),
 	    "%}",
@@ -311,7 +312,7 @@ let extract_parser tokens start_line lines =
 	    "",
 	    "%}",
 	    "",
-	    "%pure-parser",
+	    "%define api.pure",
 	    "%define parse.lac full",
 	    "%define parse.error verbose",
 	    "%union { string str_t; g_ptr nd_t;}",
@@ -408,7 +409,7 @@ let emit_code fl_code tokens flex_code parser_res =
     (fprintf Cfp "#include \"fl.h\"\n") fseq
     (fprintf Cfp "#include \"graph.h\"\n") fseq
     (fprintf Cfp "#include \"%s.tab.h\"\n\n" prefix_name) fseq
-    (fprintf Cfp "FILE *%sin;\n" prefix_name) fseq
+    (fprintf Cfp "extern FILE *%sin;\n" prefix_name) fseq
     (fprintf Cfp "extern str_mgr     *stringsp;\n") fseq
     (fprintf Cfp "extern symbol_tbl_ptr   symb_tbl;\n") fseq
     (fprintf Cfp "extern char         FailBuf[4096];\n") fseq
