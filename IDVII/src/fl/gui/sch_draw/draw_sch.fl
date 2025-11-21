@@ -1181,7 +1181,9 @@ let base_get_complete_value ste vectors t =
 		idx = 0 =>
 		    let b = implode (map (\(H,L). H=>"1"| "0") vals) then
 		    let i = sscanf "%b" b in
-		    let base_txt = length r >= 4 => sprintf "0x%x" i | b in
+		    let base_txt = length r < 4 => b |
+			sprintf "0x%0*x" (length r/4 + 1)  i
+		    in
 		    let pretty_txt = (" "^(find_pretty_printer v i)) catch "" in
 		    (v, [base_txt^pretty_txt])
 		|

@@ -314,6 +314,8 @@ load_shared_library(g_ptr redex)
 	    return;
 	}
     }
+    shared_lib_name = wastrsave(stringsp, shared_lib_name);
+
     void *handle = dlopen(shared_lib_name, RTLD_NOW);
 
     if( !handle ) {
@@ -341,8 +343,7 @@ load_shared_library(g_ptr redex)
 	return;
     }
     
-    MAKE_REDEX_STRING(redex,
-		      Make_STRING_leaf(wastrsave(stringsp, shared_lib_name)));
+    MAKE_REDEX_STRING(redex, shared_lib_name);
     return;
 }
 

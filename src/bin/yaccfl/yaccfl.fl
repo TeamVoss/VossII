@@ -83,7 +83,7 @@ let extract_scanner start_line lines =
 	|
 	(s,"{}")
     in
-    let prelude =
+    let prelude tokens =
 	[
 	    "%{",
 	    "#include <stdlib.h>",
@@ -95,8 +95,24 @@ let extract_scanner start_line lines =
 		prefix_name,
 	    "",
 	    "char *copy_str(char *txt) { char *res = malloc(strlen(txt+1)); strcpy(res, txt); return res; }",
+
+	    "struct token_rec {int tk; char name[50];} token_tbl [] = {"
+	]@(map (\tk. sprintf "    {%s, \"%s\"}," tk tk) tokens)@
+	[
+	    "    {-1, \"_DUMMY_\"}\n};",
+	    "char ebuf[100];",
+	    "",
+	    "char *tk2name(int tk) {",
+	    "    struct token_rec dummy;",
+	    "    for(int i = 0; i < sizeof(token_tbl)/sizeof(dummy); i++) {",
+	    "        if( token_tbl[i].tk == tk ) return( token_tbl[i].name );",
+	    "    }",
+	    "    sprintf(ebuf, \"%d\", tk);",
+	    "    return ebuf;",
+	    "}",
+	    "",
 	    (do_debug =>
-		sprintf "#define RET(tk) fprintf(stderr, \"Lex: |%%s| -> %%d in state %%d\\n\",yytext, tk, YY_START); lvalp->str_t = copy_str(yytext); return(tk);"
+		sprintf "#define RET(tk) fprintf(stderr, \"Lex: |%%s| -> %%s in state %%d\\n\",yytext, tk2name(tk), YY_START); lvalp->str_t = copy_str(yytext); return(tk);"
 	    |
 		"#define RET(tk) lvalp->str_t = copy_str(yytext); return(tk);"
 	    ),
@@ -121,8 +137,8 @@ let extract_scanner start_line lines =
     let raw_out = map process rules then
     let max_len = itlist (\(p,c).\r. max r (strlen p)) raw_out 1 then
     let out = map (\(p,r). sprintf "%-*s  %s" max_len p r) raw_out then
-    let res = prelude @ out @ postlude then
     let all_tokens = rev (setify (deref tokensr)) then
+    let res = (prelude all_tokens) @ out @ postlude then
     (all_tokens, res)
 ;
 
@@ -430,13 +446,14 @@ let emit_code fl_code tokens flex_code parser_res =
     (fprintf Cfp "static void\n") fseq
     (fprintf Cfp "do_parse_%s(g_ptr redex)\n" prefix_name) fseq
     (fprintf Cfp "{\n") fseq
-    (fprintf Cfp "    g_ptr   gfile;\n") fseq
+    (fprintf Cfp "    g_ptr   gfile, gdo_debug;\n") fseq
     (fprintf Cfp "    string  filename;\n") fseq
     (fprintf Cfp "\n") fseq
-    (fprintf Cfp "    EXTRACT_1_ARG(redex, gfile);\n") fseq
+    (fprintf Cfp "    EXTRACT_2_ARGS(redex, gfile, gdo_debug);\n") fseq
     (fprintf Cfp "    filename = GET_STRING(gfile);\n") fseq
     (fprintf Cfp "    %s_filename = filename;\n" prefix_name) fseq
     (fprintf Cfp "\n") fseq
+    (do_debug => (fprintf Cfp "if(GET_BOOL(gdo_debug) == B_One()) { %sdebug = 1;}" prefix_name) | ()) fseq
     (fprintf Cfp "    // Call the bison/flex parser on the file given\n") fseq
     (fprintf Cfp "    if( (%sin = fopen(filename, \"r\")) == NULL ) {\n" prefix_name) fseq
     (fprintf Cfp "        MAKE_REDEX_FAILURE(redex,Fail_pr(\"Cannot open file %%s\\n\", filename));\n") fseq
@@ -487,8 +504,8 @@ let emit_code fl_code tokens flex_code parser_res =
     (fprintf Cfp "        return( FALSE );\n") fseq
     (fprintf Cfp "    }\n") fseq
     (fprintf Cfp "\n") fseq
-    (fprintf Cfp "    Add_ExtAPI_Function(\"parse_%s\", \"1\", FALSE," prefix_name) fseq
-    (fprintf Cfp " GLmake_arrow(GLmake_string(), return_type),") fseq
+    (fprintf Cfp "    Add_ExtAPI_Function(\"parse_%s\", \"11\", FALSE," prefix_name) fseq
+    (fprintf Cfp " GLmake_arrow(GLmake_string(), GLmake_arrow(GLmake_bool(), return_type)),") fseq
     (fprintf Cfp " do_parse_%s);\n" prefix_name) fseq
     (fprintf Cfp "    return TRUE;\n") fseq
     (fprintf Cfp "}\n") fseq
@@ -535,7 +552,7 @@ let parse_yfl {dummy::void} =
     then
     (emit_code fl_code tokens flex_code parse_res) fseq
     // Now run bison and flex
-    let bison_cmd = sprintf "bison --defines=%s.tab.h -o %s.tab.c -p %s %s.y"
+    let bison_cmd = sprintf "bison -v -t --defines=%s.tab.h -o %s.tab.c -p %s %s.y"
 		    base_name base_name prefix_name base_name
     then
     val (ret, outs, errs) = system2 bison_cmd then
@@ -578,6 +595,7 @@ do_debug => () |
 		 ".l",
 		 ".tab.c",
 		 ".typecheck",
+		 ".output",
 		 ".y",
 		 ".c",
 		 ".lex.c",
