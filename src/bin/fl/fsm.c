@@ -193,6 +193,7 @@ static gbv	    (*c_NOT)(gbv a);
 static gbv	    (*c_AND)(gbv a, gbv b);
 static gbv	    (*c_OR)(gbv a, gbv b);
 static bool	    (*c_NEQ)(gbv a, gbv b);
+static bool	    (*c_isX)(gbv H, gbv L);
 static gbv	    c_ZERO;
 static gbv	    c_ONE;
 static buffer	    inps_buf;
@@ -401,6 +402,8 @@ static bool           no_fanout(ncomp_ptr cp);
 static int            assign_rank(int depth, ncomp_ptr cp);
 static int            rank_order();
 static void           bexpr_c_Print(odests fp, gbv a, int size);
+static bool	      bexpr_c_isX(gbv H, gbv L);
+static bool	      BDD_c_isX(gbv H, gbv L);
 static void           BDD_c_Print(odests fp, gbv a, int size);
 static gbv            bexpr_c_NOT(gbv a);
 static gbv            BDD_c_NOT(gbv a);
@@ -475,6 +478,8 @@ static void           gen_limited_get_trace(g_ptr redex, value_type type);
 static void           gen_get_trace(g_ptr redex, value_type type);
 static void           gen_get_trace_val(g_ptr redex, value_type type);
 static void           gen_get_ste_result(g_ptr redex, value_type type);
+static void	      get_nonX_entries(g_ptr redex);
+
 static void           dbg_print_ils(pointer key, pointer data);
 static void           dbg_print_stop_nds(pointer key, pointer data);
 
@@ -2731,6 +2736,16 @@ Fsm_Install_Functions()
 					 GLmake_list(GLmake_string()))),
 			 get_abstract_depends);
 
+    Add_ExtAPI_Function("get_nonX_entries", "111", FALSE,
+			GLmake_arrow(
+			  ste_handle_tp,
+			  GLmake_arrow(
+			    GLmake_list(GLmake_string()),
+			    GLmake_arrow(
+				GLmake_int(),
+				GLmake_list(GLmake_string())))),
+			get_nonX_entries);
+			
     Add_ExtAPI_Function("get_trace", "11", FALSE,
 			GLmake_arrow(
 			  ste_handle_tp,
@@ -6944,6 +6959,22 @@ BDD_c_limited_OR(gbv a, gbv b)
 }
 
 static bool
+bexpr_c_isX(gbv H, gbv L)
+{
+    bexpr h = H.bp;
+    bexpr l = L.bp;
+    return( (h == BE_One()) && (l == BE_One()) );
+}
+
+static bool
+BDD_c_isX(gbv H, gbv L)
+{
+    formula h = H.f;
+    formula l = L.f;
+    return( (h == B_One()) && (l == B_One()) );
+}
+
+static bool
 bexpr_c_NEQ(gbv a, gbv b)
 {
     bexpr f = a.bp;
@@ -6974,6 +7005,7 @@ switch_to_bexprs()
     c_NEQ = bexpr_c_NEQ;
     c_ZERO.bp = BE_Zero();
     c_ONE.bp  = BE_One();
+    c_isX = bexpr_c_isX;
 }
 
 static void
@@ -7009,6 +7041,7 @@ switch_to_BDDs()
     c_NEQ = BDD_c_NEQ;
     c_ZERO.f = B_Zero();
     c_ONE.f  = B_One();
+    c_isX = BDD_c_isX;
 }
 
 static int
@@ -9037,6 +9070,55 @@ gen_limited_get_trace(g_ptr redex, value_type type)
 				   Make_CONS_ND(Make_GBV_leaf(te->H),
 						Make_GBV_leaf(te->L)));
 	APPEND1(tail, event);
+    }
+    pop_fsm();
+    pop_ste();
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+    End_string_ops(sop);
+}
+
+static void
+get_nonX_entries(g_ptr redex)
+{
+    sop = Begin_string_ops();
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_ste, g_nodes, g_time;
+    EXTRACT_3_ARGS(redex, g_ste, g_nodes, g_time);
+    ste_ptr ste = (ste_ptr) GET_EXT_OBJ(g_ste);
+    push_ste(ste);
+    push_fsm(ste->fsm);
+    int	time = GET_INT(g_time);
+    MAKE_REDEX_NIL(redex);
+    g_ptr tail = redex;
+    while( !IS_NIL(g_nodes) ) {
+	string node = GET_STRING(GET_CONS_HD(g_nodes));
+	int idx = name2idx(node);
+	if( idx < 0 ) {
+	    pop_ste();
+	    pop_fsm();
+	    End_string_ops(sop);
+	    MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in ste-fsm", node));
+	    return;
+	}
+	trace_ptr tp = (trace_ptr) find_hash(trace_tblp, INT2PTR(idx));
+	if( tp == NULL ) {
+	    pop_ste();
+	    pop_fsm();
+	    End_string_ops(sop);
+	    MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not traced", node));
+	    return;
+	}
+	for(trace_event_ptr te = tp->events; te != NULL; te = te->next) {
+	    if( te->time <= time ) {
+		if( !c_isX(te->H, te->L) ) {
+		    APPEND1(tail, Make_STRING_leaf(node));
+		}
+		break;
+	    }
+	}
+	g_nodes = GET_CONS_TL(g_nodes);
     }
     pop_fsm();
     pop_ste();
