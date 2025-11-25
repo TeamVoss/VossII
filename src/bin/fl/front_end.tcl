@@ -1767,7 +1767,8 @@ proc do_remote_tcl_request {chan} {
                 puts $::sync_to_tcl_fp [protect $res]
             }
             flush $::sync_to_tcl_fp
-        }
+        } else {
+	}
     }
 }
 

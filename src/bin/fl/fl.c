@@ -1128,6 +1128,13 @@ Send_to_tcl(string cmd, string *resp)
 	    p++;
 	    ASSERT(rid <= tcl_eval_depth);
 	    store_buf(&tcl_eval_done_buf, rid, &ok);
+	    if( *(p+strlen(p)-1) != '\n' ) {
+		// Too long return value to fit in the buffer
+		int c;
+		while( (c = fgetc(sync_to_tcl_fp)) != EOF && c != '\n' ) ;
+		FP(err_fp,
+		   "WARNING: tcl_eval return value too long. Truncated.\n");
+	    }
 	    string res = unprotect(p);
 	    int len = strlen(res);
 	    string fres = Malloc(len+1);
