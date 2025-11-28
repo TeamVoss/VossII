@@ -35,6 +35,7 @@ bool        Interrupt_asap = FALSE;
 bool	    cephalopode_mode = FALSE;
 bool	    profiling_active = FALSE;
 bool	    profiling_builtins = FALSE;
+bool	    quiet_run = FALSE;
 #if DBG_TRACE_AND_SAVE
 int	    debug_id = -1;
 int	    debug_start_comparing = 0;
@@ -272,6 +273,11 @@ fl_main(int argc, char *argv[])
             RCadd_debug_info = FALSE;
             argc--, argv++;
         } else
+        if( strcmp(argv[1], "-q") == 0 ) {
+	    // Turn off printing of the VossII banner.
+            quiet_run = TRUE;
+            argc--, argv++;
+        } else
         if( (strcmp(argv[1], "-use_stdin") == 0) ||
 	    (strcmp(argv[1], "--use_stdin") == 0) )
 	{
@@ -477,11 +483,13 @@ fl_main(int argc, char *argv[])
 
         if(hide_window) { Send_to_tcl("hide_fl_window", NULL); }
 
-        FP(stdout_fp, "     /\\           \n");
-        FP(stdout_fp, "    /  \\ /\\       \n");
-        FP(stdout_fp, "   /    VossII %s (%s)\n", FL_VERSION, VERSION_DATE);
-        FP(stdout_fp, "VOSS-LIBRARY-DIRECTORY = %s\n", RCDefault_dir);
-        FP(stdout_fp, "Temporary files directory = %s\n", Voss_tmp_dir);
+	if( !quiet_run ) {
+	    FP(stdout_fp, "     /\\           \n");
+	    FP(stdout_fp, "    /  \\ /\\       \n");
+	    FP(stdout_fp, "   /    VossII %s (%s)\n", FL_VERSION, VERSION_DATE);
+	    FP(stdout_fp, "VOSS-LIBRARY-DIRECTORY = %s\n", RCDefault_dir);
+	    FP(stdout_fp, "Temporary files directory = %s\n", Voss_tmp_dir);
+	}
 
         {
             string cmd = tprintf("(_load \"%s/preamble.fl\" F) fseq ();",
@@ -652,7 +660,7 @@ fl_main(int argc, char *argv[])
         }
     } else {
         /* noX mode */
-	if( !hide_window ) {
+	if( !quiet_run ) {
 	    FP(stdout_fp, "     /\\           \n");
 	    FP(stdout_fp, "    /  \\ /\\       \n");
 	    FP(stdout_fp, "   /    VossII %s (%s)\n", FL_VERSION, VERSION_DATE);

@@ -403,7 +403,7 @@ let emit_code fl_code tokens flex_code parser_res =
     (fprintf tfp "quit;\n") fseq
     (fclose tfp) fseq
     // =============== Extract the return type ===============
-    val (ret, outs, errs) = system2 (sprintf "fl -noX -F %s" filename) then
+    val (ret, outs, errs) = system2 (sprintf "fl -noX -q -F %s" filename) then
     ret != 0 =>
 	eprintf "Typechecking of %s failed.\n%s\n" yfl_file (sl2s errs)
     |

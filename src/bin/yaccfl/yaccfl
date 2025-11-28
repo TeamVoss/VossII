@@ -44,7 +44,7 @@ if [ "$HELP" = true ]; then
 fi
 
 if [ "$DEBUG" = true ]; then
-    fl -noX -hide-window -F yaccfl.fl DO_DEBUG $@
+    fl -noX -q -hide-window -F yaccfl.fl DO_DEBUG $@
 else
-    fl -noX -hide-window -F yaccfl.fl $@
+    fl -noX -q -hide-window -F yaccfl.fl $@
 fi

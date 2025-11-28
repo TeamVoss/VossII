@@ -43,6 +43,7 @@ typedef struct old_yyin_rec {
 } old_yyin_rec;
 
 
+extern bool		quiet_run;
 extern bool		file_load;
 extern bool	        gui_mode;
 extern int		line_nbr;
@@ -855,7 +856,7 @@ Read_from_file(string name, bool verbose, bool remove_after)
 	cur_file = new;
 	bool old_file_load = file_load;
 	file_load = TRUE;
-	if( verbose ) {
+	if( verbose && !quiet_run ) {
 	    FP(stdout_fp, "-Loading file %s:\n", cur_file_name);
 	}
 	yyin = new_fid;
