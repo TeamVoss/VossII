@@ -194,6 +194,7 @@ static gbv	    (*c_AND)(gbv a, gbv b);
 static gbv	    (*c_OR)(gbv a, gbv b);
 static bool	    (*c_NEQ)(gbv a, gbv b);
 static bool	    (*c_isX)(gbv H, gbv L);
+static bool	    (*c_isT)(gbv H, gbv L);
 static gbv	    c_ZERO;
 static gbv	    c_ONE;
 static buffer	    inps_buf;
@@ -403,7 +404,9 @@ static int            assign_rank(int depth, ncomp_ptr cp);
 static int            rank_order();
 static void           bexpr_c_Print(odests fp, gbv a, int size);
 static bool	      bexpr_c_isX(gbv H, gbv L);
+static bool	      bexpr_c_isT(gbv H, gbv L);
 static bool	      BDD_c_isX(gbv H, gbv L);
+static bool	      BDD_c_isT(gbv H, gbv L);
 static void           BDD_c_Print(odests fp, gbv a, int size);
 static gbv            bexpr_c_NOT(gbv a);
 static gbv            BDD_c_NOT(gbv a);
@@ -2465,7 +2468,7 @@ Fsm_Install_Functions()
 			      GLmake_tuple(GLmake_int(), GLmake_int())));
 
 
-    Add_ExtAPI_Function("STE", "111111", FALSE,
+    Add_ExtAPI_Function("STE", "1111111", FALSE,
 			GLmake_arrow(
 			  GLmake_string(),
 			  GLmake_arrow(
@@ -2477,10 +2480,13 @@ Fsm_Install_Functions()
 				GLmake_arrow(
 				  ant_tp,
 				  GLmake_arrow(
-				    tr_tp, ste_handle_tp)))))),
+				    tr_tp,
+				    GLmake_arrow(
+				      GLmake_string(),
+				      ste_handle_tp))))))),
 			newSTE);
 
-    Add_ExtAPI_Function("bSTE", "111111", FALSE,
+    Add_ExtAPI_Function("bSTE", "1111111", FALSE,
 			GLmake_arrow(
 			  GLmake_string(),
 			  GLmake_arrow(
@@ -2492,7 +2498,10 @@ Fsm_Install_Functions()
 				GLmake_arrow(
 				  be_ant_tp,
 				  GLmake_arrow(
-				    tr_tp, ste_handle_tp)))))),
+				    tr_tp,
+				    GLmake_arrow(
+				      GLmake_string(),
+				      ste_handle_tp))))))),
 			bSTE);
 
     Add_ExtAPI_Function("ste2fsm", "1", FALSE,
@@ -6959,11 +6968,27 @@ BDD_c_limited_OR(gbv a, gbv b)
 }
 
 static bool
+bexpr_c_isT(gbv H, gbv L)
+{
+    bexpr h = H.bp;
+    bexpr l = L.bp;
+    return( (h == BE_One()) && (l == BE_Zero()) );
+}
+
+static bool
 bexpr_c_isX(gbv H, gbv L)
 {
     bexpr h = H.bp;
     bexpr l = L.bp;
     return( (h == BE_One()) && (l == BE_One()) );
+}
+
+static bool
+BDD_c_isT(gbv H, gbv L)
+{
+    formula h = H.f;
+    formula l = L.f;
+    return( (h == B_One()) && (l == B_Zero()) );
 }
 
 static bool
@@ -7005,6 +7030,7 @@ switch_to_bexprs()
     c_NEQ = bexpr_c_NEQ;
     c_ZERO.bp = BE_Zero();
     c_ONE.bp  = BE_One();
+    c_isT = bexpr_c_isT;
     c_isX = bexpr_c_isX;
 }
 
@@ -7041,6 +7067,7 @@ switch_to_BDDs()
     c_NEQ = BDD_c_NEQ;
     c_ZERO.f = B_Zero();
     c_ONE.f  = B_One();
+    c_isT = BDD_c_isT;
     c_isX = BDD_c_isX;
 }
 
@@ -8440,6 +8467,15 @@ simulation_break_handler()
     quit_simulation_early = TRUE;
 }
 
+static bool
+stop_node_active(int idx)
+{
+    if( idx < 0 ) return FALSE;
+    gbv Hcur = *(cur_buf+2*idx);
+    gbv Lcur = *(cur_buf+2*idx+1);
+    return( c_isT(Hcur, Lcur) );
+}
+
 static void
 gSTE(g_ptr redex, value_type type)
 {
@@ -8447,9 +8483,10 @@ gSTE(g_ptr redex, value_type type)
 
     sop = Begin_string_ops();
     // STE opts fsm wl ant cons trl
-    g_ptr g_opts, g_fsm, wl, ant, cons, trl;
+    g_ptr g_opts, g_fsm, wl, ant, cons, trl, g_stop_node;
     nbr_errors_reported = 0;
-    EXTRACT_6_ARGS(redex, g_opts, g_fsm, wl, ant, cons, trl);
+    EXTRACT_7_ARGS(redex, g_opts, g_fsm, wl, ant, cons, trl, g_stop_node);
+    string stop_node = GET_STRING(g_stop_node);
     string opts = GET_STRING(g_opts);
     bool trace_all = FALSE;
     print_failures = RCprint_failures;
@@ -8491,13 +8528,26 @@ gSTE(g_ptr redex, value_type type)
 	}
     }
 
-    old_handler = signal(SIGINT, simulation_break_handler);
-    quit_simulation_early = FALSE;
 
     fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
     push_fsm(fsm);
     ste_ptr ste = create_ste(fsm, type);
     ste->abort_ASAP = abort_ASAP;
+    int stop_idx = -1;
+    if( !STREQ(stop_node, s_ES) ) {
+	stop_idx = name2idx(stop_node);
+	if( stop_idx < 0 ) {
+	    pop_ste();
+	    pop_fsm();
+	    End_string_ops(sop);
+	    MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", stop_node));
+	    return;
+	}
+    }
+
+    old_handler = signal(SIGINT, simulation_break_handler);
+    quit_simulation_early = FALSE;
+
     //
     // Now translate weakenings, ant, cons and trl into events
     //
@@ -8600,6 +8650,20 @@ gSTE(g_ptr redex, value_type type)
 		    FP(sim_fp, "Time: %d\n", t);
 	    }
 	}
+	if ( stop_node_active(stop_idx) ) {
+	    ste->max_time = t;
+	    free_ste_buffers();
+	    ste->active = FALSE;
+	    if( gui_mode ) {
+		Sprintf(buf, "simulation_end");
+		Info_to_tcl(buf);
+	    }
+	    signal(SIGINT, old_handler);
+	    End_string_ops(sop);
+	    pop_fsm();
+	    return;
+	}
+
 	process_event(event_bufp, t);
 	nnode_ptr np;
 	// Put nodes whose weak/ant changed on evaluation list.
