@@ -228,6 +228,33 @@ float2str(g_ptr redex)
 }
 
 static void
+float2binary(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr arg = GET_APPLY_RIGHT(redex);
+    float_ptr a = (float_ptr) GET_EXT_OBJ(arg);
+    union {
+	double	d;
+	ui	u;
+    } du;
+    du.d = a->u.f;
+    ui v = du.u;
+    MAKE_REDEX_NIL(redex);
+    g_ptr tl = redex;
+    for(int i = 63; i >= 0; i--) {
+	int bit = (v >> i) & 0x1;
+	if( bit != 0 ) {
+	    APPEND1(tl, Make_BOOL_leaf(B_One()));
+	} else {
+	    APPEND1(tl, Make_BOOL_leaf(B_Zero()));
+	}
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
 gen_double_binop(double (*binop)(double a1, double a2), g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
@@ -382,6 +409,11 @@ void
 Float_Install_Functions()
 {
     // Add builtin functions
+
+    Add_ExtAPI_Function("float2binary", "1", FALSE,
+			GLmake_arrow(float_handle_tp,
+				     GLmake_list(GLmake_bool())),
+			float2binary);
 
     Add_ExtAPI_Function("float2str", "1", FALSE,
 			GLmake_arrow(float_handle_tp, GLmake_string()),

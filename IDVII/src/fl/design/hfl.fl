@@ -149,6 +149,7 @@ let CELL {name::string} {body::pexlif list} =
     (anon_arg_cnt := 0) fseq
     (PINST name [] F [] [] [] (P_HIER body))
 ;
+free_binder CELL;
 
 let ileq {i::int} {j::int} = i <= j;
 
@@ -1547,16 +1548,19 @@ let TYPE name size =
     (fprintf stdinfo "TYPE is deprecated. Use SIGNED or UNSIGNED instead\n")
     fseq (core_TYPE name size T F "") fseq ()
 ;
+free_binder TYPE;
 
 // Declare a new hw type with name 'name' and size number of bits as width
 // that will be interpreted as a 2-s complement signed bitvector.
 let SIGNED name size = (core_TYPE name size T T "") fseq ();
+free_binder SIGNED;
 
 // Declare a new hw type with name 'name' and size number of bits as width.
 // that will be interpreted as an unsigned bitvector.
 let UNSIGNED name size = (core_TYPE name size T F "") fseq ();
+free_binder UNSIGNED;
 
-UNSIGNED "bit" 1;
+UNSIGNED bit 1;
 
 let wexpr_hw_type_name {bv::wexpr} = "wexpr";
 let wexpr_hw_mk_var {we::wexpr} base = W_VAR 0 base;

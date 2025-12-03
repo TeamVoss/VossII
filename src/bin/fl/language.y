@@ -1681,6 +1681,10 @@ expr2		: VART
 		{
 		    $$ = Make_1inp_Primitive(P_UNQUOTE, Make_VAR_leaf($2));
 		}
+		| FREE_BINDER_VAR LPAR expr RPAR
+		{
+		    $$ = Make_APPL_ND(Make_VAR_leaf($1), $3);
+		}
 		| FREE_BINDER_VAR var_or_infix
 		{
 		    $$ = Make_APPL_ND(Make_VAR_leaf($1), Make_STRING_leaf($2));

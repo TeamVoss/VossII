@@ -6,13 +6,56 @@ time (p fseq 1);
 let z {dummy :: void} = get_idv_current_pexlif (get_current_canvas dummy);
 non_lazy z;
 
-IDV p "DB_sp_fpu" [];
+//IDV p "DB_sp_fpu" [];
 
-%%%%%%%%%%%%%%%%%%%%%%%%
+//%%%%%%%%%%%%%%%%%%%%%%%%
+
+float2binary 2.3;
+float2binary (-2.3);
+
+float2binary (2.4e17);
+float2binary (-2.4e17);
+
+
+let SP_BIAS = 127;
+let DP_BIAS = 1023;
+
+let dp2sp bl =
+    length bl != 64 =>
+	eprintf "Double precision shoul be 64 bits (%d)" (length bl)
+    |
+    val (sign:rem) = bl in
+    let dexp = list2bv (firstn 11 rem) in
+    let dfrac = list2bv (butfirstn 11 rem) in
+    let exp = dexp - (int2bv DP_BIAS) + (int2bv SP_BIAS) in
+%%%%%%%%%%
+    sign, dexp, dfrac
+;
+
+dp2sp (float2binary (-32.4e3));
 
 VIS p;
 
 let N = 10;
+
+let mk_sp s =
+    let is_neg = str_is_prefix "-" s in
+    let s' = is_neg => string_tl s | s in
+    let parts = str_split s' "e" in
+    let mant = el 1 parts in
+    let exp  = length parts = 1 => 0 | sscanf "%d" (el 2 parts) in
+    let mparts = str_split mant "." in
+    let digits = sscanf "%d" (el 1 mparts) in
+    let fractions = (length mparts = 1) => 0 | sscanf "%d" (el 2 mparts) in
+    is_neg, digits, fractions, exp
+;
+
+mk_sp "1";
+mk_sp "-3";
+mk_sp "-3.3";
+mk_sp "-3.4e5";
+mk_sp "-3.4e05";
+mk_sp "-3.4e-5";
 
 let ant =
     "BCLK" is_clock N

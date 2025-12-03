@@ -25,6 +25,7 @@ extern bool		gui_mode;
 extern bool		use_stdout;
 extern char		FailBuf[4096];
 extern bool		RCverbose_fsm_print;
+extern bool		RCprint_node_eval;
 extern bool		RC_print_warnings_toplevel_fa_mismatch;
 extern bool		RCnotify_traj_failures;
 extern bool		RCnotify_check_failures;
@@ -5735,7 +5736,10 @@ do_combinational(ste_ptr ste)
 		while( COUNT_BUF(bp) > 0 ) {
 		    ncomp_ptr cp;
 		    pop_buf(bp, &cp);
-//FP(err_fp, "Computing the result for output: "); DBG_print_ilist(cp->outs);
+		    if( RCprint_node_eval ) {
+			FP(err_fp, "Computing the result for output: ");
+			DBG_print_ilist(cp->outs);
+		    }
 		    cp->flag = FALSE;
 		    if( quit_simulation_early ) return -1;
 		    todo += do_wl_op(ste, cp);

@@ -60,10 +60,10 @@ libfl.so: $(LOBJ)
 	$(CXX) $(CXXFLAGS) $(CXXFLAGS) $(INC) -c $<
 
 language.tab.c: language.y fl.h language.h graph.h prefs_ext.h
-	@$(YACC) -d -v language.y
+	$(YACC) -d -v language.y
 
 lex.yy.c: lexer language.tab.c graph.h fl.h language.tab.c
-	@$(LEX) lexer
+	$(LEX) lexer
 
 clean:
 	-@touch .q

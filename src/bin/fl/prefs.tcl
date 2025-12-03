@@ -57,6 +57,8 @@ set voss2_preferences {
         "Print high-low expression for failing nodes" "bool" "TRUE"}
     {"PRINT-TIME" "RCprint_time"
         "Print time points during simulation" "bool" "TRUE"}
+    {"PRINT-NODE-EVAL" "RCprint_node_eval"
+        "Print each traced node that has its value updated" "bool" "FALSE"}
     {"PRINT-TIME-MOD" "RCprint_time_mod"
         "Print time points only mod this number during simulation" "int" "1"}
     {"STEP-LIMIT" "RCStep_limit"
