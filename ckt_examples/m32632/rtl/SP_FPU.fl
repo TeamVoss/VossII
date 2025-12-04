@@ -10,52 +10,23 @@ non_lazy z;
 
 //%%%%%%%%%%%%%%%%%%%%%%%%
 
-float2binary 2.3;
-float2binary (-2.3);
-
-float2binary (2.4e17);
-float2binary (-2.4e17);
-
-
-let SP_BIAS = 127;
-let DP_BIAS = 1023;
-
-let dp2sp bl =
-    length bl != 64 =>
-	eprintf "Double precision shoul be 64 bits (%d)" (length bl)
-    |
-    val (sign:rem) = bl in
-    let dexp = list2bv (firstn 11 rem) in
-    let dfrac = list2bv (butfirstn 11 rem) in
-    let exp = dexp - (int2bv DP_BIAS) + (int2bv SP_BIAS) in
-%%%%%%%%%%
-    sign, dexp, dfrac
-;
-
-dp2sp (float2binary (-32.4e3));
-
 VIS p;
 
 let N = 10;
 
-let mk_sp s =
-    let is_neg = str_is_prefix "-" s in
-    let s' = is_neg => string_tl s | s in
-    let parts = str_split s' "e" in
-    let mant = el 1 parts in
-    let exp  = length parts = 1 => 0 | sscanf "%d" (el 2 parts) in
-    let mparts = str_split mant "." in
-    let digits = sscanf "%d" (el 1 mparts) in
-    let fractions = (length mparts = 1) => 0 | sscanf "%d" (el 2 mparts) in
-    is_neg, digits, fractions, exp
+let ibv2fl i =
+    float2str (bools2sp (map (\n. n = "1") (explode (sprintf "%032b" i))))
 ;
 
-mk_sp "1";
-mk_sp "-3";
-mk_sp "-3.3";
-mk_sp "-3.4e5";
-mk_sp "-3.4e05";
-mk_sp "-3.4e-5";
+add_pretty_printer "SRC1[31:0]" ibv2fl;
+add_pretty_printer "SRC2[31:0]" ibv2fl;
+add_pretty_printer "FP_OUT[31:0]" ibv2fl;
+
+let fp1 = 2.1;
+let fp2 = 0.59;
+
+let fp1 = pow 2.0 (-149.0);
+let fp2 = pow 2.0 (-149.0);
 
 let ant =
     "BCLK" is_clock N
@@ -70,9 +41,9 @@ let ant =
   and
     "FL" is 1 for N cycle
   and
-    "SRC1[31:0]" is 0b01111111000000000000000000000011 for N cycles
+    "SRC1[31:0]" is (sp2bools fp1) for N cycles
   and
-    "SRC2[31:0]" is 0b01111111100000000000000000000001 for N cycles
+    "SRC2[31:0]" is (sp2bools fp2) for N cycles
 ;
 
 

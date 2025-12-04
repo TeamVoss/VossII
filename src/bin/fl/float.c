@@ -228,7 +228,7 @@ float2str(g_ptr redex)
 }
 
 static void
-float2binary(g_ptr redex)
+dp2bools(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
@@ -250,6 +250,131 @@ float2binary(g_ptr redex)
 	    APPEND1(tl, Make_BOOL_leaf(B_Zero()));
 	}
     }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+sp2bools(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr arg = GET_APPLY_RIGHT(redex);
+    float_ptr a = (float_ptr) GET_EXT_OBJ(arg);
+    union {
+	float	d;
+	unint	u;
+    } du;
+    du.d = (float) (a->u.f);
+    unint v = du.u;
+    MAKE_REDEX_NIL(redex);
+    g_ptr tl = redex;
+    for(int i = 31; i >= 0; i--) {
+	int bit = (v >> i) & 0x1;
+	if( bit != 0 ) {
+	    APPEND1(tl, Make_BOOL_leaf(B_One()));
+	} else {
+	    APPEND1(tl, Make_BOOL_leaf(B_Zero()));
+	}
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+bools2dp(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr list = GET_APPLY_RIGHT(redex);
+    union {
+	double	d;
+	ui	u;
+    } du;
+    int cnt = 63;
+    ui res = 0; 
+    while( !IS_NIL(list) ) {
+	if( cnt < 0 ) {
+	    DEC_REF_CNT(l);
+	    DEC_REF_CNT(r);
+	    MAKE_REDEX_FAILURE(redex,"bools2dp given list of length != 64");
+	    return;
+	}
+	formula bit = GET_BOOL(GET_CONS_HD(list));
+	if( bit == B_One() ) {
+	    res |= (((ui) 0x1) << ((ui) cnt));
+	} else {
+	    if( bit == B_Zero() ) {
+		// Do nothing
+	    } else {
+		MAKE_REDEX_FAILURE(
+		    redex, 
+		    Fail_pr("Bit %d in bools2dp is symbolic", cnt));
+		DEC_REF_CNT(l);
+		DEC_REF_CNT(r);
+		return;
+	    }
+	}
+	cnt--;
+	list = GET_CONS_TL(list);
+    }
+    if( cnt != -1 ) {
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	MAKE_REDEX_FAILURE(redex,"bools2dp given list of length != 64");
+	return;
+    }
+    du.u = res;
+    MAKE_REDEX_EXT_OBJ(redex, float_oidx, get_float_rec(du.d));
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+bools2sp(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr list = GET_APPLY_RIGHT(redex);
+    union {
+	float	d;
+	unint	u;
+    } du;
+    int cnt = 31;
+    unint res = 0; 
+    while( !IS_NIL(list) ) {
+	if( cnt < 0 ) {
+	    DEC_REF_CNT(l);
+	    DEC_REF_CNT(r);
+	    MAKE_REDEX_FAILURE(redex,"bools2sp given list of length != 32");
+	    return;
+	}
+	formula bit = GET_BOOL(GET_CONS_HD(list));
+	if( bit == B_One() ) {
+	    res |= (((unint) 0x1) << ((unint) cnt));
+	} else {
+	    if( bit == B_Zero() ) {
+		// Do nothing
+	    } else {
+		MAKE_REDEX_FAILURE(
+		    redex, 
+		    Fail_pr("Bit %d in bools2sp is symbolic", cnt));
+		DEC_REF_CNT(l);
+		DEC_REF_CNT(r);
+		return;
+	    }
+	}
+	cnt--;
+	list = GET_CONS_TL(list);
+    }
+    if( cnt != -1 ) {
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	MAKE_REDEX_FAILURE(redex,"bools2sp given list of length != 64");
+	return;
+    }
+    du.u = res;
+    MAKE_REDEX_EXT_OBJ(redex, float_oidx, get_float_rec((double)(du.d)));
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
@@ -410,10 +535,27 @@ Float_Install_Functions()
 {
     // Add builtin functions
 
-    Add_ExtAPI_Function("float2binary", "1", FALSE,
+    Add_ExtAPI_Function("dp2bools", "1", FALSE,
 			GLmake_arrow(float_handle_tp,
 				     GLmake_list(GLmake_bool())),
-			float2binary);
+			dp2bools);
+
+    Add_ExtAPI_Function("sp2bools", "1", FALSE,
+			GLmake_arrow(float_handle_tp,
+				     GLmake_list(GLmake_bool())),
+			sp2bools);
+
+    Add_ExtAPI_Function("bools2dp", "1", FALSE,
+			GLmake_arrow(
+			     GLmake_list(GLmake_bool()),
+			     float_handle_tp),
+			bools2dp);
+
+    Add_ExtAPI_Function("bools2sp", "1", FALSE,
+			GLmake_arrow(
+			     GLmake_list(GLmake_bool()),
+			     float_handle_tp),
+			bools2sp);
 
     Add_ExtAPI_Function("float2str", "1", FALSE,
 			GLmake_arrow(float_handle_tp, GLmake_string()),
