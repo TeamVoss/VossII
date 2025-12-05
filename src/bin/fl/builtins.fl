@@ -344,11 +344,22 @@ let file_exists filename = defix file_exists filename;
 let top_cofactor b = defix top_cofactor b;
 
 // Draw (using dot) the forest of BDDs given in bool_list.
+// The root nodes can be given names in the names list.
 // If draw_neg is T, draw the (true) internal BDD using negated edges (red).
 // If draw_neg is F, draw the BDD without negated pointer.
 // The true-edge is drawn solid and the false-edge is drawn dotted.
-// Usage: draw_bdds draw_neg bool_list;
-let draw_bdds draw_neg bool_list = defix draw_bdds draw_neg bool_list;
+// Usage: draw_bdds draw_neg bool_list name_list;
+let draw_bdds draw_neg bool_list names->[] =
+    let nl = names != [] => names |
+	     let upto f t =
+		letrec gen i = i > t => [] | i:(gen (i+1)) in
+		gen f
+	     in
+	     letrec map fn l = empty l => [] | (fn (hd l)):(map fn (tl l)) in
+	     map (sprintf "b%d") (upto 0 (length bool_list-1))
+    in
+    defix draw_bdds draw_neg bool_list nl
+;
 
 // Execute cmd as a Bourne shell command and return the exit status.
 // Note: The output of cmd will go to 'stdout' (whatever that may be).

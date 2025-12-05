@@ -159,7 +159,7 @@ static g_ptr		top_bdd_depends(g_ptr np);
 static g_ptr		top_bdd_size(g_ptr np);
 static subst_ptr	add_to_subs(subst_ptr start, formula v, formula e);
 static formula		b_substitute(formula f, subst_ptr subs);
-static bool		do_draw_bdds(formula *bdds, int cnt);
+static bool		do_draw_bdds(formula *bdds, string *names, int cnt);
 static int		draw_bdd_rec(FILE *fp, hash_record *hp, formula f);
 static bool		truth_cover_rec(hash_record *done_tblp,
 					buffer *var_bufp, unint idx, formula b,
@@ -1436,26 +1436,46 @@ draw_bdds(g_ptr redex)
 {   
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr arg1 = GET_APPLY_RIGHT(l);
-    g_ptr arg2 = GET_APPLY_RIGHT(redex);
+    g_ptr gneg_ptr, formulas, names;
+    EXTRACT_3_ARGS(redex, gneg_ptr, formulas, names);
     if( !gui_mode ) {
 	MAKE_REDEX_FAILURE(redex,
 			   Fail_pr("draw_bdds not available in -noX mode"));
 	return;
     }
-    use_negated_pointers = (GET_BOOL(arg1) == B_One());
+    use_negated_pointers = (GET_BOOL(gneg_ptr) == B_One());
     buffer bdd_buf;
+    buffer name_buf;
     new_buf(&bdd_buf, 100, sizeof(formula));
-    while( !IS_NIL(arg2) ) {
-        formula b = GET_BOOL(GET_CONS_HD(arg2));
+    while( !IS_NIL(formulas) ) {
+        formula b = GET_BOOL(GET_CONS_HD(formulas));
 	push_buf(&bdd_buf, (pointer) &b);
-        arg2 = GET_CONS_TL(arg2);
+        formulas = GET_CONS_TL(formulas);
     }
-    if ( do_draw_bdds(START_BUF(&bdd_buf), COUNT_BUF(&bdd_buf)) ) {
+    new_buf(&name_buf, 100, sizeof(string));
+    while( !IS_NIL(names) ) {
+        string name = GET_STRING(GET_CONS_HD(names));
+	push_buf(&name_buf, (pointer) &name);
+        names = GET_CONS_TL(names);
+    }
+    if( COUNT_BUF(&bdd_buf) != COUNT_BUF(&name_buf) )
+    {
+	string msg = Fail_pr("draw_bdds: |formulas(%d)| != |names(%d)|\n",
+			     COUNT_BUF(&bdd_buf), COUNT_BUF(&name_buf));
+	MAKE_REDEX_FAILURE(redex, msg);
+	free_buf(&bdd_buf);
+	free_buf(&name_buf);
+	return;
+    }
+    if ( do_draw_bdds(START_BUF(&bdd_buf), START_BUF(&name_buf),
+		      COUNT_BUF(&bdd_buf)) )
+    {
 	MAKE_REDEX_VOID(redex);
     } else {
 	MAKE_REDEX_FAILURE(redex, FailBuf);
     } 
+    free_buf(&bdd_buf);
+    free_buf(&name_buf);
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
@@ -1790,10 +1810,14 @@ BDD_Install_Functions()
 					   GLmake_bool()))),
 			limitedOR);
 
-    Add_ExtAPI_Function("draw_bdds", "11", FALSE,
-                        GLmake_arrow(GLmake_bool(),
-				     GLmake_arrow(GLmake_list(GLmake_bool()),
-						  GLmake_void())),
+    Add_ExtAPI_Function("draw_bdds", "111", FALSE,
+                        GLmake_arrow(
+			    GLmake_bool(),
+			    GLmake_arrow(
+				GLmake_list(GLmake_bool()),
+				GLmake_arrow(
+				    GLmake_list(GLmake_string()),
+				    GLmake_void()))),
                         draw_bdds);
 
     Add_ExtAPI_Function("bv2num", "1", FALSE,
@@ -3275,7 +3299,7 @@ b_substitute(formula f, subst_ptr subs)
 
 
 static bool
-do_draw_bdds(formula *bdds, int cnt) 
+do_draw_bdds(formula *bdds, string *names, int cnt)
 {
     FILE *fp;
     string filename;
@@ -3295,13 +3319,18 @@ do_draw_bdds(formula *bdds, int cnt)
     fprintf(fp, "ordering=out;\n");
     draw_node_id = 0;
     for(int i = 0; i < cnt; i++) {
-        fprintf(fp, "f%u [shape=box,style=filled,label=\"b%d\"];\n", i, i);
+        fprintf(fp, "f%u [shape=box,style=filled,label=\"%s\"];\n", i, *names);
+	names++;
     }
-    fprintf(fp, "{rank=same");
+    fprintf(fp, "{rank=same;\n");
+    fprintf(fp, " edge [style=invis];\n");
+    bool first = TRUE;
     for(int i = 0; i < cnt; i++) {
-	fprintf(fp, " f%d", i);
+	if( !first ) fprintf(fp, "->");
+	first = FALSE;
+	fprintf(fp, "f%d", i);
     }
-    fprintf(fp, "}\n");
+    fprintf(fp, ";\n rankdir=LR;\n}\n");
     for(int i = 0; i < cnt; i++) {
 	formula b = *(bdds+i);
 	if( use_negated_pointers ) {
