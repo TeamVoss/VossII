@@ -21,11 +21,11 @@ let valid_ident s =
 ;
 
 let valid_Verilog_name name =
-    (find_first0 (\c. NOT (valid_ident c)) (explode name)) != 0
+    (find_first0 (\c. NOT (valid_ident c)) (explode name)) = 0
 ;
 
 let valid_Verilog_names name_list =
-    (find_first0 (\n. NOT (valid_Verilog_name n)) name_list) != 0
+    (find_first0 (\n. NOT (valid_Verilog_name n)) name_list) = 0
 ;
 
 // Positive index.
@@ -1014,11 +1014,20 @@ let pretty_pexlif_h netlist module (PINST name _ _ fa_inps fa_outs _ _)
 // to make the new pexlif equivalent to the original.
 let make_verilog_safe p =
     let make_subs ints fa_inps fa_outs =
-	let mk_int_sub i v = v, (mk_name (md_size v) (sprintf "m%d" i)) in
+	let mk_int_sub i v = 
+	    valid_Verilog_name v => (v,v) |
+	    v, (mk_name (md_size v) (sprintf "m%d" i))
+	in
 	let int_sub = map_index mk_int_sub (md_extract_vectors ints) then
-	let mk_inp_sub i (f,as) = f, (mk_name (md_size f) (sprintf "i%d" i)) in
+	let mk_inp_sub i (f,as) =
+	    valid_Verilog_name f => (f,f) |
+	    f, (mk_name (md_size f) (sprintf "i%d" i))
+	in
 	let inp_sub = map_index mk_inp_sub fa_inps then
-	let mk_out_sub i (f,as) = f, (mk_name (md_size f) (sprintf "o%d" i)) in
+	let mk_out_sub i (f,as) =
+	    valid_Verilog_name f => (f,f) |
+	    f, (mk_name (md_size f) (sprintf "o%d" i))
+	in
 	let out_sub = map_index mk_out_sub fa_outs then
         let fa_inps' = map (\(f,as). assoc f inp_sub, as) fa_inps then
         let fa_outs' = map (\(f,as). assoc f out_sub, as) fa_outs then

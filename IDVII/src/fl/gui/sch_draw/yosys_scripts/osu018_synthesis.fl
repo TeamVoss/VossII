@@ -16,7 +16,7 @@ dfflibmap -liberty `libdir`/osu018_stdcells.lib
 dfflegalize -cell $_DFF_P_ x
 abc -liberty `libdir`/osu018_stdcells.lib -keepff
 clean
-autoname
+rename -enumerate -pattern _$%% w:$*
 clean -purge
 write_pexlif -noalias -icells -gates -impltf `file`.fl
 

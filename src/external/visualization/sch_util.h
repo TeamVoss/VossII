@@ -10,6 +10,13 @@
 #include "place.h"
 #include "buf.h"
 
+#if 0
+#define DBG_INFO
+#if 0
+#define VERBOSE_DBG
+#endif
+#endif
+
 sch_draw_list_ptr	Add_to_front_network(sch_draw_ptr tree,
 					     sch_draw_list_ptr network);
 sch_draw_list_ptr	Add_to_back_network(sch_draw_ptr tree,

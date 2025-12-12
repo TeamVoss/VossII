@@ -164,9 +164,13 @@ print_network_rec(int indent, sch_draw_ptr tree)
 void
 Print_network(string name, sch_draw_ptr tree)
 {
+#ifdef DBG_INFO
     count = 1;
     fprintf(stderr, "\n====== %s ======\n", name);
+#ifdef VERBOSE_DBG
     print_network_rec(1,tree);
+#endif
+#endif
 }
 
 // type_to_str takes a schematic type and returns the string value.

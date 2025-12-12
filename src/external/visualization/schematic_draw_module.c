@@ -296,7 +296,9 @@ draw_schematics(Tcl_Interp *interp, char *canvas, sch_draw_ptr tree)
 	    sprintf(cmd_buf, "draw_output1 [fl_tag2vec %s %s] %s %s %d %d",
 		    canvas, strip_dummy_prefixes(driver_name), canvas,
 		    driver_tag, tree->x, driver_y);
-	    if( Tcl_Eval(interp, cmd_buf) != TCL_OK ) { return FALSE; }
+	    if( Tcl_Eval(interp, cmd_buf) != TCL_OK ) {
+		return FALSE;
+	    }
 	    sprintf(cmd_buf, "out_connect %s %s %d %d %d %d %d %d %s",
 		    canvas, driver_tag,
 		    driver_x, driver_y, tree->x, driver_y, 
@@ -377,22 +379,22 @@ draw_network(ClientData clientData, Tcl_Interp *interp,
     int ntwk_idx = atoi(Tcl_GetString(objv[2]));
     sch_draw_ptr tree = *((sch_draw_ptr *) locate_buf(&sch_ptr_buf, ntwk_idx));
 
-    //Print_network("Initial tree", tree);
+    Print_network("Initial tree", tree);
 
     Find_drivers(tree);
     Break_loops(tree);
-    //Print_network("After loop breaking", tree);
+    Print_network("After loop breaking", tree);
 
     // Add space for inputs
     Adjust_widths(tree);
-    //Print_network("After Adjust_widths", tree);
+    Print_network("After Adjust_widths", tree);
 
     Rank_order_tree(tree, 0); // Initial pos 0
-    //Print_network("After Rank_order_tree", tree);
+    Print_network("After Rank_order_tree", tree);
 
     // Find every (proper) driver
     Find_drivers(tree);
-    //Print_network("After Find_drivers", tree);
+    Print_network("After Find_drivers", tree);
 
     // Move drivers to left-most (according to bin number)
     int max_cnt = 500;
@@ -403,35 +405,39 @@ draw_network(ClientData clientData, Tcl_Interp *interp,
     if( max_cnt == 0 ) {
 	fprintf(stderr, "WARNING: Iteration in Move_driver_leftmost\n");
     }
-    //Print_network("After Move_driver_leftmost", tree);
+    Print_network("After Move_driver_leftmost", tree);
 
     Rank_order_tree(tree, 0); // Initial pos 0
     //    Remove_drive_repeat_overlaps(tree);
+    Print_network("After Rank_order_tree", tree);
 
     Equalize_width(tree);
-    //Print_network("After Equalize width tree", tree);
+    Print_network("After Equalize width tree", tree);
 
     /* Initial placement */
     tree = Place(tree);
-    //Print_network("After initial placement", tree);
+    Print_network("After initial placement", tree);
 
     // Find right-most repeat nodes
     Find_rightmost_repeats(tree);
+    Print_network("After Find_rightmost_repeats", tree);
 
     // Replace right-most repeat nodes with long wires to driver locations.
     Replace_rmost_repeat_with_wires();
+    Print_network("After Replace_rmost_repeat_with_wires", tree);
 
     /* Second placement (with long wires) */
     tree = Place(tree);
-    //Print_network("After second placement", tree);
+    Print_network("After second placement", tree);
 
     Add_vertical_to_wires();
-    //Print_network("After Add_vertical_to_wires", tree);
+    Print_network("After Add_vertical_to_wires", tree);
 
     Connect_verticals(tree);
+    Print_network("After Connect_verticals", tree);
 
     Expand_for_vertical_wires(tree);
-    //Print_network("Final", tree);
+    Print_network("Final", tree);
 
     sprintf(cmd_buf, "%s delete all", canvas);
     if( Tcl_Eval(interp, cmd_buf) != TCL_OK ) {
@@ -440,6 +446,7 @@ draw_network(ClientData clientData, Tcl_Interp *interp,
     if( draw_schematics(interp, canvas, tree) != TRUE ) {
 	return TCL_ERROR;
     }
+    Print_network("Done draw_schematics", tree);
     if( Tcl_Eval(interp, "update") != TCL_OK ) { return TCL_ERROR; }
     sprintf(cmd_buf, "set_scrollregion %s", canvas);
     if( Tcl_Eval(interp, cmd_buf) != TCL_OK ) { return TCL_ERROR; }

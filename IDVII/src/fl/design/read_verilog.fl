@@ -71,10 +71,10 @@ let verilog2pexlif no_popup flags top_level_module file_list additional_files =
     (fprintf sfp "read_verilog %s %s\n" flags files) fseq
     (fprintf sfp "hierarchy -check -top %s\n" top_level_module) fseq
     (fprintf sfp "proc\n") fseq
-//    (fprintf sfp "rename -enumerate -pattern _$%%\n") fseq
     (fprintf sfp "memory -nomap\n") fseq
     (fprintf sfp "opt_clean -purge\n") fseq
     //(fprintf sfp "clean select *;\n") fseq
+    (fprintf sfp "rename -enumerate -pattern _$%% w:$*\n") fseq
     (fprintf sfp "write_pexlif -noalias -icells -gates -impltf _tmp.fl\n") fseq
     (fclose sfp) fseq
     // Run yosys

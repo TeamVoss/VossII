@@ -49,17 +49,6 @@ idv_clean_name(std::string &str)
 	    str.replace(found, 8, "");
 	}
     }
-    if( str[0] == '\\' ) {
-	str.replace(0, 1, "");
-    }
-    for (size_t i = 0; i < str.size(); i++) {
-	if( str[i] == '\\' || str[i] == '#' || str[i] == '=' ||
-	    str[i] == ':' || str[i] == '<' || str[i] == '>' ||
-	    str[i] == '$' || str[i] == '\'' )
-	{
-	    str[i] = '_';
-	}
-    }
 
     char *res = new char [str.length()+1];
     strcpy(res, str.c_str());
@@ -190,14 +179,6 @@ struct PexlifDumper
 		    if( found != std::string::npos ) {
 			changed = true;
 			str.replace(found, 8, "");
-		    }
-		}
-		for (size_t i = 0; i < str.size(); i++) {
-		    if( str[i] == '\\' || str[i] == '#' || str[i] == '=' ||
-			str[i] == ':' || str[i] == '<' || str[i] == '>' ||
-			str[i] == '$' || str[i] == '\'' )
-		    {
-			str[i] = '_';
 		    }
 		}
 		cstr_buf.push_back(str);

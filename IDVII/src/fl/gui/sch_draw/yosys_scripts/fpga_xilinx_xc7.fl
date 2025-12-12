@@ -21,7 +21,7 @@ proc
 opt
 
 clean
-autoname
+rename -enumerate -pattern _$%% w:$*
 clean -purge
 
 write_pexlif -noalias -icells -gates -impltf `file`.fl
