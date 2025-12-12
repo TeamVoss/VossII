@@ -1154,7 +1154,7 @@ let base_synthesis title file bname pexlif_file p synth_type synth_script =
     // Write out a Verilog version of the pexlif
     let fp = mktemp "pre_verilog" then
     let pre_v_file = stream2filename fp then
-    let io_sub = safe_pexlif2verilog F fp p' then
+    let io_sub = pexlif2verilog F fp p' then
     (fclose fp) seq
     let edit_file = sprintf "%s/verilog_filter.sed" DIR then
     let cmd = sprintf "sed -f %s < %s > %s.v" edit_file pre_v_file file then
@@ -2359,7 +2359,7 @@ let fl_save_verilog canvas name file only_netlist =
     let netlist = only_netlist = "1" then
     let p' = netlist => p | rename_toplevel_pexlif name p then
     let fp = fopen file "w" then
-    (safe_pexlif2verilog netlist fp p') fseq
+    (pexlif2verilog netlist fp p') fseq
     (fclose fp) fseq
     ()
   ) gen_catch (\msg. window_ok canvas (clean_error_message msg))

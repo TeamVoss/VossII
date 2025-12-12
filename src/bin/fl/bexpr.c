@@ -842,7 +842,9 @@ bget_model(g_ptr redex)
 	    break;
 	}
 	case 2: {
-	    MAKE_REDEX_FAILURE(redex, Fail_pr("Timeout in bget_model"));
+	    MAKE_REDEX_FAILURE(
+		redex,
+	        Fail_pr("Timeout/Out of resources in bget_model"));
 	    return;
 	}
 	default:

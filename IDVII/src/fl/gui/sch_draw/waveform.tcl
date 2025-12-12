@@ -1029,12 +1029,13 @@ proc wv:set_new_max_time {w force} {
     if { !$force && $new_maxtime == $::wv_info($f,maxtime) } { return }
 
     set ::wv_info($f,maxtime) $new_maxtime
+    set vectors {}
+    set show_names {}
     if [info exists ::wv_info(vectors,$f)] {
 	set vectors $::wv_info(vectors,$f)
+    }
+    if [info exists ::wv_info(show_names,$f)] {
 	set show_names $::wv_info(show_names,$f)
-    } else {
-	set vectors {}
-	set show_names {}
     }
     set ::wv_info(vectors,$f) {}
     set ::wv_info(show_names,$f) {}

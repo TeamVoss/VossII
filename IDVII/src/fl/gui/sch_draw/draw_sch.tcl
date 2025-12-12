@@ -5038,7 +5038,7 @@ proc draw_stdcell {name args} {
     set ty $uy
     $c create rectangle  $bx $by $tx $ty -outline green -fill "" \
 	-tag "$tag _IsStDcElL_"
-    set t [$c create text $bx $by -text $name -anchor sw -justify left \
+    set t [$c create text $bx $by -text $name -anchor nw -justify left \
 		-font $::sfont($c) -fill green -tag $tag]
     add_font_tags $c $t _IsTeXt_
     return $res

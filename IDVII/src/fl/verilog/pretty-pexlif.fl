@@ -13,11 +13,19 @@
 // of letters, digits, dollar signs ($), and underscore characters (_).
 let valid_ident s =
       let c = ord s in
-      ((c >= 65) AND (c <= 90)) OR // A-Z
-      ((c >= 97) AND (c <= 122)) OR // a-z
-      ((c >= 48) AND (c <= 57)) OR // 0-9
-      (c == 36) OR // $
-      (c == 95) // _
+      ((c >= ord "A") AND (c <= ord "Z")) OR
+      ((c >= ord "a") AND (c <= ord "z")) OR
+      ((c >= ord "0") AND (c <= ord "9")) OR
+      (c == ord "$") OR
+      (c == ord "_")
+;
+
+let valid_Verilog_name name =
+    (find_first0 (\c. NOT (valid_ident c)) (explode name)) != 0
+;
+
+let valid_Verilog_names name_list =
+    (find_first0 (\n. NOT (valid_Verilog_name n)) name_list) != 0
 ;
 
 // Positive index.
@@ -1064,6 +1072,7 @@ let pexlif2verilog netlist {fp::stream} {pex::pexlif} =
 	let fa_outs' = mk_io fa_outs in
 	PINST name attrs F fa_inps' fa_outs' [] (P_HIER [pex])
     then
+    val (pex',sub) = make_verilog_safe pex' then
     (pexlif2verilog_start ()) fseq
     (find_insert_module netlist pex' 1) fseq
     let results = pexlif2verilog_end () then
@@ -1071,12 +1080,7 @@ let pexlif2verilog netlist {fp::stream} {pex::pexlif} =
 	(render (p_source_text (Source_text [descr])) fp) fseq
 	(fprintf fp "\n\n")
     in
-    (foreach do1 results)
-;
-
-let safe_pexlif2verilog netlist {fp::stream} {pex::pexlif} =
-    val (pex',sub) = make_verilog_safe pex then
-    (pexlif2verilog netlist fp pex') fseq
+    (foreach do1 results) fseq
     sub
 ;
 
