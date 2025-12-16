@@ -1744,13 +1744,36 @@ truth_cover_rec(hash_record *done_tblp, buffer *var_bufp, unint idx, formula b,
     return TRUE;
 }
 
+static void
+bdd_index(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr arg1 = GET_APPLY_RIGHT(redex);
+    formula b = GET_BOOL(arg1);
+    if( b == ZERO || b == ONE ) {
+	MAKE_REDEX_FAILURE(redex,
+			   Fail_pr("bdd_index not defined for constants T/F"));
+	return;
+    }
+    bdd_ptr bp = GET_BDDP(b);
+    MAKE_REDEX_INT(redex, BDD_GET_VAR(bp));
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
 
 void
 BDD_Install_Functions()
 {
 
     Add_ExtAPI_Function("bdd_signature", "1", FALSE,
-			GLmake_arrow(GLmake_bool(), GLmake_int()),bddSignature);
+			GLmake_arrow(GLmake_bool(), GLmake_int()),
+			bddSignature);
+
+    Add_ExtAPI_Function("bdd_index", "1", FALSE,
+			GLmake_arrow(GLmake_bool(), GLmake_int()),
+			bdd_index);
 
     Add_ExtAPI_Function("T", "", FALSE, GLmake_bool(), bddT);
 

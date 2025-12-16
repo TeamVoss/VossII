@@ -1141,8 +1141,8 @@ let fl_get_synthesis_script_dir {dummy::void} =
 ;
 export_to_tcl fl_get_synthesis_script_dir;
 
-let base_synthesis title file bname pexlif_file p synth_type synth_script =
-    let cw = make_info_window title F then
+let base_synthesis title file bname pexlif_file p synth_type synth_script verbose =
+    let cw = verbose => make_info_window title F | "NO_GUI" then
     let info_cmd = "echo 'Clean and write out synthesis friendly Verilog'\n" in
     val (status, _, _) = gui_exec cw "Prepare for synthesis" info_cmd "" then
     status = "SIGKILL" => "" |
@@ -1175,7 +1175,7 @@ let base_synthesis title file bname pexlif_file p synth_type synth_script =
     // Now run Yosys 
     let wr_pexlif = (get_vossrc "VOSS-BINARY-DIRECTORY")^"/write_pexlif.so" in
     let cmd = sprintf "yosys -m %s -s %s" wr_pexlif yosys_file then
-    let cw = make_info_window "Yosys" F then
+    let cw = verbose => make_info_window "Yosys" F | "NO_GUI" then
     val (status, emsg, logfile) = gui_exec cw "Yosys synthesis" cmd "" then
     status = "SIGKILL" => "" |
     status != "0" => eprintf "yosys failed\nSee %s for details" logfile |
@@ -1208,9 +1208,9 @@ let base_synthesis title file bname pexlif_file p synth_type synth_script =
     (file^"_load.fl")
 ;
 
-let fl_run_fl_loader file =
+let fl_run_fl_loader file verbose =
     let cmd = sprintf "fl -noX -unbuf_stdout -F %s" file then
-    let cw = make_info_window "Load result" F then
+    let cw = verbose => make_info_window "Load result" F | "NO_GUI" then
     val (status, _, _) = gui_exec cw "Load result" cmd "" then
     status
 ;
@@ -1219,6 +1219,7 @@ export_to_tcl fl_run_fl_loader;
 let do_synthesis p
 		 synth_type->"Flat"
 		 synth_script->"osu018_synthesis"
+		 GUI->F
     =
     let bname = "synth_top_level" in
     let dir = mktempd "synthesis" then
@@ -1226,12 +1227,12 @@ let do_synthesis p
     let res = sprintf "%s/%s.pexlif" dir bname then
     let title = sprintf "Synthesize %s" (pexlif_get_name p) then
     let ld_file =
-	base_synthesis title file bname res p synth_type synth_script
+	base_synthesis title file bname res p synth_type synth_script GUI
     then
     ld_file = "" =>
 	eprintf "Synthesis failed. See %s for more information" dir
     |
-    let ok = fl_run_fl_loader ld_file then
+    let ok = fl_run_fl_loader ld_file F then
     ok != "0" => 
 	eprintf "Synthesis failed. See %s for more information" dir
     |
@@ -1246,7 +1247,7 @@ let fl_do_synthesis canvas file basename synth_type synth_script =
     let p = get_idv_current_pexlif canvas then
     let load_file =
 	    base_synthesis "Write Verilog" file basename
-			    pexlif_file p synth_type synth_script
+			    pexlif_file p synth_type synth_script T
     then
     load_file = "" => ["-", "-"] |
     [pexlif_file, load_file]

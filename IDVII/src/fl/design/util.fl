@@ -1217,7 +1217,7 @@ let get_mapped_cell_info p =
     in
     val (raw_mapped, raw_unmapped) = split fst (map get_cell cells) then
     let TOT = length raw_mapped + length raw_unmapped in
-    let name_size = deref nm_size_r then
+    let name_size = max 8 (deref nm_size_r) then
     let sep = implode (replicate (name_size+16) "-") in
     let mapped = map snd raw_mapped in
     let unmapped = map snd raw_unmapped in

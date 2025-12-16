@@ -231,6 +231,7 @@ TypeCheck(g_ptr *ondp, bool delayed, impl_arg_ptr *impl_argsp)
 			GET_LINE_NBR(nrp->old));
 	    ASSERT( IS_USERDEF(nrp->old) );
 	    fn_ptr fn = GET_USERDEF(nrp->old);
+	    ASSERT(fn->in_use);
 	    FP(err_fp, "No match found for overloaded function '%s'\n",
 		    fn->name);
 	    failure("");
@@ -257,6 +258,7 @@ TypeCheck(g_ptr *ondp, bool delayed, impl_arg_ptr *impl_argsp)
 		ntp=ntp->unresolved)
 	    {
 		fn_ptr fp = GET_USERDEF(ntp->node);
+		ASSERT(fp->in_use);
 		result = make_arrow(ntp->type, result);
 		string vname = tprintf(".impl_arg.%d", cnt);
 		vname = wastrsave(stringsp, vname);
@@ -525,6 +527,7 @@ Get_Real_Type(typeExp_ptr type)
 void
 Print_Full_Type(fn_ptr fn, odests fp, bool newline, bool reset)
 {
+    ASSERT(fn->in_use);
     typeExp_ptr	   type = Get_Real_Type(fn->type);
     impl_arg_ptr   np = fn->implicit_args;
     if( np != NULL ) {
@@ -1423,6 +1426,7 @@ report_failure(node_type_ptr cur, typeExp_ptr type, typeExp_ptr expected_type)
 			GET_LINE_NBR(node));
 	    FP(err_fp, "Function/variable/constant `");
 	    fn_ptr fn = GET_USERDEF(node);
+	    ASSERT(fn->in_use);
 	    FP(err_fp, "'%s' is of type:\n\t", fn->name);
 	    Print_Type(get_real_type(type), err_fp, TRUE, TRUE);
 	    FP(err_fp, "but its usage requires it to be of type:\n\t");
@@ -2125,6 +2129,7 @@ build_node_type_struct(hash_record *lvars_tbl, g_ptr node)
 		}
 		case USERDEF: {
 		    fn_ptr  fp = GET_USERDEF(node);
+		    ASSERT(fp->in_use);
 		    res->type = fresh_inst(fp->type);
 		    check_hint(node, res->type);
 		    res->type = get_real_type(res->type);
@@ -2150,6 +2155,7 @@ build_node_type_struct(hash_record *lvars_tbl, g_ptr node)
 g_ptr
 make_implicit_call(impl_arg_ptr iargs, fn_ptr fun)
 {
+    ASSERT(fun->in_use);
     g_ptr node = Make_USERDEF_leaf(fun);
     while( iargs != NULL ) {
 	node = Make_APPL_ND(node, Make_USERDEF_leaf(iargs->def));
@@ -2161,6 +2167,7 @@ make_implicit_call(impl_arg_ptr iargs, fn_ptr fun)
 fn_ptr
 Find_Overload_Choice(fn_ptr fn, typeExp_ptr type)
 {
+    ASSERT(fn->in_use);
     if( type == NULL ) {
 	return fn;
     }
@@ -2177,6 +2184,7 @@ Find_Overload_Choice(fn_ptr fn, typeExp_ptr type)
     fn_ptr match_fn = NULL;
     for(oll_ptr ol = fn->overload_list; ol != NULL; ol = ol->next) {
 	push_tc_context();
+	ASSERT(ol->fn->in_use);
 	if( unify(TRUE, type, ol->fn->type) ) {
 	    matches++;
 	    match_fn = ol->fn;
@@ -2212,6 +2220,7 @@ nbr_succ_overload_res(node_type_ptr cur, node_replace_ptr *replsp, bool closed,
     ASSERT(cur->r == NULL);
     ASSERT(IS_USERDEF(cur->node));
     fn_ptr fn = GET_USERDEF(cur->node);
+    ASSERT(fn->in_use);
     oll_ptr alts = fn->overload_list;
     int cnt = 0;
     typeExp_ptr cur_type = get_real_type(cur->type);

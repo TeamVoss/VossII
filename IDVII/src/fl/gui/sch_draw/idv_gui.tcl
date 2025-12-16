@@ -678,7 +678,7 @@ proc idv:edit_and_load {w file load_file pexlif_file type} {
 		again {}
 	    }
 	} else {
-	    fl_run_fl_loader $load_file
+	    fl_run_fl_loader $load_file 1
 	    return $pexlif_file;
 	}
     }

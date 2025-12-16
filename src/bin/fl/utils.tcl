@@ -1392,38 +1392,45 @@ proc gui_execute_sub_process {w cmd logfile comment {cmd_file ""}} {
 
     set pids [pid $fp]
 
-    set sw $w.t
+    if { $w != "NO_GUI" } {
+	set sw $w.t
 
-    if ![winfo exists $sw] {
-        frame $sw -relief flat
-        pack $sw -side top -fill both -expand yes
+	if ![winfo exists $sw] {
+	    frame $sw -relief flat
+	    pack $sw -side top -fill both -expand yes
 
-        ttk::label $sw.l -text $comment -relief flat -font {Helvetica -12 bold}
-        pack $sw.l -side top -pady 2 -fill x
+	    ttk::label $sw.l -text $comment -relief flat \
+		    -font {Helvetica -12 bold}
+	    pack $sw.l -side top -pady 2 -fill x
 
-        ttk::button $sw.b -text Interrupt -command "subproc:interrupt $w $pids"
-        pack $sw.b -side bottom -pady 10
-	
-        scrollbar $sw.yscroll -command "$sw.t yview"
-        scrollbar $sw.xscroll -orient horizontal -command "$sw.t xview"
-        text $sw.t -setgrid 1 \
-            -yscroll "$sw.yscroll set" -xscroll "$sw.xscroll set" \
-            -font $::voss2_txtfont -bg white
-        pack $sw.yscroll -side right -fill y
-        pack $sw.xscroll -side bottom -fill x
-        pack $sw.t -side top -fill both -expand yes
-        update idletasks
+	    ttk::button $sw.b -text Interrupt \
+		-command "subproc:interrupt $w $pids"
+	    pack $sw.b -side bottom -pady 10
+	    
+	    scrollbar $sw.yscroll -command "$sw.t yview"
+	    scrollbar $sw.xscroll -orient horizontal -command "$sw.t xview"
+	    text $sw.t -setgrid 1 \
+		-yscroll "$sw.yscroll set" -xscroll "$sw.xscroll set" \
+		-font $::voss2_txtfont -bg white
+	    pack $sw.yscroll -side right -fill y
+	    pack $sw.xscroll -side bottom -fill x
+	    pack $sw.t -side top -fill both -expand yes
+	    update idletasks
+	} else {
+	    ttk::button $sw.b -text Interrupt \
+		-command "subproc:interrupt $w $pids"
+	    pack $sw.b -side bottom -pady 10
+	    $sw.t delete 1.0 end
+	    update idletasks
+	}
+	if { $cmd_file != "" } {
+	    set cfp [open $cmd_file "r"]    
+	    $sw.t insert end [read $cfp]
+	    $sw.t insert end "\n"
+	    close $cfp
+	}
     } else {
-        ttk::button $sw.b -text Interrupt -command "subproc:interrupt $w $pids"
-        pack $sw.b -side bottom -pady 10
-	$sw.t delete 1.0 end
-        update idletasks
-    }
-    if { $cmd_file != "" } {
-        set cfp [open $cmd_file "r"]    
-        $sw.t insert end [read $cfp]
-        $sw.t insert end "\n"
-        close $cfp
+	set sw ""
     }
 
     set logfp [open $logfile w]

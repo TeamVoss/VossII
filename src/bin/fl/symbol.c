@@ -1163,6 +1163,7 @@ Replace_name(g_ptr node, symbol_tbl_ptr stbl)
         case LEAF:
             if( IS_USERDEF(node) ) {
                 fn_ptr fn = GET_USERDEF(node);
+		ASSERT(fn->in_use);
                 g_ptr res = fn->expr;
                 SET_REFCNT(res, MAX_REF_CNT);
                 return( res );
@@ -1902,6 +1903,8 @@ get_matching_functions(g_ptr redex)
     while( list != NULL ) {
         if( !list->visible )
             goto do_next;
+        if( !list->in_use )
+            goto do_next;
 	if( find_hash(symb_tbl->tbl_ptr, (pointer) list->name) == NULL )
             goto do_next;
         if( STREQ(s_dummy, list->name) )
@@ -2609,6 +2612,9 @@ update_stbl(symbol_tbl_ptr stbl, fn_ptr fp)
     fn_ptr last = (fn_ptr) find_hash(stbl->tbl_ptr,(pointer) name);
     if( last == fp ) { return; }
     if(last != NULL && last != fp ) {
+	if( last->ADT_level == fp->ADT_level ) {
+	    last->in_use = FALSE;
+	}
         delete_hash(stbl->tbl_ptr, (pointer) name);
     }
     insert_hash(stbl->tbl_ptr, (pointer) name, (pointer) fp);
