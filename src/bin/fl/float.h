@@ -14,6 +14,7 @@
 
 /* ----- Function prototypes for public functions ----- */
 g_ptr	    Str2float(string s);
+g_ptr	    Make_float_leaf(double f);
 void	    Float_Init();
 void	    Float_Install_Functions();
 

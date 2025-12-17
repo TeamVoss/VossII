@@ -122,6 +122,9 @@
 #define PTR2UINT(p)     ((int) ((lunint)(p)))
 #define UINT2PTR(p)     ((pointer) ((lunint)(p)))
 
+#define PTR2DOUBLE(p)     ((double) ((lunint)(p)))
+#define DOUBLE2PTR(p)     ((pointer) ((lunint)(p)))
+
 #define EXPORT_FORWARD_DECL
 /* First fl.h's forward declarations */
 

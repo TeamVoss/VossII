@@ -177,6 +177,14 @@ float_hash_fn(pointer p, unint n)
     return( ((unint) fp->u.f) % n );
 }
 
+g_ptr
+Make_float_leaf(double d)
+{
+    g_ptr nd = Get_node();
+    MAKE_REDEX_EXT_OBJ(nd, float_oidx, get_float_rec(d));
+    return( nd );
+}
+
 static void
 str2float(g_ptr redex)
 {

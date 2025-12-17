@@ -164,6 +164,11 @@ static int		draw_bdd_rec(FILE *fp, hash_record *hp, formula f);
 static bool		truth_cover_rec(hash_record *done_tblp,
 					buffer *var_bufp, unint idx, formula b,
 					arbi_T *resp, string *emsgp);
+static bool
+			fp_truth_cover_rec(hash_record *done_tblp,
+					   buffer *var_bufp, unint idx,
+					   formula b, double *resp,
+					   string *emsgp);
 static int		bdd_get_size_rec(formula f, int *limitp);
 static void		restore_mark(formula f);
 static cache_ptr	get_new_cache_rec();
@@ -1661,16 +1666,171 @@ do_truth_cover(g_ptr redex)
 	push_buf(&var_table, (pointer) &var);
 	var_list = GET_CONS_TL(var_list);
     }
-
     qsort(START_BUF(&var_table), COUNT_BUF(&var_table), sizeof(unint),
 		    var_ord_comp);
-
     arbi_T res;
     string emsg;
     if( !truth_cover_rec(&truth_table_done, &var_table, 0, fun, &res, &emsg) ) {
 	MAKE_REDEX_FAILURE(redex, emsg);
     } else {
 	MAKE_REDEX_AINT(redex, res);
+    }
+    free_buf(&var_table);
+    dispose_hash(&truth_table_done, NULLFCN);
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+do_fp_truth_cover_n(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr var_list, funs;
+    EXTRACT_2_ARGS(redex, var_list, funs);
+    buffer  var_table;
+    new_buf(&var_table, nbr_VarTbl, sizeof(unint));
+    hash_record truth_table_done;
+    create_hash(&truth_table_done, 100, bdd_hash, bdd_eq);
+    while( !IS_NIL(var_list) ) {
+        string vname = GET_STRING(GET_CONS_HD(var_list));
+	formula v = B_Var(vname);
+	bdd_ptr	bp = GET_BDDP(v);
+	unint var = BDD_GET_VAR(bp);
+	push_buf(&var_table, (pointer) &var);
+	var_list = GET_CONS_TL(var_list);
+    }
+    qsort(START_BUF(&var_table), COUNT_BUF(&var_table), sizeof(unint),
+		    var_ord_comp);
+    MAKE_REDEX_NIL(redex);
+    g_ptr tail = redex;
+    while( !IS_NIL(funs) ) {
+	double res;
+	string emsg;
+	formula fun = GET_BOOL(GET_CONS_HD(funs));
+	if( !fp_truth_cover_rec(&truth_table_done,&var_table,0,fun,&res,&emsg)){
+	    MAKE_REDEX_FAILURE(redex, emsg);
+	    free_buf(&var_table);
+	    dispose_hash(&truth_table_done, NULLFCN);
+	    DEC_REF_CNT(l);
+	    DEC_REF_CNT(r);
+	    return;
+	} else {
+	    APPEND1(tail, Make_float_leaf(res));
+	}
+	funs = GET_CONS_TL(funs);
+    }
+    free_buf(&var_table);
+    dispose_hash(&truth_table_done, NULLFCN);
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static bool
+fp_truth_cover_rec(hash_record *done_tblp, buffer *var_bufp, unint idx,
+		   formula b, double *resp, string *emsgp)
+{
+    if( b == ZERO ) {
+	*resp = 0.0;
+	return TRUE;
+    }
+    if( b == ONE ) {
+	double res = 1.0;
+	while( idx < COUNT_BUF(var_bufp) ) {
+	    res = res*2.0;
+	    idx++;
+	}
+	*resp = res;
+	return TRUE;
+    }
+    bdd_ptr bp = GET_BDDP(b);
+    unint next_var = BDD_GET_VAR(bp);
+    double mult = 1.0;
+    if( idx == COUNT_BUF(var_bufp) ) {
+	var_ptr vp = VarTbl + next_var;
+	*emsgp =
+	    Fail_pr("Variable %s not in truth_cover list but f depends on it",
+		    vp->var_name);
+	return FALSE;
+    }
+    while( *((unint *) M_LOCATE_BUF(var_bufp, idx)) != next_var ) {
+	mult = mult * 2.0;
+	idx++;
+	if( idx == COUNT_BUF(var_bufp) ) {
+	    var_ptr vp = VarTbl + next_var;
+	    *emsgp =
+	      Fail_pr("Variable %s not in truth_cover list but f depends on it",
+		      vp->var_name);
+	    return FALSE;
+	}
+    }
+    pointer p = find_hash(done_tblp, FORMULA2PTR(b));
+    if( p != NULL ) {
+	double old_resp = PTR2DOUBLE(p);
+	*resp = mult*old_resp;
+	return TRUE;
+    }
+    formula L, R;
+    if( ISNOT(b) ) {
+        L = NOT(GET_LSON(bp));
+        R = NOT(GET_RSON(bp));
+    } else {
+        L = GET_LSON(bp);
+        R = GET_RSON(bp);
+    }
+    double Lres;
+    if( !fp_truth_cover_rec(done_tblp, var_bufp, idx+1, L, &Lres, emsgp) ) {
+	return FALSE;
+    }
+    double Rres;
+    if( !fp_truth_cover_rec(done_tblp, var_bufp, idx+1, R, &Rres, emsgp) ) {
+	return FALSE;
+    }
+    double sum = Lres+Rres;
+    insert_hash(done_tblp, FORMULA2PTR(b), DOUBLE2PTR(sum));
+    *resp = mult*sum;
+    return TRUE;
+}
+
+static void
+do_truth_cover_n(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr var_list, funs;
+    EXTRACT_2_ARGS(redex, var_list, funs);
+    
+    buffer  var_table;
+    new_buf(&var_table, nbr_VarTbl, sizeof(unint));
+    hash_record truth_table_done;
+    create_hash(&truth_table_done, 100, bdd_hash, bdd_eq);
+    while( !IS_NIL(var_list) ) {
+        string vname = GET_STRING(GET_CONS_HD(var_list));
+	formula v = B_Var(vname);
+	bdd_ptr	bp = GET_BDDP(v);
+	unint var = BDD_GET_VAR(bp);
+	push_buf(&var_table, (pointer) &var);
+	var_list = GET_CONS_TL(var_list);
+    }
+    qsort(START_BUF(&var_table), COUNT_BUF(&var_table), sizeof(unint),
+		    var_ord_comp);
+    MAKE_REDEX_NIL(redex);
+    g_ptr tail = redex;
+    while( !IS_NIL(funs) ) {
+	arbi_T res;
+	string emsg;
+	formula fun = GET_BOOL(GET_CONS_HD(funs));
+	if( !truth_cover_rec(&truth_table_done,&var_table,0,fun,&res,&emsg) ) {
+	    MAKE_REDEX_FAILURE(redex, emsg);
+	    free_buf(&var_table);
+	    dispose_hash(&truth_table_done, NULLFCN);
+	    DEC_REF_CNT(l);
+	    DEC_REF_CNT(r);
+	    return;
+	} else {
+	    APPEND1(tail, Make_AINT_leaf(res));
+	}
+	funs = GET_CONS_TL(funs);
     }
     free_buf(&var_table);
     dispose_hash(&truth_table_done, NULLFCN);
@@ -1883,6 +2043,23 @@ BDD_Install_Functions()
 			GLmake_arrow(GLmake_list(GLmake_string()),
 				     GLmake_arrow(GLmake_bool(),GLmake_int())),
 			do_truth_cover);
+
+    Add_ExtAPI_Function("truth_cover_n", "11", FALSE,
+			GLmake_arrow(
+			    GLmake_list(GLmake_string()),
+			    GLmake_arrow(
+				GLmake_list(GLmake_bool()),
+				GLmake_list(GLmake_int()))),
+			do_truth_cover_n);
+
+    typeExp_ptr float_tp = Get_Type("float", NULL, TP_INSERT_PLACE_HOLDER);
+    Add_ExtAPI_Function("fp_truth_cover_n", "11", FALSE,
+			GLmake_arrow(
+			    GLmake_list(GLmake_string()),
+			    GLmake_arrow(
+				GLmake_list(GLmake_bool()),
+				GLmake_list(float_tp))),
+			do_fp_truth_cover_n);
 
 }
 
