@@ -350,7 +350,8 @@ let rename_internals p =
     let get_base s = hd (str_split (get_vector_signature s) "[") in
     let init_map = map (\(f,_).f,f) (fa_inps @ fa_outs) then
     let mapping = ref init_map in
-    let bases_used = ref (map (\(m,n). get_base m) init_map) then
+    let bases_used = (map (\(m,n). (get_base m, ref 0)) init_map) then
+    let bases_tbl = ref (list2tbl bases_used) then
     let insert name =
         let cname =
             let core_name = last (str_split name "/") in
@@ -358,15 +359,19 @@ let rename_internals p =
             core = "" => core_name | core
         in
 	let base  = get_base cname in
-	letrec try i =
-	    let new_name = sprintf "%s%d%s" BASE_TMP i cname in
-	    let new_base = sprintf "%s%d%s" BASE_TMP i base in
-	    mem new_base (deref bases_used) => try (i+1) |
+	tbl_member (deref bases_tbl) base =>
+	    let cur_max_idx_r = tbl_get (deref bases_tbl) base in
+	    let idx = deref cur_max_idx_r + 1 then
+	    (cur_max_idx_r := idx) fseq
+	    let new_name = sprintf "%s%d%s" BASE_TMP idx cname in
 	    (mapping := ((name, new_name):(deref mapping))) fseq
-	    (bases_used := (new_base:(deref bases_used))) fseq
 	    new_name
-	in
-	try 1
+	|
+	    let idx = 1 in
+	    (bases_tbl := (tbl_insert (deref bases_tbl) base (ref idx))) fseq
+	    let new_name = sprintf "%s%d%s" BASE_TMP idx cname in
+	    (mapping := ((name, new_name):(deref mapping))) fseq
+	    new_name
     in
     let ints' = map insert ints then
     let bit_mapping =

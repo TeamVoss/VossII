@@ -522,10 +522,13 @@ Mark_symbols()
     fn_ptr      fp;
     // Make sure all overload versions in_use are marked as in_use
     FOR_REC(&fn_rec_mgr, fn_ptr, fp) {
-        if( fp->in_use && fp->overload_list != NULL ) {
+        if( fp->in_use ) {
             for(oll_ptr ol = fp->overload_list; ol != NULL; ol = ol->next) {
                 ol->fn->in_use = TRUE;
             }
+	    for(impl_arg_ptr ip = fp->implicit_args; ip != NULL; ip = ip->next){
+                ip->def->in_use = TRUE;
+	    }
         }
     }
     FOR_REC(&fn_rec_mgr, fn_ptr, fp) {
@@ -2613,7 +2616,7 @@ update_stbl(symbol_tbl_ptr stbl, fn_ptr fp)
     if( last == fp ) { return; }
     if(last != NULL && last != fp ) {
 	if( last->ADT_level == fp->ADT_level ) {
-	    last->in_use = FALSE;
+//	    last->in_use = FALSE;
 	}
         delete_hash(stbl->tbl_ptr, (pointer) name);
     }

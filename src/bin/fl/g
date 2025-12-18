@@ -4,5 +4,4 @@ r -noX -f bugs/b274.fl
 break exit
 break voss_abort
 break Dbg_stop
-break Rand_Var
 c

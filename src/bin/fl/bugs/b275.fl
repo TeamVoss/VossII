@@ -1,0 +1,284 @@
+// Define a symbolic matrix data type.
+lettype smatrix = SMAT
+                    {rows::int}
+                    {cols::int}
+                    {row_idx:: bv}
+                    {col_idx:: bv}
+                    {matrix :: bv}
+;
+
+let get_rows_and_cols sm =
+    val (SMAT rows cols ridx cidx sv) = sm in
+    (rows, cols)
+;
+
+let get_matrix_bv sm =
+    val (SMAT rows cols ridx cidx sv) = sm in
+    sv
+;
+
+let smatrix2matrix sm =
+    val (SMAT rows cols ridx cidx sv) = sm in
+    let ovars = (depends sv) subtract (depends (ridx,cidx)) in
+    ovars != [] => eprintf "Symbolic matrix (%S)" ovars |
+    letrec mk_row r =
+        r = rows => [] |
+        let rcond = (ridx = (int2bv r)) in
+        letrec mk_col c =
+            c == cols => [] |
+            let ccond = (cidx = (int2bv c)) in
+            let sub = param (rcond AND ccond) in
+            let v = bv2int (substitute sub sv) in
+            v:(mk_col (c+1))
+        in
+        (mk_col 0):(mk_row (r+1))
+    in
+    mk_row 0
+;
+
+let Psmatrix sm =
+    val (SMAT rows cols ridx cidx v) = sm in
+    (depends v) subtract (depends (ridx,cidx)) = [] =>
+        let pcol fp l = list2fp fp T "[" ", " "]" int2str l in
+        (list2fp stdout T "\n[\n\t" ",\n\t" "\n]" pcol (smatrix2matrix sm))
+        fseq ""
+    |
+    sprintf "(SMAT %d %d %s %s %s)" rows cols
+                (bv2str 10 ridx)
+                (bv2str 10 cidx)
+                (bv2str 10 v)
+;
+install_print_function Psmatrix;
+
+cletrec truthcov free vars f =
+    f == F => int2bv 0 |
+    f == T => int2bv (2**(length (vars subtract free))) |
+    val (v,H,L) = top_cofactor f in
+    let idx = find_first (\s. s = v) vars in
+    let vars' = butfirstn idx vars in
+    let qvars = (firstn (idx-1) vars) subtract free in
+    let m = int2bv (2**(length qvars)) in
+    m * (
+        mem v free =>
+            let Hres = truthcov free vars' H then
+            let Lres = truthcov free vars' L then
+            IF (variable v) THEN Hres ELSE Lres
+        |
+        (truthcov free vars' H)+
+        (truthcov free vars' L)
+    )
+;
+
+// More convenient function to use.
+let gen_truthcov vars f =
+    let all = depends (f,map variable vars) then
+    let free = (depends f) subtract vars then
+    let old = update_vossrc "DYNAMIC-ORDERING" "NO" then
+    let res = truthcov free all f then
+    (update_vossrc "DYNAMIC-ORDERING" old) fseq
+    res
+;
+
+
+let sum vars bv =
+    letrec add1 idx (b:bs) =
+        let cnt = gen_truthcov vars b in
+        bv_add (bv_mul (int2bv (2**idx)) cnt) (add1 (idx+1) bs)
+     /\    add1 idx [] = int2bv 0
+    in
+    let is_pos = (bv >= '0) in
+    let pos = is_pos => bv | '0 in
+    let neg = is_pos => '0 | '-1*bv in
+    let pos_sum = add1 0 (rev (bv2list pos)) in
+    let neg_sum = add1 0 (rev (bv2list neg)) in
+    pos_sum - neg_sum
+;
+
+// Matrix arithmetic
+
+// Helpful functions...
+let mdepends e = md_extract_vectors (depends e);
+
+// mk_vars  --->  bv_uvector
+
+let mk_sub old new =
+    let get_var b =
+        let dep = depends b in
+        length dep != 1 => eprintf "Non-variable in mk_sub (%B)" b |
+        hd dep
+    in
+    let old_vars  = map get_var (tl (bv2list old)) in
+    let n = length old_vars in
+    let raw = (replicate n F)@(bv2list new) in
+    zip old_vars (lastn n raw)
+;
+
+let transpose m =
+    val (SMAT rows cols ridx cidx v) = m in
+    let rows' = cols in
+    let cols' = rows in
+    let ridx' = bv_uvector "r" (ubits_needed (rows' - 1)) in
+    let cidx' = bv_uvector "c" (ubits_needed (cols' - 1)) in
+    let sub = (mk_sub ridx cidx')@(mk_sub cidx ridx') in
+    let v' = substitute sub v in
+    (SMAT rows' cols' ridx' cidx' v')
+;
+
+let get_element sm row col =
+    val (SMAT rows cols ridx cidx v) = sm in
+    let sub = (mk_sub ridx row)@(mk_sub cidx col) in
+    substitute sub v
+;
+
+let set_element sm row col new_val =
+    val (SMAT rows cols ridx cidx v) = sm in
+    let v' = (row = ridx) AND (col = cidx) => new_val | v in
+    (SMAT rows cols ridx cidx v')
+;
+
+let maybe_set_element fail_conds (cnt,sm) row col new_val =
+    val (SMAT rows cols ridx cidx v) = sm in
+    let dont = itlist (\c.\r. (c = cnt) OR r) fail_conds F in
+    let v' = NOT dont AND (row = ridx) AND (col = cidx) => new_val | v in
+    (cnt+ int2bv 1), (SMAT rows cols ridx cidx v')
+;
+
+
+let mat_add m1 m2 =
+    val (SMAT rows1 cols1 ridx1 cidx1 v1) = m1 in
+    val (SMAT rows2 cols2 ridx2 cidx2 v2) = m2 in
+    rows1 != rows2 =>
+        eprintf "Different rows in matrices in mat_add (%d!=%d)" rows1 rows2
+    |
+    cols1 != cols2 =>
+        eprintf "Different cols in matrices in mat_add (%d!=%d)" cols1 cols2
+    |
+    ridx1 != ridx2 =>
+        eprintf "Different ridxs in mat_add (%s!=%s)"
+                (bv2str 10 ridx1) (bv2str 10 ridx2)
+    |
+    cidx1 != cidx2 =>
+        eprintf "Different cidxs in mat_add (%s!=%s)"
+                (bv2str 10 cidx1) (bv2str 10 cidx2)
+    |
+    (SMAT rows1 cols1 ridx1 cidx1 (v1 + v2))
+;
+overload + + mat_add;
+
+let mat_sub m1 m2 =
+    val (SMAT rows1 cols1 ridx1 cidx1 v1) = m1 in
+    val (SMAT rows2 cols2 ridx2 cidx2 v2) = m2 in
+    rows1 != rows2 =>
+        eprintf "Different rows in matrices in mat_sub (%d!=%d)" rows1 rows2
+    |
+    cols1 != cols2 =>
+        eprintf "Different cols in matrices in mat_sub (%d!=%d)" cols1 cols2
+    |
+    ridx1 != ridx2 =>
+        eprintf "Different ridxs in mat_sub (%s!=%s)"
+                (bv2str 10 ridx1) (bv2str 10 ridx2)
+    |
+    cidx1 != cidx2 =>
+        eprintf "Different cidxs in mat_sub (%s!=%s)"
+                (bv2str 10 cidx1) (bv2str 10 cidx2)
+    |
+    (SMAT rows1 cols1 ridx1 cidx1 (v1 - v2))
+;
+overload - - mat_sub;
+
+let mat_mult m1 m2 =
+    val (SMAT rows1 cols1 ridx1 cidx1 v1) = m1 in
+    val (SMAT rows2 cols2 ridx2 cidx2 v2) = m2 in
+    cols1 != rows2 => eprintf "Dimension mismatch (%d != %d)" cols1 rows2 |
+    let tmp = bv_uvector "mid" (ubits_needed (cols1-1)) in
+    let sub1 = mk_sub cidx1 tmp in
+    let sub2 = mk_sub ridx2 tmp in
+    let v1' = substitute sub1 v1 in
+    let v2' = substitute sub2 v2 in
+    let prod = v1' * v2' in
+(fprintf stderr "Mul size: %d\n" (bdd_size prod)) fseq
+    let v' = sum (depends tmp) prod in
+    (SMAT rows1 cols2 ridx1 cidx2 v')
+;
+overload * * mat_mult;
+
+// Conversion and creation of random entities.
+let int_matrix2symb r c ll =
+    let rows = length ll in
+    let cols = length (hd ll) in
+    let do_row ints =
+	sitlist (\(idx,v).\bv. (c = (int2bv idx)) => (int2bv v) | bv)
+		(zip (0 upto (cols-1)) ints) (int2bv 0)
+    in
+    let brows = map do_row ll then
+    sitlist (\(idx,v).\bv. (r = (int2bv idx)) => v | bv)
+		(zip (0 upto (rows-1)) brows) (int2bv 0)
+;
+
+
+//    letrec do_row i (row:rows) =
+//        let row_cond = (r = (int2bv i)) then
+//        letrec do_col j (v:vs) =
+//            let col_cond = (c = (int2bv j)) then
+//            (row_cond AND col_cond) => (int2bv v) | do_col(j+1) vs
+//         /\    do_col j [] =
+//            do_row (i+1) rows
+//        in
+//        let r = do_col 0 row then
+//        r
+//     /\   do_row i [] =
+//        int2bv 0
+//    in
+//    do_row 0 ll
+//;
+
+// Conversion and creation of random entities.
+let bv_matrix2symb r c ll =
+    letrec do_row i (row:rows) =
+        let row_cond = (r = (int2bv i)) then
+        letrec do_col j (v:vs) =
+            let col_cond = (c = (int2bv j)) then
+            (row_cond AND col_cond) => v | do_col(j+1) vs
+         /\    do_col j [] =
+            do_row (i+1) rows
+        in
+        let r = do_col 0 row then
+        r
+     /\   do_row i [] =
+        int2bv 0
+    in
+    do_row 0 ll
+;
+
+overload matrix2symb int_matrix2symb bv_matrix2symb;
+
+let matrix2smatrix m =
+    let rows = length m in
+    let pot_cols = setify (map length m) in
+    length pot_cols != 1 => eprintf "Diferent number of columns!" |
+    let cols = hd pot_cols in
+    let row_idx = bv_uvector "r" (ubits_needed (rows-1)) in
+    let col_idx = bv_uvector "c" (ubits_needed (cols-1)) in
+    let sm = matrix2symb row_idx col_idx m in
+    (SMAT rows cols row_idx col_idx sm)
+;
+
+	    
+    
+
+let vector2svector l = matrix2smatrix [l];
+
+let mk_row min max cols = map (\i. random min max) (1--cols);
+non_lazy mk_row;
+
+let mk_random_smatrix rows cols min max =
+    let row_idx = bv_uvector "r" (ubits_needed (rows-1)) in
+    let col_idx = bv_uvector "c" (ubits_needed (cols-1)) in
+    let m = map (\r. mk_row min max cols) (1--rows) then
+    let sm = matrix2symb row_idx col_idx m in
+    (SMAT rows cols row_idx col_idx sm)
+;
+
+let mk_random_svectr cols min max = mk_random_smatrix 1 cols min max;
+
+
