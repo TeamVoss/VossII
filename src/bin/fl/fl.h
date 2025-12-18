@@ -165,6 +165,10 @@ typedef struct g_rec            *g_ptr;
 typedef struct name_list_rec	*name_list_ptr;
 typedef struct impl_arg_rec	*impl_arg_ptr;
 
+typedef enum { let_decl, letrec_decl,
+               slet_decl, sletrec_decl,
+               clet_decl, cletrec_decl}            mdecl_type;
+
 /* Then include the forward declarations in local .h files */
 #include	"prefs_ext.h"
 #include	"error.h"

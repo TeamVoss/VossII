@@ -300,7 +300,7 @@ SHA256_Install_Functions()
 {
     typeExp_ptr tv = GLnew_tVar();
 
-    Add_ExtAPI_Function("sha256_signature", "1", FALSE,
+    Add_ExtAPI_Function("sha256_signature", "-", FALSE,
 			GLmake_arrow(tv, GLmake_string()),
                         sha256_signature);
 }

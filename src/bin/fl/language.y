@@ -192,6 +192,7 @@ extern int dbg_tst_line_cnt;
 		g_ptr		expr;
 		typeExp_ptr	type;
 		int		cnt;
+		mdecl_type	decl_tp;
 	    }			    decl_t;
 	    struct {
 		bool		ok;
@@ -203,11 +204,12 @@ extern int dbg_tst_line_cnt;
 	    }			    overloads_t;
 	    g_ptr		    expr_t;
 	    struct {
-	        string	file;
-	        int	line;
-	    	bool strict;
-	    	bool cached;
-	    	bool recursive;
+	        string	    file;
+	        int	    line;
+	    	bool	    strict;
+	    	bool	    cached;
+	    	bool	    recursive;
+		mdecl_type   decl_tp;
 	    } let_t;
 	    struct {
 	    	g_ptr expr;
@@ -803,6 +805,7 @@ decl		: let_top fn_defs
 			$$.file = $1.file;
     			$$.line = $1.line;
     			$$.var  = $2.var;
+    			$$.decl_tp  = $1.decl_tp;
 			res = $2.expr;
     			if( RCadd_debug_info ) {
     			    g_ptr dbg = Make_Debug_Primitive($2.var,
@@ -1282,9 +1285,24 @@ expr		: LCURL expr TYPE_SEP simple_type RCURL
 		| decl IN expr
 		{
 		    /* return: (\($1->lhs).$3)($1->rhs) */
-		    if( $1.ok )
-			$$ = Make_APPL_ND(Make_Lambda($1.var, $3), $1.expr);
-		    else
+		    if( $1.ok ) {
+			if( ($1.decl_tp != let_decl) &&
+			    ($1.decl_tp != letrec_decl) )
+			{
+			    FP(err_fp,
+			    "#### Syntax error in file %s, close to line %d:\n",
+				cur_file_name, line_nbr);
+			    FP(err_fp, "%s can only be used at top-level\n",
+				($1.decl_tp == slet_decl)? "slet" :
+				($1.decl_tp == sletrec_decl)? "sletrec" :
+				($1.decl_tp == clet_decl)? "clet" :
+				($1.decl_tp == cletrec_decl)? "cletrec" :
+				"???");
+			    $$ = NULL;
+			} else {
+			    $$ = Make_APPL_ND(Make_Lambda($1.var, $3), $1.expr);
+			}
+		    } else
 			$$ = NULL;
 		}
                 | VAL arg_expr EQUAL expr IN expr
@@ -1312,8 +1330,23 @@ expr		: LCURL expr TYPE_SEP simple_type RCURL
 		{
 		    /* return: (\($1->lhs).$3)($1->rhs) */
 		    if( $1.ok ) {
-			$$ = Make_2inp_Primitive(P_THEN, $1.expr, 
-						 Make_Lambda($1.var, $3));
+                        if( ($1.decl_tp != let_decl) &&
+                            ($1.decl_tp != letrec_decl) )
+                        {
+                            FP(err_fp,
+			    "#### Syntax error in file %s, close to line %d:\n",
+				cur_file_name, line_nbr);
+                            FP(err_fp, "%s can only be used at top-level\n",
+                                ($1.decl_tp == slet_decl)? "slet" :
+                                ($1.decl_tp == sletrec_decl)? "sletrec" :
+                                ($1.decl_tp == clet_decl)? "clet" :
+                                ($1.decl_tp == cletrec_decl)? "cletrec" :
+                                "???");
+                            $$ = NULL;
+                        } else {
+			    $$ = Make_2inp_Primitive(P_THEN, $1.expr, 
+						     Make_Lambda($1.var, $3));
+			}
                     } else
 			$$ = NULL;
 		}
@@ -1731,6 +1764,7 @@ let_top :	LET
 		    $$.recursive = FALSE;
 		    $$.strict = FALSE;
 		    $$.cached = FALSE;
+		    $$.decl_tp = let_decl;
 		}
 		| LETREC
 		{
@@ -1739,6 +1773,7 @@ let_top :	LET
 		    $$.recursive = TRUE ;
 		    $$.strict = FALSE;
 		    $$.cached = FALSE;
+		    $$.decl_tp = letrec_decl;
 		}
 		| S_LET    
 		{
@@ -1747,6 +1782,7 @@ let_top :	LET
 		    $$.recursive = FALSE;
 		    $$.strict = TRUE ;
 		    $$.cached = FALSE;
+		    $$.decl_tp = slet_decl;
 		}
 		| S_LETREC 
 		{
@@ -1755,6 +1791,7 @@ let_top :	LET
 		    $$.recursive = TRUE ;
 		    $$.strict = TRUE ;
 		    $$.cached = FALSE;
+		    $$.decl_tp = sletrec_decl;
 		}
 		| C_LET    
 		{
@@ -1763,6 +1800,7 @@ let_top :	LET
 		    $$.recursive = FALSE;
 		    $$.strict = FALSE;
 		    $$.cached = TRUE ;
+		    $$.decl_tp = clet_decl;
 		}
 		| C_LETREC 
 		{
@@ -1771,6 +1809,7 @@ let_top :	LET
 		    $$.recursive = TRUE ;
 		    $$.strict = FALSE;
 		    $$.cached = TRUE ;
+		    $$.decl_tp = cletrec_decl;
 		}
 		;
 %%

@@ -1,6 +1,6 @@
 load "ste.fl";
 
-let p = verilog2pexlif (sprintf "-I%sm6502" DIR) "M65C02_Core" [
+let p = verilog2pexlif T (sprintf "-I%sm6502" DIR) "M65C02_Core" [
                                     "M65C02_Core.v",
                                     "M65C02_ALU.v",
                                     "M65C02_AddrGen.v",

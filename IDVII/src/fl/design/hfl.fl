@@ -4092,8 +4092,9 @@ let flfun2pexlif_core fn =
     let idx = find_first0 (\(a,tp). NOT (is_hw_type tp)) args in
     idx != 0 =>
 	val (arg,tp) = el idx args in
-	eprintf "Argument %s not a simple hw_type (%s). VIS for %s aborted\n"
-	      arg tp fn
+	eprintf 
+	  "Argument %s not a simple hw_type (%s). flfun2pexlif for %s aborted\n"
+	  arg tp fn
     |
     let pre = sprintf "let foo = remove_wrappers (%s " fn in
     let post = ") then (_pExLiF_ := foo);" in
@@ -4217,3 +4218,24 @@ let connect p conns =
     (PINST name attrs lf fa_inps' fa_outs' ints body)
 ;
 
+begin_abstype;
+
+lettype pexlif_cache = PEXLIF_CACHE {sig::string} {p::pexlif};
+
+// Function to memoize pexlif creation.
+let pexlif_cache file p_fn =
+    let sig = sha256_signature p_fn then
+    let do_save =
+	p_fn fseq
+	(write_pexlif_cache file (PEXLIF_CACHE sig p_fn)) fseq
+	p_fn
+    in
+    file_exists file =>
+	val (PEXLIF_CACHE saved_sig p) = read_pexlif_cache file then
+	saved_sig == sig => p |
+	do_save
+    |
+    do_save
+;
+
+end_abstype pexlif_cache;

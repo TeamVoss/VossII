@@ -1,0 +1,139 @@
+load "idv.fl";
+
+let N = 16;
+
+UNSIGNED word N;
+
+let NSZ = 2;
+UNSIGNED nibble NSZ;
+
+let SYN1 p = do_synthesis p "Flat";
+let SYN2 p = do_synthesis p "Hierarchical";
+
+let enAND =
+    bit_input	    en.
+    bit_list_input  as.
+    bit_list_output bs.
+    CELL enAND (
+	(map2 (\o.\i. o <- en '&' i) bs as)
+);
+
+let comp1 =
+    nibble_input    a b.
+    bit_output	    gr eq.
+    CELL comp1 [
+	gr <- a '>' b,
+	eq <- a '=' b
+];
+    
+
+letrec comp_rec =
+    bit_list_input  as bs.
+    bit_output	    gr eq.
+    //
+    let sz = length as in
+    let sz2 = sz/2 in
+    nibble_internal a b.
+    bit_internal    gr1 eq1 gr0 eq0.
+    bit_list_internal sz2 a0s b0s.
+    CELL comp_rec (
+	length as = NSZ => [
+	    SYN1 (comp1 (frombits as) (frombits bs) gr eq)
+	] | 
+	[
+	    SYN1 (enAND eq1 (butfirstn sz2 as) a0s),
+	    SYN1 (enAND eq1 (butfirstn sz2 bs) b0s),
+	    comp_rec (firstn sz2 as) (firstn sz2 bs) gr1 eq1,
+	    comp_rec a0s b0s gr0 eq0,
+	    SYN1 (gr <- (gr1 '|' eq1) '&' (gr1 '|' gr0)),
+	    SYN1 (eq <- eq1 '&' eq0)
+	]
+);
+
+let geq =
+    word_input	a b.
+    bit_output	geq.
+    //
+    bit_internal gr eq.
+    CELL geq [
+	comp_rec (tobits a) (tobits b) gr eq,
+	SYN1 (geq <- gr '|' eq)
+];
+
+let max2 =
+    word_input	a b.
+    word_output	min max.
+    //
+    bit_internal    a_geq_b.
+    CELL max2 [
+	geq a b a_geq_b,
+	SYN1 (min <- (IF a_geq_b THEN b ELSE a)),
+	SYN1 (max <- (IF a_geq_b THEN a ELSE b))
+];
+
+let p_max2 = (rvariable "a") fseq (pexlif_cache "p_max2.pexlif" (flfun2pexlif max2));
+//p_max2 fseq ();
+
+let max2 = 
+    word_input	a b.
+    word_output	min max.
+    CELL max2 [
+	p_max2
+];
+
+let stage (i,j) =
+    word_list_input	inps.
+    word_list_output	outs.
+    CELL (sprintf "stage(%d,%d)" i j) (
+	(max2 (el (i+1) inps) (el (j+1) inps) (el (i+1) outs) (el (j+1) outs)):
+	(flatmap (\k. (k = i) OR (k = j) => [] |
+		[ (el (k+1) outs) <- (el (k+1) inps)]) (0 upto (length inps-1)))
+);
+
+let median9 =
+    word_input	i0 i1 i2 i3 i4 i5 i6 i7 i8.
+    word_output	median.
+    word_list_internal 9 m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 m12 m13 m14 m15 m16 m17 m18 m19.
+    CELL median9 [
+	(stage (2,7) [i0,i1,i2,i3,i4,i5,i6,i7,i8] m1),
+	(stage (5,8) m1  m2),
+	(stage (0,4) m2  m3),
+	(stage (0,6) m3  m4),
+	(stage (6,7) m4  m5),
+	(stage (3,7) m5  m6),
+	(stage (4,5) m6  m7),
+	(stage (5,6) m7  m8),
+	(stage (7,8) m8  m9),
+	(stage (1,4) m9  m10),
+	(stage (6,7) m10 m11),
+	(stage (1,2) m11 m12),
+	(stage (2,6) m12 m13),
+	(stage (1,8) m13 m14),
+	(stage (3,4) m14 m15),
+	(stage (0,8) m15 m16),
+	(stage (0,6) m16 m17),
+	(stage (0,4) m17 m18),
+	(stage (4,6) m18 m19),
+	median <- el 5 m19
+];
+
+
+let p0 = flfun2pexlif median9;
+let unfold_and_remove_buffer p = 
+    let cnt = length (pexlif_get_children p) then
+    let p' = itlist (\i.\p. unfold_pexlif p i) (1 upto cnt) p then
+    let chs' = pexlif_get_children p' then
+    let indices = find_all has_unmapped chs' in
+    remove_wire p' indices
+;
+
+let p =
+    let name = sprintf "mapped_median_%d.pexlif" N in
+    file_exists name => read_pexlif name |
+    let p = flatten_pexlif (unfold_and_remove_buffer p0) then
+    (write_pexlif name p) fseq
+    p
+;
+let ckt = pexlif2fsm p;
+wtime ckt;
+

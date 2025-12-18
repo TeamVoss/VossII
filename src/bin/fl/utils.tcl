@@ -1442,6 +1442,7 @@ proc gui_execute_sub_process {w cmd logfile comment {cmd_file ""}} {
 	    break
 	} else {
 	    set txt [read $fp]
+	    puts $logfp $txt
 	    if [winfo exists $sw] {
 		$sw.t insert end $txt
 		$sw.t yview end

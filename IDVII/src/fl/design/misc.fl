@@ -345,7 +345,9 @@ non_lazy split_at_random;
 
 // Compute the SHA256 signature of a 'set' of components.
 //  sha_set::(a list)->string
-let sha_set = sha256_signature # qsort strcmp # map sha256_signature;
+let sha_set l =
+    l fseq ((sha256_signature # qsort strcmp # map sha256_signature) l)
+;
 
 //------------------------------------------------------------------------------
 // Fin.

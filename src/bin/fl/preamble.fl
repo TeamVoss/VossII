@@ -2173,7 +2173,9 @@ let base_PINST = PINST;
 // Re-define PINST so that we always compute a signature (FP) and
 // a SHA256 (SHA) signatures and store them in the attribute list.
 // Also, every (non-toplevel) wrapper PINST is unfolded.
-slet PINST n a l i o t c =
+let PINST n a l i o t c =
+    // Force evaluation of all arguments.
+    n fseq a fseq l fseq i fseq o fseq t fseq c fseq 
     let wrappers = get_wrappers c then
     wrappers = [] =>
         mk_pinst n a l i o t c
@@ -2359,6 +2361,15 @@ let gui_exec {window::string} {title::string} {cmd::string} {workdir::string} =
     let dir = mktempd "gui_exec" then
     let cmd_file = sprintf "%s/cmd_in" dir then
     let log_file = sprintf "%s/cmd_out" dir then
+    window == "NO_GUI" =>
+	let fp = fopen cmd_file "w" then
+	(workdir != "" => (fprintf fp "cd %s\n" workdir) | ()) fseq
+	(fprintf fp "exec %s" cmd) fseq
+	(fclose fp) fseq
+	let ncmd = sprintf "/bin/sh %s 2>&1 %s" cmd_file log_file then
+	let status = system ncmd then
+	(sprintf "%d" status, "", log_file)
+    |
     let fp = fopen cmd_file "w" then
     (workdir != "" => (fprintf fp "cd %s\n" workdir) | ()) fseq
     (fprintf fp "exec %s" cmd) fseq
