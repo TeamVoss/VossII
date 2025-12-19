@@ -1,0 +1,27 @@
+
+update_vossrc "DYNAMIC-ORDERING" "NO";
+
+let av = bv_variable "a[11:0]";
+let bv = bv_variable "b[11:0]";
+
+let res = av * bv;
+
+// Bad order
+var_order ( (md_expand_vector "a[11:0]")@(md_expand_vector "b[11:0]"));
+
+bdd_size res;
+
+bdd_reorder 2;
+
+let cv = bv_variable "c[15:0]";
+let dv = bv_variable "d[15:0]";
+
+let res = cv + dv;
+
+// Bad order
+var_order (interleave[(md_expand_vector "c[15:0]"),(md_expand_vector "d[15:0]")]);
+
+bdd_size res;
+
+bdd_reorder 2;
+

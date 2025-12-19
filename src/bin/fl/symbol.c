@@ -516,21 +516,37 @@ DBG_check(string msg)
     }
 }
 
+static void
+mark_fn_rec(fn_ptr fp)
+{
+    if( fp->in_use ) return;
+    fp->in_use = TRUE;
+    for(oll_ptr op = fp->overload_list; op != NULL; op = op->next) {
+	mark_fn_rec(op->fn);
+    }
+    for(impl_arg_ptr np = fp->implicit_args; np != NULL; np = np->next) {
+	mark_fn_rec(np->def);
+    }
+}
+
 void
 Mark_symbols()
 {
     fn_ptr      fp;
-    // Make sure all overload versions in_use are marked as in_use
+
+    // Clear all in_use
     FOR_REC(&fn_rec_mgr, fn_ptr, fp) {
-        if( fp->in_use ) {
-            for(oll_ptr ol = fp->overload_list; ol != NULL; ol = ol->next) {
-                ol->fn->in_use = TRUE;
-            }
-	    for(impl_arg_ptr ip = fp->implicit_args; ip != NULL; ip = ip->next){
-                ip->def->in_use = TRUE;
-	    }
-        }
+	fp->in_use = FALSE;
     }
+    // Mark all visible (directly or indirectly) in use
+    fp = symb_tbl->def_list;
+    while( fp != NULL ) {
+	if( fp->visible ) {
+	    mark_fn_rec(fp);
+	}
+	fp = fp->next;
+    }
+    // Now mark the expressions in all function blocks that are in_use
     FOR_REC(&fn_rec_mgr, fn_ptr, fp) {
         if( fp->in_use ) {
 	    Mark(fp->expr);
@@ -2616,7 +2632,7 @@ update_stbl(symbol_tbl_ptr stbl, fn_ptr fp)
     if( last == fp ) { return; }
     if(last != NULL && last != fp ) {
 	if( last->ADT_level == fp->ADT_level ) {
-//	    last->in_use = FALSE;
+	    last->visible = FALSE;
 	}
         delete_hash(stbl->tbl_ptr, (pointer) name);
     }
