@@ -364,4 +364,3 @@ let try2 median below = gen_try ordered_median_split (median,below);
 let q = gen_try (\v. \il. case2) inps;
 
 wtime q;
-
