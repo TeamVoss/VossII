@@ -1,0 +1,367 @@
+load "idv.fl";
+
+let N = 16;
+
+UNSIGNED word N;
+
+let NSZ = 1;
+UNSIGNED nibble NSZ;
+
+let SYN1 p = do_synthesis p "Flat";
+let SYN2 p = do_synthesis p "Hierarchical";
+
+let enAND =
+    bit_input	    en.
+    bit_list_input  as.
+    bit_list_output bs.
+    CELL enAND (
+	(map2 (\o.\i. o <- en '&' i) bs as)
+);
+
+let comp1 =
+    nibble_input    a b.
+    bit_output	    gr eq.
+    CELL comp1 [
+	gr <- a '>' b,
+	eq <- a '=' b
+];
+    
+
+letrec comp_rec =
+    bit_list_input  as bs.
+    bit_output	    gr eq.
+    //
+    let sz = length as in
+    let sz2 = sz/2 in
+    nibble_internal a b.
+    bit_internal    gr1 eq1 gr0 eq0.
+    bit_list_internal sz2 a0s b0s.
+    CELL comp_rec (
+	length as = NSZ => [
+	    SYN1 (comp1 (frombits as) (frombits bs) gr eq)
+	] | 
+	[
+	    SYN1 (enAND eq1 (butfirstn sz2 as) a0s),
+	    SYN1 (enAND eq1 (butfirstn sz2 bs) b0s),
+	    comp_rec (firstn sz2 as) (firstn sz2 bs) gr1 eq1,
+	    comp_rec a0s b0s gr0 eq0,
+	    SYN1 (gr <- (gr1 '|' eq1) '&' (gr1 '|' gr0)),
+	    SYN1 (eq <- eq1 '&' eq0)
+	]
+);
+
+let geq =
+    word_input	a b.
+    bit_output	geq.
+    //
+    bit_internal gr eq.
+    CELL geq [
+	comp_rec (tobits a) (tobits b) gr eq,
+	SYN1 (geq <- gr '|' eq)
+];
+
+let max2 =
+    word_input	a b.
+    word_output	min max.
+    //
+    bit_internal    a_geq_b.
+    CELL max2 [
+	geq a b a_geq_b,
+	SYN1 (min <- (IF a_geq_b THEN b ELSE a)),
+	SYN1 (max <- (IF a_geq_b THEN a ELSE b))
+];
+
+let p_max2 = pexlif_cache "p_max2.pexlif" (flfun2pexlif max2);
+p_max2 fseq ();	// Must force evaluation....
+
+
+
+let max2 = 
+    word_input	a b.
+    word_output	min max.
+    CELL max2 [
+	p_max2
+];
+
+let stage (i,j) =
+    word_list_input	inps.
+    word_list_output	outs.
+    CELL (sprintf "stage(%d,%d)" i j) (
+	(max2 (el (i+1) inps) (el (j+1) inps) (el (i+1) outs) (el (j+1) outs)):
+	(flatmap (\k. (k = i) OR (k = j) => [] |
+		[ (el (k+1) outs) <- (el (k+1) inps)]) (0 upto (length inps-1)))
+);
+
+let median9 =
+    word_input	i0 i1 i2 i3 i4 i5 i6 i7 i8.
+    word_output	median.
+    word_list_internal 9 m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 m12 m13 m14 m15 m16 m17 m18 m19.
+    CELL median9 [
+	(stage (2,7) [i0,i1,i2,i3,i4,i5,i6,i7,i8] m1),
+	(stage (5,8) m1  m2),
+	(stage (0,4) m2  m3),
+	(stage (0,6) m3  m4),
+	(stage (6,7) m4  m5),
+	(stage (3,7) m5  m6),
+	(stage (4,5) m6  m7),
+	(stage (5,6) m7  m8),
+	(stage (7,8) m8  m9),
+	(stage (1,4) m9  m10),
+	(stage (6,7) m10 m11),
+	(stage (1,2) m11 m12),
+	(stage (2,6) m12 m13),
+	(stage (1,8) m13 m14),
+	(stage (3,4) m14 m15),
+	(stage (0,8) m15 m16),
+	(stage (0,6) m16 m17),
+	(stage (0,4) m17 m18),
+	(stage (4,6) m18 m19),
+	median <- el 5 m19
+];
+
+
+let p0 = flfun2pexlif median9;
+let unfold_and_remove_buffer p = 
+    let cnt = length (pexlif_get_children p) then
+    let p' = itlist (\i.\p. unfold_pexlif p i) (1 upto cnt) p then
+    let chs' = pexlif_get_children p' then
+    let indices = find_all has_unmapped chs' in
+    remove_wire p' indices
+;
+
+let p =
+    let name = sprintf "mapped_median_%d.pexlif" N in
+    pexlif_cache name (flatten_pexlif (unfold_and_remove_buffer p0))
+;
+wtime (p fseq 2);
+
+let ckt = pexlif2fsm p;
+wtime ckt;
+
+let nds = visualization_nodes ckt 0;
+length nds;
+
+let vec name = N = 1 => name | sprintf "%s[%d:0]" name (N-1);
+
+(var_order (interleave [
+		md_expand_vector (vec "i0"),
+		md_expand_vector (vec "i1"),
+		md_expand_vector (vec "i2"),
+		md_expand_vector (vec "i3"),
+		md_expand_vector (vec "i4"),
+		md_expand_vector (vec "i5"),
+		md_expand_vector (vec "i6"),
+		md_expand_vector (vec "i7"),
+		md_expand_vector (vec "i8")])
+) fseq ();
+update_vossrc "DYNAMIC-ORDERING" "NO";
+
+let i0 = bv_ZX (bv_variable (vec "i0"));
+let i1 = bv_ZX (bv_variable (vec "i1"));
+let i2 = bv_ZX (bv_variable (vec "i2"));
+let i3 = bv_ZX (bv_variable (vec "i3"));
+let i4 = bv_ZX (bv_variable (vec "i4"));
+let i5 = bv_ZX (bv_variable (vec "i5"));
+let i6 = bv_ZX (bv_variable (vec "i6"));
+let i7 = bv_ZX (bv_variable (vec "i7"));
+let i8 = bv_ZX (bv_variable (vec "i8"));
+
+let is_big i = i > int2bv(2**(N-2));
+
+let exactly_k_big k vs =
+    letrec cond j (v:vs) =
+	j <= 0 => NOT (is_big v) AND (cond j vs) |
+	is_big v => cond (j-1) vs | cond j vs
+     /\    cond j [] = T
+    in
+    cond k vs
+;
+
+let inps = [ i0, i1, i2, i3, i4, i5, i6, i7, i8];
+
+let median_is_k k {vs::bv list} =
+    let median = el (k+1) vs in
+    letrec greater remain vs =
+	vs = [] => F |
+	remain = 0 => itlist (\i.\r. (median <= i) AND r) vs T |
+	val (v:vs) = vs in
+	(median > v) => (greater (remain-1) vs)
+		      | (median <= v) AND (greater remain vs)
+    in
+    greater 4 ((firstn k vs)@(butfirstn (k+1) vs))
+;
+
+let case0 nbr_big = exactly_k_big nbr_big inps;
+let case1 median = median_is_k median inps;
+let case median nbr_big =
+    (median_is_k median inps) AND (exactly_k_big nbr_big inps)
+;
+
+// Try simple case
+let case2 =
+    // i0 is median, i1 i2 i3 i4 less i5 i6 i7 i8 greater
+    (i0 >= i1) AND
+    (i0 >= i2) AND
+    (i0 >= i3) AND
+    (i0 >= i4) AND
+    (i0 <= i5) AND
+    (i0 <= i6) AND
+    (i0 <= i7) AND
+    (i0 <= i8)
+;
+wtime (bdd_size case2);
+
+
+
+let ant = bool_ant (
+    vec "i0" is i0 for 1 phase and
+    vec "i1" is i1 for 1 phase and
+    vec "i2" is i2 for 1 phase and
+    vec "i3" is i3 for 1 phase and
+    vec "i4" is i4 for 1 phase and
+    vec "i5" is i5 for 1 phase and
+    vec "i6" is i6 for 1 phase and
+    vec "i7" is i7 for 1 phase and
+    vec "i8" is i8 for 1 phase 
+);
+
+cletrec uwmc f =
+    f == F => 0.0 |
+    f == T => 1.0 |
+    val (v,H,L) = top_cofactor f in
+    0.5*(uwmc L + uwmc H)
+;
+
+cletrec uwmc2 pred f =
+    f == F => 0.0 |
+    pred == F => 0.0 |
+    f == T => uwmc pred |
+    pred == T => uwmc f |
+    val (vp,Hp,Lp) = top_cofactor pred in
+    val (vf,Hf,Lf) = top_cofactor f in
+    vp == vf => 0.5*((uwmc2 Hp Hf)+(uwmc2 Lp Lf)) |
+    bdd_index pred < bdd_index f =>
+	0.5*((uwmc2 Hp f)+(uwmc2 Lp f))
+    |
+	0.5*((uwmc2 pred Hf)+(uwmc2 pred Lf))
+;
+
+
+//cletrec ftruthcov vars f =
+//    f == F => 0.0 |
+//    f == T => int2float (2**(length vars)) |
+//    val (v,H,L) = top_cofactor f in
+//    let idx = find_first (\s. s = v) vars in
+//    let vars' = butfirstn idx vars in
+//    let qvars = firstn (idx-1) vars in
+//    let m = int2float (2**(length qvars)) in
+//    m * ((ftruthcov vars' H)+(ftruthcov vars' L))
+//;
+//
+//let split_varlist vars v =
+//    let idx = find_first (\s. s = v) vars in
+//    let vars' = butfirstn idx vars in
+//    let qvars = firstn (idx-1) vars in
+//    let m = int2float (2**(length qvars)) in
+//    (m, vars')
+//;
+//
+//cletrec ftruthcov2 vars p f =
+//    f == F => 0.0 |
+//    p == F => 0.0 |
+//    f == T => ftruthcov vars p |
+//    p == T => ftruthcov vars f |
+//    val (vp,Hp,Lp) = top_cofactor p in
+//    val (vf,Hf,Lf) = top_cofactor f in
+//    vp = vf =>
+//	val (m,vars') = split_varlist vars vp in
+//	m*((ftruthcov2 vars' Hp Hf)+ (ftruthcov2 vars' Lp Lf))
+//    |
+//    bdd_index p < bdd_index f =>
+//	val (m,vars') = split_varlist vars vp in
+//	m*((ftruthcov2 vars' Hp f)+(ftruthcov2 vars' Lp f))
+//    |
+//	val (m,vars') = split_varlist vars vf in
+//	m*((ftruthcov2 vars' p Hf)+(ftruthcov2 vars' p Lf))
+//;
+
+let ORIG_gen_try pred v =
+    let cond = pred v inps then
+    let vs = depends (cond,ant) in
+    (fprintf stderr "|cond|=%d\n" (bdd_size cond)) fseq
+    let sub = param cond then
+    (fprintf stderr "|sub|=%d\n" (bdd_size sub)) fseq
+    let ant' = substitute sub ant then
+    (fprintf stderr "|ant'|=%d\n" (bdd_size ant')) fseq
+    let ste = STE "-e" ckt [] ant' [] [] then
+    let vals = map (\nd. fst (get_trace_val ste nd 0)) nds then
+    (fprintf stderr "|vals|=%d\n" (bdd_size vals)) fseq
+    let vals' = map (\f. cond AND f) vals then
+    (fprintf stderr "|vals'|=%d\n" (bdd_size vals')) fseq
+    let all = hd (fp_truth_cover_n vs [cond]) then
+    let sps = map (\f. f/all) (fp_truth_cover_n vs vals') then
+    let tot =
+	let sps' = qsort (\i.\j. i > j => 1 | i < j => -1 | 0) sps in
+	itlist (defix +) sps' 0.0
+    then
+    tot
+;
+
+let gen_try pred v =
+    let cond = pred v inps then
+    let vs = depends (cond,ant) in
+    (fprintf stderr "|cond|=%d\n" (bdd_size cond)) fseq
+    let sub = param cond then
+    (fprintf stderr "|sub|=%d\n" (bdd_size sub)) fseq
+    let ant' = substitute sub ant then
+    (fprintf stderr "|ant'|=%d\n" (bdd_size ant')) fseq
+    let ste = STE "-e" ckt [] ant' [] [] then
+    let vals = map (\nd. fst (get_trace_val ste nd 0)) nds then
+    (fprintf stderr "|vals|=%d\n" (bdd_size vals)) fseq
+    let all = hd (fp_truth_cover_n vs [cond]) then
+    let sps = map (\f. f/all) (fp_truth_cover2_n vs cond vals) then
+    let tot =
+	let sps' = qsort (\i.\j. i > j => 1 | i < j => -1 | 0) sps in
+	itlist (defix +) sps' 0.0
+    then
+    tot
+;
+
+let median_split (k,less) {vs::bv list} =
+    let median = el (k+1) vs in
+    let below = gather vs (map (\i. i+1) less) in
+    let above = vs subtract (median:below) in
+    let below_conds = map (\bv. bv <= median) below in
+    let above_conds = map (\bv. bv > median) above in
+    accumulate (defix AND) (below_conds @ above_conds)
+;
+
+let try1 median below = gen_try median_split (median,below);
+// This would require  9*(choose 8 4)=630 cases...
+let q = try1 0 [1,2,3,4]; wtime q;
+
+
+let ordered_median_split (k,less) {vs::bv list} =
+    let median = el (k+1) vs in
+    let below = gather vs (map (\i. i+1) less) in
+    let above = vs subtract (median:below) in
+    let below_conds = map (\bv. bv <= median) below in
+    let above_conds = map (\bv. bv > median) above in
+    let below_ordered =
+	letrec order_cond (a:b:rem) = (a >= b):(order_cond (b:rem))
+	 /\    order_cond other = []
+	in
+	order_cond below
+    in
+    accumulate (defix AND) (below_conds @ below_ordered @ above_conds)
+;
+
+let try2 median below = gen_try ordered_median_split (median,below);
+// This would require  9*8*7*6*5=15,129 cases...
+//let q = try2 0 [1,2,3,4]; wtime q;
+
+
+let q = gen_try (\v. \il. case2) inps;
+
+wtime q;
+

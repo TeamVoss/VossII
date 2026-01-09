@@ -243,12 +243,12 @@ typedef struct relprod_cache_rec {
         formula         result;
 } relprod_cache_rec;
 
+
 typedef struct param_rec    *param_ptr;
 typedef struct param_rec {
 	formula	    f;
 	param_ptr   next;
 } param_rec;
-
 
 #define B_TRUE              (ONE)
 #define B_FALSE             (ZERO)
@@ -256,6 +256,19 @@ typedef struct param_rec {
 #define B_IS_FALSE(p)       ((p) == ZERO)
 #define B_IS_CONSTANT(p)    (B_IS_TRUE(p) || B_IS_FALSE(p))
 
+
+typedef struct fp_truth_cov2_rec    *fp_truth_cov2_ptr;
+typedef struct fp_truth_cov2_rec {
+	formula		cond;
+	formula		f;
+	double		res;
+} fp_truth_cov2_rec;
+
+typedef struct tc2_caches_rec {
+    buffer		var_table;
+    rec_mgr		fp_truth_cov2_rec_mgr;
+    hash_record		truth_table1_done;
+} tc2_caches_rec;
 
 #endif /* NEW_BDD_H */
 #endif /* EXPORT_FORWARD_DECL */

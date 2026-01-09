@@ -1,0 +1,66 @@
+
+VARS "a b c d e";
+
+let av = bv_variable "a[7:0]";
+let bv = bv_variable "b[7:0]";
+let cv = bv_variable "c[7:0]";
+
+//let cond = av = (bv - '1);
+//let f = (av+bv = cv);
+//let cf = cond AND f;
+//cf;
+
+//draw_bdds F [cond, f, cf] ["cond", "f", "cond AND f"];
+//draw_bdds T [cond, f, cf] ["cond", "f", "cond AND f"];
+
+
+//fp_truth_cover_n (depends [cond,f]) [cond AND f];
+//fp_truth_cover2_n (depends [cond,f]) cond [f];
+
+let ops = [ 
+	    (\a.\b. (a AND b)),
+	    (\a.\b. NOT (a AND b)),
+	    (\a.\b. (a OR b)),
+	    (\a.\b. NOT (a OR b)),
+	    (\a.\b. (a XOR b)),
+	    (\a.\b. NOT (a XOR b))
+];
+
+let gen_random_bool vars sz =
+    let so_far = ref (map variable vars) then
+    letrec gen f =
+	bdd_size f > sz => f |
+	let new = f:(deref so_far) in
+	(so_far := new) fseq
+	let len = length new in
+	let arg1 = random 1 len in
+	let arg2 = random 1 len in
+	let op = random 1 (length ops) in
+//(fprintf stderr "arg1:%d arg2:%d op:%d\n" arg1 arg2 op) fseq
+	let f' = (el op ops) (el arg1 new) (el arg2 new) in
+	gen f'
+    in
+    gen T
+;
+
+let tst cond f =
+    let vars = depends (cond,f) then
+    let cf = cond AND f then
+    (fprintf stderr "|cond|=%d |f|=%d |cond AND f|=%d\n" 
+		(bdd_size cond) (bdd_size f) (bdd_size cf)) fseq
+    let res1 = hd (fp_truth_cover_n vars [cf]) then
+    let res2 = hd (fp_truth_cover2_n vars cond [f]) then
+    (fprintf stderr "-> %s\n" (float2str res1)) fseq
+    (fprintf stderr "-> %s\n" (float2str res2)) fseq
+    ()
+;
+
+let cond = gen_random_bool (depends (av,bv,cv)) 10000;
+let f = gen_random_bool (depends (av,bv,cv)) 10000;
+tst cond f;
+
+lettype bug = BUG bool bool;
+//write_bug "bug_cond_f.bug" (BUG cond f);
+
+val (BUG cond f) = read_bug "bug_cond_f.bug";
+tst cond f;

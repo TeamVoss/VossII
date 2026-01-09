@@ -11,6 +11,7 @@
 #include "new_bdd.h"
 #include "prefs_ext.h"
 #include "graph.h"
+#include <math.h>
 
 /* ------------- Global variables ------------- */
 formula		ZERO;
@@ -108,6 +109,9 @@ static hash_record	bdd_save_tbl;
 static relprod_cache_ptr relprod_cache;
 static int 		relprod_cache_sz;
 
+static fp_truth_cov2_ptr fp_truth_cov2_cache;
+static int 		fp_truth_cov2_cache_sz;
+
 extern int		RCminimum_reduction;	/* For dynamic var. ordering  */
 extern int		RCelasticity;		/* For dynamic var. ordering  */
 static bool		quit_early;
@@ -123,6 +127,9 @@ static subst_ptr	bdd_subs;
 static buffer           bdd_gc_buf;
 
 /* ----- Forward definitions local functions ----- */
+static bool		fp_truth_cover2_rec(tc2_caches_rec *tp,
+					    unint idx, formula cond, formula f,
+					    double *resp, string *emsgp);
 static void		gc_update_ref_cnt(bdd_ptr bp);
 static formula		prim_B_Var(string name);
 static formula		find_insert_bdd(var_ptr vp, formula lson, formula rson);
@@ -152,6 +159,7 @@ static unint		f2var(formula f);
 static formula		f2rson(formula f);
 static formula		f2lson(formula f);
 static relprod_cache_ptr find_in_relprod_cache(formula v, formula a, formula b);
+static fp_truth_cov2_ptr find_in_fp_truth_cov2_cache(formula cond, formula f);
 static int		var_ord_comp(const void *pi, const void *pj);
 static void		b_save(FILE *fp, formula f);
 static g_ptr		top_b_subst(g_ptr np);
@@ -1735,17 +1743,11 @@ fp_truth_cover_rec(hash_record *done_tblp, buffer *var_bufp, unint idx,
 	return TRUE;
     }
     if( b == ONE ) {
-	double res = 1.0;
-	while( idx < COUNT_BUF(var_bufp) ) {
-	    res = res*2.0;
-	    idx++;
-	}
-	*resp = res;
+	*resp = pow(2.0, (double) (COUNT_BUF(var_bufp)-idx));
 	return TRUE;
     }
     bdd_ptr bp = GET_BDDP(b);
     unint next_var = BDD_GET_VAR(bp);
-    double mult = 1.0;
     if( idx == COUNT_BUF(var_bufp) ) {
 	var_ptr vp = VarTbl + next_var;
 	*emsgp =
@@ -1753,6 +1755,7 @@ fp_truth_cover_rec(hash_record *done_tblp, buffer *var_bufp, unint idx,
 		    vp->var_name);
 	return FALSE;
     }
+    double mult = 1.0;
     while( *((unint *) M_LOCATE_BUF(var_bufp, idx)) != next_var ) {
 	mult = mult * 2.0;
 	idx++;
@@ -1768,6 +1771,14 @@ fp_truth_cover_rec(hash_record *done_tblp, buffer *var_bufp, unint idx,
     if( p != NULL ) {
 	double old_resp = PTR2DOUBLE(p);
 	*resp = mult*old_resp;
+	return TRUE;
+    }
+    formula bnot = NOT(b);
+    p = find_hash(done_tblp, FORMULA2PTR(bnot));
+    if( p != NULL ) {
+	double old_resp = PTR2DOUBLE(p);
+	double all = pow(2.0, (double) (COUNT_BUF(var_bufp)-idx));
+	*resp = mult*(all-old_resp);
 	return TRUE;
     }
     formula L, R;
@@ -1790,6 +1801,227 @@ fp_truth_cover_rec(hash_record *done_tblp, buffer *var_bufp, unint idx,
     insert_hash(done_tblp, FORMULA2PTR(b), DOUBLE2PTR(sum));
     *resp = mult*sum;
     return TRUE;
+}
+
+static void
+create_tc2_caches(tc2_caches_rec *tp)
+{
+    new_buf(&(tp->var_table), nbr_VarTbl, sizeof(unint));
+    new_mgr(&(tp->fp_truth_cov2_rec_mgr), sizeof(fp_truth_cov2_rec));
+    create_hash(&(tp->truth_table1_done), 1000, bdd_hash,  bdd_eq);
+    fp_truth_cov2_cache_sz = sz_MainTbl;
+    fp_truth_cov2_cache = (fp_truth_cov2_ptr)Calloc((fp_truth_cov2_cache_sz)*
+						     sizeof(fp_truth_cov2_rec));
+}
+
+static fp_truth_cov2_ptr
+find_in_fp_truth_cov2_cache(formula cond, formula f)
+{
+    unint idx;
+    ASSERT(fp_truth_cov2_cache_sz > 0);
+    idx = (137*((unint) cond) + 487*((unint) f) ) % fp_truth_cov2_cache_sz;
+    return( fp_truth_cov2_cache + idx );
+}
+
+static void
+free_tc2_caches(tc2_caches_rec *tp)
+{
+    free_buf(&(tp->var_table));
+    free_mgr(&(tp->fp_truth_cov2_rec_mgr));
+    dispose_hash(&(tp->truth_table1_done), NULLFCN);
+    Free((pointer) fp_truth_cov2_cache);
+    fp_truth_cov2_cache_sz = -1;
+}
+
+
+static void
+do_fp_truth_cover2_n(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr var_list, g_cond, funs;
+    EXTRACT_3_ARGS(redex, var_list, g_cond, funs);
+    formula cond = GET_BOOL(g_cond);
+    bool o_do_dynamic_var_order = RCdo_dynamic_var_order;
+    tc2_caches_rec  tc;
+    create_tc2_caches(&tc);
+    while( !IS_NIL(var_list) ) {
+        string vname = GET_STRING(GET_CONS_HD(var_list));
+	formula v = B_Var(vname);
+	bdd_ptr	bp = GET_BDDP(v);
+	unint var = BDD_GET_VAR(bp);
+	push_buf(&(tc.var_table), (pointer) &var);
+	var_list = GET_CONS_TL(var_list);
+    }
+    qsort(START_BUF(&(tc.var_table)), COUNT_BUF(&(tc.var_table)), sizeof(unint),
+		    var_ord_comp);
+    MAKE_REDEX_NIL(redex);
+    g_ptr tail = redex;
+    while( !IS_NIL(funs) ) {
+	double res;
+	string emsg;
+	formula fun = GET_BOOL(GET_CONS_HD(funs));
+	if( !fp_truth_cover2_rec(&tc, 0, cond, fun, &res, &emsg) )
+	{
+	    MAKE_REDEX_FAILURE(redex, emsg);
+	    free_tc2_caches(&tc);
+	    RCdo_dynamic_var_order = o_do_dynamic_var_order;
+	    DEC_REF_CNT(l);
+	    DEC_REF_CNT(r);
+	    return;
+	} else {
+	    APPEND1(tail, Make_float_leaf(res));
+	}
+	funs = GET_CONS_TL(funs);
+    }
+    free_tc2_caches(&tc);
+    RCdo_dynamic_var_order = o_do_dynamic_var_order;
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static bool
+fp_truth_cover2_rec(tc2_caches_rec *tp, unint idx, formula cond, formula f,
+		    double *resp, string *emsgp)
+{
+    if( f == ZERO ) {
+	*resp = 0.0;
+	return TRUE;
+    }
+    if( cond == ZERO ) {
+	*resp = 0.0;
+	return TRUE;
+    }
+    if( f == ONE ) {
+	return( fp_truth_cover_rec(&(tp->truth_table1_done), &(tp->var_table),
+			           idx, cond, resp, emsgp) );
+    }
+    if( cond == ONE ) {
+	return( fp_truth_cover_rec(&(tp->truth_table1_done), &(tp->var_table),
+			           idx, f, resp, emsgp) );
+    }
+
+%%%%%%%%%%%%%%
+Change idx to a formula that is the AND of all the variables....
+%%%%%%%%%%%%%%
+
+    bdd_ptr fp = GET_BDDP(f);
+    bdd_ptr cp = GET_BDDP(cond);
+    unint fnext_var = BDD_GET_VAR(fp);
+    unint cnext_var = BDD_GET_VAR(cp);
+
+    unint next_var;
+    if( (VarTbl+fnext_var)->variable < (VarTbl+cnext_var)->variable ) {
+	next_var = fnext_var;
+    } else {
+	next_var = cnext_var;
+    }
+    double mult = 1.0;
+    if( idx == COUNT_BUF(&(tp->var_table)) ) {
+	var_ptr vp = VarTbl + next_var;
+	*emsgp =
+	    Fail_pr("Variable %s not in truth_cover2 list but f depends on it",
+		    vp->var_name);
+	return FALSE;
+    }
+    while( *((unint *) M_LOCATE_BUF(&(tp->var_table), idx)) != next_var ) {
+	mult = mult * 2.0;
+	idx++;
+	if( idx == COUNT_BUF(&(tp->var_table)) ) {
+	    var_ptr vp = VarTbl + next_var;
+	    *emsgp =
+	      Fail_pr("Variable %s not in truth_cover2 list but f depends on it",
+		      vp->var_name);
+	    return FALSE;
+	}
+    }
+    // Look up in cache
+    fp_truth_cov2_ptr old = find_in_fp_truth_cov2_cache(cond, f);
+    if( (old->cond == cond) && (old->f == f) ) {
+	*resp = mult*old->res;
+	return TRUE;
+    }
+    // Not in cache
+    if( fnext_var < cnext_var ) {
+	formula L, R;
+	if( ISNOT(f) ) {
+	    L = NOT(GET_LSON(fp));
+	    R = NOT(GET_RSON(fp));
+	} else {
+	    L = GET_LSON(fp);
+	    R = GET_RSON(fp);
+	}
+	double Lres;
+	if( !fp_truth_cover2_rec(tp, idx+1, cond, L, &Lres, emsgp) ) {
+	    return FALSE;
+	}
+	double Rres;
+	if( !fp_truth_cover2_rec(tp, idx+1, cond, R, &Rres, emsgp) ) {
+	    return FALSE;
+	}
+	double sum = Lres+Rres;
+	old->cond = cond;
+	old->f = f;
+	old->res = sum;
+	*resp = mult*sum;
+	return TRUE;
+    } else {
+	if( fnext_var > cnext_var ) {
+	    formula L, R;
+		if( ISNOT(cond) ) {
+		L = NOT(GET_LSON(cp));
+		R = NOT(GET_RSON(cp));
+	    } else {
+		L = GET_LSON(cp);
+		R = GET_RSON(cp);
+	    }
+	    double Lres;
+	    if( !fp_truth_cover2_rec(tp, idx+1, L, f, &Lres, emsgp) ) {
+		return FALSE;
+	    }
+	    double Rres;
+	    if( !fp_truth_cover2_rec(tp, idx+1, R, f, &Rres, emsgp) ) {
+		return FALSE;
+	    }
+	    double sum = Lres+Rres;
+	    old->cond = cond;
+	    old->f = f;
+	    old->res = sum;
+	    *resp = mult*sum;
+	    return TRUE;
+	} else {
+	    formula L, R;
+	    if( ISNOT(f) ) {
+		L = NOT(GET_LSON(fp));
+		R = NOT(GET_RSON(fp));
+	    } else {
+		L = GET_LSON(fp);
+		R = GET_RSON(fp);
+	    }
+	    formula Lc, Rc;
+            if( ISNOT(cond) ) {
+                Lc = NOT(GET_LSON(cp));
+                Rc = NOT(GET_RSON(cp));
+            } else {
+                Lc = GET_LSON(cp);
+                Rc = GET_RSON(cp); 
+            }
+	    double Lres;
+	    if( !fp_truth_cover2_rec(tp, idx+1, Lc, L, &Lres, emsgp) ) {
+		return FALSE;
+	    }
+	    double Rres;
+	    if( !fp_truth_cover2_rec(tp, idx+1, Rc, R, &Rres, emsgp) ) {
+		return FALSE;
+	    }
+	    double sum = Lres+Rres;
+	    old->cond = cond;
+	    old->f = f;
+	    old->res = sum;
+	    *resp = mult*sum;
+	    return TRUE;
+	}
+    }
 }
 
 static void
@@ -2060,6 +2292,16 @@ BDD_Install_Functions()
 				GLmake_list(GLmake_bool()),
 				GLmake_list(float_tp))),
 			do_fp_truth_cover_n);
+
+    Add_ExtAPI_Function("fp_truth_cover2_n", "111", FALSE,
+			GLmake_arrow(
+			    GLmake_list(GLmake_string()),
+			    GLmake_arrow(
+			      GLmake_bool(),
+			      GLmake_arrow(
+				GLmake_list(GLmake_bool()),
+				GLmake_list(float_tp)))),
+			do_fp_truth_cover2_n);
 
 }
 
@@ -3252,10 +3494,11 @@ find_in_relprod_cache(formula v, formula a, formula b)
     return( relprod_cache + idx );
 }
 
+
 static unsigned int
 bdd_hash(pointer np, unsigned int n)
 {
-    return( ((lunint) np) % n );
+    return( (unsigned int) (((lunint) np) % (lunint) n) );
 }
 
 static bool

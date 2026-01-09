@@ -2616,7 +2616,7 @@ update_stbl(symbol_tbl_ptr stbl, fn_ptr fp)
     if( last == fp ) { return; }
     if(last != NULL && last != fp ) {
 	if( last->ADT_level == fp->ADT_level ) {
-//	    last->in_use = FALSE;
+	    last->in_use = FALSE;
 	}
         delete_hash(stbl->tbl_ptr, (pointer) name);
     }
