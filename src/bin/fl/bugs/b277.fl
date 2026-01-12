@@ -5,6 +5,12 @@ let av = bv_variable "a[7:0]";
 let bv = bv_variable "b[7:0]";
 let cv = bv_variable "c[7:0]";
 
+//draw_bdds T [a AND b AND c] ["vs"];
+
+let cond = a XOR b;
+let f = a OR b OR c;
+fp_truth_cover_n (depends [cond,f]) [cond AND f];
+
 //let cond = av = (bv - '1);
 //let f = (av+bv = cv);
 //let cf = cond AND f;
@@ -49,18 +55,36 @@ let tst cond f =
     (fprintf stderr "|cond|=%d |f|=%d |cond AND f|=%d\n" 
 		(bdd_size cond) (bdd_size f) (bdd_size cf)) fseq
     let res1 = hd (fp_truth_cover_n vars [cf]) then
+(fprintf stderr "Done res1\n") fseq
     let res2 = hd (fp_truth_cover2_n vars cond [f]) then
+(fprintf stderr "Done res2\n") fseq
     (fprintf stderr "-> %s\n" (float2str res1)) fseq
     (fprintf stderr "-> %s\n" (float2str res2)) fseq
     ()
 ;
 
+let cond = gen_random_bool (depends (av,bv,cv)) 100;
+let f = gen_random_bool (depends (av,bv,cv)) 100;
+tst cond f;
+
+let cond = gen_random_bool (depends (av,bv,cv)) 1000;
+let f = gen_random_bool (depends (av,bv,cv)) 1000;
+tst cond f;
+
 let cond = gen_random_bool (depends (av,bv,cv)) 10000;
 let f = gen_random_bool (depends (av,bv,cv)) 10000;
 tst cond f;
 
-lettype bug = BUG bool bool;
+let cond = gen_random_bool (depends (av,bv,cv)) 10000;
+let f = gen_random_bool (depends (av,bv,cv)) 10000;
+tst cond f;
+
+let cond = gen_random_bool (depends (av,bv,cv)) 10000;
+let f = gen_random_bool (depends (av,bv,cv)) 10000;
+tst cond f;
+
+//lettype bug = BUG bool bool;
 //write_bug "bug_cond_f.bug" (BUG cond f);
 
-val (BUG cond f) = read_bug "bug_cond_f.bug";
-tst cond f;
+//val (BUG cond f) = read_bug "bug_cond_f.bug";
+//tst cond f;

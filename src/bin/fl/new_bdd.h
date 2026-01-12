@@ -265,7 +265,6 @@ typedef struct fp_truth_cov2_rec {
 } fp_truth_cov2_rec;
 
 typedef struct tc2_caches_rec {
-    buffer		var_table;
     rec_mgr		fp_truth_cov2_rec_mgr;
     hash_record		truth_table1_done;
 } tc2_caches_rec;

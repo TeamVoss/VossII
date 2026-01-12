@@ -128,7 +128,7 @@ static buffer           bdd_gc_buf;
 
 /* ----- Forward definitions local functions ----- */
 static bool		fp_truth_cover2_rec(tc2_caches_rec *tp,
-					    unint idx, formula cond, formula f,
+					    formula vs, formula cond, formula f,
 					    double *resp, string *emsgp);
 static void		gc_update_ref_cnt(bdd_ptr bp);
 static formula		prim_B_Var(string name);
@@ -174,9 +174,8 @@ static bool		truth_cover_rec(hash_record *done_tblp,
 					arbi_T *resp, string *emsgp);
 static bool
 			fp_truth_cover_rec(hash_record *done_tblp,
-					   buffer *var_bufp, unint idx,
-					   formula b, double *resp,
-					   string *emsgp);
+					   formula vs, formula b,
+					   double *resp, string *emsgp);
 static int		bdd_get_size_rec(formula f, int *limitp);
 static void		restore_mark(formula f);
 static cache_ptr	get_new_cache_rec();
@@ -1696,30 +1695,27 @@ do_fp_truth_cover_n(g_ptr redex)
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr var_list, funs;
     EXTRACT_2_ARGS(redex, var_list, funs);
-    buffer  var_table;
-    new_buf(&var_table, nbr_VarTbl, sizeof(unint));
     hash_record truth_table_done;
     create_hash(&truth_table_done, 100, bdd_hash, bdd_eq);
+    bool o_do_dynamic_var_order = RCdo_dynamic_var_order;
+    formula vs = ONE;
     while( !IS_NIL(var_list) ) {
         string vname = GET_STRING(GET_CONS_HD(var_list));
 	formula v = B_Var(vname);
-	bdd_ptr	bp = GET_BDDP(v);
-	unint var = BDD_GET_VAR(bp);
-	push_buf(&var_table, (pointer) &var);
+	vs = B_And(vs, v);
 	var_list = GET_CONS_TL(var_list);
     }
-    qsort(START_BUF(&var_table), COUNT_BUF(&var_table), sizeof(unint),
-		    var_ord_comp);
+
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
     while( !IS_NIL(funs) ) {
 	double res;
 	string emsg;
 	formula fun = GET_BOOL(GET_CONS_HD(funs));
-	if( !fp_truth_cover_rec(&truth_table_done,&var_table,0,fun,&res,&emsg)){
+	if( !fp_truth_cover_rec(&truth_table_done,vs,fun,&res,&emsg)){
 	    MAKE_REDEX_FAILURE(redex, emsg);
-	    free_buf(&var_table);
 	    dispose_hash(&truth_table_done, NULLFCN);
+	    RCdo_dynamic_var_order = o_do_dynamic_var_order;
 	    DEC_REF_CNT(l);
 	    DEC_REF_CNT(r);
 	    return;
@@ -1728,14 +1724,14 @@ do_fp_truth_cover_n(g_ptr redex)
 	}
 	funs = GET_CONS_TL(funs);
     }
-    free_buf(&var_table);
     dispose_hash(&truth_table_done, NULLFCN);
+    RCdo_dynamic_var_order = o_do_dynamic_var_order;
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
 
 static bool
-fp_truth_cover_rec(hash_record *done_tblp, buffer *var_bufp, unint idx,
+fp_truth_cover_rec(hash_record *done_tblp, formula vs,
 		   formula b, double *resp, string *emsgp)
 {
     if( b == ZERO ) {
@@ -1743,29 +1739,28 @@ fp_truth_cover_rec(hash_record *done_tblp, buffer *var_bufp, unint idx,
 	return TRUE;
     }
     if( b == ONE ) {
-	*resp = pow(2.0, (double) (COUNT_BUF(var_bufp)-idx));
+	double res = 1.0;
+	while( vs != ZERO ) {
+	    res = 2.0*res;
+	    bdd_ptr vsp = GET_BDDP(vs);
+	    vs = GET_RSON(vsp);
+	}
+	*resp = res;
 	return TRUE;
     }
     bdd_ptr bp = GET_BDDP(b);
     unint next_var = BDD_GET_VAR(bp);
-    if( idx == COUNT_BUF(var_bufp) ) {
+    double mult = 1.0;
+    while( (vs != ZERO) && (BDD_GET_VAR(GET_BDDP(vs)) != next_var) ) {
+	mult = 2.0*mult;
+	vs = GET_LSON(GET_BDDP(vs));
+    }
+    if( vs == ZERO ) {
 	var_ptr vp = VarTbl + next_var;
 	*emsgp =
 	    Fail_pr("Variable %s not in truth_cover list but f depends on it",
 		    vp->var_name);
 	return FALSE;
-    }
-    double mult = 1.0;
-    while( *((unint *) M_LOCATE_BUF(var_bufp, idx)) != next_var ) {
-	mult = mult * 2.0;
-	idx++;
-	if( idx == COUNT_BUF(var_bufp) ) {
-	    var_ptr vp = VarTbl + next_var;
-	    *emsgp =
-	      Fail_pr("Variable %s not in truth_cover list but f depends on it",
-		      vp->var_name);
-	    return FALSE;
-	}
     }
     pointer p = find_hash(done_tblp, FORMULA2PTR(b));
     if( p != NULL ) {
@@ -1777,7 +1772,11 @@ fp_truth_cover_rec(hash_record *done_tblp, buffer *var_bufp, unint idx,
     p = find_hash(done_tblp, FORMULA2PTR(bnot));
     if( p != NULL ) {
 	double old_resp = PTR2DOUBLE(p);
-	double all = pow(2.0, (double) (COUNT_BUF(var_bufp)-idx));
+	double all = 1.0;
+	while( (vs != ZERO) ) {
+	    all = 2.0*all;
+	    vs = GET_LSON(GET_BDDP(vs));
+	}
 	*resp = mult*(all-old_resp);
 	return TRUE;
     }
@@ -1790,11 +1789,12 @@ fp_truth_cover_rec(hash_record *done_tblp, buffer *var_bufp, unint idx,
         R = GET_RSON(bp);
     }
     double Lres;
-    if( !fp_truth_cover_rec(done_tblp, var_bufp, idx+1, L, &Lres, emsgp) ) {
+    vs = GET_LSON(GET_BDDP(vs));
+    if( !fp_truth_cover_rec(done_tblp, vs, L, &Lres, emsgp) ) {
 	return FALSE;
     }
     double Rres;
-    if( !fp_truth_cover_rec(done_tblp, var_bufp, idx+1, R, &Rres, emsgp) ) {
+    if( !fp_truth_cover_rec(done_tblp, vs, R, &Rres, emsgp) ) {
 	return FALSE;
     }
     double sum = Lres+Rres;
@@ -1806,7 +1806,6 @@ fp_truth_cover_rec(hash_record *done_tblp, buffer *var_bufp, unint idx,
 static void
 create_tc2_caches(tc2_caches_rec *tp)
 {
-    new_buf(&(tp->var_table), nbr_VarTbl, sizeof(unint));
     new_mgr(&(tp->fp_truth_cov2_rec_mgr), sizeof(fp_truth_cov2_rec));
     create_hash(&(tp->truth_table1_done), 1000, bdd_hash,  bdd_eq);
     fp_truth_cov2_cache_sz = sz_MainTbl;
@@ -1826,7 +1825,6 @@ find_in_fp_truth_cov2_cache(formula cond, formula f)
 static void
 free_tc2_caches(tc2_caches_rec *tp)
 {
-    free_buf(&(tp->var_table));
     free_mgr(&(tp->fp_truth_cov2_rec_mgr));
     dispose_hash(&(tp->truth_table1_done), NULLFCN);
     Free((pointer) fp_truth_cov2_cache);
@@ -1845,23 +1843,20 @@ do_fp_truth_cover2_n(g_ptr redex)
     bool o_do_dynamic_var_order = RCdo_dynamic_var_order;
     tc2_caches_rec  tc;
     create_tc2_caches(&tc);
+    formula vs = ONE;
     while( !IS_NIL(var_list) ) {
         string vname = GET_STRING(GET_CONS_HD(var_list));
 	formula v = B_Var(vname);
-	bdd_ptr	bp = GET_BDDP(v);
-	unint var = BDD_GET_VAR(bp);
-	push_buf(&(tc.var_table), (pointer) &var);
+	vs = B_And(vs, v);
 	var_list = GET_CONS_TL(var_list);
     }
-    qsort(START_BUF(&(tc.var_table)), COUNT_BUF(&(tc.var_table)), sizeof(unint),
-		    var_ord_comp);
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
     while( !IS_NIL(funs) ) {
 	double res;
 	string emsg;
 	formula fun = GET_BOOL(GET_CONS_HD(funs));
-	if( !fp_truth_cover2_rec(&tc, 0, cond, fun, &res, &emsg) )
+	if( !fp_truth_cover2_rec(&tc, vs, cond, fun, &res, &emsg) )
 	{
 	    MAKE_REDEX_FAILURE(redex, emsg);
 	    free_tc2_caches(&tc);
@@ -1881,7 +1876,7 @@ do_fp_truth_cover2_n(g_ptr redex)
 }
 
 static bool
-fp_truth_cover2_rec(tc2_caches_rec *tp, unint idx, formula cond, formula f,
+fp_truth_cover2_rec(tc2_caches_rec *tp, formula vs, formula cond, formula f,
 		    double *resp, string *emsgp)
 {
     if( f == ZERO ) {
@@ -1893,48 +1888,31 @@ fp_truth_cover2_rec(tc2_caches_rec *tp, unint idx, formula cond, formula f,
 	return TRUE;
     }
     if( f == ONE ) {
-	return( fp_truth_cover_rec(&(tp->truth_table1_done), &(tp->var_table),
-			           idx, cond, resp, emsgp) );
+	return(fp_truth_cover_rec(&(tp->truth_table1_done),vs,cond,resp,emsgp));
     }
     if( cond == ONE ) {
-	return( fp_truth_cover_rec(&(tp->truth_table1_done), &(tp->var_table),
-			           idx, f, resp, emsgp) );
+	return(fp_truth_cover_rec(&(tp->truth_table1_done),vs,f,resp,emsgp));
     }
-
-%%%%%%%%%%%%%%
-Change idx to a formula that is the AND of all the variables....
-%%%%%%%%%%%%%%
 
     bdd_ptr fp = GET_BDDP(f);
     bdd_ptr cp = GET_BDDP(cond);
     unint fnext_var = BDD_GET_VAR(fp);
     unint cnext_var = BDD_GET_VAR(cp);
-
-    unint next_var;
-    if( (VarTbl+fnext_var)->variable < (VarTbl+cnext_var)->variable ) {
-	next_var = fnext_var;
-    } else {
-	next_var = cnext_var;
-    }
     double mult = 1.0;
-    if( idx == COUNT_BUF(&(tp->var_table)) ) {
-	var_ptr vp = VarTbl + next_var;
+    unint csvar = BDD_GET_VAR(GET_BDDP(vs));
+    while( (vs != ZERO) && (csvar != fnext_var) && (csvar != cnext_var) ) {
+        mult = 2.0*mult;
+        vs = GET_LSON(GET_BDDP(vs));
+	csvar = BDD_GET_VAR(GET_BDDP(vs));
+    }
+    if( vs == ZERO ) {
+	var_ptr vp = VarTbl + fnext_var;
 	*emsgp =
-	    Fail_pr("Variable %s not in truth_cover2 list but f depends on it",
+	    Fail_pr("Variable %s not in truth_cover list but f depends on it",
 		    vp->var_name);
 	return FALSE;
     }
-    while( *((unint *) M_LOCATE_BUF(&(tp->var_table), idx)) != next_var ) {
-	mult = mult * 2.0;
-	idx++;
-	if( idx == COUNT_BUF(&(tp->var_table)) ) {
-	    var_ptr vp = VarTbl + next_var;
-	    *emsgp =
-	      Fail_pr("Variable %s not in truth_cover2 list but f depends on it",
-		      vp->var_name);
-	    return FALSE;
-	}
-    }
+
     // Look up in cache
     fp_truth_cov2_ptr old = find_in_fp_truth_cov2_cache(cond, f);
     if( (old->cond == cond) && (old->f == f) ) {
@@ -1942,7 +1920,8 @@ Change idx to a formula that is the AND of all the variables....
 	return TRUE;
     }
     // Not in cache
-    if( fnext_var < cnext_var ) {
+    vs = GET_LSON(GET_BDDP(vs));
+    if( (csvar == fnext_var) && (csvar != cnext_var) ) {
 	formula L, R;
 	if( ISNOT(f) ) {
 	    L = NOT(GET_LSON(fp));
@@ -1952,11 +1931,11 @@ Change idx to a formula that is the AND of all the variables....
 	    R = GET_RSON(fp);
 	}
 	double Lres;
-	if( !fp_truth_cover2_rec(tp, idx+1, cond, L, &Lres, emsgp) ) {
+	if( !fp_truth_cover2_rec(tp, vs, cond, L, &Lres, emsgp) ) {
 	    return FALSE;
 	}
 	double Rres;
-	if( !fp_truth_cover2_rec(tp, idx+1, cond, R, &Rres, emsgp) ) {
+	if( !fp_truth_cover2_rec(tp, vs, cond, R, &Rres, emsgp) ) {
 	    return FALSE;
 	}
 	double sum = Lres+Rres;
@@ -1966,7 +1945,7 @@ Change idx to a formula that is the AND of all the variables....
 	*resp = mult*sum;
 	return TRUE;
     } else {
-	if( fnext_var > cnext_var ) {
+	if( (csvar != fnext_var) && (csvar == cnext_var) ) {
 	    formula L, R;
 		if( ISNOT(cond) ) {
 		L = NOT(GET_LSON(cp));
@@ -1976,11 +1955,11 @@ Change idx to a formula that is the AND of all the variables....
 		R = GET_RSON(cp);
 	    }
 	    double Lres;
-	    if( !fp_truth_cover2_rec(tp, idx+1, L, f, &Lres, emsgp) ) {
+	    if( !fp_truth_cover2_rec(tp, vs, L, f, &Lres, emsgp) ) {
 		return FALSE;
 	    }
 	    double Rres;
-	    if( !fp_truth_cover2_rec(tp, idx+1, R, f, &Rres, emsgp) ) {
+	    if( !fp_truth_cover2_rec(tp, vs, R, f, &Rres, emsgp) ) {
 		return FALSE;
 	    }
 	    double sum = Lres+Rres;
@@ -2007,11 +1986,11 @@ Change idx to a formula that is the AND of all the variables....
                 Rc = GET_RSON(cp); 
             }
 	    double Lres;
-	    if( !fp_truth_cover2_rec(tp, idx+1, Lc, L, &Lres, emsgp) ) {
+	    if( !fp_truth_cover2_rec(tp, vs, Lc, L, &Lres, emsgp) ) {
 		return FALSE;
 	    }
 	    double Rres;
-	    if( !fp_truth_cover2_rec(tp, idx+1, Rc, R, &Rres, emsgp) ) {
+	    if( !fp_truth_cover2_rec(tp, vs, Rc, R, &Rres, emsgp) ) {
 		return FALSE;
 	    }
 	    double sum = Lres+Rres;
