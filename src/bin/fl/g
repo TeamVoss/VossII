@@ -4,4 +4,6 @@ r -noX -f bugs/b277.fl
 break exit
 break voss_abort
 break Dbg_stop
+break fp_truth_cover_rec
+break fp_truth_cover2_rec
 c

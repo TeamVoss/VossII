@@ -9,7 +9,12 @@ let cv = bv_variable "c[7:0]";
 
 let cond = a XOR b;
 let f = a OR b OR c;
+let cf = cond AND f;
+//draw_bdds F [cond, f, cf] ["cond", "f", "cond AND f"];
+//draw_bdds T [cond, f, cf] ["cond", "f", "cond AND f"];
 fp_truth_cover_n (depends [cond,f]) [cond AND f];
+fp_truth_cover2_n (depends [cond,f]) cond [f];
+
 
 //let cond = av = (bv - '1);
 //let f = (av+bv = cv);

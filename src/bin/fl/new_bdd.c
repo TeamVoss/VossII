@@ -109,6 +109,8 @@ static hash_record	bdd_save_tbl;
 static relprod_cache_ptr relprod_cache;
 static int 		relprod_cache_sz;
 
+static fp_truth_cov_ptr fp_truth_cov_cache;
+static int 		fp_truth_cov_cache_sz;
 static fp_truth_cov2_ptr fp_truth_cov2_cache;
 static int 		fp_truth_cov2_cache_sz;
 
@@ -127,8 +129,7 @@ static subst_ptr	bdd_subs;
 static buffer           bdd_gc_buf;
 
 /* ----- Forward definitions local functions ----- */
-static bool		fp_truth_cover2_rec(tc2_caches_rec *tp,
-					    formula vs, formula cond, formula f,
+static bool		fp_truth_cover2_rec(formula vs, formula cond, formula f,
 					    double *resp, string *emsgp);
 static void		gc_update_ref_cnt(bdd_ptr bp);
 static formula		prim_B_Var(string name);
@@ -173,14 +174,16 @@ static bool		truth_cover_rec(hash_record *done_tblp,
 					buffer *var_bufp, unint idx, formula b,
 					arbi_T *resp, string *emsgp);
 static bool
-			fp_truth_cover_rec(hash_record *done_tblp,
-					   formula vs, formula b,
+			fp_truth_cover_rec(formula vs, formula b,
 					   double *resp, string *emsgp);
 static int		bdd_get_size_rec(formula f, int *limitp);
 static void		restore_mark(formula f);
 static cache_ptr	get_new_cache_rec();
 static unint		cache_hash(pointer p, unint n);
 static bool		cache_equ(pointer p1, pointer p2);
+#if 0
+static unint		get_bdd_size(formula f);
+#endif
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
 /********************************************************/
@@ -1689,15 +1692,38 @@ do_truth_cover(g_ptr redex)
 }
 
 static void
+create_tc_cache()
+{
+    fp_truth_cov_cache_sz = sz_MainTbl;
+    fp_truth_cov_cache = (fp_truth_cov_ptr)Calloc((fp_truth_cov_cache_sz)*
+						     sizeof(fp_truth_cov_rec));
+}
+
+static fp_truth_cov_ptr
+find_in_fp_truth_cov_cache(formula f)
+{
+    unint idx;
+    ASSERT(fp_truth_cov_cache_sz > 0);
+    idx = (137*((unint) f) ) % fp_truth_cov_cache_sz;
+    return( fp_truth_cov_cache + idx );
+}
+
+static void
+free_tc_cache()
+{
+    Free((pointer) fp_truth_cov_cache);
+    fp_truth_cov_cache_sz = -1;
+}
+
+static void
 do_fp_truth_cover_n(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr var_list, funs;
     EXTRACT_2_ARGS(redex, var_list, funs);
-    hash_record truth_table_done;
-    create_hash(&truth_table_done, 100, bdd_hash, bdd_eq);
     bool o_do_dynamic_var_order = RCdo_dynamic_var_order;
+    create_tc_cache();
     formula vs = ONE;
     while( !IS_NIL(var_list) ) {
         string vname = GET_STRING(GET_CONS_HD(var_list));
@@ -1705,17 +1731,16 @@ do_fp_truth_cover_n(g_ptr redex)
 	vs = B_And(vs, v);
 	var_list = GET_CONS_TL(var_list);
     }
-
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
     while( !IS_NIL(funs) ) {
 	double res;
 	string emsg;
 	formula fun = GET_BOOL(GET_CONS_HD(funs));
-	if( !fp_truth_cover_rec(&truth_table_done,vs,fun,&res,&emsg)){
+	if( !fp_truth_cover_rec(vs,fun,&res,&emsg)){
 	    MAKE_REDEX_FAILURE(redex, emsg);
-	    dispose_hash(&truth_table_done, NULLFCN);
 	    RCdo_dynamic_var_order = o_do_dynamic_var_order;
+	    free_tc_cache();
 	    DEC_REF_CNT(l);
 	    DEC_REF_CNT(r);
 	    return;
@@ -1724,15 +1749,14 @@ do_fp_truth_cover_n(g_ptr redex)
 	}
 	funs = GET_CONS_TL(funs);
     }
-    dispose_hash(&truth_table_done, NULLFCN);
     RCdo_dynamic_var_order = o_do_dynamic_var_order;
+    free_tc_cache();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
 
 static bool
-fp_truth_cover_rec(hash_record *done_tblp, formula vs,
-		   formula b, double *resp, string *emsgp)
+fp_truth_cover_rec(formula vs, formula b, double *resp, string *emsgp)
 {
     if( b == ZERO ) {
 	*resp = 0.0;
@@ -1743,7 +1767,7 @@ fp_truth_cover_rec(hash_record *done_tblp, formula vs,
 	while( vs != ZERO ) {
 	    res = 2.0*res;
 	    bdd_ptr vsp = GET_BDDP(vs);
-	    vs = GET_RSON(vsp);
+	    vs = GET_LSON(vsp);
 	}
 	*resp = res;
 	return TRUE;
@@ -1762,22 +1786,20 @@ fp_truth_cover_rec(hash_record *done_tblp, formula vs,
 		    vp->var_name);
 	return FALSE;
     }
-    pointer p = find_hash(done_tblp, FORMULA2PTR(b));
-    if( p != NULL ) {
-	double old_resp = PTR2DOUBLE(p);
-	*resp = mult*old_resp;
+    fp_truth_cov_ptr old = find_in_fp_truth_cov_cache(b);
+    if( old->f == b ) {
+	*resp = mult*old->res;
 	return TRUE;
     }
     formula bnot = NOT(b);
-    p = find_hash(done_tblp, FORMULA2PTR(bnot));
-    if( p != NULL ) {
-	double old_resp = PTR2DOUBLE(p);
+    fp_truth_cov_ptr oldnot = find_in_fp_truth_cov_cache(bnot);
+    if( oldnot->f == bnot ) {
 	double all = 1.0;
 	while( (vs != ZERO) ) {
 	    all = 2.0*all;
 	    vs = GET_LSON(GET_BDDP(vs));
 	}
-	*resp = mult*(all-old_resp);
+	*resp = mult*(all-oldnot->res);
 	return TRUE;
     }
     formula L, R;
@@ -1790,24 +1812,25 @@ fp_truth_cover_rec(hash_record *done_tblp, formula vs,
     }
     double Lres;
     vs = GET_LSON(GET_BDDP(vs));
-    if( !fp_truth_cover_rec(done_tblp, vs, L, &Lres, emsgp) ) {
+    if( !fp_truth_cover_rec(vs, L, &Lres, emsgp) ) {
 	return FALSE;
     }
     double Rres;
-    if( !fp_truth_cover_rec(done_tblp, vs, R, &Rres, emsgp) ) {
+    if( !fp_truth_cover_rec(vs, R, &Rres, emsgp) ) {
 	return FALSE;
     }
     double sum = Lres+Rres;
-    insert_hash(done_tblp, FORMULA2PTR(b), DOUBLE2PTR(sum));
+    old->f = b;
+    old->res = sum;
     *resp = mult*sum;
     return TRUE;
 }
 
+
 static void
-create_tc2_caches(tc2_caches_rec *tp)
+create_tc2_cache()
 {
-    new_mgr(&(tp->fp_truth_cov2_rec_mgr), sizeof(fp_truth_cov2_rec));
-    create_hash(&(tp->truth_table1_done), 1000, bdd_hash,  bdd_eq);
+    create_tc_cache();
     fp_truth_cov2_cache_sz = sz_MainTbl;
     fp_truth_cov2_cache = (fp_truth_cov2_ptr)Calloc((fp_truth_cov2_cache_sz)*
 						     sizeof(fp_truth_cov2_rec));
@@ -1823,10 +1846,9 @@ find_in_fp_truth_cov2_cache(formula cond, formula f)
 }
 
 static void
-free_tc2_caches(tc2_caches_rec *tp)
+free_tc2_cache()
 {
-    free_mgr(&(tp->fp_truth_cov2_rec_mgr));
-    dispose_hash(&(tp->truth_table1_done), NULLFCN);
+    free_tc_cache();
     Free((pointer) fp_truth_cov2_cache);
     fp_truth_cov2_cache_sz = -1;
 }
@@ -1841,8 +1863,7 @@ do_fp_truth_cover2_n(g_ptr redex)
     EXTRACT_3_ARGS(redex, var_list, g_cond, funs);
     formula cond = GET_BOOL(g_cond);
     bool o_do_dynamic_var_order = RCdo_dynamic_var_order;
-    tc2_caches_rec  tc;
-    create_tc2_caches(&tc);
+    create_tc2_cache();
     formula vs = ONE;
     while( !IS_NIL(var_list) ) {
         string vname = GET_STRING(GET_CONS_HD(var_list));
@@ -1856,10 +1877,10 @@ do_fp_truth_cover2_n(g_ptr redex)
 	double res;
 	string emsg;
 	formula fun = GET_BOOL(GET_CONS_HD(funs));
-	if( !fp_truth_cover2_rec(&tc, vs, cond, fun, &res, &emsg) )
+	if( !fp_truth_cover2_rec(vs, cond, fun, &res, &emsg) )
 	{
 	    MAKE_REDEX_FAILURE(redex, emsg);
-	    free_tc2_caches(&tc);
+	    free_tc2_cache();
 	    RCdo_dynamic_var_order = o_do_dynamic_var_order;
 	    DEC_REF_CNT(l);
 	    DEC_REF_CNT(r);
@@ -1869,14 +1890,14 @@ do_fp_truth_cover2_n(g_ptr redex)
 	}
 	funs = GET_CONS_TL(funs);
     }
-    free_tc2_caches(&tc);
+    free_tc2_cache();
     RCdo_dynamic_var_order = o_do_dynamic_var_order;
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
 
 static bool
-fp_truth_cover2_rec(tc2_caches_rec *tp, formula vs, formula cond, formula f,
+fp_truth_cover2_rec(formula vs, formula cond, formula f,
 		    double *resp, string *emsgp)
 {
     if( f == ZERO ) {
@@ -1888,10 +1909,10 @@ fp_truth_cover2_rec(tc2_caches_rec *tp, formula vs, formula cond, formula f,
 	return TRUE;
     }
     if( f == ONE ) {
-	return(fp_truth_cover_rec(&(tp->truth_table1_done),vs,cond,resp,emsgp));
+	return(fp_truth_cover_rec(vs,cond,resp,emsgp));
     }
     if( cond == ONE ) {
-	return(fp_truth_cover_rec(&(tp->truth_table1_done),vs,f,resp,emsgp));
+	return(fp_truth_cover_rec(vs,f,resp,emsgp));
     }
 
     bdd_ptr fp = GET_BDDP(f);
@@ -1931,11 +1952,11 @@ fp_truth_cover2_rec(tc2_caches_rec *tp, formula vs, formula cond, formula f,
 	    R = GET_RSON(fp);
 	}
 	double Lres;
-	if( !fp_truth_cover2_rec(tp, vs, cond, L, &Lres, emsgp) ) {
+	if( !fp_truth_cover2_rec(vs, cond, L, &Lres, emsgp) ) {
 	    return FALSE;
 	}
 	double Rres;
-	if( !fp_truth_cover2_rec(tp, vs, cond, R, &Rres, emsgp) ) {
+	if( !fp_truth_cover2_rec(vs, cond, R, &Rres, emsgp) ) {
 	    return FALSE;
 	}
 	double sum = Lres+Rres;
@@ -1955,11 +1976,11 @@ fp_truth_cover2_rec(tc2_caches_rec *tp, formula vs, formula cond, formula f,
 		R = GET_RSON(cp);
 	    }
 	    double Lres;
-	    if( !fp_truth_cover2_rec(tp, vs, L, f, &Lres, emsgp) ) {
+	    if( !fp_truth_cover2_rec(vs, L, f, &Lres, emsgp) ) {
 		return FALSE;
 	    }
 	    double Rres;
-	    if( !fp_truth_cover2_rec(tp, vs, R, f, &Rres, emsgp) ) {
+	    if( !fp_truth_cover2_rec(vs, R, f, &Rres, emsgp) ) {
 		return FALSE;
 	    }
 	    double sum = Lres+Rres;
@@ -1986,11 +2007,11 @@ fp_truth_cover2_rec(tc2_caches_rec *tp, formula vs, formula cond, formula f,
                 Rc = GET_RSON(cp); 
             }
 	    double Lres;
-	    if( !fp_truth_cover2_rec(tp, vs, Lc, L, &Lres, emsgp) ) {
+	    if( !fp_truth_cover2_rec(vs, Lc, L, &Lres, emsgp) ) {
 		return FALSE;
 	    }
 	    double Rres;
-	    if( !fp_truth_cover2_rec(tp, vs, Rc, R, &Rres, emsgp) ) {
+	    if( !fp_truth_cover2_rec(vs, Rc, R, &Rres, emsgp) ) {
 		return FALSE;
 	    }
 	    double sum = Lres+Rres;
@@ -3864,3 +3885,18 @@ restore_mark(formula f)
     restore_mark(POS(GET_RSON(bp)));
 }
 
+#if 0
+static unint
+get_bdd_size(formula f)
+{
+    Reset_BDD_Size();
+    B_Size(f);
+    unint vars = Get_VarCnt();
+    unint size = 0;
+    for(unint i = 0; i < vars; i++) {
+	int wid = B_Width(i);
+	size += wid;
+    }
+    return size;
+}
+#endif
