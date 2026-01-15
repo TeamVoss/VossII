@@ -4509,35 +4509,6 @@ traverse_left(g_ptr oroot)
                             goto clean_up;
 			}
                     }
-                case P_FOPEN:
-                    { if( Fopen(&root, &sp, &depth) ) {
-			    DO_TRACE_DBG();
-                            goto start;
-                        } else {
-			    DO_TRACE_DBG();
-                            goto clean_up;
-			}
-                    }
-
-                case P_FFLUSH:
-                    { if( Fflush(&root, &sp, &depth) ) {
-			    DO_TRACE_DBG();
-                            goto start;
-                        } else {
-			    DO_TRACE_DBG();
-                            goto clean_up;
-			}
-                    }
-
-                case P_FCLOSE:
-                    { if( Fclose(&root, &sp, &depth) ) {
-			    DO_TRACE_DBG();
-                            goto start;
-                        } else {
-			    DO_TRACE_DBG();
-                            goto clean_up;
-			}
-                    }
 
 		case P_UPDATE_RVAR:
 		    if( depth < 2 )

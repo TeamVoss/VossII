@@ -27,6 +27,7 @@ extern str_mgr     *stringsp;
 extern bool	   gui_mode;
 extern string      *fl_args;
 extern char	   FailBuf[4096];
+extern string      Voss_tmp_dir;
 
 /***** PRIVATE VARIABLES *****/
 static char buf [4096];
@@ -202,6 +203,49 @@ normalize_file(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
+static void
+emit_eval_graph(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr exprs;
+    EXTRACT_1_ARG(redex, exprs);
+    Sprintf(buf, "%s/eval_graph_emit_XXXXXX", Voss_tmp_dir);
+    string dir = wastrsave(stringsp, mkdtemp(buf));
+    MAKE_REDEX_NIL(redex);
+    g_ptr tail = redex;
+    int cnt = 0;
+    while( !IS_NIL(exprs) ) {
+	string file = wastrsave(stringsp, tprintf("%s/%d.tar.gz", dir, cnt));
+	if( !Save_graph("_dummy_sig_", file, GET_CONS_HD(exprs)) ) {
+	    MAKE_REDEX_FAILURE(redex,
+		Fail_pr("Saving element %d in emit_eval_graph failed\n", cnt));
+	    return;
+	}
+	APPEND1(tail, Make_STRING_leaf(file));
+	exprs = GET_CONS_TL(exprs);
+	cnt++;
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
+static void
+retrieve_eval_graph(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr gfile;
+    EXTRACT_1_ARG(redex, gfile);
+    string file = GET_STRING(gfile);
+    if( !Load_graph("_dummy_sig_", file, redex) ) {
+	MAKE_REDEX_FAILURE(redex,
+	    Fail_pr("Loading file %s in retrieve_eval_graph failed\n", file));
+	return;
+    }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
 
 void
 System_Install_Functions()
@@ -220,6 +264,14 @@ System_Install_Functions()
     Add_ExtAPI_Function("ARGS", "", FALSE, GLmake_list(GLmake_string()), ARGS);
 
     typeExp_ptr tv1 = GLnew_tVar();
+
+    Add_ExtAPI_Function("emit_eval_graph", "2", FALSE,
+		GLmake_arrow(GLmake_list(tv1), GLmake_list(GLmake_string())),
+		emit_eval_graph);
+
+    Add_ExtAPI_Function("retrieve_eval_graph", "1", FALSE,
+		GLmake_arrow(GLmake_string(), tv1),
+		retrieve_eval_graph);
 
     Add_ExtAPI_Function("wtime", "-", FALSE,
 		GLmake_arrow(tv1, GLmake_tuple(tv1,GLmake_string())),

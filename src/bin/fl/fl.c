@@ -260,7 +260,7 @@ fl_main(int argc, char *argv[])
 	    display = argv[2];
             argc -= 2; argv += 2;
         } else
-        if( strcmp(argv[1], "-eval_expr") == 0 ) {
+        if( strcmp(argv[1], "--eval_expr") == 0 ) {
 	    expr_eval_file = argv[2];
             argc -= 2; argv += 2;
         } else

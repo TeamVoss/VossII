@@ -1,0 +1,148 @@
+
+lettype *a para = PARA_EVAL
+		    {pids:: int list}
+		    {files:: string list}
+		    {results:: ({*a} opt) list}
+;
+
+let PRpara (PARA_EVAL pids files _) =
+    sprintf "(PARA_EVAL %S %S .)\n" (map int2str pids) files
+;
+
+let spawn_fl_eval file =
+    let cmd = sprintf "fl -noX --eval_expr %s" file then
+//    let pid = sscanf "%d" (tcl_eval [sprintf "exec %s >& /dev/null &" cmd]) then
+let pid = sscanf "%d" (tcl_eval [sprintf "exec %s &" cmd]) then
+    pid
+;
+
+let para_eval {exprs:: *a list} =
+    let files = emit_eval_graph exprs then
+(map (\f. system (sprintf "/bin/cp %s %s_ORIG" f f)) files) fseq
+    let pids = map spawn_fl_eval files then
+    let results = replicate (length files) {NONE:: {*a} opt} then
+    let res = PARA_EVAL pids files results then
+    res
+;
+
+
+let para_eval_update peval =
+    val (PARA_EVAL pids files results) = peval in
+    let is_alive pid = (system (sprintf "ps --pid %d > /dev/null" pid)) = 0 in
+    let update pid file res =
+	has_value res => res |
+	(is_alive pid) => NONE |
+	let res = retrieve_eval_graph file then
+	SOME res
+    in
+    let results' = map3 update pids files results then
+    (PARA_EVAL pids files results')
+;
+
+let para_eval_kill peval =
+    val (PARA_EVAL pids files results) = peval in
+    let kill pid = (system (sprintf "kill -9 %d" pid)) fseq () in
+    foreach kill pids
+;
+
+let para_eval_done peval =
+    val (PARA_EVAL pids files results) = peval in
+    find_all has_value results
+;
+
+let para_eval_not_done peval =
+    val (PARA_EVAL pids files results) = peval in
+    find_all (\op. NOT (has_value op)) results
+;
+
+let para_eval_get_result peval idx =
+    val (PARA_EVAL pids files results) = peval in
+    let ores = el idx results in
+    NOT (has_value ores) => eprintf "Result %d not ready in para_eval" idx |
+    get_value ores
+;
+
+let para_eval_get_all_results pev =
+    letrec loop pev =
+	let pev' = para_eval_update pev then
+	(para_eval_not_done pev') = [] => 
+	    val (PARA_EVAL pids files results) = pev' in
+	    map get_value results
+	|
+	loop pev'
+    in
+    loop pev
+;
+
+
+
+let N = 20;
+
+let vec name = N = 1 => name | sprintf "%s[%d:0]" name (N-1);
+
+let good_order = interleave [
+                md_expand_vector (vec "i0"),
+                md_expand_vector (vec "i1"),
+                md_expand_vector (vec "i2"),
+                md_expand_vector (vec "i3"),
+                md_expand_vector (vec "i4"),
+                md_expand_vector (vec "i5"),
+                md_expand_vector (vec "i6"),
+                md_expand_vector (vec "i7"),
+                md_expand_vector (vec "i8")]
+;
+
+let bad_order = flat [
+                md_expand_vector (vec "i0"),
+                md_expand_vector (vec "i1"),
+                md_expand_vector (vec "i2"),
+                md_expand_vector (vec "i3"),
+                md_expand_vector (vec "i4"),
+                md_expand_vector (vec "i5"),
+                md_expand_vector (vec "i6"),
+                md_expand_vector (vec "i7"),
+                md_expand_vector (vec "i8")]
+;
+
+let i0 = bv_ZX (bv_variable (vec "i0"));
+let i1 = bv_ZX (bv_variable (vec "i1"));
+let i2 = bv_ZX (bv_variable (vec "i2"));
+let i3 = bv_ZX (bv_variable (vec "i3"));
+let i4 = bv_ZX (bv_variable (vec "i4"));
+let i5 = bv_ZX (bv_variable (vec "i5"));
+let i6 = bv_ZX (bv_variable (vec "i6"));
+let i7 = bv_ZX (bv_variable (vec "i7"));
+let i8 = bv_ZX (bv_variable (vec "i8"));
+
+let test1 =
+    (fprintf stderr "Hi 1\n") fseq
+    (var_order good_order) fseq
+    let res = i0 + i1 in
+    pid, bdd_size res
+;
+
+let test2 =
+    (fprintf stderr "Hi 2\n") fseq
+    (var_order bad_order) fseq
+    let res = i2 + i3 in
+    pid, bdd_size res
+;
+
+let test3 =
+    (fprintf stderr "Hi 3\n") fseq
+    (var_order good_order) fseq
+    let res = i4 + i5 in
+    pid, bdd_size res
+;
+
+
+let pev = para_eval [test1, test2, test3];
+pev;
+PRpara pev;
+
+let res = para_eval_get_all_results pev;
+
+res;
+
+
+

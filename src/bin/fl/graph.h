@@ -642,6 +642,13 @@ typedef struct g_rec {
 		    SET_EXT_OBJ(redex, p);				    \
 	    }
 
+#define MAKE_REDEX_IO_PTR(redex,ip)	{				    \
+		    SET_TYPE(redex, LEAF);				    \
+		    SET_LEAF_TYPE(redex, PRIM_FN);			    \
+		    SET_PRIM_FN(redex, P_FILEFP);			    \
+		    SET_FILE_IO_PTR(redex, (ip));			    \
+	    }
+
 #define MAKE_REDEX_FAILURE(redex,msg)   {				    \
 		    SET_TYPE(redex, LEAF);				    \
 		    SET_LEAF_TYPE(redex, PRIM_FN);			    \

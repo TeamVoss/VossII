@@ -62,8 +62,6 @@ static buffer		str_results;
 /* ----- Forward definitions local functions ----- */
 static void	neg_too_big(int i, int pfn, g_ptr redex);
 static void     make_redex_failure(g_ptr redex);
-static bool     check_arg(g_ptr *rootp, g_ptr **spp, int *depthp,
-                         int n, g_ptr redex, g_ptr arg);
 static bool     prs(int pfn, int i, g_ptr redex,
                     char *s, bool ljust, bool zfill, int size);
 static bool     force_arg_and_check(g_ptr redex, g_ptr arg);
@@ -98,6 +96,38 @@ Get_StreamName(io_ptr ip)
     return( ip->name );
 }
 
+static io_ptr stdin_io_ptr;
+static io_ptr stdout_io_ptr;
+static io_ptr stderr_io_ptr;
+static io_ptr stdinfo_io_ptr;
+
+static io_ptr
+open_stdio(string name, FILE *fp, string mode, bool writable)
+{
+    io_ptr ip;
+    ip = (io_ptr) new_rec(&io_rec_mgr);
+    ip->name = wastrsave(stringsp, name);
+    ip->fp = fp;
+    ip->is_pipe = FALSE;
+    ip->mode = wastrsave(stringsp, mode);
+    ip->writable = writable;
+    ip->next = open_ios;
+    open_ios = ip;
+    return( ip );
+}
+
+static void
+c_stdin(g_ptr redex) { MAKE_REDEX_IO_PTR(redex, stdin_io_ptr); }
+
+static void
+c_stdout(g_ptr redex) { MAKE_REDEX_IO_PTR(redex, stdout_io_ptr); }
+
+static void
+c_stderr(g_ptr redex) { MAKE_REDEX_IO_PTR(redex, stderr_io_ptr); }
+
+static void
+c_stdinfo(g_ptr redex) { MAKE_REDEX_IO_PTR(redex, stdinfo_io_ptr); }
+
 /*                                                                  */
 /* Function to open a file or a pipeline to a command.              */
 /* mode is one of:                                                  */
@@ -122,31 +152,22 @@ Get_StreamName(io_ptr ip)
 /*                                                                  */
 /* Stdin, stdout, and stderr cannot be opened (or closed)           */
 
-bool
-Fopen(g_ptr *rootp, g_ptr **spp, int *depthp)
+static void
+c_fopen(g_ptr redex)
 {
-    if( *depthp < 2 ) return FALSE;
-    g_ptr redex = *(*spp+1);
-    g_ptr arg1 = force(GET_APPLY_RIGHT(**spp), FALSE);
-    if( !check_arg(rootp, spp, depthp, 2, redex, arg1) ) return( TRUE );
-    g_ptr arg2 = force(GET_APPLY_RIGHT(*(*spp+1)), FALSE);
-    if( !check_arg(rootp, spp, depthp, 2, redex, arg2) ) return( TRUE );
-
-    string name = GET_STRING(arg1);
-    string mode = GET_STRING(arg2);
-
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr gname, gmode;
+    EXTRACT_2_ARGS(redex, gname, gmode);
+    string name = GET_STRING(gname);
+    string mode = GET_STRING(gmode);
+    //
     for(io_ptr ip = open_ios; ip != NULL; ip = ip->next) {
         if( STREQ(name, ip->name) ) {
-	    Fail_pr("File %s already opened", name);
-	    g_ptr l = GET_APPLY_LEFT(redex);
-	    g_ptr r = GET_APPLY_RIGHT(redex);
-            make_redex_failure(redex);
-	    DEC_REF_CNT(l);
-	    DEC_REF_CNT(r);
-	    *spp = *spp + 2;
-	    *depthp = *depthp - 2;
-	    *rootp = redex;
-            return( TRUE );
+	    MAKE_REDEX_FAILURE(redex, Fail_pr("File %s already opened", name));
+	    DEC_REF_CNT( l );
+	    DEC_REF_CNT( r );
+	    return;
         }
     }
     FILE *fp;
@@ -192,16 +213,11 @@ Fopen(g_ptr *rootp, g_ptr **spp, int *depthp)
         is_pipe = FALSE;
     }
     if( fp == NULL ) {
-        Fail_pr("Cannot open %s in mode %s", name, mode);
-	g_ptr l = GET_APPLY_LEFT(redex);
-	g_ptr r = GET_APPLY_RIGHT(redex);
-        make_redex_failure(redex);
-	DEC_REF_CNT(l);
-	DEC_REF_CNT(r);
-	*spp = *spp + 2;
-	*depthp = *depthp - 2;
-	*rootp = redex;
-        return( TRUE );
+	MAKE_REDEX_FAILURE(redex,
+			   Fail_pr("Cannot open %s in mode %s", name, mode));
+	DEC_REF_CNT( l );
+	DEC_REF_CNT( r );
+	return;
     }
 
     io_ptr ip;
@@ -213,95 +229,57 @@ Fopen(g_ptr *rootp, g_ptr **spp, int *depthp)
     ip->writable = writable;
     ip->next = open_ios;
     open_ios = ip;
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    SET_TYPE(redex, LEAF);
-    SET_LEAF_TYPE(redex, PRIM_FN);
-    SET_PRIM_FN(redex, P_FILEFP);
-    SET_FILE_IO_PTR(redex, ip);
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);
-    *spp = *spp+2;
-    *depthp -= 2;
-    *rootp = redex;
-    return TRUE;
-}
-
-bool
-Fflush(g_ptr *rootp, g_ptr **spp, int *depthp)
-{
-    if( *depthp < 1 ) return FALSE;
-    g_ptr redex = **spp;
-    g_ptr arg1 = force(GET_APPLY_RIGHT(**spp), FALSE);
-    if( !check_arg(rootp, spp, depthp, 1, redex, arg1) ) return( TRUE );
-    io_ptr ip = GET_FILE_IO_PTR(arg1);
-    fflush(ip->fp);
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    OVERWRITE(redex, void_nd);
+    MAKE_REDEX_IO_PTR(redex, ip);
     DEC_REF_CNT( l );
     DEC_REF_CNT( r );
-    *spp = *spp+1;
-    *depthp -= 1;
-    *rootp = redex;
-    return( TRUE );
 }
 
-bool
-Fclose(g_ptr *rootp, g_ptr **spp, int *depthp)
+static void
+c_fflush(g_ptr redex)
 {
-    if( *depthp < 1 ) return FALSE;
-    g_ptr redex = **spp;
-    g_ptr arg1 = force(GET_APPLY_RIGHT(**spp), FALSE);
-    if( !check_arg(rootp, spp, depthp, 1, redex, arg1) ) return( TRUE );
-    io_ptr ip = GET_FILE_IO_PTR(arg1);
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr gfp;
+    EXTRACT_1_ARG(redex, gfp);
+    io_ptr ip = GET_FILE_IO_PTR(gfp);
+    fflush(ip->fp);
+    MAKE_REDEX_VOID(redex);
+    DEC_REF_CNT( l );
+    DEC_REF_CNT( r );
+}
+
+static void
+c_fclose(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr gfp;
+    EXTRACT_1_ARG(redex, gfp);
+    io_ptr ip = GET_FILE_IO_PTR(gfp);
+
     if( strcmp(ip->name, "stdin") == 0 ) {
-	g_ptr l = GET_APPLY_LEFT(redex);
-	g_ptr r = GET_APPLY_RIGHT(redex);
-	Fail_pr("Cannot close stdin.");
-        make_redex_failure(redex);
-	DEC_REF_CNT(l);
-	DEC_REF_CNT(r);
-	*spp = *spp + 1;
-	*depthp = *depthp - 1;
-	*rootp = redex;
-        return( TRUE );
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot close stdin."));
+	DEC_REF_CNT( l );
+	DEC_REF_CNT( r );
+	return;
     } else 
     if( strcmp(ip->name, "stdout") == 0 ) {
-	g_ptr l = GET_APPLY_LEFT(redex);
-	g_ptr r = GET_APPLY_RIGHT(redex);
-	Fail_pr("Cannot close stdout.");
-        make_redex_failure(redex);
-	DEC_REF_CNT(l);
-	DEC_REF_CNT(r);
-	*spp = *spp + 1;
-	*depthp = *depthp - 1;
-	*rootp = redex;
-        return( TRUE );
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot close stdout."));
+	DEC_REF_CNT( l );
+	DEC_REF_CNT( r );
+	return;
     } else
     if( strcmp(ip->name, "stderr") == 0 ) {
-	g_ptr l = GET_APPLY_LEFT(redex);
-	g_ptr r = GET_APPLY_RIGHT(redex);
-	Fail_pr("Cannot close stderr.");
-        make_redex_failure(redex);
-	DEC_REF_CNT(l);
-	DEC_REF_CNT(r);
-	*spp = *spp + 1;
-	*depthp = *depthp - 1;
-	*rootp = redex;
-        return( TRUE );
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot close stderr."));
+	DEC_REF_CNT( l );
+	DEC_REF_CNT( r );
+	return;
     } else
     if( strcmp(ip->name, "stdinfo") == 0 ) {
-	g_ptr l = GET_APPLY_LEFT(redex);
-	g_ptr r = GET_APPLY_RIGHT(redex);
-	Fail_pr("Cannot close stdinfo.");
-        make_redex_failure(redex);
-	DEC_REF_CNT(l);
-	DEC_REF_CNT(r);
-	*spp = *spp + 1;
-	*depthp = *depthp - 1;
-	*rootp = redex;
-        return( TRUE );
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Cannot close stdinfo."));
+	DEC_REF_CNT( l );
+	DEC_REF_CNT( r );
+	return;
     }
 
     io_ptr *prev_io = &open_ios;
@@ -318,10 +296,7 @@ Fclose(g_ptr *rootp, g_ptr **spp, int *depthp)
 				    ip->name));
 	DEC_REF_CNT( l );
 	DEC_REF_CNT( r );
-	*spp = *spp+1;
-	*depthp -= 1;
-	*rootp = redex;
-	return( TRUE );
+	return;
     }
     *prev_io = cur->next;
     int ret = 0;
@@ -336,15 +311,9 @@ Fclose(g_ptr *rootp, g_ptr **spp, int *depthp)
     // For the time being, I will simply not free the record....
     // free_rec(&io_rec_mgr, (pointer) ip);
 #endif
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
     MAKE_REDEX_INT(redex, ret);
     DEC_REF_CNT( l );
     DEC_REF_CNT( r );
-    *spp = *spp+1;
-    *depthp -= 1;
-    *rootp = redex;
-    return( TRUE );
 }
 
 static bool
@@ -1100,9 +1069,12 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
     Sprintf(buf, "%s/graph", dir);
     string graph_file_name = wastrsave(stringsp, buf);
     // ------------- Untar file into tmp directory ------------------
-    Sprintf(buf, " tar -C %s -x -z -f %s", dir, file_name);
-    if( system(buf) != 0 ) {
-	MAKE_REDEX_FAILURE(redex, Fail_pr("Failed to read %s", file_name));
+    string cmd = tprintf("tar -C %s -xzf %s", dir, file_name);
+fprintf(stderr, "cmd: %s\n", cmd);
+    int ret;
+    if( (ret = system(cmd)) != 0 ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("Failed to read %s (return code %d)",
+					  file_name, ret));
 	Unserialize_End();
 	return(FALSE);
     }
@@ -1358,6 +1330,32 @@ Fget(g_ptr redex)
 void
 Io_Install_Functions()
 {
+    // Make sure all the std_io streams are open
+    stdin_io_ptr = open_stdio("stdin", stdin, "r", FALSE);
+    stdout_io_ptr = open_stdio("stdout", stdout, "w", TRUE);
+    stderr_io_ptr = open_stdio("stderr", stderr, "w", TRUE);
+    stdinfo_io_ptr = open_stdio("stdinfo", stdout, "w", TRUE);
+    
+    Add_ExtAPI_Function("stdin", "", FALSE, GLmake_fp(), c_stdin);
+    Add_ExtAPI_Function("stdout", "", FALSE, GLmake_fp(), c_stdout);
+    Add_ExtAPI_Function("stderr", "", FALSE, GLmake_fp(), c_stderr);
+    Add_ExtAPI_Function("stdinfo", "", FALSE, GLmake_fp(), c_stdinfo);
+
+    Add_ExtAPI_Function("fopen", "11", FALSE,
+			GLmake_arrow(
+			    GLmake_string(),
+			    GLmake_arrow(
+				GLmake_string(),
+				GLmake_fp())),
+			c_fopen);
+
+    Add_ExtAPI_Function("fflush", "1", FALSE,
+			 GLmake_arrow(GLmake_fp(), GLmake_void()),
+			c_fflush);
+
+    Add_ExtAPI_Function("fclose", "1", FALSE,
+			 GLmake_arrow(GLmake_fp(), GLmake_int()),
+			c_fclose);
 
     Add_ExtAPI_Function("mktemp", "1", FALSE,
 			GLmake_arrow(GLmake_string(), GLmake_fp()),
@@ -1393,21 +1391,6 @@ Io_Install_Functions()
 /****************************************************************************/
 /*                          Local functions                                 */
 /****************************************************************************/
-static bool
-check_arg(g_ptr *rootp, g_ptr **spp, int *depthp, int n, g_ptr redex, g_ptr arg)
-{
-    if( !is_fail(arg) ) return( TRUE );
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    OVERWRITE(redex, arg);
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);
-    *spp = *spp + n;
-    *depthp = *depthp - n;
-    *rootp = redex;
-    return FALSE;
-}
-
 static bool
 force_arg_and_check(g_ptr redex, g_ptr arg)
 {
