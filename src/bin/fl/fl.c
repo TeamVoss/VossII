@@ -197,6 +197,7 @@ fl_main(int argc, char *argv[])
 {
     string	size_str;
     string	rand_str;
+    string	expr_eval_file = NULL;
     int		rand_init;
     FILE *	input_file_for_cmds_fp = NULL;
     bool	exit_on_failure = FALSE;
@@ -259,7 +260,10 @@ fl_main(int argc, char *argv[])
 	    display = argv[2];
             argc -= 2; argv += 2;
         } else
-
+        if( strcmp(argv[1], "-eval_expr") == 0 ) {
+	    expr_eval_file = argv[2];
+            argc -= 2; argv += 2;
+        } else
         if( strcmp(argv[1], "--read_input_from_file") == 0 ) {
             input_file_for_cmds = argv[2];
             argc -= 2; argv += 2;
@@ -423,6 +427,25 @@ fl_main(int argc, char *argv[])
 #if DBG_TRACE_AND_SAVE
     Start_Compare_Fun(debug_id);
 #endif
+
+    if( expr_eval_file != NULL ) {
+	// Only evaluate expression in file and write out result
+	g_ptr redex = Get_node();
+	PUSH_GLOBAL_GC(redex);
+	if( !Load_graph("_dummy_sig_", expr_eval_file, redex) ) {
+	    fprintf(stderr, "Load_graph in expr_eval_file failed\n");
+	    exit(-21);
+	}
+	// Now force evaluation of redex
+	redex = force(redex, FALSE);
+	// And save the result in the same file
+	if( !Save_graph("_dummy_sig_", expr_eval_file, redex) ) {
+	    fprintf(stderr, "Save_graph in expr_eval_file failed\n");
+	    exit(-22);
+	}
+	// And quit
+	Exit(0);
+    }
 
     if( gui_mode ) {
         /* Until GUI is up and running */
