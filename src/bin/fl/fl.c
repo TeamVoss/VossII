@@ -17,6 +17,7 @@
 #include <poll.h>
 #include <X11/Xresource.h>
 
+
 #define FL_VERSION "4.0"
 
 /* ======================== Global variables ======================== */
@@ -260,6 +261,24 @@ fl_main(int argc, char *argv[])
 	    display = argv[2];
             argc -= 2; argv += 2;
         } else
+        if( strcmp(argv[1], "--max_cpu_time") == 0 ) {
+	    int limit;
+	    str2int(argv[2], &limit);
+	    struct rlimit rl;
+	    getrlimit(RLIMIT_CPU, &rl);
+	    rl.rlim_cur = (rlim_t) limit;
+	    setrlimit(RLIMIT_CPU, &rl);
+            argc -= 2; argv += 2;
+        } else
+        if( strcmp(argv[1], "--max_memory") == 0 ) {
+	    int limit;
+	    str2int(argv[2], &limit);
+	    struct rlimit rl;
+	    getrlimit(RLIMIT_DATA, &rl);
+	    rl.rlim_cur = (rlim_t) limit;
+	    setrlimit(RLIMIT_DATA, &rl);
+            argc -= 2; argv += 2;
+        } else
         if( strcmp(argv[1], "--eval_expr") == 0 ) {
 	    expr_eval_file = argv[2];
             argc -= 2; argv += 2;
@@ -429,18 +448,22 @@ fl_main(int argc, char *argv[])
 #endif
 
     if( expr_eval_file != NULL ) {
+	string inp_file = tprintf("%s.inp.tar.gz", expr_eval_file);
 	// Only evaluate expression in file and write out result
 	g_ptr redex = Get_node();
 	PUSH_GLOBAL_GC(redex);
-	if( !Load_graph("_dummy_sig_", expr_eval_file, redex) ) {
-	    fprintf(stderr, "Load_graph in expr_eval_file failed\n");
+	if( !Load_graph("_dummy_sig_", inp_file, redex) ) {
+	    fprintf(stderr, "Load_graph in expr_eval_file failed (%s)\n",
+			    inp_file);
 	    exit(-21);
 	}
 	// Now force evaluation of redex
 	redex = force(redex, FALSE);
-	// And save the result in the same file
+	// And save the result in the output file
+	string out_file = tprintf("%s.out.tar.gz", expr_eval_file);
 	if( !Save_graph("_dummy_sig_", expr_eval_file, redex) ) {
-	    fprintf(stderr, "Save_graph in expr_eval_file failed\n");
+	    fprintf(stderr, "Save_graph in expr_eval_file failed (%s)\n",
+			    out_file);
 	    exit(-22);
 	}
 	// And quit

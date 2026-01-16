@@ -520,9 +520,6 @@ typedef struct g_rec {
 #define P_EPRINTF	    110
 #define P_FPRINTF	    111
 #define P_FILEFP	    112
-#define P_FOPEN		    113
-#define P_FCLOSE	    114
-#define P_FFLUSH	    115
 #define P_GEN_CATCH	    116
 #define P_GET_VOSSRC	    117
 #define P_UPDATE_VOSSRC	    118

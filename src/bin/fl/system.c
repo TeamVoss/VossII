@@ -10,6 +10,7 @@
 /************************************************************************/
 #include <time.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include "system.h"
 #include "graph.h"
 #ifndef __APPLE__
@@ -74,6 +75,24 @@ Init_Paths(string bin_path, string lib_path)
 /********************************************************/
 /*	    EXPORTED EXTAPI FUNCTIONS    		*/
 /********************************************************/
+
+static void
+spawn(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr scmd;
+    EXTRACT_1_ARG(redex, scmd);
+    string cmd = GET_STRING(scmd);
+    pid_t pid = fork();
+    if( pid == 0 ) {
+        // Child
+        execlp("/usr/bin/bash", "/usr/bin/bash", "-c", cmd, (char *) NULL);
+    }
+    MAKE_REDEX_INT(redex, (int) pid);
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
 
 static void
 my_exec(g_ptr redex)
@@ -216,13 +235,14 @@ emit_eval_graph(g_ptr redex)
     g_ptr tail = redex;
     int cnt = 0;
     while( !IS_NIL(exprs) ) {
-	string file = wastrsave(stringsp, tprintf("%s/%d.tar.gz", dir, cnt));
+	string base = wastrsave(stringsp, tprintf("%s/%d", dir, cnt));
+	string file = tprintf("%s.inp.tar.gz",base);
 	if( !Save_graph("_dummy_sig_", file, GET_CONS_HD(exprs)) ) {
 	    MAKE_REDEX_FAILURE(redex,
 		Fail_pr("Saving element %d in emit_eval_graph failed\n", cnt));
 	    return;
 	}
-	APPEND1(tail, Make_STRING_leaf(file));
+	APPEND1(tail, Make_STRING_leaf(base));
 	exprs = GET_CONS_TL(exprs);
 	cnt++;
     }
@@ -237,7 +257,7 @@ retrieve_eval_graph(g_ptr redex)
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr gfile;
     EXTRACT_1_ARG(redex, gfile);
-    string file = GET_STRING(gfile);
+    string file = tprintf("%s.out.tar.gz", GET_STRING(gfile));
     if( !Load_graph("_dummy_sig_", file, redex) ) {
 	MAKE_REDEX_FAILURE(redex,
 	    Fail_pr("Loading file %s in retrieve_eval_graph failed\n", file));
@@ -251,6 +271,10 @@ void
 System_Install_Functions()
 {
     // Add builtin functions
+    Add_ExtAPI_Function("spawn", "1", TRUE, 
+			GLmake_arrow(GLmake_string(), GLmake_int()),
+			spawn);
+
     Add_ExtAPI_Function("exec", "1", FALSE,
 			GLmake_arrow(GLmake_string(),
 			    GLmake_tuple(GLmake_int(),

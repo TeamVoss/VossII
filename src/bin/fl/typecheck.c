@@ -1907,16 +1907,6 @@ get_prim_fun_type(g_ptr node)
 	case P_SSCANF:
 	    type = sscanf_type(GET_PRINTF_STRING(node));
 	    break; 
-	case P_FOPEN:
-	    type = make_arrow(string_op,
-			      make_arrow(string_op, fp_op));
-	    break; 
-	case P_FCLOSE:
-	    type = make_arrow(fp_op, int_op);
-	    break; 
-	case P_FFLUSH:
-	    type = make_arrow(fp_op, void_op);
-	    break; 
 	case P_VOID:
 	    type = void_op;
 	    break;
