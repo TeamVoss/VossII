@@ -275,7 +275,7 @@ fl_main(int argc, char *argv[])
 	    str2int(argv[2], &limit);
 	    struct rlimit rl;
 	    getrlimit(RLIMIT_DATA, &rl);
-	    rl.rlim_cur = (rlim_t) limit;
+	    rl.rlim_cur = (rlim_t) limit*1000000;
 	    setrlimit(RLIMIT_DATA, &rl);
             argc -= 2; argv += 2;
         } else
@@ -461,13 +461,21 @@ fl_main(int argc, char *argv[])
 	redex = force(redex, FALSE);
 	// And save the result in the output file
 	string out_file = tprintf("%s.out.tar.gz", expr_eval_file);
-	if( !Save_graph("_dummy_sig_", expr_eval_file, redex) ) {
+	out_file = wastrsave(stringsp, out_file);
+	if( !Save_graph("_dummy_sig_", out_file, redex) ) {
 	    fprintf(stderr, "Save_graph in expr_eval_file failed (%s)\n",
 			    out_file);
 	    exit(-22);
 	}
 	// And quit
-	Exit(0);
+	// Make sure file is written (and visible) before quitting.
+	for(int i = 0; i < 5; i++) {
+	    if( access(out_file, F_OK) >= 0 ) {
+		Exit(0);
+	    }
+	    sleep(1);
+	}
+	Exit(-33);
     }
 
     if( gui_mode ) {
@@ -1344,28 +1352,37 @@ process_commands(string bufp, bool verbose)
 static void
 print_help()
 {
- P("Usage: fl [flags]\n");
- P("  Flags:\n");
- P("    -f file			    start by reading file\n");
- P("    -I dir			    Search for fl libraries in dir\n");
- P("    -hide-window		    hide the main window while still preserving X functionality\n");
- P("    -noX			    do not use X windows (text only)\n");
- P("    --noX			    do not use X windows (text only)\n");
- P("    -use_stdin		    read inputs also from stdin\n");
- P("    -use_stdout		    write outputs also to stdout\n");
- P("    --hide-window		    hide the main window while still preserving X functionality\n");
- P("    --use_stdin		    read inputs also from stdin\n");
- P("    --use_stdout		    write outputs also to stdout\n");
- P("    --read_input_from_file file read inputs from file\n");
- P("    --write_output_to_file file write outputs to file\n");
- P("    -r n			    initialize random number generator to n\n");
- P("    -v file			    save dynamic variable order in file\n");
- P("    -h			    print out this message and quit\n");
- P("    --help			    print out this message and quit\n");
- P("    -d			    turn off function tracing information\n");
- P("    -C			    Cephalopode mode\n");
- P("    -cephalopode		    Cephalopode mode\n");
-
+ P("Usage: fl [flags] [-- {args}+]\n");
+ P(" Flags:\n");
+ P("  -noX                          do not use X windows (text only)\n");
+ P("  -f file                       Start by reading file\n");
+ P("  -F file                       Start by reading file. Quit on failure\n");
+ P("  -I dir                        Search for fl libraries in dir\n");
+ P("  -T dir                        Use dir for all temporary files.\n");
+ P("  -hide-window / --hide-window  Hide the main window while still preserving X functionality\n");
+ P("  -use_stdin / --use_stdin      Read inputs also from stdin\n");
+ P("  -use_stdout / --use_stdout    Write outputs also to stdout\n");
+ P("  -unbuf_stdout/--unbuf_stdout  Do not buffer stdout.\n");
+ P("  --hide-window                 Hide the main window while still preserving X functionality\n");
+ P("  --read_input_from_file file   Read inputs from file\n");
+ P("  --write_output_to_file file   Write outputs to file\n");
+ P("  -r n                          Initialize random number generator to n\n");
+ P("  -v file                       Save dynamic variable order in file\n");
+ P("  -h / --help                   Print out this message and quit\n");
+ P("  -d                            Turn off function tracing information\n");
+ P("  -q                            Turn off printing of the VossII banner.\n");
+ P("  -p / --profiling              Profile all functions in the fl run.\n");
+ P("  -P / --Profiling              Profile only user defined functions.\n");
+ P("  -C / --cephalopode            Cephalopode mode\n");
+ P("  --use window                  Place top-level GUI inside window\n");
+ P("  --scaling num                 Set scaling factor for GUI\n");
+ P("  --display window              Use X window display\n");
+ P("  --max_cpu_time                Max CPU time in seconds allowed\n");
+ P("  --max_memory                  Max memory in Mbytes allowed\n");
+ P("  --eval_expr basename          Read <basename>.inp.tar.gz,\n");
+ P("                                evaluate the expression, and\n");
+ P("                                write result to <basename>.out.tar.gz\n");
+ P("    --                          Remaining arguments placed in ARGS list\n");
 }
 
 static string

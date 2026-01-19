@@ -1961,6 +1961,13 @@ let get_wrappers body = (defix get_wrappers) body;
 // the formatted text.
 let do_layout width end_str doc fp = (defix do_layout) width end_str doc fp;
 
+// Sleep for ms milliseconds.
+let sleep ms = (defix sleep) ms;
+non_lazy sleep;
 
+// Spawn a new process and execute cmd in a Bourne shell.
+// Returns the process id of the new process.
+let spawn cmd = (defix spawn) cmd;
+non_lazy spawn;
 
 (update_vossrc "ADD-DEBUG-INFO" __old_debug_on__) fseq ();

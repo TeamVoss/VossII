@@ -9,8 +9,10 @@
 /*									*/
 /************************************************************************/
 #include <time.h>
+#include <errno.h>    
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/wait.h>
 #include "system.h"
 #include "graph.h"
 #ifndef __APPLE__
@@ -29,6 +31,7 @@ extern bool	   gui_mode;
 extern string      *fl_args;
 extern char	   FailBuf[4096];
 extern string      Voss_tmp_dir;
+extern g_ptr	   void_nd;
 
 /***** PRIVATE VARIABLES *****/
 static char buf [4096];
@@ -267,10 +270,102 @@ retrieve_eval_graph(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
+static void
+do_sleep(g_ptr redex)
+{
+g_ptr l = GET_APPLY_LEFT(redex);
+g_ptr r = GET_APPLY_RIGHT(redex);
+g_ptr gms;
+EXTRACT_1_ARG(redex, gms);
+arbi_T amsec = GET_AINT(gms);
+long *msec = Arbi_ToInt(amsec);
+if( msec == NULL ) {
+    MAKE_REDEX_FAILURE(redex, "Too large argument to sleep\n");
+    DEC_REF_CNT(r);
+    DEC_REF_CNT(l);
+    return;
+}
+struct timespec ts;
+if (*msec < 0) {
+    MAKE_REDEX_FAILURE(redex, "Negative number to sleep\n");
+    DEC_REF_CNT(r);
+    DEC_REF_CNT(l);
+    return;
+}
+ts.tv_sec = *msec / 1000;
+ts.tv_nsec = (*msec % 1000) * 1000000;
+int res;
+do {
+    res = nanosleep(&ts, &ts);
+} while (res && errno == EINTR);
+if( res != 0 ) {
+    MAKE_REDEX_FAILURE(redex, Fail_pr("sleep failed (%d)\n", res));
+    DEC_REF_CNT(r);
+    DEC_REF_CNT(l);
+    return;
+}
+MAKE_REDEX_VOID(redex);
+DEC_REF_CNT(r);
+DEC_REF_CNT(l);
+}
+
+static void
+get_process_exit_status(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr gpid;
+    EXTRACT_1_ARG(redex, gpid);
+    pid_t pid = (pid_t) GET_INT(gpid);
+    int status;
+    waitpid(pid, &status, WNOHANG);
+    if( WIFEXITED(status) ) {
+	int ret = WEXITSTATUS(status);
+	MAKE_REDEX_INT(redex, ret);
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
+    MAKE_REDEX_INT(redex, 999999);
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+    return;
+}
+
+static void
+do_kill(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr gpid, gsig;
+    EXTRACT_2_ARGS(redex, gpid, gsig);
+    pid_t pid = (pid_t) GET_INT(gpid);
+    int sig = GET_INT(gsig);
+    MAKE_REDEX_INT(redex, kill(pid, sig));
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+    return;
+}
+
 void
 System_Install_Functions()
 {
     // Add builtin functions
+
+    Add_ExtAPI_Function("kill", "11", TRUE, 
+			GLmake_arrow(GLmake_int(),
+				     GLmake_arrow(GLmake_int(),
+						  GLmake_int())),
+			do_kill);
+
+    Add_ExtAPI_Function("get_process_exit_status", "1", TRUE, 
+			GLmake_arrow(GLmake_int(), GLmake_int()),
+			get_process_exit_status);
+
+    Add_ExtAPI_Function("sleep", "1", TRUE, 
+			GLmake_arrow(GLmake_int(), GLmake_void()),
+			do_sleep);
+
     Add_ExtAPI_Function("spawn", "1", TRUE, 
 			GLmake_arrow(GLmake_string(), GLmake_int()),
 			spawn);

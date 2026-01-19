@@ -2521,83 +2521,83 @@ export_to_tcl fl_float2rat;
 // Para_eval related code.
 // ------------------------------------------------------
 
-begin_abstype;
-
-lettype *a para = PARA_EVAL
-                    {pids:: int list}
-                    {files:: string list}
-                    {results:: ({*a} opt) list}
-;
-
-let spawn_fl_eval file =
-    let cmd = sprintf "fl -noX --eval_expr %s" file then
-    let pid = sscanf "%d" (tcl_eval [sprintf "exec %s >& /dev/null &" cmd]) then
-    pid
-;
-
-// Evaluate all the expressions in parallel
-let para_eval {exprs:: *a list} =
-    let files = emit_eval_graph exprs then
-    let pids = map spawn_fl_eval files then
-    let results = replicate (length files) {NONE:: {*a} opt} then
-    let res = PARA_EVAL pids files results then
-    res
-;
-export para_eval;
-
-
-let para_eval_update peval =
-    val (PARA_EVAL pids files results) = peval in
-    let is_alive pid = (system (sprintf "ps --pid %d > /dev/null" pid)) = 0 in
-    let update pid file res =
-        has_value res => res |
-        (is_alive pid) => NONE |
-        let res = retrieve_eval_graph file then
-        SOME res
-    in
-    let results' = map3 update pids files results then
-    (PARA_EVAL pids files results')
-;
-
-let para_eval_kill peval =
-    val (PARA_EVAL pids files results) = peval in
-    let kill pid = (system (sprintf "kill -9 %d" pid)) fseq () in
-    foreach kill pids
-;
-export para_eval_kill;
-
-let para_eval_done peval =
-    val (PARA_EVAL pids files results) = para_eval_update peval in
-    find_all has_value results
-;
-export para_eval_done;
-
-let para_eval_not_done peval =
-    val (PARA_EVAL pids files results) = para_eval_update peval in
-    find_all (\op. NOT (has_value op)) results
-;
-export para_eval_not_done;
-
-let para_eval_get_result peval idx =
-    val (PARA_EVAL pids files results) = para_eval_update peval in
-    let ores = el idx results in
-    NOT (has_value ores) => eprintf "Result %d not ready in para_eval" idx |
-    get_value ores
-;
-export para_eval_get_result;
-
-let para_eval_get_all_results pev =
-    letrec loop pev =
-        let pev' = para_eval_update pev then
-        (para_eval_not_done pev') = [] =>
-            val (PARA_EVAL pids files results) = pev' in
-            map get_value results
-        |
-        loop pev'
-    in
-    loop pev
-;
-export para_eval_get_all_results;
-
-end_abstype;
-
+// begin_abstype;
+// 
+// lettype *a para = PARA_EVAL
+//                     {pids:: int list}
+//                     {files:: string list}
+//                     {results:: ({*a} opt) list}
+// ;
+// 
+// let spawn_fl_eval file =
+//     let cmd = sprintf "fl -noX --eval_expr %s" file then
+//     let pid = sscanf "%d" (tcl_eval [sprintf "exec %s >& /dev/null &" cmd]) then
+//     pid
+// ;
+// 
+// // Evaluate all the expressions in parallel
+// let para_eval {exprs:: *a list} =
+//     let files = emit_eval_graph exprs then
+//     let pids = map spawn_fl_eval files then
+//     let results = replicate (length files) {NONE:: {*a} opt} then
+//     let res = PARA_EVAL pids files results then
+//     res
+// ;
+// export para_eval;
+// 
+// 
+// let para_eval_update peval =
+//     val (PARA_EVAL pids files results) = peval in
+//     let is_alive pid = (system (sprintf "ps --pid %d > /dev/null" pid)) = 0 in
+//     let update pid file res =
+//         has_value res => res |
+//         (is_alive pid) => NONE |
+//         let res = retrieve_eval_graph file then
+//         SOME res
+//     in
+//     let results' = map3 update pids files results then
+//     (PARA_EVAL pids files results')
+// ;
+// 
+// let para_eval_kill peval =
+//     val (PARA_EVAL pids files results) = peval in
+//     let kill pid = (system (sprintf "kill -9 %d" pid)) fseq () in
+//     foreach kill pids
+// ;
+// export para_eval_kill;
+// 
+// let para_eval_done peval =
+//     val (PARA_EVAL pids files results) = para_eval_update peval in
+//     find_all has_value results
+// ;
+// export para_eval_done;
+// 
+// let para_eval_not_done peval =
+//     val (PARA_EVAL pids files results) = para_eval_update peval in
+//     find_all (\op. NOT (has_value op)) results
+// ;
+// export para_eval_not_done;
+// 
+// let para_eval_get_result peval idx =
+//     val (PARA_EVAL pids files results) = para_eval_update peval in
+//     let ores = el idx results in
+//     NOT (has_value ores) => eprintf "Result %d not ready in para_eval" idx |
+//     get_value ores
+// ;
+// export para_eval_get_result;
+// 
+// let para_eval_get_all_results pev =
+//     letrec loop pev =
+//         let pev' = para_eval_update pev then
+//         (para_eval_not_done pev') = [] =>
+//             val (PARA_EVAL pids files results) = pev' in
+//             map get_value results
+//         |
+//         loop pev'
+//     in
+//     loop pev
+// ;
+// export para_eval_get_all_results;
+// 
+// end_abstype;
+// 
