@@ -2536,18 +2536,29 @@ let Pstatus (PID_RUNNING) = "running"
 ;
 install_print_function Pstatus;
 
+lettype process = PROCESS
+			{idx::int}
+			{base_image_file::string}
+			{output_file::string}
+			{pid::int}
+;
 
-let get_status ({idx::int},file,pid) =
+let get_index process =
+    val (PROCESS idx image ofile pid) = process in
+    idx
+;
+
+let get_status process =
+    val (PROCESS idx image ofile pid) = process in
     let exit = get_process_exit_status pid then
     (exit != 0) AND (exit != 999999) => PID_DIED exit |
     (kill pid 0) == (-1) =>
 	// Process exited
-	file_exists (sprintf "%s.out.tar.gz" file) => PID_DONE_OK |
+	file_exists (sprintf "%s.out.tar.gz" image) => PID_DONE_OK |
 	PID_FAILED
     |
     PID_RUNNING
 ;
-non_lazy get_status;
 
 let is_running fpid = (get_status fpid) = PID_RUNNING;
 non_lazy is_running;
@@ -2562,10 +2573,35 @@ let list_grab cnt l =
 let spawn_fl_eval max_cpu max_mem file =
     let cl = max_cpu < 0 => "" | sprintf "--max_cpu_time %d" max_cpu in
     let ml = max_mem < 0 => "" | sprintf "--max_memory %d" max_mem in
-    let cmd = sprintf "fl -noX %s %s --eval_expr %s >& /dev/null" cl ml file in
-    spawn cmd
+    let ofile = file^".output" then
+    let cmd = sprintf "fl -noX %s %s --eval_expr %s >& %s" cl ml file ofile in
+    let pid = spawn cmd then
+    pid, ofile
 ;
 
+let get_result pr =
+    val (PROCESS idx image ofile pid) = pr in
+    let res = retrieve_eval_graph image then
+    (idx, SOME res)
+;
+
+let kill_process pr =
+    val (PROCESS idx image ofile pid) = pr in
+    // Kill the actual process
+    (system (sprintf "kill -9 %d" pid))
+    fseq
+    // Avoid making it a zoombie.
+    (get_process_exit_status pid)
+    fseq
+    ()
+;
+
+// Evaluate the expressions in exprs in separate processes.
+// Issue at most max_processes jobs at a time
+// If single_winner is true, return as soon as anyone finishes.
+// max_memory (in Mbytes) and max_cpu (in seconds) can be used to
+// limit the memory/cput time allocated to each job.
+// verbose is used to give feedback on the progress.
 let para_eval {exprs:: *a list}
 	      max_processes->20
 	      single_winner->F
@@ -2575,49 +2611,54 @@ let para_eval {exprs:: *a list}
     =
     let files = emit_eval_graph exprs then
     let idx_files = zip (1 upto (length files)) files in
-    letrec process finished current todo =
+    let stop (finished, current, todo) =
+	(current == []) AND (todo == []) => T |
+	let found = find_first0 (\fp. get_status fp = PID_DONE_OK) finished in
+	single_winner AND (found != 0)
+    in
+    let update_fn (finished, current, todo) =
 	(NOT verbose => () |
 	    (fprintf stdinfo "Para_eval: %d %d %d\n"
 		(length finished) (length current) (length todo))
 	) fseq
-	(sleep 1000) fseq
-	(current == []) AND (todo == []) =>
-	    val (ok,failed) = split is_succsesful finished in
-	    let results =
-		map (\(idx,f,_). idx,SOME (retrieve_eval_graph f)) ok
-	    then
-	    let failed = map (\(idx,_). idx, NONE) failed then
-	    let raw_res = results@failed then
-	    let cmp (i1,_) (i2,_) = i1-i2 in
-	    map snd (qsort cmp raw_res)
+	val (active,done) = split is_running current then
+	(active != []) AND (done = []) =>
+	    ((sleep 500) fseq (finished, current, todo))
 	|
-	val (active,done) = split is_running current in
-	let found = find_first0 (\fpid. get_status fpid = PID_DONE_OK) done in
-	single_winner AND (found != 0) =>
-	    val (_,file,pid) = el found done in
-	    // Now kill all other processes
-	    let kill (idx,f,pid) =
-		(system (sprintf "kill -9 %d" pid)) fseq ()
+	let finished' = finished@done then
+	let cnt = max_processes-(length active) then
+	val (to_add, todo') = list_grab cnt todo then
+	let new =
+	    let start (idx,image) =
+		val (pid, ofile) = spawn_fl_eval max_cpu max_memory image then
+		PROCESS idx image ofile pid
 	    in
-	    (foreach kill active) fseq
-	    [(SOME {(retrieve_eval_graph file):: *a})]
-	|
-	let finished' = finished@done in
-	length active = max_processes => process finished' active todo |
-	val (new,todo') = 
-	    let cnt = max_processes-(length active) in
-	    val (to_add, todo') = list_grab cnt todo in
-	    let new =
-		map (\(idx,f). idx,f, spawn_fl_eval max_cpu max_memory f) to_add
-	    then
-	    new, todo'
-	in
-	let current' = active@new in
-	process finished' current' todo'
+	    map start to_add
+	then
+	let current' = active@new then
+	(finished', current', todo')
     in
-    process [] [] idx_files
+    val (finished, current, todo) = loop update_fn stop ([],[],idx_files) then
+    let raw_res = 
+	NOT single_winner =>
+	    val (ok,failed) = split is_succsesful finished then
+	    let results = map get_result ok then
+	    let failed = map (\pr. get_index pr, NONE) failed then
+	    results@failed
+	|
+	    let found = find_first0 (\f. get_status f = PID_DONE_OK) finished in
+	    let winner = el found finished in
+	    // Now kill all other processes
+	    (foreach kill_process current) fseq
+	    let rem =
+		let indices = (1 upto (length exprs)) subtract [found] in
+		map (\i.i,{NONE:: {*a} opt}) indices
+	    in
+	    (get_result winner):rem
+    then
+    let cmp (i1,_) (i2,_) = i1-i2 in
+    map snd (qsort cmp raw_res)
 ;
-
 
 end_abstype para_eval;
 

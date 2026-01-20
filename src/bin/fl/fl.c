@@ -267,6 +267,7 @@ fl_main(int argc, char *argv[])
 	    struct rlimit rl;
 	    getrlimit(RLIMIT_CPU, &rl);
 	    rl.rlim_cur = (rlim_t) limit;
+	    rl.rlim_max = (rlim_t) limit;
 	    setrlimit(RLIMIT_CPU, &rl);
             argc -= 2; argv += 2;
         } else

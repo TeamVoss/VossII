@@ -3053,7 +3053,7 @@ Handle_Recursion_Limits()
 g_ptr
 traverse_left(g_ptr oroot)
 {
-    ui      	pfn;
+    unint	pfn;
     string  	s;
     g_ptr   	ntmp;
     g_ptr	arg1 = NULL;
@@ -4678,6 +4678,7 @@ traverse_left(g_ptr oroot)
 		    goto finish3;
 
 		default:
+		    fprintf(stderr, "\nIllegal primitive function %d\n", pfn);
 		    DIE("Illegal primitive function");
 	    }
 	    DIE("Illegal node type");
