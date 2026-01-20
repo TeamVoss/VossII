@@ -2608,9 +2608,11 @@ let para_eval {exprs:: *a list}
 	      max_memory->(-1)
 	      max_cpu->(-1)
 	      verbose->T
+	      import_var_order->F
     =
-    let files = emit_eval_graph exprs then
-    let idx_files = zip (1 upto (length files)) files in
+    let vorder = var_order [] then
+    let tmp_dir = mktempd "para_eval" then
+    let idx_exprs = zip (1 upto (length exprs)) exprs in
     let stop (finished, current, todo) =
 	(current == []) AND (todo == []) => T |
 	let found = find_first0 (\fp. get_status fp = PID_DONE_OK) finished in
@@ -2627,9 +2629,15 @@ let para_eval {exprs:: *a list}
 	|
 	let finished' = finished@done then
 	let cnt = max_processes-(length active) then
-	val (to_add, todo') = list_grab cnt todo then
+	val (to_add, todo') = list_grab cnt todo in
 	let new =
-	    let start (idx,image) =
+	    let start (idx,expr) =
+		let image = sprintf "%s/g%d" tmp_dir idx then
+		let expr' =
+		    import_var_order => ((var_order vorder) fseq expr)
+				      | expr
+		in
+		(emit_eval_graph image expr') seq
 		val (pid, ofile) = spawn_fl_eval max_cpu max_memory image then
 		PROCESS idx image ofile pid
 	    in
@@ -2638,7 +2646,9 @@ let para_eval {exprs:: *a list}
 	let current' = active@new then
 	(finished', current', todo')
     in
-    val (finished, current, todo) = loop update_fn stop ([],[],idx_files) then
+    // Main loop evaluating all these expressions in separate processes
+    val (finished, current, todo) = loop update_fn stop ([],[],idx_exprs) then
+    // Retrieve the result(s)
     let raw_res = 
 	NOT single_winner =>
 	    val (ok,failed) = split is_succsesful finished then

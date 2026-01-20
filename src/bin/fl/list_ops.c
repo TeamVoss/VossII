@@ -1552,7 +1552,7 @@ List_ops_Install_Functions()
     typeExp_ptr tv1 = GLnew_tVar();
     typeExp_ptr tv2 = GLnew_tVar();
 
-    Add_ExtAPI_Function("loop", "000", FALSE,
+    Add_ExtAPI_Function("loop", "---", FALSE,
 			GLmake_arrow(
 			  GLmake_arrow(tv1, tv1),
 			  GLmake_arrow(

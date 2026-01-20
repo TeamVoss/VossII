@@ -1970,4 +1970,16 @@ non_lazy sleep;
 let spawn cmd = (defix spawn) cmd;
 non_lazy spawn;
 
+// Save the graph for expr to a file named <basename>.inp.tar.gz
+// This graph can be evaluated (in a separate process) by issuing
+//  fl -noX --eval_expr <basename>, which will evaluate the graph 
+// and write out the result in <basename>.out.tar.gz.
+// That result can be imported into the original fl process by
+// issuing the command retrieve_eval_graph <basename>.
+let emit_eval_graph basename expr = (defix emit_eval_graph) basename expr;
+
+// Load the graph in the file <basename>.out.tar.gz.
+// See emit_eval_graph for more details.
+let retrieve_eval_graph basename = (defix retrieve_eval_graph) basename;
+
 (update_vossrc "ADD-DEBUG-INFO" __old_debug_on__) fseq ();

@@ -230,25 +230,18 @@ emit_eval_graph(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr exprs;
-    EXTRACT_1_ARG(redex, exprs);
-    Sprintf(buf, "%s/eval_graph_emit_XXXXXX", Voss_tmp_dir);
-    string dir = wastrsave(stringsp, mkdtemp(buf));
-    MAKE_REDEX_NIL(redex);
-    g_ptr tail = redex;
-    int cnt = 0;
-    while( !IS_NIL(exprs) ) {
-	string base = wastrsave(stringsp, tprintf("%s/%d", dir, cnt));
-	string file = tprintf("%s.inp.tar.gz",base);
-	if( !Save_graph("_dummy_sig_", file, GET_CONS_HD(exprs)) ) {
-	    MAKE_REDEX_FAILURE(redex,
-		Fail_pr("Saving element %d in emit_eval_graph failed\n", cnt));
-	    return;
-	}
-	APPEND1(tail, Make_STRING_leaf(base));
-	exprs = GET_CONS_TL(exprs);
-	cnt++;
+    g_ptr gbase, expr;
+    EXTRACT_2_ARGS(redex, gbase, expr);
+    string base = GET_STRING(gbase);
+    string file = tprintf("%s.inp.tar.gz", base);
+    if( !Save_graph("_dummy_sig_", file, expr) ) {
+	MAKE_REDEX_FAILURE(redex,
+	    Fail_pr("Saving graph to %s in emit_eval_graph failed\n", file));
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
     }
+    MAKE_REDEX_VOID(redex);
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
@@ -384,8 +377,8 @@ System_Install_Functions()
 
     typeExp_ptr tv1 = GLnew_tVar();
 
-    Add_ExtAPI_Function("emit_eval_graph", "2", FALSE,
-		GLmake_arrow(GLmake_list(tv1), GLmake_list(GLmake_string())),
+    Add_ExtAPI_Function("emit_eval_graph", "1-", FALSE,
+		GLmake_arrow(GLmake_string(), GLmake_arrow(tv1, GLmake_void())),
 		emit_eval_graph);
 
     Add_ExtAPI_Function("retrieve_eval_graph", "1", FALSE,
