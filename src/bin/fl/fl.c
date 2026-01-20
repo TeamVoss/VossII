@@ -498,7 +498,7 @@ fl_main(int argc, char *argv[])
 	    // Gymnastics needed to ensure we can read input from
 	    // a file that we gradually append to....
 	    // Needed for vi-mode and emacs-mode to avoid busy-wait
-	    int i = system(tprintf("/bin/rm -f %s", input_file_for_cmds));
+	    int i= system(tprintf("rm -f %s", input_file_for_cmds));
 	    i = system(tprintf("touch %s", input_file_for_cmds));
 	    (void) i;
 	    int fd[2];
@@ -517,7 +517,7 @@ fl_main(int argc, char *argv[])
 		close(wr_fd);
 		char pbuf[16];
 		Sprintf(pbuf, "%d", parent_pid);
-		execl("/usr/bin/tail", "tail", "-f", input_file_for_cmds,
+		execlp("tail", "tail", "-f", input_file_for_cmds,
 		      "--pid", pbuf, NULL);
 	    }
 	    close(wr_fd);
@@ -795,7 +795,7 @@ Exit(int status)
     }
     // Clean up and remove temp files
     if( (new_temp_dir == NULL) && (Voss_tmp_dir != NULL) ) {
-        Sprintf(buf, "/bin/rm -rf %s", Voss_tmp_dir);
+        Sprintf(buf, "rm -rf %s", Voss_tmp_dir);
         int i = system(buf);
 	(void) i;
     }

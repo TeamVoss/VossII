@@ -175,7 +175,7 @@ run_compare_program()
 static void
 rm_file(string file)
 {
-    Sprintf(cmd, "/bin/rm -f %s", file);
+    Sprintf(cmd, "rm -f %s", file);
     system(cmd);
 }
 

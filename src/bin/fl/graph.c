@@ -2555,7 +2555,7 @@ Emit_profile_data()
 	sprintf(tmp_name, "gmon.out.%d", ++tmp_cnt);
     }
     if( tmp_cnt != 0 ) {
-	sprintf(tmp_name, "/bin/mv gmon.out gmon.out.%d", tmp_cnt);
+	sprintf(tmp_name, "mv gmon.out gmon.out.%d", tmp_cnt);
 	system(tmp_name);
     }
     FILE *fp = fopen("gmon.out", "w");

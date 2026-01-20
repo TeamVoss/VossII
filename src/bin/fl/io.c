@@ -1044,7 +1044,7 @@ Save_graph(string type_sig, string file_name, g_ptr node)
 	Fail_pr("Command '%s' failed????", buf);
 	return FALSE;
     }
-    Sprintf(buf, "/bin/rm -rf %s", dir);
+    Sprintf(buf, "rm -rf %s", dir);
     int i  = system(buf);
     (void) i;
     Serialize_End();
@@ -1176,7 +1176,7 @@ fprintf(stderr, "cmd: %s\n", cmd);
     free_buf(&bool_results);
     free_buf(&bexpr_results);
     free_buf(&str_results);
-    Sprintf(buf, "/bin/rm -rf %s", dir);
+    Sprintf(buf, "rm -rf %s", dir);
     int i = system(buf);
     (void) i;
     Unserialize_End();

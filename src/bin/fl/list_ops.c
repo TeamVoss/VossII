@@ -408,6 +408,46 @@ el(g_ptr redex)
 }
 
 static void
+loop(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr update_fn, stop_pred, init;
+    EXTRACT_3_ARGS(redex, update_fn, stop_pred, init);
+    g_ptr cur = init;
+    while(1) {
+	SET_REFCNT(stop_pred, MAX_REF_CNT);
+	SET_REFCNT(cur, MAX_REF_CNT);
+	SET_REFCNT(update_fn, MAX_REF_CNT);
+	g_ptr stop = Make_APPL_ND(stop_pred, cur);
+	stop = Eval(stop);
+	if( is_fail(stop) ) {
+	    OVERWRITE(redex, stop);
+	    DEC_REF_CNT(l);
+	    DEC_REF_CNT(r);
+	    return;
+	}
+	if( GET_BOOL(stop) == B_One() ) {
+	    OVERWRITE(redex, cur);
+	    DEC_REF_CNT(l);
+	    DEC_REF_CNT(r);
+	    return;
+	}
+	SET_REFCNT(stop_pred, MAX_REF_CNT);
+	SET_REFCNT(cur, MAX_REF_CNT);
+	SET_REFCNT(update_fn, MAX_REF_CNT);
+	cur = Make_APPL_ND(update_fn, cur);
+	cur = Eval(cur);
+	if( is_fail(cur) ) {
+	    OVERWRITE(redex, cur);
+	    DEC_REF_CNT(l);
+	    DEC_REF_CNT(r);
+	    return;
+	}
+    }
+}
+
+static void
 sitlist(g_ptr redex)
 {
     // sitlist fn l z
@@ -1511,6 +1551,14 @@ List_ops_Install_Functions()
     // Add builtin functions
     typeExp_ptr tv1 = GLnew_tVar();
     typeExp_ptr tv2 = GLnew_tVar();
+
+    Add_ExtAPI_Function("loop", "000", FALSE,
+			GLmake_arrow(
+			  GLmake_arrow(tv1, tv1),
+			  GLmake_arrow(
+			    GLmake_arrow(tv1, GLmake_bool()),
+			    GLmake_arrow(tv1, tv1))),
+			loop);
 
     Add_ExtAPI_Function("qsort", "11", FALSE,
 			GLmake_arrow(

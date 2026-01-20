@@ -90,7 +90,7 @@ spawn(g_ptr redex)
     pid_t pid = fork();
     if( pid == 0 ) {
         // Child
-        execlp("/usr/bin/bash", "/usr/bin/bash", "-c", cmd, (char *) NULL);
+        execlp("bash", "bash","-c",cmd,(char *)NULL);
     }
     MAKE_REDEX_INT(redex, (int) pid);
     DEC_REF_CNT(l);
