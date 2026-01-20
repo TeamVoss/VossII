@@ -2521,83 +2521,104 @@ export_to_tcl fl_float2rat;
 // Para_eval related code.
 // ------------------------------------------------------
 
-// begin_abstype;
-// 
-// lettype *a para = PARA_EVAL
-//                     {pids:: int list}
-//                     {files:: string list}
-//                     {results:: ({*a} opt) list}
-// ;
-// 
-// let spawn_fl_eval file =
-//     let cmd = sprintf "fl -noX --eval_expr %s" file then
-//     let pid = sscanf "%d" (tcl_eval [sprintf "exec %s >& /dev/null &" cmd]) then
-//     pid
-// ;
-// 
-// // Evaluate all the expressions in parallel
-// let para_eval {exprs:: *a list} =
-//     let files = emit_eval_graph exprs then
-//     let pids = map spawn_fl_eval files then
-//     let results = replicate (length files) {NONE:: {*a} opt} then
-//     let res = PARA_EVAL pids files results then
-//     res
-// ;
-// export para_eval;
-// 
-// 
-// let para_eval_update peval =
-//     val (PARA_EVAL pids files results) = peval in
-//     let is_alive pid = (system (sprintf "ps --pid %d > /dev/null" pid)) = 0 in
-//     let update pid file res =
-//         has_value res => res |
-//         (is_alive pid) => NONE |
-//         let res = retrieve_eval_graph file then
-//         SOME res
-//     in
-//     let results' = map3 update pids files results then
-//     (PARA_EVAL pids files results')
-// ;
-// 
-// let para_eval_kill peval =
-//     val (PARA_EVAL pids files results) = peval in
-//     let kill pid = (system (sprintf "kill -9 %d" pid)) fseq () in
-//     foreach kill pids
-// ;
-// export para_eval_kill;
-// 
-// let para_eval_done peval =
-//     val (PARA_EVAL pids files results) = para_eval_update peval in
-//     find_all has_value results
-// ;
-// export para_eval_done;
-// 
-// let para_eval_not_done peval =
-//     val (PARA_EVAL pids files results) = para_eval_update peval in
-//     find_all (\op. NOT (has_value op)) results
-// ;
-// export para_eval_not_done;
-// 
-// let para_eval_get_result peval idx =
-//     val (PARA_EVAL pids files results) = para_eval_update peval in
-//     let ores = el idx results in
-//     NOT (has_value ores) => eprintf "Result %d not ready in para_eval" idx |
-//     get_value ores
-// ;
-// export para_eval_get_result;
-// 
-// let para_eval_get_all_results pev =
-//     letrec loop pev =
-//         let pev' = para_eval_update pev then
-//         (para_eval_not_done pev') = [] =>
-//             val (PARA_EVAL pids files results) = pev' in
-//             map get_value results
-//         |
-//         loop pev'
-//     in
-//     loop pev
-// ;
-// export para_eval_get_all_results;
-// 
-// end_abstype;
-// 
+begin_abstype;
+
+lettype status =  PID_RUNNING
+		| PID_DONE_OK
+		| PID_FAILED
+		| PID_DIED {exit_code :: int}
+;
+
+let Pstatus (PID_RUNNING) = "running"
+ /\ Pstatus (PID_DONE_OK) = "ok"
+ /\ Pstatus (PID_FAILED)  = "failed"
+ /\ Pstatus (PID_DIED exit_code)  = sprintf "Died: %d" exit_code
+;
+install_print_function Pstatus;
+
+
+let get_status ({idx::int},file,pid) =
+    let exit = get_process_exit_status pid then
+    (exit != 0) AND (exit != 999999) => PID_DIED exit |
+    (kill pid 0) == (-1) =>
+	// Process exited
+	file_exists (sprintf "%s.out.tar.gz" file) => PID_DONE_OK |
+	PID_FAILED
+    |
+    PID_RUNNING
+;
+non_lazy get_status;
+
+let is_running fpid = (get_status fpid) = PID_RUNNING;
+non_lazy is_running;
+let is_succsesful fpid = (get_status fpid) = PID_DONE_OK;
+non_lazy is_succsesful;
+
+let list_grab cnt l =
+    length l <= cnt => l,[] |
+    (firstn cnt l), (butfirstn cnt l)
+;
+
+let spawn_fl_eval max_cpu max_mem file =
+    let cl = max_cpu < 0 => "" | sprintf "--max_cpu_time %d" max_cpu in
+    let ml = max_mem < 0 => "" | sprintf "--max_memory %d" max_mem in
+    let cmd = sprintf "fl -noX %s %s --eval_expr %s >& /dev/null" cl ml file in
+    spawn cmd
+;
+
+let para_eval {exprs:: *a list}
+	      max_processes->20
+	      single_winner->F
+	      max_memory->(-1)
+	      max_cpu->(-1)
+	      verbose->T
+    =
+    let files = emit_eval_graph exprs then
+    let idx_files = zip (1 upto (length files)) files in
+    letrec process finished current todo =
+	(NOT verbose => () |
+	    (fprintf stdinfo "Para_eval: %d %d %d\n"
+		(length finished) (length current) (length todo))
+	) fseq
+	(sleep 1000) fseq
+	(current == []) AND (todo == []) =>
+	    val (ok,failed) = split is_succsesful finished in
+	    let results =
+		map (\(idx,f,_). idx,SOME (retrieve_eval_graph f)) ok
+	    then
+	    let failed = map (\(idx,_). idx, NONE) failed then
+	    let raw_res = results@failed then
+	    let cmp (i1,_) (i2,_) = i1-i2 in
+	    map snd (qsort cmp raw_res)
+	|
+	val (active,done) = split is_running current in
+	let found = find_first0 (\fpid. get_status fpid = PID_DONE_OK) done in
+	single_winner AND (found != 0) =>
+	    val (_,file,pid) = el found done in
+	    // Now kill all other processes
+	    let kill (idx,f,pid) =
+		(system (sprintf "kill -9 %d" pid)) fseq ()
+	    in
+	    (foreach kill active) fseq
+	    [(SOME {(retrieve_eval_graph file):: *a})]
+	|
+	let finished' = finished@done in
+	length active = max_processes => process finished' active todo |
+	val (new,todo') = 
+	    let cnt = max_processes-(length active) in
+	    val (to_add, todo') = list_grab cnt todo in
+	    let new =
+		map (\(idx,f). idx,f, spawn_fl_eval max_cpu max_memory f) to_add
+	    then
+	    new, todo'
+	in
+	let current' = active@new in
+	process finished' current' todo'
+    in
+    process [] [] idx_files
+;
+
+
+end_abstype para_eval;
+
+
