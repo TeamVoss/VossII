@@ -2363,7 +2363,7 @@ Get_node()
     if( allocated - last_allocated > gc_threshold )
 	do_gc_asap = 1;
     ret = (g_ptr) new_rec(&g_rec_mgr);
-    RESET_G_PTR(ret);
+    RESET_G_PTR2(ret);
     ASSERT( ((ui) ret)%8 == 0 );
     return( ret );
 }
@@ -2654,11 +2654,6 @@ refcnt_free_nd(g_ptr node)
     free_list = node;
     return;
 #else
-#if 0
-    /* Version that resets the node, but don't put it on free list */
-    RESET_G_PTR(node);
-    return;
-#endif
 #if 1
     /* Version that sets the node to an illegal type but does not free it */
     SET_TYPE(node, LEAF);
@@ -2685,7 +2680,6 @@ refcnt_free_nd(g_ptr node)
 #endif
 }
 #endif
-
 
 
 static g_ptr

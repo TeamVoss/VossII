@@ -174,8 +174,13 @@ typedef struct g_rec {
 #define RESET_G_PTR(np)		{ (np)->L = 0; (np)->R = 0;		\
 				  (np)->oldL = 0; (np)->oldR = 0;	\
 				  (np)->file = 0; (np)->line = -1; }
+#define RESET_G_PTR2(np)	{ (np)->L = 0; (np)->R = 0;		\
+				  (np)->oldL = 0; (np)->oldR = 0;	\
+				  (np)->file = 0; (np)->line = -2; }
+
 #else
 #define RESET_G_PTR(np)		{ (np)->L = 0; (np)->R = 0; }
+#define RESET_G_PTR2(np)	{ (np)->L = 0; (np)->R = 0; }
 #endif
 /* Types of nodes */
 #define LAMBDA_ND               0

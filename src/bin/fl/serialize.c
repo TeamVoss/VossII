@@ -235,7 +235,7 @@ void
 write_unint(FILE *fp, unint i)
 {
     WR_DBG1("unint");
-    fprintf(fp, "%d\n", i);
+    fprintf(fp, "%u\n", i);
 }
 
 void
@@ -243,7 +243,7 @@ read_unint(FILE *fp, unint *ip)
 {
     unint i;
     RD_DBG1("unint");
-    if( fscanf(fp, "%d\n", &i) != 1 )
+    if( fscanf(fp, "%u\n", &i) != 1 )
 	Rprintf("Corrupted unint object");
     *ip = i;
 }

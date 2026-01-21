@@ -1008,16 +1008,16 @@ static void
 split(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr pred = GET_APPLY_RIGHT(l);
-    g_ptr list = GET_APPLY_RIGHT(redex);
-
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr pred, list;
+    EXTRACT_2_ARGS(redex, pred, list);
     g_ptr ok = Make_NIL();
-    PUSH_GLOBAL_GC(ok);
     g_ptr ok_tail = ok;
+    PUSH_GLOBAL_GC(ok);
 
     g_ptr not_ok = Make_NIL();
-    PUSH_GLOBAL_GC(not_ok);
     g_ptr not_ok_tail = not_ok;
+    PUSH_GLOBAL_GC(not_ok);
 
     while( !IS_NIL(list) ) {
 	g_ptr e = GET_CONS_HD(list);
@@ -1025,33 +1025,37 @@ split(g_ptr redex)
 	g_ptr use = Make_APPL_ND(pred, e);
 	INC_REFCNT(pred);
 	INC_REFCNT(e);
-	use = Eval(use);
+	PUSH_GLOBAL_GC(use);
+	use = reduce(use, FALSE);
+	POP_GLOBAL_GC(1); // use
 	if( is_fail(use) ) {
 	    MAKE_REDEX_FAILURE(redex, FailBuf);
 	    POP_GLOBAL_GC(2);
+	    DEC_REF_CNT(l);
+	    DEC_REF_CNT(r);
 	    return;
 	}
 	formula res = GET_BOOL(use);
 	if( res == B_One() ) {
-	    SET_CONS_HD(ok_tail,e);
+	    APPEND1(ok_tail, e);
 	    INC_REFCNT(e);
-	    SET_CONS_TL(ok_tail, Make_NIL());
-	    ok_tail = GET_CONS_TL(ok_tail);
 	} else if( res == B_Zero() ) {
-	    SET_CONS_HD(not_ok_tail,e);
+	    APPEND1(not_ok_tail, e);
 	    INC_REFCNT(e);
-	    SET_CONS_TL(not_ok_tail, Make_NIL());
-	    not_ok_tail = GET_CONS_TL(not_ok_tail);
 	} else {
 	    // Evaluated to sym
 	    MAKE_REDEX_FAILURE(redex,
 			"split predicate evaluated to symbolic condition");
 	    POP_GLOBAL_GC(2);
+	    DEC_REF_CNT(l);
+	    DEC_REF_CNT(r);
 	    return;
 	}
     }
     MAKE_REDEX_CONS_ND(redex, ok, not_ok);
     POP_GLOBAL_GC(2);
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
     return;
 }
 
