@@ -2622,17 +2622,17 @@ let para_eval {exprs:: *a list}
 	(NOT verbose => () |
 	    (fprintf stdinfo "Para_eval: %d %d %d\n"
 		(length finished) (length current) (length todo))
-	) fseq
-	val (active,done) = split is_running current then
+	) seq
+	val (active,done) = split is_running current in
 	(active != []) AND (done = []) =>
-	    ((sleep 500) fseq (finished, current, todo))
+	    ((sleep 500) seq (finished, current, todo))
 	|
-	let finished' = finished@done then
-	let cnt = max_processes-(length active) then
+	let finished' = finished@done in
+	let cnt = max_processes-(length active) in
 	val (to_add, todo') = list_grab cnt todo in
 	let new =
 	    let start (idx,expr) =
-		let image = sprintf "%s/g%d" tmp_dir idx then
+		let image = sprintf "%s/g%d" tmp_dir idx in
 		let expr' =
 		    import_var_order => ((var_order vorder) fseq expr)
 				      | expr
@@ -2642,8 +2642,8 @@ let para_eval {exprs:: *a list}
 		PROCESS idx image ofile pid
 	    in
 	    map start to_add
-	then
-	let current' = active@new then
+	in
+	let current' = active@new in
 	(finished', current', todo')
     in
     // Main loop evaluating all these expressions in separate processes

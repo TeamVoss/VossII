@@ -415,20 +415,25 @@ loop(g_ptr redex)
     g_ptr update_fn, stop_pred, init;
     EXTRACT_3_ARGS(redex, update_fn, stop_pred, init);
     g_ptr cur = init;
+    PUSH_GLOBAL_GC(cur);
     while(1) {
 	SET_REFCNT(stop_pred, MAX_REF_CNT);
 	SET_REFCNT(cur, MAX_REF_CNT);
 	SET_REFCNT(update_fn, MAX_REF_CNT);
 	g_ptr stop = Make_APPL_ND(stop_pred, cur);
-	stop = Eval(stop);
+	PUSH_GLOBAL_GC(stop);
+	stop = reduce(stop, TRUE);
+	POP_GLOBAL_GC(1);
 	if( is_fail(stop) ) {
 	    OVERWRITE(redex, stop);
+	    POP_GLOBAL_GC(1);	// cur
 	    DEC_REF_CNT(l);
 	    DEC_REF_CNT(r);
 	    return;
 	}
 	if( GET_BOOL(stop) == B_One() ) {
 	    OVERWRITE(redex, cur);
+	    POP_GLOBAL_GC(1);	// cur
 	    DEC_REF_CNT(l);
 	    DEC_REF_CNT(r);
 	    return;
@@ -437,14 +442,16 @@ loop(g_ptr redex)
 	SET_REFCNT(cur, MAX_REF_CNT);
 	SET_REFCNT(update_fn, MAX_REF_CNT);
 	cur = Make_APPL_ND(update_fn, cur);
-	cur = Eval(cur);
+	cur = reduce(cur, TRUE);
 	if( is_fail(cur) ) {
 	    OVERWRITE(redex, cur);
+	    POP_GLOBAL_GC(1);	// cur
 	    DEC_REF_CNT(l);
 	    DEC_REF_CNT(r);
 	    return;
 	}
     }
+    POP_GLOBAL_GC(1);	// cur
 }
 
 static void
