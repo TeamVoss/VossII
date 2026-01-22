@@ -415,43 +415,44 @@ loop(g_ptr redex)
     g_ptr update_fn, stop_pred, init;
     EXTRACT_3_ARGS(redex, update_fn, stop_pred, init);
     g_ptr cur = init;
-    PUSH_GLOBAL_GC(cur);
     while(1) {
-	SET_REFCNT(stop_pred, MAX_REF_CNT);
-	SET_REFCNT(cur, MAX_REF_CNT);
-	SET_REFCNT(update_fn, MAX_REF_CNT);
 	g_ptr stop = Make_APPL_ND(stop_pred, cur);
+	INC_REFCNT(stop_pred);
+	INC_REFCNT(cur);
+	PUSH_GLOBAL_GC(cur);
 	PUSH_GLOBAL_GC(stop);
-	stop = reduce(stop, TRUE);
-	POP_GLOBAL_GC(1);
+	stop = reduce(stop, FALSE);
+	POP_GLOBAL_GC(2);
 	if( is_fail(stop) ) {
 	    OVERWRITE(redex, stop);
-	    POP_GLOBAL_GC(1);	// cur
 	    DEC_REF_CNT(l);
 	    DEC_REF_CNT(r);
 	    return;
 	}
 	if( GET_BOOL(stop) == B_One() ) {
 	    OVERWRITE(redex, cur);
-	    POP_GLOBAL_GC(1);	// cur
 	    DEC_REF_CNT(l);
 	    DEC_REF_CNT(r);
 	    return;
 	}
-	SET_REFCNT(stop_pred, MAX_REF_CNT);
-	SET_REFCNT(cur, MAX_REF_CNT);
-	SET_REFCNT(update_fn, MAX_REF_CNT);
+	if( GET_BOOL(stop) != B_Zero() ) {
+	    MAKE_REDEX_FAILURE(redex, "Symbolic condition in loop");
+	    DEC_REF_CNT(l);
+	    DEC_REF_CNT(r);
+	    return;
+	}
 	cur = Make_APPL_ND(update_fn, cur);
-	cur = reduce(cur, TRUE);
+	INC_REFCNT(update_fn);
+	PUSH_GLOBAL_GC(cur);
+	cur = reduce(cur, FALSE);
+	POP_GLOBAL_GC(1);
 	if( is_fail(cur) ) {
 	    OVERWRITE(redex, cur);
-	    POP_GLOBAL_GC(1);	// cur
 	    DEC_REF_CNT(l);
 	    DEC_REF_CNT(r);
 	    return;
 	}
     }
-    POP_GLOBAL_GC(1);	// cur
 }
 
 static void

@@ -21,11 +21,11 @@
 /********************************************************************/
 /*	    Version control (debug, paranoia, etc.)		    */
 /********************************************************************/
-#define PARANOIA 1		 // Turn on checking before doing graph ops.
-#define TRACK_FREEING 1		 // Keep the old value & location of freed node
-#define NO_REFCNT_GC	1	 // Turn off reference counting g.c.
-#define DONT_FREE_ND 1		 // Never free a node
 #if 0
+#define PARANOIA 1		 // Turn on checking before doing graph ops.
+#define NO_REFCNT_GC	1	 // Turn off reference counting g.c.
+#define TRACK_FREEING 1		 // Keep the old value & location of freed node
+#define DONT_FREE_ND 1		 // Never free a node
 #define CHECK_REF_CNTS 1	 // Check every reachable nodes reference count
 #define VERBOSE_DEC_REF_CNT 1	 // Verbose decrementation of reference counts
 #define NO_CACHE_HIT	1	 // Turn all memo tables into no-ops (miss only)

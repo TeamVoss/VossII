@@ -2296,6 +2296,7 @@ let vec_interleave vecs = interleave (map md_expand_vector vecs);
 // Evaluate expression e inside a context in which all of the GUI,
 // except Interrupt button(s), is made inactive.
 let busy e =
+    noX => e |
     (tcl_eval ["i_am_busy"]) fseq
     ([e] catch []) fseq
     (tcl_eval ["i_am_free"]) fseq

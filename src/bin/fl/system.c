@@ -132,11 +132,15 @@ do_pid(g_ptr redex)
 static void
 noX_mode(g_ptr redex)
 {
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
     if( gui_mode ) {
 	MAKE_REDEX_BOOL(redex, B_Zero());
     } else {
 	MAKE_REDEX_BOOL(redex, B_One());
     }
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
 }
 
 static void
@@ -369,7 +373,9 @@ System_Install_Functions()
 					 GLmake_list(GLmake_string()))),
 			my_exec);
 
-    Add_ExtAPI_Function("noX", "", FALSE, GLmake_bool(), noX_mode);
+    Add_ExtAPI_Function("noX", "1", FALSE,
+			GLmake_arrow(GLmake_void(), GLmake_bool()),
+			noX_mode);
 
     Add_ExtAPI_Function("pid", "", FALSE, GLmake_int(), do_pid);
 

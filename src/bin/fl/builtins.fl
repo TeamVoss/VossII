@@ -2,6 +2,10 @@
 // Copyright 2020 Carl-Johan Seger
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
+let q_DuMmY_q = ();
+
+// Returns T if fl is run in -noX mode. Otherwise returns F.
+let noX dummy->() = (defix noX) dummy;
 
 let __old_debug_on__ = update_vossrc "ADD-DEBUG-INFO" "FALSE";
 __old_debug_on__ fseq ();
@@ -837,9 +841,6 @@ let md_expand_vector vec = defix md_expand_vector vec;
 // A vec_info is either a (TXT s) object or a (RANGES range_list),
 // where a range is a pair of integers.
 let md_split_vector vec = defix md_split_vector vec;
-
-// Returns T if fl is run in -noX mode. Otherwise returns F.
-let noX = defix noX;
 
 // Multidimensional extraction of vectors from a list of nodes/vectors
 // Order of nodes is irrelevant and duplicates are removed.

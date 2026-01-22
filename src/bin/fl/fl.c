@@ -458,6 +458,9 @@ fl_main(int argc, char *argv[])
 			    inp_file);
 	    exit(-21);
 	}
+	// Remove input file
+	string cmd = tprintf("rm -f %s.inp.tar.gz", expr_eval_file);
+	system(cmd);
 	// Now force evaluation of redex
 	redex = force(redex, FALSE);
 	// And save the result in the output file

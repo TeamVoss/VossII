@@ -1070,7 +1070,6 @@ Load_graph(string type_sig, string file_name, g_ptr redex)
     string graph_file_name = wastrsave(stringsp, buf);
     // ------------- Untar file into tmp directory ------------------
     string cmd = tprintf("tar -C %s -xzf %s", dir, file_name);
-fprintf(stderr, "cmd: %s\n", cmd);
     int ret;
     if( (ret = system(cmd)) != 0 ) {
 	MAKE_REDEX_FAILURE(redex, Fail_pr("Failed to read %s (return code %d)",
