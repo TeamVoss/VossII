@@ -21,14 +21,10 @@ TODO to move Voss to ">=" Forte/ReFlect.
 2) Add SMT solver (?)
    - Add a WSTE engine
 
-3) Add fork primitive
-   - Create a para_eval mechanism
 
 4) Add GUI based debugger for fl.
 
 5) Add named fields in type constructors + default values.
-
-6) Add nlet functionality + defaults
 
 7) Add timeout command.
 
@@ -89,4 +85,7 @@ instead of going through an internal string representation).
 34) Add tables to fl
 35) Add fanin_dfs, _bfs and fanout_... functionality. 
 36) Fixed the save_fsm and load_fsm functions.
+37) Created a para_eval mechanism
+38) Add nlet functionality + defaults
+
 
