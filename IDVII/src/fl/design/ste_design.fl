@@ -323,12 +323,22 @@ export is;
 let bool_ant {l::(bool#string#bool#int#int) list} = l;
 export bool_ant;
 
+// Casting type
+new_type_abbrev bdd_ant = (bool#string#bool#int#int) list;
+
+
 // Casting function
 let bexpr_ant {l::(bexpr#string#bexpr#int#int) list} = l;
 export bexpr_ant;
 
+// Casting type
+new_type_abbrev bexpr_ant = (bexpr#string#bexpr#int#int) list;
+
 // Casting function
 let wexpr_ant {l::(wexpr#string#wexpr#int#int) list} = l;
 export wexpr_ant;
+
+// Casting type
+new_type_abbrev wexpr_ant = (wexpr#string#wexpr#int#int) list;
 
 end_abstype;

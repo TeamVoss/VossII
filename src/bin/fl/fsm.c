@@ -4753,6 +4753,11 @@ compile_expr(hash_record *vtblp, string hier, ilist_ptr outs, g_ptr we,
 	    int idx = GET_INT(GET_CONS_HD(l));
 	    idx_list_ptr cur = (idx_list_ptr) new_rec(idx_list_rec_mgrp);
 	    cur->idx = inp_sz-idx-1;
+	    if( cur->idx < 0 ) {
+		FP(err_fp, "Slice operation has invalid index %d)\n",idx);
+		report_source_locations(err_fp);
+		Rprintf("");
+	    }
 	    cur->next = NULL;
 	    *prevp = cur;
 	    prevp = &(cur->next);
