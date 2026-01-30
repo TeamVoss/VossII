@@ -1461,8 +1461,11 @@ let visualization_nodes ckt draw_level =
 // for `levels' back from the vectors 'vecs' stopping at nodes in
 /// 'stop_list' and nides in 'ifc_vecs'.
 //
-let visualize_fanin ckt stop_list ifc_vecs levels vecs draw_level =
+let visualize_fanin ckt stop_list ifc_vecs levels vecs draw_level
+		    ignore_tmp_nds
+    =
     (defix visualize_fanin) ckt stop_list ifc_vecs levels vecs draw_level
+			    ignore_tmp_nds
 ;
 
 // Return T if the node nd in circuit ckt is a phase delay node.
@@ -1817,8 +1820,9 @@ let visualize_get_shown_anons vis = (defix visualize_get_shown_anons) vis;
 // Return the visualization state resulting from expanding all incomplete
 // nodes by 'levels' in the fanin cone of the anonymous node 'aname' at
 // the drawing level 'draw_level'.
-let visualize_expand_fanin vis aname levels draw_level =
-    (defix visualize_expand_fanin) vis aname levels draw_level;
+let visualize_expand_fanin vis aname levels draw_level ignore_tmp_nds =
+    (defix visualize_expand_fanin) vis aname levels draw_level ignore_tmp_nds
+;
 
 // Return the visualization state resulting from making the anonymous node
 // 'aname' an incomplete at the drawing level 'draw_level'.

@@ -3,6 +3,8 @@
 ;# SPDX-License-Identifier: Apache-2.0
 ;#########################################################################
 
+set ::IGNORE_TMP_NDS 1
+
 # ---------------------------------------------------
 # Dependencies
 # ---------------------------------------------------
@@ -427,7 +429,7 @@ proc nb:draw_fanin {w p} {
 	    set draw_level -1
 	    set levels $::nodebrowser(levels,$w)
 	}
-	fl_draw_fanin_by_name $w $draw_level $levels $sel
+	fl_draw_fanin_by_name $w $draw_level $levels $::IGNORE_TMP_NDS $sel
     }
 }
 
@@ -915,7 +917,7 @@ proc cb:sch_canvas_menu {c wx wy sx sy} {
     } else {
 	$m add command -label "New fanin" \
 	    -command "after idle [list sc:draw_new_fanin_by_tag $c \
-			$::sch_info(draw_level,$c) 1 $nodes]"
+			$::sch_info(draw_level,$c) 1 0 $nodes]"
 	$m add command -label "Draw inside" \
 	    -command "after idle [list sc:draw_inside $c $nodes]"
 
@@ -1245,7 +1247,7 @@ proc cb:expand_fanin {c node amt} {
 	set old_zoom $::cur_zoom_factor($c)
 	set_zoom_factor $c 100.0
 	$c delete all
-        fl_expand_fanin $c $::sch_info(draw_level,$c) $amt $node
+        fl_expand_fanin $c $::sch_info(draw_level,$c) $amt $node $::IGNORE_TMP_NDS
 	set_zoom_factor $c $old_zoom
         cb:restore_attributes $c
         adjust_circuit_window [winfo parent $c] $c 0
@@ -3554,14 +3556,14 @@ proc sc:draw_inside {c tag} {
     if ![info exists ::tag2inst_nbr($c,$tag)] { return }
     set inst_nbr $::tag2inst_nbr($c,$tag)
     set draw_level $::sch_info(draw_level,$c)
-    set new_c [fl_draw_inside $c $draw_level $tag $inst_nbr]
+    set new_c [fl_draw_inside $c $draw_level $tag $inst_nbr $::IGNORE_TMP_NDS]
     set tab_frame [winfo parent [winfo parent $c]]
     set ::sc(parent_frame,$new_c) $tab_frame
     return $new_c
 }
 
-proc sc:draw_new_fanin_by_tag {c draw_level levels tag} {
-    set new_c [fl_draw_fanin_by_tag $c $draw_level $levels $tag]
+proc sc:draw_new_fanin_by_tag {c draw_level levels ignore_tmps tag} {
+    set new_c [fl_draw_fanin_by_tag $c $draw_level $levels $tag $ignore_tmps]
     set tab_frame [winfo parent [winfo parent $c]]
     set ::sc(parent_frame,$new_c) $tab_frame
     return $new_c
@@ -3580,7 +3582,7 @@ proc sc:double_draw_inside {c levels inst_nbr tag} {
 	fl_add_to_selection_list $nd
     }
     fl_set_selection $c "SET_SELECTION"
-    fl_draw_inside $c $levels $tag $inst_nbr
+    fl_draw_inside $c $levels $tag $inst_nbr $::IGNORE_TMP_NDS
 }
 
 proc draw_pred {name c tag x y} {

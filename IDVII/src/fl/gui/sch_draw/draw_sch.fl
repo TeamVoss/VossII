@@ -37,7 +37,7 @@ let idv_visualize_fanin p =
     let ckt = accurate_toplevel_pexlif2fsm p then
     let outs = outputs ckt then
     let props = assertions ckt then
-    visualize_fanin ckt [] [] 100 (outs@props) 0
+    visualize_fanin ckt [] [] 100 (outs@props) 0 T 
 ;
 
 let visualisation2tcl vis =
@@ -467,11 +467,13 @@ let canvas2tab c =
 let start_draw_op c = tcl_eval [sprintf "sc:prepare_draw_info %s" c];
 non_lazy start_draw_op;
 
-let gen_draw_fanin vfsm draw_level levels vecs =
+let gen_draw_fanin vfsm draw_level levels ignore_tmp_nds vecs =
     let stop_list = deref (vfsm2stop_list_r vfsm) then
     let fsm = vfsm2fsm vfsm then 
     let w = vfsm2id vfsm then
-    let vis = visualize_fanin fsm stop_list [] levels vecs draw_level then
+    let vis =
+	visualize_fanin fsm stop_list [] levels vecs draw_level ignore_tmp_nds
+    then
     val (tab_window, c) = get_new_sch_canvas w draw_level "" "" then
     (start_draw_op c) fseq
     let cmd =	
@@ -512,7 +514,7 @@ let gen_draw_fanin vfsm draw_level levels vecs =
 //    (PINST name attrs lf fa_inps' fa_outs' ints'(P_HIER chs'))
 //;
 
-let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
+let gen_draw_inside vfsm canvas cur_draw_level ignore_tmp_nds vecs inst_nbr =
     let w = vfsm2id vfsm then
     let fsm_pat = ".*draw_fsm \\{([^}]*)\\} " in
     let fub_pat = ".*draw_fub ([^ ]*) "  in
@@ -572,7 +574,10 @@ let gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr =
 	"N/A"
     then
     let draw_level = cur_draw_level+1 in
-    let vis = visualize_fanin fsm stop_list ifc_list 100 vecs draw_level then
+    let vis =
+	visualize_fanin fsm stop_list ifc_list 100 vecs
+			draw_level ignore_tmp_nds
+    then
     val (tab_window, c) = get_new_sch_canvas w draw_level hier hier then
     (start_draw_op c) fseq
     let cmd =	
@@ -619,16 +624,17 @@ let fl_vecs2tags canvas vecs =
 export_to_tcl fl_vecs2tags;
 
 
-let fl_draw_fanin_by_name canvas draw_level levels vecs =
+let fl_draw_fanin_by_name canvas draw_level levels ignore_tmp_nds vecs =
     let vfsm = w2vfsm canvas then
-    busy (gen_draw_fanin vfsm draw_level levels vecs)
+    busy (gen_draw_fanin vfsm draw_level levels ignore_tmp_nds vecs)
 ;
 export_to_tcl fl_draw_fanin_by_name;
 
-let fl_draw_inside canvas cur_draw_level tag inst_nbr =
+let fl_draw_inside canvas cur_draw_level tag inst_nbr ignore_tmp_nds =
     let vfsm = w2vfsm canvas then
     let vecs = fl_tag2vec canvas tag then
-    busy (gen_draw_inside vfsm canvas cur_draw_level vecs inst_nbr)
+    busy (gen_draw_inside vfsm canvas cur_draw_level
+			  ignore_tmp_nds vecs inst_nbr)
 ;
 export_to_tcl fl_draw_inside;
 
@@ -669,10 +675,10 @@ let fl_show_info canvas inst_nbr =
 export_to_tcl fl_show_info;
 
 
-let fl_draw_fanin_by_tag canvas draw_level levels tag =
+let fl_draw_fanin_by_tag canvas draw_level levels tag ignore_tmp_nds =
     let vfsm = w2vfsm canvas then
     let vec = fl_tag2vec canvas tag then
-    let c = gen_draw_fanin vfsm draw_level levels vec then
+    let c = gen_draw_fanin vfsm draw_level levels ignore_tmp_nds vec then
     busy c
 ;
 export_to_tcl fl_draw_fanin_by_tag;
@@ -1735,10 +1741,12 @@ let fl_delete_stop_nd canvas vec =
 ;
 export_to_tcl fl_delete_stop_nd;
 
-let fl_expand_fanin c draw_level levels tag =
+let fl_expand_fanin c draw_level levels tag ignore_tmp_nds =
     (start_draw_op c) fseq
     let vis = evis2vis (canvas2vis c) then
-    let vis = visualize_expand_fanin vis tag levels draw_level then
+    let vis =
+	visualize_expand_fanin vis tag levels draw_level ignore_tmp_nds
+    then
     let cmd =
 	let tab = canvas2tab c then
 	let vec =
@@ -1979,9 +1987,9 @@ let check_valid_vectors vfsm op vs =
 //
 // Returns the name of the canvas for the new fanin drawing.
 //
-let draw_fanin vfsm hierarchy_level levels vecs =
+let draw_fanin vfsm hierarchy_level levels ignore_tmp_nds vecs =
     (check_valid_vectors vfsm "draw_fanin" vecs) fseq
-    (gen_draw_fanin vfsm hierarchy_level levels vecs)
+    (gen_draw_fanin vfsm hierarchy_level levels ignore_tmp_nds vecs)
 ;
 
 
@@ -1996,12 +2004,14 @@ let draw_fanin vfsm hierarchy_level levels vecs =
 //
 // vecs:	    The list of vectors to end at (whose fanins to draw)
 //
+// ignore_tmp_nds:  Whether drawing will stop only on usergiven nodes.
+//
 // Returns the name of the canvas for the new fanin drawing.
 //
-let draw_inside vfsm hierarchy_level vecs =
+let draw_inside vfsm hierarchy_level vecs ignore_tmp_nds->T =
     (check_valid_vectors vfsm "draw_inside" vecs) fseq
     let c = get_current_canvas () then
-    gen_draw_inside vfsm c (hierarchy_level-1) vecs 0
+    gen_draw_inside vfsm c (hierarchy_level-1) ignore_tmp_nds vecs 0
 ;
 
 // Hide a subtree
@@ -2160,14 +2170,15 @@ end_abstype update_current_visualization get_current_visualization;
 // Visualize an pexlif provided as a fl function that return a pexlif.
 // If pre_load is T, then start with top-level visualized and
 // inputs & outputs added to the waveform viewer.
-let VIS fl_function_name pre_load->T =
+let VIS fl_function_name pre_load->T ignore_tmp_nds->T =
     let p = flfun2pexlif_core fl_function_name then
     let ckt = pexlif2fsm p then
     let vis = STE_debug ckt then
     NOT pre_load => vis |
     let inps = qsort node_name_cmp (md_extract_vectors (inputs ckt)) then
     let outs = qsort node_name_cmp (md_extract_vectors (outputs ckt)) then
-    (draw_fanin vis (0) 100 (md_extract_vectors (outputs ckt))) fseq
+    let vecs = md_extract_vectors (outputs ckt) then
+    (draw_fanin vis (0) 100 ignore_tmp_nds vecs) fseq
     (add_waveform vis inps) fseq
     (add_waveform vis outs) fseq
     (update_current_visualization p vis) fseq

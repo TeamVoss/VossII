@@ -435,7 +435,7 @@ static bool           has_stop_nodes(vstate_ptr vp, ilist_ptr il,
                                      ilist_ptr *silp, ilist_ptr *rilp);
 static void           expand_fanin(vstate_ptr vp, hash_record *exp, sch_ptr sch,
                                    string aname, int levels, bool expand,
-                                   int draw_level);
+                                   int draw_level, bool ignore_tmp_nodes);
 static void           build_limit_tbl(vstate_ptr vp, hash_record *limit_tblp,
                                       string sn, sch_ptr sch);
 static sch_ptr        limited_draw_fanin(vstate_ptr vsp, ilist_ptr il,
@@ -444,7 +444,8 @@ static sch_ptr        limited_draw_fanin(vstate_ptr vsp, ilist_ptr il,
 static bool           same_ilist(ilist_ptr il1, ilist_ptr il2);
 static bool           all_outs(ilist_ptr il, vis_io_ptr vp);
 static sch_ptr        draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels,
-                                 int anon_cnt, int draw_level);
+                                 int anon_cnt, int draw_level,
+				 bool ignore_tmp_nodes);
 static string         mk_fresh_anon_name(g_ptr internals, g_ptr fa_inps,
 					 g_ptr fa_outs, int *cur_cntp);
 static string         mk_vector_name(string base, int size);
@@ -2205,8 +2206,11 @@ visualize_fanin(g_ptr redex)
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm, stop_vecs, ifc_vecs, g_levels, vecs, g_draw_level;
-    EXTRACT_6_ARGS(redex,g_fsm,stop_vecs,ifc_vecs,g_levels,vecs,g_draw_level);
+    g_ptr g_ignore_tmp_nodes;
+    EXTRACT_7_ARGS(redex,g_fsm,stop_vecs,ifc_vecs,g_levels,vecs,g_draw_level,
+			 g_ignore_tmp_nodes);
     int levels = GET_INT(g_levels);
+    bool ignore_tmp_nodes = (GET_BOOL(g_ignore_tmp_nodes) == B_One());
     fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
     push_fsm(fsm);
     vstate_ptr vp = mk_vstate(fsm);
@@ -2261,7 +2265,8 @@ visualize_fanin(g_ptr redex)
 	}
 	pfn = gen_strappend(tmp_strs, " {");
 	pfn = gen_strappend(tmp_strs, "}");
-	sch_ptr fanin = draw_fanin(vp,il,levels,-1,GET_INT(g_draw_level));
+	sch_ptr fanin = draw_fanin(vp,il,levels,-1,GET_INT(g_draw_level),
+				   ignore_tmp_nodes);
 	if( fanin == NULL ) {
 	    pop_fsm();
 	    MAKE_REDEX_FAILURE(redex, Fail_pr("Failed to draw %s", vec));
@@ -2299,9 +2304,11 @@ visualize_expand_fanin(g_ptr redex)
     sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr g_vstate, g_aname, g_levels, g_draw_level;
-    EXTRACT_4_ARGS(redex, g_vstate, g_aname, g_levels, g_draw_level);
+    g_ptr g_vstate, g_aname, g_levels, g_draw_level, g_ignore_tmp_nodes;
+    EXTRACT_5_ARGS(redex, g_vstate, g_aname, g_levels, g_draw_level,
+		   g_ignore_tmp_nodes);
     vstate_ptr vp = (vstate_ptr) GET_EXT_OBJ(g_vstate);
+    bool ignore_tmp_nodes = (GET_BOOL(g_ignore_tmp_nodes) == B_One());
     push_fsm(vp->fsm);
     string aname = GET_STRING(g_aname);
     int levels = GET_INT(g_levels);
@@ -2309,7 +2316,7 @@ visualize_expand_fanin(g_ptr redex)
     hash_record expanded;
     create_hash(&expanded, 100, str_hash, str_equ);
     expand_fanin(vp, &expanded, vp->sch, aname, levels, FALSE,
-		 GET_INT(g_draw_level));
+		 GET_INT(g_draw_level), ignore_tmp_nodes);
     dispose_hash(&expanded, NULLFCN);
     MAKE_REDEX_EXT_OBJ(redex, vstate_oidx, vp);
     pop_fsm();
@@ -2841,7 +2848,7 @@ Fsm_Install_Functions()
 				  GLmake_bexpr())))),
 			get_btrace_val);
 
-    Add_ExtAPI_Function("visualize_fanin", "111111", FALSE,
+    Add_ExtAPI_Function("visualize_fanin", "1111111", FALSE,
 			GLmake_arrow(
 			    fsm_handle_tp,
 			    GLmake_arrow(
@@ -2852,8 +2859,11 @@ Fsm_Install_Functions()
 				   GLmake_int(),
 				    GLmake_arrow(
 					GLmake_list(GLmake_string()),
-					GLmake_arrow(GLmake_int(),
-						     vstate_handle_tp)))))),
+					GLmake_arrow(
+					    GLmake_int(),
+					    GLmake_arrow(
+					      GLmake_bool(),
+					      vstate_handle_tp))))))),
 			visualize_fanin);
 
     Add_ExtAPI_Function("visualization_anon2real", "11", FALSE,
@@ -2900,7 +2910,7 @@ Fsm_Install_Functions()
 				     GLmake_list(GLmake_string())),
 			visualize_get_shown_anons);
 
-    Add_ExtAPI_Function("visualize_expand_fanin", "1111", FALSE,
+    Add_ExtAPI_Function("visualize_expand_fanin", "11111", FALSE,
                         GLmake_arrow(
                             vstate_handle_tp,
                             GLmake_arrow(
@@ -2909,7 +2919,9 @@ Fsm_Install_Functions()
 				    GLmake_int(),
 				    GLmake_arrow(
 					GLmake_int(),
-					vstate_handle_tp)))),
+					GLmake_arrow(
+					  GLmake_bool(),
+					  vstate_handle_tp))))),
                         visualize_expand_fanin);
 
     Add_ExtAPI_Function("visualize_hide_fanin", "111", FALSE,
@@ -7278,7 +7290,8 @@ has_stop_nodes(vstate_ptr vp, ilist_ptr il, ilist_ptr *silp, ilist_ptr *rilp)
 
 static void
 expand_fanin(vstate_ptr vp, hash_record *exp, sch_ptr sch,
-	     string aname, int levels, bool expand, int draw_level)
+	     string aname, int levels, bool expand, int draw_level,
+	     bool ignore_tmp_nodes)
 {
     if( find_hash(exp, sch->vec) != NULL ) {
 	// Already expanded
@@ -7293,12 +7306,14 @@ expand_fanin(vstate_ptr vp, hash_record *exp, sch_ptr sch,
 	int idx = atoi(nname+2);
 	ilist_ptr il = *((ilist_ptr *) M_LOCATE_BUF(&(vp->anon_buf), idx));
 	delete_hash(&(vp->done), il);
-	sch_ptr subtree = draw_fanin(vp, il, levels, idx, draw_level);
+	sch_ptr subtree = draw_fanin(vp, il, levels, idx, draw_level,
+				     ignore_tmp_nodes);
 	*sch = *subtree;
 	return;
     }
     for(sch_list_ptr sl = sch->children; sl != NULL; sl = sl->next) {
-	expand_fanin(vp, exp, sl->sch, aname, levels, expand, draw_level);
+	expand_fanin(vp, exp, sl->sch, aname, levels, expand, draw_level,
+		     ignore_tmp_nodes);
     }
 }
 
@@ -7357,7 +7372,7 @@ limited_draw_fanin(vstate_ptr vsp, ilist_ptr il, hash_record *limit_tblp,
 	res->pfn = pfn;
 	//
 	sch_ptr s_child =
-	    limited_draw_fanin(vsp,stop_ilist,limit_tblp,draw_level);
+	    limited_draw_fanin(vsp, stop_ilist, limit_tblp, draw_level);
 	sch_list_ptr s_sl = (sch_list_ptr) new_rec(&(vsp->sch_list_rec_mgr));
 	s_sl->sch = s_child;
 	//
@@ -7633,7 +7648,7 @@ all_outs(ilist_ptr il, vis_io_ptr vp)
 
 static sch_ptr
 draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
-	   int draw_level)
+	   int draw_level, bool ignore_tmp_nodes)
 {
     string anon;
 
@@ -7672,11 +7687,13 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	res->vec = anon;
 	res->pfn = pfn;
 	//
-	sch_ptr s_child = draw_fanin(vsp, stop_ilist, levels, -1, draw_level);
+	sch_ptr s_child = draw_fanin(vsp, stop_ilist, levels, -1, draw_level,
+				     ignore_tmp_nodes);
 	sch_list_ptr s_sl = (sch_list_ptr) new_rec(&(vsp->sch_list_rec_mgr));
 	s_sl->sch = s_child;
 	//
-	sch_ptr r_child = draw_fanin(vsp, rem_ilist, levels, -1, draw_level);
+	sch_ptr r_child = draw_fanin(vsp, rem_ilist, levels, -1, draw_level,
+				     ignore_tmp_nodes);
 	sch_list_ptr r_sl = (sch_list_ptr) new_rec(&(vsp->sch_list_rec_mgr));
 	r_sl->sch = r_child;
 	//
@@ -7713,7 +7730,9 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	}
     }
 
-    if( levels <= 0 && (levels < -10 || ilist_is_user_defined(il)) ) {
+    if( levels <= 0 &&
+	(~ignore_tmp_nodes || levels < -10 || ilist_is_user_defined(il)) )
+    {
 	// An incomplete node  draw_incomplete
 	g_ptr nds = ilist2nds(il);
 	g_ptr vecs = Merge_Vectors(nds, TRUE);
@@ -7762,7 +7781,8 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	    cur_list = append_range(cur_list, nd, nd);
 	    current_type = new_type;
 	} else {
-	    sch_ptr child = draw_fanin(vsp, cur_list, levels, -1, draw_level);
+	    sch_ptr child = draw_fanin(vsp, cur_list, levels, -1, draw_level,
+				       ignore_tmp_nodes);
 	    sch_list_ptr sl = (sch_list_ptr) new_rec(&(vsp->sch_list_rec_mgr));
 	    sl->sch = child;
 	    sl->next = NULL;
@@ -7841,7 +7861,8 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 		res->vec = anon;
 		res->pfn = pfn;
 		//
-		sch_ptr s_child = draw_fanin(vsp,new_il,levels,-1,draw_level);
+		sch_ptr s_child = draw_fanin(vsp,new_il,levels,-1,draw_level,
+					     ignore_tmp_nodes);
 		sch_list_ptr s_sl =
 			(sch_list_ptr) new_rec(&(vsp->sch_list_rec_mgr));
 		s_sl->sch = s_child;
@@ -7854,7 +7875,8 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	    res->pfn = cur_info->pfn;
 	    res->children = NULL;
 	    for(vis_io_ptr vi = cur_info->fa_inps; vi != NULL; vi = vi->next) {
-		sch_ptr child = draw_fanin(vsp,vi->acts,levels-1,-1,draw_level);
+		sch_ptr child = draw_fanin(vsp,vi->acts,levels-1,-1,draw_level,
+					   ignore_tmp_nodes);
 		sch_list_ptr sl =(sch_list_ptr)new_rec(&(vsp->sch_list_rec_mgr));
 		sl->sch = child;
 		sl->next = NULL;
@@ -7870,7 +7892,8 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	}
     } else {
 	// Mixed type. Add a catenate drawing
-	sch_ptr child = draw_fanin(vsp, cur_list, levels, -1,draw_level);
+	sch_ptr child = draw_fanin(vsp, cur_list, levels, -1,draw_level,
+				   ignore_tmp_nodes);
 	sch_list_ptr sl = (sch_list_ptr) new_rec(&(vsp->sch_list_rec_mgr));
 	sl->sch = child;
 	sl->next = NULL;

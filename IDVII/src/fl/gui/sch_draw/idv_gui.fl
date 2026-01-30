@@ -1523,7 +1523,7 @@ slet BDD_EQ_1 p1 p2 order_file =
 	then
 	sel = "No" => res |
 	let vis = STE_debug ckt then
-	let tab_1 = draw_fanin vis (0) 100 ("_OK_":asserts) then
+	let tab_1 = draw_fanin vis (0) 100 F ("_OK_":asserts) then
 	tab_1 fseq
 	let ste = STE "-e" vis [] cex_ant [] [] then
 	(draw_set_time vis fail_time) fseq
@@ -1570,7 +1570,7 @@ slet BDD_EQ_1 p1 p2 order_file =
     then
     sel = "No" => res |
     let vis = STE_debug ckt then
-    let tab_1 = draw_fanin vis (0) 100 ("_OK_":asserts) then
+    let tab_1 = draw_fanin vis (0) 100 F ("_OK_":asserts) then
     tab_1 fseq
     let ste = STE "-e" vis [] cex_ant [] [] then
     (draw_set_time vis fail_time) fseq
@@ -1612,7 +1612,7 @@ let SAT_comb_EQ p1 p2 =
     let cex = bexpr2bdd [] bcex then
     let ant' = substitute cex ant then
     let vis = STE_debug ckt then
-    let tab_1 = draw_fanin vis (0) 100 ["_OK_"] then
+    let tab_1 = draw_fanin vis (0) 100 F ["_OK_"] then
     tab_1 fseq
     (STE "-e" vis [] ant' (bexpr2bdd [] bcons) []) fseq
     ok
@@ -1664,7 +1664,7 @@ let Sim_comb_EQ effort p1 p2 =
     let cex = full_example F vars (NOT ok) then
     let ant' = substitute cex ant then
     let vis = STE_debug ckt then
-    let tab_1 = draw_fanin vis (0) 100 ("_OK_":asserts) then
+    let tab_1 = draw_fanin vis (0) 100 F ("_OK_":asserts) then
     tab_1 fseq
     (STE "-e" vis [] ant' cons []) fseq
     ok
@@ -2349,8 +2349,6 @@ let make_theorem transform_name spec imp =
     let spec_sha = idv_save_pexlif spec then
     let tr = TRANSFORM transform_name spec_sha imp_sha [MK_THM] then
     (record_transformation signature tr)
-;
-
 ;
 
 let fl_save_verilog canvas name file only_netlist =
