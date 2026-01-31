@@ -1,7 +1,8 @@
 set pagination off
 break fl_main
-r -f idv.fl
+r -noX -f bugs/b279.fl
 break exit
 break voss_abort
 break Dbg_stop
+break op_SHL
 c

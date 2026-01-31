@@ -1,0 +1,52 @@
+load "idv.fl";
+
+UNSIGNED "word" 4;
+
+let bug =
+    word_input	i.
+    word_input	shift.
+    word_output	o.
+    word_output	oo.
+    word_output	ooo.
+    CELL bug [
+	o <- i '<<' shift,
+	oo <- i '>>' shift,
+	ooo <- i '|>>' shift
+];
+
+let p = flfun2pexlif bug;
+p fseq 1;
+let ckt = pexlif2fsm p;
+ckt;
+
+let pp = do_synthesis p;
+pp fseq 2;
+
+//VIS pp;
+//VIS p;
+
+let ant =
+    "i[3:0]" is "i[3:0]" for 20 phases
+  and 
+    "shift[3:0]" is 0 for 1 phase followed_by
+		    1 for 1 phase followed_by
+		    2 for 1 phase followed_by
+		    3 for 1 phase followed_by
+		    4 for 1 phase followed_by
+		    5 for 1 phase followed_by
+		    6 for 1 phase followed_by
+		    7 for 1 phase followed_by
+		    8 for 1 phase followed_by
+		    9 for 1 phase followed_by
+		    10 for 1 phase followed_by
+		    11 for 1 phase followed_by
+		    12 for 1 phase followed_by
+		    13 for 1 phase followed_by
+		    14 for 1 phase followed_by
+		    15 for 1 phase
+;
+
+//simulate pp ant;
+//simulate p ant;
+
+BDD_EQ p pp [];
