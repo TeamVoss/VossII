@@ -34,8 +34,9 @@ extern string      Voss_tmp_dir;
 extern g_ptr	   void_nd;
 
 /***** PRIVATE VARIABLES *****/
-static char buf [4096];
-static char path_buf [PATH_MAX+1];
+static char	buf [4096];
+static char	path_buf [PATH_MAX+1];
+static buffer	spawned_pids;
 
 /* ----- Forward definitions local functions ----- */
 static string	get_binary_directory();
@@ -49,6 +50,17 @@ void
 System_Init()
 {
     // Any needed initialization code
+    new_buf(&spawned_pids, 100, sizeof(int));
+}
+
+void
+Kill_Child_Processes()
+{
+    int	*ip;
+    FOR_BUF(&spawned_pids, int, ip) {
+	pid_t pid = (pid_t) *ip;
+	kill(pid, -9);
+    }
 }
 
 /* Initialize the binary and library paths.
@@ -92,7 +104,9 @@ spawn(g_ptr redex)
         // Child
         execlp("bash", "bash","-c",cmd,(char *)NULL);
     }
-    MAKE_REDEX_INT(redex, (int) pid);
+    int ipid = (int) pid;
+    MAKE_REDEX_INT(redex, ipid);
+    push_buf(&spawned_pids, &ipid);
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }

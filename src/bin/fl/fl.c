@@ -805,6 +805,8 @@ Exit(int status)
     }
     fprintf(stderr, "\n");
     if( profiling_active ) { Emit_profile_data(); }
+    // Now kill any remaining spawned processes
+    Kill_Child_Processes();
     exit(status);
 }
 

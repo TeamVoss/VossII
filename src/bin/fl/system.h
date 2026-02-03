@@ -16,6 +16,7 @@
 void	    System_Init();
 void	    System_Install_Functions();
 void	    Init_Paths(char* bin_path, char* lib_path);
+void	    Kill_Child_Processes();
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */
