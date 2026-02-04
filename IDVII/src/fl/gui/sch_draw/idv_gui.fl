@@ -1221,6 +1221,7 @@ let do_synthesis p
 		 synth_script->"osu018_synthesis"
 		 GUI->F
     =
+    let top_name = pexlif_get_name p then
     let bname = "synth_top_level" in
     let dir = mktempd "synthesis" then
     let file = sprintf "%s/%s.v" dir bname then
@@ -1236,7 +1237,8 @@ let do_synthesis p
     ok != "0" => 
 	eprintf "Synthesis failed. See %s for more information" dir
     |
-    read_pexlif res
+    let pres = read_pexlif res then
+    rename_toplevel_pexlif top_name (wrap_pexlif pres)
 ;
 
 let fl_do_synthesis canvas file basename synth_type synth_script =

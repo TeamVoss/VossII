@@ -1038,6 +1038,7 @@ let fl_get_long_value canvas tag =
     let nds = md_expand_vectors vecs in
     length nds > 128 => "..." |
     type = "bdd" =>
+      (
 	let get_val nd = (get_trace_val ste nd t) catch (T,T) in
 	let vals = map get_val nds then
 	let is_const HL =
@@ -1094,6 +1095,7 @@ let fl_get_long_value canvas tag =
 	in
 	let res = list2str T "" "\n" "" p_range raw_res then
 	strlen res > 30 => "..." | res
+      ) catch sprintf "Too large to display"
     |
     type = "bexpr" =>
 	let get_val nd = (bget_trace_val ste nd t) catch (bT,bT) in
@@ -1182,6 +1184,7 @@ let base_get_complete_value ste vectors t =
     let process v =
 	let nds = md_expand_vector v in
 	type = "bdd" =>
+	  (
 	    let get_val nd = (get_trace_val ste nd t) catch (T,T) in
 	    let vals = map get_val nds then
 	    let is_const HL =
@@ -1222,21 +1225,22 @@ let base_get_complete_value ste vectors t =
 		NOT (ovc == F) => (nd,["OVERCONSTRAINED"]):(group [] nds HLs) |
 		let one   = (HL = (T,F)) in
 		let X     = (HL = (T,T)) in
-		let deps = list2str T "Depends on: " " " "" id 
+		let deps = list2str T "    Depends on: " " " "" id 
 				   (md_extract_vectors (depends HL))
 		in
-		X == F => (nd,[bool2str 3 one,deps]):(group [] nds HLs) |
-		let one_s = bool2str 3 one then
-		let X_s   = bool2str 3 X then
+		X == F => 
+		    let bs = (bool2str 3 one) catch "..." in
+		    let deps = str_is_substr "..." bs => deps | "" in
+		    (nd,[bs,deps]):(group [] nds HLs)
+		|
+		let one_s = (bool2str 3 one) catch "..." then
+		let X_s   = (bool2str 3 X) catch "..." then
 		(nd, [one_s, (sprintf "  + X(%s)" X_s),deps]):(group [] nds HLs)
 	     /\   group cur [] [] =
 		cur = [] => [] |
 		[mk_range cur]
 	    in
 	    let raw_res = group [] nds vals then
-	    length raw_res = 1 =>
-		list2str T "" "\n" "" id (snd (hd raw_res))
-	    |
 	    let slen = (itlist (\p.\m. max (strlen (fst p)) m) raw_res 0)+3 then
 	    let slen = (slen > 40) => 40 | slen in
 	    let p_range (vec,exprs) =
@@ -1245,6 +1249,8 @@ let base_get_complete_value ste vectors t =
 		sprintf "%*s: %s" slen vec es
 	    in
 	    list2str T "" "\n" "" p_range raw_res
+	  ) gen_catch (\msg.
+		sprintf "Cannot print value for %s due to size\n%s\n" v msg)
 	|
 	type = "bexpr" =>
 	    let get_val nd = (bget_trace_val ste nd t) catch (bT,bT) in
