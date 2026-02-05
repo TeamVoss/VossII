@@ -59,7 +59,7 @@ Kill_Child_Processes()
     int	*ip;
     FOR_BUF(&spawned_pids, int, ip) {
 	pid_t pid = (pid_t) *ip;
-	kill(pid, -9);
+	kill(pid, SIGKILL);
     }
 }
 

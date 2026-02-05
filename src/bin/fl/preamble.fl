@@ -2575,7 +2575,7 @@ let spawn_fl_eval max_cpu max_mem file =
     let cl = max_cpu < 0 => "" | sprintf "--max_cpu_time %d" max_cpu in
     let ml = max_mem < 0 => "" | sprintf "--max_memory %d" max_mem in
     let ofile = file^".output" then
-    let cmd = sprintf "fl -noX %s %s --eval_expr %s >& %s" cl ml file ofile in
+    let cmd = sprintf "exec fl -noX %s %s --eval_expr %s >& %s" cl ml file ofile in
     let pid = spawn cmd then
     pid, ofile
 ;

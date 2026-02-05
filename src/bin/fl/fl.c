@@ -790,6 +790,9 @@ Set_default_break_handler()
 void
 Exit(int status)
 {
+    // Kill any remaining spawned processes
+    Kill_Child_Processes();
+    // Unlink the input/output files
     if( output_file_for_results != NULL ) {
 	unlink(output_file_for_results);
     }
@@ -805,8 +808,6 @@ Exit(int status)
     }
     fprintf(stderr, "\n");
     if( profiling_active ) { Emit_profile_data(); }
-    // Now kill any remaining spawned processes
-    Kill_Child_Processes();
     exit(status);
 }
 
