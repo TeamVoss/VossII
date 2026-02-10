@@ -1,0 +1,34 @@
+load "idv.fl";
+
+UNSIGNED "word" 8;
+
+let tst =
+    word_input	a ac b bc.
+    bit_input   do_add do_sub.
+    word_output	out.
+    //
+    word_input tmp1 tmp2.
+    CELL tst [
+	tmp1 <- (IF do_add THEN (a '+' ac) ELSE a),
+	tmp2 <- (IF do_sub THEN (b '+' bc) ELSE b),
+	out  <- tmp1 '*' tmp2
+];
+
+let p = flfun2pexlif tst;
+
+let ckt = pexlif2fsm p;
+ckt;
+
+rank_order ckt "a[0]";
+
+let nds = visualization_nodes ckt 0;
+
+let rnd = map (\n. rank_order ckt n, n) nds;
+
+let cmp (r1,_) (r2,_) = r2-r1;
+
+let srnds = qsort cmp rnd;
+
+srnds;
+
+fanin ckt "_$2[7]";

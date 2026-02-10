@@ -1521,6 +1521,39 @@ fanin(g_ptr redex)
 }
 
 static void
+do_rank_order(g_ptr redex)
+{
+    sop = Begin_string_ops();
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr g_fsm, g_node;
+    EXTRACT_2_ARGS(redex, g_fsm, g_node);
+    fsm_ptr fsm = (fsm_ptr) GET_EXT_OBJ(g_fsm);
+    string node = GET_STRING(g_node);
+    push_fsm(fsm);
+    int idx = name2idx(node);
+    if( idx < 0 ) {
+	pop_fsm();
+	MAKE_REDEX_FAILURE(redex, FailBuf);
+	End_string_ops(sop);
+	return;
+    }
+    nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
+    int composite = np->composite;
+    if( composite < 0 ) {
+	MAKE_REDEX_INT(redex, -1);
+    } else {
+	ncomp_ptr cp = (ncomp_ptr) M_LOCATE_BUF(compositesp, composite);
+	MAKE_REDEX_INT(redex, cp->rank);
+    }
+    pop_fsm();
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+    End_string_ops(sop);
+}
+
+
+static void
 excitation_function(g_ptr redex)
 {
     sop = Begin_string_ops();
@@ -2652,6 +2685,12 @@ Fsm_Install_Functions()
 				 GLmake_arrow(GLmake_string(),
 					      GLmake_list(GLmake_string()))),
 			fanin);
+
+    Add_ExtAPI_Function("rank_order", "11", FALSE,
+			GLmake_arrow(fsm_handle_tp,
+				 GLmake_arrow(GLmake_string(),
+					      GLmake_int())),
+			do_rank_order);
 
     Add_ExtAPI_Function("excitation_function", "11", FALSE,
 			GLmake_arrow(fsm_handle_tp,

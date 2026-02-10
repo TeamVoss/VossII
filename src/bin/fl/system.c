@@ -214,6 +214,20 @@ wtime(g_ptr redex)
 }
 
 static void
+process_size(g_ptr redex)
+{
+    g_ptr ginclude_children;
+    EXTRACT_1_ARG(redex, ginclude_children);
+    struct rusage usage;
+    if( GET_BOOL(ginclude_children) == B_One() ) {
+	getrusage(RUSAGE_CHILDREN, &usage);
+    } else {
+	getrusage(RUSAGE_SELF, &usage);
+    }
+    MAKE_REDEX_AINT(redex, Arbi_FromInt(usage.ru_maxrss));
+}
+
+static void
 get_stack_trace(g_ptr redex)
 {
     g_ptr res = Get_fl_stack_trace();
@@ -284,40 +298,40 @@ retrieve_eval_graph(g_ptr redex)
 static void
 do_sleep(g_ptr redex)
 {
-g_ptr l = GET_APPLY_LEFT(redex);
-g_ptr r = GET_APPLY_RIGHT(redex);
-g_ptr gms;
-EXTRACT_1_ARG(redex, gms);
-arbi_T amsec = GET_AINT(gms);
-long *msec = Arbi_ToInt(amsec);
-if( msec == NULL ) {
-    MAKE_REDEX_FAILURE(redex, "Too large argument to sleep\n");
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr gms;
+    EXTRACT_1_ARG(redex, gms);
+    arbi_T amsec = GET_AINT(gms);
+    long *msec = Arbi_ToInt(amsec);
+    if( msec == NULL ) {
+	MAKE_REDEX_FAILURE(redex, "Too large argument to sleep\n");
+	DEC_REF_CNT(r);
+	DEC_REF_CNT(l);
+	return;
+    }
+    struct timespec ts;
+    if (*msec < 0) {
+	MAKE_REDEX_FAILURE(redex, "Negative number to sleep\n");
+	DEC_REF_CNT(r);
+	DEC_REF_CNT(l);
+	return;
+    }
+    ts.tv_sec = *msec / 1000;
+    ts.tv_nsec = (*msec % 1000) * 1000000;
+    int res;
+    do {
+	res = nanosleep(&ts, &ts);
+    } while (res && errno == EINTR);
+    if( res != 0 ) {
+	MAKE_REDEX_FAILURE(redex, Fail_pr("sleep failed (%d)\n", res));
+	DEC_REF_CNT(r);
+	DEC_REF_CNT(l);
+	return;
+    }
+    MAKE_REDEX_VOID(redex);
     DEC_REF_CNT(r);
     DEC_REF_CNT(l);
-    return;
-}
-struct timespec ts;
-if (*msec < 0) {
-    MAKE_REDEX_FAILURE(redex, "Negative number to sleep\n");
-    DEC_REF_CNT(r);
-    DEC_REF_CNT(l);
-    return;
-}
-ts.tv_sec = *msec / 1000;
-ts.tv_nsec = (*msec % 1000) * 1000000;
-int res;
-do {
-    res = nanosleep(&ts, &ts);
-} while (res && errno == EINTR);
-if( res != 0 ) {
-    MAKE_REDEX_FAILURE(redex, Fail_pr("sleep failed (%d)\n", res));
-    DEC_REF_CNT(r);
-    DEC_REF_CNT(l);
-    return;
-}
-MAKE_REDEX_VOID(redex);
-DEC_REF_CNT(r);
-DEC_REF_CNT(l);
 }
 
 static void
@@ -404,6 +418,10 @@ System_Install_Functions()
     Add_ExtAPI_Function("retrieve_eval_graph", "1", FALSE,
 		GLmake_arrow(GLmake_string(), tv1),
 		retrieve_eval_graph);
+
+    Add_ExtAPI_Function("process_size", "1", FALSE,
+		GLmake_arrow(GLmake_bool(), GLmake_int()),
+		process_size);
 
     Add_ExtAPI_Function("wtime", "-", FALSE,
 		GLmake_arrow(tv1, GLmake_tuple(tv1,GLmake_string())),

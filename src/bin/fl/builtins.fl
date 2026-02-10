@@ -1248,6 +1248,12 @@ let node_name_cmp s1 s2 = defix node_name_cmp s1 s2;
 // will be placed in the list ARGS.
 let ARGS = defix ARGS;
 
+// Return the maximum resident set size used (in kilobytes).
+// If children = F, then the value is for the current process.
+// If children = T, then it is the resident set size of the largest child.
+let process_size children = (defix process_size) children;
+non_lazy process_size;
+
 // Evaluate an expression e and return the pair (e',t) where t is the
 // wall time (as a string) it took to fully evaluate e.
 // Usage: wtime e;
