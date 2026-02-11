@@ -2673,4 +2673,25 @@ let para_eval {exprs:: *a list}
 
 end_abstype para_eval;
 
+begin_abstype;
 
+cletrec fac n = n <= 1 => 1 | n*fac (n-1);
+
+// Compute the factorial of n
+let factorial n =
+    n <= 0 => eprintf "Factorial only defined for positive numbers (%d)" n |
+    fac n
+;
+export factorial;
+
+// Compute n choose k.
+let choose n k =
+    n <= 0 => eprintf "choose n k only defined for positive numbers (n=%d)" n |
+    k <= 0 => eprintf "choose n k only defined for positive numbers (k=%d)" k |
+    n < k  => eprintf "choose n k requires n >= k (%d<%d)" n k |
+    (fac n)/((fac (n-k))*(fac k))
+;
+infix 9 choose;
+export choose;
+
+end_abstype;
