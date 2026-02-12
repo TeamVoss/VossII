@@ -1662,8 +1662,9 @@ do_truth_cover(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr var_list = GET_APPLY_RIGHT(l);
-    formula fun = GET_BOOL(GET_APPLY_RIGHT(redex));
+    g_ptr var_list, gfun;
+    EXTRACT_2_ARGS(redex, var_list, gfun);
+    formula fun = GET_BOOL(gfun);
     buffer  var_table;
     new_buf(&var_table, nbr_VarTbl, sizeof(unint));
     hash_record truth_table_done;
@@ -2271,7 +2272,7 @@ BDD_Install_Functions()
 			GLmake_arrow(tv, GLmake_int()),
 			bdd_size);
 
-    Add_ExtAPI_Function("truth_cover", "11", FALSE,
+    Add_ExtAPI_Function("simple_model_count", "11", FALSE,
 			GLmake_arrow(GLmake_list(GLmake_string()),
 				     GLmake_arrow(GLmake_bool(),GLmake_int())),
 			do_truth_cover);
@@ -2293,7 +2294,7 @@ BDD_Install_Functions()
 				GLmake_list(float_tp))),
 			do_fp_truth_cover_n);
 
-    Add_ExtAPI_Function("fp_truth_cover2_n", "111", FALSE,
+    Add_ExtAPI_Function("model_count", "111", FALSE,
 			GLmake_arrow(
 			    GLmake_list(GLmake_string()),
 			    GLmake_arrow(

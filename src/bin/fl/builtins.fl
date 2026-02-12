@@ -1224,7 +1224,7 @@ let draw_graph levels e = defix draw_graph levels e;
 // the number of assignments to the variables in vars that makes f true.
 // If f depends on a variable not in vars, the function fails.
 // Usage: truth_cover vars f;
-let truth_cover vars f = defix truth_cover vars f;
+let truth_cover vars f = defix simple_model_count vars f;
 
 // Return the minisat literal used to represent the bexpr be.
 // Usage: bget_sat_literal be;
@@ -1992,5 +1992,29 @@ let emit_eval_graph basename expr = (defix emit_eval_graph) basename expr;
 // Load the graph in the file <basename>.out.tar.gz.
 // See emit_eval_graph for more details.
 let retrieve_eval_graph basename = (defix retrieve_eval_graph) basename;
+
+// For each expression e in exprs, compute the model count,
+// over all variables in vars, for (e AND cond).
+let fp_model_count vars exprs cond->T =
+    (defix model_count) vars cond exprs
+;
+
+let fp_truth_cover2_n vars exprs cond =
+    (fprintf stdinfo "fp_truth_cover2_n is deprecated.\n") seq
+    (fprintf stdinfo "Use model_count instead (different argument order!)\n")seq
+    (defix model_count) vars cond exprs
+;
+
+// Compute the (integer) model count over all the variables in vars for f.
+let int_model_count vars f = (defix simple_model_count) vars f;
+
+let truth_cover vars f =
+    (fprintf stdinfo "truth_cover is deprecated.\n") seq
+    (fprintf stdinfo "Use simple_model_count instead.\n")seq
+    (defix simple_model_count) vars f
+;
+
+overload model_count fp_model_count int_model_count;
+
 
 (update_vossrc "ADD-DEBUG-INFO" __old_debug_on__) fseq ();
