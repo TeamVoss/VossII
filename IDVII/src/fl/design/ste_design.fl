@@ -66,7 +66,9 @@ export cycle;
 lettype values =  STR_VAL   {v::string}
 		| INT_VAL   {i::int}
 		| BV_VAL    {v::bv}
+		| BEV_VAL   {v::bev}
 		| BL_VAL    {v:: bool list}
+		| BEL_VAL   {v:: bexpr list}
 		| WEXPR_VAL {e::wexpr}
 		| UNC
 ;
@@ -78,11 +80,14 @@ export X;
 let s_in_phase v ph = [(T,STR_VAL v,ph,ph+1)];
 let i_in_phase v ph = [(T,INT_VAL v,ph,ph+1)];
 let bv_in_phase v ph = [(T,BV_VAL v,ph,ph+1)];
+let bev_in_phase v ph = [(T,BEV_VAL v,ph,ph+1)];
 let bool_in_phase v ph = [(T,BL_VAL [v],ph,ph+1)];
 let bl_in_phase v ph = [(T,BL_VAL v,ph,ph+1)];
+let bexpr_in_phase v ph = [(T,BEL_VAL v,ph,ph+1)];
 let w_in_phase v ph = [(T,WEXPR_VAL (hw_destr v), ph, ph+1)];
 let u_in_phase UNC ph = [(T,UNC,ph,ph+1)];
-overload in_phase s_in_phase i_in_phase bv_in_phase bool_in_phase
+overload in_phase s_in_phase i_in_phase bv_in_phase bev_in_phase
+		  bool_in_phase bexpr_in_phase
 		  bl_in_phase w_in_phase u_in_phase
 ;
 infix 6 in_phase;
@@ -91,11 +96,14 @@ export in_phase;
 let s_in_cycle v cyc    = [(T,STR_VAL v,2*cyc,2*cyc+2)];
 let i_in_cycle v cyc    = [(T,INT_VAL v,2*cyc,2*cyc+2)];
 let bv_in_cycle v cyc   = [(T,BV_VAL v,2*cyc,2*cyc+2)];
+let bev_in_cycle v cyc  = [(T,BEV_VAL v,2*cyc,2*cyc+2)];
 let bool_in_cycle v cyc = [(T,BL_VAL [v],2*cyc,2*cyc+2)];
+let bexpr_in_cycle v cyc = [(T,BEL_VAL [v],2*cyc,2*cyc+2)];
 let bl_in_cycle v cyc   = [(T,BL_VAL v,2*cyc,2*cyc+2)];
 let w_in_cycle v cyc    = [(T,WEXPR_VAL (hw_destr v), 2*cyc, 2*cyc+2)];
 let u_in_cycle UNC cyc    = [(T,UNC, 2*cyc, 2*cyc+2)];
-overload in_cycle s_in_cycle i_in_cycle bv_in_cycle bool_in_cycle
+overload in_cycle s_in_cycle i_in_cycle bv_in_cycle bev_in_cycle
+			     bool_in_cycle bexpr_in_cycle
 			     bl_in_cycle w_in_cycle u_in_cycle
 ;
 infix 6 in_cycle;
@@ -105,11 +113,14 @@ let mk_in_cycs v cycs = map (\cyc. (T,v,2*cyc, 2*cyc+2)) cycs;
 let s_in_cycles v cycs    = mk_in_cycs (STR_VAL v) cycs;
 let i_in_cycles v cycs    = mk_in_cycs (INT_VAL v) cycs;
 let bv_in_cycles v cycs   = mk_in_cycs (BV_VAL v) cycs;
+let bev_in_cycles v cycs  = mk_in_cycs (BEV_VAL v) cycs;
 let bool_in_cycles v cycs = mk_in_cycs (BL_VAL [v]) cycs;
+let bexpr_in_cycles v cycs = mk_in_cycs (BEL_VAL [v]) cycs;
 let bl_in_cycles v cycs   = mk_in_cycs (BL_VAL v) cycs;
 let w_in_cycles v cycs    = mk_in_cycs (WEXPR_VAL (hw_destr v)) cycs;
 let u_in_cycles UNC cycs  = mk_in_cycs (UNC) cycs;
-overload in_cycles s_in_cycles i_in_cycles bv_in_cycles bool_in_cycles
+overload in_cycles s_in_cycles i_in_cycles bv_in_cycles bev_in_cycles
+			     bool_in_cycles bexpr_in_cycles
 			     bl_in_cycles w_in_cycles u_in_cycles
 ;
 infix 6 in_cycles;
@@ -121,7 +132,9 @@ let gfor [({fixed::bool}, {v::values}, {start::int}, {end::int})] cnt =
 let sfor {v::string} {cnt::int} = [(F,STR_VAL v,0,cnt)];
 let ifor {i::int} {cnt::int} = [(F,INT_VAL i,0,cnt)];
 let bvfor {v::bv} {cnt::int} = [(F,BV_VAL v,0,cnt)];
+let bevfor {v::bev} {cnt::int} = [(F,BEV_VAL v,0,cnt)];
 let boolfor {v::bool} {cnt::int} = [(F,BL_VAL [v], 0, cnt)];
+let bexprfor {v::bexpr} {cnt::int} = [(F,BEL_VAL [v], 0, cnt)];
 let blfor {v::bool list} {cnt::int} = [(F,BL_VAL v,0,cnt)];
 let wfor v {cnt::int} = [(F,WEXPR_VAL (hw_destr v),0,cnt)];
 let ufor UNC {cnt::int} = [(F,UNC,0,cnt)];
@@ -131,7 +144,9 @@ overload for gfor
 	     sfor
 	     ifor
 	     bvfor
+	     bevfor
 	     boolfor
+	     bexprfor
 	     blfor
 	     wfor
 	     ufor
@@ -174,14 +189,18 @@ let gen_otherwise vt (v,end) =
 let s_otherwise vt (v,end)    = gen_otherwise vt (STR_VAL v, end);
 let i_otherwise vt (v,end)    = gen_otherwise vt (INT_VAL v, end);
 let bv_otherwise vt (v,end)   = gen_otherwise vt (BV_VAL v, end);
+let bev_otherwise vt (v,end)  = gen_otherwise vt (BEV_VAL v, end);
 let bool_otherwise vt (v,end) = gen_otherwise vt (BL_VAL [v], end);
+let bexpr_otherwise vt (v,end) = gen_otherwise vt (BEL_VAL [v], end);
 let bl_otherwise vt (v,end)   = gen_otherwise vt (BL_VAL v, end);
 let w_otherwise vt (v,end)    = gen_otherwise vt (WEXPR_VAL (hw_destr v), end);
 let u_otherwise vt (UNC,end)  = gen_otherwise vt (UNC, end);
 overload otherwise s_otherwise
 		   i_otherwise
 		   bv_otherwise
+		   bev_otherwise
 		   bool_otherwise
+		   bexpr_otherwise
 		   bl_otherwise
 		   w_otherwise
 		   u_otherwise
@@ -201,7 +220,7 @@ let is_number str =
     (find_first0 non_digit (explode str)) = 0
 ;
 
-let base_is nds vtlist =
+let bdd_base_is nds vtlist =
     let nds = md_expand_vectors nds in
     let vec = list2str T "" "," "" id (md_merge_vectors nds) in
     let sz = length nds in
@@ -256,7 +275,68 @@ let base_is nds vtlist =
     flatmap cnv vtlist
 ;
 
-let s_is vec vtlist = base_is [vec] vtlist;
+let s_is_bool vec vtlist = bdd_base_is [vec] vtlist;
+
+let bexpr_base_is nds vtlist =
+    let nds = md_expand_vectors nds in
+    let vec = list2str T "" "," "" id (md_merge_vectors nds) in
+    let sz = length nds in
+    let cnv ({fixed::bool}, (STR_VAL v), {f::int} , {t::int}) =
+	let vs = (
+	    let s2l s = map (\s. (s="1") => bT | bF ) (explode s) in
+	    str_is_prefix "0x" v =>
+		s2l (sprintf "%0*b" sz (sscanf "0x%x" v))
+	    |
+	    str_is_prefix "0b" v =>
+		s2l (sprintf "%0*b" sz (sscanf "0b%b" v))
+	    |
+	    is_number v =>
+		s2l (sprintf "%0*b" sz (sscanf "%d" v))
+	    |
+	    (sz = 1) AND (v = "T") => [bT] |
+	    (sz = 1) AND (v = "F") => [bF] |
+	    let ss = md_expand_vector v then
+	    length ss != sz => error "nope" |
+	    map bvariable ss
+	) catch
+	    eprintf "Length mismatch in is (|%s| != |%s|)" vec v
+	in
+	map2 (\n.\v. (bT,n,v,f,t)) nds vs
+     /\ cnv (fixed, (INT_VAL i), f, t) =
+	i < (-1*2**(sz-1)) =>
+	    eprintf "Integer %d too small to fit %s" i vec
+	| 
+	i > (2**sz-1) =>
+	    eprintf "Integer %d too large to fit %s" i vec
+	| 
+	let s = sprintf "%0*b" sz i in
+	let vs = map (\s. (s = "1") => bT | bF) (explode s) in
+	map2 (\n.\v. (bT,n,v,f,t)) nds vs
+     /\ cnv (fixed, (BV_VAL bv), f, t) = 
+        eprintf "Cannot use bv's for bexprSTE statements"
+     /\ cnv (fixed, (BEV_VAL bv), f, t) =
+	let vs = fixed_bev2list sz F bv T in
+	map2 (\n.\v. (bT,n,v,f,t)) nds vs
+     /\ cnv (fixed, (BL_VAL vs), f, t) =
+        eprintf "Cannot use bool lists for bexprSTE statements"
+     /\ cnv (fixed, (BEL_VAL vs), f, t) =
+	length vs != sz =>
+	    eprintf "Length mismatch in is (|%s| != length of list = %d)"
+		    vec (length vs)
+	|
+	map2 (\n.\v. (bT,n,v,f,t)) nds vs
+     /\ cnv (fixed, (WEXPR_VAL e), f, t) =
+	sz != wexpr_size e =>
+	    eprintf "Length mismatch in is (|%s| != |%s|)" vec (Pwexpr e)
+	|
+	let vs  = wexpr2bexpr [] e in
+	map2 (\n.\v. (bT,n,v,f,t)) nds vs
+     /\ cnv (fixed, UNC, f, t) = []
+    in
+    flatmap cnv vtlist
+;
+
+let s_is_bexpr vec vtlist = bexpr_base_is [vec] vtlist;
 
 let wbase_is vec vtlist =
     let sz = md_size vec in
@@ -312,10 +392,10 @@ let wbase_is vec vtlist =
 ;
 
 let hw_is v vtlist =
-    base_is (md_expand_vectors (base_get_lhs_vars (hw_destr v))) vtlist
+    bdd_base_is (md_expand_vectors (base_get_lhs_vars (hw_destr v))) vtlist
 ;
 
-overload is s_is hw_is wbase_is;
+overload is s_is_bool s_is_bexpr hw_is wbase_is;
 infix 2 is;
 export is;
 

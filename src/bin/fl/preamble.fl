@@ -13,11 +13,58 @@ infixr 0 #;
 let $ f x = f x;
 infixr 9 $;
 
+// Take two lists of the same length and return a list of pairs
+letrec zip l1 l2 =
+        empty l1 =>
+            empty l2 => [] | error "Length mismatch in zip"
+        |
+            empty l2 => error "Length mismatch in zip"
+        |
+            (hd l1, hd l2):(zip (tl l1) (tl l2))
+;
+
+// (map fn l) -- Apply function fn to every element of list l.
+letrec map fn l = empty l => [] | (fn (hd l)):(map fn (tl l));
+
 // Convert a natural number to a bitvector.
 let nat2bv n =
     n < 0 => eprintf "nat2bv of negative number %d" n |
     bv_ZX (int2bv n)
 ;
+
+let IF c = c;
+let ELSE {t:: *a} {e:: *a} = (t,e);
+open_overload {THEN :: *a -> (*b # *b) -> *b};
+
+
+let bTHEN c (t,e) = c => t | e;
+add_open_overload THEN bTHEN;
+let bexprTHEN {c::bexpr} (t,e) = (c bAND t) bOR (bNOT c bAND e);
+add_open_overload THEN bexprTHEN;
+let bevTHEN {c::bexpr} ({t::bev},{e::bev}) =
+    let cb = list2bev [c] then
+    bev_OR (bev_AND cb t) (bev_AND (bev_NOT cb) e)
+;
+add_open_overload THEN bevTHEN;
+let lTHEN {c::bexpr} (t,e) = map (THEN c) (zip t e);
+add_open_overload THEN lTHEN;
+let pTHEN {c::bexpr} ((t1,t2),(e1,e2)) = (THEN c (t1,e1)), (THEN c (t2,e2));
+add_open_overload THEN pTHEN;
+
+let iTHEN {c::bexpr} ({t::int}, {e::int}) =
+    t == e => t |
+    eprintf "Type clash in THEN for ints (%d!=%d)"  t e
+;
+add_open_overload THEN iTHEN;
+
+let sTHEN {c::bexpr} ({t::string}, {e::string}) =
+    t == e => t |
+    eprintf "Type clash in THEN for strings (%s!=%s)"  t e
+;
+add_open_overload THEN sTHEN;
+
+if_then_else_binder THEN ELSE;
+
 
 let pi = 3.1415926535897932;
 
@@ -182,9 +229,6 @@ letrec replicate n x =
     n=0 => [] | x:(replicate (n-1) x)
 ;
 
-// (map fn l) -- Apply function fn to every element of list l.
-letrec map fn l = empty l => [] | (fn (hd l)):(map fn (tl l));
-
 // (map2 fn l1 l2) - Apply the binary function fn to every elements in
 // l1 and l2, i.e., if l1 = [a1,a2,...,an] and l2 = [b1,b2,...,bn],then
 // map2 fn l1 l2 will return the list:
@@ -324,16 +368,6 @@ letrec interleave ll = (empty ll) => [] |
                 let rm = (empty head)=>[] | [(tl (head))] in
                 rm @ (rem (tl ll)) in
         (hdlist ll) @ (interleave (rem ll));
-
-// Take two lists of the same length and return a list of pairs
-letrec zip l1 l2 =
-        empty l1 =>
-            empty l2 => [] | error "Length mismatch in zip"
-        |
-            empty l2 => error "Length mismatch in zip"
-        |
-            (hd l1, hd l2):(zip (tl l1) (tl l2))
-;
 
 // Take three lists of the same length and return a list of tripples
 let zip3 l1 l2 l3 = zip l1 (zip l2 l3);
@@ -636,6 +670,23 @@ let fixed_bv2list bits sign_ext bv truncate->F =
     (replicate (bits-len) rep_bit)@l
 ;
 
+// Convert a bev to fixed size bexpr-list.
+//	bits:	    the desired length of list
+//	sign_ext:   whether the bv should be sign extended or zero extended
+//		    (in case it is shorter than the desired length)
+//	truncate:   truncate the bev and only return the last bits signals
+//
+let fixed_bev2list bits sign_ext bev truncate->F =
+    let l = bev2list bev in
+    let len = length l in
+    let l = truncate => lastn (min len bits) l | l in
+    let len = length l in
+    len > bits => eprintf "bev doesn't fit in %d bits" bits |
+    len = bits => l |
+    let rep_bit = sign_ext => (hd l) | bF in
+    (replicate (bits-len) rep_bit)@l
+;
+
 // Compute the condition for two bitvectors to be equal.
 let bv_eq {a::bv} {b::bv} = a = b;
 
@@ -697,8 +748,38 @@ let bv_ashr_bvbv n amount =
     bv_div n (bv_pow (int2bv 2) amount)
 ;
 
+overload bv_ashr bv_ashr bv_ashr_bvbv;
+
+
 // Return the negation of bv
 let bv_neg bv = bv_add (bv_NOT bv) (int2bv 1);
+
+// Compute base to the power of n.
+letrec bev_pow {base::bev} {n::bev} =
+    IF (bev_geq n (int2bev 0)) THEN (int2bev 1) ELSE
+    (bev_mul base (bev_pow base (bev_sub n (int2bev 1))))
+;
+
+// Compute n shifted left by amount.
+let bev_shl n amount =
+    bev_mul n (bev_pow (int2bev 2) amount)
+;
+
+// Compute n shifted right by amount.
+let bev_shr n amount =
+    bev_div (bev_ZX n) (bev_pow (int2bev 2) amount)
+;
+
+// Compute n arithmetically shifted right by amount.
+let bev_ashr_bevbev n amount =
+    bev_div n (bev_pow (int2bev 2) amount)
+;
+
+overload bev_ashr bev_ashr bev_ashr_bevbev;
+
+// Return the negation of bv
+let bev_neg bev = bev_add (bev_NOT bev) (int2bev 1);
+
 
 forward_declare {bv_min :: bv -> int};
 
@@ -725,8 +806,6 @@ let bv_min bv =
     in
     sscanf "%b" (implode (try (bv2list bv)))
 ;
-
-overload bv_ashr bv_ashr bv_ashr_bvbv;
 
 // Compute a substitution for all variables that must take on
 // some value for cond to be satisfied.
@@ -2466,40 +2545,6 @@ let nearest_power_of_2 n =
     let lg2n = log2 n in
     (2**lg2n) == n => n | 2**(lg2n+1)
 ;
-
-
-let IF c = c;
-let ELSE {t:: *a} {e:: *a} = (t,e);
-open_overload {THEN :: *a -> (*b # *b) -> *b};
-
-
-let bTHEN c (t,e) = c => t | e;
-add_open_overload THEN bTHEN;
-let bexprTHEN {c::bexpr} (t,e) = (c bAND t) bOR (bNOT c bAND e);
-add_open_overload THEN bexprTHEN;
-let bevTHEN {c::bexpr} ({t::bev},{e::bev}) =
-    let cb = list2bev [c] then
-    bev_OR (bev_AND cb t) (bev_AND (bev_NOT cb) e)
-;
-add_open_overload THEN bevTHEN;
-let lTHEN {c::bexpr} (t,e) = map (THEN c) (zip t e);
-add_open_overload THEN lTHEN;
-let pTHEN {c::bexpr} ((t1,t2),(e1,e2)) = (THEN c (t1,e1)), (THEN c (t2,e2));
-add_open_overload THEN pTHEN;
-
-let iTHEN {c::bexpr} ({t::int}, {e::int}) =
-    t == e => t |
-    eprintf "Type clash in THEN for ints (%d!=%d)"  t e
-;
-add_open_overload THEN iTHEN;
-
-let sTHEN {c::bexpr} ({t::string}, {e::string}) =
-    t == e => t |
-    eprintf "Type clash in THEN for strings (%s!=%s)"  t e
-;
-add_open_overload THEN sTHEN;
-
-if_then_else_binder THEN ELSE;
 
 let fl_color2rgbhsv color =
     val (r,g,b) = sscanf "#%02x%02x%02x" color in
