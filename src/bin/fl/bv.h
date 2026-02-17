@@ -20,6 +20,7 @@ g_ptr	    Ite_bv_list(formula cond, g_ptr l1, g_ptr l2);
 g_ptr	    Bv_get_list(bv_ptr bp);
 g_ptr	    Aint2bv(arbi_T ai);
 void	    MAKE_REDEX_BV(g_ptr redex, g_ptr list);
+g_ptr	    Make_bv(g_ptr list);
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */

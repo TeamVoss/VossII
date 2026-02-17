@@ -1370,6 +1370,14 @@ MAKE_REDEX_BV(g_ptr redex, g_ptr list)
 }
 
 g_ptr
+Make_bv(g_ptr list)
+{
+    g_ptr ret = Get_node();
+    MAKE_REDEX_BV(ret, list);
+    return ret;
+}
+
+g_ptr
 Aint2bv(arbi_T ai)
 {
     string s;
@@ -1405,3 +1413,119 @@ Aint2bv(arbi_T ai)
     }
     return res;
 }
+
+
+
+#if 0
+//
+//
+//static gen_mc_ptr   gen_mc_cache;
+//static int          gen_mc_cache_sz;
+//
+//
+//static void
+//create_gen_mc_cache()
+//{
+//    gen_mc_cache_sz = sz_MainTbl;
+//    gen_mc_cache = (gen_mc_ptr) Calloc((gen_mc_cache_sz)* sizeof(gen_mc_rec));
+//}
+//
+//static gen_mc_ptr 
+//find_in_gen_mc_cache(formula f)
+//{
+//    unint idx;          
+//    ASSERT(gen_mc_cache_sz > 0);
+//    idx = (137*((unint) f) ) % gen_mc_cache_sz;
+//    return( gen_mc_cache + idx ); 
+//}                                       
+//
+//static void             
+//free_gen_mc_cache()
+//{
+//    Free((pointer) gen_mc_cache_sz);
+//    gen_mc_cache = -1;
+//}
+//
+//
+//static void
+//do_gen_model_count(g_ptr redex)
+//{
+//    g_ptr l = GET_APPLY_LEFT(redex);
+//    g_ptr r = GET_APPLY_RIGHT(redex);
+//    g_ptr var_list, funs;
+//    EXTRACT_2_ARGS(redex, var_list, funs);
+//    bool o_do_dynamic_var_order = RCdo_dynamic_var_order;
+//    RCdo_dynamic_var_order = FALSE;
+//    create_tc_cache();
+//    formula vs = ONE;
+//    while( !IS_NIL(var_list) ) {
+//        string vname = GET_STRING(GET_CONS_HD(var_list));
+//        formula v = B_Var(vname);
+//        vs = B_And(vs, v);
+//        var_list = GET_CONS_TL(var_list);
+//    }
+//    MAKE_REDEX_NIL(redex);
+//    g_ptr tail = redex;
+//    while( !IS_NIL(funs) ) {
+//        g_ptr res;
+//        string emsg;
+//        formula fun = GET_BOOL(GET_CONS_HD(funs));
+//	if( !gen_model_count_rec(vs, fun, &res, &emsg) ) {
+//            MAKE_REDEX_FAILURE(redex, emsg);
+//            free_gen_mc_cache();
+//            RCdo_dynamic_var_order = o_do_dynamic_var_order;
+//            DEC_REF_CNT(l);
+//            DEC_REF_CNT(r);
+//            return;
+//        } else {
+//            APPEND1(tail, Make_bv(res));
+//        }
+//        funs = GET_CONS_TL(funs);
+//    }
+//    free_gen_mc_cache();
+//    RCdo_dynamic_var_order = o_do_dynamic_var_order;
+//    DEC_REF_CNT(l);
+//    DEC_REF_CNT(r);
+//}
+//
+//static bool
+//gen_model_count_rec(formula vs, formula fun, g_ptr *res, string *emsg)
+//{
+//}
+//
+//
+//
+//
+//    
+//
+//
+//cletrec truthcov free vars f =
+//    f == F => int2bv 0 |
+//    f == T => int2bv (2**(length (vars subtract free))) |
+//    val (v,H,L) = top_cofactor f in
+//    let idx = find_first (\s. s = v) vars in
+//    let vars' = butfirstn idx vars in
+//    let qvars = (firstn (idx-1) vars) subtract free in
+//    let m = int2bv (2**(length qvars)) in
+//    m * (
+//        mem v free =>
+//            let Hres = truthcov free vars' H then
+//            let Lres = truthcov free vars' L then
+//            IF (variable v) THEN Hres ELSE Lres
+//        |
+//        (truthcov free vars' H)+
+//        (truthcov free vars' L)
+//    )
+//;
+//
+//// More convenient function to use.
+//let gen_truthcov vars f =
+//    let all = depends (f,map variable vars) then
+//    let free = (depends f) subtract vars then
+//    let old = update_vossrc "DYNAMIC-ORDERING" "NO" then
+//    let res = truthcov free all f then
+//    (update_vossrc "DYNAMIC-ORDERING" old) fseq
+//    res
+//;
+//
+#endif

@@ -1724,6 +1724,7 @@ do_fp_truth_cover_n(g_ptr redex)
     g_ptr var_list, funs;
     EXTRACT_2_ARGS(redex, var_list, funs);
     bool o_do_dynamic_var_order = RCdo_dynamic_var_order;
+    RCdo_dynamic_var_order = FALSE;
     create_tc_cache();
     formula vs = ONE;
     while( !IS_NIL(var_list) ) {
@@ -1864,6 +1865,7 @@ do_fp_truth_cover2_n(g_ptr redex)
     EXTRACT_3_ARGS(redex, var_list, g_cond, funs);
     formula cond = GET_BOOL(g_cond);
     bool o_do_dynamic_var_order = RCdo_dynamic_var_order;
+    RCdo_dynamic_var_order = FALSE;
     create_tc2_cache();
     formula vs = ONE;
     while( !IS_NIL(var_list) ) {
