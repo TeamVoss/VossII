@@ -1411,13 +1411,16 @@ Aint2bv(arbi_T ai)
 	}
 	s++;
     }
-    return res;
+    return( trim_bv(res) );
 }
 
 
 
-#if 0
-//
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 //
 //static gen_mc_ptr   gen_mc_cache;
 //static int          gen_mc_cache_sz;
@@ -1452,8 +1455,8 @@ Aint2bv(arbi_T ai)
 //{
 //    g_ptr l = GET_APPLY_LEFT(redex);
 //    g_ptr r = GET_APPLY_RIGHT(redex);
-//    g_ptr var_list, funs;
-//    EXTRACT_2_ARGS(redex, var_list, funs);
+//    g_ptr var_list, free_list, funs;
+//    EXTRACT_3_ARGS(redex, free_list, var_list, funs);
 //    bool o_do_dynamic_var_order = RCdo_dynamic_var_order;
 //    RCdo_dynamic_var_order = FALSE;
 //    create_tc_cache();
@@ -1464,13 +1467,20 @@ Aint2bv(arbi_T ai)
 //        vs = B_And(vs, v);
 //        var_list = GET_CONS_TL(var_list);
 //    }
+//    formula fs = ONE;
+//    while( !IS_NIL(feee_list) ) {
+//        string vname = GET_STRING(GET_CONS_HD(feee_list));
+//        formula v = B_Var(vname);
+//        fs = B_And(fs, v);
+//        feee_list = GET_CONS_TL(feee_list);
+//    }
 //    MAKE_REDEX_NIL(redex);
 //    g_ptr tail = redex;
 //    while( !IS_NIL(funs) ) {
 //        g_ptr res;
 //        string emsg;
 //        formula fun = GET_BOOL(GET_CONS_HD(funs));
-//	if( !gen_model_count_rec(vs, fun, &res, &emsg) ) {
+//	if( !gen_model_count_rec(vs, fs, fun, &res, &emsg) ) {
 //            MAKE_REDEX_FAILURE(redex, emsg);
 //            free_gen_mc_cache();
 //            RCdo_dynamic_var_order = o_do_dynamic_var_order;
@@ -1491,6 +1501,15 @@ Aint2bv(arbi_T ai)
 //static bool
 //gen_model_count_rec(formula vs, formula fun, g_ptr *res, string *emsg)
 //{
+//    if( fun == ZERO ) {
+//	*res = Zero;
+//	return TRUE;
+//    }
+//    if( fun == ONE ) {
+//
+//	return TRUE;
+//    }
+//    
 //}
 //
 //
@@ -1528,4 +1547,3 @@ Aint2bv(arbi_T ai)
 //    res
 //;
 //
-#endif
