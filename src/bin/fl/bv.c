@@ -1499,17 +1499,53 @@ Aint2bv(arbi_T ai)
 //}
 //
 //static bool
-//gen_model_count_rec(formula vs, formula fun, g_ptr *res, string *emsg)
+//gen_model_count_rec(formula vs, formula fs, formula fun,
+//		    g_ptr *res, string *emsg)
 //{
 //    if( fun == ZERO ) {
 //	*res = Zero;
 //	return TRUE;
 //    }
 //    if( fun == ONE ) {
-//
+//	g_ptr *res = Make_CONS_ND(Make_BOOL_leaf(B_One()), Make_NIL());
+//	g_ptr tail = *res;
+//	while( (vs != ZERO) ) {
+//	    unint vvar = BDD_GET_VAR(GET_BDDP(vs));
+//	    unint fvar = BDD_GET_VAR(GET_BDDP(fs));
+//	    if( vvar == fvar ) {
+//		fs = GET_LSON(GET_BDDP(fs));
+//		vs = GET_LSON(GET_BDDP(vs));
+//	    } else {
+//		APPEND1(tail, Make_BOOL_leaf(B_Zero()));
+//		vs = GET_LSON(GET_BDDP(vs));
+//	    }
+//	}
 //	return TRUE;
 //    }
-//    
+//    bdd_ptr funp = GET_BDDP(fun);
+//    unint fun_var = BDD_GET_VAR(funp);
+//    int mul = 1;
+//    while( (vs != ZERO) && (BDD_GET_VAR(GET_BDDP(vs)) != fun_var) ) {
+//	if( BDD_GET_VAR(GET_BDDP(fs)) != BDD_GET_VAR(GET_BDDP(vs)) ) {
+//	    mul *= 2;
+//	    vs = GET_LSON(GET_BDDP(vs));
+//	} else {
+//	    fs = GET_LSON(GET_BDDP(fs));
+//	    vs = GET_LSON(GET_BDDP(vs));
+//	}
+//    }
+//    g_ptr Hres, Lres;
+//    if( !gen_model_count_rec(vs, fs, GET_LSON(funp), &Hres, emsg) ) {
+//	return FALSE;
+//    }
+//    if( !gen_model_count_rec(vs, fs, GET_RSON(funp), &Lres, emsg) ) {
+//	return FALSE;
+//    }
+//    if( BDD_GET_VAR(GET_BDDP(fs)) == fun_var ) {
+//%%%%%%%%%
+//	*res = ite_bv_list(B_Var(
+//    } else {
+//    }
 //}
 //
 //
