@@ -92,6 +92,8 @@ void		Get_abstract_depends(g_ptr redex, hash_record *abs_tblp,
 				     g_ptr obj);
 int		SHA256_bdd(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha,
 			    formula f); 
+void		Get_Size_and_Vars(g_ptr funs, g_ptr vars,
+				  unint *sizep, formula *all, formula *frees);
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */

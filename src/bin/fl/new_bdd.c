@@ -165,7 +165,6 @@ static int		var_ord_comp(const void *pi, const void *pj);
 static void		b_save(FILE *fp, formula f);
 static g_ptr		top_b_subst(g_ptr np);
 static g_ptr		top_bdd_depends(g_ptr np);
-static g_ptr		top_bdd_size(g_ptr np);
 static subst_ptr	add_to_subs(subst_ptr start, formula v, formula e);
 static formula		b_substitute(formula f, subst_ptr subs);
 static bool		do_draw_bdds(formula *bdds, string *names, int cnt);
@@ -1252,6 +1251,46 @@ SHA256_bdd(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha, formula f)
     return res;
 }
 
+void
+Get_Size_and_Vars(g_ptr funs, g_ptr vars,
+		  unint *sizep, formula *allp, formula *freep)
+{
+    hash_record var_tbl;
+    create_hash(&var_tbl, 100, str_hash, str_equ);
+    for(g_ptr cur = vars; !IS_NIL(cur); cur = GET_CONS_TL(cur) ) {
+	string vname = GET_STRING(GET_CONS_HD(cur));
+	if( find_hash(&var_tbl, vname) == NULL ) {
+	    insert_hash(&var_tbl, vname, vname);
+	}
+    }
+    Reset_BDD_Size();
+    Gen_map(top_bdd_depends, funs, TRUE);
+    unint vars = Get_VarCnt();
+    unint size = 0;
+    *freep = B_One();
+    for(unint i = 0; i < vars; i++) {
+	int wid = B_Width(i);
+	*sizep += wid;
+	if( wid > 0 && (find_hash(&var_tbl, Get_Var_Name(i)) == NULL) ) {
+	    formula v = B_Var(Get_Var_Name(i));
+	    *freep = B_And(*freep, v);
+	}
+    }
+    for(g_ptr cur = vars; !IS_NIL(cur); cur = GET_CONS_TL(cur) ) {
+	string vname = GET_STRING(GET_CONS_HD(cur));
+	B_Size(B_Var(vname));
+    }
+    vars = Get_VarCnt();
+    *allp = B_One();
+    for(unint i = 0; i < vars; i++) {
+	int wid = B_Width(i);
+	if( wid > 0  ) {
+	    formula v = B_Var(Get_Var_Name(i));
+	    *allp = B_And(*allp, v);
+	}
+    }
+}
+
 
 #if 0
 
@@ -1578,7 +1617,7 @@ bdd_size(g_ptr redex)
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr arg1 = GET_APPLY_RIGHT(redex);
     Reset_BDD_Size();
-    Gen_map(top_bdd_size, arg1, TRUE);
+    Gen_map(top_bdd_depends, arg1, TRUE);
     unint vars = Get_VarCnt();
     unint size = 0;
     for(unint i = 0; i < vars; i++) {
@@ -3607,15 +3646,6 @@ top_b_subst(g_ptr np)
 
 static g_ptr
 top_bdd_depends(g_ptr np)
-{
-    ASSERT(IS_LEAF(np));
-    if( !IS_BOOL(np) ) return np;
-    B_Size(GET_BOOL(np));
-    return np;
-}
-
-static g_ptr
-top_bdd_size(g_ptr np)
 {
     ASSERT(IS_LEAF(np));
     if( !IS_BOOL(np) ) return np;

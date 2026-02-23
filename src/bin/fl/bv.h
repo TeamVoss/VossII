@@ -36,5 +36,12 @@ typedef struct bv_rec {
     unsigned char	    flag:1;
 } bv_rec;
 
+
+typedef struct gen_mc_rec   *gen_mc_ptr;
+typedef struct gen_mc_rec {
+    formula	fun;
+    g_ptr	result;
+} gen_mc_rec;
+
 #endif /* BV_H */
 #endif /* EXPORT_FORWARD_DECL */

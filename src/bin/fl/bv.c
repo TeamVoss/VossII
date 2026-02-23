@@ -28,10 +28,17 @@ static bv_ptr	    bv_free_list;
 static char	    bv_str_buf[4096];
 static g_ptr	    Zero;
 static g_ptr	    One;
+static gen_mc_ptr   gen_mc_cache;
+static int          gen_mc_cache_sz;
 
 /* ----- Forward definitions local functions ----- */
 static int	    sx2(g_ptr *lp1, g_ptr *lp2);
 static g_ptr	    trim_bv(g_ptr l);
+static bool	    gen_model_count_rec(formula vs, formula fs, formula fun,
+					g_ptr *res, string *emsg);
+static void	    create_gen_mc_cache(unint sz);
+static gen_mc_ptr   find_in_gen_mc_cache(formula f);
+static void	    free_gen_mc_cache();
 
 /********************************************************/
 /*                    LOCAL FUNCTIONS    		*/
@@ -1203,6 +1210,69 @@ bv_geq(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
+static void
+do_gen_model_count(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr var_list, funs;
+    EXTRACT_2_ARGS(redex, var_list, funs);
+    // Determine total BDD size and all variables.
+    bool o_do_dynamic_var_order = RCdo_dynamic_var_order;
+    RCdo_dynamic_var_order = FALSE;
+
+    unint sz;
+    formula as, fs;
+    Get_Size_and_Vars(funs, var_list, &sz, &all, &frees);
+    create_gen_mc_cache(sz);
+
+%%%%%%%%%%%%%%%%
+
+
+
+
+
+
+    formula vs = ONE;
+    while( !IS_NIL(var_list) ) {
+        string vname = GET_STRING(GET_CONS_HD(var_list));
+        formula v = B_Var(vname);
+        vs = B_And(vs, v);
+        var_list = GET_CONS_TL(var_list);
+    }
+
+    formula fs = ONE;
+    while( !IS_NIL(free_list) ) {
+        string vname = GET_STRING(GET_CONS_HD(free_list));
+        formula v = B_Var(vname);
+        fs = B_And(fs, v);
+        free_list = GET_CONS_TL(free_list);
+    }
+
+    MAKE_REDEX_NIL(redex);
+    g_ptr tail = redex;
+    while( !IS_NIL(funs) ) {
+        g_ptr res;
+        string emsg;
+        formula fun = GET_BOOL(GET_CONS_HD(funs));
+	if( !gen_model_count_rec(allvs, fs, fun, &res, &emsg) ) {
+            MAKE_REDEX_FAILURE(redex, emsg);
+            free_gen_mc_cache();
+            RCdo_dynamic_var_order = o_do_dynamic_var_order;
+            DEC_REF_CNT(l);
+            DEC_REF_CNT(r);
+            return;
+        } else {
+            APPEND1(tail, Make_bv(res));
+        }
+        funs = GET_CONS_TL(funs);
+    }
+    free_gen_mc_cache();
+    RCdo_dynamic_var_order = o_do_dynamic_var_order;
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
 
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
@@ -1348,6 +1418,17 @@ Bv_Install_Functions()
 						  GLmake_bool())),
 			bv_geq);
 
+
+    Add_ExtAPI_Function("gen_model_count", "111", FALSE,
+			GLmake_arrow(
+			    GLmake_list(GLmake_string()),
+			    GLmake_arrow(
+				GLmake_list(GLmake_string()),
+				GLmake_arrow(
+				    GLmake_list(GLmake_bool()),
+				    GLmake_list(bv_handle_tp)))),
+			do_gen_model_count);
+
 }
 
 g_ptr
@@ -1417,143 +1498,112 @@ Aint2bv(arbi_T ai)
 
 
 
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-//
-//static gen_mc_ptr   gen_mc_cache;
-//static int          gen_mc_cache_sz;
-//
-//
-//static void
-//create_gen_mc_cache()
-//{
-//    gen_mc_cache_sz = sz_MainTbl;
-//    gen_mc_cache = (gen_mc_ptr) Calloc((gen_mc_cache_sz)* sizeof(gen_mc_rec));
-//}
-//
-//static gen_mc_ptr 
-//find_in_gen_mc_cache(formula f)
-//{
-//    unint idx;          
-//    ASSERT(gen_mc_cache_sz > 0);
-//    idx = (137*((unint) f) ) % gen_mc_cache_sz;
-//    return( gen_mc_cache + idx ); 
-//}                                       
-//
-//static void             
-//free_gen_mc_cache()
-//{
-//    Free((pointer) gen_mc_cache_sz);
-//    gen_mc_cache = -1;
-//}
-//
-//
-//static void
-//do_gen_model_count(g_ptr redex)
-//{
-//    g_ptr l = GET_APPLY_LEFT(redex);
-//    g_ptr r = GET_APPLY_RIGHT(redex);
-//    g_ptr var_list, free_list, funs;
-//    EXTRACT_3_ARGS(redex, free_list, var_list, funs);
-//    bool o_do_dynamic_var_order = RCdo_dynamic_var_order;
-//    RCdo_dynamic_var_order = FALSE;
-//    create_tc_cache();
-//    formula vs = ONE;
-//    while( !IS_NIL(var_list) ) {
-//        string vname = GET_STRING(GET_CONS_HD(var_list));
-//        formula v = B_Var(vname);
-//        vs = B_And(vs, v);
-//        var_list = GET_CONS_TL(var_list);
-//    }
-//    formula fs = ONE;
-//    while( !IS_NIL(feee_list) ) {
-//        string vname = GET_STRING(GET_CONS_HD(feee_list));
-//        formula v = B_Var(vname);
-//        fs = B_And(fs, v);
-//        feee_list = GET_CONS_TL(feee_list);
-//    }
-//    MAKE_REDEX_NIL(redex);
-//    g_ptr tail = redex;
-//    while( !IS_NIL(funs) ) {
-//        g_ptr res;
-//        string emsg;
-//        formula fun = GET_BOOL(GET_CONS_HD(funs));
-//	if( !gen_model_count_rec(vs, fs, fun, &res, &emsg) ) {
-//            MAKE_REDEX_FAILURE(redex, emsg);
-//            free_gen_mc_cache();
-//            RCdo_dynamic_var_order = o_do_dynamic_var_order;
-//            DEC_REF_CNT(l);
-//            DEC_REF_CNT(r);
-//            return;
-//        } else {
-//            APPEND1(tail, Make_bv(res));
-//        }
-//        funs = GET_CONS_TL(funs);
-//    }
-//    free_gen_mc_cache();
-//    RCdo_dynamic_var_order = o_do_dynamic_var_order;
-//    DEC_REF_CNT(l);
-//    DEC_REF_CNT(r);
-//}
-//
-//static bool
-//gen_model_count_rec(formula vs, formula fs, formula fun,
-//		    g_ptr *res, string *emsg)
-//{
-//    if( fun == ZERO ) {
-//	*res = Zero;
-//	return TRUE;
-//    }
-//    if( fun == ONE ) {
-//	g_ptr *res = Make_CONS_ND(Make_BOOL_leaf(B_One()), Make_NIL());
-//	g_ptr tail = *res;
-//	while( (vs != ZERO) ) {
-//	    unint vvar = BDD_GET_VAR(GET_BDDP(vs));
-//	    unint fvar = BDD_GET_VAR(GET_BDDP(fs));
-//	    if( vvar == fvar ) {
-//		fs = GET_LSON(GET_BDDP(fs));
-//		vs = GET_LSON(GET_BDDP(vs));
-//	    } else {
-//		APPEND1(tail, Make_BOOL_leaf(B_Zero()));
-//		vs = GET_LSON(GET_BDDP(vs));
-//	    }
-//	}
-//	return TRUE;
-//    }
-//    bdd_ptr funp = GET_BDDP(fun);
-//    unint fun_var = BDD_GET_VAR(funp);
-//    int mul = 1;
-//    while( (vs != ZERO) && (BDD_GET_VAR(GET_BDDP(vs)) != fun_var) ) {
-//	if( BDD_GET_VAR(GET_BDDP(fs)) != BDD_GET_VAR(GET_BDDP(vs)) ) {
-//	    mul *= 2;
-//	    vs = GET_LSON(GET_BDDP(vs));
-//	} else {
-//	    fs = GET_LSON(GET_BDDP(fs));
-//	    vs = GET_LSON(GET_BDDP(vs));
-//	}
-//    }
-//    g_ptr Hres, Lres;
-//    if( !gen_model_count_rec(vs, fs, GET_LSON(funp), &Hres, emsg) ) {
-//	return FALSE;
-//    }
-//    if( !gen_model_count_rec(vs, fs, GET_RSON(funp), &Lres, emsg) ) {
-//	return FALSE;
-//    }
-//    if( BDD_GET_VAR(GET_BDDP(fs)) == fun_var ) {
-//%%%%%%%%%
-//	*res = ite_bv_list(B_Var(
-//    } else {
-//    }
-//}
-//
-//
-//
-//
-//    
-//
-//
+static void
+create_gen_mc_cache(unint sz)
+{
+    gen_mc_cache_sz = sz;
+    gen_mc_cache = (gen_mc_ptr) Calloc((gen_mc_cache_sz)* sizeof(gen_mc_rec));
+}
+
+static gen_mc_ptr 
+find_in_gen_mc_cache(formula f)
+{
+    unint idx;          
+    ASSERT(gen_mc_cache_sz > 0);
+    idx = (137*((unint) f) ) % gen_mc_cache_sz;
+    return( gen_mc_cache + idx ); 
+}                                       
+
+static void             
+free_gen_mc_cache()
+{
+    Free((pointer) gen_mc_cache_sz);
+    gen_mc_cache = -1;
+}
+
+static g_ptr shift_left(g_ptr l, int cnt)
+{
+    if( cnt == 0 ) { return l; };
+    g_ptr result = Make_NIL();
+    g_ptr tail = result;
+    while( !IS_NIL(GET_CONS_TL(l)) ) {
+	g_ptr b = GET_CONS_HD(l);
+	INC_REFCNT(b);
+	APPEND1(tail, b);
+	l = GET_CONS_TL(l);
+    }
+    while( cnt != 0 ) {
+	APPEND1(tail, Make_BOOL_leaf(B_Zero()));
+	cnt--;
+    }
+    return result;
+}
+
+static bool
+gen_model_count_rec(formula vs, formula fs, formula fun,
+		    g_ptr *res, string *emsg)
+{
+    if( fun == ZERO ) {
+	*res = Zero;
+	return TRUE;
+    }
+    if( fun == ONE ) {
+	g_ptr *res = Make_CONS_ND(Make_BOOL_leaf(B_One()), Make_NIL());
+	g_ptr tail = *res;
+	while( (vs != ZERO) ) {
+	    unint vvar = BDD_GET_VAR(GET_BDDP(vs));
+	    unint fvar = BDD_GET_VAR(GET_BDDP(fs));
+	    if( vvar == fvar ) {
+		fs = GET_LSON(GET_BDDP(fs));
+		vs = GET_LSON(GET_BDDP(vs));
+	    } else {
+		APPEND1(tail, Make_BOOL_leaf(B_Zero()));
+		vs = GET_LSON(GET_BDDP(vs));
+	    }
+	}
+	return TRUE;
+    }
+    bdd_ptr funp = GET_BDDP(fun);
+    unint fun_var = BDD_GET_VAR(funp);
+    int mul = 0;
+    while( (vs != ZERO) && (BDD_GET_VAR(GET_BDDP(vs)) != fun_var) ) {
+	if( BDD_GET_VAR(GET_BDDP(fs)) != BDD_GET_VAR(GET_BDDP(vs)) ) {
+	    mul++;
+	    vs = GET_LSON(GET_BDDP(vs));
+	} else {
+	    fs = GET_LSON(GET_BDDP(fs));
+	    vs = GET_LSON(GET_BDDP(vs));
+	}
+    }
+    gen_mc_ptr vp = find_in_gen_mc_cache(fun);
+    if( vp->fun == fun ) {
+	*res = shift_left(vp->result, mul);
+	return TRUE;
+    }
+    g_ptr Hres, Lres;
+    if( !gen_model_count_rec(vs, fs, GET_LSON(funp), &Hres, emsg) ) {
+	return FALSE;
+    }
+    if( !gen_model_count_rec(vs, fs, GET_RSON(funp), &Lres, emsg) ) {
+	return FALSE;
+    }
+    g_ptr raw_res;
+    if( BDD_GET_VAR(GET_BDDP(fs)) == fun_var ) {
+	bdd_ptr bp = GET_BDDP(b);
+	var_ptr vp = VarTbl + BDD_GET_VAR(funp);
+	formula v = B_Var(vp->var_name);
+	raw_res = ite_bv_list(v, Hres, Lres);
+    } else {
+	(void) sx2(&Hres, &Lres);
+	raw_res = gen_add(FALSE, Hres, Lres);
+    }
+    vp->fun = fun;
+    vp->result = raw_res;
+    *res = shift_left(raw_res, mul);
+    return TRUE;
+}
+
+
 //cletrec truthcov free vars f =
 //    f == F => int2bv 0 |
 //    f == T => int2bv (2**(length (vars subtract free))) |
