@@ -1224,6 +1224,8 @@ do_gen_model_count(g_ptr redex)
     unint sz;
     formula vs, fs;
     Get_Size_and_Vars(funs, var_list, &sz, &vs, &fs);
+    PUSH_BDD_GC(vs);
+    PUSH_BDD_GC(fs);
     create_gen_mc_cache(sz);
     // Now compute the gen_model_count for all variables
     MAKE_REDEX_NIL(redex);
@@ -1236,6 +1238,7 @@ do_gen_model_count(g_ptr redex)
     }
     free_gen_mc_cache();
     RCdo_dynamic_var_order = o_do_dynamic_var_order;
+    POP_BDD_GC(2);
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
@@ -1256,6 +1259,8 @@ bv_sum(g_ptr redex)
     unint sz;
     formula vs, fs;
     Get_Size_and_Vars(bvl, var_list, &sz, &vs, &fs);
+    PUSH_BDD_GC(vs);
+    PUSH_BDD_GC(fs);
     create_gen_mc_cache(sz);
     // Now compute the gen_model_count for all variables
     g_ptr sum = Make_CONS_ND(Zero, Make_NIL());
@@ -1275,6 +1280,7 @@ bv_sum(g_ptr redex)
     MAKE_REDEX_EXT_OBJ(redex, bv_oidx, get_bv_rec(sum));
     free_gen_mc_cache();
     RCdo_dynamic_var_order = o_do_dynamic_var_order;
+    POP_BDD_GC(2);
     POP_GLOBAL_GC(1);
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -1606,9 +1612,6 @@ DBG_Pbv(string txt, formula fun, g_ptr l)
 }
 #endif
 
-static int calls = 0;
-static int hits = 0;
-
 static g_ptr
 gen_model_count_rec(formula vs, formula fs, formula fun)
 {
@@ -1627,8 +1630,6 @@ gen_model_count_rec(formula vs, formula fs, formula fun)
 	}
 	return res;
     }
-calls++;
-if( (calls % 10000) == 0 ) fprintf(stderr, "%d hits from %d calls\n", hits, calls);
     unint fun_var = f_BDD_GET_VAR(f_GET_BDDP(fun));
     int mul = 0;
     while( f_BDD_GET_VAR(f_GET_BDDP(vs)) != fun_var ) {
@@ -1638,7 +1639,6 @@ if( (calls % 10000) == 0 ) fprintf(stderr, "%d hits from %d calls\n", hits, call
     }
     gen_mc_ptr vp = find_in_gen_mc_cache(fun);
     if( vp->fun == fun ) {
-hits++;
 	res = shift_left(vp->result, mul);
 	return res;
     }
@@ -1660,7 +1660,6 @@ hits++;
 	raw_res = gen_add(FALSE, Hres, Lres);
     }
     POP_GLOBAL_GC(2);
-if( vp->fun != 0 ) fprintf(stderr, "Collision\n");
     vp->fun = fun;
     vp->result = raw_res;
     res = shift_left(raw_res, mul);
