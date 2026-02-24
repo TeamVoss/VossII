@@ -16,6 +16,7 @@ typedef struct bv_rec    *bv_ptr;
 /* ----- Function prototypes for public functions ----- */
 void	    Bv_Init();
 void	    Bv_Install_Functions();
+void	    Bv_GC();
 g_ptr	    Ite_bv_list(formula cond, g_ptr l1, g_ptr l2);
 g_ptr	    Bv_get_list(bv_ptr bp);
 g_ptr	    Aint2bv(arbi_T ai);

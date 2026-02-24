@@ -1633,6 +1633,8 @@ Do_garbage_collect()
     scan_hash(&gc_protect_tbl, mark_pp_fns);
     // Clean hidden state in list code
     List_GC();
+    // Clean hidden state in bv code
+    Bv_GC();
 
     /* Finally clean out unused nodes */
     Sweep_G_caches();

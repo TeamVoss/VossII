@@ -29,16 +29,16 @@ static char	    bv_str_buf[4096];
 static g_ptr	    Zero;
 static g_ptr	    One;
 static gen_mc_ptr   gen_mc_cache;
-static int          gen_mc_cache_sz;
+static int          gen_mc_cache_sz = 0;
 
 /* ----- Forward definitions local functions ----- */
 static int	    sx2(g_ptr *lp1, g_ptr *lp2);
 static g_ptr	    trim_bv(g_ptr l);
-static bool	    gen_model_count_rec(formula vs, formula fs, formula fun,
-					g_ptr *res, string *emsg);
+static g_ptr	    gen_model_count_rec(formula vs, formula fs, formula fun);
 static void	    create_gen_mc_cache(unint sz);
 static gen_mc_ptr   find_in_gen_mc_cache(formula f);
 static void	    free_gen_mc_cache();
+static g_ptr	    shift_left(g_ptr l, int cnt);
 
 /********************************************************/
 /*                    LOCAL FUNCTIONS    		*/
@@ -1217,54 +1217,21 @@ do_gen_model_count(g_ptr redex)
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr var_list, funs;
     EXTRACT_2_ARGS(redex, var_list, funs);
-    // Determine total BDD size and all variables.
+    // Turn off Dynamic variable ordering
     bool o_do_dynamic_var_order = RCdo_dynamic_var_order;
     RCdo_dynamic_var_order = FALSE;
-
+    // Determine total BDD size and all variables.
     unint sz;
-    formula as, fs;
-    Get_Size_and_Vars(funs, var_list, &sz, &all, &frees);
+    formula vs, fs;
+    Get_Size_and_Vars(funs, var_list, &sz, &vs, &fs);
     create_gen_mc_cache(sz);
-
-%%%%%%%%%%%%%%%%
-
-
-
-
-
-
-    formula vs = ONE;
-    while( !IS_NIL(var_list) ) {
-        string vname = GET_STRING(GET_CONS_HD(var_list));
-        formula v = B_Var(vname);
-        vs = B_And(vs, v);
-        var_list = GET_CONS_TL(var_list);
-    }
-
-    formula fs = ONE;
-    while( !IS_NIL(free_list) ) {
-        string vname = GET_STRING(GET_CONS_HD(free_list));
-        formula v = B_Var(vname);
-        fs = B_And(fs, v);
-        free_list = GET_CONS_TL(free_list);
-    }
-
+    // Now compute the gen_model_count for all variables
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
     while( !IS_NIL(funs) ) {
-        g_ptr res;
-        string emsg;
         formula fun = GET_BOOL(GET_CONS_HD(funs));
-	if( !gen_model_count_rec(allvs, fs, fun, &res, &emsg) ) {
-            MAKE_REDEX_FAILURE(redex, emsg);
-            free_gen_mc_cache();
-            RCdo_dynamic_var_order = o_do_dynamic_var_order;
-            DEC_REF_CNT(l);
-            DEC_REF_CNT(r);
-            return;
-        } else {
-            APPEND1(tail, Make_bv(res));
-        }
+        g_ptr res = gen_model_count_rec(vs, fs, fun);
+	APPEND1(tail, Make_bv(res));
         funs = GET_CONS_TL(funs);
     }
     free_gen_mc_cache();
@@ -1272,6 +1239,47 @@ do_gen_model_count(g_ptr redex)
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
+
+static void
+bv_sum(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr var_list, gbv;
+    EXTRACT_2_ARGS(redex, var_list, gbv);
+    bv_ptr bv = (bv_ptr) GET_EXT_OBJ(gbv);
+    g_ptr bvl  = bv->u.l;
+    // Turn off Dynamic variable ordering
+    bool o_do_dynamic_var_order = RCdo_dynamic_var_order;
+    RCdo_dynamic_var_order = FALSE;
+    // Determine total BDD size and all variables.
+    unint sz;
+    formula vs, fs;
+    Get_Size_and_Vars(bvl, var_list, &sz, &vs, &fs);
+    create_gen_mc_cache(sz);
+    // Now compute the gen_model_count for all variables
+    g_ptr sum = Make_CONS_ND(Zero, Make_NIL());
+    PUSH_GLOBAL_GC(sum);
+    int shift = 0;
+    for(g_ptr cur = bvl; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
+	shift++;
+    }
+    for(g_ptr cur = bvl; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
+        formula fun = GET_BOOL(GET_CONS_HD(cur));
+        g_ptr res = gen_model_count_rec(vs, fs, fun);
+	shift--;
+	res = shift_left(res, shift);
+        (void) sx2(&sum, &res);
+        sum = gen_add(FALSE, sum, res);
+    }
+    MAKE_REDEX_EXT_OBJ(redex, bv_oidx, get_bv_rec(sum));
+    free_gen_mc_cache();
+    RCdo_dynamic_var_order = o_do_dynamic_var_order;
+    POP_GLOBAL_GC(1);
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
 
 
 /********************************************************/
@@ -1299,6 +1307,19 @@ Bv_Init()
 				 bv_gmap2_fn,
 				 bv_sha256_fn);
     bv_handle_tp  = Get_Type("bv", NULL, TP_INSERT_FULL_TYPE);
+}
+
+void
+Bv_GC()
+{
+    if( gen_mc_cache_sz == 0 ) return;
+    for(int i = 0; i < gen_mc_cache_sz; i++) {
+	gen_mc_ptr gp = gen_mc_cache+i;
+	if( gp->fun != 0 ) {
+	    B_Mark(gp->fun);
+	    Mark(gp->result);
+	}
+    }
 }
 
 void
@@ -1419,15 +1440,20 @@ Bv_Install_Functions()
 			bv_geq);
 
 
-    Add_ExtAPI_Function("gen_model_count", "111", FALSE,
+    Add_ExtAPI_Function("gen_model_count", "11", FALSE,
 			GLmake_arrow(
 			    GLmake_list(GLmake_string()),
 			    GLmake_arrow(
-				GLmake_list(GLmake_string()),
-				GLmake_arrow(
-				    GLmake_list(GLmake_bool()),
-				    GLmake_list(bv_handle_tp)))),
+				GLmake_list(GLmake_bool()),
+				GLmake_list(bv_handle_tp))),
 			do_gen_model_count);
+
+    Add_ExtAPI_Function("bv_sum", "11", FALSE,
+			GLmake_arrow(
+			    GLmake_list(GLmake_string()),
+			    GLmake_arrow(bv_handle_tp, bv_handle_tp)),
+			bv_sum);
+
 
 }
 
@@ -1510,23 +1536,24 @@ find_in_gen_mc_cache(formula f)
 {
     unint idx;          
     ASSERT(gen_mc_cache_sz > 0);
-    idx = (137*((unint) f) ) % gen_mc_cache_sz;
+    idx = (7919*((unint) f) ) % gen_mc_cache_sz;
     return( gen_mc_cache + idx ); 
 }                                       
 
 static void             
 free_gen_mc_cache()
 {
-    Free((pointer) gen_mc_cache_sz);
-    gen_mc_cache = -1;
+    Free((pointer) gen_mc_cache);
+    gen_mc_cache_sz = -1;
 }
 
-static g_ptr shift_left(g_ptr l, int cnt)
+static g_ptr
+shift_left(g_ptr l, int cnt)
 {
     if( cnt == 0 ) { return l; };
     g_ptr result = Make_NIL();
     g_ptr tail = result;
-    while( !IS_NIL(GET_CONS_TL(l)) ) {
+    while( !IS_NIL(l) ) {
 	g_ptr b = GET_CONS_HD(l);
 	INC_REFCNT(b);
 	APPEND1(tail, b);
@@ -1540,96 +1567,103 @@ static g_ptr shift_left(g_ptr l, int cnt)
 }
 
 static bool
-gen_model_count_rec(formula vs, formula fs, formula fun,
-		    g_ptr *res, string *emsg)
+get_next_vars(formula *vsp, formula *fsp)
 {
+    bool is_free;
+    bdd_ptr vp = f_GET_BDDP(*vsp);
+    if( *fsp == ONE ) {
+	is_free = FALSE;
+    } else {
+	bdd_ptr fp = f_GET_BDDP(*fsp);
+	unint f_var = f_BDD_GET_VAR(fp);
+	unint v_var = f_BDD_GET_VAR(vp);
+	if( f_var == v_var ) {
+	    *fsp = f_GET_LSON(fp);
+	    is_free = TRUE;
+	} else {
+	    is_free = FALSE;
+	}
+    }
+    *vsp = f_GET_LSON(vp);
+    return is_free;
+}
+
+#if 0
+static void
+DBG_Pbv(string txt, formula fun, g_ptr l)
+{
+    FP(err_fp, "-- %s for function ", txt);
+    BP(fun);
+    FP(err_fp, " --> ");
+    char sep = '[';
+    while( !IS_NIL(l) ) {
+	FP(err_fp, "%c", sep);
+	sep = ',';
+	BP(GET_BOOL(GET_CONS_HD(l)));
+	l = GET_CONS_TL(l);
+    }
+    FP(err_fp, "]\n");
+}
+#endif
+
+static int calls = 0;
+static int hits = 0;
+
+static g_ptr
+gen_model_count_rec(formula vs, formula fs, formula fun)
+{
+    g_ptr res;
     if( fun == ZERO ) {
-	*res = Zero;
-	return TRUE;
+	res = Make_CONS_ND(Zero, Make_NIL());
+	return res;
     }
     if( fun == ONE ) {
-	g_ptr *res = Make_CONS_ND(Make_BOOL_leaf(B_One()), Make_NIL());
-	g_ptr tail = *res;
+	res = Make_CONS_ND(Zero, Make_CONS_ND(One, Make_NIL()));
+	g_ptr tail = GET_CONS_TL(GET_CONS_TL(res));
 	while( (vs != ZERO) ) {
-	    unint vvar = BDD_GET_VAR(GET_BDDP(vs));
-	    unint fvar = BDD_GET_VAR(GET_BDDP(fs));
-	    if( vvar == fvar ) {
-		fs = GET_LSON(GET_BDDP(fs));
-		vs = GET_LSON(GET_BDDP(vs));
-	    } else {
+	    if( !get_next_vars(&vs, &fs) ) {
 		APPEND1(tail, Make_BOOL_leaf(B_Zero()));
-		vs = GET_LSON(GET_BDDP(vs));
 	    }
 	}
-	return TRUE;
+	return res;
     }
-    bdd_ptr funp = GET_BDDP(fun);
-    unint fun_var = BDD_GET_VAR(funp);
+calls++;
+if( (calls % 10000) == 0 ) fprintf(stderr, "%d hits from %d calls\n", hits, calls);
+    unint fun_var = f_BDD_GET_VAR(f_GET_BDDP(fun));
     int mul = 0;
-    while( (vs != ZERO) && (BDD_GET_VAR(GET_BDDP(vs)) != fun_var) ) {
-	if( BDD_GET_VAR(GET_BDDP(fs)) != BDD_GET_VAR(GET_BDDP(vs)) ) {
+    while( f_BDD_GET_VAR(f_GET_BDDP(vs)) != fun_var ) {
+	if( !get_next_vars(&vs, &fs) ) {
 	    mul++;
-	    vs = GET_LSON(GET_BDDP(vs));
-	} else {
-	    fs = GET_LSON(GET_BDDP(fs));
-	    vs = GET_LSON(GET_BDDP(vs));
 	}
     }
     gen_mc_ptr vp = find_in_gen_mc_cache(fun);
     if( vp->fun == fun ) {
-	*res = shift_left(vp->result, mul);
-	return TRUE;
+hits++;
+	res = shift_left(vp->result, mul);
+	return res;
     }
+    formula H, L;
+    string top_var;
+    Get_top_cofactor(fun, &top_var, &H, &L);
+    bool is_free = get_next_vars(&vs, &fs);
     g_ptr Hres, Lres;
-    if( !gen_model_count_rec(vs, fs, GET_LSON(funp), &Hres, emsg) ) {
-	return FALSE;
-    }
-    if( !gen_model_count_rec(vs, fs, GET_RSON(funp), &Lres, emsg) ) {
-	return FALSE;
-    }
+    Hres = gen_model_count_rec(vs, fs, H);
+    PUSH_GLOBAL_GC(Hres);
+    Lres = gen_model_count_rec(vs, fs, L);
+    PUSH_GLOBAL_GC(Lres);
     g_ptr raw_res;
-    if( BDD_GET_VAR(GET_BDDP(fs)) == fun_var ) {
-	bdd_ptr bp = GET_BDDP(b);
-	var_ptr vp = VarTbl + BDD_GET_VAR(funp);
-	formula v = B_Var(vp->var_name);
+    if( is_free ) {
+	formula v = B_Var(top_var);
 	raw_res = ite_bv_list(v, Hres, Lres);
     } else {
 	(void) sx2(&Hres, &Lres);
 	raw_res = gen_add(FALSE, Hres, Lres);
     }
+    POP_GLOBAL_GC(2);
+if( vp->fun != 0 ) fprintf(stderr, "Collision\n");
     vp->fun = fun;
     vp->result = raw_res;
-    *res = shift_left(raw_res, mul);
-    return TRUE;
+    res = shift_left(raw_res, mul);
+    return res;
 }
 
-
-//cletrec truthcov free vars f =
-//    f == F => int2bv 0 |
-//    f == T => int2bv (2**(length (vars subtract free))) |
-//    val (v,H,L) = top_cofactor f in
-//    let idx = find_first (\s. s = v) vars in
-//    let vars' = butfirstn idx vars in
-//    let qvars = (firstn (idx-1) vars) subtract free in
-//    let m = int2bv (2**(length qvars)) in
-//    m * (
-//        mem v free =>
-//            let Hres = truthcov free vars' H then
-//            let Lres = truthcov free vars' L then
-//            IF (variable v) THEN Hres ELSE Lres
-//        |
-//        (truthcov free vars' H)+
-//        (truthcov free vars' L)
-//    )
-//;
-//
-//// More convenient function to use.
-//let gen_truthcov vars f =
-//    let all = depends (f,map variable vars) then
-//    let free = (depends f) subtract vars then
-//    let old = update_vossrc "DYNAMIC-ORDERING" "NO" then
-//    let res = truthcov free all f then
-//    (update_vossrc "DYNAMIC-ORDERING" old) fseq
-//    res
-//;
-//

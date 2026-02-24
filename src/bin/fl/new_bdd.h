@@ -13,6 +13,7 @@
 /* --- Forward declarations that need to be exported to earlier .h files --- */
 typedef unint				formula;
 extern formula 				ZERO, ONE;
+typedef struct var_rec			*var_ptr;
 typedef struct subst_rec		*subst_ptr;
 typedef struct relprod_cache_rec	*relprod_cache_ptr;
 typedef struct bdd_rec			*bdd_ptr;
@@ -30,9 +31,9 @@ typedef struct bdd_rec			*bdd_ptr;
 #ifdef DEBUG
 string		get_var_name(formula f);
 bdd_ptr		f_GET_BDDP(formula f);
-int		f_ISNOT(formula f);
+bool		f_ISNOT(formula f);
 formula		f_POS(formula f);
-int		f_BDD_GET_VAR(bdd_ptr f);
+unint		f_BDD_GET_VAR(bdd_ptr f);
 formula		f_GET_LSON(bdd_ptr f);
 formula		f_GET_RSON(bdd_ptr f);
 #endif
@@ -101,8 +102,6 @@ void		Get_Size_and_Vars(g_ptr funs, g_ptr vars,
 #define NEW_BDD_H
 #include "fl.h"	/* Global data types and include files 		     */
 
-
-typedef struct var_rec		*var_ptr;
 
 /* Bdd package parameters: Bdd node size = 4 words */
 #define AND			1

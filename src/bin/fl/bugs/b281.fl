@@ -1,0 +1,88 @@
+
+VARS "a b c d e";
+
+let ex1 = F;
+let ex2 = T;
+let ex3 = a AND b;
+let ex4 = a AND (b OR c);
+let ex5 = a XOR (b OR c);
+
+//map bv2int (gen_model_count ["a", "b", "c"] [ex1]);
+//map bv2int (gen_model_count ["a", "b", "c"] [ex2]);
+//map bv2int (gen_model_count ["a", "b", "c"] [ex3]);
+//map bv2int (gen_model_count ["a", "b", "c"] [ex4]);
+//map bv2int (gen_model_count ["a", "b", "c"] [ex5]);
+
+//map bv2int (gen_model_count ["a", "b", "c"] [ex1, ex2, ex3, ex4, ex5]);
+
+
+
+//(gen_model_count ["a", "c"] [ex1]);
+//(gen_model_count ["a", "c"] [ex2]);
+//(gen_model_count ["a", "c"] [ex3]);
+//(gen_model_count ["a", "c"] [ex4]);
+//(gen_model_count ["a", "c"] [ex5]);
+
+let av = bv_uvector "a" 4;
+let cond = av > '10;
+let sub = param cond;
+let av' = substitute sub av;
+let av'' = cond => av' | '0;
+
+let q = bv2list av'';
+let vars = depends q;
+
+let f = last q;
+
+//draw_bdds T [f];
+gen_model_count vars [f];
+
+1111111;
+bv_sum (depends av'') av'';
+
+cletrec truthcov free vars f = 
+    f == F => int2bv 0 | 
+    f == T => int2bv (2**(length (vars subtract free))) | 
+    val (v,H,L) = top_cofactor f in
+    let idx = find_first (\s. s = v) vars in
+    let vars' = butfirstn idx vars in
+    let qvars = (firstn (idx-1) vars) subtract free in
+    let m = int2bv (2**(length qvars)) in
+    m * ( 
+        mem v free =>
+            let Hres = truthcov free vars' H then
+            let Lres = truthcov free vars' L then
+            IF (variable v) THEN Hres ELSE Lres
+        | 
+        (truthcov free vars' H)+
+        (truthcov free vars' L)
+    ) 
+;
+
+// More convenient function to use.
+let gen_truthcov vars f = 
+    let all = depends (f,map variable vars) then
+    let free = (depends f) subtract vars then
+    let old = update_vossrc "DYNAMIC-ORDERING" "NO" then
+    let res = truthcov free all f then
+    (update_vossrc "DYNAMIC-ORDERING" old) fseq
+    res
+;
+
+let bv_sum2 vars bv =
+    letrec add1 idx (b:bs) =
+        let cnt = gen_truthcov vars b in
+        bv_add (bv_mul (int2bv (2**idx)) cnt) (add1 (idx+1) bs)
+     /\    add1 idx [] = int2bv 0
+    in
+    let is_pos = (bv >= '0) in
+    let pos = is_pos => bv | '0 in
+    let neg = is_pos => '0 | '-1*bv in
+    let pos_sum = add1 0 (rev (bv2list pos)) in
+    let neg_sum = add1 0 (rev (bv2list neg)) in
+    pos_sum - neg_sum 
+;
+
+
+22222222;
+bv_sum2 (depends av'') av'';

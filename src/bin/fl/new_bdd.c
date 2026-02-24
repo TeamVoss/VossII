@@ -195,7 +195,7 @@ f_GET_BDDP(formula f)
     return( GET_BDDP(f) );
 }
 
-int
+bool
 f_ISNOT(formula f)
 {
     return( ISNOT(f) );
@@ -207,7 +207,7 @@ f_POS(formula f)
     return( POS(f) );
 }
 
-int
+unint
 f_BDD_GET_VAR(bdd_ptr f)
 {
     return( BDD_GET_VAR(f) );
@@ -368,8 +368,13 @@ Get_top_cofactor(formula b, string *varp, formula *Hp, formula *Lp)
     bdd_ptr bp = GET_BDDP(b);
     var_ptr vp = VarTbl + BDD_GET_VAR(bp);
     *varp = wastrsave(stringsp, vp->var_name);
-    *Hp = GET_LSON(bp);
-    *Lp = GET_RSON(bp);
+    if( ISNOT(b) ) {
+	*Hp = NOT(GET_LSON(bp));
+	*Lp = NOT(GET_RSON(bp));
+    } else {
+	*Hp = GET_LSON(bp);
+	*Lp = GET_RSON(bp);
+    }
 }
 
 static void
@@ -1265,10 +1270,9 @@ Get_Size_and_Vars(g_ptr funs, g_ptr vars,
     }
     Reset_BDD_Size();
     Gen_map(top_bdd_depends, funs, TRUE);
-    unint vars = Get_VarCnt();
-    unint size = 0;
+    unint var_cnt = Get_VarCnt();
     *freep = B_One();
-    for(unint i = 0; i < vars; i++) {
+    for(unint i = 0; i < var_cnt; i++) {
 	int wid = B_Width(i);
 	*sizep += wid;
 	if( wid > 0 && (find_hash(&var_tbl, Get_Var_Name(i)) == NULL) ) {
@@ -1280,9 +1284,9 @@ Get_Size_and_Vars(g_ptr funs, g_ptr vars,
 	string vname = GET_STRING(GET_CONS_HD(cur));
 	B_Size(B_Var(vname));
     }
-    vars = Get_VarCnt();
+    var_cnt = Get_VarCnt();
     *allp = B_One();
-    for(unint i = 0; i < vars; i++) {
+    for(unint i = 0; i < var_cnt; i++) {
 	int wid = B_Width(i);
 	if( wid > 0  ) {
 	    formula v = B_Var(Get_Var_Name(i));
