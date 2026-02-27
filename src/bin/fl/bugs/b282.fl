@@ -50,50 +50,6 @@ let Psmatrix sm =
 ;
 install_print_function Psmatrix;
 
-cletrec truthcov free vars f =
-    f == F => int2bv 0 |
-    f == T => int2bv (2**(length (vars subtract free))) |
-    val (v,H,L) = top_cofactor f in
-    let idx = find_first (\s. s = v) vars in
-    let vars' = butfirstn idx vars in
-    let qvars = (firstn (idx-1) vars) subtract free in
-    let m = int2bv (2**(length qvars)) in
-    m * (
-        mem v free =>
-            let Hres = truthcov free vars' H then
-            let Lres = truthcov free vars' L then
-            IF (variable v) THEN Hres ELSE Lres
-        |
-        (truthcov free vars' H)+
-        (truthcov free vars' L)
-    )
-;
-
-// More convenient function to use.
-let gen_truthcov vars f =
-    let all = depends (f,map variable vars) then
-    let free = (depends f) subtract vars then
-    let old = update_vossrc "DYNAMIC-ORDERING" "NO" then
-    let res = truthcov free all f then
-    (update_vossrc "DYNAMIC-ORDERING" old) fseq
-    res
-;
-
-
-let sum vars bv =
-    letrec add1 idx (b:bs) =
-        let cnt = gen_truthcov vars b in
-        bv_add (bv_mul (int2bv (2**idx)) cnt) (add1 (idx+1) bs)
-     /\    add1 idx [] = int2bv 0
-    in
-    let is_pos = (bv >= '0) in
-    let pos = is_pos => bv | '0 in
-    let neg = is_pos => '0 | '-1*bv in
-    let pos_sum = add1 0 (rev (bv2list pos)) in
-    let neg_sum = add1 0 (rev (bv2list neg)) in
-    pos_sum - neg_sum
-;
-
 let sum = bv_sum;
 
 // Matrix arithmetic

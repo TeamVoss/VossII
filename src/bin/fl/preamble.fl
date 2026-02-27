@@ -2739,4 +2739,24 @@ let choose n k =
 infix 9 choose;
 export choose;
 
+// Compute the sum of all values obtained from bv by substituting
+// every binary value of the variables in vars.
+// If bv ony depends on variables in vars, the result can be converted
+// to an integer by applying bv2int.
+// However, if there are variables in bv that are not in vars,
+// the result will be a bv that depends on these other variables
+// but for each assignment to these variables, respresents the
+// sum of all the values the bv can take on by substituting
+// every binary value of the variables in vars.
+let bv_sum vars bv =
+    let is_pos = (bv >= '0) in
+    is_pos == T => bv_sum vars bv |
+    let pos = is_pos => bv | '0 in
+    let neg = is_pos => '0 | bv_neg bv in
+    let pos_sum = bv_sum vars pos in
+    let neg_sum = bv_sum vars neg in
+    pos_sum - neg_sum
+;
+
+
 end_abstype;
