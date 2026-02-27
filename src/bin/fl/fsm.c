@@ -5310,7 +5310,7 @@ map_vector(hash_record *vtblp, string hier, string name, bool ignore_missing)
 	ip = oip;
 	idx_map_result = NULL;
 	while( ip != NULL && idx_map_result == NULL ) {
-	    vec_ptr dp = ip->declaration;
+	    volatile vec_ptr dp = ip->declaration;
 	    if( is_full_range(dp, vp) ) {
 		idx_map_result = ilist_copy(ip->map);
 	    } else {
