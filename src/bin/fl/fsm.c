@@ -5233,6 +5233,9 @@ name2idx(string name)
     return -1;
 }
 
+static ilist_ptr final_idx_map_result;
+static ilist_ptr *next_list;
+
 static ilist_ptr
 map_vector(hash_record *vtblp, string hier, string name, bool ignore_missing)
 {
@@ -5299,8 +5302,7 @@ map_vector(hash_record *vtblp, string hier, string name, bool ignore_missing)
     }
 
     vec_list_ptr vl = Expand_vector(sop, vp);
-    ilist_ptr final_idx_map_result = NULL;
-    ilist_ptr volatile *next_list;
+    final_idx_map_result = NULL;
     next_list = &final_idx_map_result; 
 
     while( vl != NULL ) {
