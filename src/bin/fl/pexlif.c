@@ -1147,7 +1147,7 @@ string
 get_top_name(g_ptr p)
 {
     g_ptr attrs, fa_inps, fa_outs, internals, content;
-    string name;
+    string name = s_EMPTY_STRING;
     bool leaf;
     is_PINST(p,&name,&attrs,&leaf,&fa_inps,&fa_outs,&internals,&content);
     return name;
@@ -1323,6 +1323,7 @@ fold_pexlif(g_ptr p, g_ptr ids, string name)
         p, &old_name, &old_attrs, &old_leaf, &old_fa_inps, &old_fa_outs,
         &old_inter, &old_cont
     );
+    old_children = NULL;
     is_P_HIER(old_cont, &old_children);
     // Children are split by 'ids' into new and folded.
     ix = 1;

@@ -77,7 +77,8 @@ VERSION_DATE = `date +'%y/%m/%d'`
 #DEBUG_FLAG = '-g -DDEBUG'	# Maybe:  -fstack-protector-all
 #DEBUG_FLAG = '-g'		#
 DEBUG_FLAG = ''		#
-OPTIMIZATION_FLAG =  '-O4'	# Maybe: -O4
+#OPTIMIZATION_FLAG =  '-Ofast'
+OPTIMIZATION_FLAG =  '-O3'
 
 usage:
 	@echo "Basic targets: install, package or clean"
