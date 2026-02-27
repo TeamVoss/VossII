@@ -727,7 +727,9 @@ g_ptr_hash(pointer p, unint n)
             }
             break;
         default:
+#if DEBUG
             DPR(nd);
+#endif
             DIE("Unexpected cache argument value. GURU\n");
     }
 }

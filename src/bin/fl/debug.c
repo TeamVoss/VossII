@@ -173,32 +173,40 @@ run_compare_program()
 }
 
 static void
+safe_system(string s)
+{
+    if( system(s) != 0 ) {
+	fprintf(stderr, "system(%s) failed...\n", s);
+    }
+}
+
+static void
 rm_file(string file)
 {
     Sprintf(cmd, "rm -f %s", file);
-    system(cmd);
+    safe_system(cmd);
 }
 
 static void
 push_graph(string file)
 {
     Sprintf(cmd, "cp %s-8 %s-9 2>/dev/null", file, file);
-    system(cmd);
+    safe_system(cmd);
     Sprintf(cmd, "cp %s-7 %s-8 2>/dev/null", file, file);
-    system(cmd);
+    safe_system(cmd);
     Sprintf(cmd, "cp %s-6 %s-7 2>/dev/null", file, file);
-    system(cmd);
+    safe_system(cmd);
     Sprintf(cmd, "cp %s-5 %s-6 2>/dev/null", file, file);
-    system(cmd);
+    safe_system(cmd);
     Sprintf(cmd, "cp %s-4 %s-5 2>/dev/null", file, file);
-    system(cmd);
+    safe_system(cmd);
     Sprintf(cmd, "cp %s-3 %s-4 2>/dev/null", file, file);
-    system(cmd);
+    safe_system(cmd);
     Sprintf(cmd, "cp %s-2 %s-3 2>/dev/null", file, file);
-    system(cmd);
+    safe_system(cmd);
     Sprintf(cmd, "cp %s-1 %s-2 2>/dev/null", file, file);
-    system(cmd);
+    safe_system(cmd);
     Sprintf(cmd, "cp %s %s-1 2>/dev/null", file, file);
-    system(cmd);
+    safe_system(cmd);
 }
 #endif

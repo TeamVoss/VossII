@@ -3,7 +3,6 @@
 # in the subdirectory.
 #
 
-
 MINISAT_DIR ?=../../external/minisat/
 PLUGIN_DIR ?=$(ROOT_DIR)/plugins
 
@@ -12,10 +11,17 @@ BASE_FLAGS = $(DEBUG_FLAG) $(OPTIMIZATION_FLAG) $(FL_OPTIONS) \
 	-DVERSION_DATE='"$(VERSION_DATE)"' \
 	-DDEFAULT_PLUGIN_DIR='"$(PLUGIN_DIR)"' -DFL_BINARY=1
 
+NO_OPT_BASE_FLAGS = $(DEBUG_FLAG) $(FL_OPTIONS) \
+	-Wall -Wextra -Werror \
+	-DVERSION_DATE='"$(VERSION_DATE)"' \
+	-DDEFAULT_PLUGIN_DIR='"$(PLUGIN_DIR)"' -DFL_BINARY=1
+
 ifeq ($(CC), clang)
 	CFLAGS += $(BASE_FLAGS) $(COMPATIBILITY_FLAG) -Wno-unused-command-line-argument -Wno-error=unused-but-set-variable -Wno-error=misleading-indentation
+	NO_OPT_CFLAGS += $(NO_OPT_BASE_FLAGS) $(COMPATIBILITY_FLAG) -Wno-unused-command-line-argument -Wno-error=unused-but-set-variable -Wno-error=misleading-indentation
 else
 	CFLAGS += $(BASE_FLAGS) $(COMPATIBILITY_FLAG) -Wno-unused-command-line-argument 
+	NO_OPT_CFLAGS += $(NO_OPT_BASE_FLAGS) $(COMPATIBILITY_FLAG) -Wno-unused-command-line-argument 
 endif
 CXXFLAGS += $(BASE_FLAGS) -fpermissive -Wno-error
 
@@ -50,6 +56,10 @@ fl: libfl.so $(OBJ) $(LIB)
 libfl.so: $(LOBJ)
 	$(CC) -shared -fPIC -o libfl.so $(LOBJ)
 
+arb_prec.o: arb_prec.c arb_prec.h fl.h
+	echo "###############################################"
+	$(CC) -shared -fPIC $(NO_OPT_CFLAGS) $(INC) -c arb_prec.c
+
 #
 # compilation with includes
 #
@@ -77,7 +87,6 @@ clean:
 #
 # additional dependencies
 #
-arb_prec.o:	    arb_prec.h fl.h
 cache.o:	    cache.h graph.h fl.h
 compile.o:	    compile.h graph.h prefs_ext.h fl.h
 emit.o:		    emit.h fl.h

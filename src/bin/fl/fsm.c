@@ -487,6 +487,7 @@ static void	      get_nonX_entries(g_ptr redex);
 
 static void           dbg_print_ils(pointer key, pointer data);
 static void           dbg_print_stop_nds(pointer key, pointer data);
+static void	      print_ilist(ilist_ptr il);
 
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
@@ -4978,7 +4979,7 @@ static string
 mk_vec_name(string base, int sz)
 {
     if( sz == 1 ) return base;
-    Sprintf(tmp_name_buf, "%s[%d:0]", base, sz-1);
+    Sprintf(tmp_name_buf, "%.4000s[%d:0]", base, sz-1);
     return tmp_name_buf;
 }
 
@@ -5299,7 +5300,8 @@ map_vector(hash_record *vtblp, string hier, string name, bool ignore_missing)
 
     vec_list_ptr vl = Expand_vector(sop, vp);
     ilist_ptr final_idx_map_result = NULL;
-    ilist_ptr *next_list = &final_idx_map_result; 
+    ilist_ptr volatile *next_list;
+    next_list = &final_idx_map_result; 
 
     while( vl != NULL ) {
 	vec_ptr vp = vl->vec;
@@ -5794,7 +5796,7 @@ do_combinational(ste_ptr ste)
 		    pop_buf(bp, &cp);
 		    if( RCprint_node_eval ) {
 			FP(err_fp, "Computing the result for output: ");
-			DBG_print_ilist(cp->outs);
+			print_ilist(cp->outs);
 		    }
 		    cp->flag = FALSE;
 		    if( quit_simulation_early ) return -1;
@@ -6710,13 +6712,15 @@ traverse_pexlif(hash_record *parent_tblp, g_ptr p, string hier,
             int len = match-vp->pfn+8;
             string res = strtemp(vp->pfn);
             *(res+len) = 0;
-	    if( (strlen(res)+20+strlen(res+len+1)) > 4000 ) {
+	    if( (strlen(res)+100+strlen(res+len+1)) > 4000 ) {
 		sprintf(buf, "%s_code %d %d {...}", res, inst_cnt, nbr_inputs);
+		pfn = gen_strappend(sm, buf);
 	    } else {
-		sprintf(buf, "%s_code %d %d %s",
-			     res, nbr_inputs, inst_cnt, res+len+1);
+		pfn = gen_strappend(sm, res);
+		sprintf(buf, "_code %d %d ", nbr_inputs, inst_cnt);
+		pfn = gen_strappend(sm, buf);
+		pfn = gen_strappend(sm, res+len+1);
 	    }
-            pfn = gen_strappend(sm, buf);
         } else if( (match = strstr(vp->pfn, "draw_hier ")) != NULL ) {
             // Replace draw_hier txt with draw_fub txt inst inputs outputs
             int len = match-vp->pfn;
@@ -8904,15 +8908,6 @@ DBG_print_vec_info_ptr(vec_info_ptr vp)
 }
 
 void
-DBG_print_ilist(ilist_ptr il)
-{
-    FP(err_fp, " ilist:");
-    if( il == NULL ) { FP(err_fp, "<NULL>"); return; }
-    base_print_ilist(il);
-    FP(err_fp, "\n");
-}
-
-void
 DBG_print_vis_io_ptr(vis_io_ptr vp)
 {
     FP(err_fp, " vis_io_ptr:");
@@ -9386,4 +9381,13 @@ dbg_print_stop_nds(pointer key, pointer data)
     (void) data;
     int id = PTR2INT(key);
     FP(err_fp, " %s", idx2name(id));
+}
+
+static void
+print_ilist(ilist_ptr il)
+{
+    FP(err_fp, " ilist:");
+    if( il == NULL ) { FP(err_fp, "<NULL>"); return; }
+    base_print_ilist(il);
+    FP(err_fp, "\n");
 }

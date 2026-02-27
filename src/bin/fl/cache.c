@@ -302,7 +302,9 @@ g_rec_hash_rec(pointer p, unint n, unint sz)
 	    }
 	    break;
 	default:
+#ifdef DEBUG
 	    DPR(nd);
+#endif
 	    DIE("Unexpected cache argument value. GURU\n");
     }
 }

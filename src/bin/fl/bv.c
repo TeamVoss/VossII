@@ -28,15 +28,15 @@ static bv_ptr	    bv_free_list;
 static char	    bv_str_buf[4096];
 static g_ptr	    Zero;
 static g_ptr	    One;
-static gen_mc_ptr   gen_mc_cache;
-static int          gen_mc_cache_sz = 0;
+static hash_record  gen_mc_cache_tbl;
+static int          gen_mc_cache_sz = -1;
 
 /* ----- Forward definitions local functions ----- */
 static int	    sx2(g_ptr *lp1, g_ptr *lp2);
 static g_ptr	    trim_bv(g_ptr l);
 static g_ptr	    gen_model_count_rec(formula vs, formula fs, formula fun);
 static void	    create_gen_mc_cache(unint sz);
-static gen_mc_ptr   find_in_gen_mc_cache(formula f);
+static g_ptr	    find_in_gen_mc_cache(formula f);
 static void	    free_gen_mc_cache();
 static g_ptr	    shift_left(g_ptr l, int cnt);
 
@@ -1275,7 +1275,9 @@ bv_sum(g_ptr redex)
 	shift--;
 	res = shift_left(res, shift);
         (void) sx2(&sum, &res);
+	POP_GLOBAL_GC(1);
         sum = gen_add(FALSE, sum, res);
+	PUSH_GLOBAL_GC(sum);
     }
     MAKE_REDEX_EXT_OBJ(redex, bv_oidx, get_bv_rec(sum));
     free_gen_mc_cache();
@@ -1315,17 +1317,19 @@ Bv_Init()
     bv_handle_tp  = Get_Type("bv", NULL, TP_INSERT_FULL_TYPE);
 }
 
+static void
+mark_cache_entry(pointer key, pointer data)
+{
+    (void) key; 
+    g_ptr bvl = (g_ptr) data;
+    Mark(bvl);
+}
+
 void
 Bv_GC()
 {
-    if( gen_mc_cache_sz == 0 ) return;
-    for(int i = 0; i < gen_mc_cache_sz; i++) {
-	gen_mc_ptr gp = gen_mc_cache+i;
-	if( gp->fun != 0 ) {
-	    B_Mark(gp->fun);
-	    Mark(gp->result);
-	}
-    }
+    if( gen_mc_cache_sz < 0 ) return;
+    scan_hash(&gen_mc_cache_tbl, mark_cache_entry);
 }
 
 void
@@ -1529,27 +1533,45 @@ Aint2bv(arbi_T ai)
 
 
 
+static unsigned int
+formula_hash(pointer np, unsigned int n)
+{   
+    return( (unsigned int) (((lunint) np) % (lunint) n) );
+}   
+        
+static bool
+formula_eq(pointer p1, pointer p2)
+{       
+    return( p1 == p2 );
+}   
+                    
+
 
 static void
 create_gen_mc_cache(unint sz)
 {
     gen_mc_cache_sz = sz;
-    gen_mc_cache = (gen_mc_ptr) Calloc((gen_mc_cache_sz)* sizeof(gen_mc_rec));
+    create_hash(&gen_mc_cache_tbl, 2*sz, formula_hash, formula_eq);
 }
 
-static gen_mc_ptr 
+static g_ptr 
 find_in_gen_mc_cache(formula f)
 {
-    unint idx;          
     ASSERT(gen_mc_cache_sz > 0);
-    idx = (7919*((unint) f) ) % gen_mc_cache_sz;
-    return( gen_mc_cache + idx ); 
+    g_ptr res = find_hash(&gen_mc_cache_tbl, FORMULA2PTR(f));
+    return res;
 }                                       
+
+static void
+insert_in_gen_mc_cache(formula f, g_ptr bvl)
+{
+    insert_hash(&gen_mc_cache_tbl, FORMULA2PTR(f), bvl);
+}
 
 static void             
 free_gen_mc_cache()
 {
-    Free((pointer) gen_mc_cache);
+    dispose_hash(&gen_mc_cache_tbl, NULLFCN);
     gen_mc_cache_sz = -1;
 }
 
@@ -1637,9 +1659,9 @@ gen_model_count_rec(formula vs, formula fs, formula fun)
 	    mul++;
 	}
     }
-    gen_mc_ptr vp = find_in_gen_mc_cache(fun);
-    if( vp->fun == fun ) {
-	res = shift_left(vp->result, mul);
+    g_ptr cres = find_in_gen_mc_cache(fun);
+    if( cres != NULL ) {
+	res = shift_left(cres, mul);
 	return res;
     }
     formula H, L;
@@ -1660,8 +1682,7 @@ gen_model_count_rec(formula vs, formula fs, formula fun)
 	raw_res = gen_add(FALSE, Hres, Lres);
     }
     POP_GLOBAL_GC(2);
-    vp->fun = fun;
-    vp->result = raw_res;
+    insert_in_gen_mc_cache(fun, raw_res);
     res = shift_left(raw_res, mul);
     return res;
 }

@@ -460,7 +460,9 @@ fl_main(int argc, char *argv[])
 	}
 	// Remove input file
 	string cmd = tprintf("rm -f %s.inp.tar.gz", expr_eval_file);
-	system(cmd);
+	if( system(cmd) != 0 ) {
+	    fprintf(stderr, "Failed to remove %s.inp.tar.gz", expr_eval_file);
+	}
 	// Now force evaluation of redex
 	redex = force(redex, FALSE);
 	// And save the result in the output file
@@ -586,7 +588,7 @@ fl_main(int argc, char *argv[])
         while (1) {
             struct pollfd fds[3];
             int source_cnt = 2;
-	    FILE *fp;
+	    FILE *fp = NULL;
             fds[0].fd = fileno(cmd_from_tcl_fp);
             fds[0].events = POLLIN;
             fds[0].revents = 0;

@@ -714,7 +714,7 @@ do_parse(bool flush)
 bool
 do_parse_stdin(bool flush)
 {
-    bool ok;
+    volatile bool all_ok;
     eval_ctx_rec ctx;
     Record_eval_context(&ctx);
     jmp_buf eval_env;
@@ -737,21 +737,21 @@ do_parse_stdin(bool flush)
                     add_history(line);
                     bp= yy_scan_string( line );
                     yy_switch_to_buffer(bp);
-                    ok = yyparse();
+                    all_ok = yyparse();
                     yy_delete_buffer(bp);
                   }
                }
             break;
         case 1:
             /* Return from a failure */
-            ok = FALSE;
+            all_ok = FALSE;
             break;
         default:
             DIE("Should never happen");
             break;
     }
     Restore_eval_context(&ctx);
-    return ok;
+    return all_ok;
 }
 
 

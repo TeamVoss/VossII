@@ -251,8 +251,11 @@ normalize_file(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
-    realpath(GET_STRING(r), path_buf);
-    MAKE_REDEX_STRING(redex, wastrsave(stringsp, path_buf));
+    string res = realpath(GET_STRING(r), path_buf);
+    if( res == NULL ) {
+	res = path_buf;
+    }
+    MAKE_REDEX_STRING(redex, wastrsave(stringsp, res));
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }

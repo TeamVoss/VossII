@@ -28,7 +28,6 @@ typedef struct bdd_rec			*bdd_ptr;
 
 /* ----- Function prototypes for public functions ----- */
 
-#ifdef DEBUG
 string		get_var_name(formula f);
 bdd_ptr		f_GET_BDDP(formula f);
 bool		f_ISNOT(formula f);
@@ -36,7 +35,6 @@ formula		f_POS(formula f);
 unint		f_BDD_GET_VAR(bdd_ptr f);
 formula		f_GET_LSON(bdd_ptr f);
 formula		f_GET_RSON(bdd_ptr f);
-#endif
 
 void		B_Init(void);
 void		PUSH_BDD_GC(formula f);

@@ -22,10 +22,10 @@ else
 	LEX    :="flex -l"
 endif
 RANLIB = ranlib
-CC     ?= gcc
-CX     ?= g++
-# CC     = clang
-# CX     = clang++
+# CC     ?= gcc
+# CX     ?= g++
+CC     = clang
+CX     = clang++
 
 #
 # Names of executables
@@ -74,9 +74,10 @@ VERSION_DATE = `date +'%y/%m/%d'`
 #-----------------------------------------------------------------------------
 # Debugging version or optimized version?
 #-----------------------------------------------------------------------------
-DEBUG_FLAG = '-g -DDEBUG'	# Maybe:  -fstack-protector-all
+#DEBUG_FLAG = '-g -DDEBUG'	# Maybe:  -fstack-protector-all
 #DEBUG_FLAG = '-g'		#
-#OPTIMIZATION_FLAG =  '-O3'	# Maybe: -O4
+DEBUG_FLAG = ''		#
+OPTIMIZATION_FLAG =  '-O3'	# Maybe: -O4
 
 usage:
 	@echo "Basic targets: install, package or clean"

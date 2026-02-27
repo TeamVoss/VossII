@@ -476,7 +476,9 @@ sitlist(g_ptr redex)
 	INC_REFCNT(l);
 	SET_REFCNT(fn,MAX_REF_CNT);
 	cur = Make_APPL_ND(Make_APPL_ND(fn, *gp), cur);
+	PUSH_GLOBAL_GC(cur);
 	cur = Eval(cur);
+	POP_GLOBAL_GC(1);
     }
     OVERWRITE(redex, cur);
 }

@@ -198,7 +198,6 @@ let mat_mult m1 m2 =
     let v1' = substitute sub1 v1 in
     let v2' = substitute sub2 v2 in
     let prod = v1' * v2' in
-(fprintf stderr "Mul size: %d\n" (bdd_size prod)) fseq
     let v' = sum (depends tmp) prod in
     (SMAT rows1 cols2 ridx1 cidx2 v')
 ;
@@ -206,15 +205,16 @@ overload * * mat_mult;
 
 // Conversion and creation of random entities.
 let int_matrix2symb r c ll =
-    let rows = length ll in
-    let cols = length (hd ll) in
+    let rows = length ll then
+    let cols = length (hd ll) then
     let do_row ints =
 	sitlist (\(idx,v).\bv. (c = (int2bv idx)) => (int2bv v) | bv)
 		(zip (0 upto (cols-1)) ints) (int2bv 0)
-    in
+    then
     let brows = map do_row ll then
-    sitlist (\(idx,v).\bv. (r = (int2bv idx)) => v | bv)
-		(zip (0 upto (rows-1)) brows) (int2bv 0)
+    let res = sitlist (\(idx,v).\bv. (r = (int2bv idx)) => v | bv)
+		(zip (0 upto (rows-1)) brows) (int2bv 0) then
+res
 ;
 
 
@@ -255,14 +255,15 @@ let bv_matrix2symb r c ll =
 overload matrix2symb int_matrix2symb bv_matrix2symb;
 
 let matrix2smatrix m =
-    let rows = length m in
-    let pot_cols = setify (map length m) in
+    let rows = length m then
+    let pot_cols = setify (map length m) then
     length pot_cols != 1 => eprintf "Diferent number of columns!" |
-    let cols = hd pot_cols in
-    let row_idx = bv_uvector "r" (ubits_needed (rows-1)) in
-    let col_idx = bv_uvector "c" (ubits_needed (cols-1)) in
-    let sm = matrix2symb row_idx col_idx m in
-    (SMAT rows cols row_idx col_idx sm)
+    let cols = hd pot_cols then
+    let row_idx = bv_uvector "r" (ubits_needed (rows-1)) then
+    let col_idx = bv_uvector "c" (ubits_needed (cols-1)) then
+    let sm = matrix2symb row_idx col_idx m then
+    let res = (SMAT rows cols row_idx col_idx sm) then
+    res
 ;
 
 	    
@@ -1377,7 +1378,6 @@ let scalar_W3 = [[15, 54, 23, 0, i_unary_minus 74, 37, i_unary_minus 107, 64, i_
   [i_unary_minus 36, i_unary_minus 42, 15, i_unary_minus 19, 26, i_unary_minus 26, i_unary_minus 47, 20, 13, i_unary_minus 9],
   [54, i_unary_minus 127, i_unary_minus 66, i_unary_minus 13, 60, 15, 78, 13, i_unary_minus 32, i_unary_minus 10]];
 
-
 let W1 = matrix2smatrix scalar_W1;
 wtime (bdd_size W1);
 
@@ -1514,6 +1514,9 @@ let res6 = NeuralNetwork tst6;
 let res7 = NeuralNetwork tst7;
 
 var_order ["r[10]","mid[10]","c[10]","r[9:8,5:4,7:6]","mid[9:1]","q[1:2,0]","c[9:7]","mid[0]","c[6:4]","r[3:2]","c[3]","r[1:0]","c[1:0,2]"];
+
+//var_order ["r[10]","mid[10]","c[10]","mid[9:0]","q[2]","r[9:7]","q[1:0]","r[6:4]","c[9:7,5:6,4:3,1:0]","r[3,0,2:1]","c[2]"];
+
 
 
 //wtime (res0 fseq res1 fseq res2 fseq res3 fseq res4 fseq res5 fseq res6 fseq res7 fseq ());	// 122.7 seconds

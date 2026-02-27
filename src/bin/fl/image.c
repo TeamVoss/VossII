@@ -145,6 +145,7 @@ do_hsv2rgb(g_ptr redex)
 	case 3: { r = p; g = q; b = v; break; }
 	case 4: { r = t; g = p; b = v; break; }
 	case 5: { r = v; g = p; b = q; break; }
+	default: { r = 0.0; g = 0.0; b = 0.0; break; }
     }
     R = (int) (round(r*255));
     G = (int) (round(g*255));

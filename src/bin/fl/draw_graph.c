@@ -383,7 +383,7 @@ draw_graph_rec(FILE *fp, hash_record *hp, int depth, bool do_addr,
 
 		case PRIM_FN:
 		    {
-			char txt[1024];
+			char txt[1050];
 			bool hili = FALSE;
 			switch ( GET_PRIM_FN(node) ) {
 			    case P_EXTAPI_FN:

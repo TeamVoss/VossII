@@ -30,7 +30,9 @@ static char	*BlockPos;
  * with relatively little waste (an allocated block is at most 1/9 larger
  * than the request).
  */
-static void *FreeList[256];
+static void	*FreeList[256];
+static char	i2c_convert[37];
+static int	c2i_convert[256];
 
 /* ----- Forward definitions local functions ----- */
 static arbi_T		allocate(Length_T ndigits);
@@ -71,9 +73,16 @@ static arbi_T 		arbi__bvop(arbi_T x, arbi_T y,  Word (*operation)(Word a, Word b
 void
 Init_arbi()
 {
-    for(int i = 0; i < MaxBlock; i++) {
+    int i;
+    for(i = 0; i < MaxBlock; i++) {
 	blocks[i] = NULL;
     }
+    for(i = 0; i < 10; i++) i2c_convert[i] = '0' + i;
+    for(i = 0; i < 26; i++) i2c_convert[i+10] = 'a' + i;
+    for(i = 0; i < 256; i++) c2i_convert[i] = 1000;
+    for(i = '0'; i <= '9'; i++) c2i_convert[i] = i - '0';
+    for(i = 'a'; i <= 'z'; i++) c2i_convert[i] = (i - 'a') + 10;
+    for(i = 'A'; i <= 'Z'; i++) c2i_convert[i] = (i - 'A') + 10;
 }
 
 int
@@ -878,21 +887,8 @@ arbi__FromString(char *s, int base)
 {
     char *t;
     arbi_T b, x, y, z;
-    int j;
-    static int convert[256];
 
     arbi__errmsg = NULL;
-    if(!*convert) { /* first time, initialize the convert array */
-        for(j = 0; j < 256; j++)
-            convert[j] = 1000;
-	for(j = '0'; j <= '9'; j++)
-	    convert[j] = j - '0';
-	for(j = 'a'; j <= 'z'; j++)
-	    convert[j] = (j - 'a') + 10;
-	for(j = 'A'; j <= 'Z'; j++)
-	    convert[j] = (j - 'A') + 10;
-    }
-
     /* convert the string */
     if((base < 2) || base > 36) {
 	arbi__errmsg = "arbi_FromString: invalid base";
@@ -901,13 +897,13 @@ arbi__FromString(char *s, int base)
     x = arbi__FromInt(0);
     b = arbi__FromInt(base);
     for(t = s; *t; t++) {
-	if(convert[(unint) (*t)] >= base) {
+	if(c2i_convert[(unint) (*t)] >= base) {
 	    arbi__errmsg = "arbi_FromString: character not a valid digit";
 	    return(NULL);
 	}
 	y = arbi__mlt(x, b);
 	ffree(x);
-	z = arbi__FromInt(convert[(unint) (*t)]);
+	z = arbi__FromInt(c2i_convert[(unint) (*t)]);
 	x = arbi__add(y, z);
 	ffree(y); ffree(z);
     }
@@ -922,16 +918,8 @@ arbi__ToString(arbi_T x, int base)
     char bf[40], *buf, *t;
     int i, lgb4, m, lx, rz;
     Word w, b4, bb;
-    static char convert[37];
 
     arbi__errmsg = NULL;
-    if(!*convert) { /* first time, initialize the convert array */
-        for(i = 0; i < 10; i++)
-            convert[i] = '0' + i;
-        for(i = 0; i < 26; i++)
-            convert[i+10] = 'a' + i;
-    }
-
     lx = Length(x);
     if((lx == 1)  &&  (base == 10 || base ==16)) {
         if(base == 10) { Sprintf(bf, "%ld", x[0]); }
@@ -956,11 +944,7 @@ arbi__ToString(arbi_T x, int base)
     for(lgb4 = 4; b4 >> (lgb4+1); lgb4++);
     w = x[lx-1];
     if(w < 0) { w = -w; }
-    if( w < 0 ) {
-        m = WordSize;
-    } else {
-        for(m = 0; w >> m; m++);
-    }
+    for(m = 0; w >> m; m++);
     m = (4*(m + WordSize*(lx-1)) + lgb4 - 1)/lgb4 + 1;
     if(x[lx-1] < 0) m++;
     buf = (char *)arbi_alloc((unsigned int) m);
@@ -982,7 +966,7 @@ arbi__ToString(arbi_T x, int base)
 	w = a[1][0];
 	rz = cmp0(r);
 	for(i = 0; (i < m) && (rz || (w != 0)); i++) {
-	    *--t = convert[w % base];
+	    *--t = i2c_convert[w % base];
 	    w /= base;
 	}
 	ffree(a[1]);

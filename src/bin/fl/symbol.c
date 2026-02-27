@@ -492,6 +492,7 @@ Create_empty_symb_tbl()
     return stbl;
 }
 
+#ifdef DEBUG
 void
 DBG_check(string msg)
 {
@@ -515,6 +516,7 @@ DBG_check(string msg)
 	}
     }
 }
+#endif
 
 static void
 mark_fn_rec(fn_ptr fp)

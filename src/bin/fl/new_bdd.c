@@ -187,8 +187,6 @@ static unint		get_bdd_size(formula f);
 /*                    PUBLIC FUNCTIONS    		*/
 /********************************************************/
 
-#ifdef DEBUG
-
 bdd_ptr
 f_GET_BDDP(formula f)
 {
@@ -225,12 +223,13 @@ f_GET_RSON(bdd_ptr f)
     return( GET_RSON(f) );
 }
 
+#ifdef DEBUG
+
 void
 BP(formula f)
 {
     B_Print(err_fp, f, -1);
 }
-
 
 #endif
 
@@ -857,6 +856,7 @@ Save_BDDs(string filename, buffer *roots)
     }
     fclose(fp);
     dispose_hash(&bdd_save_tbl, NULLFCN);
+    dispose_hash(&save_var_tbl, NULLFCN);
     return( TRUE );
 }
 
@@ -1269,17 +1269,21 @@ Get_Size_and_Vars(g_ptr funs, g_ptr vars,
 	}
     }
     Reset_BDD_Size();
-    Gen_map(top_bdd_depends, funs, TRUE);
+    for(g_ptr cur = funs; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
+	B_Size(GET_BOOL(GET_CONS_HD(cur)));
+    }
     unint var_cnt = Get_VarCnt();
     *freep = B_One();
+    unint sz = 0;
     for(unint i = 0; i < var_cnt; i++) {
 	int wid = B_Width(i);
-	*sizep += wid;
+	sz += wid;
 	if( wid > 0 && (find_hash(&var_tbl, Get_Var_Name(i)) == NULL) ) {
 	    formula v = B_Var(Get_Var_Name(i));
 	    *freep = B_And(*freep, v);
 	}
     }
+    *sizep = sz;
     for(g_ptr cur = vars; !IS_NIL(cur); cur = GET_CONS_TL(cur) ) {
 	string vname = GET_STRING(GET_CONS_HD(cur));
 	B_Size(B_Var(vname));

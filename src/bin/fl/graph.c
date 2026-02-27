@@ -2347,6 +2347,7 @@ Get_pfn_name(g_ptr np, bool verbose_debug)
 	    return( pfn2name[i].name );
 	}
     }
+    pfn2str_buf = Calloc(100);
     Sprintf(pfn2str_buf, "Unknown pfn (%d)", pfn);
     return pfn2str_buf;
 }
@@ -2370,7 +2371,7 @@ Get_node()
     return( ret );
 }
 
-static int
+static unsigned char
 number_of_digits_needed(int n)
 {
     if( n == 0 ) return 1;
@@ -2397,14 +2398,14 @@ Get_fl_stack_trace()
 string
 Get_stack_trace(int max_entries)
 {
-    char    ibuf[16];
+    char    ibuf[260];
     string *namep;
     string res;
     if( RCadd_debug_info ) {
 	tstr_ptr ts = new_temp_str_mgr();
 	res = gen_strtemp(ts, "Stack trace:\n");
 	int cnt = COUNT_BUF(&fn_trace_buf);
-	int digits_needed = number_of_digits_needed(cnt);
+	unsigned char digits_needed = number_of_digits_needed(cnt);
 	int idx = cnt;
 	if( cnt < max_entries ) {
 	    FUB_ROF(&fn_trace_buf, string, namep) {
@@ -2558,7 +2559,9 @@ Emit_profile_data()
     }
     if( tmp_cnt != 0 ) {
 	sprintf(tmp_name, "mv gmon.out gmon.out.%d", tmp_cnt);
-	system(tmp_name);
+	if( system(tmp_name) != 0 ) {
+	    fprintf(stderr, "Failed to move gmon.out\n");
+	}
     }
     FILE *fp = fopen("gmon.out", "w");
     if( fp == NULL ) {
@@ -4122,15 +4125,12 @@ traverse_left(g_ptr oroot)
 		    arg1  = traverse_left(GET_APPLY_RIGHT(*sp));
                     if( is_fail(arg1) )
                         goto arg1_fail2;
-		    switch( pfn ) {
-			case P_QUANT_FORALL:
-			    res = B_forall(B_Depends(GET_BOOL(arg1)),
-					   GET_BOOL(arg2));
-			    break;
-			case P_QUANT_THEREIS:
-			    res = B_thereis(B_Depends(GET_BOOL(arg1)),
-					    GET_BOOL(arg2));
-			    break;
+		    if( pfn == P_QUANT_FORALL ) {	
+			res = B_forall(B_Depends(GET_BOOL(arg1)),
+				       GET_BOOL(arg2));
+		    } else {
+			res = B_thereis(B_Depends(GET_BOOL(arg1)),
+					GET_BOOL(arg2));
 		    }
 		    SET_TYPE(redex, LEAF);
 		    SET_LEAF_TYPE(redex, BOOL);

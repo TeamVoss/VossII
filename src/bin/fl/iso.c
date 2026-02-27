@@ -372,6 +372,7 @@ mk_iso_list(sig_ptr *sigs, g_ptr p)
     return FALSE;
 }
 
+#ifdef DEBUG
 static inline unint
 sig_length(sig_ptr p)
 {
@@ -379,6 +380,7 @@ sig_length(sig_ptr p)
     for (; p != NULL; p = p->next) { len++; }
     return len;
 }
+#endif
 
 static bool
 mk_iso_matrix(mat_ptr m, sig_ptr p, sig_ptr g)
