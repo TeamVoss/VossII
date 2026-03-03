@@ -93,6 +93,17 @@ let hw_bundle_pairs {o:: *a} =
     hw_bparts o
 ;
 
+let convert i =
+    let o = {undefined :: *o} in
+    let sz_i = hw_size i in
+    let sz_o = hw_size o in
+    sz_i != sz_o =>
+        eprintf "Convert fails: %s is of size %d and %s is of size %d\n"
+                (hw_type_name i) sz_i (hw_type_name o) sz_o
+    |
+    let res = hw_constr (hw_destr i) in
+    {res:: *o}
+;
 
 let hw_types_decl_ref = ref {[]::(string#(int#bool#bool#string)) list};
 
@@ -415,6 +426,14 @@ let base_assignment do_split lhs rhs =
 		(mid, p1)
 	    in
 	    let p = mk_pinst NONE lhs (W_EQ a' (W_CONST sz v)) then
+	    p1@[p]
+     /\    split lhs (W_EQ a (W_NAMED_CONST name sz v)) =
+	    val (a',p1) = is_var a => (a,[]) |
+		let mid = mk_tmp (wexpr_size a) then
+		let p1 = split mid a then
+		(mid, p1)
+	    in
+	    let p = mk_pinst NONE lhs (W_EQ a' (W_NAMED_CONST name sz v)) then
 	    p1@[p]
      /\    split lhs (W_NOT (W_EQ a (W_CONST sz v))) assuming (v < 10)  =
 	    val (a',p1) = is_var a => (a,[]) |
@@ -2000,6 +2019,7 @@ let ENUM_custom_with_sz name min_sz name_encoding_list =
 ;
 
 overload ENUM ENUM_binary ENUM_custom ENUM_custom_with_sz;
+free_binder ENUM;
 
 
 let mutex_enum_defs = ref {[] :: (string # (string list)) list};
@@ -2043,6 +2063,7 @@ let MUTEX_ENUM name name_list =
     in
     add_item 0 name_list
 ;
+free_binder MUTEX_ENUM;
 
 // Given a name (as a string) for one of the enumerated items, return
 // its value. The return type determines which ENUM value that is selected.
@@ -2198,6 +2219,7 @@ let STRUCT_implicit name field_list =
 ;
 
 overload STRUCT STRUCT_explicit STRUCT_implicit;
+free_binder STRUCT;
 
 let UNION name alternatives =
     let get_size (field_name, type) =
@@ -2215,6 +2237,7 @@ let UNION name alternatives =
     let ftb_list = map build alternatives then
     base_STRUCT_explicit "UNION" name size ftb_list F
 ;
+free_binder UNION;
 
 
 let bundle_exists name =
@@ -2335,6 +2358,7 @@ let BUNDLE name left_signals right_signals =
     let new = (name,left_signals, right_signals):old then
     (bundle_decls :=  new)
 ;
+free_binder BUNDLE;
 
 let MEMORY name size_list word_type =
     let width = get_hw_type_size word_type in
@@ -2495,6 +2519,7 @@ let MEMORY name size_list word_type =
     then
     eval_fl_code pgm
 ;
+free_binder MEMORY;
 
 let emit_hw_type_info filename =
     let fp = fopen filename "w" then
