@@ -1465,7 +1465,9 @@ let visualization_nodes ckt draw_level =
 
 // Compute the visualization information at drawing level 'draw_level'
 // for `levels' back from the vectors 'vecs' stopping at nodes in
-/// 'stop_list' and nides in 'ifc_vecs'.
+/// 'stop_list' and nodes in 'ifc_vecs'.
+// If ignore_tmp_nds is T then the drawing will start on user-given
+// nodes and thus tmp_nds are ignored for the level computation.
 //
 let visualize_fanin ckt stop_list ifc_vecs levels vecs draw_level
 		    ignore_tmp_nds
@@ -1826,6 +1828,8 @@ let visualize_get_shown_anons vis = (defix visualize_get_shown_anons) vis;
 // Return the visualization state resulting from expanding all incomplete
 // nodes by 'levels' in the fanin cone of the anonymous node 'aname' at
 // the drawing level 'draw_level'.
+// If ignore_tmp_nds is T then the drawing will start on user-given
+// nodes and thus tmp_nds are ignored for the level computation.
 let visualize_expand_fanin vis aname levels draw_level ignore_tmp_nds =
     (defix visualize_expand_fanin) vis aname levels draw_level ignore_tmp_nds
 ;

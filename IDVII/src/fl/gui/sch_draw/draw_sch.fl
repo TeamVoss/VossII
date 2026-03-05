@@ -1991,6 +1991,8 @@ let check_valid_vectors vfsm op vs =
 //
 // vecs:	    The list of vectors to end at (whose fanins to draw)
 //
+// ignore_tmp_nds:  Whether drawing will stop only on usergiven nodes.
+//
 // Returns the name of the canvas for the new fanin drawing.
 //
 let draw_fanin vfsm hierarchy_level levels ignore_tmp_nds vecs =

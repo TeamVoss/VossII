@@ -1,0 +1,931 @@
+cload "idv.fl";
+
+let USE_RISCV_REGISTER_NAMES = T;
+//let USE_RISCV_REGISTER_NAMES = F;
+
+// Size parameters (can be set to create smaller/bigger models)
+let MEM_SIZE = 1024;
+let REGS = 32;
+
+
+// Fixed sizes
+let WORD_SIZE = 32;
+let RADDR = 5;
+
+// Type declarations
+UNSIGNED word WORD_SIZE;
+UNSIGNED reg_addr RADDR;
+
+UNSIGNED nibble 4;
+
+ENUM opcode 7 (
+    [
+	    ("_LUI",	0b0110111),
+	    ("_AUIPC",	0b0010111),
+	    ("_JAL",	0b1101111),
+	    ("_JALR",	0b1100111),
+	    ("_BEQ",	0b1100011),
+//	    ("_BNE",	0b1100011),
+	    ("_BLT",	0b1100011),
+//	    ("_BGE",	0b1100011),
+//	    ("_BLTU",	0b1100011),
+//	    ("_BGEU",	0b1100011),
+//	    ("_LB",	0b0000011),
+//	    ("_LH",	0b0000011),
+	    ("_LW",	0b0000011),
+//	    ("_LBU",	0b0000011),
+//	    ("_LHU",	0b0000011),
+//	    ("_SB",	0b0100011),
+//	    ("_SH",	0b0100011),
+	    ("_SW",	0b0100011),
+	    ("_ADDI",	0b0010011),
+//	    ("_SLTI",	0b0010011),
+//	    ("_SLTIU",	0b0010011),
+//	    ("_XORI",	0b0010011),
+//	    ("_ORI",	0b0010011),
+//	    ("_ANDI",	0b0010011),
+//	    ("_SLLI",	0b0010011),
+//	    ("_SRLI",	0b0010011),
+//	    ("_SRAI",	0b0010011),
+	    ("_ADD",	0b0110011),
+	    ("_SUB",	0b0110011),
+	    ("_SLL",	0b0110011),
+//	    ("_SLT",	0b0110011),
+//	    ("_SLTU",	0b0110011),
+	    ("_XOR",	0b0110011),
+	    ("_SRL",	0b0110011),
+	    ("_SRA",	0b0110011),
+	    ("_OR",	0b0110011),
+	    ("_AND",	0b0110011)
+    ] @
+    [
+	    //
+	    // M extension
+	    //
+	      ("_MUL",	    0b0110011)
+//	    , ("_MULH",	    0b0110011)
+//	    , ("_MULHSU",   0b0110011)
+//	    , ("_MULHU",    0b0110011)
+//	    , ("_DIV",	    0b0110011)
+//	    , ("_DIVU",	    0b0110011)
+//	    , ("_REM",	    0b0110011)
+//	    , ("_REMU",	    0b0110011)
+    ]
+);
+
+ENUM funct3 3 (
+    [
+            ("_JALR",    0b000),
+            ("_BEQ",     0b000),
+//          ("_BNE",     0b001),
+            ("_BLT",     0b100),
+//          ("_BGE",     0b101),
+//          ("_BLTU",    0b110),
+//          ("_BGEU",    0b111),
+//          ("_LB",      0b000),
+//          ("_LH",      0b001),
+            ("_LW",      0b010),
+//          ("_LBU",     0b100),
+//          ("_LHU",     0b101),
+//          ("_SB",      0b000),
+//          ("_SH",      0b001),
+            ("_SW",      0b010),
+            ("_ADDI",    0b000),
+//          ("_SLTI",    0b010),
+//          ("_SLTIU",   0b011),
+//          ("_XORI",    0b100),
+//          ("_ORI",     0b110),
+//          ("_ANDI",    0b111),
+//          ("_SLLI",    0b001),
+//          ("_SRLI",    0b101),
+//          ("_SRAI",    0b101),
+            ("_ADD",     0b000),
+            ("_SUB",     0b000),
+            ("_SLL",     0b001),
+//          ("_SLT",     0b010),
+//          ("_SLTU",    0b011),
+            ("_XOR",     0b100),
+            ("_SRL",     0b101),
+            ("_SRA",     0b101),
+            ("_OR",      0b110),
+            ("_AND",     0b111)
+    ] @
+    [
+	    //
+	    // M extension
+	    //
+	      ("_MUL",	    0b000)
+//	    , ("_MULH",	    0b001)
+//	    , ("_MULHSU",   0b010)
+//	    , ("_MULHU",    0b011)
+//	    , ("_DIV",	    0b100)
+//	    , ("_DIVU",	    0b101)
+//	    , ("_REM",	    0b110)
+//	    , ("_REMU",	    0b111)
+    ]
+);
+
+ENUM funct7 7 (
+    [
+//          ("_SLLI",    0b0000000),
+//          ("_SRLI",    0b0000000),
+//          ("_SRAI",    0b0100000),
+            ("_ADD",     0b0000000),
+            ("_SUB",     0b0100000),
+            ("_SLL",     0b0000000),
+//          ("_SLT",     0b0000000),
+//          ("_SLTU",    0b0000000),
+            ("_XOR",     0b0000000),
+            ("_SRL",     0b0000000),
+            ("_SRA",     0b0100000),
+            ("_OR",      0b0000000),
+            ("_AND",     0b0000000)
+    ] @
+    [
+	    //
+	    // M extension
+	    //
+	      ("_MUL",	    0b0000001)
+//	    , ("_MULH",	    0b0000001)
+//	    , ("_MULHSU",   0b0000001)
+//	    , ("_MULHU",    0b0000001)
+//	    , ("_DIV",	    0b0000001)
+//	    , ("_DIVU",	    0b0000001)
+//	    , ("_REM",	    0b0000001)
+//	    , ("_REMU",	    0b0000001)
+    ]
+);
+
+
+SIGNED imm20  20;
+SIGNED imm12  12;
+SIGNED imm7	   7;
+SIGNED imm5	   5;
+
+STRUCT R_type [
+		    ("funct7", "funct7"),
+		    ("rs2",    "reg_addr"),
+		    ("rs1",    "reg_addr"),
+		    ("funct3", "funct3"),
+		    ("rd",     "reg_addr"),
+		    ("opcode", "opcode")
+];
+
+STRUCT I_type [
+		    ("imm12",  "imm12"),
+		    ("rs1",    "reg_addr"),
+		    ("funct3", "funct3"),
+		    ("rd",     "reg_addr"),
+		    ("opcode", "opcode")
+];
+
+
+STRUCT S_type [
+		    ("imm7",   "imm7"),
+		    ("rs2",    "reg_addr"),
+		    ("rs1",    "reg_addr"),
+		    ("funct3", "funct3"),
+		    ("imm5",   "imm5"),
+		    ("opcode", "opcode")
+];
+
+STRUCT B_type [
+		    ("imm7",   "imm7"),
+		    ("rs2",    "reg_addr"),
+		    ("rs1",    "reg_addr"),
+		    ("funct3", "funct3"),
+		    ("imm5",   "imm5"),
+		    ("opcode", "opcode")
+];
+
+
+STRUCT U_type [
+		    ("imm20",  "imm20"),
+		    ("rd",     "reg_addr"),
+		    ("opcode", "opcode")
+];
+
+STRUCT J_type [
+		    ("imm20",  "imm20"),
+		    ("rd",     "reg_addr"),
+		    ("opcode", "opcode")
+];
+
+UNION instr [
+	    ("R", "R_type"),
+	    ("I", "I_type"),
+	    ("S", "S_type"),
+	    ("B", "B_type"),
+	    ("U", "U_type"),
+	    ("J", "J_type")
+];
+
+let word2instr {w::word} = {(hw_constr (hw_destr w))::instr};
+
+let Uop_is i op = i-->U-->opcode '=' (enum_value op)
+;
+let Jop_is i op = i-->J-->opcode '=' (enum_value op)
+;
+let Bop_is i op =     i-->B-->opcode '=' (enum_value op)
+		  '&' i-->B-->funct3 '=' (enum_value op)
+;
+let Iop_is i op =     i-->I-->opcode '=' (enum_value op)
+		  '&' i-->I-->funct3 '=' (enum_value op)
+;
+let Sop_is i op =     i-->S-->opcode '=' (enum_value op)
+		  '&' i-->S-->funct3 '=' (enum_value op)
+;
+let Rop_is i op = i-->R-->opcode '=' (enum_value op)
+	      '&' i-->R-->funct3 '=' (enum_value op)
+	      '&' i-->R-->funct7 '=' (enum_value op)
+;
+
+let J2imm {i::instr} =
+    let bits = tobits i in
+    let l = length bits in
+    let sel idxs = map (\i. el (l-i) bits) idxs in
+    let res = (replicate 12 (i~~31))@
+	      (sel (19--12))@
+	      (sel [20])@
+	      (sel (30--25))@
+	      (sel (24--21)) @
+	      [ {'0 :: bit} ]
+    in
+    {frombits res:: word}
+;
+
+let B2imm {i::instr} =
+    let bits = tobits i in
+    let l = length bits in
+    let sel idxs = map (\i. el (l-i) bits) idxs in
+    let res = (replicate 20 (i~~31))@
+	      (sel [7])@
+	      (sel (30--25))@
+	      (sel (11--8)) @
+	      [ {'0 :: bit} ]
+    in
+    {frombits res:: word}
+;
+
+let I2imm {i::instr} = {SX (i-->I-->imm12):: word};
+let S2imm {i::instr} = {SX {(i-->S-->imm7 ++ i-->S-->imm5):: imm12}:: word};
+
+
+STRUCT fetch [
+	("instr",     "instr"),
+	("PC",	      "word")
+];
+    
+
+STRUCT decode [
+	("is_LUI",      "bit"),
+	("is_AUIPC",    "bit"),
+	("is_JAL",      "bit"),
+	("is_JALR",     "bit"),
+	("is_BEQ",      "bit"),
+	("is_BLT",      "bit"),
+	("is_LW",       "bit"),
+	("is_SW",       "bit"),
+	("is_ADDI",     "bit"),
+	("is_ADD",      "bit"),
+	("is_MUL",      "bit"),
+	("is_SUB",      "bit"),
+	("is_SLL",      "bit"),
+	("is_XOR",      "bit"),
+	("is_SRL",      "bit"),
+	("is_SRA",      "bit"),
+	("is_OR",       "bit"),
+	("is_AND",      "bit"),
+	("reg_write",   "bit"),
+	("D1",	        "word"),
+	("D2",	        "word"),
+	("fetch",	"fetch")
+];
+
+STRUCT exe [
+	("result",	"word"),
+	("jmp",		"bit"),
+	("next_pc",	"word"),
+	("decode",	"decode")
+];
+
+STRUCT mem [
+	("result",    "word"),
+	("exe",	      "exe")
+];
+
+STRUCT wb [
+	("next_pc",	"word")
+];
+
+BUNDLE mem_rd
+	[
+	    ("req",      "bit"),
+	    ("addr",     "word")
+	]
+	[
+	    ("ack",	"bit"),
+	    ("dout",	"word")
+	]
+;
+
+BUNDLE mem_rw
+	[
+	    ("req",      "bit"),
+	    ("write_en", "bit"),
+	    ("addr",     "word"),
+	    ("din",	 "word")
+	]
+	[
+	    ("ack",	"bit"),
+	    ("dout",	"word")
+	]
+;
+
+BUNDLE io
+	[
+	    ("din_req",	"bit"),
+	    ("addr",	"word"),
+	    ("din",	"word")
+	]
+	[
+	    ("dout_req","bit"),
+	    ("dout",	"word")
+	]
+;
+
+lettype pgm = PGM {ops::({int} opt) list};
+
+
+let register_names = [
+	("zero",  0),
+	("ra",    1),
+	("sp",    2),
+	("gp",    3),
+	("tp",    4),
+	("t0",    5),
+	("t1",    6),
+	("t2",    7),
+	("s0",    8),
+	("fp",    8),
+	("s1",    9),
+	("a0",   10),
+	("a1",   11),
+	("a2",   12),
+	("a3",   13),
+	("a4",   14),
+	("a5",   15),
+	("a6",   16),
+	("a7",   17),
+	("s2",   18),
+	("s3",   19),
+	("s4",   20),
+	("s5",   21),
+	("s6",   22),
+	("s7",   23),
+	("s8",   24),
+	("s9",   25),
+	("s10",  26),
+	("s11",  27),
+	("t3",   28),
+	("t4",   29),
+	("t5",   30),
+	("t6",   31)
+];
+
+let fl_get_register_name i =
+    USE_RISCV_REGISTER_NAMES => rev_assoc i register_names | sprintf "x%d" i
+;
+export_to_tcl fl_get_register_name;
+
+
+let Fetch =
+    bit_input	    clk reset.
+    // Top-level interface
+    bit_input	    fetch.
+    wb_input	    wb.
+    fetch_output    fetch_info.
+    mem_rd_output   im.
+    //
+    word_internal	pc new_pc.
+    instr_internal	instr.
+    fetch_internal	new_fetch_info.
+    bit_internal	ready.
+    //
+    CELL "Fetch" [
+	pc <- wb-->next_pc,
+	im-->addr <- pc,
+	instr <- word2instr (im-->dout),
+	im-->req <- fetch,
+	ready <- fetch '&' im-->ack,
+	// Bundle all the outputs and store in final ff
+	new_fetch_info <- mk_fetch instr->instr PC->pc,
+	re_ff_en_reset clk ready reset new_fetch_info fetch_info
+];
+
+//VIS Fetch;
+
+let Decoder =
+    bit_input		clk reset.
+    bit_input		decode.
+    fetch_input		fetch.
+    decode_output	decode_info.
+    // Interface to RegFile
+    reg_addr_output	raddr1 raddr2.
+    word_input		reg_d1 reg_d2.
+    //
+    instr_internal	op.
+    bit_internal	is_LUI is_AUIPC is_JAL is_JALR is_BEQ is_BLT.
+    bit_internal	is_LW is_SW.
+    bit_internal	is_ADDI is_ADD is_MUL is_SUB is_SLL is_XOR is_SRL.
+    bit_internal	is_SRA is_OR is_AND do_reg_write.
+    decode_internal	tmp_res.
+    CELL "Decoder" [
+	// Decode instructions
+	op <- fetch-->instr,
+	is_LUI   <- Uop_is op "_LUI",
+	is_AUIPC <- Uop_is op "_AUIPC",
+	is_JALR  <- Iop_is op "_JALR",
+	is_JAL   <- Uop_is op "_JAL",
+	is_BEQ   <- Bop_is op "_BEQ",
+	is_BLT   <- Bop_is op "_BLT",
+	is_LW    <- Iop_is op "_LW",
+	is_SW    <- Sop_is op "_SW",
+	is_ADDI  <- Iop_is op "_ADDI",
+	is_ADD   <- Rop_is op "_ADD",
+	is_MUL   <- Rop_is op "_MUL",
+	is_SUB   <- Rop_is op "_SUB",
+	is_SLL   <- Rop_is op "_SLL",
+	is_XOR   <- Rop_is op "_XOR",
+	is_SRL   <- Rop_is op "_SRL",
+	is_SRA   <- Rop_is op "_SRA",
+	is_OR    <- Rop_is op "_OR",
+	is_AND   <- Rop_is op "_AND",
+	// Compute useful control signals derived from the opcode
+	do_reg_write <- is_LUI '|' is_AUIPC '|' is_JAL '|' is_JALR '|'
+			is_LW '|' is_ADDI '|' is_ADD '|' is_MUL '|'
+			is_SUB '|' is_SLL '|' is_XOR '|'
+			is_SRL '|' is_SRA '|' is_OR '|'
+			is_AND,
+	// Read the register file (read even if not needed)
+	raddr1 <- op-->R-->rs1,
+	raddr2 <- op-->R-->rs2,
+	// Bundle all the outputs
+	tmp_res <- mk_decode
+			 fetch->fetch
+			 is_LUI->is_LUI
+			 is_AUIPC->is_AUIPC
+			 is_JAL->is_JAL
+			 is_JALR->is_JALR
+			 is_BEQ->is_BEQ
+			 is_BLT->is_BLT
+			 is_LW->is_LW
+			 is_SW->is_SW
+			 is_ADDI->is_ADDI
+			 is_ADD->is_ADD
+			 is_MUL->is_MUL
+			 is_SUB->is_SUB
+			 is_SLL->is_SLL
+			 is_XOR->is_XOR
+			 is_SRL->is_SRL
+			 is_SRA->is_SRA
+			 is_OR->is_OR
+			 is_AND->is_AND
+			 reg_write->do_reg_write
+			 D1->reg_d1
+			 D2->reg_d2,
+	re_ff_en_reset clk decode reset tmp_res decode_info
+];
+
+//VIS Decoder;
+
+let Execute =
+    bit_input		clk reset.
+    bit_input		execute.
+    decode_input	decode.
+    exe_output		exe_info.
+    //
+    instr_internal	op.
+    word_internal	tmp offset jalr_address pc d1 d2.
+    bit_internal	do_jmp.
+    word_internal	new_jmp_addr.
+    word_internal	new_pc.
+    exe_internal	tmp_res.
+    CELL "Execute" [
+	op <- decode-->fetch-->instr,
+	pc <- decode-->fetch-->PC,
+	d1 <- decode-->D1,
+	d2 <- decode-->D2,
+	CASE tmp [
+	    (decode-->is_LUI,   op-->U-->imm20 ++ {'0:: imm12}),
+	    (decode-->is_AUIPC, pc '+' (op-->U-->imm20 ++ {'0:: imm12})),
+	    (decode-->is_JAL,   pc '+' '4),
+	    (decode-->is_JALR,  pc '+' '4),
+	    (decode-->is_ADDI,  d1 '+' I2imm op),
+	    (decode-->is_ADD,   d1 '+' d2),
+	    (decode-->is_MUL,   d1 '*' d2),
+	    (decode-->is_SUB,   d1 '-' d2),
+	    (decode-->is_SLL,   d1 '<<' d2),
+	    (decode-->is_XOR,   d1 '^' d2),
+	    (decode-->is_SRL,   d1 '>>' d2),
+	    (decode-->is_SRA,   d1 '|>>' d2),
+	    (decode-->is_OR,    d1 '|' d2),
+	    (decode-->is_AND,   d1 '&' d2)
+	] 'X,
+	//
+	do_jmp <- decode-->is_JAL '|' decode-->is_JALR '|'
+	          decode-->is_BEQ '&' (d1 '=' d2) '|'
+	          decode-->is_BLT '&' (d1 '<' d2),
+	offset <- (IF decode-->is_JAL THEN (J2imm op) ELSE (B2imm op)),
+	jalr_address <- (d1 '+' I2imm op) '&' '0xfffffffe,
+	new_jmp_addr <- (IF (decode-->is_JALR) THEN jalr_address
+					       ELSE pc '+' offset),
+	new_pc <- (IF do_jmp THEN new_jmp_addr ELSE (pc '+' '4)),
+	// Bundle all the outputs and flop the results
+	tmp_res <- mk_exe
+			decode->decode
+			result->tmp
+			jmp->do_jmp
+			next_pc->new_pc,
+	re_ff_en_reset clk execute reset tmp_res exe_info
+];
+
+//VIS Execute;
+
+
+let MemRW =
+    bit_input		clk reset.
+    bit_input		memory.
+    exe_input		exe.
+    mem_output		mem_info.
+    mem_rw_output	dm.
+    // Internal
+    word_internal	pre_d_addr d_addr wb_res.
+    decode_internal	dec.
+    bit_internal	mem_op mreq.
+    mem_internal	new_mem_info.
+    instr_internal	op.
+    fetch_internal	fet.
+    //
+    CELL "MemRW" [
+	dec <- (exe-->decode),
+	fet <- dec-->fetch,
+	op <- fet-->instr,
+	pre_d_addr <- (IF dec-->is_SW THEN S2imm op ELSE I2imm op),
+	d_addr <- dec-->D1 '+' pre_d_addr,
+	mem_op <- dec-->is_SW '|' dec-->is_LW,
+	mreq <- memory '&' mem_op,
+	dm-->req <- mreq,
+	dm-->addr <- d_addr,
+	wb_res <- (IF dec-->is_LW THEN dm-->dout ELSE exe-->result),
+	dm-->write_en <- memory '&' dec-->is_SW,
+	dm-->din <- dec-->D2,
+	// Bundle all the outputs and flop the results
+	new_mem_info <- mk_mem exe->exe result->wb_res,
+	re_ff_en_reset clk (memory '&' ('~' mem_op '|' dm-->ack)) reset new_mem_info mem_info
+];
+
+// VIS MemRW;
+
+let WriteBack =
+    bit_input	    clk reset.
+    bit_input	    wb.
+    mem_input	    mem.
+    wb_output	    wb_info.
+    // Register file interface
+    bit_output	    rwrite.
+    reg_addr_output raddr.
+    word_output	    rdata.
+    //
+    wb_internal	    new_wb_info.
+    bit_internal    do_jmp.
+    word_internal   new_addr.
+    CELL "WriteBack" [
+	rwrite   <- wb '&' mem-->exe-->decode-->reg_write,
+	raddr    <- mem-->exe-->decode-->fetch-->instr-->R-->rd,
+	rdata    <- mem-->result,
+	do_jmp   <- mem-->exe-->jmp,
+	new_addr <- mem-->exe-->next_pc,
+	// Bundle all the outputs and flop the results
+	new_wb_info <- mk_wb new_addr,
+	re_ff_en_reset clk wb reset new_wb_info wb_info
+];
+
+//VIS WriteBack;
+
+let MemCtrl =
+    bit_input	    clk reset.
+    // Port 1: Read/write port
+    mem_rw_input    m1.
+    // Port 2: Read only port
+    mem_rd_input    m2.
+    // Memory interface 
+    bit_output	    mwrite.
+    word_output	    maddr.
+    word_output	    mdin.
+    word_input	    mdout.
+    //
+    bit_internal    last.
+    CELL "MemCtrl" [
+	m2-->ack <- m2-->req '&' ('~' (m1-->req) '|' '~' last),
+	m1-->ack <- m1-->req '&' ('~' (m2-->req) '|' last),
+	re_ff_reset clk reset (m2-->ack) last,
+	mwrite <- m1-->ack '&' m1-->write_en,
+	maddr  <- (IF m2-->ack THEN m2-->addr ELSE m1-->addr),
+	mdin   <- m1-->din,
+	m2-->dout <- mdout,
+	m1-->dout <- mdout
+];
+
+//VIS MemCtrl;
+
+MEMORY "RF" [(REGS, "reg_addr")] "word";
+
+let RegFile =
+    bit_input		clk.
+    // Read port 1
+    reg_addr_input      rd_addr1.
+    word_output         rd_out1.
+    // Read port 2
+    reg_addr_input      rd_addr2.
+    word_output         rd_out2.
+    // Write port
+    bit_input		wr_enable.
+    reg_addr_input	wr_addr.
+    word_input		din.
+    //
+    word_internal	tmp1 tmp2.
+    RF_internal         RF wRF new_RF.
+    word_internal	act_din.
+    CELL "RegFile" [
+        Read_RF RF rd_addr1 tmp1,
+        Read_RF RF rd_addr2 tmp2,
+	rd_out1 <- (IF (rd_addr1 '=' '0) THEN '0 ELSE tmp1),
+	rd_out2 <- (IF (rd_addr2 '=' '0) THEN '0 ELSE tmp2),
+	act_din <- (IF (wr_addr '=' '0) THEN '0 ELSE din),
+        Write_RF RF wr_addr act_din wRF,
+        new_RF <- (IF wr_enable THEN wRF ELSE RF),
+        re_ff clk new_RF RF
+];
+
+//VIS RegFile;
+
+
+ENUM "stage" ["FCH", "DEC", "EXE", "MEM", "WB"];
+
+
+let microRISC_V =
+    bit_input		clk reset.
+    // Memory interface
+    word_output		addr.
+    bit_output		wr_en.
+    word_output		to_mem_data.
+    word_input		from_mem_data.
+    bit_output		stop.
+    // Internal
+    stage_internal	stage.
+    fetch_internal	fetch_out.
+    decode_internal	decode_out.
+    exe_internal	exe_out.
+    mem_internal	mem_out.
+    wb_internal		wb_out.
+    reg_addr_internal	reg_addr1 reg_addr2 reg_waddr.
+    word_internal	reg_d1 reg_d2 reg_wdata.
+    bit_internal	reg_write.
+    mem_rd_internal	im.
+    mem_rw_internal	dm.
+    bit_internal	is_fetch is_dec is_exe is_mem is_wb.
+    CELL "microRISC-V" [
+	// Control machine
+	Moore_FSM "Mode" clk stage (reset, FCH) [
+	    FCH  --- '1 --- DEC,
+	    DEC  --- '1 --- EXE,
+	    EXE  --- '1 --- MEM,
+	    MEM  --- '1 --- WB,
+	    WB   --- '1 --- FCH
+	],
+	is_fetch <- is_FCH stage,
+	is_dec   <- is_DEC stage,
+	is_exe   <- is_EXE stage,
+	is_mem   <- is_MEM stage,
+	is_wb    <- is_WB stage,
+	Fetch clk reset is_fetch wb_out fetch_out im,
+	stop <- ((fetch_out-->instr) '=' '0) '&' is_fetch,
+	Decoder clk reset is_dec fetch_out decode_out
+		    reg_addr1 reg_addr2 reg_d1 reg_d2,
+	Execute clk reset is_exe decode_out exe_out,
+	MemRW clk reset is_mem exe_out mem_out dm,
+	WriteBack clk reset is_wb mem_out wb_out reg_write reg_waddr reg_wdata,
+	MemCtrl clk reset dm im wr_en addr to_mem_data from_mem_data,
+	RegFile clk reg_addr1 reg_d1 reg_addr2 reg_d2
+		    reg_write reg_waddr reg_wdata
+];
+
+//VIS microRISC_V;
+
+MEMORY "Mem" [(MEM_SIZE, "word")] "word";
+
+let RAM =
+    word_input      addr.
+    word_input      din.
+    bit_input       write_en.
+    word_output     dout.
+    //
+    Mem_internal   newM wM M.
+    word_internal   act_addr.
+    bit_internal    in_range_write_en.
+    CELL (sprintf "draw_RAM RAM %d" MEM_SIZE) [
+        act_addr <- addr '>>' '2,
+        Write_Mem M act_addr din wM,
+	in_range_write_en <- write_en '&' (addr '<' ''MEM_SIZE),
+        newM <- (IF in_range_write_en THEN wM ELSE M),
+        M <: newM,
+        Read_Mem M act_addr dout
+];
+
+//VIS RAM;
+
+let clock_generator =
+    bit_input reset_in.
+    bit_input stop.
+    bit_output	clk.
+    bit_output	reset.
+    //
+    bit_internal    lclk new_lclk steady_stop new_steady_stop.
+    bit_internal    r1 r2 r3 r4 reset4 gated_stop.
+    CELL "clock_generator" [
+	r1 <: reset_in,
+	r2 <: r1,
+	r3 <: r2,
+	r4 <: r3,
+	reset <- reset_in '|' r1 '|' r2,
+	reset4 <- reset '|' r3 '|' r4,
+	gated_stop <- stop '&' '~' reset4,
+	new_steady_stop <- '~' reset_in '&' (gated_stop '|' steady_stop),
+	steady_stop <: new_steady_stop,
+	new_lclk <- ('~' reset_in '&' lclk) '^' '~' steady_stop,
+	lclk <: new_lclk,
+	clk <- lclk '|' reset_in
+];
+
+//VIS clock_generator;
+//
+//let ant = 
+//    "reset_in" is 1 for 1 cycle otherwise 0 until 200 cycles
+//  and
+//    "stop" is X for 3 cycles followed_by
+//	      0 for 47 cycles followed_by
+//	      1 for 1 cycle followed_by
+//	      0 for 150 cycles
+//;
+//
+//simulate clock_generator ant;
+
+
+
+let south_bridge =
+    bit_input	    clk.
+    bit_input	    reset.
+    word_input      pc_addr.
+    word_input      pc_dout.
+    bit_input       pc_wen.
+    word_output     pc_din.
+    word_output     mem_addr.
+    word_output     mem_din.
+    bit_output      mem_wen.
+    word_input	    mem_dout.
+    io_list_input  ios.
+    CELL south_bridge (
+	(map (\io. io-->din_req <- pc_wen) ios)@
+	(map (\io. io-->addr <- pc_addr) ios)@
+	(map (\io. io-->din <- pc_dout) ios)@
+	[
+	    mem_addr <- pc_addr,
+	    mem_din  <- pc_dout,
+	    mem_wen  <- pc_wen,
+	    CASE pc_din (map (\io.io-->dout_req, io-->dout) ios) mem_dout
+	]
+);
+
+
+UNSIGNED sevenseg 7;
+
+let hex_to_7segment =
+    nibble_input    i.
+    sevenseg_output res.
+    //
+    CELL hex_to_7segment [
+	MUTEX_CASE res [
+	((i '=' '0),  '0b1110111),
+	((i '=' '1),  '0b0010010),
+	((i '=' '2),  '0b1011101),
+	((i '=' '3),  '0b1011011),
+	((i '=' '4),  '0b0111010),
+	((i '=' '5),  '0b1101011),
+	((i '=' '6),  '0b1101111),
+	((i '=' '7),  '0b1010010),
+	((i '=' '8),  '0b1111111),
+	((i '=' '9),  '0b1111010),
+	((i '=' '10), '0b1110110),
+	((i '=' '11), '0b0101111),
+	((i '=' '12), '0b1100101),
+	((i '=' '13), '0b0011111),
+	((i '=' '14), '0b1101101),
+	((i '=' '15), '0b1101100)
+	]
+];
+
+//VIS hex_to_7segment;
+
+STRUCT nibbleword [
+		    ("n7", "nibble"),
+		    ("n6", "nibble"),
+		    ("n5", "nibble"),
+		    ("n4", "nibble"),
+		    ("n3", "nibble"),
+		    ("n2", "nibble"),
+		    ("n1", "nibble"),
+		    ("n0", "nibble")
+];
+
+let LED4 {ADDR::int} =
+    bit_input	    clk.
+    bit_input	    reset.
+    io_input	    io.
+    // 
+    word_internal	out.
+    nibbleword_internal	nout.
+    sevenseg_internal	d3 d2 d1 d0.
+    bit_internal	en.
+    CELL LED [
+	io-->dout_req <- '0,
+	en <- (io-->addr '=' {''ADDR::word}) '&' (io-->din_req),
+	re_ff_en_reset clk en reset (io-->din) out,
+	nout <- convert out,
+	hex_to_7segment (nout-->n3) d3,
+	hex_to_7segment (nout-->n2) d2,
+	hex_to_7segment (nout-->n1) d1,
+	hex_to_7segment (nout-->n0) d0
+];
+
+
+let system =
+    bit_input		reset_in.
+    word_output		dummy.
+    //
+    bit_internal	reset stop clk.
+    word_internal	pc_addr mem_addr.
+    word_internal	pc_dout mem_dout.
+    word_internal	pc_din mem_din.
+    bit_internal	pc_wr_en mem_wr_en.
+    io_internal		led4_io.
+    CELL "system" [
+	clock_generator reset_in stop clk reset,
+	microRISC_V clk reset pc_addr pc_wr_en pc_dout pc_din stop,
+	south_bridge clk reset pc_addr pc_dout pc_wr_en pc_din
+			       mem_addr mem_din mem_wr_en mem_dout
+			       [led4_io],
+	RAM mem_addr mem_din mem_wr_en mem_dout,
+	LED4 0x80000000 clk reset led4_io,
+	dummy <- pc_dout
+];
+
+//VIS system;
+
+let p = flfun2pexlif system;
+
+let cs = pexlif_get_children p;
+map pexlif_get_name cs;
+let pp = el 3 cs;
+pexlif_get_fa_outs pp;
+pexlif_get_outs_actuals pp;
+pexlif_get_outs_formals pp;
+
+let ppp = el 5 cs;
+pexlif_get_fa_outs ppp;
+pexlif_get_outs_actuals ppp;
+
+
+let ckt = pexlif2fsm p;
+ckt;
+
+
+(visualize_fanin ckt [] [] 10 ["pc_din[2]"] 0 F) fseq (); 
+
+
+qqqqqqqqq;
+
+get_visualization_pfn ckt "dummy[2]" 0;
+get_visualization_fanins ckt "dummy[2]" 0;
+
+get_visualization_pfn ckt "pc_dout[2]" 0;
+get_visualization_fanins ckt "pc_dout[2]" 0; 
+
+get_visualization_pfn ckt "pc_din[2]" 0;
+get_visualization_fanins ckt "pc_din[2]" 0; 
+
+
+//get_visualization_pfn ckt "mem_addr[2]" 0;
+//get_visualization_pfn ckt "mem_addr[2]" 1;
+//get_visualization_pfn ckt "mem_addr[2]" 2;
+//get_visualization_pfn ckt "mem_addr[2]" (-1);

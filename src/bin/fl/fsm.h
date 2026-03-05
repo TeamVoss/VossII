@@ -38,6 +38,7 @@ bool        ilist_ptr_equ(pointer k1, pointer k2);
 void	    dbg_print_ilist(string msg, ilist_ptr ip);
 void	    dbg_print_sch_rec(sch_ptr sch, int indent);
 void	    DBG_print_ilist(ilist_ptr il);
+void	    DBG_print_sch(string title, sch_ptr sch);
 void	    DBG_print_vec_ptr(vec_ptr vp);
 void	    DBG_print_vec_info_ptr(vec_info_ptr vp);
 #endif

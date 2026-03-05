@@ -7688,17 +7688,15 @@ all_outs(ilist_ptr il, vis_io_ptr vp)
     return res;
 }
 
-
 static sch_ptr
 draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	   int draw_level, bool ignore_tmp_nodes)
 {
     string anon;
 
-
     // Is it aldready drawn
     if( (anon = (string) find_hash(&(vsp->done), il)) != NULL ) {
-	return(mk_repeat(vsp, anon) );
+	return( mk_repeat(vsp, anon) );
     }
     // Insert this node since we will draw it.
     if( anon_cnt < 0 ) {
@@ -7719,7 +7717,7 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	    res->vec = anon;
 	    res->pfn = pfn;
 	    res->children = NULL;
-	    return(res );
+	    return( res );
 	}
 	// Some of the nodes are stop nodes, but not all
 	// Must create a draw_concat 2 symbol and
@@ -7769,7 +7767,7 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	    res->vec = anon;
 	    res->pfn = pfn;
 	    res->children = NULL;
-	    return(res );
+	    return( res );
 	}
     }
 
@@ -7920,7 +7918,8 @@ draw_fanin(vstate_ptr vsp, ilist_ptr il, int levels, int anon_cnt,
 	    for(vis_io_ptr vi = cur_info->fa_inps; vi != NULL; vi = vi->next) {
 		sch_ptr child = draw_fanin(vsp,vi->acts,levels-1,-1,draw_level,
 					   ignore_tmp_nodes);
-		sch_list_ptr sl =(sch_list_ptr)new_rec(&(vsp->sch_list_rec_mgr));
+		sch_list_ptr sl;
+		sl = (sch_list_ptr) new_rec(&(vsp->sch_list_rec_mgr));
 		sl->sch = child;
 		sl->next = NULL;
 		if( res->children == NULL ) {
