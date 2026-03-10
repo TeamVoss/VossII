@@ -131,9 +131,10 @@ proc sc:inform_canvas_change {w} {
     fl_set_current_tab_selected $w $cur_sel
 }
 
-proc create_ste_debugger {w} {
+proc create_ste_debugger {w {iconfiy 0}} {
     catch {destroy $w}
     toplevel $w
+    if { $iconfiy } { wm iconify $w; }
     set ht  [expr round(0.8*[winfo screenheight .])]
     set wid [expr round(0.8*[winfo screenwidth .])]
     wm geometry $w -20+100

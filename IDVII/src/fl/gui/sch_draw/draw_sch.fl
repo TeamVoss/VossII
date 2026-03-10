@@ -207,10 +207,10 @@ let mk_ste_debug_window {dummy::void} =
 ;
 non_lazy mk_ste_debug_window;
 
-let STE_debug fsm =
+let STE_debug fsm iconify->F =
     fsm fseq
     let w = mk_ste_debug_window () then
-    (tcl_eval [sprintf "create_ste_debugger %s" w]) fseq
+    (tcl_eval [sprintf "create_ste_debugger %s%s" w (iconify=>" 1" | "")]) fseq
     let ste0 = STE "" fsm [] [] [] [] then
     let cmd = sprintf "let vis = get_current_vis ();" in
     let res = STEV_ENV
@@ -236,6 +236,19 @@ let STE_debug fsm =
     ]) fseq
     res
 ;
+
+let vis_unhide vis =
+    let w = vfsm2id vis then
+    (tcl_eval [sprintf "wm deiconify %s" w]) fseq
+    ()
+;
+
+let vis_hide vis =
+    let w = vfsm2id vis then
+    (tcl_eval [sprintf "wm iconify %s" w]) fseq
+    ()
+;
+
 
 let fl_destroy_vfsm w =
     let raw = deref cur_vfsm then
@@ -2178,10 +2191,10 @@ end_abstype update_current_visualization get_current_visualization;
 // Visualize an pexlif provided as a fl function that return a pexlif.
 // If pre_load is T, then start with top-level visualized and
 // inputs & outputs added to the waveform viewer.
-let VIS fl_function_name pre_load->T ignore_tmp_nds->T =
+let VIS fl_function_name pre_load->T ignore_tmp_nds->T iconify->F =
     let p = flfun2pexlif_core fl_function_name then
     let ckt = pexlif2fsm p then
-    let vis = STE_debug ckt then
+    let vis = STE_debug ckt iconify then
     NOT pre_load => vis |
     let inps = qsort node_name_cmp (md_extract_vectors (inputs ckt)) then
     let outs = qsort node_name_cmp (md_extract_vectors (outputs ckt)) then
