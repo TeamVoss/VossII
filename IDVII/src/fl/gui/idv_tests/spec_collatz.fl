@@ -1,4 +1,4 @@
-load "ste.fl";
+cload "ste.fl";
 
 TYPE "word" 16;
 

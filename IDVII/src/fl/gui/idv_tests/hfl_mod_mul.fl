@@ -1,4 +1,4 @@
-load "ste.fl";
+cload "ste.fl";
 
 update_vossrc "ACCURATE-HIERARCHY-VISUALIZATION" "TRUE";
 

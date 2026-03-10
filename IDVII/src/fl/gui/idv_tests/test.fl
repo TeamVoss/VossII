@@ -1,4 +1,4 @@
-load "ste.fl";
+cload "ste.fl";
 
 let buf =
     bit_input	i.
