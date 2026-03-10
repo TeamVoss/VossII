@@ -4264,3 +4264,26 @@ let pexlif_cache file p_fn =
 ;
 
 end_abstype pexlif_cache;
+
+begin_abstype;
+
+lettype fsm_cache = FSM_CACHE {sig::string} {ckt::fsm};
+
+// Function to memoize ckt creation from pexlif function.
+let fsm_cache file p_fn =
+    let sig = sha256_signature p_fn then
+    let do_save =
+	p_fn fseq
+	let ckt = pexlif2fsm p_fn then
+	(write_fsm_cache file (FSM_CACHE sig ckt)) fseq
+	ckt
+    in
+    file_exists file =>
+	val (FSM_CACHE saved_sig ckt) = read_fsm_cache file then
+	saved_sig == sig => ckt |
+	do_save
+    |
+    do_save
+;
+
+end_abstype fsm_cache;
