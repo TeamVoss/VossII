@@ -1990,7 +1990,7 @@ let bv_examples_n cnt bvs =
     let exs = qsort lcmp res then
     let szs = map bv_size bvs in
     let p1 fp {ls::int list} =
-        let pp fp (sz,i) = fprintf fp "%0*b(%*d) " sz i (dsz sz) i in
+        let pp fp (sz,i) = fprintf fp "%0*b(%*d) " (sz+1) i (1+dsz sz) i in
         list2fp fp T "" " " "" pp (zip szs ls)
     in
     let end = length exs > cnt => "\n...\n" | "\n" in
@@ -2757,6 +2757,7 @@ let bv_sum vars bv =
     let neg_sum = bv_sum vars neg in
     pos_sum - neg_sum
 ;
+export bv_sum;
 
 
 end_abstype;
