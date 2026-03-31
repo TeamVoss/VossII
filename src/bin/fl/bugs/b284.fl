@@ -1,0 +1,54 @@
+load "idv.fl";
+
+SIGNED "byte" 8;
+
+ENUM "stages" ["INIT", "START_1", "START_2", "SHIFT", "PARITY"];
+UNSIGNED "cnt" 4;
+
+let UART_transmitter =
+    bit_input       clk reset.
+    bit_input       req.
+    byte_input      din.
+    bit_output      dout.
+    //
+    stages_internal state.
+    cnt_internal    cnt.
+    byte_internal   reg.
+    bit_internal    done.
+    bit_internal    parity.
+    CELL "UART_transmitter" [
+        Moore_FSM "uart_tr_fsm" clk state (reset --- INIT) [
+            INIT    --- req  --- START_1,
+            START_1 --- '1   --- START_2,
+            START_2 --- '1   --- SHIFT,
+            SHIFT   --- done --- PARITY,
+            PARITY  --- '1   --- INIT
+        ],
+        STATE clk cnt [
+            is_START_2 state --- '0,
+            is_SHIFT state   --- cnt '+' '1
+        ],
+        done <- cnt '=' '7,
+        STATE clk reg [
+            is_INIT state '&' req --- din,
+            is_SHIFT state        --- reg '>>' '1
+        ],
+        STATE clk parity [
+            is_START_2 state --- '0,
+            is_SHIFT state   --- parity '^' reg~~0
+        ],
+        CASE dout [
+            is_START_1 state --- '0,
+            is_START_2 state --- '0,
+            is_SHIFT  state --- reg~~0,
+            is_PARITY state --- parity
+        ] '1
+];
+
+let p = flfun2pexlif UART_transmitter;
+let ckt = pexlif2fsm p;
+
+is_latch ckt "i1/_intermediate_state[0]";
+
+let state = filter (is_latch ckt) (nodes ckt);
+length state;

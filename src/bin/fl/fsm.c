@@ -1128,6 +1128,7 @@ visualization_nodes(g_ptr redex)
 static void
 get_latch_type(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm, g_node;
@@ -1156,11 +1157,13 @@ get_latch_type(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
 is_latch(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm, g_node;
@@ -1172,6 +1175,7 @@ is_latch(g_ptr redex)
     if( idx < 0 ) {
         pop_fsm();
         MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	End_string_ops(sop);
         return;
     }
     nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
@@ -1179,7 +1183,11 @@ is_latch(g_ptr redex)
     vis_list_ptr vp = np->draw_info;
     while( vp != NULL ) {
 	string s;
-	if( (s = find_hash(&state_holding_tbl, vp->vp->pfn)) != NULL ) {
+	s = vp->vp->pfn;
+	s += 9;	// "add_inst "
+	while( *s && *s != ' ') s++;
+	if( *s ) s++;
+	if( (s = find_hash(&state_holding_tbl, s)) != NULL ) {
 	    res = s;
 	    break;
 	}
@@ -1193,11 +1201,13 @@ is_latch(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void
 is_input(g_ptr redex)
 {
+    sop = Begin_string_ops();
     g_ptr l = GET_APPLY_LEFT(redex);
     g_ptr r = GET_APPLY_RIGHT(redex);
     g_ptr g_fsm, g_node;
@@ -1209,6 +1219,7 @@ is_input(g_ptr redex)
     if( idx < 0 ) {
         pop_fsm();
         MAKE_REDEX_FAILURE(redex, Fail_pr("Node %s not in fsm", node));
+	End_string_ops(sop);
         return;
     }
     nnode_ptr np = (nnode_ptr) M_LOCATE_BUF(nodesp, idx);
@@ -1220,6 +1231,7 @@ is_input(g_ptr redex)
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
+    End_string_ops(sop);
 }
 
 static void

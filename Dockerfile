@@ -2,10 +2,10 @@ FROM debian:buster
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && \
-    apt-get -y install gcc g++ doxygen flex bison gawk \
-                       libz-dev tcl-dev tk-dev libc6-dev imagemagick \
-                       clang libreadline-dev python3 # for yosys
+RUN sudo apt-get update && \
+    sudo apt-get -y install gawk git make python3 lld bison clang flex \
+	libffi-dev libfl-dev libreadline-dev pkg-config tcl-dev zlib1g-dev \
+	graphviz xdot
 
 VOLUME /vossroot
 WORKDIR /vossroot/src

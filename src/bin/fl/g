@@ -1,11 +1,8 @@
 set pagination off
 break fl_main
-r -noX -f bugs/b283.fl
+r -noX -f bugs/b284.fl
 break exit
 break voss_abort
 break Dbg_stop
-break draw_fanin
-break fsm.c:7850
-break fsm.c:7903
-break fsm.c:7923
+break is_latch
 c
