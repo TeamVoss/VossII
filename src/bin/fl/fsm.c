@@ -1147,7 +1147,11 @@ get_latch_type(g_ptr redex)
     vis_list_ptr vp = np->draw_info;
     while( vp != NULL ) {
 	string s;
-	if( (s = find_hash(&state_holding_tbl, vp->vp->pfn)) != NULL ) {
+	s = vp->vp->pfn;
+	s += 9;	// "add_inst "
+	while( *s && *s != ' ') s++;
+	if( *s ) s++;
+	if( (s = find_hash(&state_holding_tbl, s)) != NULL ) {
 	    res = s;
 	    break;
 	}
