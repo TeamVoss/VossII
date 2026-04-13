@@ -18,7 +18,8 @@
 #include "hash.h"
 
 #define STRMGR_MAGIC_NBR	12349876
-#define STR_BLOCK_SIZE	32750	/* Leave some room for malloc's header */
+// #define STR_BLOCK_SIZE	32750	/* Leave some room for malloc's header */
+#define STR_BLOCK_SIZE	130000	/* Leave some room for malloc's header */
 
 typedef struct str_mgr {
 	int		initialized;
