@@ -109,7 +109,7 @@ ste;
 
 draw_set_time vis 0;
 
-let tab_1 = draw_fanin vis (0) 100 ["iwb_cyc_o","iwb_adr_o[31:0]","iwb_stb_o","iwb_we_o","iwb_sel_o[3:0]","iwb_dat_o[31:0]","iwb_cab_o","dwb_cyc_o","dwb_adr_o[31:0]","dwb_stb_o","dwb_we_o","dwb_sel_o[3:0]","dwb_dat_o[31:0]","dwb_cab_o","dbg_lss_o[3:0]","dbg_is_o[1:0]","dbg_wp_o[10:0]","dbg_bp_o","dbg_dat_o[31:0]","dbg_ack_o","pm_clksd_o[3:0]","pm_dc_gate_o","pm_ic_gate_o","pm_dmmu_gate_o","pm_immu_gate_o","pm_tt_gate_o","pm_cpu_gate_o","pm_wakeup_o","pm_lvolt_o"];
+let tab_1 = draw_fanin vis (0) 100 T ["iwb_cyc_o","iwb_adr_o[31:0]","iwb_stb_o","iwb_we_o","iwb_sel_o[3:0]","iwb_dat_o[31:0]","iwb_cab_o","dwb_cyc_o","dwb_adr_o[31:0]","dwb_stb_o","dwb_we_o","dwb_sel_o[3:0]","dwb_dat_o[31:0]","dwb_cab_o","dbg_lss_o[3:0]","dbg_is_o[1:0]","dbg_wp_o[10:0]","dbg_bp_o","dbg_dat_o[31:0]","dbg_ack_o","pm_clksd_o[3:0]","pm_dc_gate_o","pm_ic_gate_o","pm_dmmu_gate_o","pm_immu_gate_o","pm_tt_gate_o","pm_cpu_gate_o","pm_wakeup_o","pm_lvolt_o"];
 tab_1;
 
 let tab_2 = draw_inside vis 1 ["ic_en","icpu_adr_cpu[31:0]","icpu_cycstb_cpu","icpu_sel_cpu[3:0]","icpu_tag_cpu[3:0]","immu_en","ex_insn[31:0]","ex_freeze","id_pc[31:0]","branch_op[2:0]","spr_dat_npc[31:0]","rf_dataw[31:0]","du_except[12:0]","du_dat_cpu[31:0]","dc_en","dcpu_adr_cpu[31:0]","dcpu_cycstb_cpu","dcpu_we_cpu","dcpu_sel_cpu[3:0]","dcpu_tag_cpu[3:0]","dcpu_dat_cpu[31:0]","dmmu_en","supv","spr_addr[31:0]","spr_dat_cpu[31:0]","spr_cs[31:0]","spr_we"];

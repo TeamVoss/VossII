@@ -1197,6 +1197,11 @@ let is_XOR (W_OR (W_AND (W_NOT a) b) (W_AND c (W_NOT d))) = (a==c) AND (b==d)
  /\ is_XOR _ = F
 ;
 
+let is_XNOR (W_OR (W_AND a b) (W_AND (W_NOT c) (W_NOT d))) = (a==c) AND (b==d)
+ /\ is_XNOR (W_OR (W_AND a b) (W_AND (W_NOT c) (W_NOT d))) = (a==c) AND (b==d)
+ /\ is_XNOR _ = F
+;
+
 let is_LEQ (W_NOT (W_GR a b)) = T
  /\ is_LEQ _ = F;
 
@@ -1292,6 +1297,7 @@ let opt_base_compact_wprint inps rhs =
      /\ special (W_SX sz (W_EXPLICIT_VAR ssz name)) = "draw_unary_arithm {SX}"
      /\ special (W_ZX sz (W_EXPLICIT_VAR ssz name)) = "draw_unary_arithm {ZX}"
      /\ special op assuming (is_XOR op) = "draw_xor2"
+     /\ special op assuming (is_XNOR op) = "draw_xnor2"
      /\ special op assuming (is_LEQ op) = "draw_binary_arithm {<=}"
      /\ special op assuming (is_binary_base op) = get_binary_draw_cmd op
      /\ special op assuming (is_tuple op) =

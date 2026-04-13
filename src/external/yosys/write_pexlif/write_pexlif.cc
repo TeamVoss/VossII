@@ -52,7 +52,23 @@ idv_clean_name(std::string &str)
 
     char *res = new char [str.length()+1];
     strcpy(res, str.c_str());
+
     return( res );
+}
+
+char *
+mk_legal_id(char *inp)
+{
+    char *t= inp;
+    while( *t ) {
+	if( !('0' <= *t && *t <= '9') && !('a' <= *t && *t <= 'z') &&
+	    !('A' <= *t && *t <= 'Z') && (*t != '_') )
+	{
+	    *t = '_';
+	}
+	t++;
+    }
+    return( inp );
 }
 
 char *
@@ -374,7 +390,7 @@ struct PexlifDumper
 	{
 		f << stringf("\n");
 		f << stringf("let Q%s {attrs::(string#string) list} conns =\n",
-			     Cstr(module->name));
+			     mk_legal_id(Cstr(module->name)));
 
 		std::map<int, RTLIL::Wire*> inputs, outputs, internals;
 
@@ -497,6 +513,7 @@ struct PexlifDumper
 		    start = false;
 		    if ( cell->type == "$or" ||
 			 cell->type == "$xor" ||
+			 cell->type == "$xnor" ||
 			 cell->type == "$and" ||
 			 cell->type == "$sub" ||
 			 cell->type == "$add" ||
@@ -1230,7 +1247,7 @@ struct PexlifDumper
 			continue;
 		    }
 
-		    f << "Q" << Cstr(cell->type)
+		    f << "Q" << mk_legal_id(Cstr(cell->type))
 		      << " [(\"instance\","
 		      << stringf("\"%s\"", (id_clean_name(cell->name)))
 		      << "), (\"src\", \""
@@ -1475,7 +1492,7 @@ struct PexlifBackend : public Backend {
 
 		for (auto module : mod_list) {
 			RTLIL::IdString id = module->name;
-			char *name = Cstr(id);
+			char *name = mk_legal_id(Cstr(id));
 			*f << "forward_declare {Q" << name <<
 			      "::((string#string) list) -> " <<
 			      "((string#(string list)) list) " <<

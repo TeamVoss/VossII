@@ -172,6 +172,12 @@ let _xor sz src =
     mk_rtl fn "draw_xor2" attrs sz
 ;
 
+let _xnor sz src =
+    let attrs = mk_attr src __FILE__ __LINE__ then
+    let fn A B = W_OR (W_AND A B) (W_AND (W_NOT A) (W_NOT B)) in
+    mk_rtl fn "draw_xnor2" attrs sz
+;
+
 let _neg sz src out inp =
     let attrs = mk_attr src __FILE__ __LINE__ then
     let f_out = mk_name sz "Y" in

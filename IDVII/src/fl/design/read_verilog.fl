@@ -66,9 +66,9 @@ let verilog2pexlif no_popup flags top_level_module file_list additional_files =
     // Create script file
     let script_file = sprintf "%s/script.ys" tmp_dir then
     let sfp = fopen script_file "w" then
-    let mk_full_name f = sprintf "%s/%s" tmp_dir f in
-    let files = list2str T "" " " "" mk_full_name base_names then
-    (fprintf sfp "read_verilog %s %s\n" flags files) fseq
+    (fprintf sfp "read_verilog %s " flags) fseq
+    (foreach (\f. fprintf sfp "%s/%s " tmp_dir f) base_names) fseq
+    (fprintf sfp "\n") fseq
     (fprintf sfp "hierarchy -check -top %s\n" top_level_module) fseq
     (fprintf sfp "proc\n") fseq
     (fprintf sfp "memory -nomap\n") fseq
