@@ -120,6 +120,7 @@ let f_ge i j = fge i j;
 overload {>= :: *a -> *a -> bool} i_ge f_ge bv_geq bev_geq;
 infix 5 >=;
 
+
 let gen_str2int s =
     val (neg,s) = 
 	let s0 = string_hd s in
@@ -542,7 +543,6 @@ let fparam vars f =
 
 end_abstype param fparam;
 
-
 // Convert a list to a string
 // Usage: list2str print_empty_list pre sep post pr_fun l, where
 //	print_empty_list    decides whether a pre^post or "" will be the result
@@ -805,6 +805,30 @@ let bv_min bv =
      /\   try [] = []
     in
     sscanf "%b" (implode (try (bv2list bv)))
+;
+
+// Gretest common divisor of two bvs.
+letrec bv_gcd a b =
+    IF (b = int2bv 0) THEN a ELSE
+    bv_gcd b (a % b)
+;
+
+// Divide the bv with the gcd of all values the bv can represent.
+// For example, if the bv can represent 9, 12, and 15, the bv_reduce
+// will return a bv that represents 3, 4, and 5 for the same assignments
+// to the variable in the original bv.
+let bv_reduce bv =
+    NOT ((bv = int2bv 0) == F) =>
+	error "bv_reduce cannot be applied to bv that might represent 0" |
+    let vs = depends bv in
+    let cond0 = sitlist (\v.\r. NOT (variable v) AND r) vs T in
+    let sub0 = param cond0 in
+    let subrem  = param (NOT cond0) in
+    let bv0 = substitute sub0 bv in
+    let bvrem = substitute subrem bv in
+    let cd = bv_gcd bv0 bvrem in
+    let my_gcd = bv_min cd in
+    bv_div bv (int2bv my_gcd)
 ;
 
 // Compute a substitution for all variables that must take on
