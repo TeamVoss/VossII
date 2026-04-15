@@ -178,18 +178,41 @@ bv_list2str(g_ptr l, int depth)
     if((odests_fp = fmemopen(bv_str_buf, 4096, "w")) == NULL ) {
 	DIE("Should never happen");
     }
+    bool scalar = TRUE;
+    bool negative = FALSE;
+    int value = 0;
+    int sz = 0;
     char sep = '<';
     for(g_ptr np = l; !IS_NIL(np); np = GET_CONS_TL(np)) {
 	formula f = GET_BOOL(GET_CONS_HD(np));
 	FP(FILE_fp,"%c", sep);
 	sep = ',';
-	if( depth == 0 && is_symbolic(f) ) {
-	    FP(FILE_fp, "S");
+	if( scalar && (f == ONE) ) {
+	    if( sz == 0 ) { negative = TRUE; }
+	    sz++;
+	    value = 2*value + 1;
+	    FP(FILE_fp, "T");
+	} else if( scalar && (f == ZERO) ) {
+	    sz++;
+	    value = 2*value;
+	    FP(FILE_fp, "F");
 	} else {
-	    B_Print(FILE_fp, f,depth);
+	    scalar = FALSE;
+	    if( depth == 0 && is_symbolic(f) ) {
+		FP(FILE_fp, "S");
+	    } else {
+		B_Print(FILE_fp, f,depth);
+	    }
 	}
     }
     FP(FILE_fp, ">");
+    if( scalar ) {
+	if( negative ) {
+	    FP(FILE_fp, " (%d)", value - (1 << sz));
+	} else {
+	    FP(FILE_fp, " (%d)", value);
+	}
+    }
     fclose(odests_fp);
     odests_fp = NULL;
     return( wastrsave(stringsp, bv_str_buf) );
