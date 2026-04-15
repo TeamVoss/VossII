@@ -2,6 +2,12 @@
 # Top level makefile
 #
 
+# rumi 260415: Automatically detect compiler and linker flags for Tcl, Tk, and Editline
+PKG_FLAGS := $(filter-out -static, $(shell pkg-config --cflags --libs tcl tk libedit))
+CFLAGS += $(PKG_FLAGS)
+CXXFLAGS += $(PKG_FLAGS)
+LDFLAGS += $(PKG_FLAGS)
+
 #
 # Current directory
 #
@@ -96,7 +102,7 @@ docker_package:
 	docker run --user $(REPO_OWNER) -v `pwd`/..:/vossroot vossii-static-builder
 
 package: clean
-	make install LINKFLAG=-static
+	make install
 	rm -r ../voss ; true
 	install -m 755 -d ../voss/
 	install -m 755 -d ../voss/bin
@@ -242,8 +248,27 @@ minisat:
 visualization:
 	make -C "$(VISUALIZATION_DIR)" TCL_INCLUDE=$(TCL_INCLUDE) CC=$(CC) CXX=$(CX)
 
-$(YOSYS_WRITE_PEXLIF)/write_pexlif.so: $(YOSYS_WRITE_PEXLIF)/write_pexlif.cc
-	make -C $(YOSYS_WRITE_PEXLIF)
+# $(YOSYS_WRITE_PEXLIF)/write_pexlif.so: $(YOSYS_WRITE_PEXLIF)/write_pexlif.cc
+# 	make -C $(YOSYS_WRITE_PEXLIF)
+# Define the libraries to link
+# YOSYS_LIBS := $(shell /opt/tools/yosys/bin/yosys-config --ldflags --libs)
+
+# write_pexlif.so: write_pexlif.o
+# 	g++ -shared -o $@ $^ $(YOSYS_LIBS)
+
+# rumi 260415: this is a stupid HACK to make pexlif compile
+VPATH := /vossroot/src/external/yosys/write_pexlif
+
+PEXLIF_OBJ := write_pexlif.o
+PEXLIF_TARGET := /vossroot/src/external/yosys/write_pexlif/write_pexlif.so
+
+$(PEXLIF_TARGET): $(PEXLIF_OBJ)
+	g++ -shared -o $@ $^ $(shell /opt/tools/yosys/bin/yosys-config --ldflags --libs)
+
+# Now make will automatically find write_pexlif.cc because of VPATH
+$(PEXLIF_OBJ): write_pexlif.cc
+	g++ -fPIC -D_YOSYS_ -DDEBUG -I/opt/tools/yosys/share/yosys/include -c $< -o $@
+
 
 clean:
 	@-make -C lib clean
