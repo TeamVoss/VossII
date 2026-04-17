@@ -2773,6 +2773,7 @@ export choose;
 // sum of all the values the bv can take on by substituting
 // every binary value of the variables in vars.
 let bv_sum vars bv =
+    vars fseq bv fseq	// Must evaluate args. first
     let is_pos = (bv >= '0) in
     is_pos == T => bv_sum vars bv |
     let pos = is_pos => bv | '0 in
