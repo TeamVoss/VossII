@@ -128,39 +128,35 @@ let CAM =
 	restore_addr  <- match_addr
 ]);
 
-let p = CAM 'clk 'reset
-	    'get_free 'free_valid 'free_addr
-	    'update 'update_addr 'update_tag
-	    'restore 'restore_tag 'restore_valid 'restore_addr
-	    'cleanup 'clean_level
-;
+let p = flfun2pexlif CAM;
 
 let ckt = pexlif2fsm p;
 
 let vis = STE_debug ckt;
+vis;
 
-//vis;
-
-let ant =
-    "addr[3:0]" is 0x0 for 1 phase followed_by
-		   0x1 for 1 phase followed_by
-		   0x2 for 1 phase followed_by
-		   0x3 for 1 phase followed_by
-		   0x0 for 1 phase followed_by
-		   0x1 for 1 phase followed_by
-		   0x2 for 1 phase followed_by
-		   0x3 for 1 phase
-  and
-    "din[15:0]" is "0x123" for 1 phase followed_by
-		   "0x5f2" for 1 phase followed_by
-		   "0x222[15:0]" for 1 phase followed_by
-		   "0xffff" for 1 phase followed_by
-		   "d4[15:0]" for 1 phase followed_by
-		   "d5[15:0]" for 1 phase followed_by
-		   "d6[15:0]" for 1 phase followed_by
-		   "d7[15:0]" for 1 phase
-  and
-    "write" is 1 for 4 phases otherwise 0 until 8 phases
-;
-
+////vis;
+//
+//let ant =
+//    "addr[3:0]" is 0x0 for 1 phase followed_by
+//		   0x1 for 1 phase followed_by
+//		   0x2 for 1 phase followed_by
+//		   0x3 for 1 phase followed_by
+//		   0x0 for 1 phase followed_by
+//		   0x1 for 1 phase followed_by
+//		   0x2 for 1 phase followed_by
+//		   0x3 for 1 phase
+//  and
+//    "din[15:0]" is "0x123" for 1 phase followed_by
+//		   "0x5f2" for 1 phase followed_by
+//		   "0x0222" for 1 phase followed_by
+//		   "0xffff" for 1 phase followed_by
+//		   "d4[15:0]" for 1 phase followed_by
+//		   "d5[15:0]" for 1 phase followed_by
+//		   "d6[15:0]" for 1 phase followed_by
+//		   "d7[15:0]" for 1 phase
+//  and
+//    "write" is 1 for 4 phases otherwise 0 until 8 phases
+//;
+//
 //STE "-e" vis [] ant [] [];

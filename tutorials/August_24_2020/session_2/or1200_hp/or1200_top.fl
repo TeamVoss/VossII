@@ -1,6 +1,6 @@
 load "ste.fl";
 
-let p = verilog2pexlif "-I../../rtl_virtex_orig/verilog/" "or1200_top" [
+let p = verilog2pexlif F "-I../../rtl_virtex_orig/verilog/" "or1200_top" [
 	    "rf_sub.v",
 	    "or1200_alu.v",
 	    "or1200_cfgr.v",

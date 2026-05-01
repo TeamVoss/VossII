@@ -25,8 +25,8 @@
 //   restored. Enforce order in which linens are restored from diffstate?
 // * Handle memory writes (i.e. non-instruction cache).
 cload "ste.fl";
-cload (DIR^"diffcache_constants.fl");
-cload (DIR^"diffstate.fl");
+cload (DIR^"diff_cache/diffcache_constants.fl");
+cload (DIR^"diff_cache/diffstate.fl");
 
 let LINES               = 8;            // Number of cache lines
 let BYTES_IN_CACHE_LINE = 8;            // Number of bytes in cache line
@@ -149,7 +149,6 @@ let CPU_model =
 		(cnt '=' (''(CPU_INSTRUCTIONS-1))) --- cnt, 
 		(is_P_Incr_PC state '&' '~' do_stop) --- (cnt '+' '1)] cnt,
 	re_ff clk n_cnt cnt,
-
         // TODO: CPU currently only supports L1 ("low") and L2 ("high")
         // TODO: CPU is currently hardcoded to always restore 5 cache lines :D
 	(Moore_FSM "TRUST_FSM" clk trust
@@ -166,7 +165,6 @@ let CPU_model =
         P2D_restore_max <- '5,
         restore_done <- D2P_restore_done '|' (trust '=' L2),
         //////////////////////
-
 	mask <- ('' (2**(hw_size P2C_addr-1)-1)),
 	raw_addr <- (c_instr-->addr),
 	ok_addr <- (IF (is_L2 trust) THEN raw_addr ELSE (raw_addr '&' mask)),
@@ -487,7 +485,6 @@ let CACHE =
     ]),
     C2P_valid <- is_C_HIT state,
     C2M_req   <- is_C_MISS state,
-
     // If the cache line is occupied but we still get a miss, an eviction
     // is about to happen and we need to store the old cache line.
     // But only if another security level owns the evicted line.
@@ -501,12 +498,10 @@ let CACHE =
     C2D_store_line-->lAddr <- match_addr-->line,
     C2D_store_line-->aTag  <- match_addr-->aTag,
     ///////////////////////////////
-
     store_addr <- ((is_C_REQ state) '&' '~' hit),
     re_ff_en clk store_addr P2C_addr C2M_addr,
     do_latch <- is_C_IDLE state,
     re_ff_en clk do_latch P2C_addr match_addr,
-
     // TODO: currently restore signals trump everything else. We might
     // want to be stricter about state here.
     we <- (is_C_MISS state '&' M2C_valid) '|' D2C_valid,
@@ -515,7 +510,6 @@ let CACHE =
     l_addr <- (IF D2C_valid THEN D2C_restore_line-->lAddr ELSE match_addr-->line),
     l_atag <- (IF D2C_valid THEN D2C_restore_line-->aTag  ELSE match_addr-->aTag),
     ///////////////////////////////
-
     cache_mem clk reset we l_addr l_data l_atag l_stag hit occupied C2P_data cur_secTag
 ];
 

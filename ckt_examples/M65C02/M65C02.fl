@@ -250,10 +250,10 @@ let static =
     // Microprogram setup.
     "MC[2:0]"      is "0b100"     in_cycle 0 and  // Microcycle controller.
     "uPL[31:28]"   is "0b0101"    in_phase 0 and  // Instruction field.
-    "i72/dRst"     is "0x0"       in_cycle 0 and  // Delayed reset.
+    "i72/dRst"     is 0x0         in_cycle 0 and  // Delayed reset.
     "i69/PSW[5:0]" is "0b000100"  in_cycle 1 and  // Program status word.
-    "OP1[7:0]"     is "0x0"       in_cycle 0 and  // Operand one.
-    "OP2[7:0]"     is "0x0"       in_cycle 0 and  // Operand two.
+    "OP1[7:0]"     is 0x0       in_cycle 0 and  // Operand one.
+    "OP2[7:0]"     is 0x0       in_cycle 0 and  // Operand two.
     // Constant.
     "Clk"  is_clock (N/2)      and                  // Clock.
     "Rst"  is "0" for N cycles and                  // Reset.
@@ -270,8 +270,8 @@ let b_bv = fixed_bv2list 8 T b;
 // 0x196 _ADC_imm, opcode 0x69.
 let ant =
     "A[7:0]"  is a_bv    in_cycle 1 and
-//    "BA[8:0]" is "0x196" in_cycle 0 and
-    "DI[7:0]" is "0x69"  in_cycle 0 and
+//    "BA[8:0]" is 0x196 in_cycle 0 and
+    "DI[7:0]" is 0x69  in_cycle 0 and
     "DI[7:0]" is "tmp[7:0]"  in_cycle 1 and // ????????????????????
     "DI[7:0]" is b_bv    in_cycle 4 and
     static
@@ -294,8 +294,8 @@ ok;
 // 0x156 _ADC_dp, opcode 0x65, NA <= OP1.
 let ant =
     "A[7:0]"  is a_bv     in_cycle 1 and
-    "BA[8:0]" is "0x156"  in_cycle 0 and
-    "DI[7:0]" is "0x65"   in_cycle 0 and
+    "BA[8:0]" is 0x156  in_cycle 0 and
+    "DI[7:0]" is 0x65   in_cycle 0 and
     "DI[7:0]" is "m[7:0]" in_cycle 4 and // OP1 address.
     "DI[7:0]" is b_bv     in_cycle 8 and 
     static
@@ -316,8 +316,8 @@ ok;
 let ant =
     "A[7:0]"  is a_bv     in_cycle 1 and
     "X[7:0]"  is "x[7:0]" in_cycle 1 and
-    "BA[8:0]" is "0x157"  in_cycle 0 and
-    "DI[7:0]" is "0x75"   in_cycle 0 and
+    "BA[8:0]" is 0x157    in_cycle 0 and
+    "DI[7:0]" is 0x75     in_cycle 0 and
     "DI[7:0]" is "m[7:0]" in_cycle 4 and // OP1 address.
     "DI[7:0]" is b_bv     in_cycle 8 and
     static
@@ -336,8 +336,8 @@ let ok = ok AND get_ste_result ste "strong";
 // 0x01D6 _ADC_abs, opcode 6D, NA <= {OP2, OP1}.
 let ant =
     "A[7:0]"  is a_bv      in_cycle 1  and
-    "BA[8:0]" is "0x1D6"   in_cycle 0  and
-    "DI[7:0]" is "0x6D"    in_cycle 0  and
+    "BA[8:0]" is 0x1D6   in_cycle 0  and
+    "DI[7:0]" is 0x6D    in_cycle 0  and
     "DI[7:0]" is "m1[7:0]" in_cycle 4  and // OP1 address.
     "DI[7:0]" is "m2[7:0]" in_cycle 8  and // OP2 address.
     "DI[7:0]" is b_bv      in_cycle 12 and
@@ -358,8 +358,8 @@ let ok = ok AND get_ste_result ste "strong";
 let ant =
     "A[7:0]"  is a_bv      in_cycle 1  and
     "X[7:0]"  is "x[7:0]"  in_cycle 1  and
-    "BA[8:0]" is "0x1D7"   in_cycle 0  and
-    "DI[7:0]" is "0x7D"    in_cycle 0  and
+    "BA[8:0]" is 0x1D7   in_cycle 0  and
+    "DI[7:0]" is 0x7D    in_cycle 0  and
     "DI[7:0]" is "m1[7:0]" in_cycle 4 and // OP1 address.
     "DI[7:0]" is "m2[7:0]" in_cycle 8 and // OP2 address.
     "DI[7:0]" is b_bv      in_cycle 12 and
@@ -383,8 +383,8 @@ let ok = ok AND get_ste_result ste "strong";
 let ant =
     "A[7:0]"  is a_bv      in_cycle 1  and
     "Y[7:0]"  is "y[7:0]"  in_cycle 1  and
-    "BA[8:0]" is "0x197"   in_cycle 0  and
-    "DI[7:0]" is "0x79"    in_cycle 0  and
+    "BA[8:0]" is 0x197   in_cycle 0  and
+    "DI[7:0]" is 0x79    in_cycle 0  and
     "DI[7:0]" is "m1[7:0]" in_cycle 4 and // OP1 address.
     "DI[7:0]" is "m2[7:0]" in_cycle 8 and // OP2 address.
     "DI[7:0]" is b_bv      in_cycle 12 and 
@@ -409,8 +409,8 @@ let ok = ok AND get_ste_result ste "strong";
 let ant =
     "A[7:0]"  is a_bv      in_cycle 1  and
     "X[7:0]"  is "x[7:0]"  in_cycle 1  and
-    "BA[8:0]" is "0x116"   in_cycle 0  and
-    "DI[7:0]" is "0x61"    in_cycle 0  and
+    "BA[8:0]" is 0x116   in_cycle 0  and
+    "DI[7:0]" is 0x61    in_cycle 0  and
     "DI[7:0]" is "i[7:0]"  in_cycle 4 and // OP1 indirect address.
     "DI[7:0]" is "lo[7:0]" in_cycle 8 and // OP1 low address bits.
     "DI[7:0]" is "hi[7:0]" in_cycle 12 and // OP2 high address bits.
@@ -438,8 +438,8 @@ let ok = ok AND get_ste_result ste "strong";
 let ant =
     "A[7:0]"  is a_bv      in_cycle 1  and
     "Y[7:0]"  is "y[7:0]"  in_cycle 1  and
-    "BA[8:0]" is "0x117"   in_cycle 0  and
-    "DI[7:0]" is "0x71"    in_cycle 0  and
+    "BA[8:0]" is 0x117   in_cycle 0  and
+    "DI[7:0]" is 0x71    in_cycle 0  and
     "DI[7:0]" is "i[7:0]"  in_cycle 4 and // OP1 indirect address.
     "DI[7:0]" is "lo[7:0]" in_cycle 8 and // OP1 low address bits.
     "DI[7:0]" is "hi[7:0]" in_cycle 12 and // OP2 high address bits.

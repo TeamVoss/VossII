@@ -1,7 +1,7 @@
 // =============================================================
 // Verification example
 // =============================================================
-set_font font_large;
+//set_font font_large;
 load "ste.fl";
 
 
@@ -46,18 +46,18 @@ let carry  = (bv_AND (bv_add (bv_ZX a) (bv_ZX b)) (int2bv 256)) != (int2bv 0);
 let zero   = res = (replicate 8 F);                 // Expected zero flag.
 let static =
     // Microprogram setup.
-    "MC[2:0]"      is "0b100"     in_cycle 0 and  // Microcycle controller.
-    "uPL[31:28]"   is "0b0101"    in_cycle 0 and  // Instruction field.
-    "i4/dRst"      is "0x0"       in_cycle 0 and  // Delayed reset.
-    "i1/PSW[5:0]"  is "0b000100"  in_cycle 1 and  // Program status word.
-    "OP1[7:0]"     is "0x0"       in_cycle 0 and  // Operand one.
-    "OP2[7:0]"     is "0x0"       in_cycle 0 and  // Operand two.
+    "MC[2:0]"      is 0b100     in_cycle 0 and  // Microcycle controller.
+    "uPL[31:28]"   is 0b0101    in_cycle 0 and  // Instruction field.
+    "i72/dRst"      is 0x0       in_cycle 0 and  // Delayed reset.
+    "i69/PSW[5:0]"  is 0b000100  in_cycle 1 and  // Program status word.
+    "OP1[7:0]"     is 0x0       in_cycle 0 and  // Operand one.
+    "OP2[7:0]"     is 0x0       in_cycle 0 and  // Operand two.
     // Constant.
     "Clk"  is_clock N          and                  // Clock.
-    "Rst"  is "0" for N cycles and                  // Reset.
-    "Wait" is "0" for N cycles and                  // Memory Wait.
-    "Int"  is "0" for N cycles and                  // Interrupt.
-    "xIRQ" is "0" for N cycles // and                  // Interrupt Mask.
+    "Rst"  is 0 for N cycles and                  // Reset.
+    "Wait" is 0 for N cycles and                  // Memory Wait.
+    "Int"  is 0 for N cycles and                  // Interrupt.
+    "xIRQ" is 0 for N cycles // and                  // Interrupt Mask.
     // ROM.
     // ROM_ant "M65C02/M65C02_uPgm_V3a.coe"    "uP_ROM" N and // Program ROM.
     // ROM_ant "M65C02/M65C02_Decoder_ROM.coe" "ID_ROM" N     // Instruction ROM.
@@ -70,8 +70,8 @@ let b_bv = fixed_bv2list 8 T b;
 // 0x196 _ADC_imm, opcode 0x69.
 let ant =
     "A[7:0]"  is a_bv    in_cycle 1 and
-    "BA[8:0]" is "0x196" in_cycle 0 and
-    "DI[7:0]" is "0x69"  in_cycle 0 and
+    "BA[8:0]" is 0x196 in_cycle 0 and
+    "DI[7:0]" is 0x69  in_cycle 0 and
     "DI[7:0]" is b_bv    in_cycle 4 and
     static
 ;

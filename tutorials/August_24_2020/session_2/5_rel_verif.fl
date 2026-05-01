@@ -1,7 +1,7 @@
 // =============================================================
 // What about non-functional (relational) specifications?
 // =============================================================
-set_font font_large;
+//set_font font_large;
 cload "ste.fl";
 
 // The basic idea is to add an "observer" circuit.

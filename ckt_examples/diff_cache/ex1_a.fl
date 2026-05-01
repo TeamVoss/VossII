@@ -69,7 +69,7 @@ let ant = "clk" is_clock N
 	and
 	  "t0[15:0]" is "26" for 1 cycle
 	and
-	  "start" is "0x1" for 1 cycle followed_by "0" for (N-2) cycles
+	  "start" is "1" for 1 cycle followed_by "0" for (N-2) cycles
 	and
 	  "max_cnt[15:0]" is "100" for N cycles
 ;
@@ -80,7 +80,7 @@ let ant = "clk" is_clock N
 	and
 	  "t0[15:0]" is "173" for 1 cycle
 	and
-	  "start" is "0x1" for 1 cycle followed_by "0" for (N-2) cycles
+	  "start" is "1" for 1 cycle followed_by "0" for (N-2) cycles
 	and
 	  "max_cnt[15:0]" is "100" for N cycles
 ;
@@ -97,12 +97,12 @@ let ant = "clk" is_clock N
 	and
 	  "t0[15:0]" is A for 1 cycle
 	and
-	  "start" is "0x1" for 1 cycle followed_by "0" for (N-2) cycles
+	  "start" is "1" for 1 cycle followed_by "0" for (N-2) cycles
 	and
 	  "max_cnt[15:0]" is spec for N cycles
 ;
 
-let cons = "in_range" is "0x1" in_cycle (N-1);
+let cons = "in_range" is "1" in_cycle (N-1);
 
 update_vossrc "DYNAMIC-ORDERING" "NO";
 STE "-e" vis [] ant cons [];

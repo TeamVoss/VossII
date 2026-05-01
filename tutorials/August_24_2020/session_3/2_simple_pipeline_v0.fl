@@ -2,7 +2,7 @@
 //  A simple 4-stage pipline
 // ----------------------------------------------------------------
 
-set_font font_large;
+//set_font font_large;
 cload "ste.fl";
 
 ENUM "security" ["LOW", "HIGH"];

@@ -213,37 +213,85 @@ infix 4 until;
 export until;
 
 let is_number str =
-    let non_digit s = 
-	let v = ord s then
-	(v < ord "0") OR (v > ord "9")
+    let es = explode str in
+    let es = (hd es = "-") => tl es | es in
+    let non_digit s =
+        let v = ord s then
+        (v < ord "0") OR (v > ord "9")
     in
-    (find_first0 non_digit (explode str)) = 0
+    (find_first0 non_digit es) = 0
 ;
+
+letrec s2bl sz s =
+    let sx_pat = "^SX\\((.*)\\)$" in
+    let zx_pat = "^ZX\\((.*)\\)$" in
+    let hex_pat = "^0x([0-9A-Fa-f]+)$" in
+    let oct_pat = "^0o([0-7]+)$" in
+    let bin_pat = "^0b([0-1]+)$" in
+    let atom2bl a =
+        let s2l s = map (\s. s = "1") (explode s) in
+        str_reg_match hex_pat a =>
+            let digits = el 2 (str_reg_extract hex_pat a) in
+            let msz = 4*strlen digits in
+            s2l (sprintf "%0*b" msz (sscanf "%x" digits))
+        |
+        str_reg_match oct_pat a =>
+            let digits = el 2 (str_reg_extract oct_pat a) in
+            let msz = 3*strlen digits in
+            s2l (sprintf "%0*b" msz (sscanf "%o" digits))
+        |
+        str_reg_match bin_pat a =>
+            let digits = el 2 (str_reg_extract bin_pat a) in
+            let msz = strlen digits in
+            s2l (sprintf "%0*b" msz (sscanf "%b" digits))
+        |
+        is_number a =>
+            let num = sscanf "%d" a in
+            let msz = num < 0 => sbits_needed num | ubits_needed num in
+            s2l (sprintf "%0*b" msz num)
+        |
+        (a = "T") => [T] |
+        (a = "F") => [F] |
+        let ss = md_expand_vector a then
+        map variable ss
+    in
+    let body2bl b =
+        let parts = str_split b "@" in
+        flatmap atom2bl parts
+    in
+    //
+    str_reg_match sx_pat s =>
+        // Sign extend
+        let body = el 2 (str_reg_extract sx_pat s) in
+        let raw = body2bl body in
+        let msz = length raw in
+        msz > sz =>
+            eprintf "Value list longer (%d) than node list (%d)" msz sz
+        |
+        (replicate (sz-msz) (hd raw))@raw
+    |
+    str_reg_match zx_pat s =>
+        // Zero extend
+        let body = el 2 (str_reg_extract zx_pat s) in
+        let raw = body2bl body in
+        let msz = length raw in
+        msz > sz =>
+            eprintf "Value list longer (%d) than node list (%d)" msz sz
+        |
+        (replicate (sz-msz) F)@raw
+    |
+    // Default is zero extended number
+    s2bl sz (sprintf "ZX(%s)" s)
+;
+
+
 
 let bdd_base_is nds vtlist =
     let nds = md_expand_vectors nds in
     let vec = list2str T "" "," "" id (md_merge_vectors nds) in
     let sz = length nds in
     let cnv ({fixed::bool}, (STR_VAL v), {f::int} , {t::int}) =
-	let vs = (
-	    let s2l s = map (\s. s = "1") (explode s) in
-	    str_is_prefix "0x" v =>
-		s2l (sprintf "%0*b" sz (sscanf "0x%x" v))
-	    |
-	    str_is_prefix "0b" v =>
-		s2l (sprintf "%0*b" sz (sscanf "0b%b" v))
-	    |
-	    is_number v =>
-		s2l (sprintf "%0*b" sz (sscanf "%d" v))
-	    |
-	    (sz = 1) AND (v = "T") => [T] |
-	    (sz = 1) AND (v = "F") => [F] |
-	    let ss = md_expand_vector v then
-	    length ss != sz => error "nope" |
-	    map variable ss
-	) catch
-	    eprintf "Length mismatch in is (|%s| != |%s|)" vec v
-	in
+	let vs = s2bl sz v in
 	map2 (\n.\v. (T,n,v,f,t)) nds vs
      /\ cnv (fixed, (INT_VAL i), f, t) =
 	i < (-1*2**(sz-1)) =>
