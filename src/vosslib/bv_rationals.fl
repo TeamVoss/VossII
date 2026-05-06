@@ -1,0 +1,80 @@
+//-------------------------------------------------------------------
+// Copyright 2020 Carl-Johan Seger
+// SPDX-License-Identifier: Apache-2.0
+//-------------------------------------------------------------------
+load "rationals.fl";
+
+// Library for representing bv-rational numbers.
+
+lettype brat = BVRAT bv bv;
+
+// Make a bv-rational
+clet mk_brat d n = 
+    let c = bv_gcd d n in
+    BVRAT (d/c) (n/c)
+;
+
+// Convert a decimal number (as a string) to a bv-rational
+// Syntax:  1.32	    -- non-repeating decimal
+//	    0.343...	    -- infinitely repeating 3
+//	    1.225{123}...   -- infinitely repeating 123 pattern
+let str2brat s =
+    val (RAT n d) = str2rat s in
+    BVRAT (int2bv n) (int2bv d)
+;
+
+let Pbrat (BVRAT d n) =
+    let b2s v = depends v = [] => sprintf "%d" (bv2int v) | "S" in
+    n == (int2bv 1) => b2s d |
+    sprintf "%s/%s" (b2s d) (b2s n)
+;
+install_print_function Pbrat;
+
+// Add two bv-rational numbers
+let '+' r1 r2 =
+    val (BVRAT d1 n1) = r1 in
+    val (BVRAT d2 n2) = r2 in
+    let d = d1*n2 + d2*n1 in
+    let n = n1 * n2 in
+    mk_brat d n
+;
+infix 7 '+';
+
+// Subtract two bv-rational numbers
+let '-' r1 r2 =
+    val (BVRAT d1 n1) = r1 in
+    val (BVRAT d2 n2) = r2 in
+    let d = d1*n2 - d2*n1 in
+    let n = n1 * n2 in
+    mk_brat d n
+;
+infix 7 '-';
+
+// Multiply two bv-rational numbers
+let '*' r1 r2 =
+    val (BVRAT d1 n1) = r1 in
+    val (BVRAT d2 n2) = r2 in
+    let d = d1*d2 in
+    let n = n1*n2 in
+    mk_brat d n
+;
+infix 8 '*';
+
+// Divide two bv-rational numbers
+let '/' r1 r2 =
+    val (BVRAT d1 n1) = r1 in
+    val (BVRAT d2 n2) = r2 in
+    let d = d1*n2 in
+    let n = n1*d2 in
+    mk_brat d n
+;
+infix 8 '/';
+
+let floor r =
+    val (BVRAT d n) = r in
+    d/n;
+
+let round r =
+    val (BVRAT d n) = r in
+    (((d*int2bv 10)/n)+int2bv 5)/int2bv 10;
+
