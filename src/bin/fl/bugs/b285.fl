@@ -1,2 +1,6 @@
 
 bv2int (bv_sum [] (int2bv 1));
+
+bv2int (bv_sum ["a"] (int2bv 1));
+
+(map (\i. (bv2int (bv_sum ["a"] (int2bv i)))) (0 upto 100));
