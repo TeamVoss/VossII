@@ -1668,7 +1668,7 @@ gen_model_count_rec(formula vs, formula fs, formula fun)
     if( fun == ONE ) {
 	res = Make_CONS_ND(Zero, Make_CONS_ND(One, Make_NIL()));
 	g_ptr tail = GET_CONS_TL(GET_CONS_TL(res));
-	while( (vs != ZERO) ) {
+	while( (vs != ONE) ) {
 	    if( !get_next_vars(&vs, &fs) ) {
 		APPEND1(tail, Make_BOOL_leaf(B_Zero()));
 	    }
