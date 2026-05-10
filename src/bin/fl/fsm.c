@@ -1163,6 +1163,11 @@ get_latch_type(g_ptr redex)
     while( vp != NULL ) {
 	string s = get_draw_name(vp->vp->pfn);
 	if( (s = find_hash(&state_holding_tbl, s)) != NULL ) {
+	    // Remove "add_inst <num> "
+	    s = vp->vp->pfn;
+	    s += 9;	// "add_inst "
+	    while( *s && *s != ' ') s++;
+	    if( *s ) s++;
 	    res = s;
 	    break;
 	}
