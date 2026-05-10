@@ -1125,6 +1125,21 @@ visualization_nodes(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
+static string
+get_draw_name(string s)
+{
+    s = strtemp(s);
+    // Remove "add_inst <num> "
+    s += 9;	// "add_inst "
+    while( *s && *s != ' ') s++;
+    if( *s ) s++;
+    // Remove trailing arguments
+    string es = s+1;
+    while( *es && *es != ' ') es++;
+    *es = 0;
+    return( s );
+}
+
 static void
 get_latch_type(g_ptr redex)
 {
@@ -1146,18 +1161,14 @@ get_latch_type(g_ptr redex)
     string res = s_ES;
     vis_list_ptr vp = np->draw_info;
     while( vp != NULL ) {
-	string s;
-	s = vp->vp->pfn;
-	s += 9;	// "add_inst "
-	while( *s && *s != ' ') s++;
-	if( *s ) s++;
+	string s = get_draw_name(vp->vp->pfn);
 	if( (s = find_hash(&state_holding_tbl, s)) != NULL ) {
 	    res = s;
 	    break;
 	}
 	vp = vp->next;
     }
-    MAKE_REDEX_STRING(redex, res);
+    MAKE_REDEX_STRING(redex, wastrsave(stringsp, res));
     pop_fsm();
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -1186,11 +1197,7 @@ is_latch(g_ptr redex)
     string res = s_ES;
     vis_list_ptr vp = np->draw_info;
     while( vp != NULL ) {
-	string s;
-	s = vp->vp->pfn;
-	s += 9;	// "add_inst "
-	while( *s && *s != ' ') s++;
-	if( *s ) s++;
+	string s = get_draw_name(vp->vp->pfn);
 	if( (s = find_hash(&state_holding_tbl, s)) != NULL ) {
 	    res = s;
 	    break;

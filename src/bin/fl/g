@@ -1,10 +1,8 @@
 set pagination off
 break fl_main
-r -noX -f bugs/b285.fl
+r -noX -f bugs/b284.fl
 break exit
 break voss_abort
 break Dbg_stop
-break bv_sum
-c
-break gen_model_count_rec
+break is_latch
 c

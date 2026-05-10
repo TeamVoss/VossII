@@ -1,5 +1,19 @@
 load "idv.fl";
 
+
+let pp =
+wrap_pexlif (PINST "draw_adff 1 0" [("SHA","35dbc9ee7004ad7804ed36feaba9c50d527f6c422a1bf65c5043ca27611cf2af"),("FP","23393345075802"),("fl_src","/home/cseger/VossII/IDVII/src/fl/design/yosys_lib.fl:1267"),("src","/tmp/voss2_cseger_X1ct9e/ct_top_verilog_NlmBuV/ct_cp0_regs.v:1964.1-1972.4")] T
+  [("D[63:0]",["_$69[63:0]"]),("CLK",["regs_clk"]),("ARST",["cpurst_b"])]
+  [("Q[63:0]",["mscratch_value[63:0]"])]
+  ["D_##_[63:0]","CLK_##_","Q_##_[63:0]"]
+(P_LEAF [(W_PHASE_DELAY (W_VAR 1 "CLK_##_") (W_VAR 1 "CLK")), (W_PHASE_DELAY (W_VAR 64 "D_##_") (W_VAR 64 "D")), (W_PHASE_DELAY (W_VAR 64 "Q_##_") (W_VAR 64 "Q")), (W_UPDATE_FN (W_VAR 64 "Q") (W_ITE (W_NOT (W_VAR 1 "ARST")) (W_CONST 64 0) (W_ITE (W_AND (W_NOT (W_VAR 1 "CLK_##_")) (W_VAR 1 "CLK")) (W_VAR 64 "D_##_") (W_VAR 64 "Q_##_"))))])
+);
+let ckt = pexlif2fsm pp;
+ckt;
+let nd = "mscratch_value[0]";
+is_latch ckt nd;
+
+
 SIGNED "byte" 8;
 
 ENUM "stages" ["INIT", "START_1", "START_2", "SHIFT", "PARITY"];

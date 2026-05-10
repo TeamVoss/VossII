@@ -1026,6 +1026,11 @@ Install_PrinterFn(result_ptr res)
 	if( is_fail(res->expr) ) {
 	    FP(err_fp, "Failure:    %s", GET_FAIL_STRING(res->expr));
 	} else {
+	    if( find_hash(&pretty_printer_tbl, (pointer)pr_type) != NULL ) {
+		FP(warning_fp, "Pretty printer for type %s replaced\n",
+			       Type2String(pr_type, TRUE));
+		delete_hash(&pretty_printer_tbl, (pointer) pr_type);
+	    }
 	    insert_hash(&pretty_printer_tbl, (pointer)pr_type,
 			(pointer)(res->expr));
 	}
