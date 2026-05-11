@@ -30,6 +30,7 @@ static g_ptr	    Zero;
 static g_ptr	    One;
 static hash_record  gen_mc_cache_tbl;
 static int          gen_mc_cache_sz = -1;
+static string	    sES;
 
 /* ----- Forward definitions local functions ----- */
 static int	    sx2(g_ptr *lp1, g_ptr *lp2);
@@ -722,6 +723,67 @@ fixed_ext_bvdiv(g_ptr av, g_ptr bv, g_ptr *Qp, g_ptr *Rp)
 /********************************************************/
 
 static void
+bv_top_cofactor(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    bv_ptr bp = (bv_ptr) GET_EXT_OBJ(GET_APPLY_RIGHT(redex));
+    g_ptr list = bp->u.l;
+    // Find the top-most variable
+    int top_var = -1;
+    for(g_ptr cur = list; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
+	formula f = GET_BOOL(GET_CONS_HD(cur));
+	if( f != ZERO && f != ONE ) {
+	    int cur_var = Get_BDD_index(f);
+	    if( top_var == -1 ) {
+		top_var = cur_var;
+	    } else if ( cur_var < top_var ) {
+		top_var = cur_var;
+	    }
+	}
+    }
+    if( top_var == -1 ) {
+	MAKE_REDEX_FAILURE(redex, "bv_top_cofactor on a constant bv");
+	DEC_REF_CNT(l);
+	DEC_REF_CNT(r);
+	return;
+    }
+    g_ptr Hres = Make_NIL();
+    g_ptr Htail = Hres;
+    g_ptr Lres = Make_NIL();
+    g_ptr Ltail = Lres;
+    string top_var_name = NULL;
+    for(g_ptr cur = list; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
+	g_ptr gf = GET_CONS_HD(cur);
+	formula f = GET_BOOL(gf);
+	if( f == ZERO || f == ONE ) {
+	    APPEND1(Htail, gf); INC_REFCNT(gf);
+	    APPEND1(Ltail, gf); INC_REFCNT(gf);
+	} else {
+	    int cur_var = Get_BDD_index(f);
+	    if( cur_var != top_var ) {
+		APPEND1(Htail, gf); INC_REFCNT(gf);
+		APPEND1(Ltail, gf); INC_REFCNT(gf);
+	    } else {
+		formula H, L;
+		Get_top_cofactor(f, &top_var_name, &H, &L);
+		APPEND1(Htail, Make_BOOL_leaf(H));
+		APPEND1(Ltail, Make_BOOL_leaf(L));
+	    }
+	}
+    }
+    g_ptr Hbv = Get_node();
+    MAKE_REDEX_EXT_OBJ(Hbv, bv_oidx, get_bv_rec(Hres));
+    g_ptr Lbv = Get_node();
+    MAKE_REDEX_EXT_OBJ(Lbv, bv_oidx, get_bv_rec(Lres));
+    MAKE_REDEX_PAIR(redex, Make_STRING_leaf(wastrsave(stringsp, top_var_name)),
+			   Make_PAIR_ND(Hbv, Lbv));
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+    return;
+}
+
+static void
 list2bv(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
@@ -1338,6 +1400,7 @@ Bv_Init()
 				 bv_gmap2_fn,
 				 bv_sha256_fn);
     bv_handle_tp  = Get_Type("bv", NULL, TP_INSERT_FULL_TYPE);
+    sES = wastrsave(stringsp, "");
 }
 
 static void
@@ -1367,6 +1430,13 @@ Bv_Install_Functions()
     Add_ExtAPI_Function("bv2list", "1", FALSE,
 			GLmake_arrow(bv_handle_tp, GLmake_list(GLmake_bool())),
 			bv2list);
+
+    Add_ExtAPI_Function("bv_top_cofactor", "1", FALSE,
+			GLmake_arrow(bv_handle_tp,
+			    GLmake_tuple(
+				GLmake_string(),
+				GLmake_tuple(bv_handle_tp,bv_handle_tp))),
+			bv_top_cofactor);
 
     Add_ExtAPI_Function("bv_size", "1", FALSE,
 			GLmake_arrow(bv_handle_tp, GLmake_int()),

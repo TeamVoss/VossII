@@ -1,0 +1,24 @@
+
+VARS "a b c d e f";
+
+let bv = list2bv [F,T,F,b, b AND c, c, b OR c OR d];
+
+var_order[];
+
+bv;
+bv_top_cofactor bv;
+
+let spec = "b", (substitute [("b", T)] bv), (substitute [("b", F)] bv);
+spec;
+
+spec == bv_top_cofactor bv;
+
+var_order ["d", "c", "b"];
+
+bv;
+bv_top_cofactor bv;
+
+let spec = "d", (substitute [("d", T)] bv), (substitute [("d", F)] bv);
+spec;
+
+spec == bv_top_cofactor bv;

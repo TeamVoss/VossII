@@ -2186,6 +2186,16 @@ truth_cover_rec(hash_record *done_tblp, buffer *var_bufp, unint idx, formula b,
     return TRUE;
 }
 
+int
+Get_BDD_index(formula b)
+{
+    if( b == ZERO || b == ONE ) {
+	return -1;
+    }
+    bdd_ptr bp = GET_BDDP(b);
+    return( VarTbl[BDD_GET_VAR(bp)].variable );
+}
+
 static void
 bdd_index(g_ptr redex)
 {
@@ -2198,8 +2208,7 @@ bdd_index(g_ptr redex)
 			   Fail_pr("bdd_index not defined for constants T/F"));
 	return;
     }
-    bdd_ptr bp = GET_BDDP(b);
-    MAKE_REDEX_INT(redex, BDD_GET_VAR(bp));
+    MAKE_REDEX_INT(redex, Get_BDD_index(b));
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
