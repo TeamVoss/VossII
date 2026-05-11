@@ -22,3 +22,6 @@ let spec = "d", (substitute [("d", T)] bv), (substitute [("d", F)] bv);
 spec;
 
 spec == bv_top_cofactor bv;
+111111111;
+
+bv_is_constant bv;

@@ -723,6 +723,28 @@ fixed_ext_bvdiv(g_ptr av, g_ptr bv, g_ptr *Qp, g_ptr *Rp)
 /********************************************************/
 
 static void
+bv_is_constant(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    bv_ptr bp = (bv_ptr) GET_EXT_OBJ(GET_APPLY_RIGHT(redex));
+    g_ptr list = bp->u.l;
+    for(g_ptr cur = list; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
+	formula f = GET_BOOL(GET_CONS_HD(cur));
+	if( (f != ZERO) && ( f != ONE) ) {
+	    MAKE_REDEX_BOOL(redex, B_Zero());
+	    DEC_REF_CNT(l);
+	    DEC_REF_CNT(r);
+	    return;
+	}
+    }
+    MAKE_REDEX_BOOL(redex, B_One());
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+    return;
+}
+
+static void
 bv_top_cofactor(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
@@ -1430,6 +1452,10 @@ Bv_Install_Functions()
     Add_ExtAPI_Function("bv2list", "1", FALSE,
 			GLmake_arrow(bv_handle_tp, GLmake_list(GLmake_bool())),
 			bv2list);
+
+    Add_ExtAPI_Function("bv_is_constant", "1", FALSE,
+			GLmake_arrow(bv_handle_tp, GLmake_bool()),
+			bv_is_constant);
 
     Add_ExtAPI_Function("bv_top_cofactor", "1", FALSE,
 			GLmake_arrow(bv_handle_tp,
