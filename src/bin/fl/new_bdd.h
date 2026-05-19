@@ -92,7 +92,8 @@ void		Get_abstract_depends(g_ptr redex, hash_record *abs_tblp,
 int		SHA256_bdd(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha,
 			    formula f); 
 void		Get_Size_and_Vars(g_ptr funs, g_ptr vars,
-				  unint *sizep, formula *all, formula *frees);
+				  unint *sizep, formula *all,
+				  hash_record *vtbl);
 int		Get_BDD_index(formula f);
 
 #else /* EXPORT_FORWARD_DECL */

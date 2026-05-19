@@ -901,6 +901,9 @@ AddToOpenOverloadDef(string name, oll_ptr alts, symbol_tbl_ptr stbl,
         return stbl;
     }
     // We probably should check for overlapping overloads....
+
+//%%%%%%%%%%%%%
+
     while( fp->next != NULL ) { fp = fp->next; }
     fp->next = alts;
     return stbl;

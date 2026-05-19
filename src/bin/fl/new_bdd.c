@@ -1258,45 +1258,32 @@ SHA256_bdd(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha, formula f)
 
 void
 Get_Size_and_Vars(g_ptr funs, g_ptr vars,
-		  unint *sizep, formula *allp, formula *freep)
+		  unint *sizep, formula *vsp, hash_record *var_tblp)
 {
-    hash_record var_tbl;
-    create_hash(&var_tbl, 100, str_hash, str_equ);
+    Reset_BDD_Size();
     for(g_ptr cur = vars; !IS_NIL(cur); cur = GET_CONS_TL(cur) ) {
 	string vname = GET_STRING(GET_CONS_HD(cur));
-	if( find_hash(&var_tbl, vname) == NULL ) {
-	    insert_hash(&var_tbl, vname, vname);
+	if( find_hash(var_tblp, vname) == NULL ) {
+	    insert_hash(var_tblp, vname, vname);
+	    string vname = GET_STRING(GET_CONS_HD(cur));
+	    B_Size(B_Var(vname));
 	}
     }
-    Reset_BDD_Size();
-    for(g_ptr cur = funs; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
+    for(g_ptr cur = funs; !IS_NIL(cur); cur = GET_CONS_TL(cur) ) {
 	B_Size(GET_BOOL(GET_CONS_HD(cur)));
     }
+    int sz = 0;
     unint var_cnt = Get_VarCnt();
-    *freep = B_One();
-    unint sz = 0;
+    *vsp = B_One();
     for(unint i = 0; i < var_cnt; i++) {
-	int wid = B_Width(i);
-	sz += wid;
-	if( wid > 0 && (find_hash(&var_tbl, Get_Var_Name(i)) == NULL) ) {
+        int wid = B_Width(i);
+        sz += wid;
+        if( wid > 0  ) {
 	    formula v = B_Var(Get_Var_Name(i));
-	    *freep = B_And(*freep, v);
-	}
+	    *vsp = B_And(*vsp, v);
+        }
     }
     *sizep = sz;
-    for(g_ptr cur = vars; !IS_NIL(cur); cur = GET_CONS_TL(cur) ) {
-	string vname = GET_STRING(GET_CONS_HD(cur));
-	B_Size(B_Var(vname));
-    }
-    var_cnt = Get_VarCnt();
-    *allp = B_One();
-    for(unint i = 0; i < var_cnt; i++) {
-	int wid = B_Width(i);
-	if( wid > 0  ) {
-	    formula v = B_Var(Get_Var_Name(i));
-	    *allp = B_And(*allp, v);
-	}
-    }
 }
 
 

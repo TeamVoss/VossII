@@ -35,7 +35,8 @@ static string	    sES;
 /* ----- Forward definitions local functions ----- */
 static int	    sx2(g_ptr *lp1, g_ptr *lp2);
 static g_ptr	    trim_bv(g_ptr l);
-static g_ptr	    gen_model_count_rec(formula vs, formula fs, formula fun);
+static g_ptr	    gen_model_count_rec(formula vs, hash_record *vtbl,
+					formula fun);
 static void	    create_gen_mc_cache(unint sz);
 static g_ptr	    find_in_gen_mc_cache(formula f);
 static void	    free_gen_mc_cache();
@@ -1329,23 +1330,25 @@ do_gen_model_count(g_ptr redex)
     RCdo_dynamic_var_order = FALSE;
     // Determine total BDD size and all variables.
     unint sz;
-    formula vs, fs;
-    Get_Size_and_Vars(funs, var_list, &sz, &vs, &fs);
+    formula vs;
+    hash_record var_tbl;
+    create_hash(&var_tbl, 100, str_hash, str_equ);
+    Get_Size_and_Vars(funs, var_list, &sz, &vs, &var_tbl);
     PUSH_BDD_GC(vs);
-    PUSH_BDD_GC(fs);
     create_gen_mc_cache(sz);
     // Now compute the gen_model_count for all variables
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
     while( !IS_NIL(funs) ) {
         formula fun = GET_BOOL(GET_CONS_HD(funs));
-        g_ptr res = gen_model_count_rec(vs, fs, fun);
+        g_ptr res = gen_model_count_rec(vs, &var_tbl, fun);
 	APPEND1(tail, Make_bv(res));
         funs = GET_CONS_TL(funs);
     }
     free_gen_mc_cache();
     RCdo_dynamic_var_order = o_do_dynamic_var_order;
-    POP_BDD_GC(2);
+    dispose_hash(&var_tbl, NULLFCN);
+    POP_BDD_GC(1);
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
 }
@@ -1364,10 +1367,11 @@ bv_sum(g_ptr redex)
     RCdo_dynamic_var_order = FALSE;
     // Determine total BDD size and all variables.
     unint sz;
-    formula vs, fs;
-    Get_Size_and_Vars(bvl, var_list, &sz, &vs, &fs);
+    formula vs;
+    hash_record var_tbl;
+    create_hash(&var_tbl, 100, str_hash, str_equ);
+    Get_Size_and_Vars(bvl, var_list, &sz, &vs, &var_tbl);
     PUSH_BDD_GC(vs);
-    PUSH_BDD_GC(fs);
     create_gen_mc_cache(sz);
     // Now compute the gen_model_count for all variables
     g_ptr sum = Make_CONS_ND(Zero, Make_NIL());
@@ -1378,18 +1382,19 @@ bv_sum(g_ptr redex)
     }
     for(g_ptr cur = bvl; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
         formula fun = GET_BOOL(GET_CONS_HD(cur));
-        g_ptr res = gen_model_count_rec(vs, fs, fun);
+        g_ptr res = gen_model_count_rec(vs, &var_tbl, fun);
 	shift--;
 	res = shift_left(res, shift);
         (void) sx2(&sum, &res);
-	POP_GLOBAL_GC(1);
         sum = gen_add(FALSE, sum, res);
+	POP_GLOBAL_GC(1);
 	PUSH_GLOBAL_GC(sum);
     }
     MAKE_REDEX_EXT_OBJ(redex, bv_oidx, get_bv_rec(sum));
     free_gen_mc_cache();
     RCdo_dynamic_var_order = o_do_dynamic_var_order;
-    POP_BDD_GC(2);
+    dispose_hash(&var_tbl, NULLFCN);
+    POP_BDD_GC(1);
     POP_GLOBAL_GC(1);
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -1713,27 +1718,6 @@ shift_left(g_ptr l, int cnt)
     return result;
 }
 
-static bool
-get_next_vars(formula *vsp, formula *fsp)
-{
-    bool is_free;
-    bdd_ptr vp = f_GET_BDDP(*vsp);
-    if( *fsp == ONE ) {
-	is_free = FALSE;
-    } else {
-	bdd_ptr fp = f_GET_BDDP(*fsp);
-	unint f_var = f_BDD_GET_VAR(fp);
-	unint v_var = f_BDD_GET_VAR(vp);
-	if( f_var == v_var ) {
-	    *fsp = f_GET_LSON(fp);
-	    is_free = TRUE;
-	} else {
-	    is_free = FALSE;
-	}
-    }
-    *vsp = f_GET_LSON(vp);
-    return is_free;
-}
 
 #if 0
 static void
@@ -1754,9 +1738,11 @@ DBG_Pbv(string txt, formula fun, g_ptr l)
 #endif
 
 static g_ptr
-gen_model_count_rec(formula vs, formula fs, formula fun)
+gen_model_count_rec(formula vs, hash_record *var_tblp, formula fun)
 {
     g_ptr res;
+    string vtop_var;
+    formula vH, vL;
     if( fun == ZERO ) {
 	res = Make_CONS_ND(Zero, Make_NIL());
 	return res;
@@ -1764,19 +1750,23 @@ gen_model_count_rec(formula vs, formula fs, formula fun)
     if( fun == ONE ) {
 	res = Make_CONS_ND(Zero, Make_CONS_ND(One, Make_NIL()));
 	g_ptr tail = GET_CONS_TL(GET_CONS_TL(res));
-	while( (vs != ONE) && (vs != ZERO) ) {
-	    if( !get_next_vars(&vs, &fs) ) {
+	while( (vs != ONE) ) {
+	    Get_top_cofactor(vs, &vtop_var, &vH, &vL);
+	    if( find_hash(var_tblp, vtop_var) != NULL ) {
 		APPEND1(tail, Make_BOOL_leaf(B_Zero()));
 	    }
+	    vs = vH;
 	}
 	return res;
     }
     unint fun_var = f_BDD_GET_VAR(f_GET_BDDP(fun));
     int mul = 0;
     while( f_BDD_GET_VAR(f_GET_BDDP(vs)) != fun_var ) {
-	if( !get_next_vars(&vs, &fs) ) {
+	Get_top_cofactor(vs, &vtop_var, &vH, &vL);
+	if( find_hash(var_tblp, vtop_var) != NULL ) {
 	    mul++;
 	}
+	vs = vH;
     }
     g_ptr cres = find_in_gen_mc_cache(fun);
     if( cres != NULL ) {
@@ -1786,14 +1776,15 @@ gen_model_count_rec(formula vs, formula fs, formula fun)
     formula H, L;
     string top_var;
     Get_top_cofactor(fun, &top_var, &H, &L);
-    bool is_free = get_next_vars(&vs, &fs);
+    Get_top_cofactor(vs, &vtop_var, &vH, &vL);
+    vs = vH;
     g_ptr Hres, Lres;
-    Hres = gen_model_count_rec(vs, fs, H);
+    Hres = gen_model_count_rec(vs, var_tblp, H);
     PUSH_GLOBAL_GC(Hres);
-    Lres = gen_model_count_rec(vs, fs, L);
+    Lres = gen_model_count_rec(vs, var_tblp, L);
     PUSH_GLOBAL_GC(Lres);
     g_ptr raw_res;
-    if( is_free ) {
+    if( find_hash(var_tblp, top_var) == NULL ) {
 	formula v = B_Var(top_var);
 	raw_res = ite_bv_list(v, Hres, Lres);
     } else {

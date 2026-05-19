@@ -1,0 +1,32 @@
+
+VARS "a b";
+
+let bv = b => (a => int2bv 7 | int2bv 13) | int2bv 234;
+//bv;
+
+
+let spec = (substitute [("a",F)] bv)+ (substitute [("a",T)] bv);
+spec;
+r01;
+
+let r01 = (var_order ["a","b","c"]) fseq ( bv_sum ["a"] bv);
+let r02 = (var_order ["a","b","c"]) fseq ( bv_sum ["a"] bv);
+let r03 = (var_order ["a","c","b"]) fseq ( bv_sum ["a"] bv);
+let r04 = (var_order ["a","c","b"]) fseq ( bv_sum ["a"] bv);
+let r05 = (var_order ["a","b","c"]) fseq ( bv_sum ["a"] bv);
+let r06 = (var_order ["a","c","b"]) fseq ( bv_sum ["a"] bv);
+let r07 = (var_order ["b","a","c"]) fseq ( bv_sum ["a"] bv);
+let r08 = (var_order ["b","a","c"]) fseq ( bv_sum ["a"] bv);
+let r09 = (var_order ["b","c","a"]) fseq ( bv_sum ["a"] bv);
+let r10 = (var_order ["b","c","a"]) fseq ( bv_sum ["a"] bv);
+let r11 = (var_order ["b","a","c"]) fseq ( bv_sum ["a"] bv);
+let r12 = (var_order ["b","c","a"]) fseq ( bv_sum ["a"] bv);
+let r13 = (var_order ["c","a","b"]) fseq ( bv_sum ["a"] bv);
+let r14 = (var_order ["c","a","b"]) fseq ( bv_sum ["a"] bv);
+let r15 = (var_order ["c","b","a"]) fseq ( bv_sum ["a"] bv);
+let r16 = (var_order ["c","b","a"]) fseq ( bv_sum ["a"] bv);
+let r17 = (var_order ["c","a","b"]) fseq ( bv_sum ["a"] bv);
+let r18 = (var_order ["c","b","a"]) fseq ( bv_sum ["a"] bv);
+
+
+(spec == r01) AND (r01 == r02) AND (r01 == r03) AND (r01 == r04) AND (r01 == r05) AND (r01 == r06) AND (r01 == r07) AND (r01 == r08) AND (r01 == r09) AND (r01 == r10) AND (r01 == r11) AND (r01 == r12) AND (r01 == r13) AND (r01 == r14) AND (r01 == r15) AND (r01 == r16) AND (r01 == r17) AND (r01 == r18);
