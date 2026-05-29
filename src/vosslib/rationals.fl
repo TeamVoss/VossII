@@ -8,9 +8,11 @@
 lettype rat = RAT int int;
 
 // Make a rational
-clet mk_rat d n = 
-    let c = gcd d n in
-    RAT (d/c) (n/c)
+clet mk_rat n d = 
+    // Normalize signs.
+    val (n,d) = d < 0 => ((-n),(-d)) | (n,d) in 
+    let c = gcd n d in
+    RAT (n/c) (d/c)
 ;
 
 // Convert a decimal number (as a string) to a rational
@@ -51,57 +53,57 @@ let str2rat s =
     mk_srat (div*int + last_digit) (div*g_fact)
 ;
 
-let Prat (RAT d n) =
-    n = 1 => int2str d |
-    sprintf "%d/%d" d n
+let Prat (RAT n d) =
+    d = 1 => int2str n |
+    sprintf "%d/%d" n d
 ;
 install_print_function Prat;
 
 // Add two rational numbers
 let '+' r1 r2 =
-    val (RAT d1 n1) = r1 in
-    val (RAT d2 n2) = r2 in
-    let d = d1*n2 + d2*n1 in
-    let n = n1 * n2 in
-    mk_rat d n
+    val (RAT n1 d1) = r1 in
+    val (RAT n2 d2) = r2 in
+    let n = n1*d2 + n2*d1 in
+    let d = d1 * d2 in
+    mk_rat n d
 ;
 infix 7 '+';
 
 // Subtract two rational numbers
 let '-' r1 r2 =
-    val (RAT d1 n1) = r1 in
-    val (RAT d2 n2) = r2 in
-    let d = d1*n2 - d2*n1 in
-    let n = n1 * n2 in
-    mk_rat d n
+    val (RAT n1 d1) = r1 in
+    val (RAT n2 d2) = r2 in
+    let n = n1*d2 - n2*d1 in
+    let d = d1 * d2 in
+    mk_rat n d
 ;
 infix 7 '-';
 
 // Multiply two rational numbers
 let '*' r1 r2 =
-    val (RAT d1 n1) = r1 in
-    val (RAT d2 n2) = r2 in
-    let d = d1*d2 in
+    val (RAT n1 d1) = r1 in
+    val (RAT n2 d2) = r2 in
     let n = n1*n2 in
-    mk_rat d n
+    let d = d1*d2 in
+    mk_rat n d
 ;
 infix 8 '*';
 
 // Divide two rational numbers
 let '/' r1 r2 =
-    val (RAT d1 n1) = r1 in
-    val (RAT d2 n2) = r2 in
-    let d = d1*n2 in
+    val (RAT n1 d1) = r1 in
+    val (RAT n2 d2) = r2 in
     let n = n1*d2 in
-    mk_rat d n
+    let d = d1*n2 in
+    mk_rat n d
 ;
 infix 8 '/';
 
 let floor r =
-    val (RAT d n) = r in
-    d/n;
+    val (RAT n d) = r in
+    n/d;
 
 let round r =
-    val (RAT d n) = r in
-    (((d*10)/n)+5)/10;
+    val (RAT n d) = r in
+    (((n*10)/d)+5)/10;
 
