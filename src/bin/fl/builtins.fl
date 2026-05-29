@@ -2020,5 +2020,32 @@ let truth_cover vars f =
 
 overload model_count fp_model_count int_model_count;
 
+open_overload {ToString :: *a -> string};
+
+let str_ToString s = sprintf "\"%s\"" s;
+add_open_overload ToString str_ToString;
+let int_ToString i = sprintf "%d" i;
+add_open_overload ToString int_ToString;
+let bool_ToString b = sprintf "%B" b;
+add_open_overload ToString bool_ToString;
+let bexpr_ToString b = bexpr2str 10 b;
+add_open_overload ToString bexpr_ToString;
+let bv_ToString bv = bv2str 10 bv;
+add_open_overload ToString bv_ToString;
+let bev_ToString bev = bev2str 10 bev;
+add_open_overload ToString bev_ToString;
+let list_ToString l = 
+    l == [] => "[]" |
+    let pr a = ToString a in
+    letrec cnv (a1:a2:rem) = (pr a1)^", "^(cnv (a2:rem))
+     /\    cnv [a] = (pr a)^"]"
+    in
+    "["^(cnv l)
+;
+add_open_overload ToString list_ToString;
+let pair_ToString p = 
+    sprintf "(%s, %s)" (ToString (fst p)) (ToString (snd p))
+;
+add_open_overload ToString pair_ToString;
 
 (update_vossrc "ADD-DEBUG-INFO" __old_debug_on__) fseq ();

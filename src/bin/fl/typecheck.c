@@ -451,6 +451,14 @@ Get_common_type(typeExp_ptr default_type, oll_ptr alts)
     return( copy_to_persistent_store(summary_type) );
 }
 
+bool
+Types_Overlap(typeExp_ptr tp1, typeExp_ptr tp2)
+{
+    push_tc_context();
+    bool can_unify = unify(TRUE, tp1, tp2);
+    pop_tc_context(TRUE);
+    return( can_unify );
+}
 
 typeExp_ptr
 Get_Type(string name, typeList_ptr tvars, int insert_missing)

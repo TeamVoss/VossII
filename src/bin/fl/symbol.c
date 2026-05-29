@@ -847,12 +847,66 @@ Add_To_OverloadList(string name, typeExp_ptr type, oll_ptr l,
     return ret;
 }
 
+static oll_ptr
+add_overloads(oll_ptr cur_alts, oll_ptr new_alts)
+{
+    if( new_alts == NULL ) { return cur_alts; }
+    // Make sure there is at least one element in the cur_alts list
+    if( cur_alts == NULL ) {
+	cur_alts = new_alts;
+	new_alts = new_alts->next;
+	cur_alts->next = NULL;
+    }
+    oll_ptr last = cur_alts;
+    while( new_alts != NULL ) {
+	fn_ptr  new_fn = new_alts->fn;
+	for(oll_ptr cur = cur_alts; cur != NULL; cur = cur->next) {
+	    if( Types_Overlap(cur->fn->type, new_fn->type) ) {
+		if( file_load ) {
+		    FP(err_fp,
+		       "-E-: Cannot overload functions with overlapping types "
+		       "in file %s close to line %d\n",cur_file_name,line_nbr);
+		} else {
+		    FP(err_fp,
+		       "-E-: Cannot overload functions with overlapping types "
+		       "close to line %d\n", line_nbr);
+		}
+		return NULL;
+	    }
+	    last = cur;
+	}
+	last->next = new_alts;
+	new_alts = new_alts->next;
+	last->next->next = NULL;
+    }
+    return( cur_alts );
+}
+
+#if 0
+static void
+DBG_print_alts(string msg, oll_ptr alts)
+{
+    fprintf(stderr, "%s: ", msg);
+    while( alts != NULL ) {
+	fprintf(stderr, " %s", alts->fn->name);
+	alts = alts->next;
+    }
+    fprintf(stderr, "\n");
+}
+#endif
 
 symbol_tbl_ptr
 InsertOverloadDef(string name, bool open_overload, oll_ptr alts,
                   typeExp_ptr type, symbol_tbl_ptr stbl,
                   string file, int start_line)
 {
+    // Check that overload alternatives can be added.
+    if( alts != NULL ) {
+	alts = add_overloads(NULL, alts);
+	if( alts == NULL ) {
+	    return stbl;
+	}
+    }
     fn_ptr      ret;
     ret                 = (fn_ptr) get_fn_rec();
     ret->ADT_level      = ADT_level;
@@ -896,16 +950,11 @@ AddToOpenOverloadDef(string name, oll_ptr alts, symbol_tbl_ptr stbl,
         return stbl;
     }
     oll_ptr fp = cur->overload_list;
+    fp = add_overloads(fp, alts);
     if( fp == NULL ) {
-        cur->overload_list = alts;
-        return stbl;
+	return stbl;
     }
-    // We probably should check for overlapping overloads....
-
-//%%%%%%%%%%%%%
-
-    while( fp->next != NULL ) { fp = fp->next; }
-    fp->next = alts;
+    cur->overload_list = fp;
     return stbl;
 }
 

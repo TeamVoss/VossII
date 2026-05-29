@@ -18,6 +18,7 @@ typedef struct typeList_rec	*typeList_ptr;
 void		TC_Init();
 bool            Is_Void(typeExp_ptr type);
 typeExp_ptr	TypeCheck(g_ptr *ondp, bool delayed, impl_arg_ptr *impl_argsp);
+bool		Types_Overlap(typeExp_ptr tp1, typeExp_ptr tp2);
 void		Reset_TypeChecker();
 typeExp_ptr	Get_common_type(typeExp_ptr default_type, oll_ptr alts);
 fn_ptr		Find_Overload_Choice(fn_ptr fn, typeExp_ptr type);
