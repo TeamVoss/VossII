@@ -864,12 +864,16 @@ add_overloads(oll_ptr cur_alts, oll_ptr new_alts)
 	    if( Types_Overlap(cur->fn->type, new_fn->type) ) {
 		if( file_load ) {
 		    FP(err_fp,
-		       "-E-: Cannot overload functions with overlapping types "
-		       "in file %s close to line %d\n",cur_file_name,line_nbr);
+		       "-E-: Cannot overload %s with %s (overlapping types) "
+		       "in file %s close to line %d\n",
+			new_fn->name, cur->fn->name, 
+			cur_file_name, line_nbr);
 		} else {
 		    FP(err_fp,
-		       "-E-: Cannot overload functions with overlapping types "
-		       "close to line %d\n", line_nbr);
+		       "-E-: Cannot overload %s with %s (overlapping types) "
+		       "close to line %d\n",
+			new_fn->name, cur->fn->name, 
+			line_nbr);
 		}
 		return NULL;
 	    }
