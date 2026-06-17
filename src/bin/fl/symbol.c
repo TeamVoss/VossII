@@ -848,9 +848,30 @@ Add_To_OverloadList(string name, typeExp_ptr type, oll_ptr l,
 }
 
 static oll_ptr
+expand_overload_list(oll_ptr l)
+{
+    if( l == NULL ) { return NULL; }
+    if( l->fn->overload_list != NULL ) {
+	oll_ptr pre = expand_overload_list(l->fn->overload_list);
+	oll_ptr rest = expand_overload_list(l->next);
+	oll_ptr cur = pre;
+	while( cur->next != NULL ) { cur = cur->next; }
+	cur->next = rest;
+	return pre;
+    } else {
+	oll_ptr ret = (oll_ptr) new_rec(&oll_rec_mgr);
+	ret->fn = l->fn;
+	ret->next = expand_overload_list(l->next);
+	return ret;
+    }
+}
+
+
+static oll_ptr
 add_overloads(oll_ptr cur_alts, oll_ptr new_alts)
 {
     if( new_alts == NULL ) { return cur_alts; }
+    new_alts = expand_overload_list(new_alts);
     // Make sure there is at least one element in the cur_alts list
     if( cur_alts == NULL ) {
 	cur_alts = new_alts;
@@ -860,6 +881,7 @@ add_overloads(oll_ptr cur_alts, oll_ptr new_alts)
     oll_ptr last = cur_alts;
     while( new_alts != NULL ) {
 	fn_ptr  new_fn = new_alts->fn;
+	ASSERT(new_fn->overload_list == NULL);
 	for(oll_ptr cur = cur_alts; cur != NULL; cur = cur->next) {
 	    if( Types_Overlap(cur->fn->type, new_fn->type) ) {
 		if( file_load ) {
@@ -879,6 +901,7 @@ add_overloads(oll_ptr cur_alts, oll_ptr new_alts)
 	    }
 	    last = cur;
 	}
+
 	last->next = new_alts;
 	new_alts = new_alts->next;
 	last->next->next = NULL;

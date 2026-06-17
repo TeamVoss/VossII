@@ -1,0 +1,99 @@
+// Define a symbolic matrix data type.
+lettype {*a} smatrix = SMAT
+                    {rows::int}
+                    {cols::int}
+                    {row_idx:: bv}
+                    {col_idx:: bv}
+                    {matrix :: *a}
+;
+
+let get_rows_and_cols sm =
+    val (SMAT rows cols ridx cidx sv) = sm in
+    (rows, cols)
+;
+
+let get_matrix_bv sm =
+    val (SMAT rows cols ridx cidx sv) = sm in
+    sv
+;
+
+let smatrix2matrix sm =
+    val (SMAT rows cols ridx cidx sv) = sm in
+    let ovars = (depends sv) subtract (depends (ridx,cidx)) in
+    ovars != [] => eprintf "Symbolic matrix (%S)" ovars |
+    letrec mk_row r =
+        r = rows => [] |
+        let rcond = (ridx = (int2bv r)) in
+        letrec mk_col c =
+            c == cols => [] |
+            let ccond = (cidx = (int2bv c)) in
+            let sub = param (rcond AND ccond) in
+            let v = substitute sub sv in
+            v:(mk_col (c+1))
+        in
+        (mk_col 0):(mk_row (r+1))
+    in
+    mk_row 0
+;
+
+let matrix_ToString sm =
+    val (SMAT rows cols ridx cidx v) = sm in
+    (depends v) subtract (depends (ridx,cidx)) = [] =>
+        let pcol fp l = fprintf fp "%s" (ToString l) in
+        (list2fp stdout T "\n[\n\t" ",\n\t" "\n]" pcol (smatrix2matrix sm))
+        fseq ""
+    |
+    sprintf "(SMAT %d %d %s %s)" rows cols
+                (bv2str 10 ridx)
+                (bv2str 10 cidx)
+;
+add_open_overload ToString matrix_ToString;
+
+
+// Matrix arithmetic
+
+let mk_sub old new =
+    let get_var b =
+        let dep = depends b in
+        length dep != 1 => eprintf "Non-variable in mk_sub (%B)" b |
+        hd dep
+    in
+    let old_vars  = map get_var (tl (bv2list old)) in
+    let n = length old_vars in
+    let raw = (replicate n F)@(bv2list new) in
+    zip old_vars (lastn n raw)
+;
+
+let transpose m =
+    val (SMAT rows cols ridx cidx v) = m in
+    let rows' = cols in
+    let cols' = rows in
+    let ridx' = bv_uvector "r" (ubits_needed (rows' - 1)) in
+    let cidx' = bv_uvector "c" (ubits_needed (cols' - 1)) in
+    let sub = (mk_sub ridx cidx')@(mk_sub cidx ridx') in
+    let v' = substitute sub v in
+    (SMAT rows' cols' ridx' cidx' v')
+;
+
+let get_element sm row col =
+    val (SMAT rows cols ridx cidx v) = sm in
+    row >= (int2bv rows) => NONE |
+    col >= (int2bv cols) => NONE |
+    let sub = (mk_sub ridx row)@(mk_sub cidx col) in
+    SOME (substitute sub v)
+;
+
+let set_element sm row col new_val =
+    val (SMAT rows cols ridx cidx v) = sm in
+    let v' = (row = ridx) AND (col = cidx) => new_val | v in
+    (SMAT rows cols ridx cidx v')
+;
+
+let mat_abs m =
+    val (SMAT rows cols ridx cidx sv) = m in
+    let sv' = (sv >= (int2bv 0)) => sv | (int2bv (-1)) * sv in
+    (SMAT rows cols ridx cidx sv')
+;
+
+overload abs abs mat_abs;
+
