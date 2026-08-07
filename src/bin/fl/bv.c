@@ -1748,11 +1748,13 @@ gen_model_count_rec(formula vs, hash_record *var_tblp, formula fun)
 	return res;
     }
     if( fun == ONE ) {
-	res = Make_CONS_ND(Zero, Make_CONS_ND(One, Make_NIL()));
+	// Return 2**|vars_left|
+	res = Make_CONS_ND(Zero, Make_CONS_ND(One, Make_NIL()));    // 1
 	g_ptr tail = GET_CONS_TL(GET_CONS_TL(res));
 	while( (vs != ONE) ) {
 	    Get_top_cofactor(vs, &vtop_var, &vH, &vL);
 	    if( find_hash(var_tblp, vtop_var) != NULL ) {
+		// 2*current
 		APPEND1(tail, Make_BOOL_leaf(B_Zero()));
 	    }
 	    vs = vH;
