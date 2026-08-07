@@ -813,23 +813,48 @@ letrec bv_gcd a b =
     bv_gcd b (a % b)
 ;
 
-// Divide the bv with the gcd of all values the bv can represent.
-// For example, if the bv can represent 9, 12, and 15, the bv_reduce
-// will return a bv that represents 3, 4, and 5 for the same assignments
-// to the variable in the original bv.
-let bv_reduce bv =
-    NOT ((bv = int2bv 0) == F) =>
-	error "bv_reduce cannot be applied to bv that might represent 0" |
-    let vs = depends bv in
-    let cond0 = sitlist (\v.\r. NOT (variable v) AND r) vs T in
-    let sub0 = param cond0 in
-    let subrem  = param (NOT cond0) in
-    let bv0 = substitute sub0 bv in
-    let bvrem = substitute subrem bv in
-    let cd = bv_gcd bv0 bvrem in
-    let my_gcd = bv_min cd in
-    bv_div bv (int2bv my_gcd)
+// Compute the gcd of all values a bv can represent.
+// The bv is assumed to be non-negative.
+// Note that gcd a 0 = gcd 0 a = a.
+let bv_internal_gcd bv =
+    NOT ((bv < int2bv 0) == F) =>
+        eprintf "bv_internal_gcd of (possibly) negative bitvector (%s)\n" (bv2str 10 bv) |
+    letrec rec {bv::bv} {g::int} =
+        let cond = (bv_mod bv (int2bv g)) != int2bv 0 in
+        cond==F => g |
+        let bv' = substitute (param cond) bv in
+        let g' = gcd g (bv_min bv') in
+        rec bv' g' in
+    rec bv (bv_min bv)
 ;
+
+// Compute the lcm of all values a bv can represent.
+// The bv is assumed to be non-negative.
+// Note that if the bv can represent 0 the result is 0.
+let bv_internal_lcm bv =
+    NOT ((bv < int2bv 0) == F) =>
+        eprintf "bv_internal_lcm of (possibly) negative bitvector (%s)\n" (bv2str 10 bv) |
+    NOT ((bv = int2bv 0) == F) => 0 |
+    letrec rec {bv::bv} {L::int} =
+        let violating_cond = (bv_mod bv (int2bv L)) != int2bv 0 in
+        violating_cond==F => L |
+        let violating_set = substitute (param violating_cond) bv in
+        let x = bv_max violating_set in
+        let L' = lcm L x in
+        let violating_cond' = violating_cond AND NOT (bv = int2bv x) in
+        violating_cond' == F => L' |
+        let bv' = substitute (param violating_cond') bv in
+        rec bv' L' in
+    rec bv (bv_max bv)
+;
+
+// Divide the bv with the gcd of all values the bv can represent.
+// For example, if the bv can represent 0, 9, 12, and 15, the bv_reduce
+// will return a bv that represents 0, 3, 4, and 5 for the same assignments
+// to the variable in the original bv.
+// The bv is assumed to be non-negative.
+let bv_internal_reduce bv =
+    bv_div bv (int2bv (bv_internal_gcd bv));
 
 // Compute a substitution for all variables that must take on
 // some value for cond to be satisfied.
