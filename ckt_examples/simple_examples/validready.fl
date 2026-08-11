@@ -1,0 +1,135 @@
+//
+// The example creates a buffer for a stream of bits that support valid-ready handshaking.
+// Currently it doesn't prove anything useful, but what I'd like to prove is:
+//   `i_sent_data` is the sequence of values of `i_data` where both `i_valid` and `i_ready` are high.
+//   `o_sent_data` is the sequence of values of `o_data` where both `o_valid` and `o_ready` are high.
+//   I want to prove that `o_sent_data == i_sent_data + buffered_dat` where buffered_data is a sequence of max length 1.
+//
+// Hopefully I'll get the hang of VossII enough to be able to prove these properties.
+//
+//  The proof should look something like:
+//
+//  Let S[x], I[x], O[x] be state, inputs and outputs at time x.
+//  Assume reset[0] = 0
+//  Assume reset[x] = 1 for x > 0
+//  Define i_sent_data[1] = []
+//  Define o_sent_data[1] = []
+//  Assert buffered_data[1] = [] (buffered_data[x] is a function of S[x])
+//  Define i_sent_data[x] = i_sent_data[x-1] + (if i_valid[x-1]&i_ready[x-1] then [i_data[x-1]] else [])
+//  Define o_sent_data[x] = o_sent_data[x-1] + (if o_valid[x-1]&o_ready[x-1] then [o_data[x-1]] else [])
+//  Assert (i_sent_data[x] == o_sent_data[x] + buffered_data[x]) ==> (i_sent_data[x+1] == o_sent_data[x+1] + buffered_data[x+1])
+//
+//  It feels like what I need to prove with STE is straightforward and only needs to step one cycle.
+//  1) Show that one cycle after a reset that buffered_data is [].
+//  2) Show that additional_o_data + new_buffered_data = additional_i_data + old_buffered_data
+//     additional_o_data is a function of the O[x].o_valid O[x].o_data and I[x].o_ready
+//     additional_i_data is a function of the I[x].i_valid I[x].i_data and O[x].i_ready
+//     new_buffered_data is a function of S[x+1] and old_buffered_data is a function of S[x].
+//
+//  What I'm not sure of is:
+//  1) How do I actually use the STE to prove the above two points.  If a could extract from the fsm functions for
+//     (I, S) -> O and (I, S) -> S, then I could do this manually as described in the fl tutorial, but presumably there are
+//     better ways.
+//  2) I'm not sure how to prove the recursion in fl, and how I should define the things I want to prove so that I can use them
+//     when I compose larger circuits whose proofs need these properties.
+
+// The below expression doesn't work.  I think the length of the list can't be variable.
+// Maybe I need to use normal booleans for this function.  Do they even exist in fl?
+// let {buffered_data::bool->bool->bool list} {o_valid::bool} {o_data::bool} = o_valid => [o_data] | [] ;
+// let {additional_data::bool->bool->bool->bool list} {valid::bool} {ready::bool} {data::bool} = valid AND ready => [data] | [];
+
+// I'm not sure how to connect this up to the hardware model that I've made.
+// Probably something like this?
+// let buffered_data_correct i_valid i_ready i_data o_valid o_ready o_data i_valid_n i_ready_n i_data_n o_valid_n o_ready_n o_data_n =
+//  ((additional_data o_valid o_ready o_data) @ (buffered_data o_valid_n o_data_n) == (additional_data i_valid i_ready i_data) @ (buffered_data o_valid o_data));
+
+load "ste.fl";
+
+let valid_ready_buffer =
+    bit_input	    clk reset i_valid i_ready i_data.
+    bit_output	    o_valid o_ready o_data.
+    bit_internal    en_data.
+    CELL "valid_ready_buffer" [
+	i_ready <- o_ready '|' '~' o_valid,
+	always_ff (posedge clk) [
+            o_valid <== (IF reset THEN '0 ELSE (IF i_ready THEN i_valid ELSE o_valid)),
+            o_data <== (IF i_ready '&' i_valid THEN i_data ELSE o_data)
+        ]
+    ];
+print "valid_ready_buffer is ";
+valid_ready_buffer;
+
+let p = valid_ready_buffer 'clk 'reset 'i_valid 'i_ready 'i_data 'o_valid 'o_ready 'o_data;
+
+let ckt = pexlif2fsm p;
+
+let vis = STE_debug ckt;
+
+//  1) Show that one cycle after a reset that buffered_data is [].
+
+let ant =
+  "clk"  is_clock (10/2) and
+  "reset" is "1" in_cycle 0;
+
+let cons =
+  "o_valid" is "0" in_cycle 1;
+
+let ste  = STE "-e" vis [] ant cons [];
+let ok = get_ste_result ste "strong";
+"Result is:";
+ok;
+
+//  2) Show that additional_o_data + new_buffered_data = additional_i_data + old_buffered_data
+//     additional_o_data is a function of the O[x].o_valid O[x].o_data and I[x].o_ready
+//     additional_i_data is a function of the I[x].i_valid I[x].i_data and O[x].i_ready
+//     new_buffered_data is a function of S[x+1] and old_buffered_data is a function of S[x].
+
+// new i_data cycle 0 
+// buffer_data cycle 0
+// new o_data cycle 0
+
+let i_valid_1 = variable "i_valid_1";
+let i_valid_2 = variable "i_valid_2";
+let i_ready_1 = variable "i_ready_1";
+let i_ready_2 = variable "i_ready_2";
+let i_data_1 = variable "i_data_1";
+let i_data_2 = variable "i_data_2";
+
+let o_valid_1 = variable "o_valid_1";
+let o_valid_2 = variable "o_valid_2";
+let o_ready_1 = variable "o_ready_1";
+let o_ready_2 = variable "o_ready_2";
+let o_data_1 = variable "o_data_1";
+let o_data_2 = variable "o_data_2";
+
+let ant =
+  "clk" is_clock (10/2) and
+  "reset" is "0" in_cycle 0 and
+  "i_valid" is i_valid_1 in_cycle 1 and
+  "i_ready" is i_ready_1 in_cycle 1 and
+  "i_data" is i_data_1 in_cycle 1 and
+  "o_valid" is o_valid_1 in_cycle 1 and
+  "o_ready" is o_ready_1 in_cycle 1 and
+  "o_data" is o_data_1 in_cycle 1 and
+  "o_valid" is o_valid_2 in_cycle 2 and
+  "o_data" is o_data_2 in_cycle 2
+  ;
+
+let cons = [];
+
+let ste  = STE "-e" vis [] ant cons [];
+let constraint = get_ste_result ste "strong";
+
+// The below doesn't work because of the problem with `bool list`.
+
+//let additional_i_data = additional_data i_ready_1 i_valid_1 i_data_1;
+//let additional_o_data = additional_data o_ready_1 o_valid_1 o_data_1;
+//
+//let init_buffered_data = buffered_data o_valid_1 o_data_1;
+//let final_buffered_data = buffered_data o_valid_2 o_data_2;
+//
+//let correct = (init_buffered_data @ additional_i_data = additional_o_data @ final_buffered_data);
+
+"Result is:";
+ok;
+//correct;
