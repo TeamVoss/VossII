@@ -82,7 +82,12 @@ let fanout ckt nd = defix fanout ckt nd;
 let gcd i j = defix gcd i j;
 
 // Return the least common multiplier of the integers i and j.
-let lcm i j = (i*j)/(gcd i j);
+// The lcm is the smallest positive integer that is divisible by both i and j.
+let lcm i j =
+    let prod = i*j in
+    let res = prod/(gcd i j) in
+    (prod < 0) => -1*res | res
+;
 
 // fopen filename mode opens a file or pipeline for reading and/or writing.
 // Mode is a string beginning with one of the sequences below,

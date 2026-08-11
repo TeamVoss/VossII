@@ -781,31 +781,39 @@ overload bev_ashr bev_ashr bev_ashr_bevbev;
 let bev_neg bev = bev_add (bev_NOT bev) (int2bev 1);
 
 
-forward_declare {bv_min :: bv -> int};
+begin_abstype;
 
-// Compute the maximum value bv can represent
-let bv_max bv =
-    bv < (int2bv 0) => -1*(bv_min (bv_neg bv)) |
-    letrec try (b:bs) =
-        b == F => "0":(try bs) |
-        let sub = param b in
-        "1":(try (substitute sub bs))
-     /\   try [] = []
+let bl_pick pick_high l =
+    letrec find pick_high (b:bs) =
+        b == F => "0":(find pick_high bs) |
+        b == T => "1":(find pick_high bs) |
+        let sub = param (pick_high => b | NOT b) in
+        (pick_high => "1" | "0"):(find pick_high (substitute sub bs))
+     /\   find pick_high [] = []
     in
-    sscanf "%b" (implode (try (bv2list bv)))
+    sscanf "%b" (implode (find pick_high l))
+;   
+    
+// Compute the maximum value a bv can represent
+let bv_max bv =
+    let is_pos = bv >= (int2bv 0) in
+    is_pos == F => -1*(bl_pick F (bv2list (bv_neg bv))) |
+    let pos = is_pos => bv | '0 in
+    bl_pick T (bv2list pos)
 ;
+export bv_max;
 
 // Compute the minimum value bv can represent
 let bv_min bv =
-    bv < (int2bv 0) => -1*(bv_max (bv_neg bv)) |
-    letrec try (b:bs) =
-        b == T => "1":(try bs) |
-        let sub = param (NOT b) in
-        "0":(try (substitute sub bs))
-     /\   try [] = []
-    in
-    sscanf "%b" (implode (try (bv2list bv)))
+    let is_pos = bv >= (int2bv 0) in
+    is_pos == T => bl_pick F (bv2list bv) |
+    let neg = is_pos => '0 | bv_neg bv in
+    -1*(bl_pick T (bv2list neg)) 
 ;
+export bv_min;
+
+end_abstype;
+
 
 // Gretest common divisor of two bvs.
 letrec bv_gcd a b =
@@ -814,14 +822,11 @@ letrec bv_gcd a b =
 ;
 
 // Compute the gcd of all values a bv can represent.
-// The bv is assumed to be non-negative.
 // Note that gcd a 0 = gcd 0 a = a.
 let bv_internal_gcd bv =
-    NOT ((bv < int2bv 0) == F) =>
-        eprintf "bv_internal_gcd of (possibly) negative bitvector (%s)\n" (bv2str 10 bv) |
     letrec rec {bv::bv} {g::int} =
         let cond = (bv_mod bv (int2bv g)) != int2bv 0 in
-        cond==F => g |
+        cond == F => g |
         let bv' = substitute (param cond) bv in
         let g' = gcd g (bv_min bv') in
         rec bv' g' in
@@ -829,30 +834,25 @@ let bv_internal_gcd bv =
 ;
 
 // Compute the lcm of all values a bv can represent.
-// The bv is assumed to be non-negative.
 // Note that if the bv can represent 0 the result is 0.
 let bv_internal_lcm bv =
-    NOT ((bv < int2bv 0) == F) =>
-        eprintf "bv_internal_lcm of (possibly) negative bitvector (%s)\n" (bv2str 10 bv) |
-    NOT ((bv = int2bv 0) == F) => 0 |
-    letrec rec {bv::bv} {L::int} =
-        let violating_cond = (bv_mod bv (int2bv L)) != int2bv 0 in
-        violating_cond==F => L |
+    (bv = int2bv 0) !== F => 0 |
+    let bv = bv_abs bv in
+    letrec search cur =
+        let violating_cond = (bv_mod (int2bv cur) bv) != int2bv 0 in
+        violating_cond == F => cur |
         let violating_set = substitute (param violating_cond) bv in
         let x = bv_max violating_set in
-        let L' = lcm L x in
-        let violating_cond' = violating_cond AND NOT (bv = int2bv x) in
-        violating_cond' == F => L' |
-        let bv' = substitute (param violating_cond') bv in
-        rec bv' L' in
-    rec bv (bv_max bv)
+        let cur' = lcm cur x in
+        search cur'
+    in
+    search (bv_max bv)
 ;
 
 // Divide the bv with the gcd of all values the bv can represent.
 // For example, if the bv can represent 0, 9, 12, and 15, the bv_reduce
 // will return a bv that represents 0, 3, 4, and 5 for the same assignments
 // to the variable in the original bv.
-// The bv is assumed to be non-negative.
 let bv_internal_reduce bv =
     bv_div bv (int2bv (bv_internal_gcd bv));
 
