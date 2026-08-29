@@ -1,0 +1,19 @@
+{
+	"name": "My Project",
+	"build": {
+		"dockerfile": "../Dockerfile"
+	},
+	"postCreateCommand": "make -C /vossroot/src package",
+	"workspaceFolder": "/vossroot",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-vscode.cpptools"
+			]
+		}
+	},
+	"mounts": [
+		"source=${localWorkspaceFolder},target=/vossroot,type=bind,consistency=cached"
+	],
+	"remoteUser": "root"
+}
