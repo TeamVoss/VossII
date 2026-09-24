@@ -2,18 +2,12 @@
 // Copyright 2020 Carl-Johan Seger
 // SPDX-License-Identifier: Apache-2.0
 //-------------------------------------------------------------------
-let q_DuMmY_q = ();
-
-// Returns T if fl is run in -noX mode. Otherwise returns F.
-let noX dummy->() = (defix noX) dummy;
 
 let __old_debug_on__ = update_vossrc "ADD-DEBUG-INFO" "FALSE";
 __old_debug_on__ fseq ();
 
-// Dummy
-let ___z = 0;
-
-
+// Returns T if fl is run in -noX mode. Otherwise returns F.
+let noX dummy->() = (defix noX) dummy;
 
 // Convert the BDD f to a string.
 // The format of the expression is decided by the vossrc option PRINT-FORMAT
@@ -1225,12 +1219,6 @@ let get_fixity op = defix get_fixity op;
 // Usage: draw_graph levels e;
 let draw_graph levels e = defix draw_graph levels e;
 
-// Given a list of variables (vars) and a boolean function (f), return
-// the number of assignments to the variables in vars that makes f true.
-// If f depends on a variable not in vars, the function fails.
-// Usage: truth_cover vars f;
-let truth_cover vars f = defix simple_model_count vars f;
-
 // Return the minisat literal used to represent the bexpr be.
 // Usage: bget_sat_literal be;
 let bget_sat_literal be = defix bget_sat_literal be;
@@ -2017,6 +2005,9 @@ let fp_truth_cover2_n vars exprs cond =
 // Compute the (integer) model count over all the variables in vars for f.
 let int_model_count vars f = (defix simple_model_count) vars f;
 
+// Given a list of variables (vars) and a boolean function (f), return
+// the number of assignments to the variables in vars that makes f true.
+// If f depends on a variable not in vars, the function fails.
 let truth_cover vars f =
     (fprintf stdinfo "truth_cover is deprecated.\n") seq
     (fprintf stdinfo "Use simple_model_count instead.\n")seq
