@@ -1639,7 +1639,7 @@ Do_garbage_collect()
     // Clean hidden state in list code
     List_GC();
     // Clean hidden state in bv code
-    Bv_GC();
+    Model_Count_GC();
 
     /* Finally clean out unused nodes */
     Sweep_G_caches();

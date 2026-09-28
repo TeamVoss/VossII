@@ -1,0 +1,7 @@
+VARS "a b c";
+
+let f = b OR a;
+let c = b AND a;
+
+gen_cond_model_count ["a", "b"] [f] c;
+

@@ -18,6 +18,9 @@ formula		ZERO;
 formula		ONE;
 bool		Do_gc_asap;
 int             LG_TBL_SIZE;
+bdd_ptr		MainTbl;		/* Global BDD node table      */
+lunint		Size_MainTbl = 0;	/* Nbr of bins in ClustBuf    */
+var_ptr		VarTbl;			/* Variable table	      */
 
 /********* Global variables referenced ***********/
 extern str_mgr  *stringsp;
@@ -32,8 +35,6 @@ extern bool	Interrupt_asap;
 /***** PRIVATE VARIABLES *****/
 static cache_ptr	cache_free_list;
 static g_ptr		new_var_order_list = NULL;
-static bdd_ptr		MainTbl;		/* Global BDD node table      */
-static lunint		sz_MainTbl = 0;		/* Nbr of bins in ClustBuf    */
 static formula		b_free_list;		/* Free list of bdd nodes     */
 static int		bdd_save_cnt;
 
@@ -41,7 +42,6 @@ static char		draw_cmd[1024];
 
 static lunint		gc_limit;		/* When do garbage collection */
 
-static var_ptr		VarTbl;			/* Variable table	      */
 static unint		sz_VarTbl;		/* Nbr of bins in VarTbl      */
 static unint		nbr_VarTbl;		/* Nbr of element in VarTbl   */
 
@@ -109,11 +109,6 @@ static hash_record	bdd_save_tbl;
 static relprod_cache_ptr relprod_cache;
 static int 		relprod_cache_sz;
 
-static fp_truth_cov_ptr fp_truth_cov_cache;
-static int 		fp_truth_cov_cache_sz;
-static fp_truth_cov2_ptr fp_truth_cov2_cache;
-static int 		fp_truth_cov2_cache_sz;
-
 extern int		RCminimum_reduction;	/* For dynamic var. ordering  */
 extern int		RCelasticity;		/* For dynamic var. ordering  */
 static bool		quit_early;
@@ -129,8 +124,6 @@ static subst_ptr	bdd_subs;
 static buffer           bdd_gc_buf;
 
 /* ----- Forward definitions local functions ----- */
-static bool		fp_truth_cover2_rec(formula vs, formula cond, formula f,
-					    double *resp, string *emsgp);
 static void		gc_update_ref_cnt(bdd_ptr bp);
 static formula		prim_B_Var(string name);
 static formula		find_insert_bdd(var_ptr vp, formula lson, formula rson);
@@ -146,8 +139,6 @@ static bool		sop_pr_rec(odests fp, formula node,
 string			get_var_name(formula f);
 static unsigned int	subst_hash(pointer p, unsigned int n);
 static bool		subst_eq(pointer p1, pointer p2);
-static unsigned int	bdd_hash(pointer np, unsigned int n);
-static bool		bdd_eq(pointer p1, pointer p2);
 static void		clean_cache(bool erase);
 static lunint		uniq_hash_fn(formula l, formula r, lunint n);
 static void		Bdec_ref_cnt(formula f);
@@ -160,8 +151,6 @@ static unint		f2var(formula f);
 static formula		f2rson(formula f);
 static formula		f2lson(formula f);
 static relprod_cache_ptr find_in_relprod_cache(formula v, formula a, formula b);
-static fp_truth_cov2_ptr find_in_fp_truth_cov2_cache(formula cond, formula f);
-static int		var_ord_comp(const void *pi, const void *pj);
 static void		b_save(FILE *fp, formula f);
 static g_ptr		top_b_subst(g_ptr np);
 static g_ptr		top_bdd_depends(g_ptr np);
@@ -169,12 +158,6 @@ static subst_ptr	add_to_subs(subst_ptr start, formula v, formula e);
 static formula		b_substitute(formula f, subst_ptr subs);
 static bool		do_draw_bdds(formula *bdds, string *names, int cnt);
 static int		draw_bdd_rec(FILE *fp, hash_record *hp, formula f);
-static bool		truth_cover_rec(hash_record *done_tblp,
-					buffer *var_bufp, unint idx, formula b,
-					arbi_T *resp, string *emsgp);
-static bool
-			fp_truth_cover_rec(formula vs, formula b,
-					   double *resp, string *emsgp);
 static int		bdd_get_size_rec(formula f, int *limitp);
 static void		restore_mark(formula f);
 static cache_ptr	get_new_cache_rec();
@@ -186,6 +169,26 @@ static unint		get_bdd_size(formula f);
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
 /********************************************************/
+
+unsigned int
+Bdd_hash(pointer np, unsigned int n)
+{
+    return( (unsigned int) (((lunint) np) % (lunint) n) );
+}
+
+bool
+Bdd_eq(pointer p1, pointer p2)
+{
+    return( p1 == p2 );
+}
+
+int
+Var_ord_comp(const void *pi, const void *pj)
+{
+    int *i = (int *) pi;
+    int *j = (int *) pj;
+    return( (VarTbl+*i)->variable - (VarTbl+*j)->variable );
+}
 
 bdd_ptr
 f_GET_BDDP(formula f)
@@ -353,7 +356,7 @@ Reset_Ref_cnts()
 	bdd_ptr bp = MainTbl;
 	bp->mark = TRUE;
 	bp->ref_cnt = MAX_REF_CNT;
-	for(unint i = 0; i < sz_MainTbl; i++) {
+	for(unint i = 0; i < Size_MainTbl; i++) {
 	    bp->mark = 0;
 	    bp->ref_cnt = 0;
 	    bp++;
@@ -791,7 +794,7 @@ Reset_BDD_Size()
     for(unint i = 0;  i < nbr_VarTbl; i++)
 	*(bddwidth + i) = 0;
     dispose_hash(&bdd_size_tbl, NULLFCN);
-    create_hash(&bdd_size_tbl, 100, bdd_hash, bdd_eq);
+    create_hash(&bdd_size_tbl, 100, Bdd_hash, Bdd_eq);
 }
 
 void
@@ -839,7 +842,7 @@ Save_BDDs(string filename, buffer *roots)
 	    vcnt++;
 	}
     }
-    create_hash(&bdd_save_tbl, 100, bdd_hash, bdd_eq);
+    create_hash(&bdd_save_tbl, 100, Bdd_hash, Bdd_eq);
     bdd_save_cnt = 1;
     FOR_BUF(roots, formula, bp) {
 	b_save(fp, *bp);
@@ -911,7 +914,7 @@ Load_BDDs(string filename, buffer *results)
 void
 Begin_RelProd()
 {
-    relprod_cache_sz = sz_MainTbl/10;
+    relprod_cache_sz = Size_MainTbl/10;
     relprod_cache = (relprod_cache_ptr)
 			Calloc((relprod_cache_sz)*sizeof(relprod_cache_rec));
 }
@@ -1131,10 +1134,10 @@ B_Init()
 {
     bdd_ptr		new;
     unsigned long int	i;
-    sz_MainTbl = 1<< LG_TBL_SIZE;
-    MainTbl = (bdd_ptr) Malloc(sz_MainTbl*sizeof(bdd_rec));
+    Size_MainTbl = 1<< LG_TBL_SIZE;
+    MainTbl = (bdd_ptr) Malloc(Size_MainTbl*sizeof(bdd_rec));
     b_free_list = LNULL;
-    i = sz_MainTbl-1;
+    i = Size_MainTbl-1;
     new = (bdd_ptr) (MainTbl + i);
     while( new > MainTbl ) {
 	new->next = b_free_list;
@@ -1158,7 +1161,7 @@ B_Init()
     nbr_VarTbl = 0;
     new_mgr(&cache_rec_mgr, sizeof(cache_rec));
     cache_free_list = NULL;
-    create_hash(&cache_tbl, sz_MainTbl/10, cache_hash, cache_equ);
+    create_hash(&cache_tbl, Size_MainTbl/10, cache_hash, cache_equ);
     ZERO = 0;
     ONE  = NOT(ZERO);
     create_hash(&var_htbl, sz_VarTbl, Ustr_hash, Ustr_equ);
@@ -1166,7 +1169,7 @@ B_Init()
     nodes_used = 0;
     unique_cnt = 0;
     Do_gc_asap = 0;
-    gc_limit   = (lunint) sz_MainTbl/2;
+    gc_limit   = (lunint) Size_MainTbl/2;
     if( strcmp(RCpr_str, "SOP") == 0 || strcmp(RCpr_str, "sop") == 0 )
 	print_format = sop_format;
     else if( strcmp(RCpr_str, "INFIX") == 0 || strcmp(RCpr_str, "infix") == 0 )
@@ -1178,7 +1181,7 @@ B_Init()
 	FP(err_fp, "         Will use SOP\n");
 	print_format = sop_format;
     }
-    create_hash(&bdd_size_tbl, 100, bdd_hash, bdd_eq);
+    create_hash(&bdd_size_tbl, 100, Bdd_hash, Bdd_eq);
     dont_grow_uniq_tbl = FALSE;
     want_to_grow_uniq_tbl = FALSE;
     user_defined_ordering_flag = FALSE;
@@ -1257,7 +1260,7 @@ SHA256_bdd(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha, formula f)
 }
 
 void
-Get_Size_and_Vars(g_ptr funs, g_ptr vars,
+Get_Size_and_Vars(g_ptr funs, g_ptr cond, g_ptr vars,
 		  unint *sizep, formula *vsp, hash_record *var_tblp)
 {
     Reset_BDD_Size();
@@ -1272,6 +1275,7 @@ Get_Size_and_Vars(g_ptr funs, g_ptr vars,
     for(g_ptr cur = funs; !IS_NIL(cur); cur = GET_CONS_TL(cur) ) {
 	B_Size(GET_BOOL(GET_CONS_HD(cur)));
     }
+    if( cond != NULL ) B_Size (GET_BOOL(cond));
     int sz = 0;
     unint var_cnt = Get_VarCnt();
     *vsp = B_One();
@@ -1335,7 +1339,7 @@ formula
 Get_Path_Condition(int signature, formula f)
 {
     signature_target = POS(signature);
-    create_hash(&path_cond_tbl, 100, bdd_hash, bdd_eq);
+    create_hash(&path_cond_tbl, 100, Bdd_hash, Bdd_eq);
     mark_relevant(f);
     formula res = build_path_cond(f);
 
@@ -1691,488 +1695,6 @@ do_substitute(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
-static void
-do_truth_cover(g_ptr redex)
-{
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr var_list, gfun;
-    EXTRACT_2_ARGS(redex, var_list, gfun);
-    formula fun = GET_BOOL(gfun);
-    buffer  var_table;
-    new_buf(&var_table, nbr_VarTbl, sizeof(unint));
-    hash_record truth_table_done;
-    create_hash(&truth_table_done, 100, bdd_hash, bdd_eq);
-    while( !IS_NIL(var_list) ) {
-        string vname = GET_STRING(GET_CONS_HD(var_list));
-	formula v = B_Var(vname);
-	bdd_ptr	bp = GET_BDDP(v);
-	unint var = BDD_GET_VAR(bp);
-	push_buf(&var_table, (pointer) &var);
-	var_list = GET_CONS_TL(var_list);
-    }
-    qsort(START_BUF(&var_table), COUNT_BUF(&var_table), sizeof(unint),
-		    var_ord_comp);
-    arbi_T res;
-    string emsg;
-    if( !truth_cover_rec(&truth_table_done, &var_table, 0, fun, &res, &emsg) ) {
-	MAKE_REDEX_FAILURE(redex, emsg);
-    } else {
-	MAKE_REDEX_AINT(redex, res);
-    }
-    free_buf(&var_table);
-    dispose_hash(&truth_table_done, NULLFCN);
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);
-}
-
-static void
-create_tc_cache()
-{
-    fp_truth_cov_cache_sz = sz_MainTbl;
-    fp_truth_cov_cache = (fp_truth_cov_ptr)Calloc((fp_truth_cov_cache_sz)*
-						     sizeof(fp_truth_cov_rec));
-}
-
-static fp_truth_cov_ptr
-find_in_fp_truth_cov_cache(formula f)
-{
-    unint idx;
-    ASSERT(fp_truth_cov_cache_sz > 0);
-    idx = (137*((unint) f) ) % fp_truth_cov_cache_sz;
-    return( fp_truth_cov_cache + idx );
-}
-
-static void
-free_tc_cache()
-{
-    Free((pointer) fp_truth_cov_cache);
-    fp_truth_cov_cache_sz = -1;
-}
-
-static void
-do_fp_truth_cover_n(g_ptr redex)
-{
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr var_list, funs;
-    EXTRACT_2_ARGS(redex, var_list, funs);
-    bool o_do_dynamic_var_order = RCdo_dynamic_var_order;
-    RCdo_dynamic_var_order = FALSE;
-    create_tc_cache();
-    formula vs = ONE;
-    while( !IS_NIL(var_list) ) {
-        string vname = GET_STRING(GET_CONS_HD(var_list));
-	formula v = B_Var(vname);
-	vs = B_And(vs, v);
-	var_list = GET_CONS_TL(var_list);
-    }
-    MAKE_REDEX_NIL(redex);
-    g_ptr tail = redex;
-    while( !IS_NIL(funs) ) {
-	double res;
-	string emsg;
-	formula fun = GET_BOOL(GET_CONS_HD(funs));
-	if( !fp_truth_cover_rec(vs,fun,&res,&emsg)){
-	    MAKE_REDEX_FAILURE(redex, emsg);
-	    RCdo_dynamic_var_order = o_do_dynamic_var_order;
-	    free_tc_cache();
-	    DEC_REF_CNT(l);
-	    DEC_REF_CNT(r);
-	    return;
-	} else {
-	    APPEND1(tail, Make_float_leaf(res));
-	}
-	funs = GET_CONS_TL(funs);
-    }
-    RCdo_dynamic_var_order = o_do_dynamic_var_order;
-    free_tc_cache();
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);
-}
-
-static bool
-fp_truth_cover_rec(formula vs, formula b, double *resp, string *emsgp)
-{
-    if( b == ZERO ) {
-	*resp = 0.0;
-	return TRUE;
-    }
-    if( b == ONE ) {
-	double res = 1.0;
-	while( vs != ZERO ) {
-	    res = 2.0*res;
-	    bdd_ptr vsp = GET_BDDP(vs);
-	    vs = GET_LSON(vsp);
-	}
-	*resp = res;
-	return TRUE;
-    }
-    bdd_ptr bp = GET_BDDP(b);
-    unint next_var = BDD_GET_VAR(bp);
-    double mult = 1.0;
-    while( (vs != ZERO) && (BDD_GET_VAR(GET_BDDP(vs)) != next_var) ) {
-	mult = 2.0*mult;
-	vs = GET_LSON(GET_BDDP(vs));
-    }
-    if( vs == ZERO ) {
-	var_ptr vp = VarTbl + next_var;
-	*emsgp =
-	    Fail_pr("Variable %s not in truth_cover list but f depends on it",
-		    vp->var_name);
-	return FALSE;
-    }
-    fp_truth_cov_ptr old = find_in_fp_truth_cov_cache(b);
-    if( old->f == b ) {
-	*resp = mult*old->res;
-	return TRUE;
-    }
-    formula bnot = NOT(b);
-    fp_truth_cov_ptr oldnot = find_in_fp_truth_cov_cache(bnot);
-    if( oldnot->f == bnot ) {
-	double all = 1.0;
-	while( (vs != ZERO) ) {
-	    all = 2.0*all;
-	    vs = GET_LSON(GET_BDDP(vs));
-	}
-	*resp = mult*(all-oldnot->res);
-	return TRUE;
-    }
-    formula L, R;
-    if( ISNOT(b) ) {
-        L = NOT(GET_LSON(bp));
-        R = NOT(GET_RSON(bp));
-    } else {
-        L = GET_LSON(bp);
-        R = GET_RSON(bp);
-    }
-    double Lres;
-    vs = GET_LSON(GET_BDDP(vs));
-    if( !fp_truth_cover_rec(vs, L, &Lres, emsgp) ) {
-	return FALSE;
-    }
-    double Rres;
-    if( !fp_truth_cover_rec(vs, R, &Rres, emsgp) ) {
-	return FALSE;
-    }
-    double sum = Lres+Rres;
-    old->f = b;
-    old->res = sum;
-    *resp = mult*sum;
-    return TRUE;
-}
-
-
-static void
-create_tc2_cache()
-{
-    create_tc_cache();
-    fp_truth_cov2_cache_sz = sz_MainTbl;
-    fp_truth_cov2_cache = (fp_truth_cov2_ptr)Calloc((fp_truth_cov2_cache_sz)*
-						     sizeof(fp_truth_cov2_rec));
-}
-
-static fp_truth_cov2_ptr
-find_in_fp_truth_cov2_cache(formula cond, formula f)
-{
-    unint idx;
-    ASSERT(fp_truth_cov2_cache_sz > 0);
-    idx = (137*((unint) cond) + 487*((unint) f) ) % fp_truth_cov2_cache_sz;
-    return( fp_truth_cov2_cache + idx );
-}
-
-static void
-free_tc2_cache()
-{
-    free_tc_cache();
-    Free((pointer) fp_truth_cov2_cache);
-    fp_truth_cov2_cache_sz = -1;
-}
-
-
-static void
-do_fp_truth_cover2_n(g_ptr redex)
-{
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr var_list, g_cond, funs;
-    EXTRACT_3_ARGS(redex, var_list, g_cond, funs);
-    formula cond = GET_BOOL(g_cond);
-    bool o_do_dynamic_var_order = RCdo_dynamic_var_order;
-    RCdo_dynamic_var_order = FALSE;
-    create_tc2_cache();
-    formula vs = ONE;
-    while( !IS_NIL(var_list) ) {
-        string vname = GET_STRING(GET_CONS_HD(var_list));
-	formula v = B_Var(vname);
-	vs = B_And(vs, v);
-	var_list = GET_CONS_TL(var_list);
-    }
-    MAKE_REDEX_NIL(redex);
-    g_ptr tail = redex;
-    while( !IS_NIL(funs) ) {
-	double res;
-	string emsg;
-	formula fun = GET_BOOL(GET_CONS_HD(funs));
-	if( !fp_truth_cover2_rec(vs, cond, fun, &res, &emsg) )
-	{
-	    MAKE_REDEX_FAILURE(redex, emsg);
-	    free_tc2_cache();
-	    RCdo_dynamic_var_order = o_do_dynamic_var_order;
-	    DEC_REF_CNT(l);
-	    DEC_REF_CNT(r);
-	    return;
-	} else {
-	    APPEND1(tail, Make_float_leaf(res));
-	}
-	funs = GET_CONS_TL(funs);
-    }
-    free_tc2_cache();
-    RCdo_dynamic_var_order = o_do_dynamic_var_order;
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);
-}
-
-static bool
-fp_truth_cover2_rec(formula vs, formula cond, formula f,
-		    double *resp, string *emsgp)
-{
-    if( f == ZERO ) {
-	*resp = 0.0;
-	return TRUE;
-    }
-    if( cond == ZERO ) {
-	*resp = 0.0;
-	return TRUE;
-    }
-    if( f == ONE ) {
-	return(fp_truth_cover_rec(vs,cond,resp,emsgp));
-    }
-    if( cond == ONE ) {
-	return(fp_truth_cover_rec(vs,f,resp,emsgp));
-    }
-
-    bdd_ptr fp = GET_BDDP(f);
-    bdd_ptr cp = GET_BDDP(cond);
-    unint fnext_var = BDD_GET_VAR(fp);
-    unint cnext_var = BDD_GET_VAR(cp);
-    double mult = 1.0;
-    unint csvar = BDD_GET_VAR(GET_BDDP(vs));
-    while( (vs != ZERO) && (csvar != fnext_var) && (csvar != cnext_var) ) {
-        mult = 2.0*mult;
-        vs = GET_LSON(GET_BDDP(vs));
-	csvar = BDD_GET_VAR(GET_BDDP(vs));
-    }
-    if( vs == ZERO ) {
-	var_ptr vp = VarTbl + fnext_var;
-	*emsgp =
-	    Fail_pr("Variable %s not in truth_cover list but f depends on it",
-		    vp->var_name);
-	return FALSE;
-    }
-
-    // Look up in cache
-    fp_truth_cov2_ptr old = find_in_fp_truth_cov2_cache(cond, f);
-    if( (old->cond == cond) && (old->f == f) ) {
-	*resp = mult*old->res;
-	return TRUE;
-    }
-    // Not in cache
-    vs = GET_LSON(GET_BDDP(vs));
-    if( (csvar == fnext_var) && (csvar != cnext_var) ) {
-	formula L, R;
-	if( ISNOT(f) ) {
-	    L = NOT(GET_LSON(fp));
-	    R = NOT(GET_RSON(fp));
-	} else {
-	    L = GET_LSON(fp);
-	    R = GET_RSON(fp);
-	}
-	double Lres;
-	if( !fp_truth_cover2_rec(vs, cond, L, &Lres, emsgp) ) {
-	    return FALSE;
-	}
-	double Rres;
-	if( !fp_truth_cover2_rec(vs, cond, R, &Rres, emsgp) ) {
-	    return FALSE;
-	}
-	double sum = Lres+Rres;
-	old->cond = cond;
-	old->f = f;
-	old->res = sum;
-	*resp = mult*sum;
-	return TRUE;
-    } else {
-	if( (csvar != fnext_var) && (csvar == cnext_var) ) {
-	    formula L, R;
-		if( ISNOT(cond) ) {
-		L = NOT(GET_LSON(cp));
-		R = NOT(GET_RSON(cp));
-	    } else {
-		L = GET_LSON(cp);
-		R = GET_RSON(cp);
-	    }
-	    double Lres;
-	    if( !fp_truth_cover2_rec(vs, L, f, &Lres, emsgp) ) {
-		return FALSE;
-	    }
-	    double Rres;
-	    if( !fp_truth_cover2_rec(vs, R, f, &Rres, emsgp) ) {
-		return FALSE;
-	    }
-	    double sum = Lres+Rres;
-	    old->cond = cond;
-	    old->f = f;
-	    old->res = sum;
-	    *resp = mult*sum;
-	    return TRUE;
-	} else {
-	    formula L, R;
-	    if( ISNOT(f) ) {
-		L = NOT(GET_LSON(fp));
-		R = NOT(GET_RSON(fp));
-	    } else {
-		L = GET_LSON(fp);
-		R = GET_RSON(fp);
-	    }
-	    formula Lc, Rc;
-            if( ISNOT(cond) ) {
-                Lc = NOT(GET_LSON(cp));
-                Rc = NOT(GET_RSON(cp));
-            } else {
-                Lc = GET_LSON(cp);
-                Rc = GET_RSON(cp); 
-            }
-	    double Lres;
-	    if( !fp_truth_cover2_rec(vs, Lc, L, &Lres, emsgp) ) {
-		return FALSE;
-	    }
-	    double Rres;
-	    if( !fp_truth_cover2_rec(vs, Rc, R, &Rres, emsgp) ) {
-		return FALSE;
-	    }
-	    double sum = Lres+Rres;
-	    old->cond = cond;
-	    old->f = f;
-	    old->res = sum;
-	    *resp = mult*sum;
-	    return TRUE;
-	}
-    }
-}
-
-static void
-do_truth_cover_n(g_ptr redex)
-{
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr var_list, funs;
-    EXTRACT_2_ARGS(redex, var_list, funs);
-    
-    buffer  var_table;
-    new_buf(&var_table, nbr_VarTbl, sizeof(unint));
-    hash_record truth_table_done;
-    create_hash(&truth_table_done, 100, bdd_hash, bdd_eq);
-    while( !IS_NIL(var_list) ) {
-        string vname = GET_STRING(GET_CONS_HD(var_list));
-	formula v = B_Var(vname);
-	bdd_ptr	bp = GET_BDDP(v);
-	unint var = BDD_GET_VAR(bp);
-	push_buf(&var_table, (pointer) &var);
-	var_list = GET_CONS_TL(var_list);
-    }
-    qsort(START_BUF(&var_table), COUNT_BUF(&var_table), sizeof(unint),
-		    var_ord_comp);
-    MAKE_REDEX_NIL(redex);
-    g_ptr tail = redex;
-    while( !IS_NIL(funs) ) {
-	arbi_T res;
-	string emsg;
-	formula fun = GET_BOOL(GET_CONS_HD(funs));
-	if( !truth_cover_rec(&truth_table_done,&var_table,0,fun,&res,&emsg) ) {
-	    MAKE_REDEX_FAILURE(redex, emsg);
-	    free_buf(&var_table);
-	    dispose_hash(&truth_table_done, NULLFCN);
-	    DEC_REF_CNT(l);
-	    DEC_REF_CNT(r);
-	    return;
-	} else {
-	    APPEND1(tail, Make_AINT_leaf(res));
-	}
-	funs = GET_CONS_TL(funs);
-    }
-    free_buf(&var_table);
-    dispose_hash(&truth_table_done, NULLFCN);
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);
-}
-
-static bool
-truth_cover_rec(hash_record *done_tblp, buffer *var_bufp, unint idx, formula b,
-		arbi_T *resp, string *emsgp)
-{
-    if( b == ZERO ) {
-	*resp = Arbi_FromInt(0);
-	return TRUE;
-    }
-    if( b == ONE ) {
-	arbi_T res = Arbi_FromInt(1);
-	while( idx < COUNT_BUF(var_bufp) ) {
-	    res = Arbi_mlt(res, Arbi_FromInt(2));
-	    idx++;
-	}
-	*resp = res;
-	return TRUE;
-    }
-
-    bdd_ptr bp = GET_BDDP(b);
-    unint next_var = BDD_GET_VAR(bp);
-    arbi_T mult = Arbi_FromInt(1);
-    if( idx == COUNT_BUF(var_bufp) ) {
-	var_ptr vp = VarTbl + next_var;
-	*emsgp =
-	    Fail_pr("Variable %s not in truth_cover list but f depends on it",
-		    vp->var_name);
-	return FALSE;
-    }
-    while( *((unint *) M_LOCATE_BUF(var_bufp, idx)) != next_var ) {
-	mult = Arbi_mlt(mult, Arbi_FromInt(2));
-	idx++;
-	if( idx == COUNT_BUF(var_bufp) ) {
-	    var_ptr vp = VarTbl + next_var;
-	    *emsgp =
-	      Fail_pr("Variable %s not in truth_cover list but f depends on it",
-		      vp->var_name);
-	    return FALSE;
-	}
-    }
-    arbi_T old_resp = (arbi_T) find_hash(done_tblp, FORMULA2PTR(b));
-    if( old_resp != NULL ) {
-	*resp = Arbi_mlt(mult, old_resp);
-	return TRUE;
-    }
-    formula L, R;
-    if( ISNOT(b) ) {
-        L = NOT(GET_LSON(bp));
-        R = NOT(GET_RSON(bp));
-    } else {
-        L = GET_LSON(bp);
-        R = GET_RSON(bp);
-    }
-    arbi_T Lres;
-    if( !truth_cover_rec(done_tblp, var_bufp, idx+1, L, &Lres, emsgp) ) {
-	return FALSE;
-    }
-    arbi_T Rres;
-    if( !truth_cover_rec(done_tblp, var_bufp, idx+1, R, &Rres, emsgp) ) {
-	return FALSE;
-    }
-    arbi_T sum = Arbi_add(Lres, Rres);
-    insert_hash(done_tblp, FORMULA2PTR(b), (pointer) sum);
-    *resp = Arbi_mlt(mult, sum);
-    return TRUE;
-}
-
 int
 Get_BDD_index(formula b)
 {
@@ -2317,38 +1839,6 @@ BDD_Install_Functions()
 			GLmake_arrow(tv, GLmake_int()),
 			bdd_size);
 
-    Add_ExtAPI_Function("simple_model_count", "11", FALSE,
-			GLmake_arrow(GLmake_list(GLmake_string()),
-				     GLmake_arrow(GLmake_bool(),GLmake_int())),
-			do_truth_cover);
-
-    Add_ExtAPI_Function("truth_cover_n", "11", FALSE,
-			GLmake_arrow(
-			    GLmake_list(GLmake_string()),
-			    GLmake_arrow(
-				GLmake_list(GLmake_bool()),
-				GLmake_list(GLmake_int()))),
-			do_truth_cover_n);
-
-    typeExp_ptr float_tp = Get_Type("float", NULL, TP_INSERT_PLACE_HOLDER);
-    Add_ExtAPI_Function("fp_truth_cover_n", "11", FALSE,
-			GLmake_arrow(
-			    GLmake_list(GLmake_string()),
-			    GLmake_arrow(
-				GLmake_list(GLmake_bool()),
-				GLmake_list(float_tp))),
-			do_fp_truth_cover_n);
-
-    Add_ExtAPI_Function("model_count", "111", FALSE,
-			GLmake_arrow(
-			    GLmake_list(GLmake_string()),
-			    GLmake_arrow(
-			      GLmake_bool(),
-			      GLmake_arrow(
-				GLmake_list(GLmake_bool()),
-				GLmake_list(float_tp)))),
-			do_fp_truth_cover2_n);
-
 }
 
 /********************************************************/
@@ -2363,12 +1853,12 @@ grow_MainTbl()
     bdd_ptr	otop;
     lunint	osize, i;
 
-    FP(warning_fp, "Growing the main bdd table to %ld nodes.",2*sz_MainTbl);
-    osize = sz_MainTbl;
-    sz_MainTbl = 2*sz_MainTbl;
-    MainTbl = (bdd_ptr) Realloc((pointer) MainTbl, sz_MainTbl*sizeof(bdd_rec));
+    FP(warning_fp, "Growing the main bdd table to %ld nodes.",2*Size_MainTbl);
+    osize = Size_MainTbl;
+    Size_MainTbl = 2*Size_MainTbl;
+    MainTbl = (bdd_ptr) Realloc((pointer) MainTbl, Size_MainTbl*sizeof(bdd_rec));
     b_free_list = LNULL;
-    i = sz_MainTbl-1;
+    i = Size_MainTbl-1;
     new  = (bdd_ptr) (MainTbl + i);
     otop = (bdd_ptr) (MainTbl + osize);
     while( new >= otop ) {
@@ -2837,7 +2327,7 @@ garbage_collect()
 
 #if 0
     /* Reset external references */
-    for(i = 0; i < sz_MainTbl; i++) {
+    for(i = 0; i < Size_MainTbl; i++) {
 	bp = MainTbl+i;
 	if(bp->mark) {
 	    if( bp->ref_cnt < BDD_MAX_REF_CNT )
@@ -2850,7 +2340,7 @@ garbage_collect()
     
     static lunint limit1, limit2;
     limit1 = 16*nodes_used;
-    limit2 = (lunint) sz_MainTbl/2;
+    limit2 = (lunint) Size_MainTbl/2;
     gc_limit = (limit1 > limit2)? limit1 : limit2;
 
     if( RCverbose_GC ) {
@@ -2887,7 +2377,7 @@ clean_cache(bool erase)
 {
     if( erase ) {
 	dispose_hash(&cache_tbl, NULLFCN);
-	create_hash(&cache_tbl, sz_MainTbl/10, cache_hash, cache_equ);
+	create_hash(&cache_tbl, Size_MainTbl/10, cache_hash, cache_equ);
     } else {
 	scan_hash(&cache_tbl, clean_cache_rec_fn);
     }
@@ -3001,14 +2491,6 @@ get_var_name(formula f)
     return( (VarTbl+BDD_GET_VAR(fp))->var_name );
 }
 
-static int
-var_ord_comp(const void *pi, const void *pj)
-{
-    int *i = (int *) pi;
-    int *j = (int *) pj;
-    return( (VarTbl+*i)->variable - (VarTbl+*j)->variable );
-}
-
 void
 reorder_break_handler()
 {
@@ -3071,7 +2553,7 @@ re_order()
     for(i = 0; i < nbr_VarTbl; i++) {
 	push_buf(&rev_table, (pointer) &i);
     }
-    qsort(START_BUF(&rev_table), nbr_VarTbl, sizeof(int), var_ord_comp);
+    qsort(START_BUF(&rev_table), nbr_VarTbl, sizeof(int), Var_ord_comp);
 
     for(j = 0; j < (unint) RCdyn_var_repetitions; j++) {
 	bool done = FALSE;
@@ -3224,7 +2706,7 @@ user_defined_reorder()
     for(i = 0; i < nbr_VarTbl; i++) {
 	push_buf(&rev_table, (pointer) &i);
     }
-    qsort(START_BUF(&rev_table), nbr_VarTbl, sizeof(int), var_ord_comp);
+    qsort(START_BUF(&rev_table), nbr_VarTbl, sizeof(int), Var_ord_comp);
 
     for(i = 0; i < COUNT_BUF(&new_order_tbl); i++) {
 	unint next;
@@ -3541,18 +3023,6 @@ find_in_relprod_cache(formula v, formula a, formula b)
 }
 
 
-static unsigned int
-bdd_hash(pointer np, unsigned int n)
-{
-    return( (unsigned int) (((lunint) np) % (lunint) n) );
-}
-
-static bool
-bdd_eq(pointer p1, pointer p2)
-{
-    return( p1 == p2 );
-}
-
 
 static cache_ptr
 get_new_cache_rec()
@@ -3789,7 +3259,7 @@ do_draw_bdds(formula *bdds, string *names, int cnt)
         Fail_pr("Cannot create dot_draw file. Out of disk space?");
         return FALSE;
     }
-    create_hash(&draw_tbl, 100, bdd_hash, bdd_eq);
+    create_hash(&draw_tbl, 100, Bdd_hash, Bdd_eq);
     //
     fprintf(fp, "digraph G {\n");
     fprintf(fp, "node [shape=circle];\n");

@@ -14,6 +14,8 @@
 #include <math.h>
 
 /* ------------- Global variables ------------- */
+g_ptr		    Zero;
+g_ptr		    One;
 
 /********* Global variables referenced ***********/
 extern str_mgr     *stringsp;
@@ -26,21 +28,10 @@ static typeExp_ptr  bv_handle_tp;
 static rec_mgr	    bv_rec_mgr;
 static bv_ptr	    bv_free_list;
 static char	    bv_str_buf[4096];
-static g_ptr	    Zero;
-static g_ptr	    One;
-static hash_record  gen_mc_cache_tbl;
-static int          gen_mc_cache_sz = -1;
 static string	    sES;
 
 /* ----- Forward definitions local functions ----- */
-static int	    sx2(g_ptr *lp1, g_ptr *lp2);
 static g_ptr	    trim_bv(g_ptr l);
-static g_ptr	    gen_model_count_rec(formula vs, hash_record *vtbl,
-					formula fun);
-static void	    create_gen_mc_cache(unint sz);
-static g_ptr	    find_in_gen_mc_cache(formula f);
-static void	    free_gen_mc_cache();
-static g_ptr	    shift_left(g_ptr l, int cnt);
 
 /********************************************************/
 /*                    LOCAL FUNCTIONS    		*/
@@ -49,7 +40,7 @@ static g_ptr	    shift_left(g_ptr l, int cnt);
 static g_ptr
 ite_bv_list(formula cond, g_ptr l1, g_ptr l2)
 {
-    sx2(&l1, &l2);
+    SX2(&l1, &l2);
     PUSH_BDD_GC(cond);
     g_ptr res = Make_NIL();
     PUSH_GLOBAL_GC(l1);
@@ -326,30 +317,6 @@ bv_gmap_fn(gmap_info_ptr ip, pointer a)
 }
 
 static int
-sx2(g_ptr *lp1, g_ptr *lp2)
-{
-    g_ptr l1 = *lp1;
-    g_ptr l2 = *lp2;
-    int	    len1 = get_bv_length(l1);
-    int	    len2 = get_bv_length(l2);
-    while( len1 > len2 ) {
-	g_ptr msb = GET_CONS_HD(l2);
-	INC_REFCNT(msb);
-	l2 = Make_CONS_ND(msb, l2);
-	len2++;
-    }
-    while( len2 > len1 ) {
-	g_ptr msb = GET_CONS_HD(l1);
-	INC_REFCNT(msb);
-	l1 = Make_CONS_ND(msb, l1);
-	len1++;
-    }
-    *lp1 = l1;
-    *lp2 = l2;
-    return( len2 );
-}
-
-static int
 zx2(g_ptr *lp1, g_ptr *lp2)
 {
     g_ptr l1 = *lp1;
@@ -376,7 +343,7 @@ bv_gmap2_fn(gmap_info_ptr ip, pointer a1, pointer a2)
     bv_ptr  bp2 = (bv_ptr) a2;
     g_ptr   l1 = bp1->u.l;
     g_ptr   l2 = bp2->u.l;
-    sx2(&l1, &l2);
+    SX2(&l1, &l2);
     if( ip->read_only ) {
 	Gen_map2(ip->parent_op, ip->u.leaf_fun2, l1, l2, ip->read_only);
 	return NULL;
@@ -434,19 +401,6 @@ add_rec(bool neg, g_ptr l1, g_ptr l2, formula *coutp)
     return( rem );
 }
 
-static g_ptr
-gen_add(bool neg, g_ptr l1, g_ptr l2)
-{
-    formula cout;
-    l1 = Make_CONS_ND(GET_CONS_HD(l1), l1);
-    l2 = Make_CONS_ND(GET_CONS_HD(l2), l2);
-    PUSH_GLOBAL_GC(l1);
-    PUSH_GLOBAL_GC(l2);
-    g_ptr res = add_rec(neg, l1, l2, &cout);
-    POP_GLOBAL_GC(2);
-    return( trim_bv(res) );
-}
-
 static formula
 is_zero_list(g_ptr l)
 {
@@ -462,10 +416,10 @@ static g_ptr
 negate_bv_list(g_ptr l)
 {
     g_ptr zero = Make_CONS_ND(Zero, Make_NIL());
-    sx2(&l,&zero);
+    SX2(&l,&zero);
     PUSH_GLOBAL_GC(zero);
     PUSH_GLOBAL_GC(l);
-    g_ptr res = trim_bv(gen_add(TRUE, zero, l));
+    g_ptr res = trim_bv(Add_bv_lists(TRUE, zero, l));
     PUSH_GLOBAL_GC(res);
     if( Do_gc_asap ) Garbage_collect();
     POP_GLOBAL_GC(3);
@@ -476,10 +430,10 @@ static g_ptr
 decrement_bv_list(g_ptr l)
 {
     g_ptr one = Make_CONS_ND(Zero, Make_CONS_ND(One, Make_NIL()));
-    sx2(&l,&one);
+    SX2(&l,&one);
     PUSH_GLOBAL_GC(one);
     PUSH_GLOBAL_GC(l);
-    g_ptr res = trim_bv(gen_add(TRUE, l, one));
+    g_ptr res = trim_bv(Add_bv_lists(TRUE, l, one));
     PUSH_GLOBAL_GC(res);
     if( Do_gc_asap ) Garbage_collect();
     POP_GLOBAL_GC(3);
@@ -527,7 +481,7 @@ mult_bv_list(g_ptr xv, g_ptr yv)
     PUSH_GLOBAL_GC(rem);
     PUSH_GLOBAL_GC(prod);
     if( Do_gc_asap ) Garbage_collect();
-    g_ptr res = trim_bv(gen_add(FALSE, prod, rem));
+    g_ptr res = trim_bv(Add_bv_lists(FALSE, prod, rem));
     POP_GLOBAL_GC(2);
     return( res );
 }
@@ -559,7 +513,7 @@ less_rec(g_ptr l1, g_ptr l2)
 static formula
 less_than_bv_list(g_ptr l1, g_ptr l2)
 {
-    sx2(&l1, &l2);
+    SX2(&l1, &l2);
     formula neg1 = GET_BOOL(GET_CONS_HD(l1));
     formula neg2 = GET_BOOL(GET_CONS_HD(l2));
     formula raw_res = less_rec(l1, l2);
@@ -938,8 +892,8 @@ bv_add(g_ptr redex)
     bv_ptr a2 = (bv_ptr) GET_EXT_OBJ(arg2);
     g_ptr l1  = a1->u.l;
     g_ptr l2  = a2->u.l;
-    (void) sx2(&l1, &l2);
-    g_ptr res = gen_add(FALSE, l1, l2);
+    (void) SX2(&l1, &l2);
+    g_ptr res = Add_bv_lists(FALSE, l1, l2);
     MAKE_REDEX_EXT_OBJ(redex, bv_oidx, get_bv_rec(res));
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -957,8 +911,8 @@ bv_sub(g_ptr redex)
     bv_ptr a2 = (bv_ptr) GET_EXT_OBJ(arg2);
     g_ptr l1  = a1->u.l;
     g_ptr l2  = a2->u.l;
-    (void) sx2(&l1, &l2);
-    g_ptr res = gen_add(TRUE, l1, l2);
+    (void) SX2(&l1, &l2);
+    g_ptr res = Add_bv_lists(TRUE, l1, l2);
     MAKE_REDEX_EXT_OBJ(redex, bv_oidx, get_bv_rec(res));
     DEC_REF_CNT(l);
     DEC_REF_CNT(r);
@@ -1000,7 +954,7 @@ bv_mul(g_ptr redex)
     PUSH_GLOBAL_GC(abs_res);
     g_ptr neg_res = negate_bv_list(abs_res);
     PUSH_GLOBAL_GC(neg_res);
-    sx2(&abs_res, &neg_res);
+    SX2(&abs_res, &neg_res);
     g_ptr res = ite_bv_list(neg, neg_res, abs_res);
     POP_GLOBAL_GC(4);
     POP_BDD_GC(1);
@@ -1035,7 +989,7 @@ signed_bvdiv(g_ptr dv, g_ptr nv, g_ptr *Q, g_ptr *R)
     PUSH_GLOBAL_GC(Q0);
     *Q = ite_bv_list(B_Or(exact,same_sign), Q0, decrement_bv_list(Q0));
     PUSH_GLOBAL_GC(*Q);
-    g_ptr R0 = ite_bv_list(same_sign, Rraw, gen_add(TRUE, Rraw, abs_nv));
+    g_ptr R0 = ite_bv_list(same_sign, Rraw, Add_bv_lists(TRUE, Rraw, abs_nv));
     PUSH_GLOBAL_GC(R0);
     *R = ite_bv_list(exact, Rraw, ite_bv_list(neg_d, negate_bv_list(R0), R0));
     POP_BDD_GC(2);
@@ -1154,7 +1108,7 @@ bv_AND(g_ptr redex)
     bv_ptr a2 = (bv_ptr) GET_EXT_OBJ(arg2);
     g_ptr l1  = a1->u.l;
     g_ptr l2  = a2->u.l;
-    (void) sx2(&l1, &l2);
+    (void) SX2(&l1, &l2);
     g_ptr res = Make_NIL();
     g_ptr tail = res;
     g_ptr n1, n2;
@@ -1180,7 +1134,7 @@ bv_OR(g_ptr redex)
     bv_ptr a2 = (bv_ptr) GET_EXT_OBJ(arg2);
     g_ptr l1  = a1->u.l;
     g_ptr l2  = a2->u.l;
-    (void) sx2(&l1, &l2);
+    (void) SX2(&l1, &l2);
     g_ptr res = Make_NIL();
     g_ptr tail = res;
     g_ptr n1, n2;
@@ -1206,7 +1160,7 @@ bv_XOR(g_ptr redex)
     bv_ptr a2 = (bv_ptr) GET_EXT_OBJ(arg2);
     g_ptr l1  = a1->u.l;
     g_ptr l2  = a2->u.l;
-    (void) sx2(&l1, &l2);
+    (void) SX2(&l1, &l2);
     g_ptr res = Make_NIL();
     g_ptr tail = res;
     g_ptr n1, n2;
@@ -1232,7 +1186,7 @@ bv_XNOR(g_ptr redex)
     bv_ptr a2 = (bv_ptr) GET_EXT_OBJ(arg2);
     g_ptr l1  = a1->u.l;
     g_ptr l2  = a2->u.l;
-    (void) sx2(&l1, &l2);
+    (void) SX2(&l1, &l2);
     g_ptr res = Make_NIL();
     g_ptr tail = res;
     g_ptr n1, n2;
@@ -1319,41 +1273,6 @@ bv_geq(g_ptr redex)
 }
 
 static void
-do_gen_model_count(g_ptr redex)
-{
-    g_ptr l = GET_APPLY_LEFT(redex);
-    g_ptr r = GET_APPLY_RIGHT(redex);
-    g_ptr var_list, funs;
-    EXTRACT_2_ARGS(redex, var_list, funs);
-    // Turn off Dynamic variable ordering
-    bool o_do_dynamic_var_order = RCdo_dynamic_var_order;
-    RCdo_dynamic_var_order = FALSE;
-    // Determine total BDD size and all variables.
-    unint sz;
-    formula vs;
-    hash_record var_tbl;
-    create_hash(&var_tbl, 100, str_hash, str_equ);
-    Get_Size_and_Vars(funs, var_list, &sz, &vs, &var_tbl);
-    PUSH_BDD_GC(vs);
-    create_gen_mc_cache(sz);
-    // Now compute the gen_model_count for all variables
-    MAKE_REDEX_NIL(redex);
-    g_ptr tail = redex;
-    while( !IS_NIL(funs) ) {
-        formula fun = GET_BOOL(GET_CONS_HD(funs));
-        g_ptr res = gen_model_count_rec(vs, &var_tbl, fun);
-	APPEND1(tail, Make_bv(res));
-        funs = GET_CONS_TL(funs);
-    }
-    free_gen_mc_cache();
-    RCdo_dynamic_var_order = o_do_dynamic_var_order;
-    dispose_hash(&var_tbl, NULLFCN);
-    POP_BDD_GC(1);
-    DEC_REF_CNT(l);
-    DEC_REF_CNT(r);
-}
-
-static void
 bv_sum(g_ptr redex)
 {
     g_ptr l = GET_APPLY_LEFT(redex);
@@ -1370,9 +1289,9 @@ bv_sum(g_ptr redex)
     formula vs;
     hash_record var_tbl;
     create_hash(&var_tbl, 100, str_hash, str_equ);
-    Get_Size_and_Vars(bvl, var_list, &sz, &vs, &var_tbl);
+    Get_Size_and_Vars(bvl, NULL, var_list, &sz, &vs, &var_tbl);
     PUSH_BDD_GC(vs);
-    create_gen_mc_cache(sz);
+    Create_gen_mc_cache(sz);
     // Now compute the gen_model_count for all variables
     g_ptr sum = Make_CONS_ND(Zero, Make_NIL());
     PUSH_GLOBAL_GC(sum);
@@ -1382,16 +1301,16 @@ bv_sum(g_ptr redex)
     }
     for(g_ptr cur = bvl; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
         formula fun = GET_BOOL(GET_CONS_HD(cur));
-        g_ptr res = gen_model_count_rec(vs, &var_tbl, fun);
+        g_ptr res = Gen_model_count_rec(vs, &var_tbl, fun);
 	shift--;
-	res = shift_left(res, shift);
-        (void) sx2(&sum, &res);
-        sum = gen_add(FALSE, sum, res);
+	res = Shift_left(res, shift);
+        (void) SX2(&sum, &res);
+        sum = Add_bv_lists(FALSE, sum, res);
 	POP_GLOBAL_GC(1);
 	PUSH_GLOBAL_GC(sum);
     }
     MAKE_REDEX_EXT_OBJ(redex, bv_oidx, get_bv_rec(sum));
-    free_gen_mc_cache();
+    Free_gen_mc_cache();
     RCdo_dynamic_var_order = o_do_dynamic_var_order;
     dispose_hash(&var_tbl, NULLFCN);
     POP_BDD_GC(1);
@@ -1430,19 +1349,60 @@ Bv_Init()
     sES = wastrsave(stringsp, "");
 }
 
-static void
-mark_cache_entry(pointer key, pointer data)
+int
+SX2(g_ptr *lp1, g_ptr *lp2)
 {
-    (void) key; 
-    g_ptr bvl = (g_ptr) data;
-    Mark(bvl);
+    g_ptr l1 = *lp1;
+    g_ptr l2 = *lp2;
+    int	    len1 = get_bv_length(l1);
+    int	    len2 = get_bv_length(l2);
+    while( len1 > len2 ) {
+	g_ptr msb = GET_CONS_HD(l2);
+	INC_REFCNT(msb);
+	l2 = Make_CONS_ND(msb, l2);
+	len2++;
+    }
+    while( len2 > len1 ) {
+	g_ptr msb = GET_CONS_HD(l1);
+	INC_REFCNT(msb);
+	l1 = Make_CONS_ND(msb, l1);
+	len1++;
+    }
+    *lp1 = l1;
+    *lp2 = l2;
+    return( len2 );
 }
 
-void
-Bv_GC()
+g_ptr
+Add_bv_lists(bool neg, g_ptr l1, g_ptr l2)
 {
-    if( gen_mc_cache_sz < 0 ) return;
-    scan_hash(&gen_mc_cache_tbl, mark_cache_entry);
+    formula cout;
+    l1 = Make_CONS_ND(GET_CONS_HD(l1), l1);
+    l2 = Make_CONS_ND(GET_CONS_HD(l2), l2);
+    PUSH_GLOBAL_GC(l1);
+    PUSH_GLOBAL_GC(l2);
+    g_ptr res = add_rec(neg, l1, l2, &cout);
+    POP_GLOBAL_GC(2);
+    return( trim_bv(res) );
+}
+
+g_ptr
+Shift_left(g_ptr l, int cnt)
+{
+    if( cnt == 0 ) { return l; };
+    g_ptr result = Make_NIL();
+    g_ptr tail = result;
+    while( !IS_NIL(l) ) {
+	g_ptr b = GET_CONS_HD(l);
+	INC_REFCNT(b);
+	APPEND1(tail, b);
+	l = GET_CONS_TL(l);
+    }
+    while( cnt != 0 ) {
+	APPEND1(tail, Make_BOOL_leaf(B_Zero()));
+	cnt--;
+    }
+    return result;
 }
 
 void
@@ -1574,14 +1534,6 @@ Bv_Install_Functions()
 			bv_geq);
 
 
-    Add_ExtAPI_Function("gen_model_count", "11", FALSE,
-			GLmake_arrow(
-			    GLmake_list(GLmake_string()),
-			    GLmake_arrow(
-				GLmake_list(GLmake_bool()),
-				GLmake_list(bv_handle_tp))),
-			do_gen_model_count);
-
     Add_ExtAPI_Function("bv_sum", "11", FALSE,
 			GLmake_arrow(
 			    GLmake_list(GLmake_string()),
@@ -1656,69 +1608,6 @@ Aint2bv(arbi_T ai)
 }
 
 
-
-static unsigned int
-formula_hash(pointer np, unsigned int n)
-{   
-    return( (unsigned int) (((lunint) np) % (lunint) n) );
-}   
-        
-static bool
-formula_eq(pointer p1, pointer p2)
-{       
-    return( p1 == p2 );
-}   
-                    
-
-
-static void
-create_gen_mc_cache(unint sz)
-{
-    gen_mc_cache_sz = sz;
-    create_hash(&gen_mc_cache_tbl, 2*sz, formula_hash, formula_eq);
-}
-
-static g_ptr 
-find_in_gen_mc_cache(formula f)
-{
-    ASSERT(gen_mc_cache_sz > 0);
-    g_ptr res = find_hash(&gen_mc_cache_tbl, FORMULA2PTR(f));
-    return res;
-}                                       
-
-static void
-insert_in_gen_mc_cache(formula f, g_ptr bvl)
-{
-    insert_hash(&gen_mc_cache_tbl, FORMULA2PTR(f), bvl);
-}
-
-static void             
-free_gen_mc_cache()
-{
-    dispose_hash(&gen_mc_cache_tbl, NULLFCN);
-    gen_mc_cache_sz = -1;
-}
-
-static g_ptr
-shift_left(g_ptr l, int cnt)
-{
-    if( cnt == 0 ) { return l; };
-    g_ptr result = Make_NIL();
-    g_ptr tail = result;
-    while( !IS_NIL(l) ) {
-	g_ptr b = GET_CONS_HD(l);
-	INC_REFCNT(b);
-	APPEND1(tail, b);
-	l = GET_CONS_TL(l);
-    }
-    while( cnt != 0 ) {
-	APPEND1(tail, Make_BOOL_leaf(B_Zero()));
-	cnt--;
-    }
-    return result;
-}
-
-
 #if 0
 static void
 DBG_Pbv(string txt, formula fun, g_ptr l)
@@ -1736,66 +1625,4 @@ DBG_Pbv(string txt, formula fun, g_ptr l)
     FP(err_fp, "]\n");
 }
 #endif
-
-static g_ptr
-gen_model_count_rec(formula vs, hash_record *var_tblp, formula fun)
-{
-    g_ptr res;
-    string vtop_var;
-    formula vH, vL;
-    if( fun == ZERO ) {
-	res = Make_CONS_ND(Zero, Make_NIL());
-	return res;
-    }
-    if( fun == ONE ) {
-	// Return 2**|vars_left|
-	res = Make_CONS_ND(Zero, Make_CONS_ND(One, Make_NIL()));    // 1
-	g_ptr tail = GET_CONS_TL(GET_CONS_TL(res));
-	while( (vs != ONE) ) {
-	    Get_top_cofactor(vs, &vtop_var, &vH, &vL);
-	    if( find_hash(var_tblp, vtop_var) != NULL ) {
-		// 2*current
-		APPEND1(tail, Make_BOOL_leaf(B_Zero()));
-	    }
-	    vs = vH;
-	}
-	return res;
-    }
-    unint fun_var = f_BDD_GET_VAR(f_GET_BDDP(fun));
-    int mul = 0;
-    while( f_BDD_GET_VAR(f_GET_BDDP(vs)) != fun_var ) {
-	Get_top_cofactor(vs, &vtop_var, &vH, &vL);
-	if( find_hash(var_tblp, vtop_var) != NULL ) {
-	    mul++;
-	}
-	vs = vH;
-    }
-    g_ptr cres = find_in_gen_mc_cache(fun);
-    if( cres != NULL ) {
-	res = shift_left(cres, mul);
-	return res;
-    }
-    formula H, L;
-    string top_var;
-    Get_top_cofactor(fun, &top_var, &H, &L);
-    Get_top_cofactor(vs, &vtop_var, &vH, &vL);
-    vs = vH;
-    g_ptr Hres, Lres;
-    Hres = gen_model_count_rec(vs, var_tblp, H);
-    PUSH_GLOBAL_GC(Hres);
-    Lres = gen_model_count_rec(vs, var_tblp, L);
-    PUSH_GLOBAL_GC(Lres);
-    g_ptr raw_res;
-    if( find_hash(var_tblp, top_var) == NULL ) {
-	formula v = B_Var(top_var);
-	raw_res = ite_bv_list(v, Hres, Lres);
-    } else {
-	(void) sx2(&Hres, &Lres);
-	raw_res = gen_add(FALSE, Hres, Lres);
-    }
-    POP_GLOBAL_GC(2);
-    insert_in_gen_mc_cache(fun, raw_res);
-    res = shift_left(raw_res, mul);
-    return res;
-}
 

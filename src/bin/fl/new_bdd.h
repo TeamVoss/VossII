@@ -91,10 +91,13 @@ void		Get_abstract_depends(g_ptr redex, hash_record *abs_tblp,
 				     g_ptr obj);
 int		SHA256_bdd(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha,
 			    formula f); 
-void		Get_Size_and_Vars(g_ptr funs, g_ptr vars,
+void		Get_Size_and_Vars(g_ptr funs, g_ptr cond, g_ptr vars,
 				  unint *sizep, formula *all,
 				  hash_record *vtbl);
 int		Get_BDD_index(formula f);
+unsigned int	Bdd_hash(pointer np, unsigned int n);
+bool		Bdd_eq(pointer p1, pointer p2);
+int		Var_ord_comp(const void *pi, const void *pj);
 
 #else /* EXPORT_FORWARD_DECL */
 /* ----------------------- Main include file ------------------------------- */
@@ -256,20 +259,6 @@ typedef struct param_rec {
 #define B_IS_TRUE(p)        ((p) == ONE)
 #define B_IS_FALSE(p)       ((p) == ZERO)
 #define B_IS_CONSTANT(p)    (B_IS_TRUE(p) || B_IS_FALSE(p))
-
-
-typedef struct fp_truth_cov_rec    *fp_truth_cov_ptr;
-typedef struct fp_truth_cov_rec {
-	formula		f;
-	double		res;
-} fp_truth_cov_rec;
-
-typedef struct fp_truth_cov2_rec    *fp_truth_cov2_ptr;
-typedef struct fp_truth_cov2_rec {
-	formula		cond;
-	formula		f;
-	double		res;
-} fp_truth_cov2_rec;
 
 #endif /* NEW_BDD_H */
 #endif /* EXPORT_FORWARD_DECL */

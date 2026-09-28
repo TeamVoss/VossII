@@ -621,18 +621,6 @@ bsubstitute(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
-static unsigned int
-bdd_hash(pointer np, unsigned int n)
-{   
-    return( ((lunint) np) % n );
-}       
-        
-static bool
-bdd_eq(pointer p1, pointer p2)
-{       
-    return( p1 == p2 );
-}
-
 static void
 bool2bexpr(g_ptr redex)
 {
@@ -640,7 +628,7 @@ bool2bexpr(g_ptr redex)
     EXTRACT_1_ARG(redex, fs);
     MAKE_REDEX_NIL(redex);
     g_ptr tail = redex;
-    create_hash(&bdd2bexpr_tbl, 100, bdd_hash, bdd_eq);
+    create_hash(&bdd2bexpr_tbl, 100, Bdd_hash, Bdd_eq);
     for(g_ptr cur = fs; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
 	formula f = GET_BOOL(GET_CONS_HD(cur));
 	bexpr b = bdd2bexpr(f);

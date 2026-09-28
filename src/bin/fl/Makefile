@@ -45,7 +45,7 @@ LOBJ = new_bdd.o error.o arb_prec.o file_ops.o initialize.o symbol_tbl.o \
 	draw_graph.o debug.o symbol.o voss_strings.o int_ops.o list_ops.o \
 	system.o float.o bv.o bev.o fsm.o sha256.o table.o image.o \
 	plugin.o plugin_loader.o plugin_checker.o plugin_errlog.o \
-	iso.o pexlif.o doc.o serialize.o
+	iso.o pexlif.o doc.o serialize.o model_count.o
 
 OBJ = main.o minisat_ifc.o
 
@@ -126,6 +126,7 @@ table.o:	    table.h graph.h typecheck.h fl.h
 iso.o:              iso.h fsm.h pexlif.h graph.h fl.h
 pexlif.o:           pexlif.h graph.h voss_strings.h fl.h
 serialize.o:	    graph.h voss_strings.h fsm.h scripts/template
+model_count.o:	    graph.h new_bdd.h bv.h fl.h model_count.h
 
 scripts/template:
 	@make -C scripts

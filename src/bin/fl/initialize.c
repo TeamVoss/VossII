@@ -98,5 +98,6 @@ Init()
     Iso_Install_Functions();
     Pexlif_Install_Functions();
     Doc_Install_Functions();
+    Model_count_Install_Functions();
 }
 

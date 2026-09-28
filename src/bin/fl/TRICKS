@@ -1,0 +1,7 @@
+When debugging g.c. bugs, turning off address randomization is useful.
+To get a new shell with randomization turn off for all commands issued, 
+it suffices to do:
+
+setarch `uname -m` -R $SHELL
+
+

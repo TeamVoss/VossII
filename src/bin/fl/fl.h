@@ -208,6 +208,7 @@ typedef enum { let_decl, letrec_decl,
 #include        "pexlif.h"
 #include        "doc.h"
 #include        "serialize.h"
+#include        "model_count.h"
 
 /* Include function prototypes */
 #undef EXPORT_FORWARD_DECL
