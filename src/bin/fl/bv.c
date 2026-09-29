@@ -1319,6 +1319,56 @@ bv_sum(g_ptr redex)
     DEC_REF_CNT(r);
 }
 
+static void
+cond_bv_sum(g_ptr redex)
+{
+    g_ptr l = GET_APPLY_LEFT(redex);
+    g_ptr r = GET_APPLY_RIGHT(redex);
+    g_ptr var_list, gbv, gcond;
+    EXTRACT_3_ARGS(redex, var_list, gbv,gcond);
+    bv_ptr bv = (bv_ptr) GET_EXT_OBJ(gbv);
+    g_ptr bvl  = bv->u.l;
+    formula cond = GET_BOOL(gcond);
+    // Turn off Dynamic variable ordering
+    bool o_do_dynamic_var_order = RCdo_dynamic_var_order;
+    RCdo_dynamic_var_order = FALSE;
+    // Determine total BDD size and all variables.
+    unint sz;
+    formula vs;
+    hash_record var_tbl;
+    create_hash(&var_tbl, 100, str_hash, str_equ);
+    Get_Size_and_Vars(bvl, gcond, var_list, &sz, &vs, &var_tbl);
+    PUSH_BDD_GC(vs);
+    Create_gen_mc_cache(sz);
+    Create_cond_gen_mc_cache(sz);
+    // Now compute the gen_model_count for all variables
+    g_ptr sum = Make_CONS_ND(Zero, Make_NIL());
+    PUSH_GLOBAL_GC(sum);
+    int shift = 0;
+    for(g_ptr cur = bvl; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
+	shift++;
+    }
+    for(g_ptr cur = bvl; !IS_NIL(cur); cur = GET_CONS_TL(cur)) {
+        formula fun = GET_BOOL(GET_CONS_HD(cur));
+        g_ptr res = Gen_cond_model_count_rec(vs, &var_tbl, cond, fun);
+	shift--;
+	res = Shift_left(res, shift);
+        (void) SX2(&sum, &res);
+        sum = Add_bv_lists(FALSE, sum, res);
+	POP_GLOBAL_GC(1);
+	PUSH_GLOBAL_GC(sum);
+    }
+    MAKE_REDEX_EXT_OBJ(redex, bv_oidx, get_bv_rec(sum));
+    Free_cond_gen_mc_cache();
+    Free_gen_mc_cache();
+    RCdo_dynamic_var_order = o_do_dynamic_var_order;
+    dispose_hash(&var_tbl, NULLFCN);
+    POP_BDD_GC(1);
+    POP_GLOBAL_GC(1);
+    DEC_REF_CNT(l);
+    DEC_REF_CNT(r);
+}
+
 
 
 /********************************************************/
@@ -1540,6 +1590,13 @@ Bv_Install_Functions()
 			    GLmake_arrow(bv_handle_tp, bv_handle_tp)),
 			bv_sum);
 
+    Add_ExtAPI_Function("cond_bv_sum", "111", FALSE,
+			GLmake_arrow(
+			    GLmake_list(GLmake_string()),
+			    GLmake_arrow(
+				    bv_handle_tp,
+				    GLmake_arrow(GLmake_bool(), bv_handle_tp))),
+			cond_bv_sum);
 
 }
 

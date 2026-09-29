@@ -1,7 +1,33 @@
 VARS "a b c";
 
-let f = b OR a;
-let c = b AND a;
+let f1 = b OR a;
+let c1 = b AND a;
 
-gen_cond_model_count ["a", "b"] [f] c;
+gen_cond_model_count ["a", "b"] [f1] c1;
+
+
+let bv1 = 
+    a AND b => int2bv 7 |
+    a XOR c => int2bv 11 |
+    int2bv 4
+;
+bv1;
+
+cond_bv_sum ["a","b", "c"] bv1 F;
+cond_bv_sum ["a","b", "c"] bv1 T;
+
+cond_bv_sum ["a","b", "c"] (a => bv1 | int2bv 0) T;
+cond_bv_sum ["a","b", "c"] bv1 a;
+
+cond_bv_sum ["a","b"] bv1 F;
+
+cond_bv_sum ["a","b"] bv1 T;
+bv_examples 10 it;
+cond_bv_sum ["a","b"] (substitute [("c",F)] bv1) T;
+cond_bv_sum ["a","b"] (substitute [("c",T)] bv1) T;
+
+cond_bv_sum ["a","b"] bv1 b;
+bv_examples 10 it;
+cond_bv_sum ["a","b"] (substitute [("c",F)] (b => bv1 | int2bv 0)) T;
+cond_bv_sum ["a","b"] (substitute [("c",T)] (b => bv1 | int2bv 0)) T;
 
