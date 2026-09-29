@@ -1373,27 +1373,59 @@ Get_Help(string fun)
         }
         int arg = 1;
         arg_names_ptr ap = fp->arg_names;
-        int sz = 1;
+        int name_sz = 1;
         while(ap != NULL ) {
             int l = strlen(ap->name);
-            if( l > sz ) sz = l;
+            if( l > name_sz ) name_sz = l;
             ap = ap->next;
         }
         ap = fp->arg_names;
+	str_mgr type_str_mgr;
+	new_strmgr(&type_str_mgr);
+	buffer type_name_buf;
+	new_buf(&type_name_buf, 10, sizeof(string));
+	int type_sz = 1;
+	typeExp_ptr tp = type;
+        while( tp->typeOp == arrow_tp ) {
+	    FILE *old_odests_fp = odests_fp;
+	    if( (odests_fp = fmemopen(type_buf, 4096, "w")) == NULL ) {
+		DIE("Should never happen");
+	    }
+	    Print_Type(tp->typelist->type, FILE_fp, FALSE, (arg == 1));
+	    fclose(odests_fp);
+	    odests_fp = old_odests_fp;;
+	    string arg_type = Strsave(&type_str_mgr, type_buf);
+	    push_buf(&type_name_buf, &arg_type);
+	    int tlen = strlen(arg_type);
+	    if( type_sz < tlen ) type_sz = tlen;
+            tp = Get_Real_Type(tp->typelist->next->type);
+	}
         FP(FILE_fp, "Arguments:\n");
-        if( ap != NULL ) { sz += 2; }
+        if( ap != NULL ) { name_sz += 2; }
+	arg = 1;
         while( type->typeOp == arrow_tp ) {
+	    g_ptr dv = NULL;
             if( ap != NULL ) {
-                FP(FILE_fp, "%*s: ", sz, ap->name);
+		dv = ap->default_value;
+                FP(FILE_fp, "%*s: ", name_sz, ap->name);
                 ap = ap->next;
             } else {
                 FP(FILE_fp, "  arg. %d: ", arg);
             }
-            typeExp_ptr arg_type = type->typelist->type;
-            Print_Type(arg_type, FILE_fp, TRUE, (arg == 1));
+	    string type_name;
+	    fetch_buf(&type_name_buf, arg-1, &type_name);
+	    FP(FILE_fp, "%-*s ", type_sz, type_name);
+	    if( dv != NULL ) {
+		FP(FILE_fp, "  ->");
+		Print_Graph(dv, FILE_fp);
+	    } else {
+		FP(FILE_fp, "\n");
+	    }
             type = Get_Real_Type(type->typelist->next->type);
             arg++;
         }
+	free_buf(&type_name_buf);
+	free_strmgr(&type_str_mgr);
         FP(FILE_fp, "\nReturn type: ");
         Print_Type(type, FILE_fp, TRUE, (arg == 1));
         FP(FILE_fp, "\nFixity: %s\n", Get_Fixity(fun));
@@ -2572,7 +2604,7 @@ add_non_lazy_context_rec(buffer *ctxt, symbol_tbl_ptr stbl, g_ptr node)
   err_named_arg:
     report_error_loc(node, "Syntax");
     FP(err_fp, "Named argument in calling ", GET_VAR(node));
-    Print_leaf(node, err_fp);
+    Print_leaf(node, err_fp, TRUE);
     FP(err_fp, "\n");
     free_buf(&arg_info_buf);
     longjmp(context_env, 1);

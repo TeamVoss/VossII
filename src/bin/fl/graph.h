@@ -111,7 +111,7 @@ void         Debug_change_string(char *new_name, g_ptr n);
 int	     Read_from_file(string name, bool message, bool remove_after);
 var_list_ptr Add_Var_to_Var_List(string var, typeExp_ptr type_hint,
 				 var_list_ptr vlp);
-void         Print_leaf(g_ptr node, odests fp);
+void         Print_leaf(g_ptr node, odests fp, bool simple_userdefs);
 bool         Can_Fail_Pat_Match(g_ptr node);
 void         AddComment(string s);
 g_ptr	     Gen_map(g_ptr (*fun)(g_ptr), g_ptr node, bool read_only);
@@ -122,6 +122,7 @@ string	     Get_pfn_name(g_ptr np, bool verbose_debug);
 string	     Get_stack_trace(int max_entries);
 g_ptr	     Get_fl_stack_trace();
 void	     DPR(g_ptr node);
+void	     Print_Graph(g_ptr np, odests fp);
 void	     Record_eval_context(eval_ctx_ptr ctx);
 void	     Restore_eval_context(eval_ctx_ptr ctx);
 void	     Reset_eval_context();

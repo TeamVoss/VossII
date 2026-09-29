@@ -1173,7 +1173,7 @@ Print_Expr(g_ptr node, odests fp)
 	    FP(fp, ")");
 	    break;
 	case LEAF:
-	    Print_leaf(node, fp);
+	    Print_leaf(node, fp, FALSE);
 	    break;
 	default:
 	    DIE("Illegal node type");
@@ -1664,7 +1664,7 @@ Debug_change_string(char *new_name, g_ptr n)
 }
 
 void
-Print_leaf(g_ptr node, odests fp)
+Print_leaf(g_ptr node, odests fp, bool simple_userdefs)
 {
     switch( GET_LEAF_TYPE(node) ) {
 	case INT:
@@ -1701,7 +1701,10 @@ Print_leaf(g_ptr node, odests fp)
 	    break;
 	case USERDEF: {
 	    fn_ptr fn = GET_USERDEF(node);
-	    FP(fp, "UD_%s", fn->name);
+	    if( simple_userdefs )
+		FP(fp, "%s", fn->name);
+	    else
+		FP(fp, "UD_%s", fn->name);
 	    break;
 	}
 	case EXT_OBJ:
@@ -5262,7 +5265,7 @@ print_result_local(g_ptr node, odests fp, bool pr_brack, bool pr_comma,
 	case LEAF:
 	    if( pr_comma )
 		FP(fp, ",");
-	    Print_leaf(node, fp);
+	    Print_leaf(node, fp, FALSE);
 	    break;
 	default:
 	    Print_Expr(node, fp);
@@ -6516,7 +6519,7 @@ limitedPR(g_ptr node, odests fp, int num, bool strict)
 	    FP(fp, ")");
 	    break;
 	case LEAF:
-	    Print_leaf(node, fp);
+	    Print_leaf(node, fp, TRUE);
 	    break;
 	default:
 	    DIE("Illegal node type");
@@ -6633,6 +6636,14 @@ DPR(g_ptr node)
 }
 
 void
+Print_Graph(g_ptr np, odests fp)
+{
+    if( limitedPR(np, fp, pr_depth, TRUE) == FALSE )
+	FP(fp, "...");
+    FP(fp, "\n");
+}
+
+void
 PR(g_ptr np)
 {
     FILE *old_odests_fp = odests_fp;
@@ -6716,7 +6727,7 @@ Print_Nd_type(g_ptr nd)
                            (long int) GET_CONS_TL(nd));
 	    break;
 	case LEAF:
-	    Print_leaf(nd, err_fp);
+	    Print_leaf(nd, err_fp, FALSE);
 	    FP(err_fp, "\n");
 	    break;
 	default:

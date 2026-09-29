@@ -1467,7 +1467,7 @@ report_failure(node_type_ptr cur, typeExp_ptr type, typeExp_ptr expected_type)
 		    FP(err_fp, "===Type error around line %d\n",
 			    GET_LINE_NBR(node));
 		FP(err_fp, "Function/variable/constant `");
-		Print_leaf(node, err_fp);
+		Print_leaf(node, err_fp, TRUE);
 		FP(err_fp, "' is of type:\n\t");
 	    }
 	    Print_Type(get_real_type(type), err_fp, TRUE, TRUE);
@@ -1488,7 +1488,7 @@ report_failure(node_type_ptr cur, typeExp_ptr type, typeExp_ptr expected_type)
 		FP(err_fp, "===Type error around line %d\n",
 			GET_LINE_NBR(node));
 	    FP(err_fp, "Constant `");
-	    Print_leaf(node, err_fp);
+	    Print_leaf(node, err_fp, TRUE);
 	    FP(err_fp, "' is of type:\n\t");
 	    Print_Type(get_real_type(type), err_fp, TRUE,TRUE);
 	    FP(err_fp,
@@ -1506,7 +1506,7 @@ report_failure(node_type_ptr cur, typeExp_ptr type, typeExp_ptr expected_type)
 		FP(err_fp, "===Type error around line %d\n",
 			GET_LINE_NBR(node));
 	    FP(err_fp, "Function `");
-	    Print_leaf(node, err_fp);
+	    Print_leaf(node, err_fp, TRUE);
 	    FP(err_fp, "' is of type:\n\t");
 	    Print_Type(get_real_type(type), err_fp, TRUE,TRUE);
 	    FP(err_fp, "but its usage requires it to be of type:\n\t");
@@ -2995,7 +2995,7 @@ dbg_print_node_type_tree(node_type_ptr ntp, int level)
 	    break;
 	case LEAF:
 	    FP(err_fp, "\n%*s{", level*3, "");
-	    Print_leaf(ntp->node, err_fp);
+	    Print_leaf(ntp->node, err_fp, FALSE);
 	    FP(err_fp, "::");
 	    dbg_print_type_rec(ntp->type, err_fp, 0);
 	    FP(err_fp, "}");
