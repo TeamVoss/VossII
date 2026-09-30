@@ -5,6 +5,6 @@ break exit
 break voss_abort
 break Dbg_stop
 break failure
-break do_gen_cond_model_count
+break do_bv_model_count
 break Gen_cond_model_count_rec
 c

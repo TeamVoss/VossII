@@ -687,9 +687,6 @@ let fixed_bev2list bits sign_ext bev truncate->F =
     (replicate (bits-len) rep_bit)@l
 ;
 
-// Compute the condition for two bitvectors to be equal.
-let bv_eq {a::bv} {b::bv} = a = b;
-
 begin_abstype;
 // For small values -100 <= x <= 100 (-1.0 -- 1.0)
 // Result 100*exp(x/100)
@@ -724,9 +721,6 @@ let bv_exp {n::bv} {d::bv} =
 ;
 end_abstype bv_exp bv_abs;
 
-// Compute the condition for two bitvectors not to be equal.
-let bv_neq {a::bv} {b::bv} = a != b;
-
 // Compute base to the power of n.
 letrec bv_pow {base::bv} {n::bv} =
     n <= '0 => '1 |
@@ -751,9 +745,6 @@ let bv_ashr_bvbv n amount =
 overload bv_ashr bv_ashr bv_ashr_bvbv;
 
 
-// Return the negation of bv
-let bv_neg bv = bv_add (bv_NOT bv) (int2bv 1);
-
 // Compute base to the power of n.
 letrec bev_pow {base::bev} {n::bev} =
     IF (bev_geq n (int2bev 0)) THEN (int2bev 1) ELSE
@@ -777,7 +768,7 @@ let bev_ashr_bevbev n amount =
 
 overload bev_ashr bev_ashr bev_ashr_bevbev;
 
-// Return the negation of bv
+// Return the negation of bev
 let bev_neg bev = bev_add (bev_NOT bev) (int2bev 1);
 
 
@@ -2787,27 +2778,6 @@ let choose n k =
 ;
 infix 9 choose;
 export choose;
-
-// Compute the sum of all values obtained from bv by substituting
-// every binary value of the variables in vars.
-// If bv ony depends on variables in vars, the result can be converted
-// to an integer by applying bv2int.
-// However, if there are variables in bv that are not in vars,
-// the result will be a bv that depends on these other variables
-// but for each assignment to these variables, respresents the
-// sum of all the values the bv can take on by substituting
-// every binary value of the variables in vars.
-let bv_sum vars bv =
-    vars fseq bv fseq	// Must evaluate args. first
-    let is_pos = (bv >= '0) in
-    is_pos == T => bv_sum vars bv |
-    let pos = is_pos => bv | '0 in
-    let neg = is_pos => '0 | bv_neg bv in
-    let pos_sum = bv_sum vars pos in
-    let neg_sum = bv_sum vars neg in
-    pos_sum - neg_sum
-;
-export bv_sum;
 
 
 end_abstype;

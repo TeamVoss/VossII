@@ -1,9 +1,11 @@
 VARS "a b c";
 
 let f1 = b OR a;
-let c1 = b AND a;
+let c1 = b XOR a;
 
-gen_cond_model_count ["a", "b"] [f1] c1;
+bv_model_count ["a", "b"] [f1] c1;
+int_model_count ["a", "b"] [f1] c1;
+fp_model_count ["a", "b"] [f1] c1;
 
 
 let bv1 = 
@@ -13,21 +15,21 @@ let bv1 =
 ;
 bv1;
 
-cond_bv_sum ["a","b", "c"] bv1 F;
-cond_bv_sum ["a","b", "c"] bv1 T;
+bv_sum ["a","b", "c"] bv1 F;
+bv_sum ["a","b", "c"] bv1 T;
 
-cond_bv_sum ["a","b", "c"] (a => bv1 | int2bv 0) T;
-cond_bv_sum ["a","b", "c"] bv1 a;
+bv_sum ["a","b", "c"] (a => bv1 | int2bv 0) T;
+bv_sum ["a","b", "c"] bv1 a;
 
-cond_bv_sum ["a","b"] bv1 F;
+bv_sum ["a","b"] bv1 F;
 
-cond_bv_sum ["a","b"] bv1 T;
+bv_sum ["a","b"] bv1 T;
 bv_examples 10 it;
-cond_bv_sum ["a","b"] (substitute [("c",F)] bv1) T;
-cond_bv_sum ["a","b"] (substitute [("c",T)] bv1) T;
+bv_sum ["a","b"] (substitute [("c",F)] bv1) T;
+bv_sum ["a","b"] (substitute [("c",T)] bv1) T;
 
-cond_bv_sum ["a","b"] bv1 b;
+bv_sum ["a","b"] bv1 b;
 bv_examples 10 it;
-cond_bv_sum ["a","b"] (substitute [("c",F)] (b => bv1 | int2bv 0)) T;
-cond_bv_sum ["a","b"] (substitute [("c",T)] (b => bv1 | int2bv 0)) T;
+bv_sum ["a","b"] (substitute [("c",F)] (b => bv1 | int2bv 0)) T;
+bv_sum ["a","b"] (substitute [("c",T)] (b => bv1 | int2bv 0)) T;
 

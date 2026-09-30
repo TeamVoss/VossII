@@ -1184,6 +1184,16 @@ let bv_XNOR av bv = defix bv_XNOR av bv;
 // Usage: bv_XOR av bv;
 let bv_XOR av bv = defix bv_XOR av bv;
 
+
+// Compute the condition for two bitvectors to be equal.
+let bv_eq {a::bv} {b::bv} = a = b;
+
+// Compute the condition for two bitvectors not to be equal.
+let bv_neq {a::bv} {b::bv} = a != b;
+
+// Return the negation of bv
+let bv_neg bv = bv_add (bv_NOT bv) (int2bv 1);
+
 // Zero extend bv. In practice: if bv currently starts with a F, then 
 // return it. Otherwise prepend a F to bv.
 // Usage: bv_ZX bv;
@@ -1193,6 +1203,26 @@ let bv_ZX bv = defix bv_ZX bv;
 // Note that bitvectors are 2's complement.
 // Usage: int2bv i;
 let int2bv i = defix int2bv i;
+
+// Compute the sum of all values obtained from bv by substituting
+// every binary value that satisfies cond for variables in vars.
+// If cond and bv ony depends on variables in vars, the result can be converted
+// to an integer by applying bv2int.
+// However, if there are variables in cond or bv that are not in vars,
+// the result will be a bv that depends on these other variables
+// but for each assignment to these variables, respresents the
+// sum of all the values the bv can take on by substituting
+// every binary value of the variables in vars.
+let bv_sum vars bv cond->T =
+    vars fseq bv fseq cond fseq // Must evaluate args. first
+    let is_pos = (bv_geq bv (int2bv 0)) in
+    is_pos == T => pos_bv_sum vars bv cond |
+    let pos = is_pos => bv | int2bv 0 in
+    let neg = is_pos => int2bv 0 | bv_neg bv in
+    let pos_sum = pos_bv_sum vars pos cond in
+    let neg_sum = pos_bv_sum vars neg cond in
+    bv_sub pos_sum neg_sum
+;
 
 // Convert a list l of bools (MSB is head of list) to a bv.
 // Usage: list2bv l;
@@ -1990,31 +2020,29 @@ let emit_eval_graph basename expr = (defix emit_eval_graph) basename expr;
 // See emit_eval_graph for more details.
 let retrieve_eval_graph basename = (defix retrieve_eval_graph) basename;
 
-// For each expression e in exprs, compute the model count,
+// For each expression e in exprs, compute the model count as a float,
 // over all variables in vars, for (e AND cond).
+// Fails if cond or exprs depends on some variable not in vars.
 let fp_model_count vars exprs cond->T =
-    (defix model_count) vars cond exprs
+    (defix fp_model_count) vars exprs cond
 ;
 
-let fp_truth_cover2_n vars exprs cond =
-    (fprintf stdinfo "fp_truth_cover2_n is deprecated.\n") seq
-    (fprintf stdinfo "Use model_count instead (different argument order!)\n")seq
-    (defix model_count) vars cond exprs
+// For each expression e in exprs, compute the model count as a bv,
+// over all variables in vars, for (e AND cond).
+// Note that the result may be symbolic if cond or exprs
+// depends on some variable not in vars.
+let bv_model_count vars exprs cond->T =
+    (defix bv_model_count) vars exprs cond
 ;
 
-// Compute the (integer) model count over all the variables in vars for f.
-let int_model_count vars f = (defix simple_model_count) vars f;
-
-// Given a list of variables (vars) and a boolean function (f), return
-// the number of assignments to the variables in vars that makes f true.
-// If f depends on a variable not in vars, the function fails.
-let truth_cover vars f =
-    (fprintf stdinfo "truth_cover is deprecated.\n") seq
-    (fprintf stdinfo "Use simple_model_count instead.\n")seq
-    (defix simple_model_count) vars f
+// For each expression e in exprs, compute the model count as an int,
+// over all variables in vars, for (e AND cond).
+// Fails if cond or exprs depends on some variable not in vars.
+let int_model_count vars exprs cond->T =
+     (defix int_model_count) vars exprs cond
 ;
 
-overload model_count fp_model_count int_model_count;
+overload model_count fp_model_count int_model_count bv_model_count;
 
 open_overload {ToString :: *a -> string};
 

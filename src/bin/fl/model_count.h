@@ -31,18 +31,31 @@ g_ptr		    Gen_cond_model_count_rec(formula vs, hash_record *var_tblp,
 #define MODEL_COUNT_H
 #include "fl.h" /* Global data types and include files               */
 
-typedef struct fp_truth_cov_rec    *fp_truth_cov_ptr;
-typedef struct fp_truth_cov_rec {
+typedef struct int_model_cnt_rec    *int_model_cnt_ptr;
+typedef struct int_model_cnt_rec {
+        formula         f;      
+        arbi_T          res;    
+} int_model_cnt_rec;             
+                            
+typedef struct int_model_cnt2_rec    *int_model_cnt2_ptr;
+typedef struct int_model_cnt2_rec {
+        formula         cond;   
+        formula         f;      
+        arbi_T          res;    
+} int_model_cnt2_rec;        
+
+typedef struct fp_model_cnt_rec    *fp_model_cnt_ptr;
+typedef struct fp_model_cnt_rec {
         formula         f;      
         double          res;    
-} fp_truth_cov_rec;             
+} fp_model_cnt_rec;             
                             
-typedef struct fp_truth_cov2_rec    *fp_truth_cov2_ptr;
-typedef struct fp_truth_cov2_rec {
+typedef struct fp_model_cnt2_rec    *fp_model_cnt2_ptr;
+typedef struct fp_model_cnt2_rec {
         formula         cond;   
         formula         f;      
         double          res;    
-} fp_truth_cov2_rec;        
+} fp_model_cnt2_rec;        
 
 
 typedef struct cond_gen_cache_rec   *cond_gen_cache_ptr;
