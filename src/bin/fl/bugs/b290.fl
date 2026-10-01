@@ -1,0 +1,2 @@
+let sum vars bv = bv_sum vars bv;
+
