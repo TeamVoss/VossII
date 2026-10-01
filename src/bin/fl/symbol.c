@@ -518,16 +518,16 @@ DBG_check(string msg)
 }
 #endif
 
-static void
-mark_fn_rec(fn_ptr fp)
+void
+Mark_one_symbol(fn_ptr fp)
 {
     if( fp->in_use ) return;
     fp->in_use = TRUE;
     for(oll_ptr op = fp->overload_list; op != NULL; op = op->next) {
-	mark_fn_rec(op->fn);
+	Mark_one_symbol(op->fn);
     }
     for(impl_arg_ptr np = fp->implicit_args; np != NULL; np = np->next) {
-	mark_fn_rec(np->def);
+	Mark_one_symbol(np->def);
     }
 }
 
@@ -544,7 +544,7 @@ Mark_symbols()
     fp = symb_tbl->def_list;
     while( fp != NULL ) {
 	if( fp->visible ) {
-	    mark_fn_rec(fp);
+	    Mark_one_symbol(fp);
 	}
 	fp = fp->next;
     }
@@ -565,7 +565,16 @@ Mark_symbols()
 		    ap = ap->next;
 		}
 	    }
-        } else {
+        }
+    }
+}
+
+void
+Sweep_symbols()
+{
+    fn_ptr      fp;
+    FOR_REC(&fn_rec_mgr, fn_ptr, fp) {
+        if( !fp->in_use ) {
             fp->expr = NULL;
             fp->expr_init = NULL;
             fp->expr_comb = NULL;

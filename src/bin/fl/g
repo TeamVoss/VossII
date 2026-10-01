@@ -1,10 +1,11 @@
 set pagination off
 break fl_main
-r -noX -f bugs/b289.fl
+r -noX -f bugs/b290.fl
 break exit
 break voss_abort
 break Dbg_stop
 break failure
-break do_bv_model_count
-break Gen_cond_model_count_rec
+watch ((fn_ptr) 0x6e4d20)->in_use
+watch ((fn_ptr) 0x6e4d20)->visible
+watch ((fn_ptr) 0x6e4d20)->type
 c

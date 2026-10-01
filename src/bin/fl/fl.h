@@ -224,7 +224,7 @@ typedef struct impl_arg_rec {
 	string		    name;   	    /* Valid name for this node */
 	fn_ptr		    def;
 	typeExp_ptr	    type;	        /* General type for this node */
-    impl_arg_ptr	    next;
+	impl_arg_ptr	    next;
 } impl_arg_rec;
 
 /*  ========= Generally useful macros ============ */

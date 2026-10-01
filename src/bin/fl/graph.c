@@ -1576,6 +1576,12 @@ Mark(g_ptr node)
 			op->mark_fn(GET_EXT_OBJ(node));
 			break;
 		    }
+		case USERDEF:
+		    {
+			fn_ptr fn = GET_USERDEF(node);
+			Mark_one_symbol(fn);
+			break;
+		    }
 		default:
 		    break;
 	    }
@@ -1642,6 +1648,7 @@ Do_garbage_collect()
     Model_Count_GC();
 
     /* Finally clean out unused nodes */
+    Sweep_symbols();
     Sweep_G_caches();
     Sweep_ext_objs();
     sweep();

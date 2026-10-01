@@ -94,7 +94,7 @@ let sum vars bv =
     pos_sum - neg_sum
 ;
 
-let sum = bv_sum;
+let sum vars bv = bv_sum vars bv T;
 
 // Matrix arithmetic
 
