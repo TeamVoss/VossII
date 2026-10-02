@@ -15,6 +15,9 @@ y.tab.c
 /src/bin/fl/prefs.h
 /src/bin/fl/prefs_ext.h
 /src/bin/fl/abi_version.h
+/src/bin/fl/language.output
+/src/bin/fl/language.tab.c
+/src/bin/fl/language.tab.h
 /bin/
 /vosslib/
 /isomatches/

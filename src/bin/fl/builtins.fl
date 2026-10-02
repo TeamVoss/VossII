@@ -1640,6 +1640,7 @@ let get_return_type fn = (defix get_return_type) fn;
 
 // Return the SHA256 signature of the function fn.
 // This function fails if the argument is an overloaded (implicitly or
+// explicitly) function.
 let get_symbol_signature fn = (defix get_symbol_signature) fn;
 
 // The id of the user invoking fl.

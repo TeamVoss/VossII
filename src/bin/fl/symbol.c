@@ -1409,8 +1409,10 @@ Get_Help(string fun)
 	    if( type_sz < tlen ) type_sz = tlen;
             tp = Get_Real_Type(tp->typelist->next->type);
 	}
-        FP(FILE_fp, "Arguments:\n");
         if( ap != NULL ) { name_sz += 2; }
+	if( name_sz < 9 ) name_sz = 9;
+	FP(FILE_fp, "%*s: %-*s Default value:\n",
+		    name_sz, "Arguments", type_sz, "");
 	arg = 1;
         while( type->typeOp == arrow_tp ) {
 	    g_ptr dv = NULL;

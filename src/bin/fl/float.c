@@ -12,6 +12,7 @@
 #include "graph.h"
 
 #include <math.h>
+#include <float.h>
 
 /* ------------- Global variables ------------- */
 
@@ -504,6 +505,17 @@ float_sha256_fn(int *g_cntp, hash_record *g_tblp, SHA256_ptr sha, pointer a)
     return res;     
 }
 
+static void
+max_float(g_ptr redex)
+{
+    MAKE_REDEX_EXT_OBJ(redex, float_oidx, get_float_rec(DBL_MAX));
+}
+
+static void
+min_float(g_ptr redex)
+{
+    MAKE_REDEX_EXT_OBJ(redex, float_oidx, get_float_rec(DBL_MIN));
+}
 
 /********************************************************/
 /*                    PUBLIC FUNCTIONS    		*/
@@ -542,6 +554,9 @@ void
 Float_Install_Functions()
 {
     // Add builtin functions
+
+    Add_ExtAPI_Function("max_float", "", FALSE, float_handle_tp, max_float);
+    Add_ExtAPI_Function("min_float", "", FALSE, float_handle_tp, min_float);
 
     Add_ExtAPI_Function("dp2bools", "1", FALSE,
 			GLmake_arrow(float_handle_tp,
