@@ -594,6 +594,47 @@ let port {vec::string} =
 	val (id,rs) = split_name_rng vec in
 	Exp_primary (prim_hier id rs)
 ;
+let compress_vectors as =
+    letrec merge2 [] = []
+     /\    merge2 [v1] = [v1]
+     /\    merge2 (v1:v2:rem) =
+        get_vector_signature v1 != get_vector_signature v2 =>
+            v1:(merge2 (v2:rem))
+        |
+        let ev1 = md_split_vector v1 in
+        let ev2 = md_split_vector v2 in
+        let pairs = zip ev1 ev2 in
+        let diff_range ((RANGES r1),(RANGES r2)) = r1 != r2
+         /\ diff_range ((TXT s1),(TXT s2)) =
+            s1 != s2 => eprintf "SHOULD NOT HAPPEN (%s!=%s)" s1 s2 |
+            F
+        in
+        let diffs = find_all diff_range pairs in
+        length diffs != 1 => v1:(merge2 (v2:rem)) |
+        let diff_idx = hd diffs in
+        val ((RANGES r1),(RANGES r2)) = el diff_idx pairs in
+        let pdiff ((m1,n1),(m2,n2)) = (m1 != m2) OR (n1 != n2) in
+        let ppairs = zip r1 r2 in
+        let pdiffs = find_all pdiff ppairs in
+        length pdiffs != 1 => v1:(merge2 (v2:rem)) |
+        let pdiff_idx = hd pdiffs in
+        val ((m1,n1),(m2,n2)) = el pdiff_idx ppairs in
+        n1 != (m2+1) => v1:(merge2 (v2:rem)) |
+        let new_ranges = (firstn (pdiff_idx-1) r1)
+                        @[(m1,n2)]
+                        @(butfirstn pdiff_idx r1)
+        in
+        let new =  (firstn (diff_idx-1) ev1)
+                 @ [RANGES new_ranges]
+                 @ (butfirstn diff_idx ev1)
+        in
+        let v1' = vec_info2str new in
+        merge2 (v1' : rem)
+    in
+    merge2 as
+;
+
+
 
 let connect_ports f as =
     let connect []     = NONE
@@ -601,7 +642,7 @@ let connect_ports f as =
     /\  connect (a:as) = SOME (Exp_primary (Prim_cat (CAT (map port (a:as)))))
     in
     val (id,_) = split_name_rng f in
-    let as' = merge_vectors (md_expand_vectors as) in
+    let as' = compress_vectors (md_expand_vectors as) in
     Port_con_named (ID id) (connect as')
 ;
 

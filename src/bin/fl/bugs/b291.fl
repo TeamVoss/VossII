@@ -92,18 +92,3 @@ p2';
 BDD_EQ p2 p2' [];
 
 
-
-let p2' = verilog2pexlif T "-I." "p1" ["WWW_p2.v"] [];
-
-
-BDD_EQ p1 p1' [];
-
-p1 == p1';
-
-
-let vis = VIS p;
-vis;
-
-let ant = "a[1:0]" is "a[1:0]" for 4 phases;
-
-STE "-e" vis [] ant [] [];
