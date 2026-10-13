@@ -3373,7 +3373,7 @@ let DECODER =
     |
     let pfn = sprintf "draw_DECODER 0 %d %d" isz osz in
     let mk i = hw_bit_destr (inp '=' (''i)) in
-    CELL pfn [
+    CELL (pfn) [
 	out <- hw_constr (W_CAT (map mk ((2**(hw_size inp)-1) downto 0)))
 ];
 
@@ -3387,7 +3387,7 @@ let DECODER_list =
 		osz isz
     |
     let pfn = sprintf "draw_DECODER 0 %d %d" isz osz in
-    CELL pfn (
+    CELL (pfn) (
 	map2 (\i.\o. o <- (inp '=' (''i))) ((2**(hw_size inp)-1) downto 0) outs
 );
 
@@ -3403,7 +3403,7 @@ let EN_DECODER =
     |
     let pfn = sprintf "draw_DECODER 1 %d %d" isz osz in
     let mk i = hw_bit_destr (enable '&' (inp '=' (''i))) in
-    CELL pfn [
+    CELL (pfn) [
 	out <- hw_constr (W_CAT (map mk ((2**(hw_size inp)-1) downto 0)))
 ];
 
@@ -3414,7 +3414,7 @@ let EN_DECODER_list =
     let isz = hw_size inp in
     let osz = length outs in
     let pfn = sprintf "draw_DECODER 1 %d %d" isz osz in
-    CELL pfn (
+    CELL (pfn) (
 	map2 (\i.\o. o <- (enable '&' (inp '=' (''i))))
 	     ((length outs-1) downto 0) outs
 );

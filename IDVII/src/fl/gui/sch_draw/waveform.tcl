@@ -808,6 +808,8 @@ proc wv:prim_add_waveform {w vec {show_name ""}} {
     set ww $wf.waveforms
     set wx $wf.xscroll
 
+    if { $show_name == "{}" } { set show_name ""; }
+
     unpost_popup $ww
 
     set root [w2root $w]

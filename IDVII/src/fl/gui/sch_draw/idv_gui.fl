@@ -841,11 +841,7 @@ let fl_do_new_tranf canvas =
     let il = get_selected_pinsts canvas then
     il = [] => () |
     let parent = get_idv_current_pexlif canvas then
-    // This code relies on fold_pexlif putting the new instance first!!!!
-    let p' = fold_pexlif parent il "_TMP_" then
-    val (PINST _ _ _ _ _ _ (P_HIER chs)) = p' in
-    let p = el 1 chs then
-    //
+    let p = pexlif_extract_subcircuit parent il in
     let vis = idv_visualize_fanin p then
     val (tab_window, c) = get_new_sch_canvas w 0 "" "" then
     (start_draw_op c) fseq
@@ -1150,7 +1146,6 @@ let base_synthesis title file bname pexlif_file p synth_type synth_script verbos
     // Toplevel name is `bname`
     let p' = rename_toplevel_pexlif bname p then
     val (PINST nm attrs lf fa_inps fa_outs ints body) = p' then
-    let ios = map fst (fa_inps @ fa_outs) then
     // Write out a Verilog version of the pexlif
     let fp = mktemp "pre_verilog" then
     let pre_v_file = stream2filename fp then
@@ -2161,9 +2156,7 @@ let fl_do_replacement canvas =
 	    // For single selections, search for the "inside" pexlif
 	    pexlif_extract_inside (el (hd il) (pexlif_get_children parent))
 	|
-	    // This code relies on fold_pexlif putting the new instance first!
-	    let p' = fold_pexlif parent il "_TMP_" then
-	    el 1 (pexlif_get_children p')
+	    pexlif_extract_subcircuit parent il
     in
     let cidx = single => hd il | 1 in
     let signature = pexlif_get_FP p then

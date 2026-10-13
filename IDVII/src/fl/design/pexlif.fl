@@ -200,6 +200,14 @@ let get_rev_labels attrs =
     rev (map snd (filter (\(an,av). an = "Label") attrs))
 ;
 
+let pexlif_extract_subcircuit parent il =
+    // This code relies on fold_pexlif putting the new instance first!!!!
+    let p' = fold_pexlif parent il "_TMP_" then
+    val (PINST _ _ _ _ _ _ (P_HIER chs)) = p' in
+    hd chs
+;
+
+
 // Use the "Label" attributes to group the instances inside the pexlif.
 // Basically an easy way to create an extra level of hierarchy without
 // having to manually create all the interfaces.

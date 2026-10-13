@@ -1,0 +1,109 @@
+load "idv.fl";
+
+let p1 = ( 
+	PINST "p1" [] F 
+            [("a[1:0]", ["a[1:0]"])]
+            [("o", ["o"])]
+            []
+	    (P_HIER [
+		(PINST "mid" [] F
+		    [("i1[1:0]", ["a[1:0]"])]
+		    [("o1", ["o"])]
+		    []
+		    (P_HIER [
+			(PINST "leaf" [] T
+			    [("i1[1:0]", ["i1[0:1]"])]
+			    [("o1", ["o1"])]
+			    []
+			    (P_LEAF [
+				W_UPDATE_FN
+				    (W_VAR 1 "o1")
+				    (W_AND 
+					(W_NOT (W_SLICE [0] (W_VAR 2 "i1")))
+					((W_SLICE [1] (W_VAR 2 "i1")))
+				    )
+			    ])
+			)
+		    ])
+		)
+		]
+	    )
+);
+
+let p2 = 
+	PINST "p2" [] F 
+            [("a[1:0]", ["a[1:0]"])]
+            [("o", ["o"])]
+            []
+	    (P_HIER [
+		(PINST "mid" [] F
+		    [("i1[1:0]", ["a[1:0]"])]
+		    [("o1", ["o"])]
+		    []
+		    (P_HIER [
+			(PINST "leaf" [] T
+			    [("i1[1:0]", ["i1[1:0]"])]
+			    [("o1", ["o1"])]
+			    []
+			    (P_LEAF [
+				W_UPDATE_FN
+				    (W_VAR 1 "o1")
+				    (W_AND 
+					(W_NOT (W_SLICE [0] (W_VAR 2 "i1")))
+					((W_SLICE [1] (W_VAR 2 "i1")))
+				    )
+			    ])
+			)
+		    ])
+		)
+		]
+	    )
+;
+
+let pexlif_restore_ifc sub (PINST name attrs leaf fa_inps fa_outs ints boody) =
+    let fa_inps' = map (\(f,as). f, (assoc f sub) catch as) fa_inps in
+    let fa_outs' = map (\(f,as). f, (assoc f sub) catch as) fa_outs in
+    (PINST name attrs leaf fa_inps' fa_outs' ints boody)
+;
+
+let fp = fopen "WWW_p1.v" "w";
+let sub1 = pexlif2verilog F fp p1;
+sub1;
+fclose fp;
+
+let p1' = pexlif_restore_ifc sub1
+		(verilog2pexlif T "-I." "p1" ["WWW_p1.v"] [])
+;
+p1';
+
+BDD_EQ p1 p1' [];
+
+
+let fp = fopen "WWW_p2.v" "w";
+let sub2 = pexlif2verilog F fp p2;
+sub2;
+fclose fp;
+
+let p2' = pexlif_restore_ifc sub2
+		(verilog2pexlif T "-I." "p2" ["WWW_p2.v"] [])
+;
+p2';
+
+BDD_EQ p2 p2' [];
+
+
+
+let p2' = verilog2pexlif T "-I." "p1" ["WWW_p2.v"] [];
+
+
+BDD_EQ p1 p1' [];
+
+p1 == p1';
+
+
+let vis = VIS p;
+vis;
+
+let ant = "a[1:0]" is "a[1:0]" for 4 phases;
+
+STE "-e" vis [] ant [] [];

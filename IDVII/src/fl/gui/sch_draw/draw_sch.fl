@@ -492,8 +492,8 @@ let gen_draw_fanin vfsm draw_level levels ignore_tmp_nds vecs =
     let cmd =	
 	let tab = canvas2tab c then
 	let svecs = list2str T "[" "," "]" (sprintf "\"%s\"") vecs in
-	sprintf "let %s = draw_fanin vis (%d) %d %s;\n%s;"
-		 tab draw_level levels svecs tab
+	sprintf "let %s = draw_fanin vis (%d) %d %B %s;\n%s;"
+		 tab draw_level levels ignore_tmp_nds svecs tab
     in
     (add_active_sch_tab_window vfsm c (BASE_VIS vis) cmd) fseq
     val (final_res, cmds) = visualisation2tcl vis then
