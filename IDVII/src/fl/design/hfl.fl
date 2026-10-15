@@ -1370,7 +1370,7 @@ let add_internal new_int cell =
 ;
 
 
-// Declare internal array of signals to a unit.
+// Declare internal list of signals to a unit.
 let list_internal cnt body_fun {base_fs::string} acc =
     is_bundle {undefined :: *a} =>
 	val (lefts,rights) = hw_bundle_pairs {undefined :: *a} in
@@ -2626,7 +2626,7 @@ let MUX =
 begin_abstype;
 // ---------------------------------------------------
 // Needed to make the drawing functions happy....
-let base_re_ff =
+let core_base_re_ff =
     input d.
     bit_input clk.
     output q.
@@ -2639,6 +2639,14 @@ let base_re_ff =
 	MUX TmP_en TmP_d_o TmP_q_o q
 ];
 
+let base_re_ff =
+    input d.
+    bit_input clk.
+    output q.
+    CELL "draw_ff_re" [
+	core_base_re_ff d clk q
+];
+
 let base_re_ff_en =
     input	d.
     bit_input	en.
@@ -2647,7 +2655,7 @@ let base_re_ff_en =
     internal	mid.
     CELL "draw_ff_re_with_en" [
 	MUX en d q mid,
-	base_re_ff mid clk q
+	core_base_re_ff mid clk q
 ];
 
 let base_re_ff_reset =
@@ -2658,7 +2666,7 @@ let base_re_ff_reset =
     internal	mid cur.
     CELL "draw_ff_re_reset" [
 	MUX reset '0 d mid,
-	base_re_ff mid clk cur,
+	core_base_re_ff mid clk cur,
 	MUX reset '0 cur q
 ];
 
@@ -2670,7 +2678,7 @@ let base_re_ff_set =
     internal	mid cur.
     CELL "draw_ff_re_set" [
 	MUX set '1 d mid,
-	base_re_ff mid clk cur,
+	core_base_re_ff mid clk cur,
 	MUX set '1 cur q
 ];
 
@@ -2682,7 +2690,7 @@ let base_re_ff_sreset =
     internal	mid.
     CELL "draw_ff_re_reset" [
 	MUX reset '0 d mid,
-	base_re_ff mid clk q
+	core_base_re_ff mid clk q
 ];
 
 let base_re_ff_en_reset =
@@ -2695,7 +2703,7 @@ let base_re_ff_en_reset =
     CELL "draw_ff_re_with_en_reset" [
 	MUX en d q tmp,
 	MUX reset '0 tmp mid,
-	base_re_ff mid clk cur,
+	core_base_re_ff mid clk cur,
 	MUX reset '0 cur q
 ];
 
@@ -2709,7 +2717,7 @@ let base_re_ff_en_sreset =
     CELL "draw_ff_re_with_en_reset" [
 	MUX en d q tmp,
 	MUX reset '0 tmp mid,
-	base_re_ff mid clk q
+	core_base_re_ff mid clk q
 ];
 
 let base_re_ff_en_reset_with_value reset_value =
@@ -2722,7 +2730,7 @@ let base_re_ff_en_reset_with_value reset_value =
     CELL "draw_ff_re_with_en_reset" [
 	MUX en d q tmp,
 	MUX reset reset_value tmp mid,
-	base_re_ff mid clk cur,
+	core_base_re_ff mid clk cur,
 	MUX reset reset_value cur q
 ];
 
@@ -2736,7 +2744,7 @@ let base_re_ff_en_sreset_with_value reset_value =
     CELL "draw_ff_re_with_en_reset" [
 	MUX en d q tmp,
 	MUX reset reset_value tmp mid,
-	base_re_ff mid clk q
+	core_base_re_ff mid clk q
 ];
 
 //
@@ -2778,7 +2786,7 @@ let base_fe_ff =
     output q.
     bit_internal nclk.
     CELL "draw_ff_fe" [
-	base_re_ff d nclk q,
+	core_base_re_ff d nclk q,
 	nclk <- '~' clk
 ];
 
@@ -3691,19 +3699,13 @@ let idelay min_rise max_rise min_fall max_fall =
     )
 ;
 
-let hw__pair__type_name {p:: *a # *b} =
-    let a = {undefined :: *a} in
-    let b = {undefined :: *b} in
+let hw__pair__type_name (a,b) =
     sprintf "pair_%s_%s" (hw_type_name a) (hw_type_name b)
 ;
 
-let hw__pair__is_arithmetic {p:: *a # *b} = F;
+let hw__pair__is_arithmetic (a,b) = F;
 
-let hw__pair__size {p:: *a # *b} =
-    let a = {undefined :: *a} in
-    let b = {undefined :: *b} in
-    i_plus (hw_size a) (hw_size b)
-;
+let hw__pair__size (a,b) = i_plus (hw_size a) (hw_size b);
 
 let hw__pair__destr (a,b) = W_CAT [hw_destr a, hw_destr b];
 
@@ -3750,11 +3752,20 @@ let hw__list__values {p:: *a list} = "";
 
 let hw__list__bundle_parts {p:: *a list} = [], [];
 
+letrec lazy_length (a:as) = 1+lazy_length as
+   /\  lazy_length [] = 0
+;
+
+let hw_list_size {l :: *a list} =
+    let a = hd l in
+    i_mul (hw_size a) (length l)
+;
+
 let hw_list_hw_type_destr =
 	    HW_TYPE (error "Not defined for lists")
 		    (error "Not defined for lists")
 		    (error "Not defined for lists")
-		    (error "Not defined for lists")
+		    hw_list_size
 		    hw__list__destr
 		    hw__list__constr
 		    hw__list__values

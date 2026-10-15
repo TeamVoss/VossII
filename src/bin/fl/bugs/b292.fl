@@ -1,0 +1,6 @@
+load "idv.fl";
+
+let vl1 = [ "pps[3:0][7:0]","pps[2][2]"];
+let vl2 = ["pps[3:0][7:0]"];
+vl1 vec_subtract vl2;
+

@@ -959,7 +959,7 @@ proc bgerror {msg} {
     wm geom $w +$x+$y
     wm deiconify $w
 
-    tkwait window $w
+#    tkwait window $w
 
     return
 }

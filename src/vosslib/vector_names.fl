@@ -79,7 +79,7 @@ let vec_subtract vl1 vl2 =
         let v2s = (assoc b p2) catch [] then
         let in_both = v1s intersect v2s then
         let nds1 = md_expand_vectors (v1s subtract in_both) in
-        let nds2 = md_expand_vectors (v2s subtract in_both) in
+        let nds2 = md_expand_vectors v2s in
         md_extract_vectors (nds1 subtract nds2)
     in
     let rem = flatmap do_subtract (map fst p1) then
