@@ -485,14 +485,27 @@ let flatten_recursive_pexlif recursion_name p record_insts_attr_name->"" =
     gen_flatten_pexlif stop_pred p record_insts_attr_name
 ;
 
+// Remove toplevel actuals and sort the internal wire names to
+// make the pexlif more easy to match.
+let pexlif_make_semi_canonical p =
+    val (PINST name attrs lf fa_inps fa_outs ints body) = p in
+    let fa_inps' = map (\p. fst p, [fst p]) fa_inps in
+    let fa_outs' = map (\p. fst p, [fst p]) fa_outs in
+    let ints' = qsort node_name_cmp ints in
+    (PINST name attrs lf fa_inps' fa_outs' ints' body)
+;
+
 // Extract the relevant information for a re_ff (if possible)
-let extract_re_ff p =
+letrec extract_re_ff p =
     NOT (pexlif_is_hier p) => NONE |
-    val (PINST name attrs lf fa_inps fa_outs ints (P_HIER cs)) = p in
-    let sz = md_sizes (snd (hd fa_outs)) then
+    let base_sig p = pexlif_get_SHA (pexlif_make_semi_canonical p) in
+    let fa_outs = pexlif_get_fa_outs p in
+    let fa_inps = pexlif_get_fa_inps p in
+    length fa_outs != 1 => NONE |
+    let sz = md_sizes (snd (hd fa_outs)) in
     let base = re_ff 'clk {'d :: wexpr} {'q :: wexpr} then
-    let master = resize_pexlif sz base then
-    NOT ((pexlif_get_SHA p) == (pexlif_get_SHA master)) => NONE |
+    let master = unfold_pexlif (resize_pexlif sz base) 1 then
+    NOT ((base_sig p) == (base_sig master)) => NONE |
     let clk = hd (assoc "clk" fa_inps) in
     let din = assoc (mk_name sz "d") fa_inps in
     let dout = assoc (mk_name sz "q") fa_outs in
