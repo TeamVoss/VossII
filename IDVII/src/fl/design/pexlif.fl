@@ -505,7 +505,7 @@ letrec extract_re_ff p =
     let sz = md_sizes (snd (hd fa_outs)) in
     let base = re_ff 'clk {'d :: wexpr} {'q :: wexpr} then
     let master = unfold_pexlif (resize_pexlif sz base) 1 then
-    NOT ((base_sig p) == (base_sig master)) => NONE |
+    ((base_sig p) !== (base_sig master)) => NONE |
     let clk = hd (assoc "clk" fa_inps) in
     let din = assoc (mk_name sz "d") fa_inps in
     let dout = assoc (mk_name sz "q") fa_outs in

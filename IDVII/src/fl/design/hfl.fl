@@ -3573,6 +3573,8 @@ let RAM name lines {raddr:: *a} {waddr:: *a} {din:: *d} {we::bit} {out:: *d} =
     PINST pfn [] T fa_inps fa_outs [s_mem] (P_HIER [rd,wr])
 ;
 
+
+
 begin_abstype;
 
 let delay_0 =
@@ -3916,6 +3918,25 @@ let MUTEX_CASE {out:: *a} {cond_res_list:: (bit # *a) list} =
     let cnv (cond,res) = hw_bit_destr cond, hw_destr res then
     let w_cond_res_list = map cnv cond_res_list then
     w_MUTEX_CASE w_out w_cond_res_list
+;
+
+// A pipeline register with an arbitrary input type (including
+// pairs, lists, etc.).
+// NOTE: the inp and out must be valid Left-Hand_side expressions
+// (for example, cannot be expressions or constants).
+//
+let pipe_reg {clk::bit} {inp:: *a} {out:: *a} =
+    let sz = hw_size inp in
+    let base = re_ff 'clk {'d :: wexpr} {'q :: wexpr} then
+    let master = unfold_pexlif (resize_pexlif sz base) 1 then
+    let get_name b = get_lhs_vars (hw_destr {b::bit}) in
+    let act_clk = get_name (hd (tobits clk)) in
+    let act_inps = md_merge_vectors (flatmap get_name (tobits inp)) in
+    let act_outs = md_merge_vectors (flatmap get_name (tobits out)) in
+    val (PINST name attrs lf fa_inps fa_outs ints body) = master in
+    let fa_inps' = [("clk", act_clk), (mk_name sz "d", act_inps)] in
+    let fa_outs' = [(mk_name sz "q", act_outs)] in
+    (PINST name attrs lf fa_inps' fa_outs' ints body)
 ;
 
 // User contribution: flip-flops that wish they were latches.
