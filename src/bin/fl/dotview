@@ -1,0 +1,465 @@
+#!/bin/sh
+# the next line restarts using wish \
+              exec wish "$0" ${1+"$@"}
+
+
+proc get_font {name} {
+    set font [font actual $name]
+    return [eval font create $font]
+}
+
+set ::base_sc     0.85            ;# Scale factor
+set base_sfont  [get_font "{bitstream vera sans mono} 10"]
+set base_mfont  [get_font "{bitstream vera sans mono} 11"]
+set base_bfont  [get_font "{bitstream vera sans mono} 13"]
+set ::voss2_txtfont1    [get_font "-*-courier-bold-r-normal-*-12-*-*-*-*-*-*-*"]
+
+proc unpost_popup {c} { 
+    catch {$c delete pOpUp_TxT}
+#    update
+}
+
+proc val {vars list} {
+    if { [llength $vars] != [llength $list] } {
+        error "-E- val: length mismatch |$vars| != |$list|"
+    }
+    foreach v $vars e $list {
+        if { [llength $v] > 1 } {
+            uplevel 1 "val [list $v] [list $e]" 
+        } else {
+            upvar 1 $v var
+            set var $e    
+        }
+    } 
+}
+
+proc scale_font {fontname zoom_factor} {
+    set font [font actual $fontname]
+    set idx [lsearch -exact $font -size]
+    incr idx
+    set old_size [lindex $font $idx]
+    set new_size [expr round($old_size*$zoom_factor/100.0)]
+    set new_font [lreplace $font $idx $idx $new_size]
+    return [list $new_size $new_font]
+}
+
+proc scale_text_objects {c label new_size new_font zoom_factor} {
+    if { $new_size < 4 } {
+	foreach tag [$c find withtag $label] {
+            if ![info exists ::store_zoom_text($c,$tag)] {
+                set ::store_zoom_text($c,$tag) [$c itemcget $tag -text]
+            }
+	    $c itemconfigure $tag -text {}
+	}
+    } else {
+	foreach tag [$c find withtag $label] {
+	    set txt [$c itemcget $tag -text]
+	    if { $txt == "" && [info exists ::store_zoom_text($c,$tag)] } {
+		# Restore text if removed due to being too small to show
+                set txt $::store_zoom_text($c,$tag)
+                unset ::store_zoom_text($c,$tag)
+	    }
+	    $c itemconfigure $tag -font $new_font -text $txt
+	}
+    }
+}
+
+proc set_text_font_according_to_zoom {c zoom_factor} {
+    # Update new font sizes and scale factor
+    global base_mfont mfont base_sfont sfont sc
+    val {new_msize new_mfont}  [scale_font $base_mfont $zoom_factor]
+    val {new_ssize new_sfont}  [scale_font $base_sfont $zoom_factor]
+    set mfont($c) $new_mfont
+    set sfont($c) $new_sfont
+    scale_text_objects $c "_IsTeXt_"  $new_msize $mfont($c) $zoom_factor
+    scale_text_objects $c "_IsVaLuE_" $new_ssize $sfont($c) $zoom_factor
+}
+
+proc my_scale_image {im scale} {
+    if { $scale == 1 } { return; }
+    val {num den} [fl_float2rat $scale 2]
+    set tmp [image create photo]
+    $tmp copy ORIG_$im -zoom $num $num -compositingrule set
+    $im blank
+    $im copy $tmp -shrink -subsample $den $den -compositingrule set
+    image delete $tmp
+}
+
+
+proc scale_all_images_on_canvas {c scale} {
+    foreach item [$c find all] {
+        if { [$c type $item] == "image" } {
+            set im [$c itemcget $item -image]
+            my_scale_image $im $scale
+        }
+    }
+    update
+    $c configure -scrollregion [$c bbox all]
+}
+
+
+proc set_zoom_factor {c zoom_factor {xc 0} {yc 0} {reset_scroll 1}} {
+    global cur_zoom_factor
+    global base_mfont mfont base_sfont sfont base_sc sc
+    # Clean up display by removing pop-up windows etc.
+    unpost_popup $c
+    catch {destroy .popup_data}
+    # Compute scale factor
+    set scale [expr $zoom_factor*1.0/($cur_zoom_factor($c)) ]
+    set cur_zoom_factor($c) $zoom_factor
+    # Update new font sizes and scale factor
+    val {new_msize new_mfont}  [scale_font $base_mfont $zoom_factor]
+    val {new_ssize new_sfont}  [scale_font $base_sfont $zoom_factor]
+    set mfont($c) $new_mfont
+    set sfont($c) $new_sfont
+    set sc($c) [expr $base_sc*$zoom_factor/100.0]
+    # Now scale current drawn objects and the text objects
+    # If text size gets too small, remove the text (but restore later if needed)
+    scale_text_objects $c "_IsTeXt_"  $new_msize $mfont($c) $zoom_factor
+    scale_text_objects $c "_IsVaLuE_" $new_ssize $sfont($c) $zoom_factor
+    $c scale all $xc $yc $scale $scale
+    scale_all_images_on_canvas $c [expr $zoom_factor/100.0]
+    if { $reset_scroll == 1 } {
+	$c config -scrollregion [$c bbox all]
+    }
+}
+
+proc zoom_to_fit {c} {
+    global cur_zoom_factor
+    set ww [winfo width $c].0
+    set wh [winfo height $c].0
+    val {lx ly ux uy} [$c bbox all]
+    set old_frac [expr $cur_zoom_factor($c)/100.0]
+    set w [expr [expr abs($ux-$lx)].0/$old_frac]
+    set h [expr [expr abs($uy-$ly)].0/$old_frac]
+    set zfx [expr $ww/$w]
+    set zfy [expr $wh/$h]
+    if [expr $zfx < $zfy] { set fzf [expr 100.0*$zfx]
+    } else { set fzf [expr 100.0*$zfy] }
+    set_zoom_factor $c $fzf
+}
+
+proc zoom_out {c factor wx wy} {
+    global cur_zoom_factor
+    set xc [$c canvasx $wx]
+    set yc [$c canvasy $wy]
+    set_zoom_factor $c [expr $cur_zoom_factor($c)*$factor] $xc $yc
+}
+
+#
+# Centers the given rectangle in the view for a canvas.
+# Coordinates for the rectangle should be in canvas coordinates, not screen (mouse)
+# coordinates.
+#
+# c - Canvas
+# x1 - top left x
+# y1 - top left y
+# x2 - bottom right x
+# y2 - bottom right y
+#
+proc center_rectangle {c x1 y1 x2 y2} {
+
+    # Make sure all zooming is done
+    update idletasks
+
+    # Get the canvas dimensions
+    val {cl ct cr cb} [$c cget -scrollregion]
+    set cw [expr ($cr - $cl)]
+    set ch [expr ($cb - $ct)]
+
+    # puts [format "x1: %f, y1: %f, x2: %f, y2: %f" $x1 $y1 $x2 $y2]
+
+    # Limit the provided rectangle to the canvas
+    if [expr $x1 < $cl] { set x1 $cl }
+    if [expr $x1 > $cr] { set x1 $cr }
+    if [expr $x2 < $cl] { set x2 $cl }
+    if [expr $x2 > $cr] { set x2 $cr }
+    if [expr $y1 < $ct] { set y1 $ct }
+    if [expr $y1 > $cb] { set y1 $cb }
+    if [expr $y2 < $ct] { set y2 $ct }
+    if [expr $y2 > $cb] { set y2 $cb }
+
+    # puts [format "x1: %f, y1: %f, x2: %f, y2: %f (adjusted)" $x1 $y1 $x2 $y2]
+
+    # Compute the center of the rectangle
+    set crx [expr $x1 + ($x2 - $x1) / 2.0]
+    set cry [expr $y1 + ($y2 - $y1) / 2.0]
+
+    # Compute what percent the center of the rectangle is into the canvas.
+    set crx_p [expr ($crx - $cl) / $cw];
+    set cry_p [expr ($cry - $ct) / $ch];
+
+    # Compute what percent of the canvas is in the center of the current scroll
+    # position.
+    val {ledge_p redge_p} [$c xview]
+    val {tedge_p bedge_p} [$c yview]
+    set cur_centerx_p [expr $ledge_p + ($redge_p - $ledge_p) / 2.0]
+    set cur_centery_p [expr $tedge_p + ($bedge_p - $tedge_p) / 2.0]
+
+    # Now compute the new left and top edge percentages to move to
+    set new_ledge_p 0.0
+    set new_tedge_p 0.0
+    if [expr $crx_p <= $cur_centerx_p] {
+        # Need to move left
+        set deltax_p [expr $cur_centerx_p - $crx_p]
+        # puts [format "moving left by: %f" $deltax_p]
+        set new_ledge_p [expr $ledge_p - $deltax_p]
+        if [expr $new_ledge_p < 0.0] {
+            set new_ledge_p 0.0
+        }
+    } else {
+        # Need to move right
+        set deltax_p [expr $crx_p - $cur_centerx_p]
+        # puts [format "moving right by: %f" $deltax_p]
+        set new_ledge_p [expr $ledge_p + $deltax_p]
+        if [expr $new_ledge_p > 1.0] {
+            set new_ledge_p 1.0
+        }
+    }
+    if [expr $cry_p <= $cur_centery_p] {
+        # Need to move up
+        set deltay_p [expr $cur_centery_p - $cry_p]
+        # puts [format "moving up by: %f" $deltay_p]
+        set new_tedge_p [expr $tedge_p - $deltay_p]
+        if [expr $new_tedge_p < 0.0] {
+            set new_tedge_p 0.0
+        }
+    } else {
+        # Need to move down
+        set deltay_p [expr $cry_p - $cur_centery_p]
+        # puts [format "moving down by: %f" $deltay_p]
+        set new_tedge_p [expr $tedge_p + $deltay_p]
+        if [expr $new_tedge_p > 1.0] {
+            set new_tedge_p 1.0
+        }
+    }
+    # puts [format "new_ledge_p: %f, new_tedge_p: %f" $new_ledge_p $new_tedge_p]
+
+    $c xview moveto $new_ledge_p
+    $c yview moveto $new_tedge_p
+}
+
+proc base_zoom_to_rectangle {c x1 y1 x2 y2} {
+    global cur_zoom_factor
+    set old_frac [expr $cur_zoom_factor($c)/100.0]
+    set rx1 [expr $x1/$old_frac]
+    set ry1 [expr $y1/$old_frac]
+    set rx2 [expr $x2/$old_frac]
+    set ry2 [expr $y2/$old_frac]
+    set w [expr $rx2-$rx1]
+    set h [expr $ry2-$ry1]
+    set ww [winfo width $c].0
+    set wh [winfo height $c].0
+    set zfx [expr $ww/$w]
+    set zfy [expr $wh/$h]
+    if [expr $zfx < $zfy] {
+	set fzf [expr 100.0*$zfx]
+    } else {
+	set fzf [expr 100.0*$zfy]
+    }
+    set_zoom_factor $c $fzf
+    # Now center the selected (and zoomed) rectangle
+    set new_zoom_factor [expr $fzf/100.0]
+    set nx1 [expr $rx1*$new_zoom_factor]
+    set ny1 [expr $ry1*$new_zoom_factor]
+    set nx2 [expr $rx2*$new_zoom_factor]
+    set ny2 [expr $ry2*$new_zoom_factor]
+    center_rectangle $c $nx1 $ny1 $nx2 $ny2
+}
+
+proc zoom_to_rectangle {c x1 y1 x2 y2} {
+    # puts [format "Zooming to: ul(%d, %d) lr(%d, %d)\n" $x1 $y1 $x2 $y2]
+    catch "base_zoom_to_rectangle $c $x1 $y1 $x2 $y2"
+}
+
+proc zoom_lock {c wx wy} {
+    global zoom_anchor_point
+    set x [$c canvasx $wx]
+    set y [$c canvasy $wy]
+    set zoom_anchor_point($c,orig_x) $x
+    set zoom_anchor_point($c,orig_y) $y
+    set zoom_anchor_point($c,fig) ""
+    set zoom_anchor_point($c,txt) ""
+    set zoom_anchor_point($c,zoom_movement) 0
+}
+
+proc zoom_move {c wx wy} {
+    global zoom_anchor_point
+    set x [$c canvasx $wx]
+    set y [$c canvasy $wy]
+    catch {$c delete $zoom_anchor_point($c,fig)}
+    catch {$c delete $zoom_anchor_point($c,txt)}
+    set ox $zoom_anchor_point($c,orig_x)
+    set oy $zoom_anchor_point($c,orig_y)
+    set deltax [expr $x - $ox]
+    set deltay [expr $y - $oy]
+    #
+    if [expr abs($deltax) <= 2.0 && abs($deltay) <= 2.0] { return }
+    set zoom_anchor_point($c,zoom_movement) 1
+    if [expr $deltax < 0.0] {
+	if [expr $deltay < 0.0] {
+	    # NW
+	    set zoom_anchor_point($c,fig) [$c create line $ox $oy $x $y \
+						    -arrow last -fill red]
+	    set zoom_anchor_point($c,txt) \
+		    [$c create text [expr $x-2] [expr $y-2] \
+						-anchor sw \
+						-text "View more" \
+						-fill red]
+	    $c lower $zoom_anchor_point($c,fig) $zoom_anchor_point($c,txt)
+	} else {
+	    # SW
+	    set zoom_anchor_point($c,fig) [$c create line $ox $oy $x $y \
+						    -arrow last -fill red]
+	    set zoom_anchor_point($c,txt) \
+			[$c create text [expr $x-2] [expr $y+2] \
+						-anchor ne \
+						-text "Zoom to fit" \
+						-fill red]
+	    $c lower $zoom_anchor_point($c,fig) $zoom_anchor_point($c,txt)
+	}
+    } else {
+	if [expr $deltay < 0.0] {
+	    # NE
+	    set zoom_anchor_point($c,fig) [$c create line $ox $oy $x $y \
+						    -arrow last -fill red]
+	    set zoom_anchor_point($c,txt) \
+		    [$c create text [expr $x-2] [expr $y-2] \
+						-anchor sw \
+						-text "Undo last operation" \
+						-fill red]
+	    $c lower $zoom_anchor_point($c,fig) $zoom_anchor_point($c,txt)
+	} else {
+	    # SE
+	    set zoom_anchor_point($c,fig) \
+		[$c create line  $ox $oy $x $oy $x $y $ox $y $ox $oy \
+		    -fill red -dash {1 3}]
+	    set zoom_anchor_point($c,txt) \
+		[$c create text [expr $x+2] [expr $y+2] \
+						-anchor nw \
+						-text "Zoom to rectangle" \
+						-fill red]
+	    $c lower $zoom_anchor_point($c,fig) $zoom_anchor_point($c,txt)
+	}
+    }
+}
+
+proc zoom_execute {c wx wy sx sy menu_function} {
+    global zoom_anchor_point
+    set x [$c canvasx $wx]
+    set y [$c canvasy $wy]
+    catch {$c delete $zoom_anchor_point($c,fig)}
+    catch {$c delete $zoom_anchor_point($c,txt)}
+    set ox $zoom_anchor_point($c,orig_x)
+    set oy $zoom_anchor_point($c,orig_y)
+    set deltax [expr $x - $ox]
+    set deltay [expr $y - $oy]
+ 
+    if [expr abs($deltax) <= 2.0 && abs($deltay) <= 2.0] {
+	# Was it a cancelled zoom operation?
+	if [expr $zoom_anchor_point($c,zoom_movement) == 1] { return }
+	if { $menu_function != {} } {
+	    eval $menu_function $c $wx $wy $sx $sy
+	}
+    } else {
+	if [expr $deltax < 0.0] {
+	    if [expr $deltay < 0.0] {
+		# NW
+		zoom_out $c 0.75 $wx $wy
+	    } else {
+		# SW
+		zoom_to_fit $c
+	    }
+	} else {
+	    if [expr $deltay < 0.0] {
+		# NE
+		after idle [list cb:expand_undo $c]
+	    } else {
+		# SE
+		zoom_to_rectangle $c [expr round($ox)] [expr round($oy)] \
+				     [expr round($x)] [expr round($y)]
+	    }
+	}
+    }
+}
+
+proc display_dot {dot_pgm} {
+    wm withdraw .
+    incr ::dot_displays
+    set w .dot$::dot_displays
+    catch {destroy $w}
+    toplevel $w
+    set c $w.c
+    scrollbar $w.yscroll -command "$c yview"
+    scrollbar $w.xscroll -orient horizontal -command "$c xview"
+    canvas $c -background white \
+	    -yscrollcommand "$w.yscroll set" \
+	    -xscrollcommand "$w.xscroll set"
+    pack $w.yscroll -side right -fill y
+    pack $w.xscroll -side bottom -fill x
+    pack $c -side top -fill both -expand yes
+
+    bind $c <2> "%W scan mark %x %y"
+    bind $c <B2-Motion> "%W scan dragto %x %y"
+
+    # Zoom bindings
+    bind $c <ButtonPress-3> "zoom_lock %W %x %y"
+    bind $c <B3-Motion> "zoom_move %W %x %y"
+    bind $c <ButtonRelease-3> "zoom_execute %W %x %y %X %Y {}"
+
+    # Mouse-wheel bindings for zooming in/out
+    bind $c <Button-4> "zoom_out $c 1.1 %x %y"
+    bind $c <Button-5> "zoom_out $c [expr {1.0/1.1}] %x %y"
+
+    set ::cur_zoom_factor($w) 100.0
+    set ::cur_zoom_factor($c) 100.0
+    set ::sc($c) $::base_sc
+    set ::mfont($c) $::base_mfont
+    set ::sfont($c) $::base_sfont
+
+    set fp [open "|dot -Ttk $dot_pgm 2> /dev/null"]
+    while {[gets $fp line] >= 0} {
+	set nline [regsub {{"Times" 14}} $line {$::voss2_txtfont1}]
+        eval $nline
+    }
+    close $fp
+    update idletasks
+
+    ;# Create maps from node/edge name to tag of drawn symbol
+    catch {unset ::dot_node2node_fig_tag}
+    catch {unset ::dot_node2text_tag}
+    catch {unset ::dot_edge2line_tag}
+    catch {unset ::dot_edge2text_tag}
+    foreach t [$c find all] {
+        if ![catch {$c itemcget $t -text} txt] {
+            set tag [$c gettags $t]
+            $c itemconfigure $tag -font $::base_mfont
+            $c addtag "_IsTeXt_" withtag $tag
+            if [regexp "0node.*" $tag] {
+                set rtag "1[string range $tag 1 end]"
+                set ::dot_node2node_fig_tag($c,$txt) $rtag
+                set ::dot_node2text_tag($c,$txt) $tag
+            } elseif [regexp "0edge.*" $tag] {
+                set rtag "1[string range $tag 1 end]"
+                lappend ::dot_edge2line_tag($c,$txt) $rtag
+                lappend ::dot_edge2text_tag($c,$txt) $tag
+            }
+        }
+    }
+
+    val {lx ly ux uy} [$w.c bbox all]
+    set wid [expr $ux-$lx]
+    if [expr $wid > 800] { set wid 800 }
+    set ht [expr $uy-$ly]
+    if [expr $ht > 800] { set ht 800 }
+    $c configure -width $wid -height $ht
+    wm geometry $w -2+30
+    $w.c configure -scrollregion [$w.c bbox all]
+    bind $w.c <KeyPress-q> "destroy ."
+    focus $w.c
+    update
+    zoom_to_fit $c
+}
+
+display_dot [lindex $argv 0]
+

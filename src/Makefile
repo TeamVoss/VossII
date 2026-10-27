@@ -115,6 +115,7 @@ package: clean
 	install -m 644 -t ../voss/bin ../bin/utils.tcl
 	install -m 644 -t ../voss/bin ../bin/builtins.fl
 	install -m 644 -t ../voss/bin ../bin/preamble.fl
+	install -m 755 -t ../voss/bin ../bin/dotview
 
 	install -m 644 -t ../voss/modes/emacs ../modes/emacs/fl-mode.el
 	install -m 644 -t ../voss/modes/emacs ../modes/emacs/README.md
@@ -211,6 +212,8 @@ install_all: fl functor \
 	@chmod ugo+r $(BIN_DIR)/utils.tcl
 	@cp ./bin/fl/prefs.tcl $(BIN_DIR)/prefs.tcl
 	@chmod ugo+r $(BIN_DIR)/prefs.tcl
+	@cp ./bin/fl/dotview $(BIN_DIR)/dotview
+	@chmod ugo+r $(BIN_DIR)/dotview
 	@cp ./bin/ignore_signals/ignore_signals $(BIN_DIR)/ignore_signals
 	@chmod ugo+rx $(BIN_DIR)/ignore_signals
 	@make functor
@@ -246,6 +249,7 @@ $(YOSYS_WRITE_PEXLIF)/write_pexlif.so: $(YOSYS_WRITE_PEXLIF)/write_pexlif.cc
 	make -C $(YOSYS_WRITE_PEXLIF)
 
 clean:
+	@-rm -rf ../bin
 	@-make -C lib clean
 	@-make -C bin/fl clean
 	@-make -C bin/functor clean

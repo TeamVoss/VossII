@@ -1096,7 +1096,7 @@ let make_verilog_safe p =
 	let clean_fn (W_UPDATE_FN lhs rhs) =
 		W_UPDATE_FN (w_substitute sub lhs) (w_substitute sub rhs)
 	 /\ clean_fn (W_PHASE_DELAY lhs rhs) =
-		W_UPDATE_FN (w_substitute sub lhs) (w_substitute sub rhs)
+		W_PHASE_DELAY (w_substitute sub lhs) (w_substitute sub rhs)
 	in
 	let fns' = map clean_fn fns in
         PINST nm attrs lf fa_inps' fa_outs' ints' (P_LEAF fns')

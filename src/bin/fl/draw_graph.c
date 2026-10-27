@@ -110,8 +110,9 @@ draw_graphs(g_ptr *nodes, int depth, bool display_address)
 
     fprintf(fp, "digraph G {\n");
     fprintf(fp, "node [shape=circle];\n");
-    fprintf(fp, "size = \"8.5,11.0\";\n");
     fprintf(fp, "center = 1;\n");
+    fprintf(fp, "fontname = \"Times-Roman\";\n");
+    fprintf(fp, "fontsize = 14;\n");
     fprintf(fp, "margin = 0.5;\n");
     fprintf(fp, "ordering=out;\n");
     draw_node_id = 0;
@@ -128,16 +129,24 @@ draw_graphs(g_ptr *nodes, int depth, bool display_address)
     fprintf(fp, "}");
     fclose(fp);
     dispose_hash(&draw_tbl, NULLFCN);
+#if 0
     Sprintf(draw_cmd, "dot -Tpdf %s -o %s.pdf", filename, filename);
     if( system(draw_cmd) != 0 ) {
 	Fail_pr("dot failed");
 	return FALSE;
     }
-    Sprintf(draw_cmd, "xpdf %s.pdf &", filename);
+    Sprintf(draw_cmd, "evince %s.pdf &", filename);
     if( system(draw_cmd) != 0 ) {
 	Fail_pr("xpdf failed");
 	return FALSE;
     }
+#else
+    Sprintf(draw_cmd, "dotview %s &", filename);
+    if( system(draw_cmd) != 0 ) {
+	Fail_pr("dotview failed");
+	return FALSE;
+    }
+#endif
     return TRUE;
 }
 

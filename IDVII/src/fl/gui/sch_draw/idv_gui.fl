@@ -1137,7 +1137,9 @@ let fl_get_synthesis_script_dir {dummy::void} =
 ;
 export_to_tcl fl_get_synthesis_script_dir;
 
-let base_synthesis title file bname pexlif_file p synth_type synth_script verbose =
+let base_synthesis title file bname pexlif_file p synth_type synth_script
+		   verbose
+    =
     let cw = verbose => make_info_window title F | "NO_GUI" then
     let info_cmd = "echo 'Clean and write out synthesis friendly Verilog'\n" in
     val (status, _, _) = gui_exec cw "Prepare for synthesis" info_cmd "" then
@@ -1233,7 +1235,18 @@ let do_synthesis p
 	eprintf "Synthesis failed. See %s for more information" dir
     |
     let pres = read_pexlif res then
-    rename_toplevel_pexlif top_name (wrap_pexlif pres)
+    let synth_wrap p =
+	val (PINST _ _ _ l_fa_inps l_fa_outs _ _) = p in
+	let mk_io fa =
+	    let tr a = NOT (str_is_prefix "0b" a) => [(a,[a])] | [] in
+	    let mk (f,as) = flatmap tr as in
+	    flatmap mk fa
+	in
+	let fa_inps = mk_io l_fa_inps in
+	let fa_outs = mk_io l_fa_outs in
+	(PINST "wrapper" [] F fa_inps fa_outs [] (P_HIER [p]))
+    in
+    rename_toplevel_pexlif top_name (synth_wrap pres)
 ;
 
 let fl_do_synthesis canvas file basename synth_type synth_script =
@@ -2453,6 +2466,12 @@ let replace_signal fa_list f as =
     res
 ;
 
+let get_all_internal fa_inps fa_outs pexlifs =
+    let all_wires = flatmap pexlif_get_actuals pexlifs in
+    let ios = map fst (fa_inps @ fa_outs) in
+    all_wires vec_subtract ios
+;
+
 let do_retime_fwd p ill =
     NOT (pexlif_is_hier p) => error "retime_fwd on a leaf instance" |
     ill = [] => p |
@@ -2462,64 +2481,77 @@ let do_retime_fwd p ill =
     let idx = 1 in
     let block = el idx cs then
     has_state block =>
-	eprintf "Selection contains state in retiming operation"
+        eprintf "Selection contains state in retiming operation"
     |
     let io = build_io_tbl p' then
     let name_db = build_name_db p' then
     has_output_fanout io idx =>
-	eprintf "Selection has a fanout to an output pin"
+        eprintf "Selection has a fanout to an output pin"
     |
     let fanouts = inst_fanout io idx then
     let ff_info = map (\i. extract_re_ff (el i cs)) fanouts then
     let tp_clks = setify (map get_type_and_clock ff_info) then
     length tp_clks != 1 =>
-	let tps = setify (map fst tp_clks) in
-	let clks = setify (map snd tp_clks) in
-	length tps != 1 => eprintf "Different types of ffs in fanout" |
-	length clks != 1 => eprintf "Different clocks to ffs in fanout" |
-	eprintf "What??"
+        let tps = setify (map fst tp_clks) in
+        let clks = setify (map snd tp_clks) in
+        length tps != 1 => eprintf "Different types of ffs in fanout" |
+        length clks != 1 => eprintf "Different clocks to ffs in fanout" |
+        eprintf "What??"
     |
     val [(type,clk)] = tp_clks in
     type = "" => eprintf "Not a flip-flop in fanout" |
     // Do the retiming
     let out_sub =
-	let find_io (SOME (tp,base,fp,clk,d,q,other)) = vec_zip d q in
-	flatmap find_io ff_info
+        let find_io (SOME (tp,base,fp,clk,d,q,other)) = vec_zip d q in
+        flatmap find_io ff_info
     then
     let inps  = md_extract_vectors (pexlif_get_inps_actuals block) then
     let inps' = map (get_unique_name name_db) inps then
     let inp_sub = vec_zip inps inps' then
     val (SOME (tp,base,_,clk,d,q,other)) = hd ff_info then
-    let new_ffs =
-	let mk inp inp' =
-	    let sz = md_size inp then
-	    let ff = resize_pexlif sz base then
-	    val (PINST ffnm ffattrs fflf ffinps ffouts ffints ffbody) = ff then
-	    let ffinps' = replace_signal ffinps (mk_name sz "d") [inp]  then
-	    let ffouts' = replace_signal ffouts (mk_name sz "q") [inp']  then
-	    PINST ffnm ffattrs fflf ffinps' ffouts' ffints ffbody
+    let mk_ff inp inp' =
+	let sz = md_size inp then
+	let ff = resize_pexlif sz base then
+	val (PINST ffnm ffattrs fflf ffinps ffouts ffints ffbody) = ff then
+	let ffinps' = replace_signal ffinps (mk_name 1 "clk") [clk]  then
+	let ffinps''  = replace_signal ffinps' (mk_name sz "d") [inp]  then
+	let ffouts'  = replace_signal ffouts (mk_name sz "q") [inp']  then
+	PINST ffnm ffattrs fflf ffinps'' ffouts' ffints ffbody
+    in
+    let new_ffs = map2 mk_ff inps inps' then
+    val (PINST bname battrs blf bfa_inps bfa_outs bints bbody) = block in
+    let remain_ffs =
+	let used = flatmap snd bfa_outs in
+	let keep1 (i,o) = NOT ([i] vec_overlap used) in
+	let process (vi,vo) =
+	    let ii = md_expand_vector vi in
+	    let oo = md_expand_vector vo in
+	    filter keep1 (zip ii oo)
 	in
-	map2 mk inps inps'
+	let remains = flatmap process out_sub in
+	val (iis, oos) = unzip remains in
+	let vis = md_merge_vectors iis in
+	let vos = md_merge_vectors oos in
+	map2 mk_ff vis vos
     then
-    let block' = 
-	val (PINST bname battrs blf bfa_inps bfa_outs bints bbody) = block in
-	let bfa_inps' =
-	    let tr (f,as) =
-		f, (flatmap (\a. vec_assoc a inp_sub) as)
-	    in
-	    map tr bfa_inps
-	in
-	let bfa_outs' =
-	    let tr (f,as) =
-		f, (flatmap (\a. vec_assoc a out_sub) as)
-	    in
-	    map tr bfa_outs
-	in
-	PINST bname battrs blf bfa_inps' bfa_outs' bints bbody
+    let block' =
+        let bfa_inps' =
+            let tr (f,as) =
+                f, (flatmap (\a. vec_assoc a inp_sub) as)
+            in
+            map tr bfa_inps
+        in
+        let bfa_outs' =
+            let tr (f,as) =
+                f, (flatmap (\a. vec_assoc a out_sub) as)
+            in
+            map tr bfa_outs
+        in
+        PINST bname battrs blf bfa_inps' bfa_outs' bints bbody
     then
     let unchanged = gather cs ((1 upto length cs) subtract (idx:fanouts)) then
-    let cs' = block':(new_ffs@unchanged) then
-    let ints' = inps' @ (ints vec_subtract (map fst out_sub)) then
+    let cs' = block':(new_ffs@remain_ffs@unchanged) then
+    let ints' = get_all_internal fa_inps fa_outs cs' then
     unfold_pexlif (PINST name attrs lf fa_inps fa_outs ints' (P_HIER cs')) 1
 ;
 

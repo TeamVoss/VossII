@@ -1708,9 +1708,13 @@ Print_leaf(g_ptr node, odests fp, bool simple_userdefs)
 	    break;
 	case USERDEF: {
 	    fn_ptr fn = GET_USERDEF(node);
-	    if( simple_userdefs )
-		FP(fp, "%s", fn->name);
-	    else
+	    if( simple_userdefs ) {
+		if( strcmp(fn->name, "i_unary_minus") == 0 ) 
+		    FP(fp, "-", fn->name);
+		else if( strcmp(fn->name, "f_unary_minus") == 0 ) 
+		    FP(fp, "-", fn->name);
+		else FP(fp, "%s", fn->name);
+	    } else
 		FP(fp, "UD_%s", fn->name);
 	    break;
 	}
@@ -6643,11 +6647,47 @@ DPR(g_ptr node)
 }
 
 void
-Print_Graph(g_ptr np, odests fp)
+Print_Graph(g_ptr node, odests fp)
 {
-    if( limitedPR(np, fp, pr_depth, TRUE) == FALSE )
-	FP(fp, "...");
-    FP(fp, "\n");
+    g_ptr h, t;
+    if( node == NULL ) {
+	FP(fp, "NIL");
+	return;
+    }
+    switch( GET_TYPE(node) ) {
+	case APPLY_ND:
+	    FP(fp, "(");
+	    Print_Graph(GET_APPLY_LEFT(node), fp);
+	    FP(fp, " ");
+	    Print_Graph(GET_APPLY_RIGHT(node), fp);
+	    FP(fp, ")");
+	    break;
+	case LAMBDA_ND:
+	    FP(fp, "(\\%s. ", GET_LAMBDA_VAR(node));
+	    Print_Graph(GET_LAMBDA_BODY(node), fp);
+	    FP(fp, ")");
+	    break;
+	case CONS_ND:
+	    h = GET_CONS_HD(node);
+	    t = GET_CONS_TL(node);
+	    if( h == t && h == NULL ) {
+		FP(fp, "NIL");
+		break;
+	    }
+	    ASSERT(h != NULL && t != NULL );
+	    FP(fp, "(");
+	    Print_Graph(h, fp);
+	    FP(fp, ":");
+	    Print_Graph(t, fp);
+	    FP(fp, ")");
+	    break;
+	case LEAF:
+	    Print_leaf(node, fp, TRUE);
+	    break;
+	default:
+	    DIE("Illegal node type");
+    }
+    return;
 }
 
 void

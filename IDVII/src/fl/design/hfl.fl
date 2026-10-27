@@ -2851,7 +2851,7 @@ end_abstype re_ff re_ff_reset re_ff_en re_ff_en_reset re_ff_en_reset_with_value
 begin_abstype;
 // ---------------------------------------------------
 // Needed to make the drawing functions happy....
-let base_ah_latch =
+let core_base_ah_latch =
     input	d.
     bit_input	clk.
     output	q.
@@ -2862,7 +2862,15 @@ let base_ah_latch =
 	MUX clk d TmP_q_o q
 ];
 
-let base_al_latch =
+let base_ah_latch =
+    input	d.
+    bit_input	clk.
+    output	q.
+    CELL "draw_ah_latch" [
+	core_base_ah_latch d clk q
+];
+
+let core_base_al_latch =
     input d.
     bit_input clk.
     output q.
@@ -2870,6 +2878,14 @@ let base_al_latch =
     CELL "draw_al_latch" [
 	TmP_q_o <: q,
 	MUX clk TmP_q_o d q
+];
+
+let base_al_latch =
+    input d.
+    bit_input clk.
+    output q.
+    CELL "draw_al_latch" [
+	core_base_al_latch d clk q
 ];
 
 // An active high transparent latch.
@@ -3934,7 +3950,7 @@ let pipe_reg {clk::bit} {inp:: *a} {out:: *a} =
     let act_inps = md_merge_vectors (flatmap get_name (tobits inp)) in
     let act_outs = md_merge_vectors (flatmap get_name (tobits out)) in
     val (PINST name attrs lf fa_inps fa_outs ints body) = master in
-    let fa_inps' = [("clk", act_clk), (mk_name sz "d", act_inps)] in
+    let fa_inps' = [(mk_name sz "d", act_inps), ("clk", act_clk)] in
     let fa_outs' = [(mk_name sz "q", act_outs)] in
     (PINST name attrs lf fa_inps' fa_outs' ints body)
 ;
@@ -4113,8 +4129,8 @@ let pcompile fn =
       (sprintf "\t  val (PINST nm attrs lf fa_inps fa_outs ints body) =\n")^
       (sprintf "\t       pcompile_read_pexlif \"%s\" pexlif_file\n" fn)^
       (sprintf "\t  then\n")^
-      (sprintf "\t  let fa_inps' = map (\\(f,as). f, assoc f conns) fa_inps in\n")^
-      (sprintf "\t  let fa_outs' = map (\\(f,as). f, assoc f conns) fa_outs in\n")^
+      (sprintf "\t  let fa_inps' =map (\\(f,as).f,assoc f conns) fa_inps in\n")^
+      (sprintf "\t  let fa_outs' =map (\\(f,as).f,assoc f conns) fa_outs in\n")^
       (sprintf "\t  (PINST nm attrs lf fa_inps' fa_outs' ints body)\n")^
       (sprintf "\t|\n")
     in
@@ -4126,9 +4142,9 @@ let pcompile fn =
       let mk (nm,tp) = sprintf "'%s" nm in
       (list2str T pre " " " then\n" mk args)^
       (sprintf "\t  (write_pexlif pexlif_file p) fseq\n")^
-      (sprintf "\t  val (PINST nm attrs lf fa_inps fa_outs ints body) = p in\n")^
-      (sprintf "\t  let fa_inps' = map (\\(f,as). f, assoc f conns) fa_inps in\n")^
-      (sprintf "\t  let fa_outs' = map (\\(f,as). f, assoc f conns) fa_outs in\n")^
+      (sprintf "\t  val (PINST nm attrs lf fa_inps fa_outs ints body)=p in\n")^
+      (sprintf "\t  let fa_inps' =map (\\(f,as).f,assoc f conns) fa_inps in\n")^
+      (sprintf "\t  let fa_outs' =map (\\(f,as).f,assoc f conns) fa_outs in\n")^
       (sprintf "\t  (PINST nm attrs lf fa_inps' fa_outs' ints body)\n")
     in
     let cmd = top^mid1^mid2^case1^case2^case3^";\n" in
@@ -4143,7 +4159,7 @@ let _pExLiF_ = ref {(error "No pexlif") :: pexlif};
 let flfun2pexlif_core fn =
     let rtype = get_return_type fn then
     rtype != "pexlif" =>
-	eprintf "Return type not pexlif (%s). VIS aborted\n" rtype
+	eprintf "Return type not pexlif (%s). flfun2pexlif aborted\n" rtype
     |
     let args = get_args fn then
     let idx = find_first0 (\(a,tp). NOT (is_hw_type tp)) args in
