@@ -2690,12 +2690,21 @@ let kill_process pr =
 // verbose is used to give feedback on the progress.
 let para_eval {exprs:: *a list}
 	      max_processes->20
+	      names->[]
 	      single_winner->F
 	      max_memory->(-1)
 	      max_cpu->(-1)
 	      verbose->T
 	      import_var_order->F
+	      GUI->F
     =
+    ({names::string list} != []) AND ((length exprs) != (length names)) =>
+	eprintf "Not the same number of expressions as names (%d!=%d)"
+		(length exprs) (length names)
+    |
+    (noX AND GUI =>
+	fprintf stdinfo "Cannot use GUI in noX mode. Ignored\n" |   ()
+    ) fseq
     let vorder = var_order [] then
     let tmp_dir = mktempd "para_eval" then
     let idx_exprs = zip (1 upto (length exprs)) exprs in

@@ -113,6 +113,7 @@ package: clean
 	install -m 755 -t ../voss/bin ../bin/front_end.tcl
 	install -m 644 -t ../voss/bin ../bin/prefs.tcl
 	install -m 644 -t ../voss/bin ../bin/utils.tcl
+	install -m 644 -t ../voss/bin ../bin/commands.tcl
 	install -m 644 -t ../voss/bin ../bin/builtins.fl
 	install -m 644 -t ../voss/bin ../bin/preamble.fl
 	install -m 755 -t ../voss/bin ../bin/dotview
@@ -210,6 +211,8 @@ install_all: fl functor \
 	@chmod ugo+r $(BIN_DIR)/front_end.tcl
 	@cp ./bin/fl/utils.tcl $(BIN_DIR)/utils.tcl
 	@chmod ugo+r $(BIN_DIR)/utils.tcl
+	@cp ./bin/fl/commands.tcl $(BIN_DIR)/commands.tcl
+	@chmod ugo+r $(BIN_DIR)/commands.tcl
 	@cp ./bin/fl/prefs.tcl $(BIN_DIR)/prefs.tcl
 	@chmod ugo+r $(BIN_DIR)/prefs.tcl
 	@cp ./bin/fl/dotview $(BIN_DIR)/dotview

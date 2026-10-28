@@ -31,6 +31,9 @@ source "$DIR/prefs.tcl"
 # Load misc. utilities
 source "$DIR/utils.tcl"
 
+# Load command help
+source "$DIR/commands.tcl"
+
 # Top-level stuff
 wm title . "VossII"
 wm iconname . "VossII"
@@ -1470,6 +1473,51 @@ namespace eval voss2_help {
 	$lb selection clear 0 end
     }
 
+    proc help_show_command_info {nb lb tb} {
+	variable max_results_to_list
+	foreach index [$lb curselection] {
+	    set fun [$lb get $index]
+	    set info [lindex $::command_help $index]
+	    set command [lindex $info 0]
+	    set usage [lindex $info 1]
+	    set help [lindex $info 2]
+	    set cur_wid [winfo width $nb]
+	    set wname [name2wname $command]
+	    if { ![winfo exists $tb.$wname] } {
+		set f $tb.$wname
+		frame $f -relief flat
+		button $f.b -text Close -command [list destroy $f] \
+			-font $::voss2_txtfont
+		pack $f.b -side bottom
+		ttk::scrollbar $f.yscroll -command [list $f.t yview]
+		ttk::scrollbar $f.xscroll -orient horizontal \
+					  -command [list $f.t xview]
+		text $f.t -background white -font $::voss2_help_font \
+		    -foreground black \
+		    -wrap none \
+		    -xscrollcommand [list $f.xscroll set] \
+		    -yscrollcommand [list $f.yscroll set] \
+		    -setgrid 1
+
+		$f.t insert 1.0 "Command: $command\n\n"
+		$f.t insert end "Usage:   $usage\n\n"
+		$f.t insert end $help
+
+		$f.t configure -state disabled
+		pack $f.yscroll -side right -fill y
+		pack $f.xscroll -side bottom -fill x
+		pack $f.t -side right -expand yes -fill both
+		$tb add $f -text $fun
+		$tb select $f
+		$nb configure -width $cur_wid 
+	    } else {
+		set f $tb.$wname
+		$tb select $f
+	    }
+	}
+	$lb selection clear 0 end
+    }
+
     proc help_do_match {lb first} {
 	variable max_results_to_list
 	if { $first == 1 } {
@@ -1533,6 +1581,13 @@ namespace eval voss2_help {
 	set w_special_search_alts	    	$w.nb.s.p.w.alts
 	set w_special_action_buttons    	$w.nb.s.p.w.actions
 
+	set w_command_tab_frame			$w.nb.command
+	set w_command_panedwindow		$w.nb.command.p
+	set w_command_search_frame		$w.nb.command.p.w
+	set w_command_help_tab_notebook		$w.nb.command.p.e
+	set w_command_search_alts	    	$w.nb.command.p.w.alts
+	set w_command_action_buttons    	$w.nb.command.p.w.actions
+
 	set w_search_name_pat			$w.nb.f.p.w.name
 	set w_search_file_pat			$w.nb.f.p.w.file
 	set w_search_arg_pat			$w.nb.f.p.w.arg
@@ -1555,14 +1610,21 @@ namespace eval voss2_help {
 	bind $w.nb <<NotebookTabChanged>> \
 		[list ::voss2_help::help_detach $w $w.nb]
 
+	# Regular functions
 	frame $w_function_tab_frame -relief flat
 	$w.nb add $w_function_tab_frame -text "Functions"
 
+	# Special functions
 	frame $w_special_tab_frame -relief flat
-	$w.nb add $w_special_tab_frame -text "Special"
+	$w.nb add $w_special_tab_frame -text "Special Functions"
+
+	# Commands
+	frame $w_command_tab_frame -relief flat
+	$w.nb add $w_command_tab_frame -text "Commands"
 
 	$w.nb select 1
 
+	####### Special functions ####### 
 	ttk::panedwindow $w_special_panedwindow -orient horizontal
 	pack $w_special_panedwindow -side top -fill both -expand yes
 
@@ -1571,7 +1633,6 @@ namespace eval voss2_help {
 
 	ttk::notebook $w_special_help_tab_notebook
 	$w_special_panedwindow add $w_special_help_tab_notebook
-
 
 	frame $w_special_search_alts -relief flat
 	pack $w_special_search_alts -side top -fill both -expand yes
@@ -1615,6 +1676,57 @@ namespace eval voss2_help {
 	$lb insert end "printf"
 	$lb insert end "sprintf"
 	$lb insert end "sscanf"
+
+	####### Commands ####### 
+	ttk::panedwindow $w_command_panedwindow -orient horizontal
+	pack $w_command_panedwindow -side top -fill both -expand yes
+
+	frame $w_command_search_frame -relief raised
+	$w_command_panedwindow add $w_command_search_frame
+
+	ttk::notebook $w_command_help_tab_notebook
+	$w_command_panedwindow add $w_command_help_tab_notebook
+
+	frame $w_command_search_alts -relief flat
+	pack $w_command_search_alts -side top -fill both -expand yes
+
+	ttk::scrollbar $w_command_search_alts.scroll \
+			-command "$w_command_search_alts.list yview"
+	listbox $w_command_search_alts.list \
+		    -yscroll "$w_command_search_alts.scroll set" \
+		    -font $::voss2_txtfont -setgrid 1 -selectmode extended \
+		    -width 30
+	pack $w_command_search_alts.scroll -side right -fill y
+	pack $w_command_search_alts.list -side left -fill both -expand yes
+	
+	frame $w_command_action_buttons -relief raised
+	pack $w_command_action_buttons -side top -fill x
+
+	    button $w_command_action_buttons.quit -text "Quit" \
+		-command ::voss2_help::help_end
+	    pack $w_command_action_buttons.quit -side left -expand yes
+
+	    button $w_command_action_buttons.info -text "Man page" \
+	      -command "::voss2_help::help_show_command_info \
+				$w.nb \
+				$w_command_search_alts.list \
+				$w_command_help_tab_notebook"
+	    pack $w_command_action_buttons.info -side left -expand yes
+
+	bind $w_command_search_alts.list <Double-Button-1> \
+			"$w_command_action_buttons.info invoke"
+	if [info exists ::voss2_status(hidden_fl_window)] {
+	    wm minsize $::voss2_top_level.voss2_help 100 20
+	} else {
+	    pack $w -side bottom -before $::voss2_info(txtwin) -fill x
+	}
+
+	set lb $w_command_search_alts.list
+	$lb delete 0 end
+	foreach tr $::command_help {
+	    set cmd [lindex $tr 0]
+	    $lb insert end $cmd
+	}
 
 	ttk::panedwindow $w_panedwindow -orient horizontal
 	pack $w_panedwindow -side top -fill both -expand yes
