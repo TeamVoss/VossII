@@ -2328,6 +2328,14 @@ print_fixity(pointer key, pointer data)
 	    fprintf(tmp_fp, "infix_unary 9 %s %s;\n", (string) key,
 		    Get_Unary(key));
 	    break;
+	case FREE_BINDER_VAR:
+	    fprintf(tmp_fp, "free_binder %s;\n", (string) key); break;
+	case BINDER_WITH_ACC_VAR:
+	    fprintf(tmp_fp, "binder_with_accumulator %s;\n", (string) key);
+	    break;
+	case SZ_BINDER_WITH_ACC_VAR:
+	    fprintf(tmp_fp, "sized_binder_with_accumulator %s;\n", (string)key);
+	    break;
 	default:
 	    fprintf(stderr, "Unknown fixity (%d) of %s\n",
 			    PTR2INT(data), (string) key);
